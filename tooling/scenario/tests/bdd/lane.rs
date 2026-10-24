@@ -332,6 +332,32 @@ fn files(dir: &Path, out: &mut Vec<(PathBuf, Vec<u8>)>) -> Result<(), String> {
 }
 
 #[then(
+    regex = r"^the secret that keys the worktree digests is in no log line, export, backup or segment$"
+)]
+fn the_secret_is_kept_to_the_node(w: &mut World) -> Result<(), String> {
+    let home = home(w)?.with_identity(administration::node_identity::IdentitySource::Files(vec![
+        w.home.join("machine-id"),
+    ]));
+    let store = store::Store::open_read_only(&home.store()).map_err(|e| e.to_string())?;
+    let node = administration::node::Node::find(&home, &store).map_err(|e| e.to_string())?;
+    let secret = administration::repository::name_secret(&node);
+    let hex: String = secret.iter().map(|b| format!("{b:02x}")).collect();
+    // No file of the home holds it: not the log, the audit log or any
+    // other, nor the store with its segments and payloads. A backup or an
+    // export copies from these files.
+    let mut all = Vec::new();
+    files(home.root(), &mut all)?;
+    for (path, bytes) in all {
+        let holds = |needle: &[u8]| bytes.windows(needle.len()).any(|b| b == needle);
+        if holds(&secret) || holds(hex.as_bytes()) {
+            return Err(format!("{} holds the secret", path.display()));
+        }
+    }
+
+    Ok(())
+}
+
+#[then(
     regex = r"^no name ParleyInn derives from the identity for its local state reveals anything about the identity off this node$"
 )]
 fn no_local_name_reveals_it(w: &mut World) -> Result<(), String> {

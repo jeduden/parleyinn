@@ -93,8 +93,11 @@ const LABEL: &[u8] = b"parinn repository v1\0";
 const PROVISIONAL: &str = "provisional:";
 
 /// The secret this node hashes its local repository names under, derived
-/// from its device key, so it rebuilds with the key set (I10).
-fn name_secret(node: &Node) -> [u8; 32] {
+/// from its device key, so it rebuilds with the key set (I10). It is never
+/// logged, exported, backed up or placed in a segment; public so a test can
+/// look for it.
+#[must_use]
+pub fn name_secret(node: &Node) -> [u8; 32] {
     node.device().derive_secret(b"repository names")
 }
 
