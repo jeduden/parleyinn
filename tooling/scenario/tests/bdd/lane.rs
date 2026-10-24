@@ -483,10 +483,9 @@ fn a_later_change(w: &mut World) -> Result<(), String> {
 }
 
 #[then(
-    regex = r#"^a commit bound later to a worktree that held a provisional identity names the provisional identity it replaces, and after a node identity change each worktree is bound again, audited and counted as "repository_identity_rebound", never by a widening principal act$"#
+    regex = r"^a commit bound later to a worktree that held a provisional identity names the provisional identity it replaces$"
 )]
-fn replaced_and_rebound(w: &mut World) -> Result<(), String> {
-    // A provisional identity that a commit bound later names it.
+fn replaced_provisional_is_named(w: &mut World) -> Result<(), String> {
     let binds = events(w, "repository_bind")?;
     for (_, later) in binds
         .iter()
@@ -502,10 +501,24 @@ fn replaced_and_rebound(w: &mut World) -> Result<(), String> {
             ));
         }
     }
+
+    Ok(())
+}
+
+// "after a rotated device key or one minted anew each worktree is bound
+// again in the same way" stays unbound: no command rotates a device key
+// before PRV-12 ships; the unit tests of `administration::repository` cover
+// both key events.
+
+#[then(
+    regex = r#"^after a node identity change each worktree is bound again, keeping the identity the clone resolves to, audited and counted as "repository_identity_rebound", never by a widening principal act$"#
+)]
+fn rebound_after_a_node_identity_change(w: &mut World) -> Result<(), String> {
     // The node moves to another machine; its next look binds the worktree
     // again under its new device key.
     let dir = clone_dir(w)?;
     let acts_before = events(w, "principal_act")?.len();
+    let binds_before = events(w, "repository_bind")?;
     fs::write(w.home.join("machine-id"), "another-machine\n").map_err(|e| e.to_string())?;
     first_hook_event(w, &dir, "lane-02-moved")?;
     run_core(w, &["status", "--json"], None)?;
@@ -516,6 +529,22 @@ fn replaced_and_rebound(w: &mut World) -> Result<(), String> {
     }
     if events(w, "principal_act")?.len() != acts_before {
         return Err("a principal act recorded the new bind".to_owned());
+    }
+    // The new bind names the identity the clone resolves to now.
+    let resolves = git(w, &dir, &["rev-list", "--max-parents=0", "HEAD"]).ok();
+    let new: Vec<_> = events(w, "repository_bind")?
+        .into_iter()
+        .filter(|bind| !binds_before.contains(bind))
+        .collect();
+    let [(_, newest)] = new.as_slice() else {
+        return Err(format!("wanting one new bind, the record gained {new:?}"));
+    };
+    let kept = match &resolves {
+        Some(root) => newest["repository"] == json!(root),
+        None => newest["repository_provisional"].is_string(),
+    };
+    if !kept {
+        return Err(format!("the new bind does not keep the identity: {newest}"));
     }
 
     Ok(())
