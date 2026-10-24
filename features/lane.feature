@@ -33,10 +33,14 @@ Feature: Room (LANE)
     And a repository clone that <clone>
     When the first hook event for the clone arrives
     Then the repository identity is <identity>
-    And a repository's first bind is a structural event ParleyInn records at the first hook event, never an "operator" event
-    And no identity is minted from the local path
+    And a repository's first bind is a structural event ParleyInn records when the first hook's observation reaches the record, never an "operator" event, and it names the worktree by a keyed digest of its root path
+    And no identity is minted from the local path, and a further worktree of the identity is recorded by a bind event of its own
+    And the secret that keys the worktree digests is in no log line, export, backup or segment
     And no name ParleyInn derives from the identity for its local state reveals anything about the identity off this node
     And a later change in the identity the directory resolves to is audited, rewrites no room's branch links silently, rebinds only on the widening principal act "parinn repository bind", the same act that binds by hand, and scopes no ParleyInn state
+    And a commit bound later to a worktree that held a provisional identity names the provisional identity it replaces
+    And after a node identity change each worktree is bound again, keeping the identity the clone resolves to, audited and counted as "repository_identity_rebound", never by a widening principal act
+    And after a rotated device key or one minted anew each worktree is bound again in the same way
 
     Examples:
       | clone                                                      | identity                           |
