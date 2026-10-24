@@ -54,7 +54,9 @@ summary: >-
   signs principal acts and expire acts once PRV-10 ships, and a blind peer holds
   a room's segments encrypted to its principals' device keys or a token-key-only
   node's token key (PEER-12). Before PRV-10 ships no principal key certifies
-  one, so a device seat's pins qualify only on its own node (PIN-10).
+  one, so a device seat's pins qualify only on its own node (PIN-10). A node
+  also derives from its device key the secret that keys its worktree digests
+  (LANE-02); that secret signs nothing and never leaves the node.
 - **Principal key**: A principal's root key, kept offline or in a
   platform-protected key store and never by a ParleyInn component, which
   certifies
