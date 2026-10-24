@@ -15,6 +15,9 @@ Feature: Recall (RCL)
     When the agent calls each of those six tools
     Then each returns its content in the envelope, "stat_list" its counts in an envelope marked structural
     And each call is recorded as a recall event
+    When the agent calls "mcp_server_get", with a session binding held and with none
+    Then it returns closed words and counts and no recalled content, whether or not a run is found for the call
+    And the call is recorded as no recall event
 
   @RCL-02 @P0 @pending
   Scenario Outline: event search honours its filters and caps hits at k

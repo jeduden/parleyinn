@@ -6,10 +6,11 @@ summary: >-
 ---
 # Git and forge
 
-- **Repository**: A git repository, identified by its **repository identity**, a
-  bound root commit, the same on every node with a git clone, else a
-  provisional node-local identity bound later (LANE-02). It has remotes and may
-  carry room trailers in its commits and bundles as git refs.
+- **Repository**: A git repository, identified by its **repository identity**,
+  a bound parentless commit of its default branch, the same on every node with
+  a git clone, else a provisional node-local identity bound later by a
+  structural event that names the identity it replaces (LANE-02). It has
+  remotes and may carry room trailers in its commits and bundles as git refs.
 - **Branch**: A git branch, identified by repository identity, remote URL and
   branch name (LANE-01). It belongs to the first of this node's principal's
   rooms whose branch link names it, concurrent links resolving by Room merge
@@ -22,7 +23,10 @@ summary: >-
 - **Commit**: A git commit.
 - **Commit author**: Git's author of a commit, never a seat.
 - **Worktree**: A git working tree on a node, where a run edits a branch; its
-  repository's **git directory** is git's own store of objects and refs.
+  repository's **git directory** is git's own store of objects and refs. Its
+  repository identity is recorded by a structural event that names it by a keyed
+  digest of its root path, so a node rebuilds which identity each worktree is
+  bound to from its writer logs (LANE-02).
 - **Forge**: The service that keeps remotes, issues, pull requests, reviews
   and branch protection, and approves and lands; its **forge reports** count
   as `asserted` (LANE-08). A **forge import grant** is the credential owner's

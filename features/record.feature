@@ -279,6 +279,7 @@ Feature: Record (REC)
     And a segment was closed once 30 s had passed though no turn had ended, and the open segment is closed at <moment>
     And a second run, whose "SessionStart" hook handler ran before any MCP server held its run-seat key, appended nothing, and its MCP server appended the hook observation from the ingest marker once it held that key
     And a third harness session, for whose "SessionStart" hook observation no MCP server took the session binding within 30 s, is counted and audited as a failure once, by whichever of its next hook handler, "parinn status" and "parinn ingest" finds it first
+    And that failure's audit entry and "parinn status" each say whether any MCP server on this node has taken a session binding
     And "parinn verify" and "parinn status" each report the other writer's chain as ended without a closed segment
     And the paired phone sealed its device seat's writer with that seat's key after each append to it
     And the core sealed every writer but the witnessed run's run seats' and the paired phone's, the ingested run's run seat's writer and this node's device seat's writer included, after each append to it
