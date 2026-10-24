@@ -9,11 +9,11 @@ result: false
 Requirements. PRV-02's trust policy, PRV-06's taint, PRV-13's origin,
 LANE-02's repository identity, LANE-01's routing, LANE-31's rule for two
 branch links naming one branch, OWN-01, MEM-01 and ADM-13's M1 steps.
-LMK-03's sanitizer lands early for LANE-01, with a fuzz target (ENG-07).
-`@PRV-02`, `@PRV-06`, `@LANE-02`, `@OWN-01` and `@MEM-01` come off
-`@pending`. PRV-02 and PRV-13 must pass a recorded I2 security review
-before they ship; the persona-security-officer reviews this phase's
-code, recorded in the result file.
+LMK-03's sanitizer lands early for LANE-01, with a fuzz target.
+`@OWN-01` and `@MEM-01` come off `@pending`; `@PRV-02`, `@PRV-06` and
+`@LANE-02` stay pending where M1 cannot show them. PRV-02 and PRV-13 must
+pass a recorded I2 security review before they ship: the
+persona-security-officer reviews this phase's code.
 
 The trust policy (PRV-02, I2): `trust_policy::trust_level` takes an
 event's provenance, kind, origin, recorder, writer, recording node, the

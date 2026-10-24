@@ -162,12 +162,32 @@ fn no_memory_store(w: &mut World) -> Result<(), String> {
                 MEMORY_NAMES.iter().any(|m| name.contains(m))
             })
     };
-    match all
+    if let Some(found) = all
         .iter()
         .filter(|p| !p.starts_with(w.home.join(".claude")))
         .find(|p| named(p))
     {
-        Some(found) => Err(format!("{} is a memory store", found.display())),
-        None => Ok(()),
+        return Err(format!("{} is a memory store", found.display()));
     }
+    // The harness keeps memory of its own under HOME/.claude; none of it
+    // holds the canary.
+    let source = transcript(w, SESSION)?;
+    for path in all
+        .iter()
+        .filter(|p| p.starts_with(w.home.join(".claude")) && **p != source)
+    {
+        let lower = path.to_string_lossy().to_lowercase();
+        if !MEMORY_NAMES.iter().any(|m| lower.contains(m)) {
+            continue;
+        }
+        let bytes = fs::read(path).map_err(|e| format!("{}: {e}", path.display()))?;
+        if bytes
+            .windows(CANARY.len())
+            .any(|window| window == CANARY.as_bytes())
+        {
+            return Err(format!("{} holds the canary", path.display()));
+        }
+    }
+
+    Ok(())
 }

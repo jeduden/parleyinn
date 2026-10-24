@@ -121,6 +121,9 @@ fn the_nodes_principal_is_the_runs(w: &mut World) -> Result<(), String> {
     // Before PRV-10 no principal key exists: a run's principal is the
     // node's, whose one device key certified every seat that records the
     // run (OWN-01, PRV-11). No seat of another key holds an event.
+    // This narrowing is temporary: once principal keys exist (PRV-10), the
+    // step names the run's principal by its key, not by the one device key
+    // that certified every seat.
     run_core(w, &["verify", "--json"], None)?;
     let out = last_run(w)?;
     let report: Value = serde_json::from_slice(&out.stdout).map_err(|e| e.to_string())?;

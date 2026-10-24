@@ -84,7 +84,7 @@ quarantine (phase 14) must change no origin.
 For the stakeholder:
 
 - The SRS and model edits (LANE-02, RCL-01, REC-19, §9.2, the device-key
-  secret) are pull request #76, to land first.
+  secret) landed as pull request #76.
 - Needs a ruling: LANE-02 binds at the first hook event; here it is
   recorded when `parinn ingest` or an MCP server starts, for a session
   binding a server holds (SEC-18): reading git cannot fit NFR-02.
