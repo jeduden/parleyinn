@@ -85,9 +85,8 @@ For the stakeholder:
 
 - The SRS and model edits (LANE-02, RCL-01, REC-19, §9.2, the device-key
   secret) landed as pull request #76.
-- Needs a ruling: LANE-02 binds at the first hook event; here it is
-  recorded when `parinn ingest` or an MCP server starts, for a session
-  binding a server holds (SEC-18): reading git cannot fit NFR-02.
+- LANE-02's bind follows the landed row: an MCP server that holds a
+  session binding looks at the clone, at its start and as it takes one.
 - Deviation, PRV-13: after a node identity change every writer reads
   `peer` until a PRV-12 confirm, which no M1 command makes.
 - Residual: a `.git` file may still name a worktree or submodule git

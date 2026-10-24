@@ -291,15 +291,15 @@ fn counter(p: &Process, name: &str) -> u64 {
 }
 
 #[test]
-fn the_first_hook_event_in_a_clone_binds_its_identity_when_ingest_next_runs_once() {
+fn the_first_hook_event_in_a_clone_binds_its_identity_when_an_mcp_server_next_starts_once() {
     let mut p = Process::new();
     let a = root_id("a");
     let app = clone(&p, "app", Some("a"));
     start_in(&mut p, "s1", &app);
 
-    assert_eq!(run(&p, &["ingest", "--all"]).0, EXIT_OK);
+    assert_eq!(run(&p, &["mcp"]).0, EXIT_OK);
     start_in(&mut p, "s2", &app);
-    assert_eq!(run(&p, &["ingest", "--all"]).0, EXIT_OK);
+    assert_eq!(run(&p, &["mcp"]).0, EXIT_OK);
 
     let binds = binds(&p);
     assert_eq!(binds.len(), 1);
@@ -325,13 +325,13 @@ fn a_change_of_identity_is_audited_and_counted_once_and_relinks_nothing() {
     let (a, b) = (root_id("a"), root_id("b"));
     let app = clone(&p, "app", Some("a"));
     start_in(&mut p, "s1", &app);
-    run(&p, &["ingest", "--all"]);
+    run(&p, &["mcp"]);
     fs::remove_dir_all(app.join(".git")).unwrap();
     repository(&app, Some("b"));
     start_in(&mut p, "s2", &app);
 
-    run(&p, &["ingest", "--all"]);
-    run(&p, &["ingest", "--all"]);
+    run(&p, &["mcp"]);
+    run(&p, &["mcp"]);
 
     assert_eq!(counter(&p, "repository_identity_changed"), 1);
     assert_eq!(binds(&p).len(), 1);
@@ -360,8 +360,8 @@ fn a_clone_that_cannot_be_read_is_counted_once() {
     .unwrap();
     start_in(&mut p, "s1", &bad);
 
-    run(&p, &["ingest", "--all"]);
-    run(&p, &["ingest", "--all"]);
+    run(&p, &["mcp"]);
+    run(&p, &["mcp"]);
 
     assert_eq!(counter(&p, "repository_read_failed"), 1);
     assert!(binds(&p).is_empty());
@@ -372,13 +372,13 @@ fn only_hook_observations_not_yet_in_the_record_are_looked_at() {
     let mut p = Process::new();
     let app = clone(&p, "app", Some("a"));
     start_in(&mut p, "s1", &app);
-    run(&p, &["ingest", "--all"]);
+    run(&p, &["mcp"]);
     fs::remove_dir_all(app.join(".git")).unwrap();
     repository(&app, Some("b"));
 
     // No new hook event: the earlier observation is in the record, and
     // its clone is not walked again.
-    run(&p, &["ingest", "--all"]);
+    run(&p, &["mcp"]);
     run(&p, &["mcp"]);
 
     assert_eq!(counter(&p, "repository_identity_changed"), 0);
@@ -402,6 +402,7 @@ fn the_repository_verbs_report_a_home_they_cannot_open() {
 fn a_widening_bind_is_refused_while_a_run_leaves_a_risk_open() {
     let p = Process::new();
     crate::tests::transcript_in(&p, "-w-a", "s1.jsonl", b"{\"a\":1}\n");
+    // A run only `parinn ingest` records leaves a residual risk open.
     assert_eq!(run(&p, &["ingest", "--all"]).0, EXIT_OK);
     let app = clone(&p, "app", Some("a"));
 
@@ -447,15 +448,15 @@ fn a_bind_the_record_refuses_is_counted_apart_from_a_clone_that_cannot_be_read()
     .unwrap();
     drop(conn);
 
-    run(&p, &["ingest", "--all"]);
+    run(&p, &["mcp"]);
 
     assert_eq!(counter(&p, "repository_bind_failed"), 1);
     assert_eq!(counter(&p, "repository_read_failed"), 0);
     assert!(binds(&p).is_empty());
 
     // Tried again at each start, counted once for the observation.
-    run(&p, &["ingest", "--all"]);
-    run(&p, &["ingest", "--all"]);
+    run(&p, &["mcp"]);
+    run(&p, &["mcp"]);
     assert_eq!(counter(&p, "repository_bind_failed"), 1);
 
     // Once the record takes the event, the next start binds it.
@@ -463,7 +464,7 @@ fn a_bind_the_record_refuses_is_counted_apart_from_a_clone_that_cannot_be_read()
         .unwrap()
         .execute_batch("DROP TRIGGER refuse")
         .unwrap();
-    run(&p, &["ingest", "--all"]);
+    run(&p, &["mcp"]);
     assert_eq!(binds(&p).len(), 1);
     assert_eq!(counter(&p, "repository_bind_failed"), 1);
 }
@@ -689,7 +690,7 @@ fn show_writes_nothing_and_starts_no_node() {
 
     // A started node's store is left byte for byte as it was.
     start_in(&mut p, "s1", &app);
-    run(&p, &["ingest", "--all"]);
+    run(&p, &["mcp"]);
     let before = fs::read(p.parinn_home().join("store.db")).unwrap();
     assert_eq!(shown(&p, &app)["status"], "bound");
     let after = fs::read(p.parinn_home().join("store.db")).unwrap();
@@ -704,12 +705,12 @@ fn a_worktree_bound_again_after_a_node_identity_change_is_audited_and_counted_on
     p.node_identity = Some(id.clone());
     let app = clone(&p, "app", Some("a"));
     start_in(&mut p, "s1", &app);
-    assert_eq!(run(&p, &["ingest", "--all"]).0, EXIT_OK);
+    assert_eq!(run(&p, &["mcp"]).0, EXIT_OK);
     fs::write(&id, "second").unwrap();
 
     start_in(&mut p, "s2", &app);
-    assert_eq!(run(&p, &["ingest", "--all"]).0, EXIT_OK);
-    assert_eq!(run(&p, &["ingest", "--all"]).0, EXIT_OK);
+    assert_eq!(run(&p, &["mcp"]).0, EXIT_OK);
+    assert_eq!(run(&p, &["mcp"]).0, EXIT_OK);
 
     assert_eq!(counter(&p, "repository_identity_rebound"), 1);
     assert_eq!(counter(&p, "repository_identity_changed"), 0);

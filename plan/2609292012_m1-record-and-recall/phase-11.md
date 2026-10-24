@@ -12,8 +12,7 @@ branch links naming one branch, OWN-01, MEM-01 and ADM-13's M1 steps.
 LMK-03's sanitizer lands early for LANE-01, with a fuzz target.
 `@OWN-01` and `@MEM-01` come off `@pending`; `@PRV-02`, `@PRV-06` and
 `@LANE-02` stay pending where M1 cannot show them. PRV-02 and PRV-13 must
-pass a recorded I2 security review before they ship: the
-persona-security-officer reviews this phase's code.
+pass a recorded I2 security review by the persona-security-officer.
 
 The trust policy (PRV-02, I2): `trust_policy::trust_level` takes an
 event's provenance, kind, origin, recorder, writer, recording node, the
@@ -54,9 +53,9 @@ own so the core adds no dependency (ENG-18). It finds the lowest
 parentless commit of the default branch within a deadline (ENG-03).
 `RepositoryIdentity` is `Bound(commit_id)` or `Provisional`.
 
-- `SessionStart` binds it once per directory as a structural event of the
-  device seat. A clone without commits is provisional and binds later,
-  without rewriting the record.
+- A session binding an MCP server holds binds it once per worktree, as a
+  structural event of the device seat. A clone without commits is
+  provisional and binds later, rewriting nothing.
 - A change is audited and counted `repository_identity_changed`; no
   branch link is relinked. `parinn repository show|bind`; `bind` is a
   widening principal act.
@@ -75,6 +74,6 @@ OWN-01: a run records under one principal. MEM-01: no file outside the
 store holds a canary after any hook or `parinn rebuild`. ADM-13: no
 command changes a repository's worktree, refs, notes or hooks.
 
-Gate: `@PRV-02`, `@PRV-06`, `@LANE-02`, `@OWN-01` and `@MEM-01` pass,
-or name what keeps them pending. The M1 steps of PRV-13, LANE-01,
-LANE-31 and ADM-13 pass. The sanitizer's fuzz target runs.
+Gate: `@OWN-01` and `@MEM-01` pass; `@PRV-02`, `@PRV-06` and
+`@LANE-02` pass narrowed or name what keeps them pending. The M1 steps
+of PRV-13, LANE-01, LANE-31 and ADM-13 pass. The fuzz target runs.

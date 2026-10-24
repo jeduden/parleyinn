@@ -81,10 +81,10 @@ fn deadline(within: Duration) -> impl Fn() -> bool {
 /// Binds the identity of every repository the session bindings an MCP
 /// server holds, and no look has marked, showed, once each (LANE-02).
 ///
-/// The bind is recorded here, when `parinn ingest` or an MCP server
-/// starts, and by a server's live ingest as it takes a session binding,
-/// not in the hook handler: reading git cannot stay within the handler's
-/// hook budget (NFR-02). Only the `cwd` of a session binding an MCP
+/// The bind is recorded here, when an MCP server starts, and by a
+/// server's live ingest as it takes a session binding, not in the hook
+/// handler (reading git cannot stay within its budget, NFR-02) and not by
+/// `parinn ingest` (LANE-02). Only the `cwd` of a session binding an MCP
 /// server holds is read (SEC-18): a hook input no server took, which any
 /// process able to run the hook handler could forge, steers nothing.
 /// A change in a bound identity is audited and counted, a clone that

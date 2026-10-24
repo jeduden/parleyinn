@@ -169,6 +169,26 @@ fn no_memory_store(w: &mut World) -> Result<(), String> {
     {
         return Err(format!("{} is a memory store", found.display()));
     }
+    // Nor is the database itself a memory store: no table is named for one.
+    let conn = rusqlite::Connection::open_with_flags(
+        w.parinn_home.join("store.db"),
+        rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY,
+    )
+    .map_err(|e| e.to_string())?;
+    let mut statement = conn
+        .prepare("SELECT name FROM sqlite_master WHERE type = 'table'")
+        .map_err(|e| e.to_string())?;
+    let tables: Vec<String> = statement
+        .query_map([], |r| r.get(0))
+        .map_err(|e| e.to_string())?
+        .collect::<Result<_, _>>()
+        .map_err(|e| e.to_string())?;
+    if let Some(table) = tables.iter().find(|t| {
+        let lower = t.to_lowercase();
+        MEMORY_NAMES.iter().any(|m| lower.contains(m))
+    }) {
+        return Err(format!("the store has a table named {table}"));
+    }
     // The harness keeps memory of its own under HOME/.claude; none of it
     // holds the canary.
     let source = transcript(w, SESSION)?;

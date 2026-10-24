@@ -468,10 +468,7 @@ fn ingest(
     // not to, each transcript would fail with why.
     let redactor = redactor(ctx, settings, stderr);
     match start_node(ctx, &home, stderr) {
-        Ok(mut store) => {
-            count_untaken_bindings(ctx, &mut store);
-            repository_identity::bind_observed(ctx, &home, &mut store);
-        }
+        Ok(mut store) => count_untaken_bindings(ctx, &mut store),
         Err(e) => return failed("ingest", &e, stderr),
     }
     // What an MCP server killed before it stopped left is audited by
