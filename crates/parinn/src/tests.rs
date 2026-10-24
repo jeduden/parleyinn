@@ -49,6 +49,8 @@ pub(crate) struct Process {
     /// How long a search may run, as a development build's seam lets a
     /// test say; the default when none.
     pub(crate) query_deadline: Option<Duration>,
+    /// The working directory, the process directory when none.
+    pub(crate) working_dir: Option<std::path::PathBuf>,
 }
 
 /// The harness process the tests' hook handlers and MCP servers run
@@ -95,6 +97,7 @@ impl Process {
             live_limit: None,
             now: NOW,
             query_deadline: None,
+            working_dir: None,
         }
     }
 
@@ -136,7 +139,11 @@ impl Process {
             hook_panics: self.hook_panics,
             hook_hangs: self.hook_hangs,
             terminal: self.terminal,
-            working_dir: Some(self.dir.path().to_path_buf()),
+            working_dir: Some(
+                self.working_dir
+                    .clone()
+                    .unwrap_or_else(|| self.dir.path().to_path_buf()),
+            ),
             managed_policy: self.dir.path().join("managed").join("managed_policy.toml"),
             node_identity: self.node_identity.clone(),
             os_user: self.os_user,
@@ -242,11 +249,11 @@ fn help_prints_the_usage_to_stdout() {
 
 #[test]
 fn an_unknown_command_is_a_usage_error() {
-    let (code, _, err) = invoke(&["rebuild"], &DEV);
+    let (code, _, err) = invoke(&["restructure"], &DEV);
 
     assert_eq!(code, EXIT_USAGE);
     assert!(
-        err.starts_with("parinn: unknown command \"rebuild\"\n\nusage: parinn"),
+        err.starts_with("parinn: unknown command \"restructure\"\n\nusage: parinn"),
         "{err}"
     );
 }
@@ -573,7 +580,12 @@ fn ingest_says_which_unparsed_line_or_drift_it_cannot_audit_and_still_records() 
 
 /// Writes a transcript `name` holding `text` in project `project` under
 /// the default transcript root.
-fn transcript_in(p: &Process, project: &str, name: &str, text: &[u8]) -> std::path::PathBuf {
+pub(crate) fn transcript_in(
+    p: &Process,
+    project: &str,
+    name: &str,
+    text: &[u8],
+) -> std::path::PathBuf {
     let dir = p.dir.path().join(".claude").join("projects").join(project);
     std::fs::create_dir_all(&dir).unwrap();
     let path = dir.join(name);
@@ -3278,4 +3290,169 @@ fn identity_json() -> serde_json::Value {
 /// `parinn status --json`'s fork detection.
 fn fork_detection_json() -> serde_json::Value {
     serde_json::json!({"local": "parinn verify", "peer": "with the peer network"})
+}
+
+/// How many events the store holds.
+fn event_count(p: &Process) -> i64 {
+    let conn = rusqlite::Connection::open(p.parinn_home().join("store.db")).unwrap();
+    conn.query_row("SELECT count(*) FROM events", [], |r| r.get(0))
+        .unwrap()
+}
+
+#[test]
+fn rebuild_derives_the_origins_again_and_appends_no_event() {
+    let p = Process::new();
+    transcript_in(&p, "-w-a", "s1.jsonl", CLEAN_LINE.as_bytes());
+    assert_eq!(p.invoke(&["ingest", "--all"], &DEV).0, EXIT_OK);
+    let before = event_count(&p);
+
+    let (code, out, err) = p.invoke(&["rebuild", "--json"], &DEV);
+
+    assert_eq!((code, err.as_str()), (EXIT_OK, ""));
+    let v: serde_json::Value = serde_json::from_str(&out).unwrap();
+    assert_eq!(v["origins"], 2);
+    assert_eq!(v["worktrees"], 0);
+    assert_eq!(v["indexed"], before);
+    assert_eq!(event_count(&p), before);
+    assert_eq!(p.invoke(&["verify"], &DEV).0, EXIT_OK);
+    let (_, text, _) = p.invoke(&["rebuild"], &DEV);
+    assert!(
+        text.starts_with("rebuilt: 2 origins, 0 worktrees"),
+        "{text}"
+    );
+}
+
+#[test]
+fn a_kept_worktree_identity_the_record_lacks_fails_verify_until_rebuild_derives_it_again() {
+    let p = Process::new();
+    transcript_in(&p, "-w-a", "s1.jsonl", CLEAN_LINE.as_bytes());
+    assert_eq!(p.invoke(&["ingest", "--all"], &DEV).0, EXIT_OK);
+    assert_eq!(p.invoke(&["rebuild"], &DEV).0, EXIT_OK);
+    let conn = rusqlite::Connection::open(p.parinn_home().join("store.db")).unwrap();
+    conn.execute(
+        "INSERT INTO repository_worktrees (worktree, identity) VALUES ('stray', 'x')",
+        [],
+    )
+    .unwrap();
+    drop(conn);
+
+    let (code, _, err) = p.invoke(&["verify"], &DEV);
+    assert_eq!(code, EXIT_INTEGRITY);
+    assert!(
+        err.contains("the identity kept for worktree stray"),
+        "{err}"
+    );
+
+    assert_eq!(p.invoke(&["rebuild"], &DEV).0, EXIT_OK);
+    assert_eq!(p.invoke(&["verify"], &DEV).0, EXIT_OK);
+}
+
+#[test]
+fn a_kept_origin_changed_in_place_fails_verify_until_rebuild_derives_it_again() {
+    let p = Process::new();
+    transcript_in(&p, "-w-a", "s1.jsonl", CLEAN_LINE.as_bytes());
+    assert_eq!(p.invoke(&["ingest", "--all"], &DEV).0, EXIT_OK);
+    assert_eq!(p.invoke(&["rebuild"], &DEV).0, EXIT_OK);
+    let conn = rusqlite::Connection::open(p.parinn_home().join("store.db")).unwrap();
+    conn.execute("UPDATE origins SET origin = 'peer'", [])
+        .unwrap();
+    drop(conn);
+
+    let (code, _, err) = p.invoke(&["verify"], &DEV);
+    assert_eq!(code, EXIT_INTEGRITY);
+    assert!(err.contains("derived artifact consistency"), "{err}");
+    let (code, out, _) = p.invoke(&["verify", "--json"], &DEV);
+    assert_eq!(code, EXIT_INTEGRITY);
+    assert!(out.contains("derived_artifact_consistency"), "{out}");
+
+    assert_eq!(p.invoke(&["rebuild"], &DEV).0, EXIT_OK);
+    assert_eq!(p.invoke(&["verify"], &DEV).0, EXIT_OK);
+}
+
+#[test]
+fn rebuild_without_a_store_fails_and_an_unknown_flag_is_usage() {
+    let p = Process::new();
+
+    let (code, _, err) = p.invoke(&["rebuild"], &DEV);
+    assert_eq!(code, EXIT_FAILURE);
+    assert!(err.contains("no store at "), "{err}");
+    let (code, _, err) = p.invoke(&["rebuild", "--now"], &DEV);
+    assert_eq!(code, EXIT_USAGE);
+    assert!(err.contains("unknown flag"), "{err}");
+}
+
+#[test]
+fn rebuild_refuses_a_home_it_cannot_open_a_newer_store_and_a_store_with_no_node() {
+    let mut p = Process::new();
+    p.invoke(&["counter", "ack"], &DEV);
+    let db = p.parinn_home().join("store.db");
+
+    let conn = rusqlite::Connection::open(&db).unwrap();
+    conn.execute_batch("DROP TABLE seats").unwrap();
+    drop(conn);
+    let (code, _, err) = p.invoke(&["rebuild"], &DEV);
+    assert_eq!(code, EXIT_FAILURE);
+    assert!(err.starts_with("parinn rebuild: "), "{err}");
+
+    let conn = rusqlite::Connection::open(&db).unwrap();
+    conn.execute(
+        "UPDATE meta SET value = '99' WHERE key = 'schema_version'",
+        [],
+    )
+    .unwrap();
+    drop(conn);
+    assert_eq!(p.invoke(&["rebuild"], &DEV).0, EXIT_INTEGRITY);
+
+    p.home_id = Some("home-b".into());
+    let binding = p.parinn_home().join("home.json");
+    std::fs::write(&binding, r#"{"id":"home-a"}"#).unwrap();
+    set_mode(&binding, 0o600);
+    assert_eq!(p.invoke(&["rebuild"], &DEV).0, EXIT_FAILURE);
+}
+
+#[test]
+fn status_says_whether_an_mcp_server_took_the_session_bindings() {
+    assert_eq!(
+        binding_line(0, 2),
+        "MCP server: none has taken a session binding on this node (2 untaken)"
+    );
+    assert_eq!(binding_line(3, 0), "MCP server: took 3 session bindings");
+    assert_eq!(
+        binding_line(3, 1),
+        "MCP server: took 3 session bindings, 1 untaken"
+    );
+}
+
+#[test]
+fn status_reports_the_session_bindings_in_text_and_json_once_any_was_observed() {
+    let mut p = Process::new();
+    let (_, none, _) = p.invoke(&["status", "--json"], &DEV);
+    let none: serde_json::Value = serde_json::from_str(&none).unwrap();
+    assert!(none.get("mcp_server").is_none());
+
+    let app = p.dir.path().join("app");
+    std::fs::create_dir_all(&app).unwrap();
+    p.lines = vec![
+        serde_json::json!({
+            "session_id": "s1",
+            "transcript_path": p.transcript("a\n"),
+            "cwd": app,
+            "hook_event_name": "SessionStart",
+            "source": "startup",
+        })
+        .to_string(),
+    ];
+    assert_eq!(p.invoke(&["hook", "SessionStart"], &DEV).0, EXIT_OK);
+    p.lines = Vec::new();
+
+    let (_, json, _) = p.invoke(&["status", "--json"], &DEV);
+    let json: serde_json::Value = serde_json::from_str(&json).unwrap();
+    let (_, text, _) = p.invoke(&["status"], &DEV);
+
+    assert_eq!(json["mcp_server"]["bindings_untaken"], 1);
+    assert_eq!(json["mcp_server"]["bindings_taken"], 0);
+    assert!(
+        text.contains("MCP server: none has taken a session binding on this node (1 untaken)"),
+        "{text}"
+    );
 }

@@ -11,6 +11,7 @@ publish.workspace = true
 key.workspace = true
 platform.workspace = true
 record.workspace = true
+repository.workspace = true
 serde_json.workspace = true
 store.workspace = true
 
@@ -24,5 +25,5 @@ workspace = true
 # ENG-02: see crates/parinn/Cargo.toml.
 [package.metadata.parinn]
 responsibility = "Administers the home: the node's first start, the seats it certifies, and the record's verification"
-may-depend-on = ["key", "platform", "record", "store"]
+may-depend-on = ["key", "platform", "record", "repository", "store"]
 may-dev-depend-on = ["testkit"]

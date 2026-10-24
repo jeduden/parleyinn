@@ -48,6 +48,7 @@ impl Fixture {
         let roots = AllowedRoots::default().with(&self.dir.path().join("projects"), Access::Read);
         Running {
             capture: Capture {
+                ceiling: None,
                 home: self.home.clone(),
                 roots,
                 redactor: Redactor::new(&[]).unwrap().0,
@@ -396,6 +397,7 @@ fn live_ingest_starts_bound_and_stops_when_told() {
     f.bind(SESSION, &f.main(), HARNESS);
     let running = f.running(Some(HARNESS), None);
     let capture = Capture {
+        ceiling: None,
         home: running.capture.home.clone(),
         roots: running.capture.roots.clone(),
         redactor: running.capture.redactor.clone(),
@@ -598,4 +600,51 @@ fn a_gap_of_the_search_index_is_audited_once_by_the_live_ingest() {
         .filter(|c| c == "search_index_writer_unindexed")
         .count();
     assert_eq!(gaps, 1);
+}
+
+#[test]
+fn a_session_binding_taken_after_the_server_started_binds_the_repository_it_showed() {
+    let f = Fixture::new();
+    let mut store = Store::open(&f.home.store()).unwrap();
+    administration::node::Node::open(&f.home, &mut store, &mut key::random::OsEntropy).unwrap();
+    drop(store);
+    let app = f.dir.path().join("app");
+    std::fs::create_dir_all(app.join(".git/refs/heads")).unwrap();
+    std::fs::write(app.join(".git/HEAD"), "ref: refs/heads/main\n").unwrap();
+    f.bind_in(SESSION, &f.main(), HARNESS, &app);
+    let mut running = f.running(Some(HARNESS), None);
+
+    running.bind();
+
+    let conn = rusqlite::Connection::open(f.home.store()).unwrap();
+    let binds: i64 = conn
+        .query_row(
+            "SELECT count(*) FROM events WHERE kind = 'repository_bind'",
+            [],
+            |r| r.get(0),
+        )
+        .unwrap();
+    assert_eq!(binds, 1);
+}
+
+#[test]
+fn a_clone_a_taken_binding_shows_unreadable_is_counted_by_the_server() {
+    let f = Fixture::new();
+    let mut store = Store::open(&f.home.store()).unwrap();
+    administration::node::Node::open(&f.home, &mut store, &mut key::random::OsEntropy).unwrap();
+    drop(store);
+    let app = f.dir.path().join("app");
+    std::fs::create_dir_all(app.join(".git/refs/heads")).unwrap();
+    std::fs::write(app.join(".git/HEAD"), "ref: refs/heads/main\n").unwrap();
+    std::fs::write(
+        app.join(".git/config"),
+        "[extensions]\n\tobjectformat = sha256\n",
+    )
+    .unwrap();
+    f.bind_in(SESSION, &f.main(), HARNESS, &app);
+    let mut running = f.running(Some(HARNESS), None);
+
+    running.bind();
+
+    assert!(f.counted().contains(&"repository_read_failed".to_owned()));
 }

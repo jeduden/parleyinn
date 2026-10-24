@@ -54,6 +54,8 @@ mcp = { path = "crates/mcp" }
 provenance = { path = "crates/provenance" }
 record = { path = "crates/record" }
 redaction = { path = "crates/redaction" }
+room = { path = "crates/room" }
+repository = { path = "crates/repository" }
 search = { path = "crates/search" }
 store = { path = "crates/store" }
 structured_log = { path = "crates/structured_log" }

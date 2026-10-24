@@ -181,20 +181,73 @@ fn a_search_past_its_deadline_is_cancelled_counted_and_told_in_fixed_text() {
     ingest_path(&home, &path, &redactor(), &mut OsEntropy).unwrap();
     let store = Store::open(&home.store()).unwrap();
     let node = Node::find(&home, &store).unwrap();
-    let mut server = Server::new(
-        store,
-        "v9",
-        node.device().public(),
-        node.device_writer(),
-        node.personal_room(),
-    )
-    .with_query_deadline(Duration::ZERO);
+    let mut server = Server::new(store, "v9", node.device().public(), node.personal_room())
+        .with_query_deadline(Duration::ZERO);
 
     let result = ask(&mut server, "alpha", json!({}));
 
     assert_eq!(refusal(&result), CANCELLED);
     assert_eq!(server.take_cancelled(), 1);
     assert_eq!(server.take_cancelled(), 0);
+}
+
+fn mcp_server_get(server: &mut Server) -> Value {
+    let result = call(
+        server,
+        json!({"jsonrpc": "2.0", "id": 9, "method": "tools/call", "params": {"name": "mcp_server_get", "arguments": {}}}),
+    )["result"]
+        .clone();
+    assert_eq!(result["isError"], false, "{result}");
+
+    serde_json::from_str(result["content"][0]["text"].as_str().unwrap()).unwrap()
+}
+
+#[test]
+fn the_server_tells_its_own_state_in_closed_words_whether_or_not_a_run_is_found() {
+    let f = fixture();
+    let mut server = f.server();
+
+    // No session binding is held, and no run is needed to say so.
+    let state = mcp_server_get(&mut server);
+    assert_eq!(
+        state,
+        json!({
+            "session_binding": "not_held",
+            "search_index": "readable",
+            "searches_timed_out": 0,
+            "version": "v9",
+        })
+    );
+
+    // A bound server whose calls name no run still tells its state.
+    let mut bound = f.server().with_runs(Box::new(OneRun { serving: true }));
+    assert_eq!(mcp_server_get(&mut bound)["session_binding"], "held");
+    assert!(bound.take_found().is_empty());
+}
+
+#[test]
+fn the_server_counts_the_searches_that_timed_out_and_the_index_it_cannot_read() {
+    let dir = TempDir::new().unwrap();
+    let home = Home::locate(Some(dir.path().join(".parinn").as_os_str()), None).unwrap();
+    let path = dir.path().join("t.jsonl");
+    std::fs::write(&path, "alpha pad\n".repeat(2100)).unwrap();
+    ingest_path(&home, &path, &redactor(), &mut OsEntropy).unwrap();
+    let store = Store::open(&home.store()).unwrap();
+    let node = Node::find(&home, &store).unwrap();
+    let mut server = Server::new(store, "v9", node.device().public(), node.personal_room())
+        .with_query_deadline(Duration::ZERO);
+    ask(&mut server, "alpha", json!({}));
+    ask(&mut server, "alpha", json!({}));
+    // Counting them for the audit log leaves the server's own total.
+    assert_eq!(server.take_cancelled(), 2);
+    assert_eq!(mcp_server_get(&mut server)["searches_timed_out"], 2);
+
+    for suffix in ["", "-wal", "-shm"] {
+        let _ = std::fs::remove_file(home.root().join(format!("search_index{suffix}")));
+    }
+    let store = Store::open_read_only(&home.store()).unwrap();
+    let mut gone = Server::new(store, "v9", node.device().public(), node.personal_room());
+    assert_eq!(mcp_server_get(&mut gone)["search_index"], "unreadable");
 }
 
 #[test]
@@ -216,13 +269,7 @@ fn a_store_with_no_index_makes_a_search_say_to_run_verify() {
     }
     let store = Store::open_read_only(&f.home.store()).unwrap();
     let node = Node::find(&f.home, &store).unwrap();
-    let mut server = Server::new(
-        store,
-        "v9",
-        node.device().public(),
-        node.device_writer(),
-        node.personal_room(),
-    );
+    let mut server = Server::new(store, "v9", node.device().public(), node.personal_room());
 
     let result = ask(&mut server, "instructions", json!({}));
 
@@ -238,13 +285,7 @@ fn hits_of_one_run_share_its_author_and_origin() {
     let ingested = ingest_path(&home, &path, &redactor(), &mut OsEntropy).unwrap();
     let store = Store::open(&home.store()).unwrap();
     let node = Node::find(&home, &store).unwrap();
-    let mut server = Server::new(
-        store,
-        "v9",
-        node.device().public(),
-        node.device_writer(),
-        node.personal_room(),
-    );
+    let mut server = Server::new(store, "v9", node.device().public(), node.personal_room());
 
     let result = ask(&mut server, "alpha", json!({}));
 
@@ -255,4 +296,70 @@ fn hits_of_one_run_share_its_author_and_origin() {
         assert_eq!(item["author"], ingested.seat.to_string());
         assert_eq!(item["origin"], "ingested");
     }
+}
+
+#[test]
+fn the_trust_filter_keeps_the_events_of_that_level_and_each_hit_shows_its_level() {
+    let f = fixture();
+    let mut store = Store::open(&f.home.store()).unwrap();
+    let node = Node::find(&f.home, &store).unwrap();
+    store
+        .append(
+            node.device_writer(),
+            &[store::NewEvent {
+                kind: record::event::EventKind::PrincipalAct,
+                provenance: record::event::Provenance::Operator,
+                content: json!({"text": "instructions the principal gave"}),
+                commitment_key: record::commitment::CommitmentKey::from_bytes([7; 32]),
+                transcript_timestamp: None,
+            }],
+        )
+        .unwrap();
+    drop(store);
+    let mut server = f.server();
+    let level = |result: &Value| {
+        envelope_of(result)["items"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|i| i["trust"].as_str().unwrap().to_owned())
+            .collect::<Vec<_>>()
+    };
+
+    let trusted = ask(&mut server, "instructions", json!({"trust": "trusted"}));
+    let untrusted = ask(&mut server, "instructions", json!({"trust": "untrusted"}));
+    let any = ask(&mut server, "instructions", json!({}));
+
+    assert_eq!(level(&trusted), ["trusted"]);
+    assert_eq!(level(&untrusted), ["untrusted"]);
+    assert_eq!(level(&any).len(), 2);
+}
+
+#[test]
+fn the_trust_filter_finds_a_trusted_event_ranked_below_fifty_untrusted_matches() {
+    let f = fixture();
+    let mut store = Store::open(&f.home.store()).unwrap();
+    let node = Node::find(&f.home, &store).unwrap();
+    let event = |provenance, text: &str| store::NewEvent {
+        kind: record::event::EventKind::PrincipalAct,
+        provenance,
+        content: json!({ "text": text }),
+        commitment_key: record::commitment::CommitmentKey::from_bytes([7; 32]),
+        transcript_timestamp: None,
+    };
+    let filler = "word ".repeat(60);
+    let mut events = vec![event(
+        record::event::Provenance::Operator,
+        &format!("{filler} instructions"),
+    )];
+    events.extend((0..60).map(|_| event(record::event::Provenance::Web, "instructions")));
+    store.append(node.device_writer(), &events).unwrap();
+    drop(store);
+    let mut server = f.server();
+
+    let trusted = ask(&mut server, "instructions", json!({"trust": "trusted"}));
+
+    let items = envelope_of(&trusted)["items"].as_array().unwrap().clone();
+    assert_eq!(items.len(), 1, "{items:?}");
+    assert_eq!(items[0]["trust"], "trusted");
 }

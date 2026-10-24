@@ -153,3 +153,15 @@ fn errors_explain_themselves() {
     assert!(std::error::Error::source(&KeyError::Encoding(enc)).is_some());
     assert!(std::error::Error::source(&KeyError::Malformed("y".into())).is_none());
 }
+
+#[test]
+fn a_derived_secret_is_the_keys_own_and_each_label_has_its_own() {
+    let key = DeviceKey::mint(&mut Counted::default()).unwrap();
+    let again = DeviceKey::from_seed(&key.seed_hex()).unwrap();
+    let other = DeviceKey::from_seed(&"22".repeat(32)).unwrap();
+
+    assert_eq!(key.derive_secret(b"a"), again.derive_secret(b"a"));
+    assert_ne!(key.derive_secret(b"a"), key.derive_secret(b"b"));
+    assert_ne!(key.derive_secret(b"a"), other.derive_secret(b"a"));
+    assert_ne!(&key.derive_secret(b"a"), key.public().as_bytes());
+}

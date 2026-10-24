@@ -5,7 +5,7 @@ Feature: Boundary to durable memory (MEM)
   declared but not yet written: its steps are bound when the plan that
   implements the requirement lands.
 
-  @MEM-01 @P0 @I2 @pending
+  @MEM-01 @P0 @I2
   Scenario: record content is never promoted into long-term memory
     Given an isolated ParleyInn home
     And an agent run with a Claude Code transcript "memory-canary"

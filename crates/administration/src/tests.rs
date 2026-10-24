@@ -16,6 +16,24 @@ fn errors_explain_themselves_and_keep_their_cause() {
     assert!(std::error::Error::source(&store).is_some());
     assert!(std::error::Error::source(&AdminError::NoHome).is_none());
     assert!(std::error::Error::source(&AdminError::Node("n")).is_none());
+    let repository = AdminError::Repository("r");
+    assert_eq!(repository.to_string(), "r");
+    assert!(std::error::Error::source(&repository).is_none());
+    let read = AdminError::RepositoryRead(::repository::Error::Deadline);
+    assert!(
+        read.to_string()
+            .starts_with("the repository's git data cannot be read: ")
+    );
+    assert!(std::error::Error::source(&read).is_some());
+    let unresolved = AdminError::Unresolved {
+        what: "worktree",
+        source: std::io::Error::other("gone"),
+    };
+    assert_eq!(
+        unresolved.to_string(),
+        "the worktree cannot be resolved: gone"
+    );
+    assert!(std::error::Error::source(&unresolved).is_some());
 }
 
 #[test]

@@ -149,6 +149,9 @@ pub(crate) struct Capture {
     pub(crate) inputs: ingest::Inputs,
     /// The server's own harness process, whose session bindings it takes.
     pub(crate) harness: Option<u32>,
+    /// The OS user's home directory, above which no repository is looked
+    /// for (LANE-02).
+    pub(crate) ceiling: Option<PathBuf>,
     /// A development build's seam: ingest no further than this many
     /// lines of a transcript.
     pub(crate) limit: Option<usize>,
@@ -229,11 +232,14 @@ impl Running {
         let Some(harness) = self.capture.harness else {
             return;
         };
-        let Ok(taken) =
-            Store::open(&self.capture.home.store()).and_then(|mut s| s.take_bindings(harness))
+        let Some((mut store, taken)) = Store::open(&self.capture.home.store())
+            .ok()
+            .and_then(|mut s| Some((s.take_bindings(harness).ok()?, s)))
+            .map(|(taken, s)| (s, taken))
         else {
             return;
         };
+        self.bind_repositories(&mut store, &taken);
         for held in taken {
             self.capture.shared.serving.store(true, Ordering::SeqCst);
             // The run's worktree, from the cwd of the session binding it
@@ -244,6 +250,26 @@ impl Running {
             if let Some(main) = self.resolve(&path) {
                 self.sessions.push(Bound { main });
             }
+        }
+    }
+
+    /// Binds the identity of the repositories the session bindings just
+    /// taken showed, a hook event that fired after this server started
+    /// included (LANE-02).
+    fn bind_repositories(&self, store: &mut Store, taken: &[store::Held]) {
+        let home = &self.capture.home;
+        if let Ok(node) = administration::node::Node::find(home, store) {
+            let say = |occurrence: &Occurrence| {
+                self.audited(occurrence);
+            };
+            crate::repository_identity::bind_held(
+                &say,
+                self.capture.ceiling.as_deref(),
+                store,
+                &node,
+                taken.to_vec(),
+                &crate::repository_identity::start_deadline(),
+            );
         }
     }
 

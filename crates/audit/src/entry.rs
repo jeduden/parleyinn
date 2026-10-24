@@ -180,6 +180,25 @@ pub enum Counter {
     /// The search index's unreported gaps could not be looked up after
     /// an ingest recorded its events (REC-11, I6).
     SearchIndexGapLookupFailed,
+    /// The identity a directory's repository resolves to changed since
+    /// it was bound; no room's branch link is relinked for it (LANE-02,
+    /// I6).
+    RepositoryIdentityChanged,
+    /// A worktree was bound after the node's device key was replaced (a
+    /// node identity change, a rotation or a key minted anew): its kept
+    /// names went with the old key, so a worktree bound before and one
+    /// never bound are told apart by neither. A structural event, not a
+    /// widening principal act (LANE-02, I6).
+    RepositoryIdentityRebound,
+    /// A clone's git data could not be read, so its repository identity
+    /// stays as it was (LANE-02, I6).
+    RepositoryReadFailed,
+    /// The identity of a clone could not be bound: the record or the
+    /// random source failed, not the clone (LANE-02, I6).
+    RepositoryBindFailed,
+    /// A look at a clone ran out of its time, so its identity stays as it
+    /// was and the next look tries again (LANE-02, ENG-03, I6).
+    RepositoryReadTimedOut,
 }
 
 impl Counter {
@@ -233,6 +252,11 @@ impl Counter {
             Self::SearchIndexSeqBeyondLimit => "search_index_seq_beyond_limit",
             Self::ForkConflict => "fork_conflict",
             Self::SearchIndexGapLookupFailed => "search_index_gap_lookup_failed",
+            Self::RepositoryIdentityChanged => "repository_identity_changed",
+            Self::RepositoryIdentityRebound => "repository_identity_rebound",
+            Self::RepositoryReadFailed => "repository_read_failed",
+            Self::RepositoryBindFailed => "repository_bind_failed",
+            Self::RepositoryReadTimedOut => "repository_read_timed_out",
         }
     }
 }

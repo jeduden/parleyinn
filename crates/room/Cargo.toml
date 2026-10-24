@@ -1,0 +1,21 @@
+[package]
+name = "room"
+version = "0.0.0"
+description = "Where a room's branches and a run's events belong: branch links resolved by LANE-31's rule and a run's event routed to a seat by LANE-01"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+provenance.workspace = true
+record.workspace = true
+
+[lints]
+workspace = true
+
+# ENG-02: see crates/parinn/Cargo.toml.
+[package.metadata.parinn]
+responsibility = "Resolves which room a branch belongs to and routes a run's event to a seat"
+may-depend-on = ["provenance", "record"]
+may-dev-depend-on = []

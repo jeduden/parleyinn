@@ -1,0 +1,20 @@
+[package]
+name = "repository"
+version = "0.0.0"
+description = "A repository's identity read from a git clone's own files: the lowest parentless commit reachable from the default branch (LANE-02)"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dev-dependencies]
+testkit.workspace = true
+
+[lints]
+workspace = true
+
+# ENG-02: see crates/parinn/Cargo.toml.
+[package.metadata.parinn]
+responsibility = "Reads a git clone's files, loose objects and packs, and names the repository by its lowest root commit, starting no program and opening no socket"
+may-depend-on = []
+may-dev-depend-on = ["testkit"]

@@ -778,3 +778,38 @@ fn ingest_says_which_prompt_match_it_cannot_audit() {
         "{err}"
     );
 }
+
+#[test]
+fn an_untaken_session_binding_says_whether_any_mcp_server_ever_took_one() {
+    let p = Process::new();
+    hold_start(&p, "old", NOW - 31);
+    let mut store = store(&p);
+    let details = std::cell::RefCell::new(Vec::new());
+    let say = |o: &Occurrence| {
+        if let Occurrence::Degraded { detail, .. } = o {
+            details.borrow_mut().push(*detail);
+        }
+    };
+
+    count_untaken(&mut store, NOW, &say);
+    // A server took a binding since; the next untaken one is not the first.
+    hold_start(&p, "taken", NOW - 40);
+    store.take_bindings(0).unwrap();
+    rusqlite::Connection::open(p.parinn_home().join("store.db"))
+        .unwrap()
+        .execute(
+            "UPDATE hook_observations SET taken = 1 WHERE harness_session = 'taken'",
+            [],
+        )
+        .unwrap();
+    hold_start(&p, "later", NOW - 31);
+    count_untaken(&mut store, NOW, &say);
+
+    assert_eq!(
+        *details.borrow(),
+        [
+            "no MCP server has taken a session binding on this node",
+            "no MCP server took the session binding within 30 s"
+        ]
+    );
+}

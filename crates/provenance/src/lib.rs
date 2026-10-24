@@ -22,6 +22,8 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
+pub mod structural_field;
+
 use record::event::Provenance;
 use redaction::Redactor;
 use serde_json::Value;

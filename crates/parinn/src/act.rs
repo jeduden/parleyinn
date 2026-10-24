@@ -26,17 +26,17 @@ use crate::{Context, EXIT_USAGE, failed, json_flag, written};
 
 /// What an act is taken in: the home, its store and node, the acts it
 /// recorded, and the settings in force.
-struct Taking {
-    home: Home,
-    store: Store,
-    node: Node,
+pub(crate) struct Taking {
+    pub(crate) home: Home,
+    pub(crate) store: Store,
+    pub(crate) node: Node,
     acts: Vec<Recorded>,
     settings: InForce,
 }
 
 impl Taking {
     /// Opens the home for an act, starting the node when it never has.
-    fn open(ctx: &Context) -> Result<Self, String> {
+    pub(crate) fn open(ctx: &Context) -> Result<Self, String> {
         let home = ctx.home().map_err(|e| e.to_string())?;
         home.create().map_err(|e| e.to_string())?;
         let mut store = Store::open(&home.store()).map_err(|e| e.to_string())?;
@@ -82,7 +82,7 @@ impl Taking {
 
     /// Takes `act` if the gate permits it: records it, or audits and
     /// reports the refusal.
-    fn take(
+    pub(crate) fn take(
         &mut self,
         ctx: &Context,
         operation: &'static str,
@@ -134,7 +134,11 @@ fn refused(
 
 /// Refuses an act unless standard input and output are a terminal, the
 /// first check of every verb that writes one (OWN-12).
-fn at_terminal(ctx: &Context, operation: &'static str, stderr: &mut dyn Write) -> Result<(), u8> {
+pub(crate) fn at_terminal(
+    ctx: &Context,
+    operation: &'static str,
+    stderr: &mut dyn Write,
+) -> Result<(), u8> {
     if ctx.terminal {
         Ok(())
     } else {

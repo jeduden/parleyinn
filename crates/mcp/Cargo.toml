@@ -8,6 +8,7 @@ license.workspace = true
 publish.workspace = true
 
 [dependencies]
+administration.workspace = true
 envelope.workspace = true
 key.workspace = true
 record.workspace = true
@@ -16,7 +17,6 @@ serde_json.workspace = true
 store.workspace = true
 
 [dev-dependencies]
-administration.workspace = true
 ingest.workspace = true
 redaction.workspace = true
 rusqlite.workspace = true
@@ -28,5 +28,5 @@ workspace = true
 # ENG-02: see crates/parinn/Cargo.toml.
 [package.metadata.parinn]
 responsibility = "Serves the MCP tools to one harness session over stdio"
-may-depend-on = ["envelope", "key", "record", "search", "store"]
-may-dev-depend-on = ["administration", "ingest", "redaction", "testkit"]
+may-depend-on = ["administration", "envelope", "key", "record", "search", "store"]
+may-dev-depend-on = ["ingest", "redaction", "testkit"]
