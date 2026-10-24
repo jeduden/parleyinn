@@ -184,9 +184,11 @@ pub enum Counter {
     /// it was bound; no room's branch link is relinked for it (LANE-02,
     /// I6).
     RepositoryIdentityChanged,
-    /// A worktree this node had bound was bound again after a node
-    /// identity change, its kept names lost with the replaced key; a
-    /// structural event, not a widening principal act (LANE-02, I6).
+    /// A worktree was bound after the node's device key was replaced (a
+    /// node identity change, a rotation or a key minted anew): its kept
+    /// names went with the old key, so a worktree bound before and one
+    /// never bound are told apart by neither. A structural event, not a
+    /// widening principal act (LANE-02, I6).
     RepositoryIdentityRebound,
     /// A clone's git data could not be read, so its repository identity
     /// stays as it was (LANE-02, I6).
