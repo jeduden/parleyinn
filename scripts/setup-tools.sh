@@ -18,7 +18,7 @@
 #   installs and writes nothing.
 #   Under GitHub Actions it exports PATH and mise's environment to the
 #   job's later steps. Elsewhere it prints the lines that put them on
-#   PATH; --profile appends those lines to ~/.bashrc as well.
+#   PATH; --profile writes those lines to ~/.bashrc as well.
 set -eu
 
 check_only= profile=
@@ -114,22 +114,48 @@ if [ -n "${GITHUB_ENV:-}" ] && [ -n "${GITHUB_PATH:-}" ]; then
   echo "MISE_YES=1" >> "$GITHUB_ENV"
 else
   # Later shells (an agent's tool calls) need mise and the pinned tools
-  # on PATH. These lines do it; --profile appends them to ~/.bashrc.
-  lines="export PATH=\"$bindir:\$PATH\""
+  # on PATH. A shell hook such as `mise activate` never runs in a
+  # non-interactive shell, and a shim fails in a directory whose config
+  # mise has not trusted, so the lines hold the tools' bin directories
+  # and mise's variables as plain exports, which work from any
+  # directory. --profile writes them to the top of ~/.bashrc, replacing
+  # an earlier block.
+  toolpath=$(mise bin-paths | paste -sd: -)
+  lines="export PATH=\"$bindir:$toolpath:\$PATH\""
   if [ -n "${MISE_ENV:-}" ]; then lines="export MISE_ENV=$MISE_ENV
 $lines"; fi
   lines="$lines
-eval \"\$(mise activate bash)\""
+$(mise env -s bash | grep -v '^export PATH=')"
   profile_file=$HOME/.bashrc
-  marker='# parleyinn setup-tools'
+  begin='# parleyinn setup-tools'
+  end='# end parleyinn setup-tools'
   if [ -z "$profile" ]; then
     echo "setup-tools: to put the tools on PATH, add to your shell profile:"
     echo "$lines"
-  elif grep -qF "$marker" "$profile_file" 2>/dev/null; then
-    echo "setup-tools: $profile_file already holds the setup-tools lines"
   else
-    printf '%s\n%s\n' "$marker" "$lines" >> "$profile_file"
-    echo "setup-tools: appended to $profile_file:"
+    # The block goes first: a stock ~/.bashrc returns early in a
+    # non-interactive shell, which would never reach lines at its end.
+    # Drop a block an earlier run wrote: everything from begin to end, or,
+    # from a run before the end marker, begin and the export and eval
+    # lines after it. That fallback is only for a block the earlier
+    # script version wrote, which had no end marker: it also drops an
+    # export line a user put straight after such a block.
+    printf '%s\n%s\n%s\n' "$begin" "$lines" "$end" > "$tmp/profile"
+    if [ -f "$profile_file" ]; then
+      awk -v b="$begin" -v e="$end" '
+        { line[NR] = $0; if ($0 == e) ended = 1 }
+        END {
+          for (i = 1; i <= NR; i++) {
+            if (line[i] == b) { skip = 1; continue }
+            if (skip && ended) { if (line[i] == e) skip = 0; continue }
+            if (skip && (line[i] ~ /^export / || line[i] ~ /^eval "\$\(mise activate/)) continue
+            skip = 0; print line[i]
+          }
+        }
+      ' "$profile_file" >> "$tmp/profile"
+    fi
+    cat "$tmp/profile" > "$profile_file"
+    echo "setup-tools: wrote to $profile_file:"
     echo "$lines"
   fi
 fi
