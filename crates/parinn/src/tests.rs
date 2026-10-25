@@ -758,7 +758,7 @@ fn verified(p: &Process) -> (u8, serde_json::Value) {
 }
 
 #[test]
-fn a_transcript_source_an_ingest_stopped_short_of_fails_verify_once_its_marker_is_old() {
+fn a_source_an_ingest_left_short_fails_verify_once_its_marker_is_old() {
     let mut p = Process::new();
     let path = transcript_in(&p, "-w-a", "stopped.jsonl", b"{\"a\":1}\n{\"b\":2}\n");
     assert_eq!(p.invoke(&["ingest", "--all"], &DEV).0, EXIT_OK);

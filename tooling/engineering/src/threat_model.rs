@@ -1,11 +1,13 @@
 //! SEC-17: the threat model kept in the repository covers every row of
 //! the boundary register with the threat sources acting across it,
-//! names the sources §6.1 lists, compares ParleyInn with Zed Delta
-//! control by control, and records a review naming the current minor
-//! release.
+//! names the sources §6.1 lists, says of each row whether its controls
+//! are enforced in M1, and by which tests, designed, or pending with
+//! their milestone, compares ParleyInn with Zed Delta control by
+//! control, and records a review naming the current minor release, by
+//! a reviewer other than its author once it is reviewed.
 
-use crate::Checkout;
 use crate::boundary::{self, Row};
+use crate::{Checkout, privacy};
 
 /// The threat model, relative to the checkout.
 pub const MODEL: &str = "docs/security/threat-model.md";
@@ -84,15 +86,64 @@ pub fn legend_matches(body: &str, security: &str) -> Vec<String> {
     )]
 }
 
-/// Requires a row of the model for each register row, naming at least
-/// one source of the legend and at least one control.
+/// The tests a status may cite: each test function by name with whether
+/// it runs, and each scenario by id with whether it is pending.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct Proofs {
+    pub tests: Vec<(String, bool)>,
+    pub scenarios: Vec<(String, bool)>,
+}
+
+/// What a row's status says, when it says none of them.
+pub const STATUSES: &str =
+    "enforced in M1 with the tests that prove it, designed, or pending with its milestone";
+
+/// Requires the status of register row `row` to be one of
+/// [`STATUSES`]: a control enforced in M1 cites tests that exist and
+/// run, after `test:` or `tests:`; a pending one names its milestone.
 #[must_use]
-pub fn rows_covered(body: &str, register: &[Row]) -> Vec<String> {
+pub fn status_holds(row: &str, status: &str, proofs: &Proofs) -> Vec<String> {
+    if status.starts_with("enforced in M1") {
+        let cited = privacy::cites(status);
+        if cited.is_empty() {
+            return vec![format!(
+                "register row {row} is enforced in M1 and cites no test"
+            )];
+        }
+        return cited
+            .iter()
+            .filter(|c| !privacy::resolves(&proofs.tests, &proofs.scenarios, c))
+            .map(|c| format!("register row {row} cites {c}, which is no test that exists and runs"))
+            .collect();
+    }
+    if status.starts_with("pending") {
+        let milestone = status.split(|c: char| !c.is_ascii_alphanumeric()).any(|w| {
+            w.strip_prefix('M')
+                .is_some_and(|n| !n.is_empty() && n.chars().all(|c| c.is_ascii_digit()))
+        });
+        if milestone {
+            return Vec::new();
+        }
+        return vec![format!(
+            "register row {row} is pending and names no milestone"
+        )];
+    }
+    if status.starts_with("designed") {
+        return Vec::new();
+    }
+
+    vec![format!("register row {row} names no status: {STATUSES}")]
+}
+
+/// Requires a row of the model for each register row, naming at least
+/// one source of the legend, at least one control, and its status.
+#[must_use]
+pub fn rows_covered(body: &str, register: &[Row], proofs: &Proofs) -> Vec<String> {
     let known: Vec<String> = legend(body).into_iter().map(|(id, _)| id).collect();
     let table = table_rows(body);
     let mut problems = Vec::new();
     for row in register {
-        let Some(found) = table.iter().find(|c| c.len() >= 5 && c[0] == row.id) else {
+        let Some(found) = table.iter().find(|c| c.len() >= 6 && c[0] == row.id) else {
             problems.push(format!("{MODEL} has no row for register row {}", row.id));
             continue;
         };
@@ -109,6 +160,7 @@ pub fn rows_covered(body: &str, register: &[Row]) -> Vec<String> {
         if found[4].is_empty() {
             problems.push(format!("register row {} names no control", row.id));
         }
+        problems.extend(status_holds(&row.id, &found[5], proofs));
     }
 
     problems
@@ -151,19 +203,38 @@ pub fn minor_release(manifest: &str) -> Option<String> {
     Some(format!("{}.{}", parts.next()?, parts.next()?))
 }
 
-/// Requires a review row naming `release` and who reviewed it.
+/// Requires a review row naming `release`, who wrote the model for it
+/// and the outcome: reviewed, by someone named other than its author,
+/// or awaiting a reviewer. An outcome still awaiting passes here; the
+/// release gate, not this check, refuses to ship it.
 #[must_use]
 pub fn reviewed(body: &str, release: &str) -> Vec<String> {
-    let row = table_rows(body)
+    let Some(c) = table_rows(body)
         .into_iter()
-        .find(|c| c.len() >= 3 && c[0] == release);
-    match row {
-        Some(c) if !c[1].is_empty() && !c[2].is_empty() => Vec::new(),
-        Some(_) => vec![format!(
-            "the review of release {release} names no reviewer or outcome"
-        )],
-        None => vec![format!("{MODEL} records no review of release {release}")],
-    }
+        .find(|c| c.len() >= 4 && c[0] == release)
+    else {
+        return vec![format!("{MODEL} records no review of release {release}")];
+    };
+    let (author, reviewer, outcome) = (&c[1], &c[2], &c[3]);
+    let problem = if author.is_empty() || outcome.is_empty() {
+        Some(format!(
+            "the review of release {release} names no author or outcome"
+        ))
+    } else if outcome.starts_with("Reviewed") && reviewer.is_empty() {
+        Some(format!("release {release} is reviewed by no one named"))
+    } else if outcome.starts_with("Reviewed") && reviewer == author {
+        Some(format!(
+            "release {release} is reviewed by the one who wrote its threat model"
+        ))
+    } else if !outcome.starts_with("Reviewed") && !outcome.contains("awaiting") {
+        Some(format!(
+            "the outcome for release {release} is neither reviewed nor awaiting a reviewer"
+        ))
+    } else {
+        None
+    };
+
+    problem.into_iter().collect()
 }
 
 /// Every problem of the threat model in the checkout (SEC-17).
@@ -178,8 +249,19 @@ pub fn check(c: &Checkout) -> Vec<String> {
         Ok(r) => r,
         Err(e) => return vec![e],
     };
-    let mut problems = legend_matches(&body, &security);
-    problems.extend(rows_covered(&body, &register));
+    let mut problems = Vec::new();
+    let proofs = match (
+        privacy::test_functions(c),
+        privacy::scenario_states(&c.root.join("features")),
+    ) {
+        (Ok(tests), Ok(scenarios)) => Proofs { tests, scenarios },
+        (Err(e), _) | (_, Err(e)) => {
+            problems.push(e);
+            Proofs::default()
+        }
+    };
+    problems.extend(legend_matches(&body, &security));
+    problems.extend(rows_covered(&body, &register, &proofs));
     problems.extend(compares(&body));
     problems.extend(match minor_release(&manifest) {
         Some(release) => reviewed(&body, &release),

@@ -1,5 +1,5 @@
 //! SEC-15: no telemetry, crash reporting to remote services or update
-//! check ships. Three records hold it. No crate the lockfile resolves is
+//! check ships. Three records hold it. No crate a lockfile resolves is
 //! a telemetry, crash-reporting, update-check or network-client crate.
 //! No product crate's shipped code names an `http://` or `https://`
 //! address. The boundary register rejects the price-table fetch, update
@@ -63,14 +63,19 @@ fn denied(name: &str) -> bool {
     })
 }
 
-/// Each locked crate that is a telemetry, crash-reporting, update-check
-/// or network-client crate.
+/// The lockfiles the repository commits: the workspace's and the fuzz
+/// workspace's, which links the product crates too.
+pub const LOCKFILES: [&str; 2] = ["Cargo.lock", "fuzz/Cargo.lock"];
+
+/// Each crate the lockfile `file`, whose text is `lock`, resolves that
+/// is a telemetry, crash-reporting, update-check or network-client
+/// crate.
 #[must_use]
-pub fn denied_crates(lock: &str) -> Vec<String> {
+pub fn denied_crates(file: &str, lock: &str) -> Vec<String> {
     locked(lock)
         .into_iter()
         .filter(|n| denied(n))
-        .map(|n| format!("Cargo.lock resolves {n}, a crate that reports, checks for updates or reaches a remote host"))
+        .map(|n| format!("{file} resolves {n}, a crate that reports, checks for updates or reaches a remote host"))
         .collect()
 }
 
@@ -151,10 +156,13 @@ pub fn register_rejects(rows: &[Row]) -> Vec<String> {
 /// Every problem of the three records, in the checkout (SEC-15).
 #[must_use]
 pub fn check(c: &Checkout) -> Vec<String> {
-    let mut problems = match c.read("Cargo.lock") {
-        Ok(lock) => denied_crates(&lock),
-        Err(e) => vec![e],
-    };
+    let mut problems = Vec::new();
+    for file in LOCKFILES {
+        match c.read(file) {
+            Ok(lock) => problems.extend(denied_crates(file, &lock)),
+            Err(e) => problems.push(e),
+        }
+    }
     problems.extend(shipped_addresses(c));
     match crate::boundary::register(c) {
         Ok(rows) => problems.extend(register_rejects(&rows)),

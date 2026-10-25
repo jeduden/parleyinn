@@ -18,10 +18,15 @@ const MODEL_BODY: &str = "\
 | S1 | First |
 | S2 | Second |
 
-| Row | Component | Boundary | Sources | Controls |
-| --- | --- | --- | --- | --- |
-| 1 | Hook | B0 | S1, S2 | T1 |
-| X1 | Import | none | S9 | |
+| Row | Component | Boundary | Sources | Controls | Status |
+| --- | --- | --- | --- | --- | --- |
+| 1 | Hook | B0 | S1, S2 | T1 | enforced in M1; tests: `runs` and `@LIVE` |
+| 3 | View | B1 | S1 | T15 | pending |
+| 4 | Peer | B2 | S2 | T17 | enforced in M1 |
+| 5 | Strip | B0 | S1 | T16 | enforced in M1; tests: `ignored`, `@PENDING`, `nobody` |
+| 6 | Kernel | B0 | S1 | T8 | pending, M4 |
+| 7 | Merge | none | S1 | Rejected | designed: rejected for v1 |
+| X1 | Import | none | S9 | | |
 
 ## Comparison with Zed Delta
 
@@ -32,10 +37,14 @@ const MODEL_BODY: &str = "\
 | Central-service dependence | none | DeltaDB |
 | Key custody | OS store |   |
 
-| Release | Reviewed by | Outcome |
-| --- | --- | --- |
-| 0.0 | an agent | awaiting |
-| 0.1 | | |
+| Release | Written by | Reviewed by | Outcome |
+| --- | --- | --- | --- |
+| 0.0 | the agent that wrote phase 15 | no one yet | awaiting the security reviewer |
+| 0.1 | | | |
+| 0.3 | an agent | an agent | Reviewed: holds |
+| 0.4 | an agent | the security reviewer | Reviewed: holds |
+| 0.5 | an agent | | Reviewed: holds |
+| 0.6 | an agent | x | maybe |
 ";
 
 fn row(id: &str) -> Row {
@@ -68,11 +77,23 @@ fn the_legend_must_match_the_listed_sources() {
     assert!(problems[0].contains("differ from those of"));
 }
 
+/// The tests and scenarios the fixture's statuses cite.
+fn proofs() -> Proofs {
+    Proofs {
+        tests: vec![("runs".to_owned(), true), ("ignored".to_owned(), false)],
+        scenarios: vec![("LIVE".to_owned(), false), ("PENDING".to_owned(), true)],
+    }
+}
+
 #[test]
 fn each_register_row_needs_a_row_with_a_known_source_and_a_control() {
-    assert_eq!(rows_covered(MODEL_BODY, &[row("1")]), Vec::<String>::new());
+    let ok = [row("1"), row("6"), row("7")];
+    assert_eq!(
+        rows_covered(MODEL_BODY, &ok, &proofs()),
+        Vec::<String>::new()
+    );
 
-    let problems = rows_covered(MODEL_BODY, &[row("2"), row("X1")]);
+    let problems = rows_covered(MODEL_BODY, &[row("2"), row("X1")], &proofs());
 
     assert_eq!(
         problems,
@@ -80,6 +101,23 @@ fn each_register_row_needs_a_row_with_a_known_source_and_a_control() {
             format!("{MODEL} has no row for register row 2"),
             "register row X1 names no known threat source".to_owned(),
             "register row X1 names no control".to_owned(),
+            format!("register row X1 names no status: {STATUSES}"),
+        ]
+    );
+}
+
+#[test]
+fn a_row_s_status_is_enforced_with_tests_that_run_designed_or_pending_with_a_milestone() {
+    let problems = rows_covered(MODEL_BODY, &[row("3"), row("4"), row("5")], &proofs());
+
+    assert_eq!(
+        problems,
+        [
+            "register row 3 is pending and names no milestone",
+            "register row 4 is enforced in M1 and cites no test",
+            "register row 5 cites ignored, which is no test that exists and runs",
+            "register row 5 cites @PENDING, which is no test that exists and runs",
+            "register row 5 cites nobody, which is no test that exists and runs",
         ]
     );
 }
@@ -109,9 +147,22 @@ fn the_minor_release_comes_from_the_manifest_version() {
 #[test]
 fn a_release_needs_a_review_row_naming_who_and_what() {
     assert_eq!(reviewed(MODEL_BODY, "0.0"), Vec::<String>::new());
+    assert_eq!(reviewed(MODEL_BODY, "0.4"), Vec::<String>::new());
     assert_eq!(
         reviewed(MODEL_BODY, "0.1"),
-        ["the review of release 0.1 names no reviewer or outcome"]
+        ["the review of release 0.1 names no author or outcome"]
+    );
+    assert_eq!(
+        reviewed(MODEL_BODY, "0.3"),
+        ["release 0.3 is reviewed by the one who wrote its threat model"]
+    );
+    assert_eq!(
+        reviewed(MODEL_BODY, "0.5"),
+        ["release 0.5 is reviewed by no one named"]
+    );
+    assert_eq!(
+        reviewed(MODEL_BODY, "0.6"),
+        ["the outcome for release 0.6 is neither reviewed nor awaiting a reviewer"]
     );
     assert_eq!(
         reviewed(MODEL_BODY, "0.2"),

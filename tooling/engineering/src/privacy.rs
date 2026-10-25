@@ -41,7 +41,8 @@ pub struct Statement {
 /// The tests a block of prose or one table row cites: after `test:` or
 /// `tests:`, backtick spans joined by commas or `and`; each is a test
 /// function's name or a scenario's `@ID`.
-fn cites(block: &str) -> Vec<String> {
+#[must_use]
+pub fn cites(block: &str) -> Vec<String> {
     let mut out = Vec::new();
     let flat = block.replace('\n', " ");
     let mut rest = flat.as_str();

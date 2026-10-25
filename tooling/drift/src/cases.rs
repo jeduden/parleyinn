@@ -1181,7 +1181,14 @@ fn boundary_cases() -> Vec<Case> {
                 "[[bin]]\nname = \"rogue\"\npath = \"src/lib.rs\"\n\n[lints]\nworkspace = true\n",
             ),
             gate(BOUNDARY),
-            "the process audit runs as no component the register lists",
+            "the process rogue runs as no component the register lists",
+        ),
+        case(
+            "a second executable in the core's crate, under src/bin",
+            BOUNDARY,
+            Injection::create("crates/parinn/src/bin/rogue.rs", "fn main() {}\n"),
+            gate(BOUNDARY),
+            "the process rogue runs as no component the register lists",
         ),
         case(
             "the core's clippy.toml no longer banning a socket",
@@ -1203,7 +1210,7 @@ fn boundary_cases() -> Vec<Case> {
                 "[[bin]]\nname = \"rogue\"\npath = \"src/lib.rs\"\n\n[lints]\nworkspace = true\n",
             ),
             gate(BUILT),
-            "left: [\"audit\", \"parinn\"]",
+            "left: [\"parinn\", \"rogue\"]",
         ),
     ]
 }
@@ -1234,6 +1241,20 @@ fn telemetry_cases() -> Vec<Case> {
             gate(TELEMETRY),
             "no rejected register row names update checks and telemetry under SEC-15",
         ),
+        // The workspace's own lockfile cannot hold a crate its graph does
+        // not resolve under `--locked`; the fuzz workspace's is read the
+        // same way.
+        case(
+            "a network-client crate in a lockfile",
+            TELEMETRY,
+            Injection::replace(
+                "fuzz/Cargo.lock",
+                "name = \"arbitrary\"",
+                "name = \"reqwest\"",
+            ),
+            gate(TELEMETRY),
+            "fuzz/Cargo.lock resolves reqwest, a crate that reports, checks for updates or reaches a remote host",
+        ),
     ]
 }
 
@@ -1256,6 +1277,61 @@ fn documentation_cases() -> Vec<Case> {
             "the comparison with Zed Delta leaves out Key custody",
         ),
         case(
+            "a threat source the threat model names otherwise than §6.1",
+            THREATS,
+            Injection::replace(
+                MODEL,
+                "| S9  | Web page in the person's own browser ",
+                "| S9  | Web page in a browser ",
+            ),
+            gate(THREATS),
+            "differ from those of docs/srs/06-security.md",
+        ),
+        case(
+            "a register row whose sources the threat model leaves empty",
+            THREATS,
+            Injection::replace(
+                MODEL,
+                "| 3   | Kernel worker                             | B0       | S1 ",
+                "| 3   | Kernel worker                             | B0       |    ",
+            ),
+            gate(THREATS),
+            "register row 3 names no known threat source",
+        ),
+        case(
+            "a register row enforced in M1 that cites no test",
+            THREATS,
+            Injection::replace(
+                MODEL,
+                "(CMP-05, ENG-03)                  | pending, M4 ",
+                "(CMP-05, ENG-03)                  | enforced in M1 ",
+            ),
+            gate(THREATS),
+            "register row 3 is enforced in M1 and cites no test",
+        ),
+        case(
+            "no review row for the current minor release",
+            THREATS,
+            Injection::replace(
+                MODEL,
+                "| 0.0     | the agent that wrote phase 15 ",
+                "| 0.9     | the agent that wrote phase 15 ",
+            ),
+            gate(THREATS),
+            "records no review of release 0.0",
+        ),
+        case(
+            "a release reviewed by the one who wrote its threat model",
+            THREATS,
+            Injection::replace(
+                MODEL,
+                "| no one yet  | Written against the register of M1; awaiting the security reviewer |",
+                "| the agent that wrote phase 15 | Reviewed: holds |",
+            ),
+            gate(THREATS),
+            "release 0.0 is reviewed by the one who wrote its threat model",
+        ),
+        case(
             "a privacy statement citing no test",
             PRIVACY,
             Injection::replace(
@@ -1276,6 +1352,17 @@ fn documentation_cases() -> Vec<Case> {
             ),
             gate(PRIVACY),
             "cites a_test_nobody_wrote, which is no test that exists and runs",
+        ),
+        case(
+            "a privacy statement citing a test that is ignored",
+            PRIVACY,
+            Injection::replace(
+                "crates/parinn/tests/reach.rs",
+                "#[test]\nfn the_core_executable_links_only_crates_its_reach_allows() {",
+                "#[test]\n#[ignore = \"drift\"]\nfn the_core_executable_links_only_crates_its_reach_allows() {",
+            ),
+            gate(PRIVACY),
+            "cites the_core_executable_links_only_crates_its_reach_allows, which is no test that exists and runs",
         ),
     ]
 }
