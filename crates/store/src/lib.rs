@@ -1757,6 +1757,11 @@ impl Out<'_> {
         new_events: &[NewEvent],
         close: bool,
     ) -> Result<Vec<Address>, StoreError> {
+        // A writer with no events claims no slot in the search index,
+        // nor evicts the writer holding it (I10).
+        if new_events.is_empty() {
+            return Ok(Vec::new());
+        }
         refuse_newer(tx, writer)?;
         let (mut next, mut prev_hash) = newest(tx, writer)?;
         let mut heads = advanced_heads(tx, writer)?;

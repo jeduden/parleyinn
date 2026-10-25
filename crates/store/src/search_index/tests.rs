@@ -1111,9 +1111,15 @@ fn an_append_of_no_events_claims_no_slot_and_evicts_no_writer() {
     let mut store = open(&dir);
     seat(&mut store, large, room());
     store.append(large, &texts(&["shared"])).unwrap();
-    seat(&mut store, small, room());
     let kept = store.search_index_digest().unwrap();
 
+    let seated = StoredSeat {
+        writer: small,
+        seat: SeatId::derive(&room(), small.digest().as_bytes()),
+        room: room(),
+        certificate: json!({}),
+    };
+    store.add_seat_and_append(&seated, small, &[]).unwrap();
     let _ = store.append(small, &[]);
 
     assert_eq!(store.search_index_digest().unwrap(), kept);
