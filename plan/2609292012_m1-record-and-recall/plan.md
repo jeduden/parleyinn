@@ -165,19 +165,17 @@ changed M1's row in §12.2.
    REC-19's segment closing; the gap-free `seq` property (ENG-08);
    crash consistency over ingest (ENG-06); freeze
    NFR-09's overhead and REC-17's secret
-7. The transcript parser and provenance: PRV-01, PRV-03, PRV-08,
-   REC-05, REC-26; the parser's fuzz target and its nightly run; the
-   transcript contract replay and the residual-identifier check
-   (ENG-17)
+7. The transcript parser and provenance: PRV-01, PRV-03, PRV-08, REC-05,
+   REC-26; the parser's fuzz target and its nightly run; the transcript
+   contract replay and the residual-identifier check (ENG-17)
 8. `parinn ingest`: REC-01 to REC-04, REC-07, REC-08, REC-22; the
    properties of a harness fork's ingest order and of ingesting twice
    (ENG-08); the NFR-04 benchmark
 9. The hook handlers: SEC-16, the session binding, prompt commitments
-   and the attended mark (PRV-04, PRV-08), holding a run's
-   hook observations, held at its ingest marker, until its MCP server
-   holds its run-seat key (REC-19);
-   the hook input decoder's fuzz target and the hook input contract
-   replay (ENG-17); the NFR-01 and NFR-02 benchmarks
+   and the attended mark (PRV-04, PRV-08), holding a run's hook
+   observations at its ingest marker until its MCP server holds its
+   run-seat key (REC-19); the hook input decoder's fuzz target and the
+   hook input contract replay (ENG-17); the NFR-01 and NFR-02 benchmarks
 10. The MCP server and live ingest: REC-13, PRV-14, run-seat keys in
     memory (SEC-10), concurrent appends (REC-06), with the gap-free
     `seq` property rerun under concurrency
@@ -276,6 +274,7 @@ footer: |
 |     | ↳      | @RCL-01, @RCL-03, @RCL-04, @RCL-05, @RCL-07, @SEC-06 and @SEC-07 off @pending and passing. The six recall tools answer in the envelope under the 8,000-token cap and a cursor, in the calling run's scope unless the call widens it, and each leaves a recall event; the envelope's golden files match. @RCL-08 stays @pending on purge and quarantine (phase 14).                                                     |
 | 14  | ✅     | [Quarantine and parinn purge --range](phase-14.md)                                                                                                                                                                                                                                                                                                                                                                     |
 |     | ↳      | @RCL-06, @REC-17 and @SEC-22 off @pending and passing; so are @RCL-08 and @REC-06, whose purged-range steps now run. A purge erases a range and records a tombstone in one transaction, a quarantine holds events out of recall by selector, and an ingest purges what a retention policy has aged out. @SEC-12 passes seven rows of eight and stays @pending: its flag row needs PRV-07 (M5).                         |
+| 15  | 🔲     | [Operations: verify, status, audit, the boundary and the threat model](phase-15.md)                                                                                                                                                                                                                                                                                                                                    |
 <?/catalog?>
 
 ## Acceptance Criteria
