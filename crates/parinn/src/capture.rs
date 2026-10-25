@@ -707,13 +707,16 @@ impl Markers for HomeMarkers {
             .unwrap_or_default()
     }
 
+    /// The marker is opened as ingest opens a transcript, so a link
+    /// is not followed and a FIFO not waited on (ENG-03), and what it
+    /// names is read from the file whose lock was tried.
     fn held(&self, path: &Path) -> Option<String> {
-        let file = fs::File::open(path).ok()?;
+        let file = ingest::read::regular_file(path).ok()?;
         if file.try_lock().is_ok() {
             return None;
         }
 
-        Some(fs::read_to_string(path).unwrap_or_default())
+        Some(io::read_to_string(file).unwrap_or_default())
     }
 }
 

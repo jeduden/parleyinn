@@ -720,3 +720,30 @@ fn a_clone_a_taken_binding_shows_unreadable_is_counted_by_the_server() {
 
     assert!(f.counted().contains(&"repository_read_failed".to_owned()));
 }
+
+#[cfg(unix)]
+#[test]
+fn a_marker_link_or_fifo_is_neither_followed_nor_waited_on() {
+    let f = Fixture::new();
+    let marker = StartMarker::leave(&f.home, &[f.main()], None).unwrap();
+    let dir = f.home.root().join(MARKERS);
+    let held = served(&f.home);
+    assert_eq!(held, [f.main()]);
+    let real = HomeMarkers(dir.clone())
+        .list()
+        .into_iter()
+        .find(|p| p.extension().is_some_and(|e| e == "marker"))
+        .unwrap();
+    std::os::unix::fs::symlink(&real, dir.join("link.marker")).unwrap();
+    crate::sources::tests::mkfifo(&dir.join("fifo.marker"));
+    let (tx, rx) = std::sync::mpsc::channel();
+    let home = f.home.clone();
+    std::thread::spawn(move || {
+        let _ = tx.send(served(&home));
+    });
+
+    let answer = rx.recv_timeout(std::time::Duration::from_secs(5));
+
+    assert_eq!(answer.expect("served waited on a FIFO marker"), [f.main()]);
+    drop(marker);
+}
