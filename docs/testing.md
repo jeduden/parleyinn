@@ -181,8 +181,8 @@ decides from two samples files. CI's `benchmark` job runs both.
 
 The benchmark jobs (ENG-15) compare the head with its first parent:
 the `main` a pull request's merge commit sits on, or `main` before a
-push. Ten `benchmark (shard N)` jobs each build both sides' suites and
-cores in release mode on one runner and sample them interleaved, three
+push. Fifteen `benchmark (shard N)` jobs each build both sides' suites
+and cores in release mode on one runner and sample them interleaved, two
 of the thirty rounds of ten samples a side, keeping the alternation of
 which side goes first, so a drift in a runner's speed lands on both.
 The `benchmark` job pools the shards' samples; the head's gate writes

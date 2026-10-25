@@ -148,6 +148,9 @@ jobs:
           name: release-core
           path: target/release
       - run: chmod +x target/release/parinn target/release/calibrate
+      # The scenarios start the development build of the core, which
+      # a workspace test run builds and a run of one crate does not.
+      - run: cargo build --locked -p parinn
       # ENG-14: the same decoy HOME as the test job.
       - name: Run the scenarios with a decoy HOME
         shell: bash
@@ -416,10 +419,10 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+        shard: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14]
     env:
       ROUNDS: 30
-      SHARDS: 10
+      SHARDS: 15
       SHARD: ${{ matrix.shard }}
       SAMPLES: 10
     steps:

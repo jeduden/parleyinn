@@ -27,7 +27,7 @@ GREEN sites:
   crate's, and `scenarios` runs that crate with the count line taken
   from the run itself; `coverage (unit|integration|e2e)` each measure
   one layer, and `coverage` merges them and holds the floors;
-  `benchmark (shard N)` each run three of the thirty rounds, and
+  `benchmark (shard N)` each run two of the thirty rounds, and
   `benchmark` pools the samples and runs the gate; `CI` names each job
   that did not succeed.
 - `.github/workflows/build.yml`: one job per release target, the target
