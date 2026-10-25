@@ -421,6 +421,54 @@ fn the_next_rebuild_or_ingest_finishes_what_a_purge_left_and_a_stuck_step_is_cou
     assert!(!store.purge_pending().unwrap());
 }
 
+/// Puts a purged event's posting back in the search index and its step
+/// back in the purge journal: what a kill after the purge's transaction
+/// and before its finishing steps leaves (ENG-06).
+fn cut_short_after_its_transaction(p: &Process, writer: WriterId, seq: u64, text: &str) {
+    let (home, store) = open(p);
+    assert!(!store.purge_pending().unwrap());
+    drop(store);
+    let address = Address {
+        writer,
+        seq: Seq::new(seq).unwrap(),
+    };
+    let row = store::search_index::row_id_of(address).unwrap();
+    let index = rusqlite::Connection::open(home.root().join("search_index")).unwrap();
+    index
+        .execute(
+            "INSERT INTO events_fts (rowid, text) VALUES (?1, ?2)",
+            rusqlite::params![row, text],
+        )
+        .unwrap();
+    let record = rusqlite::Connection::open(home.store()).unwrap();
+    record
+        .execute(
+            "INSERT INTO purge_journal (kind, target) VALUES ('index', ?1)",
+            [format!("{writer}:{seq}-{seq}")],
+        )
+        .unwrap();
+}
+
+#[test]
+fn verify_finishes_a_purge_a_kill_cut_short_and_then_finds_the_record_whole() {
+    let (p, writer) = with_a_run();
+    let range = format!("{writer}:2-2");
+    assert_eq!(p.invoke(&["purge", "--range", &range], &DEV).0, EXIT_OK);
+    cut_short_after_its_transaction(&p, writer, 2, "two");
+
+    let (code, _, err) = p.invoke(&["verify"], &DEV);
+
+    assert_eq!((code, err.as_str()), (EXIT_OK, ""));
+    let (home, store) = open(&p);
+    assert!(!store.purge_pending().unwrap(), "verify finished the purge");
+    drop(store);
+    let index = std::fs::read(home.root().join("search_index")).unwrap();
+    assert!(
+        !index.windows(3).any(|w| w == b"two"),
+        "no posting of the purged text stays"
+    );
+}
+
 #[test]
 fn finishing_left_residue_when_a_step_failed_or_the_logs_were_held_open() {
     let done = |nothing, vacuumed| {
