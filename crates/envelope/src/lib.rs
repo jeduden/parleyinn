@@ -177,6 +177,10 @@ pub struct Envelope {
     pub truncated: bool,
     /// Where a further call continues, when truncated.
     pub next_cursor: Option<String>,
+    /// The envelope's structural fields, when it is marked structural:
+    /// ParleyInn's own counts, each under a name it ships. Nothing
+    /// recalled can enter them (`stat_list`, §9.2).
+    pub structural: Option<Vec<(&'static str, u64)>>,
 }
 
 impl Envelope {
@@ -184,26 +188,39 @@ impl Envelope {
     /// (ADM-07); until then the list is empty.
     #[must_use]
     pub fn to_value(&self) -> Value {
-        json!({
+        let mut value = json!({
             "parinn_envelope": VERSION,
             "warning": WARNING,
             "items": self.items.iter().map(Item::to_value).collect::<Vec<_>>(),
             "tombstones": [],
             "truncated": self.truncated,
             "next_cursor": self.next_cursor,
-        })
+        });
+        if let Some(fields) = &self.structural {
+            value["structural"] = fields.iter().map(|(name, n)| (*name, json!(n))).collect();
+        }
+
+        value
     }
 
     /// The envelope as JSON text, its fields in the order §9.3 shows:
     /// the warning before any item, and each item's closed fields
     /// before its content, so a model reads where the content came from
-    /// and how far to trust it before the content itself.
+    /// and how far to trust it before the content itself. A structural
+    /// envelope's mark follows the warning.
     #[must_use]
     pub fn render(&self) -> String {
         let items: Vec<String> = self.items.iter().map(Item::render).collect();
+        let structural = self.structural.as_ref().map_or_else(String::new, |fields| {
+            let fields: Vec<String> = fields
+                .iter()
+                .map(|(name, n)| format!("\"{name}\":{n}"))
+                .collect();
+            format!("\"structural\":{{{}}},", fields.join(","))
+        });
 
         format!(
-            "{{\"parinn_envelope\":{VERSION},\"warning\":{},\"items\":[{}],\"tombstones\":[],\"truncated\":{},\"next_cursor\":{}}}",
+            "{{\"parinn_envelope\":{VERSION},\"warning\":{},{structural}\"items\":[{}],\"tombstones\":[],\"truncated\":{},\"next_cursor\":{}}}",
             Value::from(WARNING),
             items.join(","),
             self.truncated,

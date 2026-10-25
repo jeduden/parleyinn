@@ -336,6 +336,7 @@ impl Server {
             items: vec![item],
             truncated: false,
             next_cursor: None,
+            structural: None,
         })
     }
 
@@ -375,6 +376,7 @@ impl Server {
             items,
             truncated: false,
             next_cursor: None,
+            structural: None,
         })
     }
 

@@ -24,6 +24,7 @@ fn the_envelope_carries_its_version_warning_items_and_continuation() {
         items: vec![item()],
         truncated: false,
         next_cursor: None,
+        structural: None,
     };
 
     assert_eq!(
@@ -57,6 +58,7 @@ fn content_reaches_the_model_only_as_a_json_string() {
         items: vec![item()],
         truncated: true,
         next_cursor: Some("c".into()),
+        structural: None,
     };
 
     let text = envelope.render();
@@ -108,6 +110,7 @@ fn render_writes_the_fields_in_the_order_the_spec_shows() {
         items: vec![item(), item()],
         truncated: false,
         next_cursor: None,
+        structural: None,
     };
 
     let text = envelope.render();
@@ -136,6 +139,7 @@ fn render_writes_the_fields_in_the_order_the_spec_shows() {
         }],
         truncated: true,
         next_cursor: Some("c".into()),
+        structural: None,
     };
     let back: serde_json::Value = serde_json::from_str(&flagged.render()).unwrap();
     assert_eq!(back, flagged.to_value());
@@ -151,6 +155,7 @@ fn a_hit_carries_its_score_before_its_content() {
         items: vec![hit.clone()],
         truncated: false,
         next_cursor: None,
+        structural: None,
     };
 
     let text = envelope.render();
@@ -163,4 +168,32 @@ fn a_hit_carries_its_score_before_its_content() {
     let back: serde_json::Value = serde_json::from_str(&text).unwrap();
     assert_eq!(back, envelope.to_value());
     assert_eq!(item().to_value().get("score"), None);
+}
+
+#[test]
+fn a_structural_envelope_is_marked_and_holds_counts_alone() {
+    let envelope = Envelope {
+        items: vec![],
+        truncated: false,
+        next_cursor: None,
+        structural: Some(vec![("events", 12), ("runs", 2)]),
+    };
+
+    let text = envelope.render();
+
+    let marked = r#""warning":"#;
+    assert!(text.contains(marked), "{text}");
+    assert!(
+        text.contains(r#","structural":{"events":12,"runs":2},"items":[]"#),
+        "{text}"
+    );
+    let back: serde_json::Value = serde_json::from_str(&text).unwrap();
+    assert_eq!(back, envelope.to_value());
+    assert_eq!(back["structural"], json!({"events": 12, "runs": 2}));
+    let plain = Envelope {
+        structural: None,
+        ..envelope
+    };
+    assert_eq!(plain.to_value().get("structural"), None);
+    assert!(!plain.render().contains("structural"));
 }
