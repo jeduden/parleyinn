@@ -95,6 +95,15 @@ fn a_call_with_no_reply_an_error_or_no_envelope_fails_naming_the_tool() {
 }
 
 #[test]
+fn a_failed_search_fails_the_recall() {
+    let mut tools = scripted(vec![None]);
+    assert_eq!(
+        recall(&mut tools, "w", "q"),
+        Err("event_search got no reply".to_owned())
+    );
+}
+
+#[test]
 fn a_failed_read_of_a_hit_fails_the_recall() {
     let mut tools = scripted(vec![answer(&json!({"items": [{"address": "w:1"}]})), None]);
     assert_eq!(
