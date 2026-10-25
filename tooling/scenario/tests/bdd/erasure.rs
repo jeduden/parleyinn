@@ -177,19 +177,41 @@ fn writer_of(w: &World, label: &str) -> Result<WriterId, String> {
 }
 
 /// What a recall of every event of `writer` showed: the seqs returned as
-/// items, and the tombstones, as seq ranges with their reasons.
+/// items, the tombstones, as seq ranges with their reasons, and the
+/// quarantine markers, as seq ranges alone (SEC-12, RCL-06).
 struct Recalled {
     items: BTreeSet<u64>,
     marks: Vec<(u64, u64, String)>,
+    markers: Vec<(u64, u64)>,
 }
 
 impl Recalled {
-    /// Whether a tombstone of `reason` covers `seq`.
-    fn marked(&self, seq: u64, reason: &str) -> bool {
-        self.marks
+    /// Whether a quarantine marker covers `seq`: a tombstone that names
+    /// the word "quarantined" does not.
+    fn quarantined(&self, seq: u64) -> bool {
+        self.markers
             .iter()
-            .any(|(from, to, why)| *from <= seq && seq <= *to && why == reason)
+            .any(|(from, to)| *from <= seq && seq <= *to)
     }
+}
+
+/// Proves the quarantine check reads markers only: a recall showing a
+/// tombstone of the reason "quarantined" holds nothing back, and one
+/// showing a marker does.
+fn marker_is_not_a_tombstone() -> Result<(), String> {
+    let mut seen = Recalled {
+        items: BTreeSet::new(),
+        marks: vec![(1, 1, "quarantined".to_owned())],
+        markers: Vec::new(),
+    };
+    if seen.quarantined(1) {
+        return Err("a tombstone naming \"quarantined\" passed for a quarantine marker".to_owned());
+    }
+    seen.markers.push((1, 1));
+    if !seen.quarantined(1) {
+        return Err("a quarantine marker was not read as one".to_owned());
+    }
+    Ok(())
 }
 
 /// Recalls every event of `writer` with `event_expand`, following the
@@ -203,6 +225,7 @@ fn recall_all(w: &mut World, writer: WriterId) -> Result<Recalled, String> {
     let mut out = Recalled {
         items: BTreeSet::new(),
         marks: Vec::new(),
+        markers: Vec::new(),
     };
     for _ in 0..200 {
         let answer = call_tool(w, "event_expand", arguments)?;
@@ -221,8 +244,8 @@ fn recall_all(w: &mut World, writer: WriterId) -> Result<Recalled, String> {
             let reason = mark["reason"].as_str().unwrap_or_default().to_owned();
             out.marks.push((range.from.get(), range.to.get(), reason));
         }
-        // A quarantine marker is the range alone: its reason is the
-        // word the scenario steps use for it.
+        // A quarantine marker is the range alone, kept apart from the
+        // tombstones.
         for mark in envelope["quarantine_markers"]
             .as_array()
             .into_iter()
@@ -230,8 +253,7 @@ fn recall_all(w: &mut World, writer: WriterId) -> Result<Recalled, String> {
         {
             let range = Range::parse(mark["range"].as_str().unwrap_or_default())
                 .map_err(|e| e.to_string())?;
-            out.marks
-                .push((range.from.get(), range.to.get(), "quarantined".to_owned()));
+            out.markers.push((range.from.get(), range.to.get()));
         }
         match envelope["next_cursor"].as_str() {
             Some(cursor) => arguments = json!({"cursor": cursor}),
@@ -735,6 +757,7 @@ fn operator_event_records(w: &mut World, reason: String) -> Result<(), String> {
     regex = r"^the matched events are absent from every later recall, landmark, injection and trusted-only export on this node$"
 )]
 fn matched_absent(w: &mut World) -> Result<(), String> {
+    marker_is_not_a_tombstone()?;
     let selector = er(w).selector.clone().ok_or("no step chose a selector")?;
     let (events, first) = events(w)?;
     let writers: BTreeSet<WriterId> = events.iter().map(|e| e.writer).collect();
@@ -743,7 +766,7 @@ fn matched_absent(w: &mut World) -> Result<(), String> {
         for event in events.iter().filter(|e| e.writer == writer) {
             let held = selected(&selector, event, first)?;
             let shown = seen.items.contains(&event.seq);
-            if held && (shown || !seen.marked(event.seq, "quarantined")) {
+            if held && (shown || !seen.quarantined(event.seq)) {
                 return Err(format!(
                     "{}:{} matches {selector:?} yet is {}",
                     event.writer,
@@ -803,7 +826,7 @@ fn release_is_recorded(w: &mut World) -> Result<(), String> {
     let mut marked = 0;
     for writer in before.iter().map(|e| e.writer).collect::<BTreeSet<_>>() {
         let seen = recall_all(w, writer)?;
-        marked += seen.marks.iter().filter(|m| m.2 == "quarantined").count();
+        marked += seen.markers.len();
     }
     if marked == 0 {
         return Err("no quarantine marker stands before the release".to_owned());
@@ -827,7 +850,7 @@ fn release_is_recorded(w: &mut World) -> Result<(), String> {
     let writers: BTreeSet<WriterId> = events.iter().map(|e| e.writer).collect();
     for writer in writers {
         let seen = recall_all(w, writer)?;
-        if let Some(mark) = seen.marks.iter().find(|(_, _, why)| why == "quarantined") {
+        if let Some(mark) = seen.markers.first() {
             return Err(format!(
                 "{selector:?} is released, yet {mark:?} stays held back"
             ));
