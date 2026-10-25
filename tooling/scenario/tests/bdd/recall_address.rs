@@ -3,10 +3,9 @@
 //! wherever an address is taken, to the same events, on the MCP tools
 //! and on `parinn event expand`.
 //!
-//! `@RCL-08` stays pending: its clause on the tombstone or quarantine
-//! marker of a purged or quarantined event needs `parinn purge --range`
-//! and `parinn quarantine add` (phase 14), so that step fails naming
-//! them. Its other clauses pass for every row.
+//! Its clause on the tombstone or quarantine marker of a purged or
+//! quarantined event quarantines the shown events, then purges them, and
+//! asks again in the same form ([`crate::erasure`]).
 
 use ::record::id::{Address, RoomId, Seq, WriterId};
 use ::record::range::{self, Label};
@@ -23,6 +22,8 @@ use crate::record_search::{Reply, call_tool, last_reply};
 pub struct AddressSteps {
     /// The address as shown, and the events it names.
     shown: Option<Shown>,
+    /// The tool the last call used.
+    tool: Option<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -85,6 +86,7 @@ fn an_address_in_form(w: &mut World, form: String) -> Result<(), String> {
 /// Calls `tool` with the address shown, as the form asks: an address for
 /// `event_get`, a range for `event_expand`.
 pub fn call_that_address(w: &mut World, tool: &str) -> Result<(), String> {
+    steps(w).tool = Some(tool.to_owned());
     let text = steps(w)
         .shown
         .clone()
@@ -136,8 +138,16 @@ fn exactly_the_events(w: &mut World) -> Result<(), String> {
 #[then(
     regex = r"^an address of a purged or quarantined event resolves to its tombstone or quarantine marker$"
 )]
-fn purged_resolves(_w: &mut World) -> Result<(), String> {
-    Err("needs parinn purge --range and parinn quarantine add (phase 14)".to_owned())
+fn purged_resolves(w: &mut World) -> Result<(), String> {
+    let shown = shown(w)?;
+    let tool = steps(w).tool.clone().ok_or("no step called a tool")?;
+    let range = crate::erasure::ShownRange {
+        writer: shown.writer,
+        from: shown.from,
+        to: shown.to,
+    };
+
+    crate::erasure::resolves_to_markers(w, &range, &|w| call_that_address(w, &tool))
 }
 
 #[then(

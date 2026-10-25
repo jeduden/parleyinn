@@ -250,6 +250,29 @@ fn a_tombstone_names_its_range_and_reason() {
 }
 
 #[test]
+fn a_quarantined_range_shows_as_a_tombstone_of_its_own_reason() {
+    let envelope = Envelope {
+        tombstones: vec![Tombstone {
+            range: "A1·12".into(),
+            reason: TombstoneReason::Quarantined,
+        }],
+        ..Envelope::default()
+    };
+
+    let text = envelope.render();
+
+    assert!(
+        text.contains(r#""tombstones":[{"range":"A1·12","reason":"quarantined"}]"#),
+        "{text}"
+    );
+    assert_eq!(
+        serde_json::from_str::<serde_json::Value>(&text).unwrap(),
+        envelope.to_value()
+    );
+    assert_eq!(TombstoneReason::Purged.as_str(), "purged");
+}
+
+#[test]
 fn an_item_costs_the_estimate_of_its_rendering() {
     let small = item();
     let big = Item {

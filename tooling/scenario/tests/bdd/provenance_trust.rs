@@ -35,7 +35,7 @@ fn append_to(path: &Path, text: &str) -> Result<(), String> {
 /// Writes managed policy holding `text` into a directory of its own that
 /// another OS user owns, as managed policy must be (ADM-04), and points
 /// the core at it, given away as root or through `sudo -n`.
-fn managed_policy(w: &mut World, text: &str) -> Result<(), String> {
+pub(crate) fn managed_policy(w: &mut World, text: &str) -> Result<(), String> {
     let dir = w.home.join("managed");
     fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
     let path = dir.join("managed_policy.toml");

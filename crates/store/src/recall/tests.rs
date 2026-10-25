@@ -205,3 +205,186 @@ fn the_head_of_a_log_is_its_last_seq_and_an_empty_log_has_none() {
     assert_eq!(store.head(writer(2)).unwrap(), None);
     assert_eq!(store.head(writer(9)).unwrap(), None);
 }
+
+#[test]
+fn the_contents_of_one_kind_come_in_seq_order_without_the_erased_or_unparsed() {
+    let dir = TempDir::new().unwrap();
+    let mut store = open(&dir);
+    seat(&mut store, writer(1), room(1));
+    let act = |n: u64| {
+        event(
+            EventKind::PrincipalAct,
+            Provenance::Operator,
+            json!({"n": n}),
+        )
+    };
+    store
+        .append(
+            writer(1),
+            &[
+                act(1),
+                line("other kind", Provenance::Web),
+                act(2),
+                act(3),
+                act(4),
+            ],
+        )
+        .unwrap();
+    store
+        .conn
+        .execute("UPDATE events SET content = NULL WHERE seq = 3", [])
+        .unwrap();
+    store
+        .conn
+        .execute("UPDATE events SET content = 'not json' WHERE seq = 4", [])
+        .unwrap();
+
+    let found = store.contents(writer(1), EventKind::PrincipalAct).unwrap();
+
+    let seqs: Vec<u64> = found.iter().map(|(s, _)| s.get()).collect();
+    assert_eq!(seqs, [1, 5]);
+    assert_eq!(found[0].1, json!({"n": 1}));
+    assert!(
+        store
+            .contents(writer(2), EventKind::PrincipalAct)
+            .unwrap()
+            .is_empty()
+    );
+}
+
+#[test]
+fn a_range_shows_each_event_without_its_content_and_whether_it_was_erased() {
+    let dir = TempDir::new().unwrap();
+    let mut store = open(&dir);
+    seat(&mut store, writer(1), room(1));
+    store
+        .append(
+            writer(1),
+            &[
+                line("a", Provenance::Web),
+                assign(None),
+                line("c", Provenance::Web),
+            ],
+        )
+        .unwrap();
+    store
+        .conn
+        .execute(
+            "UPDATE events SET content = NULL, commitment_key = NULL WHERE seq = 2",
+            [],
+        )
+        .unwrap();
+
+    let seq = |n: u64| Seq::new(n).unwrap();
+    let found = store.range_events(writer(1), seq(2), seq(9)).unwrap();
+
+    let shown: Vec<(u64, EventKind, Provenance, bool)> = found
+        .iter()
+        .map(|e| (e.seq.get(), e.kind, e.provenance.clone(), e.erased))
+        .collect();
+    assert_eq!(
+        shown,
+        [
+            (2, EventKind::WriterLabel, Provenance::Structural, true),
+            (3, EventKind::TranscriptLine, Provenance::Web, false)
+        ]
+    );
+    let held = store.log(writer(1)).unwrap();
+    assert_eq!(found[1].commitment, held[2].link.header.commitment);
+    assert!(
+        store
+            .range_events(writer(2), seq(1), seq(9))
+            .unwrap()
+            .is_empty()
+    );
+}
+
+#[test]
+fn an_event_shows_its_classes_timestamp_and_erasure() {
+    let dir = TempDir::new().unwrap();
+    let mut store = open(&dir);
+    seat(&mut store, writer(1), room(1));
+    let mut stamped = line("a", Provenance::Web);
+    stamped.transcript_timestamp = Some("2026-01-01T00:00:00Z".to_owned());
+    store.append(writer(1), &[stamped]).unwrap();
+    let at = |n: u64| Address::new(writer(1), Seq::new(n).unwrap());
+
+    let facts = store.event_facts(at(1)).unwrap().unwrap();
+
+    assert_eq!(facts.kind, EventKind::TranscriptLine);
+    assert_eq!(facts.provenance, Provenance::Web);
+    assert_eq!(facts.timestamp.as_deref(), Some("2026-01-01T00:00:00Z"));
+    assert!(!facts.erased);
+    assert_eq!(store.event_facts(at(2)).unwrap(), None);
+    store
+        .conn
+        .execute("UPDATE events SET kind = 'nonsense'", [])
+        .unwrap();
+    assert!(store.event_facts(at(1)).is_err());
+}
+
+#[test]
+fn the_heads_a_device_seat_cited_come_in_the_order_it_cited_them() {
+    let dir = TempDir::new().unwrap();
+    let mut store = open(&dir);
+    seat(&mut store, writer(1), room(1));
+    seat(&mut store, writer(2), room(1));
+    let seq = |n: u64| Seq::new(n).unwrap();
+    store
+        .append(writer(1), &[line("a", Provenance::Web)])
+        .unwrap();
+    store
+        .append(writer(2), &[line("device", Provenance::Structural)])
+        .unwrap();
+    store
+        .append(
+            writer(1),
+            &[line("b", Provenance::Web), line("c", Provenance::Web)],
+        )
+        .unwrap();
+    store
+        .append(writer(2), &[line("device again", Provenance::Structural)])
+        .unwrap();
+    store
+        .append(writer(2), &[line("nothing new", Provenance::Structural)])
+        .unwrap();
+
+    let cited = store.citations(writer(2), writer(1)).unwrap();
+
+    assert_eq!(cited, [(seq(1), seq(1)), (seq(2), seq(3))]);
+    assert!(store.citations(writer(1), writer(2)).unwrap().len() <= 1);
+    assert!(store.citations(writer(2), writer(9)).unwrap().is_empty());
+}
+
+#[test]
+fn a_range_with_a_row_that_does_not_parse_is_corrupt() {
+    let dir = TempDir::new().unwrap();
+    let mut store = open(&dir);
+    seat(&mut store, writer(1), room(1));
+    store
+        .append(writer(1), &[line("a", Provenance::Web)])
+        .unwrap();
+    let seq = Seq::new(1).unwrap();
+    for (column, good, bad) in [
+        ("kind", "transcript_line", "nonsense"),
+        ("provenance", "web", "nonsense"),
+    ] {
+        let set = |value: &str| {
+            store
+                .conn
+                .execute(&format!("UPDATE events SET {column} = '{value}'"), [])
+                .unwrap()
+        };
+        set(bad);
+
+        let err = store.range_events(writer(1), seq, seq).unwrap_err();
+
+        assert!(err.to_string().contains(column), "{err}");
+        set(good);
+    }
+    store
+        .conn
+        .execute("UPDATE events SET commitment = 'zz'", [])
+        .unwrap();
+    assert!(store.range_events(writer(1), seq, seq).is_err());
+}

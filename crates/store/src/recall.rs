@@ -5,10 +5,11 @@
 
 use std::collections::BTreeMap;
 
-use record::event::EventKind;
-use record::id::{RoomId, Seq, WriterId};
+use record::commitment::Commitment;
+use record::event::{EventKind, Provenance};
+use record::id::{Address, RoomId, Seq, WriterId};
 use record::range::Label;
-use rusqlite::Connection;
+use rusqlite::{Connection, OptionalExtension};
 use serde_json::Value;
 
 use crate::StoreError;
@@ -74,6 +75,150 @@ pub(crate) fn certified(conn: &Connection, device: WriterId) -> Result<Vec<Write
             .and_then(|content| serde_json::from_str::<Value>(&content).ok())
             .and_then(|content| WriterId::parse(content["writer"].as_str()?).ok());
         out.extend(writer);
+    }
+
+    Ok(out)
+}
+
+/// The content of each event of kind `kind` in `writer`'s log, in seq
+/// order, with its seq. An event whose content a purge erased, or that
+/// does not parse, is left out.
+pub(crate) fn contents(
+    conn: &Connection,
+    writer: WriterId,
+    kind: EventKind,
+) -> Result<Vec<(Seq, Value)>, StoreError> {
+    let mut statement = conn.prepare(CONTENTS)?;
+    let args = [writer.to_string(), kind.as_str().to_owned()];
+    let rows = statement.query_map(args, |r| Ok((r.get::<_, i64>(0)?, r.get::<_, String>(1)?)))?;
+    let mut out = Vec::new();
+    for row in rows {
+        let (seq, content) = row?;
+        let parsed = serde_json::from_str::<Value>(&content).ok();
+        out.extend(crate::seq_of(seq).zip(parsed));
+    }
+
+    Ok(out)
+}
+
+/// The statements recall reads the record with, apart from their calls.
+const CONTENTS: &str = "SELECT seq, content FROM events
+    WHERE writer = ?1 AND kind = ?2 AND content IS NOT NULL ORDER BY seq";
+const RANGE: &str = "SELECT seq, kind, provenance, commitment,
+        content IS NULL AND commitment_key IS NULL AND payload IS NULL
+    FROM events WHERE writer = ?1 AND seq BETWEEN ?2 AND ?3 ORDER BY seq";
+/// A row of [`RANGE`]: seq, kind, provenance, commitment, erased.
+type RangeRow = (i64, String, String, String, bool);
+const CITATIONS: &str = "SELECT seq, other_seq FROM event_heads
+    WHERE writer = ?1 AND other_writer = ?2 ORDER BY seq";
+
+/// What a range of one writer's log shows without its content: each
+/// event's kind, provenance class, commitment and whether a purge erased
+/// it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RangeEvent {
+    pub seq: Seq,
+    pub kind: EventKind,
+    pub provenance: Provenance,
+    pub commitment: Commitment,
+    /// Its content, commitment key and payload are all gone.
+    pub erased: bool,
+}
+
+/// The events of `writer` from `first` to `last`, in seq order, as the
+/// log holds them: none of their content is read.
+pub(crate) fn range_events(
+    conn: &Connection,
+    writer: WriterId,
+    first: Seq,
+    last: Seq,
+) -> Result<Vec<RangeEvent>, StoreError> {
+    let mut statement = conn.prepare(RANGE)?;
+    let args = rusqlite::params![writer.to_string(), crate::sql(first), crate::sql(last)];
+    let rows = statement.query_map(args, |r| -> rusqlite::Result<RangeRow> {
+        Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?, r.get(4)?))
+    })?;
+    let corrupt = |what: &str| StoreError::Corrupt {
+        address: None,
+        what: format!("{what} of an event of writer {writer}"),
+    };
+    rows.map(|row| {
+        let (seq, kind, provenance, commitment, erased) = row?;
+        Ok(RangeEvent {
+            seq: crate::seq_of(seq).ok_or_else(|| corrupt("seq"))?,
+            kind: EventKind::parse(&kind).ok_or_else(|| corrupt("kind"))?,
+            provenance: Provenance::parse(&provenance).ok_or_else(|| corrupt("provenance"))?,
+            commitment: Commitment::from_hex(&commitment).map_err(|_| corrupt("commitment"))?,
+            erased,
+        })
+    })
+    .collect()
+}
+
+/// What an event shows of itself that a quarantine selector reads.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct EventFacts {
+    pub kind: EventKind,
+    pub provenance: Provenance,
+    /// The transcript timestamp, kept as metadata (REC-12); none when the
+    /// line carried none or a purge erased it.
+    pub timestamp: Option<String>,
+    /// Its content, commitment key and payload are all gone.
+    pub erased: bool,
+}
+
+/// The facts of the event at `address`; none when it is not there.
+pub(crate) fn event_facts(
+    conn: &Connection,
+    address: Address,
+) -> Result<Option<EventFacts>, StoreError> {
+    let row = conn
+        .query_row(
+            "SELECT kind, provenance, transcript_timestamp,
+                    content IS NULL AND commitment_key IS NULL AND payload IS NULL
+             FROM events WHERE writer = ?1 AND seq = ?2",
+            rusqlite::params![address.writer.to_string(), crate::sql(address.seq)],
+            |r| {
+                Ok((
+                    r.get::<_, String>(0)?,
+                    r.get::<_, String>(1)?,
+                    r.get::<_, Option<String>>(2)?,
+                    r.get::<_, bool>(3)?,
+                ))
+            },
+        )
+        .optional()?;
+    let corrupt = |what: &str| StoreError::Corrupt {
+        address: Some(address),
+        what: what.to_owned(),
+    };
+
+    row.map(|(kind, provenance, timestamp, erased)| {
+        Ok(EventFacts {
+            kind: EventKind::parse(&kind).ok_or_else(|| corrupt("kind"))?,
+            provenance: Provenance::parse(&provenance).ok_or_else(|| corrupt("provenance"))?,
+            timestamp,
+            erased,
+        })
+    })
+    .transpose()
+}
+
+/// The heads of `writer` that events of `device` cited, as pairs of the
+/// citing event's seq and the seq of `writer`'s event it cited, in the
+/// order they were cited: the causal order of the two logs (PRV-12).
+pub(crate) fn citations(
+    conn: &Connection,
+    device: WriterId,
+    writer: WriterId,
+) -> Result<Vec<(Seq, Seq)>, StoreError> {
+    let mut statement = conn.prepare(CITATIONS)?;
+    let args = [device.to_string(), writer.to_string()];
+    let rows = statement.query_map(args, |r| Ok((r.get::<_, i64>(0)?, r.get::<_, i64>(1)?)))?;
+    let mut out = Vec::new();
+    for row in rows {
+        let (citing, cited) = row?;
+        out.extend(crate::seq_of(citing).zip(crate::seq_of(cited)));
     }
 
     Ok(out)

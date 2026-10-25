@@ -124,7 +124,10 @@ impl Continuation {
 /// Why a range is not shown (§9.3).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TombstoneReason {
+    /// A purge erased the range's content (ADM-07).
     Purged,
+    /// A quarantine holds the range back, its content kept (SEC-12).
+    Quarantined,
 }
 
 impl TombstoneReason {
@@ -133,6 +136,7 @@ impl TombstoneReason {
     pub fn as_str(self) -> &'static str {
         match self {
             Self::Purged => "purged",
+            Self::Quarantined => "quarantined",
         }
     }
 }

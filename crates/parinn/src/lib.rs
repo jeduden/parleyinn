@@ -2,8 +2,8 @@
 //! handlers, the MCP server and the CLI so far.
 //!
 //! It runs `version`, `ingest`, `mcp`, `verify`, `hook`,
-//! `status`, `doctor`, and the principal acts `counter ack`,
-//! `configuration accept` and `risk-acceptance`. Every other
+//! `status`, `doctor`, `purge`, `quarantine`, and the principal acts
+//! `counter ack`, `configuration accept` and `risk-acceptance`. Every other
 //! command in the SRS's §9.5 is a pending scenario under features/, and
 //! lands with the plan that makes its scenario pass.
 
@@ -88,6 +88,10 @@ commands:
   ingest --all | --path P [--json]       record every transcript under the roots, or the one at P
   licenses                               print the third-party license texts built in
   mcp                                    serve the MCP tools over stdio
+  purge --range RANGE [--reason TEXT]    erase the content of an address range (widening)
+  quarantine add SELECTOR [--reason T]   hold events out of recall (cut)
+  quarantine release SELECTOR            take a quarantine back (widening)
+  quarantine list [--json]               show the quarantines in force
   repository show [DIR] [--json]         show the repository identity of DIR, the working directory by default
   repository bind [DIR] [--commit ID]    bind or rebind the repository identity (widening)
   rebuild [--json]                       derive the origins and the search index again from the record
@@ -315,6 +319,8 @@ pub fn run(
         Some("ingest") => ingest(args, ctx, stdout, stderr),
         Some("licenses") => licenses::licenses(args, stdout, stderr),
         Some("mcp") => mcp(args, ctx, stdout, stderr),
+        Some("purge") => purge::purge(args, ctx, stdout, stderr),
+        Some("quarantine") => quarantine::quarantine(args, ctx, stdout, stderr),
         Some("rebuild") => rebuild::rebuild(args, ctx, stdout, stderr),
         Some("repository") => repository_identity::repository(args, ctx, stdout, stderr),
         Some("risk-acceptance") => act::risk_acceptance(args, ctx, stdout, stderr),
@@ -378,6 +384,14 @@ pub(crate) fn json_flag(
     }
 
     Some(as_json)
+}
+
+/// Logs the failure of `result`, if it failed, as what `what` says: for
+/// work that must not stop the command it runs in (I9).
+pub(crate) fn logged<T, E: std::fmt::Display>(what: &str, result: Result<T, E>) {
+    if let Err(e) = result {
+        tracing::warn!(error = e.to_string().as_str(), what, "failed");
+    }
 }
 
 /// Reports a failure of `command` on `stderr`.
@@ -471,7 +485,10 @@ fn ingest(
     // not to, each transcript would fail with why.
     let redactor = redactor(ctx, settings, stderr);
     match start_node(ctx, &home, stderr) {
-        Ok(mut store) => count_untaken_bindings(ctx, &mut store),
+        Ok(mut store) => {
+            purge::finish(ctx, &mut store);
+            count_untaken_bindings(ctx, &mut store);
+        }
         Err(e) => return failed("ingest", &e, stderr),
     }
     // What an MCP server killed before it stopped left is audited by
@@ -493,6 +510,7 @@ fn ingest(
     let held = held_sources(ctx, settings, &home, stderr);
     let held: Vec<&Path> = held.iter().map(AllowedPath::path).collect();
     failures += ingest_all(ctx, &home, &held, &redactor, &inputs, stderr).1;
+    apply_retention(ctx, &home, settings, stderr);
     if target == IngestTarget::All {
         audit_lost(ctx, &home, stderr);
     }
@@ -500,6 +518,25 @@ fn ingest(
     let code = written(write!(stdout, "{shown}"), stderr);
 
     if failures > 0 { EXIT_FAILURE } else { code }
+}
+
+/// Applies the retention policies in force once the ingest is done
+/// (SEC-22); a failure to open the store again is audited and counted,
+/// and stops nothing (I9).
+fn apply_retention(
+    ctx: &Context,
+    home: &Home,
+    settings: &configuration::resolve::Settings,
+    stderr: &mut dyn Write,
+) {
+    if retention::policies(settings).is_empty() {
+        return;
+    }
+    let opened = start_node(ctx, home, stderr).and_then(|store| {
+        let node = Node::find(home, &store).map_err(|e| e.to_string())?;
+        Ok((store, node))
+    });
+    retention::apply_opened(ctx, opened, settings, &mut OsEntropy);
 }
 
 /// Ingests each transcript source at `paths`. Returns a report of each
@@ -2042,9 +2079,12 @@ mod hook_handlers;
 mod identity_status;
 mod index_gaps;
 mod licenses;
+mod purge;
+mod quarantine;
 mod rebuild;
 mod recall;
 mod repository_identity;
+mod retention;
 mod segments;
 mod settings;
 mod sources;

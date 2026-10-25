@@ -10,7 +10,7 @@ use record::range::Label;
 
 /// A fixture whose transcript holds the lines `lines`, each an
 /// unparsed line, so its text is the line itself.
-fn fixture_of(lines: &[String]) -> Fixture {
+pub(super) fn fixture_of(lines: &[String]) -> Fixture {
     let dir = TempDir::new().unwrap();
     let home = Home::locate(Some(dir.path().join(".parinn").as_os_str()), None).unwrap();
     let path = dir.path().join("t.jsonl");
@@ -31,7 +31,7 @@ fn lines(n: usize, width: usize) -> Vec<String> {
         .collect()
 }
 
-fn tool(server: &mut Server, name: &str, arguments: Value) -> Value {
+pub(super) fn tool(server: &mut Server, name: &str, arguments: Value) -> Value {
     call(
         server,
         json!({"jsonrpc": "2.0", "id": 9, "method": "tools/call", "params": {"name": name, "arguments": arguments}}),
@@ -40,13 +40,13 @@ fn tool(server: &mut Server, name: &str, arguments: Value) -> Value {
 }
 
 /// The writer of the device seat of the fixture's node.
-fn device(f: &Fixture) -> WriterId {
+pub(super) fn device(f: &Fixture) -> WriterId {
     let store = Store::open(&f.home.store()).unwrap();
     Node::find(&f.home, &store).unwrap().device_writer()
 }
 
 /// A server that records each recall without redacting anything.
-fn recording(f: &Fixture) -> Server {
+pub(super) fn recording(f: &Fixture) -> Server {
     f.server().with_recall_writer(RecallWriter {
         writer: device(f),
         redact: Some(Box::new(|t| (t.to_owned(), Vec::new()))),
@@ -108,7 +108,7 @@ fn bound(server: &mut Server, name: &str, arguments: Value) -> Value {
         .clone()
 }
 
-fn text_of(result: &Value) -> &str {
+pub(super) fn text_of(result: &Value) -> &str {
     result["content"][0]["text"].as_str().unwrap()
 }
 

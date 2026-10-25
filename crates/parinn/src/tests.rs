@@ -106,6 +106,25 @@ impl Process {
     }
 
     pub(crate) fn invoke(&self, args: &[&str], build: &Build) -> (u8, String, String) {
+        let (mut out, mut err) = (Vec::new(), Vec::new());
+        let code = self.with_context(build, |ctx| {
+            run(
+                args.iter().map(|a| (*a).to_owned()),
+                ctx,
+                &mut out,
+                &mut err,
+            )
+        });
+
+        (
+            code,
+            String::from_utf8(out).unwrap(),
+            String::from_utf8(err).unwrap(),
+        )
+    }
+
+    /// Runs `f` with the context an invocation of this process gets.
+    pub(crate) fn with_context<T>(&self, build: &Build, f: impl FnOnce(&Context) -> T) -> T {
         let now = self.now;
         let (lines, input_error, held_open, too_large) = (
             self.lines.clone(),
@@ -155,19 +174,8 @@ impl Process {
             live_limit: self.live_limit,
             query_deadline: self.query_deadline,
         };
-        let (mut out, mut err) = (Vec::new(), Vec::new());
-        let code = run(
-            args.iter().map(|a| (*a).to_owned()),
-            &ctx,
-            &mut out,
-            &mut err,
-        );
 
-        (
-            code,
-            String::from_utf8(out).unwrap(),
-            String::from_utf8(err).unwrap(),
-        )
+        f(&ctx)
     }
 
     /// Writes a transcript under the default transcript root,

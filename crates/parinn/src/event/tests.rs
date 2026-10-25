@@ -262,6 +262,26 @@ fn the_command_reports_a_home_it_cannot_find() {
 }
 
 #[test]
+fn a_tombstone_shows_as_a_line_of_its_own_with_its_range_and_reason_safely() {
+    let envelope = json!({
+        "warning": "w",
+        "items": [],
+        "tombstones": [
+            {"range": "A1·30–40", "reason": "purged"},
+            {"range": "A1·12\nforged", "reason": "quarantined"},
+        ],
+        "next_cursor": null,
+    });
+
+    let text = render(&envelope);
+
+    assert_eq!(
+        text,
+        "w\n\ntombstone A1·30–40 purged\n\ntombstone A1·12<U+000A>forged quarantined\n"
+    );
+}
+
+#[test]
 fn off_a_terminal_a_refusal_the_audit_log_cannot_take_is_still_refused_and_said() {
     let mut p = Process::new();
     p.invoke(&["ingest", "--path", &p.transcript("two needle\n")], &DEV);

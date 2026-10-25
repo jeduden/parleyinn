@@ -109,6 +109,7 @@ fn a_seat_whose_certificate_does_not_read_or_names_another_writer_reads_peer() {
     let mut seat = store.seat(node.device_writer()).unwrap().unwrap();
     let keys = KeySet::load(&store, &node.device().public()).unwrap();
     assert_eq!(keys.origin_of(&seat), Origin::Witnessed);
+    assert_eq!(keys.device_writer(), Some(node.device_writer()));
 
     seat.room = RoomId::derive(&[9; 32], &[9; 16]);
     assert_eq!(keys.origin_of(&seat), Origin::Peer);
@@ -134,6 +135,12 @@ fn after_a_node_identity_change_no_writer_reads_witnessed_or_ingested() {
 
     let origins = derive(&store, &node.device().public()).unwrap();
 
+    let keys = KeySet::load(&store, &node.device().public()).unwrap();
+    assert_eq!(
+        keys.device_writer(),
+        None,
+        "no key of this node's is its own"
+    );
     assert_eq!(origins.len(), 4);
     assert!(origins.values().all(|o| *o == Origin::Peer));
     assert_eq!(origins[&old.device_writer()], Origin::Peer);

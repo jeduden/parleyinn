@@ -1044,3 +1044,21 @@ fn a_search_over_the_matches_a_caller_keeps_chooses_them_before_the_cut() {
 
     assert_eq!(seqs(&kept), [oldest]);
 }
+
+#[test]
+fn an_event_a_purge_erased_is_no_match_though_its_postings_remain() {
+    let dir = TempDir::new().unwrap();
+    let store = with(&dir, &texts(&["the wombat rolled back", "a quiet day"]));
+    assert_eq!(seqs(&find(&store, "wombat")), [1]);
+
+    store
+        .conn
+        .execute(
+            "UPDATE events SET content = NULL, commitment_key = NULL WHERE seq = 1",
+            [],
+        )
+        .unwrap();
+
+    assert_eq!(seqs(&find(&store, "wombat")), Vec::<u64>::new());
+    assert_eq!(seqs(&find(&store, "quiet")), [2]);
+}

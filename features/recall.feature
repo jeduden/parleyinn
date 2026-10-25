@@ -76,7 +76,7 @@ Feature: Recall (RCL)
     Then the event is not returned, and the error says the address lies outside the current scope
     And with scope "room" and room "L1" the event is returned, and an audit entry logs the extended recall scope
 
-  @RCL-06 @P0 @I5 @pending
+  @RCL-06 @P0 @I5
   Scenario: quarantined events are never recalled and purged ranges return a tombstone
     Given an isolated ParleyInn home
     And an agent run with a Claude Code transcript "poisoned-web"
@@ -95,7 +95,7 @@ Feature: Recall (RCL)
     And that event lists the addresses of the returned events
     And the stat "recalls" increases by 1
 
-  @RCL-08 @P1 @I1 @pending
+  @RCL-08 @P1 @I1
   Scenario Outline: every address ParleyInn shows, and its ASCII input form, resolves wherever an address is taken
     Given an isolated ParleyInn home
     And an agent run with a Claude Code transcript "short-run"

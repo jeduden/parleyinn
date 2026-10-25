@@ -160,3 +160,119 @@ fn a_cut_falls_on_a_character_boundary_of_multibyte_text() {
         assert_eq!(format!("{}{rest}", cut.content), content, "{unit}");
     }
 }
+
+fn seat(label: bool) -> (StoredSeat, Option<Label>) {
+    let room = RoomId::derive(&[1; 32], &[2; 16]);
+    let seat = StoredSeat {
+        writer: writer(),
+        seat: record::id::SeatId::derive(&room, &[1; 32]),
+        room,
+        certificate: json!({}),
+    };
+
+    (seat, label.then(|| Label::new(1).unwrap()))
+}
+
+fn seq(n: u64) -> Seq {
+    Seq::new(n).unwrap()
+}
+
+#[test]
+fn consecutive_seqs_of_one_reason_share_a_tombstone() {
+    let (seat, label) = seat(true);
+    let mut marks = Marks::new(&seat, label);
+    assert!(marks.is_empty());
+
+    for n in [3, 4, 5] {
+        marks.add(seq(n), TombstoneReason::Purged);
+    }
+    marks.add(seq(6), TombstoneReason::Quarantined);
+    marks.add(seq(9), TombstoneReason::Quarantined);
+
+    assert!(!marks.is_empty());
+    let ranges: Vec<(String, &str)> = marks
+        .finish()
+        .into_iter()
+        .map(|t| (t.range, t.reason.as_str()))
+        .collect();
+    assert_eq!(
+        ranges,
+        [
+            ("A1·3–5".to_owned(), "purged"),
+            ("A1·6".to_owned(), "quarantined"),
+            ("A1·9".to_owned(), "quarantined"),
+        ]
+    );
+}
+
+#[test]
+fn a_seq_begins_a_tombstone_unless_it_follows_the_last_of_its_reason() {
+    let (seat, label) = seat(true);
+    let mut marks = Marks::new(&seat, label);
+
+    assert!(marks.begins(seq(1), TombstoneReason::Purged));
+    marks.add(seq(1), TombstoneReason::Purged);
+    assert!(!marks.begins(seq(2), TombstoneReason::Purged));
+    assert!(marks.begins(seq(2), TombstoneReason::Quarantined));
+    assert!(marks.begins(seq(3), TombstoneReason::Purged));
+}
+
+#[test]
+fn a_writer_without_a_label_shows_its_ranges_in_the_full_form() {
+    let (seat, label) = seat(false);
+    let mut marks = Marks::new(&seat, label);
+    marks.add(seq(2), TombstoneReason::Purged);
+    marks.add(seq(3), TombstoneReason::Purged);
+
+    let shown = marks.finish();
+
+    assert_eq!(
+        shown[0].range,
+        format!("parinn:room/{}/w/{}/2-3", seat.room, seat.writer)
+    );
+    assert!(record::range::Range::parse(&shown[0].range).is_ok());
+}
+
+#[test]
+fn a_new_tombstone_costs_tokens_and_one_that_extends_another_costs_none() {
+    let mut budget = Budget::new();
+    let before = budget.left;
+
+    assert!(budget.mark(false, 40));
+    assert_eq!(budget.left, before);
+    assert!(budget.mark(true, 40));
+    assert_eq!(before - budget.left, 40);
+    assert!(budget.holds);
+}
+
+#[test]
+fn a_tombstone_that_does_not_fit_after_others_stops_the_call() {
+    let mut budget = Budget::new();
+    budget.holds = true;
+    budget.left = 39;
+
+    assert!(!budget.mark(true, 40));
+    assert_eq!(budget.left, 39);
+    let mut first = Budget::new();
+    first.left = 39;
+    assert!(first.mark(true, 40), "the first of a call always goes in");
+    assert_eq!(first.left, 0);
+}
+
+#[test]
+fn the_budget_charges_a_tombstone_its_longest_range() {
+    let (seat, label) = seat(true);
+    let short = Marks::new(&seat, label);
+    let (seat, none) = self::seat(false);
+    let full = Marks::new(&seat, none);
+
+    // A label's range is short; a full-form one costs several times more.
+    assert!(short.cost() > 20 && short.cost() < 120, "{}", short.cost());
+    assert!(full.cost() > short.cost());
+    let widest = format!(
+        "parinn:room/{}/w/{}/{WIDEST_SEQ}-{WIDEST_SEQ}",
+        seat.room, seat.writer
+    );
+    assert!(record::range::Range::parse(&widest).is_ok());
+    assert_eq!(WIDEST_SEQ.len(), 16);
+}

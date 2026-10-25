@@ -50,6 +50,7 @@ use std::sync::mpsc::{Receiver, RecvTimeoutError};
 use std::time::Duration;
 
 use administration::origin::{KeySet, Origin as Derived};
+use administration::quarantine::Quarantine;
 use administration::trust_policy::{self, TrustLevel as Level};
 use envelope::{Envelope, Origin, TrustLevel};
 use key::signing::PublicKey;
@@ -355,15 +356,20 @@ impl Server {
             });
         };
         let keys = KeySet::load(&self.store, &self.device_key).map_err(|_| NO_INDEX.to_owned())?;
+        let quarantine =
+            Quarantine::load(&self.store, self.personal_room).map_err(|_| NO_INDEX.to_owned())?;
         let seats = RefCell::new(BTreeMap::new());
         // The trust filter keeps matches before the ranking cuts them; an
         // event whose trust cannot be derived is left out, never kept as
-        // if it were what the call asked for.
+        // if it were what the call asked for. So is a quarantined event,
+        // and one whose quarantine cannot be read (RCL-06).
         let keep = |address: record::id::Address| {
-            params.trust.is_none_or(|wanted| {
+            let trusted = params.trust.is_none_or(|wanted| {
                 self.trust_at(address, &keys, &mut seats.borrow_mut())
                     .is_ok_and(|level| wanted.as_str() == level.as_str())
-            })
+            });
+
+            trusted && quarantine.holds(address).is_ok_and(|held| !held)
         };
         let search = params.search(&compiled, &rooms, &writers, self.deadline);
         let found = match self.store.search_where(&search, &keep) {

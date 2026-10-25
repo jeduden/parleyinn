@@ -270,7 +270,7 @@ Feature: Security (SEC)
     And the Content-Security-Policy forbids every resource from outside the room view's own origin
     And the untrusted content is visibly marked
 
-  @SEC-22 @P0 @I4 @I7 @I6 @pending
+  @SEC-22 @P0 @I4 @I7 @I6
   Scenario Outline: managed policy constrains every boundary and principal power on the host
     Given an isolated ParleyInn home
     And managed policy sets <policy>

@@ -70,7 +70,7 @@ pub(crate) fn append(w: &mut World, name: &str, line: &serde_json::Value) -> Res
 }
 
 /// Every file the home holds, with its bytes.
-fn home_files(dir: &Path, out: &mut Vec<(PathBuf, Vec<u8>)>) -> Result<(), String> {
+pub(crate) fn home_files(dir: &Path, out: &mut Vec<(PathBuf, Vec<u8>)>) -> Result<(), String> {
     for entry in fs::read_dir(dir).map_err(|e| e.to_string())? {
         let path = entry.map_err(|e| e.to_string())?.path();
         if path.is_dir() {
@@ -84,7 +84,7 @@ fn home_files(dir: &Path, out: &mut Vec<(PathBuf, Vec<u8>)>) -> Result<(), Strin
 }
 
 /// The first of `needles` some file in the home holds, with the file.
-fn found_in_home(w: &World, needles: &[Vec<u8>]) -> Result<Option<String>, String> {
+pub(crate) fn found_in_home(w: &World, needles: &[Vec<u8>]) -> Result<Option<String>, String> {
     let mut files = Vec::new();
     home_files(home(w)?.root(), &mut files)?;
     for (path, bytes) in &files {

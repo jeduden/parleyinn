@@ -77,6 +77,14 @@ pub trait Disk: Send {
     ///
     /// Fails when the file cannot be read.
     fn read(&self, path: &Path) -> io::Result<Vec<u8>>;
+
+    /// Removes the file at `path` and syncs the directory it lay in; a
+    /// file that is not there is already removed.
+    ///
+    /// # Errors
+    ///
+    /// Fails when the file cannot be removed or the directory synced.
+    fn remove(&self, path: &Path) -> io::Result<()>;
 }
 
 /// The file system.
@@ -111,6 +119,16 @@ impl Disk for OsDisk {
 
     fn read(&self, path: &Path) -> io::Result<Vec<u8>> {
         fs::read(path)
+    }
+
+    fn remove(&self, path: &Path) -> io::Result<()> {
+        match fs::remove_file(path) {
+            Ok(()) => {}
+            Err(e) if e.kind() == io::ErrorKind::NotFound => return Ok(()),
+            Err(e) => return Err(e),
+        }
+
+        self.sync_dir(path.parent().unwrap_or_else(|| Path::new(".")))
     }
 }
 
@@ -161,6 +179,24 @@ impl Payloads {
     /// Fails when `name` is no payload name, or the payload cannot be
     /// read.
     pub fn read(&self, name: &str) -> io::Result<Vec<u8>> {
+        self.disk.read(&self.path_of(name)?)
+    }
+
+    /// Removes the payload `name`, and a temporary file a crash left for
+    /// it; a payload that is not there is already removed (ADM-07).
+    ///
+    /// # Errors
+    ///
+    /// Fails when `name` is no payload name, or a file cannot be removed.
+    pub fn remove(&self, name: &str) -> io::Result<()> {
+        self.disk
+            .remove(&self.dir.join(format!("{TEMPORARY}{name}")))?;
+
+        self.disk.remove(&self.path_of(name)?)
+    }
+
+    /// The path of the payload `name`, which must be one.
+    fn path_of(&self, name: &str) -> io::Result<PathBuf> {
         let named = name.len() == 64
             && name
                 .bytes()
@@ -172,7 +208,7 @@ impl Payloads {
             ));
         }
 
-        self.disk.read(&self.dir.join(name))
+        Ok(self.dir.join(name))
     }
 }
 
