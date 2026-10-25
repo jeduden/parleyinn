@@ -15,6 +15,7 @@
 
 mod administration;
 mod administration_status;
+mod administration_verify;
 mod assumptions;
 mod engineering;
 mod engineering_adr;
