@@ -138,7 +138,11 @@ that wrote the event (LANE-03), and `integrity` is the integrity status of the
 event's writer, one of §9.7.5's values. `run` is rendered relative (`current`
 for the agent's current run, `other` for any other) rather than as a raw
 identifier when the run is in scope. Items are ordered by score (`event_search`)
-or by seq within a writer (`event_expand`).
+or by seq within a writer (`event_expand`). A `tombstones` entry stands in the
+call's range for events that are not returned, and its `reason` is `purged` for
+a range a purge erased (ADM-07) and `quarantined` for a quarantine marker
+(RCL-06, SEC-12); a call that reaches the per-call cap continues from its
+cursor, and each tombstone appears on the page that reaches it.
 
 ## 9.4 Restore block
 
