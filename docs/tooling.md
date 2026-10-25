@@ -140,7 +140,8 @@ They export the tools' bin directories and mise's variables as plain
 values, so they work in a non-interactive shell and in any worktree, with
 no shim or `mise activate`. `--profile` also writes them to the top of
 `~/.bashrc`, replacing an earlier block, which a web environment needs.
-The script trusts the mise configs of every worktree.
+The block names each tool's versioned directory, so rerun the script after
+a lock bump moves a tool to a new version.
 `scripts/setup-tools.sh --check` checks the mise pin and the
 tools' backends without installing anything.
 

@@ -97,13 +97,7 @@ echo "setup-tools: installed mise $version (${pin%% *})"
 PATH=$bindir:$PATH
 export PATH
 cd "$root"
-# Trust the configs of every worktree of this repository: mise ignores
-# an untrusted config, and a worktree is a new path.
-for dir in "$root" $(git worktree list --porcelain 2>/dev/null | sed -n 's/^worktree //p'); do
-  for config in "$dir"/mise*.toml; do
-    if [ -f "$config" ]; then mise trust --yes "$config"; fi
-  done
-done
+for config in mise*.toml; do mise trust --yes "$config"; done
 mise install --locked "$@"
 
 if [ -n "${GITHUB_ENV:-}" ] && [ -n "${GITHUB_PATH:-}" ]; then
@@ -141,15 +135,21 @@ $(mise env -s bash | grep -v '^export PATH=')"
   else
     # The block goes first: a stock ~/.bashrc returns early in a
     # non-interactive shell, which would never reach lines at its end.
-    # Drop a block an earlier run wrote: begin to end, or, from a run
-    # before the end marker, begin and the export and eval lines after it.
+    # Drop a block an earlier run wrote: everything from begin to end, or,
+    # from a run before the end marker, begin and the export and eval
+    # lines after it.
     printf '%s\n%s\n%s\n' "$begin" "$lines" "$end" > "$tmp/profile"
     if [ -f "$profile_file" ]; then
       awk -v b="$begin" -v e="$end" '
-        $0 == b { skip = 1; next }
-        skip && $0 == e { skip = 0; next }
-        skip && (/^export / || /^eval "\$\(mise activate/) { next }
-        { skip = 0; print }
+        { line[NR] = $0; if ($0 == e) ended = 1 }
+        END {
+          for (i = 1; i <= NR; i++) {
+            if (line[i] == b) { skip = 1; continue }
+            if (skip && ended) { if (line[i] == e) skip = 0; continue }
+            if (skip && (line[i] ~ /^export / || line[i] ~ /^eval "\$\(mise activate/)) continue
+            skip = 0; print line[i]
+          }
+        }
       ' "$profile_file" >> "$tmp/profile"
     fi
     cat "$tmp/profile" > "$profile_file"
