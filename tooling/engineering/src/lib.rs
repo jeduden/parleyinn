@@ -8,6 +8,7 @@
 pub mod agent_instructions;
 pub mod architecture;
 pub mod benchmarks;
+pub mod boundary;
 pub mod branch_protection;
 pub mod calibration;
 pub mod codeowners;
@@ -17,13 +18,16 @@ pub mod decisions;
 pub mod dependencies;
 pub mod isolation_guard;
 pub mod license_texts;
+pub mod privacy;
 pub mod product_crates;
 pub mod registry;
 pub mod release_budgets;
 pub mod release_provenance;
 pub mod review_workflow;
 pub mod static_analysis;
+pub mod telemetry;
 pub mod third_party;
+pub mod threat_model;
 pub mod toolchain;
 pub mod trusted_text;
 

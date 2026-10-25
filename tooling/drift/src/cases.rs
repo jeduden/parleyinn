@@ -69,6 +69,7 @@ pub fn cases() -> Vec<Case> {
         confinement_cases(),
         ci_gate_cases(),
         static_analysis_cases(),
+        operations_cases(),
         complexity_cases(),
         trusted_text_cases(),
         toml_cases(),
@@ -1120,6 +1121,138 @@ fn static_analysis_cases() -> Vec<Case> {
             ),
             check("derived_code_is_refused_a_clock_or_randomness_at_build_time"),
             "code that computes derived artifacts may read a clock or randomness: crate parinn: crates/parinn/clippy.toml does not ban std::time::Instant::now in disallowed-methods",
+        ),
+    ]
+}
+
+/// The drifts the operations gates exist to catch: the boundary
+/// register and the core's evidence (SEC-01, SEC-19), telemetry and
+/// update checks (SEC-15), the threat model (SEC-17) and a privacy
+/// statement with no test behind it (ENG-22).
+fn operations_cases() -> Vec<Case> {
+    const REGISTER: &str = "docs/srs/06b-boundary-register.md";
+    const MODEL: &str = "docs/security/threat-model.md";
+    const BOUNDARY: &str =
+        "the_boundary_register_assigns_each_component_once_and_the_core_keeps_its_evidence";
+    const CORE: &str = "the_core_opens_no_socket_and_starts_no_program_but_its_kernel_worker";
+    const BUILT: &str = "only_the_core_is_built_and_it_sits_in_b0";
+    const TELEMETRY: &str = "no_telemetry_crash_report_or_update_check_ships";
+    const THREATS: &str = "the_threat_model_covers_the_register_and_compares_with_zed_delta";
+    const PRIVACY: &str = "every_privacy_statement_cites_a_test_that_exists";
+    let gate = |name| cargo_test("engineering", "boundary", name);
+    vec![
+        case(
+            "a register row naming two boundaries",
+            BOUNDARY,
+            Injection::replace(
+                REGISTER,
+                "| core                | B0       | stdin and stdout with the harness",
+                "| core                | B0, B1   | stdin and stdout with the harness",
+            ),
+            gate(BOUNDARY),
+            "row 1 names \"B0, B1\", not exactly one of B0, B1, B2, B3, outside or none",
+        ),
+        case(
+            "a room-view row no longer off by default",
+            BOUNDARY,
+            Injection::replace(
+                REGISTER,
+                "| off        | yes      | P1                         | SEC-20, SEC-21, SEC-23      |",
+                "| on         | yes      | P1                         | SEC-20, SEC-21, SEC-23      |",
+            ),
+            gate(BOUNDARY),
+            "row 8 is B1 and \"on\" by default, not off",
+        ),
+        case(
+            "a process the register does not list",
+            BOUNDARY,
+            Injection::replace(
+                "crates/audit/Cargo.toml",
+                "[lints]\nworkspace = true\n",
+                "[[bin]]\nname = \"rogue\"\npath = \"src/lib.rs\"\n\n[lints]\nworkspace = true\n",
+            ),
+            gate(BOUNDARY),
+            "the process audit runs as no component the register lists",
+        ),
+        case(
+            "the core's clippy.toml no longer banning a socket",
+            CORE,
+            Injection::replace(
+                "crates/parinn/clippy.toml",
+                "  { path = \"std::process::Command\", reason = \"the core starts no program but its kernel worker (SEC-01, CMP-05)\" },\n",
+                "",
+            ),
+            gate(CORE),
+            "crates/parinn/clippy.toml does not ban std::process::Command",
+        ),
+        case(
+            "a second executable built beside the core",
+            BUILT,
+            Injection::replace(
+                "crates/audit/Cargo.toml",
+                "[lints]\nworkspace = true\n",
+                "[[bin]]\nname = \"rogue\"\npath = \"src/lib.rs\"\n\n[lints]\nworkspace = true\n",
+            ),
+            gate(BUILT),
+            "left: [\"audit\", \"parinn\"]",
+        ),
+        case(
+            "a web address in the core's code",
+            TELEMETRY,
+            Injection::replace(
+                "crates/audit/src/lib.rs",
+                "pub mod counters;",
+                "pub mod counters;\n\n/// Where a report would go.\npub const REPORT: &str = \"https://telemetry.example\";",
+            ),
+            gate(TELEMETRY),
+            "crates/audit/src/lib.rs:",
+        ),
+        case(
+            "the register no longer rejecting update checks and telemetry",
+            TELEMETRY,
+            Injection::replace(
+                REGISTER,
+                "| Price-table fetch, update checks, telemetry                                    | rejected  ",
+                "| Price-table fetch, update checks, telemetry                                    | accepted  ",
+            ),
+            gate(TELEMETRY),
+            "no rejected register row names update checks and telemetry under SEC-15",
+        ),
+        case(
+            "a register row the threat model does not cover",
+            THREATS,
+            Injection::replace(MODEL, "| X8  | A core process", "| Y8  | A core process"),
+            gate(THREATS),
+            "has no row for register row X8",
+        ),
+        case(
+            "the comparison with Zed Delta leaving out key custody",
+            THREATS,
+            Injection::replace(MODEL, "| Key custody ", "| Key keeping "),
+            gate(THREATS),
+            "the comparison with Zed Delta leaves out Key custody",
+        ),
+        case(
+            "a privacy statement citing no test",
+            PRIVACY,
+            Injection::replace(
+                "docs/development.md",
+                "The run-time half is ENG-12's core row.",
+                "The run-time half is ENG-12's core row. Nothing leaves the machine.",
+            ),
+            gate(PRIVACY),
+            "a privacy statement cites no test",
+        ),
+        case(
+            "a privacy statement citing a test that does not exist",
+            PRIVACY,
+            Injection::replace(
+                "SECURITY.md",
+                "`the_core_executable_links_only_crates_its_reach_allows`",
+                "`a_test_nobody_wrote`",
+            ),
+            gate(PRIVACY),
+            "cites a_test_nobody_wrote, which is no test that exists and runs",
         ),
     ]
 }
