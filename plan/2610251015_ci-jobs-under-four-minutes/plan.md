@@ -76,9 +76,9 @@ shape.
 
 ## Execution
 
-| Phase | Model  | Gate                                                                                               |
-| ----- | ------ | -------------------------------------------------------------------------------------------------- |
-| 1     | sonnet | The `ci-timings` artifacts of two consecutive runs show the test job's scenario count and its time |
+| Phase | Model  | Gate                                                                                                              |
+| ----- | ------ | ----------------------------------------------------------------------------------------------------------------- |
+| 1     | sonnet | The `ci-timings` of two consecutive runs show every job under four minutes; the summaries and the provenance hold |
 
 ## Phases
 

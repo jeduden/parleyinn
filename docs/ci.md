@@ -16,7 +16,9 @@ and the `ci-review` skill measures them.
   sets the wall clock. Keep that chain short.
 - Jobs that can run side by side do. A job names only the jobs it needs.
 - Every job restores a cache keyed on the pins, and installs tools once. A
-  key that changes every run, or a cache nothing reads, is waste.
+  key that changes every run, or a cache nothing reads, is waste. The one
+  exception is the release build, which takes no branch-writable cache
+  and fits its budget without one: the cache holds only the tools.
 - No job repeats another's build, download or install. Work too slow for a
   pull request moves to the nightly job.
 - Every job in `ci.yml` and `build.yml` sets `timeout-minutes: 5`. A job

@@ -510,6 +510,10 @@ jobs:
           # a just-downloaded executable can stall for seconds.
           cat "$head"/* "$base"/* > /dev/null
           per=$((ROUNDS / SHARDS))
+          if [ $((per * SHARDS)) -ne "$ROUNDS" ]; then
+            echo "::error::$SHARDS shards do not divide $ROUNDS rounds; size the matrix to a divisor of ROUNDS"
+            exit 1
+          fi
           for i in $(seq "$per"); do
             round=$((SHARD * per + i))
             order="base head"
@@ -676,7 +680,7 @@ jobs:
   ci:
     name: CI
     if: ${{ always() }}
-    needs: [test, coverage, lint, supply-chain, drift, benchmark, build, markdown, toml, workflows, miri, scenarios, release-core]
+    needs: [test, coverage, lint, supply-chain, drift, benchmark, build, markdown, toml, workflows, miri, scenarios, release-core, coverage-layer, benchmark-suites, benchmark-rounds]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     # actions: read lets the timings step list this run's jobs.
