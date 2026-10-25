@@ -38,6 +38,20 @@
 //!
 //! The 10% is "more than": a head exactly 10% slower is within the threshold.
 //!
+//! # Strata
+//!
+//! CI samples the two sides on several runners, each shard of its job
+//! one runner, and pools the shards' files with a stratum line before
+//! each. The medians are taken over every sample, since both sides met
+//! the same runners. The significance is the stratified form of the
+//! test ([`stats::stratified_z`]): a sample is ranked only against the
+//! samples of its own runner, so the runners' speed differences, which
+//! would widen both sides' distributions and hide a real slowdown, do
+//! not enter. One stratum is the plain test. A benchmark both sides
+//! sampled but on no common stratum cannot be tested and fails
+//! ([`Status::Unpaired`]): the gate never falls back to the weaker test
+//! unasked.
+//!
 //! # Benchmarks on one side only
 //!
 //! Nothing fails silently (I6). A benchmark the base sampled and the
@@ -49,7 +63,7 @@ use std::collections::BTreeSet;
 use std::fmt::Write as _;
 
 use crate::accepted::Acceptance;
-use crate::samples::Samples;
+use crate::samples::{self, Strata};
 use crate::stats;
 
 /// How much slower, in percent of the base's median, the head's median
@@ -81,6 +95,9 @@ pub enum Status {
     New,
     /// A side has fewer than [`MIN_SAMPLES`]: no decision, so it fails.
     TooFew,
+    /// Both sides sampled it, but on no common stratum: no decision, so
+    /// it fails.
+    Unpaired,
     /// Regressed, but within a reviewed acceptance's ceiling: passes.
     Accepted,
 }
@@ -96,6 +113,7 @@ impl Status {
             Self::Retired => "retired",
             Self::New => "new on the head",
             Self::TooFew => "too few samples",
+            Self::Unpaired => "no common stratum",
             Self::Accepted => "accepted",
         }
     }
@@ -121,7 +139,7 @@ impl Delta {
     pub fn fails(&self) -> bool {
         matches!(
             self.status,
-            Status::Regressed | Status::Missing | Status::TooFew
+            Status::Regressed | Status::Missing | Status::TooFew | Status::Unpaired
         )
     }
 
@@ -153,32 +171,52 @@ impl Delta {
             Status::TooFew => Some(format!(
                 "{name} has too few samples to decide: the gate needs {MIN_SAMPLES} on each side"
             )),
+            Status::Unpaired => Some(format!(
+                "{name} was sampled on no stratum both sides share: the gate pairs each shard's base and head"
+            )),
             Status::Within | Status::Retired | Status::New | Status::Accepted => None,
         }
     }
 }
 
-/// Compares every benchmark either side sampled, in name order.
-/// `retired` names the benchmarks the head's suite retired.
+/// Compares every benchmark either side sampled, in name order, each
+/// stratum's base against its head. `retired` names the benchmarks the
+/// head's suite retired.
 #[must_use]
-pub fn decide(base: &Samples, head: &Samples, retired: &[&str]) -> Vec<Delta> {
-    let names: BTreeSet<&String> = base.keys().chain(head.keys()).collect();
+pub fn decide(base: &Strata, head: &Strata, retired: &[&str]) -> Vec<Delta> {
+    let (base_all, head_all) = (samples::pooled(base), samples::pooled(head));
+    let names: BTreeSet<&String> = base_all.keys().chain(head_all.keys()).collect();
 
     names
         .into_iter()
         .map(|name| {
+            let strata: Vec<(&[u64], &[u64])> = base
+                .iter()
+                .filter_map(|(stratum, b)| {
+                    let h = head.get(stratum)?.get(name)?;
+                    Some((b.get(name)?.as_slice(), h.as_slice()))
+                })
+                .collect();
             compare(
                 name,
-                base.get(name).map(Vec::as_slice),
-                head.get(name).map(Vec::as_slice),
+                base_all.get(name).map(Vec::as_slice),
+                head_all.get(name).map(Vec::as_slice),
+                &strata,
                 retired.contains(&name.as_str()),
             )
         })
         .collect()
 }
 
-/// Compares one benchmark's samples on each side.
-fn compare(name: &str, base: Option<&[u64]>, head: Option<&[u64]>, retired: bool) -> Delta {
+/// Compares one benchmark's samples on each side: `base` and `head` are
+/// every sample of the side, `strata` the pairs taken on one runner.
+fn compare(
+    name: &str,
+    base: Option<&[u64]>,
+    head: Option<&[u64]>,
+    strata: &[(&[u64], &[u64])],
+    retired: bool,
+) -> Delta {
     let mut c = Delta {
         benchmark: name.to_owned(),
         status: Status::Within,
@@ -191,8 +229,9 @@ fn compare(name: &str, base: Option<&[u64]>, head: Option<&[u64]>, retired: bool
         (_, None) => Status::Missing,
         (None, Some(_)) => Status::New,
         (Some(base), Some(head)) if base.len().min(head.len()) < MIN_SAMPLES => Status::TooFew,
-        (Some(base), Some(head)) => {
-            let z = stats::mann_whitney_z(base, head);
+        (Some(_), Some(_)) if strata.is_empty() => Status::Unpaired,
+        (Some(_), Some(_)) => {
+            let z = stats::stratified_z(strata);
             c.z = Some(z);
             let slower = c
                 .base

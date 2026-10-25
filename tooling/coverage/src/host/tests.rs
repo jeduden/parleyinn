@@ -81,6 +81,18 @@ fn write_creates_its_directory_and_append_adds() {
 }
 
 #[test]
+fn read_gives_a_file_s_text_or_none_for_a_missing_one() {
+    let dir = TempDir::new().unwrap();
+    let path = dir.path().join("unit.lcov");
+    fs::write(&path, "a").unwrap();
+    let cargo = Cargo::from_env();
+
+    assert_eq!(cargo.read(&path), Ok(Some("a".into())));
+    assert_eq!(cargo.read(&dir.path().join("missing.lcov")), Ok(None));
+    assert!(cargo.read(dir.path()).unwrap_err().starts_with("read "));
+}
+
+#[test]
 fn sources_reads_every_rust_file_but_build_output() {
     let dir = TempDir::new().unwrap();
     for (name, text) in [

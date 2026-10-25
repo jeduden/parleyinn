@@ -98,6 +98,23 @@ fn run_writes_the_ratchet_finding() {
     assert_eq!(checked[0]["path"], "features/record.feature");
 }
 
+#[test]
+fn run_reads_a_diff_that_holds_bytes_that_are_not_text() {
+    // A seed git shows as text, since it holds no NUL byte, though it is
+    // not UTF-8; the file the diff names after it is still read.
+    let w = World::new("");
+    let mut diff =
+        b"diff --git a/fuzz/corpus/seed b/fuzz/corpus/seed\n+\xa9\xff\xfe\x80\n".to_vec();
+    diff.extend(b"diff --git a/docs/srs/05.md b/docs/srs/05.md\n+REC-01\n");
+    fs::write(w.files.path().join("pr.diff"), diff).unwrap();
+
+    let (code, out, err) = w.run();
+
+    assert_eq!(code, EXIT_OK, "{err}");
+    assert_eq!(out, "class=deep\ntouched=1\nfindings=0\n");
+    assert!(w.output(BUNDLE).contains("### REC-01"));
+}
+
 /// A change that breaks one input.
 type Breaks<'a> = &'a dyn Fn(&World);
 

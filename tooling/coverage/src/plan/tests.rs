@@ -148,6 +148,13 @@ fn every_floor_has_its_layer() {
 }
 
 #[test]
+fn a_layer_is_found_by_its_name() {
+    assert_eq!(TestLayer::from_name("e2e"), Some(TestLayer::EndToEnd));
+    assert_eq!(TestLayer::from_name("unit"), Some(TestLayer::Unit));
+    assert_eq!(TestLayer::from_name("end-to-end"), None);
+}
+
+#[test]
 fn layers_are_named_for_reports_and_flags() {
     assert_eq!(
         TestLayer::ALL.map(TestLayer::name),

@@ -129,7 +129,7 @@ fn decide(
     let load = |path: &str| {
         read(path)
             .map_err(|e| format!("read {path}: {e}"))
-            .and_then(|text| samples::parse(&text).map_err(|e| format!("{path}: {e}")))
+            .and_then(|text| samples::parse_strata(&text).map_err(|e| format!("{path}: {e}")))
             .map_err(|e| vec![e])
     };
     let (base, head) = (load(base)?, load(head)?);
