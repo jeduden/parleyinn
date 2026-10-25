@@ -170,4 +170,7 @@ fn an_mcp_server_records_each_recall_it_serves_and_logs_one_that_extends_past_th
         .filter(|s| s.link.header.kind == record::event::EventKind::Recall)
         .count();
     assert_eq!(recalls, 2);
+    // The record the recalls and the labels grew still verifies.
+    let (verified, _, err) = p.invoke(&["verify"], &DEV);
+    assert_eq!((verified, err.as_str()), (crate::EXIT_OK, ""));
 }

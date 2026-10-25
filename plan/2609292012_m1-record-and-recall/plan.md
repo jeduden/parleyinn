@@ -92,20 +92,19 @@ ENG-08 prove CON-05.
 
 - **S2** ([ADR-2610110553], proposed): `rusqlite` without default
   features, SQLite without extension loading, a C compiler and both musl
-  targets' headers pinned on the Linux builder. BM25 ranks the newest
-  2,000 matches, 172 ms p95 (NFR-03).
+  targets' headers pinned on the Linux builder.
 - **S7** ([ADR-2610102211], proposed): an in-house stdio MCP server.
 - **S1, S3 and S13**: Claude Code 2.1.296's hook inputs and transcripts
   under `testdata/claude-code`. The parser's cargo-fuzz target is seeded
-  from them (ENG-07). A fork's repeated lines are recorded once
-  (REC-04), the MCP server ingests live (REC-13), and a drifting line
-  stays untrusted `harness_text` (REC-26).
+  from them (ENG-07). A fork's repeated lines are recorded once (REC-04),
+  the MCP server ingests live (REC-13), and a drifting line stays
+  untrusted `harness_text` (REC-26).
 - **S8**: the conservative model-token estimator of §8.4. Six targets
   freeze when M1 builds what uses them (§12.3): NFR-09's overhead, REC-11's
   cap, REC-17's secret, RCL-02's hits, RCL-03's cap and SEC-04's terms.
-- **S12** (plan 2610012322): index row ids derive from addresses; a
-  purge sets `secure_delete` and FTS5's `secure-delete` and checkpoints
-  the WAL; a `user` event's trust needs the deployment mode.
+- **S12** (plan 2610012322): index row ids derive from addresses; a purge
+  sets `secure_delete` and FTS5's `secure-delete` and checkpoints the WAL;
+  a `user` event's trust needs the deployment mode.
 
 ### The stakeholder's rulings of 14 October 2026
 
@@ -275,7 +274,8 @@ footer: |
 |     | ↳      | @MEM-01 and @OWN-01 off @pending and passing. Each event's trust level and origin derive from the record and the node's key set alone, nothing stores them, and parinn rebuild and parinn verify keep the kept origins honest. A repository's identity is read inside the core; @LANE-02 stays @pending for a ruling. @PRV-02 passes narrowed; @PRV-06 and @PRV-13 are proven by named tests.                          |
 | 12  | ✅     | [Search: the search index, the query compiler and event_search](phase-12.md)                                                                                                                                                                                                                                                                                                                                           |
 |     | ↳      | @REC-11 and @SEC-04 off @pending and passing. Event and payload text is indexed in the append transaction up to 1 MiB, and event_search finds it by literal terms, ranked by BM25 over the newest 2,000 matches, damped per run. @RCL-02 cannot pass in M1 and is raised; NFR-03 is benchmarked; the index is a derived file of its own, so the record holds 1.42x its text, within NFR-09's 1.5x; the index is 0.75x. |
-| 13  | 🔳     | [Recall and the envelope: the six recall tools, scopes and recall events](phase-13.md)                                                                                                                                                                                                                                                                                                                                 |
+| 13  | ✅     | [Recall and the envelope: the six recall tools, scopes and recall events](phase-13.md)                                                                                                                                                                                                                                                                                                                                 |
+|     | ↳      | @RCL-01, @RCL-03, @RCL-04, @RCL-05, @RCL-07, @SEC-06 and @SEC-07 off @pending and passing. The six recall tools answer in the envelope under the 8,000-token cap and a cursor, in the calling run's scope unless the call widens it, and each leaves a recall event; the envelope's golden files match. @RCL-08 stays @pending on purge and quarantine (phase 14).                                                     |
 <?/catalog?>
 
 ## Acceptance Criteria

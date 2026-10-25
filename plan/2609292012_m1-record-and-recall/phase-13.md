@@ -1,7 +1,7 @@
 ---
 n: 13
 title: "Recall and the envelope: the six recall tools, scopes and recall events"
-status: "🔳"
+status: "✅"
 result: false
 ---
 # Phase 13: recall and the envelope
@@ -35,7 +35,7 @@ persona-security-officer reviews the envelope and the recall tools.
   the device seat's writer, made when an address is first asked for; a
   label is `A` and its assignment's rank. Short, range, full and ASCII
   forms all resolve. `parinn event search|expand` prints the tool's
-  envelope with each control, escape, carriage return and
+  answer as text, each control, escape, carriage return and
   direction-override character shown as a placeholder naming its code
   point.
 - SEC-07: a static check refuses `TrustedText` built outside the
