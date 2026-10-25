@@ -1,12 +1,13 @@
 ---
 n: 3
 title: "The scenarios and the end-to-end coverage layer sharded"
-status: "🔳"
+status: "✅"
 result: true
 summary: >-
   The scenarios and the end-to-end coverage layer run as four shards
-  each. The shards partition the suite; the CI gate of two runs under
-  four minutes is still open.
+  each. The shards partition the suite; two consecutive runs on the
+  same head kept every job under four minutes (slowest 175 s and
+  171 s).
 ---
 # Phase 3 result
 

@@ -1,7 +1,7 @@
 ---
 id: 2610251015
 title: "Hold every CI job under four minutes"
-status: "🔳"
+status: "✅"
 summary: >-
   Restructure the jobs of ci.yml and build.yml so each finishes in four
   minutes or less, one minute under the five-minute cap, without
@@ -107,12 +107,12 @@ footer: |
 
 ?>
 
-| #   | Status | Phase                                                                                                                                                              |
-| --- | ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| 1   | ✅     | [Every job of ci.yml and build.yml under its five-minute cap](phase-1.md)                                                                                          |
-| 2   | ✅     | [The benchmark gate stratified by shard](phase-2.md)                                                                                                               |
-| 3   | 🔳     | [The scenarios and the end-to-end coverage layer sharded](phase-3.md)                                                                                              |
-|     | ↳      | The scenarios and the end-to-end coverage layer run as four shards each. The shards partition the suite; the CI gate of two runs under four minutes is still open. |
+| #   | Status | Phase                                                                                                                                                                                                       |
+| --- | ------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | ✅     | [Every job of ci.yml and build.yml under its five-minute cap](phase-1.md)                                                                                                                                   |
+| 2   | ✅     | [The benchmark gate stratified by shard](phase-2.md)                                                                                                                                                        |
+| 3   | ✅     | [The scenarios and the end-to-end coverage layer sharded](phase-3.md)                                                                                                                                       |
+|     | ↳      | The scenarios and the end-to-end coverage layer run as four shards each. The shards partition the suite; two consecutive runs on the same head kept every job under four minutes (slowest 175 s and 171 s). |
 <?/catalog?>
 
 ## Acceptance Criteria

@@ -1,7 +1,7 @@
 ---
 n: 3
 title: "The scenarios and the end-to-end coverage layer sharded"
-status: "🔳"
+status: "✅"
 result: false
 ---
 # Phase 3: the scenarios and the end-to-end coverage layer sharded
