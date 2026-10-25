@@ -201,13 +201,11 @@ impl Store {
         }
         secure_delete(&self.conn)?;
         self.conn.execute_batch("PRAGMA temp_store = MEMORY")?;
-        if !checkpoint(&self.conn)? {
-            return Ok(false);
-        }
-        for schema in schemas(&self.conn)? {
+        let held_before = !checkpoint(&self.conn)?;
+        for schema in schemas(&self.conn)?.iter().filter(|_| !held_before) {
             self.conn.execute_batch(&format!("VACUUM {schema}"))?;
         }
-        if !checkpoint(&self.conn)? {
+        if held_before || !checkpoint(&self.conn)? {
             return Ok(false);
         }
         self.conn.execute(CLEAR_KIND, [VACUUM])?;

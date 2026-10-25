@@ -487,3 +487,22 @@ fn a_journalled_range_is_read_back() {
         assert_eq!(parse_range(bad), None, "{bad}");
     }
 }
+
+#[test]
+fn a_prompt_match_of_a_purged_event_without_a_prompt_id_forgets_nothing() {
+    let dir = TempDir::new().unwrap();
+    let mut store = filled(&dir, &["a prompt"]);
+    let named = Address::new(writer(1), seq(1)).to_string();
+    let no_id = NewEvent {
+        kind: EventKind::PromptMatch,
+        provenance: Provenance::Structural,
+        content: json!({"event": named, "prompt_id": 7}),
+        commitment_key: CommitmentKey::from_bytes([9; 32]),
+        transcript_timestamp: None,
+    };
+    store.append(writer(2), &[no_id]).unwrap();
+
+    let purged = store.purge(writer(2), &[], &[range(1, 1)]).unwrap();
+
+    assert_eq!(purged.events, 1);
+}

@@ -260,3 +260,20 @@ fn a_purge_whose_logs_were_held_open_is_audited_as_residue_too() {
     assert_eq!(counted(&p, "retention_purged").len(), 1);
     assert_eq!(counted(&p, "purge_unfinished").len(), 1);
 }
+
+#[test]
+fn a_store_that_would_not_open_is_audited_as_a_retention_failure() {
+    let p = Process::new();
+    let none = configuration::resolve::Settings::defaults();
+
+    p.with_context(&DEV, |ctx| {
+        apply_opened(
+            ctx,
+            Err("the store is gone".to_owned()),
+            &none,
+            &mut OsEntropy,
+        );
+    });
+
+    assert_eq!(counted(&p, "retention_failed").len(), 1);
+}

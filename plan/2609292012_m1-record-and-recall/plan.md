@@ -137,11 +137,10 @@ changed M1's row in §12.2.
    real format change, in M3. ADM-05 lands in part.
 4. **Purge (ADM-07).** M1 ships `parinn purge --range` as a widening
    principal act. Phase 14 builds the tombstone, the erasure of each
-   purged event's commitment key and payload, SQLite's and FTS5's
-   secure delete with a WAL checkpoint, the audit entry, and the
-   refusal of a range that holds a pending ingest marker. ADM-07's
-   other scopes, SEC-31's copies and seal rewrites stay in M3. ADM-07
-   lands in part.
+   purged event's commitment key and payload, SQLite's and FTS5's secure
+   delete with a WAL checkpoint, the audit entry, the refusal of a range
+   holding a pending ingest marker and SEC-22's retention purge. Other
+   scopes, SEC-31's copies and seal rewrites stay in M3.
 
 ## Tasks
 
@@ -275,7 +274,8 @@ footer: |
 |     | ↳      | @REC-11 and @SEC-04 off @pending and passing. Event and payload text is indexed in the append transaction up to 1 MiB, and event_search finds it by literal terms, ranked by BM25 over the newest 2,000 matches, damped per run. @RCL-02 cannot pass in M1 and is raised; NFR-03 is benchmarked; the index is a derived file of its own, so the record holds 1.42x its text, within NFR-09's 1.5x; the index is 0.75x. |
 | 13  | ✅     | [Recall and the envelope: the six recall tools, scopes and recall events](phase-13.md)                                                                                                                                                                                                                                                                                                                                 |
 |     | ↳      | @RCL-01, @RCL-03, @RCL-04, @RCL-05, @RCL-07, @SEC-06 and @SEC-07 off @pending and passing. The six recall tools answer in the envelope under the 8,000-token cap and a cursor, in the calling run's scope unless the call widens it, and each leaves a recall event; the envelope's golden files match. @RCL-08 stays @pending on purge and quarantine (phase 14).                                                     |
-| 14  | 🔲     | [Quarantine and parinn purge --range](phase-14.md)                                                                                                                                                                                                                                                                                                                                                                     |
+| 14  | ✅     | [Quarantine and parinn purge --range](phase-14.md)                                                                                                                                                                                                                                                                                                                                                                     |
+|     | ↳      | @RCL-06, @REC-17 and @SEC-22 off @pending and passing; so are @RCL-08 and @REC-06, whose purged-range steps now run. A purge erases a range and records a tombstone in one transaction, a quarantine holds events out of recall by selector, and an ingest purges what a retention policy has aged out. @SEC-12 passes seven rows of eight and stays @pending: its flag row needs PRV-07 (M5).                         |
 <?/catalog?>
 
 ## Acceptance Criteria

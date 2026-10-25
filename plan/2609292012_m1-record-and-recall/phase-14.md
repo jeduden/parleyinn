@@ -1,7 +1,7 @@
 ---
 n: 14
 title: "Quarantine and parinn purge --range"
-status: "🔲"
+status: "✅"
 result: false
 ---
 # Phase 14: quarantine and purge

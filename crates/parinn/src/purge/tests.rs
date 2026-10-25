@@ -468,3 +468,24 @@ fn a_home_of_a_newer_store_is_refused_by_the_purge_before_anything_else() {
     assert_eq!(code, EXIT_FAILURE);
     assert!(err.contains("newer than this parinn's"), "{err}");
 }
+
+#[test]
+fn a_full_address_of_the_writer_s_own_room_is_purged_and_each_kind_kept_is_audited_once() {
+    let (p, writer) = with_a_run();
+    let (_, store) = open(&p);
+    let room = store.seat(writer).unwrap().unwrap().room;
+    drop(store);
+
+    let full = format!("parinn:room/{room}/w/{writer}/1-1");
+    let (code, out, err) = p.invoke(&["purge", "--range", &full], &DEV);
+
+    assert_eq!((code, err.as_str()), (EXIT_OK, ""), "{out}");
+    let kept = |n| Refusal::Kept {
+        address: Address::new(writer, Seq::new(n).unwrap()),
+        kind: EventKind::KeyEvent,
+    };
+    p.with_context(&DEV, |ctx| {
+        audit_refusals(ctx, &[kept(1), kept(2), kept(3)])
+    });
+    assert_eq!(counted(&p, "purge_refused").len(), 1);
+}

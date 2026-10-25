@@ -536,10 +536,7 @@ fn apply_retention(
         let node = Node::find(home, &store).map_err(|e| e.to_string())?;
         Ok((store, node))
     });
-    opened.map_or_else(
-        |e| retention::failed(ctx, &e),
-        |(mut store, node)| retention::apply(ctx, &mut store, &node, settings, &mut OsEntropy),
-    );
+    retention::apply_opened(ctx, opened, settings, &mut OsEntropy);
 }
 
 /// Ingests each transcript source at `paths`. Returns a report of each

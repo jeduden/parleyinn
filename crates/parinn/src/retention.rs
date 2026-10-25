@@ -68,10 +68,7 @@ pub(crate) fn apply(
 /// home or the random source failed; the next ingest tries again
 /// (SEC-22, I6).
 pub(crate) fn failed(ctx: &Context, cause: &dyn std::fmt::Display) {
-    tracing::warn!(
-        error = cause.to_string().as_str(),
-        "apply the retention policies"
-    );
+    crate::logged("apply the retention policies", Err::<(), _>(cause));
     let occurrence = Occurrence::Degraded {
         kind: Kind::Failed,
         counter: Counter::RetentionFailed,
@@ -79,6 +76,20 @@ pub(crate) fn failed(ctx: &Context, cause: &dyn std::fmt::Display) {
         detail: "the retention policies could not be applied: the store or the random source failed",
     };
     crate::logged("audit a retention failure", ctx.audit(&occurrence));
+}
+
+/// Applies the policies in the store and node `opened` gave, or audits
+/// and counts that it gave none.
+pub(crate) fn apply_opened(
+    ctx: &Context,
+    opened: Result<(Store, Node), String>,
+    settings: &Settings,
+    entropy: &mut dyn Entropy,
+) {
+    match opened {
+        Ok((mut store, node)) => apply(ctx, &mut store, &node, settings, entropy),
+        Err(e) => failed(ctx, &e),
+    }
 }
 
 /// Audits each range purged and each refused (SEC-22, ADM-07, I6).
