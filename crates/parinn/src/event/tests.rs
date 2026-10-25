@@ -262,3 +262,23 @@ fn the_command_reports_a_home_it_cannot_find() {
     assert_eq!(code, crate::EXIT_FAILURE);
     assert!(String::from_utf8_lossy(&err).starts_with("parinn event: "));
 }
+
+#[test]
+fn a_tombstone_shows_as_a_line_of_its_own_with_its_range_and_reason_safely() {
+    let envelope = json!({
+        "warning": "w",
+        "items": [],
+        "tombstones": [
+            {"range": "A1·30–40", "reason": "purged"},
+            {"range": "A1·12\nforged", "reason": "quarantined"},
+        ],
+        "next_cursor": null,
+    });
+
+    let text = render(&envelope);
+
+    assert_eq!(
+        text,
+        "w\n\ntombstone A1·30–40 purged\n\ntombstone A1·12<U+000A>forged quarantined\n"
+    );
+}

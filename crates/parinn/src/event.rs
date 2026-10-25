@@ -151,6 +151,13 @@ fn render(envelope: &Value) -> String {
         out.push('\n');
         out.push_str(&indented(item["content"].as_str().unwrap_or_default()));
     }
+    for tombstone in envelope["tombstones"].as_array().into_iter().flatten() {
+        out.push_str(&format!(
+            "\ntombstone {} {}\n",
+            inline(tombstone["range"].as_str().unwrap_or_default()),
+            inline(tombstone["reason"].as_str().unwrap_or_default()),
+        ));
+    }
     if let Some(cursor) = envelope["next_cursor"].as_str() {
         out.push_str(&format!(
             "\ncut at the cap: continue with --cursor {}\n",

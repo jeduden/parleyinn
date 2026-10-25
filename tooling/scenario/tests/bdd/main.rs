@@ -32,6 +32,7 @@ mod engineering_reach;
 mod engineering_release;
 mod engineering_review;
 mod engineering_third_party;
+mod erasure;
 mod lane;
 mod live;
 mod memory_boundary;
@@ -60,6 +61,7 @@ mod security;
 mod security_envelope;
 mod security_hooks;
 mod security_keys;
+mod security_policy;
 mod security_redaction;
 
 use std::env;
