@@ -82,6 +82,7 @@ Feature: Recall (RCL)
     And an agent run with a Claude Code transcript "poisoned-web"
     And the person runs "parinn quarantine add --range A1:12-12"
     And the person runs "parinn purge --range A1:30-40"
+    And a retention policy has purged A1:45-46
     When the agent calls the MCP tool "event_expand" with range "A1:1-50"
     Then the recall result is wrapped in the envelope
     And no item has address A1·12 and no item lies in A1·30–40, which appears as a tombstone with reason "purged"

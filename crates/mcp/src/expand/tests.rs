@@ -278,3 +278,29 @@ fn the_budget_charges_a_tombstone_its_longest_range() {
     assert!(record::range::Range::parse(&widest).is_ok());
     assert_eq!(WIDEST_SEQ.len(), 16);
 }
+
+fn recorded(reason: &str) -> Recorded {
+    Recorded {
+        writer: writer(),
+        first: seq(1),
+        last: seq(1),
+        count: 1,
+        reason: reason.to_owned(),
+        policy: None,
+        commitments: record::digest::Digest::ZERO,
+    }
+}
+
+#[test]
+fn a_tombstone_shows_the_reason_it_recorded_and_a_word_it_does_not_know_is_refused() {
+    assert_eq!(
+        reason_of(&recorded("purged")).unwrap(),
+        TombstoneReason::Purged
+    );
+    assert_eq!(
+        reason_of(&recorded("retention")).unwrap(),
+        TombstoneReason::Retention
+    );
+    assert!(reason_of(&recorded("quarantined")).is_err());
+    assert!(reason_of(&recorded("")).is_err());
+}

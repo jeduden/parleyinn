@@ -21,7 +21,7 @@ use std::path::PathBuf;
 use ::record::chain;
 use ::record::commitment::commit;
 use ::record::event::{EventKind, Provenance};
-use ::record::id::{Address, Seq, WriterId};
+use ::record::id::{Address, WriterId};
 use ::record::range::Range;
 use administration::node::Node;
 use administration::purge::{self, Planned, Reason};
@@ -54,6 +54,8 @@ pub struct ErasureSteps {
     /// RCL-06: the tombstones (range, reason) and quarantine markers the
     /// recall showed over all its pages.
     followed: Option<Shown>,
+    /// RCL-06: the seqs a retention policy purged.
+    retained: Option<(u64, u64)>,
 }
 
 /// The tombstones (range, reason) and quarantine markers of a recall.
@@ -219,6 +221,18 @@ fn recall_all(w: &mut World, writer: WriterId) -> Result<Recalled, String> {
             let reason = mark["reason"].as_str().unwrap_or_default().to_owned();
             out.marks.push((range.from.get(), range.to.get(), reason));
         }
+        // A quarantine marker is the range alone: its reason is the
+        // word the scenario steps use for it.
+        for mark in envelope["quarantine_markers"]
+            .as_array()
+            .into_iter()
+            .flatten()
+        {
+            let range = Range::parse(mark["range"].as_str().unwrap_or_default())
+                .map_err(|e| e.to_string())?;
+            out.marks
+                .push((range.from.get(), range.to.get(), "quarantined".to_owned()));
+        }
         match envelope["next_cursor"].as_str() {
             Some(cursor) => arguments = json!({"cursor": cursor}),
             None => return Ok(out),
@@ -290,60 +304,57 @@ fn quarantine_marker_alone(w: &mut World, address: String) -> Result<(), String>
     Ok(())
 }
 
-/// A retention policy purges a range, as the node does on its schedule
-/// (REC-15), and a call that reaches it shows the tombstone's reason
-/// as `retention`. The purge is made in the store: the schedule itself
-/// is SEC-22's.
-#[then(regex = r#"^a retention-purged range appears as a tombstone with reason "([^"]+)"$"#)]
-fn retention_tombstone(w: &mut World, reason: String) -> Result<(), String> {
-    let (first, last) = (45, 46);
-    let writer = writer_of(w, "A1")?;
+/// A retention policy has purged `range`, as the node does on its
+/// schedule (REC-15): the purge is made in the store, the schedule
+/// itself is SEC-22's.
+#[given(regex = r"^a retention policy has purged (\S+)$")]
+fn retention_purged(w: &mut World, range: String) -> Result<(), String> {
+    let parsed = Range::parse(&range).map_err(|e| e.to_string())?;
+    let ::record::range::Writer::Label(label) = parsed.writer else {
+        return Err("a label was wanted".to_owned());
+    };
+    let writer = writer_of(w, &label.to_string())?;
     let mut store = open(w)?;
     let node = Node::find(&home(w)?, &store).map_err(|e| e.to_string())?;
     let why = Reason::Retention {
         policy: "retention_policy.*.web".to_owned(),
     };
     let planned =
-        purge::plan(&store, writer, seq(first)?, seq(last)?, &why).map_err(|e| e.to_string())?;
+        purge::plan(&store, writer, parsed.from, parsed.to, &why).map_err(|e| e.to_string())?;
     let Planned::Ready(plan) = planned else {
         return Err("the retention purge was refused".to_owned());
     };
     purge::carry_out(&mut store, &node, &plan, None, &mut OsEntropy).map_err(|e| e.to_string())?;
-    drop(store);
-    let answer = call_tool(
-        w,
-        "event_expand",
-        json!({"range": format!("{writer}:{first}-{last}")}),
-    )?;
-    if answer.is_error {
-        return Err(format!("event_expand was refused: {}", answer.text));
-    }
-    let envelope: Value = serde_json::from_str(&answer.text).map_err(|e| e.to_string())?;
-    let shown: Vec<(&str, &str)> = envelope["tombstones"]
-        .as_array()
-        .into_iter()
-        .flatten()
-        .map(|t| {
-            (
-                t["range"].as_str().unwrap_or_default(),
-                t["reason"].as_str().unwrap_or_default(),
-            )
-        })
-        .collect();
-    if shown.len() != 1 || shown[0].1 != reason {
-        return Err(format!(
-            "the retention-purged range shows {shown:?}, wanting one tombstone of reason {reason:?}"
-        ));
-    }
-    if !envelope["items"].as_array().is_some_and(Vec::is_empty) {
-        return Err("a retention-purged range still returns an item".to_owned());
-    }
+    er(w).retained = Some((parsed.from.get(), parsed.to.get()));
 
     Ok(())
 }
 
-fn seq(n: u64) -> Result<Seq, String> {
-    Seq::new(n).ok_or_else(|| format!("{n} is no seq"))
+/// The recall shows the range a retention policy purged as a tombstone
+/// of the given reason, and no item in it.
+#[then(regex = r#"^a retention-purged range appears as a tombstone with reason "([^"]+)"$"#)]
+fn retention_tombstone(w: &mut World, reason: String) -> Result<(), String> {
+    let (from, to) = er(w)
+        .retained
+        .ok_or("no step had a retention policy purge")?;
+    let (marks, _) = er(w)
+        .followed
+        .clone()
+        .ok_or("no step followed the recall to its end")?;
+    let mut shown = Vec::new();
+    for (range, why) in &marks {
+        let range = Range::parse(range).map_err(|e| e.to_string())?;
+        if range.from.get() <= to && from <= range.to.get() {
+            shown.push((range.from.get(), range.to.get(), why.as_str()));
+        }
+    }
+    if shown != [(from, to, reason.as_str())] {
+        return Err(format!(
+            "the retention-purged {from}-{to} shows {shown:?}, wanting one tombstone of reason {reason:?}"
+        ));
+    }
+
+    Ok(())
 }
 
 /// The items and tombstones of the last recall and of the pages its
@@ -786,6 +797,17 @@ fn no_pin_to_remove(w: &mut World) -> Result<(), String> {
     regex = r#"^releasing the quarantine, a widening principal act, is recorded as an "operator" event the same way$"#
 )]
 fn release_is_recorded(w: &mut World) -> Result<(), String> {
+    // Before the release the held events answer quarantine markers: a
+    // recall that read none would pass the check after it vacuously.
+    let (before, _) = events(w)?;
+    let mut marked = 0;
+    for writer in before.iter().map(|e| e.writer).collect::<BTreeSet<_>>() {
+        let seen = recall_all(w, writer)?;
+        marked += seen.marks.iter().filter(|m| m.2 == "quarantined").count();
+    }
+    if marked == 0 {
+        return Err("no quarantine marker stands before the release".to_owned());
+    }
     let mut args = vec!["quarantine".to_owned(), "release".to_owned()];
     args.extend(er(w).added.clone());
     let shown: Vec<&str> = args.iter().map(String::as_str).collect();

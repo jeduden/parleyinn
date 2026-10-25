@@ -11,7 +11,7 @@
 //! refusal is fixed text, naming at most an address it parsed and
 //! renders anew (RCL-04).
 
-use administration::purge::Tombstone as Recorded;
+use administration::purge::{Reason, Tombstone as Recorded};
 use administration::quarantine::Quarantine;
 use envelope::{
     Continuation, Envelope, Item, QuarantineMarker, Tombstone, TombstoneReason, tokens,
@@ -366,21 +366,30 @@ fn held_back(
 ) -> Result<Option<Held>, administration::AdminError> {
     let address = stored.link.header.address;
     if erased(stored) {
-        let recorded = purged.iter().find(|t| t.covers(address));
-
-        return Ok(recorded.map(|t| Held::Purged(reason_of(t))));
+        return purged
+            .iter()
+            .find(|t| t.covers(address))
+            .map(|t| reason_of(t).map(Held::Purged))
+            .transpose();
     }
 
     Ok(quarantine.holds(address)?.then_some(Held::Quarantined))
 }
 
-/// Why a tombstone purged its range: a retention policy, or the
-/// principal. Only these two words are ever recorded (ADM-07, REC-15).
-fn reason_of(tombstone: &Recorded) -> TombstoneReason {
-    if tombstone.reason == "retention" {
-        TombstoneReason::Retention
-    } else {
-        TombstoneReason::Purged
+/// Why a tombstone purged its range, by the words of
+/// [`administration::purge::Reason`]: the principal, or a retention
+/// policy (ADM-07, REC-15). A tombstone naming any other word is
+/// refused, not shown as one of these.
+fn reason_of(tombstone: &Recorded) -> Result<TombstoneReason, administration::AdminError> {
+    let retention = Reason::Retention {
+        policy: String::new(),
+    };
+    match tombstone.reason.as_str() {
+        word if word == Reason::Purged.as_str() => Ok(TombstoneReason::Purged),
+        word if word == retention.as_str() => Ok(TombstoneReason::Retention),
+        _ => Err(administration::AdminError::Node(
+            "a tombstone names a reason this parinn does not know",
+        )),
     }
 }
 
@@ -415,8 +424,8 @@ impl Marks {
     }
 
     /// The estimated model tokens one tombstone of this writer takes at
-    /// its longest (a marker takes less, so the cap holds for both), with the comma that joins it: its range at the
-    /// widest seqs.
+    /// its longest, with the comma that joins it: its range at the
+    /// widest seqs. A marker takes less, so the cap holds for both.
     fn cost(&self) -> u64 {
         let range = match self.label {
             Some(_) => format!("A999999999·{WIDEST_SEQ}–{WIDEST_SEQ}"),
