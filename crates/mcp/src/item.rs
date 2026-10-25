@@ -5,14 +5,13 @@
 //! as one JSON string inside the envelope (I2).
 
 use administration::origin::{KeySet, is_device_seat};
-use envelope::{IntegrityStatus, Item, Run, TrustLevel};
+use envelope::{Continuation, IntegrityStatus, Item, Run, TrustLevel};
 use record::commitment::commit;
 use record::digest::Digest;
 use record::id::{Address, Seq, WriterId};
 use serde_json::Value;
 use store::{Hit, Stored, StoredSeat};
 
-use crate::expand::CONTINUED;
 use crate::scope::Scope;
 use crate::{NO_INDEX, Seated, Seats, Server, UNREADABLE, shown_origin, trust_of};
 
@@ -94,6 +93,7 @@ impl Server {
             provenance: provenance.name(),
             trust: trust_of(&provenance, kind, seated.origin, seated.device),
             flags: Vec::new(),
+            continuation: Vec::new(),
             integrity: IntegrityStatus::Unverified,
             score: Some(hit.score),
             content: preview,
@@ -123,9 +123,9 @@ impl Server {
         }
         let origin = shown_origin(keys.origin_of(seat));
         let text = content_text(content);
-        let mut flags = Vec::new();
+        let mut continuation = Vec::new();
         let content = if offset > 0 {
-            flags.push(CONTINUED.to_owned());
+            continuation.push(Continuation::Continued);
             text.chars().skip(offset).collect()
         } else {
             text
@@ -145,7 +145,8 @@ impl Server {
                 origin,
                 is_device_seat(seat),
             ),
-            flags,
+            flags: Vec::new(),
+            continuation,
             integrity: IntegrityStatus::Unsigned,
             score: None,
             content,

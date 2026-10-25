@@ -14,6 +14,7 @@ fn item(content: &str) -> Item {
         provenance: "unparsed".into(),
         trust: TrustLevel::Untrusted,
         flags: vec![],
+        continuation: vec![],
         integrity: IntegrityStatus::Unsigned,
         score: None,
         content: content.into(),
@@ -80,7 +81,8 @@ fn the_first_item_past_the_cap_is_cut_to_fit_and_flagged() {
 
     assert_eq!(cut.content.chars().count(), chars);
     assert!(content.starts_with(&cut.content));
-    assert_eq!(cut.flags, [CUT]);
+    assert_eq!(cut.continuation, [Continuation::Cut]);
+    assert!(cut.flags.is_empty(), "a cut is no injection-pattern mark");
     assert!(item_cost(&cut) <= left, "it fits");
     let longer = Item {
         content: content.chars().take(chars + 1).collect(),
@@ -137,4 +139,24 @@ fn what_a_range_asks_for_starts_at_its_first_event() {
     assert_eq!((asked.from.get(), asked.to.get(), asked.offset), (2, 5, 0));
     assert!(asked.named.is_none());
     assert_eq!(asked.writer, Writer::Id(w));
+}
+
+#[test]
+fn a_cut_falls_on_a_character_boundary_of_multibyte_text() {
+    for unit in ["東", "🚀", "é", "a東🚀é"] {
+        let mut budget = Budget::new();
+        budget.left = 40;
+        let content = unit.repeat(2_000);
+
+        let Taken::Cut(cut, chars) = budget.take(item(&content)) else {
+            panic!("too big to fit");
+        };
+
+        assert!(chars > 0 && chars < 2_000 * unit.chars().count(), "{unit}");
+        assert_eq!(cut.content.chars().count(), chars, "{unit}");
+        assert!(content.starts_with(&cut.content), "{unit}");
+        assert!(content.is_char_boundary(cut.content.len()), "{unit}");
+        let rest: String = content.chars().skip(chars).collect();
+        assert_eq!(format!("{}{rest}", cut.content), content, "{unit}");
+    }
 }

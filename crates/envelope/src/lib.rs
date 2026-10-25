@@ -100,6 +100,66 @@ impl IntegrityStatus {
     }
 }
 
+/// How an item's content stands to the event's whole content: a closed
+/// word, never a mark of what the content says (that is `flags`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Continuation {
+    /// The content stops short of the event's: the cursor continues it.
+    Cut,
+    /// The content continues an earlier item's.
+    Continued,
+}
+
+impl Continuation {
+    /// The name the envelope shows.
+    #[must_use]
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Cut => "cut",
+            Self::Continued => "continued",
+        }
+    }
+}
+
+/// Why a range is not shown (§9.3).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TombstoneReason {
+    Purged,
+}
+
+impl TombstoneReason {
+    /// The name the envelope shows.
+    #[must_use]
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Purged => "purged",
+        }
+    }
+}
+
+/// A range of addresses the envelope shows in place of events it holds
+/// no content of.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Tombstone {
+    /// The range, as ParleyInn renders addresses.
+    pub range: String,
+    pub reason: TombstoneReason,
+}
+
+impl Tombstone {
+    fn render(&self) -> String {
+        format!(
+            "{{\"range\":{},\"reason\":{}}}",
+            Value::from(self.range.as_str()),
+            Value::from(self.reason.as_str())
+        )
+    }
+
+    fn to_value(&self) -> Value {
+        json!({"range": self.range, "reason": self.reason.as_str()})
+    }
+}
+
 /// One recalled event.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Item {
@@ -112,7 +172,10 @@ pub struct Item {
     pub kind: String,
     pub provenance: String,
     pub trust: TrustLevel,
+    /// The injection-pattern marks of PRV-07, and nothing else.
     pub flags: Vec<String>,
+    /// Whether the content is cut short, or continues an earlier item's.
+    pub continuation: Vec<Continuation>,
     pub integrity: IntegrityStatus,
     /// How relevant a search found the event, higher the better; none
     /// for an event recalled by its address.
@@ -142,6 +205,7 @@ impl Item {
             ("provenance", Value::from(self.provenance.as_str())),
             ("trust", Value::from(self.trust.as_str())),
             ("flags", json!(self.flags)),
+            ("continuation", json!(self.continuation_names())),
             ("integrity", Value::from(self.integrity.as_str())),
         ];
         fields.extend(score);
@@ -152,6 +216,10 @@ impl Item {
             .collect();
 
         format!("{{{}}}", fields.join(","))
+    }
+
+    fn continuation_names(&self) -> Vec<&'static str> {
+        self.continuation.iter().map(|c| c.as_str()).collect()
     }
 
     fn to_value(&self) -> Value {
@@ -165,6 +233,7 @@ impl Item {
             "provenance": self.provenance,
             "trust": self.trust.as_str(),
             "flags": self.flags,
+            "continuation": self.continuation_names(),
             "integrity": self.integrity.as_str(),
             "content": self.content,
         });
@@ -180,6 +249,8 @@ impl Item {
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct Envelope {
     pub items: Vec<Item>,
+    /// The ranges shown in place of events (§9.3).
+    pub tombstones: Vec<Tombstone>,
     /// Whether the call's limit cut the items short.
     pub truncated: bool,
     /// Where a further call continues, when truncated.
@@ -191,15 +262,14 @@ pub struct Envelope {
 }
 
 impl Envelope {
-    /// The envelope as a JSON value. Tombstones arrive with purge
-    /// (ADM-07); until then the list is empty.
+    /// The envelope as a JSON value.
     #[must_use]
     pub fn to_value(&self) -> Value {
         let mut value = json!({
             "parinn_envelope": VERSION,
             "warning": WARNING,
             "items": self.items.iter().map(Item::to_value).collect::<Vec<_>>(),
-            "tombstones": [],
+            "tombstones": self.tombstones.iter().map(Tombstone::to_value).collect::<Vec<_>>(),
             "truncated": self.truncated,
             "next_cursor": self.next_cursor,
         });
@@ -226,10 +296,13 @@ impl Envelope {
             format!("\"structural\":{{{}}},", fields.join(","))
         });
 
+        let tombstones: Vec<String> = self.tombstones.iter().map(Tombstone::render).collect();
+
         format!(
-            "{{\"parinn_envelope\":{VERSION},\"warning\":{},{structural}\"items\":[{}],\"tombstones\":[],\"truncated\":{},\"next_cursor\":{}}}",
+            "{{\"parinn_envelope\":{VERSION},\"warning\":{},{structural}\"items\":[{}],\"tombstones\":[{}],\"truncated\":{},\"next_cursor\":{}}}",
             Value::from(WARNING),
             items.join(","),
+            tombstones.join(","),
             self.truncated,
             json!(self.next_cursor),
         )

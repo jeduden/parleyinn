@@ -114,14 +114,16 @@ fn counts_cover_the_events_of_the_writers_or_the_rooms_reached() {
         .append(writer(2), &[line("b", Provenance::User)])
         .unwrap();
 
-    let first = store.counts(&Reach::Writers(vec![writer(1)])).unwrap();
-    let by_room = store.counts(&Reach::Rooms(vec![room(2)])).unwrap();
-    let both = store.counts(&Reach::Rooms(vec![room(1), room(2)])).unwrap();
-    let none = store.counts(&Reach::Writers(vec![])).unwrap();
+    let first = store.stats(&RecallReach::Writers(vec![writer(1)])).unwrap();
+    let by_room = store.stats(&RecallReach::Rooms(vec![room(2)])).unwrap();
+    let both = store
+        .stats(&RecallReach::Rooms(vec![room(1), room(2)]))
+        .unwrap();
+    let none = store.stats(&RecallReach::Writers(vec![])).unwrap();
 
     assert_eq!(
         first,
-        Counts {
+        Stats {
             events: 7,
             recalls: 1,
             compactions: 1
@@ -129,14 +131,14 @@ fn counts_cover_the_events_of_the_writers_or_the_rooms_reached() {
     );
     assert_eq!(
         by_room,
-        Counts {
+        Stats {
             events: 1,
             recalls: 0,
             compactions: 0
         }
     );
     assert_eq!(both.events, 8);
-    assert_eq!(none, Counts::default());
+    assert_eq!(none, Stats::default());
 }
 
 #[test]
@@ -184,4 +186,22 @@ fn certified_writers_come_in_the_order_the_device_seat_recorded_them() {
         [writer(3), writer(1)]
     );
     assert!(store.certified_writers(writer(8)).unwrap().is_empty());
+}
+
+#[test]
+fn the_head_of_a_log_is_its_last_seq_and_an_empty_log_has_none() {
+    let dir = TempDir::new().unwrap();
+    let mut store = open(&dir);
+    seat(&mut store, writer(1), room(1));
+    seat(&mut store, writer(2), room(1));
+    store
+        .append(
+            writer(1),
+            &[line("a", Provenance::User), line("b", Provenance::User)],
+        )
+        .unwrap();
+
+    assert_eq!(store.head(writer(1)).unwrap(), Seq::new(2));
+    assert_eq!(store.head(writer(2)).unwrap(), None);
+    assert_eq!(store.head(writer(9)).unwrap(), None);
 }

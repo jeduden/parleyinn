@@ -14,6 +14,12 @@
 //! one inside it that is none of the four. A type position is no
 //! construction: `fn f(t: &TrustedText)` and `-> TrustedText` are how a
 //! restore builder takes and passes trusted text.
+//!
+//! Three forms hide a construction behind another name and are refused
+//! wherever they stand: `use .. TrustedText as X`, `type X = TrustedText`
+//! and the qualified path `<TrustedText>::name`. This is a text check,
+//! not the type system: it does not stop a construction written through
+//! a macro or generated code, and it makes no claim to.
 
 use std::fs;
 use std::path::Path;
@@ -39,6 +45,10 @@ const BUILDING: [&str; 6] = [
 
 /// The type's name.
 const NAME: &str = "TrustedText";
+
+/// The forms that name the type by another route, whose use then hides
+/// how a value is built.
+const ALIASES: [&str; 3] = ["a `use .. as` alias", "a type alias", "a qualified path"];
 
 /// Problems: each construction of `TrustedText` the rule refuses.
 #[must_use]
@@ -100,6 +110,10 @@ fn check_file(file: &str, text: &str, inside: bool) -> Vec<String> {
         };
         let refused = if inside {
             refused_inside(&code, offset, &how)
+        } else if ALIASES.contains(&how.as_str()) {
+            Some(format!(
+                "TrustedText is named by {how}, which hides how it is built, outside the {RESTORE_BLOCK} crate"
+            ))
         } else {
             Some(format!(
                 "TrustedText is constructed ({how}) outside the {RESTORE_BLOCK} crate"
@@ -127,6 +141,9 @@ fn whole_word(code: &str, offset: usize) -> bool {
 fn construction(code: &str, offset: usize) -> Option<String> {
     let rest = code[offset + NAME.len()..].trim_start();
     let before = code[..offset].trim_end();
+    if let Some(how) = aliasing(before, rest) {
+        return Some(how.to_owned());
+    }
     let previous = before
         .rsplit(char::is_whitespace)
         .next()
@@ -156,6 +173,33 @@ fn construction(code: &str, offset: usize) -> Option<String> {
     }
 
     None
+}
+
+/// The alias form the mention of the name takes, if it does: a path
+/// qualified by the type, `use .. as`, or `type X = ..`. `before` is the
+/// code before the name, `rest` the code after it.
+fn aliasing(before: &str, rest: &str) -> Option<&'static str> {
+    let qualified = before.ends_with('<')
+        && !before[..before.len() - 1]
+            .chars()
+            .next_back()
+            .is_some_and(|c| c.is_alphanumeric() || c == '_' || c == ':')
+        && (rest.starts_with("as ") || rest.strip_prefix('>').is_some_and(|r| r.starts_with("::")));
+    if qualified {
+        return Some(ALIASES[2]);
+    }
+    if rest.starts_with("as ") && !before.ends_with('<') {
+        return Some(ALIASES[0]);
+    }
+    let statement = before.rsplit([';', '{', '}']).next().unwrap_or_default();
+    let named = statement
+        .rsplit_once('=')
+        .map(|(_, path)| path.trim())
+        .filter(|path| {
+            path.chars()
+                .all(|c| c.is_alphanumeric() || c == '_' || c == ':')
+        });
+    (has_word(statement, "type") && named.is_some()).then_some(ALIASES[1])
 }
 
 /// Whether the `impl` the text before `for` ends is one of the traits
@@ -190,6 +234,11 @@ fn has_word(text: &str, word: &str) -> bool {
 /// is: it is none of the four constructors, or `fixed` takes more than a
 /// string literal.
 fn refused_inside(code: &str, offset: usize, how: &str) -> Option<String> {
+    if ALIASES.contains(&how) {
+        return Some(format!(
+            "the {RESTORE_BLOCK} crate names TrustedText by {how}, which hides how it is built"
+        ));
+    }
     let constructor = how.strip_prefix("TrustedText::").unwrap_or_default();
     if !CONSTRUCTORS.contains(&constructor) {
         return Some(format!(

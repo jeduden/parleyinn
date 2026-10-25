@@ -9,7 +9,10 @@
     reason = "a test's helpers fail loudly: a failure is the assertion"
 )]
 
-use envelope::{Envelope, IntegrityStatus, Item, Origin, Run, TrustLevel, WARNING};
+use envelope::{
+    Continuation, Envelope, IntegrityStatus, Item, Origin, Run, Tombstone, TombstoneReason,
+    TrustLevel, WARNING,
+};
 use serde_json::Value;
 
 mod support;
@@ -31,6 +34,7 @@ fn item(address: &str, content: &str) -> Item {
         provenance: "tool_result:Bash".into(),
         trust: TrustLevel::Untrusted,
         flags: vec![],
+        continuation: vec![],
         integrity: IntegrityStatus::Unsigned,
         score: None,
         content: content.into(),
@@ -40,6 +44,7 @@ fn item(address: &str, content: &str) -> Item {
 fn envelope(items: Vec<Item>) -> Envelope {
     Envelope {
         items,
+        tombstones: vec![],
         truncated: false,
         next_cursor: None,
         structural: None,
@@ -87,6 +92,33 @@ fn a_cut_envelope_names_where_to_continue() {
 }
 
 #[test]
+fn a_continued_item_says_so_beside_its_flags_not_among_them() {
+    let rest = Item {
+        flags: vec!["instruction_like".into()],
+        continuation: vec![Continuation::Continued],
+        ..item("parinn:room/r1/w/4f2a/2", "the rest of the event")
+    };
+
+    assert_eq!(
+        envelope(vec![rest]).render(),
+        golden("continued").trim_end_matches('\n')
+    );
+}
+
+#[test]
+fn a_tombstone_stands_for_a_purged_range() {
+    let purged = Envelope {
+        tombstones: vec![Tombstone {
+            range: "A1·1200–1450".into(),
+            reason: TombstoneReason::Purged,
+        }],
+        ..envelope(vec![item("parinn:room/r1/w/4f2a/3", "kept")])
+    };
+
+    assert_eq!(purged.render(), golden("tombstones").trim_end_matches('\n'));
+}
+
+#[test]
 fn a_structural_envelope_holds_counts_alone() {
     let counts = Envelope {
         structural: Some(vec![("events", 40), ("runs", 2), ("recalls", 3)]),
@@ -98,7 +130,15 @@ fn a_structural_envelope_holds_counts_alone() {
 
 #[test]
 fn the_golden_files_carry_the_warning() {
-    for name in ["one_event", "search_hit", "hostile", "cut", "structural"] {
+    for name in [
+        "one_event",
+        "search_hit",
+        "hostile",
+        "cut",
+        "structural",
+        "continued",
+        "tombstones",
+    ] {
         let parsed: Value = serde_json::from_str(&golden(name)).unwrap();
         assert_eq!(parsed["warning"], WARNING, "{name}");
     }
@@ -113,5 +153,28 @@ fn the_round_trip_holds_for_seeded_content() {
         let content = support::content(seed);
         let envelope = envelope(vec![item("parinn:room/r1/w/4f2a/1", &content)]);
         support::check(&envelope, &[content.as_str()]);
+    }
+}
+
+/// The same for the fields that come and go: a hit's score, a structural
+/// mark, a continuation and tombstones.
+#[test]
+fn the_round_trip_holds_for_the_optional_fields_too() {
+    for seed in 0..512 {
+        let content = support::content(seed);
+        let hit = Item {
+            score: Some(seed as f64 / 7.0),
+            continuation: vec![Continuation::Continued, Continuation::Cut],
+            ..item("parinn:room/r1/w/4f2a/1", &content)
+        };
+        let full = Envelope {
+            tombstones: vec![Tombstone {
+                range: content.clone(),
+                reason: TombstoneReason::Purged,
+            }],
+            structural: Some(vec![("events", seed), ("runs", 1)]),
+            ..envelope(vec![hit])
+        };
+        support::check(&full, &[content.as_str()]);
     }
 }

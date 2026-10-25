@@ -6,7 +6,7 @@
 use std::collections::BTreeMap;
 
 use record::event::EventKind;
-use record::id::{RoomId, WriterId};
+use record::id::{RoomId, Seq, WriterId};
 use record::range::Label;
 use rusqlite::Connection;
 use serde_json::Value;
@@ -16,14 +16,14 @@ use crate::StoreError;
 /// The events a recall scope reaches: the writers of some rooms, or
 /// some writers whatever their rooms.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum Reach {
+pub enum RecallReach {
     Writers(Vec<WriterId>),
     Rooms(Vec<RoomId>),
 }
 
 /// The counts within a recall scope (`stat_list`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-pub struct Counts {
+pub struct Stats {
     pub events: u64,
     pub recalls: u64,
     pub compactions: u64,
@@ -79,15 +79,26 @@ pub(crate) fn certified(conn: &Connection, device: WriterId) -> Result<Vec<Write
     Ok(out)
 }
 
+/// The seq of the last event of `writer`'s log; none for an empty log.
+pub(crate) fn head(conn: &Connection, writer: WriterId) -> Result<Option<Seq>, StoreError> {
+    let last: Option<i64> = conn.query_row(
+        "SELECT max(seq) FROM events WHERE writer = ?1",
+        [writer.to_string()],
+        |r| r.get(0),
+    )?;
+
+    Ok(last.and_then(|n| u64::try_from(n).ok()).and_then(Seq::new))
+}
+
 /// The `WHERE` clause and argument selecting the events `reach`
 /// reaches, over `events e JOIN seats s`.
-fn clause(reach: &Reach) -> (&'static str, String) {
+fn clause(reach: &RecallReach) -> (&'static str, String) {
     match reach {
-        Reach::Writers(writers) => (
+        RecallReach::Writers(writers) => (
             "e.writer IN (SELECT value FROM json_each(?1))",
             Value::from(writers.iter().map(ToString::to_string).collect::<Vec<_>>()).to_string(),
         ),
-        Reach::Rooms(rooms) => (
+        RecallReach::Rooms(rooms) => (
             "s.room IN (SELECT value FROM json_each(?1))",
             Value::from(rooms.iter().map(ToString::to_string).collect::<Vec<_>>()).to_string(),
         ),
@@ -96,7 +107,7 @@ fn clause(reach: &Reach) -> (&'static str, String) {
 
 /// The counts of the events `reach` reaches. A compaction is a `system`
 /// line of subtype `compact_boundary` the harness wrote.
-pub(crate) fn counts(conn: &Connection, reach: &Reach) -> Result<Counts, StoreError> {
+pub(crate) fn stats(conn: &Connection, reach: &RecallReach) -> Result<Stats, StoreError> {
     let (filter, argument) = clause(reach);
     let sql = format!(
         "SELECT count(*), coalesce(sum(e.kind = 'recall'), 0)
@@ -114,7 +125,7 @@ pub(crate) fn counts(conn: &Connection, reach: &Reach) -> Result<Counts, StoreEr
         compactions += u64::from(row?.is_some_and(|content| is_compact_boundary(&content)));
     }
 
-    Ok(Counts {
+    Ok(Stats {
         events: u64::try_from(events).unwrap_or(0),
         recalls: u64::try_from(recalls).unwrap_or(0),
         compactions,

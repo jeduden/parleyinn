@@ -11,8 +11,9 @@
 //! scope it names, `run` unless it says more ([`scope`], RCL-05). Until
 //! the session binding lands the server serves no run, so every event
 //! lies outside the current run: a call takes only the explicit scope
-//! `room`, in the personal room unless it names another, and shows its
-//! run as `other`.
+//! `room`, for the personal room alone, and shows its run as `other`. A
+//! call refused for its scope, or for a gap in the range it asked for,
+//! is noted for the caller to count and audit (RCL-04, I6).
 //!
 //! An event is served only once it checks against the record: its
 //! content opens its commitment, its header hashes to its stored hash,
@@ -57,7 +58,7 @@ use record::id::{RoomId, WriterId};
 use serde_json::{Value, json};
 use store::Store;
 
-pub use recording::{Note, Recorder};
+pub use recording::{Note, RecallWriter};
 
 /// The MCP protocol versions the server speaks, newest first.
 pub const PROTOCOL_VERSIONS: [&str; 3] = ["2025-11-25", "2025-06-18", "2025-03-26"];
@@ -83,7 +84,7 @@ const NO_INDEX: &str = "the search index cannot be read: run parinn verify";
 #[derive(Debug)]
 pub(crate) struct Served {
     pub(crate) envelope: Envelope,
-    pub(crate) scope: Option<scope::Name>,
+    pub(crate) scope: Option<scope::RecallScope>,
 }
 
 /// The server over one store, for one node.
@@ -103,7 +104,7 @@ pub struct Server {
     /// How many searches the deadline cancelled since this server started.
     timed_out: Cell<u64>,
     /// What records each recall, when this server records (RCL-07).
-    recorder: Option<Recorder>,
+    recall_writer: Option<RecallWriter>,
     /// The device seat's writer, which assigns the writer labels a range
     /// names its writer by (RCL-08), when this server may assign them.
     labeller: Option<WriterId>,
@@ -136,7 +137,7 @@ impl Server {
             deadline: event_search::DEADLINE,
             cancelled: Cell::new(0),
             timed_out: Cell::new(0),
-            recorder: None,
+            recall_writer: None,
             labeller: None,
             notes: RefCell::new(Vec::new()),
         }
@@ -150,12 +151,12 @@ impl Server {
         self
     }
 
-    /// This server, recording each recall through `recorder` (RCL-07),
+    /// This server, recording each recall through `recall_writer` (RCL-07),
     /// and assigning writer labels in the same writer.
     #[must_use]
-    pub fn with_recorder(mut self, recorder: Recorder) -> Self {
-        self.labeller = Some(recorder.writer);
-        self.recorder = Some(recorder);
+    pub fn with_recall_writer(mut self, recall_writer: RecallWriter) -> Self {
+        self.labeller = Some(recall_writer.writer);
+        self.recall_writer = Some(recall_writer);
         self
     }
 
@@ -284,8 +285,8 @@ impl Server {
             "event_expand" => self.event_expand(arguments, run),
             "event_search" => self.event_search(arguments, run),
             "landmark_list" => self.landmark_list(arguments, run),
-            "pin_list" => self.pin_list(arguments),
-            _ => self.stat_list(run),
+            "pin_list" => self.pin_list(arguments, run),
+            _ => self.stat_list(arguments, run),
         }
     }
 
@@ -315,10 +316,15 @@ impl Server {
         }
     }
 
-    /// The fixed text a refused scope is answered with.
-    fn refusal(&self, refused: scope::Refused) -> String {
+    /// The fixed text a refused scope is answered with. A scope the
+    /// server does not serve is noted for the caller to count and audit
+    /// (RCL-04, I6).
+    fn refusal(&self, tool: &'static str, refused: scope::Refused) -> String {
         match refused {
-            scope::Refused::Text(text) => text.to_owned(),
+            scope::Refused::Text(text) => {
+                self.notes.borrow_mut().push(Note::ScopeRefused(tool));
+                text.to_owned()
+            }
             scope::Refused::Unreadable => NO_INDEX.to_owned(),
         }
     }
@@ -350,11 +356,12 @@ impl Server {
         let keys = KeySet::load(&self.store, &self.device_key).map_err(|_| NO_INDEX.to_owned())?;
         let seats = RefCell::new(BTreeMap::new());
         // The trust filter keeps matches before the ranking cuts them; an
-        // event whose trust cannot be derived stays, and fails its item.
+        // event whose trust cannot be derived is left out, never kept as
+        // if it were what the call asked for.
         let keep = |address: record::id::Address| {
             params.trust.is_none_or(|wanted| {
                 self.trust_at(address, &keys, &mut seats.borrow_mut())
-                    .map_or(true, |level| wanted.as_str() == level.as_str())
+                    .is_ok_and(|level| wanted.as_str() == level.as_str())
             })
         };
         let search = params.search(&compiled, &rooms, &writers, self.deadline);
@@ -387,7 +394,7 @@ impl Server {
         &self,
         arguments: &Value,
         run: Option<&str>,
-        tool: &str,
+        tool: &'static str,
     ) -> Result<scope::Scope, String> {
         let call = scope::Call {
             store: &self.store,
@@ -395,7 +402,7 @@ impl Server {
             run,
         };
 
-        scope::resolve(&call, arguments, None, self.no_run(tool)).map_err(|r| self.refusal(r))
+        scope::resolve(&call, arguments, None, self.no_run(tool)).map_err(|r| self.refusal(tool, r))
     }
 }
 

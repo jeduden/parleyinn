@@ -10,9 +10,9 @@
 //! here: a transcript a step registered and left empty is given its
 //! fixture's lines, then ingested, before the first call.
 //!
-//! `recall_calls` is no audit counter, which would fail `parinn doctor`
-//! on every recall: it is the number of recall events the record
-//! holds, the count `stat_list` derives.
+//! "recalls" is a stat `stat_list` derives from the recall events the
+//! record holds, no audit counter, which would fail `parinn doctor` on
+//! every recall.
 
 use std::collections::BTreeSet;
 
@@ -27,7 +27,7 @@ use crate::World;
 use crate::live::{Harness, wait_until};
 use crate::record::{home, last_run, run_core};
 use crate::record_search::{Reply, arguments_of, call_tool, last_reply};
-use crate::record_transcript::{ingest, recorded_call};
+use crate::record_transcript::{ingest, recorded, recorded_call};
 use crate::security_redaction::{append, transcripts};
 
 /// What the recall steps track.
@@ -37,10 +37,15 @@ pub struct RecallSteps {
     recorded: BTreeSet<String>,
     /// The tools the last listing offered.
     tools: Vec<Value>,
+    /// The tool and arguments of the last `event_expand`, `event_get` or
+    /// `event_search` call a step made.
+    asked: Option<(String, Value)>,
     /// The six tools' calls, by tool.
     calls: Vec<(String, Reply)>,
     /// How many recall events the record held before the last call.
     before: usize,
+    /// The "recalls" stat `stat_list` gave before the first search.
+    recalls_before: Option<u64>,
     /// The pages of an `event_expand` followed by its cursor.
     pages: Vec<Value>,
     /// What `mcp_server_get` answered, without a session binding and
@@ -87,6 +92,18 @@ fn fixture(name: &str) -> Result<Vec<Value>, String> {
             lines.extend(pair(2, "tests passed")?);
         }
         "mixed-provenance" => {
+            // A typed prompt, the assistant's own words, then tool
+            // results: the run holds more than one provenance class.
+            lines.push(crate::record_search::user_line(
+                "please deploy the staging build",
+                1,
+            )?);
+            let mut said = recorded("an assistant text line", |l| {
+                l["type"] == "assistant" && l["message"]["content"][0]["type"] == "text"
+            })?;
+            said["message"]["content"][0]["text"] = json!("deploying the staging build now");
+            said["uuid"] = json!(uuid(999));
+            lines.push(said);
             for n in 1..=12 {
                 lines.extend(pair(n, &format!("deploy step {n}: ok"))?);
             }
@@ -127,6 +144,30 @@ pub fn record_runs(w: &mut World) -> Result<(), String> {
         }
         recall(w).recorded.insert(name);
     }
+
+    Ok(())
+}
+
+/// The "recalls" stat `stat_list` gives now, which the call itself
+/// leaves a recall event for.
+fn recalls_stat(w: &mut World) -> Result<u64, String> {
+    let answer = call_tool(w, "stat_list", json!({}))?;
+    let envelope: Value = serde_json::from_str(&answer.text)
+        .map_err(|e| format!("stat_list answered no envelope: {e}: {}", answer.text))?;
+
+    envelope["structural"]["recalls"]
+        .as_u64()
+        .ok_or_else(|| format!("stat_list gave no recalls: {}", answer.text))
+}
+
+/// Reads the "recalls" stat once, before the scenario's first search,
+/// and keeps the recall events it leaves out of the call's count.
+pub fn note_recalls_stat(w: &mut World) -> Result<(), String> {
+    if recall(w).recalls_before.is_none() {
+        let stat = recalls_stat(w)?;
+        recall(w).recalls_before = Some(stat);
+    }
+    recall(w).before = recall_events(w)?.len();
 
     Ok(())
 }
@@ -176,6 +217,7 @@ fn calls_tool(w: &mut World, tool: String, args: String) -> Result<(), String> {
     }
     let arguments = tool_arguments(w, &args)?;
     recall(w).before = recall_events(w)?.len();
+    recall(w).asked = Some((tool.clone(), arguments.clone()));
     call_tool(w, &tool, arguments).map(drop)
 }
 
@@ -221,7 +263,107 @@ fn wrapped(envelope: &Value) -> Result<(), String> {
 #[then(regex = r"^the recall result is wrapped in the envelope$")]
 fn wrapped_in_envelope(w: &mut World) -> Result<(), String> {
     let envelope = envelope_of(w)?;
-    wrapped(&envelope)
+    wrapped(&envelope)?;
+    if envelope["structural"].is_object() {
+        return Ok(());
+    }
+    // An envelope wrapping nothing wraps nothing to check: the call must
+    // have returned what it was asked for.
+    let items = envelope["items"].as_array().cloned().unwrap_or_default();
+    if items.is_empty() {
+        return Err("the envelope wraps no item".to_owned());
+    }
+    if let Some((tool, arguments)) = recall(w).asked.clone() {
+        let mixed = recall(w).recorded.contains("mixed-provenance");
+        asked_items(
+            &tool,
+            &arguments,
+            &items,
+            envelope["truncated"] == true,
+            mixed,
+        )?;
+    }
+    Ok(())
+}
+
+/// Keeps the tool and arguments of the call the next step makes.
+pub fn asked(w: &mut World, tool: &str, arguments: &Value) {
+    recall(w).asked = Some((tool.to_owned(), arguments.clone()));
+}
+
+/// The seq an address text such as `A1:7` ends in.
+fn seq_of(text: &str) -> Result<u64, String> {
+    text.rsplit([':', '/'])
+        .next()
+        .and_then(|s| s.parse().ok())
+        .ok_or_else(|| format!("{text:?} ends in no seq"))
+}
+
+/// Fails unless `items` are the events `tool` was asked for: the one
+/// address of `event_get`, the whole range of `event_expand`, from one
+/// writer, or the first of them when the cap cut the call; a search's
+/// hits are checked by their own steps.
+fn asked_items(
+    tool: &str,
+    arguments: &Value,
+    items: &[Value],
+    cut: bool,
+    mixed: bool,
+) -> Result<(), String> {
+    let wanted = match tool {
+        "event_get" => {
+            let seq = seq_of(arguments["address"].as_str().unwrap_or_default())?;
+            seq..=seq
+        }
+        "event_expand" => match arguments["range"].as_str() {
+            // A range as one string, such as A1:3-9.
+            Some(text) => {
+                let (from, to) = text
+                    .rsplit(':')
+                    .next()
+                    .unwrap_or_default()
+                    .split_once('-')
+                    .ok_or_else(|| format!("{text:?} is no range"))?;
+                let seq = |s: &str| s.parse::<u64>().map_err(|e| format!("{text:?}: {e}"));
+                seq(from)?..=seq(to)?
+            }
+            None => {
+                let end =
+                    |name: &str| seq_of(arguments["range"][name].as_str().unwrap_or_default());
+                end("from")?..=end("to")?
+            }
+        },
+        _ => return Ok(()),
+    };
+    let seqs = items
+        .iter()
+        .map(|i| seq_of(i["address"].as_str().unwrap_or_default()))
+        .collect::<Result<Vec<_>, _>>()?;
+    let writers: BTreeSet<&str> = items.iter().filter_map(|i| i["writer"].as_str()).collect();
+    let all: Vec<u64> = wanted.clone().collect();
+    // A call cut at the cap returns the first of them, the cursor the rest.
+    let returned = if cut {
+        &all[..seqs.len().min(all.len())]
+    } else {
+        &all[..]
+    };
+    if seqs != returned || writers.len() != 1 {
+        return Err(format!(
+            "{tool} was asked for seqs {wanted:?} and returned {seqs:?} of {writers:?}"
+        ));
+    }
+    if tool == "event_expand" && mixed {
+        let classes: BTreeSet<&str> = items
+            .iter()
+            .filter_map(|i| i["provenance"].as_str())
+            .collect();
+        if classes.len() < 3 {
+            return Err(format!(
+                "the run is not mixed: its provenance is {classes:?}"
+            ));
+        }
+    }
+    Ok(())
 }
 
 #[then(
@@ -500,9 +642,15 @@ fn exact_content(w: &mut World) -> Result<(), String> {
         return Err("the envelope holds no item".to_owned());
     }
     for item in &items {
-        let cut = item["flags"]
+        let cut = item["continuation"]
             .as_array()
             .is_some_and(|f| f.iter().any(|f| f == "cut"));
+        if item["flags"].as_array().is_some_and(|f| !f.is_empty()) {
+            return Err(format!(
+                "{} carries flags: {}",
+                item["address"], item["flags"]
+            ));
+        }
         let address = Address::parse(item["address"].as_str().unwrap_or_default())
             .map_err(|e| e.to_string())?
             .0;
@@ -585,7 +733,7 @@ fn cursor_continues(w: &mut World) -> Result<(), String> {
     {
         let address = item["address"].as_str().unwrap_or_default().to_owned();
         let content = item["content"].as_str().unwrap_or_default();
-        let continued = item["flags"]
+        let continued = item["continuation"]
             .as_array()
             .is_some_and(|f| f.iter().any(|f| f == "continued"));
         match events.last_mut() {
@@ -679,6 +827,24 @@ fn lists_addresses(w: &mut World) -> Result<(), String> {
     Ok(())
 }
 
+#[then(regex = r#"^the stat "recalls" increases by 1$"#)]
+fn recalls_stat_increases(w: &mut World) -> Result<(), String> {
+    let before = recall(w)
+        .recalls_before
+        .ok_or("no step read the recalls stat before the call")?;
+    let after = recalls_stat(w)?;
+    // Reading the stat first left a recall event of its own, which the
+    // later read counts beside the search.
+    if after == before + 2 {
+        return Ok(());
+    }
+    Err(format!(
+        "stat_list gave {before} recalls before the search and {after} after, \
+         wanting {} (the search, and the first read's own recall)",
+        before + 2
+    ))
+}
+
 // RCL-01: `mcp_server_get`.
 
 #[when(regex = r#"^the agent calls "mcp_server_get", with a session binding held and with none$"#)]
@@ -713,6 +879,19 @@ fn calls_server_get(w: &mut World) -> Result<(), String> {
             .to_owned();
         Ok(text.contains("\"held\""))
     })?;
+    recall(w).states.push(text);
+    // And under a tool-use id no transcript line carries: no run is
+    // found for the call, and the state is told all the same.
+    let named = json!({
+        "name": "mcp_server_get",
+        "arguments": {},
+        "_meta": {"claudecode/toolUseId": "toolu_no_such_call"},
+    });
+    let reply = harness.request("tools/call", named)?;
+    let text = reply["result"]["content"][0]["text"]
+        .as_str()
+        .unwrap_or_default()
+        .to_owned();
     harness.stop()?;
     recall(w).states.push(text);
     Ok(())
@@ -723,13 +902,13 @@ fn calls_server_get(w: &mut World) -> Result<(), String> {
 )]
 fn server_state_is_closed(w: &mut World) -> Result<(), String> {
     let states = recall(w).states.clone();
-    let [none, held] = states.as_slice() else {
+    let [none, held, named] = states.as_slice() else {
         return Err(format!(
-            "wanting two answers, the step made {}",
+            "wanting three answers, the step made {}",
             states.len()
         ));
     };
-    for (text, binding) in [(none, "not_held"), (held, "held")] {
+    for (text, binding) in [(none, "not_held"), (held, "held"), (named, "held")] {
         let state: Value = serde_json::from_str(text).map_err(|e| format!("{text:?}: {e}"))?;
         let object = state.as_object().ok_or("the answer is no object")?;
         let mut names: Vec<&str> = object.keys().map(String::as_str).collect();

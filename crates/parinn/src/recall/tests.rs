@@ -74,17 +74,38 @@ fn an_unrecorded_recall_and_a_redacted_argument_are_counted() {
 }
 
 #[test]
-fn the_recorder_redacts_by_the_patterns_it_was_given_and_records_in_the_device_writer() {
+fn a_call_refused_for_its_scope_or_a_gap_is_counted_as_refused() {
+    let p = Process::new();
+
+    let got = entries(
+        &p,
+        &[
+            Note::ScopeRefused("event_get"),
+            Note::RecordGap("event_expand"),
+        ],
+    );
+
+    assert_eq!(got.len(), 2);
+    assert_eq!(got[0].0, "rejected");
+    assert_eq!(got[0].1.as_deref(), Some("recall_refused"));
+    assert_eq!(got[0].2, "event_get");
+    assert_eq!(got[1].0, "failed");
+    assert_eq!(got[1].1.as_deref(), Some("recall_refused"));
+    assert_eq!(got[1].2, "event_expand");
+}
+
+#[test]
+fn the_recall_writer_redacts_by_the_patterns_it_was_given_and_records_in_the_device_writer() {
     let writer = WriterId::derive(&[4; 32]);
     let (redactor, _) = Redactor::new(&["ACME-[0-9]{8}".to_owned()]).unwrap();
 
-    let recorder = recorder(writer, Some(redactor));
+    let recall_writer = recall_writer(writer, Some(redactor));
 
-    assert_eq!(recorder.writer, writer);
-    let (text, rules) = (recorder.redact.unwrap())("token ACME-12345678 here");
+    assert_eq!(recall_writer.writer, writer);
+    let (text, rules) = (recall_writer.redact.unwrap())("token ACME-12345678 here");
     assert_eq!(text, "token [REDACTED:extra_pattern_1] here");
     assert_eq!(rules, ["extra_pattern_1"]);
-    assert!(super::recorder(writer, None).redact.is_none());
+    assert!(super::recall_writer(writer, None).redact.is_none());
 }
 
 #[test]

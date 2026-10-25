@@ -109,6 +109,7 @@ fn each_counter_of_the_mcp_server_has_its_name() {
         (Counter::QueryCancelled, "query_cancelled"),
         (Counter::RecallTruncated, "recall_truncated"),
         (Counter::RecallNotRecorded, "recall_not_recorded"),
+        (Counter::RecallRefused, "recall_refused"),
         (
             Counter::SearchIndexWriterUnindexed,
             "search_index_writer_unindexed",

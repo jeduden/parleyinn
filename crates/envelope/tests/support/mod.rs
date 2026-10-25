@@ -9,7 +9,7 @@
 use envelope::Envelope;
 use serde_json::Value;
 
-/// The fields every envelope has, and the one a structural one adds.
+/// The fields every envelope has; a structural one adds `structural`.
 const CLOSED: [&str; 6] = [
     "items",
     "next_cursor",
@@ -33,12 +33,26 @@ pub fn check(envelope: &Envelope, contents: &[&str]) {
         .map(String::as_str)
         .collect();
     names.sort_unstable();
-    assert_eq!(names, CLOSED, "{text:?}");
+    let mut closed = CLOSED.to_vec();
+    if envelope.structural.is_some() {
+        closed.push("structural");
+        closed.sort_unstable();
+    }
+    assert_eq!(names, closed, "{text:?}");
     let items = parsed["items"].as_array().expect("items");
     assert_eq!(items.len(), contents.len());
-    for (item, content) in items.iter().zip(contents) {
+    for ((item, content), shown) in items.iter().zip(contents).zip(&envelope.items) {
         assert_eq!(item["content"].as_str(), Some(*content));
-        assert_eq!(item.as_object().expect("an item").len(), 11);
+        // Twelve closed fields and the content, and a score on a hit.
+        let fields = 12 + usize::from(shown.score.is_some());
+        assert_eq!(item.as_object().expect("an item").len(), fields);
+    }
+    for tombstone in parsed["tombstones"].as_array().expect("tombstones") {
+        assert_eq!(tombstone.as_object().expect("a tombstone").len(), 2);
+    }
+    if let Some(counts) = &envelope.structural {
+        let shown = parsed["structural"].as_object().expect("structural");
+        assert_eq!(shown.len(), counts.len());
     }
 }
 
@@ -88,13 +102,18 @@ pub fn content(seed: u64) -> String {
 /// last part; the rendering must be the closed shape with every
 /// content back exactly.
 pub fn encode(data: &[u8]) {
-    use envelope::{IntegrityStatus, Item, Origin, Run, TrustLevel};
+    use envelope::{
+        Continuation, IntegrityStatus, Item, Origin, Run, Tombstone, TombstoneReason, TrustLevel,
+    };
 
     let text = String::from_utf8_lossy(data);
     let parts: Vec<&str> = text.split('\u{1}').collect();
+    // What varies with the input's length: a hit's score, a structural
+    // envelope and a continuation, so each optional field is covered.
     let items: Vec<Item> = parts
         .iter()
-        .map(|content| Item {
+        .enumerate()
+        .map(|(n, content)| Item {
             address: (*content).to_owned(),
             writer: (*content).to_owned(),
             author: (*content).to_owned(),
@@ -104,17 +123,33 @@ pub fn encode(data: &[u8]) {
             provenance: (*content).to_owned(),
             trust: TrustLevel::Untrusted,
             flags: vec![(*content).to_owned()],
+            continuation: match (n + data.len()) % 3 {
+                0 => vec![],
+                1 => vec![Continuation::Cut],
+                _ => vec![Continuation::Continued, Continuation::Cut],
+            },
             integrity: IntegrityStatus::Broken,
-            score: None,
+            score: data
+                .len()
+                .is_multiple_of(2)
+                .then(|| content.len() as f64 / 3.0),
             content: (*content).to_owned(),
         })
         .collect();
     let cursor = parts.last().map(|c| (*c).to_owned());
     let envelope = Envelope {
         items,
+        tombstones: parts
+            .iter()
+            .take(data.len() % 3)
+            .map(|range| Tombstone {
+                range: (*range).to_owned(),
+                reason: TombstoneReason::Purged,
+            })
+            .collect(),
         truncated: cursor.is_some(),
         next_cursor: cursor,
-        structural: None,
+        structural: (data.len() % 5 < 2).then(|| vec![("events", data.len() as u64), ("runs", 1)]),
     };
     check(&envelope, &parts);
 }

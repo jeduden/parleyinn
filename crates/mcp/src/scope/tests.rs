@@ -70,34 +70,52 @@ fn resolved(store: &Store, run: Option<&str>, arguments: &Value) -> Result<Scope
 
 #[test]
 fn a_scope_is_run_unless_the_call_names_room_or_rooms() {
-    assert_eq!(Name::of(&json!({})), Ok(Name::Run));
-    assert_eq!(Name::of(&json!({"scope": "run"})), Ok(Name::Run));
-    assert_eq!(Name::of(&json!({"scope": "room"})), Ok(Name::Room));
-    assert_eq!(Name::of(&json!({"scope": "rooms"})), Ok(Name::Rooms));
-    assert_eq!(Name::of(&json!({"scope": "world"})), Err(BAD_SCOPE));
-    assert_eq!(Name::of(&json!({"scope": 1})), Err(BAD_SCOPE));
+    assert_eq!(RecallScope::of(&json!({})), Ok(RecallScope::Run));
     assert_eq!(
-        [Name::Run, Name::Room, Name::Rooms].map(Name::as_str),
+        RecallScope::of(&json!({"scope": "run"})),
+        Ok(RecallScope::Run)
+    );
+    assert_eq!(
+        RecallScope::of(&json!({"scope": "room"})),
+        Ok(RecallScope::Room)
+    );
+    assert_eq!(
+        RecallScope::of(&json!({"scope": "rooms"})),
+        Ok(RecallScope::Rooms)
+    );
+    assert_eq!(RecallScope::of(&json!({"scope": "world"})), Err(BAD_SCOPE));
+    assert_eq!(RecallScope::of(&json!({"scope": 1})), Err(BAD_SCOPE));
+    assert_eq!(
+        [RecallScope::Run, RecallScope::Room, RecallScope::Rooms].map(RecallScope::as_str),
         ["run", "room", "rooms"]
     );
 }
 
 #[test]
-fn a_server_serving_no_run_serves_the_room_scope_alone() {
+fn a_server_serving_no_run_serves_the_personal_room_alone() {
     let dir = TempDir::new().unwrap();
     let store = store(&dir);
 
     let default = resolved(&store, None, &json!({"scope": "room"})).unwrap();
-    let named = resolved(
+    let personal = resolved(
         &store,
         None,
-        &json!({"scope": "room", "room": room(3).to_string()}),
+        &json!({"scope": "room", "room": room(1).to_string()}),
     )
     .unwrap();
 
     assert_eq!(default.rooms, BTreeSet::from([room(1)]));
-    assert_eq!(named.rooms, BTreeSet::from([room(3)]));
+    assert_eq!(personal.rooms, BTreeSet::from([room(1)]));
     assert!(default.current.is_empty());
+    assert_eq!(
+        resolved(
+            &store,
+            None,
+            &json!({"scope": "room", "room": room(3).to_string()})
+        )
+        .unwrap_err(),
+        Refused::Text(ROOM_NEEDS_A_RUN)
+    );
     assert_eq!(
         resolved(&store, None, &json!({})).unwrap_err(),
         Refused::Text(NO_RUN)
@@ -172,10 +190,20 @@ fn the_room_argument_is_a_room_id_and_agrees_with_the_room_an_address_names() {
         resolve(&call, &arguments, Some(room(3)), NO_RUN).unwrap_err(),
         Refused::Text(ROOM_CONFLICT)
     );
-    let named = resolve(&call, &scope, Some(room(3)), NO_RUN).unwrap();
+    // A server serving no run serves its personal room alone.
+    let at = |personal: u8| Call {
+        store: &store,
+        personal_room: room(personal),
+        run: None,
+    };
+    let named = resolve(&at(3), &scope, Some(room(3)), NO_RUN).unwrap();
     assert_eq!(named.rooms, BTreeSet::from([room(3)]));
-    let agreeing = resolve(&call, &arguments, Some(room(2)), NO_RUN).unwrap();
+    let agreeing = resolve(&at(2), &arguments, Some(room(2)), NO_RUN).unwrap();
     assert_eq!(agreeing.rooms, BTreeSet::from([room(2)]));
+    assert_eq!(
+        resolve(&call, &scope, Some(room(3)), NO_RUN).unwrap_err(),
+        Refused::Text(ROOM_NEEDS_A_RUN)
+    );
 }
 
 #[test]
@@ -220,9 +248,12 @@ fn what_a_scope_reaches_is_its_writers_or_its_rooms() {
 
     assert_eq!(
         run.reach(),
-        Reach::Writers(sorted(vec![writer(1), writer(2)]))
+        RecallReach::Writers(sorted(vec![writer(1), writer(2)]))
     );
-    assert_eq!(rooms.reach(), Reach::Rooms(sorted(vec![room(1), room(2)])));
+    assert_eq!(
+        rooms.reach(),
+        RecallReach::Rooms(sorted(vec![room(1), room(2)]))
+    );
 }
 
 #[test]
@@ -256,7 +287,7 @@ fn a_search_is_limited_to_the_run_and_never_to_everything() {
 #[test]
 fn a_room_scope_with_no_room_reaches_nothing() {
     let none = Scope {
-        name: Name::Rooms,
+        name: RecallScope::Rooms,
         current: BTreeSet::new(),
         rooms: BTreeSet::new(),
     };

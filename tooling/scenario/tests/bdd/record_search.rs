@@ -184,7 +184,9 @@ fn calls_event_search(w: &mut World, args: String) -> Result<(), String> {
         return crate::recall_scope::call(w, "event_search", &args);
     }
     crate::recall::record_runs(w)?;
+    crate::recall::note_recalls_stat(w)?;
     let arguments = arguments_of(w, &args)?;
+    crate::recall::asked(w, "event_search", &arguments);
     call_search(w, arguments).map(drop)
 }
 

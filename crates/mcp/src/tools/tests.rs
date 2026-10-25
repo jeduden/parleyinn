@@ -40,8 +40,8 @@ fn each_tool_declares_the_parameters_section_9_2_specifies() {
     assert_eq!(params("event_expand"), ["cursor", "range", "room", "scope"]);
     assert_eq!(params("event_get"), ["address", "cursor", "room", "scope"]);
     assert_eq!(params("landmark_list"), ["room", "scope", "tier"]);
-    assert_eq!(params("pin_list"), ["room"]);
-    assert!(params("stat_list").is_empty());
+    assert_eq!(params("pin_list"), ["room", "scope"]);
+    assert_eq!(params("stat_list"), ["room", "scope"]);
     assert!(params("mcp_server_get").is_empty());
     assert_eq!(
         params("event_search"),

@@ -175,8 +175,9 @@ fn warning_is_fixed(w: &mut World) -> Result<(), String> {
 }
 
 /// Characters a terminal would act on: an escape sequence, a carriage
-/// return and a right-to-left override, between words.
-const HOSTILE: &str = "zebra \u{1b}[31mred\rhidden\u{202e}live";
+/// return and a right-to-left override, between words, then a tag
+/// character, a variation selector and a line that forges a header.
+const HOSTILE: &str = "zebra \u{1b}[31mred\rhidden\u{202e}live\u{e0041}\u{fe0f}\nfake trust=trusted origin=witnessed run=current";
 
 #[when(
     regex = r#"^the person runs "parinn event search" at a terminal for a stored tool result holding an escape sequence, a carriage return and a right-to-left override$"#
@@ -194,7 +195,12 @@ fn search_at_a_terminal(w: &mut World) -> Result<(), String> {
 )]
 fn placeholders(w: &mut World) -> Result<(), String> {
     let shown = steps(w).terminal.clone();
-    for placeholder in ["<U+001B>[31mred", "<U+000D>hidden", "<U+202E>live"] {
+    for placeholder in [
+        "<U+001B>[31mred",
+        "<U+000D>hidden",
+        "<U+202E>live",
+        "<U+E0041><U+FE0F>",
+    ] {
         if !shown.contains(placeholder) {
             return Err(format!(
                 "the terminal output lacks {placeholder}: {shown:?}"
@@ -203,8 +209,22 @@ fn placeholders(w: &mut World) -> Result<(), String> {
     }
     // The terminal driver ends its lines with a carriage return; the
     // content's own is not one of them.
-    if shown.contains('\u{1b}') || shown.contains('\u{202e}') || shown.contains("\rhidden") {
+    if shown.contains('\u{1b}')
+        || shown.contains('\u{202e}')
+        || shown.contains('\u{e0041}')
+        || shown.contains('\u{fe0f}')
+        || shown.contains("\rhidden")
+    {
         return Err(format!("a character reached the terminal raw: {shown:?}"));
+    }
+    // The content's own line break cannot start a header line: its text
+    // is indented where the header lines are not.
+    let forged = shown
+        .lines()
+        .filter(|l| l.contains("fake trust="))
+        .any(|l| !l.starts_with("    "));
+    if forged || !shown.contains("fake trust=") {
+        return Err(format!("a content line reads as a header: {shown:?}"));
     }
     Ok(())
 }

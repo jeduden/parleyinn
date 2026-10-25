@@ -8,30 +8,33 @@
 //!
 //! A run is found through the tool-use id of its call (PRV-14); a
 //! server that holds no session binding serves no run, so it takes only
-//! `room`, in the personal room unless the call names another.
+//! `room`, and only for the personal room: with no run there is no seat
+//! to say which other rooms the caller has.
 
 use std::collections::BTreeSet;
 
 use record::id::{RoomId, WriterId};
 use serde_json::Value;
-use store::{Reach, Store};
+use store::{RecallReach, Store};
 
 /// The refusals, each fixed text (RCL-04).
 pub const BAD_SCOPE: &str = "the scope is none of run, room or rooms";
 pub const BAD_ROOM: &str = "the room is not a room id";
 pub const ROOM_CONFLICT: &str = "the address and the room argument name different rooms";
 const NO_SEAT_IN_ROOM: &str = "the run has no seat in that room";
+const ROOM_NEEDS_A_RUN: &str =
+    "this server serves no run yet, so scope \"room\" serves only the personal room";
 const ROOMS_NEED_A_RUN: &str = "scope \"rooms\" needs a run, and this server serves none yet";
 
 /// How far a call reaches.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Name {
+pub enum RecallScope {
     Run,
     Room,
     Rooms,
 }
 
-impl Name {
+impl RecallScope {
     /// The name a call spells it by.
     #[must_use]
     pub fn as_str(self) -> &'static str {
@@ -60,7 +63,7 @@ impl Name {
 /// What a call may reach.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Scope {
-    pub name: Name,
+    pub name: RecallScope,
     /// The calling run's writers, none while the server serves no run.
     current: BTreeSet<WriterId>,
     /// The rooms reached, for `room` and `rooms`.
@@ -137,7 +140,7 @@ pub fn resolve(
     named: Option<RoomId>,
     no_run: &'static str,
 ) -> Result<Scope, Refused> {
-    let name = Name::of(arguments)?;
+    let name = RecallScope::of(arguments)?;
     let argued = match &arguments["room"] {
         Value::Null => None,
         Value::String(text) => Some(RoomId::parse(text).map_err(|_| BAD_ROOM)?),
@@ -152,17 +155,18 @@ pub fn resolve(
         None => BTreeSet::new(),
     };
     let rooms = match (name, call.run) {
-        (Name::Run, None) => return Err(no_run.into()),
-        (Name::Run, Some(_)) => BTreeSet::new(),
-        (Name::Room, None) => BTreeSet::from([room]),
-        (Name::Room, Some(_)) => {
+        (RecallScope::Run, None) => return Err(no_run.into()),
+        (RecallScope::Run, Some(_)) => BTreeSet::new(),
+        (RecallScope::Room, None) if room == call.personal_room => BTreeSet::from([room]),
+        (RecallScope::Room, None) => return Err(ROOM_NEEDS_A_RUN.into()),
+        (RecallScope::Room, Some(_)) => {
             let mine = call.run_rooms(&current)?;
             mine.contains(&room)
                 .then_some(BTreeSet::from([room]))
                 .ok_or(NO_SEAT_IN_ROOM)?
         }
-        (Name::Rooms, None) => return Err(ROOMS_NEED_A_RUN.into()),
-        (Name::Rooms, Some(_)) => call.run_rooms(&current)?,
+        (RecallScope::Rooms, None) => return Err(ROOMS_NEED_A_RUN.into()),
+        (RecallScope::Rooms, Some(_)) => call.run_rooms(&current)?,
     };
 
     Ok(Scope {
@@ -177,7 +181,7 @@ impl Scope {
     /// call is logged for.
     #[must_use]
     pub fn extends(&self) -> bool {
-        self.name != Name::Run
+        self.name != RecallScope::Run
     }
 
     /// Whether the scope reaches an event of `writer`, whose seat lies
@@ -185,8 +189,8 @@ impl Scope {
     #[must_use]
     pub fn covers(&self, writer: WriterId, room: RoomId) -> bool {
         match self.name {
-            Name::Run => self.current.contains(&writer),
-            Name::Room | Name::Rooms => self.rooms.contains(&room),
+            RecallScope::Run => self.current.contains(&writer),
+            RecallScope::Room | RecallScope::Rooms => self.rooms.contains(&room),
         }
     }
 
@@ -198,10 +202,12 @@ impl Scope {
 
     /// The events a count over the scope reaches.
     #[must_use]
-    pub fn reach(&self) -> Reach {
+    pub fn reach(&self) -> RecallReach {
         match self.name {
-            Name::Run => Reach::Writers(self.current.iter().copied().collect()),
-            Name::Room | Name::Rooms => Reach::Rooms(self.rooms.iter().copied().collect()),
+            RecallScope::Run => RecallReach::Writers(self.current.iter().copied().collect()),
+            RecallScope::Room | RecallScope::Rooms => {
+                RecallReach::Rooms(self.rooms.iter().copied().collect())
+            }
         }
     }
 
@@ -212,14 +218,16 @@ impl Scope {
     #[must_use]
     pub fn limits(&self, only: Option<WriterId>) -> Option<(Vec<RoomId>, Vec<WriterId>)> {
         let writers: Vec<WriterId> = match (self.name, only) {
-            (Name::Run, None) => self.current.iter().copied().collect(),
-            (Name::Run, Some(w)) => self.current.contains(&w).then_some(w).into_iter().collect(),
+            (RecallScope::Run, None) => self.current.iter().copied().collect(),
+            (RecallScope::Run, Some(w)) => {
+                self.current.contains(&w).then_some(w).into_iter().collect()
+            }
             (_, only) => only.into_iter().collect(),
         };
         let rooms: Vec<RoomId> = self.rooms.iter().copied().collect();
         let nothing = match self.name {
-            Name::Run => writers.is_empty(),
-            Name::Room | Name::Rooms => rooms.is_empty(),
+            RecallScope::Run => writers.is_empty(),
+            RecallScope::Room | RecallScope::Rooms => rooms.is_empty(),
         };
 
         (!nothing).then_some((rooms, writers))

@@ -1109,7 +1109,7 @@ fn mcp(
     let redactor = recall::redactor(ctx, &in_force, stderr);
     let mut server = server
         .with_runs(Box::new(capture::Finder(shared.clone())))
-        .with_recorder(recall::recorder(device_writer, redactor.clone()));
+        .with_recall_writer(recall::recall_writer(device_writer, redactor.clone()));
     let live = redactor
         .map(|r| live_capture(ctx, &home, &shared, &in_force, r))
         .map(capture::Capture::start)

@@ -25,12 +25,13 @@ persona-security-officer reviews the envelope and the recall tools.
 - Scopes (RCL-05). `run` is the calling run's writers, found through its
   tool-use id; `room` and `rooms` need the explicit parameter, serve
   only rooms the run has a seat in, and each such call appends an audit
-  entry. Without a session binding `run` stays refused.
+  entry. Without a session binding `run` stays refused and `room`
+  serves the personal room alone.
 - Every call that returns an envelope appends a recall event, kind
   `recall`, provenance `assistant`, to the device seat's writer: the
   tool, its redacted arguments, the run and the returned addresses.
-  `recall_calls` is read from the record by `stat_list`, as a count, and
-  no audit counter, which would fail `parinn doctor` on every recall.
+  The stat "recalls" is read from the record by `stat_list`, as a count,
+  and no audit counter, which would fail `parinn doctor` on every recall.
 - Writer labels (RCL-08): a label assignment is a structural event in
   the device seat's writer, made when an address is first asked for; a
   label is `A` and its assignment's rank. Short, range, full and ASCII

@@ -47,7 +47,7 @@ use serde_json::Value;
 
 pub use hook::{Held, Observation, PromptCommitment};
 pub use payload::{Disk, OsDisk, Payloads};
-pub use recall::{Counts, Reach};
+pub use recall::{RecallReach, Stats};
 pub use search::rank::Hit;
 pub use search_index::{GapClass, IndexGap, Search};
 pub use segment::{SEGMENT_VERSION, Segment};
@@ -621,8 +621,8 @@ impl Store {
     /// # Errors
     ///
     /// Fails when SQLite does.
-    pub fn counts(&self, reach: &Reach) -> Result<Counts, StoreError> {
-        recall::counts(&self.conn, reach)
+    pub fn stats(&self, reach: &RecallReach) -> Result<Stats, StoreError> {
+        recall::stats(&self.conn, reach)
     }
 
     /// The search index's canonical digest (§8.3): the same for any two
@@ -1367,6 +1367,16 @@ impl Store {
     /// Fails when SQLite does or a row does not parse.
     pub fn ingested_runs(&self) -> Result<Vec<IngestedRun>, StoreError> {
         source::runs(&self.conn, "WHERE ?1 = ?2", "", "")
+    }
+
+    /// The seq of the last event of `writer`'s log; none for an empty
+    /// log.
+    ///
+    /// # Errors
+    ///
+    /// Fails when SQLite does.
+    pub fn head(&self, writer: WriterId) -> Result<Option<Seq>, StoreError> {
+        recall::head(&self.conn, writer)
     }
 
     /// The event at `address`.

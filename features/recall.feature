@@ -93,7 +93,7 @@ Feature: Recall (RCL)
     When the agent calls the MCP tool "event_search" with query "deploy"
     Then the record gains one recall event with provenance "assistant" carrying the query
     And that event lists the addresses of the returned events
-    And the counter "recall_calls" increases by 1
+    And the stat "recalls" increases by 1
 
   @RCL-08 @P1 @I1 @pending
   Scenario Outline: every address ParleyInn shows, and its ASCII input form, resolves wherever an address is taken

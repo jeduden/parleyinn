@@ -308,7 +308,8 @@ fn event_get_refuses_what_it_cannot_serve_naming_why() {
         ),
         (
             json!({"address": address, "scope": "room", "room": other_room}),
-            "the event lies in another room".to_owned(),
+            "this server serves no run yet, so scope \"room\" serves only the personal room"
+                .to_owned(),
         ),
         (
             json!({
@@ -579,10 +580,17 @@ fn the_room_scope_is_the_personal_room_unless_a_room_is_named() {
     );
 
     assert_eq!(refusal(&unnamed), "the event lies in another room");
-    let item = &envelope_of(&named)["items"][0];
+    // With no run, no other room is served, whatever room is named.
     assert_eq!(
-        item["address"].as_str(),
-        Some(format!("parinn:room/{other}/w/{writer}/1").as_str())
+        refusal(&named),
+        "this server serves no run yet, so scope \"room\" serves only the personal room"
+    );
+    assert_eq!(
+        server.take_notes(),
+        [
+            Note::ScopeRefused("event_get"),
+            Note::ScopeRefused("event_get")
+        ]
     );
 }
 

@@ -1,8 +1,8 @@
 //! What `parinn mcp` leaves of a recall beyond the envelope (RCL-03,
-//! RCL-05, RCL-07, SEC-08, I6): the recorder that appends each recall
-//! event with its arguments redacted, and the audit entries for a call
-//! cut at its cap, one whose scope extends past its run and one that
-//! went unrecorded.
+//! RCL-04, RCL-05, RCL-07, SEC-08, I6): the writer that appends each
+//! recall event with its arguments redacted, and the audit entries for a
+//! call cut at its cap, one whose scope extends past its run, one
+//! refused for its scope or a gap, and one that went unrecorded.
 
 use std::io::Write;
 
@@ -30,11 +30,11 @@ pub(crate) fn redactor(
 /// What records the MCP server's recalls (RCL-07): in the device seat's
 /// writer, their arguments redacted by `redactor`; where none is known,
 /// no recall is recorded.
-pub(crate) fn recorder(
+pub(crate) fn recall_writer(
     device_writer: record::id::WriterId,
     redactor: Option<Redactor>,
-) -> mcp::Recorder {
-    mcp::Recorder {
+) -> mcp::RecallWriter {
+    mcp::RecallWriter {
         writer: device_writer,
         redact: redactor.map(|redactor| -> mcp::recording::Redact {
             Box::new(move |text| {
@@ -74,6 +74,18 @@ pub(crate) fn audit_notes(ctx: &Context, notes: &[mcp::Note]) {
                 counter: Counter::RecallNotRecorded,
                 operation: tool,
                 detail: "a recall was served but its recall event could not be written",
+            },
+            mcp::Note::ScopeRefused(tool) => Occurrence::Degraded {
+                kind: Kind::Rejected,
+                counter: Counter::RecallRefused,
+                operation: tool,
+                detail: "a recall call was refused: its scope is not one this server serves",
+            },
+            mcp::Note::RecordGap(tool) => Occurrence::Degraded {
+                kind: Kind::Failed,
+                counter: Counter::RecallRefused,
+                operation: tool,
+                detail: "a recall call was refused: the record has a gap inside the range asked for",
             },
             mcp::Note::Redacted(rule) => Occurrence::Keyed {
                 kind: Kind::Redacted,

@@ -166,7 +166,12 @@ fn the_filters_narrow_the_hits() {
     let run = f.ingested.writer.to_string();
     assert_eq!(count(&mut server, json!({"run": run})), 1);
     assert_eq!(count(&mut server, json!({"run": "ab".repeat(32)})), 0);
-    assert_eq!(count(&mut server, json!({"room": "ab".repeat(32)})), 0);
+    let elsewhere = ask(
+        &mut server,
+        "instructions",
+        json!({"room": "ab".repeat(32)}),
+    );
+    assert_eq!(elsewhere["isError"], true, "no room but the personal room");
     assert_eq!(count(&mut server, json!({"since": "2999-01-01"})), 0);
 }
 
@@ -370,4 +375,23 @@ fn the_trust_filter_finds_a_trusted_event_ranked_below_fifty_untrusted_matches()
     let items = envelope_of(&trusted)["items"].as_array().unwrap().clone();
     assert_eq!(items.len(), 1, "{items:?}");
     assert_eq!(items[0]["trust"], "trusted");
+}
+
+#[test]
+fn an_event_whose_trust_cannot_be_derived_is_left_out_of_a_trust_filtered_search() {
+    let f = fixture();
+    let mut server = f.server();
+    // A row whose kind no kind of ParleyInn's names.
+    f.sql(&format!(
+        "UPDATE events SET kind = 'not_a_kind' WHERE seq = 2 AND writer = '{}'",
+        f.ingested.writer
+    ));
+
+    let filtered = ask(&mut server, "instructions", json!({"trust": "untrusted"}));
+    let unfiltered = ask(&mut server, "instructions", json!({}));
+
+    // The filter fails closed: what it cannot place is not kept as a
+    // match. Without the filter the same event fails its item.
+    assert_eq!(envelope_of(&filtered)["items"], json!([]));
+    assert_eq!(refusal(&unfiltered), NO_INDEX);
 }

@@ -47,7 +47,7 @@ fn device(f: &Fixture) -> WriterId {
 
 /// A server that records each recall without redacting anything.
 fn recording(f: &Fixture) -> Server {
-    f.server().with_recorder(Recorder {
+    f.server().with_recall_writer(RecallWriter {
         writer: device(f),
         redact: Some(Box::new(|t| (t.to_owned(), Vec::new()))),
     })
@@ -75,6 +75,19 @@ impl tool_call::Runs for Fixed {
 
     fn find(&self, _id: &str, _wait: Duration) -> (Vec<String>, Duration) {
         (vec![self.0.clone()], Duration::ZERO)
+    }
+}
+
+/// Runs that find no run for any tool-use id.
+struct NoRun;
+
+impl tool_call::Runs for NoRun {
+    fn serving(&self) -> bool {
+        true
+    }
+
+    fn find(&self, _id: &str, _wait: Duration) -> (Vec<String>, Duration) {
+        (Vec::new(), Duration::ZERO)
     }
 }
 
@@ -278,7 +291,8 @@ fn an_event_past_the_cap_is_cut_and_its_cursor_continues_its_content() {
         for item in envelope["items"].as_array().unwrap() {
             if item["address"].as_str().unwrap().ends_with("/1") {
                 joined.push_str(item["content"].as_str().unwrap());
-                flags.push(item["flags"].clone());
+                assert_eq!(item["flags"], json!([]), "a cut is no injection mark");
+                flags.push(item["continuation"].clone());
             }
         }
         match envelope["next_cursor"].as_str() {
@@ -378,7 +392,7 @@ fn a_label_names_no_writer_while_the_server_cannot_assign_one() {
 #[test]
 fn every_call_that_returns_an_envelope_leaves_a_recall_event() {
     let f = fixture_of(&lines(3, 5));
-    let mut server = f.server().with_recorder(Recorder {
+    let mut server = f.server().with_recall_writer(RecallWriter {
         writer: device(&f),
         redact: Some(Box::new(|t| {
             let rules = t
@@ -440,7 +454,7 @@ fn every_call_that_returns_an_envelope_leaves_a_recall_event() {
         Address::new(w, Seq::FIRST).full(&f.ingested.room)
     );
     assert_eq!(recalled[5]["scope"], "room");
-    assert_eq!(recalled[4]["scope"], Value::Null);
+    assert_eq!(recalled[4]["scope"], "room");
     assert_eq!(recalled[2]["truncated"], false);
     let notes = server.take_notes();
     let extended = notes
@@ -481,7 +495,7 @@ fn a_recall_event_is_assistant_provenance_and_no_search_finds_it() {
 fn a_call_whose_recall_event_cannot_be_written_is_served_and_noted() {
     let f = fixture_of(&lines(2, 5));
     let w = f.ingested.writer;
-    let mut unredacted = f.server().with_recorder(Recorder {
+    let mut unredacted = f.server().with_recall_writer(RecallWriter {
         writer: device(&f),
         redact: None,
     });
@@ -657,6 +671,7 @@ fn another_run_s_event_lies_outside_the_scope_until_it_is_extended() {
     assert_eq!(
         server.take_notes(),
         [
+            Note::ScopeRefused("event_get"),
             Note::Extended {
                 tool: "event_get",
                 scope: "room"
@@ -689,6 +704,13 @@ fn a_room_the_run_has_no_seat_in_is_refused_and_a_foreign_one_never_reached() {
 
     assert_eq!(refusal(&result), "the run has no seat in that room");
     assert_eq!(refusal(&search), "the run has no seat in that room");
+    assert_eq!(
+        server.take_notes(),
+        [
+            Note::ScopeRefused("event_get"),
+            Note::ScopeRefused("event_search")
+        ]
+    );
 }
 
 #[test]
@@ -806,4 +828,143 @@ fn a_cursor_may_come_with_the_range_it_continues() {
     );
 
     assert!(!contents(&envelope_of(&next)).is_empty());
+}
+
+#[test]
+fn pin_list_and_stat_list_are_served_in_the_scope_they_name() {
+    let f = fixture_of(&lines(3, 5));
+    let mut server = f
+        .server()
+        .with_runs(Box::new(Fixed("someone-else".to_owned())));
+    let elsewhere = RoomId::derive(&[5; 32], &[6; 16]).to_string();
+
+    let run = bound(&mut server, "stat_list", json!({}));
+    let rooms = bound(&mut server, "stat_list", json!({"scope": "rooms"}));
+    let pins = bound(
+        &mut server,
+        "pin_list",
+        json!({"scope": "room", "room": f.ingested.room.to_string()}),
+    );
+    let room_alone = bound(
+        &mut server,
+        "pin_list",
+        json!({"room": f.ingested.room.to_string()}),
+    );
+    let foreign = bound(&mut server, "pin_list", json!({"room": elsewhere}));
+    let foreign_stats = bound(
+        &mut server,
+        "stat_list",
+        json!({"scope": "room", "room": elsewhere}),
+    );
+    let bad = bound(&mut server, "pin_list", json!({"room": "x"}));
+
+    assert_eq!(envelope_of(&run)["structural"]["events"], 0);
+    assert!(envelope_of(&rooms)["structural"]["events"].as_u64() >= Some(3));
+    assert_eq!(envelope_of(&pins)["items"], json!([]));
+    assert_eq!(envelope_of(&room_alone)["items"], json!([]));
+    assert_eq!(refusal(&foreign), "the run has no seat in that room");
+    assert_eq!(refusal(&foreign_stats), "the run has no seat in that room");
+    assert_eq!(refusal(&bad), "the room is not a room id");
+    assert_eq!(
+        server.take_notes(),
+        [
+            Note::Extended {
+                tool: "stat_list",
+                scope: "rooms"
+            },
+            Note::Extended {
+                tool: "pin_list",
+                scope: "room"
+            },
+            Note::Extended {
+                tool: "pin_list",
+                scope: "room"
+            },
+            Note::ScopeRefused("pin_list"),
+            Note::ScopeRefused("stat_list"),
+            Note::ScopeRefused("pin_list"),
+        ]
+    );
+}
+
+#[test]
+fn a_server_serving_no_run_serves_pin_list_and_stat_list_in_the_personal_room() {
+    let f = fixture_of(&lines(2, 5));
+    let mut server = f.server();
+    let elsewhere = RoomId::derive(&[5; 32], &[6; 16]).to_string();
+
+    let stats = tool(&mut server, "stat_list", json!({}));
+    let pins = tool(&mut server, "pin_list", json!({}));
+    let foreign = tool(&mut server, "pin_list", json!({"room": elsewhere}));
+    let run = tool(&mut server, "stat_list", json!({"scope": "run"}));
+
+    assert!(envelope_of(&stats)["structural"]["events"].as_u64() >= Some(2));
+    assert_eq!(envelope_of(&pins)["items"], json!([]));
+    assert!(refusal(&foreign).contains("only the personal room"));
+    assert_eq!(refusal(&run), OUTSIDE_RUN);
+    // The scope the server chose is no extension; the two refusals are.
+    assert_eq!(
+        server.take_notes(),
+        [
+            Note::ScopeRefused("pin_list"),
+            Note::ScopeRefused("stat_list")
+        ]
+    );
+}
+
+#[test]
+fn mcp_server_get_tells_its_state_under_a_tool_use_id_too() {
+    let f = fixture_of(&lines(1, 5));
+    let mut held = f.server().with_runs(Box::new(Fixed("a-run".to_owned())));
+    let mut gone = f.server().with_runs(Box::new(NoRun));
+
+    let with_run = bound(&mut held, "mcp_server_get", json!({}));
+    let without = bound(&mut gone, "mcp_server_get", json!({}));
+
+    for result in [&with_run, &without] {
+        assert_eq!(result["isError"], false, "{result}");
+        let state: Value = serde_json::from_str(text_of(result)).unwrap();
+        assert_eq!(state["session_binding"], "held");
+    }
+    // The state is told whether or not the call's run was found, and
+    // finding it is not what the answer rests on.
+    assert!(held.take_found().is_empty() && gone.take_found().is_empty());
+}
+
+#[test]
+fn a_missing_event_before_later_ones_is_told_not_taken_for_the_end_of_the_log() {
+    let f = fixture_of(&lines(4, 5));
+    let mut server = recording(&f);
+    let w = f.ingested.writer;
+    f.sql(&format!(
+        "DELETE FROM events WHERE writer = '{w}' AND seq = 3"
+    ));
+
+    let gap = tool(
+        &mut server,
+        "event_expand",
+        json!({"range": format!("{w}:1-4"), "scope": "room"}),
+    );
+    let whole = fixture_of(&lines(2, 5));
+    let mut whole_server = whole.server();
+    let end = tool(
+        &mut whole_server,
+        "event_expand",
+        json!({"range": format!("{}:2-9", whole.ingested.writer), "scope": "room"}),
+    );
+
+    assert!(refusal(&gap).starts_with(&format!(
+        "the record has no event at {w}:3 though later ones exist"
+    )));
+    assert_eq!(contents(&envelope_of(&end)).len(), 1);
+    assert_eq!(
+        server.take_notes(),
+        [
+            Note::Extended {
+                tool: "event_expand",
+                scope: "room"
+            },
+            Note::RecordGap("event_expand")
+        ]
+    );
 }

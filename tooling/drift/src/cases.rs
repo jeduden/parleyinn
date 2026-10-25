@@ -1196,16 +1196,28 @@ fn toml_cases() -> Vec<Case> {
 fn trusted_text_cases() -> Vec<Case> {
     const GATE: &str = "restore_content_is_built_from_trusted_text_alone";
     let gate = || cargo_test("engineering", "static_analysis", GATE);
-    vec![case(
-        "a crate outside restore_block constructing TrustedText",
-        GATE,
-        Injection::create(
-            "crates/store/src/leak.rs",
-            "fn leak(recalled: String) -> TrustedText {\n    TrustedText::new(recalled)\n}\n",
+    vec![
+        case(
+            "a crate outside restore_block constructing TrustedText",
+            GATE,
+            Injection::create(
+                "crates/store/src/leak.rs",
+                "fn leak(recalled: String) -> TrustedText {\n    TrustedText::new(recalled)\n}\n",
+            ),
+            gate(),
+            "crates/store/src/leak.rs:2: TrustedText is constructed (TrustedText::new) outside the restore_block crate",
         ),
-        gate(),
-        "crates/store/src/leak.rs:2: TrustedText is constructed (TrustedText::new) outside the restore_block crate",
-    )]
+        case(
+            "a crate outside restore_block hiding TrustedText behind an alias",
+            GATE,
+            Injection::create(
+                "crates/store/src/alias.rs",
+                "use restore_block::TrustedText as Safe;\nfn leak(s: String) -> Safe {\n    Safe::new(s)\n}\n",
+            ),
+            gate(),
+            "crates/store/src/alias.rs:1: TrustedText is named by a `use .. as` alias, which hides how it is built, outside the restore_block crate",
+        ),
+    ]
 }
 
 /// The drifts the complexity gate exists to catch: the workspace lints

@@ -30,7 +30,7 @@ use crate::{Served, Server};
 pub type Redact = Box<dyn Fn(&str) -> (String, Vec<String>)>;
 
 /// What records the recalls of a server.
-pub struct Recorder {
+pub struct RecallWriter {
     /// The device seat's writer, which the recall events go to.
     pub writer: WriterId,
     /// Removes secrets from a text before it is written (SEC-08); none
@@ -52,6 +52,12 @@ pub enum Note {
     },
     /// The call's recall event could not be appended (RCL-07).
     NotRecorded(&'static str),
+    /// The call was refused because its scope is not one this server
+    /// serves (RCL-04, RCL-05).
+    ScopeRefused(&'static str),
+    /// The call was refused because the record has no event inside the
+    /// range it asked for, though later ones exist (RCL-04).
+    RecordGap(&'static str),
     /// A secret was redacted from the call's arguments before they were
     /// recorded, by the rule named (SEC-08).
     Redacted(String),
@@ -111,17 +117,17 @@ impl Server {
         run: Option<&str>,
         served: &Served,
     ) {
-        let Some(recorder) = &self.recorder else {
+        let Some(recall_writer) = &self.recall_writer else {
             return;
         };
-        let writer = recorder.writer;
+        let writer = recall_writer.writer;
         let mut rules = Vec::new();
-        let event = recorder.redact.as_deref().and_then(|redact| {
+        let event = recall_writer.redact.as_deref().and_then(|redact| {
             let content = json!({
                 "tool": tool,
                 "arguments": redacted(arguments, redact, &mut rules),
                 "run": run,
-                "scope": served.scope.map(crate::scope::Name::as_str),
+                "scope": served.scope.map(crate::scope::RecallScope::as_str),
                 "returned": served.envelope.items.iter().map(|i| i.address.as_str()).collect::<Vec<_>>(),
                 "truncated": served.envelope.truncated,
             });

@@ -205,6 +205,9 @@ pub enum Counter {
     /// A recall call's event could not be appended to the record, so the
     /// call went unrecorded (RCL-07, I6).
     RecallNotRecorded,
+    /// A recall call was refused: its scope was not served, or the record
+    /// holds a gap inside the range it asked for (RCL-04, RCL-05, I6).
+    RecallRefused,
 }
 
 impl Counter {
@@ -265,6 +268,7 @@ impl Counter {
             Self::RepositoryReadTimedOut => "repository_read_timed_out",
             Self::RecallTruncated => "recall_truncated",
             Self::RecallNotRecorded => "recall_not_recorded",
+            Self::RecallRefused => "recall_refused",
         }
     }
 }

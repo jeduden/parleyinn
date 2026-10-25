@@ -11,24 +11,18 @@
 //! refusal is fixed text, naming at most an address it parsed and
 //! renders anew (RCL-04).
 
-use envelope::{Envelope, Item, tokens};
+use envelope::{Continuation, Envelope, Item, tokens};
 use record::id::{Address, RoomId, Seq, WriterId};
 use record::range::{Range, Writer};
 use serde_json::Value;
 use store::StoredSeat;
 
 use crate::cursor::Cursor;
-use crate::scope::{self, Call, Name};
+use crate::scope::{self, Call, RecallScope};
 use crate::{Note, Served, Server, UNREADABLE};
 
 /// The most estimated model tokens one call returns (RCL-03).
 pub const CAP: u64 = 8_000;
-
-/// The flag on an item whose content stops short of the event's: the
-/// cursor continues it.
-pub const CUT: &str = "cut";
-/// The flag on an item whose content continues an earlier one.
-pub const CONTINUED: &str = "continued";
 
 const NO_RANGE: &str = "event_expand needs a range or a cursor";
 pub(crate) const BAD_RANGE: &str =
@@ -128,7 +122,7 @@ impl Server {
                 run,
             };
             let scope = scope::resolve(&call, arguments, asked.named, self.no_run(tool))
-                .map_err(|r| self.refusal(r))?;
+                .map_err(|r| self.refusal(tool, r))?;
             let seat = self
                 .store
                 .seat(writer)
@@ -137,14 +131,15 @@ impl Server {
             (scope, seat)
         };
         if !scope.covers(writer, seat.room) {
+            self.notes.borrow_mut().push(Note::ScopeRefused(tool));
             return Err(match scope.name {
-                Name::Run => OUTSIDE_SCOPE,
+                RecallScope::Run => OUTSIDE_SCOPE,
                 _ => OTHER_ROOM,
             }
             .to_owned());
         }
         self.note_extended(tool, &scope);
-        let (envelope, cut) = self.read_events(&scope, &seat, &asked)?;
+        let (envelope, cut) = self.read_events(&scope, &seat, &asked, tool)?;
         if cut {
             self.notes.borrow_mut().push(Note::Truncated(tool));
         }
@@ -183,6 +178,7 @@ impl Server {
         scope: &scope::Scope,
         seat: &StoredSeat,
         asked: &Asked,
+        tool: &'static str,
     ) -> Result<(Envelope, bool), String> {
         let unreadable = |_| UNREADABLE.to_owned();
         let keys = administration::origin::KeySet::load(&self.store, &self.device_key)
@@ -197,6 +193,16 @@ impl Server {
             let Some(stored) = self.store.event(address).map_err(unreadable)? else {
                 if items.is_empty() {
                     return Err(format!("no event at {address}"));
+                }
+                // The log ending inside the range is no gap; an event
+                // missing before later ones is, and is told, not passed
+                // over as if the log ended there (I6).
+                let head = self.store.head(writer).map_err(unreadable)?;
+                if head.is_some_and(|head| head > seq) {
+                    self.notes.borrow_mut().push(Note::RecordGap(tool));
+                    return Err(format!(
+                        "the record has no event at {address} though later ones exist: run parinn verify"
+                    ));
                 }
                 break;
             };
@@ -231,6 +237,7 @@ impl Server {
         Ok((
             Envelope {
                 items,
+                tombstones: Vec::new(),
                 truncated: next.is_some(),
                 next_cursor: next.map(|c| c.encode()),
                 structural: None,
@@ -300,6 +307,7 @@ impl Budget {
     fn new() -> Self {
         let around = Envelope {
             items: vec![],
+            tombstones: vec![],
             truncated: true,
             next_cursor: Some("0a".repeat(Cursor::LONGEST)),
             structural: None,
@@ -329,7 +337,7 @@ impl Budget {
         let chars = self.fitting(&item).max(1);
         let mut cut = item;
         cut.content = cut.content.chars().take(chars).collect();
-        cut.flags.push(CUT.to_owned());
+        cut.continuation.push(Continuation::Cut);
         self.left = self.left.saturating_sub(item_cost(&cut));
         self.holds = true;
 
@@ -346,7 +354,7 @@ impl Budget {
             let middle = (low + high).div_ceil(2);
             let probe = Item {
                 content: text[..middle].iter().collect(),
-                flags: [item.flags.clone(), vec![CUT.to_owned()]].concat(),
+                continuation: [item.continuation.clone(), vec![Continuation::Cut]].concat(),
                 ..item.clone()
             };
             if item_cost(&probe) <= self.left {

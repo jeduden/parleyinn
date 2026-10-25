@@ -58,6 +58,60 @@ fn every_way_to_build_one_is_refused_outside_the_crate() {
 }
 
 #[test]
+fn a_name_that_hides_the_type_is_refused_wherever_it_stands() {
+    for (text, how) in [
+        (
+            "use restore_block::TrustedText as Safe;",
+            "a `use .. as` alias",
+        ),
+        (
+            "use restore_block::{Other, TrustedText as Safe};",
+            "a `use .. as` alias",
+        ),
+        ("type Safe = TrustedText;", "a type alias"),
+        (
+            "pub type Safe = restore_block::TrustedText;",
+            "a type alias",
+        ),
+        ("let t = <TrustedText>::new(s);", "a qualified path"),
+        (
+            "let t = <TrustedText as From<String>>::from(s);",
+            "a qualified path",
+        ),
+        ("let t = (<TrustedText>::fixed(\"x\"));", "a qualified path"),
+    ] {
+        for inside in [false, true] {
+            let got = problems(text, inside);
+
+            assert_eq!(got.len(), 1, "{text:?} inside {inside}: {got:?}");
+            assert!(got[0].contains(how), "{text:?}: {got:?}");
+            assert!(got[0].starts_with("src/lib.rs:1: "), "{got:?}");
+        }
+    }
+    assert!(
+        problems("type Safe = TrustedText;", false)[0].ends_with("outside the restore_block crate")
+    );
+    assert!(problems("type Safe = TrustedText;", true)[0].contains("hides how it is built"));
+}
+
+#[test]
+fn naming_the_type_inside_another_type_is_no_alias() {
+    let text = "\
+type Pins = Vec<TrustedText>;
+fn f(x: Option<TrustedText>) -> Box<TrustedText> { todo() }
+let v = Vec::<TrustedText>::new();
+let w = Vec::<TrustedText>::with_capacity(1);
+fn g() -> impl Iterator<Item = <TrustedText as Block>::Out> { todo() }
+";
+
+    // Only the last, a qualified path of the type, is refused.
+    let got = problems(text, false);
+
+    assert_eq!(got.len(), 1, "{got:?}");
+    assert!(got[0].starts_with("src/lib.rs:5: "), "{got:?}");
+}
+
+#[test]
 fn a_type_position_builds_nothing() {
     let text = "\
 use restore_block::TrustedText;
