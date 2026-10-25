@@ -51,6 +51,7 @@ jobs:
           - { builder: ubuntu-24.04, os: linux, runs: linux-amd64 }
           - { builder: macos-15, os: darwin, runs: darwin-arm64 }
     runs-on: ${{ matrix.builder }}
+    timeout-minutes: 20
     env:
       OS: ${{ matrix.os }}
     steps:
@@ -158,6 +159,7 @@ jobs:
   linux-arm64:
     needs: build
     runs-on: ubuntu-24.04-arm
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -187,6 +189,7 @@ jobs:
   windows:
     needs: build
     runs-on: windows-2025
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:

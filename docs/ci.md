@@ -19,8 +19,12 @@ and the `ci-review` skill measures them.
   key that changes every run, or a cache nothing reads, is waste.
 - No job repeats another's build, download or install. Work too slow for a
   pull request moves to the nightly job.
-- Every job sets `timeout-minutes` near its normal duration, so a hang
-  fails in minutes.
+- Every job sets `timeout-minutes` at about three times its median, so a
+  hang fails in minutes. A job that grows toward its timeout is a finding
+  before it is a failure.
+- The `CI` job records each job's duration and result in its job summary
+  and uploads them as the `ci-timings` artifact. Read those; do not
+  measure again.
 
 ## Stable
 

@@ -18,14 +18,16 @@ cannot take and the procedure around it.
 1. Name the target: a pull request, a branch diff, or workflow paths. The
    agent only reads files, so save the diff and the changed paths to a
    scratch file and hand it those paths.
-2. Measure the history with the GitHub Actions tools for the last 30 runs
-   of `ci.yml` on `main` and on pull requests, and save a table beside the
-   diff. For speed, take the median and p90 wall clock of the `CI` run, the
-   per-job median, the critical path and the cache hit or miss per job. For
-   stability, take the runs that failed, then passed on the same commit
-   (the rerun rate) per job, and the jobs that failed on `main`. For
-   actionable output, fetch the logs of the last few failed jobs and note
-   whether the first failing line names the cause and the repro command.
+2. Read the recorded timings; do not measure again. Each `CI` run
+   uploads a `ci-timings` artifact with every job's duration and result.
+   Download it for the recent runs of `ci.yml` on `main` and on pull
+   requests (the Actions tools, or `gh run download -n ci-timings`) and
+   save a table beside the diff. For speed, take the job durations and
+   how close each runs to its `timeout-minutes`. For stability, take the
+   run attempts that failed, then passed on the same commit, and the jobs
+   that failed on `main`. For actionable output, fetch the logs of the last
+   few failed jobs and note whether the first failing line names the cause
+   and the repro command. A run with no artifact is a finding.
 3. Launch the `ci-engineer` agent with the target and the table. Add the
    `persona-platform-engineer` agent when the target changes runners or
    caching, and `persona-security-officer` when it changes permissions,
