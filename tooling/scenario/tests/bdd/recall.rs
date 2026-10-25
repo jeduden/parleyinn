@@ -167,7 +167,13 @@ fn tool_arguments(w: &mut World, text: &str) -> Result<Value, String> {
 
 #[when(regex = r#"^the agent calls the MCP tool "(event_expand|event_get)" with (.+)$"#)]
 fn calls_tool(w: &mut World, tool: String, args: String) -> Result<(), String> {
+    if crate::recall_scope::serves_a_run(w) {
+        return crate::recall_scope::call(w, &tool, &args);
+    }
     record_runs(w)?;
+    if args == "that address" {
+        return crate::recall_address::call_that_address(w, &tool);
+    }
     let arguments = tool_arguments(w, &args)?;
     recall(w).before = recall_events(w)?.len();
     call_tool(w, &tool, arguments).map(drop)

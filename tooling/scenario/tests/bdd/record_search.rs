@@ -126,6 +126,11 @@ pub fn last_reply(w: &mut World) -> Result<Reply, String> {
     reply(w)
 }
 
+/// Keeps `answer` as the answer of the last recall call.
+pub fn set_reply(w: &mut World, answer: Reply) {
+    steps(w).reply = Some(answer);
+}
+
 /// The words a query description stands for: the scenario names a
 /// query by its shape, and the step writes one of that shape.
 fn query_of(w: &mut World, described: &str) -> String {
@@ -175,6 +180,9 @@ pub fn arguments_of(w: &mut World, text: &str) -> Result<Value, String> {
 
 #[when(regex = r#"^the agent calls the MCP tool "event_search" with (.+)$"#)]
 fn calls_event_search(w: &mut World, args: String) -> Result<(), String> {
+    if crate::recall_scope::serves_a_run(w) {
+        return crate::recall_scope::call(w, "event_search", &args);
+    }
     crate::recall::record_runs(w)?;
     let arguments = arguments_of(w, &args)?;
     call_search(w, arguments).map(drop)

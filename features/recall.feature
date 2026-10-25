@@ -64,7 +64,7 @@ Feature: Recall (RCL)
       | event_expand | range from "A1:1" to "A1:20" |
       | event_get    | address "A1:7"               |
 
-  @RCL-05 @P0 @I8 @pending
+  @RCL-05 @P0 @I8
   Scenario: recall defaults to the agent's current run and extending it to its rooms is explicit and logged
     Given an isolated ParleyInn home
     And a run with seats in its personal room and in room "L1", whose writers this node holds beside those of other runs in "L1" on two worktrees and of room "L2" where the run has no seat
