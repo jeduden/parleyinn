@@ -8,8 +8,9 @@
 //! every writer's chain gap-free and whole, every payload its event
 //! names present and opening its commitment, every purged event's
 //! erasure confirmed by its tombstone, and every writer's segments
-//! tiling its log. A purge a kill left unfinished is reported, and the
-//! next rebuild finishes it, after which verify reports none. A kill before the store exists leaves nothing to
+//! tiling its log. A purge a kill left unfinished is reported, the
+//! search index is checked outside its address ranges, and the next rebuild
+//! finishes it, after which verify reports none. A kill before the store exists leaves nothing to
 //! verify.
 //!
 //! The kill points come from a seeded generator, so a failing iteration
@@ -359,6 +360,44 @@ fn a_purge_cut_short_after_its_transaction_verifies_and_the_next_rebuild_finishe
 
     assert_eq!(left, [format!("{writer}:2-2")], "verify names what is left");
     finished(home.path(), Duration::ZERO, label);
+}
+
+/// Puts `text` in the search index of `home` as the entry of `writer`'s
+/// event `seq`, in place of the one the record derives: a forged entry.
+fn forge_entry(home: &Path, writer: &str, seq: u64, text: &str) {
+    let address = store::Address::parse(&format!("{writer}:{seq}")).unwrap().0;
+    let row = store::search_index::row_id_of(address).unwrap();
+    let index = rusqlite::Connection::open(home.join(".parinn/search_index")).unwrap();
+    index
+        .execute("DELETE FROM events_fts WHERE rowid = ?1", [row])
+        .unwrap();
+    index
+        .execute(
+            "INSERT INTO events_fts (rowid, text) VALUES (?1, ?2)",
+            rusqlite::params![row, text],
+        )
+        .unwrap();
+}
+
+#[test]
+fn a_forged_entry_outside_a_pending_purges_ranges_fails_verify_and_one_inside_does_not() {
+    let (home, writer) = ingested();
+    cut_short_purge(home.path(), &writer);
+    forge_entry(home.path(), &writer, 2, "forged inside");
+    let inside = "a forged entry inside the pending purge's range";
+    assert_eq!(
+        verified(home.path(), Duration::ZERO, inside),
+        [format!("{writer}:2-2")]
+    );
+
+    forge_entry(home.path(), &writer, 5, "forged outside");
+    let out = core()
+        .run(program(), &["verify"], home.path())
+        .unwrap_or_else(|e| panic!("{e}"));
+
+    let err = String::from_utf8_lossy(&out.stderr);
+    assert_eq!(out.status.code(), Some(3), "{err}");
+    assert!(err.contains("derived artifact consistency"), "{err}");
 }
 
 #[test]

@@ -137,6 +137,88 @@ fn an_index_that_the_record_derives_is_derived_and_a_changed_entry_is_not() {
     assert!(!store.search_index_is_derived(&|| true).unwrap());
 }
 
+/// The row id of event `seq` of the writer [`with_events`] appends to.
+fn row(seq: u64) -> i64 {
+    search_index::row_id_of(record::id::Address::new(
+        WriterId::derive(&[1; 32]),
+        record::id::Seq::new(seq).unwrap(),
+    ))
+    .unwrap()
+}
+
+/// Puts `text` in the index as event `seq`'s entry, in place of the one
+/// it has.
+fn forge(store: &Store, seq: u64, text: &str) {
+    store
+        .conn
+        .execute("DELETE FROM idx.events_fts WHERE rowid = ?1", [row(seq)])
+        .unwrap();
+    store
+        .conn
+        .execute(
+            "INSERT INTO idx.events_fts (rowid, text) VALUES (?1, ?2)",
+            rusqlite::params![row(seq), text],
+        )
+        .unwrap();
+}
+
+/// Journals the range `first`-`last` of the writer [`with_events`]
+/// appends to as a purge's step still to take out of the index.
+fn pending(store: &Store, first: u64, last: u64) {
+    store.conn.execute_batch(crate::purge::SCHEMA).unwrap();
+    store
+        .conn
+        .execute(
+            "INSERT INTO purge_journal (kind, target) VALUES ('index', ?1)",
+            [format!("{}:{first}-{last}", WriterId::derive(&[1; 32]))],
+        )
+        .unwrap();
+}
+
+#[test]
+fn an_entry_inside_a_pending_purges_range_is_not_compared() {
+    let dir = TempDir::new().unwrap();
+    let store = with_events(&dir, &["alpha", "beta", "gamma"]);
+    forge(&store, 2, "residue");
+    assert!(!store.search_index_is_derived(&|| true).unwrap());
+
+    pending(&store, 2, 2);
+
+    assert!(store.search_index_is_derived(&|| true).unwrap());
+}
+
+#[test]
+fn an_entry_outside_a_pending_purges_range_is_still_compared() {
+    let dir = TempDir::new().unwrap();
+    let store = with_events(&dir, &["alpha", "beta", "gamma"]);
+    pending(&store, 2, 2);
+    forge(&store, 2, "residue");
+    assert!(store.search_index_is_derived(&|| true).unwrap());
+
+    forge(&store, 3, "zebra");
+
+    assert!(!store.search_index_is_derived(&|| true).unwrap());
+}
+
+#[test]
+fn a_pending_range_of_a_writer_without_its_slot_leaves_every_entry_compared() {
+    let dir = TempDir::new().unwrap();
+    let store = with_events(&dir, &["alpha", "beta"]);
+    store.conn.execute_batch(crate::purge::SCHEMA).unwrap();
+    // Another writer: it holds no slot, so its range covers no entry,
+    // even one at the slot it would take.
+    store
+        .conn
+        .execute(
+            "INSERT INTO purge_journal (kind, target) VALUES ('index', ?1)",
+            [format!("{}:1-2", WriterId::derive(&[9; 32]))],
+        )
+        .unwrap();
+    forge(&store, 2, "zebra");
+
+    assert!(!store.search_index_is_derived(&|| true).unwrap());
+}
+
 #[test]
 fn a_store_without_its_index_file_attached_has_only_its_own_objects() {
     let dir = TempDir::new().unwrap();

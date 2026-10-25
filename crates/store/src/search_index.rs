@@ -657,6 +657,18 @@ pub(crate) fn run(
 /// event, position), in key order, folded into one SHA-256. A row id
 /// derives from an address, so no storage layout reaches it.
 pub(crate) fn digest(conn: &Connection) -> Result<Digest, StoreError> {
+    digest_outside(conn, &[])
+}
+
+/// The canonical [`digest`] of the index's content, leaving out the
+/// postings of the events inside `ranges`, each a writer's first and
+/// last seq: what a pending purge has still to take out (ADM-09). A
+/// range of a writer that holds no slot in the index covers no posting.
+pub(crate) fn digest_outside(
+    conn: &Connection,
+    ranges: &[(WriterId, Seq, Seq)],
+) -> Result<Digest, StoreError> {
+    let left_out = rows_of(conn, ranges)?;
     let mut state = Fold(Digest::of(&[b"parinn search index digest v1"]));
     for (key, _) in settings() {
         let value: String = conn.query_row(
@@ -686,11 +698,47 @@ pub(crate) fn digest(conn: &Connection) -> Result<Digest, StoreError> {
     })?;
     for row in rows {
         let (term, doc, col, offset) = row?;
+        if left_out.iter().any(|r| r.holds(doc)) {
+            continue;
+        }
         let (doc, offset) = (doc.to_be_bytes(), offset.to_be_bytes());
         state.add(&[term.as_bytes(), b"\0", &doc, col.as_bytes(), b"\0", &offset]);
     }
 
     Ok(state.0)
+}
+
+/// The row ids of one writer's events from one seq to another.
+struct Rows {
+    slot: i64,
+    first: i64,
+    last: i64,
+}
+
+impl Rows {
+    /// Whether the row id `doc` is one of them.
+    fn holds(&self, doc: i64) -> bool {
+        doc & SLOT_MASK == self.slot && (self.first..=self.last).contains(&doc)
+    }
+}
+
+/// The row ids `ranges` cover in the index `conn` holds: none for a
+/// writer that holds no slot there.
+fn rows_of(conn: &Connection, ranges: &[(WriterId, Seq, Seq)]) -> Result<Vec<Rows>, StoreError> {
+    let mut rows = Vec::new();
+    for (writer, first, last) in ranges {
+        let slot = slot_of(*writer);
+        let args = params![slot, writer.to_string()];
+        if conn.query_row(HOLDS_SLOT, args, |r| r.get::<_, bool>(0))? {
+            rows.push(Rows {
+                slot,
+                first: row_id(0, *first),
+                last: row_id(SLOT_MASK, *last),
+            });
+        }
+    }
+
+    Ok(rows)
 }
 
 /// A digest folded over the parts of each row in turn.
