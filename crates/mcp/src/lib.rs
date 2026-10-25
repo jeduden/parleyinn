@@ -104,6 +104,9 @@ pub struct Server {
     timed_out: Cell<u64>,
     /// What records each recall, when this server records (RCL-07).
     recorder: Option<Recorder>,
+    /// The device seat's writer, which assigns the writer labels a range
+    /// names its writer by (RCL-08), when this server may assign them.
+    labeller: Option<WriterId>,
     /// What the calls since `take_notes` came to, for the caller to log.
     notes: RefCell<Vec<Note>>,
 }
@@ -134,6 +137,7 @@ impl Server {
             cancelled: Cell::new(0),
             timed_out: Cell::new(0),
             recorder: None,
+            labeller: None,
             notes: RefCell::new(Vec::new()),
         }
     }
@@ -146,10 +150,20 @@ impl Server {
         self
     }
 
-    /// This server, recording each recall through `recorder` (RCL-07).
+    /// This server, recording each recall through `recorder` (RCL-07),
+    /// and assigning writer labels in the same writer.
     #[must_use]
     pub fn with_recorder(mut self, recorder: Recorder) -> Self {
+        self.labeller = Some(recorder.writer);
         self.recorder = Some(recorder);
+        self
+    }
+
+    /// This server, assigning writer labels in `device`, a device seat's
+    /// writer, without recording any recall (RCL-08).
+    #[must_use]
+    pub fn with_labeller(mut self, device: WriterId) -> Self {
+        self.labeller = Some(device);
         self
     }
 

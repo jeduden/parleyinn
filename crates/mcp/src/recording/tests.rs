@@ -3,7 +3,10 @@ use serde_json::json;
 
 #[test]
 fn every_text_in_the_arguments_and_every_name_is_redacted() {
-    let redact = |t: &str| t.replace("secret", "[R]");
+    let redact = |t: &str| {
+        let rules: Vec<String> = t.matches("secret").map(|_| "rule".to_owned()).collect();
+        (t.replace("secret", "[R]"), rules)
+    };
     let arguments = json!({
         "query": "a secret",
         "any_of": ["secret", 3, {"secret": "x secret"}],
@@ -12,7 +15,9 @@ fn every_text_in_the_arguments_and_every_name_is_redacted() {
         "none": null,
     });
 
-    let out = redacted(&arguments, &redact);
+    let mut rules = Vec::new();
+
+    let out = redacted(&arguments, &redact, &mut rules);
 
     assert_eq!(
         out,
@@ -24,4 +29,5 @@ fn every_text_in_the_arguments_and_every_name_is_redacted() {
             "none": null,
         })
     );
+    assert_eq!(rules.len(), 4, "one rule for each redaction");
 }

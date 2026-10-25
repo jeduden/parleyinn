@@ -49,7 +49,7 @@ fn device(f: &Fixture) -> WriterId {
 fn recording(f: &Fixture) -> Server {
     f.server().with_recorder(Recorder {
         writer: device(f),
-        redact: Some(Box::new(str::to_owned)),
+        redact: Some(Box::new(|t| (t.to_owned(), Vec::new()))),
     })
 }
 
@@ -380,7 +380,13 @@ fn every_call_that_returns_an_envelope_leaves_a_recall_event() {
     let f = fixture_of(&lines(3, 5));
     let mut server = f.server().with_recorder(Recorder {
         writer: device(&f),
-        redact: Some(Box::new(|t| t.replace("secret", "[REDACTED]"))),
+        redact: Some(Box::new(|t| {
+            let rules = t
+                .matches("secret")
+                .map(|_| "extra_pattern_1".to_owned())
+                .collect();
+            (t.replace("secret", "[REDACTED]"), rules)
+        })),
     });
     let w = f.ingested.writer;
 
@@ -436,11 +442,13 @@ fn every_call_that_returns_an_envelope_leaves_a_recall_event() {
     assert_eq!(recalled[5]["scope"], "room");
     assert_eq!(recalled[4]["scope"], Value::Null);
     assert_eq!(recalled[2]["truncated"], false);
-    assert_eq!(
-        server.take_notes().len(),
-        4,
-        "four calls extended past the run"
-    );
+    let notes = server.take_notes();
+    let extended = notes
+        .iter()
+        .filter(|n| matches!(n, Note::Extended { .. }))
+        .count();
+    assert_eq!(extended, 4, "four calls extended past the run");
+    assert!(notes.contains(&Note::Redacted("extra_pattern_1".to_owned())));
 }
 
 #[test]
@@ -714,4 +722,24 @@ fn an_unreadable_record_refuses_in_fixed_text() {
     );
 
     assert_eq!(refusal(&result), NO_INDEX);
+}
+
+#[test]
+fn a_server_that_only_labels_assigns_labels_and_records_no_recall() {
+    let f = fixture_of(&lines(3, 5));
+    let mut server = f.server().with_labeller(device(&f));
+
+    let result = tool(
+        &mut server,
+        "event_expand",
+        json!({"range": "A1:1-2", "scope": "room"}),
+    );
+
+    assert_eq!(contents(&envelope_of(&result)).len(), 2);
+    assert!(recalls(&f).is_empty());
+    assert!(
+        !server
+            .take_notes()
+            .contains(&Note::NotRecorded("event_expand"))
+    );
 }
