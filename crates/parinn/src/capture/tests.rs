@@ -254,6 +254,9 @@ fn only_a_running_server_serves_the_transcripts_its_marker_names() {
     std::fs::create_dir_all(f.home.root().join(MARKERS)).unwrap();
     std::fs::write(f.home.root().join(MARKERS).join("x.staged"), "a\n").unwrap();
     std::fs::create_dir(f.home.root().join(MARKERS).join("d.marker")).unwrap();
+    #[cfg(unix)]
+    std::os::unix::fs::symlink("/nonexistent", f.home.root().join(MARKERS).join("l.marker"))
+        .unwrap();
     assert_eq!(served(&f.home), Vec::<PathBuf>::new());
 
     let marker = StartMarker::leave(&f.home, &[f.main(), f.subagent("a")], None).unwrap();

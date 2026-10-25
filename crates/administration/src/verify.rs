@@ -308,15 +308,14 @@ pub fn verify_shape(store: &mut Store) -> Result<(), VerifyError> {
     if !objects.is_empty() {
         return Err(VerifyError::Foreign { objects });
     }
-    match store.search_index_ranking_is_shipped() {
-        Ok(true) => {}
-        Ok(false) => {
-            return Err(VerifyError::Index {
-                reason: "ranks in a way this parinn does not ship",
-            });
-        }
+    let ranks = match store.search_index_ranking_is_shipped() {
         Err(StoreError::NoIndex) => return Ok(()),
-        Err(e) => return Err(e.into()),
+        other => other?,
+    };
+    if !ranks {
+        return Err(VerifyError::Index {
+            reason: "ranks in a way this parinn does not ship",
+        });
     }
     if store.search_index_is_derived()? {
         return Ok(());
