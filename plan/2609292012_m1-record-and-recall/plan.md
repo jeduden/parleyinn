@@ -200,9 +200,8 @@ changed M1's row in §12.2.
 
 ## Execution
 
-Phase 1 fixed the test approach the others copy. ENG-18's rewording
-landed before phases 4, 5 and 7. Tracks 2 then 3; 4; 5 then 6; 7 ran in
-parallel. Phases 8 to 16 follow in order, each spec written at its turn.
+Phase 1 fixed the test approach; ENG-18's rewording landed before 4, 5
+and 7. Tracks 2-3; 4; 5-6; 7 ran in parallel; 8 to 16 run in order.
 
 | Phase | Model  | Gate                                                                                                                                                     |
 | ----- | ------ | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -276,6 +275,7 @@ footer: |
 |     | ↳      | @RCL-06, @REC-17 and @SEC-22 off @pending and passing; so are @RCL-08 and @REC-06, whose purged-range steps now run. A purge erases a range and records a tombstone in one transaction, a quarantine holds events out of recall by selector, and an ingest purges what a retention policy has aged out. @SEC-12 passes seven rows of eight and stays @pending: its flag row needs PRV-07 (M5).                         |
 | 15  | ✅     | [Operations: verify, status, audit, the boundary and the threat model](phase-15.md)                                                                                                                                                                                                                                                                                                                                    |
 |     | ↳      | @ADM-11, @OPS-01, @SEC-15, @SEC-17, @SEC-19 and @ENG-22 off @pending and passing. SEC-01's core row passes as gate tests. @ADM-09 passes seven rows of eight and stays @pending: no landmark exists before M2.                                                                                                                                                                                                         |
+| 16  | 🔳     | [Exit: the engineering gates, the recall evaluation and the S12 rebuild test](phase-16.md)                                                                                                                                                                                                                                                                                                                             |
 <?/catalog?>
 
 ## Acceptance Criteria
