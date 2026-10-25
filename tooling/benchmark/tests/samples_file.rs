@@ -49,11 +49,11 @@ fn rounds_appended_to_one_file_are_decided_as_one_set_of_samples() {
     fs::write(&base, base_text).unwrap();
     fs::write(&head, head_text).unwrap();
 
-    let read = |path| samples::parse(&fs::read_to_string(path).unwrap()).unwrap();
+    let read = |path| samples::parse_strata(&fs::read_to_string(path).unwrap()).unwrap();
     let (base, head) = (read(&base), read(&head));
     let decided = gate::decide(&base, &head, &[]);
 
-    assert_eq!(base["core_start_up"].len(), 30);
+    assert_eq!(samples::pooled(&base)["core_start_up"].len(), 30);
     assert_eq!(decided.len(), 1);
     assert_eq!(decided[0].status, Status::Regressed);
 }
