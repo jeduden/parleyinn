@@ -81,11 +81,8 @@ pub(crate) fn certified(conn: &Connection, device: WriterId) -> Result<Vec<Write
 
 /// The seq of the last event of `writer`'s log; none for an empty log.
 pub(crate) fn head(conn: &Connection, writer: WriterId) -> Result<Option<Seq>, StoreError> {
-    let last: Option<i64> = conn.query_row(
-        "SELECT max(seq) FROM events WHERE writer = ?1",
-        [writer.to_string()],
-        |r| r.get(0),
-    )?;
+    const LAST: &str = "SELECT max(seq) FROM events WHERE writer = ?1";
+    let last: Option<i64> = conn.query_row(LAST, [writer.to_string()], |r| r.get(0))?;
 
     Ok(last.and_then(|n| u64::try_from(n).ok()).and_then(Seq::new))
 }
