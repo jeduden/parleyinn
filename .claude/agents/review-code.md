@@ -29,8 +29,9 @@ the build and CI configuration. These specialists report to you:
 - Do errors keep their cause, blocking calls take a deadline, and I/O
   sit behind a seam a test injects (ENG-03, ENG-04)?
 - Does the change stay inside its latency, throughput and footprint
-  budgets, grow no worse than `O(n log n)` in the store's size, and
-  keep its benchmark?
+  budgets, grow no worse than `O(n log n)` in the store's size, add
+  no costly crossing to a budgeted call's path, and keep its
+  benchmark?
 - Does CI still build fast and fail with output that tells the author
   what to do?
 
