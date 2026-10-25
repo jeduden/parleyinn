@@ -433,7 +433,7 @@ impl Entry {
                 counter.map(Counter::as_str),
                 "purge",
                 format!(
-                    "purged {} ({reason}) by {by} {}",
+                    "purge of {} ({reason}) by {by} {}",
                     shown(scope),
                     shown(behind)
                 ),

@@ -345,11 +345,14 @@ fn a_purge_entry_names_its_range_reason_and_the_act_or_policy_behind_it() {
     let policy = Entry::next(&by_policy, 4, 5, Digest::ZERO).unwrap();
 
     assert_eq!((act.kind.as_str(), act.counter.clone()), (PURGE, None));
-    assert_eq!(act.detail, "purged w1:30-40 (purged) by principal act w2:9");
+    assert_eq!(
+        act.detail,
+        "purge of w1:30-40 (purged) by principal act w2:9"
+    );
     assert_eq!(policy.counter.as_deref(), Some("retention_purged"));
     assert_eq!(
         policy.detail,
-        "purged w1:30-40 (retention) by retention policy retention_policy.*.web"
+        "purge of w1:30-40 (retention) by retention policy retention_policy.*.web"
     );
     assert_eq!(Entry::parse(&policy.line().unwrap()), Ok(policy));
 }
@@ -368,6 +371,6 @@ fn a_purge_entry_never_holds_text_no_range_or_policy_could_spell() {
 
     assert_eq!(
         e.detail,
-        "purged a key no settings key spells (purged) by principal act a key no settings key spells"
+        "purge of a key no settings key spells (purged) by principal act a key no settings key spells"
     );
 }
