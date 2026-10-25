@@ -225,7 +225,7 @@ pub enum Counter {
     /// `parinn verify` ran out of time deriving the search index again:
     /// the index was left unchecked, neither passed nor failed (ADM-09,
     /// ENG-03, I6).
-    VerifyUnfinished,
+    VerifyTimedOut,
 }
 
 impl Counter {
@@ -291,7 +291,7 @@ impl Counter {
             Self::PurgeUnfinished => "purge_unfinished",
             Self::RetentionPurged => "retention_purged",
             Self::RetentionFailed => "retention_failed",
-            Self::VerifyUnfinished => "verify_unfinished",
+            Self::VerifyTimedOut => "verify_timed_out",
         }
     }
 }

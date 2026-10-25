@@ -28,7 +28,7 @@ Outcome:
 - ENG-06: kills of purge, at a terminal, and of rebuild. They found
   verify exiting 3 after a kill between a purge's transaction and its
   finishing. Verify stays read-only: it names the unfinished purge
-  (`unfinished_purges`), counts it, leaves the index unchecked and exits
+  (`pending_purges`), counts it, leaves the index unchecked and exits
   0; the next purge, ingest or rebuild finishes it. A built case and
   the seeded kills both check it.
 - ENG-09: a soak of 50 writers; at 1M events (release, 13 min), 4,293 of
@@ -53,11 +53,14 @@ For the stakeholder:
 
 - Names (no domain-model agent here): `parinn-eval`, `ingest_fifty_runs`,
   `run_killed_at_terminal`.
-- Counters: `verify_unfinished` (verify's index derivation ran out of
-  time) is new against main; the gates also count `purge_unfinished` (an
-  unfinished purge verify names) and `recall_refused`, both on main.
-  None renamed; the names await a domain-model agent check, which could
-  not run here.
+- Counters, domain-model agent verdict: `verify_unfinished` did not fit
+  (the cause is a deadline); renamed here to `verify_timed_out`, and the
+  `parinn verify` report key `unfinished_purges` to `pending_purges`
+  (purges awaiting the next rebuild). `purge_unfinished` does not fit
+  either: the model says `purge_failed` or `purge_timed_out`, and the
+  report key's analogue likewise; both kept for now on main, stakeholder
+  to rule. `recall_refused` fits; `recall_rejected` is the strict-literal
+  alternative.
 - Verify's derived-index recheck is bounded at 60 s
   (`INDEX_CHECK_SECS`). On a store whose derivation always takes longer,
   ADM-09's derived artifact check never runs (NFR-05). A ruling on the

@@ -31,7 +31,7 @@ After the reviews:
   hashes each source's consumed prefix and fails one cut or rewritten.
 - Verify derives the search index again on a read into memory, under a
   60 s deadline: no write lock (I9, ENG-03). One out of time leaves it
-  unchecked and counts `verify_unfinished`.
+  unchecked and counts `verify_timed_out`.
 - Counter `redacted` is now `redactions`, as OPS-01 names it.
 - `short_sources`, `VerifyError::Unshipped`, a served-marker seam, and
   no index slot for an event-less writer (I10).

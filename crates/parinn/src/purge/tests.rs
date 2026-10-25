@@ -513,7 +513,7 @@ fn verify_reports_a_purge_a_kill_left_unfinished_exits_0_and_changes_nothing() {
     assert_eq!(counted(&p, "purge_unfinished").len(), counted_before + 1);
     let (_, json, _) = p.invoke(&["verify", "--json"], &DEV);
     let report: Value = serde_json::from_str(&json).unwrap();
-    assert_eq!(report["unfinished_purges"], serde_json::json!([range]));
+    assert_eq!(report["pending_purges"], serde_json::json!([range]));
     assert_eq!(report["index_checked"], false);
 }
 
@@ -529,7 +529,7 @@ fn once_the_next_rebuild_finishes_the_purge_verify_finds_nothing_unfinished() {
 
     assert_eq!((code, err.as_str()), (EXIT_OK, ""));
     let report: Value = serde_json::from_str(&json).unwrap();
-    assert_eq!(report["unfinished_purges"], serde_json::json!([]));
+    assert_eq!(report["pending_purges"], serde_json::json!([]));
     assert_eq!(report["index_checked"], true);
     let (home, _) = open(&p);
     let index = std::fs::read(home.root().join("search_index")).unwrap();

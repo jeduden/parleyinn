@@ -1498,7 +1498,7 @@ fn checked_shape(ctx: &Context, store: &Store) -> Result<Shape, VerifyError> {
     if shape == Shape::IndexUnfinished {
         let _ = ctx.audit(&Occurrence::Degraded {
             kind: Kind::TimedOut,
-            counter: Counter::VerifyUnfinished,
+            counter: Counter::VerifyTimedOut,
             operation: "verify",
             detail: "the search index was not derived again in time and is unchecked",
         });
@@ -1562,7 +1562,7 @@ fn verified_line(
             "seats": seats_json(&r.seats),
             "open_segments": segments::open_json(&r.open_segments),
             "short_sources": incomplete.short,
-            "unfinished_purges": checks.unfinished,
+            "pending_purges": checks.unfinished,
             "index_checked": index_checked,
             "staged": staged,
             "audit": {"files": a.files, "entries": a.entries},

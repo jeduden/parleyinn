@@ -815,7 +815,7 @@ fn verify_that_runs_out_of_time_deriving_the_index_leaves_it_unchecked_and_count
     assert_eq!(v["index_checked"], false);
     let counted = audited(&p)
         .into_iter()
-        .filter(|e| e.counter.as_deref() == Some("verify_unfinished"))
+        .filter(|e| e.counter.as_deref() == Some("verify_timed_out"))
         .count();
     assert_eq!(counted, 2);
 
