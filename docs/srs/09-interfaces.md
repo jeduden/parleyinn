@@ -152,7 +152,8 @@ a quarantined address, or a run of consecutive ones, whose events are not
 returned and carries no reason (RCL-06, SEC-12). Each entry lies within the
 call's range and the caller's recall scope, so neither hints at an address
 outside it (I8, RCL-05); neither names a
-selector, a policy, a principal or a reason text, and neither carries content
+selector, a policy, a principal or a free-form reason text, and neither carries
+content
 (RCL-04). An address both purged and quarantined appears only as a tombstone
 (RCL-06). A call that reaches the per-call cap continues from its cursor, and
 each entry appears on the page that reaches it. An envelope marked
