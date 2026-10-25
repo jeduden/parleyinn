@@ -299,5 +299,30 @@ pub fn apply(root: &Path, injection: &Injection) -> Result<(), Error> {
     })
 }
 
+/// The cases shard `spec`, of the form `i/n`, holds: every `n`th case
+/// from the `i`th, so `n` shards together hold every case once and CI
+/// may run them side by side. `None` holds them all.
+///
+/// # Errors
+///
+/// Fails when `spec` is not `i/n` with `i` below `n`.
+pub fn shard(cases: Vec<Case>, spec: Option<&str>) -> Result<Vec<Case>, String> {
+    let Some(spec) = spec else {
+        return Ok(cases);
+    };
+    let parsed = spec
+        .split_once('/')
+        .and_then(|(i, n)| Some((i.parse::<usize>().ok()?, n.parse::<usize>().ok()?)));
+    match parsed {
+        Some((i, n)) if i < n => Ok(cases
+            .into_iter()
+            .enumerate()
+            .filter(|(at, _)| at % n == i)
+            .map(|(_, c)| c)
+            .collect()),
+        _ => Err(format!("shard {spec:?} is not i/n with i below n")),
+    }
+}
+
 #[cfg(test)]
 mod tests;

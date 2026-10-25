@@ -6,7 +6,9 @@
 //! copy, so cargo compiles once and reuses the build for every case.
 //!
 //! It needs mdsmith and taplo on PATH, so its tests are ignored by
-//! default; CI's drift job runs them with `--ignored`.
+//! default; CI's drift jobs run them with `--ignored`, each one shard
+//! of the cases named by `DRIFT_SHARD=i/n`, so the suite fits a job's
+//! budget. Unset, one run holds every case.
 
 #![allow(
     clippy::unwrap_used,
@@ -20,7 +22,7 @@ use std::process::{Command, Stdio};
 use std::thread;
 use std::time::{Duration, Instant};
 
-use drift::{Check, apply, cases};
+use drift::{Check, apply, cases, shard};
 use testkit::TempDir;
 
 /// Bounds one check; a run of one test target takes seconds once the
@@ -40,15 +42,19 @@ fn every_drift_is_caught() {
     let tmp = TempDir::new().unwrap();
     let (work, target) = (tmp.path().join("work"), tmp.path().join("target"));
 
+    let spec = std::env::var("DRIFT_SHARD").ok();
+    let selected = shard(cases(), spec.as_deref()).unwrap();
+    assert!(!selected.is_empty(), "shard {spec:?} holds no case");
+
     sync_copy(&testkit::repo_root(), &work);
-    let checks: BTreeSet<Check> = cases().into_iter().map(|c| c.check).collect();
+    let checks: BTreeSet<Check> = selected.iter().map(|c| c.check.clone()).collect();
     for check in checks {
         let (ok, out) = run(&work, &target, &check);
         assert!(ok, "{check} fails on the unedited copy:\n{out}");
     }
 
     let mut problems = Vec::new();
-    for c in cases() {
+    for c in selected {
         sync_copy(&testkit::repo_root(), &work);
         apply(&work, &c.injection).unwrap();
 

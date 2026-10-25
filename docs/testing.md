@@ -35,9 +35,8 @@ kept. Build and CI commands are in [development.md](development.md).
 test layer, over one build, and prints line coverage per crate for
 each test layer and for all of them. It counts the tests in each test
 layer too, scenarios included, and writes each layer's lcov to
-`target/coverage/`. Install the tool first, with `cargo install
---locked cargo-llvm-cov@0.9.1`. `--layer NAME` measures one layer alone;
-`--merge` reads the layers so written and holds the floors.
+`target/coverage/`; `--layer NAME` writes one layer's, and `--merge`
+reads them back. Install `cargo-llvm-cov@0.9.1` first, with cargo.
 
 The policy lives in [Cargo.toml](../Cargo.toml) under
 `[workspace.metadata.coverage]`, and the run fails when a crate falls
@@ -123,7 +122,8 @@ message it must fail with.
 - `cargo test -p drift --test suite -- --ignored` — the drift suite.
   It proves the unedited copy passes every check, then injects each
   case into a fresh copy and requires its check to fail. It needs
-  mdsmith on PATH; CI's `drift` job runs it.
+  mdsmith on PATH; CI's `drift (shard N)` jobs each run the shard
+  `DRIFT_SHARD=i/n` names.
 - A case the checks miss today is marked `known_gap`. The suite fails
   the day a check starts catching it, so the mark goes with the fix.
 - The ENG-27 scenario runs in plain `cargo test --workspace`. It fails
@@ -181,16 +181,17 @@ decides from two samples files. CI's `benchmark` job runs both.
 
 The benchmark jobs (ENG-15) compare the head with its first parent:
 the `main` a pull request's merge commit sits on, or `main` before a
-push. Fifteen `benchmark (shard N)` jobs each build both sides' suites
-and cores in release mode on one runner and sample them interleaved, two
-of the thirty rounds of ten samples a side, keeping the alternation of
-which side goes first, so a drift in a runner's speed lands on both.
-The `benchmark` job pools the shards' samples; the head's gate writes
-its report into the job summary and fails naming each benchmark that
-regressed more than 10% with significance. A benchmark too slow for the
-budget, such as one on a store of 10M events, would run nightly
-instead. Until the suite reaches `main`, the base has none, and the
-gate warns and reports the head's samples alone.
+push. `benchmark-suites` builds both sides' suites and cores once, in
+release mode. Ten `benchmark (shard N)` jobs each sample them on one
+runner, three of the thirty rounds of ten samples a side. A shard
+interleaves the sides and keeps the alternation of which goes first, so
+a drift in a runner's speed lands on both. The `benchmark` job pools the
+shards' samples; the head's gate writes its report into the job summary
+and fails naming each benchmark that regressed more than 10% with
+significance. A benchmark too slow for the budget, such as one on a
+store of 10M events, would run nightly instead. Until the suite reaches
+`main`, the base has none, and the gate warns and reports the head's
+samples alone.
 
 ## Adding or writing a scenario
 

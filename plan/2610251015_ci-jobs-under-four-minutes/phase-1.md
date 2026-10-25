@@ -27,15 +27,17 @@ GREEN sites:
   crate's, and `scenarios` runs that crate with the count line taken
   from the run itself; `coverage (unit|integration|e2e)` each measure
   one layer, and `coverage` merges them and holds the floors;
-  `benchmark (shard N)` each run two of the thirty rounds, and
-  `benchmark` pools the samples and runs the gate; `CI` names each job
-  that did not succeed.
+  `benchmark-suites` builds both sides once, `benchmark (shard N)` each
+  run three of the thirty rounds, and `benchmark` pools the samples and
+  runs the gate; `drift (shard N)` each run a quarter of the cases; `CI`
+  names each job that did not succeed.
 - `.github/workflows/build.yml`: one job per release target, the target
   read from the `*_TARGETS` lists, with `<name>-parinn` and
   `<name>-licenses` artifacts; the arm64 and Windows checks and the
   release provenance read the per-target artifacts.
 - `tooling/coverage`: `--layer NAME` and `--merge`, with `Host::read`.
 - `tooling/engineering`: the benchmark gate check follows `needs:`.
+- `tooling/drift`: `shard` selects the cases `DRIFT_SHARD=i/n` names.
 
 Gate. The `ci-timings` artifacts of two consecutive runs show every job
 of `ci.yml` and `build.yml` under four minutes; the scenario count, the

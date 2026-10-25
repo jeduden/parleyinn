@@ -69,8 +69,7 @@ records, it adds a drift case too (ENG-27).
    benchmark rounds sharded and pooled
 2. A cargo registry and target cache for ci jobs only, never for the
    release build, if a job still runs over four minutes
-3. Drift: shard the cases across a matrix, each shard holding every
-   case's expectation, if the drift job runs over four minutes
+3. The drift cases sharded across four jobs (phase 1)
 
 Later phases are declared when the prior phase's result shows the real
 shape.

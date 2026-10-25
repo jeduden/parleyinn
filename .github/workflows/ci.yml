@@ -371,8 +371,17 @@ jobs:
   # when the check it names lets the drift through. It needs mdsmith and
   # taplo on PATH, so it runs here rather than in `cargo test --workspace`.
   drift:
+    name: drift (shard ${{ matrix.shard }})
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1, 2, 3]
+    env:
+      # Every fourth case from the shard's own: the four together hold
+      # every case once, and each fits the budget.
+      DRIFT_SHARD: ${{ matrix.shard }}/4
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -407,24 +416,12 @@ jobs:
   # runner's speed lands on both alike. The head's gate then fails
   # naming each benchmark whose median is more than 10% slower with
   # significance (one-sided Mann-Whitney U, alpha 0.01). The suite
-  # times the core's start-up today. The rounds are sharded across
-  # runners, each shard interleaving both sides on its one runner and
-  # keeping the global alternation of which side goes first; the
-  # benchmark job pools every shard's samples and runs the gate. Thirty
-  # rounds of ten samples a side in all, whatever the shard count.
-  benchmark-rounds:
-    name: benchmark (shard ${{ matrix.shard }})
+  # times the core's start-up today. Three jobs share the work so each
+  # fits its budget: this one builds both sides once, the shards sample,
+  # and the benchmark job pools every shard's samples and runs the gate.
+  benchmark-suites:
     runs-on: ubuntu-latest
     timeout-minutes: 5
-    strategy:
-      fail-fast: false
-      matrix:
-        shard: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14]
-    env:
-      ROUNDS: 30
-      SHARDS: 15
-      SHARD: ${{ matrix.shard }}
-      SAMPLES: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -455,12 +452,51 @@ jobs:
           if [ -f tooling/benchmark/Cargo.toml ]; then
             cargo build --release --locked -p benchmark -p parinn
           fi
+      # Both sides' release suites and cores, for every shard and the
+      # gate, so each builds nothing.
+      - name: Collect both sides' suites and cores
+        shell: bash
+        run: |
+          mkdir -p "$RUNNER_TEMP/suites/head" "$RUNNER_TEMP/suites/base"
+          cp target/release/benchmark target/release/parinn "$RUNNER_TEMP/suites/head/"
+          base="$RUNNER_TEMP/base/target/release"
+          if [ -x "$base/benchmark" ]; then
+            cp "$base/benchmark" "$base/parinn" "$RUNNER_TEMP/suites/base/"
+          fi
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: benchmark-suites
+          path: ${{ runner.temp }}/suites/
+
+  # The rounds, sharded across runners: each shard interleaves both
+  # sides on its one runner and keeps the global alternation of which
+  # side goes first. Thirty rounds of ten samples a side in all.
+  benchmark-rounds:
+    name: benchmark (shard ${{ matrix.shard }})
+    needs: benchmark-suites
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+    env:
+      ROUNDS: 30
+      SHARDS: 10
+      SHARD: ${{ matrix.shard }}
+      SAMPLES: 10
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: benchmark-suites
+          path: ${{ runner.temp }}/suites
       - name: Sample both sides, this shard's rounds
         shell: bash
         run: |
           set -euo pipefail
-          head="$GITHUB_WORKSPACE/target/release"
-          base="$RUNNER_TEMP/base/target/release"
+          chmod +x "$RUNNER_TEMP"/suites/*/*
+          head="$RUNNER_TEMP/suites/head"
+          base="$RUNNER_TEMP/suites/base"
           out="$RUNNER_TEMP/samples"
           mkdir -p "$out"
           if [ ! -x "$base/benchmark" ]; then
@@ -520,13 +556,10 @@ jobs:
           fetch-depth: 2
       - name: Check out the base beside the head
         run: git worktree add --detach "$RUNNER_TEMP/base" HEAD^1
-      - name: Install the head's pinned Rust with mise
-        uses: ./.github/actions/setup-mise
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
-          tools: rust
-          cache: true
-      - name: Build the head's suite
-        run: cargo build --release --locked -p benchmark
+          name: benchmark-suites
+          path: ${{ runner.temp }}/suites
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           pattern: benchmark-samples-*
@@ -535,7 +568,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          head="$GITHUB_WORKSPACE/target/release"
+          chmod +x "$RUNNER_TEMP"/suites/*/*
+          head="$RUNNER_TEMP/suites/head"
           out="$RUNNER_TEMP/samples"
           mkdir -p "$out"
           cat "$RUNNER_TEMP"/shards/*/head.samples > "$out/head.samples"
@@ -672,8 +706,9 @@ jobs:
           path: ci-timings.json
           if-no-files-found: ignore
       # Each job that did not succeed is named, so the failure says
-      # where to look; a cancelled job means a newer push superseded
-      # this run.
+      # where to look. A cancelled job either ran past its
+      # timeout-minutes or was superseded by a newer push; its own log
+      # says which.
       - name: Fail unless every job passed
         env:
           RESULTS: ${{ join(needs.*.result, ' ') }}

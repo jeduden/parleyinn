@@ -12,6 +12,26 @@ fn read(path: &Path) -> String {
 }
 
 #[test]
+fn shard_takes_every_nth_case_or_all() {
+    let names =
+        |spec| shard(cases(), spec).map(|c| c.into_iter().map(|c| c.name).collect::<Vec<_>>());
+    let all = names(None).unwrap();
+    let specs: Vec<String> = (0..3).map(|i| format!("{i}/3")).collect();
+    let thirds: Vec<_> = specs.iter().map(|s| names(Some(s)).unwrap()).collect();
+
+    assert_eq!(thirds[1][0], all[1]);
+    assert_eq!(thirds[1][1], all[4]);
+    assert_eq!(thirds.iter().map(Vec::len).sum::<usize>(), all.len());
+    assert_eq!(names(Some("0/1")).unwrap(), all);
+    for bad in ["3/3", "x/2", "1", "1/0"] {
+        assert_eq!(
+            names(Some(bad)).unwrap_err(),
+            format!("shard {bad:?} is not i/n with i below n")
+        );
+    }
+}
+
+#[test]
 fn apply_replaces_the_first_occurrence() {
     let root = tree();
 
