@@ -282,6 +282,29 @@ fn a_tombstone_shows_as_a_line_of_its_own_with_its_range_and_reason_safely() {
 }
 
 #[test]
+fn off_a_terminal_a_refusal_the_audit_log_cannot_take_is_still_refused_and_said() {
+    let mut p = Process::new();
+    p.invoke(&["ingest", "--path", &p.transcript("two needle\n")], &DEV);
+    p.terminal = false;
+    let audit_dir = p.parinn_home().join("audit");
+    std::fs::remove_dir_all(&audit_dir).unwrap();
+    std::fs::write(&audit_dir, "").unwrap();
+    crate::tests::set_mode(&audit_dir, 0o600);
+
+    let (code, out, err) = p.invoke(&["event", "search", "needle"], &DEV);
+
+    assert_eq!((code, out.as_str()), (crate::EXIT_FAILURE, ""));
+    assert!(
+        err.starts_with("parinn event: audit the refusal: "),
+        "{err}"
+    );
+    assert!(
+        err.ends_with("parinn event: refused: recalled content is written to a terminal only\n"),
+        "{err}"
+    );
+}
+
+#[test]
 fn off_a_terminal_the_command_refuses_with_fixed_text_and_counts_it() {
     let mut p = Process::new();
     p.invoke(&["ingest", "--path", &p.transcript("two needle\n")], &DEV);

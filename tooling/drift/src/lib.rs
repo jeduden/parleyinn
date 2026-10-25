@@ -142,6 +142,14 @@ pub fn scenario(id: &str) -> Check {
     )
 }
 
+/// Builds the development core, which the scenario checks start and no
+/// check builds for itself, so the suite does not depend on which check
+/// happens to run first.
+#[must_use]
+pub fn build_core() -> Check {
+    Check::new("cargo", &["build", "--locked", "-p", "parinn"])
+}
+
 /// Runs the one test `name` in the `target` test target of `package`.
 #[must_use]
 pub fn cargo_test(package: &str, target: &str, name: &str) -> Check {
@@ -297,6 +305,31 @@ pub fn apply(root: &Path, injection: &Injection) -> Result<(), Error> {
         file: injection.file.into(),
         source,
     })
+}
+
+/// The cases shard `spec`, of the form `i/n`, holds: every `n`th case
+/// from the `i`th, so `n` shards together hold every case once and CI
+/// may run them side by side. `None` holds them all.
+///
+/// # Errors
+///
+/// Fails when `spec` is not `i/n` with `i` below `n`.
+pub fn shard(cases: Vec<Case>, spec: Option<&str>) -> Result<Vec<Case>, String> {
+    let Some(spec) = spec else {
+        return Ok(cases);
+    };
+    let parsed = spec
+        .split_once('/')
+        .and_then(|(i, n)| Some((i.parse::<usize>().ok()?, n.parse::<usize>().ok()?)));
+    match parsed {
+        Some((i, n)) if i < n => Ok(cases
+            .into_iter()
+            .enumerate()
+            .filter(|(at, _)| at % n == i)
+            .map(|(_, c)| c)
+            .collect()),
+        _ => Err(format!("shard {spec:?} is not i/n with i below n")),
+    }
 }
 
 #[cfg(test)]

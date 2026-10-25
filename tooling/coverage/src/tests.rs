@@ -51,6 +51,11 @@ impl Host for FakeHost {
         Ok(())
     }
 
+    fn read(&self, path: &Path) -> Result<Option<String>, String> {
+        self.call(format!("read {}", path.display()))?;
+        Ok(self.files.borrow().get(path).cloned())
+    }
+
     fn append(&self, path: &Path, text: &str) -> Result<(), String> {
         self.call(format!("append {}", path.display()))?;
         self.files

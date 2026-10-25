@@ -89,6 +89,62 @@ fn run_fails_when_the_measurement_does() {
 }
 
 #[test]
+fn run_measures_one_layer_and_writes_only_its_lcov() {
+    let host = host("SF:/w/srs/src/lib.rs\nDA:1,1\n");
+
+    let (code, out, err) = invoke(&["--layer", "unit", "--out", "cov"], &host, None);
+
+    assert_eq!(code, EXIT_OK, "{err}");
+    assert_eq!(out, "wrote cov/unit.lcov\n");
+    {
+        let calls = host.calls.borrow();
+        assert!(
+            calls.contains(
+                &"cargo llvm-cov --no-report --workspace --locked --lib --bins".to_owned()
+            )
+        );
+        assert!(!calls.iter().any(|c| c.contains("--test")), "{calls:?}");
+    }
+    assert!(!host.files.borrow().contains_key(Path::new("cov/all.lcov")));
+
+    let (code, out, _) = invoke(&["--layer=integration"], &host, None);
+    assert_eq!(code, EXIT_OK);
+    assert_eq!(out, "no integration tests to measure\n");
+}
+
+#[test]
+fn run_merges_the_layers_written_and_holds_the_floors() {
+    let host = host("");
+    host.files.borrow_mut().insert(
+        "cov/unit.lcov".into(),
+        "SF:/w/srs/src/lib.rs\nDA:1,1\nDA:2,0\n".into(),
+    );
+    host.files.borrow_mut().insert(
+        "cov/e2e.lcov".into(),
+        "SF:/w/srs/src/lib.rs\nDA:2,1\n".into(),
+    );
+
+    let (code, out, err) = invoke(&["--merge", "--out", "cov"], &host, None);
+
+    assert_eq!(code, EXIT_OK, "{err}");
+    assert!(
+        out.contains("| srs | 2 | 50.0% | 0.0% | 50.0% | 100.0% |"),
+        "{out}"
+    );
+    assert!(
+        !host.calls.borrow().iter().any(|c| c.contains("llvm-cov")),
+        "a merge runs no test"
+    );
+
+    let (code, _, err) = invoke(&["--merge"], &host, None);
+    assert_eq!(code, EXIT_FAILURE);
+    assert!(
+        err.contains("no <layer>.lcov under target/coverage"),
+        "{err}"
+    );
+}
+
+#[test]
 fn run_explains_its_command_line() {
     let host = host("");
 
@@ -99,6 +155,10 @@ fn run_explains_its_command_line() {
     for (args, want) in [
         (&["--bogus"][..], r#"unexpected argument "--bogus""#),
         (&["--out"], "--out needs a directory"),
+        (&["--layer"], "--layer needs a name"),
+        (&["--layer", "end-to-end"], r#"no test layer "end-to-end""#),
+        (&["--layer", "unit", "--merge"], "one or the other, once"),
+        (&["--merge", "--merge"], "one or the other, once"),
     ] {
         let (code, _, err) = invoke(args, &host, None);
         assert_eq!(code, EXIT_USAGE);

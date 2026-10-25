@@ -123,6 +123,36 @@ fn gated_holds_a_job_that_runs_the_gate_and_that_ci_needs() {
 }
 
 #[test]
+fn gated_holds_a_suite_sharded_into_the_jobs_the_gate_needs() {
+    let w = review_workflow::parse(
+        "\
+jobs:
+  benchmark-rounds:
+    steps:
+      - run: \"$bin/benchmark\" run --core \"$bin/parinn\"
+  benchmark:
+    needs: benchmark-rounds
+    steps:
+      - run: \"$head/benchmark\" gate --base base --head head
+  ci:
+    needs: [test, benchmark, build]
+",
+    );
+
+    assert!(gated(&w).is_empty());
+}
+
+#[test]
+fn gated_names_a_suite_no_job_runs() {
+    let w = review_workflow::parse(&WORKFLOW.replace("run --core", "ran --core"));
+
+    assert_eq!(
+        gated(&w),
+        [r#"job benchmark does not run "benchmark\" run --core", nor does a job it needs"#]
+    );
+}
+
+#[test]
 fn gated_names_a_missing_job() {
     let w = review_workflow::parse("jobs:\n  ci:\n    needs: [benchmark]\n");
 
