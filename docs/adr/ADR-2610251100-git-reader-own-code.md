@@ -38,16 +38,20 @@ Extend `crates/repository` with its own code for the remaining rows. Do
 not depend on `gix`, `gix-*`, Grit, `git2`, `weavatrix-git` or any other
 git crate. Operations the reader does not support (alternates, multi-pack
 index, reftable, SHA-256, sparse index, submodule contents) return
-`Error::Unsupported`, which the caller counts (I6) and turns into a
-provisional identity (I9).
+`Error::Unsupported`, which the caller counts (I6) and then falls back
+by row (I9). LANE-02 falls to a provisional identity. REC-20 leaves
+the rest to an ingest marker, as the row says.
 
 The code meets four rules.
 
 1. **A measured budget gate.** A benchmark job runs the REC-20 checkpoint
    path on a fixture of 100,000 tracked files and fails the build when it
-   exceeds a committed time and peak-RSS ceiling. The ceilings come from
-   NFR-01 and NFR-09 (peak RSS ≤ 50 MiB per hook handler invocation) and
-   are set by the first spike run. Scenarios and unit tests prove
+   exceeds a committed time and peak-RSS ceiling. NFR-01 already sets the
+   hook latency targets (`UserPromptSubmit` ≤ 50 ms, `SessionStart` ≤
+   150 ms at p95) and NFR-09 caps peak RSS at 50 MiB per hook handler
+   invocation. The ceilings are the share of those limits the checkpoint
+   path may use. Only that share is open, and the first spike run sets
+   it. Scenarios and unit tests prove
    behaviour only; the gate proves cost. It lands with a drift case
    (ENG-27).
 2. **Cost rules in the design.** Parse the index once per command. Cache
@@ -89,8 +93,8 @@ state in SEC-18's notes why a planted colliding object is out of scope.
 - **weavatrix-git.** Dependency-free and read-only like ours, but
   pre-1.0, one maintainer, no ignore matching. Useful as a reference
   to compare our output against, not as a dependency.
-- **git2 (libgit2 bindings).** C code, GPL-2.0 with a linking exception,
-  and the exclusion of C code from the core.
+- **git2 (libgit2 bindings).** C code, where CON-01 names Rust for the
+  product, under GPL-2.0 with a linking exception.
 - **Own code from git's C source.** Refused. git is GPL-2.0-only. A
   translation of its code, or code written while following it, is
   likely a derivative work, which would put the repository's MIT licence
