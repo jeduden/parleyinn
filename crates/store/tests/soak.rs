@@ -8,7 +8,9 @@
 //! An append that waits past the store's busy deadline fails whole and
 //! appends nothing. The MCP server counts it as `live_ingest_failed`
 //! and reads the transcript again on its next pass; each writer here
-//! does the same, and the soak prints how many appends it retried.
+//! does the same, and the soak prints how many appends it retried. So
+//! is an open that waits past it: an opener can take the write lock to
+//! bring the store's schema and index up to date.
 
 #![allow(
     clippy::unwrap_used,
@@ -58,12 +60,28 @@ fn busy(e: &StoreError) -> bool {
     matches!(e, StoreError::Sqlite(rusqlite::Error::SqliteFailure(f, _)) if f.code == ErrorCode::DatabaseBusy)
 }
 
+/// A connection of writer `w`'s own, opened again while the open waits
+/// past the busy deadline, as the next pass of an MCP server would; how
+/// many opens it retried.
+fn opened(path: &Path, w: u8) -> (Store, usize) {
+    let mut retried = 0;
+    loop {
+        match Store::open(path) {
+            Ok(store) => return (store, retried),
+            Err(e) => {
+                assert!(busy(&e), "writer {w}: {e}");
+                retried += 1;
+            }
+        }
+    }
+}
+
 /// Appends `per` events to writer `w`'s log through a connection of its
 /// own, retrying an append the busy deadline failed: how many it
 /// retried.
 fn append_all(path: &Path, w: u8, per: usize) -> usize {
-    let mut store = Store::open(path).unwrap();
-    let (mut done, mut retried) = (0, 0);
+    let (mut store, mut retried) = opened(path, w);
+    let mut done = 0;
     while done < per {
         let n = BATCH.min(per - done);
         match store.append(writer(w), &events(done, n)) {
@@ -104,7 +122,7 @@ fn fifty_writers_appending_at_once_keep_every_log_gap_free_and_every_address_uni
 
     let retried = soak(&path, per);
     println!(
-        "{total} events by {WRITERS} writers, {retried} appends retried past the busy deadline"
+        "{total} events by {WRITERS} writers, {retried} opens and appends retried past the busy deadline"
     );
 
     let store = Store::open(&path).unwrap();
