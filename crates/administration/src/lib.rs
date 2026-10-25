@@ -15,6 +15,7 @@ pub mod origin;
 pub mod purge;
 pub mod quarantine;
 pub mod repository;
+pub mod retention;
 pub mod role;
 pub mod trust_policy;
 pub mod verify;

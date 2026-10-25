@@ -199,6 +199,19 @@ pub(crate) fn purge(
 
 /// Audits and counts each cause that refused the range, and names it.
 fn refused(ctx: &Context, refusals: &[Refusal], stderr: &mut dyn Write) -> u8 {
+    audit_refusals(ctx, refusals);
+    let _ = writeln!(
+        stderr,
+        "parinn purge: refused:\n{}",
+        describe(refusals, SHOWN)
+    );
+
+    EXIT_FAILURE
+}
+
+/// Audits and counts each cause that refused a range: one entry for each
+/// kind of event kept, not one for each event (ADM-07, I6).
+pub(crate) fn audit_refusals(ctx: &Context, refusals: &[Refusal]) {
     let mut kept: Vec<&str> = Vec::new();
     for refusal in refusals {
         let key = match refusal {
@@ -206,11 +219,10 @@ fn refused(ctx: &Context, refusals: &[Refusal], stderr: &mut dyn Write) -> u8 {
             Refusal::Kept { kind, .. } => kind.as_str().to_owned(),
             Refusal::PendingIngest { writer } => writer.to_string(),
         };
-        // One entry for each kind of event kept, not one for each event.
-        if matches!(refusal, Refusal::Kept { kind, .. } if kept.contains(&kind.as_str())) {
-            continue;
-        }
         if let Refusal::Kept { kind, .. } = refusal {
+            if kept.contains(&kind.as_str()) {
+                continue;
+            }
             kept.push(kind.as_str());
         }
         let occurrence = Occurrence::Keyed {
@@ -221,16 +233,9 @@ fn refused(ctx: &Context, refusals: &[Refusal], stderr: &mut dyn Write) -> u8 {
             key: &key,
         };
         if let Err(e) = ctx.audit(&occurrence) {
-            let _ = writeln!(stderr, "parinn purge: audit the refusal: {e}");
+            tracing::warn!(error = e.to_string().as_str(), "audit a purge's refusal");
         }
     }
-    let _ = writeln!(
-        stderr,
-        "parinn purge: refused:\n{}",
-        describe(refusals, SHOWN)
-    );
-
-    EXIT_FAILURE
 }
 
 /// How many causes a refusal names on the terminal; every one is audited.
@@ -275,7 +280,7 @@ fn left_over(done: &Result<store::Finished, store::StoreError>) -> bool {
 }
 
 /// Audits and counts the residue a purge left.
-fn audit_residue(ctx: &Context) {
+pub(crate) fn audit_residue(ctx: &Context) {
     let occurrence = Occurrence::Degraded {
         kind: Kind::Failed,
         counter: Counter::PurgeUnfinished,

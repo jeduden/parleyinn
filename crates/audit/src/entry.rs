@@ -219,6 +219,9 @@ pub enum Counter {
     /// A retention policy aged a range out and the node purged it
     /// (REC-15, SEC-22).
     RetentionPurged,
+    /// Applying the retention policies failed: the store or the random
+    /// source did; the next ingest tries again (SEC-22, I6).
+    RetentionFailed,
 }
 
 impl Counter {
@@ -283,6 +286,7 @@ impl Counter {
             Self::PurgeRefused => "purge_refused",
             Self::PurgeUnfinished => "purge_unfinished",
             Self::RetentionPurged => "retention_purged",
+            Self::RetentionFailed => "retention_failed",
         }
     }
 }

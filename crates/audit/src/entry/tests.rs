@@ -113,6 +113,7 @@ fn each_counter_of_the_mcp_server_has_its_name() {
         (Counter::PurgeRefused, "purge_refused"),
         (Counter::PurgeUnfinished, "purge_unfinished"),
         (Counter::RetentionPurged, "retention_purged"),
+        (Counter::RetentionFailed, "retention_failed"),
         (
             Counter::SearchIndexWriterUnindexed,
             "search_index_writer_unindexed",

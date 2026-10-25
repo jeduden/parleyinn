@@ -653,6 +653,21 @@ impl Store {
         recall::range_events(&self.conn, writer, first, last)
     }
 
+    /// The heads of `writer` that events of `device` cited, as pairs of
+    /// the citing event's seq and the seq of the cited event of `writer`,
+    /// in the order they were cited.
+    ///
+    /// # Errors
+    ///
+    /// Fails when SQLite does.
+    pub fn citations(
+        &self,
+        device: WriterId,
+        writer: WriterId,
+    ) -> Result<Vec<(Seq, Seq)>, StoreError> {
+        recall::citations(&self.conn, device, writer)
+    }
+
     /// The kind, provenance class and transcript timestamp of the event
     /// at `address`, and whether a purge erased it.
     ///

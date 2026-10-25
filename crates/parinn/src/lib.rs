@@ -502,6 +502,7 @@ fn ingest(
     let held = held_sources(ctx, settings, &home, stderr);
     let held: Vec<&Path> = held.iter().map(AllowedPath::path).collect();
     failures += ingest_all(ctx, &home, &held, &redactor, &inputs, stderr).1;
+    apply_retention(ctx, &home, settings, stderr);
     if target == IngestTarget::All {
         audit_lost(ctx, &home, stderr);
     }
@@ -509,6 +510,29 @@ fn ingest(
     let code = written(write!(stdout, "{shown}"), stderr);
 
     if failures > 0 { EXIT_FAILURE } else { code }
+}
+
+/// Applies the retention policies in force once the ingest is done
+/// (SEC-22); a failure to open the store again stops nothing (I9).
+fn apply_retention(
+    ctx: &Context,
+    home: &Home,
+    settings: &configuration::resolve::Settings,
+    stderr: &mut dyn Write,
+) {
+    if retention::policies(settings).is_empty() {
+        return;
+    }
+    match start_node(ctx, home, stderr) {
+        Ok(mut store) => match Node::find(home, &store) {
+            Ok(node) => retention::apply(ctx, &mut store, &node, settings, &mut OsEntropy),
+            Err(e) => tracing::warn!(
+                error = e.to_string().as_str(),
+                "find the node to apply retention"
+            ),
+        },
+        Err(e) => tracing::warn!(error = e.as_str(), "open the store to apply retention"),
+    }
 }
 
 /// Ingests each transcript source at `paths`. Returns a report of each
@@ -2056,6 +2080,7 @@ mod quarantine;
 mod rebuild;
 mod recall;
 mod repository_identity;
+mod retention;
 mod segments;
 mod settings;
 mod sources;

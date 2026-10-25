@@ -105,11 +105,13 @@ pub(crate) fn contents(
 }
 
 /// What a range of one writer's log shows without its content: each
-/// event's kind, commitment and whether a purge erased it.
+/// event's kind, provenance class, commitment and whether a purge erased
+/// it.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RangeEvent {
     pub seq: Seq,
     pub kind: EventKind,
+    pub provenance: Provenance,
     pub commitment: Commitment,
     /// Its content, commitment key and payload are all gone.
     pub erased: bool,
@@ -124,7 +126,7 @@ pub(crate) fn range_events(
     last: Seq,
 ) -> Result<Vec<RangeEvent>, StoreError> {
     let mut statement = conn.prepare(
-        "SELECT seq, kind, commitment,
+        "SELECT seq, kind, provenance, commitment,
                 content IS NULL AND commitment_key IS NULL AND payload IS NULL
          FROM events WHERE writer = ?1 AND seq BETWEEN ?2 AND ?3 ORDER BY seq",
     )?;
@@ -135,7 +137,8 @@ pub(crate) fn range_events(
                 r.get::<_, i64>(0)?,
                 r.get::<_, String>(1)?,
                 r.get::<_, String>(2)?,
-                r.get::<_, bool>(3)?,
+                r.get::<_, String>(3)?,
+                r.get::<_, bool>(4)?,
             ))
         },
     )?;
@@ -144,10 +147,11 @@ pub(crate) fn range_events(
         what: format!("{what} of an event of writer {writer}"),
     };
     rows.map(|row| {
-        let (seq, kind, commitment, erased) = row?;
+        let (seq, kind, provenance, commitment, erased) = row?;
         Ok(RangeEvent {
             seq: crate::seq_of(seq).ok_or_else(|| corrupt("seq"))?,
             kind: EventKind::parse(&kind).ok_or_else(|| corrupt("kind"))?,
+            provenance: Provenance::parse(&provenance).ok_or_else(|| corrupt("provenance"))?,
             commitment: Commitment::from_hex(&commitment).map_err(|_| corrupt("commitment"))?,
             erased,
         })
@@ -202,6 +206,29 @@ pub(crate) fn event_facts(
         })
     })
     .transpose()
+}
+
+/// The heads of `writer` that events of `device` cited, as pairs of the
+/// citing event's seq and the seq of `writer`'s event it cited, in the
+/// order they were cited: the causal order of the two logs (PRV-12).
+pub(crate) fn citations(
+    conn: &Connection,
+    device: WriterId,
+    writer: WriterId,
+) -> Result<Vec<(Seq, Seq)>, StoreError> {
+    let mut statement = conn.prepare(
+        "SELECT seq, other_seq FROM event_heads WHERE writer = ?1 AND other_writer = ?2
+         ORDER BY seq",
+    )?;
+    let args = [device.to_string(), writer.to_string()];
+    let rows = statement.query_map(args, |r| Ok((r.get::<_, i64>(0)?, r.get::<_, i64>(1)?)))?;
+    let mut out = Vec::new();
+    for row in rows {
+        let (citing, cited) = row?;
+        out.extend(crate::seq_of(citing).zip(crate::seq_of(cited)));
+    }
+
+    Ok(out)
 }
 
 /// The seq of the last event of `writer`'s log; none for an empty log.

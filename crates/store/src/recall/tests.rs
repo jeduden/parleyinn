@@ -278,15 +278,15 @@ fn a_range_shows_each_event_without_its_content_and_whether_it_was_erased() {
     let seq = |n: u64| Seq::new(n).unwrap();
     let found = store.range_events(writer(1), seq(2), seq(9)).unwrap();
 
-    let shown: Vec<(u64, EventKind, bool)> = found
+    let shown: Vec<(u64, EventKind, Provenance, bool)> = found
         .iter()
-        .map(|e| (e.seq.get(), e.kind, e.erased))
+        .map(|e| (e.seq.get(), e.kind, e.provenance.clone(), e.erased))
         .collect();
     assert_eq!(
         shown,
         [
-            (2, EventKind::WriterLabel, true),
-            (3, EventKind::TranscriptLine, false)
+            (2, EventKind::WriterLabel, Provenance::Structural, true),
+            (3, EventKind::TranscriptLine, Provenance::Web, false)
         ]
     );
     let held = store.log(writer(1)).unwrap();
@@ -321,4 +321,37 @@ fn an_event_shows_its_classes_timestamp_and_erasure() {
         .execute("UPDATE events SET kind = 'nonsense'", [])
         .unwrap();
     assert!(store.event_facts(at(1)).is_err());
+}
+
+#[test]
+fn the_heads_a_device_seat_cited_come_in_the_order_it_cited_them() {
+    let dir = TempDir::new().unwrap();
+    let mut store = open(&dir);
+    seat(&mut store, writer(1), room(1));
+    seat(&mut store, writer(2), room(1));
+    let seq = |n: u64| Seq::new(n).unwrap();
+    store
+        .append(writer(1), &[line("a", Provenance::Web)])
+        .unwrap();
+    store
+        .append(writer(2), &[line("device", Provenance::Structural)])
+        .unwrap();
+    store
+        .append(
+            writer(1),
+            &[line("b", Provenance::Web), line("c", Provenance::Web)],
+        )
+        .unwrap();
+    store
+        .append(writer(2), &[line("device again", Provenance::Structural)])
+        .unwrap();
+    store
+        .append(writer(2), &[line("nothing new", Provenance::Structural)])
+        .unwrap();
+
+    let cited = store.citations(writer(2), writer(1)).unwrap();
+
+    assert_eq!(cited, [(seq(1), seq(1)), (seq(2), seq(3))]);
+    assert!(store.citations(writer(1), writer(2)).unwrap().len() <= 1);
+    assert!(store.citations(writer(2), writer(9)).unwrap().is_empty());
 }
