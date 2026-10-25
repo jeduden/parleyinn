@@ -49,7 +49,7 @@ pub(super) fn device(f: &Fixture) -> WriterId {
 pub(super) fn recording(f: &Fixture) -> Server {
     f.server().with_recall_writer(RecallWriter {
         writer: device(f),
-        redact: Some(Box::new(|t| (t.to_owned(), Vec::new()))),
+        redact: Some(Box::new(|t| (t.to_owned(), Vec::new(), false))),
     })
 }
 
@@ -399,7 +399,11 @@ fn every_call_that_returns_an_envelope_leaves_a_recall_event() {
                 .matches("secret")
                 .map(|_| "extra_pattern_1".to_owned())
                 .collect();
-            (t.replace("secret", "[REDACTED]"), rules)
+            (
+                t.replace("secret", "[REDACTED]"),
+                rules,
+                t.contains("secret"),
+            )
         })),
     });
     let w = f.ingested.writer;
@@ -463,6 +467,7 @@ fn every_call_that_returns_an_envelope_leaves_a_recall_event() {
         .count();
     assert_eq!(extended, 4, "four calls extended past the run");
     assert!(notes.contains(&Note::Redacted("extra_pattern_1".to_owned())));
+    assert!(notes.contains(&Note::RedactionLimited));
 }
 
 #[test]

@@ -100,6 +100,7 @@ fn main() -> ExitCode {
         parinn::run(args, &ctx, &mut io::stdout(), &mut io::stderr())
     });
     parinn::audit_dropped_log_lines(&ctx, log.dropped());
+    parinn::audit_limited_log_fields(&ctx, log.limited());
 
     ExitCode::from(code)
 }

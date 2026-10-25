@@ -273,7 +273,7 @@ impl<'a> Classifier<'a> {
             && name
                 .chars()
                 .all(|c| c.is_ascii_alphanumeric() || " _.-".contains(c))
-            && self.redactor.redact_text(name).rules.is_empty()
+            && self.redactor.redact_text(name).text == name
     }
 }
 
