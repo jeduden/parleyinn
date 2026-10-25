@@ -308,27 +308,48 @@ pub fn no_owner_on_rust_source(checkout: &Checkout) -> Vec<String> {
         Err(e) => return vec![e],
     };
 
-    rust_sources(checkout, "")
-        .into_iter()
-        .filter_map(|path| {
-            let owners = owners_of(&entries, &path);
-            (!owners.is_empty())
-                .then(|| format!("{path} is Rust source owned by {}", crate::list(owners)))
-        })
-        .collect()
+    let found = rust_sources(checkout, "");
+    let mut problems = found.unread;
+    problems.extend(found.sources.into_iter().filter_map(|path| {
+        let owners = owners_of(&entries, &path);
+        (!owners.is_empty())
+            .then(|| format!("{path} is Rust source owned by {}", crate::list(owners)))
+    }));
+
+    problems
+}
+
+/// The `.rs` files a walk found, and the directories it could not read.
+#[derive(Debug, Default)]
+struct Sources {
+    sources: Vec<String>,
+    unread: Vec<String>,
 }
 
 /// The `.rs` files under `dir` of the checkout, relative to its root,
-/// in name order, leaving out [`NOT_SOURCE`].
-fn rust_sources(checkout: &Checkout, dir: &str) -> Vec<String> {
-    let mut names: Vec<(String, bool)> = fs::read_dir(checkout.root.join(dir))
-        .into_iter()
-        .flatten()
-        .flatten()
-        .filter_map(|e| Some((e.file_name().into_string().ok()?, e.path().is_dir())))
-        .collect();
+/// in name order, leaving out [`NOT_SOURCE`]. A symlink is never
+/// followed, so a loop cannot recurse; a directory that cannot be read
+/// is named, so the check never passes without having looked.
+fn rust_sources(checkout: &Checkout, dir: &str) -> Sources {
+    let mut found = Sources::default();
+    let entries = match fs::read_dir(checkout.root.join(dir)) {
+        Ok(entries) => entries,
+        Err(e) => {
+            found.unread.push(format!("read {dir}: {e}"));
+            return found;
+        }
+    };
+    let mut names: Vec<(String, bool)> = Vec::new();
+    for entry in entries {
+        match entry {
+            Ok(e) => {
+                let is_dir = e.file_type().is_ok_and(|t| t.is_dir());
+                names.extend(e.file_name().into_string().ok().map(|n| (n, is_dir)));
+            }
+            Err(e) => found.unread.push(format!("read {dir}: {e}")),
+        }
+    }
     names.sort();
-    let mut out = Vec::new();
     for (name, is_dir) in names {
         let path = if dir.is_empty() {
             name.clone()
@@ -336,13 +357,15 @@ fn rust_sources(checkout: &Checkout, dir: &str) -> Vec<String> {
             format!("{dir}/{name}")
         };
         if is_dir && !NOT_SOURCE.contains(&name.as_str()) {
-            out.extend(rust_sources(checkout, &path));
+            let inner = rust_sources(checkout, &path);
+            found.sources.extend(inner.sources);
+            found.unread.extend(inner.unread);
         } else if !is_dir && name.ends_with(".rs") {
-            out.push(path);
+            found.sources.push(path);
         }
     }
 
-    out
+    found
 }
 
 #[cfg(test)]

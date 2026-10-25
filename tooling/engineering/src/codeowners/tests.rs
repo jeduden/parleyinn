@@ -292,3 +292,26 @@ fn rust_source_under_target_and_git_is_not_read() {
 
     assert_eq!(no_owner_on_rust_source(&c), Vec::<String>::new());
 }
+
+#[test]
+fn a_directory_symlink_is_not_followed() {
+    let (_d, c) = crate::tests::checkout(&[(FILE, "* @boss\n"), ("a/x.txt", "x")]);
+    std::os::unix::fs::symlink(c.root.join("a"), c.root.join("a/loop")).unwrap();
+
+    assert_eq!(no_owner_on_rust_source(&c), Vec::<String>::new());
+}
+
+#[test]
+fn a_directory_that_cannot_be_read_is_reported() {
+    let (_d, c) = crate::tests::checkout(&[(FILE, "* @boss\n")]);
+
+    let got = rust_sources(&c, "missing");
+
+    assert_eq!(got.sources, Vec::<String>::new());
+    assert_eq!(got.unread.len(), 1, "{:?}", got.unread);
+    assert!(
+        got.unread[0].starts_with("read missing: "),
+        "{:?}",
+        got.unread
+    );
+}
