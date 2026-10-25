@@ -45,7 +45,7 @@ summary: >-
   length, the most one redaction reads of it (I9). A text that reaches it is
   not written: a fixed marker, which names the limit and no rule, stands for
   it, and it is counted, as a dropped operation (I6), as
-  `redaction_scan_limited`, not `redacted`. In a transcript line only the
+  `redaction_scan_limited`, not `redactions`. In a transcript line only the
   string that reaches it is replaced. The count
   covers each text written to the record, the audit log or the log; a text
   only hashed or compared is not counted. I9's defined
