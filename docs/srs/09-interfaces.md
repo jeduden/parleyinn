@@ -121,6 +121,7 @@ and, when another act caused it, that act's id (LANE-24, LANE-25).
       "provenance": "web",
       "trust": "untrusted",
       "flags": ["instruction_like"],
+      "continuation": [],
       "integrity": "verified",
       "content": "…JSON-escaped original content…"
     }
@@ -140,9 +141,10 @@ for the agent's current run, `other` for any other) rather than as a raw
 identifier when the run is in scope. Items are ordered by score (`event_search`)
 or by seq within a writer (`event_expand`). A tool that stops at its per-call
 cap sets `truncated` and `next_cursor`; an event too long for one call is cut
-at a character boundary, its item flagged `cut`, and the item that continues it
-flagged `continued` (RCL-03). An envelope marked structural (`stat_list`)
-carries a `structural` object of counts and no item.
+at a character boundary, its item's `continuation` holding `cut`, and the item
+that continues it holding `continued` (RCL-03). `flags` holds the
+injection-pattern marks of PRV-07 and nothing else. An envelope marked
+structural (`stat_list`) carries a `structural` object of counts and no item.
 
 ## 9.4 Restore block
 
