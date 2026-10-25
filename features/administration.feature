@@ -173,7 +173,7 @@ Feature: Administration and lifecycle (ADM)
     Then the change "chmod 0600" is shown before it is applied
     And the store file has mode 0600
 
-  @ADM-11 @P0 @I6 @pending
+  @ADM-11 @P0 @I6
   Scenario: status shows locations, sizes, schema, deployment mode and failure counters
     Given an isolated ParleyInn home
     And deployment mode "automation"

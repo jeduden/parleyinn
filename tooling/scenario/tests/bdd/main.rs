@@ -14,6 +14,7 @@
 //! scenario by its requirement id.
 
 mod administration;
+mod administration_status;
 mod assumptions;
 mod engineering;
 mod engineering_adr;
