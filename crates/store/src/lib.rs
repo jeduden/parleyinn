@@ -52,7 +52,7 @@ use serde_json::Value;
 pub use hook::{Held, Observation, PromptCommitment};
 pub use payload::{Disk, OsDisk, Payloads};
 pub use purge::{Erase, Finished, Purged};
-pub use recall::{RecallReach, Stats};
+pub use recall::{EventFacts, RangeEvent, RecallReach, Stats};
 pub use search::rank::Hit;
 pub use search_index::{GapClass, IndexGap, Search};
 pub use segment::{SEGMENT_VERSION, Segment};
@@ -635,6 +635,32 @@ impl Store {
         kind: EventKind,
     ) -> Result<Vec<(Seq, Value)>, StoreError> {
         recall::contents(&self.conn, writer, kind)
+    }
+
+    /// The events of `writer` from `first` to `last`, in seq order, as
+    /// the log holds them, none of their content read: a purge's plan
+    /// and its tombstone read them.
+    ///
+    /// # Errors
+    ///
+    /// Fails when SQLite does or a row does not parse.
+    pub fn range_events(
+        &self,
+        writer: WriterId,
+        first: Seq,
+        last: Seq,
+    ) -> Result<Vec<RangeEvent>, StoreError> {
+        recall::range_events(&self.conn, writer, first, last)
+    }
+
+    /// The kind, provenance class and transcript timestamp of the event
+    /// at `address`, and whether a purge erased it.
+    ///
+    /// # Errors
+    ///
+    /// Fails when SQLite does or the row does not parse.
+    pub fn event_facts(&self, address: Address) -> Result<Option<EventFacts>, StoreError> {
+        recall::event_facts(&self.conn, address)
     }
 
     /// The counts of the events `reach` reaches (`stat_list`).

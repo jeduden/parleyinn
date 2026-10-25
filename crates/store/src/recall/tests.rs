@@ -251,3 +251,74 @@ fn the_contents_of_one_kind_come_in_seq_order_without_the_erased_or_unparsed() {
             .is_empty()
     );
 }
+
+#[test]
+fn a_range_shows_each_event_without_its_content_and_whether_it_was_erased() {
+    let dir = TempDir::new().unwrap();
+    let mut store = open(&dir);
+    seat(&mut store, writer(1), room(1));
+    store
+        .append(
+            writer(1),
+            &[
+                line("a", Provenance::Web),
+                assign(None),
+                line("c", Provenance::Web),
+            ],
+        )
+        .unwrap();
+    store
+        .conn
+        .execute(
+            "UPDATE events SET content = NULL, commitment_key = NULL WHERE seq = 2",
+            [],
+        )
+        .unwrap();
+
+    let seq = |n: u64| Seq::new(n).unwrap();
+    let found = store.range_events(writer(1), seq(2), seq(9)).unwrap();
+
+    let shown: Vec<(u64, EventKind, bool)> = found
+        .iter()
+        .map(|e| (e.seq.get(), e.kind, e.erased))
+        .collect();
+    assert_eq!(
+        shown,
+        [
+            (2, EventKind::WriterLabel, true),
+            (3, EventKind::TranscriptLine, false)
+        ]
+    );
+    let held = store.log(writer(1)).unwrap();
+    assert_eq!(found[1].commitment, held[2].link.header.commitment);
+    assert!(
+        store
+            .range_events(writer(2), seq(1), seq(9))
+            .unwrap()
+            .is_empty()
+    );
+}
+
+#[test]
+fn an_event_shows_its_classes_timestamp_and_erasure() {
+    let dir = TempDir::new().unwrap();
+    let mut store = open(&dir);
+    seat(&mut store, writer(1), room(1));
+    let mut stamped = line("a", Provenance::Web);
+    stamped.transcript_timestamp = Some("2026-01-01T00:00:00Z".to_owned());
+    store.append(writer(1), &[stamped]).unwrap();
+    let at = |n: u64| Address::new(writer(1), Seq::new(n).unwrap());
+
+    let facts = store.event_facts(at(1)).unwrap().unwrap();
+
+    assert_eq!(facts.kind, EventKind::TranscriptLine);
+    assert_eq!(facts.provenance, Provenance::Web);
+    assert_eq!(facts.timestamp.as_deref(), Some("2026-01-01T00:00:00Z"));
+    assert!(!facts.erased);
+    assert_eq!(store.event_facts(at(2)).unwrap(), None);
+    store
+        .conn
+        .execute("UPDATE events SET kind = 'nonsense'", [])
+        .unwrap();
+    assert!(store.event_facts(at(1)).is_err());
+}

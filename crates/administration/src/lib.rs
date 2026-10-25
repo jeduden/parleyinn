@@ -12,6 +12,8 @@ pub mod label;
 pub mod node;
 pub mod node_identity;
 pub mod origin;
+pub mod purge;
+pub mod quarantine;
 pub mod repository;
 pub mod role;
 pub mod trust_policy;
