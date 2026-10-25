@@ -223,11 +223,11 @@ fn a_shard_reads_k_of_n_and_names_its_file() {
     ] {
         assert_eq!(
             bad.parse::<Shard>().unwrap_err(),
-            format!("{bad:?} is no shard: want K/N with 1 <= K <= N")
+            format!("want K/N with 1 <= K <= N, not {bad:?}")
         );
     }
     assert_eq!(
-        shard(2, 4).file_name(TestLayer::EndToEnd),
+        shard_file_name(TestLayer::EndToEnd, shard(2, 4)),
         "e2e-2-of-4.lcov"
     );
 }
@@ -237,7 +237,7 @@ fn a_shard_file_name_is_read_back_for_its_layer_only() {
     let e2e = TestLayer::EndToEnd;
 
     assert_eq!(
-        Shard::from_file_name(e2e, "e2e-3-of-4.lcov"),
+        shard_from_file_name(e2e, "e2e-3-of-4.lcov"),
         Some(shard(3, 4))
     );
     for other in [
@@ -250,7 +250,7 @@ fn a_shard_file_name_is_read_back_for_its_layer_only() {
         "unit-3-of-4.lcov",
         "all.lcov",
     ] {
-        assert_eq!(Shard::from_file_name(e2e, other), None, "{other}");
+        assert_eq!(shard_from_file_name(e2e, other), None, "{other}");
     }
 }
 

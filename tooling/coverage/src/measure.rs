@@ -3,59 +3,29 @@
 //! layer.
 
 use std::path::Path;
-use std::str::FromStr;
 
 use crate::Host;
 use crate::lcov::{self, Lines};
 use crate::plan::{Plan, TestLayer};
 
-/// One of `total` shards of the end-to-end test layer, counted from 1:
-/// the scenario runner `bdd` holds its share of the scenarios, and the
-/// first shard also runs the layer's other targets.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct Shard {
-    pub index: u64,
-    pub total: u64,
+pub use scenario::runner::Shard;
+
+/// The file a shard's lcov is written to, such as `e2e-2-of-4.lcov`.
+#[must_use]
+pub fn shard_file_name(layer: TestLayer, shard: Shard) -> String {
+    format!("{layer}-{}-of-{}.lcov", shard.index, shard.total)
 }
 
-impl FromStr for Shard {
-    type Err = String;
-
-    /// Reads `K/N`, `1 <= K <= N`.
-    fn from_str(text: &str) -> Result<Self, String> {
-        let bad = || format!("{text:?} is no shard: want K/N with 1 <= K <= N");
-        let (index, total) = text.split_once('/').ok_or_else(bad)?;
-        let number = |n: &str| {
-            n.bytes()
-                .all(|b| b.is_ascii_digit())
-                .then(|| n.parse::<u64>().ok())
-                .flatten()
-        };
-        match (number(index), number(total)) {
-            (Some(index), Some(total)) if (1..=total).contains(&index) => Ok(Self { index, total }),
-            _ => Err(bad()),
-        }
-    }
-}
-
-impl Shard {
-    /// The file the shard's lcov is written to, such as `e2e-2-of-4.lcov`.
-    #[must_use]
-    pub fn file_name(self, layer: TestLayer) -> String {
-        format!("{layer}-{}-of-{}.lcov", self.index, self.total)
-    }
-
-    /// The shard a file name spells for `layer`, or `None` for a name
-    /// that is not a shard file of the layer.
-    #[must_use]
-    pub fn from_file_name(layer: TestLayer, name: &str) -> Option<Self> {
-        let (index, total) = name
-            .strip_prefix(layer.name())?
-            .strip_prefix('-')?
-            .strip_suffix(".lcov")?
-            .split_once("-of-")?;
-        format!("{index}/{total}").parse().ok()
-    }
+/// The shard a file name spells for `layer`, or `None` for a name that
+/// is not a shard file of the layer.
+#[must_use]
+pub fn shard_from_file_name(layer: TestLayer, name: &str) -> Option<Shard> {
+    let (index, total) = name
+        .strip_prefix(layer.name())?
+        .strip_prefix('-')?
+        .strip_suffix(".lcov")?
+        .split_once("-of-")?;
+    format!("{index}/{total}").parse().ok()
 }
 
 /// The scenario runner, the one end-to-end target that shards.
@@ -227,7 +197,7 @@ fn read_layer(
 ) -> Result<Option<Lines>, String> {
     let shards: Vec<Shard> = names
         .iter()
-        .filter_map(|n| Shard::from_file_name(layer, n))
+        .filter_map(|n| shard_from_file_name(layer, n))
         .collect();
     let Some(first) = shards.first() else {
         let text = host.read(&out.join(format!("{layer}.lcov")))?;
@@ -243,7 +213,7 @@ fn read_layer(
     }
     let mut parts = Vec::new();
     for index in 1..=total {
-        let path = out.join(Shard { index, total }.file_name(layer));
+        let path = out.join(shard_file_name(layer, Shard { index, total }));
         let Some(text) = host.read(&path)? else {
             return Err(format!(
                 "the {layer} shards under {} lack shard {index} of {total}",
@@ -275,7 +245,7 @@ fn run_layer(
         host.cargo(args)?;
     }
     let text = host.cargo_output(&report_args(plan))?;
-    let name = shard.map_or_else(|| format!("{layer}.lcov"), |s| s.file_name(layer));
+    let name = shard.map_or_else(|| format!("{layer}.lcov"), |s| shard_file_name(layer, s));
     host.write(&out.join(name), &text)?;
 
     Ok(Some(lcov::parse(&text)?))

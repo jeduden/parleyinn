@@ -6,7 +6,7 @@ use std::path::{Path, PathBuf};
 
 use crate::Host;
 use crate::lcov;
-use crate::measure::{Shard, measure, measure_layer, merge_layers};
+use crate::measure::{Shard, measure, measure_layer, merge_layers, shard_file_name};
 use crate::plan::{Plan, TestLayer};
 use crate::report::{shortfalls, table, tally};
 use crate::shape;
@@ -170,7 +170,7 @@ fn report(
         Mode::Measure => measure(host, &plan, out)?,
         Mode::Merge => merge_layers(host, out)?,
         Mode::Layer(layer, shard) => {
-            let name = shard.map_or_else(|| format!("{layer}.lcov"), |s| s.file_name(layer));
+            let name = shard.map_or_else(|| format!("{layer}.lcov"), |s| shard_file_name(layer, s));
             let line = match measure_layer(host, &plan, layer, shard, out)? {
                 Some(_) => format!("wrote {}\n", out.join(name).display()),
                 None => format!("no {layer} tests to measure\n"),

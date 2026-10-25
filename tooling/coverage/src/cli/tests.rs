@@ -188,9 +188,12 @@ fn run_refuses_a_shard_it_cannot_use() {
         (&["--shard"][..], "--shard needs K/N"),
         (
             &["--layer", "e2e", "--shard", "5/4"],
-            r#""5/4" is no shard"#,
+            r#"want K/N with 1 <= K <= N, not "5/4""#,
         ),
-        (&["--layer", "e2e", "--shard", "x"], r#""x" is no shard"#),
+        (
+            &["--layer", "e2e", "--shard", "x"],
+            r#"want K/N with 1 <= K <= N, not "x""#,
+        ),
         (&["--shard", "1/2"], "--shard goes with --layer e2e"),
         (
             &["--layer", "unit", "--shard", "1/2"],
