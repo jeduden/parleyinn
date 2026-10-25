@@ -179,12 +179,12 @@ Open only the [SRS](docs/srs/index.md) section a task touches.
 ## Review
 
 Agents review and approve each other's pull requests (ENG-21). A pull request
-touching a path [CODEOWNERS](.github/CODEOWNERS) assigns — the SRS, the gates
-that enforce it, CI and its tooling, the supply-chain policy, the agent
-instructions, and the security-sensitive packages until a security reviewer is
-named — also waits for the stakeholder's approval. Keep such changes out of code
-pull requests. On GitHub, write every `@`-word in backticks: a bare one, such as
-`@I2`, mentions that GitHub user (jeduden/parleyinn#22).
+touching a path [CODEOWNERS](.github/CODEOWNERS) assigns also waits for the
+stakeholder's approval: the SRS, the ADRs, the scenarios, CI, the build and lint
+configuration, the supply-chain policy and the agent instructions. Rust source
+has no code owner; the gates and the security-sensitive crates review deep. On
+GitHub, write every `@`-word in backticks: a bare one, such as `@I2`, mentions
+that GitHub user (jeduden/parleyinn#22).
 
 ## Requirements and Scenarios
 

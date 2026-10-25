@@ -185,8 +185,9 @@ jobs:
           cache: false
       # The review class sets how deep the review goes, from the paths that
       # changed: light for Markdown no stakeholder path holds, deep for
-      # any path CODEOWNERS assigns, standard otherwise. A deep review
-      # may consult the read-only reviewer subagents.
+      # any path CODEOWNERS assigns and for the gates' code, the reach
+      # tests and the security-sensitive crates, standard otherwise. A
+      # deep review may consult the read-only reviewer subagents.
       - name: Bundle what the change touches
         id: bundle
         if: steps.pull_head.outputs.number != ''

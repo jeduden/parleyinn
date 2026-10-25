@@ -188,12 +188,10 @@ fn the_checkout_s_codeowners_name_no_owner_on_any_other_path() {
     assert!(problems.is_empty(), "{}", problems.join("\n"));
 }
 
-/// The security-sensitive crates are owned by the security reviewer
-/// before they exist (ENG-21).
+/// CODEOWNERS names no owner on Rust source (ENG-21).
 #[test]
-fn the_checkout_s_security_crates_belong_to_the_security_reviewer() {
-    let problems =
-        engineering::codeowners::security_crates_owned_by_the_security_reviewer(&checkout());
+fn the_checkout_s_codeowners_name_no_owner_on_rust_source() {
+    let problems = engineering::codeowners::no_owner_on_rust_source(&checkout());
 
     assert!(problems.is_empty(), "{}", problems.join("\n"));
 }

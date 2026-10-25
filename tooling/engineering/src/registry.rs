@@ -54,7 +54,7 @@ pub const GATE_TESTS: [&str; 42] = [
     "the_checkout_s_ruleset_needs_an_approval_from_another_reviewer",
     "the_checkout_s_codeowners_name_the_stakeholder_on_the_enforcing_paths",
     "the_checkout_s_codeowners_name_no_owner_on_any_other_path",
-    "the_checkout_s_security_crates_belong_to_the_security_reviewer",
+    "the_checkout_s_codeowners_name_no_owner_on_rust_source",
     "the_checkout_s_nightly_compares_every_committed_ruleset",
     "the_checkout_s_rulesets_each_name_themselves_their_target_and_refs",
     "the_product_crates_keep_their_bans",

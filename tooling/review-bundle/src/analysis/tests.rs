@@ -41,12 +41,16 @@ fn base() -> Snapshot {
             req("REC-02", "Link."),
             req("PRV-10", "Certify."),
             req(
+                "ENG-11",
+                "Coverage MUST be ≥ 90% for security-sensitive crates (`pin`, `search`) and more.",
+            ),
+            req(
                 "ENG-29",
                 "A change to an invariant, or to a requirement marked for I2 review (PRV-10, PRV-11), MUST land with an ADR.",
             ),
         ],
         scenarios: vec![sc("REC-01", false), sc("REC-02", true), sc("PRV-10", true)],
-        codeowners: "/docs/srs/ @owner\n/tooling/ @owner\n".into(),
+        codeowners: "/docs/srs/ @owner\n/crates/*/Cargo.toml @owner\n".into(),
         invariants: "I1".into(),
         decisions: BTreeMap::new(),
     }
@@ -78,7 +82,7 @@ fn analyse_routes_by_the_paths_that_changed() {
         ),
         (vec!["features/record.feature"], Class::Standard),
         (vec!["README.md", "docs/srs/05.md"], Class::Deep),
-        (vec!["tooling/drift/src/cases.rs"], Class::Deep),
+        (vec!["crates/pinx/Cargo.toml"], Class::Deep),
     ];
     for (paths, want) in cases {
         let diff: String = paths.iter().map(|p| header(p)).collect();
@@ -87,6 +91,41 @@ fn analyse_routes_by_the_paths_that_changed() {
         assert_eq!(got.class == Class::Deep, !got.owned.is_empty(), "{paths:?}");
         assert!(got.unparsed.is_empty(), "{paths:?}");
     }
+}
+
+#[test]
+fn code_no_stakeholder_holds_reviews_deep_when_it_gates_or_is_security_sensitive() {
+    for (path, want) in [
+        ("tooling/drift/src/cases.rs", Class::Deep),
+        ("crates/pin/src/lib.rs", Class::Deep),
+        ("crates/search/src/a/b.rs", Class::Deep),
+        ("crates/parinn/tests/reach.rs", Class::Deep),
+        ("crates/pinx/src/lib.rs", Class::Standard),
+        ("crates/parinn/tests/other.rs", Class::Standard),
+        ("x/tooling/a.rs", Class::Standard),
+    ] {
+        let got = analyse(&base(), &base(), &header(path), false);
+        assert_eq!(got.class, want, "{path}");
+        assert!(got.owned.is_empty(), "{path}");
+    }
+}
+
+#[test]
+fn security_crates_come_from_the_eng_11_row() {
+    assert_eq!(security_crates(&base()), ["pin", "search"]);
+
+    for text in [
+        "No list.",
+        "security-sensitive crates (`a`",
+        "security-sensitive crates ()",
+    ] {
+        let mut snap = base();
+        snap.requirements = vec![req("ENG-11", text)];
+        assert!(security_crates(&snap).is_empty(), "{text}");
+    }
+    let mut snap = base();
+    snap.requirements.clear();
+    assert!(security_crates(&snap).is_empty());
 }
 
 #[test]

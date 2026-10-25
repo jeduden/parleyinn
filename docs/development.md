@@ -194,21 +194,20 @@ Main's protection is committed as a ruleset,
 commits, `CI`, one approval from a reviewer other than the author, and
 a code owner's approval where [CODEOWNERS](../.github/CODEOWNERS) names
 one. The ENG-21 gate tests read it, and CODEOWNERS: the stakeholder
-owns the requirement text and every path that enforces it, and nothing
-else is owned but the decision records, the supply-chain policy and the
-security-sensitive crates. Two tag rulesets sit beside it.
+owns the specification, the scenarios and every path of the process
+that builds and checks the code, nothing else is owned but the
+supply-chain policy, and no Rust source has an owner. Two tag rulesets
+sit beside it.
 `releases-semver` keeps each `v*.*.*` tag fixed on a signed commit that
 passed `CI`. `no-other-tags-allowed` refuses every other tag. The
 stakeholder applies the rulesets on GitHub. The nightly `protection`
 job runs `protection-check` on each file under `.github/rulesets`. It
 fails when the live ruleset of that name is missing or weaker. The
-workflow's token cannot see a ruleset's bypass actors. The
-security-sensitive crates are owned by the designated security
-reviewer, so a change to one needs that reviewer's approval as a code
-owner. The stakeholder holds the role. One approval count holds for the
-whole branch, so a second approval on those crates alone would need a
-second reviewer account and a check that counts reviews; ENG-21 does
-not ask for it until one is named.
+workflow's token cannot see a ruleset's bypass actors. A code change,
+the gates and the security-sensitive crates included, lands on one
+approval from a reviewer other than its author, which an agent may
+give; the review class below keeps those deep. A change to an
+invariant still needs a named human security reviewer's ADR (ENG-29).
 
 [release.yml](../.github/workflows/release.yml) runs from the Actions
 "Run workflow" button on `main`, with a version like `v0.1.0`. A pushed
@@ -274,9 +273,10 @@ What `review-bundle` decides, comparing the pull request with main:
 
 The review class sets the agent's model, turn budget and tools. A change
 holding only Markdown outside the stakeholder's paths, the domain model,
-plans and scenarios is light. Any path CODEOWNERS assigns makes it
-deep, and only a deep review may consult the read-only reviewer
-subagents. Anything else, an empty diff included, is standard.
+plans and scenarios is light. Any path CODEOWNERS assigns, the gates,
+a reach test or a security-sensitive crate makes it deep, and only a
+deep review may consult the read-only reviewer subagents. Anything
+else, an empty diff included, is standard.
 The review bundle quotes only the touched rows, their scenarios and
 the invariants, a few thousand model tokens where the SRS holds
 hundreds of thousands. A re-review starts from the diff since the reviewer app's

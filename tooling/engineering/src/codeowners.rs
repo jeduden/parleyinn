@@ -1,13 +1,11 @@
-//! ENG-21: `CODEOWNERS` names the stakeholder on the requirement text
-//! and on everything that enforces it, and on nothing else but the
-//! decision records, the supply-chain policy and the security-sensitive
-//! crates.
+//! ENG-21: `CODEOWNERS` names the stakeholder on the specification, the
+//! scenarios and the process that builds and checks the code, on
+//! nothing else but the supply-chain policy, and on no Rust source.
 //!
 //! The enforcing paths come from the ENG-21 row of the SRS: each class
 //! it names maps to the paths that hold it today, and a class the row
 //! stops naming is reported, so the mapping cannot go stale unseen. The
-//! stakeholder and the security-sensitive crates are read from the SRS
-//! as well.
+//! stakeholder is read from the SRS as well.
 
 use std::fs;
 
@@ -28,12 +26,13 @@ pub struct Entry {
 /// stands for each directory under its parent.
 const ENFORCING: &[(&str, &[&str])] = &[
     ("`docs/srs/`", &["docs/srs/"]),
-    ("the requirement–scenario gate", &["tooling/"]),
+    ("the decision records", &["docs/adr/"]),
+    ("the scenarios (`features/`)", &["features/"]),
     // Every mise configuration and lockfile: CI's install step reads
     // them all to refuse a tool that would build from source, and the
     // developer pins install the tools agents run.
     (
-        "gate, CI,",
+        "CI,",
         &[
             ".github/",
             "scripts/",
@@ -44,7 +43,7 @@ const ENFORCING: &[(&str, &[&str])] = &[
         ],
     ),
     (
-        "the lint and coverage configuration",
+        "the build, lint and coverage configuration",
         &[
             "Cargo.toml",
             "rust-toolchain.toml",
@@ -54,7 +53,7 @@ const ENFORCING: &[(&str, &[&str])] = &[
             ".mdsmith.yml",
             "crates/*/clippy.toml",
             "crates/*/Cargo.toml",
-            "crates/*/tests/reach.rs",
+            "tooling/*/Cargo.toml",
         ],
     ),
     (
@@ -65,9 +64,12 @@ const ENFORCING: &[(&str, &[&str])] = &[
 ];
 
 /// The paths besides the enforcing ones that CODEOWNERS may name: the
-/// decision records (ENG-26) and the supply-chain and disclosure policy
-/// (ENG-18, ENG-24).
-const OTHER_ALLOWED: &[&str] = &["docs/adr/", "SECURITY.md", "DEPENDENCIES.md"];
+/// supply-chain and disclosure policy (ENG-18, ENG-24).
+const OTHER_ALLOWED: &[&str] = &["SECURITY.md", "DEPENDENCIES.md"];
+
+/// The directories the Rust source check does not descend into: build
+/// output and git's own store.
+const NOT_SOURCE: &[&str] = &["target", ".git"];
 
 /// Reads the file.
 ///
@@ -156,67 +158,22 @@ fn unsupported(pattern: &str) -> bool {
     pattern.contains("**") || pattern.contains(['[', '!', '\\'])
 }
 
-/// The stakeholder and the security reviewer, as the SRS names them.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Roles {
-    pub stakeholder: String,
-    pub security_reviewer: String,
-}
-
-/// Reads the roles from the SRS index's `Stakeholder` row, which says
-/// who the stakeholder is and whether that person is also the security
-/// reviewer.
+/// The stakeholder, as the SRS index's `Stakeholder` row names it.
 ///
 /// # Errors
 ///
 /// Fails when the index cannot be read or has no stakeholder row naming
 /// a user.
-pub fn roles(checkout: &Checkout) -> Result<Roles, String> {
+pub fn stakeholder(checkout: &Checkout) -> Result<String, String> {
     let index = checkout.read("docs/srs/index.md")?;
     let row = index
         .lines()
         .find(|l| l.contains("**Stakeholder**"))
         .ok_or("docs/srs/index.md has no Stakeholder row")?;
-    let who = row
-        .split_whitespace()
+    row.split_whitespace()
         .find(|w| w.starts_with('@'))
         .map(|w| w.trim_end_matches([',', '|', '.']).to_owned())
-        .ok_or("the Stakeholder row names no user")?;
-    let security_reviewer = if row.contains("the security reviewer") {
-        who.clone()
-    } else {
-        String::new()
-    };
-
-    Ok(Roles {
-        stakeholder: who,
-        security_reviewer,
-    })
-}
-
-/// The security-sensitive crates, as the ENG-11 row names them.
-///
-/// # Errors
-///
-/// Fails when the SRS has no such row or the row lists no crate.
-pub fn security_crates(checkout: &Checkout) -> Result<Vec<String>, String> {
-    let text = checkout.requirement("ENG-11")?.text;
-    let (_, after) = text
-        .split_once("security-sensitive crates (")
-        .ok_or("ENG-11 names no security-sensitive crates")?;
-    let (list, _) = after
-        .split_once(')')
-        .ok_or("ENG-11's crate list is not closed")?;
-    let crates: Vec<String> = list
-        .split(',')
-        .map(|c| c.trim().trim_matches('`').to_owned())
-        .filter(|c| !c.is_empty())
-        .collect();
-    if crates.is_empty() {
-        Err("ENG-11 lists no security-sensitive crate".to_owned())
-    } else {
-        Ok(crates)
-    }
+        .ok_or_else(|| "the Stakeholder row names no user".to_owned())
 }
 
 /// The enforcing paths of the checkout that exist, with the class each
@@ -256,8 +213,8 @@ fn expand(checkout: &Checkout, path: &str) -> Vec<String> {
 /// requirement text that exists is not owned by the stakeholder alone.
 #[must_use]
 pub fn stakeholder_owns_the_enforcing_paths(checkout: &Checkout) -> Vec<String> {
-    let (roles, entries) = match (roles(checkout), load(checkout)) {
-        (Ok(r), Ok(e)) => (r, e),
+    let (stakeholder, entries) = match (stakeholder(checkout), load(checkout)) {
+        (Ok(s), Ok(e)) => (s, e),
         (r, e) => return [r.err(), e.err()].into_iter().flatten().collect(),
     };
     let row = match checkout.requirement("ENG-21") {
@@ -277,11 +234,10 @@ pub fn stakeholder_owns_the_enforcing_paths(checkout: &Checkout) -> Vec<String> 
             path.clone()
         };
         let owners = owners_of(&entries, &dir);
-        if owners != [roles.stakeholder.clone()] {
+        if owners != [stakeholder.clone()] {
             problems.push(format!(
-                "{path} ({class}) is owned by {}, want {}",
+                "{path} ({class}) is owned by {}, want {stakeholder}",
                 crate::list(owners),
-                roles.stakeholder
             ));
         }
     }
@@ -290,25 +246,19 @@ pub fn stakeholder_owns_the_enforcing_paths(checkout: &Checkout) -> Vec<String> 
 }
 
 /// Problems with entries that name a path outside the allowed classes:
-/// the enforcing paths, the decision records, the supply-chain policy
-/// and the security-sensitive crates.
+/// the enforcing paths and the supply-chain policy.
 #[must_use]
 pub fn no_owner_on_any_other_path(checkout: &Checkout) -> Vec<String> {
     let entries = match load(checkout) {
         Ok(e) => e,
         Err(e) => return vec![e],
     };
-    let crates = match security_crates(checkout) {
-        Ok(c) => c,
-        Err(e) => return vec![e],
-    };
-    let mut allowed: Vec<String> = ENFORCING
+    let allowed: Vec<String> = ENFORCING
         .iter()
         .flat_map(|(_, paths)| paths.iter())
         .chain(OTHER_ALLOWED)
         .map(|p| (*p).to_owned())
         .collect();
-    allowed.extend(crates.iter().map(|c| format!("crates/{c}/")));
 
     let mut problems = unsupported_patterns(&entries);
     problems.extend(
@@ -349,26 +299,50 @@ fn unsupported_patterns(entries: &[Entry]) -> Vec<String> {
         .collect()
 }
 
-/// Problems with the security-sensitive crates' owner: each crate the
-/// SRS names, built or not, is owned by the security reviewer alone.
+/// Problems with the owners of Rust source: each `.rs` file of the
+/// checkout, outside build output, that an entry gives an owner.
 #[must_use]
-pub fn security_crates_owned_by_the_security_reviewer(checkout: &Checkout) -> Vec<String> {
-    let (roles, entries, crates) =
-        match (roles(checkout), load(checkout), security_crates(checkout)) {
-            (Ok(r), Ok(e), Ok(c)) => (r, e, c),
-            (r, e, c) => return [r.err(), e.err(), c.err()].into_iter().flatten().collect(),
+pub fn no_owner_on_rust_source(checkout: &Checkout) -> Vec<String> {
+    let entries = match load(checkout) {
+        Ok(e) => e,
+        Err(e) => return vec![e],
+    };
+
+    rust_sources(checkout, "")
+        .into_iter()
+        .filter_map(|path| {
+            let owners = owners_of(&entries, &path);
+            (!owners.is_empty())
+                .then(|| format!("{path} is Rust source owned by {}", crate::list(owners)))
+        })
+        .collect()
+}
+
+/// The `.rs` files under `dir` of the checkout, relative to its root,
+/// in name order, leaving out [`NOT_SOURCE`].
+fn rust_sources(checkout: &Checkout, dir: &str) -> Vec<String> {
+    let mut names: Vec<(String, bool)> = fs::read_dir(checkout.root.join(dir))
+        .into_iter()
+        .flatten()
+        .flatten()
+        .filter_map(|e| Some((e.file_name().into_string().ok()?, e.path().is_dir())))
+        .collect();
+    names.sort();
+    let mut out = Vec::new();
+    for (name, is_dir) in names {
+        let path = if dir.is_empty() {
+            name.clone()
+        } else {
+            format!("{dir}/{name}")
         };
-    if roles.security_reviewer.is_empty() {
-        return vec!["the SRS index names no security reviewer".to_owned()];
+        if is_dir && !NOT_SOURCE.contains(&name.as_str()) {
+            out.extend(rust_sources(checkout, &path));
+        } else if !is_dir && name.ends_with(".rs") {
+            out.push(path);
+        }
     }
 
-    crates
-        .iter()
-        .filter(|c| {
-            owners_of(&entries, &format!("crates/{c}/")) != [roles.security_reviewer.clone()]
-        })
-        .map(|c| format!("crates/{c}/ is not owned by {}", roles.security_reviewer))
-        .collect()
+    out
 }
 
 #[cfg(test)]

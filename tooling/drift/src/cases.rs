@@ -1902,7 +1902,7 @@ fn mise_owner_case() -> Case {
         "the mise toolchain pin without the stakeholder",
         Injection::replace(CODEOWNERS, "/mise.toml                    @jeduden\n", ""),
         "the_checkout_s_codeowners_name_the_stakeholder_on_the_enforcing_paths",
-        "mise.toml (gate, CI,) is owned by [], want @jeduden",
+        "mise.toml (CI,) is owned by [], want @jeduden",
     )
 }
 
@@ -1913,7 +1913,31 @@ fn mise_dev_owner_case() -> Case {
         "the developer tool pin without the stakeholder",
         Injection::replace(CODEOWNERS, "/mise.dev.toml                @jeduden\n", ""),
         "the_checkout_s_codeowners_name_the_stakeholder_on_the_enforcing_paths",
-        "mise.dev.toml (gate, CI,) is owned by [], want @jeduden",
+        "mise.dev.toml (CI,) is owned by [], want @jeduden",
+    )
+}
+
+/// The scenarios must remain owned by the stakeholder.
+fn scenarios_owner_case() -> Case {
+    protection_case(
+        "the scenarios without the stakeholder",
+        Injection::replace(CODEOWNERS, "/features/                    @jeduden\n", ""),
+        "the_checkout_s_codeowners_name_the_stakeholder_on_the_enforcing_paths",
+        "features/ (the scenarios (`features/`)) is owned by [], want @jeduden",
+    )
+}
+
+/// No Rust source may get a code owner, the stakeholder included.
+fn rust_source_owner_case() -> Case {
+    protection_case(
+        "an owner on Rust source",
+        Injection::replace(
+            CODEOWNERS,
+            "/SECURITY.md                  @jeduden\n",
+            "/SECURITY.md                  @jeduden\n*.rs                          @jeduden\n",
+        ),
+        "the_checkout_s_codeowners_name_no_owner_on_rust_source",
+        "crates/parinn/src/main.rs is Rust source owned by [@jeduden]",
     )
 }
 
@@ -1995,12 +2019,8 @@ fn protection_cases() -> Vec<Case> {
             "the_checkout_s_codeowners_name_no_owner_on_any_other_path",
             "/crates/parinn/src/ names an owner on a path outside the allowed classes",
         ),
-        protection_case(
-            "a security-sensitive crate without the security reviewer",
-            Injection::replace(CODEOWNERS, "/crates/pin/                  @jeduden\n", ""),
-            "the_checkout_s_security_crates_belong_to_the_security_reviewer",
-            "crates/pin/ is not owned by @jeduden",
-        ),
+        scenarios_owner_case(),
+        rust_source_owner_case(),
         protection_case(
             "the nightly comparing main's ruleset alone",
             Injection::replace(

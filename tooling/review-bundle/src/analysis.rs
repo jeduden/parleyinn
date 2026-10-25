@@ -22,6 +22,17 @@ const ADR_DIR: &str = "docs/adr/";
 /// domain model, the plans and the scenarios.
 const NOT_LIGHT: [&str; 3] = ["docs/domain-model/", "plan/", "features/"];
 
+/// The code no stakeholder path holds that still reviews deep: the
+/// gates. Each crate's reach test and the security-sensitive crates the
+/// ENG-11 row names join it.
+const DEEP_CODE: [&str; 1] = ["tooling/"];
+
+/// The test, within a crate, that refuses a crate linked into it.
+const REACH_TEST: &str = "tests/reach.rs";
+
+/// The requirement whose text names the security-sensitive crates.
+const ENG_11: &str = "ENG-11";
+
 /// What an added line that lifts a ban weighs.
 const LIFTS_A_BAN: &str = "lifts a reach or determinism ban: weigh its reason";
 
@@ -50,9 +61,10 @@ pub enum Class {
     /// Anything else no stakeholder path holds: product code, scenarios,
     /// plans, or a diff that names no path.
     Standard,
-    /// A path CODEOWNERS assigns: the SRS, its gates, CI, the agent
-    /// instructions, the security-sensitive crates; or a diff header
-    /// whose paths do not read, so the class fails closed.
+    /// A path CODEOWNERS assigns: the SRS, the scenarios, CI, the agent
+    /// instructions; code that gates the build or is security-sensitive;
+    /// or a diff header whose paths do not read, so the class fails
+    /// closed.
     Deep,
 }
 
@@ -133,8 +145,11 @@ pub fn analyse(base: &Snapshot, head: &Snapshot, diff: &str, consent: bool) -> A
     findings.extend(lifted_bans(diff));
     findings.sort();
 
+    let crates = security_crates(base);
+    let deep = paths.iter().any(|p| deep_code(&crates, p));
+
     Analysis {
-        class: classify(&paths, &owned, &unparsed),
+        class: classify(&paths, deep || !owned.is_empty(), &unparsed),
         owned,
         paths,
         unparsed,
@@ -169,12 +184,40 @@ fn lifted_bans(diff: &str) -> BTreeSet<Finding> {
         .collect()
 }
 
-/// The review class: deep when a stakeholder path changed or a header
-/// does not read, light when only prose Markdown did, standard
-/// otherwise.
-fn classify(paths: &[String], owned: &[String], unparsed: &[String]) -> Class {
+/// The security-sensitive crates the ENG-11 row of `snapshot` names,
+/// none when it names no list.
+fn security_crates(snapshot: &Snapshot) -> Vec<String> {
+    snapshot
+        .requirements
+        .iter()
+        .find(|r| r.id == ENG_11)
+        .and_then(|r| r.text.split_once("security-sensitive crates ("))
+        .and_then(|(_, after)| after.split_once(')'))
+        .map(|(list, _)| {
+            list.split(',')
+                .map(|c| c.trim().trim_matches('`').to_owned())
+                .filter(|c| !c.is_empty())
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+/// Whether `path` is code that reviews deep though no stakeholder path
+/// holds it: a gate, a reach test, or a security-sensitive crate.
+fn deep_code(crates: &[String], path: &str) -> bool {
+    DEEP_CODE.iter().any(|d| path.starts_with(d))
+        || path.strip_prefix("crates/").is_some_and(|rest| {
+            rest.split_once('/')
+                .is_some_and(|(name, tail)| crates.iter().any(|c| c == name) || tail == REACH_TEST)
+        })
+}
+
+/// The review class: deep when `deep` says a stakeholder path or deep
+/// code changed, or a header does not read; light when only prose
+/// Markdown did; standard otherwise.
+fn classify(paths: &[String], deep: bool, unparsed: &[String]) -> Class {
     let light = |p: &String| p.ends_with(".md") && !NOT_LIGHT.iter().any(|d| p.starts_with(d));
-    if !owned.is_empty() || !unparsed.is_empty() {
+    if deep || !unparsed.is_empty() {
         Class::Deep
     } else if !paths.is_empty() && paths.iter().all(light) {
         Class::Light
