@@ -1,7 +1,7 @@
 ---
 id: 2610251015
 title: "Hold every CI job under four minutes"
-status: "🔲"
+status: "🔳"
 summary: >-
   Restructure the jobs of ci.yml and build.yml so each finishes in four
   minutes or less, one minute under the five-minute cap, without
@@ -63,22 +63,14 @@ records, it adds a drift case too (ENG-27).
 
 ## Tasks
 
-1. Proving slice: the test job counts scenarios from its main run
-   instead of running them again, and the recorded time shows what
-   remains (phase 1)
-2. Split the test job into unit and integration tests, and scenarios,
-   if phase 1 leaves it over four minutes
-3. A cargo registry and target cache for ci jobs only, never for the
-   release build
-4. Coverage: a `--layer` flag on the coverage tool, one job per layer,
-   and a job that merges the layers for the floors check
-5. Drift: shard the cases across a matrix, each shard holding every
-   case's expectation
-6. Build: a matrix per release target, with the artifact names, the
-   arm64 and Windows consumers and the release provenance unchanged
-7. Benchmark: shard the rounds across runners that each upload their
-   samples, and a gate job that pools them, with `ROUNDS`, `SAMPLES` and
-   the 0.01 significance gate unchanged
+1. Proving slice: every job of `ci.yml` and `build.yml` under its cap
+   (phase 1): the release core built once, the scenarios in their own
+   job, one job per coverage layer, one job per release target, the
+   benchmark rounds sharded and pooled
+2. A cargo registry and target cache for ci jobs only, never for the
+   release build, if a job still runs over four minutes
+3. Drift: shard the cases across a matrix, each shard holding every
+   case's expectation, if the drift job runs over four minutes
 
 Later phases are declared when the prior phase's result shows the real
 shape.
@@ -110,9 +102,9 @@ footer: |
 
 ?>
 
-| #   | Status | Phase                                                        |
-| --- | ------ | ------------------------------------------------------------ |
-| 1   | 🔲     | [The test job counts scenarios from its own run](phase-1.md) |
+| #   | Status | Phase                                                                     |
+| --- | ------ | ------------------------------------------------------------------------- |
+| 1   | 🔳     | [Every job of ci.yml and build.yml under its five-minute cap](phase-1.md) |
 <?/catalog?>
 
 ## Acceptance Criteria

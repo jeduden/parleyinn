@@ -27,6 +27,7 @@ empty: |
 | 2609292011 | sonnet | [The remaining engineering gates in CI](plan/2609292011_ci-engineering-gates/plan.md)                            |
 | 2609292012 | opus   | [M1: record and recall](plan/2609292012_m1-record-and-recall/plan.md)                                            |
 | 2609292156 | sonnet | [The repository's knowledge follows ParleyInn's layers](plan/2609292156_knowledge-follows-parinn-layers/plan.md) |
+| 2610251015 | sonnet | [Hold every CI job under four minutes](plan/2610251015_ci-jobs-under-four-minutes/plan.md)                       |
 <?/catalog?>
 
 ## All plans
@@ -78,5 +79,5 @@ empty: |
 | 2610112059 | 🔲     | opus   | [M9: review, publishing, bridges](plan/2610112059_m9-review-publishing-bridges.md)                                      |
 | 2610112203 | ✅     | sonnet | [Spike S13: can a hook tell which run compacted](plan/2610112203_spike-s13-compaction-ambiguity/plan.md)                |
 | 2610190944 | ✅     | sonnet | [Ship third-party license texts inside every executable](plan/2610190944_third-party-licenses/plan.md)                  |
-| 2610251015 | 🔲     | sonnet | [Hold every CI job under four minutes](plan/2610251015_ci-jobs-under-four-minutes/plan.md)                              |
+| 2610251015 | 🔳     | sonnet | [Hold every CI job under four minutes](plan/2610251015_ci-jobs-under-four-minutes/plan.md)                              |
 <?/catalog?>

@@ -36,7 +36,8 @@ test layer, over one build, and prints line coverage per crate for
 each test layer and for all of them. It counts the tests in each test
 layer too, scenarios included, and writes each layer's lcov to
 `target/coverage/`. Install the tool first, with `cargo install
---locked cargo-llvm-cov@0.9.1`.
+--locked cargo-llvm-cov@0.9.1`. `--layer NAME` measures one layer alone;
+`--merge` reads the layers so written and holds the floors.
 
 The policy lives in [Cargo.toml](../Cargo.toml) under
 `[workspace.metadata.coverage]`, and the run fails when a crate falls
@@ -67,8 +68,10 @@ crate, where the unit tests reach it. Every cargo the tool starts
 carries `PARINN_COVERAGE_MEASURING`, and a run that finds it set refuses
 to start, so a test cannot set off a measurement inside a measurement.
 
-CI's `coverage` job writes the table and the test counts into its
-summary. It uploads one Codecov flag per test layer. Codecov's
+CI measures each test layer in a `coverage (<layer>)` job of its own,
+under the budget [ci.md](ci.md) sets. The `coverage` job merges them,
+writes the table and the test counts into its summary, holds the
+floors, and uploads one Codecov flag per test layer. Codecov's
 thresholds in [codecov.yml](../codecov.yml) are a soft ratchet on top.
 
 ## The executable requirement matrix
@@ -176,18 +179,18 @@ that fails on a statistically significant regression greater than
 the suite; `cargo run -p benchmark -- gate --base FILE --head FILE`
 decides from two samples files. CI's `benchmark` job runs both.
 
-The `benchmark` job (ENG-15) compares the head with its first
-parent: the `main` a pull request's merge commit sits on, or `main`
-before a push. It builds both sides' benchmark suites and cores in
-release mode on one runner and samples them interleaved, thirty rounds
-of ten samples a side, alternating which side goes first, so a drift
-in the runner's speed lands on both. The head's gate then writes its
-report into the job summary and fails naming each benchmark that
-regressed more than 10% with significance. The suite samples in a
-second or two, so it gates every pull request; a benchmark too slow
-for that, such as one on a store of 10M events, would run nightly
+The benchmark jobs (ENG-15) compare the head with its first parent:
+the `main` a pull request's merge commit sits on, or `main` before a
+push. Ten `benchmark (shard N)` jobs each build both sides' suites and
+cores in release mode on one runner and sample them interleaved, three
+of the thirty rounds of ten samples a side, keeping the alternation of
+which side goes first, so a drift in a runner's speed lands on both.
+The `benchmark` job pools the shards' samples; the head's gate writes
+its report into the job summary and fails naming each benchmark that
+regressed more than 10% with significance. A benchmark too slow for the
+budget, such as one on a store of 10M events, would run nightly
 instead. Until the suite reaches `main`, the base has none, and the
-job warns and runs the head's alone.
+gate warns and reports the head's samples alone.
 
 ## Adding or writing a scenario
 
@@ -230,7 +233,7 @@ starts the core through `run_release_core`. That runs
 else `target/release/parinn`. The test run never builds it. It fails
 naming `cargo build --release -p parinn` when the core is absent, so
 build it before `cargo test --workspace` or `cargo run -p coverage`.
-CI's `test`, `coverage` and release preflight jobs do.
+CI's `release-core` job builds it once for the jobs that run it.
 
 A release build has no seams. That row gives the handler its own
 budget, and the rows that kill a hung handler (`PARINN_TEST_FAULT`,
@@ -269,8 +272,8 @@ real ParleyInn home or real Claude Code configuration.
   That is what makes the guard cover every test. A product crate that
   later resolves real state in shipped code joins that list with its plan,
   and the stakeholder approves it (`tooling/` is a code-owner path).
-- **The decoy.** CI's `test` job runs the suite with `HOME` pointed at
-  an empty directory and fails if anything appears there. The guard
+- **The decoy.** CI's `test` and `scenarios` jobs run with `HOME`
+  pointed at an empty directory and fail if anything appears there. The guard
   stops a test that asks for the user's `HOME`. The decoy catches a test
   that writes under the user's `HOME` without going through the guard,
   such as a program a test started without `isolate`. A read, or a write

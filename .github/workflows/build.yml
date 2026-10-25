@@ -42,18 +42,25 @@ env:
   MUSL_SHA256: 7a35eae33d5372a7c0da1188de798726f68825513b7ae3ebe97aaaa52114f039
 
 jobs:
+  # One job per release target, each under the same budget; the target
+  # is read from the *_TARGETS lists above, their one source. A target
+  # that runs on its builder is checked there; the others run once
+  # below, on their own platform.
   build:
-    name: build (${{ matrix.builder }})
+    name: build (${{ matrix.name }})
     strategy:
       fail-fast: false
       matrix:
         include:
-          - { builder: ubuntu-24.04, os: linux, runs: linux-amd64 }
-          - { builder: macos-15, os: darwin, runs: darwin-arm64 }
+          - { builder: ubuntu-24.04, os: linux, name: linux-amd64, runs: true }
+          - { builder: ubuntu-24.04, os: linux, name: linux-arm64, runs: false }
+          - { builder: ubuntu-24.04, os: linux, name: windows-amd64, runs: false }
+          - { builder: macos-15, os: darwin, name: darwin-arm64, runs: true }
     runs-on: ${{ matrix.builder }}
     timeout-minutes: 5
     env:
       OS: ${{ matrix.os }}
+      NAME: ${{ matrix.name }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -64,31 +71,36 @@ jobs:
           tools: rust
           # Release builds must never consume a branch-writable cache.
           cache: ${{ github.event_name != 'workflow_dispatch' }}
-      - name: Pick this builder's targets
+      - name: Pick this job's target from the lists
         run: |
-          if [ "$OS" = linux ]; then targets="$LINUX_TARGETS"; else targets="$DARWIN_TARGETS"; fi
-          echo "TARGETS=$targets" >> "$GITHUB_ENV"
-      - name: Install mingw-w64 and clang
-        if: matrix.os == 'linux'
+          if [ "$OS" = linux ]; then all="$LINUX_TARGETS"; else all="$DARWIN_TARGETS"; fi
+          # shellcheck disable=SC2086 # the list is space-separated pairs
+          target=$(printf '%s\n' $all | sed -n "s/:$NAME\$//p")
+          test -n "$target"
+          echo "TARGET=$target" >> "$GITHUB_ENV"
+          echo "TARGETS=$target:$NAME" >> "$GITHUB_ENV"
+      - name: Install mingw-w64
+        if: matrix.name == 'windows-amd64'
         run: |
           sudo apt-get update -qq
           # shellcheck disable=SC2086 # MINGW is a list of packages
-          sudo apt-get install -y -qq --no-install-recommends $MINGW "$CLANG"
-      # Each musl target's headers, from one checked release, in a tree
+          sudo apt-get install -y -qq --no-install-recommends $MINGW
+      # The musl target's headers, from one checked release, in a tree
       # of its own: musl generates its per-architecture headers in
-      # place, so one tree would hand the second target the first's.
-      - name: Install both musl targets' headers
-        if: matrix.os == 'linux'
+      # place, so a tree serves one target.
+      - name: Install clang and the musl target's headers
+        if: matrix.os == 'linux' && matrix.name != 'windows-amd64'
         run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq --no-install-recommends "$CLANG"
           archive="$RUNNER_TEMP/musl.tar.gz"
           curl -fsSL -o "$archive" "https://musl.libc.org/releases/musl-$MUSL_VERSION.tar.gz"
           echo "$MUSL_SHA256  $archive" | sha256sum -c -
-          for arch in x86_64 aarch64; do
-            src="$RUNNER_TEMP/musl-src-$arch"
-            mkdir "$src"
-            tar -xzf "$archive" -C "$src"
-            make -s -C "$src/musl-$MUSL_VERSION" ARCH="$arch" prefix="$RUNNER_TEMP/musl-$arch" install-headers
-          done
+          arch="${TARGET%%-*}"
+          src="$RUNNER_TEMP/musl-src-$arch"
+          mkdir "$src"
+          tar -xzf "$archive" -C "$src"
+          make -s -C "$src/musl-$MUSL_VERSION" ARCH="$arch" prefix="$RUNNER_TEMP/musl-$arch" install-headers
           echo "MUSL_HEADERS=$RUNNER_TEMP" >> "$GITHUB_ENV"
       - name: Install the pinned Rust targets
         run: |
@@ -125,8 +137,9 @@ jobs:
           done
           (cd dist && shasum -a 256 parinn-*)
       - name: Check the binary reports what it was stamped with
+        if: matrix.runs
         env:
-          BIN: dist/parinn-${{ matrix.runs }}
+          BIN: dist/parinn-${{ matrix.name }}
           VERSION: ${{ inputs.version }}
           COMMIT: ${{ github.sha }}
         run: scripts/check-stamp.sh "$BIN" "$VERSION" "$COMMIT"
@@ -138,21 +151,16 @@ jobs:
           cargo fetch --locked
           cargo run --locked -p engineering --bin license-check -- --out "$RUNNER_TEMP/regenerated"
       - name: Check the binary prints the regenerated licenses
-        env:
-          RUNS: ${{ matrix.runs }}
-        run: |
-          for pair in $TARGETS; do
-            if [ "${pair#*:}" = "$RUNS" ]; then target="${pair%%:*}"; fi
-          done
-          scripts/check-licenses.sh "dist/parinn-$RUNS" "$RUNNER_TEMP/regenerated/licenses/$target/THIRD_PARTY_LICENSES"
+        if: matrix.runs
+        run: scripts/check-licenses.sh "dist/parinn-$NAME" "$RUNNER_TEMP/regenerated/licenses/$TARGET/THIRD_PARTY_LICENSES"
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: ${{ matrix.os }}-parinn
+          name: ${{ matrix.name }}-parinn
           path: dist/
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: ${{ matrix.os }}-licenses
-          path: ${{ runner.temp }}/regenerated/licenses/
+          name: ${{ matrix.name }}-licenses
+          path: ${{ runner.temp }}/regenerated/licenses/${{ env.TARGET }}/
 
   # The linux/arm64 executable is built on the x86_64 Linux builder; it
   # runs once here, on the platform it is for.
@@ -166,7 +174,7 @@ jobs:
           persist-credentials: false
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
-          name: linux-parinn
+          name: linux-arm64-parinn
           path: dist
       - name: Check the binary reports what it was stamped with
         env:
@@ -177,12 +185,10 @@ jobs:
           scripts/check-stamp.sh dist/parinn-linux-arm64 "$VERSION" "$COMMIT"
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
-          name: linux-licenses
+          name: linux-arm64-licenses
           path: regenerated
       - name: Check the binary prints the regenerated licenses
-        run: |
-          target=$(printf '%s\n' $LINUX_TARGETS | sed -n 's/:linux-arm64$//p')
-          scripts/check-licenses.sh dist/parinn-linux-arm64 "regenerated/$target/THIRD_PARTY_LICENSES"
+        run: scripts/check-licenses.sh dist/parinn-linux-arm64 regenerated/THIRD_PARTY_LICENSES
 
   # The Windows executable is built on Linux; it runs once here, on the
   # platform it is for.
@@ -196,7 +202,7 @@ jobs:
           persist-credentials: false
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
-          name: linux-parinn
+          name: windows-amd64-parinn
           path: dist
       - name: Check the binary reports what it was stamped with
         shell: bash
@@ -206,10 +212,8 @@ jobs:
         run: scripts/check-stamp.sh dist/parinn-windows-amd64.exe "$VERSION" "$COMMIT"
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
-          name: linux-licenses
+          name: windows-amd64-licenses
           path: regenerated
       - name: Check the binary prints the regenerated licenses
         shell: bash
-        run: |
-          target=$(printf '%s\n' $LINUX_TARGETS | sed -n 's/:windows-amd64$//p')
-          scripts/check-licenses.sh dist/parinn-windows-amd64.exe "regenerated/$target/THIRD_PARTY_LICENSES"
+        run: scripts/check-licenses.sh dist/parinn-windows-amd64.exe regenerated/THIRD_PARTY_LICENSES
