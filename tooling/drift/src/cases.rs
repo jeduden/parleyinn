@@ -963,7 +963,8 @@ fn core_wait_cases() -> Vec<Case> {
                 "checkout",
                 "no_product_crate_keeps_mutable_global_state",
             ),
-            "crates/parinn/src/lib.rs:16: mutable global state: pub static SEQ",
+            // The line number moves with the file; the finding is stable.
+            ": mutable global state: pub static SEQ",
         ),
     ]
 }
