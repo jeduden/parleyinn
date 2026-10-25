@@ -409,6 +409,7 @@ Feature: Security (SEC)
     And every prompt commitment whose prompt_id a purged event's line carries, matched or not, is erased with its key, and the receipt counts them
     And after a retention purge, and after a backup restore that reapplies the purge, no file in the home, decrypted, holds the purged events' canary token, their commitment keys or a search index entry naming them
     And while a purge has residue, "parinn doctor" exits non-zero even after "parinn counter ack", the Needs you queue and Catch up show it, and once a retry clears it a further purge receipt is written
+    And a purge a kill stopped after its erasure is recorded stays pending in the same way, no search matching a purged event, until the next "parinn purge", "parinn ingest" or "parinn rebuild" finishes it
     And no audit entry or log line carries the purged events' canary token
 
   @SEC-32 @P1 @I2 @I6 @pending
