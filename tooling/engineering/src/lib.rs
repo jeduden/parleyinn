@@ -16,6 +16,7 @@ pub mod complexity;
 pub mod confinement;
 pub mod decisions;
 pub mod dependencies;
+pub mod fuzzing;
 pub mod isolation_guard;
 pub mod license_texts;
 pub mod privacy;
