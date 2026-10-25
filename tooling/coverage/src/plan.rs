@@ -36,6 +36,12 @@ impl TestLayer {
         }
     }
 
+    /// The layer `name` names, as [`Self::name`] spells it.
+    #[must_use]
+    pub fn from_name(name: &str) -> Option<Self> {
+        Self::ALL.into_iter().find(|l| l.name() == name)
+    }
+
     /// The layer a `tests/` target named `target` belongs to.
     #[must_use]
     pub fn of_test_target(target: &str) -> Self {

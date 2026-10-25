@@ -117,6 +117,94 @@ fn measure_stops_at_the_first_failure() {
 }
 
 #[test]
+fn measure_layer_runs_one_layer_on_a_fresh_build() {
+    let host = host(&["SF:/w/a.rs\nDA:2,3\n"]);
+
+    let lines = measure_layer(&host, &plan(), TestLayer::Integration, Path::new("out"))
+        .unwrap()
+        .unwrap();
+
+    assert_eq!(lines[&PathBuf::from("/w/a.rs")][&2], 3);
+    assert_eq!(
+        *host.calls.borrow(),
+        [
+            "cargo llvm-cov clean --workspace",
+            "cargo llvm-cov --no-report --workspace --locked --test gates",
+            "cargo llvm-cov report --lcov --ignore-filename-regex tests.rs$",
+            "write out/integration.lcov",
+        ]
+    );
+    assert!(
+        measure_layer(
+            &host,
+            &Plan::default(),
+            TestLayer::EndToEnd,
+            Path::new("out")
+        )
+        .unwrap()
+        .is_none(),
+        "a layer without tests is nothing to measure"
+    );
+}
+
+#[test]
+fn merge_layers_reads_what_was_written_and_skips_a_missing_layer() {
+    let host = host(&[]);
+    host.files.borrow_mut().insert(
+        PathBuf::from("out/unit.lcov"),
+        "SF:/w/a.rs\nDA:1,1\nDA:2,0\n".into(),
+    );
+    host.files
+        .borrow_mut()
+        .insert(PathBuf::from("out/e2e.lcov"), "SF:/w/a.rs\nDA:2,3\n".into());
+
+    let layers = merge_layers(&host, Path::new("out")).unwrap();
+
+    assert_eq!(
+        layers.iter().map(|(l, _)| *l).collect::<Vec<_>>(),
+        [TestLayer::Unit, TestLayer::EndToEnd]
+    );
+    assert_eq!(
+        host.files.borrow()[&PathBuf::from("out/all.lcov")],
+        "SF:/w/a.rs\nDA:1,1\nDA:2,3\nend_of_record\n"
+    );
+    assert!(
+        !host.calls.borrow().iter().any(|c| c.starts_with("cargo")),
+        "a merge runs no cargo"
+    );
+}
+
+#[test]
+fn merge_layers_refuses_nothing_to_merge_and_a_bad_file() {
+    let empty = host(&[]);
+    assert_eq!(
+        merge_layers(&empty, Path::new("out")).unwrap_err(),
+        "no <layer>.lcov under out"
+    );
+
+    let malformed = host(&[]);
+    malformed
+        .files
+        .borrow_mut()
+        .insert(PathBuf::from("out/unit.lcov"), "SF:a\nDA:x\n".into());
+    assert!(
+        merge_layers(&malformed, Path::new("out"))
+            .unwrap_err()
+            .starts_with("lcov line 2: ")
+    );
+
+    let unreadable = FakeHost {
+        fail_on: Some("read out/unit.lcov"),
+        ..host(&[])
+    };
+    assert!(
+        merge_layers(&unreadable, Path::new("out"))
+            .unwrap_err()
+            .contains("read out/unit.lcov")
+    );
+}
+
+#[test]
 fn render_writes_lines_back_as_lcov() {
     let lines = crate::lcov::parse("SF:b\nDA:2,0\nSF:a\nDA:1,1\n").unwrap();
 
