@@ -268,7 +268,7 @@ fn a_tombstone_shows_as_a_line_of_its_own_with_its_range_and_reason_safely() {
         "items": [],
         "tombstones": [
             {"range": "A1·30–40", "reason": "purged"},
-            {"range": "A1·12\nforged", "reason": "quarantined"},
+            {"range": "A1·50\nforged", "reason": "retention"},
         ],
         "next_cursor": null,
     });
@@ -277,7 +277,28 @@ fn a_tombstone_shows_as_a_line_of_its_own_with_its_range_and_reason_safely() {
 
     assert_eq!(
         text,
-        "w\n\ntombstone A1·30–40 purged\n\ntombstone A1·12<U+000A>forged quarantined\n"
+        "w\n\ntombstone A1·30–40 purged\n\ntombstone A1·50<U+000A>forged retention\n"
+    );
+}
+
+#[test]
+fn a_quarantine_marker_shows_as_a_line_of_its_own_with_its_range_alone_safely() {
+    let envelope = json!({
+        "warning": "w",
+        "items": [],
+        "tombstones": [],
+        "quarantine_markers": [
+            {"range": "A1·12"},
+            {"range": "A1·13\nforged\u{1b}[2J"},
+        ],
+        "next_cursor": null,
+    });
+
+    let text = render(&envelope);
+
+    assert_eq!(
+        text,
+        "w\n\nquarantine marker A1·12\n\nquarantine marker A1·13<U+000A>forged<U+001B>[2J\n"
     );
 }
 

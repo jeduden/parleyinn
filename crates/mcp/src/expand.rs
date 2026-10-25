@@ -11,9 +11,11 @@
 //! refusal is fixed text, naming at most an address it parsed and
 //! renders anew (RCL-04).
 
-use administration::purge::Tombstone as Recorded;
+use administration::purge::{Reason, Tombstone as Recorded};
 use administration::quarantine::Quarantine;
-use envelope::{Continuation, Envelope, Item, Tombstone, TombstoneReason, tokens};
+use envelope::{
+    Continuation, Envelope, Item, QuarantineMarker, Tombstone, TombstoneReason, tokens,
+};
 use record::id::{Address, RoomId, Seq, WriterId};
 use record::range::{self, Label, Range, Writer};
 use serde_json::Value;
@@ -221,10 +223,13 @@ impl Server {
             seq = after;
         }
 
+        let (tombstones, quarantine_markers) = reading.marks.finish();
+
         Ok((
             Envelope {
                 items: reading.items,
-                tombstones: reading.marks.finish(),
+                tombstones,
+                quarantine_markers,
                 truncated: next.is_some(),
                 next_cursor: next.map(|c| c.encode()),
                 structural: None,
@@ -358,26 +363,51 @@ fn held_back(
     stored: &Stored,
     purged: &[Recorded],
     quarantine: &Quarantine<'_>,
-) -> Result<Option<TombstoneReason>, administration::AdminError> {
+) -> Result<Option<Held>, administration::AdminError> {
     let address = stored.link.header.address;
     if erased(stored) {
-        let recorded = purged.iter().any(|t| t.covers(address));
-
-        return Ok(recorded.then_some(TombstoneReason::Purged));
+        return purged
+            .iter()
+            .find(|t| t.covers(address))
+            .map(|t| reason_of(t).map(Held::Purged))
+            .transpose();
     }
 
-    Ok(quarantine
-        .holds(address)?
-        .then_some(TombstoneReason::Quarantined))
+    Ok(quarantine.holds(address)?.then_some(Held::Quarantined))
 }
 
-/// The tombstones a call has gathered: consecutive seqs of one reason
-/// share one.
+/// Why a tombstone purged its range, by the words of
+/// [`administration::purge::Reason`]: the principal, or a retention
+/// policy (ADM-07, REC-15). A tombstone naming any other word is
+/// refused, not shown as one of these.
+fn reason_of(tombstone: &Recorded) -> Result<TombstoneReason, administration::AdminError> {
+    let retention = Reason::Retention {
+        policy: String::new(),
+    };
+    match tombstone.reason.as_str() {
+        word if word == Reason::Purged.as_str() => Ok(TombstoneReason::Purged),
+        word if word == retention.as_str() => Ok(TombstoneReason::Retention),
+        _ => Err(administration::AdminError::Node(
+            "a tombstone names a reason this parinn does not know",
+        )),
+    }
+}
+
+/// How the envelope holds an address back: a purged range as a
+/// tombstone with its reason, a quarantined one as a marker with none.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Held {
+    Purged(TombstoneReason),
+    Quarantined,
+}
+
+/// The tombstones and quarantine markers a call has gathered:
+/// consecutive seqs held back the same way share one.
 struct Marks {
     room: RoomId,
     writer: WriterId,
     label: Option<Label>,
-    ranges: Vec<(Seq, Seq, TombstoneReason)>,
+    ranges: Vec<(Seq, Seq, Held)>,
 }
 
 /// The widest seq: sixteen digits, the most a seq can hold.
@@ -395,7 +425,7 @@ impl Marks {
 
     /// The estimated model tokens one tombstone of this writer takes at
     /// its longest, with the comma that joins it: its range at the
-    /// widest seqs.
+    /// widest seqs. A marker takes less, so the cap holds for both.
     fn cost(&self) -> u64 {
         let range = match self.label {
             Some(_) => format!("A999999999·{WIDEST_SEQ}–{WIDEST_SEQ}"),
@@ -406,7 +436,7 @@ impl Marks {
         };
         let longest = Tombstone {
             range,
-            reason: TombstoneReason::Quarantined,
+            reason: TombstoneReason::Retention,
         };
         let with = Envelope {
             tombstones: vec![longest],
@@ -422,7 +452,7 @@ impl Marks {
 
     /// Whether `seq`, which the call reaches after the seqs before it,
     /// begins a tombstone of its own rather than extending the last.
-    fn begins(&self, seq: Seq, reason: TombstoneReason) -> bool {
+    fn begins(&self, seq: Seq, reason: Held) -> bool {
         !self
             .ranges
             .last()
@@ -430,7 +460,7 @@ impl Marks {
     }
 
     /// Adds `seq` to the last tombstone, or begins one.
-    fn add(&mut self, seq: Seq, reason: TombstoneReason) {
+    fn add(&mut self, seq: Seq, reason: Held) {
         if self.begins(seq, reason) {
             self.ranges.push((seq, seq, reason));
         } else if let Some((_, last, _)) = self.ranges.last_mut() {
@@ -438,22 +468,33 @@ impl Marks {
         }
     }
 
-    /// The tombstones, each range as ParleyInn renders it: with its
-    /// writer's label when it has one, else in the full form.
-    fn finish(self) -> Vec<Tombstone> {
-        self.ranges
-            .iter()
-            .map(|(first, last, reason)| Tombstone {
-                range: match (self.label, first == last) {
-                    (Some(label), true) => range::short(label, *first),
-                    (Some(label), false) => range::range(label, *first, *last),
-                    (None, _) => {
-                        format!("parinn:room/{}/w/{}/{first}-{last}", self.room, self.writer)
-                    }
-                },
-                reason: *reason,
-            })
-            .collect()
+    /// A range as ParleyInn renders it: with its writer's label when it
+    /// has one, else in the full form.
+    fn render(&self, first: Seq, last: Seq) -> String {
+        match (self.label, first == last) {
+            (Some(label), true) => range::short(label, first),
+            (Some(label), false) => range::range(label, first, last),
+            (None, _) => format!("parinn:room/{}/w/{}/{first}-{last}", self.room, self.writer),
+        }
+    }
+
+    /// The tombstones and the quarantine markers, in the order the call
+    /// reached them.
+    fn finish(self) -> (Vec<Tombstone>, Vec<QuarantineMarker>) {
+        let mut tombstones = Vec::new();
+        let mut markers = Vec::new();
+        for (first, last, held) in &self.ranges {
+            let range = self.render(*first, *last);
+            match held {
+                Held::Purged(reason) => tombstones.push(Tombstone {
+                    range,
+                    reason: *reason,
+                }),
+                Held::Quarantined => markers.push(QuarantineMarker { range }),
+            }
+        }
+
+        (tombstones, markers)
     }
 }
 
@@ -523,6 +564,7 @@ impl Budget {
         let around = Envelope {
             items: vec![],
             tombstones: vec![],
+            quarantine_markers: vec![],
             truncated: true,
             next_cursor: Some("0a".repeat(Cursor::LONGEST)),
             structural: None,

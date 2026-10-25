@@ -184,25 +184,27 @@ fn consecutive_seqs_of_one_reason_share_a_tombstone() {
     assert!(marks.is_empty());
 
     for n in [3, 4, 5] {
-        marks.add(seq(n), TombstoneReason::Purged);
+        marks.add(seq(n), Held::Purged(TombstoneReason::Purged));
     }
-    marks.add(seq(6), TombstoneReason::Quarantined);
-    marks.add(seq(9), TombstoneReason::Quarantined);
+    marks.add(seq(6), Held::Quarantined);
+    marks.add(seq(9), Held::Quarantined);
 
     assert!(!marks.is_empty());
-    let ranges: Vec<(String, &str)> = marks
-        .finish()
+    marks.add(seq(10), Held::Purged(TombstoneReason::Retention));
+    let (tombstones, markers) = marks.finish();
+    let tombstones: Vec<(String, &str)> = tombstones
         .into_iter()
         .map(|t| (t.range, t.reason.as_str()))
         .collect();
+    let markers: Vec<String> = markers.into_iter().map(|m| m.range).collect();
     assert_eq!(
-        ranges,
+        tombstones,
         [
             ("A1·3–5".to_owned(), "purged"),
-            ("A1·6".to_owned(), "quarantined"),
-            ("A1·9".to_owned(), "quarantined"),
+            ("A1·10".to_owned(), "retention"),
         ]
     );
+    assert_eq!(markers, ["A1·6", "A1·9"]);
 }
 
 #[test]
@@ -210,21 +212,21 @@ fn a_seq_begins_a_tombstone_unless_it_follows_the_last_of_its_reason() {
     let (seat, label) = seat(true);
     let mut marks = Marks::new(&seat, label);
 
-    assert!(marks.begins(seq(1), TombstoneReason::Purged));
-    marks.add(seq(1), TombstoneReason::Purged);
-    assert!(!marks.begins(seq(2), TombstoneReason::Purged));
-    assert!(marks.begins(seq(2), TombstoneReason::Quarantined));
-    assert!(marks.begins(seq(3), TombstoneReason::Purged));
+    assert!(marks.begins(seq(1), Held::Purged(TombstoneReason::Purged)));
+    marks.add(seq(1), Held::Purged(TombstoneReason::Purged));
+    assert!(!marks.begins(seq(2), Held::Purged(TombstoneReason::Purged)));
+    assert!(marks.begins(seq(2), Held::Quarantined));
+    assert!(marks.begins(seq(3), Held::Purged(TombstoneReason::Purged)));
 }
 
 #[test]
 fn a_writer_without_a_label_shows_its_ranges_in_the_full_form() {
     let (seat, label) = seat(false);
     let mut marks = Marks::new(&seat, label);
-    marks.add(seq(2), TombstoneReason::Purged);
-    marks.add(seq(3), TombstoneReason::Purged);
+    marks.add(seq(2), Held::Purged(TombstoneReason::Purged));
+    marks.add(seq(3), Held::Purged(TombstoneReason::Purged));
 
-    let shown = marks.finish();
+    let (shown, _) = marks.finish();
 
     assert_eq!(
         shown[0].range,
@@ -275,4 +277,30 @@ fn the_budget_charges_a_tombstone_its_longest_range() {
     );
     assert!(record::range::Range::parse(&widest).is_ok());
     assert_eq!(WIDEST_SEQ.len(), 16);
+}
+
+fn recorded(reason: &str) -> Recorded {
+    Recorded {
+        writer: writer(),
+        first: seq(1),
+        last: seq(1),
+        count: 1,
+        reason: reason.to_owned(),
+        policy: None,
+        commitments: record::digest::Digest::ZERO,
+    }
+}
+
+#[test]
+fn a_tombstone_shows_the_reason_it_recorded_and_a_word_it_does_not_know_is_refused() {
+    assert_eq!(
+        reason_of(&recorded("purged")).unwrap(),
+        TombstoneReason::Purged
+    );
+    assert_eq!(
+        reason_of(&recorded("retention")).unwrap(),
+        TombstoneReason::Retention
+    );
+    assert!(reason_of(&recorded("quarantined")).is_err());
+    assert!(reason_of(&recorded("")).is_err());
 }
