@@ -504,6 +504,9 @@ jobs:
             touch "$out/no-base"
             exit 0
           fi
+          # Both sides' files read once: a fresh runner's first start of
+          # a just-downloaded executable can stall for seconds.
+          cat "$head"/* "$base"/* > /dev/null
           per=$((ROUNDS / SHARDS))
           for i in $(seq "$per"); do
             round=$((SHARD * per + i))
@@ -515,9 +518,9 @@ jobs:
               core="$bin/parinn"
               # Only the base side is taken again: it runs main's
               # benchmark, which fails a round when a stalled disk
-              # overruns the hook budget twice. The head's benchmark
-              # retries inside the round, and a head round that fails
-              # fails the gate.
+              # overruns the hook budget twice or holds a start past
+              # its deadline. The head's benchmark retries inside the
+              # round, and a head round that fails fails the gate.
               tries=1
               [ "$side" = base ] && tries=3
               for try in $(seq "$tries"); do
@@ -527,7 +530,7 @@ jobs:
                   break
                 fi
                 cat "$out/round.err" >&2
-                if [ "$try" -eq "$tries" ] || ! grep -q "overran its hook budget" "$out/round.err"; then
+                if [ "$try" -eq "$tries" ] || ! grep -qE "overran its hook budget|did not exit within" "$out/round.err"; then
                   exit 1
                 fi
                 sleep 2
