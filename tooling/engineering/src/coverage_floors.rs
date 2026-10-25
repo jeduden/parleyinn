@@ -48,10 +48,7 @@ impl Row {
     /// neither before the list nor before "overall".
     pub fn parse(text: &str) -> Result<Self, String> {
         let (before, rest) = text.split_once(SENSITIVE).unwrap_or((text, ""));
-        let list = rest
-            .split_once('(')
-            .and_then(|(_, l)| l.split_once(')'))
-            .map(|(l, after)| (l, after));
+        let list = rest.split_once('(').and_then(|(_, l)| l.split_once(')'));
         let Some((list, after)) = list else {
             return Err(
                 "the ENG-11 row names no security-sensitive crates in parentheses".to_owned(),
