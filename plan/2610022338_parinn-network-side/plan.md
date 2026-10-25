@@ -1,7 +1,7 @@
 ---
 id: 2610022338
 title: "ParleyInn's lane experience and peer network: no central service"
-status: "🔲"
+status: "⛔"
 summary: >-
   Builds the live lane — a pull request with chat, real time,
   multiplayer and result views — over a peer network that needs no
@@ -12,6 +12,16 @@ model: opus
 depends-on: [2610012322]
 ---
 # ParleyInn's lane experience and peer network: no central service
+
+> **Superseded.** Plan
+> [2610012322](../2610012322_parinn-for-agent-fleets/plan.md)
+> put this scope into [SRS §12.2](../../docs/srs/12-delivery-plan.md):
+> the standalone room view is [M7](../2610112057_m7-standalone-room-view.md),
+> the peer network [M8](../2610112058_m8-peer-network.md), and review,
+> publishing and bridges [M9](../2610112059_m9-review-publishing-bridges.md).
+> The one task with no home there is live co-editing of files in one
+> worktree with a CRDT (task 4): no SRS row covers it, so it needs a
+> stakeholder decision before any plan takes it up.
 
 ## Goal
 
@@ -194,7 +204,7 @@ footer: |
 
 | #   | Status | Phase                                                         |
 | --- | ------ | ------------------------------------------------------------- |
-| 1   | 🔲     | [The standalone lane experience, with no network](phase-1.md) |
+| 1   | ⛔     | [The standalone lane experience, with no network](phase-1.md) |
 <?/catalog?>
 
 ## Acceptance Criteria

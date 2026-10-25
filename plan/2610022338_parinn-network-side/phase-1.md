@@ -1,7 +1,7 @@
 ---
 n: 1
 title: "The standalone lane experience, with no network"
-status: "🔲"
+status: "⛔"
 result: false
 ---
 # Phase 1: the standalone lane experience, with no network

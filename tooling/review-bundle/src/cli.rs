@@ -82,8 +82,12 @@ fn build(
 ) -> Result<String, String> {
     let base_tree = Snapshot::read(base).map_err(|e| format!("{e} (main's tree)"))?;
     let head_tree = Snapshot::read(head).map_err(|e| format!("{e} (the pull request's tree)"))?;
+    // The diff is read as bytes: git shows a file it takes for text, though
+    // it is not UTF-8 (a fuzz seed, a fixture), and a review must not fail
+    // for it. Each such byte reads as U+FFFD; every line of text is whole.
+    let diff = fs::read(diff).map_err(failed("read", diff))?;
+    let diff = String::from_utf8_lossy(&diff);
     let read = |path: &Path| fs::read_to_string(path).map_err(failed("read", path));
-    let diff = read(diff)?;
     let consent = consents(&read(consent)?).map_err(failed("read", consent))?;
     let a = analyse(&base_tree, &head_tree, &diff, consent);
     let write = |name: &str, body: &str| {
