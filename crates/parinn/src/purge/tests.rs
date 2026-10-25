@@ -483,18 +483,55 @@ fn cut_short_after_its_transaction(p: &Process, writer: WriterId, seq: u64, text
 }
 
 #[test]
-fn verify_finishes_a_purge_a_kill_cut_short_and_then_finds_the_record_whole() {
+fn verify_reports_a_purge_a_kill_left_unfinished_exits_0_and_changes_nothing() {
     let (p, writer) = with_a_run();
     let range = format!("{writer}:2-2");
     assert_eq!(p.invoke(&["purge", "--range", &range], &DEV).0, EXIT_OK);
     cut_short_after_its_transaction(&p, writer, 2, "two");
+    let (home, _) = open(&p);
+    let before = std::fs::read(home.root().join("search_index")).unwrap();
+    let counted_before = counted(&p, "purge_unfinished").len();
 
-    let (code, _, err) = p.invoke(&["verify"], &DEV);
+    let (code, out, err) = p.invoke(&["verify"], &DEV);
 
     assert_eq!((code, err.as_str()), (EXIT_OK, ""));
-    let (home, store) = open(&p);
-    assert!(!store.purge_pending().unwrap(), "verify finished the purge");
+    assert!(
+        out.contains(&format!(
+            "; a purge was cut short before it finished, so its residue stays until the next \
+             purge, ingest or rebuild clears it, and the search index is unchecked: {range}"
+        )),
+        "{out}"
+    );
+    let (_, store) = open(&p);
+    assert!(store.purge_pending().unwrap(), "verify finishes nothing");
     drop(store);
+    assert_eq!(
+        std::fs::read(home.root().join("search_index")).unwrap(),
+        before,
+        "verify leaves the index as it found it"
+    );
+    assert_eq!(counted(&p, "purge_unfinished").len(), counted_before + 1);
+    let (_, json, _) = p.invoke(&["verify", "--json"], &DEV);
+    let report: Value = serde_json::from_str(&json).unwrap();
+    assert_eq!(report["unfinished_purges"], serde_json::json!([range]));
+    assert_eq!(report["index_checked"], false);
+}
+
+#[test]
+fn once_the_next_rebuild_finishes_the_purge_verify_finds_nothing_unfinished() {
+    let (p, writer) = with_a_run();
+    let range = format!("{writer}:2-2");
+    assert_eq!(p.invoke(&["purge", "--range", &range], &DEV).0, EXIT_OK);
+    cut_short_after_its_transaction(&p, writer, 2, "two");
+    assert_eq!(p.invoke(&["rebuild"], &DEV).0, EXIT_OK);
+
+    let (code, json, err) = p.invoke(&["verify", "--json"], &DEV);
+
+    assert_eq!((code, err.as_str()), (EXIT_OK, ""));
+    let report: Value = serde_json::from_str(&json).unwrap();
+    assert_eq!(report["unfinished_purges"], serde_json::json!([]));
+    assert_eq!(report["index_checked"], true);
+    let (home, _) = open(&p);
     let index = std::fs::read(home.root().join("search_index")).unwrap();
     assert!(
         !index.windows(3).any(|w| w == b"two"),
