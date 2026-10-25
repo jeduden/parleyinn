@@ -26,6 +26,12 @@ and the `ci-review` skill measures them.
   that cannot finish in five minutes fails, and that failure is the signal
   to speed it up or split it, not to raise the limit. The other workflows
   keep limits sized to their work.
+- A sharded job takes its shard from its place in the matrix
+  (`strategy.job-index` of `strategy.job-total`), not from a number the
+  matrix lists, so the shards cover the work once whatever the list says.
+  The scenarios divide by a hash of the feature file and scenario name
+  (`--shard K/N`, or `PARINN_BDD_SHARD` for `cargo test -p scenario`),
+  the drift cases and benchmark rounds by position.
 - The `CI` job records each job's duration and result in its job summary
   and uploads them as the `ci-timings` artifact. Read those; do not
   measure again.

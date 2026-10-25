@@ -1,7 +1,7 @@
 ---
 id: 2610251015
 title: "Hold every CI job under four minutes"
-status: "✅"
+status: "🔳"
 summary: >-
   Restructure the jobs of ci.yml and build.yml so each finishes in four
   minutes or less, one minute under the five-minute cap, without
@@ -72,16 +72,19 @@ records, it adds a drift case too (ENG-27).
 3. The drift cases sharded across four jobs (phase 1)
 4. The benchmark gate stratified by shard, so the runners' speed
    differences do not blunt it (phase 2)
+5. The scenarios and the end-to-end coverage layer sharded in four,
+   once the growth of the suite took both over the cap (phase 3)
 
 Later phases are declared when the prior phase's result shows the real
 shape.
 
 ## Execution
 
-| Phase | Model  | Gate                                                                                                                     |
-| ----- | ------ | ------------------------------------------------------------------------------------------------------------------------ |
-| 1     | sonnet | The `ci-timings` of two consecutive runs show every job under four minutes; the summaries and the provenance hold        |
-| 2     | sonnet | A three-runner fixture fails the pooled test and passes the stratified one; the single-stratum fixtures decide as before |
+| Phase | Model  | Gate                                                                                                                                 |
+| ----- | ------ | ------------------------------------------------------------------------------------------------------------------------------------ |
+| 1     | sonnet | The `ci-timings` of two consecutive runs show every job under four minutes; the summaries and the provenance hold                    |
+| 2     | sonnet | A three-runner fixture fails the pooled test and passes the stratified one; the single-stratum fixtures decide as before             |
+| 3     | sonnet | The shards partition the scenarios in unit tests and on the real suite; two consecutive runs show every shard job under four minutes |
 
 ## Phases
 
@@ -104,10 +107,12 @@ footer: |
 
 ?>
 
-| #   | Status | Phase                                                                     |
-| --- | ------ | ------------------------------------------------------------------------- |
-| 1   | ✅     | [Every job of ci.yml and build.yml under its five-minute cap](phase-1.md) |
-| 2   | ✅     | [The benchmark gate stratified by shard](phase-2.md)                      |
+| #   | Status | Phase                                                                                                                                                              |
+| --- | ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 1   | ✅     | [Every job of ci.yml and build.yml under its five-minute cap](phase-1.md)                                                                                          |
+| 2   | ✅     | [The benchmark gate stratified by shard](phase-2.md)                                                                                                               |
+| 3   | 🔳     | [The scenarios and the end-to-end coverage layer sharded](phase-3.md)                                                                                              |
+|     | ↳      | The scenarios and the end-to-end coverage layer run as four shards each. The shards partition the suite; the CI gate of two runs under four minutes is still open. |
 <?/catalog?>
 
 ## Acceptance Criteria
@@ -125,4 +130,7 @@ footer: |
 - [x] Each phase that changes `/tooling/` keeps its crates at their
   coverage floors and adds a drift case where it checks the
   repository's records
+- [ ] The `scenarios` and `coverage (e2e shard K)` jobs finish in four
+  minutes or less in two consecutive runs, with the scenario count and
+  the coverage table unchanged (phase 3)
 - [x] `mdsmith check .` passes
