@@ -914,6 +914,45 @@ fn preflight_fails_a_trace_that_follows_no_child() {
 }
 
 #[test]
+fn a_tool_that_outlives_its_deadline_is_killed_and_named() {
+    let mut sleeper = Command::new("sleep");
+    sleeper.arg("30");
+    let started = std::time::Instant::now();
+
+    let err = output_within(&mut sleeper, std::time::Duration::from_millis(200)).unwrap_err();
+
+    assert!(started.elapsed() < std::time::Duration::from_secs(10));
+    assert_eq!(err, "sleep did not finish within 0.2 s");
+    let mut echo = Command::new("sh");
+    echo.args(["-c", "echo out; echo err >&2"]);
+    let out = output_within(&mut echo, std::time::Duration::from_secs(10)).unwrap();
+    assert_eq!(
+        (&out.stdout[..], &out.stderr[..]),
+        (&b"out\n"[..], &b"err\n"[..])
+    );
+    let missing = output_within(
+        &mut Command::new("parinn-no-such-tool"),
+        std::time::Duration::from_secs(1),
+    );
+    assert!(
+        missing
+            .unwrap_err()
+            .starts_with("start parinn-no-such-tool: ")
+    );
+}
+
+#[test]
+fn a_preflight_that_hangs_fails_with_what_hung() {
+    let _ = must_confine();
+    // The "trace" sleeps instead of starting the probe.
+    let hung = ["sh", "-c", "sleep 30", "-o"];
+
+    let err = preflight_within(UNSHARE, &hung, std::time::Duration::from_millis(300)).unwrap_err();
+
+    assert_eq!(err, "unshare did not finish within 0.3 s");
+}
+
+#[test]
 fn preflight_refuses_a_strace_older_than_its_minimum() {
     assert_eq!(
         strace_new_enough("strace -- version 6.8\nCopyright"),

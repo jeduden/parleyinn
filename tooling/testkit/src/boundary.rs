@@ -28,6 +28,7 @@ use std::io::{self, Write};
 use std::panic::Location;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output, Stdio};
+use std::time::Duration;
 
 use crate::{TempDir, isolate};
 
@@ -616,14 +617,67 @@ const PREFLIGHT_PROBE: [&str; 3] = [
 /// socket the probe opens in the namespace under the trace is recorded
 /// and failed.
 fn preflight() -> Result<(), String> {
-    let strace = TRACE[0];
-    let version = Command::new(strace)
-        .arg("-V")
-        .stdin(Stdio::null())
-        .output()
-        .map_err(|e| format!("start {strace}: {e}"))?;
+    let mut version = Command::new(TRACE[0]);
+    version.arg("-V");
+    let version = output_within(&mut version, PREFLIGHT_DEADLINE)?;
     strace_new_enough(&String::from_utf8_lossy(&version.stdout))?;
     preflight_with(UNSHARE)
+}
+
+/// Runs `command` with no input, in a process group of its own, and
+/// returns its output, unless it is still running once `deadline`
+/// passed: then it is killed with everything it started, and the
+/// failure names it.
+fn output_within(command: &mut Command, deadline: Duration) -> Result<Output, String> {
+    let program = command.get_program().to_string_lossy().into_owned();
+    #[cfg(unix)]
+    std::os::unix::process::CommandExt::process_group(command, 0);
+    let mut child = command
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .map_err(|e| format!("start {program}: {e}"))?;
+    let read = |pipe: Option<Box<dyn io::Read + Send>>| {
+        std::thread::spawn(move || {
+            let mut bytes = Vec::new();
+            if let Some(mut pipe) = pipe {
+                let _ = pipe.read_to_end(&mut bytes);
+            }
+            bytes
+        })
+    };
+    let stdout = read(child.stdout.take().map(|p| Box::new(p) as _));
+    let stderr = read(child.stderr.take().map(|p| Box::new(p) as _));
+    let started = std::time::Instant::now();
+    let status = loop {
+        match child
+            .try_wait()
+            .map_err(|e| format!("wait for {program}: {e}"))?
+        {
+            Some(status) => break status,
+            None if started.elapsed() >= deadline => {
+                let _ = Command::new("kill")
+                    .args(["-KILL", "--", &format!("-{}", child.id())])
+                    .stdout(Stdio::null())
+                    .stderr(Stdio::null())
+                    .status();
+                let _ = child.kill();
+                let _ = child.wait();
+                return Err(format!(
+                    "{program} did not finish within {} s",
+                    deadline.as_secs_f64()
+                ));
+            }
+            None => std::thread::sleep(Duration::from_millis(10)),
+        }
+    };
+
+    Ok(Output {
+        status,
+        stdout: stdout.join().unwrap_or_default(),
+        stderr: stderr.join().unwrap_or_default(),
+    })
 }
 
 /// Fails unless `version`, what `strace -V` printed, names a version at
@@ -655,6 +709,15 @@ fn preflight_with(unshare: &str) -> Result<(), String> {
 
 /// [`preflight_with`] under the trace `trace`, up to its output file.
 fn preflight_traced(unshare: &str, trace_args: &[&str]) -> Result<(), String> {
+    preflight_within(unshare, trace_args, PREFLIGHT_DEADLINE)
+}
+
+/// How long each tool the preflight runs may take (ENG-03): far past
+/// what a working machine needs, short of a run that seems to hang.
+const PREFLIGHT_DEADLINE: Duration = Duration::from_secs(30);
+
+/// [`preflight_traced`] with each tool given `deadline` to finish.
+fn preflight_within(unshare: &str, trace_args: &[&str], deadline: Duration) -> Result<(), String> {
     let dir = TempDir::new().map_err(|e| format!("make the preflight's trace: {e}"))?;
     let trace = dir.path().join("trace");
     let mut command = Command::new(unshare);
@@ -664,10 +727,7 @@ fn preflight_traced(unshare: &str, trace_args: &[&str]) -> Result<(), String> {
         .arg(&trace)
         .arg("--")
         .args(PREFLIGHT_PROBE);
-    let out = command
-        .stdin(Stdio::null())
-        .output()
-        .map_err(|e| format!("start {unshare}: {e}"))?;
+    let out = output_within(&mut command, deadline)?;
     if out.status.success() {
         let read =
             fs::read_to_string(&trace).map_err(|e| format!("read the preflight's trace: {e}"))?;
