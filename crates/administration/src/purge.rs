@@ -22,12 +22,13 @@ use key::random::{Entropy, draw};
 use record::commitment::CommitmentKey;
 use record::digest::Digest;
 use record::event::{EventKind, Provenance};
-use record::id::{Address, Seq, WriterId};
+use record::id::{Address, RoomId, Seq, WriterId};
 use serde_json::{Value, json};
 use store::{Erase, NewEvent, Store};
 
 use crate::AdminError;
 use crate::node::Node;
+use crate::quarantine::device_writers;
 
 /// The kinds of event whose content a purge may erase: a transcript
 /// line, a line the parser could not read, a hook observation and a
@@ -122,6 +123,27 @@ impl Tombstone {
     pub fn covers(&self, address: Address) -> bool {
         address.writer == self.writer && self.first <= address.seq && address.seq <= self.last
     }
+}
+
+/// The tombstones the device seats of `room`, the node's personal room,
+/// record, in the order they were recorded: what says an event without
+/// content was purged and not lost (ADM-07, RCL-06).
+///
+/// # Errors
+///
+/// Fails when the store does.
+pub fn recorded(store: &Store, room: RoomId) -> Result<Vec<Tombstone>, AdminError> {
+    let mut out = Vec::new();
+    for device in device_writers(store, room)? {
+        let found = store.contents(device, EventKind::Tombstone)?;
+        out.extend(
+            found
+                .iter()
+                .filter_map(|(_, content)| Tombstone::from_value(content)),
+        );
+    }
+
+    Ok(out)
 }
 
 /// The digest over `commitments`, as a tombstone holds it.

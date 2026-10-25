@@ -11,11 +11,13 @@
 //! refusal is fixed text, naming at most an address it parsed and
 //! renders anew (RCL-04).
 
-use envelope::{Continuation, Envelope, Item, tokens};
+use administration::purge::Tombstone as Recorded;
+use administration::quarantine::Quarantine;
+use envelope::{Continuation, Envelope, Item, Tombstone, TombstoneReason, tokens};
 use record::id::{Address, RoomId, Seq, WriterId};
-use record::range::{Range, Writer};
+use record::range::{self, Label, Range, Writer};
 use serde_json::Value;
-use store::StoredSeat;
+use store::{Stored, StoredSeat};
 
 use crate::cursor::Cursor;
 use crate::scope::{self, Call, RecallScope};
@@ -172,7 +174,9 @@ impl Server {
         find(self)?.ok_or_else(|| NO_LABEL.to_owned())
     }
 
-    /// The events from `asked.from` on, within the cap.
+    /// The events from `asked.from` on, within the cap. An event a purge
+    /// erased, or a quarantine holds, is not returned: its address shows
+    /// as a tombstone of its reason (RCL-06).
     fn read_events(
         &self,
         scope: &scope::Scope,
@@ -180,52 +184,30 @@ impl Server {
         asked: &Asked,
         tool: &'static str,
     ) -> Result<(Envelope, bool), String> {
-        let unreadable = |_| UNREADABLE.to_owned();
-        let keys = administration::origin::KeySet::load(&self.store, &self.device_key)
-            .map_err(unreadable)?;
-        let mut budget = Budget::new();
-        let mut items: Vec<Item> = Vec::new();
+        let label = self.labels()?.get(&seat.writer).copied();
+        let mut reading = Reading::new(self, scope, seat, label)?;
         let (mut seq, mut offset) = (asked.from, asked.offset);
         let mut next = None;
-        let writer = seat.writer;
         while seq <= asked.to {
-            let address = Address::new(writer, seq);
+            let address = Address::new(seat.writer, seq);
             let Some(stored) = self.store.event(address).map_err(unreadable)? else {
-                if items.is_empty() {
-                    return Err(format!("no event at {address}"));
-                }
-                // The log ending inside the range is no gap; an event
-                // missing before later ones is, and is told, not passed
-                // over as if the log ended there (I6).
-                let head = self.store.head(writer).map_err(unreadable)?;
-                if head.is_some_and(|head| head > seq) {
-                    self.notes.borrow_mut().push(Note::RecordGap(tool));
-                    return Err(format!(
-                        "the record has no event at {address} though later ones exist: run parinn verify"
-                    ));
-                }
+                self.end_of_log(address, tool, reading.is_empty())?;
                 break;
             };
-            let item = self.event_item(&stored, seat, &keys, scope, offset)?;
-            match budget.take(item) {
-                Taken::Whole(item) => items.push(item),
-                Taken::Cut(item, chars) => {
-                    items.push(item);
-                    next = Some(Cursor {
-                        writer,
-                        seq,
-                        offset: offset + chars,
-                        to: asked.to,
-                    });
+            let at = |offset| Cursor {
+                writer: seat.writer,
+                seq,
+                offset,
+                to: asked.to,
+            };
+            match reading.step(self, &stored, offset)? {
+                Step::Went => {}
+                Step::Cut(chars) => {
+                    next = Some(at(offset + chars));
                     break;
                 }
-                Taken::Stop => {
-                    next = Some(Cursor {
-                        writer,
-                        seq,
-                        offset,
-                        to: asked.to,
-                    });
+                Step::Stopped => {
+                    next = Some(at(offset));
                     break;
                 }
             }
@@ -236,8 +218,8 @@ impl Server {
 
         Ok((
             Envelope {
-                items,
-                tombstones: Vec::new(),
+                items: reading.items,
+                tombstones: reading.marks.finish(),
                 truncated: next.is_some(),
                 next_cursor: next.map(|c| c.encode()),
                 structural: None,
@@ -245,6 +227,234 @@ impl Server {
             next.is_some(),
         ))
     }
+
+    /// Ends a read at `address`, where the log holds no event: an error
+    /// when nothing was read before it, or when later events exist; else
+    /// the log ends inside the range, which is no gap (I6).
+    fn end_of_log(
+        &self,
+        address: Address,
+        tool: &'static str,
+        nothing: bool,
+    ) -> Result<(), String> {
+        if nothing {
+            return Err(format!("no event at {address}"));
+        }
+        // An event missing before later ones is a gap, and is told, not
+        // passed over as if the log ended there.
+        let head = self.store.head(address.writer).map_err(unreadable)?;
+        if head.is_some_and(|head| head > address.seq) {
+            self.notes.borrow_mut().push(Note::RecordGap(tool));
+            return Err(format!(
+                "the record has no event at {address} though later ones exist: run parinn verify"
+            ));
+        }
+
+        Ok(())
+    }
+}
+
+/// What reading one event came to.
+enum Step {
+    /// The event, or its tombstone, is in; the read goes on.
+    Went,
+    /// The event's content was cut after this many characters.
+    Cut(usize),
+    /// The event does not fit; the next call begins with it.
+    Stopped,
+}
+
+/// What a read of one writer's range has gathered, and reads it from.
+struct Reading<'a> {
+    scope: &'a scope::Scope,
+    seat: &'a StoredSeat,
+    keys: administration::origin::KeySet,
+    quarantine: Quarantine<'a>,
+    purged: Vec<Recorded>,
+    budget: Budget,
+    items: Vec<Item>,
+    marks: Marks,
+}
+
+impl<'a> Reading<'a> {
+    fn new(
+        server: &'a Server,
+        scope: &'a scope::Scope,
+        seat: &'a StoredSeat,
+        label: Option<Label>,
+    ) -> Result<Self, String> {
+        Ok(Self {
+            scope,
+            seat,
+            keys: administration::origin::KeySet::load(&server.store, &server.device_key)
+                .map_err(unreadable)?,
+            quarantine: Quarantine::load(&server.store, server.personal_room)
+                .map_err(unreadable)?,
+            purged: administration::purge::recorded(&server.store, server.personal_room)
+                .map_err(unreadable)?,
+            budget: Budget::new(),
+            items: Vec::new(),
+            marks: Marks::new(seat, label),
+        })
+    }
+
+    /// Whether nothing was gathered yet.
+    fn is_empty(&self) -> bool {
+        self.items.is_empty() && self.marks.is_empty()
+    }
+
+    /// Reads `stored`, its content from the character `offset` on.
+    fn step(&mut self, server: &Server, stored: &Stored, offset: usize) -> Result<Step, String> {
+        let address = stored.link.header.address;
+        let reason = held_back(stored, &self.purged, &self.quarantine).map_err(unreadable)?;
+        if reason.is_none() && erased(stored) {
+            // Content gone with no tombstone is a loss, not a purge.
+            return Err(format!(
+                "the content at {} was removed, and no tombstone records it: run parinn verify",
+                address.full(&self.seat.room)
+            ));
+        }
+        let Some(reason) = reason else {
+            let item = server.event_item(stored, self.seat, &self.keys, self.scope, offset)?;
+
+            return Ok(match self.budget.take(item) {
+                Taken::Whole(item) => {
+                    self.items.push(item);
+                    Step::Went
+                }
+                Taken::Cut(item, chars) => {
+                    self.items.push(item);
+                    Step::Cut(chars)
+                }
+                Taken::Stop => Step::Stopped,
+            });
+        };
+        let begins = self.marks.begins(address.seq, reason);
+        if !self.budget.mark(begins, self.marks.cost()) {
+            return Ok(Step::Stopped);
+        }
+        self.marks.add(address.seq, reason);
+
+        Ok(Step::Went)
+    }
+}
+
+/// Whether a purge erased the event's content: all of it is gone.
+fn erased(stored: &Stored) -> bool {
+    stored.content.is_none() && stored.commitment_key.is_none() && stored.payload.is_none()
+}
+
+/// Why the event is not returned, when it is not: a tombstone records
+/// that a purge erased its content, or a quarantine holds it (RCL-06). A
+/// purge wins, since nothing is left to hold. Content gone with no
+/// tombstone is not a purge: it is returned as neither, and the caller
+/// refuses it.
+fn held_back(
+    stored: &Stored,
+    purged: &[Recorded],
+    quarantine: &Quarantine<'_>,
+) -> Result<Option<TombstoneReason>, administration::AdminError> {
+    let address = stored.link.header.address;
+    if erased(stored) {
+        let recorded = purged.iter().any(|t| t.covers(address));
+
+        return Ok(recorded.then_some(TombstoneReason::Purged));
+    }
+
+    Ok(quarantine
+        .holds(address)?
+        .then_some(TombstoneReason::Quarantined))
+}
+
+/// The tombstones a call has gathered: consecutive seqs of one reason
+/// share one.
+struct Marks {
+    room: RoomId,
+    writer: WriterId,
+    label: Option<Label>,
+    ranges: Vec<(Seq, Seq, TombstoneReason)>,
+}
+
+/// The widest seq: sixteen digits, the most a seq can hold.
+const WIDEST_SEQ: &str = "9007199254740991";
+
+impl Marks {
+    fn new(seat: &StoredSeat, label: Option<Label>) -> Self {
+        Self {
+            room: seat.room,
+            writer: seat.writer,
+            label,
+            ranges: Vec::new(),
+        }
+    }
+
+    /// The estimated model tokens one tombstone of this writer takes at
+    /// its longest, with the comma that joins it: its range at the
+    /// widest seqs.
+    fn cost(&self) -> u64 {
+        let range = match self.label {
+            Some(_) => format!("A999999999·{WIDEST_SEQ}–{WIDEST_SEQ}"),
+            None => format!(
+                "parinn:room/{}/w/{}/{WIDEST_SEQ}-{WIDEST_SEQ}",
+                self.room, self.writer
+            ),
+        };
+        let longest = Tombstone {
+            range,
+            reason: TombstoneReason::Quarantined,
+        };
+        let with = Envelope {
+            tombstones: vec![longest],
+            ..Envelope::default()
+        };
+
+        tokens::estimate(&with.render()) - tokens::estimate(&Envelope::default().render()) + 1
+    }
+
+    fn is_empty(&self) -> bool {
+        self.ranges.is_empty()
+    }
+
+    /// Whether `seq`, which the call reaches after the seqs before it,
+    /// begins a tombstone of its own rather than extending the last.
+    fn begins(&self, seq: Seq, reason: TombstoneReason) -> bool {
+        !self
+            .ranges
+            .last()
+            .is_some_and(|(_, last, held)| *held == reason && last.next() == Some(seq))
+    }
+
+    /// Adds `seq` to the last tombstone, or begins one.
+    fn add(&mut self, seq: Seq, reason: TombstoneReason) {
+        if self.begins(seq, reason) {
+            self.ranges.push((seq, seq, reason));
+        } else if let Some((_, last, _)) = self.ranges.last_mut() {
+            *last = seq;
+        }
+    }
+
+    /// The tombstones, each range as ParleyInn renders it: with its
+    /// writer's label when it has one, else in the full form.
+    fn finish(self) -> Vec<Tombstone> {
+        self.ranges
+            .iter()
+            .map(|(first, last, reason)| Tombstone {
+                range: match (self.label, first == last) {
+                    (Some(label), true) => range::short(label, *first),
+                    (Some(label), false) => range::range(label, *first, *last),
+                    (None, _) => {
+                        format!("parinn:room/{}/w/{}/{first}-{last}", self.room, self.writer)
+                    }
+                },
+                reason: *reason,
+            })
+            .collect()
+    }
+}
+
+/// The refusal for a record that cannot be read, whatever failed.
+fn unreadable<E>(_: E) -> String {
+    UNREADABLE.to_owned()
 }
 
 /// What a range asks for, from its first event.
@@ -342,6 +552,22 @@ impl Budget {
         self.holds = true;
 
         Taken::Cut(cut, chars)
+    }
+
+    /// Takes the `cost` of a new tombstone, when `new`; whether the call
+    /// goes on. A tombstone that does not fit after others stops it,
+    /// for the next call to begin with.
+    fn mark(&mut self, new: bool, cost: u64) -> bool {
+        if !new {
+            return true;
+        }
+        if cost > self.left && self.holds {
+            return false;
+        }
+        self.left = self.left.saturating_sub(cost);
+        self.holds = true;
+
+        true
     }
 
     /// How many characters of `item`'s content fit in what is left.

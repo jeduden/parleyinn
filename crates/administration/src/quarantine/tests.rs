@@ -195,7 +195,8 @@ fn a_time_window_compares_to_the_second_and_holds_no_event_without_a_time() {
 }
 
 struct Fixture {
-    _dir: TempDir,
+    dir: TempDir,
+    home: Home,
     store: Store,
     node: Node,
     ingest: StoredSeat,
@@ -244,7 +245,8 @@ fn fixture() -> Fixture {
         .unwrap();
 
     Fixture {
-        _dir: dir,
+        dir,
+        home,
         store,
         node,
         ingest,
@@ -261,7 +263,7 @@ impl Fixture {
     }
 
     fn quarantine(&self) -> Quarantine<'_> {
-        Quarantine::load(&self.store, self.node.device_writer()).unwrap()
+        Quarantine::load(&self.store, self.node.personal_room()).unwrap()
     }
 }
 
@@ -361,4 +363,37 @@ fn a_quarantine_changes_no_origin() {
         crate::origin::derive(&f.store, &f.node.device().public()).unwrap(),
         before
     );
+}
+
+#[test]
+fn a_node_identity_change_keeps_the_acts_of_the_device_seat_it_replaced() {
+    let mut f = fixture();
+    let old = f.node.device_writer();
+    let selector = Selector::Provenance(Provenance::Web);
+    f.act(&Act::QuarantineAdd {
+        selector: selector.clone(),
+        reason: "before".to_owned(),
+    });
+    std::fs::write(f.dir.path().join("machine-id"), "second").unwrap();
+    f.node = Node::open(&f.home, &mut f.store, &mut OsEntropy).unwrap();
+    assert_ne!(f.node.device_writer(), old);
+
+    let devices = device_writers(&f.store, f.node.personal_room()).unwrap();
+
+    assert_eq!(devices, [old, f.node.device_writer()]);
+    assert!(f.quarantine().holds(f.at(2)).unwrap(), "still quarantined");
+    f.act(&Act::QuarantineRelease { selector });
+    assert!(
+        !f.quarantine().holds(f.at(2)).unwrap(),
+        "released by the new seat"
+    );
+}
+
+#[test]
+fn a_device_seat_of_another_room_holds_no_quarantine_of_this_node() {
+    let f = fixture();
+
+    let devices = device_writers(&f.store, room(7)).unwrap();
+
+    assert!(devices.is_empty());
 }

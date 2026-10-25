@@ -335,3 +335,31 @@ fn a_value_that_is_no_tombstone_is_none_and_one_covers_its_range_alone() {
     assert_eq!(Tombstone::from_value(&zero), None);
     assert_eq!(Reason::Purged.as_str(), "purged");
 }
+
+#[test]
+fn the_tombstones_of_the_personal_room_are_read_in_the_order_they_were_recorded() {
+    let mut f = fixture();
+    for (first, last) in [(1, 1), (4, 4)] {
+        let plan = ready(f.plan(first, last));
+        carry_out(&mut f.store, &f.node, &plan, None, &mut OsEntropy).unwrap();
+    }
+    f.store
+        .append(
+            f.node.device_writer(),
+            &[NewEvent {
+                content: json!({"not": "a tombstone"}),
+                ..line(7, EventKind::Tombstone)
+            }],
+        )
+        .unwrap();
+
+    let found = recorded(&f.store, f.node.personal_room()).unwrap();
+
+    let ranges: Vec<(u64, u64)> = found
+        .iter()
+        .map(|t| (t.first.get(), t.last.get()))
+        .collect();
+    assert_eq!(ranges, [(1, 1), (4, 4)]);
+    let other = RoomId::derive(&[9; 32], &[9; 16]);
+    assert!(recorded(&f.store, other).unwrap().is_empty());
+}

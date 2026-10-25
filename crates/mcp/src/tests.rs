@@ -7,6 +7,7 @@ use serde_json::{Value, json};
 use std::sync::mpsc;
 use testkit::TempDir;
 
+mod erasure_calls;
 mod recall_calls;
 mod search_calls;
 
@@ -449,11 +450,39 @@ fn serve_waits_past_an_idle_deadline_and_stops_on_a_read_error() {
 }
 
 #[test]
-fn an_event_whose_content_was_removed_is_refused() {
+fn an_event_whose_content_was_removed_without_a_tombstone_is_a_loss_and_says_so() {
     let f = fixture();
     let conn = rusqlite::Connection::open(f.home.store()).unwrap();
     conn.execute(
         &format!("UPDATE events SET content = NULL, commitment_key = NULL WHERE seq = 1 AND writer = '{}'", f.ingested.writer),
+        [],
+    )
+    .unwrap();
+    let mut server = f.server();
+
+    let result = event_get(
+        &mut server,
+        json!({"address": format!("{}:1", f.ingested.writer), "scope": "room"}),
+    );
+
+    assert_eq!(
+        refusal(&result),
+        format!(
+            "the content at parinn:room/{}/w/{}/1 was removed, and no tombstone records it: run parinn verify",
+            f.ingested.room, f.ingested.writer
+        )
+    );
+}
+
+#[test]
+fn an_event_whose_content_alone_was_removed_is_refused() {
+    let f = fixture();
+    let conn = rusqlite::Connection::open(f.home.store()).unwrap();
+    conn.execute(
+        &format!(
+            "UPDATE events SET content = NULL WHERE seq = 1 AND writer = '{}'",
+            f.ingested.writer
+        ),
         [],
     )
     .unwrap();

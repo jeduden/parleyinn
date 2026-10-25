@@ -11,6 +11,13 @@
 //! A quarantine changes no origin, no trust level and no key set: it is
 //! read beside them, never into them (PRV-13).
 //!
+//! The acts are read from the device seats of the node's personal room
+//! alone: every device seat the node ever had lies there, those of
+//! another node lie in rooms of their own, and an act of another node
+//! is a request its principal applies, not a quarantine (I8, PEER-11).
+//! Where a node identity change gave the node a second device seat, the
+//! genesis seat's acts come first.
+//!
 //! The selectors M1 reaches are an address range, a run, an author
 //! seat, a room, a writer, a provenance class, a flag and a time
 //! window. No event carries a flag before PRV-07 ships, so a flag
@@ -27,6 +34,7 @@ use serde_json::{Value, json};
 use store::Store;
 
 use crate::AdminError;
+use crate::origin::is_device_seat;
 
 /// The longest run name, flag or time a selector holds.
 const LONGEST: usize = 200;
@@ -273,30 +281,52 @@ pub struct QuarantineSet {
 pub const ADD: &str = "quarantine_add";
 pub const RELEASE: &str = "quarantine_release";
 
+/// The writers of the device seats in `room`, the node's personal room,
+/// the genesis seat's first (see the module's notes).
+///
+/// # Errors
+///
+/// Fails when the store does.
+pub fn device_writers(store: &Store, room: RoomId) -> Result<Vec<WriterId>, AdminError> {
+    let mut found = Vec::new();
+    for seat in store.seats()? {
+        if seat.room != room || !is_device_seat(&seat) {
+            continue;
+        }
+        let first = store.event(Address::new(seat.writer, Seq::FIRST))?;
+        let changed = first.is_some_and(|f| f.link.header.kind == EventKind::NodeIdentityChange);
+        found.push((changed, seat.writer));
+    }
+    found.sort();
+
+    Ok(found.into_iter().map(|(_, writer)| writer).collect())
+}
+
 impl QuarantineSet {
-    /// The quarantine set `store` holds for the node whose device seat's
-    /// writer is `device`: the selectors its acts added and none
+    /// The quarantine set `store` holds for the node whose device seats'
+    /// writers are `devices`: the selectors their acts added and none
     /// released, in the order they were added. An act that does not
     /// parse adds or releases nothing.
     ///
     /// # Errors
     ///
     /// Fails when the store does.
-    pub fn load(store: &Store, device: WriterId) -> Result<Self, AdminError> {
-        let acts = store.contents(device, EventKind::PrincipalAct)?;
+    pub fn load(store: &Store, devices: &[WriterId]) -> Result<Self, AdminError> {
         let mut active: Vec<Active> = Vec::new();
-        for (seq, act) in acts {
-            let Some(selector) = Selector::from_value(&act["selector"]) else {
-                continue;
-            };
-            match act["act"].as_str() {
-                Some(ADD) => active.push(Active {
-                    selector,
-                    act: seq,
-                    reason: act["reason"].as_str().unwrap_or_default().to_owned(),
-                }),
-                Some(RELEASE) => active.retain(|a| a.selector != selector),
-                _ => {}
+        for device in devices {
+            for (seq, act) in store.contents(*device, EventKind::PrincipalAct)? {
+                let Some(selector) = Selector::from_value(&act["selector"]) else {
+                    continue;
+                };
+                match act["act"].as_str() {
+                    Some(ADD) => active.push(Active {
+                        selector,
+                        act: seq,
+                        reason: act["reason"].as_str().unwrap_or_default().to_owned(),
+                    }),
+                    Some(RELEASE) => active.retain(|a| a.selector != selector),
+                    _ => {}
+                }
             }
         }
 
@@ -335,14 +365,13 @@ pub struct Quarantine<'s> {
 }
 
 impl<'s> Quarantine<'s> {
-    /// The quarantine of the node whose device seat's writer is
-    /// `device`.
+    /// The quarantine of the node whose personal room is `room`.
     ///
     /// # Errors
     ///
     /// Fails when the store does.
-    pub fn load(store: &'s Store, device: WriterId) -> Result<Self, AdminError> {
-        let set = QuarantineSet::load(store, device)?;
+    pub fn load(store: &'s Store, room: RoomId) -> Result<Self, AdminError> {
+        let set = QuarantineSet::load(store, &device_writers(store, room)?)?;
         let runs = if set.is_empty() {
             BTreeMap::new()
         } else {
