@@ -164,3 +164,15 @@ fn pieces_cut_a_line_at_its_string_literals() {
     // An escape at the very end runs past it, and the literal ends there.
     assert_eq!(literal_end(b"ab\\", 0), 3);
 }
+
+#[test]
+fn redact_text_redacts_a_secret_a_later_replacement_uncovers() {
+    let r = redactor(&["ACME-[0-9]{8}"]);
+    let out = r.redact_text(&format!("{AWS}ACME-12345678"));
+    assert_eq!(
+        out.text,
+        "[REDACTED:aws_access_key][REDACTED:extra_pattern_1]"
+    );
+    assert_eq!(r.redact_text(&out.text).text, out.text);
+    assert_eq!(out.rules, ["extra_pattern_1", "aws_access_key"]);
+}

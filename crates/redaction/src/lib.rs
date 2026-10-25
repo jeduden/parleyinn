@@ -60,6 +60,10 @@ pub struct Redactor {
     rules: Vec<RedactionRule>,
 }
 
+/// The most scans of one text: each scan that matches replaces text by
+/// a marker no rule matches, so a few settle any text.
+const MAX_PASSES: usize = 8;
+
 impl Redactor {
     /// The rule set and the principal's redaction patterns, with each
     /// pattern that is refused.
@@ -97,9 +101,27 @@ impl Redactor {
         Ok(Self { rules })
     }
 
-    /// `text` with every match replaced.
+    /// `text` with every match replaced. A replacement can end the text
+    /// that kept an earlier secret from matching (a key's word boundary
+    /// hidden by a principal's pattern after it), so it repeats until
+    /// nothing matches, within [`MAX_PASSES`].
     #[must_use]
     pub fn redact_text(&self, text: &str) -> Redacted {
+        let mut out = self.redact_pass(text);
+        for _ in 1..MAX_PASSES {
+            let next = self.redact_pass(&out.text);
+            if next.rules.is_empty() {
+                break;
+            }
+            out.text = next.text;
+            out.rules.extend(next.rules);
+        }
+
+        out
+    }
+
+    /// `text` with every match of one scan replaced.
+    fn redact_pass(&self, text: &str) -> Redacted {
         let mut spans: Vec<(usize, usize, usize)> = self
             .rules
             .iter()
