@@ -1124,6 +1124,17 @@ fn static_analysis_cases() -> Vec<Case> {
             check("derived_code_is_refused_a_clock_or_randomness_at_build_time"),
             "code that computes derived artifacts may read a clock or randomness: crate parinn: crates/parinn/clippy.toml does not ban std::time::Instant::now in disallowed-methods",
         ),
+        case(
+            "the core's code quieting a lint with a bare allow",
+            "the core's #![deny(clippy::allow_attributes)]",
+            Injection::replace(
+                "crates/parinn/src/licenses.rs",
+                "\nuse std::io::Write;\n",
+                "\n#[allow(unused_imports)]\nuse std::io::Write;\n",
+            ),
+            clippy("parinn"),
+            "#[allow] attribute found",
+        ),
     ]
 }
 

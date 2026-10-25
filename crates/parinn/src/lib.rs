@@ -7,6 +7,11 @@
 //! command in the SRS's §9.5 is a pending scenario under features/, and
 //! lands with the plan that makes its scenario pass.
 
+// A lint the core's code would quiet says so with an expectation and a
+// reason, which fails once nothing trips it; a bare allow does not
+// (SEC-01, ENG-16).
+#![deny(clippy::allow_attributes)]
+
 use std::cell::RefCell;
 use std::collections::BTreeMap;
 use std::ffi::OsString;

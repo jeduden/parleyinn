@@ -5,17 +5,13 @@
 //! links. A dependency joins `REACHABLE` in the same change that adds
 //! it, under review, with its reach weighed.
 
-#![allow(
+#![expect(
     clippy::disallowed_types,
     reason = "the test runs cargo metadata; the shipped code starts no program"
 )]
-#![allow(
+#![expect(
     clippy::disallowed_methods,
     reason = "the test waits for cargo metadata; the test run's own limit bounds it"
-)]
-#![allow(
-    clippy::unwrap_used,
-    reason = "a test's helpers unwrap: a failure is the assertion"
 )]
 
 use std::collections::BTreeSet;
