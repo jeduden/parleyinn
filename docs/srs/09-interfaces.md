@@ -138,7 +138,11 @@ that wrote the event (LANE-03), and `integrity` is the integrity status of the
 event's writer, one of §9.7.5's values. `run` is rendered relative (`current`
 for the agent's current run, `other` for any other) rather than as a raw
 identifier when the run is in scope. Items are ordered by score (`event_search`)
-or by seq within a writer (`event_expand`).
+or by seq within a writer (`event_expand`). A tool that stops at its per-call
+cap sets `truncated` and `next_cursor`; an event too long for one call is cut
+at a character boundary, its item flagged `cut`, and the item that continues it
+flagged `continued` (RCL-03). An envelope marked structural (`stat_list`)
+carries a `structural` object of counts and no item.
 
 ## 9.4 Restore block
 
