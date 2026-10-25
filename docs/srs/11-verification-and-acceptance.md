@@ -14,6 +14,14 @@ MUST use the Claude models and Claude Code versions used in production**, with
 at least three repetitions and reported confidence intervals. Published numbers
 from other systems are reference points only.
 
+M1's exit criterion for recall after one to three compactions (§12.2) comes
+before any model runs in CI. It is measured without a model. A scripted agent
+asks `event_search` for each planted value, then reads each hit with
+`event_get`. An answer counts when the exact value comes back inside the
+envelope within the default page of hits. This measures what recall puts in
+front of the model, not what the model makes of it. The model runs above
+replace it for v1.0.
+
 **Baselines:** (base-0) plain Claude Code; (base-1) Claude Code with
 lossless-claude/lcm; (C) ParleyInn full; (C−L) ParleyInn without landmarks;
 (C−K) ParleyInn
