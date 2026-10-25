@@ -2,7 +2,11 @@
 //! one snapshot of the store and checked against this node's device key:
 //!
 //! - every writer's chain (REC-10) and every cited head;
-//! - every stored content against its commitment (REC-17);
+//! - every stored content against its commitment (REC-17), and content
+//!   a purge erased against the tombstone that holds its commitment
+//!   (ADM-07): a range without content has a tombstone whose count and
+//!   digest of commitments the chained headers confirm, and no tombstoned
+//!   event keeps its content or its key;
 //! - the inceptions of the node's device keys (PRV-12): a device seat a
 //!   key certified whose log begins with that key's `minted` key event,
 //!   or with a node identity change event naming it and then its
@@ -45,6 +49,7 @@ use store::{Segment, Store, StoreError, Stored, StoredSeat};
 use crate::AdminError;
 use crate::node::{Node, begins_genesis};
 use crate::origin;
+use crate::purge::{Tombstone, commitments_digest};
 use crate::repository;
 
 /// What a verified record holds, and the causal order its cited heads
@@ -98,6 +103,9 @@ pub enum VerifyError {
     /// This event's stored content does not open its commitment, or was
     /// removed with no tombstone to record it.
     Content { address: String, removed: bool },
+    /// The tombstone at this address does not match the events it names
+    /// (ADM-07).
+    Tombstone { address: String, reason: String },
     /// The key event at this address does not check.
     KeyEvent { address: String, reason: String },
     /// The certificate record at this address names no seat the store
@@ -118,6 +126,11 @@ pub enum VerifyError {
     /// derives (I10): the identity kept for this worktree, named by its
     /// digest, or one the record holds and the store does not.
     DerivedWorktree { worktree: String },
+    /// The store holds schema objects this build does not ship (ADM-09).
+    Unshipped { objects: Vec<String> },
+    /// The search index differs from what the record derives, or from
+    /// the ranking a new one has (ADM-09, I10).
+    Index { reason: &'static str },
     /// A segment is of a newer format version than this parinn's: it is
     /// refused and left as it is (ADM-05).
     NewerSegment(Segment),
@@ -138,17 +151,44 @@ impl VerifyError {
         match self {
             Self::Broken { .. } => "chain",
             Self::Content { .. } => "content",
+            Self::Tombstone { .. } => "tombstone",
             Self::KeyEvent { .. } => "key_event",
             Self::Record { .. } => "certificate_record",
             Self::Provenance { .. } => "provenance",
             Self::Seat { .. } => "seat",
             Self::Genesis(_) => "genesis",
-            Self::Derived { .. } | Self::DerivedWorktree { .. } => "derived_artifact_consistency",
+            Self::Derived { .. }
+            | Self::DerivedWorktree { .. }
+            | Self::Unshipped { .. }
+            | Self::Index { .. } => "derived_artifact_consistency",
             Self::NewerSegment(_) => "newer_segment",
             Self::Segments { .. } => "segment",
             Self::Payload { .. } => "payload",
             Self::Corrupt(_) => "corrupt",
             Self::Store(_) => "store",
+        }
+    }
+
+    /// The check of ADM-09 the failure belongs to, as `parinn verify`
+    /// names it.
+    #[must_use]
+    pub fn check(&self) -> &'static str {
+        match self {
+            Self::Broken { .. }
+            | Self::Tombstone { .. }
+            | Self::KeyEvent { .. }
+            | Self::Record { .. }
+            | Self::Provenance { .. }
+            | Self::Seat { .. }
+            | Self::Genesis(_)
+            | Self::Segments { .. }
+            | Self::NewerSegment(_) => "hash chain",
+            Self::Content { .. } | Self::Payload { .. } => "payload integrity",
+            Self::Derived { .. }
+            | Self::DerivedWorktree { .. }
+            | Self::Unshipped { .. }
+            | Self::Index { .. } => "derived artifact consistency",
+            Self::Corrupt(_) | Self::Store(_) => "store",
         }
     }
 
@@ -159,6 +199,7 @@ impl VerifyError {
         match self {
             Self::Broken { address, .. }
             | Self::Content { address, .. }
+            | Self::Tombstone { address, .. }
             | Self::KeyEvent { address, .. }
             | Self::Record { address }
             | Self::Provenance { address, .. }
@@ -167,6 +208,8 @@ impl VerifyError {
             | Self::Genesis(_)
             | Self::Derived { .. }
             | Self::DerivedWorktree { .. }
+            | Self::Unshipped { .. }
+            | Self::Index { .. }
             | Self::NewerSegment(_)
             | Self::Segments { .. }
             | Self::Corrupt(_)
@@ -190,6 +233,9 @@ impl fmt::Display for VerifyError {
                 address,
                 removed: false,
             } => write!(f, "the content at {address} does not open its commitment"),
+            Self::Tombstone { address, reason } => {
+                write!(f, "the tombstone at {address} does not check: {reason}")
+            }
             Self::KeyEvent { address, reason } => {
                 write!(f, "the key event at {address} does not check: {reason}")
             }
@@ -214,12 +260,18 @@ impl fmt::Display for VerifyError {
             Self::Genesis(why) => f.write_str(why),
             Self::Derived { writer } => write!(
                 f,
-                "derived artifact consistency: the origin kept for writer {writer} differs from the record's: run parinn rebuild"
+                "the origin kept for writer {writer} differs from the record's: run parinn rebuild"
             ),
             Self::DerivedWorktree { worktree } => write!(
                 f,
-                "derived artifact consistency: the identity kept for worktree {worktree} differs from the record's: run parinn rebuild"
+                "the identity kept for worktree {worktree} differs from the record's: run parinn rebuild"
             ),
+            Self::Unshipped { objects } => write!(
+                f,
+                "the store holds schema objects this parinn does not ship: {}",
+                objects.join(", ")
+            ),
+            Self::Index { reason } => write!(f, "the search index {reason}: run parinn rebuild"),
             Self::Corrupt(e) | Self::Store(e) => write!(f, "{e}"),
         }
     }
@@ -241,6 +293,54 @@ impl From<StoreError> for VerifyError {
             e => Self::Store(e),
         }
     }
+}
+
+/// How far [`verify_shape`] got.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Shape {
+    /// Every part of the shape was checked and holds.
+    Checked,
+    /// The schema and the ranking hold, but deriving the search index
+    /// again ran out of time: the index is neither passed nor failed
+    /// (ENG-03, I6).
+    IndexUnfinished,
+}
+
+/// Checks the store's own shape (ADM-09): it holds no schema object this
+/// build does not ship, and its search index has the shipped
+/// ranking and is what the record derives (I10). A store with no
+/// search index has none to check. The index is derived again on a read
+/// of the store, holding no write lock, while `time_left` says time
+/// remains.
+///
+/// # Errors
+///
+/// Fails at the first difference, naming it, or when the store fails.
+pub fn verify_shape(store: &Store, time_left: &dyn Fn() -> bool) -> Result<Shape, VerifyError> {
+    let objects = store.foreign_schema_objects()?;
+    if !objects.is_empty() {
+        return Err(VerifyError::Unshipped { objects });
+    }
+    let ranks = match store.search_index_ranking_is_shipped() {
+        Err(StoreError::NoIndex) => return Ok(Shape::Checked),
+        other => other?,
+    };
+    if !ranks {
+        return Err(VerifyError::Index {
+            reason: "ranks in a way this parinn does not ship",
+        });
+    }
+    let derived = match store.search_index_is_derived(time_left) {
+        Err(StoreError::Cancelled) => return Ok(Shape::IndexUnfinished),
+        other => other?,
+    };
+    if derived {
+        return Ok(Shape::Checked);
+    }
+
+    Err(VerifyError::Index {
+        reason: "differs from what the record derives",
+    })
 }
 
 /// The provenance classes only a device seat records, and, for
@@ -292,13 +392,16 @@ pub fn verify(store: &Store, node_key: &PublicKey) -> Result<Report, VerifyError
         open_segments.extend(segments.last().filter(|s| !s.closed).cloned());
         let links: Vec<Link> = log.iter().map(|s| s.link.clone()).collect();
         chain::check_writer(writer, &links).map_err(broken)?;
-        if let Some(s) = log.iter().find(|s| !opens(s)) {
+        held.insert(writer, log);
+    }
+    let purged = tombstones(&held, &full)?;
+    for log in held.values() {
+        if let Some(s) = log.iter().find(|s| !opens(s) && !purged.holds(s)) {
             return Err(VerifyError::Content {
                 address: full(s.link.header.address),
                 removed: s.content.is_none() && s.commitment_key.is_none(),
             });
         }
-        held.insert(writer, log);
     }
     let record: BTreeMap<WriterId, Vec<Link>> = held
         .iter()
@@ -329,6 +432,79 @@ pub fn verify(store: &Store, node_key: &PublicKey) -> Result<Report, VerifyError
         seats: certs.iter().map(|(w, c)| seat_report(*w, c)).collect(),
         open_segments,
     })
+}
+
+/// The ranges the tombstones of the record cover, each checked against
+/// the events it names.
+struct Purged(Vec<Tombstone>);
+
+impl Purged {
+    /// Whether `stored` is an event a tombstone covers whose content is
+    /// erased: the only content a record may lack.
+    fn holds(&self, stored: &Stored) -> bool {
+        let erased =
+            stored.content.is_none() && stored.commitment_key.is_none() && stored.payload.is_none();
+
+        erased && self.0.iter().any(|t| t.covers(stored.link.header.address))
+    }
+}
+
+/// Every tombstone `held` records, checked: it names events of a writer
+/// the record holds, its count and the digest of their commitments are
+/// the chained headers', and none of them keeps its content or key
+/// (ADM-07, REC-17).
+fn tombstones(
+    held: &BTreeMap<WriterId, Vec<Stored>>,
+    full: &dyn Fn(Address) -> String,
+) -> Result<Purged, VerifyError> {
+    let mut out = Vec::new();
+    for stored in held.values().flatten() {
+        if stored.link.header.kind != EventKind::Tombstone {
+            continue;
+        }
+        let at = full(stored.link.header.address);
+        let wrong = |reason: &str| VerifyError::Tombstone {
+            address: at.clone(),
+            reason: reason.to_owned(),
+        };
+        let tombstone = stored
+            .content
+            .as_ref()
+            .and_then(Tombstone::from_value)
+            .ok_or_else(|| wrong("it holds no range, count and digest"))?;
+        let covered: Vec<&Stored> = held
+            .get(&tombstone.writer)
+            .map_or(&[][..], Vec::as_slice)
+            .iter()
+            .filter(|s| tombstone.covers(s.link.header.address))
+            .collect();
+        let hex: Vec<String> = covered
+            .iter()
+            .map(|s| s.link.header.commitment.to_string())
+            .collect();
+        let named = covered.len() as u64 == tombstone.count
+            && covered.first().map(|s| s.link.header.address.seq) == Some(tombstone.first)
+            && covered.last().map(|s| s.link.header.address.seq) == Some(tombstone.last);
+        if !named {
+            return Err(wrong("it names events the record does not hold"));
+        }
+        if commitments_digest(&hex) != tombstone.commitments {
+            return Err(wrong(
+                "the commitments of the events it names differ from its digest",
+            ));
+        }
+        if covered
+            .iter()
+            .any(|s| s.content.is_some() || s.commitment_key.is_some())
+        {
+            return Err(wrong(
+                "an event it names still keeps its content or its key",
+            ));
+        }
+        out.push(tombstone);
+    }
+
+    Ok(Purged(out))
 }
 
 /// Checks that every origin the store keeps is the one the record and

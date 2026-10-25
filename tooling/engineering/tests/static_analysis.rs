@@ -53,6 +53,17 @@ fn derived_code_is_refused_a_clock_or_randomness_at_build_time() {
     assert!(problems.is_empty(), "{}", problems.join("\n"));
 }
 
+/// Restore content is built from trusted text alone: `TrustedText` is
+/// constructed only inside the `restore_block` crate, and there only
+/// from qualifying pins, sanitized structural fields and fixed text
+/// (SEC-07, ENG-16).
+#[test]
+fn restore_content_is_built_from_trusted_text_alone() {
+    let problems = engineering::trusted_text::constructions(&checkout());
+
+    assert!(problems.is_empty(), "{}", problems.join("\n"));
+}
+
 /// Function complexity is held at build time: the workspace lints deny
 /// clippy's complexity lints, and every crate's clippy configuration
 /// holds each threshold at or below its ceiling.

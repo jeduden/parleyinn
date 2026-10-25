@@ -86,6 +86,14 @@ impl Disk for Recording {
     fn read(&self, path: &Path) -> io::Result<Vec<u8>> {
         OsDisk.read(path)
     }
+
+    fn remove(&self, path: &Path) -> io::Result<()> {
+        self.0
+            .lock()
+            .unwrap()
+            .push(format!("remove {}", file(path)));
+        OsDisk.remove(path)
+    }
 }
 
 fn file(path: &Path) -> String {
@@ -165,6 +173,9 @@ impl Disk for Failing {
     fn read(&self, _: &Path) -> io::Result<Vec<u8>> {
         Err(io::Error::other("no read"))
     }
+    fn remove(&self, _: &Path) -> io::Result<()> {
+        Err(io::Error::other("no remove"))
+    }
 }
 
 #[test]
@@ -207,4 +218,63 @@ fn the_payload_store_shows_where_it_is() {
     let payloads = Payloads::new(PathBuf::from("/h/payloads"), Box::new(OsDisk));
 
     assert!(format!("{payloads:?}").contains("/h/payloads"));
+}
+
+#[test]
+fn a_payload_is_removed_with_a_temporary_file_a_crash_left_for_it() {
+    let dir = TempDir::new().unwrap();
+    let ops = Recording::default();
+    let payloads = Payloads::new(dir.path().join("payloads"), Box::new(ops.clone()));
+    let name = name(&key(1));
+    payloads.write(&name, b"content").unwrap();
+    std::fs::write(
+        dir.path().join("payloads").join(format!(".tmp-{name}")),
+        "a crash left this",
+    )
+    .unwrap();
+    ops.0.lock().unwrap().clear();
+
+    payloads.remove(&name).unwrap();
+
+    assert_eq!(
+        *ops.0.lock().unwrap(),
+        [format!("remove .tmp-{name}"), format!("remove {name}")]
+    );
+    assert_eq!(
+        std::fs::read_dir(dir.path().join("payloads"))
+            .unwrap()
+            .count(),
+        0
+    );
+}
+
+#[test]
+fn removing_a_payload_that_is_not_there_is_already_done() {
+    let dir = TempDir::new().unwrap();
+    std::fs::create_dir_all(dir.path().join("payloads")).unwrap();
+    let payloads = Payloads::new(dir.path().join("payloads"), Box::new(OsDisk));
+
+    payloads.remove(&name(&key(1))).unwrap();
+}
+
+#[test]
+fn only_a_payload_name_is_removed() {
+    let dir = TempDir::new().unwrap();
+    let payloads = Payloads::new(dir.path().to_path_buf(), Box::new(OsDisk));
+    std::fs::write(dir.path().join("store.db"), "the record").unwrap();
+
+    let err = payloads.remove("../store.db").unwrap_err();
+
+    assert_eq!(err.kind(), io::ErrorKind::InvalidInput);
+    assert!(dir.path().join("store.db").exists());
+}
+
+#[test]
+fn a_file_that_cannot_be_removed_says_why() {
+    let dir = TempDir::new().unwrap();
+    std::fs::create_dir_all(dir.path().join("payloads").join(name(&key(1)))).unwrap();
+    let payloads = Payloads::new(dir.path().join("payloads"), Box::new(OsDisk));
+
+    assert!(payloads.remove(&name(&key(1))).is_err());
+    assert!(Failing.remove(dir.path()).is_err());
 }

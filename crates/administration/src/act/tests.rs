@@ -413,3 +413,66 @@ fn a_repository_bind_is_a_widening_act_that_records_the_identity_it_names() {
     };
     assert_eq!(provisional.content()["repository_provisional"], "ab");
 }
+
+#[test]
+fn a_quarantine_is_a_cut_act_and_its_release_and_a_purge_are_widening() {
+    let selector = Selector::run("session-1").unwrap();
+    let add = Act::QuarantineAdd {
+        selector: selector.clone(),
+        reason: "suspect content".to_owned(),
+    };
+    let release = Act::QuarantineRelease {
+        selector: selector.clone(),
+    };
+    let purge = Act::Purge {
+        ranges: vec!["w:1-2".to_owned()],
+        reason: Some("a secret".to_owned()),
+    };
+
+    assert_eq!(class_of("quarantine_add"), Class::Cut);
+    assert_eq!(class_of("quarantine_release"), Class::Widening);
+    assert_eq!(class_of("purge"), Class::Widening);
+    assert_eq!((add.name(), add.class()), ("quarantine_add", Class::Cut));
+    assert_eq!(release.class(), Class::Widening);
+    assert_eq!((purge.name(), purge.class()), ("purge", Class::Widening));
+    assert_eq!(
+        add.content(),
+        json!({
+            "act": "quarantine_add", "class": "cut", "principal_surface": "cli",
+            "selector": selector.to_value(), "reason": "suspect content",
+        })
+    );
+    assert_eq!(release.content()["selector"], selector.to_value());
+    assert_eq!(purge.content()["ranges"], json!(["w:1-2"]));
+    assert_eq!(purge.content()["reason"], "a secret");
+    let silent = Act::Purge {
+        ranges: vec![],
+        reason: None,
+    };
+    assert!(silent.content().get("reason").is_none());
+}
+
+#[test]
+fn a_cut_quarantine_needs_a_terminal_alone_and_a_purge_the_risk_acceptance_too() {
+    let add = Act::QuarantineAdd {
+        selector: Selector::flag("instruction_like").unwrap(),
+        reason: String::new(),
+    };
+    let purge = Act::Purge {
+        ranges: vec![],
+        reason: None,
+    };
+    let open = Gate {
+        open: OpenRisks {
+            risks: all(),
+            runs: vec![],
+        },
+        ..gate()
+    };
+
+    assert_eq!(permit(&add, &open), Ok(()));
+    assert!(matches!(
+        permit(&purge, &open),
+        Err(Refusal::OpenRisks { .. })
+    ));
+}

@@ -112,6 +112,14 @@ fn a_store_closed_without_a_checkpoint_leaves_its_log_to_the_next_opener() {
 }
 
 #[test]
+fn the_store_tells_its_schema_version() {
+    let dir = TempDir::new().unwrap();
+    let store = open(&dir);
+
+    assert_eq!(store.schema_version().unwrap(), SCHEMA_VERSION);
+}
+
+#[test]
 fn a_store_of_a_newer_version_is_refused_and_named() {
     let dir = TempDir::new().unwrap();
     let store = open(&dir);
@@ -778,6 +786,9 @@ fn a_payload_goes_through_the_store_s_disk() {
         fn read(&self, path: &Path) -> std::io::Result<Vec<u8>> {
             OsDisk.read(path)
         }
+        fn remove(&self, path: &Path) -> std::io::Result<()> {
+            OsDisk.remove(path)
+        }
     }
     let dir = TempDir::new().unwrap();
     let count = Count::default();
@@ -1177,7 +1188,7 @@ fn a_read_only_store_without_its_schema_is_corrupt() {
 }
 
 #[test]
-fn a_payload_that_is_not_utf_8_is_corrupt() {
+fn a_payload_that_is_not_utf_8_is_a_payload_fault() {
     let dir = TempDir::new().unwrap();
     let mut store = open(&dir);
     store.append(writer(1), &[sized_event(1, 9000)]).unwrap();
@@ -1191,7 +1202,7 @@ fn a_payload_that_is_not_utf_8_is_corrupt() {
     let err = store.log(writer(1)).unwrap_err();
 
     assert!(
-        matches!(&err, StoreError::Corrupt { address: Some(_), what } if what.contains("not UTF-8")),
+        matches!(&err, StoreError::Payload { source, .. } if source.to_string().contains("not UTF-8")),
         "{err}"
     );
 }

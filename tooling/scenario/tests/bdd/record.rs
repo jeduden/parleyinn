@@ -243,6 +243,12 @@ pub fn last_run(w: &mut World) -> Result<&Output, String> {
 
 #[when(regex = r#"^the person runs "parinn ([^"]*)"$"#)]
 fn person_runs(w: &mut World, args: String) -> Result<(), String> {
+    crate::erasure::person_runs(w, &args)
+}
+
+/// Runs `parinn` with `args` as a person's command, split at white
+/// space.
+pub fn person_command(w: &mut World, args: &str) -> Result<(), String> {
     let args: Vec<&str> = args.split_whitespace().collect();
     run_core(w, &args, None)
 }

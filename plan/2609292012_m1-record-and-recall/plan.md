@@ -46,12 +46,11 @@ how the components ship.
 
 ### Scope
 
-§12.2 lists M1's scope, and this plan takes all of it. These rows
-land in full:
+§12.2 lists M1's scope, and this plan takes all of it. These rows land in full:
 
 - REC P0, PRV P0 (PRV-01 to PRV-06, PRV-08, PRV-09, PRV-11, PRV-14)
   and RCL P0, with RCL-08
-- MEM-01, SEC-02 to SEC-08, SEC-12, SEC-15 to SEC-19 and SEC-22
+- MEM-01, SEC-02 to SEC-08, SEC-12, SEC-15, SEC-16, SEC-18 and SEC-22
 - OPS-01 to OPS-03, ADM-04, ADM-09 and ADM-11
 - LANE-02 and OWN-01
 
@@ -77,6 +76,8 @@ These land in part, as §12.2 bounds them or as their scenarios reach past M1:
 | SEC-10         | keys kept per ruling 2; no key in the store, a log or output            | backup M3, at-rest key M5, launch M7 |
 | LANE-01        | routing to personal-room and device seats; branch links                 | joins, M2 and M7                     |
 | ADM-13         | the core writes to no git repository                                    | install M2; commit hook, launcher M7 |
+| SEC-17, SEC-19 | the threat model and the register's check, as tripwires                 | the review and the release gate      |
+| ENG-22         | statements found by phrase, each citing a test that exists              | every statement, a passing test      |
 
 A scenario of a row that lands in part stays `@pending`, its M1 part
 proven by bound steps or named tests, as ENG-12 in plan 2609292011. One
@@ -90,23 +91,13 @@ ENG-08 prove CON-05.
 
 ### What the spikes left
 
-- **S2** ([ADR-2610110553], proposed): `rusqlite` without default
-  features, SQLite without extension loading, a C compiler and both musl
-  targets' headers pinned on the Linux builder. BM25 ranks the newest
-  2,000 matches, 172 ms p95 (NFR-03).
-- **S7** ([ADR-2610102211], proposed): an in-house stdio MCP server.
-- **S1, S3 and S13**: Claude Code 2.1.296's hook inputs and transcripts
-  under `testdata/claude-code`. The parser's cargo-fuzz target is seeded
-  from them (ENG-07). A fork's repeated lines are recorded once
-  (REC-04), the MCP server ingests live (REC-13), and a drifting line
-  stays untrusted `harness_text` (REC-26).
-- **S8**: the conservative model-token estimator of §8.4. Six targets
-  freeze when M1 builds what uses them (§12.3): NFR-09's overhead,
-  REC-11's cap, REC-17's secret, RCL-02's hits, RCL-03's cap and
-  SEC-04's terms.
-- **S12** (plan 2610012322): index row ids derive from addresses; a
-  purge sets `secure_delete` and FTS5's `secure-delete` and checkpoints
-  the WAL; a `user` event's trust needs the deployment mode.
+S2 ([ADR-2610110553]): `rusqlite`, no extension loading, BM25 over the
+newest 2,000 matches in 172 ms p95 (NFR-03). S7 ([ADR-2610102211]): an
+in-house stdio MCP server. S1, S3 and S13: Claude Code 2.1.296's hook
+inputs and transcripts in `testdata/claude-code`, which seed the
+parser's fuzz target (ENG-07). S8: the §8.4 estimator; six §12.3
+targets freeze when M1 builds what uses them. S12 (plan 2610012322):
+row ids from addresses, secure delete and a WAL checkpoint on purge.
 
 ### The stakeholder's rulings of 14 October 2026
 
@@ -114,15 +105,10 @@ The stakeholder ruled on these in the session that re-planned M1, and
 consents to them on [pull request #46][pr46]. Rulings 3 and 4 also
 changed M1's row in §12.2.
 
-1. **The dependency budget (ENG-18).** ENG-18's target of ten counts
-   only direct dependencies linked into a shipped executable. Test,
-   fuzz and tooling crates still need an accepted ADR and an allowed
-   license, but do not count. ENG-18 and its gate are stakeholder
-   paths, so their rewording, with a drift case, lands as its own pull
-   request before phases 4, 5 and 7 add crates past ten. The
-   core then holds about nine: `rusqlite`, `serde_json`, `tracing`,
-   `toml`, `sha2`, `ed25519-dalek`, `getrandom` and one key-store crate
-   per OS.
+1. **The dependency budget (ENG-18).** ENG-18's ten counts only direct
+   dependencies linked into a shipped executable; test, fuzz and
+   tooling crates need an ADR and an allowed license but do not count.
+   Its rewording landed as its own pull request before phases 4, 5 and 7.
 2. **Key stores (SEC-10).** macOS keeps keys in its Keychain through
    `security-framework`, whose `unsafe` stays inside that crate. Windows
    keeps them in a file DPAPI protects, through `windows-sys` in one
@@ -133,18 +119,15 @@ changed M1's row in §12.2.
    this in an ADR. `@SEC-10`'s scenario also needs a backup (M3), the
    at-rest key (SEC-09, M5) and keys handed over at launch (M7), so
    SEC-10 lands in part.
-3. **Migrations (ADM-05).** M1 ships format version 1, so nothing
-   migrates yet. M1 versions every segment and the store, and refuses
-   and names anything newer; `parinn status` then exits 3. `parinn
-   migrate` and the ADM-06 backup it runs first come with the first
-   real format change, in M3. ADM-05 lands in part.
+3. **Migrations (ADM-05).** M1 ships format version 1 and refuses,
+   naming it, anything newer; `parinn migrate` and its ADM-06 backup
+   come with the first format change, in M3. ADM-05 lands in part.
 4. **Purge (ADM-07).** M1 ships `parinn purge --range` as a widening
    principal act. Phase 14 builds the tombstone, the erasure of each
-   purged event's commitment key and payload, SQLite's and FTS5's
-   secure delete with a WAL checkpoint, the audit entry, and the
-   refusal of a range that holds a pending ingest marker. ADM-07's
-   other scopes, SEC-31's copies and seal rewrites stay in M3. ADM-07
-   lands in part.
+   purged event's commitment key and payload, SQLite's and FTS5's secure
+   delete with a WAL checkpoint, the audit entry, the refusal of a range
+   holding a pending ingest marker and SEC-22's retention purge. Other
+   scopes, SEC-31's copies and seal rewrites stay in M3.
 
 ## Tasks
 
@@ -169,19 +152,17 @@ changed M1's row in §12.2.
    REC-19's segment closing; the gap-free `seq` property (ENG-08);
    crash consistency over ingest (ENG-06); freeze
    NFR-09's overhead and REC-17's secret
-7. The transcript parser and provenance: PRV-01, PRV-03, PRV-08,
-   REC-05, REC-26; the parser's fuzz target and its nightly run; the
-   transcript contract replay and the residual-identifier check
-   (ENG-17)
+7. The transcript parser and provenance: PRV-01, PRV-03, PRV-08, REC-05,
+   REC-26; the parser's fuzz target and its nightly run; the transcript
+   contract replay and the residual-identifier check (ENG-17)
 8. `parinn ingest`: REC-01 to REC-04, REC-07, REC-08, REC-22; the
    properties of a harness fork's ingest order and of ingesting twice
    (ENG-08); the NFR-04 benchmark
 9. The hook handlers: SEC-16, the session binding, prompt commitments
-   and the attended mark (PRV-04, PRV-08), holding a run's
-   hook observations, held at its ingest marker, until its MCP server
-   holds its run-seat key (REC-19);
-   the hook input decoder's fuzz target and the hook input contract
-   replay (ENG-17); the NFR-01 and NFR-02 benchmarks
+   and the attended mark (PRV-04, PRV-08), holding a run's hook
+   observations at its ingest marker until its MCP server holds its
+   run-seat key (REC-19); the hook input decoder's fuzz target and the
+   hook input contract replay (ENG-17); the NFR-01 and NFR-02 benchmarks
 10. The MCP server and live ingest: REC-13, PRV-14, run-seat keys in
     memory (SEC-10), concurrent appends (REC-06), with the gap-free
     `seq` property rerun under concurrency
@@ -206,9 +187,8 @@ changed M1's row in §12.2.
 
 ## Execution
 
-Phase 1 fixed the test approach the others copy. ENG-18's rewording
-landed before phases 4, 5 and 7. Tracks 2 then 3; 4; 5 then 6; 7 ran in
-parallel. Phases 8 to 16 follow in order; each spec is written at its turn.
+Phase 1 fixed the test approach; ENG-18's rewording landed before 4, 5
+and 7. Tracks 2-3; 4; 5-6; 7 ran in parallel; 8 to 16 run in order.
 
 | Phase | Model  | Gate                                                                                                                                                     |
 | ----- | ------ | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -276,6 +256,14 @@ footer: |
 |     | ↳      | @MEM-01 and @OWN-01 off @pending and passing. Each event's trust level and origin derive from the record and the node's key set alone, nothing stores them, and parinn rebuild and parinn verify keep the kept origins honest. A repository's identity is read inside the core; @LANE-02 stays @pending for a ruling. @PRV-02 passes narrowed; @PRV-06 and @PRV-13 are proven by named tests.                          |
 | 12  | ✅     | [Search: the search index, the query compiler and event_search](phase-12.md)                                                                                                                                                                                                                                                                                                                                           |
 |     | ↳      | @REC-11 and @SEC-04 off @pending and passing. Event and payload text is indexed in the append transaction up to 1 MiB, and event_search finds it by literal terms, ranked by BM25 over the newest 2,000 matches, damped per run. @RCL-02 cannot pass in M1 and is raised; NFR-03 is benchmarked; the index is a derived file of its own, so the record holds 1.42x its text, within NFR-09's 1.5x; the index is 0.75x. |
+| 13  | ✅     | [Recall and the envelope: the six recall tools, scopes and recall events](phase-13.md)                                                                                                                                                                                                                                                                                                                                 |
+|     | ↳      | @RCL-01, @RCL-03, @RCL-04, @RCL-05, @RCL-07, @SEC-06 and @SEC-07 off @pending and passing. The six recall tools answer in the envelope under the 8,000-token cap and a cursor, in the calling run's scope unless the call widens it, and each leaves a recall event; the envelope's golden files match. @RCL-08 stays @pending on purge and quarantine (phase 14).                                                     |
+| 14  | ✅     | [Quarantine and parinn purge --range](phase-14.md)                                                                                                                                                                                                                                                                                                                                                                     |
+|     | ↳      | @RCL-06, @REC-17 and @SEC-22 off @pending and passing; so are @RCL-08 and @REC-06, whose purged-range steps now run. A purge erases a range and records a tombstone in one transaction, a quarantine holds events out of recall by selector, and an ingest purges what a retention policy has aged out. @SEC-12 passes seven rows of eight and stays @pending: its flag row needs PRV-07 (M5).                         |
+| 15  | ✅     | [Operations: verify, status, audit, the boundary and the threat model](phase-15.md)                                                                                                                                                                                                                                                                                                                                    |
+|     | ↳      | @ADM-11, @OPS-01 and @SEC-15 off @pending and passing; SEC-01's core row passes as gate tests. @ADM-09 passes seven rows of eight and stays @pending (landmarks, M2). @SEC-17, @SEC-19 and @ENG-22 are bound in part and stay @pending, their findings raised below.                                                                                                                                                   |
+| 16  | ✅     | [Exit: the engineering gates, the recall evaluation and the S12 rebuild test](phase-16.md)                                                                                                                                                                                                                                                                                                                             |
+|     | ↳      | @ENG-03, @ENG-07 and @ENG-11 off @pending and passing. parinn-eval recalls 216 of 216 planted values after one to three compactions within ten hits; the S12 rebuild test passes. @ENG-06, @ENG-09, @ENG-15, @ENG-23 and @ENG-29 stay @pending, each raised.                                                                                                                                                           |
 <?/catalog?>
 
 ## Acceptance Criteria
@@ -283,24 +271,24 @@ footer: |
 - [ ] Every scenario of a row M1 lands in full passes, off `@pending`
 - [ ] Each row M1 lands in part has its M1 part proven, and its
   scenario names what keeps it pending
-- [ ] Recall of at least 95% after 1 to 3 compactions on the §11.1
+- [x] Recall of at least 95% after 1 to 3 compactions on the §11.1
   evaluation
 - [ ] `parinn verify` proves completeness, and quarantine is effective
-- [ ] Two writers' logs rebuild one search index identical in content
+- [x] Two writers' logs rebuild one search index identical in content
   in either order (S12)
 - [ ] A purged event leaves no value that confirms a guess at it
-- [ ] Every dependency M1 adds has an accepted ADR (ENG-18, ENG-26),
+  (open: phase-15.result.md's erasure residue finding)
+- [x] Every dependency M1 adds has an accepted ADR (ENG-18, ENG-26),
   within the budget the stakeholder rules
-- [ ] ENG-11's coverage floors hold for every security-sensitive crate
-- [ ] The fuzz targets of ENG-07 run nightly from committed corpora
-- [ ] The six targets §12.3 assigns to M1 are frozen, each with its
+- [x] ENG-11's coverage floors hold for every security-sensitive crate
+- [x] The fuzz targets of ENG-07 run nightly from committed corpora
+- [x] The six targets §12.3 assigns to M1 are frozen, each with its
   evidence
-- [ ] @ENG-03 and @ENG-15 pass, closing plan 2609292011's phases 3
-  and 4
-- [ ] All tests pass: `cargo test --workspace`
-- [ ] `cargo clippy --workspace --all-targets --locked -- -D warnings`
+- [ ] @ENG-03 (passes) and @ENG-15 close plan 2609292011's 3 and 4
+- [x] All tests pass: `cargo test --workspace`
+- [x] `cargo clippy --workspace --all-targets --locked -- -D warnings`
   and `cargo fmt --all --check` are clean
-- [ ] `mdsmith check .` is clean
+- [x] `mdsmith check .` is clean
 
 [ADR-2610112209]: ../../docs/adr/ADR-2610112209-invariants-after-s1-s3.md
 [ADR-2610122234]: ../../docs/adr/ADR-2610122234-key-event-log.md

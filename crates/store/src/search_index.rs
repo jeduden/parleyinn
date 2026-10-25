@@ -44,7 +44,7 @@ use crate::StoreError;
 pub const FILE: &str = "search_index";
 
 /// The name the index file is attached to the store's connection under.
-const SCHEMA_NAME: &str = "idx";
+pub(crate) const SCHEMA_NAME: &str = "idx";
 
 /// REC-11's indexing cap: the most bytes of one event's text indexed.
 pub const DEFAULT_CAP: usize = 1 << 20;
@@ -121,7 +121,7 @@ pub(crate) fn settings() -> [(&'static str, String); 2] {
 }
 
 /// Whether the index file is attached to `conn`.
-fn attached(conn: &Connection) -> Result<bool, StoreError> {
+pub(crate) fn attached(conn: &Connection) -> Result<bool, StoreError> {
     let found = conn.query_row(
         "SELECT count(*) FROM pragma_database_list WHERE name = ?1",
         [SCHEMA_NAME],
@@ -160,6 +160,17 @@ pub(crate) fn exists(conn: &Connection) -> Result<bool, StoreError> {
     Ok(found?)
 }
 
+/// An empty search index in memory, under the shipped settings: what
+/// verify derives the record's index into, apart from the store (ADM-09).
+pub(crate) fn in_memory() -> Result<Connection, StoreError> {
+    let conn = Connection::open_in_memory()?;
+    conn.execute_batch(&format!("ATTACH DATABASE ':memory:' AS {SCHEMA_NAME};"))?;
+    conn.execute_batch(SCHEMA)?;
+    write_settings(&conn)?;
+
+    Ok(conn)
+}
+
 /// Records the settings the index is built under.
 pub(crate) fn write_settings(conn: &Connection) -> Result<(), StoreError> {
     for (key, value) in settings() {
@@ -174,9 +185,9 @@ pub(crate) fn write_settings(conn: &Connection) -> Result<(), StoreError> {
 
 /// Whether the index holds what the record does, given each writer's
 /// newest seq (none for a writer with no events): every writer that
-/// holds a slot is indexed to its newest event and no further, no slot
-/// is held by a writer the record lacks, and a writer without a slot
-/// has lost it to a smaller writer id.
+/// holds a slot has events and is indexed to its newest and no further,
+/// no slot is held by a writer the record lacks or one with no events,
+/// and a writer without a slot has lost it to a smaller writer id.
 pub(crate) fn is_current(conn: &Connection, heads: &[(WriterId, u64)]) -> Result<bool, StoreError> {
     let mut held = std::collections::BTreeMap::new();
     let mut statement = conn.prepare("SELECT writer, slot, indexed_to FROM search_writers")?;
@@ -197,6 +208,9 @@ pub(crate) fn is_current(conn: &Connection, heads: &[(WriterId, u64)]) -> Result
     for (writer, newest) in heads {
         let name = writer.to_string();
         match held.get(&name) {
+            // A writer with no events holds no slot in the index the
+            // record derives (I10).
+            Some(_) if *newest == 0 => return Ok(false),
             Some((_, indexed)) => {
                 known += 1;
                 if u64::try_from(*indexed).ok() != Some(*newest) {
@@ -428,6 +442,39 @@ pub(crate) fn unmark_reported(conn: &Connection, gaps: &[IndexGap]) -> Result<()
     Ok(())
 }
 
+const HOLDS_SLOT: &str = "SELECT count(*) FROM search_writers WHERE slot = ?1 AND writer = ?2";
+const REMOVE_RANGE: &str =
+    "DELETE FROM events_fts WHERE rowid BETWEEN ?1 AND ?2 AND (rowid & ?3) = ?4";
+
+/// Takes the postings of `writer`'s events from `first` to `last` out of
+/// the index, with FTS5's secure delete on so the removed postings leave
+/// its segments too (ADM-07, SEC-14); how many events had one. A writer
+/// that does not hold its slot has none, and an index never made holds
+/// none.
+pub(crate) fn remove(
+    conn: &Connection,
+    writer: WriterId,
+    first: Seq,
+    last: Seq,
+) -> Result<u64, StoreError> {
+    if !exists(conn)? {
+        return Ok(0);
+    }
+    let slot = slot_of(writer);
+    let args = params![slot, writer.to_string()];
+    let holds = conn.query_row(HOLDS_SLOT, args, |r| r.get::<_, bool>(0))?;
+    if !holds {
+        return Ok(0);
+    }
+    conn.execute_batch("INSERT INTO events_fts (events_fts, rank) VALUES ('secure-delete', 1)")?;
+    let args = params![row_id(0, first), row_id(SLOT_MASK, last), SLOT_MASK, slot];
+    let removed = conn.execute(REMOVE_RANGE, args)?;
+
+    conn.execute_batch("INSERT INTO events_fts (events_fts) VALUES ('optimize')")?;
+
+    Ok(removed as u64)
+}
+
 /// Empties the index, leaving its tables.
 pub(crate) fn clear(conn: &Connection) -> Result<(), StoreError> {
     conn.execute_batch(CLEAR)?;
@@ -447,10 +494,11 @@ pub(crate) fn unindexed_writers(conn: &Connection) -> Result<Vec<String>, StoreE
 #[derive(Debug, Clone, Copy)]
 pub struct Search<'a> {
     pub query: &'a Compiled,
-    /// The room whose writers are searched.
-    pub room: RoomId,
-    /// One writer: a run, until runs derive from their seats.
-    pub writer: Option<WriterId>,
+    /// The rooms whose writers are searched; none means any room.
+    pub rooms: &'a [RoomId],
+    /// The writers searched; none means any writer: a run's, which
+    /// span its seats' rooms (RCL-05).
+    pub writers: &'a [WriterId],
     /// Provenance classes, by name; none means any.
     pub provenance: &'a [String],
     /// Event kinds, by name; none means any.
@@ -466,6 +514,8 @@ pub struct Search<'a> {
 }
 
 /// The SQL and arguments of the query for the newest matches for `search`.
+/// An event whose content a purge erased is no match, though a crash
+/// left its postings in the index until the purge is finished (ADM-07).
 /// With `limited`, only the newest [`RANKED_MATCHES`]; without, every
 /// match, for a caller that keeps some of them.
 fn ranked_matches(search: &Search<'_>, limited: bool) -> (String, Vec<Sql>) {
@@ -475,15 +525,18 @@ fn ranked_matches(search: &Search<'_>, limited: bool) -> (String, Vec<Sql>) {
          JOIN search_writers w ON w.slot = (events_fts.rowid & 34359738367)
          JOIN seats s ON s.writer = w.writer
          JOIN events e ON e.writer = w.writer AND e.seq = (events_fts.rowid >> 35)
-         WHERE events_fts MATCH ? AND s.room = ?",
+         WHERE events_fts MATCH ? AND (e.content IS NOT NULL OR e.payload IS NOT NULL)",
     );
-    let mut args = vec![
-        Sql::Text(search.query.expression().to_owned()),
-        Sql::Text(search.room.to_string()),
-    ];
-    if let Some(writer) = search.writer {
-        sql.push_str(" AND w.writer = ?");
-        args.push(Sql::Text(writer.to_string()));
+    let mut args = vec![Sql::Text(search.query.expression().to_owned())];
+    if !search.rooms.is_empty() {
+        let marks = vec!["?"; search.rooms.len()].join(", ");
+        sql.push_str(&format!(" AND s.room IN ({marks})"));
+        args.extend(search.rooms.iter().map(|r| Sql::Text(r.to_string())));
+    }
+    if !search.writers.is_empty() {
+        sql.push_str(" AND w.writer IN (SELECT value FROM json_each(?))");
+        let writers: Vec<String> = search.writers.iter().map(ToString::to_string).collect();
+        args.push(Sql::Text(serde_json::Value::from(writers).to_string()));
     }
     for (column, values) in [("provenance", search.provenance), ("kind", search.kinds)] {
         if !values.is_empty() {

@@ -5,7 +5,7 @@ Feature: Recall (RCL)
   declared but not yet written: its steps are bound when the plan that
   implements the requirement lands.
 
-  @RCL-01 @P0 @I1 @pending
+  @RCL-01 @P0 @I1
   Scenario: the MCP server's tool list includes the six P0 recall tools
     Given an isolated ParleyInn home
     And an agent run with a Claude Code transcript "short-run"
@@ -40,7 +40,7 @@ Feature: Recall (RCL)
       | query "deploy", since "2026-01-01"   | 10   |
       | query "deploy", until "2026-06-30"   | 10   |
 
-  @RCL-03 @P0 @I1 @pending
+  @RCL-03 @P0 @I1
   Scenario: event expand returns exact post-redaction content under the model-token cap
     Given an isolated ParleyInn home
     And an agent run with a Claude Code transcript "large-payloads"
@@ -50,7 +50,7 @@ Feature: Recall (RCL)
     And the envelope is at most 8,000 estimated model tokens with "truncated" true and a "next_cursor"
     And calling "event_expand" with that cursor returns the following events without gap or overlap
 
-  @RCL-04 @P0 @I2 @pending
+  @RCL-04 @P0 @I2
   Scenario Outline: every recall tool wraps its content in the envelope
     Given an isolated ParleyInn home
     And an agent run with a Claude Code transcript "mixed-provenance"
@@ -64,7 +64,7 @@ Feature: Recall (RCL)
       | event_expand | range from "A1:1" to "A1:20" |
       | event_get    | address "A1:7"               |
 
-  @RCL-05 @P0 @I8 @pending
+  @RCL-05 @P0 @I8
   Scenario: recall defaults to the agent's current run and extending it to its rooms is explicit and logged
     Given an isolated ParleyInn home
     And a run with seats in its personal room and in room "L1", whose writers this node holds beside those of other runs in "L1" on two worktrees and of room "L2" where the run has no seat
@@ -76,7 +76,7 @@ Feature: Recall (RCL)
     Then the event is not returned, and the error says the address lies outside the current scope
     And with scope "room" and room "L1" the event is returned, and an audit entry logs the extended recall scope
 
-  @RCL-06 @P0 @I5 @pending
+  @RCL-06 @P0 @I5
   Scenario: quarantined events are never recalled and purged ranges return a tombstone
     Given an isolated ParleyInn home
     And an agent run with a Claude Code transcript "poisoned-web"
@@ -86,16 +86,16 @@ Feature: Recall (RCL)
     Then the recall result is wrapped in the envelope
     And no item has address A1·12 and no item lies in A1·30–40, which appears as a tombstone with reason "purged"
 
-  @RCL-07 @P0 @I6 @pending
+  @RCL-07 @P0 @I6
   Scenario: every recall call is appended to the record
     Given an isolated ParleyInn home
     And an agent run with a Claude Code transcript "short-run"
     When the agent calls the MCP tool "event_search" with query "deploy"
     Then the record gains one recall event with provenance "assistant" carrying the query
     And that event lists the addresses of the returned events
-    And the counter "recall_calls" increases by 1
+    And the stat "recalls" increases by 1
 
-  @RCL-08 @P1 @I1 @pending
+  @RCL-08 @P1 @I1
   Scenario Outline: every address ParleyInn shows, and its ASCII input form, resolves wherever an address is taken
     Given an isolated ParleyInn home
     And an agent run with a Claude Code transcript "short-run"

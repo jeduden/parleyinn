@@ -76,6 +76,45 @@ fn a_source_starts_at_generation_1_and_each_new_generation_counts_on() {
 }
 
 #[test]
+fn each_ingest_marker_keeps_when_ingest_left_it_there() {
+    let dir = TempDir::new().unwrap();
+    let mut store = open(&dir).with_marker_time(1_000);
+    let source = store.start_generation("/t/a.jsonl", "/t").unwrap();
+    assert_eq!(source.marked_at, 1_000);
+    assert_eq!(
+        store.source("/t/a.jsonl").unwrap().unwrap().marked_at,
+        1_000
+    );
+
+    let mut store = store.with_marker_time(2_000);
+    store
+        .append_lines(
+            writer(1),
+            &[event(EventKind::TranscriptLine, 1)],
+            &[place(1, None)],
+            &[true],
+            source.id,
+            &position(10, 1),
+        )
+        .unwrap();
+    assert_eq!(
+        store.source("/t/a.jsonl").unwrap().unwrap().marked_at,
+        2_000
+    );
+
+    let mut store = store.with_marker_time(3_000);
+    store.advance(source.id, &position(10, 1)).unwrap();
+    assert_eq!(
+        store.source("/t/a.jsonl").unwrap().unwrap().marked_at,
+        3_000
+    );
+    assert_eq!(
+        open(&dir).source("/t/a.jsonl").unwrap().unwrap().marked_at,
+        3_000
+    );
+}
+
+#[test]
 fn appended_lines_keep_their_places_and_move_the_position_with_them() {
     let dir = TempDir::new().unwrap();
     let mut store = open(&dir);
@@ -315,6 +354,7 @@ fn a_corrupt_row_names_what_does_not_parse() {
             0,
             None,
             false,
+            0,
         )
     };
     let err = source(row("zz")).unwrap_err();
@@ -366,4 +406,17 @@ fn a_run_whose_writer_does_not_parse_is_corrupt() {
         .unwrap();
 
     assert!(store.ingested_runs().is_err());
+}
+
+#[test]
+fn a_run_is_named_by_its_harness_session_and_a_subagent_by_its_agent_id_too() {
+    let run = |agent_id: Option<&str>| IngestedRun {
+        writer: WriterId::derive(&[1; 32]),
+        path: "/t/s.jsonl".into(),
+        harness_session: "s1".into(),
+        agent_id: agent_id.map(str::to_owned),
+    };
+
+    assert_eq!(run(None).run_name(), "s1");
+    assert_eq!(run(Some("a7")).run_name(), "s1/a7");
 }

@@ -199,6 +199,33 @@ pub enum Counter {
     /// A look at a clone ran out of its time, so its identity stays as it
     /// was and the next look tries again (LANE-02, ENG-03, I6).
     RepositoryReadTimedOut,
+    /// A recall tool stopped at its per-call cap and returned a
+    /// continuation cursor (RCL-03).
+    RecallTruncated,
+    /// A recall call's event could not be appended to the record, so the
+    /// call went unrecorded (RCL-07, I6).
+    RecallNotRecorded,
+    /// A recall call was refused: its scope was not served, or the record
+    /// holds a gap inside the range it asked for (RCL-04, RCL-05, I6).
+    RecallRefused,
+    /// A purge of a range was refused: the range holds an event a purge
+    /// keeps, none that holds content, or lies in a run with a pending
+    /// ingest marker (ADM-07, I6).
+    PurgeRefused,
+    /// A purge erased what it was asked to, but a step after its
+    /// transaction could not finish: the residue stays journalled for the
+    /// next attempt (ADM-07, SEC-14, I6).
+    PurgeUnfinished,
+    /// A retention policy aged a range out and the node purged it
+    /// (REC-15, SEC-22).
+    RetentionPurged,
+    /// Applying the retention policies failed: the store or the random
+    /// source did; the next ingest tries again (SEC-22, I6).
+    RetentionFailed,
+    /// `parinn verify` ran out of time deriving the search index again:
+    /// the index was left unchecked, neither passed nor failed (ADM-09,
+    /// ENG-03, I6).
+    VerifyTimedOut,
 }
 
 impl Counter {
@@ -215,7 +242,7 @@ impl Counter {
             Self::ConfigurationKeyIgnored => "configuration_key_ignored",
             Self::ManagedPolicyInvalid => "managed_policy_invalid",
             Self::PrincipalActRefused => "principal_act_refused",
-            Self::Redacted => "redacted",
+            Self::Redacted => "redactions",
             Self::RedactionPatternRefused => "redaction_pattern_refused",
             Self::HookInputTooLarge => "hook_input_too_large",
             Self::HookInputTooDeep => "hook_input_too_deep",
@@ -257,6 +284,14 @@ impl Counter {
             Self::RepositoryReadFailed => "repository_read_failed",
             Self::RepositoryBindFailed => "repository_bind_failed",
             Self::RepositoryReadTimedOut => "repository_read_timed_out",
+            Self::RecallTruncated => "recall_truncated",
+            Self::RecallNotRecorded => "recall_not_recorded",
+            Self::RecallRefused => "recall_refused",
+            Self::PurgeRefused => "purge_refused",
+            Self::PurgeUnfinished => "purge_unfinished",
+            Self::RetentionPurged => "retention_purged",
+            Self::RetentionFailed => "retention_failed",
+            Self::VerifyTimedOut => "verify_timed_out",
         }
     }
 }
@@ -289,10 +324,34 @@ pub enum Occurrence<'a> {
         operation: &'static str,
         detail: &'static str,
     },
+    /// A recall call whose scope extends past the calling run was served
+    /// (RCL-05); it feeds no counter, as nothing degraded.
+    RecallExtended {
+        operation: &'static str,
+        detail: &'static str,
+    },
+    /// A purge erased the content of the range `scope`, for `reason`,
+    /// `by` the principal act or retention policy `behind` it; a
+    /// retention policy's purge feeds `counter` (ADM-07, SEC-22). The
+    /// entry names no content.
+    Purged {
+        scope: &'a str,
+        reason: &'static str,
+        by: &'static str,
+        behind: &'a str,
+        counter: Option<Counter>,
+    },
 }
 
 /// The kind of an entry noting a principal act.
 pub const PRINCIPAL_ACT: &str = "principal_act";
+
+/// The kind of an entry noting a recall whose scope extends past the
+/// calling run.
+pub const RECALL_EXTENDED: &str = "recall_extended";
+
+/// The kind of an entry noting a purge.
+pub const PURGE: &str = "purge";
 
 /// `key` as an entry may hold it: as it is when it holds only the
 /// characters a settings key or a provenance class can, else a fixed
@@ -365,6 +424,25 @@ impl Entry {
             Occurrence::PrincipalAct { operation, detail } => {
                 (PRINCIPAL_ACT, None, operation, detail.to_owned())
             }
+            Occurrence::RecallExtended { operation, detail } => {
+                (RECALL_EXTENDED, None, operation, detail.to_owned())
+            }
+            Occurrence::Purged {
+                scope,
+                reason,
+                by,
+                behind,
+                counter,
+            } => (
+                PURGE,
+                counter.map(Counter::as_str),
+                "purge",
+                format!(
+                    "purge of {} ({reason}) by {by} {}",
+                    shown(scope),
+                    shown(behind)
+                ),
+            ),
         };
         let mut entry = Self {
             number,

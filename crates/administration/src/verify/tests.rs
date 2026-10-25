@@ -1173,7 +1173,7 @@ fn a_kept_origin_that_differs_from_the_derived_one_is_named_by_its_writer() {
     assert_eq!(
         err.to_string(),
         format!(
-            "derived artifact consistency: the origin kept for writer {} differs from the record's: run parinn rebuild",
+            "the origin kept for writer {} differs from the record's: run parinn rebuild",
             f.ingest.writer
         )
     );
@@ -1222,7 +1222,7 @@ fn a_worktree_the_record_binds_and_the_store_does_not_keep_is_named_by_its_diges
     assert_eq!(err.address(), None);
     assert_eq!(
         err.to_string(),
-        "derived artifact consistency: the identity kept for worktree w1 differs from the record's: run parinn rebuild"
+        "the identity kept for worktree w1 differs from the record's: run parinn rebuild"
     );
 }
 
@@ -1258,4 +1258,292 @@ fn a_report_marker_is_no_worktree_and_a_derive_failure_keeps_its_kind() {
     ));
     let other = derive_failed(AdminError::Node("x"));
     assert!(matches!(other, VerifyError::Corrupt(_)), "{other:?}");
+}
+
+fn purge(f: &mut Fixture, first: u64, last: u64) {
+    use crate::purge::{Planned, Reason, carry_out, plan};
+    let planned = plan(
+        &f.store,
+        f.ingest.writer,
+        Seq::new(first).unwrap(),
+        Seq::new(last).unwrap(),
+        &Reason::Purged,
+    )
+    .unwrap();
+    let Planned::Ready(planned) = planned else {
+        panic!("refused");
+    };
+    carry_out(&mut f.store, &f.node, &planned, None, &mut OsEntropy).unwrap();
+}
+
+#[test]
+fn a_purged_range_under_its_tombstone_verifies() {
+    let mut f = fixture();
+    purge(&mut f, 2, 3);
+
+    let report = verify(&f.store, &f.node.device().public()).unwrap();
+
+    assert_eq!(report.events, 8, "the tombstone is an event of the record");
+}
+
+#[test]
+fn removed_content_a_tombstone_does_not_cover_is_still_a_loss() {
+    let mut f = fixture();
+    purge(&mut f, 2, 2);
+    f.sql(&format!(
+        "UPDATE events SET content = NULL, commitment_key = NULL WHERE seq = 3 AND writer = '{}'",
+        f.ingest.writer
+    ));
+
+    let err = verify(&f.store, &f.node.device().public()).unwrap_err();
+
+    assert_eq!(
+        err.to_string(),
+        format!(
+            "the content at {} was removed, and no tombstone records it",
+            f.at(3).full(&f.node.personal_room())
+        )
+    );
+}
+
+#[test]
+fn an_event_a_tombstone_names_that_keeps_its_key_is_named() {
+    let mut f = fixture();
+    purge(&mut f, 2, 3);
+    f.sql(&format!(
+        "UPDATE events SET commitment_key = '{}' WHERE seq = 2 AND writer = '{}'",
+        "ab".repeat(32),
+        f.ingest.writer
+    ));
+
+    let err = verify(&f.store, &f.node.device().public()).unwrap_err();
+
+    assert_eq!(err.class(), "tombstone");
+    assert!(
+        err.to_string()
+            .ends_with("does not check: an event it names still keeps its content or its key"),
+        "{err}"
+    );
+    assert!(
+        err.address()
+            .unwrap()
+            .contains(&f.node.device_writer().to_string())
+    );
+}
+
+#[test]
+fn a_tombstone_naming_events_the_record_does_not_hold_is_named() {
+    let mut f = fixture();
+    purge(&mut f, 1, 1);
+    let lie = crate::purge::Tombstone {
+        first: Seq::new(1).unwrap(),
+        last: Seq::new(2).unwrap(),
+        ..tombstone_of(&f)
+    };
+    f.store
+        .append(f.node.device_writer(), &[tombstone_event(&lie)])
+        .unwrap();
+
+    let err = verify(&f.store, &f.node.device().public()).unwrap_err();
+
+    assert_eq!(err.class(), "tombstone");
+    assert!(
+        err.to_string()
+            .ends_with("it names events the record does not hold"),
+        "{err}"
+    );
+}
+
+fn tombstone_of(f: &Fixture) -> crate::purge::Tombstone {
+    f.store
+        .log(f.node.device_writer())
+        .unwrap()
+        .iter()
+        .rev()
+        .find(|s| s.link.header.kind == EventKind::Tombstone)
+        .and_then(|s| s.content.as_ref())
+        .and_then(crate::purge::Tombstone::from_value)
+        .unwrap()
+}
+
+fn tombstone_event(t: &crate::purge::Tombstone) -> NewEvent {
+    NewEvent {
+        kind: EventKind::Tombstone,
+        provenance: Provenance::Structural,
+        content: t.to_value(),
+        commitment_key: CommitmentKey::from_bytes([99; 32]),
+        transcript_timestamp: None,
+    }
+}
+
+#[test]
+fn a_tombstone_that_names_other_commitments_or_holds_no_range_is_named() {
+    let mut f = fixture();
+    purge(&mut f, 1, 2);
+    let honest = tombstone_of(&f);
+    let wrong = crate::purge::Tombstone {
+        commitments: Digest::of(&[b"other"]),
+        ..honest
+    };
+    f.store
+        .append(f.node.device_writer(), &[tombstone_event(&wrong)])
+        .unwrap();
+
+    let err = verify(&f.store, &f.node.device().public()).unwrap_err();
+
+    assert!(
+        err.to_string()
+            .ends_with("the commitments of the events it names differ from its digest"),
+        "{err}"
+    );
+
+    let mut g = fixture();
+    g.store
+        .append(
+            g.node.device_writer(),
+            &[NewEvent {
+                content: json!({"first": 1}),
+                ..tombstone_event(&wrong)
+            }],
+        )
+        .unwrap();
+    let err = verify(&g.store, &g.node.device().public()).unwrap_err();
+    assert!(
+        err.to_string()
+            .ends_with("it holds no range, count and digest"),
+        "{err}"
+    );
+}
+
+#[test]
+fn a_store_made_by_this_build_has_the_shape_it_ships() {
+    let f = fixture();
+
+    assert!(matches!(
+        verify_shape(&f.store, &|| true),
+        Ok(Shape::Checked)
+    ));
+}
+
+#[test]
+fn a_schema_object_this_build_does_not_ship_fails_the_shape_naming_it() {
+    let f = fixture();
+    let conn = rusqlite::Connection::open(f.home.store()).unwrap();
+    conn.execute_batch("CREATE TABLE exfil (x TEXT)").unwrap();
+
+    let err = verify_shape(&f.store, &|| true).unwrap_err();
+
+    assert_eq!(
+        err.to_string(),
+        "the store holds schema objects this parinn does not ship: main.exfil"
+    );
+    assert_eq!(err.class(), "derived_artifact_consistency");
+    assert_eq!(err.check(), "derived artifact consistency");
+    assert_eq!(err.address(), None);
+}
+
+#[test]
+fn an_altered_ranking_or_a_changed_entry_fails_the_shape_as_a_search_index_fault() {
+    let f = fixture();
+    let conn = rusqlite::Connection::open(f.home.store()).unwrap();
+    conn.execute(
+        "ATTACH DATABASE ?1 AS idx",
+        [f.home
+            .root()
+            .join(store::search_index::FILE)
+            .to_str()
+            .unwrap()],
+    )
+    .unwrap();
+    let row = store::search_index::row_id_of(Address::new(f.ingest.writer, Seq::new(1).unwrap()))
+        .unwrap();
+    conn.execute("DELETE FROM idx.events_fts WHERE rowid = ?1", [row])
+        .unwrap();
+    conn.execute(
+        "INSERT INTO idx.events_fts (rowid, text) VALUES (?1, 'zebra')",
+        [row],
+    )
+    .unwrap();
+
+    let err = verify_shape(&f.store, &|| true).unwrap_err();
+
+    assert_eq!(
+        err.to_string(),
+        "the search index differs from what the record derives: run parinn rebuild"
+    );
+    conn.execute(
+        "INSERT INTO idx.events_fts (events_fts, rank) VALUES ('rank', 'bm25(0.0)')",
+        [],
+    )
+    .unwrap();
+    let err = verify_shape(&f.store, &|| true).unwrap_err();
+    assert_eq!(
+        err.to_string(),
+        "the search index ranks in a way this parinn does not ship: run parinn rebuild"
+    );
+}
+
+#[test]
+fn a_derivation_out_of_time_leaves_the_index_unchecked_neither_passed_nor_failed() {
+    let f = fixture();
+
+    assert!(matches!(
+        verify_shape(&f.store, &|| false),
+        Ok(Shape::IndexUnfinished)
+    ));
+}
+
+#[test]
+fn a_store_without_a_search_index_passes_the_shape() {
+    let f = fixture();
+    drop(f.store);
+    std::fs::remove_file(f.home.root().join(store::search_index::FILE)).unwrap();
+    let fresh = Store::open_read_only_made(&f.home.store())
+        .unwrap()
+        .unwrap();
+
+    assert!(matches!(verify_shape(&fresh, &|| true), Ok(Shape::Checked)));
+}
+
+#[test]
+fn each_failure_belongs_to_one_of_the_checks_of_adm_09() {
+    let address = || "a".to_owned();
+    let hash_chain = [
+        VerifyError::Broken {
+            address: address(),
+            reason: String::new(),
+        },
+        VerifyError::Tombstone {
+            address: address(),
+            reason: String::new(),
+        },
+        VerifyError::KeyEvent {
+            address: address(),
+            reason: String::new(),
+        },
+        VerifyError::Record { address: address() },
+        VerifyError::Provenance {
+            address: address(),
+            provenance: String::new(),
+        },
+        VerifyError::Genesis("g"),
+    ];
+    for err in hash_chain {
+        assert_eq!(err.check(), "hash chain", "{err}");
+    }
+    let payload = [
+        VerifyError::Content {
+            address: address(),
+            removed: false,
+        },
+        VerifyError::Payload {
+            address: address(),
+            reason: String::new(),
+        },
+    ];
+    for err in payload {
+        assert_eq!(err.check(), "payload integrity", "{err}");
+    }
+    assert_eq!(VerifyError::Corrupt(StoreError::NoIndex).check(), "store");
+    assert_eq!(VerifyError::Store(StoreError::NoIndex).check(), "store");
 }

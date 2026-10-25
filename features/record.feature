@@ -103,7 +103,7 @@ Feature: Record (REC)
     And no line of "main-run" is missing from the record
     And the counter "events_unparsed" increases by 2
 
-  @REC-06 @P0 @I1 @I10 @pending
+  @REC-06 @P0 @I1 @I10
   Scenario: every event's address is its writer and a gap-free seq that writer alone assigns
     Given an isolated ParleyInn home
     And an agent run with a Claude Code transcript "main-run" whose writer has appended seq 1 to 20 and purged seq 5-9
@@ -239,7 +239,7 @@ Feature: Record (REC)
     Then the command exits 0
     And every event of "managed-run" is stored with its run and a provenance class
 
-  @REC-17 @P0 @I1 @I5 @I10 @pending
+  @REC-17 @P0 @I1 @I5 @I10
   Scenario: event content is reached only through a keyed commitment whose key is erased with it
     Given an isolated ParleyInn home
     And a home whose record contains 40 events, of which seq 10-14 have since been purged

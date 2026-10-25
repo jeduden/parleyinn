@@ -882,6 +882,33 @@ fn a_uuid_repeated_with_other_content_is_its_own_event_and_a_conflict() {
     assert_ne!(log[0].link.header.kind, EventKind::RepeatReference);
 }
 
+#[test]
+fn an_ingest_leaves_its_ingest_marker_at_the_time_on_its_clock() {
+    let dir = TempDir::new().unwrap();
+    let home = home(&dir);
+    let path = transcript(&dir, &numbered("s", 1, 3));
+    let at = |now_ms| Inputs {
+        now_ms,
+        ..Inputs::default()
+    };
+    ingest_with(&home, &path, &redactor(), &at(5_000), &mut OsEntropy).unwrap();
+    let marked = || {
+        Store::open(&home.store())
+            .unwrap()
+            .sources()
+            .unwrap()
+            .into_iter()
+            .map(|s| s.marked_at)
+            .collect::<Vec<_>>()
+    };
+    assert_eq!(marked(), [5_000]);
+
+    std::fs::write(&path, numbered("s", 1, 4)).unwrap();
+    ingest_with(&home, &path, &redactor(), &at(9_000), &mut OsEntropy).unwrap();
+
+    assert_eq!(marked(), [9_000]);
+}
+
 /// Inputs naming the harness session `fork` a fork, at `now_ms`.
 fn forked(fork: &str, now_ms: u64) -> Inputs {
     Inputs {

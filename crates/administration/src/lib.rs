@@ -8,10 +8,14 @@ use std::path::PathBuf;
 
 pub mod act;
 pub mod home;
+pub mod label;
 pub mod node;
 pub mod node_identity;
 pub mod origin;
+pub mod purge;
+pub mod quarantine;
 pub mod repository;
+pub mod retention;
 pub mod role;
 pub mod trust_policy;
 pub mod verify;

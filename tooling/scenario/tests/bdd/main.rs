@@ -14,6 +14,8 @@
 //! scenario by its requirement id.
 
 mod administration;
+mod administration_status;
+mod administration_verify;
 mod assumptions;
 mod engineering;
 mod engineering_adr;
@@ -22,7 +24,9 @@ mod engineering_architecture;
 mod engineering_benchmark;
 mod engineering_boundary;
 mod engineering_contract;
+mod engineering_coverage;
 mod engineering_drift;
+mod engineering_fuzz;
 mod engineering_isolation;
 mod engineering_licenses;
 mod engineering_logs;
@@ -32,6 +36,7 @@ mod engineering_reach;
 mod engineering_release;
 mod engineering_review;
 mod engineering_third_party;
+mod erasure;
 mod lane;
 mod live;
 mod memory_boundary;
@@ -44,6 +49,9 @@ mod provenance_policy;
 mod provenance_seats;
 mod provenance_tool_calls;
 mod provenance_trust;
+mod recall;
+mod recall_address;
+mod recall_scope;
 mod record;
 mod record_homes;
 mod record_hooks;
@@ -54,8 +62,11 @@ mod record_search;
 mod record_store;
 mod record_transcript;
 mod security;
+mod security_boundary;
+mod security_envelope;
 mod security_hooks;
 mod security_keys;
+mod security_policy;
 mod security_redaction;
 
 use std::env;
@@ -206,7 +217,13 @@ fn run() -> ExitCode {
 
     let root = features.clone();
     let writer = runner::block_on(
+        // The steps block their thread, so scenarios interleaved on the
+        // one thread run no faster than one after another; they only
+        // keep each other's homes alive at once, the SEC-04 store of a
+        // million events among them, until the disk fills. One at a
+        // time, the run holds one scenario's home.
         World::cucumber()
+            .max_concurrent_scenarios(1)
             .fail_on_skipped()
             .with_default_cli()
             .filter_run(features, move |feature, rule, sc| {

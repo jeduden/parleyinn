@@ -29,6 +29,7 @@ use store::{NewEvent, Store};
 
 use crate::AdminError;
 use crate::node::Node;
+use crate::quarantine::{self, Selector};
 
 /// The principal surface every act here is taken at: the CLI at a
 /// terminal (OWN-02).
@@ -63,7 +64,7 @@ impl Class {
 pub fn class_of(name: &str) -> Class {
     match name {
         "counter_ack" => Class::Neutral,
-        "risk_acceptance_withdraw" => Class::Cut,
+        "risk_acceptance_withdraw" | quarantine::ADD => Class::Cut,
         _ => Class::Widening,
     }
 }
@@ -166,6 +167,18 @@ pub enum Act {
     /// Widening. It names the worktree by a keyed digest, never a path: the
     /// act replicates.
     RepositoryBind { identity: Value },
+    /// Quarantine what `selector` selects, for `reason` (SEC-12). It
+    /// removes no pin, pin version or landmark from a restore block
+    /// while M1 records none, so it is a cut act.
+    QuarantineAdd { selector: Selector, reason: String },
+    /// Release the quarantine `selector` added (SEC-12); widening.
+    QuarantineRelease { selector: Selector },
+    /// Purge the content of `ranges`, each `<writer>:<first>-<last>`,
+    /// stating `reason` if the principal gave one (ADM-07); widening.
+    Purge {
+        ranges: Vec<String>,
+        reason: Option<String>,
+    },
 }
 
 impl Act {
@@ -178,6 +191,9 @@ impl Act {
             Self::RiskAcceptanceRecord { .. } => "risk_acceptance_record",
             Self::RiskAcceptanceWithdraw => "risk_acceptance_withdraw",
             Self::RepositoryBind { .. } => "repository_bind",
+            Self::QuarantineAdd { .. } => quarantine::ADD,
+            Self::QuarantineRelease { .. } => quarantine::RELEASE,
+            Self::Purge { .. } => "purge",
         }
     }
 
@@ -215,6 +231,19 @@ impl Act {
             Self::RepositoryBind { identity } => {
                 if let Value::Object(fields) = identity {
                     content.extend(fields.clone());
+                }
+            }
+            Self::QuarantineAdd { selector, reason } => {
+                content.insert("selector".into(), selector.to_value());
+                content.insert("reason".into(), json!(reason));
+            }
+            Self::QuarantineRelease { selector } => {
+                content.insert("selector".into(), selector.to_value());
+            }
+            Self::Purge { ranges, reason } => {
+                content.insert("ranges".into(), json!(ranges));
+                if let Some(reason) = reason {
+                    content.insert("reason".into(), json!(reason));
                 }
             }
         }
@@ -454,6 +483,21 @@ pub fn permit(act: &Act, gate: &Gate) -> Result<(), Refusal> {
     }
 }
 
+/// The event that records `act`: an `operator` principal act.
+///
+/// # Errors
+///
+/// Fails when no commitment key can be drawn.
+pub fn event(act: &Act, entropy: &mut dyn Entropy) -> Result<NewEvent, AdminError> {
+    Ok(NewEvent {
+        kind: EventKind::PrincipalAct,
+        provenance: Provenance::Operator,
+        content: act.content(),
+        commitment_key: CommitmentKey::from_bytes(draw(entropy)?),
+        transcript_timestamp: None,
+    })
+}
+
 /// Records `act` in `node`'s device seat's writer.
 ///
 /// # Errors
@@ -465,13 +509,7 @@ pub fn record(
     act: &Act,
     entropy: &mut dyn Entropy,
 ) -> Result<Address, AdminError> {
-    let event = NewEvent {
-        kind: EventKind::PrincipalAct,
-        provenance: Provenance::Operator,
-        content: act.content(),
-        commitment_key: CommitmentKey::from_bytes(draw(entropy)?),
-        transcript_timestamp: None,
-    };
+    let event = event(act, entropy)?;
     let addresses = store.append(node.device_writer(), &[event])?;
 
     addresses

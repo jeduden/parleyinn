@@ -28,6 +28,7 @@ use std::io::{self, Write};
 use std::panic::Location;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output, Stdio};
+use std::time::Duration;
 
 use crate::{TempDir, isolate};
 
@@ -56,9 +57,22 @@ const SCRIPT: &str = "script";
 /// The trace, up to its output file: every process followed, attach
 /// and exit notes and signals left out, every network call recorded,
 /// and each way to open a socket failed.
-const TRACE: [&str; 10] = [
+///
+/// `--seccomp-bpf` (strace 5.3 or later, [`STRACE_MINIMUM`]) stops a
+/// traced process only at the calls the trace names, through a seccomp
+/// filter every process and thread it starts inherits, instead of at
+/// every system call: a confined start that reads a store of a million
+/// events no longer runs ten times slower than an unconfined one. The
+/// tests prove a socket is recorded and failed when a thread of the
+/// program, a program it execs, or a process two forks below it opens
+/// one, and for Unix sockets and socket pairs too. strace documents
+/// that where it cannot set the filter up it stops at every call
+/// instead; either way the [`preflight`] fails every start unless the
+/// trace recorded and failed a socket call first.
+const TRACE: [&str; 11] = [
     "strace",
     "-f",
+    "--seccomp-bpf",
     "-qq",
     "-e",
     "signal=none",
@@ -235,16 +249,55 @@ impl Confinement {
         after: std::time::Duration,
     ) -> Result<bool, Error> {
         let caller = caller(std::thread::current().name(), Location::caller());
+        self.killed(program, args, home, env, after, false, caller)
+    }
+
+    /// [`run_killed`](Self::run_killed) at a pseudo-terminal, as
+    /// [`run_at_terminal`](Self::run_at_terminal) starts it: a person's
+    /// command, such as a widening act, killed mid-way. The kill reaches
+    /// every process of the terminal's session, the program first.
+    ///
+    /// # Errors
+    ///
+    /// As [`run_killed`](Self::run_killed).
+    #[track_caller]
+    pub fn run_killed_at_terminal(
+        &self,
+        program: &Path,
+        args: &[&str],
+        home: &Path,
+        env: &[(&str, &str)],
+        after: std::time::Duration,
+    ) -> Result<bool, Error> {
+        let caller = caller(std::thread::current().name(), Location::caller());
+        self.killed(program, args, home, env, after, true, caller)
+    }
+
+    #[allow(clippy::too_many_arguments, reason = "the two kills' one body")]
+    fn killed(
+        &self,
+        program: &Path,
+        args: &[&str],
+        home: &Path,
+        env: &[(&str, &str)],
+        after: std::time::Duration,
+        terminal: bool,
+        caller: String,
+    ) -> Result<bool, Error> {
         let dir = TempDir::new().map_err(|source| Error::Trace { source })?;
         let trace = dir.path().join("trace");
+        let session = dir.path().join("session");
         let mut command = self.command(program, args, &trace);
+        if terminal {
+            command = at_terminal_recording(&command, &session);
+        }
         command.envs(env.iter().copied());
         isolate(&mut command, home);
         let started = |source| Error::Start {
             program: program.to_path_buf(),
             source,
         };
-        let running = kill_after(&mut command, after).map_err(started)?;
+        let running = kill_after(&mut command, after, &session).map_err(started)?;
         if self.mode == Mode::Unconfined {
             return Ok(running);
         }
@@ -441,7 +494,7 @@ impl Started {
         if !exited {
             self.kill_group()?;
         }
-        self.checked().map(|()| exited)
+        self.checked(exited).map(|()| exited)
     }
 
     /// Kills the program and everything it started with `SIGKILL`, as a
@@ -452,7 +505,7 @@ impl Started {
     /// As [`finish`](Self::finish).
     pub fn kill(mut self) -> Result<(), Error> {
         self.kill_group()?;
-        self.checked()
+        self.checked(false)
     }
 
     fn kill_group(&mut self) -> Result<(), Error> {
@@ -470,12 +523,15 @@ impl Started {
             .map_err(|source| Error::Trace { source })
     }
 
-    fn checked(&self) -> Result<(), Error> {
+    /// Checks its trace. A program killed may have died before strace
+    /// began its trace, leaving none; one that `exited` by itself ran
+    /// under the trace, so a missing trace fails it.
+    fn checked(&self, exited: bool) -> Result<(), Error> {
         if self.confinement.mode == Mode::Unconfined {
             return Ok(());
         }
         let trace = match fs::read_to_string(&self.trace) {
-            Err(e) if e.kind() == io::ErrorKind::NotFound => Ok(String::new()),
+            Err(e) if !exited && e.kind() == io::ErrorKind::NotFound => Ok(String::new()),
             read => read,
         };
         let quiet = Output {
@@ -510,6 +566,18 @@ fn at_terminal(command: &Command) -> Command {
     outer
 }
 
+/// [`at_terminal`], the terminal's session first writing its process
+/// group's id to `session`, so a kill can reach the processes the
+/// terminal holds apart from [`SCRIPT`]'s own group.
+fn at_terminal_recording(command: &Command, session: &Path) -> Command {
+    let file = session.to_string_lossy().replace('\'', r"'\''");
+    let line = format!("echo $$ > '{file}'; {}", shell_line(command));
+    let mut outer = Command::new(SCRIPT);
+    outer.args(["-qefc", &line, "/dev/null"]);
+
+    outer
+}
+
 /// The shell line that runs `command`, every word quoted.
 fn shell_line(command: &Command) -> String {
     let quote = |word: &OsStr| format!("'{}'", word.to_string_lossy().replace('\'', r"'\''"));
@@ -521,8 +589,14 @@ fn shell_line(command: &Command) -> String {
 /// Starts `command` in a process group of its own, its output
 /// discarded, and kills the whole group with `SIGKILL` once `after`
 /// passed, unless it exited by then, so neither the trace nor the
-/// program outlives the other; whether it was still running.
-fn kill_after(command: &mut Command, after: std::time::Duration) -> io::Result<bool> {
+/// program outlives the other; whether it was still running. When a
+/// terminal's session wrote its group's id to `session`, that group is
+/// killed first.
+fn kill_after(
+    command: &mut Command,
+    after: std::time::Duration,
+    session: &Path,
+) -> io::Result<bool> {
     #[cfg(unix)]
     std::os::unix::process::CommandExt::process_group(command, 0);
     let mut child = command
@@ -533,12 +607,15 @@ fn kill_after(command: &mut Command, after: std::time::Duration) -> io::Result<b
     std::thread::sleep(after);
     let running = child.try_wait()?.is_none();
     if running {
-        let group = format!("-{}", child.id());
-        Command::new("kill")
-            .args(["-KILL", "--", &group])
-            .stdout(Stdio::null())
-            .stderr(Stdio::null())
-            .status()?;
+        let held = fs::read_to_string(session).unwrap_or_default();
+        let groups = [held.trim().to_owned(), child.id().to_string()];
+        for group in groups.iter().filter(|g| !g.is_empty()) {
+            Command::new("kill")
+                .args(["-KILL", "--", &format!("-{group}")])
+                .stdout(Stdio::null())
+                .stderr(Stdio::null())
+                .status()?;
+        }
     }
     // The group may have exited between the look and its kill; a kill of
     // a program that exited does nothing.
@@ -582,25 +659,139 @@ fn mode(
     }
 }
 
-/// Whether this machine can confine: `true` runs in the namespace
-/// under the trace.
+/// The oldest strace the trace runs on: the first with `--seccomp-bpf`.
+pub const STRACE_MINIMUM: (u32, u32) = (5, 3);
+
+/// The program the preflight runs confined: a subshell it forks opens a
+/// TCP socket, so the trace must follow a child to see it, and it exits
+/// 0 whatever became of the socket. Were the socket let through, its
+/// connect would find the namespace's loopback down, so even a trace
+/// that fails nothing sends nothing anywhere.
+const PREFLIGHT_PROBE: [&str; 3] = [
+    "bash",
+    "-c",
+    "exec 2>/dev/null; (true < /dev/tcp/127.0.0.1/9); exit 0",
+];
+
+/// Whether this machine can confine: strace is new enough, and a
+/// socket the probe opens in the namespace under the trace is recorded
+/// and failed.
 fn preflight() -> Result<(), String> {
+    let mut version = Command::new(TRACE[0]);
+    version.arg("-V");
+    let version = output_within(&mut version, PREFLIGHT_DEADLINE)?;
+    strace_new_enough(&String::from_utf8_lossy(&version.stdout))?;
     preflight_with(UNSHARE)
 }
 
-/// [`preflight`] with the namespace tool `unshare`.
+/// Runs `command` with no input, in a process group of its own, and
+/// returns its output, unless it is still running once `deadline`
+/// passed: then it is killed with everything it started, and the
+/// failure names it.
+fn output_within(command: &mut Command, deadline: Duration) -> Result<Output, String> {
+    let program = command.get_program().to_string_lossy().into_owned();
+    #[cfg(unix)]
+    std::os::unix::process::CommandExt::process_group(command, 0);
+    let mut child = command
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .map_err(|e| format!("start {program}: {e}"))?;
+    let read = |pipe: Option<Box<dyn io::Read + Send>>| {
+        std::thread::spawn(move || {
+            let mut bytes = Vec::new();
+            if let Some(mut pipe) = pipe {
+                let _ = pipe.read_to_end(&mut bytes);
+            }
+            bytes
+        })
+    };
+    let stdout = read(child.stdout.take().map(|p| Box::new(p) as _));
+    let stderr = read(child.stderr.take().map(|p| Box::new(p) as _));
+    let started = std::time::Instant::now();
+    let status = loop {
+        match child
+            .try_wait()
+            .map_err(|e| format!("wait for {program}: {e}"))?
+        {
+            Some(status) => break status,
+            None if started.elapsed() >= deadline => {
+                let _ = Command::new("kill")
+                    .args(["-KILL", "--", &format!("-{}", child.id())])
+                    .stdout(Stdio::null())
+                    .stderr(Stdio::null())
+                    .status();
+                let _ = child.kill();
+                let _ = child.wait();
+                return Err(format!(
+                    "{program} did not finish within {} s",
+                    deadline.as_secs_f64()
+                ));
+            }
+            None => std::thread::sleep(Duration::from_millis(10)),
+        }
+    };
+
+    Ok(Output {
+        status,
+        stdout: stdout.join().unwrap_or_default(),
+        stderr: stderr.join().unwrap_or_default(),
+    })
+}
+
+/// Fails unless `version`, what `strace -V` printed, names a version at
+/// least [`STRACE_MINIMUM`].
+fn strace_new_enough(version: &str) -> Result<(), String> {
+    let found = version
+        .split_whitespace()
+        .skip_while(|w| *w != "version")
+        .nth(1)
+        .and_then(|v| {
+            let mut parts = v.split('.').map(str::parse::<u32>);
+            Some((parts.next()?.ok()?, parts.next()?.ok()?))
+        });
+    let (major, minor) = STRACE_MINIMUM;
+    match found {
+        Some(found) if found >= STRACE_MINIMUM => Ok(()),
+        _ => Err(format!(
+            "the trace needs strace {major}.{minor} or later, for --seccomp-bpf; strace -V printed {:?}",
+            version.lines().next().unwrap_or_default()
+        )),
+    }
+}
+
+/// [`preflight`] with the namespace tool `unshare`, the version check
+/// aside.
 fn preflight_with(unshare: &str) -> Result<(), String> {
+    preflight_traced(unshare, &TRACE)
+}
+
+/// [`preflight_with`] under the trace `trace`, up to its output file.
+fn preflight_traced(unshare: &str, trace_args: &[&str]) -> Result<(), String> {
+    preflight_within(unshare, trace_args, PREFLIGHT_DEADLINE)
+}
+
+/// How long each tool the preflight runs may take (ENG-03): far past
+/// what a working machine needs, short of a run that seems to hang.
+const PREFLIGHT_DEADLINE: Duration = Duration::from_secs(30);
+
+/// [`preflight_traced`] with each tool given `deadline` to finish.
+fn preflight_within(unshare: &str, trace_args: &[&str], deadline: Duration) -> Result<(), String> {
+    let dir = TempDir::new().map_err(|e| format!("make the preflight's trace: {e}"))?;
+    let trace = dir.path().join("trace");
     let mut command = Command::new(unshare);
     command
         .args(NAMESPACE)
-        .args(TRACE)
-        .args(["/dev/null", "--", "true"]);
-    let out = command
-        .stdin(Stdio::null())
-        .output()
-        .map_err(|e| format!("start {unshare}: {e}"))?;
+        .args(trace_args)
+        .arg(&trace)
+        .arg("--")
+        .args(PREFLIGHT_PROBE);
+    let out = output_within(&mut command, deadline)?;
     if out.status.success() {
-        return Ok(());
+        let read =
+            fs::read_to_string(&trace).map_err(|e| format!("read the preflight's trace: {e}"))?;
+        return judge_preflight(&read);
     }
     let line: Vec<String> = std::iter::once(command.get_program())
         .chain(command.get_args())
@@ -612,6 +803,23 @@ fn preflight_with(unshare: &str) -> Result<(), String> {
         line.join(" "),
         out.status,
         String::from_utf8_lossy(&out.stderr).trim()
+    ))
+}
+
+/// Fails unless the preflight's `trace` recorded a socket call the trace
+/// failed with an injected `EACCES`: an empty trace, or a socket let
+/// through, would mean the trace confines nothing.
+fn judge_preflight(trace: &str) -> Result<(), String> {
+    let failed = network_calls(trace)
+        .iter()
+        .any(|c| c.starts_with("socket(") && c.contains("EACCES") && c.contains("(INJECTED)"));
+    if failed {
+        return Ok(());
+    }
+
+    Err(format!(
+        "the trace did not fail the preflight's socket; it recorded: {:?}",
+        trace.trim()
     ))
 }
 

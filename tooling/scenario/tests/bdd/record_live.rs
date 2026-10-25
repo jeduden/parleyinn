@@ -7,8 +7,7 @@
 //! ingest` reading the same transcript at once, every line is recorded
 //! once and each writer's `seq` stays gap-free.
 //!
-//! `@REC-06` stays pending: its purged range needs `parinn purge
-//! --range` (phase 14), so its first step fails naming it.
+//! `@REC-06`'s purged range is `parinn purge --range`'s (phase 14).
 
 use std::collections::BTreeMap;
 use std::fs;
@@ -466,11 +465,7 @@ fn refuses_link(w: &mut World) -> Result<(), String> {
 fn appended_and_purged(w: &mut World, name: String) -> Result<(), String> {
     make_run(w, &name, 20, None)?;
     run_core(w, &["ingest", "--all"], None)?;
-    Err(
-        "the record holds seq 1 to 20; purging seq 5-9 awaits parinn purge --range, phase 14 of \
-         plan 2609292012"
-            .to_owned(),
-    )
+    crate::erasure::purge_run_events(w, &name, 5, 9)
 }
 
 #[given(regex = r"^an append transaction of that writer that rolled back$")]

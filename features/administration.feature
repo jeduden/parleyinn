@@ -106,7 +106,7 @@ Feature: Administration and lifecycle (ADM)
     Then the command exits 0
     And the purged events are gone from the segments, events, the search index, derived artifacts, the payload store and every copy of their content
     And the commitment key and payload reference of every purged event are erased
-    And a tombstone event per purged range carries only addresses, counts, reason and commitments, and the structural fields, provenance and recorder of each purged act, tombstone and event the key set holds, never their text
+    And a tombstone event per purged range carries only addresses, counts, reason and a digest over the purged events' commitments, and the structural fields, provenance and recorder of each purged act, tombstone and event the key set holds, never their text
     And "parinn rebuild" then derives room state, the key set and the quarantine set as before the purge, but for the purged content
     And the store is vacuumed and "parinn verify" exits 0
     And once the purge reports the range erased, with encryption at rest on and off, no file in the home or the storage engine's temporary directory, read decrypted, contains a canary token only the purged events carried, their commitment keys or a search index entry naming a purged address
@@ -173,7 +173,7 @@ Feature: Administration and lifecycle (ADM)
     Then the change "chmod 0600" is shown before it is applied
     And the store file has mode 0600
 
-  @ADM-11 @P0 @I6 @pending
+  @ADM-11 @P0 @I6
   Scenario: status shows locations, sizes, schema, deployment mode and failure counters
     Given an isolated ParleyInn home
     And deployment mode "automation"

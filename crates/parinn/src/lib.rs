@@ -2,10 +2,15 @@
 //! handlers, the MCP server and the CLI so far.
 //!
 //! It runs `version`, `ingest`, `mcp`, `verify`, `hook`,
-//! `status`, `doctor`, and the principal acts `counter ack`,
-//! `configuration accept` and `risk-acceptance`. Every other
+//! `status`, `doctor`, `purge`, `quarantine`, and the principal acts
+//! `counter ack`, `configuration accept` and `risk-acceptance`. Every other
 //! command in the SRS's §9.5 is a pending scenario under features/, and
 //! lands with the plan that makes its scenario pass.
+
+// A lint the core's code would quiet says so with an expectation and a
+// reason, which fails once nothing trips it; a bare allow does not
+// (SEC-01, ENG-16).
+#![deny(clippy::allow_attributes)]
 
 use std::cell::RefCell;
 use std::collections::BTreeMap;
@@ -20,7 +25,7 @@ use administration::act as act_record;
 use administration::home::Home;
 use administration::node::Node;
 use administration::node_identity::IdentitySource;
-use administration::verify::{Report, VerifyError, verify};
+use administration::verify::{Report, Shape, VerifyError, verify};
 use allowed_root::{Access, AllowedPath, AllowedRoots};
 use audit::AuditError;
 use audit::counters::{Counts, counts};
@@ -82,10 +87,16 @@ commands:
   configuration accept [--json]          accept the configuration (widening)
   counter ack [--json]                   acknowledge the counters (neutral)
   doctor [--json]                        fail while a counter rose since the last acknowledgement
+  event search WORDS [--room ID] [--k N] find events by their text, as event_search does
+  event expand RANGE [--room ID]         read an address range, as event_expand does; --cursor C continues one
   hook <hook>                            run the hook handler on the hook input on stdin
   ingest --all | --path P [--json]       record every transcript under the roots, or the one at P
   licenses                               print the third-party license texts built in
   mcp                                    serve the MCP tools over stdio
+  purge --range RANGE [--reason TEXT]    erase the content of an address range (widening)
+  quarantine add SELECTOR [--reason T]   hold events out of recall (cut)
+  quarantine release SELECTOR            take a quarantine back (widening)
+  quarantine list [--json]               show the quarantines in force
   repository show [DIR] [--json]         show the repository identity of DIR, the working directory by default
   repository bind [DIR] [--commit ID]    bind or rebind the repository identity (widening)
   rebuild [--json]                       derive the origins and the search index again from the record
@@ -308,10 +319,13 @@ pub fn run(
         Some("configuration") => act::configuration(args, ctx, stdout, stderr),
         Some("counter") => act::counter(args, ctx, stdout, stderr),
         Some("doctor") => doctor(args, ctx, stdout, stderr),
+        Some("event") => event::event(args, ctx, stdout, stderr),
         Some("hook") => hook_handlers::hook_command(args.next().as_deref(), ctx, stdout),
         Some("ingest") => ingest(args, ctx, stdout, stderr),
         Some("licenses") => licenses::licenses(args, stdout, stderr),
         Some("mcp") => mcp(args, ctx, stdout, stderr),
+        Some("purge") => purge::purge(args, ctx, stdout, stderr),
+        Some("quarantine") => quarantine::quarantine(args, ctx, stdout, stderr),
         Some("rebuild") => rebuild::rebuild(args, ctx, stdout, stderr),
         Some("repository") => repository_identity::repository(args, ctx, stdout, stderr),
         Some("risk-acceptance") => act::risk_acceptance(args, ctx, stdout, stderr),
@@ -375,6 +389,14 @@ pub(crate) fn json_flag(
     }
 
     Some(as_json)
+}
+
+/// Logs the failure of `result`, if it failed, as what `what` says: for
+/// work that must not stop the command it runs in (I9).
+pub(crate) fn logged<T, E: std::fmt::Display>(what: &str, result: Result<T, E>) {
+    if let Err(e) = result {
+        tracing::warn!(error = e.to_string().as_str(), what, "failed");
+    }
 }
 
 /// Reports a failure of `command` on `stderr`.
@@ -468,7 +490,10 @@ fn ingest(
     // not to, each transcript would fail with why.
     let redactor = redactor(ctx, settings, stderr);
     match start_node(ctx, &home, stderr) {
-        Ok(mut store) => count_untaken_bindings(ctx, &mut store),
+        Ok(mut store) => {
+            purge::finish(ctx, &mut store);
+            count_untaken_bindings(ctx, &mut store);
+        }
         Err(e) => return failed("ingest", &e, stderr),
     }
     // What an MCP server killed before it stopped left is audited by
@@ -490,6 +515,7 @@ fn ingest(
     let held = held_sources(ctx, settings, &home, stderr);
     let held: Vec<&Path> = held.iter().map(AllowedPath::path).collect();
     failures += ingest_all(ctx, &home, &held, &redactor, &inputs, stderr).1;
+    apply_retention(ctx, &home, settings, stderr);
     if target == IngestTarget::All {
         audit_lost(ctx, &home, stderr);
     }
@@ -497,6 +523,25 @@ fn ingest(
     let code = written(write!(stdout, "{shown}"), stderr);
 
     if failures > 0 { EXIT_FAILURE } else { code }
+}
+
+/// Applies the retention policies in force once the ingest is done
+/// (SEC-22); a failure to open the store again is audited and counted,
+/// and stops nothing (I9).
+fn apply_retention(
+    ctx: &Context,
+    home: &Home,
+    settings: &configuration::resolve::Settings,
+    stderr: &mut dyn Write,
+) {
+    if retention::policies(settings).is_empty() {
+        return;
+    }
+    let opened = start_node(ctx, home, stderr).and_then(|store| {
+        let node = Node::find(home, &store).map_err(|e| e.to_string())?;
+        Ok((store, node))
+    });
+    retention::apply_opened(ctx, opened, settings, &mut OsEntropy);
 }
 
 /// Ingests each transcript source at `paths`. Returns a report of each
@@ -1082,15 +1127,16 @@ fn mcp(
     let served = start_node(ctx, &home, stderr).and_then(|mut store| {
         repository_identity::bind_observed(ctx, &home, &mut store);
         let node = Node::find(&home, &store).map_err(|e| e.to_string())?;
-        Ok(mcp::Server::new(
+        let server = mcp::Server::new(
             store,
             ctx.build.version,
             node.device().public(),
             node.personal_room(),
-        ))
+        );
+        Ok((server, node.device_writer()))
     });
-    let server = match served {
-        Ok(server) => server,
+    let (server, device_writer) = match served {
+        Ok(served) => served,
         Err(e) => return failed("mcp", &e, stderr),
     };
     // What an MCP server killed before it stopped left is audited by
@@ -1099,8 +1145,15 @@ fn mcp(
         let _ = ctx.audit(o);
     });
     let shared = std::sync::Arc::new(capture::Shared::default());
-    let mut server = server.with_runs(Box::new(capture::Finder(shared.clone())));
-    let live = live_capture(ctx, &home, &shared, stderr)
+    // Neither a recall event nor a line of a transcript may be written
+    // without the redaction patterns in force (SEC-08).
+    let in_force = audit_settings(ctx, &home, stderr);
+    let redactor = recall::redactor(ctx, &in_force, stderr);
+    let mut server = server
+        .with_runs(Box::new(capture::Finder(shared.clone())))
+        .with_recall_writer(recall::recall_writer(device_writer, redactor.clone()));
+    let live = redactor
+        .map(|r| live_capture(ctx, &home, &shared, &in_force, r))
         .map(capture::Capture::start)
         .map(spawn_capture);
     if let Some(deadline) = ctx.query_deadline {
@@ -1116,6 +1169,7 @@ fn mcp(
             let reply = server.handle(l);
             record_found(ctx, &server.take_found());
             cancelled(server.take_cancelled());
+            recall::audit_notes(ctx, &server.take_notes());
             reply
         },
         &(ctx.input)(),
@@ -1141,22 +1195,16 @@ const CAPTURE_STOP: Duration = Duration::from_secs(5);
 
 /// The MCP server's live ingest in `home` (REC-13): its own harness
 /// process's session bindings, its transcripts resolved within the
-/// transcript roots, redacted by the settings in force. None while a
-/// settings layer fails, as no line may be written without the
-/// redaction patterns it names (SEC-08); the refusal is audited.
+/// transcript roots, redacted by `redactor`, the patterns of the
+/// settings in force.
 fn live_capture(
     ctx: &Context,
     home: &Home,
     shared: &std::sync::Arc<capture::Shared>,
-    stderr: &mut dyn Write,
-) -> Option<capture::Capture> {
-    let in_force = audit_settings(ctx, home, stderr);
-    if in_force.loaded.principal_layer_failed() {
-        refuse_ingest(ctx, stderr);
-        return None;
-    }
+    in_force: &settings::InForce,
+    redactor: Redactor,
+) -> capture::Capture {
     let settings = &in_force.resolved.settings;
-    let redactor = redactor(ctx, settings, stderr).ok()?;
     let os_home = ctx.home.as_deref().map(Path::new);
     let roots = settings
         .texts("transcript.roots")
@@ -1167,7 +1215,7 @@ fn live_capture(
     let base = (ctx.clock)();
     let started = now_instant();
 
-    Some(capture::Capture {
+    capture::Capture {
         ceiling: ctx.home.as_deref().map(PathBuf::from),
         home: home.clone(),
         roots,
@@ -1182,7 +1230,7 @@ fn live_capture(
         limit: ctx.live_limit,
         clock: Box::new(move || base + started.elapsed().as_secs()),
         shared: shared.clone(),
-    })
+    }
 }
 
 /// Now, for live ingest's audit clock.
@@ -1285,7 +1333,10 @@ fn query_cancelled(home: &Home, time: u64) -> Result<Entry, AuditError> {
 
 /// `parinn verify [--json]`: checks the record against this node's
 /// device key, exiting 3 at the first failure, which it names. No log
-/// is signed yet, so a record that passes is `unsigned` (§9.7.5).
+/// is signed yet, so a record that passes is `unsigned` (§9.7.5). It
+/// changes nothing it checks: a purge a kill cut short is reported,
+/// with the search index its residue leaves unchecked, for the next
+/// purge, ingest or rebuild to finish (ADM-09, ENG-06).
 fn verify_command(
     args: impl Iterator<Item = String>,
     ctx: &Context,
@@ -1295,31 +1346,27 @@ fn verify_command(
     let Some(as_json) = json_flag("verify", args, stderr) else {
         return EXIT_USAGE;
     };
-    let home = match ctx.home() {
-        Ok(home) => home,
+    let (home, store) = match verified_store(ctx, stderr) {
+        Ok(opened) => opened,
+        Err(code) => return code,
+    };
+    let incomplete = match completeness(ctx, &home, &store) {
+        Ok(found) => found,
         Err(e) => return failed("verify", &e, stderr),
     };
-    if !home.store().exists() {
-        return failed(
-            "verify",
-            &format!("no store at {}", home.store().display()),
-            stderr,
-        );
-    }
-    let store = match Store::open(&home.store()) {
-        Ok(store) => store,
-        Err(e) => return store_failed("verify", &e, stderr),
-    };
-    let lost = match sources::of(&store) {
-        Ok(status) => status.lost,
+    let read = store
+        .refused_forks()
+        .and_then(|forks| Ok((forks, unfinished_purges(ctx, &store)?)));
+    let (forks, unfinished) = match read {
+        Ok(read) => read,
         Err(e) => return failed("verify", &e, stderr),
     };
-    let forks = match store.refused_forks() {
-        Ok(forks) => forks,
-        Err(e) => return failed("verify", &e, stderr),
-    };
+    let mut shape = Shape::Checked;
     let verified = match verify_record(&home, &store) {
-        Ok(verified) => verified,
+        Ok(verified) => verified.and_then(|(r, staged)| {
+            shape = shape_beside(ctx, &store, &unfinished)?;
+            Ok((r, staged))
+        }),
         Err(e) => return failed("verify", &e, stderr),
     };
     let checked = match verified {
@@ -1333,15 +1380,37 @@ fn verify_command(
         Ok((r, staged, _)) if !forks.is_empty() => {
             refused_report(as_json, &r, staged, &forks, stderr)
         }
-        Ok((r, staged, a)) => (EXIT_OK, verified_line(as_json, &r, staged, &a, &lost)),
+        Ok(_) if incomplete.failure().is_some() => broken_json(
+            as_json,
+            "transcript_source_completeness",
+            "transcript source completeness",
+            None,
+            &incomplete.failure().unwrap_or_default(),
+            stderr,
+        ),
+        Ok((r, staged, a)) => (
+            EXIT_OK,
+            verified_line(
+                as_json,
+                &r,
+                staged,
+                &a,
+                &incomplete,
+                Checks {
+                    shape,
+                    unfinished: &unfinished,
+                },
+            ),
+        ),
         Err(Ok(VerifyError::Store(e))) => return failed("verify", &e, stderr),
         Err(Err(e @ AuditError::Broken { .. })) => {
-            broken_json(as_json, "audit", None, &e.to_string(), stderr)
+            broken_json(as_json, "audit", "hash chain", None, &e.to_string(), stderr)
         }
         Err(Err(e)) => return failed("verify", &e, stderr),
         Err(Ok(broken)) => broken_json(
             as_json,
             broken.class(),
+            broken.check(),
             broken.address(),
             &broken.to_string(),
             stderr,
@@ -1355,6 +1424,87 @@ fn verify_command(
         EXIT_OK => code,
         other => other,
     }
+}
+
+/// The home and the store `parinn verify` checks, or the exit code of
+/// the failure it reported on `stderr`.
+fn verified_store(ctx: &Context, stderr: &mut dyn Write) -> Result<(Home, Store), u8> {
+    let home = ctx.home().map_err(|e| failed("verify", &e, stderr))?;
+    if !home.store().exists() {
+        let missing = format!("no store at {}", home.store().display());
+        return Err(failed("verify", &missing, stderr));
+    }
+    let store = Store::open(&home.store()).map_err(|e| store_failed("verify", &e, stderr))?;
+
+    Ok((home, store))
+}
+
+/// How far the transcript sources of `store` fall short (ADM-09), as
+/// `parinn verify` finds them now.
+fn completeness(
+    ctx: &Context,
+    home: &Home,
+    store: &Store,
+) -> Result<sources::Completeness, store::StoreError> {
+    Ok(sources::completeness(
+        &store.sources()?,
+        &capture::served(home),
+        &sources::look,
+        (ctx.clock)().saturating_mul(1000),
+    ))
+}
+
+/// The ranges a purge a kill cut short has still to clear from the
+/// search index, audited and counted when there are any (I6): the next
+/// purge, ingest or rebuild finishes them.
+fn unfinished_purges(ctx: &Context, store: &Store) -> Result<Vec<String>, store::StoreError> {
+    let unfinished = store.unfinished_purges()?;
+    if !unfinished.is_empty() {
+        purge::audit_residue(ctx);
+    }
+
+    Ok(unfinished)
+}
+
+/// The shape of `store` beside the ranges a purge left `unfinished`:
+/// while there are any, their residue is in the search index, which is
+/// left unchecked, and the rest of the shape is checked.
+fn shape_beside(ctx: &Context, store: &Store, unfinished: &[String]) -> Result<Shape, VerifyError> {
+    if unfinished.is_empty() {
+        checked_shape(ctx, store)
+    } else {
+        administration::verify::verify_shape(store, &|| false)
+    }
+}
+
+/// What `parinn verify` checked beside the record: the store's shape,
+/// and the ranges an unfinished purge leaves in the search index.
+#[derive(Debug, Clone, Copy)]
+struct Checks<'a> {
+    shape: Shape,
+    unfinished: &'a [String],
+}
+
+/// How long `parinn verify` derives the search index again before it
+/// leaves the index unchecked (ADM-09, ENG-03), in seconds on its clock.
+const INDEX_CHECK_SECS: u64 = 60;
+
+/// The shape of `store`, its search index derived again while
+/// [`INDEX_CHECK_SECS`] last on `ctx`'s clock; a derivation that ran out
+/// of time is audited and counted (I6).
+fn checked_shape(ctx: &Context, store: &Store) -> Result<Shape, VerifyError> {
+    let ends = (ctx.clock)().saturating_add(INDEX_CHECK_SECS);
+    let shape = administration::verify::verify_shape(store, &|| (ctx.clock)() < ends)?;
+    if shape == Shape::IndexUnfinished {
+        let _ = ctx.audit(&Occurrence::Degraded {
+            kind: Kind::TimedOut,
+            counter: Counter::VerifyTimedOut,
+            operation: "verify",
+            detail: "the search index was not derived again in time and is unchecked",
+        });
+    }
+
+    Ok(shape)
 }
 
 /// The record in `store`, verified against the device key `home` keeps,
@@ -1399,8 +1549,10 @@ fn verified_line(
     r: &Report,
     staged: bool,
     a: &audit::log::Checked,
-    lost: &[String],
+    incomplete: &sources::Completeness,
+    checks: Checks<'_>,
 ) -> String {
+    let index_checked = checks.shape == Shape::Checked;
     if as_json {
         return json!({
             "integrity": "unsigned",
@@ -1409,7 +1561,9 @@ fn verified_line(
             "order": r.full_order(),
             "seats": seats_json(&r.seats),
             "open_segments": segments::open_json(&r.open_segments),
-            "lost_sources": lost,
+            "short_sources": incomplete.short,
+            "pending_purges": checks.unfinished,
+            "index_checked": index_checked,
             "staged": staged,
             "audit": {"files": a.files, "entries": a.entries},
             "refused": [],
@@ -1422,16 +1576,31 @@ fn verified_line(
     } else {
         ""
     };
+    let unchecked = if index_checked {
+        String::new()
+    } else if checks.unfinished.is_empty() {
+        "; the search index was not derived again in time, so it is unchecked: \
+         run parinn verify again"
+            .to_owned()
+    } else {
+        format!(
+            "; a purge was cut short before it finished, so its residue stays until the next \
+             purge, ingest or rebuild clears it, and the search index is unchecked: {}",
+            checks.unfinished.join(", ")
+        )
+    };
 
     format!(
         "checked {} writers and {} events: every chain, commitment and seat certificate \
-         holds; integrity unsigned, as no log is signed yet; the audit log's chain holds \
-         over {} entries{}{}{staged}",
+         holds; integrity unsigned, as no log is signed yet, so a log cut at its tail or \
+         rewritten whole goes unseen until seals; completeness covers only the transcript \
+         sources the record names; the audit log's chain holds over {} entries{}{}{unchecked}\
+         {staged}",
         r.writers,
         r.events,
         a.entries,
         open_text(&r.open_segments),
-        lost_line(lost)
+        incomplete.short_text()
     )
 }
 
@@ -1463,16 +1632,6 @@ fn refused_report(
     });
 
     (EXIT_INTEGRITY, line.to_string())
-}
-
-/// What `parinn verify` adds for transcript sources gone before they
-/// were fully ingested: nothing when none was (REC-08).
-fn lost_line(lost: &[String]) -> String {
-    if lost.is_empty() {
-        return String::new();
-    }
-
-    format!("; {}", sources::lost_text(lost))
 }
 
 /// What `parinn verify` adds for writer chains that ended without a
@@ -1513,11 +1672,12 @@ fn seats_json(seats: &[administration::verify::SeatReport]) -> Value {
 fn broken_json(
     as_json: bool,
     class: &str,
+    check: &str,
     address: Option<&str>,
     message: &str,
     stderr: &mut dyn Write,
 ) -> (u8, String) {
-    let _ = writeln!(stderr, "parinn verify: {message}");
+    let _ = writeln!(stderr, "parinn verify: {check}: {message}");
     if !as_json {
         return (EXIT_INTEGRITY, String::new());
     }
@@ -1528,7 +1688,7 @@ fn broken_json(
         "order": null,
         "seats": null,
         "audit": null,
-        "broken": {"class": class, "address": address, "message": message},
+        "broken": {"class": class, "check": check, "address": address, "message": message},
     });
 
     (EXIT_INTEGRITY, line.to_string())
@@ -1754,6 +1914,8 @@ struct Status {
     home: String,
     /// The store's path and size, once the home exists.
     store: Option<(String, Option<u64>)>,
+    /// The schema version of the store, once it is made.
+    schema_version: Option<u32>,
     /// The audit log's path and number of entries, once the home exists.
     audit: Option<(String, u64)>,
     /// Each counter's total and rise since the last acknowledgement.
@@ -1784,7 +1946,9 @@ impl Status {
             .collect();
         let mut status = json!({
             "home": self.home,
-            "store": self.store.as_ref().map(|(p, b)| json!({"path": p, "bytes": b})),
+            "store": self.store.as_ref().map(|(p, b)| {
+                json!({"path": p, "bytes": b, "schema_version": self.schema_version})
+            }),
             "audit": self.audit.as_ref().map(|(p, n)| json!({"path": p, "entries": n})),
             "counters": counters,
             "deployment_mode": self.deployment_mode,
@@ -1812,7 +1976,12 @@ impl Status {
         let mut lines = Vec::new();
         match (&self.store, &self.audit) {
             (Some((store, bytes)), Some((audit, entries))) => {
-                let size = bytes.map_or("none yet".to_owned(), |b| format!("{b} bytes"));
+                let size = bytes.map_or("none yet".to_owned(), |b| {
+                    let schema = self
+                        .schema_version
+                        .map_or(String::new(), |v| format!(", schema version {v}"));
+                    format!("{b} bytes{schema}")
+                });
                 lines.push(format!("home: {}", self.home));
                 lines.push(format!("store: {store} ({size})"));
                 lines.push(format!("audit log: {audit} ({entries} entries)"));
@@ -1919,6 +2088,7 @@ fn status(
     };
     let refused = segments.as_ref().is_some_and(|s| !s.newer.is_empty());
     let mut status = status_of(&home, counted, &in_force);
+    status.schema_version = segments.as_ref().map(|s| s.schema_version);
     status.segments = segments;
     status.bindings = store
         .as_ref()
@@ -1948,6 +2118,7 @@ fn status_of(home: &Home, counted: Option<(Counts, u64)>, in_force: &settings::I
     let mut status = Status {
         home: home.root().display().to_string(),
         store: None,
+        schema_version: None,
         audit: None,
         counters: Vec::new(),
         deployment_mode: in_force.resolved.settings.deployment_mode().to_owned(),
@@ -2030,13 +2201,18 @@ pub(crate) fn invalid_layers(command: &str, loaded: &Loaded, stderr: &mut dyn Wr
 
 mod act;
 mod capture;
+mod event;
 pub mod forks;
 mod hook_handlers;
 mod identity_status;
 mod index_gaps;
 mod licenses;
+mod purge;
+mod quarantine;
 mod rebuild;
+mod recall;
 mod repository_identity;
+mod retention;
 mod segments;
 mod settings;
 mod sources;

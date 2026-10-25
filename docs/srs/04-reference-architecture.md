@@ -113,12 +113,13 @@ whatever
 its storage layout, from the writer logs the node holds and the node's own key
 set (I10). Purge, the only way stored content is destroyed, removes content but
 leaves a tombstone event carrying the removed addresses, counts, reason, the
-principal or retention policy that purged, and the commitments of the removed
-events, with the structural fields, provenance and recorder of each removed act,
-tombstone and event the key set holds (REC-17, ADM-07), never a hash of the
-removed content, so rebuilds stay deterministic, no purge undoes an act's
-effect, purges stay auditable and nothing retained confirms a guess at what was
-purged. Room status and a check's state are computed where shown, never stored.
+principal or retention policy that purged, and a digest over the commitments of
+the removed events (the chained headers keep each), with the structural fields,
+provenance and recorder of each removed act, tombstone and event the key set
+holds (REC-17, ADM-07), never a hash of the removed content, so rebuilds stay
+deterministic, no purge undoes an act's effect, purges stay auditable and
+nothing retained confirms a guess at what was purged. Room status and a check's
+state are computed where shown, never stored.
 
 ## 4.4 Key scenarios
 
