@@ -299,3 +299,21 @@ fn blank() -> Redacted {
         limited: false,
     }
 }
+
+#[test]
+fn marker_writes_the_rules_marker_and_counts_it() {
+    let r = redactor(&[]);
+    let mut out = blank();
+    r.marker(0, &mut out);
+    assert_eq!(out.text, "[REDACTED:private_key]");
+    assert_eq!(out.rules, ["private_key"]);
+}
+
+#[test]
+fn matches_lists_the_merged_spans_of_every_rule_in_order() {
+    let r = redactor(&["ACME-[0-9]{8}"]);
+    let piece = format!("x ACME-11111111 {AWS} y");
+    let spans = r.matches(&piece);
+    assert_eq!(spans, [(2, 15, 9), (16, 36, 1)]);
+    assert!(r.matches("nothing").is_empty());
+}

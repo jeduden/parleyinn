@@ -1074,14 +1074,17 @@ fn audit_redactions(ctx: &Context, rules: &[String], stderr: &mut dyn Write) {
     }
 }
 
-/// Audits each line whose redaction scan budget ended, a degraded
+/// What the audit says of a text whose redaction scan limit was reached.
+pub(crate) const SCAN_LIMITED_DETAIL: &str = "a text's redaction scan limit was reached; a secret beside a redacted one may stand, stored in full";
+
+/// Audits each text whose redaction scan limit was reached, a truncated
 /// redaction and not a redaction (SEC-08, I9, I6).
 fn audit_scan_limited(ctx: &Context, lines: usize, stderr: &mut dyn Write) {
     let occurrence = Occurrence::Degraded {
         kind: Kind::Truncated,
         counter: Counter::RedactionScanLimited,
         operation: "ingest",
-        detail: "a line's redaction scan budget ended; a secret beside a match may stand",
+        detail: SCAN_LIMITED_DETAIL,
     };
     for _ in 0..lines {
         if let Err(e) = ctx.audit(&occurrence) {

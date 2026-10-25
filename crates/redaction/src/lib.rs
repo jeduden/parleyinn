@@ -52,7 +52,7 @@ pub struct Redacted {
     pub text: String,
     /// One rule name per marker, in the order they appear.
     pub rules: Vec<String>,
-    /// Whether the scan budget ended (`SCAN_BUDGET_FACTOR`) before
+    /// Whether the redaction scan limit was reached (`SCAN_LIMIT_FACTOR`) before
     /// the text beside the last matches was scanned again, so a secret
     /// a match hid from the boundary rules may stand in `text`. The
     /// caller counts it (I6); `text` loses nothing for it.
@@ -61,7 +61,7 @@ pub struct Redacted {
 
 /// How many times the length of a text its scans may read together: a
 /// clean text takes one, and the text around matches about one more.
-const SCAN_BUDGET_FACTOR: usize = 8;
+const SCAN_LIMIT_FACTOR: usize = 8;
 
 /// One step of [`Redactor::redact_text`]: text to scan, or the marker
 /// of the rule that matched.
@@ -119,8 +119,8 @@ impl Redactor {
     /// a principal's pattern after it). A marker is never scanned, so
     /// no pattern matches inside one, and each rescan is of strictly
     /// less text, so it settles. The scans together read at most
-    /// `SCAN_BUDGET_FACTOR` times the text, so a chain where every
-    /// match uncovers only the next stays linear (I9); once the budget
+    /// `SCAN_LIMIT_FACTOR` times the text, so a chain where every
+    /// match uncovers only the next stays linear (I9); once the limit
     /// ends, the rest is scanned one last time without rescans and
     /// [`Redacted::limited`] says so. No text is dropped for it (I1).
     ///
@@ -135,18 +135,18 @@ impl Redactor {
             rules: Vec::new(),
             limited: false,
         };
-        let mut budget = text.len().saturating_mul(SCAN_BUDGET_FACTOR);
+        let mut allowance = text.len().saturating_mul(SCAN_LIMIT_FACTOR);
         let mut work = vec![Work::Scan(text)];
         while let Some(item) = work.pop() {
             match item {
                 Work::Marker(rule) => self.marker(rule, &mut out),
                 Work::Scan("") => {}
-                Work::Scan(piece) if piece.len() > budget => {
+                Work::Scan(piece) if piece.len() > allowance => {
                     out.limited = true;
                     self.write_once(piece, &mut out);
                 }
                 Work::Scan(piece) => {
-                    budget -= piece.len();
+                    allowance -= piece.len();
                     self.scan(piece, &mut out, &mut work);
                 }
             }

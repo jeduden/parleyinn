@@ -78,7 +78,7 @@ pub enum Counter {
     /// A principal's redaction pattern did not compile, or compiled past
     /// the size limit, and was refused (SEC-08).
     RedactionPatternRefused,
-    /// A redaction's scan budget ended before the text beside its last
+    /// A redaction's scan limit was reached before the text beside its last
     /// match was scanned again, so a secret that match hid may stand in
     /// what was written; once per line (SEC-08, I9, I6).
     RedactionScanLimited,

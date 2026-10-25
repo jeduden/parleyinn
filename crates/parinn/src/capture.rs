@@ -413,7 +413,7 @@ impl Running {
                 kind: Kind::Truncated,
                 counter: Counter::RedactionScanLimited,
                 operation: "mcp",
-                detail: "a line's redaction scan budget ended; a secret beside a match may stand",
+                detail: crate::SCAN_LIMITED_DETAIL,
             });
         }
         for _ in 0..ingested.unparsed {

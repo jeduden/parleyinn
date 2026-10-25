@@ -489,7 +489,7 @@ struct Plan {
     /// fork observation chose.
     chosen: BTreeSet<(WriterId, WriterId)>,
     redactions: Vec<String>,
-    /// How many lines' redaction scan budget ended (I9).
+    /// How many lines' redaction scan limit was reached (I9).
     scan_limited: usize,
     unparsed: usize,
     drifts: Vec<String>,

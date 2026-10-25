@@ -537,7 +537,7 @@ fn ingest_audits_a_limited_redaction_apart_from_a_redaction() {
         limited,
         [(
             "truncated".to_owned(),
-            "a line's redaction scan budget ended; a secret beside a match may stand".to_owned()
+            crate::SCAN_LIMITED_DETAIL.to_owned()
         )]
     );
 }
