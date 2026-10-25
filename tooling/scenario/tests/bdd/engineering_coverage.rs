@@ -1,10 +1,13 @@
-//! The ENG-11 steps: the coverage profile CI takes of the whole suite
-//! holds every security-sensitive crate the workspace builds to at
-//! least the row's floor, and every crate to the overall one. The
-//! `coverage` crate measures each test layer and CI's coverage job
-//! merges them and fails below a floor; these steps read the floors it
-//! holds from `[workspace.metadata.coverage]` through `cargo metadata`,
-//! and the job from the CI workflow.
+//! The ENG-11 steps. They read the floors the coverage profile is held
+//! to, not the profile itself: `[workspace.metadata.coverage]` through
+//! `cargo metadata`, and the CI job that runs `coverage --merge`. That
+//! job measures the merged profile of every test layer and fails a crate
+//! below its floor, so a floor at or above the row's holds the crate to
+//! the row whenever CI passes. Every security-sensitive crate the
+//! workspace builds must be held to at least the row's floor, and every
+//! crate to the overall one. The security-sensitive crates the workspace
+//! does not build yet (`flag`, `pin`, `landmark` and `restore_block` in
+//! M1) are skipped, and named when the step fails.
 
 use std::env;
 use std::ffi::OsString;
@@ -53,12 +56,14 @@ fn every_sensitive_crate(w: &mut World) -> Result<(), String> {
             row.sensitive_floor
         ));
     }
-    let (built, _later) = coverage_floors::built(plan, row);
+    let (built, _) = coverage_floors::built(plan, row);
     if built.is_empty() {
         return Err("the workspace builds no security-sensitive crate".to_owned());
     }
 
+    let skipped = coverage_floors::built(plan, row).1;
     outcome(coverage_floors::sensitive_problems(plan, row))
+        .map_err(|e| format!("{e}\nnot built yet, so skipped: {}", skipped.join(", ")))
 }
 
 #[then(regex = r"^the workspace as a whole is at least 80% covered$")]
