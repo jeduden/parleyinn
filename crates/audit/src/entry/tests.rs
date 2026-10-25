@@ -107,6 +107,8 @@ fn each_counter_of_the_mcp_server_has_its_name() {
         (Counter::ToolCallRunAmbiguous, "tool_call_run_ambiguous"),
         (Counter::LiveIngestFailed, "live_ingest_failed"),
         (Counter::QueryCancelled, "query_cancelled"),
+        (Counter::RecallTruncated, "recall_truncated"),
+        (Counter::RecallNotRecorded, "recall_not_recorded"),
         (
             Counter::SearchIndexWriterUnindexed,
             "search_index_writer_unindexed",
@@ -207,6 +209,19 @@ fn a_principal_act_entry_feeds_no_counter() {
         Entry::next(&act, 1, u64::MAX, Digest::ZERO),
         Err(AuditError::Encode(_))
     ));
+}
+
+#[test]
+fn an_extended_recall_entry_feeds_no_counter() {
+    let extended = Occurrence::RecallExtended {
+        operation: "event_search",
+        detail: "recall extended past the current run",
+    };
+    let e = Entry::next(&extended, 4, 5, Digest::ZERO).unwrap();
+    assert_eq!(e.kind, RECALL_EXTENDED);
+    assert_eq!(e.counter, None);
+    assert_eq!(e.operation, "event_search");
+    assert_eq!(Entry::parse(&e.line().unwrap()), Ok(e));
 }
 
 #[test]
