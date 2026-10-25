@@ -136,9 +136,13 @@ cd parleyinn && MISE_ENV=dev scripts/setup-tools.sh --profile
 ```
 
 Outside CI the script prints the lines that put the tools on `PATH`.
-`--profile` also appends them to `~/.bashrc`, which a web environment
-needs. `scripts/setup-tools.sh --check` checks the mise pin and the tools'
-backends without installing anything.
+They export the tools' bin directories and mise's variables as plain
+values, so they work in a non-interactive shell and in any worktree, with
+no shim or `mise activate`. `--profile` also writes them to the top of
+`~/.bashrc`, replacing an earlier block, which a web environment needs.
+The script trusts the mise configs of every worktree.
+`scripts/setup-tools.sh --check` checks the mise pin and the
+tools' backends without installing anything.
 
 The environment caches what setup installs. The cache rebuilds only when
 the setup script's text changes, or after about seven days. Bump the
