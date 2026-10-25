@@ -409,12 +409,7 @@ impl Running {
             ));
         }
         for _ in 0..ingested.scan_limited {
-            self.audit(&Occurrence::Degraded {
-                kind: Kind::Truncated,
-                counter: Counter::RedactionScanLimited,
-                operation: "mcp",
-                detail: crate::SCAN_LIMITED_DETAIL,
-            });
+            self.audit(&crate::scan_limited_occurrence("mcp"));
         }
         for _ in 0..ingested.unparsed {
             self.audit(&Occurrence::Degraded {

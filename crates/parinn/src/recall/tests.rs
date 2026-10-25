@@ -63,6 +63,7 @@ fn an_unrecorded_recall_and_a_redacted_argument_are_counted() {
         &[
             Note::NotRecorded("stat_list"),
             Note::Redacted("aws_access_key".to_owned()),
+            Note::RedactionLimited,
         ],
     );
 
@@ -71,6 +72,8 @@ fn an_unrecorded_recall_and_a_redacted_argument_are_counted() {
     assert_eq!(got[1].0, "redacted");
     assert_eq!(got[1].1.as_deref(), Some("redactions"));
     assert!(got[1].3.ends_with(" aws_access_key"), "{}", got[1].3);
+    assert_eq!(got[2].0, "dropped");
+    assert_eq!(got[2].1.as_deref(), Some("redaction_scan_limited"));
 }
 
 #[test]
@@ -109,9 +112,17 @@ fn the_recall_writer_redacts_by_the_patterns_it_was_given_and_records_in_the_dev
     let recall_writer = recall_writer(writer, Some(redactor));
 
     assert_eq!(recall_writer.writer, writer);
-    let (text, rules) = (recall_writer.redact.unwrap())("token ACME-12345678 here");
+    let redact = recall_writer.redact.unwrap();
+    let (text, rules, limited) = redact("token ACME-12345678 here");
     assert_eq!(text, "token [REDACTED:extra_pattern_1] here");
     assert_eq!(rules, ["extra_pattern_1"]);
+    assert!(!limited);
+    let chain = format!("AIza{}", "a".repeat(35)).repeat(5_000);
+    let (text, _, limited) = redact(&chain);
+    assert_eq!(
+        (text.as_str(), limited),
+        (redaction::SCAN_LIMIT_MARKER, true)
+    );
     assert!(super::recall_writer(writer, None).redact.is_none());
 }
 

@@ -16,6 +16,7 @@
 //!   it owns, so the entry point answers within the hook budget whatever
 //!   the work waits on.
 
+use std::cell::Cell;
 use std::fs;
 use std::io::{self, Write};
 use std::panic::{self, AssertUnwindSafe};
@@ -263,6 +264,30 @@ impl<'j> Recording<'j> {
         }
     }
 
+    /// Audits the drift of `decoded`, described through `redactor`, and
+    /// each part of it that reached the redaction scan limit (REC-26, SEC-08, I6).
+    fn audit_drift(&self, decoded: &Decoded, redactor: &Redactor) {
+        let Some(drift) = &decoded.drift else {
+            return;
+        };
+        let limited = Cell::new(0);
+        let described = drift.describe(&|t| {
+            let redacted = redactor.redact_text(t);
+            limited.set(limited.get() + usize::from(redacted.limited));
+            redacted.text
+        });
+        for _ in 0..limited.get() {
+            self.audit(&crate::scan_limited_occurrence(self.job.hook.operation()));
+        }
+        self.audit(&Occurrence::Keyed {
+            kind: Kind::Rejected,
+            counter: Counter::FormatDrift,
+            operation: self.job.hook.operation(),
+            detail: "format drift",
+            key: &described,
+        });
+    }
+
     /// [`Self::record`]'s work, failing with what could not be done.
     fn held(&self, decoded: &Decoded) -> Result<(), &'static str> {
         let loaded = configuration::load(self.sources);
@@ -295,16 +320,7 @@ impl<'j> Recording<'j> {
         let redactor = redactor_for(&patterns, compiling.recv_timeout(self.remaining()).ok())
             .ok_or("redaction rules could not be built")?;
         let redact = |t: &str| redactor.redact_text(t).text;
-        if let Some(drift) = &decoded.drift {
-            let described = drift.describe(&redact);
-            self.audit(&Occurrence::Keyed {
-                kind: Kind::Rejected,
-                counter: Counter::FormatDrift,
-                operation: self.job.hook.operation(),
-                detail: "format drift",
-                key: &described,
-            });
-        }
+        self.audit_drift(decoded, &redactor);
         if let Some(store) = opened.as_mut() {
             count_untaken(store, self.job.now, &|o| self.audit(o));
         }

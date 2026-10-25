@@ -42,6 +42,7 @@ pub struct StructuredLog {
     clock: Box<dyn Fn() -> u64 + Send + Sync>,
     spans: AtomicU64,
     dropped: AtomicU64,
+    limited: AtomicU64,
 }
 
 impl StructuredLog {
@@ -59,7 +60,15 @@ impl StructuredLog {
             clock,
             spans: AtomicU64::new(0),
             dropped: AtomicU64::new(0),
+            limited: AtomicU64::new(0),
         }
+    }
+
+    /// How many fields reached the redaction scan limit, so a marker
+    /// stands for each in the lines written.
+    #[must_use]
+    pub fn limited(&self) -> u64 {
+        self.limited.load(Ordering::Relaxed)
     }
 
     /// How many lines could not be written.
@@ -78,8 +87,10 @@ impl StructuredLog {
         let mut fields = Fields {
             map: Map::new(),
             redactor,
+            limited: 0,
         };
         event.record(&mut fields);
+        self.limited.fetch_add(fields.limited, Ordering::Relaxed);
         let meta = event.metadata();
 
         let line = json!({
@@ -148,13 +159,16 @@ fn level(level: Level) -> &'static str {
 struct Fields<'a> {
     map: Map<String, Value>,
     redactor: &'a Redactor,
+    /// How many of the fields reached the redaction scan limit.
+    limited: u64,
 }
 
 impl Fields<'_> {
     fn text(&mut self, field: &Field, text: &str) {
-        let redacted = self.redactor.redact_text(text).text;
+        let redacted = self.redactor.redact_text(text);
+        self.limited += u64::from(redacted.limited);
         self.map
-            .insert(field.name().to_owned(), Value::String(redacted));
+            .insert(field.name().to_owned(), Value::String(redacted.text));
     }
 }
 

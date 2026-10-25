@@ -42,9 +42,11 @@ summary: >-
   its own name, such as the **restore block limit** (INJ-07), CMP-05's
   wall-clock and memory limits, SEC-04's query deadline, the output caps
   (RCL-03, CMP-06) and SEC-08's **redaction scan limit**: eight times a text's
-  length, the most one redaction reads of it (I9); a text that reaches it is
-  counted, as a truncated operation (I6), as `redaction_scan_limited`, not
-  `redacted`. I9's defined
+  length, the most one redaction reads of it (I9). A text that reaches it is
+  not written: a fixed marker stands for it, and it is counted, as a dropped
+  operation (I6), as `redaction_scan_limited`, not `redacted`. The count
+  covers each text written to the record, the audit log or the log; a text
+  only hashed or compared is not counted. I9's defined
   budgets are these named budgets and limits;
   the latency targets of NFR-01, NFR-03 and NFR-15 are targets, not budgets,
   and the harness's own limit on a hook is the **harness timeout**, never a

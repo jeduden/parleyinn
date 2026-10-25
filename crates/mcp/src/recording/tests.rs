@@ -5,7 +5,8 @@ use serde_json::json;
 fn every_text_in_the_arguments_and_every_name_is_redacted() {
     let redact = |t: &str| {
         let rules: Vec<String> = t.matches("secret").map(|_| "rule".to_owned()).collect();
-        (t.replace("secret", "[R]"), rules)
+        let limited = t == "x secret";
+        (t.replace("secret", "[R]"), rules, limited)
     };
     let arguments = json!({
         "query": "a secret",
@@ -15,9 +16,9 @@ fn every_text_in_the_arguments_and_every_name_is_redacted() {
         "none": null,
     });
 
-    let mut rules = Vec::new();
+    let mut found = Found::default();
 
-    let out = redacted(&arguments, &redact, &mut rules);
+    let out = redacted(&arguments, &redact, &mut found);
 
     assert_eq!(
         out,
@@ -29,5 +30,6 @@ fn every_text_in_the_arguments_and_every_name_is_redacted() {
             "none": null,
         })
     );
-    assert_eq!(rules.len(), 4, "one rule for each redaction");
+    assert_eq!(found.rules.len(), 4, "one rule for each redaction");
+    assert_eq!(found.limited, 1, "one text reached the scan limit");
 }

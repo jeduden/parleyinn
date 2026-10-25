@@ -1,7 +1,7 @@
 use super::account::HarnessAccountIdentifiers;
 use super::{
-    PatternRefused, Piece, Redacted, Redactor, SCAN_LIMIT_FACTOR, Work, extra_pattern, literal_end,
-    merged, pieces,
+    PatternRefused, Piece, Redacted, Redactor, SCAN_LIMIT_FACTOR, SCAN_LIMIT_MARKER, Work,
+    extra_pattern, literal_end, merged, pieces,
 };
 
 const AWS: &str = "AKIAIOSFODNN7EXAMPLE";
@@ -220,17 +220,13 @@ fn redact_text_settles_many_secrets_each_hidden_by_a_pattern() {
 }
 
 #[test]
-fn redact_text_bounds_a_chain_where_each_match_uncovers_only_the_next() {
+fn redact_text_writes_nothing_of_a_chain_that_reaches_the_scan_limit() {
     let r = redactor(&[]);
     let key = format!("AIza{}", "a".repeat(35));
-    let chain = key.repeat(20_000);
-    let out = r.redact_text(&chain);
+    let out = r.redact_text(&key.repeat(20_000));
     assert!(out.limited);
-    assert_eq!(out.rules[0], "google_api_key");
-    assert!(out.rules.len() < 64, "{} markers", out.rules.len());
-    // Nothing is dropped: what the markers do not stand for is kept.
-    let kept = out.text.replace("[REDACTED:google_api_key]", "");
-    assert_eq!(kept.len() + out.rules.len() * key.len(), chain.len());
+    assert_eq!(out.text, SCAN_LIMIT_MARKER);
+    assert!(out.rules.is_empty());
 }
 
 #[test]
@@ -244,13 +240,16 @@ fn redact_text_settles_a_short_chain_within_the_budget() {
 }
 
 #[test]
-fn redact_line_says_when_a_string_of_it_was_limited() {
+fn redact_line_holds_the_whole_line_when_a_string_of_it_was_limited() {
     let r = redactor(&[]);
     let key = format!("AIza{}", "a".repeat(35));
     let line = format!("{{\"a\":\"{}\",\"b\":\"x\"}}", key.repeat(20_000));
     let out = r.redact_line(&line);
     assert!(out.limited);
-    assert!(out.text.ends_with(",\"b\":\"x\"}"));
+    assert_eq!(out.text, SCAN_LIMIT_MARKER);
+    assert!(out.rules.is_empty());
+    let raw = r.redact_line(&format!("{{broken {}", key.repeat(20_000)));
+    assert_eq!(raw.text, SCAN_LIMIT_MARKER);
     assert!(!r.redact_line(r#"{"a":"x"}"#).limited);
 }
 
@@ -279,18 +278,6 @@ fn scan_queues_the_stretches_and_markers_in_reverse() {
         })
         .collect();
     assert_eq!(order, ["scan \"a \"", "marker 1", "scan \" b\""]);
-}
-
-#[test]
-fn write_once_replaces_matches_and_keeps_the_stretches_between() {
-    let r = redactor(&["ACME-[0-9]{8}"]);
-    let mut out = blank();
-    r.write_once(&format!("x {AWS}ACME-12345678 y"), &mut out);
-    assert_eq!(
-        out.text,
-        "x ".to_owned() + AWS + "[REDACTED:extra_pattern_1] y"
-    );
-    assert_eq!(out.rules, ["extra_pattern_1"]);
 }
 
 fn blank() -> Redacted {
@@ -337,6 +324,7 @@ fn redact_measured_reads_at_most_the_scan_limit_times_the_text() {
         );
         assert!(read >= text.len());
         assert_eq!(out.limited, text.starts_with("AIza") && text.len() > 400);
+        assert_eq!(out.text == SCAN_LIMIT_MARKER, out.limited);
     }
     assert_eq!(r.redact_measured("").1, 0);
 }

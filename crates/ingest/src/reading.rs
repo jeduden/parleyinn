@@ -3,6 +3,7 @@
 //! of a repeated line (REC-04), and the appends that move the ingest
 //! position with the lines they cover.
 
+use std::cell::Cell;
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 
@@ -176,6 +177,9 @@ impl Named {
             .map(|s| s.to_string_lossy().into_owned())
             .unwrap_or_default();
 
+        // A file name is at most 255 bytes and a `/` ends a chain of
+        // adjacent secrets, so neither text can reach the redaction
+        // scan limit.
         Self {
             path: path.to_string_lossy().into_owned(),
             directory: directory.to_string_lossy().into_owned(),
@@ -768,7 +772,12 @@ impl Plan {
         redactor: &Redactor,
         entropy: &mut dyn Entropy,
     ) -> Result<(), IngestError> {
-        let describe = |text: &str| redactor.redact_text(text).text;
+        let limited = Cell::new(0);
+        let describe = |text: &str| {
+            let redacted = redactor.redact_text(text);
+            limited.set(limited.get() + usize::from(redacted.limited));
+            redacted.text
+        };
         let (kind, provenance, drift) = match classified {
             Classified::Unparsed(drift) => {
                 self.unparsed += 1;
@@ -777,6 +786,7 @@ impl Plan {
             Classified::Line(provenance, drift) => (EventKind::TranscriptLine, provenance, drift),
         };
         self.drifts.extend(drift.map(|d| d.describe(&describe)));
+        self.scan_limited += limited.get();
         let end = turn_end(at.parsed) || provenance == Provenance::SubagentResult;
         let (kind, provenance, content) = match decision {
             Decision::Reference {

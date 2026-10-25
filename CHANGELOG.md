@@ -12,11 +12,11 @@ its upgrade notes (ENG-23). ParleyInn follows semantic versioning.
 - Redaction now also redacts a secret that a neighbouring match hid from
   a rule's word boundary, such as an AWS access key directly followed by
   a principal's pattern (SEC-08). Its work is bounded by the redaction
-  scan limit, and a line that reaches it is counted as
-  `redaction_scan_limited`. Upgrade note: a transcript ingested before
-  this change that held such a secret redacts differently now, so its
-  next ingest may start a new transcript generation; the earlier events
-  stay.
+  scan limit: a text that reaches it is not written, a marker stands for
+  it, and it is counted as `redaction_scan_limited`. Upgrade note: a
+  transcript ingested before this change that held such a secret
+  redacts differently now, so its next ingest may start a new
+  transcript generation; the earlier events stay.
 - A pull request that adds a dependency with no license text in its
   source now fails CI (ENG-30). The `license-check` command, run by the
   supply-chain job, checks every crate a release links.

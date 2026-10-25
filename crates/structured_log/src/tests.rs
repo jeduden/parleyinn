@@ -165,3 +165,20 @@ fn a_redactor_that_does_not_compile_drops_every_line_unwritten() {
     assert_eq!(log.dropped(), 1);
     assert!(shared.0.lock().unwrap().is_empty());
 }
+
+#[test]
+fn a_field_that_reaches_the_scan_limit_is_marked_and_counted() {
+    let shared = Shared::default();
+    let out = shared.clone();
+    let log = Arc::new(log_to(Box::new(move || Ok(Some(Box::new(out.clone()))))));
+    let dispatch: Arc<dyn tracing::Subscriber + Send + Sync> = log.clone();
+    let chain = format!("AIza{}", "a".repeat(35)).repeat(5_000);
+
+    tracing::subscriber::with_default(dispatch, || {
+        tracing::info!(shown = chain.as_str(), n = 1u64, "x")
+    });
+
+    assert_eq!(log.limited(), 1);
+    let lines = lines(&shared);
+    assert_eq!(lines[0]["fields"]["shown"], redaction::SCAN_LIMIT_MARKER);
+}

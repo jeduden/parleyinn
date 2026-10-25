@@ -535,10 +535,7 @@ fn ingest_audits_a_limited_redaction_apart_from_a_redaction() {
         .collect();
     assert_eq!(
         limited,
-        [(
-            "truncated".to_owned(),
-            crate::SCAN_LIMITED_DETAIL.to_owned()
-        )]
+        [("dropped".to_owned(), crate::SCAN_LIMITED_DETAIL.to_owned())]
     );
 }
 
@@ -3628,4 +3625,23 @@ fn status_reports_the_session_bindings_in_text_and_json_once_any_was_observed() 
         text.contains("MCP server: none has taken a session binding on this node (1 untaken)"),
         "{text}"
     );
+}
+
+#[test]
+fn limited_log_fields_are_audited_one_entry_each() {
+    let p = Process::new();
+    p.invoke(&["ingest", "--path", &p.transcript("a\n")], &DEV);
+    let before = audited(&p).len();
+    let ctx = crate::settings::tests::ctx_of(&p);
+
+    audit_limited_log_fields(&ctx, 2);
+
+    let entries = audited(&p);
+    assert_eq!(entries.len(), before + 2);
+    assert_eq!(entries[before].kind, "dropped");
+    assert_eq!(
+        entries[before].counter.as_deref(),
+        Some("redaction_scan_limited")
+    );
+    assert_eq!(entries[before].detail, crate::SCAN_LIMITED_DETAIL);
 }

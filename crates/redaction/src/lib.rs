@@ -52,16 +52,26 @@ pub struct Redacted {
     pub text: String,
     /// One rule name per marker, in the order they appear.
     pub rules: Vec<String>,
-    /// Whether the redaction scan limit was reached (`SCAN_LIMIT_FACTOR`) before
-    /// the text beside the last matches was scanned again, so a secret
-    /// a match hid from the boundary rules may stand in `text`. The
-    /// caller counts it (I6); `text` loses nothing for it.
+    /// Whether the redaction scan limit was reached: `text` is then
+    /// [`SCAN_LIMIT_MARKER`] and nothing of the redacted text, for no
+    /// rule matched it. The caller counts it (I6).
     pub limited: bool,
 }
 
-/// How many times the length of a text its scans may read together: a
-/// clean text takes one, and the text around matches about one more.
+/// What stands for a text whose redaction reached the scan limit.
+pub const SCAN_LIMIT_MARKER: &str = "[REDACTED:redaction_scan_limit]";
+
+/// How many times the length of a text its scans may read together.
 const SCAN_LIMIT_FACTOR: usize = 8;
+
+/// The result of a text that reached the redaction scan limit.
+fn limited() -> Redacted {
+    Redacted {
+        text: SCAN_LIMIT_MARKER.to_owned(),
+        rules: Vec::new(),
+        limited: true,
+    }
+}
 
 /// One step of [`Redactor::redact_text`]: text to scan, or the marker
 /// of the rule that matched.
@@ -120,9 +130,11 @@ impl Redactor {
     /// no pattern matches inside one, and each rescan is of strictly
     /// less text, so it settles. The scans together read at most
     /// `SCAN_LIMIT_FACTOR` times the text, so a chain where every
-    /// match uncovers only the next stays linear (I9); once the limit
-    /// ends, the rest is scanned one last time without rescans and
-    /// [`Redacted::limited`] says so. No text is dropped for it (I1).
+    /// match uncovers only the next stays linear (I9). Past that limit
+    /// nothing of the text is written: the result is
+    /// [`SCAN_LIMIT_MARKER`], with [`Redacted::limited`] set (I1's
+    /// exception is for secrets, so the caller counts what it holds
+    /// back, I6).
     ///
     /// `REDACTION_RULE_SET_VERSION` stays as it is: it names the
     /// patterns, which this leaves alone, and a text the rescans
@@ -133,28 +145,22 @@ impl Redactor {
         self.redact_measured(text).0
     }
 
-    /// [`Self::redact_text`] and how many bytes its scans read. The
-    /// rescans read at most `SCAN_LIMIT_FACTOR - 1` times the text and
-    /// the last scan, over disjoint stretches, at most once more, so
-    /// the whole stays within `SCAN_LIMIT_FACTOR` times it.
+    /// [`Self::redact_text`] and how many bytes its scans read, at most
+    /// `SCAN_LIMIT_FACTOR` times the text.
     fn redact_measured(&self, text: &str) -> (Redacted, usize) {
         let mut out = Redacted {
             text: String::with_capacity(text.len()),
             rules: Vec::new(),
             limited: false,
         };
-        let mut allowance = text.len().saturating_mul(SCAN_LIMIT_FACTOR - 1);
+        let mut allowance = text.len().saturating_mul(SCAN_LIMIT_FACTOR);
         let mut read = 0;
         let mut work = vec![Work::Scan(text)];
         while let Some(item) = work.pop() {
             match item {
                 Work::Marker(rule) => self.marker(rule, &mut out),
                 Work::Scan("") => {}
-                Work::Scan(piece) if piece.len() > allowance => {
-                    out.limited = true;
-                    read += piece.len();
-                    self.write_once(piece, &mut out);
-                }
+                Work::Scan(piece) if piece.len() > allowance => return (limited(), read),
                 Work::Scan(piece) => {
                     allowance -= piece.len();
                     read += piece.len();
@@ -203,18 +209,6 @@ impl Redactor {
         work.push(Work::Scan(&piece[..at]));
     }
 
-    /// `piece` with every match of one scan replaced and the stretches
-    /// between left as they are.
-    fn write_once(&self, piece: &str, out: &mut Redacted) {
-        let mut at = 0;
-        for (start, end, rule) in self.matches(piece) {
-            out.text.push_str(&piece[at..start]);
-            self.marker(rule, out);
-            at = end;
-        }
-        out.text.push_str(&piece[at..]);
-    }
-
     /// A transcript line or hook input redacted. Each JSON string in
     /// it is decoded and redacted on its own, so neither an escape nor
     /// a key the parser would drop as a duplicate hides a secret, and a
@@ -237,6 +231,9 @@ impl Redactor {
             out.rules.extend(r.rules);
             out.limited |= r.limited;
         }
+        if out.limited {
+            return limited();
+        }
 
         out
     }
@@ -248,6 +245,9 @@ impl Redactor {
             return self.redact_text(literal);
         };
         let r = self.redact_text(&decoded);
+        if r.limited {
+            return r;
+        }
         if r.rules.is_empty() {
             return Redacted {
                 text: literal.to_owned(),
