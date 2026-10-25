@@ -54,15 +54,18 @@ pub struct Redacted {
     pub rules: Vec<String>,
 }
 
+/// One step of [`Redactor::redact_text`]: text to scan, or the marker
+/// of the rule that matched.
+enum Work<'a> {
+    Scan(&'a str),
+    Marker(usize),
+}
+
 /// The rules redaction applies.
 #[derive(Debug, Clone)]
 pub struct Redactor {
     rules: Vec<RedactionRule>,
 }
-
-/// The most scans of one text: each scan that matches replaces text by
-/// a marker no rule matches, so a few settle any text.
-const MAX_PASSES: usize = 8;
 
 impl Redactor {
     /// The rule set and the principal's redaction patterns, with each
@@ -101,52 +104,54 @@ impl Redactor {
         Ok(Self { rules })
     }
 
-    /// `text` with every match replaced. A replacement can end the text
-    /// that kept an earlier secret from matching (a key's word boundary
-    /// hidden by a principal's pattern after it), so it repeats until
-    /// nothing matches, within [`MAX_PASSES`].
+    /// `text` with every match replaced. The text around a match is
+    /// scanned again on its own, because the match was what kept a
+    /// secret beside it from matching (a key's word boundary hidden by
+    /// a principal's pattern after it). A marker is never scanned, so
+    /// no pattern matches inside one, and each rescan is of strictly
+    /// less text, so it settles.
     #[must_use]
     pub fn redact_text(&self, text: &str) -> Redacted {
-        let mut out = self.redact_pass(text);
-        for _ in 1..MAX_PASSES {
-            if out.rules.is_empty() {
-                break;
+        let mut out = Redacted {
+            text: String::with_capacity(text.len()),
+            rules: Vec::new(),
+        };
+        let mut work = vec![Work::Scan(text)];
+        while let Some(item) = work.pop() {
+            match item {
+                Work::Marker(rule) => {
+                    let name = self.rules[rule].name();
+                    out.text.push_str(&format!("[REDACTED:{name}]"));
+                    out.rules.push(name.to_owned());
+                }
+                Work::Scan(piece) => self.scan(piece, &mut out, &mut work),
             }
-            let next = self.redact_pass(&out.text);
-            if next.rules.is_empty() {
-                break;
-            }
-            out.text = next.text;
-            out.rules.extend(next.rules);
         }
 
         out
     }
 
-    /// `text` with every match of one scan replaced.
-    fn redact_pass(&self, text: &str) -> Redacted {
+    /// One scan of `piece`: written out when nothing matches, else its
+    /// stretches and markers queued in reverse on `work`.
+    fn scan<'a>(&self, piece: &'a str, out: &mut Redacted, work: &mut Vec<Work<'a>>) {
         let mut spans: Vec<(usize, usize, usize)> = self
             .rules
             .iter()
             .enumerate()
-            .flat_map(|(i, r)| r.spans(text).map(move |(s, e)| (s, e, i)))
+            .flat_map(|(i, r)| r.spans(piece).map(move |(s, e)| (s, e, i)))
             .collect();
-        spans.sort_unstable_by_key(|&(start, _, rule)| (start, rule));
-        let mut out = Redacted {
-            text: String::with_capacity(text.len()),
-            rules: Vec::new(),
-        };
-        let mut at = 0;
-        for (start, end, rule) in merged(spans) {
-            out.text.push_str(&text[at..start]);
-            let name = self.rules[rule].name();
-            out.text.push_str(&format!("[REDACTED:{name}]"));
-            out.rules.push(name.to_owned());
-            at = end;
+        if spans.is_empty() {
+            out.text.push_str(piece);
+            return;
         }
-        out.text.push_str(&text[at..]);
-
-        out
+        spans.sort_unstable_by_key(|&(start, _, rule)| (start, rule));
+        let mut at = piece.len();
+        for (start, end, rule) in merged(spans).into_iter().rev() {
+            work.push(Work::Scan(&piece[end..at]));
+            work.push(Work::Marker(rule));
+            at = start;
+        }
+        work.push(Work::Scan(&piece[..at]));
     }
 
     /// A transcript line or hook input redacted. Each JSON string in
