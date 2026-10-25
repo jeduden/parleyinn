@@ -65,8 +65,16 @@ fn mann_whitney_z_of_an_empty_side_is_zero() {
 #[test]
 fn stratified_z_of_one_stratum_is_the_mann_whitney_z() {
     let (base, head) = (&[1, 2, 2][..], &[2, 3, 3][..]);
+    let plain = mann_whitney_z(base, head);
 
-    assert_eq!(stratified_z(&[(base, head)]), mann_whitney_z(base, head));
+    let alone = stratified_z(&[(base, head)]);
+    let beside_nothing = stratified_z(&[(base, head), (&[], &[7]), (&[7, 7], &[7])]);
+
+    assert!((alone - plain).abs() < 1e-12, "{alone} against {plain}");
+    assert!(
+        (beside_nothing - plain).abs() < 1e-12,
+        "{beside_nothing} against {plain}"
+    );
 }
 
 /// Three runners of very different speed, the head 12% slower on each.
@@ -109,8 +117,8 @@ fn stratified_z_leaves_out_a_stratum_that_separates_nothing() {
     let with_tied = stratified_z(&[(base, head), (&[7, 7], &[7, 7])]);
     let alone = stratified_z(&[(base, head), (&[], &[])]);
 
-    assert_eq!(with_empty, with_tied);
-    assert_eq!(with_empty, alone);
+    assert!((with_empty - with_tied).abs() < 1e-12);
+    assert!((with_empty - alone).abs() < 1e-12);
     assert!(with_empty > 0.0);
     assert_eq!(stratified_z(&[(&[], &[1]), (&[2, 2], &[2])]), 0.0);
     assert_eq!(stratified_z(&[]), 0.0);

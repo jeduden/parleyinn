@@ -57,6 +57,6 @@ provenance covers the same binaries, under per-target artifact names.
 The drift suite had two latent order dependencies, which the shards
 surfaced. The development core is now built before any check. A source
 a case restores after an injection is touched, so cargo rebuilds from
-it. Pooling the benchmark shards' samples lowers the gate's power to
-see a regression and adds no false alarm. testing.md records that; the
-stakeholder decides whether to gate per shard or stratify.
+it. Pooling the benchmark shards' samples lowered the gate's power to
+see a regression; [phase 2](phase-2.md) stratifies the test by shard and
+settles it.

@@ -18,15 +18,17 @@ test. Runner speed differences widen both sides alike, so a real 12%
 slowdown on every runner can come out not significant: the stats test
 `stratified_z_sees_a_slowdown_the_runners_spread_hides` builds three
 runners of very different speed and shows the pooled z under the
-critical value. The stakeholder ruled for a stratified test.
+critical value. The review gate found the loss of power on the pull
+request; this phase removes it.
 
 GREEN sites:
 
 - `tooling/benchmark/src/samples.rs`: a `# stratum NAME` line starts a
   stratum; `parse_strata` keeps them apart, `pooled` joins them.
 - `tooling/benchmark/src/stats.rs`: `stratified_z`, the van Elteren form
-  of the rank test; one stratum is the plain test, so every existing
-  fixture decides as before.
+  of the rank test, each stratum's rank sum less the plain test's
+  continuity correction; one stratum is exactly the plain test, so
+  every existing fixture decides as before.
 - `tooling/benchmark/src/gate.rs`: the medians over every sample, the
   significance over the strata the two sides share; a benchmark both
   sides sampled on no common stratum fails as `Unpaired`, never falling

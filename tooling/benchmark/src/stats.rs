@@ -33,20 +33,20 @@ pub fn mann_whitney_z(base: &[u64], head: &[u64]) -> f64 {
 /// stratum a pair of the base's and the head's samples taken on one
 /// runner. A sample is ranked only against samples of its own stratum,
 /// so the runners' speed differences never widen the distributions;
-/// each stratum's rank sum is weighted by one over its size plus one
-/// and the weighted sums are combined into one z score. One stratum is
-/// [`mann_whitney_z`]. A stratum with an empty side or every sample
-/// tied separates nothing and is left out; zero when none remains.
+/// each stratum's rank sum, less the same continuity correction of one
+/// half as [`mann_whitney_z`] takes, is weighted by one over its size
+/// plus one, and the weighted sums are combined into one z score. One
+/// stratum is exactly [`mann_whitney_z`]. A stratum with an empty side
+/// or every sample tied separates nothing and is left out, so one real
+/// stratum beside such strata is the plain test too; zero when none
+/// remains.
 #[must_use]
 pub fn stratified_z(strata: &[(&[u64], &[u64])]) -> f64 {
-    if let [(base, head)] = strata {
-        return mann_whitney_z(base, head);
-    }
     let (mut above, mut variance) = (0.0, 0.0);
     for (base, head) in strata {
         if let Some((a, v)) = rank_sum(base, head) {
             let weight = 1.0 / (count(base.len() + head.len()) + 1.0);
-            above += weight * a;
+            above += weight * (a - 0.5);
             variance += weight * weight * v;
         }
     }
