@@ -119,8 +119,8 @@ fn time(store: &Store, word: &str, k: usize) -> (Duration, Duration, usize) {
     .unwrap();
     let search = Search {
         query: &query,
-        room: room(),
-        writer: None,
+        rooms: &[room()],
+        writers: &[],
         provenance: &[],
         kinds: &[],
         since: None,

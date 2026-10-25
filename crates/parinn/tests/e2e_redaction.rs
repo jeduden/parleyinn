@@ -168,7 +168,7 @@ fn ingest_redacts_before_anything_is_written() {
     }
     let redacted = audited(home.path())
         .iter()
-        .filter(|e| e["counter"] == "redacted")
+        .filter(|e| e["counter"] == "redactions")
         .count();
     assert_eq!(redacted, 5);
 }

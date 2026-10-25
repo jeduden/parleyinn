@@ -14,24 +14,11 @@ fn parsed(more: Value) -> Result<Params, &'static str> {
 }
 
 #[test]
-fn the_default_scope_needs_a_run_this_server_does_not_serve_yet() {
-    assert_eq!(parse(&json!({"query": "deploy"})), Err(NEEDS_RUN));
-    assert_eq!(parse(&json!({"scope": "run"})), Err(NEEDS_RUN));
-}
-
-#[test]
-fn the_rooms_scope_is_not_served_and_an_unknown_one_is_refused() {
-    assert_eq!(parse(&json!({"scope": "rooms"})), Err(NO_ROOMS));
-    assert_eq!(parse(&json!({"scope": "world"})), Err(BAD_SCOPE));
-}
-
-#[test]
 fn a_call_with_only_a_query_asks_for_ten_hits_in_any_run_of_the_room() {
     let params = parsed(json!({"query": "deploy"})).unwrap();
 
     assert_eq!(params.text, "deploy");
     assert_eq!(params.k, 10);
-    assert_eq!(params.room, None);
     assert_eq!(params.writer, None);
     assert!(params.provenance.is_empty() && params.kinds.is_empty());
     assert_eq!(params.trust, None);
@@ -62,14 +49,12 @@ fn trust_is_trusted_or_untrusted() {
 }
 
 #[test]
-fn the_room_and_the_run_are_ids() {
+fn the_run_is_a_writer_id() {
     let id = "ab".repeat(32);
 
-    let params = parsed(json!({"room": id, "run": id})).unwrap();
+    let params = parsed(json!({"run": id})).unwrap();
 
-    assert_eq!(params.room.unwrap().to_string(), id);
     assert_eq!(params.writer.unwrap().to_string(), id);
-    assert_eq!(parsed(json!({"room": "nope"})), Err(BAD_ROOM));
     assert_eq!(parsed(json!({"run": "nope"})), Err(BAD_RUN));
     assert_eq!(parsed(json!({"run": 3})), Err(BAD_RUN));
 }
@@ -149,12 +134,15 @@ fn the_request_and_the_search_carry_the_call_through() {
     let compiled = search::compile(&params.request()).unwrap();
     let room = RoomId::derive(&[1; 32], &[2; 16]);
 
-    let search = params.search(&compiled, room, DEADLINE);
+    let writer = WriterId::derive(&[3; 32]);
+    let (rooms, writers) = ([room], [writer]);
+
+    let search = params.search(&compiled, &rooms, &writers, DEADLINE);
 
     assert_eq!(compiled.expression(), r#""deploy" AND "p q""#);
     assert_eq!(
-        (search.room, search.k, search.deadline),
-        (room, 3, DEADLINE)
+        (search.rooms, search.writers, search.k, search.deadline),
+        (&[room][..], &[writer][..], 3, DEADLINE)
     );
     assert_eq!(search.provenance, ["web"]);
     assert_eq!(search.since, Some("2026-01-01"));

@@ -15,8 +15,10 @@ srs.workspace = true
 adr.workspace = true
 administration.workspace = true
 audit.workspace = true
+coverage.workspace = true
 drift.workspace = true
 engineering.workspace = true
+envelope.workspace = true
 harness-contract.workspace = true
 ingest.workspace = true
 key.workspace = true
@@ -43,4 +45,4 @@ workspace = true
 [package.metadata.parinn]
 responsibility = "Reads features into scenarios, keeps them in step with the SRS and runs them"
 may-depend-on = ["srs"]
-may-dev-depend-on = ["adr", "administration", "audit", "drift", "engineering", "harness-contract", "ingest", "key", "record", "redaction", "store", "testkit", "transcript"]
+may-dev-depend-on = ["adr", "administration", "audit", "coverage", "drift", "engineering", "envelope", "harness-contract", "ingest", "key", "record", "redaction", "store", "testkit", "transcript"]

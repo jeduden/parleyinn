@@ -15,6 +15,10 @@ fn every_event_kind_round_trips_through_its_name() {
         (EventKind::HookObservation, "hook_observation"),
         (EventKind::PromptMatch, "prompt_match"),
         (EventKind::RepositoryBind, "repository_bind"),
+        (EventKind::Recall, "recall"),
+        (EventKind::WriterLabel, "writer_label"),
+        (EventKind::Tombstone, "tombstone"),
+        (EventKind::TimeMark, "time_mark"),
     ] {
         assert_eq!(kind.as_str(), name);
         assert_eq!(EventKind::parse(name), Some(kind));

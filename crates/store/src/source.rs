@@ -32,6 +32,7 @@ CREATE TABLE transcript_sources (
     seen INTEGER NOT NULL,
     held_since INTEGER,
     lost INTEGER NOT NULL,
+    marked_at INTEGER NOT NULL,
     UNIQUE (path, generation)
 ) STRICT;
 CREATE TABLE transcript_places (
@@ -54,7 +55,7 @@ CREATE INDEX ingested_runs_agent ON ingested_runs (path, ifnull(agent_id, ''));
 
 /// The columns a transcript source is read from.
 const SOURCE: &str = "SELECT id, path, generation, directory, byte_offset, prefix_hash, lines,
-                             seen, held_since, lost FROM transcript_sources";
+                             seen, held_since, lost, marked_at FROM transcript_sources";
 
 /// How far ingest has read one generation of a transcript source.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -105,6 +106,11 @@ pub struct Source {
     /// Whether ingest found it gone before it was fully ingested
     /// (REC-08).
     pub lost: bool,
+    /// When ingest last left its ingest marker at its position, by
+    /// starting the generation or moving the position, in milliseconds
+    /// on ingest's clock: how long ago an ingest that stopped short of
+    /// its end did so (ADM-09).
+    pub marked_at: u64,
 }
 
 /// Where in its transcript source an event's line lies.
@@ -137,6 +143,18 @@ pub struct IngestedRun {
     pub agent_id: Option<String>,
 }
 
+impl IngestedRun {
+    /// The run's name, as a tool call's finding gives it: its harness
+    /// session, and the harness's agent id for a subagent's run.
+    #[must_use]
+    pub fn run_name(&self) -> String {
+        match &self.agent_id {
+            Some(agent) => format!("{}/{agent}", self.harness_session),
+            None => self.harness_session.clone(),
+        }
+    }
+}
+
 /// One transcript source row as SQLite returns it.
 type SourceRow = (
     i64,
@@ -149,6 +167,7 @@ type SourceRow = (
     i64,
     Option<i64>,
     bool,
+    i64,
 );
 
 /// A count or offset SQLite holds, which is never negative.
@@ -163,7 +182,7 @@ fn sql_count(n: u64) -> i64 {
 
 /// The source `row` is.
 fn source(row: SourceRow) -> Result<Source, StoreError> {
-    let (id, path, generation, directory, offset, prefix, lines, seen, held, lost) = row;
+    let (id, path, generation, directory, offset, prefix, lines, seen, held, lost, marked) = row;
     let prefix = Digest::from_hex(&prefix).map_err(|e| StoreError::Corrupt {
         address: None,
         what: format!("prefix hash of transcript source {path:?}: {e}"),
@@ -182,6 +201,7 @@ fn source(row: SourceRow) -> Result<Source, StoreError> {
         },
         held_since: held.map(count),
         lost,
+        marked_at: count(marked),
     })
 }
 
@@ -204,6 +224,7 @@ pub(crate) fn select(
             r.get(7)?,
             r.get(8)?,
             r.get(9)?,
+            r.get(10)?,
         ))
     })?;
     let rows: Vec<SourceRow> = rows.collect::<Result<_, _>>()?;
@@ -216,17 +237,29 @@ pub(crate) const NEWEST: &str = "WHERE generation = (SELECT max(generation)
      FROM transcript_sources t WHERE t.path = transcript_sources.path)";
 
 /// Starts the next generation of the source at `path`, in `directory`,
-/// nothing read of it.
-pub(crate) fn start(conn: &Connection, path: &str, directory: &str) -> Result<Source, StoreError> {
+/// nothing read of it, its ingest marker left at `at`.
+pub(crate) fn start(
+    conn: &Connection,
+    path: &str,
+    directory: &str,
+    at: u64,
+) -> Result<Source, StoreError> {
     let position = Position::start();
     let next = "SELECT ifnull(max(generation), 0) + 1 FROM transcript_sources WHERE path = ?1";
     let generation: Result<i64, _> = conn.query_row(next, [path], |r| r.get(0));
     let generation = generation?;
     let inserted = conn.execute(
         "INSERT INTO transcript_sources
-             (path, generation, directory, byte_offset, prefix_hash, lines, seen, held_since, lost)
-         VALUES (?1, ?2, ?3, 0, ?4, 0, 0, NULL, 0)",
-        params![path, generation, directory, position.prefix.to_hex()],
+             (path, generation, directory, byte_offset, prefix_hash, lines, seen, held_since, lost,
+              marked_at)
+         VALUES (?1, ?2, ?3, 0, ?4, 0, 0, NULL, 0, ?5)",
+        params![
+            path,
+            generation,
+            directory,
+            position.prefix.to_hex(),
+            sql_count(at)
+        ],
     );
     inserted?;
 
@@ -238,20 +271,29 @@ pub(crate) fn start(conn: &Connection, path: &str, directory: &str) -> Result<So
         position,
         held_since: None,
         lost: false,
+        marked_at: at,
     })
 }
 
-/// Moves source `id`'s position to `position`, never back.
-pub(crate) fn advance(conn: &Connection, id: i64, position: &Position) -> Result<(), StoreError> {
+/// Moves source `id`'s position to `position`, never back, its ingest
+/// marker left there at `at`.
+pub(crate) fn advance(
+    conn: &Connection,
+    id: i64,
+    position: &Position,
+    at: u64,
+) -> Result<(), StoreError> {
     let updated = conn.execute(
-        "UPDATE transcript_sources SET byte_offset = ?2, prefix_hash = ?3, lines = ?4, seen = ?5
+        "UPDATE transcript_sources SET byte_offset = ?2, prefix_hash = ?3, lines = ?4, seen = ?5,
+             marked_at = ?6
          WHERE id = ?1 AND byte_offset <= ?2",
         params![
             id,
             sql_count(position.offset),
             position.prefix.to_hex(),
             sql_count(position.lines),
-            sql_count(position.seen)
+            sql_count(position.seen),
+            sql_count(at)
         ],
     );
 

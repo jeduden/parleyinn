@@ -61,6 +61,7 @@ fn counts(ctx: &Context) -> Result<(usize, usize, u64), Failure> {
         )));
     }
     let mut store = Store::open(&home.store())?;
+    crate::purge::finish(ctx, &mut store);
     let node = Node::find(&home, &store).map_err(|e| plain(&e))?;
 
     derive_again(&mut store, &node)

@@ -42,6 +42,8 @@ pub(crate) struct Process {
     pub(crate) hook_budget: Option<std::time::Duration>,
     /// The time the clock reads.
     pub(crate) now: u64,
+    /// How far the clock moves on each read: none by default.
+    pub(crate) clock_step: u64,
     /// The process ancestry a hook handler reads.
     pub(crate) ancestry: fn() -> Option<hook::ancestry::Ancestry>,
     /// How many lines of a transcript live ingest reads at most.
@@ -96,6 +98,7 @@ impl Process {
             ancestry: own_harness,
             live_limit: None,
             now: NOW,
+            clock_step: 0,
             query_deadline: None,
             working_dir: None,
         }
@@ -106,7 +109,31 @@ impl Process {
     }
 
     pub(crate) fn invoke(&self, args: &[&str], build: &Build) -> (u8, String, String) {
-        let now = self.now;
+        let (mut out, mut err) = (Vec::new(), Vec::new());
+        let code = self.with_context(build, |ctx| {
+            run(
+                args.iter().map(|a| (*a).to_owned()),
+                ctx,
+                &mut out,
+                &mut err,
+            )
+        });
+
+        (
+            code,
+            String::from_utf8(out).unwrap(),
+            String::from_utf8(err).unwrap(),
+        )
+    }
+
+    /// Runs `f` with the context an invocation of this process gets.
+    pub(crate) fn with_context<T>(&self, build: &Build, f: impl FnOnce(&Context) -> T) -> T {
+        let (now, step) = (std::cell::Cell::new(self.now), self.clock_step);
+        let clock = move || {
+            let t = now.get();
+            now.set(t.saturating_add(step));
+            t
+        };
         let (lines, input_error, held_open, too_large) = (
             self.lines.clone(),
             self.input_error,
@@ -148,26 +175,15 @@ impl Process {
             node_identity: self.node_identity.clone(),
             os_user: self.os_user,
             input: &input,
-            clock: &|| now,
+            clock: &clock,
             attended: self.attended,
             hook_budget: self.hook_budget,
             ancestry: self.ancestry,
             live_limit: self.live_limit,
             query_deadline: self.query_deadline,
         };
-        let (mut out, mut err) = (Vec::new(), Vec::new());
-        let code = run(
-            args.iter().map(|a| (*a).to_owned()),
-            &ctx,
-            &mut out,
-            &mut err,
-        );
 
-        (
-            code,
-            String::from_utf8(out).unwrap(),
-            String::from_utf8(err).unwrap(),
-        )
+        f(&ctx)
     }
 
     /// Writes a transcript under the default transcript root,
@@ -434,8 +450,8 @@ fn ingest_redacts_by_the_principals_patterns_and_audits_each_redaction() {
                 "redaction_pattern_refused",
                 "refused redaction pattern extra_pattern_1"
             ),
-            entry("redacted", "redacted", "redacted by rule aws_access_key"),
-            entry("redacted", "redacted", "redacted by rule extra_pattern_2"),
+            entry("redacted", "redactions", "redacted by rule aws_access_key"),
+            entry("redacted", "redactions", "redacted by rule extra_pattern_2"),
             // The line has no type, so it is stored unparsed (REC-05).
             entry(
                 "failed",
@@ -692,17 +708,18 @@ fn a_transcript_source_gone_before_it_was_fully_ingested_is_reported_and_audited
     std::fs::remove_file(&cut).unwrap();
     std::fs::remove_file(&whole).unwrap();
 
-    let (code, out, _) = p.invoke(&["verify", "--json"], &DEV);
-    assert_eq!(code, EXIT_OK);
+    let (code, out, err) = p.invoke(&["verify", "--json"], &DEV);
+    assert_eq!(code, EXIT_INTEGRITY);
     let v: serde_json::Value = serde_json::from_str(&out).unwrap();
-    assert_eq!(
-        v["lost_sources"],
-        serde_json::json!([cut.display().to_string()])
+    assert_eq!(v["broken"]["check"], "transcript source completeness");
+    let named = format!(
+        "transcript sources fall short: {} disappeared before it was fully ingested",
+        cut.display()
     );
-    let (_, text, _) = p.invoke(&["verify"], &DEV);
-    assert!(
-        text.contains("transcript sources gone before they were fully ingested: "),
-        "{text}"
+    assert_eq!(v["broken"]["message"], named);
+    assert_eq!(
+        err,
+        format!("parinn verify: transcript source completeness: {named}\n")
     );
     let (_, status, _) = p.invoke(&["status"], &DEV);
     assert!(
@@ -739,6 +756,96 @@ fn ingest_says_which_lost_transcript_source_it_cannot_audit() {
         err.contains("parinn ingest: audit a lost transcript source: "),
         "{err}"
     );
+}
+
+/// What `parinn verify --json` says, and its exit code.
+fn verified(p: &Process) -> (u8, serde_json::Value) {
+    let (code, out, _) = p.invoke(&["verify", "--json"], &DEV);
+
+    (code, serde_json::from_str(&out).unwrap())
+}
+
+#[test]
+fn a_source_an_ingest_left_short_fails_verify_once_its_marker_is_old() {
+    let mut p = Process::new();
+    let path = transcript_in(&p, "-w-a", "stopped.jsonl", b"{\"a\":1}\n{\"b\":2}\n");
+    assert_eq!(p.invoke(&["ingest", "--all"], &DEV).0, EXIT_OK);
+    // As an ingest killed after its first line's transaction leaves it.
+    let conn = rusqlite::Connection::open(p.parinn_home().join("store.db")).unwrap();
+    conn.execute(
+        "UPDATE transcript_sources SET byte_offset = 8, prefix_hash = ?1, lines = 1, seen = 16",
+        [record::digest::Digest::of(&[b"{\"a\":1}\n"]).to_hex()],
+    )
+    .unwrap();
+    drop(conn);
+
+    let (code, v) = verified(&p);
+    assert_eq!(code, EXIT_OK, "{v}");
+    assert_eq!(v["short_sources"], json!([path.display().to_string()]));
+
+    p.now = NOW + 10 * 60 + 1;
+    let (code, v) = verified(&p);
+    assert_eq!(code, EXIT_INTEGRITY);
+    assert_eq!(v["broken"]["check"], "transcript source completeness");
+    assert_eq!(
+        v["broken"]["message"],
+        format!(
+            "transcript sources fall short: {} {}",
+            path.display(),
+            sources::STALE
+        )
+    );
+}
+
+#[test]
+fn verify_that_runs_out_of_time_deriving_the_index_leaves_it_unchecked_and_counts_it() {
+    let mut p = Process::new();
+    p.invoke(&["ingest", "--path", &p.transcript(CLEAN_LINE)], &DEV);
+    p.clock_step = 100;
+
+    let (code, out, err) = p.invoke(&["verify"], &DEV);
+    assert_eq!((code, err.as_str()), (EXIT_OK, ""));
+    assert!(
+        out.contains("; the search index was not derived again in time, so it is unchecked"),
+        "{out}"
+    );
+    let (code, out, _) = p.invoke(&["verify", "--json"], &DEV);
+    assert_eq!(code, EXIT_OK);
+    let v: serde_json::Value = serde_json::from_str(&out).unwrap();
+    assert_eq!(v["index_checked"], false);
+    let counted = audited(&p)
+        .into_iter()
+        .filter(|e| e.counter.as_deref() == Some("verify_timed_out"))
+        .count();
+    assert_eq!(counted, 2);
+
+    p.clock_step = 0;
+    let (_, out, _) = p.invoke(&["verify", "--json"], &DEV);
+    let v: serde_json::Value = serde_json::from_str(&out).unwrap();
+    assert_eq!(v["index_checked"], true);
+}
+
+#[test]
+fn a_transcript_source_cut_or_rewritten_after_ingest_fails_verify() {
+    let p = Process::new();
+    let path = transcript_in(&p, "-w-a", "main-run.jsonl", b"{\"a\":1}\n{\"b\":2}\n");
+    assert_eq!(p.invoke(&["ingest", "--all"], &DEV).0, EXIT_OK);
+    assert_eq!(verified(&p).0, EXIT_OK);
+
+    for damage in [&b"{\"a\":1}\n"[..], b"{\"a\":9}\n{\"b\":2}\n", b""] {
+        std::fs::write(&path, damage).unwrap();
+        let (code, v) = verified(&p);
+
+        assert_eq!(code, EXIT_INTEGRITY, "{damage:?}");
+        assert_eq!(
+            v["broken"]["message"],
+            format!(
+                "transcript sources fall short: {} {}",
+                path.display(),
+                sources::REPLACED
+            )
+        );
+    }
 }
 
 #[test]
@@ -845,8 +952,9 @@ fn verify_checks_the_record_and_counts_it() {
         (
             EXIT_OK,
             "checked 2 writers and 6 events: every chain, commitment and seat certificate holds; \
-             integrity unsigned, as no log is signed yet; the audit log's chain holds over 0 \
-             entries\n"
+             integrity unsigned, as no log is signed yet, so a log cut at its tail or rewritten \
+             whole goes unseen until seals; completeness covers only the transcript sources the \
+             record names; the audit log's chain holds over 0 entries\n"
                 .into(),
             String::new()
         )
@@ -893,7 +1001,7 @@ fn verify_exits_3_naming_where_the_chain_breaks() {
 
     assert_eq!((code, out.as_str()), (EXIT_INTEGRITY, ""));
     assert!(
-        err.starts_with("parinn verify: chain broken at parinn:room/"),
+        err.starts_with("parinn verify: hash chain: chain broken at parinn:room/"),
         "{err}"
     );
     assert!(
@@ -904,11 +1012,13 @@ fn verify_exits_3_naming_where_the_chain_breaks() {
     let v: serde_json::Value = serde_json::from_str(&json).unwrap();
     assert_eq!(
         format!(
-            "parinn verify: {}\n",
+            "parinn verify: {}: {}\n",
+            v["broken"]["check"].as_str().unwrap(),
             v["broken"]["message"].as_str().unwrap()
         ),
         err
     );
+    assert_eq!(v["broken"]["check"], "hash chain");
     assert_eq!(
         (&v["integrity"], &v["broken"]["class"], &v["order"]),
         (
@@ -1041,7 +1151,10 @@ fn verify_names_a_broken_chain_before_a_refused_fork() {
     let (code, _, err) = p.invoke(&["verify"], &DEV);
 
     assert_eq!(code, EXIT_INTEGRITY);
-    assert!(err.starts_with("parinn verify: chain broken at"), "{err}");
+    assert!(
+        err.starts_with("parinn verify: hash chain: chain broken at"),
+        "{err}"
+    );
 }
 
 #[test]
@@ -1077,7 +1190,7 @@ fn verify_reports_a_store_error_met_while_checking() {
 
     assert_eq!(code, EXIT_INTEGRITY);
     assert!(
-        err.starts_with("parinn verify: the store is corrupt"),
+        err.starts_with("parinn verify: store: the store is corrupt"),
         "{err}"
     );
     let v: serde_json::Value = serde_json::from_str(&json).unwrap();
@@ -1478,7 +1591,7 @@ pub(crate) fn owner_only_dirs(path: &std::path::Path) {
 
 /// Writes a store file that is no database, readable by its owner alone
 /// so the store reads it rather than refuse its permissions (SEC-02).
-fn junk_store(p: &Process) {
+pub(crate) fn junk_store(p: &Process) {
     let path = p.parinn_home().join("store.db");
     std::fs::write(&path, "not a database, but long enough to read a header").unwrap();
     #[cfg(unix)]
@@ -2003,7 +2116,7 @@ fn status_shows_the_home_the_store_the_audit_log_and_the_counters() {
     assert_eq!(
         out,
         format!(
-            "home: {home}\nstore: {home}/store.db ({bytes} bytes)\naudit log: {home}/audit (1 entries)\n\
+            "home: {home}\nstore: {home}/store.db ({bytes} bytes, schema version 1)\naudit log: {home}/audit (1 entries)\n\
              counters: hook_rejected 1 (1 since acknowledged)\ndeployment mode: automation\nkeys: files only this OS user can read; an unsandboxed agent of the same OS user could read them\n{id}"
         )
     );
@@ -2014,7 +2127,7 @@ fn status_shows_the_home_the_store_the_audit_log_and_the_counters() {
         v,
         serde_json::json!({
             "home": home,
-            "store": {"path": format!("{home}/store.db"), "bytes": bytes},
+            "store": {"path": format!("{home}/store.db"), "bytes": bytes, "schema_version": 1},
             "audit": {"path": format!("{home}/audit"), "entries": 1},
             "counters": {"hook_rejected": {"total": 1, "since_ack": 1}},
             "deployment_mode": "automation",
@@ -2142,7 +2255,7 @@ fn verify_checks_the_audit_chain_too() {
     assert_eq!(code, EXIT_INTEGRITY);
     assert_eq!(
         err,
-        "parinn verify: audit log audit-000001.jsonl line 1: hash does not match\n"
+        "parinn verify: hash chain: audit log audit-000001.jsonl line 1: hash does not match\n"
     );
     let (code, out, _) = p.invoke(&["verify", "--json"], &DEV);
     assert_eq!(code, EXIT_INTEGRITY);
@@ -2151,6 +2264,7 @@ fn verify_checks_the_audit_chain_too() {
         v["broken"],
         serde_json::json!({
             "class": "audit",
+            "check": "hash chain",
             "address": null,
             "message": "audit log audit-000001.jsonl line 1: hash does not match",
         })
@@ -2911,7 +3025,10 @@ fn status_and_verify_exit_3_naming_a_newer_segment() {
     let (code, _, err) = p.invoke(&["verify"], &DEV);
     assert_eq!(
         (code, err),
-        (EXIT_INTEGRITY, format!("parinn verify: {named}\n"))
+        (
+            EXIT_INTEGRITY,
+            format!("parinn verify: hash chain: {named}\n")
+        )
     );
 }
 
@@ -3263,7 +3380,7 @@ fn identity_lines() -> String {
     };
 
     format!(
-        "node identity: {against}\nfork detection: local scan by parinn verify; peer detection with the peer network\n"
+        "node identity: {against}\nfork detection: a second event at one (writer, seq) is refused for the segments the node holds, found by a local scan with parinn verify; the equivocated mark waits for seals; the check between peers arrives with the peer network\n"
     )
 }
 
@@ -3289,7 +3406,12 @@ fn identity_json() -> serde_json::Value {
 
 /// `parinn status --json`'s fork detection.
 fn fork_detection_json() -> serde_json::Value {
-    serde_json::json!({"local": "parinn verify", "peer": "with the peer network"})
+    serde_json::json!({
+        "local": "parinn verify",
+        "refused": "a second event at one (writer, seq), for the segments the node holds",
+        "equivocated": "the mark waits for seals",
+        "peer": "the check between peers arrives with the peer network",
+    })
 }
 
 /// How many events the store holds.

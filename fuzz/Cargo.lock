@@ -97,6 +97,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "envelope"
+version = "0.0.0"
+dependencies = [
+ "serde_json",
+]
+
+[[package]]
 name = "equivalent"
 version = "1.0.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -196,12 +203,14 @@ name = "parinn-fuzz"
 version = "0.0.0"
 dependencies = [
  "configuration",
+ "envelope",
  "hook",
  "libfuzzer-sys",
  "provenance",
  "redaction",
  "repository",
  "search",
+ "serde_json",
  "transcript",
 ]
 

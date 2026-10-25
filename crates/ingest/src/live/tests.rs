@@ -93,7 +93,14 @@ fn each_complete_line_goes_to_a_run_seat_the_device_key_certified_no_ingest_seat
         SeatCertificate::from_value(&store.seat(ingested.writer).unwrap().unwrap().certificate)
             .unwrap();
     assert!(!cert.ingest_seat, "a run seat, so its events are witnessed");
-    assert!(store.ingested_runs().unwrap().is_empty());
+    let rows = store.ingested_runs().unwrap();
+    assert_eq!(
+        rows.iter()
+            .map(|r| (r.writer, r.run_name()))
+            .collect::<Vec<_>>(),
+        [(ingested.writer, SESSION.to_owned())],
+        "the run's writer is recorded for a recall scoped to the run (RCL-05)"
+    );
     assert!(
         !format!("{seats:?}").contains("key"),
         "only the runs show: {seats:?}"
@@ -121,6 +128,20 @@ fn a_restarted_server_goes_on_in_a_new_run_seat_from_the_ingest_marker() {
 
     assert_eq!((stopped.events, resumed.events), (3, 2));
     assert_ne!(stopped.writer, resumed.writer);
+    let store = Store::open(&home.store()).unwrap();
+    let mut rows: Vec<_> = store
+        .ingested_runs()
+        .unwrap()
+        .into_iter()
+        .map(|r| (r.writer, r.run_name()))
+        .collect();
+    rows.sort();
+    let mut want = vec![
+        (stopped.writer, SESSION.to_owned()),
+        (resumed.writer, SESSION.to_owned()),
+    ];
+    want.sort();
+    assert_eq!(rows, want, "both seats are the run's writers");
     let numbers: Vec<Value> = contents(&home, resumed.writer)
         .iter()
         .map(|c| c["line"].clone())

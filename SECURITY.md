@@ -7,10 +7,12 @@ summary: >-
 # Security policy
 
 ParleyInn stores long agent histories and feeds recalled content back to
-a model. Its invariants — no automatic path from untrusted content to
-the model, no network in the core and every other component inside
-its declared boundary, isolation per principal — are security
-claims. A way to break one is a vulnerability. See
+a model. Its invariants are security claims: no automatic path from
+untrusted content to the model, isolation per principal, and no network
+in the core with every other component inside its declared boundary
+(test:
+`the_core_executable_links_only_crates_its_reach_allows`). A way to break
+one is a vulnerability. See
 [docs/srs/06-security.md](docs/srs/06-security.md) for the threat
 model.
 

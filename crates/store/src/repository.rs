@@ -38,6 +38,11 @@ const MARKS: Table = Table {
 /// Whether the store has made a table.
 const MADE: &str = "SELECT count(*) FROM sqlite_master WHERE name = ?1";
 
+/// The schema of each of the two tables.
+pub(crate) fn schemas() -> [String; 2] {
+    [WORKTREES.schema(), MARKS.schema()]
+}
+
 impl Table {
     fn schema(self) -> String {
         let Self { name, key, value } = self;

@@ -82,14 +82,17 @@ TrustedText (plan 2609292013) land.
 The run-time half is ENG-12's core row. Every end-to-end test of the
 core starts it through the testkit's `boundary` confinement: in a
 user and network namespace of its own (`unshare --map-current-user
---net`), under `strace -f`, which fails every `socket`, `socketpair`
-and `io_uring_setup` with `EACCES` and records every network call.
-Any recorded call fails the test, naming the core and the test that
-started it. The gate test `the_core_s_tests_start_it_confined` refuses
-a test that starts the core any other way; a step needing a terminal gets one
+--net`), under `strace -f --seccomp-bpf`. The trace fails every
+`socket`, `socketpair` and `io_uring_setup` with `EACCES`, records every
+network call, and stops the program at those calls alone. Any recorded
+call fails the test, naming the core and the test that started it.
+Before the first start, a `bash` subshell opens a socket under the
+trace; unless the trace records it failed, every start fails. The gate
+test `the_core_s_tests_start_it_confined` refuses a test that starts
+the core any other way; a step needing a terminal gets one
 from `script`, outside the trace. It needs Linux, `unshare` and `script` from
-util-linux with unprivileged user namespaces, and `strace`; a machine without
-them fails the end-to-end tests with what is missing.
+util-linux with unprivileged user namespaces, `bash`, and `strace` 5.3 or
+later; a machine without them fails the end-to-end tests with what is missing.
 Outside CI, `PARINN_E2E_UNCONFINED=1` runs them unconfined instead, on
 a machine that cannot confine; CI refuses it.
 
@@ -109,8 +112,10 @@ them, and the hook's time budget (I9) covers them. Nor are
 `Mutex` and `RwLock`. The engineering gate test
 `the_product_crates_keep_their_bans` requires every product crate's
 clippy.toml to carry every ban. The ENG-03 scenario reads the same
-bans, and stays `@pending` until the stakeholder rules on what the
-list exempts.
+bans. The stakeholder accepted the exemptions on 13 October 2026. I/O
+sits behind seams a test injects: the key store, entropy, the host
+identity, the payload disk, the process table, the run lookup, and the
+log sink and clock.
 
 ## CI, nightly and release
 
@@ -141,8 +146,12 @@ The benchmark jobs (ENG-15) are described in
 [nightly.yml](../.github/workflows/nightly.yml) is where
 cargo-fuzz runs each target under `fuzz/` (ENG-07) for 15 minutes,
 from its corpus under `fuzz/corpus`, on the nightly
-`fuzz/rust-toolchain.toml` pins. The crash-consistency test (ENG-06),
-the soak (ENG-09) and the live contract test (ENG-17) join it later.
+`fuzz/rust-toolchain.toml` pins. It kills `parinn ingest`, `parinn
+purge --range` and `parinn rebuild` 10,000 times each (ENG-06). After
+each kill, `parinn verify` must exit 0. In the soak (ENG-09), 50
+writers append 1,000,000 events at once. ENG-17's live test joins later.
+CI's `eval` job runs `parinn-eval recall` (§11.1) and holds its result
+to 95% and to `tooling/eval/recall-v1.txt`.
 
 [build.yml](../.github/workflows/build.yml) is the release build.
 CI runs it on every change, and the release workflow runs it too.

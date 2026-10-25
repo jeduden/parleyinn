@@ -151,14 +151,14 @@ fn one_transcript_is_recorded_recalled_in_the_envelope_and_verified() {
         String::from_utf8_lossy(&verified.stderr)
     );
     let report: Value = serde_json::from_slice(&verified.stdout).unwrap();
-    // The device seat holds four: the minted key event, the create room
-    // act, and the certificate records of its own seat and the ingest
-    // seat.
-    assert_eq!(report["events"], lines.len() + 4, "{report}");
+    // The device seat holds five: the minted key event, the create room
+    // act, the certificate records of its own seat and the ingest seat,
+    // and the recall event of the `event_get` call (RCL-07).
+    assert_eq!(report["events"], lines.len() + 5, "{report}");
     assert_eq!(report["integrity"], "unsigned", "no log is signed yet");
     assert_eq!(
         report["order"].as_array().map(Vec::len),
-        Some(lines.len() + 4),
+        Some(lines.len() + 5),
         "verify reports every event in causal order"
     );
 }
@@ -212,7 +212,7 @@ fn a_changed_header_byte_fails_verify_naming_the_event_s_address() {
     assert_eq!(
         String::from_utf8_lossy(&out.stderr),
         format!(
-            "parinn verify: chain broken at parinn:room/{room}/w/{writer}/10: the stored hash does not match the event's header\n"
+            "parinn verify: hash chain: chain broken at parinn:room/{room}/w/{writer}/10: the stored hash does not match the event's header\n"
         )
     );
 }

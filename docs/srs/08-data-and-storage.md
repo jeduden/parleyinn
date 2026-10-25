@@ -45,11 +45,11 @@ while encryption at rest is on, in memory or encrypted under the at-rest key
 | `landmarks`          | derived    | tier, address range, rendered text, taint                                                                                                                                                                                                                                                                                   | rebuildable **(N)**                                                                                                                                                                                            |
 | `pins`               | derived    | creating address, pin version, type, priority, room, text, creating event's commitment, each version's author, stamps, active                                                                                                                                                                                               | rebuildable from pin events (`operator` for device-seat pins, `assistant` for run-seat pins), stamps and unstamps **(N)**                                                                                      |
 | `quarantine`         | derived    | creating address, selector, active                                                                                                                                                                                                                                                                                          | rebuildable from quarantine events **(N)**                                                                                                                                                                     |
-| `tombstones`         | derived    | purge event address, purged range, counts, reason or retention policy, commitments of removed events, structural fields, provenance and recorder of each removed act, tombstone and event the key set holds                                                                                                                 | rebuildable **(N)**                                                                                                                                                                                            |
+| `tombstones`         | derived    | purge event address, purged range, counts, reason or retention policy, a digest over the commitments of removed events (the chained headers keep each), structural fields, provenance and recorder of each removed act, tombstone and event the key set holds                                                               | rebuildable **(N)**                                                                                                                                                                                            |
 
 Purge replaces event content with nothing and keeps the row's address, `hash`,
-and `prev_hash`, so the chain stays verifiable and each writer's `seq` stays
-gap-free **(N)**.
+`prev_hash` and commitment, so the chain stays verifiable and each writer's
+`seq` stays gap-free **(N)**.
 
 ## 8.3 Canonical encoding
 
@@ -78,8 +78,8 @@ Spike S8 calibrated one: each character adds the weight of one of
 eleven character classes, split by script and kind, and each change
 between lowercase, uppercase and digit from one letter or digit to the
 next adds another; the sum, rounded up, plus 6 is the estimate. Its
-weights and the committed sample are in the spike's report until M1
-moves them into the core and `testdata/`, with a test of this bound. The pin
+weights are in the core (`crates/envelope/src/tokens.rs`) and the committed
+sample in `testdata/model-tokens/`, with a test of this bound. The pin
 budget, the restore block limit and the output caps of RCL-03 and CMP-06
 count the estimate, not the true count; spend counts the true count.
 

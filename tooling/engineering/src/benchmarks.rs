@@ -163,7 +163,7 @@ pub fn gated(workflow: &Workflow) -> Vec<String> {
 }
 
 /// The jobs `job` needs, from its `needs:` line.
-fn needs(job: &Job) -> Vec<String> {
+pub(crate) fn needs(job: &Job) -> Vec<String> {
     job.text
         .lines()
         .filter_map(|l| l.trim_start().strip_prefix("needs:"))
