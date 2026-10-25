@@ -56,7 +56,7 @@ Feature: Engineering quality (ENG)
     Then after every kill "parinn verify" exits 0
     And each nightly job completes at least 10000 iterations
 
-  @ENG-07 @P0 @pending
+  @ENG-07 @P0
   Scenario Outline: coverage-guided fuzzing covers every parser with a committed corpus
     Given the cargo-fuzz target for the <input>
     Then its seed corpus is committed under fuzz/corpus

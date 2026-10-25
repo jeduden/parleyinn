@@ -25,6 +25,7 @@ mod engineering_benchmark;
 mod engineering_boundary;
 mod engineering_contract;
 mod engineering_drift;
+mod engineering_fuzz;
 mod engineering_isolation;
 mod engineering_licenses;
 mod engineering_logs;

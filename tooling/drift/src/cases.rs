@@ -80,6 +80,7 @@ pub fn cases() -> Vec<Case> {
         protection_cases(),
         architecture_cases(),
         benchmark_cases(),
+        fuzz_cases(),
         isolation_cases(),
         instruction_cases(),
         transcript_contract_cases(),
@@ -1276,6 +1277,36 @@ fn documentation_cases() -> Vec<Case> {
             ),
             gate(PRIVACY),
             "cites a_test_nobody_wrote, which is no test that exists and runs",
+        ),
+    ]
+}
+
+/// The drifts ENG-07's checks exist to catch: a parser's target
+/// dropped from the fuzz workspace, and the nightly job fuzzing with no
+/// committed corpus.
+fn fuzz_cases() -> Vec<Case> {
+    vec![
+        case(
+            "the redactor's fuzz target dropped from the fuzz workspace",
+            "ENG-07",
+            Injection::replace(
+                "fuzz/Cargo.toml",
+                "name = \"redactor\"",
+                "name = \"scrubber\"",
+            ),
+            scenario("ENG-07"),
+            "fuzz/Cargo.toml declares no target redactor",
+        ),
+        case(
+            "the nightly fuzz job run without the committed corpus",
+            "ENG-07",
+            Injection::replace(
+                ".github/workflows/nightly.yml",
+                " \"fuzz/corpus/$target\"",
+                "",
+            ),
+            scenario("ENG-07"),
+            "the nightly fuzz job does not fuzz redactor from fuzz/corpus/redactor",
         ),
     ]
 }
