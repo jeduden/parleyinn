@@ -88,10 +88,7 @@ pub(crate) fn contents(
     writer: WriterId,
     kind: EventKind,
 ) -> Result<Vec<(Seq, Value)>, StoreError> {
-    let mut statement = conn.prepare(
-        "SELECT seq, content FROM events WHERE writer = ?1 AND kind = ?2 AND content IS NOT NULL
-         ORDER BY seq",
-    )?;
+    let mut statement = conn.prepare(CONTENTS)?;
     let args = [writer.to_string(), kind.as_str().to_owned()];
     let rows = statement.query_map(args, |r| Ok((r.get::<_, i64>(0)?, r.get::<_, String>(1)?)))?;
     let mut out = Vec::new();
@@ -103,6 +100,17 @@ pub(crate) fn contents(
 
     Ok(out)
 }
+
+/// The statements recall reads the record with, apart from their calls.
+const CONTENTS: &str = "SELECT seq, content FROM events
+    WHERE writer = ?1 AND kind = ?2 AND content IS NOT NULL ORDER BY seq";
+const RANGE: &str = "SELECT seq, kind, provenance, commitment,
+        content IS NULL AND commitment_key IS NULL AND payload IS NULL
+    FROM events WHERE writer = ?1 AND seq BETWEEN ?2 AND ?3 ORDER BY seq";
+/// A row of [`RANGE`]: seq, kind, provenance, commitment, erased.
+type RangeRow = (i64, String, String, String, bool);
+const CITATIONS: &str = "SELECT seq, other_seq FROM event_heads
+    WHERE writer = ?1 AND other_writer = ?2 ORDER BY seq";
 
 /// What a range of one writer's log shows without its content: each
 /// event's kind, provenance class, commitment and whether a purge erased
@@ -125,23 +133,11 @@ pub(crate) fn range_events(
     first: Seq,
     last: Seq,
 ) -> Result<Vec<RangeEvent>, StoreError> {
-    let mut statement = conn.prepare(
-        "SELECT seq, kind, provenance, commitment,
-                content IS NULL AND commitment_key IS NULL AND payload IS NULL
-         FROM events WHERE writer = ?1 AND seq BETWEEN ?2 AND ?3 ORDER BY seq",
-    )?;
-    let rows = statement.query_map(
-        rusqlite::params![writer.to_string(), crate::sql(first), crate::sql(last)],
-        |r| {
-            Ok((
-                r.get::<_, i64>(0)?,
-                r.get::<_, String>(1)?,
-                r.get::<_, String>(2)?,
-                r.get::<_, String>(3)?,
-                r.get::<_, bool>(4)?,
-            ))
-        },
-    )?;
+    let mut statement = conn.prepare(RANGE)?;
+    let args = rusqlite::params![writer.to_string(), crate::sql(first), crate::sql(last)];
+    let rows = statement.query_map(args, |r| -> rusqlite::Result<RangeRow> {
+        Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?, r.get(4)?))
+    })?;
     let corrupt = |what: &str| StoreError::Corrupt {
         address: None,
         what: format!("{what} of an event of writer {writer}"),
@@ -216,10 +212,7 @@ pub(crate) fn citations(
     device: WriterId,
     writer: WriterId,
 ) -> Result<Vec<(Seq, Seq)>, StoreError> {
-    let mut statement = conn.prepare(
-        "SELECT seq, other_seq FROM event_heads WHERE writer = ?1 AND other_writer = ?2
-         ORDER BY seq",
-    )?;
+    let mut statement = conn.prepare(CITATIONS)?;
     let args = [device.to_string(), writer.to_string()];
     let rows = statement.query_map(args, |r| Ok((r.get::<_, i64>(0)?, r.get::<_, i64>(1)?)))?;
     let mut out = Vec::new();

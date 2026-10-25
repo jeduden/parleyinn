@@ -110,6 +110,22 @@ pub(crate) fn resolve(
     Ok((writer, range.from, range.to))
 }
 
+/// Why a purge did not finish as asked.
+enum Failure {
+    /// A check already reported it, with this exit code.
+    Code(u8),
+    /// Something failed; the message says what.
+    Plain(String),
+    /// The range may not be purged (ADM-07).
+    Refused(Vec<Refusal>),
+    /// The transaction failed, or its erasure stands but a step after it
+    /// failed: whether residue is journalled, and why.
+    Unfinished { pending: bool, cause: String },
+    /// The erasure stands, but the logs were held open and the vacuum
+    /// waits.
+    Residue,
+}
+
 /// `parinn purge`.
 pub(crate) fn purge(
     args: impl Iterator<Item = String>,
@@ -127,74 +143,86 @@ pub(crate) fn purge(
     if let Err(code) = at_terminal(ctx, OP, stderr) {
         return code;
     }
-    let mut taking = match Taking::open(ctx) {
-        Ok(t) => t,
-        Err(e) => return failed(OP, &e, stderr),
-    };
-    let preliminary = Act::Purge {
-        ranges: Vec::new(),
-        reason: asked.reason.clone(),
-    };
-    if let Err(code) = taking.permit(ctx, OP, &preliminary, stderr) {
-        return code;
+    match carry(ctx, &asked, stderr) {
+        Ok(line) => written(writeln!(stdout, "{line}"), stderr),
+        Err(Failure::Code(code)) => code,
+        Err(Failure::Plain(why)) => failed(OP, &why, stderr),
+        Err(Failure::Refused(refusals)) => refused(ctx, &refusals, stderr),
+        Err(Failure::Unfinished { pending, cause }) => unfinished(ctx, pending, &cause, stderr),
+        Err(Failure::Residue) => residue(ctx, stderr),
     }
-    let (writer, first, last) = match resolve(&mut taking.store, &taking.node, &asked.range) {
-        Ok(found) => found,
-        Err(e) => return failed(OP, &e, stderr),
+}
+
+/// A failure of the work, whatever failed, by its message.
+fn plain(e: impl std::fmt::Display) -> Failure {
+    Failure::Plain(e.to_string())
+}
+
+/// Takes the purge `asked` for and says what it did.
+fn carry(ctx: &Context, asked: &Asked, stderr: &mut dyn Write) -> Result<String, Failure> {
+    let mut taking = Taking::open(ctx).map_err(plain)?;
+    let reason = asked.reason.clone();
+    let first_look = Act::Purge {
+        ranges: Vec::new(),
+        reason,
     };
-    let planned = match purge::plan(&taking.store, writer, first, last, &Reason::Purged) {
-        Ok(planned) => planned,
-        Err(e) => return failed(OP, &e, stderr),
-    };
+    taking
+        .permit(ctx, OP, &first_look, stderr)
+        .map_err(Failure::Code)?;
+    let (store, node) = (&mut taking.store, &taking.node);
+    let (writer, first, last) = resolve(store, node, &asked.range).map_err(plain)?;
+    let planned = purge::plan(store, writer, first, last, &Reason::Purged).map_err(plain)?;
     let plan = match planned {
         Planned::Ready(plan) => plan,
-        Planned::Refused(refusals) => return refused(ctx, &refusals, stderr),
+        Planned::Refused(refusals) => return Err(Failure::Refused(refusals)),
     };
     let scope = format!("{writer}:{}-{}", plan.erase.first, plan.erase.last);
     let act = Act::Purge {
         ranges: vec![scope.clone()],
-        reason: asked.reason,
+        reason: asked.reason.clone(),
     };
-    let event = match administration::act::event(&act, &mut OsEntropy) {
-        Ok(event) => event,
-        Err(e) => return failed(OP, &e, stderr),
-    };
-    let done = purge::carry_out(
-        &mut taking.store,
-        &taking.node,
-        &plan,
-        Some(event),
-        &mut OsEntropy,
-    );
-    let done = match done {
-        Ok(done) => done,
-        Err(e) => return unfinished(ctx, &taking.store, &e, stderr),
-    };
+    let event = administration::act::event(&act, &mut OsEntropy).map_err(plain)?;
+    let done = purge::carry_out(store, node, &plan, Some(event), &mut OsEntropy);
+    let done = done.map_err(|e| stands(store, &e))?;
     let act_at = done.act.map(|a| a.to_string()).unwrap_or_default();
-    let noted = ctx.audit(&Occurrence::Purged {
+    let said = Occurrence::Purged {
         scope: &scope,
         reason: "purged",
         by: "principal act",
         behind: &act_at,
         counter: None,
-    });
-    if let Err(e) = noted {
-        let why = format!("the purge is recorded, but the audit log took no note of it: {e}");
-        return failed(OP, &why, stderr);
-    }
+    };
+    ctx.audit(&said).map_err(unnoted)?;
     if !done.finished.vacuumed {
-        return residue(ctx, stderr);
+        return Err(Failure::Residue);
     }
-    let line = if asked.as_json {
-        json!({"purged": done.erased, "range": scope, "act": act_at, "tombstone": done.tombstone.to_string()}).to_string()
+
+    Ok(if asked.as_json {
+        json!({"purged": done.erased, "range": scope, "act": act_at,
+               "tombstone": done.tombstone.to_string()})
+        .to_string()
     } else {
         format!(
             "purged {} events of {scope}; tombstone {}",
             done.erased, done.tombstone
         )
-    };
+    })
+}
 
-    written(writeln!(stdout, "{line}"), stderr)
+/// The failure to note a recorded purge in the audit log.
+fn unnoted(e: impl std::fmt::Display) -> Failure {
+    plain(format!(
+        "the purge is recorded, but the audit log took no note of it: {e}"
+    ))
+}
+
+/// A purge that failed after its transaction left residue journalled, or
+/// failed before it.
+fn stands(store: &Store, cause: &dyn std::fmt::Display) -> Failure {
+    Failure::Unfinished {
+        pending: store.purge_pending().unwrap_or(false),
+        cause: cause.to_string(),
+    }
 }
 
 /// Audits and counts each cause that refused the range, and names it.
@@ -232,9 +260,7 @@ pub(crate) fn audit_refusals(ctx: &Context, refusals: &[Refusal]) {
             detail: refusal.detail(),
             key: &key,
         };
-        if let Err(e) = ctx.audit(&occurrence) {
-            tracing::warn!(error = e.to_string().as_str(), "audit a purge's refusal");
-        }
+        crate::logged("audit a purge's refusal", ctx.audit(&occurrence));
     }
 }
 
@@ -262,9 +288,7 @@ fn describe(refusals: &[Refusal], limit: usize) -> String {
 /// never stops the command that found it (I9).
 pub(crate) fn finish(ctx: &Context, store: &mut Store) {
     let done = store.finish_purge();
-    if let Err(e) = &done {
-        tracing::warn!(error = e.to_string().as_str(), "finish a purge");
-    }
+    crate::logged("finish a purge", done.as_ref());
     if left_over(&done) {
         audit_residue(ctx);
     }
@@ -287,24 +311,17 @@ pub(crate) fn audit_residue(ctx: &Context) {
         operation: OP,
         detail: "a purge erased its range but could not finish clearing the residue",
     };
-    if let Err(e) = ctx.audit(&occurrence) {
-        tracing::warn!(error = e.to_string().as_str(), "audit a purge's residue");
-    }
+    crate::logged("audit a purge's residue", ctx.audit(&occurrence));
 }
 
 /// Reports a purge whose transaction failed, or whose erasure stands but
 /// whose finishing steps could not complete.
-fn unfinished(
-    ctx: &Context,
-    store: &Store,
-    cause: &dyn std::fmt::Display,
-    stderr: &mut dyn Write,
-) -> u8 {
-    if store.purge_pending().unwrap_or(false) {
+fn unfinished(ctx: &Context, pending: bool, cause: &str, stderr: &mut dyn Write) -> u8 {
+    if pending {
         let _ = residue(ctx, stderr);
     }
 
-    failed(OP, cause, stderr)
+    failed(OP, &cause, stderr)
 }
 
 /// Audits and counts the residue a purge left for its next attempt, and

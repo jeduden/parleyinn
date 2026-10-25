@@ -295,3 +295,52 @@ fn a_purged_event_is_no_gap_in_the_record_and_its_address_resolves_with_no_conte
             .is_none()
     );
 }
+
+#[test]
+fn a_page_of_tombstones_alone_stops_at_the_cap_and_goes_on() {
+    let lines: Vec<String> = (1..=300).map(|i| format!("line {i}")).collect();
+    let f = super::recall_calls::fixture_of(&lines);
+    // Purged and quarantined seqs alternate: every one a tombstone.
+    for n in (2..=300).step_by(2) {
+        quarantine(&f, n, n);
+    }
+    let ranges: Vec<store::Erase> = (1..=299)
+        .step_by(2)
+        .map(|n| store::Erase {
+            writer: f.ingested.writer,
+            first: seq(n),
+            last: seq(n),
+        })
+        .collect();
+    let recorded: Vec<store::NewEvent> = ranges
+        .iter()
+        .zip(1u8..)
+        .map(|(r, n)| store::NewEvent {
+            kind: EventKind::Tombstone,
+            provenance: record::event::Provenance::Structural,
+            content: administration::purge::Tombstone {
+                writer: r.writer,
+                first: r.first,
+                last: r.last,
+                count: 1,
+                reason: "purged".to_owned(),
+                policy: None,
+                commitments: record::digest::Digest::ZERO,
+            }
+            .to_value(),
+            commitment_key: record::commitment::CommitmentKey::from_bytes([n; 32]),
+            transcript_timestamp: None,
+        })
+        .collect();
+    let mut store = Store::open(&f.home.store()).unwrap();
+    store.purge(device(&f), &recorded, &ranges).unwrap();
+    drop(store);
+    let mut server = super::recall_calls::recording(&f);
+
+    let first = expand(&mut server, "A1:1-300");
+
+    assert_eq!(first["items"], json!([]));
+    assert_eq!(first["truncated"], true);
+    assert!(tombstones(&first).len() < 300);
+    assert!(first["next_cursor"].is_string());
+}

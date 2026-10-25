@@ -386,6 +386,14 @@ pub(crate) fn json_flag(
     Some(as_json)
 }
 
+/// Logs the failure of `result`, if it failed, as what `what` says: for
+/// work that must not stop the command it runs in (I9).
+pub(crate) fn logged<T, E: std::fmt::Display>(what: &str, result: Result<T, E>) {
+    if let Err(e) = result {
+        tracing::warn!(error = e.to_string().as_str(), what, "failed");
+    }
+}
+
 /// Reports a failure of `command` on `stderr`.
 pub(crate) fn failed(command: &str, e: &dyn std::fmt::Display, stderr: &mut dyn Write) -> u8 {
     let _ = writeln!(stderr, "parinn {command}: {e}");
@@ -513,7 +521,8 @@ fn ingest(
 }
 
 /// Applies the retention policies in force once the ingest is done
-/// (SEC-22); a failure to open the store again stops nothing (I9).
+/// (SEC-22); a failure to open the store again is audited and counted,
+/// and stops nothing (I9).
 fn apply_retention(
     ctx: &Context,
     home: &Home,
@@ -523,16 +532,14 @@ fn apply_retention(
     if retention::policies(settings).is_empty() {
         return;
     }
-    match start_node(ctx, home, stderr) {
-        Ok(mut store) => match Node::find(home, &store) {
-            Ok(node) => retention::apply(ctx, &mut store, &node, settings, &mut OsEntropy),
-            Err(e) => tracing::warn!(
-                error = e.to_string().as_str(),
-                "find the node to apply retention"
-            ),
-        },
-        Err(e) => tracing::warn!(error = e.as_str(), "open the store to apply retention"),
-    }
+    let opened = start_node(ctx, home, stderr).and_then(|store| {
+        let node = Node::find(home, &store).map_err(|e| e.to_string())?;
+        Ok((store, node))
+    });
+    opened.map_or_else(
+        |e| retention::failed(ctx, &e),
+        |(mut store, node)| retention::apply(ctx, &mut store, &node, settings, &mut OsEntropy),
+    );
 }
 
 /// Ingests each transcript source at `paths`. Returns a report of each

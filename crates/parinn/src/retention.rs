@@ -23,29 +23,31 @@ use crate::purge::audit_refusals;
 pub(crate) fn policies(settings: &Settings) -> Vec<Policy> {
     settings
         .iter()
-        .filter_map(|(key, value)| {
-            let name = key.name();
-            let mut parts = name.splitn(3, '.');
-            let (Some("retention_policy"), Some(room), Some(class)) =
-                (parts.next(), parts.next(), parts.next())
-            else {
-                return None;
-            };
-            let Value::Integer(days) = value else {
-                return None;
-            };
-
-            Some(Policy {
-                key: name.to_owned(),
-                room: match room {
-                    "*" => None,
-                    room => Some(RoomId::parse(room).ok()?),
-                },
-                class: Provenance::parse(class)?,
-                days: u64::try_from(*days).ok()?,
-            })
-        })
+        .filter_map(|(key, value)| policy(key.name(), value))
         .collect()
+}
+
+/// The policy the key `name` sets to `value`, if it is one.
+fn policy(name: &str, value: &Value) -> Option<Policy> {
+    let parts: Vec<&str> = name.splitn(3, '.').collect();
+    let ["retention_policy", room, class] = parts[..] else {
+        return None;
+    };
+    let Value::Integer(days) = value else {
+        return None;
+    };
+    let room = if room == "*" {
+        None
+    } else {
+        Some(RoomId::parse(room).ok()?)
+    };
+
+    Some(Policy {
+        key: name.to_owned(),
+        room,
+        class: Provenance::parse(class)?,
+        days: u64::try_from(*days).ok()?,
+    })
 }
 
 /// Applies the retention policies of `settings` in the home `store`
@@ -59,24 +61,24 @@ pub(crate) fn apply(
 ) {
     let policies = policies(settings);
     let applied = retention::apply(store, node, &policies, (ctx.clock)(), entropy);
-    match applied {
-        Ok(applied) => audit(ctx, &applied),
-        Err(e) => {
-            tracing::warn!(
-                error = e.to_string().as_str(),
-                "apply the retention policies"
-            );
-            let occurrence = Occurrence::Degraded {
-                kind: Kind::Failed,
-                counter: Counter::RetentionFailed,
-                operation: "retention",
-                detail: "the retention policies could not be applied: the store or the random source failed",
-            };
-            if let Err(e) = ctx.audit(&occurrence) {
-                tracing::warn!(error = e.to_string().as_str(), "audit a retention failure");
-            }
-        }
-    }
+    applied.map_or_else(|e| failed(ctx, &e), |applied| audit(ctx, &applied));
+}
+
+/// Audits and counts a failure to apply the policies: the store, the
+/// home or the random source failed; the next ingest tries again
+/// (SEC-22, I6).
+pub(crate) fn failed(ctx: &Context, cause: &dyn std::fmt::Display) {
+    tracing::warn!(
+        error = cause.to_string().as_str(),
+        "apply the retention policies"
+    );
+    let occurrence = Occurrence::Degraded {
+        kind: Kind::Failed,
+        counter: Counter::RetentionFailed,
+        operation: "retention",
+        detail: "the retention policies could not be applied: the store or the random source failed",
+    };
+    crate::logged("audit a retention failure", ctx.audit(&occurrence));
 }
 
 /// Audits each range purged and each refused (SEC-22, ADM-07, I6).
@@ -90,9 +92,7 @@ fn audit(ctx: &Context, applied: &Applied) {
             behind: &range.policy,
             counter: Some(Counter::RetentionPurged),
         };
-        if let Err(e) = ctx.audit(&occurrence) {
-            tracing::warn!(error = e.to_string().as_str(), "audit a retention purge");
-        }
+        crate::logged("audit a retention purge", ctx.audit(&occurrence));
         if !done.finished.vacuumed {
             crate::purge::audit_residue(ctx);
         }

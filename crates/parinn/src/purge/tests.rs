@@ -291,11 +291,10 @@ fn a_residue_the_purge_could_not_clear_is_audited_counted_and_said() {
 #[test]
 fn a_purge_that_failed_before_erasing_reports_its_cause_and_no_residue() {
     let (p, _) = with_a_run();
-    let (_, store) = open(&p);
     let mut err = Vec::new();
 
     let code = p.with_context(&DEV, |ctx| {
-        unfinished(ctx, &store, &"the store is gone", &mut err)
+        unfinished(ctx, false, "the store is gone", &mut err)
     });
 
     assert_eq!(code, EXIT_FAILURE);
@@ -436,4 +435,36 @@ fn finishing_left_residue_when_a_step_failed_or_the_logs_were_held_open() {
     assert!(!left_over(&done(false, true)), "finished");
     assert!(left_over(&done(false, false)), "the logs were held open");
     assert!(left_over(&Err(store::StoreError::NoIndex)));
+}
+
+#[test]
+fn failures_say_what_failed_and_a_failure_to_audit_is_only_logged() {
+    let Failure::Plain(why) = unnoted("the disk is full") else {
+        panic!("a plain failure");
+    };
+    assert_eq!(
+        why,
+        "the purge is recorded, but the audit log took no note of it: the disk is full"
+    );
+    crate::logged("a step", Ok::<(), String>(()));
+    crate::logged("a step", Err::<(), _>("it failed"));
+}
+
+#[test]
+fn a_home_of_a_newer_store_is_refused_by_the_purge_before_anything_else() {
+    let (p, writer) = with_a_run();
+    let (home, store) = open(&p);
+    drop(store);
+    let conn = rusqlite::Connection::open(home.store()).unwrap();
+    conn.execute(
+        "UPDATE meta SET value = '9' WHERE key = 'schema_version'",
+        [],
+    )
+    .unwrap();
+    drop(conn);
+
+    let (code, _, err) = p.invoke(&["purge", "--range", &format!("{writer}:1-1")], &DEV);
+
+    assert_eq!(code, EXIT_FAILURE);
+    assert!(err.contains("newer than this parinn's"), "{err}");
 }

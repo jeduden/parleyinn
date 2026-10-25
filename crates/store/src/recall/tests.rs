@@ -355,3 +355,36 @@ fn the_heads_a_device_seat_cited_come_in_the_order_it_cited_them() {
     assert!(store.citations(writer(1), writer(2)).unwrap().len() <= 1);
     assert!(store.citations(writer(2), writer(9)).unwrap().is_empty());
 }
+
+#[test]
+fn a_range_with_a_row_that_does_not_parse_is_corrupt() {
+    let dir = TempDir::new().unwrap();
+    let mut store = open(&dir);
+    seat(&mut store, writer(1), room(1));
+    store
+        .append(writer(1), &[line("a", Provenance::Web)])
+        .unwrap();
+    let seq = Seq::new(1).unwrap();
+    for (column, good, bad) in [
+        ("kind", "transcript_line", "nonsense"),
+        ("provenance", "web", "nonsense"),
+    ] {
+        let set = |value: &str| {
+            store
+                .conn
+                .execute(&format!("UPDATE events SET {column} = '{value}'"), [])
+                .unwrap()
+        };
+        set(bad);
+
+        let err = store.range_events(writer(1), seq, seq).unwrap_err();
+
+        assert!(err.to_string().contains(column), "{err}");
+        set(good);
+    }
+    store
+        .conn
+        .execute("UPDATE events SET commitment = 'zz'", [])
+        .unwrap();
+    assert!(store.range_events(writer(1), seq, seq).is_err());
+}

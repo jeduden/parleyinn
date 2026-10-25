@@ -216,3 +216,47 @@ fn a_range_the_purge_refuses_is_counted_and_never_erased() {
     assert!(store.log(writer).unwrap()[0].content.is_some());
     assert!(Provenance::parse("unparsed").is_some());
 }
+
+#[test]
+fn a_key_is_a_policy_only_when_it_names_a_room_a_class_and_a_window() {
+    let days = Value::Integer(30);
+    let id = RoomId::derive(&[1; 32], &[2; 16]).to_string();
+
+    assert!(policy("retention_policy.*.web", &days).is_some());
+    assert!(policy(&format!("retention_policy.{id}.web"), &days).is_some());
+    for (name, value) in [
+        ("recall.max_k", Value::Integer(30)),
+        ("retention_policy.*.web", Value::Bool(true)),
+        ("retention_policy.*.nonsense", Value::Integer(30)),
+        ("retention_policy.not-a-room.web", Value::Integer(30)),
+        ("retention_policy.*.web", Value::Integer(-1)),
+    ] {
+        assert!(policy(name, &value).is_none(), "{name}");
+    }
+}
+
+#[test]
+fn a_purge_whose_logs_were_held_open_is_audited_as_residue_too() {
+    let p = Process::new();
+    let range = administration::retention::Aged {
+        writer: record::id::WriterId::derive(&[1; 32]),
+        first: record::id::Seq::FIRST,
+        last: record::id::Seq::FIRST,
+        policy: "retention_policy.*.web".to_owned(),
+    };
+    let done = administration::purge::Done {
+        act: None,
+        tombstone: record::id::Address::new(range.writer, range.first),
+        erased: 1,
+        finished: store::Finished::default(),
+    };
+    let applied = Applied {
+        purged: vec![(range, done)],
+        refused: Vec::new(),
+    };
+
+    p.with_context(&DEV, |ctx| audit(ctx, &applied));
+
+    assert_eq!(counted(&p, "retention_purged").len(), 1);
+    assert_eq!(counted(&p, "purge_unfinished").len(), 1);
+}

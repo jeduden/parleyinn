@@ -210,28 +210,30 @@ impl Store {
         if !checkpoint(&self.conn)? {
             return Ok(false);
         }
-        self.conn
-            .execute("DELETE FROM purge_journal WHERE kind = ?1", [VACUUM])?;
+        self.conn.execute(CLEAR_KIND, [VACUUM])?;
 
         Ok(true)
     }
 }
 
+/// The statements the purge runs more than once, or that read best apart.
+const CLEAR_KIND: &str = "DELETE FROM purge_journal WHERE kind = ?1";
+const HAS_JOURNAL: &str = "SELECT count(*) FROM sqlite_master WHERE name = 'purge_journal'";
+const JOURNAL_ROW: &str = "INSERT OR IGNORE INTO purge_journal (kind, target) VALUES (?1, ?2)";
+const ERASE: &str = "UPDATE events SET content = NULL, commitment_key = NULL, preview = NULL,
+        payload = NULL, payload_size = NULL, transcript_timestamp = NULL
+    WHERE writer = ?1 AND seq BETWEEN ?2 AND ?3";
+const FORGET_PROMPT: &str = "UPDATE prompt_commitments SET commitment_key = '', commitment = ''
+    WHERE prompt_id = ?1 AND used = 1";
+
 /// Whether the store made the journal.
 fn has_journal(conn: &Connection) -> Result<bool, StoreError> {
-    Ok(conn.query_row(
-        "SELECT count(*) FROM sqlite_master WHERE name = 'purge_journal'",
-        [],
-        |r| r.get::<_, bool>(0),
-    )?)
+    Ok(conn.query_row(HAS_JOURNAL, [], |r| r.get::<_, bool>(0))?)
 }
 
 /// Journals `target` for a step of `kind`, once.
 fn journal(conn: &Connection, kind: &str, target: &str) -> Result<(), StoreError> {
-    conn.execute(
-        "INSERT OR IGNORE INTO purge_journal (kind, target) VALUES (?1, ?2)",
-        params![kind, target],
-    )?;
+    conn.execute(JOURNAL_ROW, params![kind, target])?;
 
     Ok(())
 }
@@ -262,12 +264,7 @@ fn erase(conn: &Connection, range: &Erase) -> Result<u64, StoreError> {
         }
     }
     used_prompts(conn, range)?;
-    conn.execute(
-        "UPDATE events SET content = NULL, commitment_key = NULL, preview = NULL,
-             payload = NULL, payload_size = NULL, transcript_timestamp = NULL
-         WHERE writer = ?1 AND seq BETWEEN ?2 AND ?3",
-        params![writer, first, last],
-    )?;
+    conn.execute(ERASE, params![writer, first, last])?;
     if !held.is_empty() {
         journal(conn, INDEX, &format!("{writer}:{first}-{last}"))?;
     }
@@ -283,18 +280,12 @@ fn used_prompts(conn: &Connection, range: &Erase) -> Result<(), StoreError> {
         conn.prepare("SELECT content FROM events WHERE kind = ?1 AND content IS NOT NULL")?;
     let rows = statement.query_map([EventKind::PromptMatch.as_str()], |r| r.get::<_, String>(0))?;
     for row in rows {
-        let Ok(content) = serde_json::from_str::<Value>(&row?) else {
-            continue;
-        };
+        let content: Value = serde_json::from_str(&row?).unwrap_or_default();
         if !names(&content["event"], range) {
             continue;
         }
         if let Some(id) = content["prompt_id"].as_str() {
-            conn.execute(
-                "UPDATE prompt_commitments SET commitment_key = '', commitment = ''
-                 WHERE prompt_id = ?1 AND used = 1",
-                [id],
-            )?;
+            conn.execute(FORGET_PROMPT, [id])?;
         }
     }
 
@@ -326,11 +317,8 @@ fn parse_range(target: &str) -> Option<(WriterId, Seq, Seq)> {
 fn checkpoint(conn: &Connection) -> Result<bool, StoreError> {
     let mut whole = true;
     for schema in schemas(conn)? {
-        let busy: i64 = conn.query_row(
-            &format!("PRAGMA {schema}.wal_checkpoint(TRUNCATE)"),
-            [],
-            |r| r.get(0),
-        )?;
+        let pragma = format!("PRAGMA {schema}.wal_checkpoint(TRUNCATE)");
+        let busy: i64 = conn.query_row(&pragma, [], |r| r.get(0))?;
         whole &= busy == 0;
     }
 

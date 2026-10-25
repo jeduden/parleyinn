@@ -288,3 +288,38 @@ fn a_list_in_a_home_that_never_started_starts_it_and_finds_nothing() {
         (EXIT_OK, "nothing is quarantined\n".into(), String::new())
     );
 }
+
+#[test]
+fn a_list_and_an_act_in_a_home_of_a_newer_store_fail_saying_why() {
+    let (p, _) = with_a_run();
+    let home = Home::locate(Some(p.parinn_home().as_os_str()), None).unwrap();
+    let conn = rusqlite::Connection::open(home.store()).unwrap();
+    conn.execute(
+        "UPDATE meta SET value = '9' WHERE key = 'schema_version'",
+        [],
+    )
+    .unwrap();
+    drop(conn);
+
+    for args in [
+        &["quarantine", "list"][..],
+        &["quarantine", "add", "--run", "r"],
+    ] {
+        let (code, _, err) = p.invoke(args, &DEV);
+
+        assert_eq!(code, EXIT_FAILURE, "{args:?}");
+        assert!(err.contains("newer than this parinn's"), "{err}");
+    }
+}
+
+#[test]
+fn a_failure_to_audit_a_recorded_act_is_told() {
+    let Failure::Plain(why) = unnoted("the disk is full") else {
+        panic!("a plain failure");
+    };
+
+    assert_eq!(
+        why,
+        "the act is recorded, but the audit log took no note of it: the disk is full"
+    );
+}

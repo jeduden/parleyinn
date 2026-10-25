@@ -141,6 +141,18 @@ fn selector_of(taking: &mut Taking, wanted: Wanted) -> Result<Selector, String> 
     }
 }
 
+/// A quarantine act that did not happen.
+enum Failure {
+    /// A check already reported it, with this exit code.
+    Code(u8),
+    /// Something failed; the message says what.
+    Plain(String),
+}
+
+fn plain(e: impl std::fmt::Display) -> Failure {
+    Failure::Plain(e.to_string())
+}
+
 /// `quarantine add` and `quarantine release`.
 fn change(
     ctx: &Context,
@@ -158,62 +170,57 @@ fn change(
     if let Err(code) = at_terminal(ctx, op, stderr) {
         return code;
     }
-    let mut taking = match Taking::open(ctx) {
-        Ok(t) => t,
-        Err(e) => return failed(op, &e, stderr),
-    };
-    let selector = match selector_of(&mut taking, wanted) {
-        Ok(selector) => selector,
-        Err(e) => return failed(op, &e, stderr),
-    };
-    if !add && !holds(&taking, &selector) {
-        return failed(op, &"no quarantine holds that selector", stderr);
+    match changed(ctx, op, add, wanted, reason, stderr) {
+        Ok(line) => written(writeln!(stdout, "{line}"), stderr),
+        Err(Failure::Code(code)) => code,
+        Err(Failure::Plain(why)) => failed(op, &why, stderr),
     }
+}
+
+/// Takes the act and says what it did.
+fn changed(
+    ctx: &Context,
+    op: &'static str,
+    add: bool,
+    wanted: Wanted,
+    reason: String,
+    stderr: &mut dyn Write,
+) -> Result<String, Failure> {
+    let mut taking = Taking::open(ctx).map_err(plain)?;
+    let selector = selector_of(&mut taking, wanted).map_err(plain)?;
+    if !add && !holds(&taking, &selector) {
+        return Err(plain("no quarantine holds that selector"));
+    }
+    let chosen = selector.clone();
     let act = if add {
         Act::QuarantineAdd {
-            selector: selector.clone(),
+            selector: chosen,
             reason,
         }
     } else {
-        Act::QuarantineRelease {
-            selector: selector.clone(),
-        }
+        Act::QuarantineRelease { selector: chosen }
     };
-    let address = match taking.take(
-        ctx,
-        if add {
-            "quarantine add"
-        } else {
-            "quarantine release"
-        },
-        &act,
-        stderr,
-    ) {
-        Ok(a) => a,
-        Err(code) => return code,
+    let address = taking.take(ctx, op, &act, stderr).map_err(Failure::Code)?;
+    let detail = if add {
+        "quarantine added"
+    } else {
+        "quarantine released"
     };
-    let noted = ctx.audit(&Occurrence::PrincipalAct {
-        operation: if add {
-            "quarantine add"
-        } else {
-            "quarantine release"
-        },
-        detail: if add {
-            "quarantine added"
-        } else {
-            "quarantine released"
-        },
-    });
-    if let Err(e) = noted {
-        let why = format!("the act is recorded, but the audit log took no note of it: {e}");
-        return failed(op, &why, stderr);
-    }
+    let noted = Occurrence::PrincipalAct {
+        operation: op,
+        detail,
+    };
+    ctx.audit(&noted).map_err(unnoted)?;
     let said = if add { "quarantined" } else { "released" };
 
-    written(
-        writeln!(stdout, "{said} {}; act {address}", selector.describe()),
-        stderr,
-    )
+    Ok(format!("{said} {}; act {address}", selector.describe()))
+}
+
+/// The failure to note a recorded act in the audit log.
+fn unnoted(e: impl std::fmt::Display) -> Failure {
+    plain(format!(
+        "the act is recorded, but the audit log took no note of it: {e}"
+    ))
 }
 
 /// Whether the quarantine set `taking` holds has `selector` in force.
@@ -224,20 +231,21 @@ fn holds(taking: &Taking, selector: &Selector) -> bool {
         .is_ok_and(|set| set.active().iter().any(|a| a.selector == *selector))
 }
 
+/// The quarantine set the home holds, starting the node when it never
+/// started.
+fn load_set(ctx: &Context, stderr: &mut dyn Write) -> Result<QuarantineSet, String> {
+    let home = ctx.home().map_err(|e| e.to_string())?;
+    let store = start_node(ctx, &home, stderr)?;
+    let node = administration::node::Node::find(&home, &store).map_err(|e| e.to_string())?;
+    let devices = device_writers(&store, node.personal_room()).map_err(|e| e.to_string())?;
+
+    QuarantineSet::load(&store, &devices).map_err(|e| e.to_string())
+}
+
 /// `quarantine list`: the selectors in force, with the seq of the act
 /// that added each and its stated reason.
 fn list(ctx: &Context, as_json: bool, stdout: &mut dyn Write, stderr: &mut dyn Write) -> u8 {
-    let home = match ctx.home() {
-        Ok(home) => home,
-        Err(e) => return failed("quarantine list", &e, stderr),
-    };
-    let set = start_node(ctx, &home, stderr).and_then(|store| {
-        let node = administration::node::Node::find(&home, &store).map_err(|e| e.to_string())?;
-        let devices = device_writers(&store, node.personal_room()).map_err(|e| e.to_string())?;
-
-        QuarantineSet::load(&store, &devices).map_err(|e| e.to_string())
-    });
-    let set = match set {
+    let set = match load_set(ctx, stderr) {
         Ok(set) => set,
         Err(e) => return failed("quarantine list", &e, stderr),
     };

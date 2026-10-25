@@ -428,6 +428,10 @@ pub(crate) fn unmark_reported(conn: &Connection, gaps: &[IndexGap]) -> Result<()
     Ok(())
 }
 
+const HOLDS_SLOT: &str = "SELECT count(*) FROM search_writers WHERE slot = ?1 AND writer = ?2";
+const REMOVE_RANGE: &str =
+    "DELETE FROM events_fts WHERE rowid BETWEEN ?1 AND ?2 AND (rowid & ?3) = ?4";
+
 /// Takes the postings of `writer`'s events from `first` to `last` out of
 /// the index, with FTS5's secure delete on so the removed postings leave
 /// its segments too (ADM-07, SEC-14); how many events had one. A writer
@@ -443,19 +447,14 @@ pub(crate) fn remove(
         return Ok(0);
     }
     let slot = slot_of(writer);
-    let holds = conn.query_row(
-        "SELECT count(*) FROM search_writers WHERE slot = ?1 AND writer = ?2",
-        params![slot, writer.to_string()],
-        |r| r.get::<_, bool>(0),
-    )?;
+    let args = params![slot, writer.to_string()];
+    let holds = conn.query_row(HOLDS_SLOT, args, |r| r.get::<_, bool>(0))?;
     if !holds {
         return Ok(0);
     }
     conn.execute_batch("INSERT INTO events_fts (events_fts, rank) VALUES ('secure-delete', 1)")?;
-    let removed = conn.execute(
-        "DELETE FROM events_fts WHERE rowid BETWEEN ?1 AND ?2 AND (rowid & ?3) = ?4",
-        params![row_id(0, first), row_id(SLOT_MASK, last), SLOT_MASK, slot],
-    )?;
+    let args = params![row_id(0, first), row_id(SLOT_MASK, last), SLOT_MASK, slot];
+    let removed = conn.execute(REMOVE_RANGE, args)?;
 
     conn.execute_batch("INSERT INTO events_fts (events_fts) VALUES ('optimize')")?;
 
