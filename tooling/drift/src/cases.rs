@@ -1478,6 +1478,16 @@ fn trusted_text_cases() -> Vec<Case> {
             gate(),
             "crates/store/src/alias.rs:1: TrustedText is named by a `use .. as` alias, which hides how it is built, outside the restore_block crate",
         ),
+        case(
+            "a crate implementing a trait that adds to TrustedText",
+            GATE,
+            Injection::create(
+                "crates/store/src/extend.rs",
+                "impl Extend<String> for TrustedText {\n    fn extend<I>(&mut self, recalled: I) {}\n}\n",
+            ),
+            gate(),
+            "crates/store/src/extend.rs:1: TrustedText is changed by the trait Extend, though trusted text is built whole by its four constructors and never added to",
+        ),
     ]
 }
 

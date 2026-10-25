@@ -46,8 +46,7 @@ how the components ship.
 
 ### Scope
 
-§12.2 lists M1's scope, and this plan takes all of it. These rows
-land in full:
+§12.2 lists M1's scope, and this plan takes all of it. These rows land in full:
 
 - REC P0, PRV P0 (PRV-01 to PRV-06, PRV-08, PRV-09, PRV-11, PRV-14)
   and RCL P0, with RCL-08
@@ -90,21 +89,22 @@ ENG-08 prove CON-05.
 
 ### What the spikes left
 
-- **S2** ([ADR-2610110553], proposed): `rusqlite` without default
-  features, SQLite without extension loading, a C compiler and both musl
-  targets' headers pinned on the Linux builder.
+- **S2** ([ADR-2610110553], proposed): `rusqlite` without default features,
+  SQLite without extension loading, a C compiler and both musl targets' headers
+  pinned on the Linux builder. BM25 ranks the newest 2,000 matches, 172 ms p95
+  (NFR-03).
 - **S7** ([ADR-2610102211], proposed): an in-house stdio MCP server.
-- **S1, S3 and S13**: Claude Code 2.1.296's hook inputs and transcripts
-  under `testdata/claude-code`. The parser's cargo-fuzz target is seeded
-  from them (ENG-07). A fork's repeated lines are recorded once (REC-04),
-  the MCP server ingests live (REC-13), and a drifting line stays
-  untrusted `harness_text` (REC-26).
-- **S8**: the conservative model-token estimator of §8.4. Six targets
-  freeze when M1 builds what uses them (§12.3): NFR-09's overhead, REC-11's
-  cap, REC-17's secret, RCL-02's hits, RCL-03's cap and SEC-04's terms.
-- **S12** (plan 2610012322): index row ids derive from addresses; a purge
-  sets `secure_delete` and FTS5's `secure-delete` and checkpoints the WAL;
-  a `user` event's trust needs the deployment mode.
+- **S1, S3 and S13**: Claude Code 2.1.296's hook inputs and transcripts under
+  `testdata/claude-code`. The parser's cargo-fuzz target is seeded from them
+  (ENG-07). A fork's repeated lines are recorded once (REC-04), the MCP server
+  ingests live (REC-13), and a drifting line stays untrusted `harness_text`
+  (REC-26).
+- **S8**: the conservative model-token estimator of §8.4. Six targets freeze
+  when M1 builds what uses them (§12.3): NFR-09's overhead, REC-11's cap,
+  REC-17's secret, RCL-02's hits, RCL-03's cap and SEC-04's terms.
+- **S12** (plan 2610012322): index row ids derive from addresses; a purge sets
+  `secure_delete` and FTS5's `secure-delete` and checkpoints the WAL; a `user`
+  event's trust needs the deployment mode.
 
 ### The stakeholder's rulings of 14 October 2026
 
@@ -202,7 +202,7 @@ changed M1's row in §12.2.
 
 Phase 1 fixed the test approach the others copy. ENG-18's rewording
 landed before phases 4, 5 and 7. Tracks 2 then 3; 4; 5 then 6; 7 ran in
-parallel. Phases 8 to 16 follow in order, each spec written at its turn.
+parallel. Phases 8 to 16 follow in order; each spec is written at its turn.
 
 | Phase | Model  | Gate                                                                                                                                                     |
 | ----- | ------ | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
