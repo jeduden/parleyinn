@@ -149,6 +149,30 @@ fn refused_saying(w: &mut World, what: &str, words: &str) -> Result<(), String> 
     Ok(())
 }
 
+/// Fails unless the audit log holds a `rejected` entry, counted under
+/// `principal_act_refused`, whose detail is `detail` (I6).
+fn refusal_audited(w: &World, detail: &str) -> Result<(), String> {
+    let entries = Log::new(home(w)?.audit())
+        .entries()
+        .map_err(|e| e.to_string())?;
+    let found = entries.iter().any(|e| {
+        e.kind == "rejected"
+            && e.counter.as_deref() == Some("principal_act_refused")
+            && e.detail == detail
+    });
+    if found {
+        return Ok(());
+    }
+    let seen: Vec<String> = entries
+        .iter()
+        .map(|e| format!("{} {:?} {}", e.kind, e.counter, e.detail))
+        .collect();
+
+    Err(format!(
+        "no rejected entry counted principal_act_refused reads {detail:?}; the log holds {seen:?}"
+    ))
+}
+
 /// The names of the principal acts the device seat recorded.
 fn acts(w: &World) -> Result<Vec<String>, String> {
     let store = Store::open(&home(w)?.store()).map_err(|e| e.to_string())?;
@@ -181,6 +205,7 @@ fn act_refused(w: &mut World) -> Result<(), String> {
     if acts(w)?.iter().any(|a| a == "configuration_accept") {
         return Err("the widening act was recorded".to_owned());
     }
+    refusal_audited(w, "refused: an authenticator is required")?;
 
     Ok(())
 }
@@ -195,6 +220,7 @@ fn acceptance_refused(w: &mut World) -> Result<(), String> {
     if acts(w)?.iter().any(|a| a == "risk_acceptance_record") {
         return Err("the risk acceptance was recorded".to_owned());
     }
+    refusal_audited(w, "refused: managed policy forbids risk acceptance")?;
 
     Ok(())
 }
