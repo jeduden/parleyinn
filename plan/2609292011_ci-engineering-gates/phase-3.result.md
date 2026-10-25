@@ -1,7 +1,7 @@
 ---
 n: 3
 title: "Deadlines on every blocking operation (ENG-03)"
-status: "🔳"
+status: "✅"
 result: true
 summary: >-
   The core's clippy configuration bans 15 blocking calls that take no deadline and a gate test holds every product crate to them; the stakeholder accepted its exemptions, and the ENG-03 scenario stays pending until M1 adds injectable I/O traits.

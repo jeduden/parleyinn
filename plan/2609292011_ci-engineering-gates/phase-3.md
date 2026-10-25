@@ -1,7 +1,7 @@
 ---
 n: 3
 title: "Deadlines on every blocking operation (ENG-03)"
-status: "🔳"
+status: "✅"
 result: false
 ---
 # Phase 3: deadlines on every blocking operation (ENG-03)

@@ -1,7 +1,7 @@
 ---
 n: 16
 title: "Exit: the engineering gates, the recall evaluation and the S12 rebuild test"
-status: "🔳"
+status: "✅"
 result: false
 ---
 # Phase 16: exit

@@ -118,7 +118,7 @@ footer: |
 |     | ↳      | `@ENG-14` passes: a guard aborts any test that resolves a path outside the temporary directory, only the guard may read the home, CI runs the suite against a decoy `HOME`, and no agent instruction file directs a destructive command at the real home. Seven drift cases hold it. |
 | 2   | ✅     | [Declared dependency directions between crates (ENG-02)](phase-2.md)                                                                                                                                                                                                                 |
 |     | ↳      | Each crate's manifest declares its one responsibility and the crates it may depend on; a gate test fails naming both crates on a forbidden direction, and the ENG-02 scenario is off pending.                                                                                        |
-| 3   | 🔳     | [Deadlines on every blocking operation (ENG-03)](phase-3.md)                                                                                                                                                                                                                         |
+| 3   | ✅     | [Deadlines on every blocking operation (ENG-03)](phase-3.md)                                                                                                                                                                                                                         |
 |     | ↳      | The core's clippy configuration bans 15 blocking calls that take no deadline and a gate test holds every product crate to them; the stakeholder accepted its exemptions, and the ENG-03 scenario stays pending until M1 adds injectable I/O traits.                                  |
 | 4   | 🔳     | [The benchmark gate (ENG-15)](phase-4.md)                                                                                                                                                                                                                                            |
 |     | ↳      | The benchmark harness, its unit-proven Mann-Whitney gate and the PR job landed; ENG-15 stays pending until NFR-01..05 have benchmarks of real code.                                                                                                                                  |
@@ -137,10 +137,10 @@ footer: |
 - [x] Scenarios @ENG-02, @ENG-14 and @ENG-20 pass, off `@pending`;
   ENG-20 reworded to the workflows it reads, on the stakeholder's
   ruling of 2026-10-13 ([ruling])
-- [ ] @ENG-03 passes, off `@pending`: its gate tests pass and its
+- [x] @ENG-03 passes, off `@pending`: its gate tests pass and its
   drift cases are caught; the stakeholder accepted its exemptions on
-  2026-10-13 ([ruling]) and keeps it pending until M1 adds injectable
-  I/O traits; M1's phase 16 ([plan 2609292012][m1]) closes it
+  2026-10-13 ([ruling]) and kept it pending until M1 added injectable
+  I/O seams; M1's phase 16 ([plan 2609292012][m1]) closed it
 - [x] @ENG-21 passes, off `@pending`: the stakeholder ruled on
   2026-10-23 that the security-sensitive crates are owned by the
   security reviewer instead of needing two approvals, since one

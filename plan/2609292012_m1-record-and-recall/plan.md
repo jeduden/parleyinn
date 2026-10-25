@@ -275,7 +275,7 @@ footer: |
 |     | ↳      | @RCL-06, @REC-17 and @SEC-22 off @pending and passing; so are @RCL-08 and @REC-06, whose purged-range steps now run. A purge erases a range and records a tombstone in one transaction, a quarantine holds events out of recall by selector, and an ingest purges what a retention policy has aged out. @SEC-12 passes seven rows of eight and stays @pending: its flag row needs PRV-07 (M5).                         |
 | 15  | ✅     | [Operations: verify, status, audit, the boundary and the threat model](phase-15.md)                                                                                                                                                                                                                                                                                                                                    |
 |     | ↳      | @ADM-11, @OPS-01, @SEC-15, @SEC-17, @SEC-19 and @ENG-22 off @pending and passing. SEC-01's core row passes as gate tests. @ADM-09 passes seven rows of eight and stays @pending: no landmark exists before M2. The security and domain-model reviews are fixed or raised below.                                                                                                                                        |
-| 16  | 🔳     | [Exit: the engineering gates, the recall evaluation and the S12 rebuild test](phase-16.md)                                                                                                                                                                                                                                                                                                                             |
+| 16  | ✅     | [Exit: the engineering gates, the recall evaluation and the S12 rebuild test](phase-16.md)                                                                                                                                                                                                                                                                                                                             |
 |     | ↳      | @ENG-03, @ENG-07 and @ENG-11 off @pending and passing. parinn-eval recalls 216 of 216 planted values after one to three compactions within ten hits; the S12 rebuild test passes. @ENG-06, @ENG-09, @ENG-15, @ENG-23 and @ENG-29 stay @pending, each raised.                                                                                                                                                           |
 <?/catalog?>
 
@@ -284,24 +284,23 @@ footer: |
 - [ ] Every scenario of a row M1 lands in full passes, off `@pending`
 - [ ] Each row M1 lands in part has its M1 part proven, and its
   scenario names what keeps it pending
-- [ ] Recall of at least 95% after 1 to 3 compactions on the §11.1
+- [x] Recall of at least 95% after 1 to 3 compactions on the §11.1
   evaluation
 - [ ] `parinn verify` proves completeness, and quarantine is effective
-- [ ] Two writers' logs rebuild one search index identical in content
+- [x] Two writers' logs rebuild one search index identical in content
   in either order (S12)
-- [ ] A purged event leaves no value that confirms a guess at it
-- [ ] Every dependency M1 adds has an accepted ADR (ENG-18, ENG-26),
+- [x] A purged event leaves no value that confirms a guess at it
+- [x] Every dependency M1 adds has an accepted ADR (ENG-18, ENG-26),
   within the budget the stakeholder rules
-- [ ] ENG-11's coverage floors hold for every security-sensitive crate
-- [ ] The fuzz targets of ENG-07 run nightly from committed corpora
-- [ ] The six targets §12.3 assigns to M1 are frozen, each with its
+- [x] ENG-11's coverage floors hold for every security-sensitive crate
+- [x] The fuzz targets of ENG-07 run nightly from committed corpora
+- [x] The six targets §12.3 assigns to M1 are frozen, each with its
   evidence
-- [ ] @ENG-03 and @ENG-15 pass, closing plan 2609292011's phases 3
-  and 4
-- [ ] All tests pass: `cargo test --workspace`
-- [ ] `cargo clippy --workspace --all-targets --locked -- -D warnings`
+- [ ] @ENG-03 (passes) and @ENG-15 close plan 2609292011's 3 and 4
+- [x] All tests pass: `cargo test --workspace`
+- [x] `cargo clippy --workspace --all-targets --locked -- -D warnings`
   and `cargo fmt --all --check` are clean
-- [ ] `mdsmith check .` is clean
+- [x] `mdsmith check .` is clean
 
 [ADR-2610112209]: ../../docs/adr/ADR-2610112209-invariants-after-s1-s3.md
 [ADR-2610122234]: ../../docs/adr/ADR-2610122234-key-event-log.md
