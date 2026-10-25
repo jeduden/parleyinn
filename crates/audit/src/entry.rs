@@ -78,6 +78,10 @@ pub enum Counter {
     /// A principal's redaction pattern did not compile, or compiled past
     /// the size limit, and was refused (SEC-08).
     RedactionPatternRefused,
+    /// A text's redaction reached its scan limit, so none of the text
+    /// was written and a marker stands for it; once per text (SEC-08,
+    /// I9, I6).
+    RedactionScanLimited,
     /// A hook input exceeded 1 MiB and was refused (SEC-05).
     HookInputTooLarge,
     /// A hook input nested deeper than 64 levels and was refused
@@ -244,6 +248,7 @@ impl Counter {
             Self::PrincipalActRefused => "principal_act_refused",
             Self::Redacted => "redactions",
             Self::RedactionPatternRefused => "redaction_pattern_refused",
+            Self::RedactionScanLimited => "redaction_scan_limited",
             Self::HookInputTooLarge => "hook_input_too_large",
             Self::HookInputTooDeep => "hook_input_too_deep",
             Self::PathOutsideAllowedRoots => "path_outside_allowed_roots",

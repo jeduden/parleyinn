@@ -520,6 +520,26 @@ fn ingest_reports_a_transcript_it_cannot_read() {
 }
 
 #[test]
+fn ingest_audits_a_limited_redaction_apart_from_a_redaction() {
+    let p = Process::new();
+    let key = format!("AIza{}", "a".repeat(35));
+    let path = p.transcript(&format!("{{\"t\":\"{}\"}}\n", key.repeat(5_000)));
+
+    let (code, _, err) = p.invoke(&["ingest", "--path", &path], &DEV);
+
+    assert_eq!((code, err.as_str()), (EXIT_OK, ""));
+    let limited: Vec<_> = audited(&p)
+        .into_iter()
+        .filter(|e| e.counter.as_deref() == Some("redaction_scan_limited"))
+        .map(|e| (e.kind, e.detail))
+        .collect();
+    assert_eq!(
+        limited,
+        [("dropped".to_owned(), crate::SCAN_LIMITED_DETAIL.to_owned())]
+    );
+}
+
+#[test]
 fn ingest_audits_and_counts_each_unparsed_line_and_format_drift() {
     let p = Process::new();
     let path = p.transcript("{not json\n{\"type\":\"future_kind\"}\n");
@@ -2367,6 +2387,34 @@ fn ingest_says_which_redaction_it_cannot_audit_and_still_records() {
 }
 
 #[test]
+fn ingest_says_which_limited_redaction_it_cannot_audit_and_still_records() {
+    let p = Process::new();
+    let (code, _, _) = p.invoke(&["ingest", "--path", &p.transcript("a\n")], &DEV);
+    assert_eq!(code, EXIT_OK);
+    let audit_dir = p.parinn_home().join("audit");
+    std::fs::remove_dir_all(&audit_dir).unwrap();
+    std::fs::write(&audit_dir, "").unwrap();
+    set_mode(&audit_dir, 0o600);
+    let chain = format!("AIza{}", "a".repeat(35)).repeat(5_000);
+
+    let (code, out, err) = p.invoke(
+        &[
+            "ingest",
+            "--path",
+            &p.transcript(&format!("{{\"t\":\"{chain}\"}}\n")),
+        ],
+        &DEV,
+    );
+
+    assert_eq!(code, EXIT_OK, "{err}");
+    assert!(out.starts_with("ingested 1 lines"), "{out}");
+    assert!(
+        err.contains("parinn ingest: audit a limited redaction: "),
+        "{err}"
+    );
+}
+
+#[test]
 fn a_hook_input_past_1_mib_is_audited_and_injects_nothing() {
     let mut p = Process::new();
     p.lines = vec![
@@ -3577,4 +3625,23 @@ fn status_reports_the_session_bindings_in_text_and_json_once_any_was_observed() 
         text.contains("MCP server: none has taken a session binding on this node (1 untaken)"),
         "{text}"
     );
+}
+
+#[test]
+fn limited_log_fields_are_audited_one_entry_each() {
+    let p = Process::new();
+    p.invoke(&["ingest", "--path", &p.transcript("a\n")], &DEV);
+    let before = audited(&p).len();
+    let ctx = crate::settings::tests::ctx_of(&p);
+
+    audit_limited_log_fields(&ctx, 2);
+
+    let entries = audited(&p);
+    assert_eq!(entries.len(), before + 2);
+    assert_eq!(entries[before].kind, "dropped");
+    assert_eq!(
+        entries[before].counter.as_deref(),
+        Some("redaction_scan_limited")
+    );
+    assert_eq!(entries[before].detail, crate::SCAN_LIMITED_DETAIL);
 }

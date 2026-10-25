@@ -717,6 +717,7 @@ fn audit_index_gaps(ctx: &Context, ingested: &ingest::Ingested, stderr: &mut dyn
 /// format drift, and logs it.
 fn record_ingested(ctx: &Context, ingested: &ingest::Ingested, stderr: &mut dyn Write) {
     audit_redactions(ctx, &ingested.redactions, stderr);
+    audit_scan_limited(ctx, ingested.scan_limited, stderr);
     audit_parsing(ctx, ingested, stderr);
     audit_sourcing(ctx, ingested, stderr);
     audit_prompts(ctx, ingested, stderr);
@@ -726,6 +727,7 @@ fn record_ingested(ctx: &Context, ingested: &ingest::Ingested, stderr: &mut dyn 
         writer = %ingested.writer,
         events = ingested.events as u64,
         redactions = ingested.redactions.len() as u64,
+        redaction_scan_limited = ingested.scan_limited as u64,
         unparsed = ingested.unparsed as u64,
         format_drift = ingested.drifts.len() as u64,
         "ingested"
@@ -1069,6 +1071,39 @@ fn audit_redactions(ctx: &Context, rules: &[String], stderr: &mut dyn Write) {
         if let Err(e) = ctx.audit(&occurrence) {
             let _ = writeln!(stderr, "parinn ingest: audit a redaction: {e}");
         }
+    }
+}
+
+/// What the audit says of a text whose redaction scan limit was reached.
+pub(crate) const SCAN_LIMITED_DETAIL: &str =
+    "a text's redaction scan limit was reached; none of it was written, a marker stands for it";
+
+/// The occurrence of a text whose redaction scan limit was reached, in
+/// `operation` (SEC-08, I9, I6).
+pub(crate) fn scan_limited_occurrence(operation: &'static str) -> Occurrence<'static> {
+    Occurrence::Degraded {
+        kind: Kind::Dropped,
+        counter: Counter::RedactionScanLimited,
+        operation,
+        detail: SCAN_LIMITED_DETAIL,
+    }
+}
+
+/// Audits each text whose redaction scan limit was reached in `ingest`,
+/// a dropped text and not a redaction (SEC-08, I9, I6).
+fn audit_scan_limited(ctx: &Context, texts: usize, stderr: &mut dyn Write) {
+    let occurrence = scan_limited_occurrence("ingest");
+    for _ in 0..texts {
+        if let Err(e) = ctx.audit(&occurrence) {
+            let _ = writeln!(stderr, "parinn ingest: audit a limited redaction: {e}");
+        }
+    }
+}
+
+/// Audits each log field that reached the redaction scan limit.
+pub fn audit_limited_log_fields(ctx: &Context, limited: u64) {
+    for _ in 0..limited {
+        let _ = ctx.audit(&scan_limited_occurrence("log"));
     }
 }
 

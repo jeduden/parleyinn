@@ -218,6 +218,36 @@ fn the_redacted_path_is_redacted_like_the_lines() {
 }
 
 #[test]
+fn a_line_that_reaches_the_scan_limit_is_held_back_and_counted() {
+    let dir = TempDir::new().unwrap();
+    let home = home(&dir);
+    let key = format!("AIza{}", "a".repeat(35));
+    let line = format!(r#"{{"message":{{"content":"{}tail"}}}}"#, key.repeat(5_000));
+    let path = transcript(&dir, &format!("{line}\n"));
+    let (redactor, _) = Redactor::new(&[]).unwrap();
+
+    let ingested = ingest_path(&home, &path, &redactor, &mut OsEntropy).unwrap();
+
+    assert_eq!(ingested.scan_limited, 1);
+    assert!(ingested.redactions.is_empty());
+    let store = Store::open(&home.store()).unwrap();
+    let log = store.log(ingested.writer).unwrap();
+    let text = log[0].content.clone().unwrap()["text"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    assert_eq!(
+        text,
+        format!(
+            r#"{{"message":{{"content":"{}"}}}}"#,
+            redaction::SCAN_LIMIT_MARKER
+        )
+    );
+    let bytes = std::fs::read(home.store()).unwrap();
+    assert!(!bytes.windows(4).any(|w| w == b"AIza"));
+}
+
+#[test]
 fn every_line_is_redacted_before_anything_is_written() {
     let dir = TempDir::new().unwrap();
     let home = home(&dir);
@@ -1420,4 +1450,26 @@ fn an_ingest_reports_the_search_index_gaps_not_yet_reported_and_only_those() {
     std::fs::write(&third, "{\"c\":3}\n").unwrap();
     let third = ingest_path(&home, &third, &redactor(), &mut OsEntropy).unwrap();
     assert!(third.index_gaps.is_empty());
+}
+
+#[test]
+fn a_drift_description_that_reaches_the_scan_limit_is_counted() {
+    let dir = TempDir::new().unwrap();
+    let home = home(&dir);
+    let key = format!("AIza{}", "a".repeat(35));
+    let line = format!(r#"{{"type":"user","version":"{}"}}"#, key.repeat(5_000));
+    let path = transcript(&dir, &format!("{line}\n"));
+    let (redactor, _) = Redactor::new(&[]).unwrap();
+
+    let ingested = ingest_path(&home, &path, &redactor, &mut OsEntropy).unwrap();
+
+    assert_eq!(
+        ingested.scan_limited, 2,
+        "the line and its drift description"
+    );
+    assert!(
+        ingested.drifts[0].contains("redaction_scan_limit"),
+        "{:?}",
+        ingested.drifts
+    );
 }

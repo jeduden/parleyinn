@@ -40,8 +40,16 @@ summary: >-
   hook handler's time limit (§9.1, NFR-02); the **step budget** how many steps a
   kernel execution may take (CMP-05); and the delegation budget. A limit keeps
   its own name, such as the **restore block limit** (INJ-07), CMP-05's
-  wall-clock and memory limits, SEC-04's query deadline and the output caps
-  (RCL-03, CMP-06). I9's defined budgets are these named budgets and limits;
+  wall-clock and memory limits, SEC-04's query deadline, the output caps
+  (RCL-03, CMP-06) and SEC-08's **redaction scan limit**: eight times a text's
+  length, the most one redaction reads of it (I9). A text that reaches it is
+  not written: a fixed marker, which names the limit and no rule, stands for
+  it, and it is counted, as a dropped operation (I6), as
+  `redaction_scan_limited`, not `redactions`. In a transcript line only the
+  string that reaches it is replaced. The count
+  covers each text written to the record, the audit log or the log; a text
+  only hashed or compared is not counted. I9's defined
+  budgets are these named budgets and limits;
   the latency targets of NFR-01, NFR-03 and NFR-15 are targets, not budgets,
   and the harness's own limit on a hook is the **harness timeout**, never a
   budget.
