@@ -23,7 +23,7 @@ Feature: Engineering quality (ENG)
     Then the architecture check fails naming both crates
     And every library crate has exactly one declared responsibility
 
-  @ENG-03 @P0 @pending
+  @ENG-03 @P0
   Scenario: no mutable global state, injectable I/O and deadlines everywhere
     Given the repository's code
     When the static analyzers run

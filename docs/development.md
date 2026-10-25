@@ -109,8 +109,10 @@ them, and the hook's time budget (I9) covers them. Nor are
 `Mutex` and `RwLock`. The engineering gate test
 `the_product_crates_keep_their_bans` requires every product crate's
 clippy.toml to carry every ban. The ENG-03 scenario reads the same
-bans, and stays `@pending` until the stakeholder rules on what the
-list exempts.
+bans. The stakeholder accepted the exemptions on 13 October 2026. I/O
+sits behind seams a test injects: the key store, entropy, the host
+identity, the payload disk, the process table, the run lookup, and the
+log sink and clock.
 
 ## CI, nightly and release
 

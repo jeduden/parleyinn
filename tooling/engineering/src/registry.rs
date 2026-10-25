@@ -21,8 +21,8 @@ pub const CHECKOUT_STEP: &str = "the repository checkout";
 /// the suite with, and the scan of the agent instruction files; and the
 /// gates that prove what a pending scenario cannot yet: the core rows
 /// of ENG-12 and ENG-16, ENG-15's benchmark gate, and ENG-21's ruleset
-/// and CODEOWNERS; and the gates behind ENG-03, pending until M1 adds
-/// injectable I/O traits, ENG-20's three workflow gates, the gate that
+/// and CODEOWNERS; and the gates behind ENG-03, ENG-20's three
+/// workflow gates, the gate that
 /// holds every crate to the complexity limits, and the gate that holds
 /// CI to the TOML checks; and the gates behind SEC-01's core row,
 /// SEC-15, SEC-17, SEC-19 and ENG-22.
