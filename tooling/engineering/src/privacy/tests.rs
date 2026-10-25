@@ -115,6 +115,27 @@ fn documentation_is_security_md_and_the_markdown_in_the_named_directories() {
 }
 
 #[test]
+fn findings_keep_an_uncited_statement_apart_from_an_unresolved_citation() {
+    let at = |line, cites: &[&str]| Statement {
+        file: "SECURITY.md".to_owned(),
+        line,
+        cites: cites.iter().map(|c| (*c).to_owned()).collect(),
+    };
+    let tests = [("it_holds".to_owned(), true)];
+    // A citation whose text reads like another check's problem is still
+    // a citation that does not resolve, never an uncited statement.
+    let statements = [at(1, &[]), at(2, &["cites no test"]), at(3, &["it_holds"])];
+
+    let found = findings(&statements, &tests, &[]);
+
+    assert_eq!(found.uncited, [at(1, &[])]);
+    assert_eq!(
+        found.unresolved,
+        [(at(2, &["cites no test"]), "cites no test".to_owned())]
+    );
+}
+
+#[test]
 fn every_statement_must_cite_a_test_that_exists() {
     let (dir, c) = checkout(&[
         ("crates/t.rs", TESTS),

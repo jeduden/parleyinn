@@ -209,33 +209,74 @@ pub fn all(c: &Checkout) -> Result<Vec<Statement>, String> {
     Ok(out)
 }
 
-/// Requires each statement to cite at least one test, and every test it
-/// cites to exist.
+/// What the check finds of the statements, by kind: each that cites no
+/// test, and each citation that resolves to no test that exists and
+/// runs, with its statement.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct Findings {
+    pub uncited: Vec<Statement>,
+    pub unresolved: Vec<(Statement, String)>,
+}
+
+/// Sorts `statements` into [`Findings`], given the workspace's test
+/// functions and the scenarios' pending states.
 #[must_use]
-pub fn proven(c: &Checkout, scenarios: &[(String, bool)]) -> Vec<String> {
-    let (found, tests) = match (all(c), test_functions(c)) {
-        (Ok(found), Ok(tests)) => (found, tests),
-        (Err(e), _) | (_, Err(e)) => return vec![e],
-    };
-    let mut problems = Vec::new();
-    for s in found {
+pub fn findings(
+    statements: &[Statement],
+    tests: &[(String, bool)],
+    scenarios: &[(String, bool)],
+) -> Findings {
+    let mut found = Findings::default();
+    for s in statements {
         if s.cites.is_empty() {
-            problems.push(format!(
-                "{}:{}: a privacy statement cites no test",
-                s.file, s.line
-            ));
+            found.uncited.push(s.clone());
         }
         for cite in &s.cites {
-            if !resolves(&tests, scenarios, cite) {
-                problems.push(format!(
-                    "{}:{}: cites {cite}, which is no test that exists and runs",
-                    s.file, s.line
-                ));
+            if !resolves(tests, scenarios, cite) {
+                found.unresolved.push((s.clone(), cite.clone()));
             }
         }
     }
 
-    problems
+    found
+}
+
+/// The [`Findings`] of the checkout's documentation.
+///
+/// # Errors
+///
+/// Fails when a documentation or Rust file cannot be read.
+pub fn checked(c: &Checkout, scenarios: &[(String, bool)]) -> Result<Findings, String> {
+    Ok(findings(&all(c)?, &test_functions(c)?, scenarios))
+}
+
+impl Findings {
+    /// One problem line per finding, uncited statements first.
+    #[must_use]
+    pub fn problems(&self) -> Vec<String> {
+        let uncited = self
+            .uncited
+            .iter()
+            .map(|s| format!("{}:{}: a privacy statement cites no test", s.file, s.line));
+        let unresolved = self.unresolved.iter().map(|(s, cite)| {
+            format!(
+                "{}:{}: cites {cite}, which is no test that exists and runs",
+                s.file, s.line
+            )
+        });
+
+        uncited.chain(unresolved).collect()
+    }
+}
+
+/// Requires each statement to cite at least one test, and every test it
+/// cites to exist.
+#[must_use]
+pub fn proven(c: &Checkout, scenarios: &[(String, bool)]) -> Vec<String> {
+    match checked(c, scenarios) {
+        Ok(found) => found.problems(),
+        Err(e) => vec![e],
+    }
 }
 
 /// The scenarios of the checkout, each by id and whether it is pending.
