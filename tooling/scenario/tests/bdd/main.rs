@@ -44,6 +44,7 @@ mod provenance_policy;
 mod provenance_seats;
 mod provenance_tool_calls;
 mod provenance_trust;
+mod recall;
 mod record;
 mod record_homes;
 mod record_hooks;

@@ -50,7 +50,7 @@ pub struct Reply {
 
 impl Reply {
     /// The envelope's items; none for a refusal.
-    fn items(&self) -> Vec<Value> {
+    pub fn items(&self) -> Vec<Value> {
         serde_json::from_str::<Value>(&self.text)
             .ok()
             .and_then(|e| e["items"].as_array().cloned())
@@ -78,7 +78,15 @@ fn reply(w: &mut World) -> Result<Reply, String> {
 
 /// Asks the MCP server `parinn mcp` for `event_search` with `arguments`,
 /// the scope `room` unless they name one, and keeps its answer.
-pub fn call_search(w: &mut World, mut arguments: Value) -> Result<Reply, String> {
+pub fn call_search(w: &mut World, arguments: Value) -> Result<Reply, String> {
+    call_tool(w, "event_search", arguments)
+}
+
+/// Asks the MCP server `parinn mcp` for the recall tool `tool` with
+/// `arguments`, the scope `room` unless they name one: no run is bound
+/// to a server started here, so only `room` is served (RCL-05). Keeps
+/// its answer for the steps that read the last recall result.
+pub fn call_tool(w: &mut World, tool: &str, mut arguments: Value) -> Result<Reply, String> {
     if arguments.get("scope").is_none() {
         arguments["scope"] = json!("room");
     }
@@ -86,7 +94,7 @@ pub fn call_search(w: &mut World, mut arguments: Value) -> Result<Reply, String>
         json!({"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {"protocolVersion": "2025-06-18"}}),
         json!({"jsonrpc": "2.0", "method": "notifications/initialized"}),
         json!({"jsonrpc": "2.0", "id": 2, "method": "tools/call", "params": {
-            "name": "event_search", "arguments": arguments,
+            "name": tool, "arguments": arguments,
         }}),
     ];
     let input: String = requests.iter().map(|r| format!("{r}\n")).collect();
@@ -100,7 +108,7 @@ pub fn call_search(w: &mut World, mut arguments: Value) -> Result<Reply, String>
         .iter()
         .find(|r| r["id"] == 2)
         .map(|r| &r["result"])
-        .ok_or_else(|| format!("event_search answered nothing: {replies:?}"))?;
+        .ok_or_else(|| format!("{tool} answered nothing: {replies:?}"))?;
     let answer = Reply {
         is_error: result["isError"] == true,
         text: result["content"][0]["text"]
@@ -111,6 +119,11 @@ pub fn call_search(w: &mut World, mut arguments: Value) -> Result<Reply, String>
     steps(w).reply = Some(answer.clone());
 
     Ok(answer)
+}
+
+/// The answer of the last recall call.
+pub fn last_reply(w: &mut World) -> Result<Reply, String> {
+    reply(w)
 }
 
 /// The words a query description stands for: the scenario names a
@@ -135,7 +148,7 @@ fn query_of(w: &mut World, described: &str) -> String {
 
 /// The arguments the step text names: `key value` pairs, a value any
 /// JSON value, separated by commas.
-fn arguments_of(w: &mut World, text: &str) -> Result<Value, String> {
+pub fn arguments_of(w: &mut World, text: &str) -> Result<Value, String> {
     let mut arguments = json!({});
     let mut rest = text.trim();
     while !rest.is_empty() {
@@ -162,12 +175,13 @@ fn arguments_of(w: &mut World, text: &str) -> Result<Value, String> {
 
 #[when(regex = r#"^the agent calls the MCP tool "event_search" with (.+)$"#)]
 fn calls_event_search(w: &mut World, args: String) -> Result<(), String> {
+    crate::recall::record_runs(w)?;
     let arguments = arguments_of(w, &args)?;
     call_search(w, arguments).map(drop)
 }
 
 /// A typed user line saying `text`, its own `uuid` `n`.
-fn user_line(text: &str, n: u64) -> Result<Value, String> {
+pub fn user_line(text: &str, n: u64) -> Result<Value, String> {
     let mut line = typed()?;
     line["message"]["content"] = json!(text);
     line["uuid"] = json!(format!("00000000-0000-4000-8000-0000000012{n:02}"));

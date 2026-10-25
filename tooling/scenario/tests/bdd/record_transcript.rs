@@ -102,10 +102,19 @@ fn tool_use_id(line: &Value, tool: &str) -> Option<String> {
     .flatten()
 }
 
-/// The counts of every counter the audit log holds now.
+/// The counts of every counter the audit log holds now, and of
+/// `recall_calls`, which is no audit counter, since it would fail
+/// `parinn doctor` on every recall: it is the recall events the record
+/// holds, the count `stat_list` derives (RCL-07).
 fn counts(w: &World) -> Result<BTreeMap<String, u64>, String> {
     let audit = home(w)?.audit();
     let mut out = BTreeMap::new();
+    if home(w)?.store().exists() {
+        let recalls = crate::recall::recall_events(w)?.len() as u64;
+        if recalls > 0 {
+            out.insert("recall_calls".to_owned(), recalls);
+        }
+    }
     if !audit.exists() {
         return Ok(out);
     }

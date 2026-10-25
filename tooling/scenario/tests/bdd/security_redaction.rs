@@ -48,6 +48,11 @@ pub(crate) fn transcript(w: &mut World, name: &str) -> Result<PathBuf, String> {
         .ok_or_else(|| format!("no agent run left a transcript {name:?}"))
 }
 
+/// Every transcript a step named, by name, in the order named.
+pub(crate) fn transcripts(w: &mut World) -> Vec<(String, PathBuf)> {
+    red(w).transcripts.clone()
+}
+
 /// Names the transcript at `path` `name`, in place of any it named.
 pub(crate) fn name_transcript(w: &mut World, name: &str, path: PathBuf) {
     let transcripts = &mut red(w).transcripts;

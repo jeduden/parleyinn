@@ -5,7 +5,7 @@ Feature: Recall (RCL)
   declared but not yet written: its steps are bound when the plan that
   implements the requirement lands.
 
-  @RCL-01 @P0 @I1 @pending
+  @RCL-01 @P0 @I1
   Scenario: the MCP server's tool list includes the six P0 recall tools
     Given an isolated ParleyInn home
     And an agent run with a Claude Code transcript "short-run"
@@ -40,7 +40,7 @@ Feature: Recall (RCL)
       | query "deploy", since "2026-01-01"   | 10   |
       | query "deploy", until "2026-06-30"   | 10   |
 
-  @RCL-03 @P0 @I1 @pending
+  @RCL-03 @P0 @I1
   Scenario: event expand returns exact post-redaction content under the model-token cap
     Given an isolated ParleyInn home
     And an agent run with a Claude Code transcript "large-payloads"
@@ -50,7 +50,7 @@ Feature: Recall (RCL)
     And the envelope is at most 8,000 estimated model tokens with "truncated" true and a "next_cursor"
     And calling "event_expand" with that cursor returns the following events without gap or overlap
 
-  @RCL-04 @P0 @I2 @pending
+  @RCL-04 @P0 @I2
   Scenario Outline: every recall tool wraps its content in the envelope
     Given an isolated ParleyInn home
     And an agent run with a Claude Code transcript "mixed-provenance"
@@ -86,7 +86,7 @@ Feature: Recall (RCL)
     Then the recall result is wrapped in the envelope
     And no item has address A1·12 and no item lies in A1·30–40, which appears as a tombstone with reason "purged"
 
-  @RCL-07 @P0 @I6 @pending
+  @RCL-07 @P0 @I6
   Scenario: every recall call is appended to the record
     Given an isolated ParleyInn home
     And an agent run with a Claude Code transcript "short-run"
