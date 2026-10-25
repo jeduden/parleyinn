@@ -186,6 +186,16 @@ fn render(envelope: &Value) -> String {
             inline(tombstone["reason"].as_str().unwrap_or_default()),
         ));
     }
+    for marker in envelope["quarantine_markers"]
+        .as_array()
+        .into_iter()
+        .flatten()
+    {
+        out.push_str(&format!(
+            "\nquarantine marker {}\n",
+            inline(marker["range"].as_str().unwrap_or_default()),
+        ));
+    }
     if let Some(cursor) = envelope["next_cursor"].as_str() {
         out.push_str(&format!(
             "\ncut at the cap: continue with --cursor {}\n",

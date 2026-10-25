@@ -10,8 +10,8 @@
 )]
 
 use envelope::{
-    Continuation, Envelope, IntegrityStatus, Item, Origin, Run, Tombstone, TombstoneReason,
-    TrustLevel, WARNING,
+    Continuation, Envelope, IntegrityStatus, Item, Origin, QuarantineMarker, Run, Tombstone,
+    TombstoneReason, TrustLevel, WARNING,
 };
 use serde_json::Value;
 
@@ -45,6 +45,7 @@ fn envelope(items: Vec<Item>) -> Envelope {
     Envelope {
         items,
         tombstones: vec![],
+        quarantine_markers: vec![],
         truncated: false,
         next_cursor: None,
         structural: None,
@@ -119,6 +120,36 @@ fn a_tombstone_stands_for_a_purged_range() {
 }
 
 #[test]
+fn a_quarantine_marker_is_its_range_alone_beside_a_retention_tombstone() {
+    let both = Envelope {
+        tombstones: vec![
+            Tombstone {
+                range: "A1·1200–1450".into(),
+                reason: TombstoneReason::Purged,
+            },
+            Tombstone {
+                range: "A1·1500–1510".into(),
+                reason: TombstoneReason::Retention,
+            },
+        ],
+        quarantine_markers: vec![
+            QuarantineMarker {
+                range: "A1·12".into(),
+            },
+            QuarantineMarker {
+                range: "A1·20–22".into(),
+            },
+        ],
+        ..envelope(vec![item("parinn:room/r1/w/4f2a/3", "kept")])
+    };
+
+    assert_eq!(
+        both.render(),
+        golden("quarantine_markers").trim_end_matches('\n')
+    );
+}
+
+#[test]
 fn a_structural_envelope_holds_counts_alone() {
     let counts = Envelope {
         structural: Some(vec![("events", 40), ("runs", 2), ("recalls", 3)]),
@@ -138,6 +169,7 @@ fn the_golden_files_carry_the_warning() {
         "structural",
         "continued",
         "tombstones",
+        "quarantine_markers",
     ] {
         let parsed: Value = serde_json::from_str(&golden(name)).unwrap();
         assert_eq!(parsed["warning"], WARNING, "{name}");
@@ -171,6 +203,9 @@ fn the_round_trip_holds_for_the_optional_fields_too() {
             tombstones: vec![Tombstone {
                 range: content.clone(),
                 reason: TombstoneReason::Purged,
+            }],
+            quarantine_markers: vec![QuarantineMarker {
+                range: content.clone(),
             }],
             structural: Some(vec![("events", seed), ("runs", 1)]),
             ..envelope(vec![hit])

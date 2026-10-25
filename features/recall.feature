@@ -85,6 +85,8 @@ Feature: Recall (RCL)
     When the agent calls the MCP tool "event_expand" with range "A1:1-50"
     Then the recall result is wrapped in the envelope
     And no item has address A1·12 and no item lies in A1·30–40, which appears as a tombstone with reason "purged"
+    And A1·12 appears as a quarantine marker carrying no reason, and not as a tombstone
+    And a retention-purged range appears as a tombstone with reason "retention"
 
   @RCL-07 @P0 @I6
   Scenario: every recall call is appended to the record

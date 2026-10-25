@@ -10,10 +10,11 @@ use envelope::Envelope;
 use serde_json::Value;
 
 /// The fields every envelope has; a structural one adds `structural`.
-const CLOSED: [&str; 6] = [
+const CLOSED: [&str; 7] = [
     "items",
     "next_cursor",
     "parinn_envelope",
+    "quarantine_markers",
     "tombstones",
     "truncated",
     "warning",
@@ -49,6 +50,14 @@ pub fn check(envelope: &Envelope, contents: &[&str]) {
     }
     for tombstone in parsed["tombstones"].as_array().expect("tombstones") {
         assert_eq!(tombstone.as_object().expect("a tombstone").len(), 2);
+    }
+    for marker in parsed["quarantine_markers"]
+        .as_array()
+        .expect("quarantine_markers")
+    {
+        // The range alone: nothing else names why it is held back.
+        assert_eq!(marker.as_object().expect("a marker").len(), 1);
+        assert!(marker["range"].is_string());
     }
     if let Some(counts) = &envelope.structural {
         let shown = parsed["structural"].as_object().expect("structural");
@@ -103,7 +112,8 @@ pub fn content(seed: u64) -> String {
 /// content back exactly.
 pub fn encode(data: &[u8]) {
     use envelope::{
-        Continuation, IntegrityStatus, Item, Origin, Run, Tombstone, TombstoneReason, TrustLevel,
+        Continuation, IntegrityStatus, Item, Origin, QuarantineMarker, Run, Tombstone,
+        TombstoneReason, TrustLevel,
     };
 
     let text = String::from_utf8_lossy(data);
@@ -142,9 +152,21 @@ pub fn encode(data: &[u8]) {
         tombstones: parts
             .iter()
             .take(data.len() % 3)
-            .map(|range| Tombstone {
+            .enumerate()
+            .map(|(n, range)| Tombstone {
                 range: (*range).to_owned(),
-                reason: TombstoneReason::Purged,
+                reason: if n % 2 == 0 {
+                    TombstoneReason::Purged
+                } else {
+                    TombstoneReason::Retention
+                },
+            })
+            .collect(),
+        quarantine_markers: parts
+            .iter()
+            .take(data.len() % 4)
+            .map(|range| QuarantineMarker {
+                range: (*range).to_owned(),
             })
             .collect(),
         truncated: cursor.is_some(),

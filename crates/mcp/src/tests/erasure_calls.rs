@@ -1,6 +1,7 @@
 //! What the recall tools show of a purged and a quarantined address
-//! (RCL-06, SEC-12): a tombstone of its reason in place of the event,
-//! never its content, and no search hit.
+//! (RCL-06, SEC-12): a purged one as a tombstone of its reason, a
+//! quarantined one as a quarantine marker of its range alone, never
+//! its content, and no search hit.
 
 use super::recall_calls::device;
 use super::*;
@@ -22,15 +23,14 @@ fn seq(n: u64) -> Seq {
 
 /// Purges events `first` to `last` of the fixture's run.
 fn purge(f: &Fixture, first: u64, last: u64) {
+    purge_for(f, first, last, &Reason::Purged);
+}
+
+/// The same, for `reason`.
+fn purge_for(f: &Fixture, first: u64, last: u64, reason: &Reason) {
     let mut store = Store::open(&f.home.store()).unwrap();
     let node = Node::find(&f.home, &store).unwrap();
-    let planned = purge::plan(
-        &store,
-        f.ingested.writer,
-        seq(first),
-        seq(last),
-        &Reason::Purged,
-    );
+    let planned = purge::plan(&store, f.ingested.writer, seq(first), seq(last), reason);
     let Planned::Ready(plan) = planned.unwrap() else {
         panic!("refused");
     };
@@ -65,6 +65,10 @@ fn tombstones(envelope: &Value) -> Vec<(String, String)> {
             )
         })
         .collect()
+}
+
+fn markers(envelope: &Value) -> Vec<Value> {
+    envelope["quarantine_markers"].as_array().unwrap().clone()
 }
 
 fn expand(server: &mut Server, range: &str) -> Value {
@@ -109,7 +113,7 @@ fn a_purged_range_shows_as_one_tombstone_between_the_events_around_it() {
 }
 
 #[test]
-fn a_single_purged_address_shows_as_its_short_form_and_a_quarantined_one_as_quarantined() {
+fn a_single_purged_address_is_a_tombstone_and_a_quarantined_one_a_marker_of_its_range_alone() {
     let f = ten();
     purge(&f, 2, 2);
     quarantine(&f, 4, 4);
@@ -119,11 +123,9 @@ fn a_single_purged_address_shows_as_its_short_form_and_a_quarantined_one_as_quar
 
     assert_eq!(
         tombstones(&envelope),
-        [
-            ("A1·2".to_owned(), "purged".to_owned()),
-            ("A1·4".to_owned(), "quarantined".to_owned()),
-        ]
+        [("A1·2".to_owned(), "purged".to_owned())]
     );
+    assert_eq!(markers(&envelope), [json!({"range": "A1·4"})]);
     assert_eq!(envelope["items"].as_array().unwrap().len(), 3);
     let get = super::recall_calls::tool(
         &mut server,
@@ -132,10 +134,8 @@ fn a_single_purged_address_shows_as_its_short_form_and_a_quarantined_one_as_quar
     );
     let got = envelope_of(&get);
     assert_eq!(got["items"], json!([]));
-    assert_eq!(
-        tombstones(&got),
-        [("A1·4".to_owned(), "quarantined".to_owned())]
-    );
+    assert_eq!(tombstones(&got), []);
+    assert_eq!(markers(&got), [json!({"range": "A1·4"})]);
     assert!(!get.to_string().contains("needle"));
 }
 
@@ -158,12 +158,10 @@ fn a_quarantine_holds_back_events_recorded_after_it_and_its_release_gives_them_b
     let held = expand(&mut server, &format!("{writer}:9-10"));
 
     assert_eq!(held["items"], json!([]));
+    assert_eq!(tombstones(&held), []);
     assert_eq!(
-        tombstones(&held),
-        [(
-            format!("parinn:room/{}/w/{writer}/9-10", f.ingested.room),
-            "quarantined".to_owned()
-        )]
+        markers(&held),
+        [json!({"range": format!("parinn:room/{}/w/{writer}/9-10", f.ingested.room)})]
     );
     let mut store = Store::open(&f.home.store()).unwrap();
     let node = Node::find(&f.home, &store).unwrap();
@@ -177,6 +175,29 @@ fn a_quarantine_holds_back_events_recorded_after_it_and_its_release_gives_them_b
     let released = expand(&mut server, &format!("{writer}:9-10"));
     assert_eq!(released["items"].as_array().unwrap().len(), 2);
     assert_eq!(released["tombstones"], json!([]));
+    assert_eq!(released["quarantine_markers"], json!([]));
+}
+
+#[test]
+fn a_retention_purge_shows_retention_and_a_purged_quarantined_address_only_a_tombstone() {
+    let f = ten();
+    let retention = Reason::Retention {
+        policy: "retention.max_age".to_owned(),
+    };
+    purge_for(&f, 2, 3, &retention);
+    quarantine(&f, 3, 4);
+    let mut server = super::recall_calls::recording(&f);
+
+    let envelope = expand(&mut server, "A1:1-5");
+
+    assert_eq!(
+        tombstones(&envelope),
+        [("A1·2–3".to_owned(), "retention".to_owned())]
+    );
+    assert_eq!(markers(&envelope), [json!({"range": "A1·4"})]);
+    let clipped = expand(&mut server, "A1:4-5");
+    assert_eq!(tombstones(&clipped), []);
+    assert_eq!(markers(&clipped), [json!({"range": "A1·4"})]);
 }
 
 #[test]
