@@ -121,13 +121,13 @@ impl Continuation {
     }
 }
 
-/// Why a range is not shown (§9.3).
+/// Why a purged range is not shown (§9.3).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TombstoneReason {
-    /// A purge erased the range's content (ADM-07).
+    /// The principal purged the range's content (ADM-07).
     Purged,
-    /// A quarantine holds the range back, its content kept (SEC-12).
-    Quarantined,
+    /// A retention policy purged the range's content (REC-15, SEC-22).
+    Retention,
 }
 
 impl TombstoneReason {
@@ -136,13 +136,13 @@ impl TombstoneReason {
     pub fn as_str(self) -> &'static str {
         match self {
             Self::Purged => "purged",
-            Self::Quarantined => "quarantined",
+            Self::Retention => "retention",
         }
     }
 }
 
-/// A range of addresses the envelope shows in place of events it holds
-/// no content of.
+/// A range of purged addresses the envelope shows in place of events it
+/// holds no content of.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Tombstone {
     /// The range, as ParleyInn renders addresses.
@@ -161,6 +161,25 @@ impl Tombstone {
 
     fn to_value(&self) -> Value {
         json!({"range": self.range, "reason": self.reason.as_str()})
+    }
+}
+
+/// A range of quarantined addresses the envelope holds back: the range
+/// and nothing else, so no reason, selector, principal, time or policy
+/// reaches the model (I8, RCL-04).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct QuarantineMarker {
+    /// The range, as ParleyInn renders addresses.
+    pub range: String,
+}
+
+impl QuarantineMarker {
+    fn render(&self) -> String {
+        format!("{{\"range\":{}}}", Value::from(self.range.as_str()))
+    }
+
+    fn to_value(&self) -> Value {
+        json!({"range": self.range})
     }
 }
 
@@ -253,8 +272,10 @@ impl Item {
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct Envelope {
     pub items: Vec<Item>,
-    /// The ranges shown in place of events (§9.3).
+    /// The purged ranges shown in place of events (§9.3).
     pub tombstones: Vec<Tombstone>,
+    /// The quarantined ranges held back, shown as ranges alone (§9.3).
+    pub quarantine_markers: Vec<QuarantineMarker>,
     /// Whether the call's limit cut the items short.
     pub truncated: bool,
     /// Where a further call continues, when truncated.
@@ -274,6 +295,7 @@ impl Envelope {
             "warning": WARNING,
             "items": self.items.iter().map(Item::to_value).collect::<Vec<_>>(),
             "tombstones": self.tombstones.iter().map(Tombstone::to_value).collect::<Vec<_>>(),
+            "quarantine_markers": self.quarantine_markers.iter().map(QuarantineMarker::to_value).collect::<Vec<_>>(),
             "truncated": self.truncated,
             "next_cursor": self.next_cursor,
         });
@@ -302,11 +324,18 @@ impl Envelope {
 
         let tombstones: Vec<String> = self.tombstones.iter().map(Tombstone::render).collect();
 
+        let markers: Vec<String> = self
+            .quarantine_markers
+            .iter()
+            .map(QuarantineMarker::render)
+            .collect();
+
         format!(
-            "{{\"parinn_envelope\":{VERSION},\"warning\":{},{structural}\"items\":[{}],\"tombstones\":[{}],\"truncated\":{},\"next_cursor\":{}}}",
+            "{{\"parinn_envelope\":{VERSION},\"warning\":{},{structural}\"items\":[{}],\"tombstones\":[{}],\"quarantine_markers\":[{}],\"truncated\":{},\"next_cursor\":{}}}",
             Value::from(WARNING),
             items.join(","),
             tombstones.join(","),
+            markers.join(","),
             self.truncated,
             json!(self.next_cursor),
         )

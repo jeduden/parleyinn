@@ -127,6 +127,7 @@ fn one_string_value(w: &mut World) -> Result<(), String> {
             "items",
             "next_cursor",
             "parinn_envelope",
+            "quarantine_markers",
             "tombstones",
             "truncated",
             "warning",

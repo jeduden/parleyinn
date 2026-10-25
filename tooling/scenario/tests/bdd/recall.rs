@@ -347,6 +347,7 @@ fn wrapped(envelope: &Value) -> Result<(), String> {
         "items",
         "next_cursor",
         "parinn_envelope",
+        "quarantine_markers",
         "tombstones",
         "truncated",
         "warning",
@@ -391,13 +392,16 @@ fn wrapped_in_envelope(w: &mut World) -> Result<(), String> {
     Ok(())
 }
 
-/// The seqs the tombstones of `envelope` stand in place of.
+/// The seqs the tombstones and quarantine markers of `envelope` stand
+/// in place of.
 fn marked_seqs(envelope: &Value) -> Result<BTreeSet<u64>, String> {
     let mut out = BTreeSet::new();
-    for mark in envelope["tombstones"].as_array().into_iter().flatten() {
-        let range = ::record::range::Range::parse(mark["range"].as_str().unwrap_or_default())
-            .map_err(|e| e.to_string())?;
-        out.extend(range.from.get()..=range.to.get());
+    for kind in ["tombstones", "quarantine_markers"] {
+        for mark in envelope[kind].as_array().into_iter().flatten() {
+            let range = ::record::range::Range::parse(mark["range"].as_str().unwrap_or_default())
+                .map_err(|e| e.to_string())?;
+            out.extend(range.from.get()..=range.to.get());
+        }
     }
 
     Ok(out)
