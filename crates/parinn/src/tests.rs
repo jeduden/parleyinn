@@ -2390,6 +2390,34 @@ fn ingest_says_which_redaction_it_cannot_audit_and_still_records() {
 }
 
 #[test]
+fn ingest_says_which_limited_redaction_it_cannot_audit_and_still_records() {
+    let p = Process::new();
+    let (code, _, _) = p.invoke(&["ingest", "--path", &p.transcript("a\n")], &DEV);
+    assert_eq!(code, EXIT_OK);
+    let audit_dir = p.parinn_home().join("audit");
+    std::fs::remove_dir_all(&audit_dir).unwrap();
+    std::fs::write(&audit_dir, "").unwrap();
+    set_mode(&audit_dir, 0o600);
+    let chain = format!("AIza{}", "a".repeat(35)).repeat(5_000);
+
+    let (code, out, err) = p.invoke(
+        &[
+            "ingest",
+            "--path",
+            &p.transcript(&format!("{{\"t\":\"{chain}\"}}\n")),
+        ],
+        &DEV,
+    );
+
+    assert_eq!(code, EXIT_OK, "{err}");
+    assert!(out.starts_with("ingested 1 lines"), "{out}");
+    assert!(
+        err.contains("parinn ingest: audit a limited redaction: "),
+        "{err}"
+    );
+}
+
+#[test]
 fn a_hook_input_past_1_mib_is_audited_and_injects_nothing() {
     let mut p = Process::new();
     p.lines = vec![

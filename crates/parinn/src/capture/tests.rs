@@ -394,8 +394,9 @@ fn what_live_ingest_found_is_audited_entry_by_entry() {
     std::fs::write(
         f.main(),
         format!(
-            "not json\n{}\n",
-            json!({"type": "atis-latch", "atis": "AKIAIOSFODNN7EXAMPLE", "sessionId": "s"})
+            "not json\n{}\n{}\n",
+            json!({"type": "atis-latch", "atis": "AKIAIOSFODNN7EXAMPLE", "sessionId": "s"}),
+            json!({"type": "atis-latch", "chain": format!("AIza{}", "a".repeat(35)).repeat(5_000)})
         ),
     )
     .unwrap();
@@ -406,6 +407,10 @@ fn what_live_ingest_found_is_audited_entry_by_entry() {
     let first = f.counted();
     assert!(first.contains(&"events_unparsed".to_owned()), "{first:?}");
     assert!(first.contains(&"redactions".to_owned()), "{first:?}");
+    assert!(
+        first.contains(&"redaction_scan_limited".to_owned()),
+        "{first:?}"
+    );
 
     // The transcript is rewritten: a new generation.
     std::fs::write(f.main(), line(9, None)).unwrap();
