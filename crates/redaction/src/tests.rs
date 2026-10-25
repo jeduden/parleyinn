@@ -1,6 +1,7 @@
 use super::account::HarnessAccountIdentifiers;
 use super::{
-    PatternRefused, Piece, Redacted, Redactor, Work, extra_pattern, literal_end, merged, pieces,
+    PatternRefused, Piece, Redacted, Redactor, SCAN_LIMIT_FACTOR, Work, extra_pattern, literal_end,
+    merged, pieces,
 };
 
 const AWS: &str = "AKIAIOSFODNN7EXAMPLE";
@@ -316,4 +317,26 @@ fn matches_lists_the_merged_spans_of_every_rule_in_order() {
     let spans = r.matches(&piece);
     assert_eq!(spans, [(2, 15, 9), (16, 36, 1)]);
     assert!(r.matches("nothing").is_empty());
+}
+
+#[test]
+fn redact_measured_reads_at_most_the_scan_limit_times_the_text() {
+    let r = redactor(&["ACME-[0-9]{8}"]);
+    let key = format!("AIza{}", "a".repeat(35));
+    for text in [
+        key.repeat(20_000),
+        format!("{AWS}ACME-12345678").repeat(500),
+        format!("{} tail", key.repeat(9)),
+        "nothing here".to_owned(),
+    ] {
+        let (out, read) = r.redact_measured(&text);
+        assert!(
+            read <= SCAN_LIMIT_FACTOR * text.len(),
+            "{read} of {}",
+            text.len()
+        );
+        assert!(read >= text.len());
+        assert_eq!(out.limited, text.starts_with("AIza") && text.len() > 400);
+    }
+    assert_eq!(r.redact_measured("").1, 0);
 }

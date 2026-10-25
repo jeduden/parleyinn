@@ -130,12 +130,21 @@ impl Redactor {
     /// names, so the record's rule names still say which rules ran.
     #[must_use]
     pub fn redact_text(&self, text: &str) -> Redacted {
+        self.redact_measured(text).0
+    }
+
+    /// [`Self::redact_text`] and how many bytes its scans read. The
+    /// rescans read at most `SCAN_LIMIT_FACTOR - 1` times the text and
+    /// the last scan, over disjoint stretches, at most once more, so
+    /// the whole stays within `SCAN_LIMIT_FACTOR` times it.
+    fn redact_measured(&self, text: &str) -> (Redacted, usize) {
         let mut out = Redacted {
             text: String::with_capacity(text.len()),
             rules: Vec::new(),
             limited: false,
         };
-        let mut allowance = text.len().saturating_mul(SCAN_LIMIT_FACTOR);
+        let mut allowance = text.len().saturating_mul(SCAN_LIMIT_FACTOR - 1);
+        let mut read = 0;
         let mut work = vec![Work::Scan(text)];
         while let Some(item) = work.pop() {
             match item {
@@ -143,16 +152,18 @@ impl Redactor {
                 Work::Scan("") => {}
                 Work::Scan(piece) if piece.len() > allowance => {
                     out.limited = true;
+                    read += piece.len();
                     self.write_once(piece, &mut out);
                 }
                 Work::Scan(piece) => {
                     allowance -= piece.len();
+                    read += piece.len();
                     self.scan(piece, &mut out, &mut work);
                 }
             }
         }
 
-        out
+        (out, read)
     }
 
     /// The marker of `rule` written to `out`.
