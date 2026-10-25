@@ -1,0 +1,28 @@
+[package]
+name = "parinn-eval"
+version = "0.0.0"
+description = "The evaluation module of SRS section 11.1: versioned, seeded datasets run through the recall tools, starting with recall of exact values after compaction"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+administration.workspace = true
+ingest.workspace = true
+key.workspace = true
+mcp.workspace = true
+record.workspace = true
+redaction.workspace = true
+serde_json.workspace = true
+store.workspace = true
+testkit.workspace = true
+
+[lints]
+workspace = true
+
+# ENG-02: see crates/parinn/Cargo.toml.
+[package.metadata.parinn]
+responsibility = "Runs the evaluation datasets of SRS section 11.1 through the recall tools and reports each result"
+may-depend-on = ["administration", "ingest", "key", "mcp", "record", "redaction", "store", "testkit"]
+may-dev-depend-on = []

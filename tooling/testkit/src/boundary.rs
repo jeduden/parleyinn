@@ -249,16 +249,55 @@ impl Confinement {
         after: std::time::Duration,
     ) -> Result<bool, Error> {
         let caller = caller(std::thread::current().name(), Location::caller());
+        self.killed(program, args, home, env, after, false, caller)
+    }
+
+    /// [`run_killed`](Self::run_killed) at a pseudo-terminal, as
+    /// [`run_at_terminal`](Self::run_at_terminal) starts it: a person's
+    /// command, such as a widening act, killed mid-way. The kill reaches
+    /// every process of the terminal's session, the program first.
+    ///
+    /// # Errors
+    ///
+    /// As [`run_killed`](Self::run_killed).
+    #[track_caller]
+    pub fn run_killed_at_terminal(
+        &self,
+        program: &Path,
+        args: &[&str],
+        home: &Path,
+        env: &[(&str, &str)],
+        after: std::time::Duration,
+    ) -> Result<bool, Error> {
+        let caller = caller(std::thread::current().name(), Location::caller());
+        self.killed(program, args, home, env, after, true, caller)
+    }
+
+    #[allow(clippy::too_many_arguments, reason = "the two kills' one body")]
+    fn killed(
+        &self,
+        program: &Path,
+        args: &[&str],
+        home: &Path,
+        env: &[(&str, &str)],
+        after: std::time::Duration,
+        terminal: bool,
+        caller: String,
+    ) -> Result<bool, Error> {
         let dir = TempDir::new().map_err(|source| Error::Trace { source })?;
         let trace = dir.path().join("trace");
+        let session = dir.path().join("session");
         let mut command = self.command(program, args, &trace);
+        if terminal {
+            command = at_terminal_recording(&command, &session);
+        }
         command.envs(env.iter().copied());
         isolate(&mut command, home);
         let started = |source| Error::Start {
             program: program.to_path_buf(),
             source,
         };
-        let running = kill_after(&mut command, after).map_err(started)?;
+        let running = kill_after(&mut command, after, &session).map_err(started)?;
         if self.mode == Mode::Unconfined {
             return Ok(running);
         }
@@ -527,6 +566,18 @@ fn at_terminal(command: &Command) -> Command {
     outer
 }
 
+/// [`at_terminal`], the terminal's session first writing its process
+/// group's id to `session`, so a kill can reach the processes the
+/// terminal holds apart from [`SCRIPT`]'s own group.
+fn at_terminal_recording(command: &Command, session: &Path) -> Command {
+    let file = session.to_string_lossy().replace('\'', r"'\''");
+    let line = format!("echo $$ > '{file}'; {}", shell_line(command));
+    let mut outer = Command::new(SCRIPT);
+    outer.args(["-qefc", &line, "/dev/null"]);
+
+    outer
+}
+
 /// The shell line that runs `command`, every word quoted.
 fn shell_line(command: &Command) -> String {
     let quote = |word: &OsStr| format!("'{}'", word.to_string_lossy().replace('\'', r"'\''"));
@@ -538,8 +589,14 @@ fn shell_line(command: &Command) -> String {
 /// Starts `command` in a process group of its own, its output
 /// discarded, and kills the whole group with `SIGKILL` once `after`
 /// passed, unless it exited by then, so neither the trace nor the
-/// program outlives the other; whether it was still running.
-fn kill_after(command: &mut Command, after: std::time::Duration) -> io::Result<bool> {
+/// program outlives the other; whether it was still running. When a
+/// terminal's session wrote its group's id to `session`, that group is
+/// killed first.
+fn kill_after(
+    command: &mut Command,
+    after: std::time::Duration,
+    session: &Path,
+) -> io::Result<bool> {
     #[cfg(unix)]
     std::os::unix::process::CommandExt::process_group(command, 0);
     let mut child = command
@@ -550,12 +607,15 @@ fn kill_after(command: &mut Command, after: std::time::Duration) -> io::Result<b
     std::thread::sleep(after);
     let running = child.try_wait()?.is_none();
     if running {
-        let group = format!("-{}", child.id());
-        Command::new("kill")
-            .args(["-KILL", "--", &group])
-            .stdout(Stdio::null())
-            .stderr(Stdio::null())
-            .status()?;
+        let held = fs::read_to_string(session).unwrap_or_default();
+        let groups = [held.trim().to_owned(), child.id().to_string()];
+        for group in groups.iter().filter(|g| !g.is_empty()) {
+            Command::new("kill")
+                .args(["-KILL", "--", &format!("-{group}")])
+                .stdout(Stdio::null())
+                .stderr(Stdio::null())
+                .status()?;
+        }
     }
     // The group may have exited between the look and its kill; a kill of
     // a program that exited does nothing.

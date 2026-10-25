@@ -14,6 +14,7 @@ fn segment(n: u8, first: u64, last: u64, version: u32) -> Segment {
 #[test]
 fn every_segment_closed_and_none_newer_shows_no_line() {
     let status = SegmentsStatus {
+        schema_version: 1,
         open: Vec::new(),
         newer: Vec::new(),
     };
@@ -26,6 +27,7 @@ fn every_segment_closed_and_none_newer_shows_no_line() {
 fn open_and_newer_segments_are_each_named() {
     let (a, b) = (segment(1, 1, 2, 1), segment(2, 4, 5, 2));
     let status = SegmentsStatus {
+        schema_version: 1,
         open: vec![a.clone(), segment(3, 7, 7, 1)],
         newer: vec![b.clone()],
     };

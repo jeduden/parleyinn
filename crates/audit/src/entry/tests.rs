@@ -41,7 +41,7 @@ fn each_kind_and_counter_has_its_name() {
         ),
         (Counter::ManagedPolicyInvalid, "managed_policy_invalid"),
         (Counter::PrincipalActRefused, "principal_act_refused"),
-        (Counter::Redacted, "redacted"),
+        (Counter::Redacted, "redactions"),
         (
             Counter::RedactionPatternRefused,
             "redaction_pattern_refused",
@@ -114,6 +114,7 @@ fn each_counter_of_the_mcp_server_has_its_name() {
         (Counter::PurgeUnfinished, "purge_unfinished"),
         (Counter::RetentionPurged, "retention_purged"),
         (Counter::RetentionFailed, "retention_failed"),
+        (Counter::VerifyTimedOut, "verify_timed_out"),
         (
             Counter::SearchIndexWriterUnindexed,
             "search_index_writer_unindexed",

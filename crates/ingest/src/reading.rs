@@ -61,8 +61,7 @@ pub(crate) fn ingest(
         .with_identifiers(&ids)
         .map_err(IngestError::Redaction)?;
     home.create().map_err(IngestError::Admin)?;
-    let mut store =
-        Store::open(&home.store())?.with_payload_threshold(inputs.payload.payload_threshold);
+    let mut store = open_store(home, inputs)?;
     let node = Node::open(home, &mut store, entropy).map_err(IngestError::Admin)?;
     let observed = Observed::load(&store)?;
     let mut inputs = inputs.clone();
@@ -184,6 +183,14 @@ impl Named {
             name: redactor.redact_text(&stem).text,
         }
     }
+}
+
+/// The store in `home`, its payloads above the threshold `inputs` names
+/// and its ingest markers left at the time on ingest's clock (ADM-09).
+fn open_store(home: &Home, inputs: &Inputs) -> Result<Store, IngestError> {
+    Ok(Store::open(&home.store())?
+        .with_payload_threshold(inputs.payload.payload_threshold)
+        .with_marker_time(inputs.now_ms))
 }
 
 /// Where an ingest resumes its transcript source.

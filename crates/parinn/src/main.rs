@@ -2,6 +2,8 @@
 //! entry point only hands it the process's arguments, environment and
 //! streams.
 
+#![deny(clippy::allow_attributes)]
+
 use std::io::{self, IsTerminal};
 use std::process::ExitCode;
 use std::sync::mpsc::{self, Receiver};

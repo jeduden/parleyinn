@@ -209,6 +209,23 @@ fn live_ingest_takes_only_its_own_harness_process_s_binding_and_reads_its_tool_u
 }
 
 #[test]
+fn each_live_read_leaves_its_ingest_marker_at_the_time_on_the_server_s_clock() {
+    let f = Fixture::new();
+    std::fs::write(f.main(), line(1, None)).unwrap();
+    f.bind(SESSION, &f.main(), HARNESS);
+    let mut running = f.running(Some(HARNESS), None);
+    running.bind();
+
+    running.poll();
+
+    let sources = Store::open(&f.home.store()).unwrap().sources().unwrap();
+    assert_eq!(
+        sources.iter().map(|s| s.marked_at).collect::<Vec<_>>(),
+        [1_760_000_000_000]
+    );
+}
+
+#[test]
 fn a_stop_short_of_a_transcript_s_end_is_audited_by_the_server() {
     let f = Fixture::new();
     std::fs::write(f.main(), (1..=4).map(|n| line(n, None)).collect::<String>()).unwrap();
@@ -245,6 +262,61 @@ fn a_killed_server_s_remainder_is_audited_once_by_the_next_reader() {
     assert_eq!(count_stopped(&f.home, "ingest", &audit), 0);
     assert_eq!(f.counted(), ["ingest_remainder_left"]);
     assert!(f.markers().is_empty());
+}
+
+#[test]
+fn only_a_running_server_serves_the_transcripts_its_marker_names() {
+    let f = Fixture::new();
+    assert_eq!(served(&f.home), Vec::<PathBuf>::new());
+    std::fs::create_dir_all(f.home.root().join(MARKERS)).unwrap();
+    std::fs::write(f.home.root().join(MARKERS).join("x.staged"), "a\n").unwrap();
+    std::fs::create_dir(f.home.root().join(MARKERS).join("d.marker")).unwrap();
+    #[cfg(unix)]
+    std::os::unix::fs::symlink("/nonexistent", f.home.root().join(MARKERS).join("l.marker"))
+        .unwrap();
+    assert_eq!(served(&f.home), Vec::<PathBuf>::new());
+
+    let marker = StartMarker::leave(&f.home, &[f.main(), f.subagent("a")], None).unwrap();
+    assert_eq!(served(&f.home), [f.main(), f.subagent("a")]);
+
+    // Killed: the marker stays, its lock released.
+    drop(marker);
+    assert_eq!(served(&f.home), Vec::<PathBuf>::new());
+}
+
+/// Start markers as a test sets them out: each path with what it names
+/// while its server holds its lock, none for a free one.
+struct FakeMarkers(Vec<(PathBuf, Option<&'static str>)>);
+
+impl Markers for FakeMarkers {
+    fn list(&self) -> Vec<PathBuf> {
+        self.0.iter().map(|(p, _)| p.clone()).collect()
+    }
+
+    fn held(&self, path: &Path) -> Option<String> {
+        self.0
+            .iter()
+            .find(|(p, _)| p == path)
+            .and_then(|(_, named)| named.map(str::to_owned))
+    }
+}
+
+#[test]
+fn the_served_transcripts_are_those_held_markers_name() {
+    let markers = FakeMarkers(vec![
+        (
+            PathBuf::from("/m/a.marker"),
+            Some("/t/a.jsonl\n/t/b.jsonl\n"),
+        ),
+        (PathBuf::from("/m/free.marker"), None),
+        (PathBuf::from("/m/c.staged"), Some("/t/c.jsonl\n")),
+    ]);
+
+    assert_eq!(
+        served_by(&markers),
+        [PathBuf::from("/t/a.jsonl"), PathBuf::from("/t/b.jsonl")]
+    );
+    assert_eq!(served_by(&FakeMarkers(Vec::new())), Vec::<PathBuf>::new());
 }
 
 #[test]
@@ -333,7 +405,7 @@ fn what_live_ingest_found_is_audited_entry_by_entry() {
     running.poll();
     let first = f.counted();
     assert!(first.contains(&"events_unparsed".to_owned()), "{first:?}");
-    assert!(first.contains(&"redacted".to_owned()), "{first:?}");
+    assert!(first.contains(&"redactions".to_owned()), "{first:?}");
 
     // The transcript is rewritten: a new generation.
     std::fs::write(f.main(), line(9, None)).unwrap();
@@ -647,4 +719,31 @@ fn a_clone_a_taken_binding_shows_unreadable_is_counted_by_the_server() {
     running.bind();
 
     assert!(f.counted().contains(&"repository_read_failed".to_owned()));
+}
+
+#[cfg(unix)]
+#[test]
+fn a_marker_link_or_fifo_is_neither_followed_nor_waited_on() {
+    let f = Fixture::new();
+    let marker = StartMarker::leave(&f.home, &[f.main()], None).unwrap();
+    let dir = f.home.root().join(MARKERS);
+    let held = served(&f.home);
+    assert_eq!(held, [f.main()]);
+    let real = HomeMarkers(dir.clone())
+        .list()
+        .into_iter()
+        .find(|p| p.extension().is_some_and(|e| e == "marker"))
+        .unwrap();
+    std::os::unix::fs::symlink(&real, dir.join("link.marker")).unwrap();
+    crate::sources::tests::mkfifo(&dir.join("fifo.marker"));
+    let (tx, rx) = std::sync::mpsc::channel();
+    let home = f.home.clone();
+    std::thread::spawn(move || {
+        let _ = tx.send(served(&home));
+    });
+
+    let answer = rx.recv_timeout(std::time::Duration::from_secs(5));
+
+    assert_eq!(answer.expect("served waited on a FIFO marker"), [f.main()]);
+    drop(marker);
 }

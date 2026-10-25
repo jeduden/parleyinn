@@ -32,6 +32,13 @@ pub fn git(home: &Path, dir: &Path, args: &[&str]) {
             "commit.gpgsign=false",
             "-c",
             "init.defaultBranch=main",
+            // git's own detached auto-maintenance, which a commit may
+            // start, would write `.git/objects/maintenance.lock` while a
+            // test snapshots the repository; the fixture starts none.
+            "-c",
+            "gc.auto=0",
+            "-c",
+            "maintenance.auto=false",
         ])
         .args(args)
         .stdout(Stdio::null())

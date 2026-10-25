@@ -12,7 +12,9 @@
 //! benchmarks time each handler on a hook input over a fresh home:
 //! `SessionStart` against its hook budget (NFR-02), `UserPromptSubmit`
 //! a floor of NFR-01's target, which a store of 1M events under fleet
-//! load sets. The ENG-15
+//! load sets. Its scale benchmark times one ingest of 50 runs, a floor
+//! of NFR-05's 50 runs writing at once into a store of 10M events. The
+//! ENG-15
 //! scenario stays pending until every NFR id it names has a
 //! [`Coverage::Target`] benchmark.
 //!
@@ -55,6 +57,10 @@ pub enum Fixture {
         lines: usize,
         prepare: &'static [&'static str],
     },
+    /// A fresh home as for [`Fixture::Transcript`], holding `runs`
+    /// transcripts of `lines` lines each, every one its own harness
+    /// session, so an ingest records `runs` runs.
+    Runs { runs: usize, lines: usize },
 }
 
 /// The lines the transcript a hook handler's benchmark names holds.
@@ -92,8 +98,16 @@ pub const INGEST_LINES: usize = 2_000;
 /// The events the search benchmark's store holds.
 pub const SEARCH_LINES: usize = 2_000;
 
+/// The runs the scale benchmark's home holds, as many as NFR-05's
+/// concurrent runs.
+pub const SCALE_RUNS: usize = 50;
+
+/// The lines each of those runs' transcripts holds: few, so the sample
+/// times what 50 runs cost the store beyond their lines.
+pub const SCALE_LINES: usize = 10;
+
 /// The suite.
-pub const SUITE: [Benchmark; 5] = [
+pub const SUITE: [Benchmark; 6] = [
     Benchmark {
         name: "core_start_up",
         requirement: "NFR-01",
@@ -152,6 +166,20 @@ pub const SUITE: [Benchmark; 5] = [
             prepare: &["ingest", "--all"],
         },
     },
+    Benchmark {
+        name: "ingest_fifty_runs",
+        requirement: "NFR-05",
+        coverage: Coverage::Floor,
+        measures: "`parinn ingest --all` over 50 transcripts of 10 recorded Claude Code lines \
+                   in a fresh home, each its own run, until it exits: the store taking 50 \
+                   runs' writers, a floor of NFR-05's 50 runs writing at once into a store of \
+                   10M events",
+        args: &["ingest", "--all"],
+        fixture: Fixture::Runs {
+            runs: SCALE_RUNS,
+            lines: SCALE_LINES,
+        },
+    },
 ];
 
 /// The NFR ids ENG-15 names that have no benchmark of real code yet.
@@ -163,7 +191,9 @@ pub const AWAITING: [Awaiting; 2] = [
     },
     Awaiting {
         requirement: "NFR-05",
-        on: "the store at 10M events and 50 concurrent runs writing (plan 2609292012)",
+        on: "the store at 10M events, 100 GiB of payloads and 50 runs writing at once on the \
+             reference hardware, beyond a CI runner's budget; ENG-09's nightly soak appends \
+             1M events from 50 writers",
     },
 ];
 

@@ -69,6 +69,10 @@ pub fn cases() -> Vec<Case> {
         confinement_cases(),
         ci_gate_cases(),
         static_analysis_cases(),
+        boundary_cases(),
+        telemetry_cases(),
+        threat_model_cases(),
+        privacy_cases(),
         complexity_cases(),
         trusted_text_cases(),
         toml_cases(),
@@ -77,6 +81,8 @@ pub fn cases() -> Vec<Case> {
         protection_cases(),
         architecture_cases(),
         benchmark_cases(),
+        fuzz_cases(),
+        coverage_floor_cases(),
         isolation_cases(),
         instruction_cases(),
         transcript_contract_cases(),
@@ -959,7 +965,8 @@ fn core_wait_cases() -> Vec<Case> {
                 "checkout",
                 "no_product_crate_keeps_mutable_global_state",
             ),
-            "crates/parinn/src/lib.rs:16: mutable global state: pub static SEQ",
+            // The line number moves with the file; the finding is stable.
+            ": mutable global state: pub static SEQ",
         ),
     ]
 }
@@ -1120,6 +1127,322 @@ fn static_analysis_cases() -> Vec<Case> {
             ),
             check("derived_code_is_refused_a_clock_or_randomness_at_build_time"),
             "code that computes derived artifacts may read a clock or randomness: crate parinn: crates/parinn/clippy.toml does not ban std::time::Instant::now in disallowed-methods",
+        ),
+        case(
+            "the core's code quieting a lint with a bare allow",
+            "the core's #![deny(clippy::allow_attributes)]",
+            Injection::replace(
+                "crates/parinn/src/licenses.rs",
+                "\nuse std::io::Write;\n",
+                "\n#[allow(unused_imports)]\nuse std::io::Write;\n",
+            ),
+            clippy("parinn"),
+            "#[allow] attribute found",
+        ),
+    ]
+}
+
+/// The boundary register the SEC-19 cases drift.
+const REGISTER: &str = "docs/srs/06b-boundary-register.md";
+
+/// The threat model the SEC-17 cases drift.
+const MODEL: &str = "docs/security/threat-model.md";
+
+const BOUNDARY: &str =
+    "the_boundary_register_assigns_each_component_once_and_the_core_keeps_its_evidence";
+const CORE: &str = "the_core_opens_no_socket_and_starts_no_program_but_its_kernel_worker";
+const BUILT: &str = "only_the_core_is_built_and_it_sits_in_b0";
+const TELEMETRY: &str = "no_telemetry_crash_report_or_update_check_ships";
+const THREATS: &str = "the_threat_model_covers_the_register_and_compares_with_zed_delta";
+const PRIVACY: &str = "every_privacy_statement_cites_a_test_that_exists";
+
+/// A drift of the operations gates, checked by the gate test `name`.
+fn gate(name: &'static str) -> Check {
+    cargo_test("engineering", "boundary", name)
+}
+
+/// The drifts the boundary register and the core's evidence exist to
+/// catch (SEC-01, SEC-19).
+fn boundary_cases() -> Vec<Case> {
+    vec![
+        case(
+            "a register row naming two boundaries",
+            BOUNDARY,
+            Injection::replace(
+                REGISTER,
+                "| core                | B0       | stdin and stdout with the harness",
+                "| core                | B0, B1   | stdin and stdout with the harness",
+            ),
+            gate(BOUNDARY),
+            "row 1 names \"B0, B1\", not exactly one of B0, B1, B2, B3, outside or none",
+        ),
+        case(
+            "a room-view row no longer off by default",
+            BOUNDARY,
+            Injection::replace(
+                REGISTER,
+                "| off        | yes      | P1                         | SEC-20, SEC-21, SEC-23      |",
+                "| on         | yes      | P1                         | SEC-20, SEC-21, SEC-23      |",
+            ),
+            gate(BOUNDARY),
+            "row 8 is B1 and \"on\" by default, not off",
+        ),
+        case(
+            "a process the register does not list",
+            BOUNDARY,
+            Injection::replace(
+                "crates/audit/Cargo.toml",
+                "[lints]\nworkspace = true\n",
+                "[[bin]]\nname = \"rogue\"\npath = \"src/lib.rs\"\n\n[lints]\nworkspace = true\n",
+            ),
+            gate(BOUNDARY),
+            "the process rogue runs as no component the register lists",
+        ),
+        case(
+            "a second executable in the core's crate, under src/bin",
+            BOUNDARY,
+            Injection::create("crates/parinn/src/bin/rogue.rs", "fn main() {}\n"),
+            gate(BOUNDARY),
+            "the process rogue runs as no component the register lists",
+        ),
+        case(
+            "the core's clippy.toml no longer banning a socket",
+            CORE,
+            Injection::replace(
+                "crates/parinn/clippy.toml",
+                "  { path = \"std::process::Command\", reason = \"the core starts no program but its kernel worker (SEC-01, CMP-05)\" },\n",
+                "",
+            ),
+            gate(CORE),
+            "crates/parinn/clippy.toml does not ban std::process::Command",
+        ),
+        case(
+            "a second executable built beside the core",
+            BUILT,
+            Injection::replace(
+                "crates/audit/Cargo.toml",
+                "[lints]\nworkspace = true\n",
+                "[[bin]]\nname = \"rogue\"\npath = \"src/lib.rs\"\n\n[lints]\nworkspace = true\n",
+            ),
+            gate(BUILT),
+            "left: [\"parinn\", \"rogue\"]",
+        ),
+    ]
+}
+
+/// The drifts SEC-15 exists to catch: a web address in the core's code
+/// and a register that no longer rejects update checks and telemetry.
+fn telemetry_cases() -> Vec<Case> {
+    vec![
+        case(
+            "a web address in the core's code",
+            TELEMETRY,
+            Injection::replace(
+                "crates/audit/src/lib.rs",
+                "pub mod counters;",
+                "pub mod counters;\n\n/// Where a report would go.\npub const REPORT: &str = \"https://telemetry.example\";",
+            ),
+            gate(TELEMETRY),
+            "crates/audit/src/lib.rs:",
+        ),
+        case(
+            "the register no longer rejecting update checks and telemetry",
+            TELEMETRY,
+            Injection::replace(
+                REGISTER,
+                "| Price-table fetch, update checks, telemetry                                    | rejected  ",
+                "| Price-table fetch, update checks, telemetry                                    | accepted  ",
+            ),
+            gate(TELEMETRY),
+            "no rejected register row names update checks and telemetry under SEC-15",
+        ),
+        // The workspace's own lockfile cannot hold a crate its graph does
+        // not resolve under `--locked`; the fuzz workspace's is read the
+        // same way.
+        case(
+            "a network-client crate in a lockfile",
+            TELEMETRY,
+            Injection::replace(
+                "fuzz/Cargo.lock",
+                "name = \"arbitrary\"",
+                "name = \"reqwest\"",
+            ),
+            gate(TELEMETRY),
+            "fuzz/Cargo.lock resolves reqwest, a crate that reports, checks for updates or reaches a remote host",
+        ),
+    ]
+}
+
+/// The drifts the threat model (SEC-17) exists to catch.
+fn threat_model_cases() -> Vec<Case> {
+    vec![
+        case(
+            "a register row the threat model does not cover",
+            THREATS,
+            Injection::replace(MODEL, "| X8  | A core process", "| Y8  | A core process"),
+            gate(THREATS),
+            "has no row for register row X8",
+        ),
+        case(
+            "the comparison with Zed Delta leaving out key custody",
+            THREATS,
+            Injection::replace(MODEL, "| Key custody ", "| Key keeping "),
+            gate(THREATS),
+            "the comparison with Zed Delta leaves out Key custody",
+        ),
+        case(
+            "a threat source the threat model names otherwise than §6.1",
+            THREATS,
+            Injection::replace(
+                MODEL,
+                "| S9  | Web page in the person's own browser ",
+                "| S9  | Web page in a browser ",
+            ),
+            gate(THREATS),
+            "differ from those of docs/srs/06-security.md",
+        ),
+        case(
+            "a register row whose sources the threat model leaves empty",
+            THREATS,
+            Injection::replace(
+                MODEL,
+                "| 3   | Kernel worker                             | B0       | S1 ",
+                "| 3   | Kernel worker                             | B0       |    ",
+            ),
+            gate(THREATS),
+            "register row 3 names no known threat source",
+        ),
+        case(
+            "a register row enforced in M1 that cites no test",
+            THREATS,
+            Injection::replace(
+                MODEL,
+                "(CMP-05, ENG-03)                  | pending, M4 ",
+                "(CMP-05, ENG-03)                  | enforced in M1 ",
+            ),
+            gate(THREATS),
+            "register row 3 is enforced in M1 and cites no test",
+        ),
+        case(
+            "no review row for the current minor release",
+            THREATS,
+            Injection::replace(
+                MODEL,
+                "| 0.0     | the agent that wrote phase 15 ",
+                "| 0.9     | the agent that wrote phase 15 ",
+            ),
+            gate(THREATS),
+            "records no review of release 0.0",
+        ),
+        case(
+            "a release reviewed by the one who wrote its threat model",
+            THREATS,
+            Injection::replace(
+                MODEL,
+                "| no one yet  | Written against the register of M1; awaiting the security reviewer |",
+                "| the agent that wrote phase 15 | Reviewed: holds |",
+            ),
+            gate(THREATS),
+            "release 0.0 is reviewed by the one who wrote its threat model",
+        ),
+    ]
+}
+
+/// The drifts the privacy statements (ENG-22) exist to catch.
+fn privacy_cases() -> Vec<Case> {
+    vec![
+        case(
+            "a privacy statement citing no test",
+            PRIVACY,
+            Injection::replace(
+                "docs/development.md",
+                "The run-time half is ENG-12's core row.",
+                "The run-time half is ENG-12's core row. Nothing leaves the machine.",
+            ),
+            gate(PRIVACY),
+            "a privacy statement cites no test",
+        ),
+        case(
+            "a privacy statement citing a test that does not exist",
+            PRIVACY,
+            Injection::replace(
+                "SECURITY.md",
+                "`the_core_executable_links_only_crates_its_reach_allows`",
+                "`a_test_nobody_wrote`",
+            ),
+            gate(PRIVACY),
+            "cites a_test_nobody_wrote, which is no test that exists and runs",
+        ),
+        case(
+            "a privacy statement citing a test that is ignored",
+            PRIVACY,
+            Injection::replace(
+                "crates/parinn/tests/reach.rs",
+                "#[test]\nfn the_core_executable_links_only_crates_its_reach_allows() {",
+                "#[test]\n#[ignore = \"drift\"]\nfn the_core_executable_links_only_crates_its_reach_allows() {",
+            ),
+            gate(PRIVACY),
+            "cites the_core_executable_links_only_crates_its_reach_allows, which is no test that exists and runs",
+        ),
+    ]
+}
+
+/// The drifts ENG-11's checks exist to catch: a security-sensitive
+/// crate held below the row's floor, and CI no longer merging the
+/// layers' profiles against the floors.
+fn coverage_floor_cases() -> Vec<Case> {
+    vec![
+        case(
+            "the search crate held below ENG-11's floor",
+            "ENG-11",
+            Injection::replace(
+                "Cargo.toml",
+                "pyramid = true\n",
+                "pyramid = true\n\n[workspace.metadata.coverage.crates.search.floors]\nall = 85\n",
+            ),
+            scenario("ENG-11"),
+            "search is held to 85% of its lines, below ENG-11's 90%",
+        ),
+        case(
+            "CI no longer holding the merged profile to the floors",
+            "ENG-11",
+            Injection::replace(
+                CI_WORKFLOW,
+                "cargo run --locked -p coverage -- --merge",
+                "cargo run --locked -p coverage -- --layer unit",
+            ),
+            scenario("ENG-11"),
+            "job coverage does not run \"-p coverage -- --merge\"",
+        ),
+    ]
+}
+
+/// The drifts ENG-07's checks exist to catch: a parser's target
+/// dropped from the fuzz workspace, and the nightly job fuzzing with no
+/// committed corpus.
+fn fuzz_cases() -> Vec<Case> {
+    vec![
+        case(
+            "the redactor's fuzz target dropped from the fuzz workspace",
+            "ENG-07",
+            Injection::replace(
+                "fuzz/Cargo.toml",
+                "name = \"redactor\"",
+                "name = \"scrubber\"",
+            ),
+            scenario("ENG-07"),
+            "fuzz/Cargo.toml declares no target redactor",
+        ),
+        case(
+            "the nightly fuzz job run without the committed corpus",
+            "ENG-07",
+            Injection::replace(
+                ".github/workflows/nightly.yml",
+                " \"fuzz/corpus/$target\"",
+                "",
+            ),
+            scenario("ENG-07"),
+            "the nightly fuzz job does not fuzz redactor from fuzz/corpus/redactor",
         ),
     ]
 }

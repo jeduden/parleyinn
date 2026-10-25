@@ -354,8 +354,17 @@ impl<'j> Recording<'j> {
 
     /// The size of the transcript at `path` when its hook fired: where
     /// the observation is held. None, audited, when it lies outside the
-    /// transcript roots or cannot be read; nothing is read of it.
+    /// transcript roots or cannot be read; nothing is read of it. A path
+    /// that cannot even be looked at (a name below a file, a link loop,
+    /// no right to search a directory) is a failure, not a refusal: it
+    /// names nothing outside the roots (OPS-01).
     fn offset(&self, path: &Path, roots: &[String]) -> Option<u64> {
+        if let Err(e) = fs::symlink_metadata(path)
+            && e.kind() != io::ErrorKind::NotFound
+        {
+            self.failed("transcript path could not be read");
+            return None;
+        }
         let os_home = self.job.os_home.as_deref();
         let allowed = roots.iter().fold(AllowedRoots::default(), |allowed, root| {
             allowed.with(&allowed_root::expand_home(root, os_home), Access::Read)

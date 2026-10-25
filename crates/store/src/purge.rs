@@ -13,7 +13,8 @@
 //!
 //! What cannot be done inside the transaction is journalled in it and
 //! finished after it, by [`Store::finish_purge`], which the next purge,
-//! ingest or rebuild also runs when a crash cut the first attempt short:
+//! ingest or rebuild also runs when a crash cut the first attempt short
+//! ([`Store::unfinished_purges`] names what is left):
 //! the search index's postings of the erased events, the payload files,
 //! and, once both are gone, a checkpoint of the write-ahead logs and a
 //! vacuum of both database files with SQLite's secure delete on, so no
@@ -163,6 +164,26 @@ impl Store {
             .query_row("SELECT count(*) FROM purge_journal", [], |r| {
                 r.get::<_, bool>(0)
             })?)
+    }
+
+    /// The ranges whose search index postings a purge has still to take
+    /// out, each `writer:first-last`, in writer and seq order: what a
+    /// purge cut short before it finished leaves for its next attempt.
+    ///
+    /// # Errors
+    ///
+    /// Fails when SQLite does.
+    pub fn unfinished_purges(&self) -> Result<Vec<String>, StoreError> {
+        if !has_journal(&self.conn)? {
+            return Ok(Vec::new());
+        }
+        let mut ranges: Vec<String> = journalled(&self.conn, INDEX)?
+            .into_iter()
+            .map(|(_, target)| target)
+            .collect();
+        ranges.sort_by_key(|r| parse_range(r).map(|(w, f, l)| (w.to_string(), f, l)));
+
+        Ok(ranges)
     }
 
     /// Takes the journalled ranges out of the search index.
