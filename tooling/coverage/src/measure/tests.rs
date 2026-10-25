@@ -270,7 +270,7 @@ fn test_runs_without_a_shard_are_the_layer_s_one_command() {
 }
 
 #[test]
-fn test_runs_give_the_first_shard_the_other_targets_once() {
+fn test_runs_give_the_first_shard_the_other_targets_and_the_rest_their_build() {
     let plan = plan();
     let joined = |index| {
         test_runs(&plan, TestLayer::EndToEnd, Some(shard(index, 4)))
@@ -290,9 +290,12 @@ fn test_runs_give_the_first_shard_the_other_targets_once() {
     for index in 2..=4 {
         assert_eq!(
             joined(index),
-            [format!(
-                "llvm-cov --no-report --workspace --locked --test bdd -- --shard {index}/4"
-            )]
+            [
+                "llvm-cov --no-report --workspace --locked --test e2e_x -- --list".to_owned(),
+                format!(
+                    "llvm-cov --no-report --workspace --locked --test bdd -- --shard {index}/4"
+                )
+            ]
         );
     }
 }
@@ -346,6 +349,7 @@ fn measure_layer_writes_a_shard_to_its_own_file() {
         *host.calls.borrow(),
         [
             "cargo llvm-cov clean --workspace",
+            "cargo llvm-cov --no-report --workspace --locked --test e2e_x -- --list",
             "cargo llvm-cov --no-report --workspace --locked --test bdd -- --shard 2/4",
             "cargo llvm-cov report --lcov --ignore-filename-regex tests.rs$",
             "write out/e2e-2-of-4.lcov",

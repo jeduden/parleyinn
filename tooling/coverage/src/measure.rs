@@ -69,7 +69,10 @@ fn base_args() -> Vec<String> {
 /// The cargo commands that run `layer`'s tests, in order; none when the
 /// layer has no tests. A `shard` of the end-to-end layer runs `bdd`
 /// with `--shard K/N`, and the layer's other targets once, in the first
-/// shard, so the shards together run each test once.
+/// shard, so the shards together run each test once. The scenarios start
+/// the instrumented core, which cargo builds only beside a target of its
+/// own crate, so every other shard lists those targets' tests, which
+/// builds them and the core and runs no test.
 ///
 /// # Errors
 ///
@@ -92,9 +95,12 @@ pub fn test_runs(
     };
     let mut runs = Vec::new();
     let others = targets.iter().filter(|t| *t != BDD);
-    if shard.index == 1 && others.clone().next().is_some() {
+    if others.clone().next().is_some() {
         let mut args = base_args();
         args.extend(others.flat_map(|t| ["--test".to_owned(), t.clone()]));
+        if shard.index != 1 {
+            args.extend(["--", "--list"].map(str::to_owned));
+        }
         runs.push(args);
     }
     let mut args = base_args();
