@@ -18,12 +18,29 @@
 //! Inside an `impl` block for the type, `Self(..)` and `Self { .. }`
 //! build one only in the bodies of those four constructors of the
 //! inherent `impl`, and `Self::name(..)` is held to what
-//! `TrustedText::name(..)` would be. Nothing changes trusted text once
-//! built: an implementation of a trait that adds to it (`Add`,
-//! `AddAssign`, `Extend`, `fmt::Write` and the rest of [`CHANGING`]),
-//! and a method that takes `mut self` or is named for adding in place
-//! (`push_str`, `append` ...), are refused inside the crate and out. A
-//! `let Self(..)` pattern takes one apart and builds nothing.
+//! `TrustedText::name(..)` would be. A `let` pattern takes one apart and
+//! builds nothing.
+//!
+//! Nothing changes trusted text once built, and these rules fail closed,
+//! inside the crate and out:
+//!
+//! - The only traits implemented for it are those of
+//!   [`ALLOWED_TRAITS_SHOWN`]: `Clone`, `Debug`, `Display`, `PartialEq`,
+//!   `Eq`, `Hash`, `PartialOrd`, `Ord`, `AsRef<str>` and
+//!   `Deref<Target = str>`. Any other, a custom trait included, is
+//!   refused.
+//! - No method of any `impl` for it takes `&mut self`, `mut self` or
+//!   `self: &mut ..`, and no inherent method is named for adding in
+//!   place (`push_str`, `append` ...).
+//! - `&mut TrustedText`, a `mut` binding of type `TrustedText`, and
+//!   `&mut Self` in its `impl` blocks are refused wherever they stand.
+//! - In its `impl` blocks, outside the four constructors, no `mut` or
+//!   `ref mut` binding is made, and its field is read only by a method
+//!   taking `&self`.
+//! - Inside the crate, no tuple field is read and no `ref mut` binding
+//!   is made outside its `impl` blocks, and the type is a tuple struct
+//!   of one private field holding immutable text: `String`, `Box<str>`,
+//!   `Arc<str>`, `Rc<str>`, `Cow<'static, str>` or `&'static str`.
 //!
 //! Three forms hide a construction behind another name and are refused
 //! wherever they stand: `use .. TrustedText as X`, `type X = TrustedText`
@@ -53,19 +70,37 @@ const BUILDING: [&str; 6] = [
     "Deserialize",
 ];
 
-/// The traits whose implementation for `TrustedText` changes one after
-/// it is built, adding to it what a constructor never vetted.
-const CHANGING: [&str; 9] = [
-    "Add",
-    "AddAssign",
-    "Extend",
-    "Write",
-    "DerefMut",
-    "AsMut",
-    "BorrowMut",
-    "IndexMut",
-    "Sub",
+/// The traits `TrustedText` may implement: none of them can add text to
+/// it. `AsRef` and `Deref` are allowed only to `str`.
+const ALLOWED_TRAITS: [&str; 10] = [
+    "Clone",
+    "Debug",
+    "Display",
+    "PartialEq",
+    "Eq",
+    "Hash",
+    "PartialOrd",
+    "Ord",
+    "AsRef",
+    "Deref",
 ];
+
+/// The allowed traits, as a refusal names them.
+pub const ALLOWED_TRAITS_SHOWN: &str = "Clone, Debug, Display, PartialEq, Eq, Hash, PartialOrd, Ord, AsRef<str> and Deref<Target = str>";
+
+/// The types the one field of `TrustedText` may have: text that cannot
+/// change in place.
+const FIELD_TYPES: [&str; 6] = [
+    "String",
+    "Box<str>",
+    "Arc<str>",
+    "Rc<str>",
+    "Cow<'static,str>",
+    "&'staticstr",
+];
+
+/// The refusal of any other shape.
+const SHAPE: &str = "TrustedText must be a tuple struct of one private String, Box<str>, Arc<str>, Rc<str>, Cow<'static, str> or &'static str";
 
 /// The methods whose names say they add to a value in place.
 const CHANGING_METHODS: [&str; 6] = [
@@ -139,6 +174,16 @@ fn check_file(file: &str, text: &str, inside: bool) -> Vec<String> {
             continue;
         }
         let line = code[..offset].matches('\n').count() + 1;
+        if let Some(form) = mutable_mention(&code, offset) {
+            problems.push(format!(
+                "{file}:{line}: TrustedText is changed by {form}, {CHANGED}"
+            ));
+            continue;
+        }
+        if inside && shape_refused(&code, offset) {
+            problems.push(format!("{file}:{line}: {SHAPE}"));
+            continue;
+        }
         let Some(how) = construction(&code, offset) else {
             continue;
         };
@@ -157,7 +202,13 @@ fn check_file(file: &str, text: &str, inside: bool) -> Vec<String> {
             problems.push(format!("{file}:{line}: {why}"));
         }
     }
-    for (offset, why) in impl_problems(&code) {
+    let (mut found, blocks) = impl_problems(&code);
+    if inside {
+        found.extend(outside_blocks(&code, &blocks));
+    }
+    found.sort_by_key(|(offset, _)| *offset);
+    // Problems by offset, after those the mentions found.
+    for (offset, why) in found {
         let line = code[..offset].matches('\n').count() + 1;
         problems.push(format!("{file}:{line}: {why}"));
     }
@@ -165,12 +216,87 @@ fn check_file(file: &str, text: &str, inside: bool) -> Vec<String> {
     problems
 }
 
+/// The form a mention of the name at `offset` takes that lets a value
+/// change, if it does: `&mut TrustedText`, or a `mut` binding of it. A
+/// receiver `self: &mut TrustedText` is its method's to refuse.
+fn mutable_mention(code: &str, offset: usize) -> Option<&'static str> {
+    let before = unpath(code[..offset].trim_end());
+    if let Some(borrow) = before.strip_suffix("mut").filter(|b| {
+        !b.chars()
+            .next_back()
+            .is_some_and(|c| c.is_alphanumeric() || c == '_')
+    }) {
+        let borrow = borrow.trim_end();
+        let borrow = strip_lifetime(borrow);
+        if let Some(binding) = borrow.strip_suffix('&') {
+            return (!binding.trim_end().ends_with("self:")).then_some("a &mut TrustedText");
+        }
+        // Any other `mut` before the name, a `*mut` pointer say, fails
+        // closed too.
+        return Some("a mut TrustedText");
+    }
+    let binding = before.strip_suffix(':')?.trim_end();
+    let name_start = binding
+        .rfind(|c: char| !(c.is_alphanumeric() || c == '_'))
+        .map_or(0, |i| i + 1);
+    let mutable = binding[..name_start].trim_end();
+    (mutable.ends_with("mut") && word_at(mutable, mutable.len() - 3, "mut"))
+        .then_some("a mut binding of TrustedText")
+}
+
+/// `before`, the code before a mention of the name, without the path
+/// that qualifies it, such as `restore_block::`.
+fn unpath(before: &str) -> &str {
+    if before.ends_with("::") {
+        before
+            .trim_end_matches(|c: char| c.is_alphanumeric() || c == '_' || c == ':')
+            .trim_end()
+    } else {
+        before
+    }
+}
+
+/// `text` without the lifetime it ends in, such as `'a`.
+fn strip_lifetime(text: &str) -> &str {
+    let name = text.trim_end_matches(|c: char| c.is_alphanumeric() || c == '_');
+    name.strip_suffix('\'').map_or(text, str::trim_end)
+}
+
+/// Whether the mention of the name at `offset` defines the type in any
+/// shape but a tuple struct of one private field of immutable text.
+fn shape_refused(code: &str, offset: usize) -> bool {
+    let before = code[..offset].trim_end();
+    if !(before.ends_with("struct") && word_at(before, before.len() - 6, "struct")) {
+        return false;
+    }
+    let Some(fields) = code[offset + NAME.len()..].trim_start().strip_prefix('(') else {
+        return true;
+    };
+    let field: String = fields
+        .split(')')
+        .next()
+        .unwrap_or_default()
+        .split_whitespace()
+        .collect();
+    let field = match field.rsplit_once("::") {
+        Some((_, last)) if !field.starts_with('&') => last.to_owned(),
+        _ => field,
+    };
+
+    !FIELD_TYPES.contains(&field.as_str())
+}
+
+/// A problem at its offset in the code.
+type Found = (usize, String);
+
 /// What the `impl` blocks for `TrustedText` in `code` do that the rule
-/// refuses, each at its offset: an implementation of a trait that
-/// changes one, a method that changes one, and a value built through
-/// `Self` anywhere but the four constructors of the inherent `impl`.
-fn impl_problems(code: &str) -> Vec<(usize, String)> {
-    let mut out = Vec::new();
+/// refuses, each at its offset, and the braces of every such block: an
+/// implementation of a trait off the allow-list, a method that changes
+/// one or reads its field where it could change it, and a value built
+/// through `Self` anywhere but the four constructors of the inherent
+/// `impl`.
+fn impl_problems(code: &str) -> (Vec<Found>, Vec<(usize, usize)>) {
+    let (mut out, mut blocks) = (Vec::new(), Vec::new());
     for (at, _) in code.match_indices("impl") {
         if !word_at(code, at, "impl") {
             continue;
@@ -186,12 +312,15 @@ fn impl_problems(code: &str) -> Vec<(usize, String)> {
             continue;
         }
         let close = matching(code, open);
-        if let Some(name) = implemented.map(last_segment)
-            && CHANGING.contains(&name)
+        blocks.push((open, close));
+        if let Some(name) = implemented
+            .filter(|t| !trait_allowed(t, &code[open..close]))
+            .map(last_segment)
+            .filter(|name| !BUILDING.contains(name))
         {
             out.push((
                 at,
-                format!("TrustedText is changed by the trait {name}, {CHANGED}"),
+                format!("TrustedText implements the trait {name}, but only {ALLOWED_TRAITS_SHOWN} may be, so none adds text to it"),
             ));
         }
         for item in methods(code, open, close) {
@@ -199,7 +328,78 @@ fn impl_problems(code: &str) -> Vec<(usize, String)> {
         }
     }
 
+    (out, blocks)
+}
+
+/// Whether `TrustedText` may implement the trait `implemented`, whose
+/// `impl` block is `block`.
+fn trait_allowed(implemented: &str, block: &str) -> bool {
+    let name = last_segment(implemented);
+    let flat: String = block.split_whitespace().collect();
+    match name {
+        "AsRef" => {
+            let arguments: String = implemented.split_whitespace().collect();
+            arguments.ends_with("AsRef<str>")
+        }
+        "Deref" => flat.contains("typeTarget=str;"),
+        _ => ALLOWED_TRAITS.contains(&name),
+    }
+}
+
+/// What the `restore_block` crate does outside the `impl` blocks of
+/// `TrustedText`, whose braces `blocks` holds, that could change one: a
+/// tuple field read, or a `ref mut` binding.
+fn outside_blocks(code: &str, blocks: &[(usize, usize)]) -> Vec<(usize, String)> {
+    let outside = |at: usize| {
+        !blocks
+            .iter()
+            .any(|(open, close)| (*open..*close).contains(&at))
+    };
+    let mut out: Vec<(usize, String)> = tuple_fields(code, 0, code.len())
+        .into_iter()
+        .filter(|at| outside(*at))
+        .map(|at| (at, format!("the {RESTORE_BLOCK} crate reads a field outside TrustedText's impl, where nothing proves it cannot change trusted text")))
+        .collect();
+    out.extend(
+        ref_muts(code, 0, code.len())
+            .into_iter()
+            .filter(|at| outside(*at))
+            .map(|at| (at, format!("the {RESTORE_BLOCK} crate makes a ref mut binding outside TrustedText's impl, which could change trusted text"))),
+    );
+
     out
+}
+
+/// The offsets of every tuple field read, such as `t.0`, in
+/// `code[from..to]`; a number such as `1.0` is none.
+fn tuple_fields(code: &str, from: usize, to: usize) -> Vec<usize> {
+    code[from..to]
+        .match_indices('.')
+        .map(|(at, _)| from + at)
+        .filter(|at| {
+            let digit = code[at + 1..]
+                .chars()
+                .next()
+                .is_some_and(|c| c.is_ascii_digit());
+            let before = &code[..*at];
+            let token = before
+                .rsplit(|c: char| !(c.is_alphanumeric() || c == '_'))
+                .next()
+                .unwrap_or_default();
+            let after_value = before.ends_with([')', ']'])
+                || (!token.is_empty() && !token.starts_with(|c: char| c.is_ascii_digit()));
+            digit && after_value
+        })
+        .collect()
+}
+
+/// The offsets of every `ref mut` in `code[from..to]`.
+fn ref_muts(code: &str, from: usize, to: usize) -> Vec<usize> {
+    code[from..to]
+        .match_indices("ref")
+        .map(|(at, _)| from + at)
+        .filter(|at| word_at(code, *at, "ref") && code[at + 3..].trim_start().starts_with("mut"))
+        .collect()
 }
 
 /// Why a change after building is refused.
@@ -281,11 +481,26 @@ fn matching(code: &str, open: usize) -> usize {
     code.len()
 }
 
+/// How a method takes its value.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Receiver {
+    /// No `self`: an associated function.
+    None,
+    /// `&self`: it can read, never change.
+    Shared,
+    /// `self` by value, not `mut`.
+    Value,
+    /// `&mut self`, `mut self` or `self: &mut ..`.
+    Mut,
+}
+
 /// One method of an `impl` block.
 struct Method {
     at: usize,
     name: String,
-    receiver_mut: bool,
+    receiver: Receiver,
+    /// Where its parameters begin.
+    params: usize,
     /// Its body's braces, when it has one.
     body: Option<(usize, usize)>,
 }
@@ -324,19 +539,15 @@ fn method_at(code: &str, at: usize, close: usize) -> Method {
         .chars()
         .take_while(|c| c.is_alphanumeric() || *c == '_')
         .collect();
-    let params = code[at..close]
-        .find('(')
-        .map(|p| {
-            let p = at + p;
-            let end = code[p..close].find(')').map_or(close, |e| p + e);
-            code[p + 1..end]
-                .split_whitespace()
-                .collect::<Vec<_>>()
-                .join(" ")
-        })
-        .unwrap_or_default();
-    let receiver = params.split(',').next().unwrap_or_default().trim();
-    let receiver_mut = receiver.ends_with("mut self") || receiver.starts_with("mut self");
+    let params = code[at..close].find('(').map_or(close, |p| at + p);
+    let end = code[params..close].find(')').map_or(close, |e| params + e);
+    let first: String = code[(params + 1).min(end)..end]
+        .split(',')
+        .next()
+        .unwrap_or_default()
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ");
     let body = code[at..close]
         .find(['{', ';'])
         .map(|b| at + b)
@@ -346,30 +557,120 @@ fn method_at(code: &str, at: usize, close: usize) -> Method {
     Method {
         at,
         name,
-        receiver_mut,
+        receiver: receiver_of(&first),
+        params,
         body,
+    }
+}
+
+/// How the first parameter `first` takes the value.
+fn receiver_of(first: &str) -> Receiver {
+    let binding = first.split(':').next().unwrap_or_default();
+    if !has_word(binding, "self") {
+        return Receiver::None;
+    }
+    if has_word(first, "mut") {
+        Receiver::Mut
+    } else if first.starts_with('&') {
+        Receiver::Shared
+    } else {
+        Receiver::Value
     }
 }
 
 /// What the rule refuses in `method`, of the inherent `impl` or not.
 fn method_problems(code: &str, method: &Method, inherent: bool) -> Vec<(usize, String)> {
-    let mut out = Vec::new();
     let name = &method.name;
-    if inherent && method.receiver_mut {
-        out.push((
+    if method.receiver == Receiver::Mut {
+        return vec![(
             method.at,
             format!("TrustedText is changed by the method {name}, which takes mut self, {CHANGED}"),
-        ));
-    } else if inherent && CHANGING_METHODS.contains(&name.as_str()) {
+        )];
+    }
+    let mut out = Vec::new();
+    if inherent && CHANGING_METHODS.contains(&name.as_str()) {
         out.push((
             method.at,
             format!("TrustedText is changed by the method {name}, {CHANGED}"),
         ));
     }
+    let end = method.body.map_or(method.params, |(_, close)| close);
+    out.extend(
+        mut_self_refs(code, method.params, end)
+            .into_iter()
+            .map(|at| {
+                (
+                    at,
+                    format!("TrustedText is changed by a &mut Self, {CHANGED}"),
+                )
+            }),
+    );
     let Some((open, close)) = method.body else {
         return out;
     };
     let constructor = inherent && CONSTRUCTORS.contains(&name.as_str());
+    if !constructor {
+        out.extend(body_changes(code, method, open, close));
+    }
+    out.extend(self_builds(code, name, constructor, open, close));
+
+    out
+}
+
+/// The offsets in `code[from..to]` of each `&mut Self`.
+fn mut_self_refs(code: &str, from: usize, to: usize) -> Vec<usize> {
+    code[from..to]
+        .match_indices("Self")
+        .map(|(at, _)| from + at)
+        .filter(|at| word_at(code, *at, "Self") && mutable_borrow(code[..*at].trim_end()))
+        .collect()
+}
+
+/// Whether `before` ends in a mutable borrow: `&mut`, `& mut` or `&'a mut`.
+fn mutable_borrow(before: &str) -> bool {
+    before
+        .strip_suffix("mut")
+        .map(str::trim_end)
+        .map(strip_lifetime)
+        .is_some_and(|b| b.ends_with('&'))
+}
+
+/// What a method's body, from `open` to `close`, does that could change
+/// the value, outside the four constructors: a `mut` binding, and a
+/// field read in a method that takes no `&self`.
+fn body_changes(code: &str, method: &Method, open: usize, close: usize) -> Vec<(usize, String)> {
+    let name = &method.name;
+    let mut out: Vec<(usize, String)> = code[open..close]
+        .match_indices("mut")
+        .map(|(at, _)| open + at)
+        .filter(|at| word_at(code, *at, "mut") && !mutable_borrow(code[..at + 3].trim_end()))
+        .map(|at| {
+            (
+                at,
+                format!("TrustedText is changed by a mut binding in {name}, {CHANGED}"),
+            )
+        })
+        .collect();
+    if method.receiver != Receiver::Shared {
+        out.extend(tuple_fields(code, open, close).into_iter().map(|at| {
+            (at, format!("TrustedText's impl reads its field in {name}, which takes no &self, though only the four constructors and methods taking &self may"))
+        }));
+    }
+
+    out
+}
+
+/// The values `Self` builds in a body from `open` to `close` that the
+/// rule refuses: any outside a `constructor`, and a call through
+/// `Self::` to anything but the four.
+fn self_builds(
+    code: &str,
+    name: &str,
+    constructor: bool,
+    open: usize,
+    close: usize,
+) -> Vec<(usize, String)> {
+    let mut out = Vec::new();
     for (at, _) in code[open..close].match_indices("Self") {
         let at = open + at;
         if !word_at(code, at, "Self") {
@@ -468,6 +769,10 @@ fn construction(code: &str, offset: usize) -> Option<String> {
         .rsplit(char::is_whitespace)
         .next()
         .unwrap_or_default();
+    // A `let` pattern takes one apart; it builds nothing.
+    if previous == "let" {
+        return None;
+    }
     // After these the name is declared or used as a type, not built.
     let naming = ["->", "struct", "enum", "dyn", "trait", "use", "for"].contains(&previous)
         || previous.starts_with("impl");
