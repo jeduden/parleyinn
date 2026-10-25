@@ -1,7 +1,7 @@
 ---
 n: 15
 title: "Operations: verify, status, audit, the boundary and the threat model"
-status: "🔲"
+status: "✅"
 result: false
 ---
 # Phase 15: operations
