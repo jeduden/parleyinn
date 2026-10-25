@@ -76,7 +76,7 @@ fi
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT
 url=https://github.com/jdx/mise/releases/download/v$version/$file
-curl --proto '=https' --tlsv1.2 -fsSL --retry 3 --max-time 120 -o "$tmp/$file" "$url"
+curl --proto '=https' --tlsv1.2 -fsSL --retry 3 --retry-all-errors --connect-timeout 15 --max-time 60 -o "$tmp/$file" "$url"
 
 # GNU sha256sum, or shasum where sha256sum is missing or BSD's (macOS),
 # which both check a list file. BSD's sha256sum cannot read one on stdin.

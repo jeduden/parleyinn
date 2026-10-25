@@ -81,20 +81,24 @@ jobs:
           echo "TARGETS=$target:$NAME" >> "$GITHUB_ENV"
       - name: Install mingw-w64
         if: matrix.name == 'windows-amd64'
+        timeout-minutes: 2
         run: |
-          sudo apt-get update -qq
           # shellcheck disable=SC2086 # MINGW is a list of packages
-          sudo apt-get install -y -qq --no-install-recommends $MINGW
+          scripts/apt-install.sh $MINGW
       # The musl target's headers, from one checked release, in a tree
       # of its own: musl generates its per-architecture headers in
       # place, so a tree serves one target.
       - name: Install clang and the musl target's headers
         if: matrix.os == 'linux' && matrix.name != 'windows-amd64'
+        timeout-minutes: 2
         run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y -qq --no-install-recommends "$CLANG"
+          scripts/apt-install.sh "$CLANG"
           archive="$RUNNER_TEMP/musl.tar.gz"
-          curl -fsSL -o "$archive" "https://musl.libc.org/releases/musl-$MUSL_VERSION.tar.gz"
+          curl -fsSL --retry 4 --retry-all-errors --retry-delay 3 --connect-timeout 15 --max-time 60 \
+            -o "$archive" "https://musl.libc.org/releases/musl-$MUSL_VERSION.tar.gz" || {
+            echo "::error::could not download musl $MUSL_VERSION (host: musl.libc.org)"
+            exit 1
+          }
           echo "$MUSL_SHA256  $archive" | sha256sum -c -
           arch="${TARGET%%-*}"
           src="$RUNNER_TEMP/musl-src-$arch"
