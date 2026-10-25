@@ -233,6 +233,9 @@ impl Disk for Recording {
     fn read(&self, path: &Path) -> std::io::Result<Vec<u8>> {
         OsDisk.read(path)
     }
+    fn remove(&self, path: &Path) -> std::io::Result<()> {
+        OsDisk.remove(path)
+    }
 }
 
 #[then(regex = r"^each payload was written to a temporary file, fsynced, then renamed into place$")]

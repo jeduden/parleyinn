@@ -79,6 +79,30 @@ pub(crate) fn certified(conn: &Connection, device: WriterId) -> Result<Vec<Write
     Ok(out)
 }
 
+/// The content of each event of kind `kind` in `writer`'s log, in seq
+/// order, with its seq. An event whose content a purge erased, or that
+/// does not parse, is left out.
+pub(crate) fn contents(
+    conn: &Connection,
+    writer: WriterId,
+    kind: EventKind,
+) -> Result<Vec<(Seq, Value)>, StoreError> {
+    let mut statement = conn.prepare(
+        "SELECT seq, content FROM events WHERE writer = ?1 AND kind = ?2 AND content IS NOT NULL
+         ORDER BY seq",
+    )?;
+    let args = [writer.to_string(), kind.as_str().to_owned()];
+    let rows = statement.query_map(args, |r| Ok((r.get::<_, i64>(0)?, r.get::<_, String>(1)?)))?;
+    let mut out = Vec::new();
+    for row in rows {
+        let (seq, content) = row?;
+        let parsed = serde_json::from_str::<Value>(&content).ok();
+        out.extend(crate::seq_of(seq).zip(parsed));
+    }
+
+    Ok(out)
+}
+
 /// The seq of the last event of `writer`'s log; none for an empty log.
 pub(crate) fn head(conn: &Connection, writer: WriterId) -> Result<Option<Seq>, StoreError> {
     const LAST: &str = "SELECT max(seq) FROM events WHERE writer = ?1";

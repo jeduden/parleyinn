@@ -10,6 +10,9 @@
 //!   payload store beside `store.db` (REC-09).
 //! - [`hook`]: the hook observations and prompt commitments the hook
 //!   handlers hold beside the record (REC-19, PRV-08).
+//! - [`Store::purge`]: erasing the content of address ranges with the
+//!   tombstones that record it, finished by [`Store::finish_purge`]
+//!   (ADM-07, REC-17).
 //! - [`segment`]: each writer's log in segments, each with its format
 //!   version; a core append closes the segment it ends (REC-19).
 //! - [`index`]: the search index over event text, kept in the append
@@ -18,6 +21,7 @@
 pub mod hook;
 mod origin;
 pub mod payload;
+mod purge;
 mod recall;
 mod refusal;
 mod repository;
@@ -47,6 +51,7 @@ use serde_json::Value;
 
 pub use hook::{Held, Observation, PromptCommitment};
 pub use payload::{Disk, OsDisk, Payloads};
+pub use purge::{Erase, Finished, Purged};
 pub use recall::{RecallReach, Stats};
 pub use search::rank::Hit;
 pub use search_index::{GapClass, IndexGap, Search};
@@ -614,6 +619,22 @@ impl Store {
     /// Fails when SQLite does.
     pub fn certified_writers(&self, device: WriterId) -> Result<Vec<WriterId>, StoreError> {
         recall::certified(&self.conn, device)
+    }
+
+    /// The content of each event of kind `kind` in `writer`'s log, in seq
+    /// order, with its seq: what a derivation over one kind of event
+    /// reads without parsing the whole log. An event whose content was
+    /// erased by a purge is left out.
+    ///
+    /// # Errors
+    ///
+    /// Fails when SQLite does.
+    pub fn contents(
+        &self,
+        writer: WriterId,
+        kind: EventKind,
+    ) -> Result<Vec<(Seq, Value)>, StoreError> {
+        recall::contents(&self.conn, writer, kind)
     }
 
     /// The counts of the events `reach` reaches (`stat_list`).

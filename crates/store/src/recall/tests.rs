@@ -205,3 +205,49 @@ fn the_head_of_a_log_is_its_last_seq_and_an_empty_log_has_none() {
     assert_eq!(store.head(writer(2)).unwrap(), None);
     assert_eq!(store.head(writer(9)).unwrap(), None);
 }
+
+#[test]
+fn the_contents_of_one_kind_come_in_seq_order_without_the_erased_or_unparsed() {
+    let dir = TempDir::new().unwrap();
+    let mut store = open(&dir);
+    seat(&mut store, writer(1), room(1));
+    let act = |n: u64| {
+        event(
+            EventKind::PrincipalAct,
+            Provenance::Operator,
+            json!({"n": n}),
+        )
+    };
+    store
+        .append(
+            writer(1),
+            &[
+                act(1),
+                line("other kind", Provenance::Web),
+                act(2),
+                act(3),
+                act(4),
+            ],
+        )
+        .unwrap();
+    store
+        .conn
+        .execute("UPDATE events SET content = NULL WHERE seq = 3", [])
+        .unwrap();
+    store
+        .conn
+        .execute("UPDATE events SET content = 'not json' WHERE seq = 4", [])
+        .unwrap();
+
+    let found = store.contents(writer(1), EventKind::PrincipalAct).unwrap();
+
+    let seqs: Vec<u64> = found.iter().map(|(s, _)| s.get()).collect();
+    assert_eq!(seqs, [1, 5]);
+    assert_eq!(found[0].1, json!({"n": 1}));
+    assert!(
+        store
+            .contents(writer(2), EventKind::PrincipalAct)
+            .unwrap()
+            .is_empty()
+    );
+}

@@ -50,6 +50,12 @@ pub enum EventKind {
     /// A writer-label assignment: the label a writer is shown by, made by
     /// the device seat that first shows it (RCL-08).
     WriterLabel,
+    /// A purge's tombstone: the addresses, count, reason and commitments of
+    /// a purged range, never its content (ADM-07, REC-17).
+    Tombstone,
+    /// A time mark: the node's clock at an interval, from which a
+    /// retention policy ages the events before it (REC-15).
+    TimeMark,
 }
 
 impl EventKind {
@@ -71,6 +77,8 @@ impl EventKind {
             Self::RepositoryBind => "repository_bind",
             Self::Recall => "recall",
             Self::WriterLabel => "writer_label",
+            Self::Tombstone => "tombstone",
+            Self::TimeMark => "time_mark",
         }
     }
 
@@ -92,6 +100,8 @@ impl EventKind {
             Self::RepositoryBind,
             Self::Recall,
             Self::WriterLabel,
+            Self::Tombstone,
+            Self::TimeMark,
         ]
         .into_iter()
         .find(|k| k.as_str() == name)
