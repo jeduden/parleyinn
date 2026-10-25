@@ -333,6 +333,7 @@ jobs:
             cargo build --release --locked -p benchmark -p parinn
           fi
       - name: Sample both sides and gate
+        timeout-minutes: 20
         shell: bash
         run: |
           set -euo pipefail
