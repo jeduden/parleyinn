@@ -59,7 +59,7 @@ fn uuid(n: u64) -> String {
 
 /// A Bash call and its result, numbered `n`, the result's output
 /// `output`, each line with a `uuid` of its own.
-fn pair(n: u64, output: &str) -> Result<Vec<Value>, String> {
+pub(crate) fn pair(n: u64, output: &str) -> Result<Vec<Value>, String> {
     let (mut call, mut result) = recorded_call("Bash")?;
     let id = format!("toolu_fixture{n}");
     call["message"]["content"][0]["id"] = json!(id);

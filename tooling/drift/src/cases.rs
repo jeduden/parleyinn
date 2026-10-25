@@ -70,6 +70,7 @@ pub fn cases() -> Vec<Case> {
         ci_gate_cases(),
         static_analysis_cases(),
         complexity_cases(),
+        trusted_text_cases(),
         toml_cases(),
         setup_cases(),
         release_cases(),
@@ -1185,6 +1186,26 @@ fn toml_cases() -> Vec<Case> {
             "the file is not properly formatted",
         ),
     ]
+}
+
+/// The drift SEC-07's check exists to catch: a crate outside
+/// `restore_block` constructing `TrustedText`. The drift of
+/// `restore_block` building it from other text gets its case when that
+/// crate lands (plan 2609292013): a case creates one file, and a crate
+/// needs a manifest too.
+fn trusted_text_cases() -> Vec<Case> {
+    const GATE: &str = "restore_content_is_built_from_trusted_text_alone";
+    let gate = || cargo_test("engineering", "static_analysis", GATE);
+    vec![case(
+        "a crate outside restore_block constructing TrustedText",
+        GATE,
+        Injection::create(
+            "crates/store/src/leak.rs",
+            "fn leak(recalled: String) -> TrustedText {\n    TrustedText::new(recalled)\n}\n",
+        ),
+        gate(),
+        "crates/store/src/leak.rs:2: TrustedText is constructed (TrustedText::new) outside the restore_block crate",
+    )]
 }
 
 /// The drifts the complexity gate exists to catch: the workspace lints
