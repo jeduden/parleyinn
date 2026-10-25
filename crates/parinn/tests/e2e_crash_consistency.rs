@@ -1,16 +1,20 @@
-//! ENG-06 over ingest (plan 2609292012, phase 6): the built core is
-//! killed with `SIGKILL` at a random point while `parinn ingest` records
-//! a transcript with payloads, turn ends and a subagent, in an isolated
+//! ENG-06 (plan 2609292012, phases 6 and 16): the built core is killed
+//! with `SIGKILL` at a random point while `parinn ingest` records a
+//! transcript with payloads, turn ends and a subagent, while `parinn
+//! purge --range` erases one of its events at a terminal, and while
+//! `parinn rebuild` derives the derived artifacts again, in an isolated
 //! home, every start confined (ENG-12). After every kill `parinn verify`
 //! exits 0: every writer's chain gap-free and whole, every payload its
-//! event names present and opening its commitment, and every writer's
-//! segments tiling its log. A kill before the store exists leaves
-//! nothing to verify.
+//! event names present and opening its commitment, every purged event's
+//! erasure confirmed by its tombstone, and every writer's segments
+//! tiling its log. A kill before the store exists leaves nothing to
+//! verify.
 //!
 //! The kill points come from a seeded generator, so a failing iteration
 //! names a seed that replays it. CI runs `PARINN_CRASH_ITERATIONS`
-//! iterations, a few by default; the nightly job runs 10,000.
-//! Purge, migration and rebuild join as their phases land.
+//! iterations of each operation, a few by default; the nightly jobs run
+//! 10,000 of each. Migration joins when M3 ships the first one
+//! (ADM-05).
 
 #![allow(
     clippy::unwrap_used,
@@ -41,6 +45,10 @@ const PER_HOME: u64 = 25;
 /// The latest kill, past which most ingests have finished.
 const LATEST: u64 = 400;
 
+/// The latest kill of a purge or a rebuild, past which most have
+/// finished.
+const LATEST_ACT: u64 = 300;
+
 fn core() -> Confinement {
     Confinement::of(Component::Core).unwrap_or_else(|e| panic!("{e}"))
 }
@@ -58,12 +66,17 @@ fn setting(name: &str, default: u64) -> u64 {
 }
 
 /// The kill point of iteration `n` under `seed`, in milliseconds after
-/// the start: a splitmix64 step, so every point replays.
-fn kill_point(seed: u64, n: u64) -> u64 {
+/// the start, below `latest`: a splitmix64 step, so every point replays.
+fn kill_point_below(seed: u64, n: u64, latest: u64) -> u64 {
     let mut z = seed.wrapping_add(n).wrapping_mul(0x9E37_79B9_7F4A_7C15);
     z = (z ^ (z >> 30)).wrapping_mul(0xBF58_476D_1CE4_E5B9);
     z = (z ^ (z >> 27)).wrapping_mul(0x94D0_49BB_1331_11EB);
-    (z ^ (z >> 31)) % LATEST
+    (z ^ (z >> 31)) % latest
+}
+
+/// The kill point of an ingest's iteration `n` under `seed`.
+fn kill_point(seed: u64, n: u64) -> u64 {
+    kill_point_below(seed, n, LATEST)
 }
 
 /// Kills `parinn ingest --path transcript` in `home` at `after`, then
@@ -138,6 +151,141 @@ fn every_kill_during_ingest_leaves_a_record_that_verifies() {
         "{iterations} iterations on {threads} threads, {} killed mid-ingest",
         killed.into_inner()
     );
+}
+
+/// Asserts that `parinn verify` exits 0 in `home`.
+fn verified(home: &Path, after: Duration, label: &str) {
+    let out = core()
+        .run(program(), &["verify"], home)
+        .unwrap_or_else(|e| panic!("{label}: {e}"));
+    assert!(
+        out.status.success(),
+        "{label}: after a kill at {after:?}, parinn verify exited {}: {}",
+        out.status,
+        String::from_utf8_lossy(&out.stderr)
+    );
+}
+
+/// A fresh home that ingested the transcript whole and recorded the
+/// standing risk acceptance a purge needs (OWN-22), and the writer of
+/// the transcript's run.
+fn ingested() -> (TempDir, String) {
+    let (home, transcript) = fresh();
+    let path = transcript.display().to_string();
+    let out = core()
+        .run(program(), &["ingest", "--path", &path], home.path())
+        .unwrap_or_else(|e| panic!("{e}"));
+    let said = String::from_utf8_lossy(&out.stdout).into_owned();
+    assert!(
+        out.status.success(),
+        "parinn ingest exited {}: {said}",
+        out.status
+    );
+    let writer = said
+        .lines()
+        .find_map(|l| {
+            l.split_once(" into writer ")
+                .map(|(_, w)| w.trim().to_owned())
+        })
+        .unwrap_or_else(|| panic!("parinn ingest named no writer: {said}"));
+    let accepted = core()
+        .run_at_terminal(program(), &["risk-acceptance", "record"], home.path(), &[])
+        .unwrap_or_else(|e| panic!("{e}"));
+    assert!(
+        accepted.status.success(),
+        "parinn risk-acceptance record exited {}",
+        accepted.status
+    );
+
+    (home, writer)
+}
+
+/// The operations killed after ingest, each by the arguments of
+/// iteration `i` in its home of `writer`'s run, and whether it runs at a
+/// terminal.
+#[derive(Clone, Copy)]
+enum Act {
+    /// `parinn purge --range` of one event, a widening act at a terminal.
+    Purge,
+    /// `parinn rebuild`.
+    Rebuild,
+}
+
+impl Act {
+    fn args(self, writer: &str, i: u64) -> Vec<String> {
+        match self {
+            // Seq 1 opens the run; each iteration of a home purges an
+            // event of its own after it.
+            Self::Purge => vec![
+                "purge".into(),
+                "--range".into(),
+                format!("{writer}:{0}-{0}", i + 2),
+            ],
+            Self::Rebuild => vec!["rebuild".into()],
+        }
+    }
+}
+
+/// Runs every `threads`th iteration of `act` from `first` up to
+/// `iterations`, each `PER_HOME` in a freshly ingested home; how many
+/// were killed mid-way.
+fn iterate_act(act: Act, first: u64, threads: u64, iterations: u64, seed: u64) -> u64 {
+    let mut home = ingested();
+    let mut killed = 0;
+    for (i, n) in (first..iterations).step_by(threads as usize).enumerate() {
+        let i = i as u64 % PER_HOME;
+        if n > first && i == 0 {
+            home = ingested();
+        }
+        let after = Duration::from_millis(kill_point_below(seed, n, LATEST_ACT));
+        let label = format!("seed {seed}, iteration {n}");
+        let args = act.args(&home.1, i);
+        let args: Vec<&str> = args.iter().map(String::as_str).collect();
+        let run = match act {
+            Act::Purge => {
+                core().run_killed_at_terminal(program(), &args, home.0.path(), &[], after)
+            }
+            Act::Rebuild => core().run_killed(program(), &args, home.0.path(), &[], after),
+        };
+        killed += u64::from(run.unwrap_or_else(|e| panic!("{label}: {e}")));
+        verified(home.0.path(), after, &label);
+    }
+
+    killed
+}
+
+/// Kills `act` at `PARINN_CRASH_ITERATIONS` points on as many threads
+/// as the machine has cores; how many iterations ran and how many were
+/// killed mid-way.
+fn kill_act(act: Act) -> (u64, u64) {
+    let iterations = setting("PARINN_CRASH_ITERATIONS", ITERATIONS);
+    let seed = setting("PARINN_CRASH_SEED", 0);
+    let cores = std::thread::available_parallelism().map_or(1, |n| n.get() as u64);
+    let threads = setting("PARINN_CRASH_THREADS", cores).clamp(1, iterations.max(1));
+    let killed = std::sync::atomic::AtomicU64::new(0);
+    std::thread::scope(|scope| {
+        for first in 0..threads {
+            let killed = &killed;
+            scope.spawn(move || {
+                let n = iterate_act(act, first, threads, iterations, seed);
+                killed.fetch_add(n, std::sync::atomic::Ordering::Relaxed);
+            });
+        }
+    });
+
+    (iterations, killed.into_inner())
+}
+
+#[test]
+fn every_kill_during_purge_leaves_a_record_that_verifies() {
+    let (iterations, killed) = kill_act(Act::Purge);
+    println!("{iterations} purge iterations, {killed} killed mid-purge");
+}
+
+#[test]
+fn every_kill_during_rebuild_leaves_a_record_that_verifies() {
+    let (iterations, killed) = kill_act(Act::Rebuild);
+    println!("{iterations} rebuild iterations, {killed} killed mid-rebuild");
 }
 
 #[test]
