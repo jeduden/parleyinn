@@ -134,7 +134,10 @@ fn the_register_must_reject_update_checks_and_telemetry_under_sec_15() {
         "rejected",
         "SEC-15",
     );
-    assert_eq!(register_rejects(&[good.clone()]), Vec::<String>::new());
+    assert_eq!(
+        register_rejects(std::slice::from_ref(&good)),
+        Vec::<String>::new()
+    );
 
     for bad in [
         row(

@@ -52,10 +52,7 @@ fn cites(block: &str) -> Vec<String> {
     {
         let (_, after) = rest.split_at(at);
         let mut text = after.split_once(": ").map_or("", |(_, t)| t.trim_start());
-        loop {
-            let Some(span) = text.strip_prefix('`').and_then(|t| t.split_once('`')) else {
-                break;
-            };
+        while let Some(span) = text.strip_prefix('`').and_then(|t| t.split_once('`')) {
             out.push(span.0.to_owned());
             text = span.1;
             let joined = [", and ", ", ", " and "]

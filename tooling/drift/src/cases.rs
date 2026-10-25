@@ -69,7 +69,9 @@ pub fn cases() -> Vec<Case> {
         confinement_cases(),
         ci_gate_cases(),
         static_analysis_cases(),
-        operations_cases(),
+        boundary_cases(),
+        telemetry_cases(),
+        documentation_cases(),
         complexity_cases(),
         trusted_text_cases(),
         toml_cases(),
@@ -1125,21 +1127,28 @@ fn static_analysis_cases() -> Vec<Case> {
     ]
 }
 
-/// The drifts the operations gates exist to catch: the boundary
-/// register and the core's evidence (SEC-01, SEC-19), telemetry and
-/// update checks (SEC-15), the threat model (SEC-17) and a privacy
-/// statement with no test behind it (ENG-22).
-fn operations_cases() -> Vec<Case> {
-    const REGISTER: &str = "docs/srs/06b-boundary-register.md";
-    const MODEL: &str = "docs/security/threat-model.md";
-    const BOUNDARY: &str =
-        "the_boundary_register_assigns_each_component_once_and_the_core_keeps_its_evidence";
-    const CORE: &str = "the_core_opens_no_socket_and_starts_no_program_but_its_kernel_worker";
-    const BUILT: &str = "only_the_core_is_built_and_it_sits_in_b0";
-    const TELEMETRY: &str = "no_telemetry_crash_report_or_update_check_ships";
-    const THREATS: &str = "the_threat_model_covers_the_register_and_compares_with_zed_delta";
-    const PRIVACY: &str = "every_privacy_statement_cites_a_test_that_exists";
-    let gate = |name| cargo_test("engineering", "boundary", name);
+/// The boundary register the SEC-19 cases drift.
+const REGISTER: &str = "docs/srs/06b-boundary-register.md";
+
+/// The threat model the SEC-17 cases drift.
+const MODEL: &str = "docs/security/threat-model.md";
+
+const BOUNDARY: &str =
+    "the_boundary_register_assigns_each_component_once_and_the_core_keeps_its_evidence";
+const CORE: &str = "the_core_opens_no_socket_and_starts_no_program_but_its_kernel_worker";
+const BUILT: &str = "only_the_core_is_built_and_it_sits_in_b0";
+const TELEMETRY: &str = "no_telemetry_crash_report_or_update_check_ships";
+const THREATS: &str = "the_threat_model_covers_the_register_and_compares_with_zed_delta";
+const PRIVACY: &str = "every_privacy_statement_cites_a_test_that_exists";
+
+/// A drift of the operations gates, checked by the gate test `name`.
+fn gate(name: &'static str) -> Check {
+    cargo_test("engineering", "boundary", name)
+}
+
+/// The drifts the boundary register and the core's evidence exist to
+/// catch (SEC-01, SEC-19).
+fn boundary_cases() -> Vec<Case> {
     vec![
         case(
             "a register row naming two boundaries",
@@ -1196,6 +1205,13 @@ fn operations_cases() -> Vec<Case> {
             gate(BUILT),
             "left: [\"audit\", \"parinn\"]",
         ),
+    ]
+}
+
+/// The drifts SEC-15 exists to catch: a web address in the core's code
+/// and a register that no longer rejects update checks and telemetry.
+fn telemetry_cases() -> Vec<Case> {
+    vec![
         case(
             "a web address in the core's code",
             TELEMETRY,
@@ -1218,6 +1234,13 @@ fn operations_cases() -> Vec<Case> {
             gate(TELEMETRY),
             "no rejected register row names update checks and telemetry under SEC-15",
         ),
+    ]
+}
+
+/// The drifts the threat model (SEC-17) and the privacy statements
+/// (ENG-22) exist to catch.
+fn documentation_cases() -> Vec<Case> {
+    vec![
         case(
             "a register row the threat model does not cover",
             THREATS,
