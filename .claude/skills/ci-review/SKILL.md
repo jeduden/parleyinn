@@ -20,13 +20,12 @@ cannot take and the procedure around it.
    scratch file and hand it those paths.
 2. Measure the history with the GitHub Actions tools for the last 30 runs
    of `ci.yml` on `main` and on pull requests, and save a table beside the
-   diff:
-   - **Fast:** median and p90 wall clock of the `CI` run; per-job median
-     and the critical path; cache hit or miss per job.
-   - **Stable:** runs that failed, then passed on the same commit
-     (rerun rate), per job; jobs that failed on `main`.
-   - **Actionable:** for the last few failed jobs, fetch the logs and note
-     whether the first failing line names the cause and the repro command.
+   diff. For speed, take the median and p90 wall clock of the `CI` run, the
+   per-job median, the critical path and the cache hit or miss per job. For
+   stability, take the runs that failed, then passed on the same commit
+   (the rerun rate) per job, and the jobs that failed on `main`. For
+   actionable output, fetch the logs of the last few failed jobs and note
+   whether the first failing line names the cause and the repro command.
 3. Launch the `ci-engineer` agent with the target and the table. Add the
    `persona-platform-engineer` agent when the target changes runners or
    caching, and `persona-security-officer` when it changes permissions,
