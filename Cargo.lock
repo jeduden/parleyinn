@@ -1044,6 +1044,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "parinn-eval"
+version = "0.0.0"
+dependencies = [
+ "administration",
+ "ingest",
+ "key",
+ "mcp",
+ "record",
+ "redaction",
+ "serde_json",
+ "store",
+ "testkit",
+]
+
+[[package]]
 name = "peg"
 version = "0.6.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"

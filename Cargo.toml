@@ -65,6 +65,7 @@ adr = { path = "tooling/adr" }
 benchmark = { path = "tooling/benchmark" }
 calibrate = { path = "tooling/calibrate" }
 drift = { path = "tooling/drift" }
+parinn-eval = { path = "tooling/eval" }
 coverage = { path = "tooling/coverage" }
 engineering = { path = "tooling/engineering" }
 finding-ledger = { path = "tooling/finding-ledger" }
