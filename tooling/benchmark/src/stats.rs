@@ -1,7 +1,8 @@
-//! The two statistics the gate decides with: the median, kept exact as
-//! twice its value, and the one-sided Mann–Whitney U test as a z score.
-//! Both are pure and deterministic: no clock, no randomness, so the same
-//! samples always yield the same decision.
+//! The statistics the gate decides with: the median, kept exact as twice
+//! its value, the one-sided Mann–Whitney U test as a z score, and its
+//! stratified form for samples taken on several runners. All are pure
+//! and deterministic: no clock, no randomness, so the same samples
+//! always yield the same decision.
 
 /// Twice the median of `samples`: an even count's median is the mean of
 /// its middle two, so twice it stays an integer and the gate compares
@@ -25,8 +26,45 @@ pub fn twice_median(samples: &[u64]) -> Option<u128> {
 /// since then nothing separates the two sides.
 #[must_use]
 pub fn mann_whitney_z(base: &[u64], head: &[u64]) -> f64 {
-    if base.is_empty() || head.is_empty() {
+    rank_sum(base, head).map_or(0.0, |(above, variance)| (above - 0.5) / variance.sqrt())
+}
+
+/// The stratified rank test (van Elteren) of `head` against `base`, each
+/// stratum a pair of the base's and the head's samples taken on one
+/// runner. A sample is ranked only against samples of its own stratum,
+/// so the runners' speed differences never widen the distributions;
+/// each stratum's rank sum, less the same continuity correction of one
+/// half as [`mann_whitney_z`] takes, is weighted by one over its size
+/// plus one, and the weighted sums are combined into one z score. One
+/// stratum is exactly [`mann_whitney_z`]. A stratum with an empty side
+/// or every sample tied separates nothing and is left out, so one real
+/// stratum beside such strata is the plain test too; zero when none
+/// remains.
+#[must_use]
+pub fn stratified_z(strata: &[(&[u64], &[u64])]) -> f64 {
+    let (mut above, mut variance) = (0.0, 0.0);
+    for (base, head) in strata {
+        if let Some((a, v)) = rank_sum(base, head) {
+            let weight = 1.0 / (count(base.len() + head.len()) + 1.0);
+            above += weight * (a - 0.5);
+            variance += weight * weight * v;
+        }
+    }
+    if variance <= 0.0 {
         return 0.0;
+    }
+
+    above / variance.sqrt()
+}
+
+/// How far the sum of `head`'s ranks among `base` and `head` together
+/// lies above its expectation when the sides do not differ, and the
+/// variance of that sum, with ties given their mean rank and the
+/// variance corrected for them. `None` when either side is empty or
+/// every sample ties, since then nothing separates the two sides.
+fn rank_sum(base: &[u64], head: &[u64]) -> Option<(f64, f64)> {
+    if base.is_empty() || head.is_empty() {
+        return None;
     }
     let mut pooled: Vec<(u64, bool)> = base
         .iter()
@@ -48,14 +86,13 @@ pub fn mann_whitney_z(base: &[u64], head: &[u64]) -> f64 {
 
     let (n_base, n_head) = (count(base.len()), count(head.len()));
     let n = n_base + n_head;
-    let u = head_ranks - n_head * (n_head + 1.0) / 2.0;
-    let mean = n_base * n_head / 2.0;
+    let expected = n_head * (n + 1.0) / 2.0;
     let variance = n_base * n_head / 12.0 * ((n + 1.0) - ties / (n * (n - 1.0)));
     if variance <= 0.0 {
-        return 0.0;
+        return None;
     }
 
-    (u - mean - 0.5) / variance.sqrt()
+    Some((head_ranks - expected, variance))
 }
 
 /// A count as a float. Sample counts stay far below 2^52, where the

@@ -154,6 +154,7 @@ row: "- [{filename}]({filename}) — {summary}"
 ?>
 - [CHANGELOG.md](CHANGELOG.md) — Release notes and upgrade notes per version, newest first (ENG-23).
 - [DEPENDENCIES.md](DEPENDENCIES.md) — Every direct dependency, listed through the decision record that justifies it (ENG-18, ENG-26). The ENG-18 scenario fails the build when the manifests and the dependency ADRs disagree or a license is off the allow-list.
+- [docs/ci.md](docs/ci.md) — What ParleyInn asks of its CI: a fast build, a stable build that does not flake, and failure output that tells the author what to do, with the ci-engineer agent and ci-review skill that check it.
 - [docs/development.md](docs/development.md) — Build commands, static analysis and supply-chain checks, and how CI, the nightly fuzz job and the signed release pipeline work. Testing has its own page, docs/testing.md.
 - [docs/domain-model/index.md](docs/domain-model/index.md) — ParleyInn's domain model: the closed set of concepts with their definitions, how they relate, the terms that are not ParleyInn concepts, and how names in code, docs and UI follow the model. The SRS links here for every term, and the domain-model agent reviews against it.
 - [docs/srs/index.md](docs/srs/index.md) — The ParleyInn Software Requirements Specification — the normative source for every requirement id a feature scenario is tagged with.
@@ -163,14 +164,13 @@ row: "- [{filename}]({filename}) — {summary}"
 - [SECURITY.md](SECURITY.md) — How to report a vulnerability in ParleyInn privately, the 90-day coordinated disclosure policy, which versions get fixes, and how to verify a release (ENG-24, ENG-20).
 <?/catalog?>
 
-The SRS sections under [docs/srs](docs/srs/index.md) each carry a one-line
-summary in the index there; open only the section a task touches.
+Open only the [SRS](docs/srs/index.md) section a task touches.
 
 ## Development Workflow
 
 - Any change follows Red/Green TDD: failing test, then pass, then commit
 - Keep commits small and focused on one change
-- Run `mdsmith check .` before committing; all Markdown must pass
+- Run tools through `mise exec --`; `mdsmith check .` must pass before a push
 - Never modify `.mdsmith.yml` (linter configuration) without explicit consent
 - Every direct dependency needs an accepted ADR under `docs/adr/`, listed in
   [DEPENDENCIES.md](DEPENDENCIES.md) (ENG-18, ENG-26); aim to add none
@@ -235,11 +235,12 @@ rules on them.
 The subagents under `.claude/agents`, each one perspective:
 
 <?catalog
-glob: ".claude/agents/{domain-model,persona-*,test-engineer}.md"
+glob: ".claude/agents/{ci-engineer,domain-model,persona-*,test-engineer}.md"
 sort: path
 header: ""
 row: "- [{name}]({filename}) — {description}"
 ?>
+- [ci-engineer](.claude/agents/ci-engineer.md) — Guards ParleyInn's CI as a process: a fast build, a stable build that does not flake, and failure output that tells the author what to do. Reviews a workflow change, a CI run history or a failing run and reports where it falls short. Never approves.
 - [domain-model](.claude/agents/domain-model.md) — Guards ParleyInn's domain model as docs/domain-model/ defines it. Reviews every change to the model and every SRS change, and is consulted on names (functions, types, modules, command and tool names, other identifiers), documentation, UX and UI copy and developer experience. Reports every term used outside the model. Never approves.
 - [persona-agent](.claude/agents/persona-agent.md) — Claude itself as a user of ParleyInn: an agent that needs its constraints back after compaction and exact recall of its own history. Reviews a pull request, plan, pitch, design or spec from this perspective and reports where it fails them. Never approves.
 - [persona-fleet-developer](.claude/agents/persona-fleet-developer.md) — A developer running five or more agents at once on one machine, each in its own worktree, and steering them through the day. Reviews a pull request, plan, pitch, design or spec from this perspective and reports where it fails them. Never approves.
@@ -293,8 +294,7 @@ Report in the SRS's terms, not the source's.
 ## Isolation for Agents and Tests
 
 Never run a command that writes to, deletes from, or purges the real
-`~/.parinn`, `$PARINN_HOME` or `~/.claude` of the machine you run on. Point
-`HOME` and `PARINN_HOME` at a temporary directory first, as the test world does
-(ENG-14). No instruction here may direct an agent to run a destructive command
-against non-isolated state.
+`~/.parinn`, `$PARINN_HOME` or `~/.claude`. Point `HOME` and `PARINN_HOME` at a
+temporary directory first, as the test world does (ENG-14). No instruction here
+may direct an agent to run a destructive command against non-isolated state.
 <?/include?>

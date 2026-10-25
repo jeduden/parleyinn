@@ -26,11 +26,41 @@ jobs:
   # mise reads rust-toolchain.toml (ENG-01) and mise.lock; each job
   # installs only its tools, with a cache key that includes the pins.
   #
-  # Every unit and integration test, and every scenario through
-  # cucumber-rs. Pending scenarios are skipped and counted, so the
-  # backlog is visible in every run.
-  test:
+  # NFR-02: the scenario that holds a hook handler to its budget times
+  # the release build of the core, never the development build
+  # (testkit::release_core_executable), against the frozen calibration
+  # workload (testkit::calibrate_executable). Built once here, with the
+  # real HOME, and handed to every job whose tests run it; no cache, as
+  # in release.yml.
+  release-core:
     runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install pinned tools with mise
+        uses: ./.github/actions/setup-mise
+        with:
+          tools: "rust"
+          cache: true
+      - run: cargo fetch --locked
+      - name: Build the release core the budget rows time
+        run: cargo build --release --locked -p parinn -p calibrate
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: release-core
+          path: |
+            target/release/parinn
+            target/release/calibrate
+
+  # Every unit and integration test but the scenario crate's, which
+  # the scenarios job runs beside its scenarios, so each job stays
+  # under its budget.
+  test:
+    needs: release-core
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -58,14 +88,12 @@ jobs:
       # ENG-30: the license check reads only the sources cargo has
       # already fetched, for every release target.
       - run: cargo fetch --locked
-      # NFR-02: the scenario that holds a hook handler to its budget
-      # times the release build of the core, never the development
-      # build (testkit::release_core_executable), against the frozen
-      # calibration workload (testkit::calibrate_executable). Built once
-      # here, with the real HOME, before the suite; no cache, as in
-      # release.yml.
-      - name: Build the release core the budget rows time
-        run: cargo build --release --locked -p parinn -p calibrate
+      - name: Take the release core the budget rows time
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: release-core
+          path: target/release
+      - run: chmod +x target/release/parinn target/release/calibrate
       # ENG-14: the suite runs with HOME pointed at an empty decoy
       # directory, the toolchain keeping its own homes. The isolation
       # guard (testkit::guard) aborts a test that resolves real
@@ -80,30 +108,81 @@ jobs:
           mkdir "$decoy"
           export CARGO_HOME="${CARGO_HOME:-$HOME/.cargo}"
           export RUSTUP_HOME="${RUSTUP_HOME:-$HOME/.rustup}"
-          HOME="$decoy" cargo test --workspace --locked
+          HOME="$decoy" cargo test --workspace --locked --exclude scenario
           if [ -n "$(ls -A "$decoy")" ]; then
             echo "::error::a test left files under the real HOME"
             ls -lA "$decoy"
             exit 1
           fi
-      # The pending backlog, counted. A measurement, not a gate.
-      - name: Count scenarios
-        if: ${{ !cancelled() }}
+
+  # Every scenario through cucumber-rs, and the scenario crate's own
+  # tests. Pending scenarios are skipped and counted, so the backlog is
+  # visible in every run: the runner's own count line goes to the
+  # summary, from the run that already happened.
+  scenarios:
+    needs: release-core
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install pinned tools with mise
+        uses: ./.github/actions/setup-mise
+        with:
+          tools: "rust"
+          cache: true
+      # ENG-12: as in the test job, the runner must confine the core.
+      - name: Let the end-to-end suite confine the core
+        run: |
+          if [ -e /proc/sys/kernel/apparmor_restrict_unprivileged_userns ]; then
+            sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+          fi
+          command -v strace >/dev/null || {
+            sudo apt-get update && sudo apt-get install -y --no-install-recommends strace
+          }
+      - run: cargo fetch --locked
+      - name: Take the release core the budget rows time
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: release-core
+          path: target/release
+      - run: chmod +x target/release/parinn target/release/calibrate
+      # The scenarios start the development build of the core, which
+      # a workspace test run builds and a run of one crate does not.
+      - run: cargo build --locked -p parinn
+      # ENG-14: the same decoy HOME as the test job.
+      - name: Run the scenarios with a decoy HOME
         shell: bash
         run: |
-          cargo test --locked --quiet -p scenario --test bdd |
-            grep '^scenarios:' | tee -a "$GITHUB_STEP_SUMMARY"
+          set -o pipefail
+          decoy="$RUNNER_TEMP/decoy-home"
+          mkdir "$decoy"
+          export CARGO_HOME="${CARGO_HOME:-$HOME/.cargo}"
+          export RUSTUP_HOME="${RUSTUP_HOME:-$HOME/.rustup}"
+          HOME="$decoy" cargo test --locked -p scenario 2>&1 | tee "$RUNNER_TEMP/scenarios.log"
+          if [ -n "$(ls -A "$decoy")" ]; then
+            echo "::error::a test left files under the real HOME"
+            ls -lA "$decoy"
+            exit 1
+          fi
+          grep '^scenarios:' "$RUNNER_TEMP/scenarios.log" | tee -a "$GITHUB_STEP_SUMMARY"
 
   # ENG-11: line coverage per test layer (unit, integration,
-  # end-to-end) and per crate, held to the floors in Cargo.toml's
-  # [workspace.metadata.coverage]. The table lands in the job summary,
-  # and Codecov receives one flag per test layer.
-  coverage:
+  # end-to-end) and per crate. Each layer is measured in a job of its
+  # own, on its own instrumented build, so each stays under its
+  # budget; the coverage job below merges them and holds the floors.
+  coverage-layer:
+    name: coverage (${{ matrix.layer }})
+    needs: release-core
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      # The OIDC token Codecov exchanges for an upload grant, below.
-      id-token: write
+    timeout-minutes: 5
+    strategy:
+      fail-fast: false
+      matrix:
+        layer: [unit, integration, e2e]
+    env:
+      LAYER: ${{ matrix.layer }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -131,8 +210,45 @@ jobs:
       - run: cargo fetch --locked
       # NFR-02: the budget rows time the release core, which the
       # instrumented run does not build.
-      - run: cargo build --release --locked -p parinn -p calibrate
-      - run: cargo run --locked -p coverage
+      - name: Take the release core the budget rows time
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: release-core
+          path: target/release
+      - run: chmod +x target/release/parinn target/release/calibrate
+      - run: cargo run --locked -p coverage -- --layer "$LAYER"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: coverage-${{ matrix.layer }}
+          path: target/coverage/${{ matrix.layer }}.lcov
+
+  # The layers merged: the table and the test counts land in the job
+  # summary, every crate is held to the floors in Cargo.toml's
+  # [workspace.metadata.coverage], and Codecov receives one flag per
+  # test layer.
+  coverage:
+    needs: coverage-layer
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      # The OIDC token Codecov exchanges for an upload grant, below.
+      id-token: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install pinned tools with mise
+        uses: ./.github/actions/setup-mise
+        with:
+          tools: "rust"
+          cache: true
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: coverage-*
+          path: target/coverage
+          merge-multiple: true
+      - run: cargo run --locked -p coverage -- --merge
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: ${{ !cancelled() }}
         with:
@@ -183,6 +299,7 @@ jobs:
   # runner can check but not run.
   miri:
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     env:
       MIRI_NIGHTLY: nightly-2026-10-16
     steps:
@@ -207,6 +324,7 @@ jobs:
   # ENG-16: clippy with warnings denied, and rustfmt's layout.
   lint:
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -225,6 +343,7 @@ jobs:
   # vulnerability.
   supply-chain:
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -252,7 +371,17 @@ jobs:
   # when the check it names lets the drift through. It needs mdsmith and
   # taplo on PATH, so it runs here rather than in `cargo test --workspace`.
   drift:
+    name: drift (shard ${{ matrix.shard }})
     runs-on: ubuntu-latest
+    timeout-minutes: 5
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1, 2, 3]
+    env:
+      # Every nth case from the shard's own, n the matrix's size, so the
+      # shards together hold every case once and each fits the budget.
+      DRIFT_SHARD: ${{ strategy.job-index }}/${{ strategy.job-total }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -287,15 +416,12 @@ jobs:
   # runner's speed lands on both alike. The head's gate then fails
   # naming each benchmark whose median is more than 10% slower with
   # significance (one-sided Mann-Whitney U, alpha 0.01). The suite
-  # times the core's start-up today, a second or two of sampling after
-  # two small release builds, so it gates every pull request rather
-  # than waiting for the nightly job.
-  benchmark:
+  # times the core's start-up today. Three jobs share the work so each
+  # fits its budget: this one builds both sides once, the shards sample,
+  # and the benchmark job pools every shard's samples and runs the gate.
+  benchmark-suites:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
-    env:
-      ROUNDS: 30
-      SAMPLES: 10
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -326,49 +452,151 @@ jobs:
           if [ -f tooling/benchmark/Cargo.toml ]; then
             cargo build --release --locked -p benchmark -p parinn
           fi
-      - name: Sample both sides and gate
+      # Both sides' release suites and cores, for every shard and the
+      # gate, so each builds nothing.
+      - name: Collect both sides' suites and cores
+        shell: bash
+        run: |
+          mkdir -p "$RUNNER_TEMP/suites/head" "$RUNNER_TEMP/suites/base"
+          cp target/release/benchmark target/release/parinn "$RUNNER_TEMP/suites/head/"
+          base="$RUNNER_TEMP/base/target/release"
+          if [ -x "$base/benchmark" ]; then
+            cp "$base/benchmark" "$base/parinn" "$RUNNER_TEMP/suites/base/"
+          fi
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: benchmark-suites
+          path: ${{ runner.temp }}/suites/
+
+  # The rounds, sharded across runners: each shard interleaves both
+  # sides on its one runner and keeps the global alternation of which
+  # side goes first. Thirty rounds of ten samples a side in all.
+  benchmark-rounds:
+    name: benchmark (shard ${{ matrix.shard }})
+    needs: benchmark-suites
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+    env:
+      ROUNDS: 30
+      SHARDS: ${{ strategy.job-total }}
+      SHARD: ${{ strategy.job-index }}
+      SAMPLES: 10
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: benchmark-suites
+          path: ${{ runner.temp }}/suites
+      - name: Sample both sides, this shard's rounds
         shell: bash
         run: |
           set -euo pipefail
-          head="$GITHUB_WORKSPACE/target/release"
-          base="$RUNNER_TEMP/base/target/release"
+          chmod +x "$RUNNER_TEMP"/suites/*/*
+          head="$RUNNER_TEMP/suites/head"
+          base="$RUNNER_TEMP/suites/base"
           out="$RUNNER_TEMP/samples"
           mkdir -p "$out"
+          # One side's suite, on that side's release core.
+          suite() { "$1/benchmark" run --core "$1/parinn" --samples "$SAMPLES"; }
           if [ ! -x "$base/benchmark" ]; then
-            "$head/benchmark" run --core "$head/parinn" --samples "$SAMPLES" > "$out/head.samples"
-            msg="the base has no benchmark suite to compare with; the head's suite ran"
-            echo "::warning::$msg"
-            echo "$msg" >> "$GITHUB_STEP_SUMMARY"
+            suite "$head" > "$out/head.samples"
+            touch "$out/no-base"
             exit 0
           fi
-          for round in $(seq "$ROUNDS"); do
+          # Both sides' files read once: a fresh runner's first start of
+          # a just-downloaded executable can stall for seconds.
+          cat "$head"/* "$base"/* > /dev/null
+          per=$((ROUNDS / SHARDS))
+          if [ $((per * SHARDS)) -ne "$ROUNDS" ]; then
+            echo "::error::$SHARDS shards do not divide $ROUNDS rounds; size the matrix to a divisor of ROUNDS"
+            exit 1
+          fi
+          for i in $(seq "$per"); do
+            round=$((SHARD * per + i))
             order="base head"
             [ $((round % 2)) -eq 0 ] && order="head base"
             for side in $order; do
               bin="$head"
               [ "$side" = base ] && bin="$base"
-              core="$bin/parinn"
               # Only the base side is taken again: it runs main's
               # benchmark, which fails a round when a stalled disk
-              # overruns the hook budget twice. The head's benchmark
-              # retries inside the round, and a head round that fails
-              # fails the gate.
+              # overruns the hook budget twice or holds a start past
+              # its deadline. The head's benchmark retries inside the
+              # round, and a head round that fails fails the gate.
               tries=1
               [ "$side" = base ] && tries=3
               for try in $(seq "$tries"); do
-                if "$bin/benchmark" run --core "$core" --samples "$SAMPLES" \
-                  > "$out/round.samples" 2> "$out/round.err"; then
+                if suite "$bin" > "$out/round.samples" 2> "$out/round.err"; then
                   cat "$out/round.samples" >> "$out/$side.samples"
                   break
                 fi
                 cat "$out/round.err" >&2
-                if [ "$try" -eq "$tries" ] || ! grep -q "overran its hook budget" "$out/round.err"; then
+                if [ "$try" -eq "$tries" ] || ! grep -qE "overran its hook budget|did not exit within" "$out/round.err"; then
                   exit 1
                 fi
                 sleep 2
               done
             done
           done
+          rm -f "$out/round.samples" "$out/round.err"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: benchmark-samples-${{ matrix.shard }}
+          path: ${{ runner.temp }}/samples/
+
+  # ENG-15: the gate, over every shard's samples, each shard one
+  # stratum so a sample is ranked only against its own runner's. The
+  # head's gate fails naming each benchmark whose median is more than
+  # 10% slower with significance (stratified one-sided rank test,
+  # alpha 0.01).
+  benchmark:
+    needs: benchmark-rounds
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          # The head and its first parent, the base, whose accepted
+          # regressions the gate reads.
+          fetch-depth: 2
+      - name: Check out the base beside the head
+        run: git worktree add --detach "$RUNNER_TEMP/base" HEAD^1
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: benchmark-suites
+          path: ${{ runner.temp }}/suites
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: benchmark-samples-*
+          path: ${{ runner.temp }}/shards
+      - name: Pool the shards and gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          chmod +x "$RUNNER_TEMP"/suites/*/*
+          head="$RUNNER_TEMP/suites/head"
+          out="$RUNNER_TEMP/samples"
+          mkdir -p "$out"
+          # Each shard's samples under a stratum line naming the shard,
+          # which the gate pairs across the two sides.
+          pool() {
+            for dir in "$RUNNER_TEMP"/shards/benchmark-samples-*/; do
+              shard="$(basename "$dir")"
+              { echo "# stratum ${shard#benchmark-samples-}"; cat "$dir/$1.samples"; } >> "$out/$1.samples"
+            done
+          }
+          pool head
+          if ls "$RUNNER_TEMP"/shards/*/no-base >/dev/null 2>&1; then
+            msg="the base has no benchmark suite to compare with; the head's suite ran"
+            echo "::warning::$msg"
+            echo "$msg" >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          pool base
           status=0
           # A regression the head's record accepts, and the base's does
           # not yet, passes as accepted (ENG-15).
@@ -400,6 +628,7 @@ jobs:
 
   markdown:
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -417,6 +646,7 @@ jobs:
   # misspelt manifest key; this refuses it.
   toml:
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -434,6 +664,7 @@ jobs:
   # interpolated into a shell.
   workflows:
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -459,14 +690,52 @@ jobs:
   ci:
     name: CI
     if: ${{ always() }}
-    needs: [test, coverage, lint, supply-chain, drift, benchmark, build, markdown, toml, workflows, miri]
+    needs: [test, coverage, lint, supply-chain, drift, benchmark, build, markdown, toml, workflows, miri, scenarios, release-core, coverage-layer, benchmark-suites, benchmark-rounds]
     runs-on: ubuntu-latest
+    timeout-minutes: 5
+    # actions: read lets the timings step list this run's jobs.
+    permissions:
+      contents: read
+      actions: read
     steps:
+      # Each job's duration and result, once per run, so ci-review reads
+      # them instead of measuring. A measurement, not a gate: when it
+      # cannot be taken, the step warns, writes no file, and the gate
+      # below still decides.
+      - name: Record job timings
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_ID: ${{ github.run_id }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -o pipefail
+          if gh api --paginate "repos/$REPO/actions/runs/$RUN_ID/jobs?filter=latest" \
+              --jq '.jobs[] | select(.completed_at != null and .name != "CI") | {name, conclusion, seconds: ((.completed_at | fromdateiso8601) - (.started_at | fromdateiso8601))}' \
+              | jq -s '.' > ci-timings.json; then
+            jq -r '"| job | result | seconds |", "|---|---|---|", (.[] | "| \(.name) | \(.conclusion) | \(.seconds) |")' ci-timings.json >> "$GITHUB_STEP_SUMMARY"
+          else
+            rm -f ci-timings.json
+            echo "::warning::could not record job timings; ci-review has no timings for this run"
+          fi
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: ${{ !cancelled() }}
+        with:
+          name: ci-timings
+          path: ci-timings.json
+          if-no-files-found: ignore
+      # Each job that did not succeed is named, so the failure says
+      # where to look. A cancelled job either ran past its
+      # timeout-minutes or was superseded by a newer push; its own log
+      # says which.
       - name: Fail unless every job passed
         env:
           RESULTS: ${{ join(needs.*.result, ' ') }}
+          NEEDS: ${{ toJSON(needs) }}
         run: |
           echo "job results: $RESULTS"
-          for r in $RESULTS; do
-            [ "$r" = "success" ] || { echo "::error::a CI job ended $r"; exit 1; }
-          done
+          failed=$(jq -r 'to_entries[] | select(.value.result != "success") | "\(.key) ended \(.value.result)"' <<< "$NEEDS")
+          if [ -n "$failed" ]; then
+            while IFS= read -r line; do echo "::error title=CI::job $line"; done <<< "$failed"
+            exit 1
+          fi

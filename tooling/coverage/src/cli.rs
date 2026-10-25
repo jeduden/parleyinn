@@ -6,8 +6,8 @@ use std::path::{Path, PathBuf};
 
 use crate::Host;
 use crate::lcov;
-use crate::measure::measure;
-use crate::plan::Plan;
+use crate::measure::{measure, measure_layer, merge_layers};
+use crate::plan::{Plan, TestLayer};
 use crate::report::{shortfalls, table, tally};
 use crate::shape;
 
@@ -18,12 +18,28 @@ pub const EXIT_FAILURE: u8 = 1;
 /// The command line is wrong.
 pub const EXIT_USAGE: u8 = 2;
 
-const USAGE: &str = "usage: coverage [--out DIR]
+const USAGE: &str = "usage: coverage [--out DIR] [--layer NAME | --merge]
 
-Runs cargo-llvm-cov once per test layer (unit, integration, end-to-end),
+Runs cargo-llvm-cov once per test layer (unit, integration, e2e),
 prints line coverage per crate and layer, writes each layer's lcov to
 DIR (target/coverage by default), and fails when a crate is below a
-floor in [workspace.metadata.coverage].";
+floor in [workspace.metadata.coverage].
+
+--layer NAME runs one layer alone and writes DIR/NAME.lcov, with no
+table and no floors; --merge reads the layers written that way under
+DIR and prints the table and the floors without running a test. CI
+measures each layer in a job of its own, then merges them.";
+
+/// What one run does.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Mode {
+    /// Every layer, then the table and the floors.
+    Measure,
+    /// One layer's lcov, nothing else.
+    Layer(TestLayer),
+    /// The table and the floors from the lcov files already written.
+    Merge,
+}
 
 /// Runs the command on `args` and returns its exit code. It is `main`
 /// without the process: `host` runs cargo and writes files, and
@@ -38,8 +54,8 @@ pub fn run(
     summary: Option<&Path>,
     nested: bool,
 ) -> u8 {
-    let out = match parse_args(args) {
-        Ok(Some(out)) => out,
+    let (out, mode) = match parse_args(args) {
+        Ok(Some(parsed)) => parsed,
         Ok(None) => {
             let _ = writeln!(stdout, "{USAGE}");
             return EXIT_OK;
@@ -59,7 +75,7 @@ pub fn run(
         return EXIT_USAGE;
     }
 
-    match report(host, &out, summary) {
+    match report(host, &out, mode, summary) {
         Ok((table, shortfalls)) => {
             let _ = write!(stdout, "{table}");
             for s in &shortfalls {
@@ -78,40 +94,71 @@ pub fn run(
     }
 }
 
-/// Reads `--out DIR`; `None` asks for the usage.
-fn parse_args(args: impl IntoIterator<Item = String>) -> Result<Option<PathBuf>, String> {
+/// Reads `--out DIR` and the mode; `None` asks for the usage.
+fn parse_args(args: impl IntoIterator<Item = String>) -> Result<Option<(PathBuf, Mode)>, String> {
     let mut out = PathBuf::from("target/coverage");
+    let mut mode = Mode::Measure;
     let mut args = args.into_iter();
     while let Some(arg) = args.next() {
-        match arg.as_str() {
+        let (flag, value) = match arg.split_once('=') {
+            Some((flag, value)) => (flag, Some(value.to_owned())),
+            None => (arg.as_str(), None),
+        };
+        match flag {
             "-h" | "--help" => return Ok(None),
             "--out" => {
-                out = args
-                    .next()
+                out = value
+                    .or_else(|| args.next())
                     .map(PathBuf::from)
-                    .ok_or("--out needs a directory")?
+                    .ok_or("--out needs a directory")?;
             }
-            _ => match arg.strip_prefix("--out=") {
-                Some(dir) => out = PathBuf::from(dir),
-                None => return Err(format!("unexpected argument {arg:?}")),
-            },
+            "--layer" => {
+                let name = value
+                    .or_else(|| args.next())
+                    .ok_or("--layer needs a name: unit, integration or e2e")?;
+                let layer = TestLayer::from_name(&name)
+                    .ok_or_else(|| format!("no test layer {name:?}: unit, integration or e2e"))?;
+                mode = set_mode(mode, Mode::Layer(layer))?;
+            }
+            "--merge" => mode = set_mode(mode, Mode::Merge)?,
+            _ => return Err(format!("unexpected argument {arg:?}")),
         }
     }
 
-    Ok(Some(out))
+    Ok(Some((out, mode)))
 }
 
-/// Measures, and returns the table and the shortfalls.
+/// `wanted` in place of `Measure`; a second mode is refused.
+fn set_mode(current: Mode, wanted: Mode) -> Result<Mode, String> {
+    match current {
+        Mode::Measure => Ok(wanted),
+        _ => Err("--layer and --merge are one or the other, once".to_owned()),
+    }
+}
+
+/// Measures, or merges, and returns the table and the shortfalls; for
+/// one layer, what it wrote and no shortfall.
 fn report(
     host: &dyn Host,
     out: &Path,
+    mode: Mode,
     summary: Option<&Path>,
 ) -> Result<(String, Vec<String>), String> {
     let metadata = host.cargo_output(
         &["metadata", "--format-version", "1", "--no-deps", "--locked"].map(str::to_owned),
     )?;
     let plan = Plan::from_metadata(&metadata)?;
-    let layers = measure(host, &plan, out)?;
+    let layers = match mode {
+        Mode::Measure => measure(host, &plan, out)?,
+        Mode::Merge => merge_layers(host, out)?,
+        Mode::Layer(layer) => {
+            let line = match measure_layer(host, &plan, layer, out)? {
+                Some(_) => format!("wrote {}\n", out.join(format!("{layer}.lcov")).display()),
+                None => format!("no {layer} tests to measure\n"),
+            };
+            return Ok((line, Vec::new()));
+        }
+    };
     let all = lcov::merge(layers.iter().map(|(_, lines)| lines));
     let rows = tally(&plan, &layers, &all);
     let mut sources = Vec::new();
