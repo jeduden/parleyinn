@@ -4,7 +4,6 @@
 //! fully ingested, and how far `parinn verify` finds each short of its
 //! end (ADM-09).
 
-use std::fs;
 use std::io::{self, Read};
 use std::path::{Path, PathBuf};
 
@@ -149,9 +148,13 @@ pub(crate) fn scan(mut bytes: impl Read, offset: u64) -> io::Result<Scanned> {
     })
 }
 
-/// What is at `path` now, its first `offset` bytes hashed.
+/// What is at `path` now, its first `offset` bytes hashed. It is read
+/// only when it is a regular file, through ingest's guarded open: a
+/// FIFO is never waited on, and a link swapped in after ingest's check
+/// is not followed out of the transcript roots, so either is unreadable
+/// (SEC-18, REC-13, ENG-03).
 pub(crate) fn look(path: &Path, offset: u64) -> Found {
-    match fs::File::open(path) {
+    match ingest::read::regular_file(path) {
         Ok(file) => scan(file, offset).map_or(Found::Unreadable, Found::File),
         Err(e) if e.kind() == io::ErrorKind::NotFound => Found::Gone,
         Err(_) => Found::Unreadable,
@@ -324,4 +327,4 @@ pub(crate) fn lost_text(lost: &[String]) -> String {
 }
 
 #[cfg(test)]
-mod tests;
+pub(crate) mod tests;

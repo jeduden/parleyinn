@@ -360,3 +360,72 @@ fn a_path_with_control_characters_is_shown_escaped() {
         "transcript sources gone before they were fully ingested: /t/<U+0007>.jsonl"
     );
 }
+
+/// Makes a FIFO at `path` with `mkfifo`, which std cannot, waiting for
+/// it up to a deadline (ENG-03).
+#[cfg(unix)]
+#[expect(
+    clippy::disallowed_types,
+    reason = "a test makes a FIFO with mkfifo; the core starts no program"
+)]
+pub(crate) fn mkfifo(path: &Path) {
+    let mut child = std::process::Command::new("mkfifo")
+        .arg(path)
+        .spawn()
+        .unwrap();
+    let step = std::time::Duration::from_millis(10);
+    let mut waited = std::time::Duration::ZERO;
+    while child.try_wait().unwrap().is_none() {
+        assert!(
+            waited < std::time::Duration::from_secs(10),
+            "mkfifo did not exit"
+        );
+        std::thread::sleep(step);
+        waited += step;
+    }
+    assert!(path.exists());
+}
+
+/// What `parinn verify` finds of the source at `path`, or none when
+/// it does not answer within five seconds (ENG-03).
+fn verified_within_deadline(path: &Path) -> Option<Completeness> {
+    let path = path.to_path_buf();
+    let (tx, rx) = std::sync::mpsc::channel();
+    std::thread::spawn(move || {
+        let found = completeness(&[source(&path, 5, 5)], &[], &look, NOW);
+        let _ = tx.send(found);
+    });
+
+    rx.recv_timeout(std::time::Duration::from_secs(5)).ok()
+}
+
+#[cfg(unix)]
+#[test]
+fn a_fifo_at_a_recorded_path_fails_as_unreadable_without_waiting() {
+    let dir = TempDir::new().unwrap();
+    let fifo = dir.path().join("a.jsonl");
+    mkfifo(&fifo);
+
+    let found = verified_within_deadline(&fifo).expect("verify waited on a FIFO");
+
+    assert!(found.short.is_empty());
+    assert_eq!(
+        found.failed,
+        [(
+            fifo.to_string_lossy().into_owned(),
+            "cannot be read to check it"
+        )]
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn a_link_swapped_in_at_a_recorded_path_is_not_followed() {
+    let dir = TempDir::new().unwrap();
+    let outside = dir.path().join("outside.jsonl");
+    std::fs::write(&outside, BODY).unwrap();
+    let path = dir.path().join("a.jsonl");
+    std::os::unix::fs::symlink(&outside, &path).unwrap();
+
+    assert_eq!(look(&path, 5), Found::Unreadable);
+}

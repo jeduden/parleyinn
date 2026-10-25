@@ -29,6 +29,25 @@ pub struct Line<'a> {
 /// Fails when the path is not a regular file, cannot be opened or read,
 /// or changed between the look and the open.
 pub fn transcript(path: &Path) -> io::Result<Vec<u8>> {
+    let mut file = regular_file(path)?;
+    let mut bytes = Vec::new();
+    file.read_to_end(&mut bytes)?;
+
+    Ok(bytes)
+}
+
+/// The regular file at `path`, opened for reading: refused unless it is
+/// a regular file, opened without blocking should it become a FIFO, and
+/// refused unless the file opened is the one looked at, so a link or
+/// other file swapped in between is refused, not followed (SEC-18,
+/// ENG-03). Ingest reads transcripts through it, and `parinn verify`
+/// and the start markers' readers read through it too.
+///
+/// # Errors
+///
+/// Fails when the path is not a regular file, cannot be opened, or
+/// changed between the look and the open.
+pub fn regular_file(path: &Path) -> io::Result<File> {
     let looked = fs::symlink_metadata(path)?;
     if !looked.file_type().is_file() {
         return Err(io::Error::new(
@@ -36,12 +55,10 @@ pub fn transcript(path: &Path) -> io::Result<Vec<u8>> {
             "not a regular file",
         ));
     }
-    let mut file = open(path)?;
+    let file = open(path)?;
     same_file(&looked, &file.metadata()?)?;
-    let mut bytes = Vec::new();
-    file.read_to_end(&mut bytes)?;
 
-    Ok(bytes)
+    Ok(file)
 }
 
 /// Opens `path` for reading, never waiting for a FIFO's writer.
