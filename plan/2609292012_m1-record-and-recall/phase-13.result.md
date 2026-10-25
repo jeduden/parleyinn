@@ -78,3 +78,21 @@ For the stakeholder:
 Parked: purge and quarantine in recall (phase 14); recall taint and the
 recall event of a command line (OQ-50 (h)); `parinn event` scopes
 (VIEW-09).
+
+## Scenario timing
+
+Full `bdd` run, 125 scenarios and 744 steps passing either way:
+870 s before, 112 s after, one machine.
+
+| Scenario (steps)           | Before | After | What dominated                   |
+| -------------------------- | -----: | ----: | -------------------------------- |
+| SEC-04, 5 rows             | 739 s  | 65 s  | recall count decoding 1M events  |
+| RCL-03, cursor walk        | 73 s   | 4 s   | ~95 confined `parinn mcp` starts |
+| NFR-02 hook budget, 3 rows | 13 s   | 11 s  | timed starts: left as measured   |
+| REC-13 live ingest, 2 rows | 7 s    | 6 s   | the steps' own waits: left       |
+| ENG license texts          | 6 s    | 4 s   | `cargo metadata`: left           |
+| every other scenario       | 29 s   | 15 s  | debug Ed25519, strace stops      |
+
+Fixes: strace `--seccomp-bpf` (ENG-12), recall events found by SQL,
+one MCP server per cursor walk, recordings parsed once, one scenario
+at a time, crypto crates optimized in dev. Left: SEC-04's 1M build, 47 s.

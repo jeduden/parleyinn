@@ -239,6 +239,14 @@ pub fn block(pin: &QualifyingPin, field: &Sanitized) -> TrustedText {
     let head = TrustedText::fixed(\"Pins that restore:\");
     TrustedText::join(&[head, TrustedText::pin(pin), TrustedText::field(field)])
 }
+pub struct TrustedText(String);
+impl TrustedText {
+    pub fn fixed(text: &'static str) -> Self { Self(text.to_owned()) }
+    pub fn pin(pin: &QualifyingPin) -> Self { Self(pin.text().to_owned()) }
+    pub fn field(field: &Sanitized) -> Self { Self(field.text().to_owned()) }
+    pub fn join(parts: &[Self]) -> Self { Self(parts.iter().map(|p| p.0.as_str()).collect()) }
+    pub fn as_str(&self) -> &str { &self.0 }
+}
 ";
 
 /// Writes `files` into a fresh directory of the scenario's home and
@@ -338,6 +346,33 @@ fn fails_inside_the_crate(w: &mut World) -> Result<(), String> {
             "sec-07-literal",
             "pub fn block(recalled: String) -> TrustedText {\n    TrustedText(recalled)\n}\n",
             2,
+        ),
+        // `Self` builds one in a method that is none of the four.
+        (
+            "sec-07-self",
+            "impl TrustedText {\n    pub fn wrap(recalled: &str) -> Self { Self(recalled.into()) }\n}\n",
+            2,
+        ),
+        (
+            "sec-07-self-call",
+            "impl TrustedText {\n    pub fn pin(recalled: &str) -> Self { Self::wrap(recalled) }\n}\n",
+            2,
+        ),
+        // A value built by `fixed` is added to after it is built.
+        (
+            "sec-07-append",
+            "impl TrustedText {\n    pub fn append(&mut self, recalled: &str) { self.0.push_str(recalled) }\n}\n",
+            2,
+        ),
+        (
+            "sec-07-extend",
+            "impl<'a> Extend<&'a str> for TrustedText {\n    fn extend<I>(&mut self, recalled: I) {}\n}\n",
+            1,
+        ),
+        (
+            "sec-07-write",
+            "impl std::fmt::Write for TrustedText {\n    fn write_str(&mut self, recalled: &str) -> std::fmt::Result { Ok(()) }\n}\n",
+            1,
         ),
     ] {
         let root = repository(w, name, &[("crates/restore_block/src/lib.rs", body)])?;
