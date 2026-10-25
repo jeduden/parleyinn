@@ -12,6 +12,11 @@ fn read(path: &Path) -> String {
 }
 
 #[test]
+fn build_core_builds_the_development_core() {
+    assert_eq!(build_core().to_string(), "cargo build --locked -p parinn");
+}
+
+#[test]
 fn shard_takes_every_nth_case_or_all() {
     let names =
         |spec| shard(cases(), spec).map(|c| c.into_iter().map(|c| c.name).collect::<Vec<_>>());

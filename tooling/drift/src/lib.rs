@@ -142,6 +142,14 @@ pub fn scenario(id: &str) -> Check {
     )
 }
 
+/// Builds the development core, which the scenario checks start and no
+/// check builds for itself, so the suite does not depend on which check
+/// happens to run first.
+#[must_use]
+pub fn build_core() -> Check {
+    Check::new("cargo", &["build", "--locked", "-p", "parinn"])
+}
+
 /// Runs the one test `name` in the `target` test target of `package`.
 #[must_use]
 pub fn cargo_test(package: &str, target: &str, name: &str) -> Check {

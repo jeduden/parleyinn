@@ -22,7 +22,7 @@ use std::process::{Command, Stdio};
 use std::thread;
 use std::time::{Duration, Instant};
 
-use drift::{Check, apply, cases, shard};
+use drift::{Check, apply, build_core, cases, shard};
 use testkit::TempDir;
 
 /// Bounds one check; a run of one test target takes seconds once the
@@ -47,6 +47,8 @@ fn every_drift_is_caught() {
     assert!(!selected.is_empty(), "shard {spec:?} holds no case");
 
     sync_copy(&testkit::repo_root(), &work);
+    let (ok, out) = run(&work, &target, &build_core());
+    assert!(ok, "the development core does not build:\n{out}");
     let checks: BTreeSet<Check> = selected.iter().map(|c| c.check.clone()).collect();
     for check in checks {
         let (ok, out) = run(&work, &target, &check);
