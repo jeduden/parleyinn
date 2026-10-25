@@ -15,8 +15,10 @@ and the `ci-review` skill measures them.
 - The `CI` job waits for every other job, so the slowest chain of jobs
   sets the wall clock. Keep that chain short.
 - Jobs that can run side by side do. A job names only the jobs it needs.
-- Every job restores a cache keyed on the pins, and installs tools once.
-- Work too slow for a pull request moves to the nightly job.
+- Every job restores a cache keyed on the pins, and installs tools once. A
+  key that changes every run, or a cache nothing reads, is waste.
+- No job repeats another's build, download or install. Work too slow for a
+  pull request moves to the nightly job.
 - Every job sets `timeout-minutes` near its normal duration, so a hang
   fails in minutes.
 
@@ -31,7 +33,7 @@ and the `ci-review` skill measures them.
   a failure that is not the change's.
 - No job touches the real `HOME`, `PARINN_HOME` or Claude Code
   configuration (ENG-14), and each workflow holds the least `permissions:`
-  it needs.
+  it needs, and zizmor stays green.
 
 ## Actionable
 
@@ -46,8 +48,7 @@ and the `ci-review` skill measures them.
 
 ## Checking it
 
-Run the `ci-review` skill on a workflow change, or on the recent runs. It
-measures run time, the rerun rate and the failed logs, then hands them to
-the `ci-engineer` agent. The agent only reports; it never approves.
+The `ci-review` skill measures the pipelines against this page and hands
+the numbers to the `ci-engineer` agent, which reports and never approves.
 Workflow changes are CODEOWNERS-protected, so they land in their own pull
 request.
