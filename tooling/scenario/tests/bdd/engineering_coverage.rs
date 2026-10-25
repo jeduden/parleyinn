@@ -56,12 +56,11 @@ fn every_sensitive_crate(w: &mut World) -> Result<(), String> {
             row.sensitive_floor
         ));
     }
-    let (built, _) = coverage_floors::built(plan, row);
+    let (built, skipped) = coverage_floors::built(plan, row);
     if built.is_empty() {
         return Err("the workspace builds no security-sensitive crate".to_owned());
     }
 
-    let skipped = coverage_floors::built(plan, row).1;
     outcome(coverage_floors::sensitive_problems(plan, row))
         .map_err(|e| format!("{e}\nnot built yet, so skipped: {}", skipped.join(", ")))
 }
