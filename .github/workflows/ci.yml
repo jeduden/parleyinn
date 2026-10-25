@@ -547,9 +547,11 @@ jobs:
           name: benchmark-samples-${{ matrix.shard }}
           path: ${{ runner.temp }}/samples/
 
-  # ENG-15: the gate, over every shard's samples pooled. The head's
-  # gate fails naming each benchmark whose median is more than 10%
-  # slower with significance (one-sided Mann-Whitney U, alpha 0.01).
+  # ENG-15: the gate, over every shard's samples, each shard one
+  # stratum so a sample is ranked only against its own runner's. The
+  # head's gate fails naming each benchmark whose median is more than
+  # 10% slower with significance (stratified one-sided rank test,
+  # alpha 0.01).
   benchmark:
     needs: benchmark-rounds
     runs-on: ubuntu-latest
@@ -579,14 +581,22 @@ jobs:
           head="$RUNNER_TEMP/suites/head"
           out="$RUNNER_TEMP/samples"
           mkdir -p "$out"
-          cat "$RUNNER_TEMP"/shards/*/head.samples > "$out/head.samples"
+          # Each shard's samples under a stratum line naming the shard,
+          # which the gate pairs across the two sides.
+          pool() {
+            for dir in "$RUNNER_TEMP"/shards/benchmark-samples-*/; do
+              shard="$(basename "$dir")"
+              { echo "# stratum ${shard#benchmark-samples-}"; cat "$dir/$1.samples"; } >> "$out/$1.samples"
+            done
+          }
+          pool head
           if ls "$RUNNER_TEMP"/shards/*/no-base >/dev/null 2>&1; then
             msg="the base has no benchmark suite to compare with; the head's suite ran"
             echo "::warning::$msg"
             echo "$msg" >> "$GITHUB_STEP_SUMMARY"
             exit 0
           fi
-          cat "$RUNNER_TEMP"/shards/*/base.samples > "$out/base.samples"
+          pool base
           status=0
           # A regression the head's record accepts, and the base's does
           # not yet, passes as accepted (ENG-15).

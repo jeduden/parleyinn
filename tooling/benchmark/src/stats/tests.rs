@@ -63,6 +63,60 @@ fn mann_whitney_z_of_an_empty_side_is_zero() {
 }
 
 #[test]
+fn stratified_z_of_one_stratum_is_the_mann_whitney_z() {
+    let (base, head) = (&[1, 2, 2][..], &[2, 3, 3][..]);
+
+    assert_eq!(stratified_z(&[(base, head)]), mann_whitney_z(base, head));
+}
+
+/// Three runners of very different speed, the head 12% slower on each.
+/// Pooled, the runners' spread hides the slowdown; stratified, each
+/// runner's own ranks show it.
+#[test]
+fn stratified_z_sees_a_slowdown_the_runners_spread_hides() {
+    let clean = |ns: u64| (0..10).map(|i| ns + i % 7).collect::<Vec<u64>>();
+    let runners: Vec<(Vec<u64>, Vec<u64>)> = [1_000, 3_000, 9_000]
+        .into_iter()
+        .map(|ns| (clean(ns), clean(ns * 112 / 100)))
+        .collect();
+    let strata: Vec<(&[u64], &[u64])> = runners
+        .iter()
+        .map(|(b, h)| (b.as_slice(), h.as_slice()))
+        .collect();
+    let (base, head): (Vec<u64>, Vec<u64>) =
+        runners
+            .iter()
+            .fold((Vec::new(), Vec::new()), |(mut b, mut h), (rb, rh)| {
+                b.extend(rb);
+                h.extend(rh);
+                (b, h)
+            });
+
+    let pooled = mann_whitney_z(&base, &head);
+    let stratified = stratified_z(&strata);
+
+    assert!(pooled < crate::gate::Z_CRITICAL, "pooled z = {pooled}");
+    assert!(
+        stratified > crate::gate::Z_CRITICAL,
+        "stratified z = {stratified}"
+    );
+}
+
+#[test]
+fn stratified_z_leaves_out_a_stratum_that_separates_nothing() {
+    let (base, head) = (&[1, 2, 3][..], &[4, 5, 6][..]);
+    let with_empty = stratified_z(&[(base, head), (&[], &[7, 8])]);
+    let with_tied = stratified_z(&[(base, head), (&[7, 7], &[7, 7])]);
+    let alone = stratified_z(&[(base, head), (&[], &[])]);
+
+    assert_eq!(with_empty, with_tied);
+    assert_eq!(with_empty, alone);
+    assert!(with_empty > 0.0);
+    assert_eq!(stratified_z(&[(&[], &[1]), (&[2, 2], &[2])]), 0.0);
+    assert_eq!(stratified_z(&[]), 0.0);
+}
+
+#[test]
 fn mann_whitney_z_ignores_how_far_an_outlier_lies() {
     let near = mann_whitney_z(&[10, 11, 12, 13], &[14, 15, 16, 17]);
     let far = mann_whitney_z(&[10, 11, 12, 13], &[14, 15, 16, 1_000_000]);

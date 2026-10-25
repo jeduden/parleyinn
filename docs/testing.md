@@ -154,10 +154,10 @@ that fails on a statistically significant regression greater than
   scenario stays `@pending`. Its steps are bound; its first fails
   naming each NFR id and what it awaits.
 - **The gate** fails a benchmark when the head's median is more than
-  10% above the base's and a one-sided Mann–Whitney U test finds the
-  head slower at α = 0.01. Both conditions must hold: significance
-  alone would fail a precise 1% slowdown, the threshold alone medians
-  a noisy runner pushed apart by chance. The test works on ranks, so
+  10% above the base's and a one-sided Mann–Whitney U test, stratified
+  by runner, finds the head slower at α = 0.01. Both must hold:
+  significance alone would fail a precise 1% slowdown, the threshold
+  alone medians a noisy runner pushed apart by chance. Ranks, so
   a spike counts as one rank, and is closed form, so the decision is a
   pure function of the samples. A benchmark the head stopped sampling
   fails unless the suite retired it, and so does one with fewer than
@@ -188,10 +188,10 @@ interleaves the sides and keeps the alternation of which goes first, so
 a drift in a runner's speed lands on both. The `benchmark` job pools the
 shards' samples; the head's gate writes its report into the job summary
 and fails naming each benchmark that regressed more than 10% with
-significance. Pooling adds the runners' speed differences to both sides
-alike: the one-sided test loses some power and gains no false alarm. A
-benchmark too slow for the budget runs nightly instead. Until the suite
-reaches `main`, the base has none; the gate warns and reports the head's.
+significance. Each shard is one stratum: a sample is ranked only against
+its own runner's, so the runners' speed differences never blunt the
+test. A benchmark too slow for the budget runs nightly instead. Until
+the suite reaches `main`, the base has none; the gate reports the head's.
 
 ## Adding or writing a scenario
 

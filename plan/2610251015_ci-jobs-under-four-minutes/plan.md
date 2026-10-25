@@ -70,15 +70,18 @@ records, it adds a drift case too (ENG-27).
 2. A cargo registry and target cache for ci jobs only, never for the
    release build, if a job still runs over four minutes
 3. The drift cases sharded across four jobs (phase 1)
+4. The benchmark gate stratified by shard, so the runners' speed
+   differences do not blunt it (phase 2)
 
 Later phases are declared when the prior phase's result shows the real
 shape.
 
 ## Execution
 
-| Phase | Model  | Gate                                                                                                              |
-| ----- | ------ | ----------------------------------------------------------------------------------------------------------------- |
-| 1     | sonnet | The `ci-timings` of two consecutive runs show every job under four minutes; the summaries and the provenance hold |
+| Phase | Model  | Gate                                                                                                                     |
+| ----- | ------ | ------------------------------------------------------------------------------------------------------------------------ |
+| 1     | sonnet | The `ci-timings` of two consecutive runs show every job under four minutes; the summaries and the provenance hold        |
+| 2     | sonnet | A three-runner fixture fails the pooled test and passes the stratified one; the single-stratum fixtures decide as before |
 
 ## Phases
 
@@ -104,6 +107,7 @@ footer: |
 | #   | Status | Phase                                                                     |
 | --- | ------ | ------------------------------------------------------------------------- |
 | 1   | ✅     | [Every job of ci.yml and build.yml under its five-minute cap](phase-1.md) |
+| 2   | ✅     | [The benchmark gate stratified by shard](phase-2.md)                      |
 <?/catalog?>
 
 ## Acceptance Criteria
@@ -114,8 +118,8 @@ footer: |
   required check
 - [x] No gate, coverage floor or requirement scenario is weakened; the
   benchmark still runs `ROUNDS=30` of `SAMPLES=10` and gates at 0.01,
-  its samples pooled across runners, which testing.md records as a loss
-  of power and no false alarm
+  and ranks each shard's samples against its own runner's, so the
+  runners' speed differences do not blunt the test
 - [x] The release build is unchanged in what it produces: the same
   binaries, checksums and provenance, under per-target artifact names
 - [x] Each phase that changes `/tooling/` keeps its crates at their
