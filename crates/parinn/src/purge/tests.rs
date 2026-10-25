@@ -498,7 +498,8 @@ fn verify_reports_a_purge_a_kill_left_unfinished_exits_0_and_changes_nothing() {
     assert!(
         out.contains(&format!(
             "; a purge was cut short before it finished, so its residue stays until the next \
-             purge, ingest or rebuild clears it, and the search index is unchecked: {range}"
+             purge, ingest or rebuild clears it, and the search index is checked outside its \
+             ranges: {range}"
         )),
         "{out}"
     );
@@ -514,7 +515,91 @@ fn verify_reports_a_purge_a_kill_left_unfinished_exits_0_and_changes_nothing() {
     let (_, json, _) = p.invoke(&["verify", "--json"], &DEV);
     let report: Value = serde_json::from_str(&json).unwrap();
     assert_eq!(report["pending_purges"], serde_json::json!([range]));
+    assert_eq!(report["index_checked"], true);
+    assert_eq!(report["index_checked_outside_pending_purges"], true);
+}
+
+/// Puts `text` in the search index as the entry of `writer`'s event
+/// `seq`, in place of the one the record derives.
+fn forge_entry(p: &Process, writer: WriterId, seq: u64, text: &str) {
+    let address = Address {
+        writer,
+        seq: Seq::new(seq).unwrap(),
+    };
+    let row = store::search_index::row_id_of(address).unwrap();
+    let (home, _) = open(p);
+    let index = rusqlite::Connection::open(home.root().join("search_index")).unwrap();
+    index
+        .execute("DELETE FROM events_fts WHERE rowid = ?1", [row])
+        .unwrap();
+    index
+        .execute(
+            "INSERT INTO events_fts (rowid, text) VALUES (?1, ?2)",
+            rusqlite::params![row, text],
+        )
+        .unwrap();
+}
+
+#[test]
+fn a_forged_entry_outside_a_pending_purges_ranges_fails_verify() {
+    let (p, writer) = with_a_run();
+    let range = format!("{writer}:2-2");
+    assert_eq!(p.invoke(&["purge", "--range", &range], &DEV).0, EXIT_OK);
+    cut_short_after_its_transaction(&p, writer, 2, "two");
+    forge_entry(&p, writer, 4, "forged");
+
+    let (code, _, err) = p.invoke(&["verify"], &DEV);
+
+    assert_eq!(code, crate::EXIT_INTEGRITY);
+    assert!(err.contains("derived artifact consistency"), "{err}");
+    let (code, json, _) = p.invoke(&["verify", "--json"], &DEV);
+    assert_eq!(code, crate::EXIT_INTEGRITY);
+    assert!(json.contains("derived_artifact_consistency"), "{json}");
+}
+
+#[test]
+fn a_forged_entry_inside_a_pending_purges_ranges_is_left_unchecked() {
+    let (p, writer) = with_a_run();
+    let range = format!("{writer}:2-2");
+    assert_eq!(p.invoke(&["purge", "--range", &range], &DEV).0, EXIT_OK);
+    cut_short_after_its_transaction(&p, writer, 2, "two");
+    forge_entry(&p, writer, 2, "forged");
+
+    let (code, json, err) = p.invoke(&["verify", "--json"], &DEV);
+
+    assert_eq!((code, err.as_str()), (EXIT_OK, ""));
+    let report: Value = serde_json::from_str(&json).unwrap();
+    assert_eq!(report["pending_purges"], serde_json::json!([range]));
+    assert_eq!(report["index_checked"], true);
+}
+
+#[test]
+fn a_pending_purge_and_an_index_not_derived_in_time_leave_the_whole_index_unchecked() {
+    let (mut p, writer) = with_a_run();
+    let range = format!("{writer}:2-2");
+    assert_eq!(p.invoke(&["purge", "--range", &range], &DEV).0, EXIT_OK);
+    cut_short_after_its_transaction(&p, writer, 2, "two");
+    forge_entry(&p, writer, 4, "forged");
+    let before = counted(&p, "verify_timed_out").len();
+    p.clock_step = 100;
+
+    let (code, out, err) = p.invoke(&["verify"], &DEV);
+
+    assert_eq!((code, err.as_str()), (EXIT_OK, ""));
+    assert!(
+        out.contains(&format!(
+            "; a purge was cut short before it finished, so its residue stays until the next \
+             purge, ingest or rebuild clears it: {range}; the search index was not derived \
+             again in time, so it is unchecked: run parinn verify again"
+        )),
+        "{out}"
+    );
+    let (_, json, _) = p.invoke(&["verify", "--json"], &DEV);
+    let report: Value = serde_json::from_str(&json).unwrap();
+    assert_eq!(report["pending_purges"], serde_json::json!([range]));
     assert_eq!(report["index_checked"], false);
+    assert_eq!(report["index_checked_outside_pending_purges"], false);
+    assert_eq!(counted(&p, "verify_timed_out").len(), before + 2);
 }
 
 #[test]
@@ -531,6 +616,7 @@ fn once_the_next_rebuild_finishes_the_purge_verify_finds_nothing_unfinished() {
     let report: Value = serde_json::from_str(&json).unwrap();
     assert_eq!(report["pending_purges"], serde_json::json!([]));
     assert_eq!(report["index_checked"], true);
+    assert_eq!(report["index_checked_outside_pending_purges"], false);
     let (home, _) = open(&p);
     let index = std::fs::read(home.root().join("search_index")).unwrap();
     assert!(

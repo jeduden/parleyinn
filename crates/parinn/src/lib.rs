@@ -1399,7 +1399,7 @@ fn verify_command(
     let mut shape = Shape::Checked;
     let verified = match verify_record(&home, &store) {
         Ok(verified) => verified.and_then(|(r, staged)| {
-            shape = shape_beside(ctx, &store, &unfinished)?;
+            shape = checked_shape(ctx, &store)?;
             Ok((r, staged))
         }),
         Err(e) => return failed("verify", &e, stderr),
@@ -1501,17 +1501,6 @@ fn unfinished_purges(ctx: &Context, store: &Store) -> Result<Vec<String>, store:
     Ok(unfinished)
 }
 
-/// The shape of `store` beside the ranges a purge left `unfinished`:
-/// while there are any, their residue is in the search index, which is
-/// left unchecked, and the rest of the shape is checked.
-fn shape_beside(ctx: &Context, store: &Store, unfinished: &[String]) -> Result<Shape, VerifyError> {
-    if unfinished.is_empty() {
-        checked_shape(ctx, store)
-    } else {
-        administration::verify::verify_shape(store, &|| false)
-    }
-}
-
 /// What `parinn verify` checked beside the record: the store's shape,
 /// and the ranges an unfinished purge leaves in the search index.
 #[derive(Debug, Clone, Copy)]
@@ -1525,8 +1514,9 @@ struct Checks<'a> {
 const INDEX_CHECK_SECS: u64 = 60;
 
 /// The shape of `store`, its search index derived again while
-/// [`INDEX_CHECK_SECS`] last on `ctx`'s clock; a derivation that ran out
-/// of time is audited and counted (I6).
+/// [`INDEX_CHECK_SECS`] last on `ctx`'s clock and compared outside the
+/// ranges a pending purge has still to clear, whose residue it holds; a
+/// derivation that ran out of time is audited and counted (I6).
 fn checked_shape(ctx: &Context, store: &Store) -> Result<Shape, VerifyError> {
     let ends = (ctx.clock)().saturating_add(INDEX_CHECK_SECS);
     let shape = administration::verify::verify_shape(store, &|| (ctx.clock)() < ends)?;
@@ -1599,6 +1589,7 @@ fn verified_line(
             "short_sources": incomplete.short,
             "pending_purges": checks.unfinished,
             "index_checked": index_checked,
+            "index_checked_outside_pending_purges": index_checked && !checks.unfinished.is_empty(),
             "staged": staged,
             "audit": {"files": a.files, "entries": a.entries},
             "refused": [],
@@ -1611,25 +1602,34 @@ fn verified_line(
     } else {
         ""
     };
-    let unchecked = if index_checked {
+    let pending = if checks.unfinished.is_empty() {
         String::new()
-    } else if checks.unfinished.is_empty() {
-        "; the search index was not derived again in time, so it is unchecked: \
-         run parinn verify again"
-            .to_owned()
+    } else if index_checked {
+        format!(
+            "; a purge was cut short before it finished, so its residue stays until the next \
+             purge, ingest or rebuild clears it, and the search index is checked outside its \
+             ranges: {}",
+            checks.unfinished.join(", ")
+        )
     } else {
         format!(
             "; a purge was cut short before it finished, so its residue stays until the next \
-             purge, ingest or rebuild clears it, and the search index is unchecked: {}",
+             purge, ingest or rebuild clears it: {}",
             checks.unfinished.join(", ")
         )
+    };
+    let unchecked = if index_checked {
+        ""
+    } else {
+        "; the search index was not derived again in time, so it is unchecked: \
+         run parinn verify again"
     };
 
     format!(
         "checked {} writers and {} events: every chain, commitment and seat certificate \
          holds; integrity unsigned, as no log is signed yet, so a log cut at its tail or \
          rewritten whole goes unseen until seals; completeness covers only the transcript \
-         sources the record names; the audit log's chain holds over {} entries{}{}{unchecked}\
+         sources the record names; the audit log's chain holds over {} entries{}{}{pending}{unchecked}\
          {staged}",
         r.writers,
         r.events,
