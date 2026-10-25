@@ -150,8 +150,9 @@ fn checklist_inspected(w: &mut World) -> Result<(), String> {
     Ok(())
 }
 
-/// The problems of the threat model that `keep` selects.
-fn threat_problems(w: &mut World, keep: impl Fn(&str) -> bool) -> Result<(), String> {
+/// The problems the last check found that `keep` selects: the threat
+/// model's or the privacy statements'.
+fn selected_problems(w: &mut World, keep: impl Fn(&str) -> bool) -> Result<(), String> {
     let found: Vec<String> = ops(w)
         .problems
         .iter()
@@ -167,14 +168,14 @@ fn threat_problems(w: &mut World, keep: impl Fn(&str) -> bool) -> Result<(), Str
 fn threat_model_reviewed(w: &mut World) -> Result<(), String> {
     let c = checkout(w)?;
     c.read(threat_model::MODEL)?;
-    threat_problems(w, |p| p.contains("review") || p.contains("version"))
+    selected_problems(w, |p| p.contains("review") || p.contains("version"))
 }
 
 #[then(
     regex = r"^it covers every row of the boundary register and the threat sources acting across each boundary$"
 )]
 fn threat_model_covers(w: &mut World) -> Result<(), String> {
-    threat_problems(w, |p| {
+    selected_problems(w, |p| {
         p.contains("register row") || p.contains("threat sources") || p.contains("read ")
     })
 }
@@ -183,7 +184,7 @@ fn threat_model_covers(w: &mut World) -> Result<(), String> {
     regex = r"^it compares ParleyInn with Zed Delta control by control on record signing, trust in other principals, central-service dependence and key custody$"
 )]
 fn threat_model_compares(w: &mut World) -> Result<(), String> {
-    threat_problems(w, |p| p.contains("comparison"))
+    selected_problems(w, |p| p.contains("comparison"))
 }
 
 #[given(regex = r"^the documentation$")]
@@ -207,10 +208,10 @@ fn statements_listed(w: &mut World) -> Result<(), String> {
     regex = r#"^each one cites a test after "test:" or "tests:", by a test function's name or a non-pending scenario's "@ID"$"#
 )]
 fn each_cites_a_test(w: &mut World) -> Result<(), String> {
-    threat_problems(w, |p| p.contains("cites no test"))
+    selected_problems(w, |p| p.contains("cites no test"))
 }
 
 #[then(regex = r"^each citation resolves to a test that exists and is not ignored$")]
 fn each_citation_resolves(w: &mut World) -> Result<(), String> {
-    threat_problems(w, |p| !p.contains("cites no test"))
+    selected_problems(w, |p| !p.contains("cites no test"))
 }
