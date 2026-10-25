@@ -115,6 +115,80 @@ fn documentation_is_security_md_and_the_markdown_in_the_named_directories() {
 }
 
 #[test]
+fn findings_keep_an_uncited_statement_apart_from_an_unresolved_citation() {
+    let at = |line, cites: &[&str]| Statement {
+        file: "SECURITY.md".to_owned(),
+        line,
+        cites: cites.iter().map(|c| (*c).to_owned()).collect(),
+    };
+    let tests = [("it_holds".to_owned(), true)];
+    // A citation whose text reads like another check's problem is still
+    // a citation that does not resolve, never an uncited statement.
+    let statements = [at(1, &[]), at(2, &["cites no test"]), at(3, &["it_holds"])];
+
+    let found = findings(&statements, &tests, &[]);
+
+    assert_eq!(found.uncited, [at(1, &[])]);
+    assert_eq!(
+        found.unresolved,
+        [(at(2, &["cites no test"]), "cites no test".to_owned())]
+    );
+}
+
+#[test]
+fn checked_sorts_the_documentation_s_statements_by_kind() {
+    let (dir, c) = checkout(&[
+        ("crates/t.rs", TESTS),
+        ("tooling/x.txt", ""),
+        (
+            "SECURITY.md",
+            "ok: no network (test: `it_holds`)\n\nbare: sends no data\n\nbad: telemetry (test: `missing`)\n",
+        ),
+    ]);
+    let at = |line, cites: &[&str]| Statement {
+        file: "SECURITY.md".to_owned(),
+        line,
+        cites: cites.iter().map(|c| (*c).to_owned()).collect(),
+    };
+
+    let found = checked(&c, &[]).unwrap();
+
+    assert_eq!(found.uncited, [at(3, &[])]);
+    assert_eq!(
+        found.unresolved,
+        [(at(5, &["missing"]), "missing".to_owned())]
+    );
+    let none = Checkout::new(&dir.path().join("none"));
+    assert!(
+        checked(&none, &[])
+            .unwrap_err()
+            .starts_with("read SECURITY.md")
+    );
+}
+
+#[test]
+fn problems_name_each_finding_uncited_first_and_none_when_all_hold() {
+    let at = |line, cites: &[&str]| Statement {
+        file: "docs/a.md".to_owned(),
+        line,
+        cites: cites.iter().map(|c| (*c).to_owned()).collect(),
+    };
+    let found = Findings {
+        uncited: vec![at(9, &[])],
+        unresolved: vec![(at(2, &["gone", "it_holds"]), "gone".to_owned())],
+    };
+
+    assert_eq!(
+        found.problems(),
+        [
+            "docs/a.md:9: a privacy statement cites no test",
+            "docs/a.md:2: cites gone, which is no test that exists and runs",
+        ]
+    );
+    assert_eq!(Findings::default().problems(), Vec::<String>::new());
+}
+
+#[test]
 fn every_statement_must_cite_a_test_that_exists() {
     let (dir, c) = checkout(&[
         ("crates/t.rs", TESTS),

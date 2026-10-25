@@ -7,7 +7,9 @@
 //!
 //! The row that alters a landmark row cannot run in M1: no landmark is
 //! recorded before M2 (LMK-01), so there is none to alter. Its step
-//! fails with that finding, and the scenario stays `@pending`.
+//! fails with that finding, and the scenario stays `@pending`. The rows
+//! of a source an ingest resumes, of a stale ingest marker and of the
+//! consumed prefix have no steps yet: they wait with it.
 
 use std::fs;
 

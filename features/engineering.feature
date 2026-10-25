@@ -235,7 +235,8 @@ Feature: Engineering quality (ENG)
   Scenario: every privacy or data-flow statement cites its proving test
     Given the documentation
     When every privacy or data-flow statement is listed
-    Then each one references a test that exists and passes
+    Then each one cites a test after "test:" or "tests:", by a test function's name or a non-pending scenario's "@ID"
+    And each citation resolves to a test that exists and is not ignored
 
   @ENG-23 @P0 @pending
   Scenario: releases are semver with a changelog, upgrade notes and migration tests

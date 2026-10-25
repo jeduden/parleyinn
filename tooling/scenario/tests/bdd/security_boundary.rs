@@ -17,13 +17,15 @@ use engineering::{
 
 use crate::World;
 
-/// What the steps track: the checkout, the register's rows and the
-/// problems a check found.
+/// What the steps track: the checkout, the register's rows, the
+/// problems a check found and, apart from them by kind, the privacy
+/// check's findings.
 #[derive(Debug, Default)]
 pub struct Operations {
     checkout: Option<Checkout>,
     rows: Vec<Row>,
     problems: Vec<String>,
+    citations: privacy::Findings,
 }
 
 fn ops(w: &mut World) -> &mut Operations {
@@ -150,8 +152,9 @@ fn checklist_inspected(w: &mut World) -> Result<(), String> {
     Ok(())
 }
 
-/// The problems of the threat model that `keep` selects.
-fn threat_problems(w: &mut World, keep: impl Fn(&str) -> bool) -> Result<(), String> {
+/// The problems the last check found that `keep` selects: the threat
+/// model's, which only its steps read.
+fn selected_problems(w: &mut World, keep: impl Fn(&str) -> bool) -> Result<(), String> {
     let found: Vec<String> = ops(w)
         .problems
         .iter()
@@ -167,14 +170,14 @@ fn threat_problems(w: &mut World, keep: impl Fn(&str) -> bool) -> Result<(), Str
 fn threat_model_reviewed(w: &mut World) -> Result<(), String> {
     let c = checkout(w)?;
     c.read(threat_model::MODEL)?;
-    threat_problems(w, |p| p.contains("review") || p.contains("version"))
+    selected_problems(w, |p| p.contains("review") || p.contains("version"))
 }
 
 #[then(
     regex = r"^it covers every row of the boundary register and the threat sources acting across each boundary$"
 )]
 fn threat_model_covers(w: &mut World) -> Result<(), String> {
-    threat_problems(w, |p| {
+    selected_problems(w, |p| {
         p.contains("register row") || p.contains("threat sources") || p.contains("read ")
     })
 }
@@ -183,7 +186,7 @@ fn threat_model_covers(w: &mut World) -> Result<(), String> {
     regex = r"^it compares ParleyInn with Zed Delta control by control on record signing, trust in other principals, central-service dependence and key custody$"
 )]
 fn threat_model_compares(w: &mut World) -> Result<(), String> {
-    threat_problems(w, |p| p.contains("comparison"))
+    selected_problems(w, |p| p.contains("comparison"))
 }
 
 #[given(regex = r"^the documentation$")]
@@ -199,11 +202,26 @@ fn statements_listed(w: &mut World) -> Result<(), String> {
         return Err("the documentation holds no privacy statement to list".to_owned());
     }
     let scenarios = privacy::scenario_states(&c.root.join("features"))?;
-    ops(w).problems = privacy::proven(&c, &scenarios);
+    ops(w).citations = privacy::findings(&found, &privacy::test_functions(&c)?, &scenarios);
     Ok(())
 }
 
-#[then(regex = r"^each one references a test that exists and passes$")]
+#[then(
+    regex = r#"^each one cites a test after "test:" or "tests:", by a test function's name or a non-pending scenario's "@ID"$"#
+)]
 fn each_cites_a_test(w: &mut World) -> Result<(), String> {
-    outcome(ops(w).problems.clone())
+    let uncited = privacy::Findings {
+        uncited: ops(w).citations.uncited.clone(),
+        unresolved: Vec::new(),
+    };
+    outcome(uncited.problems())
+}
+
+#[then(regex = r"^each citation resolves to a test that exists and is not ignored$")]
+fn each_citation_resolves(w: &mut World) -> Result<(), String> {
+    let unresolved = privacy::Findings {
+        uncited: Vec::new(),
+        unresolved: ops(w).citations.unresolved.clone(),
+    };
+    outcome(unresolved.problems())
 }
