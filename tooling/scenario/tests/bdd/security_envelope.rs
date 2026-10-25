@@ -369,6 +369,18 @@ fn fails_inside_the_crate(w: &mut World) -> Result<(), String> {
             "impl<'a> Extend<&'a str> for TrustedText {\n    fn extend<I>(&mut self, recalled: I) {}\n}\n",
             1,
         ),
+        // A trait of the crate's own whose method takes `&mut self`.
+        (
+            "sec-07-custom-trait",
+            "impl Grow for TrustedText {\n    fn grow(&mut self, recalled: &str) { self.0.push_str(recalled) }\n}\n",
+            2,
+        ),
+        // A function handed the value to change through `&mut`.
+        (
+            "sec-07-mut-param",
+            "pub fn grow(t: &mut TrustedText, recalled: &str) {\n    t.0.push_str(recalled)\n}\n",
+            1,
+        ),
         (
             "sec-07-write",
             "impl std::fmt::Write for TrustedText {\n    fn write_str(&mut self, recalled: &str) -> std::fmt::Result { Ok(()) }\n}\n",
