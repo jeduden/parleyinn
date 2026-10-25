@@ -4,11 +4,9 @@
 //! reaches the index as syntax (SEC-04). Every refusal is fixed text
 //! (RCL-04).
 //!
-//! The recall scope is `room` until the session binding names a current
-//! run (phase 9 of plan 2609292012) and RCL-05 builds the rest, so
-//! `run` is refused as `event_get` refuses it, and `rooms` is not served.
-//! The filter `trust` keeps the hits of one derived trust level
-//! (PRV-02), applied after the ranking.
+//! The recall scope is the caller's ([`crate::scope`], RCL-05). The
+//! filter `trust` keeps the hits of one derived trust level (PRV-02),
+//! applied before the ranking cuts the matches.
 
 use std::time::Duration;
 
@@ -33,9 +31,6 @@ const FILTER_CHARS: usize = 64;
 
 /// The refusals, each fixed text.
 pub const NEEDS_RUN: &str = "this server serves no run yet, so pass scope \"room\"";
-pub const NO_ROOMS: &str = "scope \"rooms\" is not served yet";
-const BAD_SCOPE: &str = "the scope is none of run, room or rooms";
-const BAD_ROOM: &str = "the room is not a room id";
 const BAD_RUN: &str =
     "the run is not a writer id: a run is named by its writer until runs derive from seats";
 const BAD_QUERY: &str = "query, phrase must be strings and any_of, all_of lists of strings";
@@ -51,7 +46,6 @@ pub struct Params {
     pub any_of: Vec<String>,
     pub all_of: Vec<String>,
     pub phrase: Option<String>,
-    pub room: Option<RoomId>,
     pub writer: Option<WriterId>,
     pub provenance: Vec<String>,
     pub kinds: Vec<String>,
@@ -74,18 +68,20 @@ impl Params {
         }
     }
 
-    /// The search over `query` in `room`, cancelled after `deadline`.
+    /// The search over `query` in `rooms` and `writers` (none means
+    /// any), cancelled after `deadline`.
     #[must_use]
     pub fn search<'a>(
         &'a self,
         query: &'a search::Compiled,
-        room: RoomId,
+        rooms: &'a [RoomId],
+        writers: &'a [WriterId],
         deadline: Duration,
     ) -> Search<'a> {
         Search {
             query,
-            room,
-            writer: self.writer,
+            rooms,
+            writers,
             provenance: &self.provenance,
             kinds: &self.kinds,
             since: self.since.as_deref(),
@@ -102,12 +98,6 @@ impl Params {
 ///
 /// Fails with fixed text naming what is wrong.
 pub fn parse(arguments: &Value) -> Result<Params, &'static str> {
-    match arguments["scope"].as_str().unwrap_or("run") {
-        "room" => {}
-        "run" => return Err(NEEDS_RUN),
-        "rooms" => return Err(NO_ROOMS),
-        _ => return Err(BAD_SCOPE),
-    }
     let text = optional_string(&arguments["query"])?.unwrap_or_default();
     let trust = optional_string(&arguments["trust"]).map_err(|_| BAD_TRUST)?;
     let trust = match trust.as_deref() {
@@ -122,7 +112,6 @@ pub fn parse(arguments: &Value) -> Result<Params, &'static str> {
         any_of: strings(&arguments["any_of"], BAD_QUERY)?,
         all_of: strings(&arguments["all_of"], BAD_QUERY)?,
         phrase: optional_string(&arguments["phrase"])?,
-        room: id(&arguments["room"], BAD_ROOM, RoomId::parse)?,
         writer: id(&arguments["run"], BAD_RUN, WriterId::parse)?,
         provenance: filter(&arguments["provenance"])?,
         kinds: filter(&arguments["kind"])?,

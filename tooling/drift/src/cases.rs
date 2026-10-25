@@ -70,6 +70,7 @@ pub fn cases() -> Vec<Case> {
         ci_gate_cases(),
         static_analysis_cases(),
         complexity_cases(),
+        trusted_text_cases(),
         toml_cases(),
         setup_cases(),
         release_cases(),
@@ -1183,6 +1184,68 @@ fn toml_cases() -> Vec<Case> {
             ),
             taplo_fmt(),
             "the file is not properly formatted",
+        ),
+    ]
+}
+
+/// The drift SEC-07's check exists to catch: a crate outside
+/// `restore_block` constructing `TrustedText`. The drift of
+/// `restore_block` building it from other text gets its case when that
+/// crate lands (plan 2609292013): a case creates one file, and a crate
+/// needs a manifest too.
+fn trusted_text_cases() -> Vec<Case> {
+    const GATE: &str = "restore_content_is_built_from_trusted_text_alone";
+    let gate = || cargo_test("engineering", "static_analysis", GATE);
+    vec![
+        case(
+            "a crate outside restore_block constructing TrustedText",
+            GATE,
+            Injection::create(
+                "crates/store/src/leak.rs",
+                "fn leak(recalled: String) -> TrustedText {\n    TrustedText::new(recalled)\n}\n",
+            ),
+            gate(),
+            "crates/store/src/leak.rs:2: TrustedText is constructed (TrustedText::new) outside the restore_block crate",
+        ),
+        case(
+            "a crate outside restore_block hiding TrustedText behind an alias",
+            GATE,
+            Injection::create(
+                "crates/store/src/alias.rs",
+                "use restore_block::TrustedText as Safe;\nfn leak(s: String) -> Safe {\n    Safe::new(s)\n}\n",
+            ),
+            gate(),
+            "crates/store/src/alias.rs:1: TrustedText is named by a `use .. as` alias, which hides how it is built, outside the restore_block crate",
+        ),
+        case(
+            "a crate implementing a trait that adds to TrustedText",
+            GATE,
+            Injection::create(
+                "crates/store/src/extend.rs",
+                "impl Extend<String> for TrustedText {\n    fn extend<I>(&mut self, recalled: I) {}\n}\n",
+            ),
+            gate(),
+            "crates/store/src/extend.rs:1: TrustedText implements the trait Extend, but only Clone, Debug, Display, PartialEq, Eq, Hash, PartialOrd, Ord, AsRef<str> and Deref<Target = str> may be, so none adds text to it",
+        ),
+        case(
+            "a crate implementing a trait of its own for TrustedText",
+            GATE,
+            Injection::create(
+                "crates/store/src/grow.rs",
+                "impl Grow for TrustedText {\n    fn grow(&self) {}\n}\n",
+            ),
+            gate(),
+            "crates/store/src/grow.rs:1: TrustedText implements the trait Grow, but only Clone, Debug, Display, PartialEq, Eq, Hash, PartialOrd, Ord, AsRef<str> and Deref<Target = str> may be, so none adds text to it",
+        ),
+        case(
+            "a crate changing TrustedText through &mut",
+            GATE,
+            Injection::create(
+                "crates/store/src/grow_mut.rs",
+                "fn grow(t: &mut TrustedText, recalled: &str) {\n    more(t, recalled)\n}\n",
+            ),
+            gate(),
+            "crates/store/src/grow_mut.rs:1: TrustedText is changed by a &mut TrustedText, though trusted text is built whole by its four constructors and never added to",
         ),
     ]
 }

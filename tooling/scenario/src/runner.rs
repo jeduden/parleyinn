@@ -10,6 +10,7 @@ use std::future::Future;
 use std::path::Path;
 use std::pin::pin;
 use std::process::Command;
+use std::str::FromStr;
 use std::sync::Arc;
 use std::task::{Context, Poll, Wake, Waker};
 use std::thread::{self, Thread};
@@ -30,6 +31,66 @@ pub struct Options {
     /// Filters from `--skip`, as libtest takes them: a scenario one of
     /// them matches, the way a name filter matches, is left out.
     pub skips: Vec<String>,
+    /// The share of the scenarios this run holds, from `--shard K/N`.
+    pub shard: Option<Shard>,
+}
+
+/// One of `total` shards the scenarios divide into, counted from 1:
+/// every scenario belongs to exactly one, so the shards run together
+/// hold the whole suite and no scenario twice.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Shard {
+    /// This shard, from 1 to `total`.
+    pub index: u64,
+    /// How many shards the suite divides into.
+    pub total: u64,
+}
+
+impl Shard {
+    /// Whether the scenario with this [`shard_key`] belongs to the shard.
+    #[must_use]
+    pub fn holds(self, key: &str) -> bool {
+        fnv1a(key.as_bytes()) % self.total == self.index - 1
+    }
+}
+
+impl FromStr for Shard {
+    type Err = String;
+
+    /// Reads `K/N`: shard `K` of `N` shards, `1 <= K <= N`.
+    fn from_str(text: &str) -> Result<Self, String> {
+        let bad = || format!("want K/N with 1 <= K <= N, not {text:?}");
+        let (index, total) = text.split_once('/').ok_or_else(bad)?;
+        let number = |n: &str| {
+            n.bytes()
+                .all(|b| b.is_ascii_digit())
+                .then(|| n.parse::<u64>().ok())
+                .flatten()
+        };
+        match (number(index), number(total)) {
+            (Some(index), Some(total)) if (1..=total).contains(&index) => Ok(Self { index, total }),
+            _ => Err(bad()),
+        }
+    }
+}
+
+/// The 64-bit FNV-1a hash of `bytes`: a fixed function, so a scenario
+/// lands in the same shard on every machine and in every run.
+#[must_use]
+pub fn fnv1a(bytes: &[u8]) -> u64 {
+    bytes.iter().fold(0xcbf2_9ce4_8422_2325, |hash, byte| {
+        (hash ^ u64::from(*byte)).wrapping_mul(0x0100_0000_01b3)
+    })
+}
+
+/// What tells a scenario apart for sharding: its feature file's path
+/// under `features/`, its name, and for a row of a scenario outline the
+/// line of that row, so the rows of one outline spread over the shards.
+#[must_use]
+pub fn shard_key(feature: &Path, name: &str, row: Option<usize>) -> String {
+    let path: Vec<_> = feature.iter().map(|p| p.to_string_lossy()).collect();
+    let row = row.map(|line| format!("\0{line}")).unwrap_or_default();
+    format!("{}\0{name}{row}", path.join("/"))
 }
 
 /// libtest's flags that take no value, accepted and ignored so that
@@ -48,12 +109,14 @@ const LIBTEST_FLAGS: [&str; 7] = [
 const LIBTEST_VALUED: [&str; 2] = ["--test-threads", "--color"];
 
 /// Reads the target's command line: `--tags EXPR` (or `-t`), name
-/// filters, `--skip FILTER`, and the libtest flags cargo may pass on.
+/// filters, `--skip FILTER`, `--shard K/N`, and the libtest flags cargo
+/// may pass on.
 ///
 /// # Errors
 ///
-/// Fails on an unknown flag, a flag missing its value, or a tag
-/// expression that does not parse.
+/// Fails on an unknown flag, a flag missing its value, a tag
+/// expression that does not parse, or a shard that is not `K/N` with
+/// `1 <= K <= N`.
 pub fn parse_args(args: &[String]) -> Result<Options, String> {
     let mut options = Options::default();
     let mut args = args.iter();
@@ -74,6 +137,10 @@ pub fn parse_args(args: &[String]) -> Result<Options, String> {
                 options.tags = Some(expr.parse().map_err(|e| format!("--tags {expr:?}: {e}"))?);
             }
             "--skip" => options.skips.push(value()?),
+            "--shard" => {
+                let text = value()?;
+                options.shard = Some(text.parse().map_err(|e| format!("--shard: {e}"))?);
+            }
             f if LIBTEST_VALUED.contains(&f) => drop(value()?),
             f if LIBTEST_FLAGS.contains(&f) => {}
             f if f.starts_with('-') => return Err(format!("unknown flag {f:?}")),
@@ -84,7 +151,41 @@ pub fn parse_args(args: &[String]) -> Result<Options, String> {
     Ok(options)
 }
 
+/// The variable that names a shard as `--shard` does, for a run that
+/// cannot pass the flag: `cargo test -p scenario` hands its arguments
+/// to every test target, and only this one takes a shard.
+pub const SHARD_ENV: &str = "PARINN_BDD_SHARD";
+
+/// The options of a run with command line `args`, whose environment
+/// holds `env_shard` as [`SHARD_ENV`]. A `--shard` flag wins over the
+/// variable.
+///
+/// # Errors
+///
+/// Fails as [`parse_args`] does, and on a variable that is not `K/N`.
+pub fn options(args: &[String], env_shard: Option<&OsStr>) -> Result<Options, String> {
+    let mut options = parse_args(args)?;
+    if options.shard.is_none() {
+        options.shard = env_shard
+            .map(|value| {
+                let text = value.to_str().ok_or_else(|| "not unicode".to_owned())?;
+                text.parse::<Shard>()
+            })
+            .transpose()
+            .map_err(|e| format!("{SHARD_ENV}: {e}"))?;
+    }
+
+    Ok(options)
+}
+
 impl Options {
+    /// Whether the scenario with this [`shard_key`] is in this run's
+    /// shard; every scenario is when the run is not sharded.
+    #[must_use]
+    pub fn in_shard(&self, key: &str) -> bool {
+        self.shard.is_none_or(|shard| shard.holds(key))
+    }
+
     /// Whether a run with these options runs the scenario `name`
     /// carrying `tags`, written without their `@`. A pending scenario is
     /// never run: it is declared, not written.

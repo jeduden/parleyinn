@@ -1314,6 +1314,7 @@ dependencies = [
  "cucumber",
  "drift",
  "engineering",
+ "envelope",
  "harness-contract",
  "ingest",
  "key",

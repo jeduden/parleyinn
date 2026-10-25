@@ -44,6 +44,12 @@ pub enum EventKind {
     /// A repository's identity, bound once at the first hook event that
     /// shows it (LANE-02): a structural event, never an `operator` one.
     RepositoryBind,
+    /// One recall: an agent's call to a recall tool, with the addresses
+    /// it returned (RCL-07).
+    Recall,
+    /// A writer-label assignment: the label a writer is shown by, made by
+    /// the device seat that first shows it (RCL-08).
+    WriterLabel,
 }
 
 impl EventKind {
@@ -63,6 +69,8 @@ impl EventKind {
             Self::HookObservation => "hook_observation",
             Self::PromptMatch => "prompt_match",
             Self::RepositoryBind => "repository_bind",
+            Self::Recall => "recall",
+            Self::WriterLabel => "writer_label",
         }
     }
 
@@ -82,6 +90,8 @@ impl EventKind {
             Self::HookObservation,
             Self::PromptMatch,
             Self::RepositoryBind,
+            Self::Recall,
+            Self::WriterLabel,
         ]
         .into_iter()
         .find(|k| k.as_str() == name)

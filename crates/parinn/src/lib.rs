@@ -82,6 +82,8 @@ commands:
   configuration accept [--json]          accept the configuration (widening)
   counter ack [--json]                   acknowledge the counters (neutral)
   doctor [--json]                        fail while a counter rose since the last acknowledgement
+  event search WORDS [--room ID] [--k N] find events by their text, as event_search does
+  event expand RANGE [--room ID]         read an address range, as event_expand does; --cursor C continues one
   hook <hook>                            run the hook handler on the hook input on stdin
   ingest --all | --path P [--json]       record every transcript under the roots, or the one at P
   licenses                               print the third-party license texts built in
@@ -308,6 +310,7 @@ pub fn run(
         Some("configuration") => act::configuration(args, ctx, stdout, stderr),
         Some("counter") => act::counter(args, ctx, stdout, stderr),
         Some("doctor") => doctor(args, ctx, stdout, stderr),
+        Some("event") => event::event(args, ctx, stdout, stderr),
         Some("hook") => hook_handlers::hook_command(args.next().as_deref(), ctx, stdout),
         Some("ingest") => ingest(args, ctx, stdout, stderr),
         Some("licenses") => licenses::licenses(args, stdout, stderr),
@@ -1082,15 +1085,16 @@ fn mcp(
     let served = start_node(ctx, &home, stderr).and_then(|mut store| {
         repository_identity::bind_observed(ctx, &home, &mut store);
         let node = Node::find(&home, &store).map_err(|e| e.to_string())?;
-        Ok(mcp::Server::new(
+        let server = mcp::Server::new(
             store,
             ctx.build.version,
             node.device().public(),
             node.personal_room(),
-        ))
+        );
+        Ok((server, node.device_writer()))
     });
-    let server = match served {
-        Ok(server) => server,
+    let (server, device_writer) = match served {
+        Ok(served) => served,
         Err(e) => return failed("mcp", &e, stderr),
     };
     // What an MCP server killed before it stopped left is audited by
@@ -1099,8 +1103,15 @@ fn mcp(
         let _ = ctx.audit(o);
     });
     let shared = std::sync::Arc::new(capture::Shared::default());
-    let mut server = server.with_runs(Box::new(capture::Finder(shared.clone())));
-    let live = live_capture(ctx, &home, &shared, stderr)
+    // Neither a recall event nor a line of a transcript may be written
+    // without the redaction patterns in force (SEC-08).
+    let in_force = audit_settings(ctx, &home, stderr);
+    let redactor = recall::redactor(ctx, &in_force, stderr);
+    let mut server = server
+        .with_runs(Box::new(capture::Finder(shared.clone())))
+        .with_recall_writer(recall::recall_writer(device_writer, redactor.clone()));
+    let live = redactor
+        .map(|r| live_capture(ctx, &home, &shared, &in_force, r))
         .map(capture::Capture::start)
         .map(spawn_capture);
     if let Some(deadline) = ctx.query_deadline {
@@ -1116,6 +1127,7 @@ fn mcp(
             let reply = server.handle(l);
             record_found(ctx, &server.take_found());
             cancelled(server.take_cancelled());
+            recall::audit_notes(ctx, &server.take_notes());
             reply
         },
         &(ctx.input)(),
@@ -1141,22 +1153,16 @@ const CAPTURE_STOP: Duration = Duration::from_secs(5);
 
 /// The MCP server's live ingest in `home` (REC-13): its own harness
 /// process's session bindings, its transcripts resolved within the
-/// transcript roots, redacted by the settings in force. None while a
-/// settings layer fails, as no line may be written without the
-/// redaction patterns it names (SEC-08); the refusal is audited.
+/// transcript roots, redacted by `redactor`, the patterns of the
+/// settings in force.
 fn live_capture(
     ctx: &Context,
     home: &Home,
     shared: &std::sync::Arc<capture::Shared>,
-    stderr: &mut dyn Write,
-) -> Option<capture::Capture> {
-    let in_force = audit_settings(ctx, home, stderr);
-    if in_force.loaded.principal_layer_failed() {
-        refuse_ingest(ctx, stderr);
-        return None;
-    }
+    in_force: &settings::InForce,
+    redactor: Redactor,
+) -> capture::Capture {
     let settings = &in_force.resolved.settings;
-    let redactor = redactor(ctx, settings, stderr).ok()?;
     let os_home = ctx.home.as_deref().map(Path::new);
     let roots = settings
         .texts("transcript.roots")
@@ -1167,7 +1173,7 @@ fn live_capture(
     let base = (ctx.clock)();
     let started = now_instant();
 
-    Some(capture::Capture {
+    capture::Capture {
         ceiling: ctx.home.as_deref().map(PathBuf::from),
         home: home.clone(),
         roots,
@@ -1182,7 +1188,7 @@ fn live_capture(
         limit: ctx.live_limit,
         clock: Box::new(move || base + started.elapsed().as_secs()),
         shared: shared.clone(),
-    })
+    }
 }
 
 /// Now, for live ingest's audit clock.
@@ -2030,12 +2036,14 @@ pub(crate) fn invalid_layers(command: &str, loaded: &Loaded, stderr: &mut dyn Wr
 
 mod act;
 mod capture;
+mod event;
 pub mod forks;
 mod hook_handlers;
 mod identity_status;
 mod index_gaps;
 mod licenses;
 mod rebuild;
+mod recall;
 mod repository_identity;
 mod segments;
 mod settings;

@@ -93,6 +93,23 @@ fn read_gives_a_file_s_text_or_none_for_a_missing_one() {
 }
 
 #[test]
+fn files_lists_a_directory_sorted_and_none_for_a_missing_one() {
+    let dir = TempDir::new().unwrap();
+    let cargo = Cargo::from_env();
+    cargo.write(&dir.path().join("b.lcov"), "").unwrap();
+    cargo.write(&dir.path().join("a.lcov"), "").unwrap();
+
+    assert_eq!(cargo.files(dir.path()).unwrap(), ["a.lcov", "b.lcov"]);
+    assert!(cargo.files(&dir.path().join("missing")).unwrap().is_empty());
+    assert!(
+        cargo
+            .files(&dir.path().join("a.lcov"))
+            .unwrap_err()
+            .starts_with("read ")
+    );
+}
+
+#[test]
 fn sources_reads_every_rust_file_but_build_output() {
     let dir = TempDir::new().unwrap();
     for (name, text) in [

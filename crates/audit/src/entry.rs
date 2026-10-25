@@ -199,6 +199,15 @@ pub enum Counter {
     /// A look at a clone ran out of its time, so its identity stays as it
     /// was and the next look tries again (LANE-02, ENG-03, I6).
     RepositoryReadTimedOut,
+    /// A recall tool stopped at its per-call cap and returned a
+    /// continuation cursor (RCL-03).
+    RecallTruncated,
+    /// A recall call's event could not be appended to the record, so the
+    /// call went unrecorded (RCL-07, I6).
+    RecallNotRecorded,
+    /// A recall call was refused: its scope was not served, or the record
+    /// holds a gap inside the range it asked for (RCL-04, RCL-05, I6).
+    RecallRefused,
 }
 
 impl Counter {
@@ -257,6 +266,9 @@ impl Counter {
             Self::RepositoryReadFailed => "repository_read_failed",
             Self::RepositoryBindFailed => "repository_bind_failed",
             Self::RepositoryReadTimedOut => "repository_read_timed_out",
+            Self::RecallTruncated => "recall_truncated",
+            Self::RecallNotRecorded => "recall_not_recorded",
+            Self::RecallRefused => "recall_refused",
         }
     }
 }
@@ -289,10 +301,20 @@ pub enum Occurrence<'a> {
         operation: &'static str,
         detail: &'static str,
     },
+    /// A recall call whose scope extends past the calling run was served
+    /// (RCL-05); it feeds no counter, as nothing degraded.
+    RecallExtended {
+        operation: &'static str,
+        detail: &'static str,
+    },
 }
 
 /// The kind of an entry noting a principal act.
 pub const PRINCIPAL_ACT: &str = "principal_act";
+
+/// The kind of an entry noting a recall whose scope extends past the
+/// calling run.
+pub const RECALL_EXTENDED: &str = "recall_extended";
 
 /// `key` as an entry may hold it: as it is when it holds only the
 /// characters a settings key or a provenance class can, else a fixed
@@ -364,6 +386,9 @@ impl Entry {
             ),
             Occurrence::PrincipalAct { operation, detail } => {
                 (PRINCIPAL_ACT, None, operation, detail.to_owned())
+            }
+            Occurrence::RecallExtended { operation, detail } => {
+                (RECALL_EXTENDED, None, operation, detail.to_owned())
             }
         };
         let mut entry = Self {
