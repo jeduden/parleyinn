@@ -201,7 +201,13 @@ fn run() -> ExitCode {
     }
 
     let writer = runner::block_on(
+        // The steps block their thread, so scenarios interleaved on the
+        // one thread run no faster than one after another; they only
+        // keep each other's homes alive at once, the SEC-04 store of a
+        // million events among them, until the disk fills. One at a
+        // time, the run holds one scenario's home.
         World::cucumber()
+            .max_concurrent_scenarios(1)
             .fail_on_skipped()
             .with_default_cli()
             .filter_run(features, move |feature, rule, sc| {
