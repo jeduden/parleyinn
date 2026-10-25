@@ -48,8 +48,8 @@ while encryption at rest is on, in memory or encrypted under the at-rest key
 | `tombstones`         | derived    | purge event address, purged range, counts, reason or retention policy, a digest over the commitments of removed events (the chained headers keep each), structural fields, provenance and recorder of each removed act, tombstone and event the key set holds                                                               | rebuildable **(N)**                                                                                                                                                                                            |
 
 Purge replaces event content with nothing and keeps the row's address, `hash`,
-and `prev_hash`, so the chain stays verifiable and each writer's `seq` stays
-gap-free **(N)**.
+`prev_hash` and commitment, so the chain stays verifiable and each writer's
+`seq` stays gap-free **(N)**.
 
 ## 8.3 Canonical encoding
 

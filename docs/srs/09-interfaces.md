@@ -148,9 +148,10 @@ injection-pattern marks of PRV-07 and nothing else. A `tombstones` entry stands
 in the call's range for a purged range whose events are not returned; its
 `reason` is `purged` when the principal purged it (ADM-07) and `retention` when
 a retention policy did (REC-15, SEC-22). A `quarantine_markers` entry stands for
-a quarantined range whose events are not returned and carries no reason (RCL-06,
-SEC-12). Each entry lies within the call's range and the caller's recall scope,
-so neither hints at an address outside it (I8, RCL-05); neither names a
+a quarantined address, or a run of consecutive ones, whose events are not
+returned and carries no reason (RCL-06, SEC-12). Each entry lies within the
+call's range and the caller's recall scope, so neither hints at an address
+outside it (I8, RCL-05); neither names a
 selector, a policy, a principal or a reason text, and neither carries content
 (RCL-04). An address both purged and quarantined appears only as a tombstone
 (RCL-06). A call that reaches the per-call cap continues from its cursor, and
