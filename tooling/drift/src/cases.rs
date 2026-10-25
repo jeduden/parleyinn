@@ -81,6 +81,7 @@ pub fn cases() -> Vec<Case> {
         architecture_cases(),
         benchmark_cases(),
         fuzz_cases(),
+        coverage_floor_cases(),
         isolation_cases(),
         instruction_cases(),
         transcript_contract_cases(),
@@ -1277,6 +1278,36 @@ fn documentation_cases() -> Vec<Case> {
             ),
             gate(PRIVACY),
             "cites a_test_nobody_wrote, which is no test that exists and runs",
+        ),
+    ]
+}
+
+/// The drifts ENG-11's checks exist to catch: a security-sensitive
+/// crate held below the row's floor, and CI no longer merging the
+/// layers' profiles against the floors.
+fn coverage_floor_cases() -> Vec<Case> {
+    vec![
+        case(
+            "the search crate held below ENG-11's floor",
+            "ENG-11",
+            Injection::replace(
+                "Cargo.toml",
+                "pyramid = true\n",
+                "pyramid = true\n\n[workspace.metadata.coverage.crates.search.floors]\nall = 85\n",
+            ),
+            scenario("ENG-11"),
+            "search is held to 85% of its lines, below ENG-11's 90%",
+        ),
+        case(
+            "CI no longer holding the merged profile to the floors",
+            "ENG-11",
+            Injection::replace(
+                CI_WORKFLOW,
+                "cargo run --locked -p coverage -- --merge",
+                "cargo run --locked -p coverage -- --layer unit",
+            ),
+            scenario("ENG-11"),
+            "job coverage does not run \"-p coverage -- --merge\"",
         ),
     ]
 }

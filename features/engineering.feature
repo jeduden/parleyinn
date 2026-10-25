@@ -100,7 +100,7 @@ Feature: Engineering quality (ENG)
     When the restore block and an envelope are rendered
     Then both equal their committed golden files byte for byte
 
-  @ENG-11 @P0 @pending
+  @ENG-11 @P0
   Scenario: line coverage meets the floor per crate class
     Given a coverage profile of the whole suite
     Then every security-sensitive crate is at least 90% covered
