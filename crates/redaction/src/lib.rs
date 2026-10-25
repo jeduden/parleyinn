@@ -52,15 +52,20 @@ pub struct Redacted {
     pub text: String,
     /// One rule name per marker, in the order they appear.
     pub rules: Vec<String>,
+    /// Whether the scan budget ended ([`SCAN_BUDGET_FACTOR`]) before
+    /// the text beside the last matches was scanned again, so a secret
+    /// a match hid from the boundary rules may stand in `text`. The
+    /// caller counts it (I6); `text` loses nothing for it.
+    pub limited: bool,
 }
+
+/// The name a caller counts a [`Redacted::limited`] text under, beside
+/// the rule names; no marker carries it.
+pub const SCAN_LIMIT: &str = "scan_limit";
 
 /// How many times the length of a text its scans may read together: a
 /// clean text takes one, and the text around matches about one more.
 const SCAN_BUDGET_FACTOR: usize = 8;
-
-/// The rule name of the marker that stands for text left unscanned
-/// when the scan budget ends.
-const SCAN_LIMIT_RULE: &str = "scan_limit";
 
 /// One step of [`Redactor::redact_text`]: text to scan, or the marker
 /// of the rule that matched.
@@ -117,31 +122,27 @@ impl Redactor {
     /// secret beside it from matching (a key's word boundary hidden by
     /// a principal's pattern after it). A marker is never scanned, so
     /// no pattern matches inside one, and each rescan is of strictly
-    /// less text, so it settles. The scans together may read at most
+    /// less text, so it settles. The scans together read at most
     /// [`SCAN_BUDGET_FACTOR`] times the text, so a chain where every
-    /// match uncovers only the next stays linear (I9); text left
-    /// unscanned when the budget ends is replaced by one
-    /// `[REDACTED:scan_limit]` marker, counted like any other, rather
-    /// than stored unredacted (I6).
+    /// match uncovers only the next stays linear (I9); once the budget
+    /// ends, the rest is scanned one last time without rescans and
+    /// [`Redacted::limited`] says so. No text is dropped for it (I1).
     #[must_use]
     pub fn redact_text(&self, text: &str) -> Redacted {
         let mut out = Redacted {
             text: String::with_capacity(text.len()),
             rules: Vec::new(),
+            limited: false,
         };
         let mut budget = text.len().saturating_mul(SCAN_BUDGET_FACTOR);
         let mut work = vec![Work::Scan(text)];
         while let Some(item) = work.pop() {
             match item {
-                Work::Marker(rule) => {
-                    let name = self.rules[rule].name();
-                    out.text.push_str(&format!("[REDACTED:{name}]"));
-                    out.rules.push(name.to_owned());
-                }
+                Work::Marker(rule) => self.marker(rule, &mut out),
                 Work::Scan("") => {}
                 Work::Scan(piece) if piece.len() > budget => {
-                    out.text.push_str(&format!("[REDACTED:{SCAN_LIMIT_RULE}]"));
-                    out.rules.push(SCAN_LIMIT_RULE.to_owned());
+                    out.limited = true;
+                    self.write_once(piece, &mut out);
                 }
                 Work::Scan(piece) => {
                     budget -= piece.len();
@@ -153,27 +154,53 @@ impl Redactor {
         out
     }
 
-    /// One scan of `piece`: written out when nothing matches, else its
-    /// stretches and markers queued in reverse on `work`.
-    fn scan<'a>(&self, piece: &'a str, out: &mut Redacted, work: &mut Vec<Work<'a>>) {
+    /// The marker of `rule` written to `out`.
+    fn marker(&self, rule: usize, out: &mut Redacted) {
+        let name = self.rules[rule].name();
+        out.text.push_str(&format!("[REDACTED:{name}]"));
+        out.rules.push(name.to_owned());
+    }
+
+    /// The merged matches of every rule in `piece`, in order.
+    fn matches(&self, piece: &str) -> Vec<(usize, usize, usize)> {
         let mut spans: Vec<(usize, usize, usize)> = self
             .rules
             .iter()
             .enumerate()
             .flat_map(|(i, r)| r.spans(piece).map(move |(s, e)| (s, e, i)))
             .collect();
+        spans.sort_unstable_by_key(|&(start, _, rule)| (start, rule));
+
+        merged(spans)
+    }
+
+    /// One scan of `piece`: written out when nothing matches, else its
+    /// stretches and markers queued in reverse on `work`.
+    fn scan<'a>(&self, piece: &'a str, out: &mut Redacted, work: &mut Vec<Work<'a>>) {
+        let spans = self.matches(piece);
         if spans.is_empty() {
             out.text.push_str(piece);
             return;
         }
-        spans.sort_unstable_by_key(|&(start, _, rule)| (start, rule));
         let mut at = piece.len();
-        for (start, end, rule) in merged(spans).into_iter().rev() {
+        for (start, end, rule) in spans.into_iter().rev() {
             work.push(Work::Scan(&piece[end..at]));
             work.push(Work::Marker(rule));
             at = start;
         }
         work.push(Work::Scan(&piece[..at]));
+    }
+
+    /// `piece` with every match of one scan replaced and the stretches
+    /// between left as they are.
+    fn write_once(&self, piece: &str, out: &mut Redacted) {
+        let mut at = 0;
+        for (start, end, rule) in self.matches(piece) {
+            out.text.push_str(&piece[at..start]);
+            self.marker(rule, out);
+            at = end;
+        }
+        out.text.push_str(&piece[at..]);
     }
 
     /// A transcript line or hook input redacted. Each JSON string in
@@ -187,17 +214,16 @@ impl Redactor {
         let mut out = Redacted {
             text: String::with_capacity(line.len()),
             rules: Vec::new(),
+            limited: false,
         };
         for piece in pieces(line) {
-            let (text, rules) = match piece {
-                Piece::Between(text) => {
-                    let r = self.redact_text(text);
-                    (r.text, r.rules)
-                }
+            let r = match piece {
+                Piece::Between(text) => self.redact_text(text),
                 Piece::String(literal) => self.redact_literal(literal),
             };
-            out.text.push_str(&text);
-            out.rules.extend(rules);
+            out.text.push_str(&r.text);
+            out.rules.extend(r.rules);
+            out.limited |= r.limited;
         }
 
         out
@@ -205,17 +231,22 @@ impl Redactor {
 
     /// One JSON string literal, quotes included, redacted: decoded when
     /// it decodes, else as it stands.
-    fn redact_literal(&self, literal: &str) -> (String, Vec<String>) {
+    fn redact_literal(&self, literal: &str) -> Redacted {
         let Ok(decoded) = serde_json::from_str::<String>(literal) else {
-            let r = self.redact_text(literal);
-            return (r.text, r.rules);
+            return self.redact_text(literal);
         };
         let r = self.redact_text(&decoded);
         if r.rules.is_empty() {
-            return (literal.to_owned(), r.rules);
+            return Redacted {
+                text: literal.to_owned(),
+                ..r
+            };
         }
 
-        (Value::String(r.text).to_string(), r.rules)
+        Redacted {
+            text: Value::String(r.text).to_string(),
+            ..r
+        }
     }
 }
 

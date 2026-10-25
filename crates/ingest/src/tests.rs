@@ -218,6 +218,30 @@ fn the_redacted_path_is_redacted_like_the_lines() {
 }
 
 #[test]
+fn a_line_whose_rescans_hit_the_budget_is_counted_and_kept() {
+    let dir = TempDir::new().unwrap();
+    let home = home(&dir);
+    let key = format!("AIza{}", "a".repeat(35));
+    let line = format!(r#"{{"message":{{"content":"{}tail"}}}}"#, key.repeat(5_000));
+    let path = transcript(&dir, &format!("{line}\n"));
+    let (redactor, _) = Redactor::new(&[]).unwrap();
+
+    let ingested = ingest_path(&home, &path, &redactor, &mut OsEntropy).unwrap();
+
+    assert_eq!(
+        ingested.redactions.last().map(String::as_str),
+        Some("scan_limit")
+    );
+    let store = Store::open(&home.store()).unwrap();
+    let log = store.log(ingested.writer).unwrap();
+    let text = log[0].content.clone().unwrap()["text"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    assert!(text.contains("tail"), "the text after the matches is kept");
+}
+
+#[test]
 fn every_line_is_redacted_before_anything_is_written() {
     let dir = TempDir::new().unwrap();
     let home = home(&dir);

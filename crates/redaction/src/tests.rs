@@ -1,6 +1,6 @@
 use super::account::HarnessAccountIdentifiers;
 use super::{
-    PatternRefused, Piece, Redacted, Redactor, extra_pattern, literal_end, merged, pieces,
+    PatternRefused, Piece, Redacted, Redactor, Work, extra_pattern, literal_end, merged, pieces,
 };
 
 const AWS: &str = "AKIAIOSFODNN7EXAMPLE";
@@ -27,6 +27,7 @@ fn redact_text_replaces_each_secret_with_its_rules_marker() {
         Redacted {
             text: "a [REDACTED:aws_access_key] b [REDACTED:extra_pattern_1] c".to_owned(),
             rules: vec!["aws_access_key".to_owned(), "extra_pattern_1".to_owned()],
+            limited: false,
         }
     );
     let clean = r.redact_text("nothing here");
@@ -221,12 +222,14 @@ fn redact_text_settles_many_secrets_each_hidden_by_a_pattern() {
 fn redact_text_bounds_a_chain_where_each_match_uncovers_only_the_next() {
     let r = redactor(&[]);
     let key = format!("AIza{}", "a".repeat(35));
-    let out = r.redact_text(&key.repeat(20_000));
-    assert!(out.rules.len() < 64, "{} markers", out.rules.len());
+    let chain = key.repeat(20_000);
+    let out = r.redact_text(&chain);
+    assert!(out.limited);
     assert_eq!(out.rules[0], "google_api_key");
-    assert_eq!(out.rules.last().map(String::as_str), Some("scan_limit"));
-    assert!(!out.text.contains("AIza"));
-    assert!(out.text.ends_with("[REDACTED:scan_limit]"));
+    assert!(out.rules.len() < 64, "{} markers", out.rules.len());
+    // Nothing is dropped: what the markers do not stand for is kept.
+    let kept = out.text.replace("[REDACTED:google_api_key]", "");
+    assert_eq!(kept.len() + out.rules.len() * key.len(), chain.len());
 }
 
 #[test]
@@ -236,4 +239,63 @@ fn redact_text_settles_a_short_chain_within_the_budget() {
     let out = r.redact_text(&key.repeat(4));
     assert_eq!(out.rules, ["google_api_key"; 4]);
     assert_eq!(out.text, "[REDACTED:google_api_key]".repeat(4));
+    assert!(!out.limited);
+}
+
+#[test]
+fn redact_line_says_when_a_string_of_it_was_limited() {
+    let r = redactor(&[]);
+    let key = format!("AIza{}", "a".repeat(35));
+    let line = format!("{{\"a\":\"{}\",\"b\":\"x\"}}", key.repeat(20_000));
+    let out = r.redact_line(&line);
+    assert!(out.limited);
+    assert!(out.text.ends_with(",\"b\":\"x\"}"));
+    assert!(!r.redact_line(r#"{"a":"x"}"#).limited);
+}
+
+#[test]
+fn scan_writes_out_a_piece_nothing_matches() {
+    let r = redactor(&[]);
+    let (mut out, mut work) = (blank(), Vec::new());
+    r.scan("nothing here", &mut out, &mut work);
+    assert_eq!(out.text, "nothing here");
+    assert!(work.is_empty());
+}
+
+#[test]
+fn scan_queues_the_stretches_and_markers_in_reverse() {
+    let r = redactor(&[]);
+    let piece = format!("a {AWS} b");
+    let (mut out, mut work) = (blank(), Vec::new());
+    r.scan(&piece, &mut out, &mut work);
+    assert!(out.text.is_empty());
+    let order: Vec<String> = work
+        .iter()
+        .rev()
+        .map(|w| match w {
+            Work::Scan(text) => format!("scan {text:?}"),
+            Work::Marker(rule) => format!("marker {rule}"),
+        })
+        .collect();
+    assert_eq!(order, ["scan \"a \"", "marker 1", "scan \" b\""]);
+}
+
+#[test]
+fn write_once_replaces_matches_and_keeps_the_stretches_between() {
+    let r = redactor(&["ACME-[0-9]{8}"]);
+    let mut out = blank();
+    r.write_once(&format!("x {AWS}ACME-12345678 y"), &mut out);
+    assert_eq!(
+        out.text,
+        "x ".to_owned() + AWS + "[REDACTED:extra_pattern_1] y"
+    );
+    assert_eq!(out.rules, ["extra_pattern_1"]);
+}
+
+fn blank() -> Redacted {
+    Redacted {
+        text: String::new(),
+        rules: Vec::new(),
+        limited: false,
+    }
 }

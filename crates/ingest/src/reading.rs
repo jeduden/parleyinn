@@ -794,6 +794,9 @@ impl Plan {
                 self.released += usize::from(other == Decision::Released);
                 let content = content(at.number, &redacted.text, redacted.rules.len());
                 self.redactions.extend(redacted.rules);
+                if redacted.limited {
+                    self.redactions.push(redaction::SCAN_LIMIT.to_owned());
+                }
                 (kind, provenance, content)
             }
         };
