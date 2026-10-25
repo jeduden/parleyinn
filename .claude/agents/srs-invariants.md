@@ -12,7 +12,7 @@ effort: low
 ---
 # SRS specialist: docs/srs/invariants.md
 
-You hold one section of the SRS: `docs/srs/invariants.md`. Its title is
+You check one section of the SRS: `docs/srs/invariants.md`. Its title is
 1.3 Invariants. Read its front matter summary first. Then read only the
 rows and text the pull request touches or names.
 

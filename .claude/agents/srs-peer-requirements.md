@@ -12,7 +12,7 @@ effort: low
 ---
 # SRS specialist: docs/srs/05d-peer-requirements.md
 
-You hold one section of the SRS: `docs/srs/05d-peer-requirements.md`.
+You check one section of the SRS: `docs/srs/05d-peer-requirements.md`.
 Its title is 5. Functional requirements: peer network. Read its front
 matter summary first. Then read only the rows and text the pull request
 touches or names.

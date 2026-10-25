@@ -20,7 +20,7 @@ rest.
 1. **No new direct dependency** without an accepted ADR under
    `docs/adr/` listed in `DEPENDENCIES.md` (ENG-18, ENG-26).
 2. **Lints stay on.** A manifest's `[lints]` keeps the workspace lints;
-   no crate's `clippy.toml` loses a `disallowed-*` entry that holds its
+   no crate's `clippy.toml` loses a `disallowed-*` entry that keeps its
    reach or determinism ban (SEC-01, ENG-16).
 3. **Pins stay pinned.** Toolchain and tool versions are exact, and a
    lockfile changes with its configuration.

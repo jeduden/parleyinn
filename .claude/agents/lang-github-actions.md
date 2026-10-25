@@ -24,7 +24,7 @@ below. Stay inside your language; another specialist covers the rest.
 3. **No injection.** Untrusted context (`github.event.*` titles,
    bodies, branch names) reaches a `run:` only through `env:`, never
    through `${{ }}` inside the script.
-4. **Trust boundary (ENG-28).** A workflow that holds a credential runs
+4. **Credential isolation (ENG-28).** A workflow that has a credential runs
    as the default branch defines it and runs nothing from the pull
    request's tree.
 5. **Checkouts** set `persist-credentials: false` unless a later step

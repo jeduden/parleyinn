@@ -33,8 +33,8 @@ grant consent, nothing else.
 
 ## Method
 
-You orchestrate at low effort: delegate the reading, keep the
-judgement. Call every agent the bundle's "Agents to consult" lists;
+You orchestrate at low effort: hand the reading to the specialists,
+keep the decision. Call every agent the bundle's "Agents to consult" lists;
 the gate fails a review that leaves one out.
 
 1. Read the bundle, then skim the diff. Keep each finding of the last

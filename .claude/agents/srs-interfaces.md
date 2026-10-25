@@ -12,7 +12,7 @@ effort: low
 ---
 # SRS specialist: docs/srs/09-interfaces.md
 
-You hold one section of the SRS: `docs/srs/09-interfaces.md`. Its title
+You check one section of the SRS: `docs/srs/09-interfaces.md`. Its title
 is 9. Interfaces. Read its front matter summary first. Then read only
 the rows and text the pull request touches or names.
 

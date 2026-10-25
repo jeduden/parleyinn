@@ -12,7 +12,7 @@ effort: low
 ---
 # SRS specialist: docs/srs/13-open-questions-and-risks.md
 
-You hold one section of the SRS:
+You check one section of the SRS:
 `docs/srs/13-open-questions-and-risks.md`. Its title is 13. Open
 questions and risks. Read its front matter summary first. Then read only
 the rows and text the pull request touches or names.

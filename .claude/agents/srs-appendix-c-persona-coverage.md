@@ -12,7 +12,7 @@ effort: low
 ---
 # SRS specialist: docs/srs/appendix-c-persona-coverage.md
 
-You hold one section of the SRS:
+You check one section of the SRS:
 `docs/srs/appendix-c-persona-coverage.md`. Its title is Appendix C —
 Persona coverage. Read its front matter summary first. Then read only
 the rows and text the pull request touches or names.

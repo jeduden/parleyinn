@@ -2,8 +2,8 @@
 //! paths a pull request changes and the requirement rows it touches,
 //! the low-effort specialists that read them, grouped under the
 //! medium-effort generalist that weighs their findings. It is a pure
-//! function of its inputs, so the review gate can hold the orchestrator
-//! to the same list.
+//! function of its inputs, so the review gate can check the
+//! orchestrator against the same list.
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
@@ -29,7 +29,7 @@ const UNIT: &str = "test-engineer-unit";
 const INTEGRATION: &str = "test-engineer-integration";
 const END_TO_END: &str = "test-engineer-end-to-end";
 
-/// Every specialist the dispatch names whatever the tree holds; the
+/// Every specialist the dispatch names whatever the tree contains; the
 /// section and domain-model specialists follow their files.
 pub const FIXED_SPECIALISTS: [&str; 12] = [
     RUST,
@@ -52,7 +52,7 @@ pub type Dispatch = BTreeMap<String, BTreeSet<String>>;
 
 /// The SRS directory, whose files each have a section specialist.
 const SRS: &str = "docs/srs/";
-/// The SRS file that holds no section: its table of contents.
+/// The SRS file that contains no section: its table of contents.
 const SRS_INDEX: &str = "docs/srs/index.md";
 /// The domain model directory and its hub.
 pub const MODEL: &str = "docs/domain-model/";

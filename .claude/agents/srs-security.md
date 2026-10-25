@@ -12,8 +12,8 @@ effort: low
 ---
 # SRS specialist: docs/srs/06-security.md
 
-You hold one section of the SRS: `docs/srs/06-security.md`. Its title is
-6. Security. Read its front matter summary first. Then read only the
+You check one section of the SRS: `docs/srs/06-security.md`. Its title
+is 6. Security. Read its front matter summary first. Then read only the
 rows and text the pull request touches or names.
 
 ## What you check

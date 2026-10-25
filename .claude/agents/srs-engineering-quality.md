@@ -12,7 +12,7 @@ effort: low
 ---
 # SRS specialist: docs/srs/10-engineering-quality.md
 
-You hold one section of the SRS: `docs/srs/10-engineering-quality.md`.
+You check one section of the SRS: `docs/srs/10-engineering-quality.md`.
 Its title is 10. Engineering quality (ENG). Read its front matter
 summary first. Then read only the rows and text the pull request touches
 or names.

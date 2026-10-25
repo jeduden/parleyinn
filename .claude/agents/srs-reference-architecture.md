@@ -12,7 +12,7 @@ effort: low
 ---
 # SRS specialist: docs/srs/04-reference-architecture.md
 
-You hold one section of the SRS:
+You check one section of the SRS:
 `docs/srs/04-reference-architecture.md`. Its title is 4. Reference
 architecture (non-normative). Read its front matter summary first. Then
 read only the rows and text the pull request touches or names.

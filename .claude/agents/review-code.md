@@ -11,7 +11,7 @@ effort: medium
 ---
 # Review generalist: code and tests
 
-You judge the code a pull request changes: the Rust, its tests, and
+You weigh the code a pull request changes: the Rust, its tests, and
 the build and CI configuration. These specialists report to you:
 
 - the languages: `lang-rust`, `lang-toml`, `lang-shell` and
@@ -20,7 +20,7 @@ the build and CI configuration. These specialists report to you:
 - the test layers: `test-engineer-unit`, `test-engineer-integration`
   and `test-engineer-end-to-end`.
 
-## What you judge
+## What you weigh
 
 - Does the code do what each touched row says, and no more?
 - Is each behaviour proven at the lowest test layer that can prove it,
