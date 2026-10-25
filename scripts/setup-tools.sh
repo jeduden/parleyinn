@@ -76,7 +76,11 @@ fi
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT
 url=https://github.com/jdx/mise/releases/download/v$version/$file
-curl --proto '=https' --tlsv1.2 -fsSL --retry 3 --max-time 120 -o "$tmp/$file" "$url"
+# CI holds each try to 60 s, so the retries fit inside the job's cap; a
+# developer machine on a slow link gets 120 s.
+max_time=120
+if [ -n "${CI:-}" ]; then max_time=60; fi
+curl --proto '=https' --tlsv1.2 -fsSL --retry 3 --retry-all-errors --connect-timeout 15 --max-time "$max_time" -o "$tmp/$file" "$url"
 
 # GNU sha256sum, or shasum where sha256sum is missing or BSD's (macOS),
 # which both check a list file. BSD's sha256sum cannot read one on stdin.

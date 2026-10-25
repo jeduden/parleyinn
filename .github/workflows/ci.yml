@@ -101,12 +101,13 @@ jobs:
       # namespaces, and its image may lack strace. A runner that still
       # cannot confine fails the end-to-end tests, never skips them.
       - name: Let the end-to-end suite confine the core
+        timeout-minutes: 3
         run: |
           if [ -e /proc/sys/kernel/apparmor_restrict_unprivileged_userns ]; then
             sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
           fi
           command -v strace >/dev/null || {
-            sudo apt-get update && sudo apt-get install -y --no-install-recommends strace
+            scripts/apt-install.sh strace
           }
       # ENG-30: the license check reads only the sources cargo has
       # already fetched, for every release target.
@@ -172,12 +173,13 @@ jobs:
           cache: true
       # ENG-12: as in the test job, the runner must confine the core.
       - name: Let the end-to-end suite confine the core
+        timeout-minutes: 3
         run: |
           if [ -e /proc/sys/kernel/apparmor_restrict_unprivileged_userns ]; then
             sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
           fi
           command -v strace >/dev/null || {
-            sudo apt-get update && sudo apt-get install -y --no-install-recommends strace
+            scripts/apt-install.sh strace
           }
       - run: cargo fetch --locked
       - name: Take the release core the budget rows time
@@ -238,12 +240,13 @@ jobs:
       # namespaces, and its image may lack strace. A runner that still
       # cannot confine fails the end-to-end tests, never skips them.
       - name: Let the end-to-end suite confine the core
+        timeout-minutes: 3
         run: |
           if [ -e /proc/sys/kernel/apparmor_restrict_unprivileged_userns ]; then
             sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
           fi
           command -v strace >/dev/null || {
-            sudo apt-get update && sudo apt-get install -y --no-install-recommends strace
+            scripts/apt-install.sh strace
           }
       # ENG-30: the license check reads only the sources cargo has
       # already fetched, for every release target.
@@ -295,12 +298,13 @@ jobs:
       # namespaces, and its image may lack strace. A runner that still
       # cannot confine fails the end-to-end tests, never skips them.
       - name: Let the end-to-end suite confine the core
+        timeout-minutes: 3
         run: |
           if [ -e /proc/sys/kernel/apparmor_restrict_unprivileged_userns ]; then
             sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
           fi
           command -v strace >/dev/null || {
-            sudo apt-get update && sudo apt-get install -y --no-install-recommends strace
+            scripts/apt-install.sh strace
           }
       # ENG-30: the license check reads only the sources cargo has
       # already fetched, for every release target.
@@ -495,12 +499,13 @@ jobs:
       # namespaces, and its image may lack strace. A runner that still
       # cannot confine fails the end-to-end tests, never skips them.
       - name: Let the end-to-end suite confine the core
+        timeout-minutes: 3
         run: |
           if [ -e /proc/sys/kernel/apparmor_restrict_unprivileged_userns ]; then
             sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
           fi
           command -v strace >/dev/null || {
-            sudo apt-get update && sudo apt-get install -y --no-install-recommends strace
+            scripts/apt-install.sh strace
           }
       # ENG-30: the license check reads only the sources cargo has
       # already fetched, for every release target.
