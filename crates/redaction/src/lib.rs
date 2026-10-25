@@ -109,6 +109,9 @@ impl Redactor {
     pub fn redact_text(&self, text: &str) -> Redacted {
         let mut out = self.redact_pass(text);
         for _ in 1..MAX_PASSES {
+            if out.rules.is_empty() {
+                break;
+            }
             let next = self.redact_pass(&out.text);
             if next.rules.is_empty() {
                 break;
