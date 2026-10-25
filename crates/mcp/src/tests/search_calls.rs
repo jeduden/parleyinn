@@ -72,7 +72,7 @@ fn event_search_shows_at_most_the_start_of_the_text() {
 }
 
 #[test]
-fn event_search_refuses_the_default_scope_and_the_rooms_scope() {
+fn event_search_refuses_the_scopes_a_server_serving_no_run_cannot_serve() {
     let f = fixture();
     let mut server = f.server();
 
@@ -81,9 +81,17 @@ fn event_search_refuses_the_default_scope_and_the_rooms_scope() {
         &mut server,
         json!({"query": "instructions", "scope": "rooms"}),
     );
+    let unknown = event_search(
+        &mut server,
+        json!({"query": "instructions", "scope": "world"}),
+    );
 
     assert_eq!(refusal(&default), event_search::NEEDS_RUN);
-    assert_eq!(refusal(&rooms), event_search::NO_ROOMS);
+    assert_eq!(
+        refusal(&rooms),
+        "scope \"rooms\" needs a run, and this server serves none yet"
+    );
+    assert_eq!(refusal(&unknown), scope::BAD_SCOPE);
 }
 
 #[test]

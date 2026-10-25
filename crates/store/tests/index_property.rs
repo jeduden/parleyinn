@@ -153,8 +153,8 @@ fn answers(store: &Store) -> Vec<Vec<(String, u64)>> {
             .unwrap();
             let search = Search {
                 query: &query,
-                room: room(),
-                writer: None,
+                rooms: &[room()],
+                writers: &[],
                 provenance: &[],
                 kinds: &[],
                 since: None,

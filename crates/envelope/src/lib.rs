@@ -122,6 +122,13 @@ pub struct Item {
 }
 
 impl Item {
+    /// The conservative estimate of the model tokens the item takes in
+    /// the envelope (§8.4).
+    #[must_use]
+    pub fn tokens(&self) -> u64 {
+        tokens::estimate(&self.render())
+    }
+
     /// The item as JSON text, its content last.
     fn render(&self) -> String {
         let score = self.score.map(|score| ("score", Value::from(score)));
@@ -170,7 +177,7 @@ impl Item {
 }
 
 /// An envelope of recalled events.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Default)]
 pub struct Envelope {
     pub items: Vec<Item>,
     /// Whether the call's limit cut the items short.

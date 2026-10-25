@@ -197,3 +197,17 @@ fn a_structural_envelope_is_marked_and_holds_counts_alone() {
     assert_eq!(plain.to_value().get("structural"), None);
     assert!(!plain.render().contains("structural"));
 }
+
+#[test]
+fn an_item_costs_the_estimate_of_its_rendering() {
+    let small = item();
+    let big = Item {
+        content: "x".repeat(4000),
+        ..item()
+    };
+
+    assert_eq!(small.tokens(), tokens::estimate(&small.render()));
+    assert!(big.tokens() > small.tokens() + 1000);
+    assert_eq!(Envelope::default().items, vec![]);
+    assert!(!Envelope::default().truncated);
+}
