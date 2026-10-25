@@ -203,7 +203,14 @@ fn statements_listed(w: &mut World) -> Result<(), String> {
     Ok(())
 }
 
-#[then(regex = r"^each one references a test that exists and passes$")]
+#[then(
+    regex = r#"^each one cites a test after "test:" or "tests:", by a test function's name or a non-pending scenario's "@ID"$"#
+)]
 fn each_cites_a_test(w: &mut World) -> Result<(), String> {
-    outcome(ops(w).problems.clone())
+    threat_problems(w, |p| p.contains("cites no test"))
+}
+
+#[then(regex = r"^each citation resolves to a test that exists and is not ignored$")]
+fn each_citation_resolves(w: &mut World) -> Result<(), String> {
+    threat_problems(w, |p| !p.contains("cites no test"))
 }
