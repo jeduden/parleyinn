@@ -20,7 +20,7 @@ Outcome:
   landmark row waits for M2, so it stays `@pending`. SEC-01's core row:
   gate tests in `tooling/engineering/tests/boundary.rs`.
 - Gates run: scenario gate, fmt, clippy `-D warnings`, `mdsmith check .`,
-  unit tests, `e2e_crash_consistency` (80 kills), drift cases by hand.
+  unit tests, `e2e_crash_consistency` (80 kills); the drift suite in CI.
 
 After the reviews:
 

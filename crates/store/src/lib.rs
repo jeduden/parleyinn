@@ -1757,11 +1757,6 @@ impl Out<'_> {
         new_events: &[NewEvent],
         close: bool,
     ) -> Result<Vec<Address>, StoreError> {
-        // A writer with no events claims no slot in the search index,
-        // nor evicts the writer holding it (I10).
-        if new_events.is_empty() {
-            return Ok(Vec::new());
-        }
         refuse_newer(tx, writer)?;
         let (mut next, mut prev_hash) = newest(tx, writer)?;
         let mut heads = advanced_heads(tx, writer)?;
@@ -1770,7 +1765,9 @@ impl Out<'_> {
             event: tx.prepare(INSERT_EVENT)?,
             head: tx.prepare(INSERT_HEAD)?,
         };
-        let mut indexing = search_index::Indexing::open(tx, writer)?;
+        // The index opens for the writer's first event: a writer with no
+        // events claims no slot, nor evicts the writer holding it (I10).
+        let mut indexing = None;
         for new in new_events {
             let seq = Seq::new(next).ok_or(StoreError::Full(writer))?;
             let address = Address::new(writer, seq);
@@ -1786,12 +1783,18 @@ impl Out<'_> {
             let hash = header.hash();
             let body = self.body(address, new, canonical)?;
             insert_event(&mut inserts, &header, hash, new, &body)?;
-            indexing.add(seq, &new.content)?;
+            let open = match indexing.as_mut() {
+                Some(open) => open,
+                None => indexing.insert(search_index::Indexing::open(tx, writer)?),
+            };
+            open.add(seq, &new.content)?;
             out.push(address);
             prev_hash = hash;
             next += 1;
         }
-        indexing.done_to(next - 1)?;
+        if let Some(open) = &indexing {
+            open.done_to(next - 1)?;
+        }
         if let (Some(first), Some(last)) = (out.first(), out.last()) {
             segment::extend(tx, writer, first.seq, last.seq, close)?;
         }
