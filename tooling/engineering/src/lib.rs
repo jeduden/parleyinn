@@ -14,6 +14,7 @@ pub mod calibration;
 pub mod codeowners;
 pub mod complexity;
 pub mod confinement;
+pub mod coverage_floors;
 pub mod decisions;
 pub mod dependencies;
 pub mod fuzzing;
