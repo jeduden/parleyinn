@@ -258,10 +258,12 @@ impl Act {
 
 /// Runs every `threads`th iteration of `act` from `first` up to
 /// `iterations`, each `PER_HOME` in a freshly ingested home; how many
-/// were killed mid-way.
-fn iterate_act(act: Act, first: u64, threads: u64, iterations: u64, seed: u64) -> u64 {
+/// were killed mid-way, and how many kills left a purge unfinished,
+/// which verify reported and the next rebuild finished.
+fn iterate_act(act: Act, first: u64, threads: u64, iterations: u64, seed: u64) -> (u64, u64) {
     let mut home = ingested();
     let mut killed = 0;
+    let mut unfinished = 0;
     for (i, n) in (first..iterations).step_by(threads as usize).enumerate() {
         let i = i as u64 % PER_HOME;
         if n > first && i == 0 {
@@ -279,38 +281,33 @@ fn iterate_act(act: Act, first: u64, threads: u64, iterations: u64, seed: u64) -
         };
         killed += u64::from(run.unwrap_or_else(|e| panic!("{label}: {e}")));
         if !verified(home.0.path(), after, &label).is_empty() {
-            UNFINISHED.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+            unfinished += 1;
             finished(home.0.path(), after, &label);
         }
     }
 
-    killed
+    (killed, unfinished)
 }
 
-/// How many kills left a purge unfinished, which verify reported and the
-/// next rebuild finished.
-static UNFINISHED: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
-
 /// Kills `act` at `PARINN_CRASH_ITERATIONS` points on as many threads
-/// as the machine has cores; how many iterations ran and how many were
-/// killed mid-way.
-fn kill_act(act: Act) -> (u64, u64) {
+/// as the machine has cores; how many iterations ran, how many were
+/// killed mid-way and how many kills left a purge unfinished.
+fn kill_act(act: Act) -> (u64, u64, u64) {
     let iterations = setting("PARINN_CRASH_ITERATIONS", ITERATIONS);
     let seed = setting("PARINN_CRASH_SEED", 0);
     let cores = std::thread::available_parallelism().map_or(1, |n| n.get() as u64);
     let threads = setting("PARINN_CRASH_THREADS", cores).clamp(1, iterations.max(1));
-    let killed = std::sync::atomic::AtomicU64::new(0);
-    std::thread::scope(|scope| {
-        for first in 0..threads {
-            let killed = &killed;
-            scope.spawn(move || {
-                let n = iterate_act(act, first, threads, iterations, seed);
-                killed.fetch_add(n, std::sync::atomic::Ordering::Relaxed);
-            });
-        }
+    let (killed, unfinished) = std::thread::scope(|scope| {
+        let lanes: Vec<_> = (0..threads)
+            .map(|first| scope.spawn(move || iterate_act(act, first, threads, iterations, seed)))
+            .collect();
+        lanes.into_iter().fold((0, 0), |(k, u), lane| {
+            let (n, m) = lane.join().unwrap_or_else(|e| std::panic::resume_unwind(e));
+            (k + n, u + m)
+        })
     });
 
-    (iterations, killed.into_inner())
+    (iterations, killed, unfinished)
 }
 
 /// The state a kill between a purge's transaction and its finishing
@@ -356,8 +353,7 @@ fn a_purge_cut_short_after_its_transaction_verifies_and_the_next_rebuild_finishe
 
 #[test]
 fn every_kill_during_purge_leaves_a_record_that_verifies() {
-    let (iterations, killed) = kill_act(Act::Purge);
-    let unfinished = UNFINISHED.load(std::sync::atomic::Ordering::Relaxed);
+    let (iterations, killed, unfinished) = kill_act(Act::Purge);
     println!(
         "{iterations} purge iterations, {killed} killed mid-purge, {unfinished} left it unfinished"
     );
@@ -365,8 +361,10 @@ fn every_kill_during_purge_leaves_a_record_that_verifies() {
 
 #[test]
 fn every_kill_during_rebuild_leaves_a_record_that_verifies() {
-    let (iterations, killed) = kill_act(Act::Rebuild);
-    println!("{iterations} rebuild iterations, {killed} killed mid-rebuild");
+    let (iterations, killed, unfinished) = kill_act(Act::Rebuild);
+    println!(
+        "{iterations} rebuild iterations, {killed} killed mid-rebuild, {unfinished} left a purge unfinished"
+    );
 }
 
 #[test]
