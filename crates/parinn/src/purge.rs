@@ -309,7 +309,7 @@ pub(crate) fn audit_residue(ctx: &Context) {
         kind: Kind::Failed,
         counter: Counter::PurgeUnfinished,
         operation: OP,
-        detail: "a purge erased its range but could not finish clearing the residue",
+        detail: "a purge is pending: its transaction committed, but residue it could not yet clear remains",
     };
     crate::logged("audit a purge's residue", ctx.audit(&occurrence));
 }
@@ -325,12 +325,13 @@ fn unfinished(ctx: &Context, pending: bool, cause: &str, stderr: &mut dyn Write)
 }
 
 /// Audits and counts the residue a purge left for its next attempt, and
-/// says so: the erasure stands, the checkpoint and vacuum do not yet.
+/// says so: the purge is pending, and never that the range is erased
+/// (SEC-31).
 fn residue(ctx: &Context, stderr: &mut dyn Write) -> u8 {
     audit_residue(ctx);
     let _ = writeln!(
         stderr,
-        "parinn purge: the range is erased, but the store could not yet be vacuumed; run parinn rebuild or parinn ingest to finish"
+        "parinn purge: pending, not finished: residue remains (payload files, search postings, or free pages the store could not yet vacuum); the next parinn purge, parinn ingest or parinn rebuild finishes it"
     );
 
     EXIT_FAILURE

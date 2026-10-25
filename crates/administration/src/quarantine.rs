@@ -22,8 +22,9 @@
 //! seat, a room, a writer, a provenance class, a flag and a time
 //! window. No event carries a flag before PRV-07 ships, so a flag
 //! selector matches none yet; a time window reads the transcript
-//! timestamp an event keeps, to the second, and no event without one
-//! lies in it.
+//! timestamp an event keeps as the UTC instant it names (an offset is
+//! applied), to the second, and no event without one, or with one that
+//! is no RFC 3339 time, lies in it.
 
 use std::cell::RefCell;
 use std::collections::BTreeMap;
@@ -38,9 +39,6 @@ use crate::origin::is_device_seat;
 
 /// The longest run name, flag or time a selector holds.
 const LONGEST: usize = 200;
-
-/// How many characters of a time a window compares: `YYYY-MM-DDTHH:MM:SS`.
-const SECONDS: usize = 19;
 
 /// What a quarantine selects.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -114,13 +112,11 @@ impl Selector {
     ///
     /// # Errors
     ///
-    /// Fails on text that does not begin `YYYY-MM-DD`, or holds a
-    /// character an RFC 3339 time does not.
+    /// Fails on text that is no RFC 3339 date or time: a date alone, or a
+    /// time with `Z`, a `+HH:MM` or `-HH:MM` offset or none (read as UTC).
     pub fn since(time: &str) -> Result<Self, Invalid> {
         let allowed = |c: char| c.is_ascii_digit() || "-:T.Z+".contains(c);
-        let dated = time.len() >= 10
-            && time.as_bytes()[..4].iter().all(u8::is_ascii_digit)
-            && time.as_bytes()[4] == b'-';
+        let dated = utc_seconds(time).is_some();
         let time = plain(
             time,
             allowed,
@@ -229,14 +225,98 @@ pub struct EventFacts<'a> {
     pub flags: &'a [String],
 }
 
-/// The first [`SECONDS`] characters of `time`.
-fn seconds(time: &str) -> &str {
-    let end = time
-        .char_indices()
-        .nth(SECONDS)
-        .map_or(time.len(), |(i, _)| i);
+/// The digits of `text` as a number; `None` when any is no digit.
+fn number(text: Option<&str>) -> Option<i64> {
+    let text = text?;
 
-    &time[..end]
+    text.bytes()
+        .all(|b| b.is_ascii_digit())
+        .then(|| text.bytes().fold(0, |n, b| n * 10 + i64::from(b - b'0')))
+}
+
+/// The whole seconds since the Unix epoch of `time`, an RFC 3339 time
+/// read as the UTC instant it names: its offset is applied, a fraction
+/// of a second dropped, and a date alone or a time without an offset
+/// read as UTC. `None` for text that is no such instant.
+fn utc_seconds(time: &str) -> Option<i64> {
+    let midnight = date_seconds(time)?;
+    let Some(clock) = time.get(10..).filter(|rest| !rest.is_empty()) else {
+        return Some(midnight);
+    };
+    let clock = clock.strip_prefix('T')?;
+    let (hour, minute, second) = (
+        number(clock.get(0..2))?,
+        number(clock.get(3..5))?,
+        number(clock.get(6..8))?,
+    );
+    let separated = clock.get(2..3)? == ":" && clock.get(5..6)? == ":";
+    if !separated || hour > 23 || minute > 59 || second > 60 {
+        return None;
+    }
+
+    Some(midnight + hour * 3600 + minute * 60 + second - offset(clock.get(8..)?)?)
+}
+
+/// The seconds from the epoch to midnight UTC of the date `YYYY-MM-DD`
+/// that begins `time`.
+fn date_seconds(time: &str) -> Option<i64> {
+    let (year, month, day) = (
+        number(time.get(0..4))?,
+        number(time.get(5..7))?,
+        number(time.get(8..10))?,
+    );
+    let leap = year % 4 == 0 && (year % 100 != 0 || year % 400 == 0);
+    let longest = match month {
+        2 if leap => 29,
+        2 => 28,
+        4 | 6 | 9 | 11 => 30,
+        _ => 31,
+    };
+    let valid = time.get(4..5)? == "-"
+        && time.get(7..8)? == "-"
+        && (1..=12).contains(&month)
+        && (1..=longest).contains(&day);
+
+    valid.then(|| days_from_civil(year, month, day) * 86_400)
+}
+
+/// The seconds `zone`, the text after a clock, is ahead of UTC: an
+/// optional fraction of a second, then nothing or `Z` (UTC) or
+/// `+HH:MM` or `-HH:MM`.
+fn offset(zone: &str) -> Option<i64> {
+    let zone = match zone.strip_prefix('.') {
+        Some(fraction) => {
+            let end = fraction.bytes().take_while(u8::is_ascii_digit).count();
+            if end == 0 {
+                return None;
+            }
+            &fraction[end..]
+        }
+        None => zone,
+    };
+    if zone.is_empty() || zone == "Z" {
+        return Some(0);
+    }
+    let sign = match zone.get(..1)? {
+        "+" => 1,
+        "-" => -1,
+        _ => return None,
+    };
+    let (hours, minutes) = (number(zone.get(1..3))?, number(zone.get(4..6))?);
+    let shaped = zone.len() == 6 && zone.get(3..4)? == ":" && hours <= 23 && minutes <= 59;
+
+    shaped.then_some(sign * (hours * 3600 + minutes * 60))
+}
+
+/// The days from 1970-01-01 to the proleptic Gregorian date.
+fn days_from_civil(year: i64, month: i64, day: i64) -> i64 {
+    let year = if month <= 2 { year - 1 } else { year };
+    let era = year.div_euclid(400);
+    let of_era = year - era * 400;
+    let of_year = (153 * ((month + 9) % 12) + 2) / 5 + day - 1;
+    let of_day = of_era * 365 + of_era / 4 - of_era / 100 + of_year;
+
+    era * 146_097 + of_day - 719_468
 }
 
 impl Selector {
@@ -255,9 +335,15 @@ impl Selector {
             Self::Writer(w) => *w == writer.writer,
             Self::Provenance(class) => class == event.provenance,
             Self::Flag(flag) => event.flags.contains(flag),
-            Self::Since(time) => event
-                .timestamp
-                .is_some_and(|stamp| seconds(stamp) >= seconds(time)),
+            Self::Since(time) => {
+                let (Some(stamp), Some(from)) =
+                    (event.timestamp.and_then(utc_seconds), utc_seconds(time))
+                else {
+                    return false;
+                };
+
+                stamp >= from
+            }
         }
     }
 }
@@ -350,6 +436,21 @@ impl QuarantineSet {
     pub fn holds(&self, writer: &WriterFacts, event: &EventFacts<'_>) -> bool {
         self.active.iter().any(|a| a.selector.holds(writer, event))
     }
+
+    /// Whether a range or writer selector names `address`, which needs
+    /// nothing of the event or its writer's seat.
+    #[must_use]
+    pub fn names(&self, address: Address) -> bool {
+        self.active.iter().any(|a| match &a.selector {
+            Selector::Range {
+                writer,
+                first,
+                last,
+            } => *writer == address.writer && *first <= address.seq && address.seq <= *last,
+            Selector::Writer(writer) => *writer == address.writer,
+            _ => false,
+        })
+    }
 }
 
 /// The quarantine set of a node read against the events of its store:
@@ -405,6 +506,11 @@ impl<'s> Quarantine<'s> {
     pub fn holds(&self, address: Address) -> Result<bool, AdminError> {
         if self.set.is_empty() {
             return Ok(false);
+        }
+        // A range or writer selector holds an event whatever its writer's
+        // seat is, or whether it has one (I5: never fail open).
+        if self.set.names(address) {
+            return Ok(true);
         }
         let Some(writer) = self.writer(address.writer)? else {
             return Ok(false);

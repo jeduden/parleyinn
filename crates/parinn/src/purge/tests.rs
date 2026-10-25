@@ -146,7 +146,7 @@ fn a_purge_erases_the_range_records_its_act_and_tombstone_and_the_record_still_v
     assert!(
         entry
             .detail
-            .starts_with(&format!("purged {writer}:2-3 (purged) by principal act "))
+            .starts_with(&format!("purge of {writer}:2-3 (purged) by principal act "))
     );
     assert!(!entry.detail.contains("secret"));
     assert_eq!(p.invoke(&["verify"], &DEV).0, EXIT_OK);
@@ -312,7 +312,7 @@ fn a_residue_the_purge_could_not_clear_is_audited_counted_and_said() {
     assert!(
         String::from_utf8(err)
             .unwrap()
-            .contains("could not yet be vacuumed")
+            .contains("pending, not finished: residue remains")
     );
     assert_eq!(counted(&p, "purge_unfinished").len(), 1);
 }
@@ -355,7 +355,7 @@ fn a_purge_whose_erasure_stands_but_whose_residue_remains_says_so() {
 
     assert_eq!((code, out.as_str()), (EXIT_FAILURE, ""));
     assert!(
-        err.contains("the range is erased, but the store could not yet be vacuumed"),
+        err.contains("pending, not finished: residue remains"),
         "{err}"
     );
     assert!(
@@ -387,7 +387,11 @@ fn a_purge_the_vacuum_could_not_follow_is_counted_and_fails_though_the_erasure_s
 
     reader.execute_batch("COMMIT").unwrap();
     assert_eq!((code, out.as_str()), (EXIT_FAILURE, ""));
-    assert!(err.contains("could not yet be vacuumed"), "{err}");
+    assert!(
+        err.contains("pending, not finished: residue remains"),
+        "{err}"
+    );
+    assert!(!err.contains("erased"), "{err}");
     assert_eq!(counted(&p, "purge_unfinished").len(), 1);
     assert!(
         audited(&p).iter().any(|e| e.kind == "purge"),

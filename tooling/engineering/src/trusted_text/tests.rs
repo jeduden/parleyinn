@@ -414,20 +414,6 @@ fn an_impl_that_builds_and_changes_nothing_passes_however_it_is_cut() {
 fn a_change_to_trusted_text_is_refused_inside_the_crate_and_out() {
     for (text, what) in [
         (
-            "impl std::ops::Add<&str> for TrustedText {\n    type Output = Self;\n}",
-            "the trait Add",
-        ),
-        (
-            "impl AddAssign<String> for TrustedText {}",
-            "the trait AddAssign",
-        ),
-        (
-            "impl<'a> Extend<&'a str> for TrustedText {}",
-            "the trait Extend",
-        ),
-        ("impl fmt::Write for TrustedText {}", "the trait Write"),
-        ("impl DerefMut for TrustedText {}", "the trait DerefMut"),
-        (
             "impl TrustedText {\n    pub fn append(&mut self, s: &str) { self.0.push_str(s) }\n}",
             "the method append, which takes mut self",
         ),
@@ -436,8 +422,41 @@ fn a_change_to_trusted_text_is_refused_inside_the_crate_and_out() {
             "the method then, which takes mut self",
         ),
         (
+            "impl TrustedText {\n    pub fn grow(self: &mut Self, s: &str) {}\n}",
+            "the method grow, which takes mut self",
+        ),
+        (
+            "impl TrustedText {\n    pub fn grow(self: &mut TrustedText, s: &str) {}\n}",
+            "the method grow, which takes mut self",
+        ),
+        (
+            "impl TrustedText {\n    pub fn grow<'a>(&'a mut self, s: &str) {}\n}",
+            "the method grow, which takes mut self",
+        ),
+        (
+            "impl Clone for TrustedText {\n    fn clone_from(&mut self, r: &Self) {}\n}",
+            "the method clone_from, which takes mut self",
+        ),
+        (
             "impl TrustedText {\n    pub fn push_str(&self, s: &str) {}\n}",
             "the method push_str",
+        ),
+        (
+            "fn grow(t: &mut TrustedText, r: &str) {\n    more(t, r)\n}",
+            "a &mut TrustedText",
+        ),
+        (
+            "fn grow(t: & 'a mut restore_block::TrustedText) {}",
+            "a &mut TrustedText",
+        ),
+        (
+            "fn grow(mut t: TrustedText) -> TrustedText { t }",
+            "a mut binding of TrustedText",
+        ),
+        ("fn grow(p: *mut TrustedText) {}", "a mut TrustedText"),
+        (
+            "impl TrustedText {\n    fn grow(other: &mut Self) {}\n}",
+            "a &mut Self",
         ),
     ] {
         for inside in [true, false] {
@@ -449,5 +468,161 @@ fn a_change_to_trusted_text_is_refused_inside_the_crate_and_out() {
                 "{what}: {got:?}"
             );
         }
+    }
+}
+
+#[test]
+fn the_review_s_two_forms_are_refused() {
+    // A custom trait whose method takes `&mut self`: refused for the
+    // trait and for the receiver.
+    let custom =
+        "impl Grow for TrustedText {\n    fn grow(&mut self, r: &str) { self.0.push_str(r) }\n}";
+    // A free function taking `&mut TrustedText`.
+    let free = "fn grow(t: &mut TrustedText, r: &str) {\n    t.0.push_str(r)\n}";
+
+    for inside in [true, false] {
+        let got = problems(custom, inside);
+        assert_eq!(got.len(), 2, "{got:?}");
+        assert!(got[0].contains("implements the trait Grow"), "{got:?}");
+        assert!(
+            got[1].contains("the method grow, which takes mut self"),
+            "{got:?}"
+        );
+        let got = problems(free, inside);
+        assert!(
+            got[0].starts_with("src/lib.rs:1: TrustedText is changed by a &mut TrustedText"),
+            "{got:?}"
+        );
+    }
+}
+
+#[test]
+fn only_the_traits_that_cannot_add_text_may_be_implemented() {
+    let allowed = "\
+impl Clone for TrustedText { fn clone(&self) -> Self { todo() } }
+impl std::fmt::Debug for TrustedText {}
+impl fmt::Display for TrustedText { fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result { f.write_str(&self.0) } }
+impl PartialEq for TrustedText {}
+impl Eq for TrustedText {}
+impl std::hash::Hash for TrustedText {}
+impl PartialOrd for TrustedText {}
+impl Ord for TrustedText {}
+impl AsRef<str> for TrustedText { fn as_ref(&self) -> &str { &self.0 } }
+impl std::ops::Deref for TrustedText { type Target = str; fn deref(&self) -> &str { &self.0 } }
+";
+    let clone_builds = problems(allowed, true);
+    assert_eq!(clone_builds, Vec::<String>::new(), "{clone_builds:?}");
+
+    for (text, name) in [
+        (
+            "impl std::ops::Add<&str> for TrustedText {\n    type Output = Self;\n}",
+            "Add",
+        ),
+        ("impl AddAssign<String> for TrustedText {}", "AddAssign"),
+        ("impl<'a> Extend<&'a str> for TrustedText {}", "Extend"),
+        ("impl fmt::Write for TrustedText {}", "Write"),
+        ("impl DerefMut for TrustedText {}", "DerefMut"),
+        ("impl Drop for TrustedText {}", "Drop"),
+        ("impl Iterator for TrustedText {}", "Iterator"),
+        ("impl Grow for TrustedText {}", "Grow"),
+        ("impl AsRef<[u8]> for TrustedText {}", "AsRef"),
+        (
+            "impl Deref for TrustedText { type Target = String; }",
+            "Deref",
+        ),
+    ] {
+        for inside in [true, false] {
+            let got = problems(text, inside);
+
+            assert_eq!(got.len(), 1, "{text:?} inside {inside}: {got:?}");
+            assert!(got[0].starts_with("src/lib.rs:1: "), "{text:?}: {got:?}");
+            assert!(
+                got[0].contains(&format!(
+                    "TrustedText implements the trait {name}, but only {ALLOWED_TRAITS_SHOWN} may be"
+                )),
+                "{name}: {got:?}"
+            );
+        }
+    }
+}
+
+#[test]
+fn inside_the_crate_its_field_is_read_only_where_it_cannot_change() {
+    let allowed = "\
+pub struct TrustedText(String);
+impl TrustedText {
+    pub fn join(parts: &[Self]) -> Self { Self(parts.iter().map(|p| p.0.as_str()).collect()) }
+    pub fn len(&self) -> usize { self.0.len() }
+}
+fn version() -> f64 { 1.0 }
+";
+    assert_eq!(problems(allowed, true), Vec::<String>::new());
+
+    for (text, how) in [
+        (
+            "pub fn grow(t: TrustedText, r: &str) -> usize {\n    t.0.len()\n}",
+            "a field outside TrustedText's impl",
+        ),
+        (
+            "impl TrustedText {\n    pub fn grown(self, r: &str) -> usize { self.0.len() }\n}",
+            "its field in grown, which takes no &self",
+        ),
+        (
+            "impl TrustedText {\n    pub fn grow(&self, r: &str) { let Self(ref mut s) = self; }\n}",
+            "a mut binding in grow",
+        ),
+        (
+            "impl TrustedText {\n    pub fn grow(self, r: &str) -> Self { let mut s = self; s }\n}",
+            "a mut binding in grow",
+        ),
+        (
+            "fn grow(t: TrustedText) {\n    let TrustedText(ref mut s) = t;\n}",
+            "a ref mut binding outside TrustedText's impl",
+        ),
+    ] {
+        let got = problems(text, true);
+
+        assert_eq!(got.len(), 1, "{text:?}: {got:?}");
+        assert!(got[0].starts_with("src/lib.rs:2: "), "{text:?}: {got:?}");
+        assert!(got[0].contains(how), "{how}: {got:?}");
+    }
+    // Outside the crate the field is private: reading a tuple field is
+    // how any other type is read.
+    assert_eq!(
+        problems("fn f(p: (u8, u8)) -> u8 { p.0 }", false),
+        Vec::<String>::new()
+    );
+}
+
+#[test]
+fn inside_the_crate_trusted_text_is_one_private_field_of_immutable_text() {
+    for allowed in [
+        "pub struct TrustedText(String);",
+        "pub struct TrustedText(Box<str>);",
+        "pub struct TrustedText(std::sync::Arc<str>);",
+        "pub struct TrustedText(Rc<str>);",
+        "pub struct TrustedText(Cow<'static, str>);",
+        "pub struct TrustedText(&'static str);",
+        "#[derive(Clone)]\npub struct TrustedText(String);",
+    ] {
+        assert_eq!(problems(allowed, true), Vec::<String>::new(), "{allowed}");
+    }
+    for refused in [
+        "pub struct TrustedText(pub String);",
+        "pub struct TrustedText(pub(crate) String);",
+        "pub struct TrustedText(RefCell<String>);",
+        "pub struct TrustedText(String, String);",
+        "pub struct TrustedText { text: String }",
+        "pub struct TrustedText;",
+    ] {
+        let got = problems(refused, true);
+
+        assert_eq!(got.len(), 1, "{refused}: {got:?}");
+        assert!(
+            got[0].contains(
+                "TrustedText must be a tuple struct of one private String, Box<str>, Arc<str>, Rc<str>, Cow<'static, str> or &'static str"
+            ),
+            "{refused}: {got:?}"
+        );
     }
 }

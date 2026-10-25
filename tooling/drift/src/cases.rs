@@ -1486,7 +1486,27 @@ fn trusted_text_cases() -> Vec<Case> {
                 "impl Extend<String> for TrustedText {\n    fn extend<I>(&mut self, recalled: I) {}\n}\n",
             ),
             gate(),
-            "crates/store/src/extend.rs:1: TrustedText is changed by the trait Extend, though trusted text is built whole by its four constructors and never added to",
+            "crates/store/src/extend.rs:1: TrustedText implements the trait Extend, but only Clone, Debug, Display, PartialEq, Eq, Hash, PartialOrd, Ord, AsRef<str> and Deref<Target = str> may be, so none adds text to it",
+        ),
+        case(
+            "a crate implementing a trait of its own for TrustedText",
+            GATE,
+            Injection::create(
+                "crates/store/src/grow.rs",
+                "impl Grow for TrustedText {\n    fn grow(&self) {}\n}\n",
+            ),
+            gate(),
+            "crates/store/src/grow.rs:1: TrustedText implements the trait Grow, but only Clone, Debug, Display, PartialEq, Eq, Hash, PartialOrd, Ord, AsRef<str> and Deref<Target = str> may be, so none adds text to it",
+        ),
+        case(
+            "a crate changing TrustedText through &mut",
+            GATE,
+            Injection::create(
+                "crates/store/src/grow_mut.rs",
+                "fn grow(t: &mut TrustedText, recalled: &str) {\n    more(t, recalled)\n}\n",
+            ),
+            gate(),
+            "crates/store/src/grow_mut.rs:1: TrustedText is changed by a &mut TrustedText, though trusted text is built whole by its four constructors and never added to",
         ),
     ]
 }

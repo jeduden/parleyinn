@@ -194,6 +194,78 @@ fn a_time_window_compares_to_the_second_and_holds_no_event_without_a_time() {
     assert!(!since("2026-01-01T00:00:00Z").holds(&facts(), &event(1, &class, None, &[])));
 }
 
+#[test]
+fn a_time_window_reads_an_offset_as_the_instant_it_names() {
+    let class = Provenance::Web;
+
+    // 10:00+05:00 is 05:00Z, not 10:00Z; 10:00-05:00 is 15:00Z; a date
+    // alone is midnight Z; a fraction of a second is dropped.
+    for (window, stamp, held) in [
+        ("2026-01-01T10:00:00+05:00", "2026-01-01T05:00:00Z", true),
+        ("2026-01-01T10:00:00+05:00", "2026-01-01T04:59:59Z", false),
+        ("2026-01-01T10:00:00Z", "2026-01-01T05:00:00Z", false),
+        ("2026-01-01T10:00:00-05:00", "2026-01-01T15:00:00Z", true),
+        ("2026-01-01T10:00:00-05:00", "2026-01-01T14:59:59Z", false),
+        ("2026-01-01T10:00:00.750Z", "2026-01-01T10:00:00Z", true),
+        ("2026-01-01T10:00:01Z", "2026-01-01T10:00:00.999Z", false),
+        (
+            "2026-01-01T10:00:00.5+05:00",
+            "2026-01-01T05:00:00.1Z",
+            true,
+        ),
+        ("2026-01-01T05:00:00Z", "2026-01-01T10:00:00+05:00", true),
+        ("2026-01-01T05:00:01Z", "2026-01-01T10:00:00+05:00", false),
+        ("2026-01-01T12:00:00Z", "2026-01-01T08:00:00-04:00", true),
+        ("2026-01-01T12:00:01Z", "2026-01-01T08:00:00-04:00", false),
+        ("2026-03-01", "2026-03-01T00:00:00Z", true),
+        ("2026-03-01", "2026-02-28T23:59:59Z", false),
+        ("2026-04-30", "2026-04-30T00:00:00Z", true),
+        ("2027-01-01", "2027-01-01T05:30:00+05:30", true),
+        ("2027-01-01", "2026-12-31T23:59:59Z", false),
+        ("2024-03-01", "2024-02-29T23:59:59-00:01", true),
+    ] {
+        let event = event(1, &class, Some(stamp), &[]);
+
+        let in_window = Selector::since(window).unwrap().holds(&facts(), &event);
+
+        assert_eq!(in_window, held, "{stamp} since {window}");
+    }
+}
+
+#[test]
+fn a_time_that_is_no_instant_is_refused_and_a_stamp_that_is_none_is_held_by_no_window() {
+    let class = Provenance::Web;
+
+    for bad in [
+        "2026-13-01",
+        "2026-00-10",
+        "2026-02-30",
+        "2026-04-31",
+        "2026-01-32",
+        "2026-01-01T24:00:00Z",
+        "2026-01-01T10:60:00Z",
+        "2026-01-01T10:00:61Z",
+        "2026-01-01T10:00:00+24:00",
+        "2026-01-01T10:00:00+05:60",
+        "2026-01-01T10:00:00+0500",
+        "2026-01-01T10:00:00+05",
+        "2026-01-01T10:00",
+        "2026-01-01T10:00:00.Z",
+        "2026-01-01T10:00:00Zjunk",
+        "2026-01-01x",
+        "2026-01-01T10:00:00ZZ",
+    ] {
+        assert!(Selector::since(bad).is_err(), "{bad}");
+    }
+    let window = Selector::since("2026-01-01").unwrap();
+    for stamp in ["garbage", "2026-01-01T10:00:00+25:00", "2026-1-01"] {
+        assert!(
+            !window.holds(&facts(), &event(1, &class, Some(stamp), &[])),
+            "{stamp}"
+        );
+    }
+}
+
 struct Fixture {
     dir: TempDir,
     home: Home,
@@ -318,6 +390,36 @@ fn an_added_selector_holds_its_events_and_those_recorded_later() {
     assert!(!q.holds(f.at(9)).unwrap(), "an event that is not there");
     let nowhere = Address::new(writer(9), seq(1));
     assert!(!q.holds(nowhere).unwrap(), "a writer with no seat");
+}
+
+#[test]
+fn a_range_or_writer_selector_holds_an_event_of_a_writer_with_no_seat() {
+    let mut f = fixture();
+    let seatless = writer(9);
+    f.act(&Act::QuarantineAdd {
+        selector: Selector::Range {
+            writer: seatless,
+            first: seq(5),
+            last: seq(7),
+        },
+        reason: "a range".to_owned(),
+    });
+    f.act(&Act::QuarantineAdd {
+        selector: Selector::Writer(writer(8)),
+        reason: "a writer".to_owned(),
+    });
+    f.act(&Act::QuarantineAdd {
+        selector: Selector::Author(seat(1)),
+        reason: "an author, which needs the seat".to_owned(),
+    });
+    let q = f.quarantine();
+    let at = |w: WriterId, n| Address::new(w, seq(n));
+
+    assert!(q.holds(at(seatless, 5)).unwrap() && q.holds(at(seatless, 7)).unwrap());
+    assert!(!q.holds(at(seatless, 4)).unwrap() && !q.holds(at(seatless, 8)).unwrap());
+    assert!(!q.holds(at(writer(7), 6)).unwrap(), "another writer");
+    assert!(q.holds(at(writer(8), 1)).unwrap() && q.holds(at(writer(8), 99)).unwrap());
+    assert!(!q.set().names(f.at(1)), "a seat selector names no address");
 }
 
 #[test]
