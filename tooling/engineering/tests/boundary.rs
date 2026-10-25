@@ -1,8 +1,12 @@
 //! SEC-01's core row, SEC-15, SEC-17, SEC-19 and ENG-22 against the
 //! repository itself. The SEC-01 scenario stays pending until the B1
 //! components of M7 have their evidence; these gate tests prove its
-//! core row in every `cargo test`. SEC-19, SEC-15, SEC-17 and ENG-22
-//! are bound scenarios whose steps call the same checks.
+//! core row in every `cargo test`. SEC-15 is a bound scenario whose
+//! steps call the same checks. SEC-17, SEC-19 and ENG-22 stay pending:
+//! their checks here are partial tripwires, each short of its row as
+//! phase 15's findings say (no recorded review or release gate; the
+//! widening act and a reach test unchecked; statements found by eight
+//! phrases, and a cited test only shown to exist and not be ignored).
 
 use engineering::review_workflow::{self, Workflow};
 use engineering::{

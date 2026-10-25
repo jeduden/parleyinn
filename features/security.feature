@@ -210,7 +210,7 @@ Feature: Security (SEC)
     And an audit entry records "hook input failed schema validation"
     And the counter "hook_input_rejected" increases by 1
 
-  @SEC-17 @P0
+  @SEC-17 @P0 @pending
   Scenario: the threat model covers every boundary and compares ParleyInn with Zed Delta
     Given the repository at a minor release tag
     When the release checklist is inspected
@@ -234,7 +234,7 @@ Feature: Security (SEC)
       | ~/src/app/.git/HEAD                                      | the file is read, and nothing in the repository is written                                             |
       | ~/src/app/docs/key (a symlink to ~/.ssh/id_ed25519)      | the path is rejected, nothing is read from it, and an audit entry records "path outside allowed roots" |
 
-  @SEC-19 @P0 @I4
+  @SEC-19 @P0 @I4 @pending
   Scenario: every component, process and protocol sits in exactly one boundary of the register
     Given an isolated ParleyInn home
     And the boundary register kept in the repository
