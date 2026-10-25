@@ -227,7 +227,7 @@ Feature: Engineering quality (ENG)
     Then direct pushes are rejected
     And commits must be signed
     And every pull request needs an approval from a reviewer other than its author
-    And CODEOWNERS names the stakeholder on the specification, the scenarios and the process that builds and checks the code
+    And CODEOWNERS names the stakeholder on the specification, the decision records, the scenarios and the process that builds and checks the code
     And CODEOWNERS names no code owner on any other path
     And CODEOWNERS names no code owner on Rust source, so a code change needs only a reviewer other than its author
 

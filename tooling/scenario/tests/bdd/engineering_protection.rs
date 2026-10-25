@@ -53,7 +53,7 @@ fn approval_from_another_reviewer(w: &mut World) -> Result<(), String> {
 }
 
 #[then(
-    regex = r"^CODEOWNERS names the stakeholder on the specification, the scenarios and the process that builds and checks the code$"
+    regex = r"^CODEOWNERS names the stakeholder on the specification, the decision records, the scenarios and the process that builds and checks the code$"
 )]
 fn stakeholder_owns_the_enforcing_paths(_w: &mut World) -> Result<(), String> {
     outcome(codeowners::stakeholder_owns_the_enforcing_paths(&checkout()))

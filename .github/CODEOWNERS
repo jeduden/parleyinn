@@ -1,12 +1,14 @@
 # ENG-21: agents review and approve each other's pull requests. The
-# stakeholder approves the specification, the scenarios and the process
-# that builds and checks the code, listed below, and no Rust source. A
-# path with no owner here, code among it, merges on the approval of any
-# reviewer other than its author, agent or human.
+# stakeholder approves the specification, the decision records, the
+# scenarios and the process that builds and checks the code, listed
+# below, and no Rust source. A path with no code owner here, code among
+# it, merges on the approval of any reviewer other than its author,
+# agent or human.
 
-# The specification: the requirement text, and the decision records
-# that justify design and dependencies (ENG-26).
+# The specification (the requirement text).
 /docs/srs/                    @jeduden
+
+# The decision records that justify design and dependencies (ENG-26).
 /docs/adr/                    @jeduden
 
 # The scenarios that make the requirement text executable.

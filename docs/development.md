@@ -193,11 +193,11 @@ Main's protection is committed as a ruleset,
 (ENG-21). It allows no direct push and no bypass, and requires signed
 commits, `CI`, one approval from a reviewer other than the author, and
 a code owner's approval where [CODEOWNERS](../.github/CODEOWNERS) names
-one. The ENG-21 gate tests read it, and CODEOWNERS: the stakeholder
-owns the specification, the scenarios and every path of the process
-that builds and checks the code, nothing else is owned but the
-supply-chain policy, and no Rust source has an owner. Two tag rulesets
-sit beside it.
+one. The ENG-21 gate tests read it, and CODEOWNERS: it names the
+stakeholder as code owner of the specification, the decision records,
+the scenarios and every path of the process that builds and checks
+the code, a code owner on nothing else but the supply-chain policy,
+and no code owner on Rust source. Two tag rulesets sit beside it.
 `releases-semver` keeps each `v*.*.*` tag fixed on a signed commit that
 passed `CI`. `no-other-tags-allowed` refuses every other tag. The
 stakeholder applies the rulesets on GitHub. The nightly `protection`
@@ -272,13 +272,13 @@ What `review-bundle` decides, comparing the pull request with main:
   a nit, and an unread header makes the review deep.
 
 The review class sets the agent's model, turn budget and tools. A change
-holding only Markdown outside the stakeholder's paths, the domain model,
+touching only Markdown outside the stakeholder's paths, the domain model,
 plans and scenarios is light. Any path CODEOWNERS assigns, the gates,
 a reach test or a security-sensitive crate makes it deep, and only a
 deep review may consult the read-only reviewer subagents. Anything
 else, an empty diff included, is standard.
 The review bundle quotes only the touched rows, their scenarios and
-the invariants, a few thousand model tokens where the SRS holds
+the invariants, a few thousand model tokens where the SRS runs to
 hundreds of thousands. A re-review starts from the diff since the reviewer app's
 last review, found by the app's own login. The pull request's agent
 instructions move out of the agent's directory, so none loads; the

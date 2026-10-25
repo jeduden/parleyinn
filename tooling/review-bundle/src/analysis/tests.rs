@@ -94,7 +94,7 @@ fn analyse_routes_by_the_paths_that_changed() {
 }
 
 #[test]
-fn code_no_stakeholder_holds_reviews_deep_when_it_gates_or_is_security_sensitive() {
+fn code_with_no_code_owner_reviews_deep_when_it_gates_or_is_security_sensitive() {
     for (path, want) in [
         ("tooling/drift/src/cases.rs", Class::Deep),
         ("crates/pin/src/lib.rs", Class::Deep),
