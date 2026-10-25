@@ -137,7 +137,9 @@ $(mise env -s bash | grep -v '^export PATH=')"
     # non-interactive shell, which would never reach lines at its end.
     # Drop a block an earlier run wrote: everything from begin to end, or,
     # from a run before the end marker, begin and the export and eval
-    # lines after it.
+    # lines after it. That fallback is only for a block the earlier
+    # script version wrote, which had no end marker: it also drops an
+    # export line a user put straight after such a block.
     printf '%s\n%s\n%s\n' "$begin" "$lines" "$end" > "$tmp/profile"
     if [ -f "$profile_file" ]; then
       awk -v b="$begin" -v e="$end" '
