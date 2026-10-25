@@ -40,13 +40,11 @@ pub(crate) fn labels(
 ) -> Result<BTreeMap<WriterId, Label>, StoreError> {
     let mut statement =
         conn.prepare("SELECT content FROM events WHERE writer = ?1 AND kind = ?2 ORDER BY seq")?;
-    let rows = statement.query_map(
-        [
-            device.to_string(),
-            EventKind::WriterLabel.as_str().to_owned(),
-        ],
-        |r| r.get::<_, Option<String>>(0),
-    )?;
+    let args = [
+        device.to_string(),
+        EventKind::WriterLabel.as_str().to_owned(),
+    ];
+    let rows = statement.query_map(args, |r| r.get::<_, Option<String>>(0))?;
     let mut out = BTreeMap::new();
     for (rank, row) in (1u32..).zip(rows) {
         let writer = row?
