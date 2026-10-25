@@ -228,10 +228,8 @@ fn a_line_whose_rescans_hit_the_budget_is_counted_and_kept() {
 
     let ingested = ingest_path(&home, &path, &redactor, &mut OsEntropy).unwrap();
 
-    assert_eq!(
-        ingested.redactions.last().map(String::as_str),
-        Some("scan_limit")
-    );
+    assert_eq!(ingested.scan_limited, 1);
+    assert!(ingested.redactions.iter().all(|r| r == "google_api_key"));
     let store = Store::open(&home.store()).unwrap();
     let log = store.log(ingested.writer).unwrap();
     let text = log[0].content.clone().unwrap()["text"]

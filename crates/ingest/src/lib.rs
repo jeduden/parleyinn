@@ -97,6 +97,11 @@ pub struct Ingested {
     pub owners_chosen: usize,
     /// The rule of each redaction made, line by line.
     pub redactions: Vec<String>,
+    /// How many lines' redaction scan budget ended before the text
+    /// beside the last match was scanned again, so a secret that match
+    /// hid may stand in the record (SEC-08, I9); no redaction is
+    /// counted for it.
+    pub scan_limited: usize,
     /// How many lines it stored as `unparsed` events (REC-05).
     pub unparsed: usize,
     /// What an audit entry says of each format drift (REC-26), line by

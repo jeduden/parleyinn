@@ -96,11 +96,10 @@ pub(crate) fn ingest(
         interactive: inputs.interactive,
         live: live_observations(&observed, &defaults, main, runs.live()),
     };
-    let landed = append(&mut store, &resume, text.as_bytes(), &plan, &seen, entropy)?;
-    let (appended, addresses) = (landed.lines, landed.addresses);
+    let land = append(&mut store, &resume, text.as_bytes(), &plan, &seen, entropy)?;
     let hold_started = hold(&mut store, &resume.source, plan.hold, inputs.now_ms)?;
     let owners_chosen = choose_owners(&mut store, &node, &plan.chosen, entropy)?;
-    let observations = record_observed(&mut store, &node, &seen, &plan, &addresses, entropy)?;
+    let observations = record_observed(&mut store, &node, &seen, &plan, &land.addresses, entropy)?;
 
     let (index_gaps, index_gaps_unread) = gaps(store.unreported_search_index_gaps());
 
@@ -111,12 +110,12 @@ pub(crate) fn ingest(
         matched: observations.matched,
         prompt_conflicts: observations.conflicts,
         not_attended: observations.not_attended,
-        observations: observations.appended + landed.observations,
+        observations: observations.appended + land.observations,
         writer: own,
         seat: seat_of(&store, own)?,
         room: node.personal_room(),
         runs: reports(&store, own, &plan.events_by_writer(), &runs)?,
-        events: appended,
+        events: land.lines,
         generation: resume.source.generation,
         new_generation: resume.new_generation,
         held: plan.hold,
@@ -126,6 +125,7 @@ pub(crate) fn ingest(
         conflicts: plan.conflicts,
         owners_chosen,
         redactions: plan.redactions,
+        scan_limited: plan.scan_limited,
         unparsed: plan.unparsed,
         drifts: plan.drifts,
         redacted_path: named.redacted_path,
@@ -489,6 +489,8 @@ struct Plan {
     /// fork observation chose.
     chosen: BTreeSet<(WriterId, WriterId)>,
     redactions: Vec<String>,
+    /// How many lines' redaction scan budget ended (I9).
+    scan_limited: usize,
     unparsed: usize,
     drifts: Vec<String>,
     /// Each prompt line's event, by its index, with its `prompt_id` and
@@ -794,9 +796,7 @@ impl Plan {
                 self.released += usize::from(other == Decision::Released);
                 let content = content(at.number, &redacted.text, redacted.rules.len());
                 self.redactions.extend(redacted.rules);
-                if redacted.limited {
-                    self.redactions.push(redaction::SCAN_LIMIT.to_owned());
-                }
+                self.scan_limited += usize::from(redacted.limited);
                 (kind, provenance, content)
             }
         };

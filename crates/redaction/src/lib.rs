@@ -59,10 +59,6 @@ pub struct Redacted {
     pub limited: bool,
 }
 
-/// The name a caller counts a [`Redacted::limited`] text under, beside
-/// the rule names; no marker carries it.
-pub const SCAN_LIMIT: &str = "scan_limit";
-
 /// How many times the length of a text its scans may read together: a
 /// clean text takes one, and the text around matches about one more.
 const SCAN_BUDGET_FACTOR: usize = 8;

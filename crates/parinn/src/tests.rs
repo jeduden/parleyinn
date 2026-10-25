@@ -520,6 +520,29 @@ fn ingest_reports_a_transcript_it_cannot_read() {
 }
 
 #[test]
+fn ingest_audits_a_limited_redaction_apart_from_a_redaction() {
+    let p = Process::new();
+    let key = format!("AIza{}", "a".repeat(35));
+    let path = p.transcript(&format!("{{\"t\":\"{}\"}}\n", key.repeat(5_000)));
+
+    let (code, _, err) = p.invoke(&["ingest", "--path", &path], &DEV);
+
+    assert_eq!((code, err.as_str()), (EXIT_OK, ""));
+    let limited: Vec<_> = audited(&p)
+        .into_iter()
+        .filter(|e| e.counter.as_deref() == Some("redaction_scan_limited"))
+        .map(|e| (e.kind, e.detail))
+        .collect();
+    assert_eq!(
+        limited,
+        [(
+            "truncated".to_owned(),
+            "a line's redaction scan budget ended; a secret beside a match may stand".to_owned()
+        )]
+    );
+}
+
+#[test]
 fn ingest_audits_and_counts_each_unparsed_line_and_format_drift() {
     let p = Process::new();
     let path = p.transcript("{not json\n{\"type\":\"future_kind\"}\n");

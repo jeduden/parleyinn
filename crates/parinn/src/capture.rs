@@ -408,6 +408,14 @@ impl Running {
                 rule,
             ));
         }
+        for _ in 0..ingested.scan_limited {
+            self.audit(&Occurrence::Degraded {
+                kind: Kind::Truncated,
+                counter: Counter::RedactionScanLimited,
+                operation: "mcp",
+                detail: "a line's redaction scan budget ended; a secret beside a match may stand",
+            });
+        }
         for _ in 0..ingested.unparsed {
             self.audit(&Occurrence::Degraded {
                 kind: Kind::Failed,
