@@ -190,9 +190,8 @@ shards' samples; the head's gate writes its report into the job summary
 and fails naming each benchmark that regressed more than 10% with
 significance. Pooling adds the runners' speed differences to both sides
 alike: the one-sided test loses some power and gains no false alarm. A
-benchmark too slow for the budget would run nightly instead. Until the
-suite reaches `main`, the base has none; the gate warns and reports the
-head's samples alone.
+benchmark too slow for the budget runs nightly instead. Until the suite
+reaches `main`, the base has none; the gate warns and reports the head's.
 
 ## Adding or writing a scenario
 
