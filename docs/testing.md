@@ -188,10 +188,11 @@ interleaves the sides and keeps the alternation of which goes first, so
 a drift in a runner's speed lands on both. The `benchmark` job pools the
 shards' samples; the head's gate writes its report into the job summary
 and fails naming each benchmark that regressed more than 10% with
-significance. A benchmark too slow for the budget, such as one on a
-store of 10M events, would run nightly instead. Until the suite reaches
-`main`, the base has none, and the gate warns and reports the head's
-samples alone.
+significance. Pooling adds the runners' speed differences to both sides
+alike: the one-sided test loses some power to see a regression and
+gains no false alarm. A benchmark too slow for the budget would run
+nightly instead. Until the suite reaches `main`, the base has none, and
+the gate warns and reports the head's samples alone.
 
 ## Adding or writing a scenario
 

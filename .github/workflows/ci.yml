@@ -379,9 +379,9 @@ jobs:
       matrix:
         shard: [0, 1, 2, 3]
     env:
-      # Every fourth case from the shard's own: the four together hold
-      # every case once, and each fits the budget.
-      DRIFT_SHARD: ${{ matrix.shard }}/4
+      # Every nth case from the shard's own, n the matrix's size, so the
+      # shards together hold every case once and each fits the budget.
+      DRIFT_SHARD: ${{ strategy.job-index }}/${{ strategy.job-total }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -482,8 +482,8 @@ jobs:
         shard: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
     env:
       ROUNDS: 30
-      SHARDS: 10
-      SHARD: ${{ matrix.shard }}
+      SHARDS: ${{ strategy.job-total }}
+      SHARD: ${{ strategy.job-index }}
       SAMPLES: 10
     steps:
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
@@ -499,8 +499,10 @@ jobs:
           base="$RUNNER_TEMP/suites/base"
           out="$RUNNER_TEMP/samples"
           mkdir -p "$out"
+          # One side's suite, on that side's release core.
+          suite() { "$1/benchmark" run --core "$1/parinn" --samples "$SAMPLES"; }
           if [ ! -x "$base/benchmark" ]; then
-            "$head/benchmark" run --core "$head/parinn" --samples "$SAMPLES" > "$out/head.samples"
+            suite "$head" > "$out/head.samples"
             touch "$out/no-base"
             exit 0
           fi
@@ -515,7 +517,6 @@ jobs:
             for side in $order; do
               bin="$head"
               [ "$side" = base ] && bin="$base"
-              core="$bin/parinn"
               # Only the base side is taken again: it runs main's
               # benchmark, which fails a round when a stalled disk
               # overruns the hook budget twice or holds a start past
@@ -524,8 +525,7 @@ jobs:
               tries=1
               [ "$side" = base ] && tries=3
               for try in $(seq "$tries"); do
-                if "$bin/benchmark" run --core "$core" --samples "$SAMPLES" \
-                  > "$out/round.samples" 2> "$out/round.err"; then
+                if suite "$bin" > "$out/round.samples" 2> "$out/round.err"; then
                   cat "$out/round.samples" >> "$out/$side.samples"
                   break
                 fi
@@ -685,22 +685,24 @@ jobs:
       actions: read
     steps:
       # Each job's duration and result, once per run, so ci-review reads
-      # them instead of measuring. A failure here warns and never fails
-      # the gate.
+      # them instead of measuring. A measurement, not a gate: when it
+      # cannot be taken, the step warns, writes no file, and the gate
+      # below still decides.
       - name: Record job timings
-        continue-on-error: true
+        shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
           RUN_ID: ${{ github.run_id }}
           REPO: ${{ github.repository }}
         run: |
+          set -o pipefail
           if gh api --paginate "repos/$REPO/actions/runs/$RUN_ID/jobs?filter=latest" \
               --jq '.jobs[] | select(.completed_at != null and .name != "CI") | {name, conclusion, seconds: ((.completed_at | fromdateiso8601) - (.started_at | fromdateiso8601))}' \
               | jq -s '.' > ci-timings.json; then
             jq -r '"| job | result | seconds |", "|---|---|---|", (.[] | "| \(.name) | \(.conclusion) | \(.seconds) |")' ci-timings.json >> "$GITHUB_STEP_SUMMARY"
           else
+            rm -f ci-timings.json
             echo "::warning::could not record job timings; ci-review has no timings for this run"
-            exit 1
           fi
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: ${{ !cancelled() }}
