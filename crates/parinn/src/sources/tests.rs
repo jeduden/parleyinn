@@ -337,6 +337,7 @@ fn a_file_is_looked_at_by_its_bytes_and_a_missing_one_is_gone() {
     }
     assert!(matches!(look(&dir.path().join("none"), 5), Found::Gone));
     assert!(matches!(look(dir.path(), 5), Found::Unreadable));
+    assert!(matches!(look(&path.join("below"), 5), Found::Unreadable));
 }
 
 #[test]

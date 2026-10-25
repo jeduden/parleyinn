@@ -71,7 +71,8 @@ pub fn cases() -> Vec<Case> {
         static_analysis_cases(),
         boundary_cases(),
         telemetry_cases(),
-        documentation_cases(),
+        threat_model_cases(),
+        privacy_cases(),
         complexity_cases(),
         trusted_text_cases(),
         toml_cases(),
@@ -1269,9 +1270,8 @@ fn telemetry_cases() -> Vec<Case> {
     ]
 }
 
-/// The drifts the threat model (SEC-17) and the privacy statements
-/// (ENG-22) exist to catch.
-fn documentation_cases() -> Vec<Case> {
+/// The drifts the threat model (SEC-17) exists to catch.
+fn threat_model_cases() -> Vec<Case> {
     vec![
         case(
             "a register row the threat model does not cover",
@@ -1342,6 +1342,12 @@ fn documentation_cases() -> Vec<Case> {
             gate(THREATS),
             "release 0.0 is reviewed by the one who wrote its threat model",
         ),
+    ]
+}
+
+/// The drifts the privacy statements (ENG-22) exist to catch.
+fn privacy_cases() -> Vec<Case> {
+    vec![
         case(
             "a privacy statement citing no test",
             PRIVACY,

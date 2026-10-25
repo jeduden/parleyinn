@@ -15,7 +15,9 @@ the persona-security-officer reviews the boundary and threat-model rows.
   integrity, and derived artifact consistency (landmarks, trust levels,
   a schema object ParleyInn does not ship, the search index's ranking
   configuration, an index entry whose event lacks the term). A source
-  past its ingest position is pending, failing only as REC-13 says.
+  past its ingest position is short, failing only as REC-13 says or
+  once its ingest marker is 10 minutes old; one cut below its position
+  or no longer holding its consumed prefix fails.
 - ADM-11: `parinn status --json` shows the store location and size,
   schema version, deployment mode, non-zero counters, and the settings
   awaiting acceptance; it says per OS whether node identity is checked,
