@@ -47,7 +47,10 @@ fn a_section_specialist_is_named_for_its_file_without_its_number() {
 fn rust_routes_to_its_language_and_its_test_layer() {
     assert_eq!(
         of(&["crates/store/src/lib.rs"]),
-        Dispatch::from([(CODE.to_owned(), names(&["lang-rust", "test-engineer-unit"]))])
+        Dispatch::from([(
+            CODE.to_owned(),
+            names(&["lang-rust", PERFORMANCE, "test-engineer-unit"])
+        )])
     );
     assert_eq!(
         of(&["crates/store/tests/disk.rs"])[CODE],
@@ -181,4 +184,40 @@ fn a_model_specialist_is_the_hub_for_the_index() {
         Some("domain-model-record")
     );
     assert_eq!(model_specialist("A b"), None);
+}
+
+#[test]
+fn product_code_and_the_benchmarks_bring_the_performance_specialist() {
+    for path in [
+        "crates/store/src/lib.rs",
+        "tooling/benchmark/src/lib.rs",
+        "tooling/calibrate/src/main.rs",
+        "tooling/benchmark/accepted.txt",
+    ] {
+        assert!(of(&[path])[CODE].contains(PERFORMANCE), "{path}");
+    }
+    for path in [
+        "crates/store/tests/disk.rs",
+        "crates/store/src/tests.rs",
+        "crates/store/src/a/tests.rs",
+        "tooling/drift/src/cases.rs",
+    ] {
+        assert!(
+            !of(&[path])
+                .get(CODE)
+                .is_some_and(|s| s.contains(PERFORMANCE)),
+            "{path}"
+        );
+    }
+}
+
+#[test]
+fn a_non_functional_row_or_one_tracing_i9_brings_the_performance_specialist() {
+    for row in [
+        req("NFR-01", "docs/srs/07-non-functional-requirements.md", &[]),
+        req("HOOK-01", "docs/srs/05-functional-requirements.md", &["I9"]),
+    ] {
+        let got = dispatch(&[], &[&row], &[]);
+        assert_eq!(got[CODE], names(&[PERFORMANCE]), "{}", row.id);
+    }
 }

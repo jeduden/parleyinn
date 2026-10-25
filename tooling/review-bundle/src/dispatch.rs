@@ -28,10 +28,19 @@ const CI: &str = "ci-engineer";
 const UNIT: &str = "test-engineer-unit";
 const INTEGRATION: &str = "test-engineer-integration";
 const END_TO_END: &str = "test-engineer-end-to-end";
+/// The specialist for the performance budgets (NFR, ENG-15, I9).
+pub const PERFORMANCE: &str = "performance";
+/// The benchmark and calibration tooling, which the performance
+/// specialist reads whatever the file's language.
+const BENCHMARKS: [&str; 2] = ["tooling/benchmark/", "tooling/calibrate/"];
+/// The prefix of the non-functional requirements, which set the budgets.
+const NON_FUNCTIONAL: &str = "NFR-";
+/// The invariant that ParleyInn never degrades the agent.
+const NEVER_DEGRADES: &str = "I9";
 
 /// Every specialist the dispatch names whatever the tree contains; the
 /// section and domain-model specialists follow their files.
-pub const FIXED_SPECIALISTS: [&str; 12] = [
+pub const FIXED_SPECIALISTS: [&str; 13] = [
     RUST,
     TOML,
     SHELL,
@@ -44,6 +53,7 @@ pub const FIXED_SPECIALISTS: [&str; 12] = [
     END_TO_END,
     OFFICER,
     MODEL_HUB,
+    PERFORMANCE,
 ];
 
 /// Each generalist the review consults, with the specialists whose
@@ -143,6 +153,9 @@ pub fn dispatch(
         {
             add(SECURITY, OFFICER);
         }
+        if row.id.starts_with(NON_FUNCTIONAL) || row.traces.iter().any(|t| t == NEVER_DEGRADES) {
+            add(CODE, PERFORMANCE);
+        }
     }
 
     out
@@ -193,6 +206,9 @@ fn by_path(path: &str, security_crates: &[String]) -> Vec<(&'static str, String)
     if let Some(file) = path.strip_prefix(MODEL).and_then(|f| f.strip_suffix(".md")) {
         out.extend(model_specialist(file).map(|s| (SPEC, s)));
     }
+    if BENCHMARKS.iter().any(|b| path.starts_with(b)) || (ext == "rs" && product_code(path)) {
+        out.push((CODE, PERFORMANCE.to_owned()));
+    }
     if path == INVARIANTS || security_code(path, security_crates) {
         out.push((SECURITY, OFFICER.to_owned()));
     }
@@ -213,6 +229,14 @@ fn test_layer(path: &str) -> &'static str {
     } else {
         UNIT
     }
+}
+
+/// Whether `path` is a product crate's shipped code: under its `src/`,
+/// and not a module's `tests.rs`.
+fn product_code(path: &str) -> bool {
+    path.strip_prefix("crates/")
+        .and_then(|rest| rest.split_once('/'))
+        .is_some_and(|(_, tail)| tail.starts_with("src/") && !tail.ends_with("/tests.rs"))
 }
 
 /// Whether `path` lies in a security-sensitive crate or is a crate's

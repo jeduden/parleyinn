@@ -531,7 +531,7 @@ fn analyse_dispatches_by_path_and_by_the_rows_the_diff_names() {
     );
     assert_eq!(
         got.dispatch[dispatch::CODE],
-        ["lang-rust", "test-engineer-unit"]
+        ["lang-rust", "performance", "test-engineer-unit"]
             .map(str::to_owned)
             .into()
     );
