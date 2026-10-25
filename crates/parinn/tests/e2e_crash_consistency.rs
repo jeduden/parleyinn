@@ -170,13 +170,23 @@ fn verified(home: &Path, after: Duration, label: &str) -> Vec<String> {
     );
     let report: serde_json::Value = serde_json::from_slice(&out.stdout)
         .unwrap_or_else(|e| panic!("{label}: parinn verify --json printed no JSON: {e}"));
-    // The unit tests hold the report's fields; here a report without
-    // the field reads as one naming no unfinished purge.
+    unfinished_in(&report, label)
+}
+
+/// The ranges a verify report names a purge left unfinished; a report
+/// without the field, or with one not a list of ranges, fails.
+fn unfinished_in(report: &serde_json::Value, label: &str) -> Vec<String> {
     report["unfinished_purges"]
         .as_array()
-        .into_iter()
-        .flatten()
-        .map(|r| r.as_str().unwrap_or_default().to_owned())
+        .unwrap_or_else(|| {
+            panic!("{label}: parinn verify --json reported no unfinished_purges: {report}")
+        })
+        .iter()
+        .map(|r| {
+            r.as_str()
+                .unwrap_or_else(|| panic!("{label}: unfinished_purges holds {r}, not a range"))
+                .to_owned()
+        })
         .collect()
 }
 
@@ -349,6 +359,12 @@ fn a_purge_cut_short_after_its_transaction_verifies_and_the_next_rebuild_finishe
 
     assert_eq!(left, [format!("{writer}:2-2")], "verify names what is left");
     finished(home.path(), Duration::ZERO, label);
+}
+
+#[test]
+#[should_panic(expected = "no unfinished_purges")]
+fn a_verify_report_without_its_unfinished_purges_fails() {
+    unfinished_in(&serde_json::json!({}), "a bare report");
 }
 
 #[test]
