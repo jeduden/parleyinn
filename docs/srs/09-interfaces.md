@@ -127,6 +127,7 @@ and, when another act caused it, that act's id (LANE-24, LANE-25).
     }
   ],
   "tombstones": [{ "range": "A1·1200–1450", "reason": "purged" }],
+  "quarantine_markers": [{ "range": "A1·12" }],
   "truncated": true,
   "next_cursor": "c2VxPTQ4MjE0"
 }
@@ -143,7 +144,19 @@ or by seq within a writer (`event_expand`). A tool that stops at its per-call
 cap sets `truncated` and `next_cursor`; an event too long for one call is cut
 at a character boundary, its item's `continuation` holding `cut`, and the item
 that continues it holding `continued` (RCL-03). `flags` holds the
-injection-pattern marks of PRV-07 and nothing else. An envelope marked
+injection-pattern marks of PRV-07 and nothing else. A `tombstones` entry stands
+in the call's range for a purged range whose events are not returned; its
+`reason` is `purged` when the principal purged it (ADM-07) and `retention` when
+a retention policy did (REC-15, SEC-22). A `quarantine_markers` entry stands for
+a quarantined address, or a run of consecutive ones, whose events are not
+returned and carries no reason (RCL-06, SEC-12). Each entry lies within the
+call's range and the caller's recall scope, so neither hints at an address
+outside it (I8, RCL-05); neither names a
+selector, a policy, a principal or a free-form reason text, and neither carries
+content
+(RCL-04). An address both purged and quarantined appears only as a tombstone
+(RCL-06). A call that reaches the per-call cap continues from its cursor, and
+each entry appears on the page that reaches it. An envelope marked
 structural (`stat_list`) carries a `structural` object of the counts `events`,
 `runs`, `compactions` and `recalls` within the caller's recall scope, and no
 item (RCL-04):
@@ -155,6 +168,7 @@ item (RCL-04):
   "structural": { "events": 40, "runs": 2, "compactions": 1, "recalls": 3 },
   "items": [],
   "tombstones": [],
+  "quarantine_markers": [],
   "truncated": false,
   "next_cursor": null
 }
