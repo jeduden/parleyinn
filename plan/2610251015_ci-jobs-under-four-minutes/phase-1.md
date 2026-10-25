@@ -1,0 +1,62 @@
+---
+n: 1
+title: "Every job of ci.yml and build.yml under its five-minute cap"
+status: "✅"
+result: false
+---
+# Phase 1: every job of ci.yml and build.yml under its five-minute cap
+
+Requirements. None applies: this phase changes how CI runs, not what
+ParleyInn does. It takes no scenario off `@pending`. ENG-15's gate test
+(`benchmarks::gated`) learns that the suite may run in a job the gate
+job needs; its unit tests cover the new shape.
+
+BDD coverage: none. The change is in the workflows and the tooling that
+reads them, and no cross-host or lease behavior is involved.
+
+RED spec. Main run 765 has test at 5.3 min, coverage at 6.5 min, build
+(ubuntu) at 4.8 min and benchmark at 15 min, all over the cap. The
+first run on this branch with the cap shows each timing out. Any run
+where a job of `ci.yml` or `build.yml` is over four minutes fails this
+phase.
+
+GREEN sites:
+
+- `.github/workflows/ci.yml`: a `release-core` job builds the release
+  core once and uploads it; `test` runs every test but the scenario
+  crate's, and `scenarios` runs that crate with the count line taken
+  from the run itself; `coverage (unit|integration|e2e)` each measure
+  one layer, and `coverage` merges them and holds the floors;
+  `benchmark-suites` builds both sides once, `benchmark (shard N)` each
+  run three of the thirty rounds, and `benchmark` pools the samples and
+  runs the gate; `drift (shard N)` each run a quarter of the cases; `CI`
+  names each job that did not succeed.
+- `.github/workflows/build.yml`: one job per release target, the target
+  read from the `*_TARGETS` lists, with `<name>-parinn` and
+  `<name>-licenses` artifacts; the arm64 and Windows checks and the
+  release provenance read the per-target artifacts.
+- `tooling/coverage`: `--layer NAME` and `--merge`, with `Host::read`.
+- `tooling/engineering`: the benchmark gate check follows `needs:`.
+- `tooling/drift`: `shard` selects the cases `DRIFT_SHARD=i/n` names.
+
+Gate. The `ci-timings` artifacts of two consecutive runs show every job
+of `ci.yml` and `build.yml` under four minutes; the scenario count, the
+coverage table and the benchmark report still appear in the job
+summaries; the release provenance covers the same binaries.
+
+## Result
+
+Closed on CI runs 805, 806 and 811 of the pull request. Three runs in a
+row had every job of `ci.yml` and `build.yml` green and none over four
+minutes. The slowest were 3.4, 2.9 and 3.1 minutes: `coverage (e2e)`,
+`scenarios` and `drift (shard 2)`. A whole run takes 5 to 7 minutes,
+against 15 before. The scenario count, the coverage table and the
+benchmark report still land in the job summaries. The release
+provenance covers the same binaries, under per-target artifact names.
+
+The drift suite had two latent order dependencies, which the shards
+surfaced. The development core is now built before any check. A source
+a case restores after an injection is touched, so cargo rebuilds from
+it. Pooling the benchmark shards' samples lowered the gate's power to
+see a regression; [phase 2](phase-2.md) stratifies the test by shard and
+settles it.

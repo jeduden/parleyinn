@@ -15,7 +15,7 @@ use benchmark::cli;
 use benchmark::samples;
 use benchmark::suite::{Awaiting, Benchmark, Coverage};
 
-use crate::review_workflow::Workflow;
+use crate::review_workflow::{Job, Workflow};
 
 /// The CI job that runs the suite and the gate.
 pub const JOB: &str = "benchmark";
@@ -23,8 +23,15 @@ pub const JOB: &str = "benchmark";
 /// The job every other job joins, whose result the rulesets require.
 pub const AGGREGATOR: &str = "ci";
 
-/// What the job must run: each side's suite, then the head's gate.
-pub const RUNS: [&str; 2] = ["benchmark\" run --core", "benchmark\" gate --base"];
+/// What must run: each side's suite, in the [`JOB`] or in a job it
+/// needs, then the head's gate in the [`JOB`] itself.
+pub const RUNS: [&str; 2] = [SUITE, GATE];
+
+/// The suite's run, which CI may shard across the jobs the gate needs.
+pub const SUITE: &str = "benchmark\" run --core";
+
+/// The gate's run, in the gate job itself.
+pub const GATE: &str = "benchmark\" gate --base";
 
 /// The ids with `prefix` that `text` names, in order and once each; a
 /// range such as `NFR-01..05` names every id from its first to its last.
@@ -126,34 +133,47 @@ fn awaited<'a>(id: &str, awaiting: &'a [Awaiting]) -> Option<&'a Awaiting> {
     awaiting.iter().find(|a| a.requirement == id)
 }
 
-/// Requires `workflow` to have the [`JOB`] that runs each of [`RUNS`],
-/// and the [`AGGREGATOR`] job to need it, so its failure fails `CI`.
+/// Requires `workflow` to have the [`JOB`] that runs the [`GATE`], the
+/// [`SUITE`] to run in it or in a job it needs, and the [`AGGREGATOR`]
+/// job to need it, so its failure fails `CI`.
 #[must_use]
 pub fn gated(workflow: &Workflow) -> Vec<String> {
     let job = |name: &str| workflow.jobs.iter().find(|j| j.name == name);
     let Some(gate) = job(JOB) else {
         return vec![format!("the CI workflow has no job {JOB}")];
     };
-    let mut problems: Vec<String> = RUNS
-        .iter()
-        .filter(|run| !gate.text.contains(*run))
-        .map(|run| format!("job {JOB} does not run {run:?}"))
-        .collect();
-    let needed = job(AGGREGATOR).is_some_and(|ci| {
-        ci.text
-            .lines()
-            .filter_map(|l| l.trim_start().strip_prefix("needs:"))
-            .any(|needs| {
-                needs
-                    .split(|c: char| !(c.is_ascii_alphanumeric() || c == '-' || c == '_'))
-                    .any(|n| n == JOB)
-            })
-    });
-    if !needed {
+    let mut problems = Vec::new();
+    let runs_suite = gate.text.contains(SUITE)
+        || needs(gate)
+            .iter()
+            .any(|n| job(n).is_some_and(|j| j.text.contains(SUITE)));
+    if !runs_suite {
+        problems.push(format!(
+            "job {JOB} does not run {SUITE:?}, nor does a job it needs"
+        ));
+    }
+    if !gate.text.contains(GATE) {
+        problems.push(format!("job {JOB} does not run {GATE:?}"));
+    }
+    if !job(AGGREGATOR).is_some_and(|ci| needs(ci).iter().any(|n| n == JOB)) {
         problems.push(format!("job {AGGREGATOR} does not need {JOB}"));
     }
 
     problems
+}
+
+/// The jobs `job` needs, from its `needs:` line.
+fn needs(job: &Job) -> Vec<String> {
+    job.text
+        .lines()
+        .filter_map(|l| l.trim_start().strip_prefix("needs:"))
+        .flat_map(|needs| {
+            needs
+                .split(|c: char| !(c.is_ascii_alphanumeric() || c == '-' || c == '_'))
+                .filter(|n| !n.is_empty())
+                .map(str::to_owned)
+        })
+        .collect()
 }
 
 /// Samples files for `benchmark`, as the base's and the head's: thirty

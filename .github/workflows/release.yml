@@ -41,6 +41,7 @@ jobs:
   # shell, so a crafted input cannot inject commands.
   preflight:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     if: github.repository == 'jeduden/parleyinn'
     steps:
       - name: Validate the version
@@ -98,6 +99,7 @@ jobs:
   publish:
     needs: build
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     if: github.repository == 'jeduden/parleyinn'
     permissions:
       # contents to create the tag and the release; id-token for the
@@ -170,6 +172,7 @@ jobs:
   verify:
     needs: publish
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     if: github.repository == 'jeduden/parleyinn'
     permissions:
       contents: read
