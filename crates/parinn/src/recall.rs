@@ -39,7 +39,7 @@ pub(crate) fn recall_writer(
         redact: redactor.map(|redactor| -> mcp::recording::Redact {
             Box::new(move |text| {
                 let redacted = redactor.redact_text(text);
-                (redacted.text, redacted.rules)
+                (redacted.text, redacted.rules, redacted.limited)
             })
         }),
     }
@@ -96,6 +96,7 @@ pub(crate) fn audit_notes(ctx: &Context, notes: &[mcp::Note]) {
                     detail: "a recall call was refused: the writer labels could not be assigned",
                 }
             }
+            mcp::Note::RedactionLimited => crate::scan_limited_occurrence("mcp"),
             mcp::Note::Redacted(rule) => Occurrence::Keyed {
                 kind: Kind::Redacted,
                 counter: Counter::Redacted,

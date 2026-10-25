@@ -3,6 +3,7 @@
 //! of a repeated line (REC-04), and the appends that move the ingest
 //! position with the lines they cover.
 
+use std::cell::Cell;
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 
@@ -96,11 +97,10 @@ pub(crate) fn ingest(
         interactive: inputs.interactive,
         live: live_observations(&observed, &defaults, main, runs.live()),
     };
-    let landed = append(&mut store, &resume, text.as_bytes(), &plan, &seen, entropy)?;
-    let (appended, addresses) = (landed.lines, landed.addresses);
+    let land = append(&mut store, &resume, text.as_bytes(), &plan, &seen, entropy)?;
     let hold_started = hold(&mut store, &resume.source, plan.hold, inputs.now_ms)?;
     let owners_chosen = choose_owners(&mut store, &node, &plan.chosen, entropy)?;
-    let observations = record_observed(&mut store, &node, &seen, &plan, &addresses, entropy)?;
+    let observations = record_observed(&mut store, &node, &seen, &plan, &land.addresses, entropy)?;
 
     let (index_gaps, index_gaps_unread) = gaps(store.unreported_search_index_gaps());
 
@@ -111,12 +111,12 @@ pub(crate) fn ingest(
         matched: observations.matched,
         prompt_conflicts: observations.conflicts,
         not_attended: observations.not_attended,
-        observations: observations.appended + landed.observations,
+        observations: observations.appended + land.observations,
         writer: own,
         seat: seat_of(&store, own)?,
         room: node.personal_room(),
         runs: reports(&store, own, &plan.events_by_writer(), &runs)?,
-        events: appended,
+        events: land.lines,
         generation: resume.source.generation,
         new_generation: resume.new_generation,
         held: plan.hold,
@@ -126,6 +126,7 @@ pub(crate) fn ingest(
         conflicts: plan.conflicts,
         owners_chosen,
         redactions: plan.redactions,
+        scan_limited: plan.scan_limited,
         unparsed: plan.unparsed,
         drifts: plan.drifts,
         redacted_path: named.redacted_path,
@@ -176,6 +177,9 @@ impl Named {
             .map(|s| s.to_string_lossy().into_owned())
             .unwrap_or_default();
 
+        // A file name is at most 255 bytes and a `/` ends a chain of
+        // adjacent secrets, so neither text can reach the redaction
+        // scan limit.
         Self {
             path: path.to_string_lossy().into_owned(),
             directory: directory.to_string_lossy().into_owned(),
@@ -489,6 +493,8 @@ struct Plan {
     /// fork observation chose.
     chosen: BTreeSet<(WriterId, WriterId)>,
     redactions: Vec<String>,
+    /// How many lines' redaction scan limit was reached (I9).
+    scan_limited: usize,
     unparsed: usize,
     drifts: Vec<String>,
     /// Each prompt line's event, by its index, with its `prompt_id` and
@@ -766,7 +772,12 @@ impl Plan {
         redactor: &Redactor,
         entropy: &mut dyn Entropy,
     ) -> Result<(), IngestError> {
-        let describe = |text: &str| redactor.redact_text(text).text;
+        let limited = Cell::new(0);
+        let describe = |text: &str| {
+            let redacted = redactor.redact_text(text);
+            limited.set(limited.get() + usize::from(redacted.limited));
+            redacted.text
+        };
         let (kind, provenance, drift) = match classified {
             Classified::Unparsed(drift) => {
                 self.unparsed += 1;
@@ -775,6 +786,7 @@ impl Plan {
             Classified::Line(provenance, drift) => (EventKind::TranscriptLine, provenance, drift),
         };
         self.drifts.extend(drift.map(|d| d.describe(&describe)));
+        self.scan_limited += limited.get();
         let end = turn_end(at.parsed) || provenance == Provenance::SubagentResult;
         let (kind, provenance, content) = match decision {
             Decision::Reference {
@@ -794,6 +806,7 @@ impl Plan {
                 self.released += usize::from(other == Decision::Released);
                 let content = content(at.number, &redacted.text, redacted.rules.len());
                 self.redactions.extend(redacted.rules);
+                self.scan_limited += usize::from(redacted.limited);
                 (kind, provenance, content)
             }
         };
