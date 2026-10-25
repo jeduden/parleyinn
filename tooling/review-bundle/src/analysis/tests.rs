@@ -514,3 +514,29 @@ fn and_list_joins_with_a_final_and() {
     assert_eq!(and_list(&["a"]), "a");
     assert_eq!(and_list(&["a", "b", "c"]), "a, b and c");
 }
+
+#[test]
+fn analyse_dispatches_by_path_and_by_the_rows_the_diff_names() {
+    let mut head = base();
+    let mut row = req("REC-03", "New.");
+    row.path = "docs/srs/06-security.md".into();
+    head.requirements.push(row);
+    let diff = format!("{}+REC-01 REC-03\n", header("crates/pin/src/lib.rs"));
+
+    let got = analyse(&base(), &head, &diff, false);
+
+    assert_eq!(
+        got.dispatch[dispatch::SPEC],
+        ["srs-05", "srs-security"].map(str::to_owned).into()
+    );
+    assert_eq!(
+        got.dispatch[dispatch::CODE],
+        ["lang-rust", "test-engineer-unit"]
+            .map(str::to_owned)
+            .into()
+    );
+    assert_eq!(
+        got.dispatch[dispatch::SECURITY],
+        ["persona-security-officer"].map(str::to_owned).into()
+    );
+}

@@ -7,6 +7,8 @@ description: >-
   paths included. Reviews a pull request, plan or design. Never
   approves.
 tools: Read, Grep, Glob
+model: haiku
+effort: low
 ---
 # Test engineer: unit tests
 

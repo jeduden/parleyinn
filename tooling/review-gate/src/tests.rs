@@ -42,7 +42,13 @@ fn input(outcome: ReviewOutcome, check_runs: Vec<CheckRun>) -> Input {
         head: REVIEWED.into(),
         check_runs,
         checked: vec![],
+        dispatched: BTreeSet::new(),
+        consulted: BTreeSet::new(),
     }
+}
+
+fn set(names: &[&str]) -> BTreeSet<String> {
+    names.iter().map(|n| (*n).to_owned()).collect()
 }
 
 fn finding(path: &str, line: i64, severity: &str, body: &str) -> Finding {
@@ -172,6 +178,64 @@ fn parse_check_runs_refuses_a_line_that_is_no_check_run() {
         "{err}"
     );
     assert!(std::error::Error::source(&err).is_some());
+}
+
+#[test]
+fn parse_dispatch_lists_every_generalist_and_specialist() {
+    let got =
+        parse_dispatch(r#"{"review-code":["lang-rust","test-engineer-unit"],"review-spec":[]}"#)
+            .unwrap();
+
+    assert_eq!(
+        got,
+        set(&[
+            "lang-rust",
+            "review-code",
+            "review-spec",
+            "test-engineer-unit"
+        ])
+    );
+    for bad in ["[]", r#"{"review-code":"lang-rust"}"#, "nope"] {
+        let err = parse_dispatch(bad).unwrap_err();
+        assert!(
+            err.to_string().starts_with("review: malformed dispatch: "),
+            "{err}"
+        );
+    }
+}
+
+#[test]
+fn parse_consulted_reads_the_agents_the_orchestrator_called() {
+    assert_eq!(
+        parse_consulted(r#"["lang-rust","review-code","lang-rust"]"#).unwrap(),
+        set(&["lang-rust", "review-code"])
+    );
+    for bad in ["{}", "[1]", r#"[""]"#] {
+        let err = parse_consulted(bad).unwrap_err();
+        assert!(
+            err.to_string()
+                .starts_with("review: malformed consulted agents: "),
+            "{err}"
+        );
+    }
+}
+
+#[test]
+fn decide_refuses_a_review_that_left_a_dispatched_agent_out() {
+    let mut i = input(approve(), green());
+    i.dispatched = set(&["lang-rust", "review-code", "srs-security"]);
+    i.consulted = set(&["review-code", "lang-toml"]);
+
+    let err = decide(&i).unwrap_err();
+
+    assert_eq!(
+        err.to_string(),
+        "review: the orchestrator did not consult lang-rust, srs-security"
+    );
+    assert!(std::error::Error::source(&err).is_none());
+
+    i.consulted = set(&["lang-rust", "review-code", "srs-security", "extra"]);
+    assert_eq!(decide(&i).unwrap().unwrap().event, APPROVE);
 }
 
 #[test]

@@ -56,6 +56,7 @@ pub fn cases() -> Vec<Case> {
         repository_cases(),
         review_cases(),
         review_gate_cases(),
+        review_agent_cases(),
         gate_cases(),
         parse_cases(),
         persona_cases(),
@@ -464,6 +465,34 @@ fn review_cases() -> Vec<Case> {
     ]
 }
 
+/// The drifts ENG-28 exists to catch in the agents the review consults:
+/// one the dispatch names but no file defines as named, or one at the
+/// wrong effort.
+fn review_agent_cases() -> Vec<Case> {
+    vec![
+        protection_case(
+            "a section of the specification without its specialist",
+            Injection::replace(
+                ".claude/agents/srs-security.md",
+                "name: srs-security\n",
+                "name: srs-secure\n",
+            ),
+            "the_checkout_s_review_agents_are_all_defined",
+            "srs-security names itself srs-secure",
+        ),
+        protection_case(
+            "a specialist raised to medium effort",
+            Injection::replace(
+                ".claude/agents/lang-rust.md",
+                "effort: low\n",
+                "effort: medium\n",
+            ),
+            "the_checkout_s_review_agents_are_all_defined",
+            "lang-rust runs at effort medium, want low",
+        ),
+    ]
+}
+
 /// The drifts ENG-28 exists to catch in what the approval rests on: the
 /// review gate, the deterministic findings and the review bundle.
 fn review_gate_cases() -> Vec<Case> {
@@ -484,11 +513,22 @@ fn review_gate_cases() -> Vec<Case> {
             "ENG-28",
             Injection::replace(
                 REVIEW_WORKFLOW,
-                "            --checked checked.json > review.json",
-                "            > review.json",
+                "            --checked checked.json --dispatch dispatch.json \\\n",
+                "            --dispatch dispatch.json \\\n",
             ),
             scenario("ENG-28"),
             r#"job post does not run "--checked checked.json""#,
+        ),
+        case(
+            "the review posted without holding the orchestrator to the dispatch",
+            "ENG-28",
+            Injection::replace(
+                REVIEW_WORKFLOW,
+                "            --consulted consulted.json > review.json",
+                "            > review.json",
+            ),
+            scenario("ENG-28"),
+            r#"job post does not run "--consulted consulted.json""#,
         ),
         // The test asserts with its own message, the findings, which
         // lack the PRV-11 finding once it drifts; only the failing

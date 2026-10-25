@@ -10,7 +10,7 @@
 
 pub mod cli;
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
 use std::fmt::Write as _;
 
@@ -86,6 +86,11 @@ pub struct Input {
     /// The findings of the deterministic checks the workflow ran on the
     /// reviewed head, beside the agent's.
     pub checked: Vec<Finding>,
+    /// Every agent the review bundle dispatched: the generalists and
+    /// their specialists.
+    pub dispatched: BTreeSet<String>,
+    /// Every agent the orchestrator called, as its run log shows.
+    pub consulted: BTreeSet<String>,
 }
 
 /// The pull request review to post, in the shape GitHub's
@@ -111,6 +116,12 @@ pub enum Error {
     },
     /// The required CI check has not passed on the reviewed head.
     Ci(String),
+    /// The review bundle's dispatch does not read.
+    Dispatch(String),
+    /// The list of agents the orchestrator called does not read.
+    Consulted(String),
+    /// The orchestrator left these dispatched agents out.
+    Unconsulted(Vec<String>),
 }
 
 impl fmt::Display for Error {
@@ -120,6 +131,13 @@ impl fmt::Display for Error {
             Self::Checked(msg) => write!(f, "review: malformed deterministic findings: {msg}"),
             Self::CheckRun { line, source } => write!(f, "review: check run line {line}: {source}"),
             Self::Ci(head) => write!(f, "review: CI has not passed on the reviewed head: {head}"),
+            Self::Dispatch(msg) => write!(f, "review: malformed dispatch: {msg}"),
+            Self::Consulted(msg) => write!(f, "review: malformed consulted agents: {msg}"),
+            Self::Unconsulted(agents) => write!(
+                f,
+                "review: the orchestrator did not consult {}",
+                agents.join(", ")
+            ),
         }
     }
 }
@@ -128,7 +146,12 @@ impl std::error::Error for Error {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match self {
             Self::CheckRun { source, .. } => Some(source),
-            Self::Outcome(_) | Self::Checked(_) | Self::Ci(_) => None,
+            Self::Outcome(_)
+            | Self::Checked(_)
+            | Self::Ci(_)
+            | Self::Dispatch(_)
+            | Self::Consulted(_)
+            | Self::Unconsulted(_) => None,
         }
     }
 }
@@ -200,6 +223,37 @@ fn validate_findings(findings: &[Finding]) -> Result<(), String> {
     Ok(())
 }
 
+/// Reads the review bundle's dispatch, each generalist with its
+/// specialists, into the set of every agent it names.
+///
+/// # Errors
+///
+/// Fails on anything that is not such a map.
+pub fn parse_dispatch(data: &str) -> Result<BTreeSet<String>, Error> {
+    let dispatch: BTreeMap<String, BTreeSet<String>> =
+        serde_json::from_str(data).map_err(|e| Error::Dispatch(e.to_string()))?;
+
+    Ok(dispatch
+        .into_iter()
+        .flat_map(|(generalist, specialists)| std::iter::once(generalist).chain(specialists))
+        .collect())
+}
+
+/// Reads the agents the orchestrator called, a list of names.
+///
+/// # Errors
+///
+/// Fails on anything that is not a list of names.
+pub fn parse_consulted(data: &str) -> Result<BTreeSet<String>, Error> {
+    let names: Vec<String> =
+        serde_json::from_str(data).map_err(|e| Error::Consulted(e.to_string()))?;
+    if names.iter().any(String::is_empty) {
+        return Err(Error::Consulted("an empty agent name".to_owned()));
+    }
+
+    Ok(names.into_iter().collect())
+}
+
 /// Reads one check run per line, as `gh api --jq` prints them; blank
 /// lines are skipped.
 ///
@@ -224,11 +278,20 @@ pub fn parse_check_runs(data: &str) -> Result<Vec<CheckRun>, Error> {
 ///
 /// # Errors
 ///
-/// A head whose CI has not passed is an error, so the step fails loudly
-/// rather than posting anything.
+/// A head whose CI has not passed, or a review whose orchestrator left
+/// out an agent the review bundle dispatched, is an error, so the step
+/// fails loudly rather than posting anything.
 pub fn decide(input: &Input) -> Result<Option<Review>, Error> {
     if input.head != input.reviewed {
         return Ok(None);
+    }
+    let left_out: Vec<String> = input
+        .dispatched
+        .difference(&input.consulted)
+        .cloned()
+        .collect();
+    if !left_out.is_empty() {
+        return Err(Error::Unconsulted(left_out));
     }
     let runs = latest(&input.check_runs);
     if !runs.iter().any(|r| passed_ci(r)) {

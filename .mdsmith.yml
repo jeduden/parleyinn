@@ -168,6 +168,8 @@ kinds:
         name: '=~"^[a-z][a-z-]*$"'
         description: nonEmpty
         tools: '"Read, Grep, Glob"'
+        "model?": '=~"^(haiku|sonnet|opus)$"'
+        "effort?": '=~"^(low|medium|high)$"'
     rules:
       required-frontmatter:
         fields: [name, description]
@@ -191,6 +193,8 @@ kinds:
         name: '=~"^persona-[a-z-]+$"'
         description: nonEmpty
         tools: '"Read, Grep, Glob"'
+        "model?": '=~"^(haiku|sonnet|opus)$"'
+        "effort?": '=~"^(low|medium|high)$"'
       closed: false
       sections:
         - heading: null

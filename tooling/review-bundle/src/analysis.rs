@@ -6,7 +6,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 
-use crate::{BLOCKING, Finding, NIT, Snapshot, diff, owners};
+use crate::{BLOCKING, Finding, NIT, Snapshot, diff, dispatch, owners};
 
 /// The invariants file ENG-29 guards.
 pub const INVARIANTS: &str = "docs/srs/invariants.md";
@@ -26,9 +26,6 @@ const NOT_LIGHT: [&str; 3] = ["docs/domain-model/", "plan/", "features/"];
 /// gates. Each crate's reach test and the security-sensitive crates the
 /// ENG-11 row names join it.
 const DEEP_CODE: [&str; 1] = ["tooling/"];
-
-/// The test, within a crate, that refuses a crate linked into it.
-const REACH_TEST: &str = "tests/reach.rs";
 
 /// The requirement whose text names the security-sensitive crates.
 const ENG_11: &str = "ENG-11";
@@ -114,6 +111,8 @@ pub struct Analysis {
     /// The record that satisfies ENG-29, when a guarded change has one
     /// and the stakeholder consented.
     pub eng_29_record: Option<Record>,
+    /// The agents the review's orchestrator consults (ENG-28).
+    pub dispatch: dispatch::Dispatch,
 }
 
 /// Compares `base`, main's tree, with `head`, the pull request's, whose
@@ -147,6 +146,11 @@ pub fn analyse(base: &Snapshot, head: &Snapshot, diff: &str, consent: bool) -> A
 
     let crates = security_crates(base);
     let deep = paths.iter().any(|p| deep_code(&crates, p));
+    let rows: Vec<&srs::Requirement> = touched
+        .iter()
+        .filter_map(|id| requirement(head, id).or_else(|| requirement(base, id)))
+        .collect();
+    let dispatch = dispatch::dispatch(&paths, &rows, &crates);
 
     Analysis {
         class: classify(&paths, deep || !owned.is_empty(), &unparsed),
@@ -158,6 +162,7 @@ pub fn analyse(base: &Snapshot, head: &Snapshot, diff: &str, consent: bool) -> A
         touched: touched.into_iter().collect(),
         findings,
         eng_29_record,
+        dispatch,
     }
 }
 
@@ -184,6 +189,11 @@ fn lifted_bans(diff: &str) -> BTreeSet<Finding> {
         .collect()
 }
 
+/// The row `id` of `snapshot`, when it defines one.
+fn requirement<'a>(snapshot: &'a Snapshot, id: &str) -> Option<&'a srs::Requirement> {
+    snapshot.requirements.iter().find(|r| r.id == id)
+}
+
 /// The security-sensitive crates the ENG-11 row of `snapshot` names,
 /// none when it names no list.
 fn security_crates(snapshot: &Snapshot) -> Vec<String> {
@@ -205,11 +215,7 @@ fn security_crates(snapshot: &Snapshot) -> Vec<String> {
 /// Whether `path` is code that reviews deep though no stakeholder path
 /// holds it: a gate, a reach test, or a security-sensitive crate.
 fn deep_code(crates: &[String], path: &str) -> bool {
-    DEEP_CODE.iter().any(|d| path.starts_with(d))
-        || path.strip_prefix("crates/").is_some_and(|rest| {
-            rest.split_once('/')
-                .is_some_and(|(name, tail)| crates.iter().any(|c| c == name) || tail == REACH_TEST)
-        })
+    DEEP_CODE.iter().any(|d| path.starts_with(d)) || dispatch::security_code(path, crates)
 }
 
 /// The review class: deep when `deep` says a stakeholder path or deep

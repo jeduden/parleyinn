@@ -188,6 +188,15 @@ fn the_checkout_s_codeowners_name_no_owner_on_any_other_path() {
     assert!(problems.is_empty(), "{}", problems.join("\n"));
 }
 
+/// Every agent the review bundle can dispatch is defined, at its
+/// effort (ENG-28).
+#[test]
+fn the_checkout_s_review_agents_are_all_defined() {
+    let problems = engineering::review_agents::every_dispatched_agent_is_defined(&checkout());
+
+    assert!(problems.is_empty(), "{}", problems.join("\n"));
+}
+
 /// CODEOWNERS names no owner on Rust source (ENG-21).
 #[test]
 fn the_checkout_s_codeowners_name_no_owner_on_rust_source() {

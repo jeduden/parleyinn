@@ -38,6 +38,9 @@ const CHANGES_REQUESTED: &str = "CHANGES_REQUESTED";
 pub const BUNDLE: &str = "bundle.md";
 /// The deterministic findings' file name under `--out`.
 pub const CHECKED: &str = "checked.json";
+/// The agents the orchestrator consults, each generalist with its
+/// specialists, which the review gate holds the review to (ENG-28).
+pub const DISPATCH: &str = "dispatch.json";
 
 /// Runs the command on `args` and returns its exit code. It is `main`
 /// without the process.
@@ -97,12 +100,15 @@ fn build(
     write(BUNDLE, &render::bundle(&a, &base_tree, &head_tree))?;
     let findings = serde_json::to_string_pretty(&a.findings).map_err(failed("encode", out))?;
     write(CHECKED, &format!("{findings}\n"))?;
+    let dispatch = serde_json::to_string_pretty(&a.dispatch).map_err(failed("encode", out))?;
+    write(DISPATCH, &format!("{dispatch}\n"))?;
 
     Ok(format!(
-        "class={}\ntouched={}\nfindings={}\n",
+        "class={}\ntouched={}\nfindings={}\nconsults={}\n",
         a.class.name(),
         a.touched.len(),
-        a.findings.len()
+        a.findings.len(),
+        crate::dispatch::agents(&a.dispatch).len()
     ))
 }
 

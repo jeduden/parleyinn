@@ -311,6 +311,44 @@ pub fn gate_decides(rows: &[BTreeMap<String, String>]) -> Vec<String> {
         .collect()
 }
 
+/// The review gate's command line, as the review workflow runs it, on
+/// the files [`gate_outcome`] writes.
+fn gate_args(reviewed: &str, head: &str) -> Vec<String> {
+    [
+        "--outcome",
+        "outcome.json",
+        "--check-runs",
+        "check-runs.jsonl",
+        "--reviewed",
+        reviewed,
+        "--head",
+        head,
+        "--checked",
+        "checked.json",
+        "--dispatch",
+        "dispatch.json",
+        "--consulted",
+        "consulted.json",
+    ]
+    .map(str::to_owned)
+    .to_vec()
+}
+
+/// The dispatch every table row hands the gate: one generalist with one
+/// specialist.
+const DISPATCH: &str = r#"{"review-code":["lang-rust"]}"#;
+
+/// The agents a row says the orchestrator consulted: both of
+/// [`DISPATCH`] for `all` or no `consulted` column, the generalist alone
+/// for `not all`, and a file that is no list for `malformed`.
+fn consulted(row: &BTreeMap<String, String>) -> &'static str {
+    match row.get("consulted").map_or("all", String::as_str) {
+        "not all" => r#"["review-code"]"#,
+        "malformed" => "nope",
+        _ => r#"["review-code","lang-rust"]"#,
+    }
+}
+
 /// Runs the review gate's command line, as the review workflow does,
 /// on the files one table row describes, and names what it does: the
 /// review event it prints, "nothing" for a head that moved, or "an
@@ -319,6 +357,7 @@ pub fn gate_decides(rows: &[BTreeMap<String, String>]) -> Vec<String> {
 /// finding` of `none`, or a row without the column, hands it an empty
 /// list, `nit` or `blocking` one deterministic finding of that
 /// severity, `malformed` a file that is no list, and `missing` no file.
+/// It always gets `--dispatch` and `--consulted` (see [`consulted`]).
 #[must_use]
 pub fn gate_outcome(row: &BTreeMap<String, String>) -> &'static str {
     const REVIEWED: &str = "206b0a76a81abb510e53d87ef187e83b5aacbcbb";
@@ -366,18 +405,8 @@ pub fn gate_outcome(row: &BTreeMap<String, String>) -> &'static str {
     } else {
         REVIEWED
     };
-    let args = vec![
-        "--outcome",
-        "outcome.json",
-        "--check-runs",
-        "check-runs.jsonl",
-        "--reviewed",
-        REVIEWED,
-        "--head",
-        head,
-        "--checked",
-        "checked.json",
-    ];
+    files.insert("dispatch.json", DISPATCH.to_owned());
+    files.insert("consulted.json", consulted(row).to_owned());
     if let Some(body) = check {
         files.insert("checked.json", body);
     }
@@ -389,12 +418,7 @@ pub fn gate_outcome(row: &BTreeMap<String, String>) -> &'static str {
     };
     let (mut out, mut err) = (Vec::new(), Vec::new());
 
-    let code = review_gate::cli::run(
-        args.into_iter().map(str::to_owned),
-        &mut out,
-        &mut err,
-        &read,
-    );
+    let code = review_gate::cli::run(gate_args(REVIEWED, head), &mut out, &mut err, &read);
     match serde_json::from_slice::<review_gate::Review>(&out) {
         _ if code != review_gate::cli::EXIT_OK => "an error",
         _ if out.is_empty() => "nothing",

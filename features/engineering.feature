@@ -287,21 +287,26 @@ Feature: Engineering quality (ENG)
     And that job runs only after the agent's job succeeded
     And that job decides the review with "cargo run --locked --quiet -p review-gate"
     And that job decides the review with "--checked checked.json"
+    And that job decides the review with "--dispatch dispatch.json"
+    And that job decides the review with "--consulted consulted.json"
+    And every agent the review bundle can dispatch is defined, specialists at low effort and generalists at medium
     And the review gate decides:
-      | verdict         | finding  | check finding | head    | CI     | other check | review          |
-      | approve         | none     | none          | current | passed | passed      | APPROVE         |
-      | approve         | nit      | none          | current | passed | passed      | APPROVE         |
-      | approve         | blocking | none          | current | passed | passed      | REQUEST_CHANGES |
-      | approve         | none     | nit           | current | passed | passed      | APPROVE         |
-      | approve         | none     | blocking      | current | passed | passed      | REQUEST_CHANGES |
-      | approve         | none     | malformed     | current | passed | passed      | an error        |
-      | approve         | none     | none          | current | passed | failed      | REQUEST_CHANGES |
-      | request_changes | none     | none          | current | passed | passed      | REQUEST_CHANGES |
-      | approve         | none     | none          | moved   | passed | passed      | nothing         |
-      | approve         | none     | none          | current | failed | passed      | an error        |
-      | malformed       | none     | none          | current | passed | passed      | an error        |
-      | missing         | none     | none          | current | passed | passed      | an error        |
-      | approve         | none     | missing       | current | passed | passed      | an error        |
+      | verdict         | finding  | check finding | head    | CI     | other check | consulted | review          |
+      | approve         | none     | none          | current | passed | passed      | all       | APPROVE         |
+      | approve         | nit      | none          | current | passed | passed      | all       | APPROVE         |
+      | approve         | blocking | none          | current | passed | passed      | all       | REQUEST_CHANGES |
+      | approve         | none     | nit           | current | passed | passed      | all       | APPROVE         |
+      | approve         | none     | blocking      | current | passed | passed      | all       | REQUEST_CHANGES |
+      | approve         | none     | malformed     | current | passed | passed      | all       | an error        |
+      | approve         | none     | none          | current | passed | failed      | all       | REQUEST_CHANGES |
+      | request_changes | none     | none          | current | passed | passed      | all       | REQUEST_CHANGES |
+      | approve         | none     | none          | moved   | passed | passed      | all       | nothing         |
+      | approve         | none     | none          | current | failed | passed      | all       | an error        |
+      | malformed       | none     | none          | current | passed | passed      | all       | an error        |
+      | missing         | none     | none          | current | passed | passed      | all       | an error        |
+      | approve         | none     | missing       | current | passed | passed      | all       | an error        |
+      | approve         | none     | none          | current | passed | passed      | not all   | an error        |
+      | approve         | none     | none          | current | passed | passed      | malformed | an error        |
 
   @ENG-29 @P0 @pending
   Scenario: an invariant or I2-review change lands only with an ADR recording a named security reviewer's approval

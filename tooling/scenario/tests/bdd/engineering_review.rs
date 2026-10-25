@@ -51,6 +51,17 @@ fn key_job_runs(w: &mut World, cmd: String) -> Result<(), String> {
     e.flow.key_job_runs(e.key()?, &cmd)
 }
 
+#[then(
+    regex = r"^every agent the review bundle can dispatch is defined, specialists at low effort and generalists at medium$"
+)]
+fn review_agents_defined(_w: &mut World) -> Result<(), String> {
+    outcome(
+        engineering::review_agents::every_dispatched_agent_is_defined(&engineering::Checkout::new(
+            &testkit::repo_root(),
+        )),
+    )
+}
+
 #[then(regex = r"^the review gate decides:$")]
 fn review_gate_decides(_w: &mut World, step: &Step) -> Result<(), String> {
     let table = step.table.as_ref().ok_or("the step has no table")?;

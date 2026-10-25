@@ -494,6 +494,7 @@ dependencies = [
  "calibrate",
  "coverage",
  "drift",
+ "review-bundle",
  "review-gate",
  "scenario",
  "serde_json",

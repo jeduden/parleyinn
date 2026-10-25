@@ -174,13 +174,11 @@ pull request does. It also triggers on `issue_comment`, which GitHub
 runs as `main` defines it too: a code owner's comment on a pull
 request whose CI passed reviews it again. Consent to a stakeholder
 path is such a comment, so the review that reads it follows at once.
-The review job first runs main's `review-bundle`
-over main's tree and the pull request's: it writes the review bundle
-the agent reads, sets the review's class and makes the deterministic
-findings
-(see Review below). The agent then runs with read-only tools on the
-pull request's tree, following
-[the review skill](../.claude/skills/review/SKILL.md). The agent only
+The review job first runs main's `review-bundle` over main's tree and
+the pull request's: it writes the review bundle the agent reads, sets
+the review's class and makes the deterministic findings (see Review).
+The agent then runs with read-only tools on the pull request's tree,
+following [the review skill](../.claude/skills/review/SKILL.md). It only
 writes a review outcome. The post job alone has the reviewer app's
 key. It runs the `review-gate` crate's executable, which approves only an
 approving review outcome with no blocking finding, its own or a
@@ -271,12 +269,14 @@ What `review-bundle` decides, comparing the pull request with main:
 - a clippy ban lifted at a call site, or a diff header it cannot read:
   a nit, and an unread header makes the review deep.
 
-The review class sets the agent's model, turn budget and tools. A change
-touching only Markdown outside the stakeholder's paths, the domain model,
-plans and scenarios is light. Any path CODEOWNERS assigns, the gates,
-a reach test or a security-sensitive crate makes it deep, and only a
-deep review may consult the read-only reviewer subagents. Anything
-else, an empty diff included, is standard.
+One Sonnet agent at low effort orchestrates the review. The bundle
+dispatches, from the changed paths and touched rows, the low-effort
+specialists (`lang-*`, `srs-*`, the domain-model and test-layer
+agents) and the medium-effort generalists (`review-code`,
+`review-spec`, `review-security`) that weigh their findings. The gate
+fails a review whose run log lacks a dispatched agent. The class sets
+the turn budget: light for Markdown outside the stakeholder's paths,
+deep for those paths, the gates and the security-sensitive code.
 The review bundle quotes only the touched rows, their scenarios and
 the invariants, a few thousand model tokens where the SRS runs to
 hundreds of thousands. A re-review starts from the diff since the reviewer app's

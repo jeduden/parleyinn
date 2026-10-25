@@ -73,9 +73,14 @@ fn run_writes_the_bundle_and_findings_and_prints_the_route() {
     let (code, out, err) = w.run();
 
     assert_eq!(code, EXIT_OK, "{err}");
-    assert_eq!(out, "class=deep\ntouched=1\nfindings=0\n");
+    assert_eq!(out, "class=deep\ntouched=1\nfindings=0\nconsults=4\n");
     assert!(w.output(BUNDLE).contains("### REC-01"));
     assert_eq!(w.output(CHECKED), "[]\n");
+    let dispatch: serde_json::Value = serde_json::from_str(&w.output(DISPATCH)).unwrap();
+    assert_eq!(
+        dispatch,
+        serde_json::json!({"review-spec": ["domain-model-hub", "lang-markdown", "srs-05"]})
+    );
 }
 
 #[test]
@@ -111,7 +116,7 @@ fn run_reads_a_diff_that_holds_bytes_that_are_not_text() {
     let (code, out, err) = w.run();
 
     assert_eq!(code, EXIT_OK, "{err}");
-    assert_eq!(out, "class=deep\ntouched=1\nfindings=0\n");
+    assert_eq!(out, "class=deep\ntouched=1\nfindings=0\nconsults=4\n");
     assert!(w.output(BUNDLE).contains("### REC-01"));
 }
 

@@ -7,6 +7,8 @@ description: >-
   their bindings, isolation and confinement. Reviews a pull request,
   plan or design. Never approves.
 tools: Read, Grep, Glob
+model: haiku
+effort: low
 ---
 # Test engineer: end-to-end tests
 

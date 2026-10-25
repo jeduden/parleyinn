@@ -321,6 +321,27 @@ fn gate_outcome_hands_the_gate_a_deterministic_finding() {
 }
 
 #[test]
+fn gate_outcome_hands_the_gate_the_agents_consulted() {
+    let row = |consulted: &str| {
+        [
+            ("verdict", "approve"),
+            ("finding", "none"),
+            ("consulted", consulted),
+            ("head", "current"),
+            ("CI", "passed"),
+            ("other check", "passed"),
+        ]
+        .into_iter()
+        .map(|(k, v)| (k.to_owned(), v.to_owned()))
+        .collect::<BTreeMap<_, _>>()
+    };
+
+    assert_eq!(gate_outcome(&row("all")), "APPROVE");
+    assert_eq!(gate_outcome(&row("not all")), "an error");
+    assert_eq!(gate_outcome(&row("malformed")), "an error");
+}
+
+#[test]
 fn grants_write_reads_quoted_values_and_write_all() {
     assert!(grants_write("      contents: \"write\"\n"));
     assert!(grants_write("      contents: 'write'\n"));

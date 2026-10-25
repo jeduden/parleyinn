@@ -6,6 +6,8 @@ description: >-
   Reviews a workflow change, a CI run history or a failing run and reports
   where it falls short. Never approves.
 tools: Read, Grep, Glob
+model: haiku
+effort: low
 ---
 # CI engineer
 

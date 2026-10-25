@@ -7,6 +7,8 @@ description: >-
   model, the instruction files and the documentation, and checks the
   file against itself and the hub. Never approves.
 tools: Read, Grep, Glob
+model: haiku
+effort: low
 ---
 # Domain model specialist: pins-and-context.md
 

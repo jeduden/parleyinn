@@ -8,6 +8,8 @@ description: >-
   against the concept files and every use in the repository. Never
   approves.
 tools: Read, Grep, Glob
+model: haiku
+effort: low
 ---
 # Domain model specialist: the hub
 

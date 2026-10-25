@@ -6,6 +6,8 @@ description: >-
   files, the repository checkout and process boundaries. Reviews a
   pull request, plan or design. Never approves.
 tools: Read, Grep, Glob
+model: haiku
+effort: low
 ---
 # Test engineer: integration tests
 

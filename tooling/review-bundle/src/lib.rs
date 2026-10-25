@@ -11,6 +11,7 @@
 pub mod analysis;
 pub mod cli;
 pub mod diff;
+pub mod dispatch;
 pub mod owners;
 pub mod render;
 pub mod snapshot;

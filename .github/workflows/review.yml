@@ -67,6 +67,8 @@ jobs:
       head_sha: ${{ steps.pull_head.outputs.head_sha }}
       outcome: ${{ steps.agent.outputs.structured_output }}
       checked: ${{ steps.bundle.outputs.checked }}
+      dispatch: ${{ steps.bundle.outputs.dispatch }}
+      consulted: ${{ steps.consulted.outputs.consulted }}
     steps:
       # The pull request and the head to review. After CI, the head CI
       # ran on. After a comment, the pull request's head, once its CI
@@ -186,8 +188,10 @@ jobs:
       # The review class sets how deep the review goes, from the paths that
       # changed: light for Markdown no stakeholder path holds, deep for
       # any path CODEOWNERS assigns and for the gates' code, the reach
-      # tests and the security-sensitive crates, standard otherwise. A
-      # deep review may consult the read-only reviewer subagents.
+      # tests and the security-sensitive crates, standard otherwise. The
+      # dispatch names the specialists the orchestrator consults and the
+      # generalists that weigh their findings; each consulted agent adds
+      # a turn to the class's budget.
       - name: Bundle what the change touches
         id: bundle
         if: steps.pull_head.outputs.number != ''
@@ -197,17 +201,17 @@ jobs:
             --diff pr.diff --consent stakeholder-comments.json --out review > class.txt
           cat class.txt >> "$GITHUB_OUTPUT"
           class=$(sed -n 's/^class=//p' class.txt)
+          consults=$(sed -n 's/^consults=//p' class.txt)
           case "$class" in
-            light) model=claude-haiku-5-5; turns=12; tools=Read,Glob,Grep ;;
-            standard) model=claude-sonnet-5-5; turns=30; tools=Read,Glob,Grep ;;
-            deep) model=claude-opus-5-5; turns=40; tools=Read,Glob,Grep,Agent ;;
+            light) turns=12 ;;
+            standard) turns=20 ;;
+            deep) turns=30 ;;
             *) echo "::error::review-bundle printed no known class"; exit 1 ;;
           esac
           {
-            echo "model=$model"
-            echo "turns=$turns"
-            echo "tools=$tools"
+            echo "turns=$((turns + consults))"
             echo "checked=$(jq -c . review/checked.json)"
+            echo "dispatch=$(jq -c . review/dispatch.json)"
           } >> "$GITHUB_OUTPUT"
           cat class.txt "review/checked.json" >> "$GITHUB_STEP_SUMMARY"
       # A pull request the reviewer app reviewed before: the diff since
@@ -271,9 +275,10 @@ jobs:
             review outcome it describes.
           claude_args: >-
             --add-dir pr-head
-            --model ${{ steps.bundle.outputs.model }}
+            --model claude-sonnet-5-5
+            --effort low
             --max-turns ${{ steps.bundle.outputs.turns }}
-            --allowedTools ${{ steps.bundle.outputs.tools }}
+            --allowedTools Read,Glob,Grep,Agent
             --disallowedTools Bash,Edit,Write,NotebookEdit,WebFetch,WebSearch
             --json-schema '{"type":"object","additionalProperties":false,
             "required":["verdict","summary","findings"],
@@ -285,6 +290,21 @@ jobs:
             "line":{"type":"integer","minimum":0},
             "severity":{"enum":["blocking","nit"]},
             "body":{"type":"string","minLength":1}}}}}}'
+      # The agents the orchestrator called, from its run log: every Agent
+      # tool call's subagent type. The log holds the pull request's text
+      # only as strings, so no content it read becomes a call here. The
+      # gate fails a review that left a dispatched agent out (ENG-28).
+      - name: List the agents the orchestrator consulted
+        id: consulted
+        if: steps.pull_head.outputs.number != ''
+        env:
+          LOG: ${{ steps.agent.outputs.execution_file }}
+        run: |
+          consulted=$(jq -c '[.. | objects
+            | select(.type? == "tool_use" and (.name == "Agent" or .name == "Task"))
+            | .input.subagent_type? // empty] | unique' "$LOG")
+          echo "consulted=$consulted" >> "$GITHUB_OUTPUT"
+          echo "consulted: $consulted" >> "$GITHUB_STEP_SUMMARY"
 
   post:
     # Runs only after the review job succeeded: a failed or missing
@@ -339,13 +359,18 @@ jobs:
         env:
           OUTCOME: ${{ needs.review.outputs.outcome }}
           CHECKED: ${{ needs.review.outputs.checked }}
+          DISPATCH: ${{ needs.review.outputs.dispatch }}
+          CONSULTED: ${{ needs.review.outputs.consulted }}
           HEAD_SHA: ${{ needs.review.outputs.head_sha }}
         run: |
           printf '%s' "$OUTCOME" > outcome.json
           printf '%s' "$CHECKED" > checked.json
+          printf '%s' "$DISPATCH" > dispatch.json
+          printf '%s' "$CONSULTED" > consulted.json
           cargo run --locked --quiet -p review-gate --offline -- --outcome outcome.json \
             --check-runs check-runs.jsonl --reviewed "$HEAD_SHA" --head "$(cat head.txt)" \
-            --checked checked.json > review.json
+            --checked checked.json --dispatch dispatch.json \
+            --consulted consulted.json > review.json
       - name: Post the review
         env:
           GH_TOKEN: ${{ steps.app.outputs.token }}
