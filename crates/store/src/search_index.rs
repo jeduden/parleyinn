@@ -466,7 +466,9 @@ pub struct Search<'a> {
 }
 
 /// The SQL and arguments of the query for the newest matches for `search`.
-fn ranked_matches(search: &Search<'_>) -> (String, Vec<Sql>) {
+/// With `limited`, only the newest [`RANKED_MATCHES`]; without, every
+/// match, for a caller that keeps some of them.
+fn ranked_matches(search: &Search<'_>, limited: bool) -> (String, Vec<Sql>) {
     let mut sql = String::from(
         "SELECT events_fts.rowid, bm25(events_fts), w.writer
          FROM events_fts
@@ -498,16 +500,22 @@ fn ranked_matches(search: &Search<'_>) -> (String, Vec<Sql>) {
         sql.push_str(" AND substr(e.transcript_timestamp, 1, length(?)) <= ?");
         args.extend([Sql::Text(until.to_owned()), Sql::Text(until.to_owned())]);
     }
-    sql.push_str(&format!(
-        " ORDER BY events_fts.rowid DESC LIMIT {RANKED_MATCHES}"
-    ));
+    sql.push_str(" ORDER BY events_fts.rowid DESC");
+    if limited {
+        sql.push_str(&format!(" LIMIT {RANKED_MATCHES}"));
+    }
 
     (sql, args)
 }
 
-/// The newest [`RANKED_MATCHES`] matches of `search`.
-fn candidates(conn: &Connection, search: &Search<'_>) -> Result<Vec<Candidate>, StoreError> {
-    let (sql, args) = ranked_matches(search);
+/// The newest [`RANKED_MATCHES`] matches of `search` that `keep` keeps
+/// (all, when it is `None`).
+fn candidates(
+    conn: &Connection,
+    search: &Search<'_>,
+    keep: Option<&dyn Fn(Address) -> bool>,
+) -> Result<Vec<Candidate>, StoreError> {
+    let (sql, args) = ranked_matches(search, keep.is_none());
     let mut statement = conn.prepare(&sql)?;
     let rows = statement.query_map(params_from_iter(args), |r| {
         Ok((
@@ -525,10 +533,17 @@ fn candidates(conn: &Connection, search: &Search<'_>) -> Result<Vec<Candidate>, 
         };
         let writer = WriterId::parse(&writer).map_err(|_| corrupt())?;
         let seq = u64::try_from(id >> SLOT_BITS).ok().and_then(Seq::new);
+        let address = Address::new(writer, seq.ok_or_else(corrupt)?);
+        if keep.is_some_and(|keep| !keep(address)) {
+            continue;
+        }
         out.push(Candidate {
-            address: Address::new(writer, seq.ok_or_else(corrupt)?),
+            address,
             relevance: -bm25,
         });
+        if out.len() == RANKED_MATCHES {
+            break;
+        }
     }
 
     Ok(out)
@@ -571,11 +586,15 @@ fn within<T>(
 }
 
 /// Searches the index for `search`, cancelled at its deadline.
-pub(crate) fn run(conn: &Connection, search: &Search<'_>) -> Result<Vec<Hit>, StoreError> {
+pub(crate) fn run(
+    conn: &Connection,
+    search: &Search<'_>,
+    keep: Option<&dyn Fn(Address) -> bool>,
+) -> Result<Vec<Hit>, StoreError> {
     if !exists(conn)? {
         return Err(StoreError::NoIndex);
     }
-    let found = within(conn, search.deadline, || candidates(conn, search))?;
+    let found = within(conn, search.deadline, || candidates(conn, search, keep))?;
 
     Ok(rank::rank(&found, search.k))
 }

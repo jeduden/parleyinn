@@ -120,6 +120,17 @@ fn each_counter_of_the_mcp_server_has_its_name() {
             Counter::SearchIndexGapLookupFailed,
             "search_index_gap_lookup_failed",
         ),
+        (
+            Counter::RepositoryIdentityChanged,
+            "repository_identity_changed",
+        ),
+        (
+            Counter::RepositoryIdentityRebound,
+            "repository_identity_rebound",
+        ),
+        (Counter::RepositoryReadFailed, "repository_read_failed"),
+        (Counter::RepositoryBindFailed, "repository_bind_failed"),
+        (Counter::RepositoryReadTimedOut, "repository_read_timed_out"),
     ];
     for (counter, name) in counters {
         assert_eq!(counter.as_str(), name);

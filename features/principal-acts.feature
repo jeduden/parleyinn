@@ -5,7 +5,7 @@ Feature: Principal acts (OWN)
   declared but not yet written: its steps are bound when the plan that
   implements the requirement lands.
 
-  @OWN-01 @P1 @I2 @pending
+  @OWN-01 @P1 @I2
   Scenario: only the run's principal can instruct it
     Given an isolated ParleyInn home
     And an agent's run started on "alice"'s node

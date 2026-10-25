@@ -972,3 +972,24 @@ fn each_class_of_gap_has_its_counter_name() {
     assert_eq!(GapClass::WriterUnindexed.name(), "writer_unindexed");
     assert_eq!(GapClass::SeqBeyondLimit.name(), "seq_beyond_limit");
 }
+
+#[test]
+fn a_search_over_the_matches_a_caller_keeps_chooses_them_before_the_cut() {
+    let dir = TempDir::new().unwrap();
+    let store = mixed(&dir);
+    let query = compiled("deploy");
+    let all = seqs(&store.search(&base(&query)).unwrap());
+    let oldest = *all.iter().min().unwrap();
+
+    let kept = store
+        .search_where(
+            &Search {
+                k: 1,
+                ..base(&query)
+            },
+            &|a| a.seq.get() == oldest,
+        )
+        .unwrap();
+
+    assert_eq!(seqs(&kept), [oldest]);
+}

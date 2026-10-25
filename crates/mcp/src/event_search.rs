@@ -7,10 +7,12 @@
 //! The recall scope is `room` until the session binding names a current
 //! run (phase 9 of plan 2609292012) and RCL-05 builds the rest, so
 //! `run` is refused as `event_get` refuses it, and `rooms` is not served.
-//! Every ingested event is untrusted until trust levels derive (PRV-02),
-//! so the filter `trust: "trusted"` finds nothing.
+//! The filter `trust` keeps the hits of one derived trust level
+//! (PRV-02), applied after the ranking.
 
 use std::time::Duration;
+
+use administration::trust_policy::TrustLevel;
 
 use record::id::{RoomId, WriterId};
 use search::Request;
@@ -53,7 +55,8 @@ pub struct Params {
     pub writer: Option<WriterId>,
     pub provenance: Vec<String>,
     pub kinds: Vec<String>,
-    pub trusted_only: bool,
+    /// Only hits of this trust level, when set.
+    pub trust: Option<TrustLevel>,
     pub since: Option<String>,
     pub until: Option<String>,
     pub k: usize,
@@ -107,9 +110,10 @@ pub fn parse(arguments: &Value) -> Result<Params, &'static str> {
     }
     let text = optional_string(&arguments["query"])?.unwrap_or_default();
     let trust = optional_string(&arguments["trust"]).map_err(|_| BAD_TRUST)?;
-    let trusted_only = match trust.as_deref() {
-        None | Some("untrusted") => false,
-        Some("trusted") => true,
+    let trust = match trust.as_deref() {
+        None => None,
+        Some("untrusted") => Some(TrustLevel::Untrusted),
+        Some("trusted") => Some(TrustLevel::Trusted),
         Some(_) => return Err(BAD_TRUST),
     };
 
@@ -122,7 +126,7 @@ pub fn parse(arguments: &Value) -> Result<Params, &'static str> {
         writer: id(&arguments["run"], BAD_RUN, WriterId::parse)?,
         provenance: filter(&arguments["provenance"])?,
         kinds: filter(&arguments["kind"])?,
-        trusted_only,
+        trust,
         since: time(&arguments["since"])?,
         until: time(&arguments["until"])?,
         k: hits(&arguments["k"])?,

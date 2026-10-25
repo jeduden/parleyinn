@@ -463,13 +463,21 @@ pub(crate) fn count_untaken(store: &mut Store, now: u64, audit: &dyn Fn(&Occurre
     let Ok(untaken) = store.untaken_bindings(now.saturating_sub(BINDING_WAIT_SECS)) else {
         return;
     };
+    // Whether any server ever took a binding on this node tells a server
+    // that never ran from one that ran and took none of these.
+    let ever = store.binding_counts().is_ok_and(|(taken, _)| taken > 0);
+    let detail = if ever {
+        "no MCP server took the session binding within 30 s"
+    } else {
+        "no MCP server has taken a session binding on this node"
+    };
     for held in untaken {
         if store.count_binding(held.id).unwrap_or(false) {
             audit(&Occurrence::Degraded {
                 kind: Kind::Failed,
                 counter: Counter::SessionBindingNotTaken,
                 operation: "hook SessionStart",
-                detail: "no MCP server took the session binding within 30 s",
+                detail,
             });
         }
     }

@@ -71,6 +71,9 @@ jobs:
       # No cache anywhere in this workflow: a cache is writable by any
       # branch, and a release must not build from something a branch
       # could have poisoned.
+      # ENG-30: the license check reads only the sources cargo has
+      # already fetched, for every release target.
+      - run: cargo fetch --locked
       # The NFR-02 rows time the release core (testkit::release_core_executable),
       # so it is built first; it is a test fixture here, never released.
       - run: cargo build --release --locked -p parinn -p calibrate

@@ -79,8 +79,8 @@ These land in part, as §12.2 bounds them or as their scenarios reach past M1:
 | ADM-13         | the core writes to no git repository                                    | install M2; commit hook, launcher M7 |
 
 A scenario of a row that lands in part stays `@pending`, its M1 part
-proven by its bound steps or named tests, as ENG-12 in plan 2609292011.
-One that cannot pass as written is a finding to raise, never re-pended.
+proven by bound steps or named tests, as ENG-12 in plan 2609292011. One
+that cannot pass as written is a finding to raise, never re-pended.
 
 Each test kind lands with its code: ENG-07's fuzz targets, ENG-08's
 properties, ENG-06, ENG-17 and NFR-01 to NFR-05's benchmarks (ENG-15).
@@ -95,12 +95,11 @@ ENG-08 prove CON-05.
   targets' headers pinned on the Linux builder. BM25 ranks the newest
   2,000 matches, 172 ms p95 (NFR-03).
 - **S7** ([ADR-2610102211], proposed): an in-house stdio MCP server.
-- **S1, S3 and S13**: Claude Code 2.1.296's hook inputs and
-  transcripts under `testdata/claude-code`. The transcript parser gets
-  its cargo-fuzz target in the change that adds it, seeded from them
-  (ENG-07). A fork's repeated lines are recorded once (REC-04), the
-  MCP server ingests live (REC-13), and a drifting line stays untrusted
-  `harness_text` (REC-26).
+- **S1, S3 and S13**: Claude Code 2.1.296's hook inputs and transcripts
+  under `testdata/claude-code`. The parser's cargo-fuzz target is seeded
+  from them (ENG-07). A fork's repeated lines are recorded once
+  (REC-04), the MCP server ingests live (REC-13), and a drifting line
+  stays untrusted `harness_text` (REC-26).
 - **S8**: the conservative model-token estimator of §8.4. Six targets
   freeze when M1 builds what uses them (§12.3): NFR-09's overhead,
   REC-11's cap, REC-17's secret, RCL-02's hits, RCL-03's cap and
@@ -208,9 +207,8 @@ changed M1's row in §12.2.
 ## Execution
 
 Phase 1 fixed the test approach the others copy. ENG-18's rewording
-(ruling 1) landed before phases 4, 5 and 7. Tracks 2 then 3; 4; 5 then 6;
-7 ran in parallel. Phases 8 to 16 follow in order, 12 once 8 lands. A
-phase's spec is written at its turn.
+landed before phases 4, 5 and 7. Tracks 2 then 3; 4; 5 then 6; 7 ran in
+parallel. Phases 8 to 16 follow in order; each spec is written at its turn.
 
 | Phase | Model  | Gate                                                                                                                                                     |
 | ----- | ------ | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -274,6 +272,8 @@ footer: |
 |     | ↳      | @SEC-16 and @NFR-02 off @pending and passing. Hook handlers decode each hook input against its schema and recorded shapes, and hold their observations at the ingest marker within their hook budgets; ingest uses them for user lines and prompt matches. PRV-04 rows 1-3, PRV-08, REC-19 and REC-26's hook steps pass narrowed; NFR-01 and NFR-02 benchmarked.                                                       |
 | 10  | ✅     | [The MCP server and live ingest](phase-10.md)                                                                                                                                                                                                                                                                                                                                                                          |
 |     | ↳      | @REC-13 off @pending and passing against a live MCP server. It takes its own harness process's session binding, ingests its transcripts into run seats whose keys it holds in memory, and leaves an ingest marker when it stops short. @REC-06 and @PRV-14 pass narrowed: purge (phase 14) and event_search (phase 12) keep them pending.                                                                              |
+| 11  | ✅     | [Trust, origin, branch links and repository identity](phase-11.md)                                                                                                                                                                                                                                                                                                                                                     |
+|     | ↳      | @MEM-01 and @OWN-01 off @pending and passing. Each event's trust level and origin derive from the record and the node's key set alone, nothing stores them, and parinn rebuild and parinn verify keep the kept origins honest. A repository's identity is read inside the core; @LANE-02 stays @pending for a ruling. @PRV-02 passes narrowed; @PRV-06 and @PRV-13 are proven by named tests.                          |
 | 12  | ✅     | [Search: the search index, the query compiler and event_search](phase-12.md)                                                                                                                                                                                                                                                                                                                                           |
 |     | ↳      | @REC-11 and @SEC-04 off @pending and passing. Event and payload text is indexed in the append transaction up to 1 MiB, and event_search finds it by literal terms, ranked by BM25 over the newest 2,000 matches, damped per run. @RCL-02 cannot pass in M1 and is raised; NFR-03 is benchmarked; the index is a derived file of its own, so the record holds 1.42x its text, within NFR-09's 1.5x; the index is 0.75x. |
 <?/catalog?>

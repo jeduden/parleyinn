@@ -9,6 +9,9 @@ its upgrade notes (ENG-23). ParleyInn follows semantic versioning.
 
 ## Unreleased
 
+- A pull request that adds a dependency with no license text in its
+  source now fails CI (ENG-30). The `license-check` command, run by the
+  supply-chain job, checks every crate a release links.
 - Upgrade note: the product is now ParleyInn and its executable is
   `parinn`, renamed from `cairn`. The executable, its release assets
   (`parinn-*`, `parinn.spdx.json`), its MCP server name and every

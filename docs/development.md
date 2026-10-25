@@ -67,6 +67,12 @@ cargo-audit and `cargo test --workspace`. Each runs in a job the `CI`
 job needs, and none may fail. Every workspace crate inherits the
 workspace's lints (`[lints] workspace = true`), or forbids unsafe code
 in its own crate roots. The core's bans and reach test are in place.
+`cargo run --locked -p engineering --bin license-check` holds every crate
+a release links to a license text that fits its declared license
+(ENG-30) and each target's `THIRD_PARTY_LICENSES` to equal its
+regeneration (ENG-31); the supply-chain job runs it on every pull request.
+It reads only the sources cargo has fetched, so run `cargo fetch --locked`
+first; `--write` rewrites the committed files after a dependency changes.
 Every product crate's clippy.toml refuses the clocks and the random
 order of the hash collections. These checks are ENG-16's core row,
 each with its drift case. The ENG-16 scenario stays pending until the

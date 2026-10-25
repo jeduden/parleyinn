@@ -96,7 +96,7 @@ pub fn cargo_shipped_deps(metadata: &str, product: &Path) -> Result<Vec<String>,
 
 /// Whether `package` builds a shipped executable: a binary target of
 /// a crate under `product`.
-fn ships(package: &serde_json::Value, product: &Path) -> bool {
+pub(crate) fn ships(package: &serde_json::Value, product: &Path) -> bool {
     let under = package["manifest_path"]
         .as_str()
         .is_some_and(|m| Path::new(m).starts_with(product));

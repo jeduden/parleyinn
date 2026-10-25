@@ -55,6 +55,9 @@ jobs:
           command -v strace >/dev/null || {
             sudo apt-get update && sudo apt-get install -y --no-install-recommends strace
           }
+      # ENG-30: the license check reads only the sources cargo has
+      # already fetched, for every release target.
+      - run: cargo fetch --locked
       # NFR-02: the scenario that holds a hook handler to its budget
       # times the release build of the core, never the development
       # build (testkit::release_core_executable), against the frozen
@@ -123,6 +126,9 @@ jobs:
           command -v strace >/dev/null || {
             sudo apt-get update && sudo apt-get install -y --no-install-recommends strace
           }
+      # ENG-30: the license check reads only the sources cargo has
+      # already fetched, for every release target.
+      - run: cargo fetch --locked
       # NFR-02: the budget rows time the release core, which the
       # instrumented run does not build.
       - run: cargo build --release --locked -p parinn -p calibrate
@@ -228,12 +234,17 @@ jobs:
         with:
           tools: "rust github:EmbarkStudios/cargo-deny github:rustsec/rustsec"
           cache: true
+      - run: cargo fetch --locked
       - run: cargo deny check licenses bans sources
       # The fuzz workspace has its own manifest and lockfile (ENG-07),
       # so the same policy reads them too.
       - run: cargo deny --manifest-path fuzz/Cargo.toml check licenses bans sources
       - run: cargo audit
       - run: cargo audit --file fuzz/Cargo.lock
+      # ENG-30: every crate a release links carries a license text that
+      # fits its declared license, so a dependency with none stops the
+      # pull request that adds it.
+      - run: cargo run --locked -p engineering --bin license-check
 
   # ENG-27: every check that keeps the specification, its scenarios
   # and the repository's records in step is proven here. The suite
@@ -264,6 +275,9 @@ jobs:
           command -v strace >/dev/null || {
             sudo apt-get update && sudo apt-get install -y --no-install-recommends strace
           }
+      # ENG-30: the license check reads only the sources cargo has
+      # already fetched, for every release target.
+      - run: cargo fetch --locked
       - run: cargo test --locked -p drift --test suite -- --ignored
 
   # ENG-15: the benchmark gate. The base is the head's first parent:
@@ -334,7 +348,25 @@ jobs:
               bin="$head"
               [ "$side" = base ] && bin="$base"
               core="$bin/parinn"
-              "$bin/benchmark" run --core "$core" --samples "$SAMPLES" >> "$out/$side.samples"
+              # Only the base side is taken again: it runs main's
+              # benchmark, which fails a round when a stalled disk
+              # overruns the hook budget twice. The head's benchmark
+              # retries inside the round, and a head round that fails
+              # fails the gate.
+              tries=1
+              [ "$side" = base ] && tries=3
+              for try in $(seq "$tries"); do
+                if "$bin/benchmark" run --core "$core" --samples "$SAMPLES" \
+                  > "$out/round.samples" 2> "$out/round.err"; then
+                  cat "$out/round.samples" >> "$out/$side.samples"
+                  break
+                fi
+                cat "$out/round.err" >&2
+                if [ "$try" -eq "$tries" ] || ! grep -q "overran its hook budget" "$out/round.err"; then
+                  exit 1
+                fi
+                sleep 2
+              done
             done
           done
           status=0

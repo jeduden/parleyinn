@@ -392,3 +392,24 @@ fn each_refusal_says_why_and_has_a_fixed_detail() {
         assert_eq!(refusal.detail(), detail);
     }
 }
+
+#[test]
+fn a_repository_bind_is_a_widening_act_that_records_the_identity_it_names() {
+    let act = Act::RepositoryBind {
+        identity: json!({"repository": "1".repeat(40)}),
+    };
+
+    assert_eq!(act.name(), "repository_bind");
+    assert_eq!(act.class(), Class::Widening);
+    assert_eq!(
+        act.content(),
+        json!({
+            "act": "repository_bind", "class": "widening", "principal_surface": "cli",
+            "repository": "1".repeat(40),
+        })
+    );
+    let provisional = Act::RepositoryBind {
+        identity: json!({"repository_provisional": "ab"}),
+    };
+    assert_eq!(provisional.content()["repository_provisional"], "ab");
+}

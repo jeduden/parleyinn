@@ -18,6 +18,7 @@ key.workspace = true
 mcp.workspace = true
 record.workspace = true
 redaction.workspace = true
+repository.workspace = true
 serde_json.workspace = true
 store.workspace = true
 structured_log.workspace = true
@@ -35,5 +36,5 @@ workspace = true
 # architecture check reads both.
 [package.metadata.parinn]
 responsibility = "Runs the core executable: the hook handlers, the MCP server and the CLI"
-may-depend-on = ["administration", "allowed_root", "audit", "configuration", "hook", "ingest", "key", "mcp", "record", "redaction", "store", "structured_log"]
+may-depend-on = ["administration", "allowed_root", "audit", "configuration", "hook", "ingest", "key", "mcp", "record", "redaction", "repository", "store", "structured_log"]
 may-dev-depend-on = ["testkit"]

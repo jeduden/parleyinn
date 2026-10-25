@@ -9,6 +9,7 @@ dependencies = [
  "key",
  "platform",
  "record",
+ "repository",
  "rusqlite",
  "serde_json",
  "store",
@@ -141,28 +142,6 @@ name = "bytecount"
 version = "0.6.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "175812e0be2bccb6abe50bb8d566126198344f707e304f45c648fd8f2cc0365e"
-
-[[package]]
-name = "parinn"
-version = "0.0.0"
-dependencies = [
- "administration",
- "allowed_root",
- "audit",
- "configuration",
- "hook",
- "ingest",
- "key",
- "mcp",
- "record",
- "redaction",
- "rusqlite",
- "serde_json",
- "store",
- "structured_log",
- "testkit",
- "tracing",
-]
 
 [[package]]
 name = "calibrate"
@@ -1041,6 +1020,29 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "384b8ab6d37215f3c5301a95a4accb5d64aa607f1fcb26a11b5303878451b4fe"
 
 [[package]]
+name = "parinn"
+version = "0.0.0"
+dependencies = [
+ "administration",
+ "allowed_root",
+ "audit",
+ "configuration",
+ "hook",
+ "ingest",
+ "key",
+ "mcp",
+ "record",
+ "redaction",
+ "repository",
+ "rusqlite",
+ "serde_json",
+ "store",
+ "structured_log",
+ "testkit",
+ "tracing",
+]
+
+[[package]]
 name = "peg"
 version = "0.6.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1217,6 +1219,13 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d6f6ff9a378485b298a5286656da665ba74413d36db0979633275d2e708145d4"
 
 [[package]]
+name = "repository"
+version = "0.0.0"
+dependencies = [
+ "testkit",
+]
+
+[[package]]
 name = "review-bundle"
 version = "0.0.0"
 dependencies = [
@@ -1235,6 +1244,14 @@ dependencies = [
  "serde",
  "serde_json",
  "testkit",
+]
+
+[[package]]
+name = "room"
+version = "0.0.0"
+dependencies = [
+ "provenance",
+ "record",
 ]
 
 [[package]]

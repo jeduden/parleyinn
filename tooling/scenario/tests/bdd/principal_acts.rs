@@ -108,3 +108,43 @@ fn acknowledgement_recorded(w: &mut World) -> Result<(), String> {
     }
     Err(format!("no neutral counter acknowledgement among {acts:?}"))
 }
+
+#[given(regex = r#"^an agent's run started on "alice"'s node$"#)]
+fn run_on_alices_node(w: &mut World) -> Result<(), String> {
+    agent_runs(w)
+}
+
+#[then(
+    regex = r#"^the run's one principal is "alice", the principal of the node that records it$"#
+)]
+fn the_nodes_principal_is_the_runs(w: &mut World) -> Result<(), String> {
+    // Before PRV-10 no principal key exists: a run's principal is the
+    // node's, whose one device key certified every seat that records the
+    // run (OWN-01, PRV-11). No seat of another key holds an event.
+    // This narrowing is temporary: once principal keys exist (PRV-10), the
+    // step names the run's principal by its key, not by the one device key
+    // that certified every seat.
+    run_core(w, &["verify", "--json"], None)?;
+    let out = last_run(w)?;
+    let report: Value = serde_json::from_slice(&out.stdout).map_err(|e| e.to_string())?;
+    let seats = report["seats"]
+        .as_array()
+        .ok_or("verify reported no seats")?;
+    let keys: std::collections::BTreeSet<_> = seats
+        .iter()
+        .map(|s| s["certificate"]["certifying_key"].to_string())
+        .collect();
+    if seats.len() < 2 || keys.len() != 1 {
+        return Err(format!(
+            "the run's seats are not all certified by the node's one device key: {keys:?}"
+        ));
+    }
+    let rooms: std::collections::BTreeSet<_> =
+        seats.iter().map(|s| s["room"].to_string()).collect();
+    if rooms.len() != 1 {
+        return Err(format!(
+            "the run's seats lie in more than one room: {rooms:?}"
+        ));
+    }
+    Ok(())
+}

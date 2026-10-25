@@ -11,6 +11,10 @@ publish.workspace = true
 name = "protection-check"
 path = "src/main.rs"
 
+[[bin]]
+name = "license-check"
+path = "src/license_check_main.rs"
+
 [dependencies]
 adr.workspace = true
 benchmark.workspace = true

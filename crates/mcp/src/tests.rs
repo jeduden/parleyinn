@@ -32,13 +32,7 @@ impl Fixture {
     fn server(&self) -> Server {
         let store = Store::open(&self.home.store()).unwrap();
         let node = Node::find(&self.home, &store).unwrap();
-        Server::new(
-            store,
-            "v9",
-            node.device().public(),
-            node.device_writer(),
-            node.personal_room(),
-        )
+        Server::new(store, "v9", node.device().public(), node.personal_room())
     }
 
     fn sql(&self, statement: &str) {
@@ -145,13 +139,22 @@ fn tools_list_offers_event_get_with_its_schema() {
     )["result"]["tools"]
         .clone();
 
-    assert_eq!(tools.as_array().unwrap().len(), 2);
+    assert_eq!(tools.as_array().unwrap().len(), 3);
     assert_eq!(tools[0]["name"], "event_search");
     assert_eq!(tools[1]["name"], "event_get");
+    assert_eq!(tools[2]["name"], "mcp_server_get");
     assert_eq!(tools[1]["inputSchema"]["required"], json!(["address"]));
-    for tool in tools.as_array().unwrap() {
+    // The recall tools answer inside the envelope; the server's own state
+    // holds no recalled content.
+    for tool in &tools.as_array().unwrap()[..2] {
         assert!(tool["description"].as_str().unwrap().contains("envelope"));
     }
+    assert!(
+        tools[2]["description"]
+            .as_str()
+            .unwrap()
+            .contains("never recalled content")
+    );
 }
 
 #[test]
@@ -227,6 +230,29 @@ fn a_device_seat_event_shows_its_content_as_json_and_its_origin_as_witnessed() {
     assert_eq!(content["room"], f.ingested.room.to_string());
 }
 
+#[test]
+fn the_trust_level_derives_from_the_policy_and_the_event_alone() {
+    let f = fixture();
+    let store = Store::open(&f.home.store()).unwrap();
+    let device = store
+        .seats()
+        .unwrap()
+        .into_iter()
+        .find(|s| s.writer != f.ingested.writer)
+        .unwrap();
+    let mut server = f.server();
+    let trust = |server: &mut Server, writer: WriterId, seq: u64| {
+        let args = json!({"address": format!("{writer}:{seq}"), "scope": "room"});
+        envelope_of(&event_get(server, args))["items"][0]["trust"].clone()
+    };
+
+    // The create room act and the key event are the node's own.
+    assert_eq!(trust(&mut server, device.writer, 1), "trusted");
+    assert_eq!(trust(&mut server, device.writer, 2), "trusted");
+    // A line ingested from a transcript is never trusted.
+    assert_eq!(trust(&mut server, f.ingested.writer, 2), "untrusted");
+}
+
 /// The text of a tool error.
 fn refusal(result: &Value) -> String {
     assert_eq!(result["isError"], true, "{result}");
@@ -295,7 +321,7 @@ fn an_unknown_tool_is_a_tool_error() {
 
     assert_eq!(
         refusal(&result),
-        "no such tool: this server offers event_get and event_search"
+        "no such tool: this server offers event_get, event_search and mcp_server_get"
     );
 }
 
@@ -801,4 +827,17 @@ fn event_search_says_its_run_is_a_writer_id_and_its_damping_is_per_writer() {
         .as_str()
         .unwrap();
     assert_eq!(run, "a writer id: a run is named by its writer for now");
+}
+
+#[test]
+fn every_origin_shows_as_itself_and_back() {
+    for (derived, shown) in [
+        (Derived::Witnessed, Origin::Witnessed),
+        (Derived::Ingested, Origin::Ingested),
+        (Derived::Bundle, Origin::Bundle),
+        (Derived::Peer, Origin::Peer),
+    ] {
+        assert_eq!(shown_origin(derived), shown);
+        assert_eq!(derived_origin(shown), derived);
+    }
 }

@@ -16,12 +16,15 @@
 //!   transaction and searched under a deadline (REC-11, RCL-02).
 
 pub mod hook;
+mod origin;
 pub mod payload;
 mod refusal;
+mod repository;
 pub mod search_index;
 pub mod segment;
 pub mod source;
 
+use std::collections::BTreeMap;
 use std::fmt;
 use std::path::Path;
 use std::time::Duration;
@@ -571,7 +574,21 @@ impl Store {
     /// Fails when SQLite does, when the store has no search index, or
     /// with [`StoreError::Cancelled`] when the deadline passes.
     pub fn search(&self, search: &Search<'_>) -> Result<Vec<Hit>, StoreError> {
-        search_index::run(&self.conn, search)
+        search_index::run(&self.conn, search, None)
+    }
+
+    /// [`search`](Self::search) over the matches `keep` keeps, chosen
+    /// before the ranking cuts them (RCL-02).
+    ///
+    /// # Errors
+    ///
+    /// As [`search`](Self::search).
+    pub fn search_where(
+        &self,
+        search: &Search<'_>,
+        keep: &dyn Fn(Address) -> bool,
+    ) -> Result<Vec<Hit>, StoreError> {
+        search_index::run(&self.conn, search, Some(keep))
     }
 
     /// The search index's canonical digest (§8.3): the same for any two
@@ -915,6 +932,157 @@ impl Store {
     /// Fails when SQLite does or a row does not parse.
     pub fn refused_forks(&self) -> Result<Vec<Fork>, StoreError> {
         refusal::all(&self.conn)
+    }
+
+    /// Every writer's kept origin, by writer: a derived artifact (PRV-13,
+    /// I10) that decides nothing, kept so `parinn verify` can compare it
+    /// to a fresh derivation. None while `parinn rebuild` has not written
+    /// it.
+    ///
+    /// # Errors
+    ///
+    /// Fails when SQLite does or a writer id does not parse.
+    pub fn origins(&self) -> Result<BTreeMap<WriterId, String>, StoreError> {
+        origin::all(&self.conn)
+    }
+
+    /// Replaces the kept origins with `origins`, in one transaction.
+    ///
+    /// # Errors
+    ///
+    /// Fails, changing nothing, when SQLite does.
+    pub fn replace_origins(
+        &mut self,
+        origins: &BTreeMap<WriterId, String>,
+    ) -> Result<(), StoreError> {
+        let tx = self
+            .conn
+            .transaction_with_behavior(TransactionBehavior::Immediate)?;
+        origin::replace(&tx, origins)?;
+        tx.commit()?;
+
+        Ok(())
+    }
+
+    /// The identity, as its caller named it, the worktree `worktree`
+    /// last resolved to (LANE-02).
+    ///
+    /// # Errors
+    ///
+    /// Fails when SQLite does.
+    pub fn worktree_identity(&self, worktree: &str) -> Result<Option<String>, StoreError> {
+        repository::identity(&self.conn, worktree)
+    }
+
+    /// Keeps `identity` as what `worktree` resolves to (LANE-02).
+    ///
+    /// # Errors
+    ///
+    /// Fails when SQLite does.
+    pub fn set_worktree_identity(
+        &mut self,
+        worktree: &str,
+        identity: &str,
+    ) -> Result<(), StoreError> {
+        repository::set_identity(&self.conn, worktree, identity)?;
+
+        Ok(())
+    }
+
+    /// What the mark `mark` holds: a node-local note of what this node
+    /// already reported or looked at, not derived from the record
+    /// (LANE-02).
+    ///
+    /// # Errors
+    ///
+    /// Fails when SQLite does.
+    pub fn worktree_mark(&self, mark: &str) -> Result<Option<String>, StoreError> {
+        repository::mark(&self.conn, mark)
+    }
+
+    /// Makes the mark `mark` hold `value` (LANE-02).
+    ///
+    /// # Errors
+    ///
+    /// Fails when SQLite does.
+    pub fn set_worktree_mark(&mut self, mark: &str, value: &str) -> Result<(), StoreError> {
+        repository::set_mark(&self.conn, mark, value)?;
+
+        Ok(())
+    }
+
+    /// Clears the mark `mark`; nothing, when it was never made (LANE-02).
+    ///
+    /// # Errors
+    ///
+    /// Fails when SQLite does.
+    pub fn forget_worktree_mark(&mut self, mark: &str) -> Result<(), StoreError> {
+        repository::forget_mark(&self.conn, mark)?;
+
+        Ok(())
+    }
+
+    /// Appends the bind `event` to `writer`'s log and keeps `identity` as
+    /// what `worktree` resolves to, in one transaction, provided the
+    /// worktree still resolves to `expected`: a bind another process
+    /// made since the caller looked changes nothing and returns `None`
+    /// (LANE-02).
+    ///
+    /// # Errors
+    ///
+    /// As [`append`](Self::append); nothing changes then.
+    pub fn bind_worktree(
+        &mut self,
+        writer: WriterId,
+        event: &NewEvent,
+        worktree: &str,
+        expected: Option<&str>,
+        identity: &str,
+    ) -> Result<Option<Address>, StoreError> {
+        let to = Out {
+            payloads: &self.payloads,
+            threshold: self.threshold,
+        };
+        let tx = self
+            .conn
+            .transaction_with_behavior(TransactionBehavior::Immediate)?;
+        if repository::identity(&tx, worktree)?.as_deref() != expected {
+            return Ok(None);
+        }
+        let address = to.append_chunk(&tx, writer, std::slice::from_ref(event), true)?;
+        repository::set_identity(&tx, worktree, identity)?;
+        tx.commit()?;
+
+        Ok(address.into_iter().next())
+    }
+
+    /// The identity each worktree resolves to, as derived from the
+    /// record (LANE-02, I10).
+    ///
+    /// # Errors
+    ///
+    /// Fails when SQLite does.
+    pub fn worktree_identities(&self) -> Result<BTreeMap<String, String>, StoreError> {
+        repository::identities(&self.conn)
+    }
+
+    /// Replaces the worktree identities with `identities` in one
+    /// transaction, leaving the marks alone (LANE-02, I10).
+    ///
+    /// # Errors
+    ///
+    /// Fails, changing nothing, when SQLite does.
+    pub fn replace_worktree_identities(
+        &mut self,
+        identities: &BTreeMap<String, String>,
+    ) -> Result<(), StoreError> {
+        let tx = self
+            .conn
+            .transaction_with_behavior(TransactionBehavior::Immediate)?;
+        repository::replace(&tx, identities)?;
+        tx.commit()?;
+
+        Ok(())
     }
 
     /// Closes `writer`'s open segment, if it has one (REC-19).

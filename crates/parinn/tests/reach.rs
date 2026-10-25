@@ -27,7 +27,7 @@ use serde_json::Value;
 /// its reach when it joined (plan 2609292012, phase 1). `cargo
 /// metadata` resolves every platform and unifies features across the
 /// workspace, so the list holds a few crates a given build leaves out.
-const REACHABLE: [&str; 77] = [
+const REACHABLE: [&str; 78] = [
     // The core's own library crates, each with the same clippy bans.
     "administration",
     "allowed_root",
@@ -42,6 +42,7 @@ const REACHABLE: [&str; 77] = [
     "provenance",
     "record",
     "redaction",
+    "repository",
     "search",
     "store",
     "structured_log",

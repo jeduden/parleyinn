@@ -177,52 +177,77 @@ fn a_hook_sample_whose_handler_counted_an_overrun_is_an_error() {
     );
 }
 
-#[test]
-fn a_sample_whose_handler_overran_once_is_taken_again() {
-    let mut calls = 0;
-    let took = twice(|| {
-        calls += 1;
-        if calls == 1 {
-            Err(Attempt::Overran("overran".to_owned()))
-        } else {
-            Ok(Duration::from_millis(7))
-        }
-    });
+/// Takes the samples `outcomes` gives, one per attempt, counting the
+/// pauses between them.
+fn retry(
+    attempts: usize,
+    outcomes: &[Result<Duration, Attempt>],
+) -> (Result<Duration, String>, usize, usize) {
+    let (mut calls, mut pauses) = (0, 0);
+    let took = retried(
+        attempts,
+        || pauses += 1,
+        || {
+            calls += 1;
+            match &outcomes[calls - 1] {
+                Ok(d) => Ok(*d),
+                Err(Attempt::Overran(e)) => Err(Attempt::Overran(format!("{e} {calls}"))),
+                Err(Attempt::Failed(e)) => Err(Attempt::Failed(e.clone())),
+            }
+        },
+    );
 
-    assert_eq!((took, calls), (Ok(Duration::from_millis(7)), 2));
+    (took, calls, pauses)
+}
+
+fn overran() -> Result<Duration, Attempt> {
+    Err(Attempt::Overran("overran".to_owned()))
+}
+
+fn seven() -> Result<Duration, Attempt> {
+    Ok(Duration::from_millis(7))
 }
 
 #[test]
-fn a_handler_that_overruns_twice_in_a_row_is_an_error() {
-    let mut calls = 0;
-    let took = twice(|| {
-        calls += 1;
-        Err(Attempt::Overran(format!("overran {calls}")))
-    });
+fn a_sample_whose_handler_overran_is_taken_again_after_a_pause_each_time() {
+    assert_eq!(
+        retry(4, &[overran(), seven()]),
+        (Ok(Duration::from_millis(7)), 2, 1)
+    );
+    assert_eq!(
+        retry(4, &[overran(), overran(), overran(), seven()]),
+        (Ok(Duration::from_millis(7)), 4, 3)
+    );
+}
 
-    assert_eq!((took, calls), (Err("overran 2".to_owned()), 2));
+#[test]
+fn a_handler_that_overruns_every_time_is_an_error_after_the_last_attempt() {
+    let (took, calls, pauses) = retry(3, &[overran(), overran(), overran(), overran()]);
+
+    assert_eq!((took, calls, pauses), (Err("overran 3".to_owned()), 3, 2));
+}
+
+#[test]
+fn settling_waits_at_least_the_settle_time() {
+    let start = std::time::Instant::now();
+
+    settle();
+
+    assert!(start.elapsed() >= SETTLE);
 }
 
 #[test]
 fn a_sample_that_cannot_be_taken_is_not_taken_again() {
-    let mut calls = 0;
-    let took = twice(|| {
-        calls += 1;
-        Err(Attempt::Failed("no fixture".to_owned()))
-    });
+    let failed = Err(Attempt::Failed("no fixture".to_owned()));
 
-    assert_eq!((took, calls), (Err("no fixture".to_owned()), 1));
+    assert_eq!(retry(4, &[failed]), (Err("no fixture".to_owned()), 1, 0));
 }
 
 #[test]
 fn a_sample_that_gives_a_time_is_taken_once() {
-    let mut calls = 0;
-    let took = twice(|| {
-        calls += 1;
-        Ok(Duration::from_millis(3))
-    });
+    let ok = Ok(Duration::from_millis(3));
 
-    assert_eq!((took, calls), (Ok(Duration::from_millis(3)), 1));
+    assert_eq!(retry(4, &[ok]), (Ok(Duration::from_millis(3)), 1, 0));
 }
 
 #[test]

@@ -48,6 +48,10 @@ CREATE TABLE prompt_commitments (
 ";
 
 /// The columns a hook observation is read from.
+/// How many session bindings were taken (`?1` is 1) or not (0).
+const COUNT_BINDINGS: &str =
+    "SELECT count(*) FROM hook_observations WHERE hook = 'SessionStart' AND taken = ?1";
+
 const OBSERVATION: &str = "SELECT id, hook, harness_session, transcript_path, cwd, byte_offset,
     source, prompt_id, attended, harnesses, nested, harness_process, at, appended, taken
     FROM hook_observations";
@@ -351,6 +355,22 @@ impl Store {
                 sql_count(before)
             ),
         )
+    }
+
+    /// How many `SessionStart` session bindings an MCP server took, and
+    /// how many it did not (REC-13, REC-19).
+    ///
+    /// # Errors
+    ///
+    /// Fails when SQLite does.
+    pub fn binding_counts(&self) -> Result<(u64, u64), StoreError> {
+        let count = |taken: u8| -> Result<u64, StoreError> {
+            let n: i64 = self.conn.query_row(COUNT_BINDINGS, [taken], |r| r.get(0))?;
+
+            Ok(u64::try_from(n).unwrap_or_default())
+        };
+
+        Ok((count(1)?, count(0)?))
     }
 
     /// Takes every session binding the `SessionStart` hook handlers of

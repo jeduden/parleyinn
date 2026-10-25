@@ -26,13 +26,7 @@ fn a_recalled_line_arrives_whole_inside_the_envelope_and_untrusted() {
     let ingested = ingest::ingest_path(&home, &path, &redactor(), &mut OsEntropy).unwrap();
     let store = Store::open(&home.store()).unwrap();
     let node = Node::find(&home, &store).unwrap();
-    let mut server = Server::new(
-        store,
-        "test",
-        node.device().public(),
-        node.device_writer(),
-        node.personal_room(),
-    );
+    let mut server = Server::new(store, "test", node.device().public(), node.personal_room());
     let request = json!({"jsonrpc": "2.0", "id": 1, "method": "tools/call", "params": {
         "name": "event_get",
         "arguments": {"address": format!("{}:2", ingested.writer), "scope": "room"},

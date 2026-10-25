@@ -34,7 +34,7 @@ fn a_call_with_only_a_query_asks_for_ten_hits_in_any_run_of_the_room() {
     assert_eq!(params.room, None);
     assert_eq!(params.writer, None);
     assert!(params.provenance.is_empty() && params.kinds.is_empty());
-    assert!(!params.trusted_only);
+    assert_eq!(params.trust, None);
     assert_eq!((params.since, params.until), (None, None));
 }
 
@@ -53,10 +53,10 @@ fn k_is_capped_at_fifty_and_must_be_a_whole_number_from_one() {
 
 #[test]
 fn trust_is_trusted_or_untrusted() {
-    let trust = |value: Value| parsed(json!({"trust": value})).map(|p| p.trusted_only);
+    let trust = |value: Value| parsed(json!({"trust": value})).map(|p| p.trust);
 
-    assert_eq!(trust(json!("trusted")), Ok(true));
-    assert_eq!(trust(json!("untrusted")), Ok(false));
+    assert_eq!(trust(json!("trusted")), Ok(Some(TrustLevel::Trusted)));
+    assert_eq!(trust(json!("untrusted")), Ok(Some(TrustLevel::Untrusted)));
     assert_eq!(trust(json!("maybe")), Err(BAD_TRUST));
     assert_eq!(trust(json!(1)), Err(BAD_TRUST));
 }

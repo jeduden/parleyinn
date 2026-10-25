@@ -17,6 +17,7 @@
 //!   holding that inception holds its certificate record, as each
 //!   certificate record there names a seat that key certified;
 //! - trusted provenance only in device seats;
+//! - every origin the store keeps against a fresh derivation (PRV-13);
 //! - every writer's segments, which tile its log, only its newest open,
 //!   none of a newer format version (REC-19, ADM-05); every payload.
 //!
@@ -41,7 +42,10 @@ use record::id::{Address, RoomId, SeatId, WriterId};
 use serde_json::Value;
 use store::{Segment, Store, StoreError, Stored, StoredSeat};
 
-use crate::node::begins_genesis;
+use crate::AdminError;
+use crate::node::{Node, begins_genesis};
+use crate::origin;
+use crate::repository;
 
 /// What a verified record holds, and the causal order its cited heads
 /// give.
@@ -106,6 +110,14 @@ pub enum VerifyError {
     Seat { writer: WriterId, reason: String },
     /// This node's genesis does not check.
     Genesis(&'static str),
+    /// A derived artifact the store keeps differs from what the record
+    /// and the node's key set derive (I10): the origin kept for this
+    /// writer.
+    Derived { writer: WriterId },
+    /// A derived artifact the store keeps differs from what the record
+    /// derives (I10): the identity kept for this worktree, named by its
+    /// digest, or one the record holds and the store does not.
+    DerivedWorktree { worktree: String },
     /// A segment is of a newer format version than this parinn's: it is
     /// refused and left as it is (ADM-05).
     NewerSegment(Segment),
@@ -131,6 +143,7 @@ impl VerifyError {
             Self::Provenance { .. } => "provenance",
             Self::Seat { .. } => "seat",
             Self::Genesis(_) => "genesis",
+            Self::Derived { .. } | Self::DerivedWorktree { .. } => "derived_artifact_consistency",
             Self::NewerSegment(_) => "newer_segment",
             Self::Segments { .. } => "segment",
             Self::Payload { .. } => "payload",
@@ -152,6 +165,8 @@ impl VerifyError {
             | Self::Payload { address, .. } => Some(address),
             Self::Seat { .. }
             | Self::Genesis(_)
+            | Self::Derived { .. }
+            | Self::DerivedWorktree { .. }
             | Self::NewerSegment(_)
             | Self::Segments { .. }
             | Self::Corrupt(_)
@@ -197,6 +212,14 @@ impl fmt::Display for VerifyError {
                 write!(f, "the payload of {address} cannot be read: {reason}")
             }
             Self::Genesis(why) => f.write_str(why),
+            Self::Derived { writer } => write!(
+                f,
+                "derived artifact consistency: the origin kept for writer {writer} differs from the record's: run parinn rebuild"
+            ),
+            Self::DerivedWorktree { worktree } => write!(
+                f,
+                "derived artifact consistency: the identity kept for worktree {worktree} differs from the record's: run parinn rebuild"
+            ),
             Self::Corrupt(e) | Self::Store(e) => write!(f, "{e}"),
         }
     }
@@ -296,6 +319,7 @@ pub fn verify(store: &Store, node_key: &PublicKey) -> Result<Report, VerifyError
         events(log, device, witnessed, &full)?;
     }
     let order = chain::causal_order(&record).map_err(broken)?;
+    kept_origins_agree(store, node_key)?;
 
     Ok(Report {
         writers: writers.len(),
@@ -305,6 +329,59 @@ pub fn verify(store: &Store, node_key: &PublicKey) -> Result<Report, VerifyError
         seats: certs.iter().map(|(w, c)| seat_report(*w, c)).collect(),
         open_segments,
     })
+}
+
+/// Checks that every origin the store keeps is the one the record and
+/// the node's key set derive (PRV-13, I10). A writer with no kept origin
+/// is not yet derived, and a store that keeps none holds no claim.
+fn kept_origins_agree(store: &Store, node_key: &PublicKey) -> Result<(), VerifyError> {
+    let derived = origin::derive(store, node_key)?;
+    for (writer, kept) in store.origins()? {
+        if derived.get(&writer).map(|o| o.as_str()) != Some(kept.as_str()) {
+            return Err(VerifyError::Derived { writer });
+        }
+    }
+
+    Ok(())
+}
+
+/// Checks that the identity this node keeps for each of its worktrees is
+/// the one its record derives, and that it keeps one for every worktree
+/// the record binds (LANE-02, I10, I6): a store restored without its
+/// table reports it rather than lose change detection silently. A store
+/// that never made the table keeps none. It needs the node's device key,
+/// which the names derive from, so it runs beside [`verify`], not in it.
+///
+/// # Errors
+///
+/// Fails naming the first worktree whose kept identity differs, or when
+/// the store fails.
+pub fn kept_worktrees_agree(store: &Store, node: &Node) -> Result<(), VerifyError> {
+    let derived = repository::derive_worktrees(store, node).map_err(derive_failed)?;
+    let kept = store.worktree_identities()?;
+    let worktrees: BTreeSet<&String> = kept.keys().chain(derived.keys()).collect();
+    for worktree in worktrees {
+        if kept.get(worktree) != derived.get(worktree) {
+            return Err(VerifyError::DerivedWorktree {
+                worktree: worktree.clone(),
+            });
+        }
+    }
+
+    Ok(())
+}
+
+/// Why the worktrees' identities could not be derived, as verification
+/// names it: the store failed, or the record held something it cannot
+/// read.
+fn derive_failed(e: AdminError) -> VerifyError {
+    match e {
+        AdminError::Store(e) => VerifyError::Store(e),
+        other => VerifyError::Corrupt(StoreError::Corrupt {
+            address: None,
+            what: other.to_string(),
+        }),
+    }
 }
 
 /// Why a writer's log could not be read, as verification names it.

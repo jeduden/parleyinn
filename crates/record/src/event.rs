@@ -41,6 +41,9 @@ pub enum EventKind {
     /// A prompt match: what became of a prompt commitment the first line
     /// carrying its `prompt_id` used up (PRV-08).
     PromptMatch,
+    /// A repository's identity, bound once at the first hook event that
+    /// shows it (LANE-02): a structural event, never an `operator` one.
+    RepositoryBind,
 }
 
 impl EventKind {
@@ -59,6 +62,7 @@ impl EventKind {
             Self::RepeatOwner => "repeat_owner",
             Self::HookObservation => "hook_observation",
             Self::PromptMatch => "prompt_match",
+            Self::RepositoryBind => "repository_bind",
         }
     }
 
@@ -77,6 +81,7 @@ impl EventKind {
             Self::RepeatOwner,
             Self::HookObservation,
             Self::PromptMatch,
+            Self::RepositoryBind,
         ]
         .into_iter()
         .find(|k| k.as_str() == name)

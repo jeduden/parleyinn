@@ -16,12 +16,14 @@ pub mod confinement;
 pub mod decisions;
 pub mod dependencies;
 pub mod isolation_guard;
+pub mod license_texts;
 pub mod product_crates;
 pub mod registry;
 pub mod release_budgets;
 pub mod release_provenance;
 pub mod review_workflow;
 pub mod static_analysis;
+pub mod third_party;
 pub mod toolchain;
 
 use std::fs;

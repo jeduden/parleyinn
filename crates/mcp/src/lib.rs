@@ -15,12 +15,12 @@
 //!
 //! `event_get` serves an event only once it checks against the record:
 //! its content opens its commitment, its header hashes to its stored
-//! hash, and its `prev_hash` names its predecessor. Its origin comes
-//! from its seat certificate, checked against this node's device key and
-//! recorded in the genesis device seat's certificate records, as `parinn
-//! verify` requires; any other seat shows as `peer`. A refusal is fixed
-//! text, naming at most an address it parsed and renders anew; it never
-//! repeats what the call passed (RCL-04).
+//! hash, and its `prev_hash` names its predecessor. Its origin and its
+//! trust level derive from the record and the node's key set
+//! (`administration::origin`, PRV-13) and the default trust policy
+//! (`administration::trust_policy`, PRV-02), never from a stored value.
+//! A refusal is fixed text, naming at most an address it parsed and
+//! renders anew; it never repeats what the call passed (RCL-04).
 //!
 //! Once its harness session's session binding is held, each tool call
 //! is served under the run its tool-use id names through what the
@@ -39,12 +39,13 @@ use std::panic::{self, AssertUnwindSafe};
 use std::sync::mpsc::{Receiver, RecvTimeoutError};
 use std::time::Duration;
 
+use administration::origin::{KeySet, Origin as Derived, is_device_seat};
+use administration::trust_policy::{self, TrustLevel as Level};
 use envelope::{Envelope, IntegrityStatus, Item, Origin, Run, TrustLevel};
-use key::certificate::SeatCertificate;
 use key::signing::PublicKey;
 use record::commitment::commit;
 use record::digest::Digest;
-use record::event::EventKind;
+use record::event::{EventKind, Provenance};
 use record::id::{Address, RoomId, Seq, WriterId};
 use serde_json::{Value, json};
 use store::{Hit, Store, StoreError, Stored, StoredSeat};
@@ -54,6 +55,11 @@ pub const PROTOCOL_VERSIONS: [&str; 3] = ["2025-11-25", "2025-06-18", "2025-03-2
 
 /// Why `event_get` refuses the default scope.
 pub const OUTSIDE_RUN: &str = "the address lies outside the current run: this server serves no run yet, so pass scope \"room\"";
+
+/// `mcp_server_get`'s description, part of the interface (§9.2).
+const MCP_SERVER_GET: &str = "Returns this MCP server's own state as fixed words and counts, never recalled content: \
+whether it holds a session binding (session_binding: held or not_held; recall by room works either way), \
+whether the search index reads (search_index), how many searches ran out of time (searches_timed_out) and its version.";
 
 /// `event_get`'s description, part of the interface (§9.2).
 const EVENT_GET: &str = "Returns one full event of the record by its address, inside the envelope: \
@@ -83,7 +89,7 @@ const ROOM_CONFLICT: &str = "the address and the room argument name different ro
 const OTHER_ROOM: &str = "the event lies in another room";
 const UNREADABLE: &str = "the record cannot be read at this address: run parinn verify";
 const NO_SEAT: &str = "the event's writer has no seat";
-const NO_TOOL: &str = "no such tool: this server offers event_get and event_search";
+const NO_TOOL: &str = "no such tool: this server offers event_get, event_search and mcp_server_get";
 const CANCELLED: &str = "the search ran past its deadline of 2 s and was cancelled";
 const NO_INDEX: &str = "the search index cannot be read: run parinn verify";
 
@@ -92,7 +98,6 @@ pub struct Server {
     store: Store,
     version: String,
     device_key: PublicKey,
-    device_writer: WriterId,
     personal_room: RoomId,
     /// What finds the run of each tool call: the server's live ingest.
     runs: Option<Box<dyn tool_call::Runs>>,
@@ -102,6 +107,8 @@ pub struct Server {
     deadline: Duration,
     /// How many searches the deadline cancelled since `take_cancelled`.
     cancelled: Cell<u64>,
+    /// How many searches the deadline cancelled since this server started.
+    timed_out: Cell<u64>,
 }
 
 impl std::fmt::Debug for Server {
@@ -115,27 +122,20 @@ impl std::fmt::Debug for Server {
 
 impl Server {
     /// A server answering from `store` for the node whose device key is
-    /// `device_key`, whose genesis device seat's writer is
-    /// `device_writer` and whose personal room is `personal_room`,
-    /// naming itself as parinn `version`.
+    /// `device_key` and whose personal room is `personal_room`, naming
+    /// itself as parinn `version`.
     #[must_use]
-    pub fn new(
-        store: Store,
-        version: &str,
-        device_key: PublicKey,
-        device_writer: WriterId,
-        personal_room: RoomId,
-    ) -> Self {
+    pub fn new(store: Store, version: &str, device_key: PublicKey, personal_room: RoomId) -> Self {
         Self {
             store,
             version: version.to_owned(),
             device_key,
-            device_writer,
             personal_room,
             runs: None,
             found: RefCell::new(Vec::new()),
             deadline: event_search::DEADLINE,
             cancelled: Cell::new(0),
+            timed_out: Cell::new(0),
         }
     }
 
@@ -217,6 +217,14 @@ impl Server {
     }
 
     fn call(&self, params: &Value) -> Value {
+        // The server's own state is told whether or not a run is found: it
+        // is what says why none is.
+        if params["name"].as_str() == Some("mcp_server_get") {
+            return json!({
+                "content": [{"type": "text", "text": self.mcp_server_get()}],
+                "isError": false,
+            });
+        }
         let outcome = match (self.refused(params), params["name"].as_str()) {
             (Some(refusal), _) => Err(refusal.to_owned()),
             (None, Some("event_get")) => self.event_get(&params["arguments"]),
@@ -233,6 +241,23 @@ impl Server {
                 "isError": true,
             }),
         }
+    }
+
+    /// `mcp_server_get`: this server's own state as closed words and
+    /// counts, no recalled content: whether it holds a session binding
+    /// (REC-13), whether the search index reads, how many searches the
+    /// deadline timed out since it started, and its version.
+    fn mcp_server_get(&self) -> String {
+        let held = self.runs.as_deref().is_some_and(|r| r.serving());
+        let readable = self.store.search_index_unindexed_writers().is_ok();
+
+        json!({
+            "session_binding": if held { "held" } else { "not_held" },
+            "search_index": if readable { "readable" } else { "unreadable" },
+            "searches_timed_out": self.timed_out.get(),
+            "version": self.version,
+        })
+        .to_string()
     }
 
     /// `event_get`: the event at the address, in the envelope.
@@ -277,6 +302,10 @@ impl Server {
             ));
         }
         let header = &stored.link.header;
+        let origin = self.origin(
+            &KeySet::load(&self.store, &self.device_key).map_err(unreadable)?,
+            &seat,
+        );
         let content = match content {
             Value::Object(fields) if fields.get("text").is_some_and(Value::is_string) => {
                 fields["text"].as_str().unwrap_or_default().to_owned()
@@ -287,11 +316,16 @@ impl Server {
             address: full,
             writer: address.writer.to_string(),
             author: seat.seat.to_string(),
-            origin: self.origin(&seat).map_err(unreadable)?,
+            origin,
             run: Run::Other,
             kind: header.kind.as_str().to_owned(),
             provenance: header.provenance.name(),
-            trust: TrustLevel::Untrusted,
+            trust: trust_of(
+                &header.provenance,
+                header.kind,
+                origin,
+                is_device_seat(&seat),
+            ),
             flags: Vec::new(),
             integrity: IntegrityStatus::Unsigned,
             score: None,
@@ -311,33 +345,58 @@ impl Server {
         let params = event_search::parse(arguments).map_err(str::to_owned)?;
         let compiled = search::compile(&params.request()).map_err(|e| e.to_string())?;
         let room = params.room.unwrap_or(self.personal_room);
-        // No event is trusted yet (PRV-02), so none matches this filter.
-        let found = if params.trusted_only {
-            Vec::new()
-        } else {
-            match self
-                .store
-                .search(&params.search(&compiled, room, self.deadline))
-            {
-                Ok(found) => found,
-                Err(StoreError::Cancelled) => {
-                    self.cancelled.set(self.cancelled.get() + 1);
-                    return Err(CANCELLED.to_owned());
-                }
-                Err(_) => return Err(NO_INDEX.to_owned()),
-            }
+        let keys = KeySet::load(&self.store, &self.device_key).map_err(|_| NO_INDEX.to_owned())?;
+        let seats = RefCell::new(BTreeMap::new());
+        // The trust filter keeps matches before the ranking cuts them; an
+        // event whose trust cannot be derived stays, and fails its item.
+        let keep = |address: Address| {
+            params.trust.is_none_or(|wanted| {
+                self.trust_at(address, &keys, &mut seats.borrow_mut())
+                    .map_or(true, |level| wanted.as_str() == level.as_str())
+            })
         };
-        let mut seats = BTreeMap::new();
-        let items = found
-            .iter()
-            .map(|hit| self.hit_item(hit, room, &mut seats))
-            .collect::<Result<Vec<_>, _>>()?;
+        let search = params.search(&compiled, room, self.deadline);
+        let found = match self.store.search_where(&search, &keep) {
+            Ok(found) => found,
+            Err(StoreError::Cancelled) => {
+                self.cancelled.set(self.cancelled.get() + 1);
+                self.timed_out.set(self.timed_out.get() + 1);
+                return Err(CANCELLED.to_owned());
+            }
+            Err(_) => return Err(NO_INDEX.to_owned()),
+        };
+        let mut items = Vec::new();
+        for hit in &found {
+            items.push(self.hit_item(hit, room, &keys, &mut seats.borrow_mut())?);
+        }
+        items.truncate(params.k);
 
         Ok(Envelope {
             items,
             truncated: false,
             next_cursor: None,
         })
+    }
+
+    /// The trust level of the event at `address`.
+    fn trust_at(
+        &self,
+        address: Address,
+        keys: &KeySet,
+        seats: &mut BTreeMap<WriterId, (String, Origin, bool)>,
+    ) -> Result<TrustLevel, String> {
+        let unreadable = |_| NO_INDEX.to_owned();
+        let (kind, provenance) = self
+            .store
+            .kind_and_provenance(address)
+            .map_err(unreadable)?
+            .ok_or_else(|| format!("no event at {address}"))?;
+        let (_, origin, device) = match seats.entry(address.writer) {
+            Entry::Occupied(known) => known.into_mut(),
+            Entry::Vacant(new) => new.insert(self.author_and_origin(keys, address.writer)?),
+        };
+
+        Ok(trust_of(&provenance, kind, *origin, *device))
     }
 
     /// The item for one hit: the event's closed fields, its score and
@@ -347,7 +406,8 @@ impl Server {
         &self,
         hit: &Hit,
         room: RoomId,
-        seats: &mut BTreeMap<WriterId, (String, Origin)>,
+        keys: &KeySet,
+        seats: &mut BTreeMap<WriterId, (String, Origin, bool)>,
     ) -> Result<Item, String> {
         let unreadable = |_| NO_INDEX.to_owned();
         let address = hit.address;
@@ -361,9 +421,9 @@ impl Server {
             .preview(address)
             .map_err(unreadable)?
             .unwrap_or_default();
-        let (author, origin) = match seats.entry(address.writer) {
+        let (author, origin, device) = match seats.entry(address.writer) {
             Entry::Occupied(known) => known.into_mut(),
-            Entry::Vacant(new) => new.insert(self.author_and_origin(address.writer)?),
+            Entry::Vacant(new) => new.insert(self.author_and_origin(keys, address.writer)?),
         };
 
         Ok(Item {
@@ -374,7 +434,7 @@ impl Server {
             run: Run::Other,
             kind: kind.as_str().to_owned(),
             provenance: provenance.name(),
-            trust: TrustLevel::Untrusted,
+            trust: trust_of(&provenance, kind, *origin, *device),
             flags: Vec::new(),
             integrity: IntegrityStatus::Unverified,
             score: Some(hit.score),
@@ -383,7 +443,11 @@ impl Server {
     }
 
     /// The seat that wrote for `writer` and where its events came from.
-    fn author_and_origin(&self, writer: WriterId) -> Result<(String, Origin), String> {
+    fn author_and_origin(
+        &self,
+        keys: &KeySet,
+        writer: WriterId,
+    ) -> Result<(String, Origin, bool), String> {
         let unreadable = |_| NO_INDEX.to_owned();
         let seat = self
             .store
@@ -393,7 +457,8 @@ impl Server {
 
         Ok((
             seat.seat.to_string(),
-            self.origin(&seat).map_err(unreadable)?,
+            self.origin(keys, &seat),
+            is_device_seat(&seat),
         ))
     }
 
@@ -419,43 +484,56 @@ impl Server {
         Ok(opens && header.hash() == stored.link.hash && prev == Some(header.prev_hash))
     }
 
-    /// Where the event of `seat` came from: a seat whose certificate
-    /// checks, names it, was certified by this node's device key, and is
-    /// recorded in the genesis device seat is this node's own, ingested
-    /// or witnessed; any other is a peer's.
-    fn origin(&self, seat: &StoredSeat) -> Result<Origin, store::StoreError> {
-        let certified = SeatCertificate::from_value(&seat.certificate)
-            .ok()
-            .filter(|c| {
-                c.check().is_ok()
-                    && c.certifying_key == self.device_key
-                    && c.writer_id() == seat.writer
-                    && c.room == seat.room
-            });
-        let own = match certified {
-            Some(c) if self.recorded(&c)? => Some(c),
-            _ => None,
-        };
-
-        Ok(match own {
-            Some(c) if c.ingest_seat => Origin::Ingested,
-            Some(_) => Origin::Witnessed,
-            None => Origin::Peer,
-        })
+    /// Where the event of `seat` came from, as `administration::origin`
+    /// derives it from the record and the node's key set (PRV-13).
+    fn origin(&self, keys: &KeySet, seat: &StoredSeat) -> Origin {
+        shown_origin(keys.origin_of(seat))
     }
+}
 
-    /// Whether the genesis device seat holds a certificate record of
-    /// `cert`.
-    fn recorded(&self, cert: &SeatCertificate) -> Result<bool, store::StoreError> {
-        let (digest, writer) = (cert.digest().to_hex(), cert.writer_id().to_string());
+/// The origin the envelope shows for a derived one.
+fn shown_origin(origin: Derived) -> Origin {
+    match origin {
+        Derived::Witnessed => Origin::Witnessed,
+        Derived::Ingested => Origin::Ingested,
+        Derived::Bundle => Origin::Bundle,
+        Derived::Peer => Origin::Peer,
+    }
+}
 
-        Ok(self.store.log(self.device_writer)?.iter().any(|s| {
-            s.link.header.kind == EventKind::CertificateRecord
-                && s.content.as_ref().is_some_and(|c| {
-                    c["certificate"].as_str() == Some(digest.as_str())
-                        && c["writer"].as_str() == Some(writer.as_str())
-                })
-        }))
+/// The derived origin an envelope's one stands for.
+fn derived_origin(origin: Origin) -> Derived {
+    match origin {
+        Origin::Witnessed => Derived::Witnessed,
+        Origin::Ingested => Derived::Ingested,
+        Origin::Bundle => Derived::Bundle,
+        Origin::Peer => Derived::Peer,
+    }
+}
+
+/// The trust level the default trust policy gives an event (PRV-02). The
+/// deployment mode, the prompt match and the attended mark matter only
+/// while no run leaves R3 and R8 open, which no run can show before
+/// OQ-40, so a `user` event is never trusted here.
+fn trust_of(
+    provenance: &Provenance,
+    kind: EventKind,
+    origin: Origin,
+    device_seat: bool,
+) -> TrustLevel {
+    let level = trust_policy::trust_level(&trust_policy::Input {
+        provenance,
+        kind,
+        origin: derived_origin(origin),
+        device_seat,
+        launcher_signed: false,
+        interactive: false,
+        prompt_matched: false,
+        attended: false,
+    });
+    match level {
+        Level::Trusted => TrustLevel::Trusted,
+        Level::Untrusted => TrustLevel::Untrusted,
     }
 }
 
@@ -494,6 +572,10 @@ fn tools() -> Value {
             },
             "required": ["address"],
         },
+    }, {
+        "name": "mcp_server_get",
+        "description": MCP_SERVER_GET,
+        "inputSchema": {"type": "object", "properties": {}},
     }]})
 }
 

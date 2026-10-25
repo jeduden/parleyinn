@@ -35,19 +35,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "parinn-fuzz"
-version = "0.0.0"
-dependencies = [
- "configuration",
- "hook",
- "libfuzzer-sys",
- "provenance",
- "redaction",
- "search",
- "transcript",
-]
-
-[[package]]
 name = "cc"
 version = "1.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -205,6 +192,20 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cf8baf1c55e62ffcace7a9f06f4bd9cd3f0c4beb022d3b367256b91b87513d98"
 
 [[package]]
+name = "parinn-fuzz"
+version = "0.0.0"
+dependencies = [
+ "configuration",
+ "hook",
+ "libfuzzer-sys",
+ "provenance",
+ "redaction",
+ "repository",
+ "search",
+ "transcript",
+]
+
+[[package]]
 name = "proc-macro2"
 version = "1.0.107"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -282,6 +283,10 @@ name = "regex-syntax"
 version = "0.8.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d6f6ff9a378485b298a5286656da665ba74413d36db0979633275d2e708145d4"
+
+[[package]]
+name = "repository"
+version = "0.0.0"
 
 [[package]]
 name = "search"

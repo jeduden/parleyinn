@@ -185,6 +185,11 @@ pub fn ingest(w: &mut World, path: &Path) -> Result<(), String> {
     Ok(())
 }
 
+/// Keeps the event at (`writer`, `seq`) as the scenario's item.
+pub fn set_item(w: &mut World, writer: String, seq: u64) {
+    steps(w).item = Some((writer, seq));
+}
+
 /// Moves the scenario's item back by `back` lines from its transcript's
 /// last line.
 pub fn item_back(w: &mut World, back: u64) -> Result<(), String> {

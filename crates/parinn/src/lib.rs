@@ -84,7 +84,11 @@ commands:
   doctor [--json]                        fail while a counter rose since the last acknowledgement
   hook <hook>                            run the hook handler on the hook input on stdin
   ingest --all | --path P [--json]       record every transcript under the roots, or the one at P
+  licenses                               print the third-party license texts built in
   mcp                                    serve the MCP tools over stdio
+  repository show [DIR] [--json]         show the repository identity of DIR, the working directory by default
+  repository bind [DIR] [--commit ID]    bind or rebind the repository identity (widening)
+  rebuild [--json]                       derive the origins and the search index again from the record
   risk-acceptance show [--json]          show the residual risks open on this node
   risk-acceptance record [--json]        accept the open residual risks (widening)
   risk-acceptance withdraw [--json]      withdraw the risk acceptance (cut)
@@ -306,7 +310,10 @@ pub fn run(
         Some("doctor") => doctor(args, ctx, stdout, stderr),
         Some("hook") => hook_handlers::hook_command(args.next().as_deref(), ctx, stdout),
         Some("ingest") => ingest(args, ctx, stdout, stderr),
+        Some("licenses") => licenses::licenses(args, stdout, stderr),
         Some("mcp") => mcp(args, ctx, stdout, stderr),
+        Some("rebuild") => rebuild::rebuild(args, ctx, stdout, stderr),
+        Some("repository") => repository_identity::repository(args, ctx, stdout, stderr),
         Some("risk-acceptance") => act::risk_acceptance(args, ctx, stdout, stderr),
         Some("status") => status(args, ctx, stdout, stderr),
         Some("verify") => verify_command(args, ctx, stdout, stderr),
@@ -1072,16 +1079,14 @@ fn mcp(
     }
     // It records its harness session's runs, so it starts the node as
     // ingest does (REC-13).
-    let served = start_node(ctx, &home, stderr).and_then(|store| {
+    let served = start_node(ctx, &home, stderr).and_then(|mut store| {
+        repository_identity::bind_observed(ctx, &home, &mut store);
         let node = Node::find(&home, &store).map_err(|e| e.to_string())?;
-        let key = node.device().public();
-        let (writer, room) = (node.device_writer(), node.personal_room());
         Ok(mcp::Server::new(
             store,
             ctx.build.version,
-            key,
-            writer,
-            room,
+            node.device().public(),
+            node.personal_room(),
         ))
     });
     let server = match served {
@@ -1163,6 +1168,7 @@ fn live_capture(
     let started = now_instant();
 
     Some(capture::Capture {
+        ceiling: ctx.home.as_deref().map(PathBuf::from),
         home: home.clone(),
         roots,
         redactor,
@@ -1360,7 +1366,18 @@ fn verify_record(
     store: &Store,
 ) -> Result<Result<(Report, bool), VerifyError>, administration::AdminError> {
     Ok(match administration::node::verifying_key(home, store)? {
-        Some((key, staged)) => verify(store, &key).map(|r| (r, staged)),
+        Some((key, staged)) => {
+            let verified = verify(store, &key);
+            // The worktrees' names derive from the device key, which a
+            // staged first start has not placed yet.
+            if verified.is_ok() && !staged {
+                let node = Node::find(home, store)?;
+                if let Err(e) = administration::verify::kept_worktrees_agree(store, &node) {
+                    return Ok(Err(e));
+                }
+            }
+            verified.map(|r| (r, staged))
+        }
         None => Ok((
             Report {
                 writers: 0,
@@ -1753,6 +1770,9 @@ struct Status {
     segments: Option<segments::SegmentsStatus>,
     /// The transcript sources held or lost, once there is a store.
     sources: Option<sources::SourcesStatus>,
+    /// How many session bindings an MCP server took and did not take
+    /// (REC-13, REC-19), once any `SessionStart` was observed.
+    bindings: Option<(u64, u64)>,
 }
 
 impl Status {
@@ -1762,7 +1782,7 @@ impl Status {
             .iter()
             .map(|(name, total, since)| (name, json!({"total": total, "since_ack": since})))
             .collect();
-        json!({
+        let mut status = json!({
             "home": self.home,
             "store": self.store.as_ref().map(|(p, b)| json!({"path": p, "bytes": b})),
             "audit": self.audit.as_ref().map(|(p, n)| json!({"path": p, "entries": n})),
@@ -1779,8 +1799,13 @@ impl Status {
             "fork_detection": identity_status::fork_detection_json(),
             "segments": self.segments.as_ref().map(segments::SegmentsStatus::json),
             "transcript_sources": self.sources.as_ref().map(sources::SourcesStatus::json),
-        })
-        .to_string()
+        });
+        // Named once any session binding was observed.
+        if let Some((taken, untaken)) = self.bindings {
+            status["mcp_server"] = json!({"bindings_taken": taken, "bindings_untaken": untaken});
+        }
+
+        status.to_string()
     }
 
     fn text(&self) -> String {
@@ -1826,8 +1851,26 @@ impl Status {
                 .flat_map(segments::SegmentsStatus::lines),
         );
         lines.extend(self.sources.iter().flat_map(sources::SourcesStatus::lines));
+        lines.extend(
+            self.bindings
+                .map(|(taken, untaken)| binding_line(taken, untaken)),
+        );
 
         lines.join("\n")
+    }
+}
+
+/// What `parinn status` says of the MCP server: whether session bindings
+/// are taken (REC-13, REC-19).
+fn binding_line(taken: u64, untaken: u64) -> String {
+    match (taken, untaken) {
+        (0, untaken) => {
+            format!("MCP server: none has taken a session binding on this node ({untaken} untaken)")
+        }
+        (taken, 0) => format!("MCP server: took {taken} session bindings"),
+        (taken, untaken) => {
+            format!("MCP server: took {taken} session bindings, {untaken} untaken")
+        }
     }
 }
 
@@ -1877,6 +1920,10 @@ fn status(
     let refused = segments.as_ref().is_some_and(|s| !s.newer.is_empty());
     let mut status = status_of(&home, counted, &in_force);
     status.segments = segments;
+    status.bindings = store
+        .as_ref()
+        .and_then(|store| store.binding_counts().ok())
+        .filter(|(taken, untaken)| taken + untaken > 0);
     status.sources = match sources::read(&home) {
         Ok(s) => s,
         Err(e) => return store_failed("status", &e, stderr),
@@ -1920,6 +1967,7 @@ fn status_of(home: &Home, counted: Option<(Counts, u64)>, in_force: &settings::I
         identity: home.identity().clone(),
         segments: None,
         sources: None,
+        bindings: None,
     };
     if let Some((counts, entries)) = counted {
         let bytes = fs::metadata(&store).ok().map(|m| m.len());
@@ -1986,6 +2034,9 @@ pub mod forks;
 mod hook_handlers;
 mod identity_status;
 mod index_gaps;
+mod licenses;
+mod rebuild;
+mod repository_identity;
 mod segments;
 mod settings;
 mod sources;

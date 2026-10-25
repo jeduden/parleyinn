@@ -129,10 +129,29 @@ jobs:
           VERSION: ${{ inputs.version }}
           COMMIT: ${{ github.sha }}
         run: scripts/check-stamp.sh "$BIN" "$VERSION" "$COMMIT"
+      # ENG-31: the license files regenerated from the lockfile are what
+      # each executable must print on its own platform. The command also
+      # fails the build when a committed file differs from them.
+      - name: Regenerate the license files
+        run: |
+          cargo fetch --locked
+          cargo run --locked -p engineering --bin license-check -- --out "$RUNNER_TEMP/regenerated"
+      - name: Check the binary prints the regenerated licenses
+        env:
+          RUNS: ${{ matrix.runs }}
+        run: |
+          for pair in $TARGETS; do
+            if [ "${pair#*:}" = "$RUNS" ]; then target="${pair%%:*}"; fi
+          done
+          scripts/check-licenses.sh "dist/parinn-$RUNS" "$RUNNER_TEMP/regenerated/licenses/$target/THIRD_PARTY_LICENSES"
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: ${{ matrix.os }}-parinn
           path: dist/
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: ${{ matrix.os }}-licenses
+          path: ${{ runner.temp }}/regenerated/licenses/
 
   # The linux/arm64 executable is built on the x86_64 Linux builder; it
   # runs once here, on the platform it is for.
@@ -154,6 +173,14 @@ jobs:
         run: |
           chmod +x dist/parinn-linux-arm64
           scripts/check-stamp.sh dist/parinn-linux-arm64 "$VERSION" "$COMMIT"
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: linux-licenses
+          path: regenerated
+      - name: Check the binary prints the regenerated licenses
+        run: |
+          target=$(printf '%s\n' $LINUX_TARGETS | sed -n 's/:linux-arm64$//p')
+          scripts/check-licenses.sh dist/parinn-linux-arm64 "regenerated/$target/THIRD_PARTY_LICENSES"
 
   # The Windows executable is built on Linux; it runs once here, on the
   # platform it is for.
@@ -174,3 +201,12 @@ jobs:
           VERSION: ${{ inputs.version }}
           COMMIT: ${{ github.sha }}
         run: scripts/check-stamp.sh dist/parinn-windows-amd64.exe "$VERSION" "$COMMIT"
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: linux-licenses
+          path: regenerated
+      - name: Check the binary prints the regenerated licenses
+        shell: bash
+        run: |
+          target=$(printf '%s\n' $LINUX_TARGETS | sed -n 's/:windows-amd64$//p')
+          scripts/check-licenses.sh dist/parinn-windows-amd64.exe "regenerated/$target/THIRD_PARTY_LICENSES"

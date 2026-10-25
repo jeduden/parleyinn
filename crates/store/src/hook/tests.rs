@@ -238,3 +238,24 @@ fn holding_and_counting_fail_when_sqlite_does() {
         Err(StoreError::Sqlite(_))
     ));
 }
+
+#[test]
+fn session_bindings_are_counted_taken_and_untaken_and_a_prompt_is_neither() {
+    let dir = TempDir::new().unwrap();
+    let mut store = open(&dir);
+    assert_eq!(store.binding_counts().unwrap(), (0, 0));
+    store
+        .hold_observation(&observed("SessionStart", "s1", 10), None)
+        .unwrap();
+    let mut other = observed("SessionStart", "s2", 10);
+    other.harness = Some(41);
+    store.hold_observation(&other, None).unwrap();
+    let mut prompt = observed("UserPromptSubmit", "s1", 10);
+    prompt.prompt_id = Some("p1".into());
+    store.hold_observation(&prompt, None).unwrap();
+    assert_eq!(store.binding_counts().unwrap(), (0, 2));
+
+    store.take_bindings(40).unwrap();
+
+    assert_eq!(store.binding_counts().unwrap(), (1, 1));
+}
