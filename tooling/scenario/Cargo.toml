@@ -18,11 +18,15 @@ audit.workspace = true
 drift.workspace = true
 engineering.workspace = true
 harness-contract.workspace = true
+ingest.workspace = true
 key.workspace = true
 record.workspace = true
+redaction.workspace = true
+rusqlite.workspace = true
 serde_json.workspace = true
 store.workspace = true
 testkit.workspace = true
+transcript.workspace = true
 
 # The executable requirement matrix: every scenario under features/,
 # run through cucumber-rs. It has its own main, so it is no libtest
@@ -35,8 +39,8 @@ harness = false
 [lints]
 workspace = true
 
-# ENG-02: see crates/cairn/Cargo.toml.
-[package.metadata.cairn]
+# ENG-02: see crates/parinn/Cargo.toml.
+[package.metadata.parinn]
 responsibility = "Reads features into scenarios, keeps them in step with the SRS and runs them"
 may-depend-on = ["srs"]
-may-dev-depend-on = ["adr", "administration", "audit", "drift", "engineering", "harness-contract", "key", "record", "store", "testkit"]
+may-dev-depend-on = ["adr", "administration", "audit", "drift", "engineering", "harness-contract", "ingest", "key", "record", "redaction", "store", "testkit", "transcript"]

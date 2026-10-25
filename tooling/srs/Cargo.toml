@@ -15,8 +15,8 @@ testkit.workspace = true
 [lints]
 workspace = true
 
-# ENG-02: see crates/cairn/Cargo.toml.
-[package.metadata.cairn]
+# ENG-02: see crates/parinn/Cargo.toml.
+[package.metadata.parinn]
 responsibility = "Reads the SRS requirement tables, appendices and personas for the gates"
 may-depend-on = []
 may-dev-depend-on = ["testkit"]

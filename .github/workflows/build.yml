@@ -57,6 +57,12 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      - name: Install pinned Rust with mise
+        uses: ./.github/actions/setup-mise
+        with:
+          tools: rust
+          # Release builds must never consume a branch-writable cache.
+          cache: ${{ github.event_name != 'workflow_dispatch' }}
       - name: Pick this builder's targets
         run: |
           if [ "$OS" = linux ]; then targets="$LINUX_TARGETS"; else targets="$DARWIN_TARGETS"; fi
@@ -83,19 +89,15 @@ jobs:
             make -s -C "$src/musl-$MUSL_VERSION" ARCH="$arch" prefix="$RUNNER_TEMP/musl-$arch" install-headers
           done
           echo "MUSL_HEADERS=$RUNNER_TEMP" >> "$GITHUB_ENV"
-      - name: Install the pinned Rust toolchain and the targets
+      - name: Install the pinned Rust targets
         run: |
-          list=""
-          for pair in $TARGETS; do list="$list,${pair%%:*}"; done
-          rustup toolchain install \
-            "$(sed -n 's/^channel = "\(.*\)"$/\1/p' rust-toolchain.toml)" \
-            --profile minimal --no-self-update --target "${list#,}"
+          for pair in $TARGETS; do rustup target add "${pair%%:*}"; done
       - name: Build
         env:
           # ENG-01: the version and the commit, stamped into the
-          # executable; `cairn version --json` reads both back.
-          CAIRN_VERSION: ${{ inputs.version }}
-          CAIRN_COMMIT: ${{ github.sha }}
+          # executable; `parinn version --json` reads both back.
+          PARINN_VERSION: ${{ inputs.version }}
+          PARINN_COMMIT: ${{ github.sha }}
         # ENG-01: the path prefixes keep the builder's paths out of the
         # binary. rust-lld links musl statically (CON-02); clang compiles
         # SQLite for each musl target against that target's headers and
@@ -117,20 +119,39 @@ jobs:
               *-windows-gnu) extra="-Clinker=x86_64-w64-mingw32-gcc-win32"; exe=".exe" ;;
               *) extra="" ;;
             esac
-            RUSTFLAGS="$base $extra" cargo build --locked --release -p cairn --bin cairn --target "$target"
-            cp "target/$target/release/cairn$exe" "dist/cairn-${pair#*:}$exe"
+            RUSTFLAGS="$base $extra" cargo build --locked --release -p parinn --bin parinn --target "$target"
+            cp "target/$target/release/parinn$exe" "dist/parinn-${pair#*:}$exe"
           done
-          (cd dist && shasum -a 256 cairn-*)
+          (cd dist && shasum -a 256 parinn-*)
       - name: Check the binary reports what it was stamped with
         env:
-          BIN: dist/cairn-${{ matrix.runs }}
+          BIN: dist/parinn-${{ matrix.runs }}
           VERSION: ${{ inputs.version }}
           COMMIT: ${{ github.sha }}
         run: scripts/check-stamp.sh "$BIN" "$VERSION" "$COMMIT"
+      # ENG-31: the license files regenerated from the lockfile are what
+      # each executable must print on its own platform. The command also
+      # fails the build when a committed file differs from them.
+      - name: Regenerate the license files
+        run: |
+          cargo fetch --locked
+          cargo run --locked -p engineering --bin license-check -- --out "$RUNNER_TEMP/regenerated"
+      - name: Check the binary prints the regenerated licenses
+        env:
+          RUNS: ${{ matrix.runs }}
+        run: |
+          for pair in $TARGETS; do
+            if [ "${pair#*:}" = "$RUNS" ]; then target="${pair%%:*}"; fi
+          done
+          scripts/check-licenses.sh "dist/parinn-$RUNS" "$RUNNER_TEMP/regenerated/licenses/$target/THIRD_PARTY_LICENSES"
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: ${{ matrix.os }}-cairn
+          name: ${{ matrix.os }}-parinn
           path: dist/
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: ${{ matrix.os }}-licenses
+          path: ${{ runner.temp }}/regenerated/licenses/
 
   # The linux/arm64 executable is built on the x86_64 Linux builder; it
   # runs once here, on the platform it is for.
@@ -143,15 +164,23 @@ jobs:
           persist-credentials: false
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
-          name: linux-cairn
+          name: linux-parinn
           path: dist
       - name: Check the binary reports what it was stamped with
         env:
           VERSION: ${{ inputs.version }}
           COMMIT: ${{ github.sha }}
         run: |
-          chmod +x dist/cairn-linux-arm64
-          scripts/check-stamp.sh dist/cairn-linux-arm64 "$VERSION" "$COMMIT"
+          chmod +x dist/parinn-linux-arm64
+          scripts/check-stamp.sh dist/parinn-linux-arm64 "$VERSION" "$COMMIT"
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: linux-licenses
+          path: regenerated
+      - name: Check the binary prints the regenerated licenses
+        run: |
+          target=$(printf '%s\n' $LINUX_TARGETS | sed -n 's/:linux-arm64$//p')
+          scripts/check-licenses.sh dist/parinn-linux-arm64 "regenerated/$target/THIRD_PARTY_LICENSES"
 
   # The Windows executable is built on Linux; it runs once here, on the
   # platform it is for.
@@ -164,11 +193,20 @@ jobs:
           persist-credentials: false
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
-          name: linux-cairn
+          name: linux-parinn
           path: dist
       - name: Check the binary reports what it was stamped with
         shell: bash
         env:
           VERSION: ${{ inputs.version }}
           COMMIT: ${{ github.sha }}
-        run: scripts/check-stamp.sh dist/cairn-windows-amd64.exe "$VERSION" "$COMMIT"
+        run: scripts/check-stamp.sh dist/parinn-windows-amd64.exe "$VERSION" "$COMMIT"
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: linux-licenses
+          path: regenerated
+      - name: Check the binary prints the regenerated licenses
+        shell: bash
+        run: |
+          target=$(printf '%s\n' $LINUX_TARGETS | sed -n 's/:windows-amd64$//p')
+          scripts/check-licenses.sh dist/parinn-windows-amd64.exe "regenerated/$target/THIRD_PARTY_LICENSES"

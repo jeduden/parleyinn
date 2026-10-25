@@ -14,7 +14,7 @@ summary: >-
 ## Done
 
 - `internal/` and `cmd/review-gate` are deleted, with godog and the
-  cucumber messages module; testify stays for the `cairn version`
+  cucumber messages module; testify stays for the `parinn version`
   stub's tests.
 - ENG-18 reads `go.mod` and `cargo metadata`, and admits an SPDX `OR`
   license when one choice is allowed. ADR-2610101442 is accepted and

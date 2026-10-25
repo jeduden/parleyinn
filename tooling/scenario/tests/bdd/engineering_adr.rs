@@ -13,14 +13,16 @@ use crate::engineering::eng;
 #[when(regex = r#"^the direct dependencies are read from "([^"]+)"$"#)]
 fn read_direct_deps(w: &mut World, file: String) -> Result<(), String> {
     let checkout = eng(w).checkout()?.clone();
-    let (cargo, cairn_home) = (
+    let (cargo, parinn_home) = (
         env::var_os("CARGO").unwrap_or_else(|| "cargo".into()),
-        w.cairn_home.clone(),
+        w.parinn_home.clone(),
     );
     let deps = dependencies::direct_deps(&checkout, &file, |manifest| {
-        dependencies::cargo_metadata(&cargo, manifest, &cairn_home)
+        dependencies::cargo_metadata(&cargo, manifest, &parinn_home)
     })?;
-    eng(w).deps.extend(deps);
+    let e = eng(w);
+    e.deps.all.extend(deps.all);
+    e.deps.shipped.extend(deps.shipped);
     Ok(())
 }
 
@@ -35,13 +37,13 @@ fn read_adrs(w: &mut World, dir: String) -> Result<(), String> {
 #[then(regex = r"^each direct dependency is named by exactly one accepted ADR$")]
 fn deps_named_once(w: &mut World) -> Result<(), String> {
     let e = eng(w);
-    outcome(dependencies::deps_named_once(&e.deps, &e.adrs))
+    outcome(dependencies::deps_named_once(&e.deps.all, &e.adrs))
 }
 
 #[then(regex = r"^every module an accepted ADR names is a direct dependency$")]
 fn modules_are_deps(w: &mut World) -> Result<(), String> {
     let e = eng(w);
-    outcome(dependencies::modules_are_deps(&e.deps, &e.adrs))
+    outcome(dependencies::modules_are_deps(&e.deps.all, &e.adrs))
 }
 
 #[then(
@@ -51,16 +53,25 @@ fn deps_justified(w: &mut World) -> Result<(), String> {
     outcome(dependencies::deps_justified(&eng(w).adrs))
 }
 
-#[then(regex = r"^each license is on the allow-list the ENG-18 requirement states$")]
-fn licenses_allowed(w: &mut World) -> Result<(), String> {
+#[then(
+    regex = r#"^each license is on the allow-list the ENG-18 requirement states, or a crate's exception in "([^"]+)"$"#
+)]
+fn licenses_allowed(w: &mut World, deny: String) -> Result<(), String> {
     let allowed = dependencies::allow_list(&eng(w).checkout()?.requirement("ENG-18")?.text)?;
-    outcome(dependencies::licenses_allowed(&eng(w).adrs, &allowed))
+    let exceptions = dependencies::license_exceptions(&eng(w).checkout()?.read(&deny)?);
+    outcome(dependencies::licenses_allowed(
+        &eng(w).adrs,
+        &allowed,
+        &exceptions,
+    ))
 }
 
-#[then(regex = r"^the direct dependencies stay within the target the ENG-18 requirement states$")]
+#[then(
+    regex = r"^the direct dependencies linked into a shipped executable stay within the target the ENG-18 requirement states$"
+)]
 fn within_target(w: &mut World) -> Result<(), String> {
     let target = dependencies::dependency_target(&eng(w).checkout()?.requirement("ENG-18")?.text)?;
-    dependencies::within_target(&eng(w).deps, target)
+    dependencies::within_target(&eng(w).deps.shipped, target)
 }
 
 #[then(regex = r#"^"([^"]+)" lists every ADR that names a module$"#)]

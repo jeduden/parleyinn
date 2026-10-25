@@ -1,26 +1,26 @@
 ---
 id: 2610031222
-title: "Sandboxed agents: the boundary Cairn's owner acts rest on"
+title: "Sandboxed agents: the boundary ParleyInn's owner acts rest on"
 status: "🔲"
 summary: >-
   Seven residual risks remain while an agent runs unsandboxed as the
-  user's own OS user: it can type into the harness, replace Cairn,
+  user's own OS user: it can type into the harness, replace ParleyInn,
   delete the record, read the store and pass any software-only check.
   Only a sandbox around the agent removes them. This arm defines what
-  Cairn needs from a sandbox, proves it against several sandbox
-  technologies, and makes Cairn detect, record and prefer sandboxed
+  ParleyInn needs from a sandbox, proves it against several sandbox
+  technologies, and makes ParleyInn detect, record and prefer sandboxed
   agents without depending on any one technology.
 model: opus
 depends-on: [2610012322]
 ---
-# Sandboxed agents: the boundary Cairn's owner acts rest on
+# Sandboxed agents: the boundary ParleyInn's owner acts rest on
 
 ## Goal
 
-An agent Cairn records cannot reach Cairn's store, keys or owner
+An agent ParleyInn records cannot reach ParleyInn's store, keys or owner
 surfaces. Nor can it reach the owner's terminals and browser, the
-harness's configuration or Cairn's executables. That holds whichever
-sandbox technology the user runs. Cairn says on every surface whether
+harness's configuration or ParleyInn's executables. That holds whichever
+sandbox technology the user runs. ParleyInn says on every surface whether
 it holds for each session.
 
 ## Context
@@ -31,35 +31,35 @@ check proves who acted. The proposal now demands a per-act WebAuthn
 assertion for every widening owner act. After its threat T21 it lists
 seven residual risks that only sandboxing removes (OQ-29):
 
-| #   | Residual risk                                                             |
-| --- | ------------------------------------------------------------------------- |
-| R1  | The agent types into the harness's own prompt to approve itself           |
-| R2  | It edits the harness's settings or hooks, or replaces Cairn's executables |
-| R3  | It deletes or rolls back `CAIRN_HOME`                                     |
-| R4  | It shows a harmless screen while a widening digest waits for a touch      |
-| R5  | It reads every lane straight from the store, unenveloped                  |
-| R6  | It uses cut acts (stop, deny, quarantine) against other agents            |
-| R7  | It passes the terminal-confirmation opt-in, by design                     |
+| #   | Residual risk                                                                 |
+| --- | ----------------------------------------------------------------------------- |
+| R1  | The agent types into the harness's own prompt to approve itself               |
+| R2  | It edits the harness's settings or hooks, or replaces ParleyInn's executables |
+| R3  | It deletes or rolls back `PARINN_HOME`                                        |
+| R4  | It shows a harmless screen while a widening digest waits for a touch          |
+| R5  | It reads every lane straight from the store, unenveloped                      |
+| R6  | It uses cut acts (stop, deny, quarantine) against other agents                |
+| R7  | It passes the terminal-confirmation opt-in, by design                         |
 
 The stakeholder's decisions (3 October 2026): sandboxing is a separate
 arm, and for an unsandboxed session the residual risks are accepted
 rather than fought. The fleets proposal carries the second as OWN-22:
 each session's sandbox state, and the owner's recorded acceptance of
 the risks it leaves open. This arm supplies what OWN-22 rests on.
-Cairn likely has to support a range of sandbox technologies. The first
+ParleyInn likely has to support a range of sandbox technologies. The first
 two named are NVIDIA OpenShell and Deno's Claw Patrol. The initial
 [survey](survey.md) places them and the others.
 
 Two shapes of sandbox exist, and they put the record writer in
 different places. A tool sandbox, like Claude Code's and Codex's own,
 confines the commands the agent runs. The harness and its hooks stay
-outside, so Cairn's hooks keep their access. A whole-harness sandbox,
+outside, so ParleyInn's hooks keep their access. A whole-harness sandbox,
 like OpenShell, a container or a microVM, confines the harness and its
 hooks too. Then the hook that writes the record runs inside, next to
 the agent. Where the writer and its key sit is the arm's central
 design question.
 
-Reuse first: Cairn builds no sandbox of its own. It integrates with
+Reuse first: ParleyInn builds no sandbox of its own. It integrates with
 the sandboxes users already run. It states the properties it needs,
 tests them and records the result. The witness runs of OWN-18 need a
 sandbox too, and use the same adapters.
@@ -69,7 +69,7 @@ Invariants touched:
 - I2 and I8 rest on the sandbox for owner acts.
 - I4 gains the sandbox's egress policy as the place where the agent's
   own network is limited.
-- I9 forbids refusing to record an unsandboxed agent, so Cairn records
+- I9 forbids refusing to record an unsandboxed agent, so ParleyInn records
   and labels it instead.
 
 ## Tasks
@@ -87,7 +87,7 @@ Invariants touched:
 3. Proving slice: a conformance probe that attempts each residual
    attack from inside a sandbox and reports which are blocked, run
    against at least two technologies
-4. Detection: Cairn records each session's sandbox, its policy digest
+4. Detection: ParleyInn records each session's sandbox, its policy digest
    and the contract properties that hold, as `harness_meta`, and shows
    unsandboxed sessions on every surface. Settle who may vouch for a
    sandbox, so an agent cannot claim one it does not run in: the
@@ -98,8 +98,8 @@ Invariants touched:
 6. The SRS change: requirements and `@pending` scenarios for the
    contract, detection and labelling; T21 scoped by sandbox state;
    OWN-22 carried into the SRS
-7. Adapters for the supported set: `cairn install` shows, as a diff,
-   the sandbox policy that denies Cairn's paths, sockets and the
+7. Adapters for the supported set: `parinn install` shows, as a diff,
+   the sandbox policy that denies ParleyInn's paths, sockets and the
    owner's terminals; witness runs use the same adapters
 8. Egress firewalls: read Claw Patrol's or OpenShell's decisions from
    files as untrusted events in the lane, and decide whether their
@@ -107,9 +107,9 @@ Invariants touched:
 
 ## Execution
 
-| Phase | Model | Gate                                                                                                                                                                         |
-| ----- | ----- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1     | opus  | The probe, run inside at least two sandbox technologies with `HOME` and `CAIRN_HOME` isolated, reports each residual risk as blocked or open, and the matrix is reproducible |
+| Phase | Model | Gate                                                                                                                                                                          |
+| ----- | ----- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1     | opus  | The probe, run inside at least two sandbox technologies with `HOME` and `PARINN_HOME` isolated, reports each residual risk as blocked or open, and the matrix is reproducible |
 
 ## Phases
 
@@ -145,7 +145,7 @@ footer: |
   which residual risks it blocks, reproducibly
 - [ ] Every session records its sandbox state, and every surface shows
   an unsandboxed session as such
-- [ ] Cairn records an unsandboxed agent rather than refusing it (I9)
+- [ ] ParleyInn records an unsandboxed agent rather than refusing it (I9)
 - [ ] Build-time evidence still shows that no code the core can
   execute opens a socket or starts a program beyond its own kernel
   worker

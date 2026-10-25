@@ -1,5 +1,5 @@
 local counts, maxseq, writers = {}, {}, {}
-for _, e in ipairs(cairn.events()) do
+for _, e in ipairs(parinn.events()) do
   local w = e.writer
   if counts[w] == nil then
     counts[w] = 0

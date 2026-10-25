@@ -4,8 +4,8 @@ title: "The signatures: Ed25519 through ed25519-dalek"
 status: accepted
 scope: dependencies
 summary: >-
-  Device and seat keys, and the recovery keys Cairn mints, are Ed25519
-  keys; every signature Cairn makes is Ed25519 through ed25519-dalek,
+  Device and seat keys, and the recovery keys ParleyInn mints, are Ed25519
+  keys; every signature ParleyInn makes is Ed25519 through ed25519-dalek,
   verified strictly. Each
   signature signs a label, its kind and the canonical body, so one kind
   never verifies as another (PRV-12).
@@ -31,7 +31,7 @@ signs the first certificates and key events.
 | `ed25519-dalek` | Ed25519 keys and signatures: minting from a seed, signing, and strict verification | BSD-3-Clause | Active; dalek-cryptography organisation, audited, 3.x line |
 
 Keys are minted from 32 bytes of the OS's random source as Ed25519
-seeds. A signature signs `cairn signature v1`, the kind's name and
+seeds. A signature signs `parinn signature v1`, the kind's name and
 the body's canonical encoding (RFC 8785), and verifies only through
 `verify_strict`, which refuses small-order keys and malleable
 signatures. The default features stay on: precomputed tables, and
@@ -44,7 +44,7 @@ signatures. The default features stay on: precomputed tables, and
   and are malleable; Ed25519's are deterministic.
 - **`ring`.** C and assembly, and no seed import without PKCS#8.
 - **Minisign or SSH signatures.** Formats for files, not for the
-  structured bodies Cairn signs.
+  structured bodies ParleyInn signs.
 
 ## Consequences
 

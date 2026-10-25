@@ -2,14 +2,14 @@ use super::*;
 use serde_json::{Value, json};
 
 /// One package of `cargo metadata --no-deps`: `meta` is its
-/// `[package.metadata.cairn]` table, `deps` its dependencies as
+/// `[package.metadata.parinn]` table, `deps` its dependencies as
 /// `(name, kind)`.
 fn package(name: &str, dir: &str, meta: &Value, deps: &[(&str, Option<&str>)]) -> Value {
     json!({
         "name": name,
         "manifest_path": format!("/repo/{dir}/Cargo.toml"),
         "targets": [{ "kind": ["lib"] }, { "kind": ["test"] }],
-        "metadata": { "cairn": meta },
+        "metadata": { "parinn": meta },
         "dependencies": deps
             .iter()
             .map(|(n, k)| json!({ "name": n, "kind": k, "path": format!("/repo/{n}") }))

@@ -36,8 +36,10 @@ pub const DEFAULT_SAMPLES: usize = 10;
 /// Reads a file's text by its path.
 pub type Read<'a> = &'a dyn Fn(&str) -> io::Result<String>;
 
-/// Times a program started with arguments until it exits.
-pub type Time<'a> = &'a dyn Fn(&Path, &[&str]) -> Result<Duration, String>;
+/// Times one sample of a benchmark: the core executable at a path,
+/// started with the benchmark's arguments over its fixture, until it
+/// exits.
+pub type Time<'a> = &'a dyn Fn(&Path, &suite::Benchmark) -> Result<Duration, String>;
 
 /// Runs the command on `args` and returns its exit code. It is `main`
 /// without the process: `read` maps a path to a file's text, `time`
@@ -107,7 +109,7 @@ fn sample_suite(
     let mut out = format!("{}\n", samples::HEADER);
     for benchmark in &suite::SUITE {
         let taken =
-            measure::sample(benchmark, count, &mut |b| time(core, b.args)).map_err(|e| vec![e])?;
+            measure::sample(benchmark, count, &mut |b| time(core, b)).map_err(|e| vec![e])?;
         out.push_str(&samples::render(benchmark.name, &taken));
     }
 

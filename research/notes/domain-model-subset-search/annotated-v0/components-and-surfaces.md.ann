@@ -2,20 +2,20 @@
 title: "Components and surfaces"
 order: "10"
 summary: >-
-  Cairn's components inside their network boundaries, the room view's surfaces⟦f:presentations⟧ and the outcome window⟦/f⟧.
+  ParleyInn's components inside their network boundaries, the room view's surfaces⟦f:presentations⟧ and the outcome window⟦/f⟧.
 ---
 # Components and surfaces
 
-- **Component**: A part Cairn plays, inside exactly one network boundary (I4).
+- **Component**: A part ParleyInn plays, inside exactly one network boundary (I4).
   The set is closed, listed here and in §6.3; how the components ship is open
   (OQ-32), and a new one is a model change and a §6.3 row.
   - **Core (B0):** the **hook handlers** (answering hooks), the **CLI**
-    (`cairn`, but for ⟦f:browser-room-view⟧`cairn ui`, ⟦/f⟧⟦f:launcher⟧`cairn launch` and ⟦/f⟧each B1 to B3 component's
+    (`parinn`, but for ⟦f:browser-room-view⟧`parinn ui`, ⟦/f⟧⟦f:launcher⟧`parinn launch` and ⟦/f⟧each B1 to B3 component's
     own entry point, which the person, a service manager or an ephemeral node's
     entrypoint starts and which runs only while the act turning it on stands⟦f:launcher⟧:
     for ⟦f:browser-room-view⟧the room-view component and ⟦/f⟧the launcher, the configuration acceptance
     that turns it on, until a configuration turning it off applies, which needs
-    no acceptance and which `cairn configuration accept` records as the cut act
+    no acceptance and which `parinn configuration accept` records as the cut act
     turning it off (ADM-04, SEC-01)⟦/f⟧⟦f:bridges⟧; for the bridge component, a bridge enabled
     for a host, while any stands⟦/f⟧), each harness adapter's transcript and hook
     part among them, the **MCP server** (the MCP tools of §9.2, one per harness
@@ -23,7 +23,7 @@ summary: >-
     executions), ⟦/f⟧the **TUI** (the terminal room view), ⟦f:work-rooms⟧the **commit hook**
     (LANE-28, run as the CLI), ⟦/f⟧and everything that builds what reaches the
     model.
-  - The **harness adapter** is no component: Cairn's code for one harness⟦f:launcher⟧, split
+  - The **harness adapter** is no component: ParleyInn's code for one harness⟦f:launcher⟧, split
     between the core and the launcher⟦/f⟧: its transcript and hook part in the core
     (it parses, opens no socket, starts no process)⟦f:launcher⟧; its run part in the
     launcher, which starts, hosts and controls runs, pauses them at the harness
@@ -35,14 +35,14 @@ summary: >-
     exchanged once for an **origin secret** only its own origin, port included,
     can read or send, which lasts until the component stops; a phone-scoped one
     serves a browser on the principal's phone (OWN-16).⟦/f⟧
-  ⟦f:launcher⟧- **Launcher (B1):** `cairn launch`, which starts, hosts and controls runs
+  ⟦f:launcher⟧- **Launcher (B1):** `parinn launch`, which starts, hosts and controls runs
     through each harness adapter's run part, carrying into the harness input
     only text the core built and recorded, read from the record⟦f:browser-room-view⟧, never text from
     the room-view component, whose loopback connection to it carries no text for
     the model⟦/f⟧⟦f:witness-check⟧; and runs witness checks⟦/f⟧; the only component that starts programs⟦f:compute-kernel⟧,
     but for the core's own kernel worker (CMP-05)⟦/f⟧.⟦/f⟧
   ⟦f:peer-sync⟧- **Peer component (B2):** exchanges segments with peers (sync)⟦f:paired-phone⟧ and serves
-    paired phones; on a paired phone it is Cairn's only code, with the room
+    paired phones; on a paired phone it is ParleyInn's only code, with the room
     view's reduced client inside it⟦/f⟧.⟦/f⟧
   ⟦f:git-carrier⟧- **Publish component (B3):** ⟦f:publishing⟧read-only publishing and ⟦/f⟧the segment exchange of
     the **git carrier**, which keeps segments in a namespaced location of the

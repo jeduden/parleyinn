@@ -9,7 +9,7 @@
   {
     "type": "undefined",
     "quote": "own entry point, which the person, a service manager or an ephemeral node's",
-    "problem": "\"Ephemeral node\" is used as if it were a Cairn concept. Node covers a machine, container or cloud environment, but nothing defines \"ephemeral\", so a reader cannot tell which nodes start a component's entry point this way.",
+    "problem": "\"Ephemeral node\" is used as if it were a ParleyInn concept. Node covers a machine, container or cloud environment, but nothing defines \"ephemeral\", so a reader cannot tell which nodes start a component's entry point this way.",
     "fix": "Replace \"an ephemeral node's entrypoint\" with \"a container's entrypoint\", or define ephemeral node under Node.",
     "severity": "minor"
   },

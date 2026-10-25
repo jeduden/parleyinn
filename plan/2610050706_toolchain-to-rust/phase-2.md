@@ -11,7 +11,7 @@ Requirements. None closes. The bound scenarios run in Rust alone.
 What lands:
 
 - `internal/` and `cmd/review-gate` go, with godog and the cucumber
-  messages module; `cmd/cairn` keeps `cairn version` and the
+  messages module; `cmd/parinn` keeps `parinn version` and the
   import-closure test until phase 4.
 - ENG-18 reads the direct dependencies from `go.mod` and from `cargo
   metadata`, and reads an SPDX `OR` expression as allowed when one

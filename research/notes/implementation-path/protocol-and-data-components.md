@@ -1,7 +1,7 @@
 # Protocol and data components per candidate language
 
 Scope: the libraries and protocols that Go, Rust, Zig, TypeScript (Bun,
-Deno, Node) and Kotlin offer for Cairn's protocol and data slots. The
+Deno, Node) and Kotlin offer for ParleyInn's protocol and data slots. The
 slots are harness hosting, the MCP server, SQLite, canonical JSON and
 signatures, peer sync, and signing on a phone. Sources were read on
 4 October 2026: package registries, repositories, documentation and
@@ -30,7 +30,7 @@ Method notes:
 
 ## Key findings
 
-1. Every harness Cairn must host speaks JSON over stdio: Claude Code's
+1. Every harness ParleyInn must host speaks JSON over stdio: Claude Code's
    `-p` stream-json mode, ACP and the Codex app-server. The run
    component can therefore be written in any language. Anthropic's
    docs tell callers in other languages to "run the CLI as a
@@ -45,7 +45,7 @@ Method notes:
    ACP only through Node adapters.
 4. MCP rates the Go, Rust and TypeScript SDKs Tier 1. Both Go MCP
    SDKs import `net/http` in the package a server needs, and the
-   official one also imports `os/exec`, which Cairn's import-closure
+   official one also imports `os/exec`, which ParleyInn's import-closure
    test bans from the core. rmcp puts HTTP and child processes behind
    Cargo features.
 5. SQLite with FTS5 is strong in Go, Rust and Bun. Node's
@@ -62,7 +62,7 @@ Method notes:
 
 ## 1. Harness hosting protocols
 
-OWN-03 lists the inputs Cairn may use: "the Agent SDK, ACP, the Codex
+OWN-03 lists the inputs ParleyInn may use: "the Agent SDK, ACP, the Codex
 app-server, or the terminal the run component hosts"
 ([§5c](../../../docs/srs/05c-owner-and-peer-requirements.md)). The run
 component (B1) is the one that "starts programs and hosts their
@@ -91,7 +91,7 @@ terminals" ([§6 register, row 10](../../../docs/srs/06-security.md)).
   The TypeScript package says "SEE LICENSE IN README.md"; the Python
   repository also holds an MIT `LICENSE` file
   ([LICENSE](https://github.com/anthropics/claude-agent-sdk-python/blob/main/LICENSE)).
-  Linking either into Cairn needs an ENG-18 decision (inference).
+  Linking either into ParleyInn needs an ENG-18 decision (inference).
 - **Login.** "Anthropic does not allow third party developers to offer
   claude.ai login or rate limits for their products, including agents
   built on the Claude Agent SDK"
@@ -111,7 +111,7 @@ terminals" ([§6 register, row 10](../../../docs/srs/06-security.md)).
 - **Bare mode.** `--bare` skips hooks, plugins, MCP servers and
   CLAUDE.md; it "is the recommended mode for scripted and SDK calls,
   and will become the default for `-p` in a future release"
-  ([headless](https://code.claude.com/docs/en/headless)). A Cairn-hosted
+  ([headless](https://code.claude.com/docs/en/headless)). A ParleyInn-hosted
   session would then have to pass its hooks and MCP server explicitly
   through `--settings` and `--mcp-config` (inference).
 - **Gap.** The control messages behind SDK permission callbacks and
@@ -189,7 +189,7 @@ terminals" ([§6 register, row 10](../../../docs/srs/06-security.md)).
   `@openai/codex`
   ([npm](https://www.npmjs.com/package/@agentclientprotocol/codex-acp)).
   Hosting Claude over ACP thus runs Node and Commercial Terms code,
-  whatever language Cairn uses (inference).
+  whatever language ParleyInn uses (inference).
 
 ### Codex app-server
 
@@ -239,7 +239,7 @@ official ACP SDK and Codex's own types (inference from the table).
 
 ## 2. MCP server SDKs
 
-Cairn's MCP server is a core (B0) component speaking stdio with the
+ParleyInn's MCP server is a core (B0) component speaking stdio with the
 harness ([§6 register, row 2](../../../docs/srs/06-security.md)). MCP's
 stdio binding "is just newline-delimited JSON-RPC"
 ([transports, 2026-07-28](https://modelcontextprotocol.io/specification/2026-07-28/basic/transports)).
@@ -264,7 +264,7 @@ stdio binding "is just newline-delimited JSON-RPC"
   MIT; its `server` package imports `net/http` 27 times
   ([proxy](https://proxy.golang.org/github.com/mark3labs/mcp-go/@latest)).
 - **Go fit.** Linking either means allow-listing `net/http`, which
-  [imports_test.go](../../../cmd/cairn/imports_test.go) bans from the
+  [imports_test.go](../../../cmd/parinn/imports_test.go) bans from the
   core. A stdio-only server written against the spec is the clean fit
   (inference).
 - **Rust.** `rmcp` 3.5.0, 28 September 2026, Apache-2.0, 32 million
@@ -418,7 +418,7 @@ goes "through an enrolled peer" (PEER-04,
   - Self-hosted relays and mDNS lookup are documented
     ([self-hosted](https://docs.iroh.computer/iroh-services/relays/self-hosted),
     [mDNS](https://docs.iroh.computer/connecting/local-address-lookup)).
-    For CON-06, Cairn would drop the N0 preset and run the relay on
+    For CON-06, ParleyInn would drop the N0 preset and run the relay on
     an enrolled peer (inference).
   - The higher protocols are still 0.x: `iroh-gossip` 0.101.0,
     `iroh-blobs` 0.103.0, `iroh-docs` 0.101.0, all 15 June 2026
@@ -479,7 +479,7 @@ goes "through an enrolled peer" (PEER-04,
     "is currently undergoing a restructuring"
     ([boringtun](https://github.com/cloudflare/boringtun)).
   - WireGuard brings keys and tunnels, not discovery or NAT traversal,
-    which Cairn would add (inference).
+    which ParleyInn would add (inference).
 - **Tailscale `tsnet` (Go).** "Package tsnet embeds a Tailscale node
   directly into a Go program"; "ControlURL optionally specifies the
   coordination server URL"
@@ -496,7 +496,7 @@ goes "through an enrolled peer" (PEER-04,
 
 ### Log replication and CRDTs
 
-Cairn replicates sealed ranges of per-writer, signed, hash-chained logs
+ParleyInn replicates sealed ranges of per-writer, signed, hash-chained logs
 (PEER-03), and a conflict-free method for live co-editing waits for an
 ADR (NG9, [§1](../../../docs/srs/01-introduction.md)). Signed
 append-only logs are the closer prior art; CRDTs matter later.
@@ -510,7 +510,7 @@ append-only logs are the closer prior art; CRDTs matter later.
     ([p2panda](https://github.com/p2panda/p2panda)).
   - Experimental FFI covers "Node.js, Python and Go support via
     UniFFI".
-  - BLAKE3 is not Cairn's SHA-256, so formats do not carry over, only
+  - BLAKE3 is not ParleyInn's SHA-256, so formats do not carry over, only
     designs (inference).
 - **Willow (Rust).** `willow25` 0.7.9 (27 August 2026) and
   `willow-data-model` 0.8.0, MIT or Apache-2.0
@@ -630,7 +630,7 @@ execute reaches beyond its boundary
 
 - **Go.** A static binary is the default with cgo off. The import
   closure per entry point is the per-component evidence, already
-  tested in [imports_test.go](../../../cmd/cairn/imports_test.go).
+  tested in [imports_test.go](../../../cmd/parinn/imports_test.go).
 - **Rust.** A static binary is routine on musl targets; `rusqlite`
   with `bundled` adds a C toolchain per target. Cargo features and
   `cargo tree` per crate give evidence, plus lints for `std::net` and
@@ -688,7 +688,7 @@ poor fit), none (nothing found).
 - **Harness hosting does not decide the language.** Every path is JSON
   over stdio, and the run component is its own process. TypeScript's
   official Agent SDK is the one advantage, and its Commercial Terms
-  keep it outside ENG-18's allow-list in any language. Cairn could
+  keep it outside ENG-18's allow-list in any language. ParleyInn could
   still drive Claude Code through stream-json alone.
 - **The core slots favour Go and Rust.** SQLite with FTS5, JCS,
   Ed25519 and SHA-256, and a stdio MCP server are strong in both. Go

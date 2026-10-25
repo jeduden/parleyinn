@@ -1,4 +1,4 @@
-local evs = cairn.events()
+local evs = parinn.events()
 local days = {}
 local n = 0
 for _, e in ipairs(evs) do

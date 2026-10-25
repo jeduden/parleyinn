@@ -1,6 +1,6 @@
 # Chat interface for AI agent sessions: systems and protocols
 
-Scope: chat and messaging systems and protocols that could act as the "chat interface" for agent sessions in Cairn. Current as of 2 October 2026. Archived, deprecated and superseded items are marked **[ARCHIVED]**, **[DEPRECATED]** or **[SUPERSEDED]**.
+Scope: chat and messaging systems and protocols that could act as the "chat interface" for agent sessions in ParleyInn. Current as of 2 October 2026. Archived, deprecated and superseded items are marked **[ARCHIVED]**, **[DEPRECATED]** or **[SUPERSEDED]**.
 
 ## Q1. Which systems already present agent sessions as chat?
 
@@ -75,9 +75,9 @@ Two kinds of design show up. Some products make the agent session itself a chat 
 
 ### Inferences
 
-- Buzz already implements most of the stakeholder's proposed shape (one signed event log, git as events, agents as keyed principals, rooms per branch), but on Rust, Postgres and Redis. Cairn could read Buzz as a reference design or as an optional bridge target. It cannot be an embedded dependency, because I4 bars Cairn from talking to the network.
+- Buzz already implements most of the stakeholder's proposed shape (one signed event log, git as events, agents as keyed principals, rooms per branch), but on Rust, Postgres and Redis. ParleyInn could read Buzz as a reference design or as an optional bridge target. It cannot be an embedded dependency, because I4 bars ParleyInn from talking to the network.
 - Three designs decouple chat from durable history in a useful way. Fossil puts chat in a separate, unsynced, auto-expiring table. Claude Code teams delete the team mailbox at session end. Buzz never stores ephemeral kinds. Each of these lets the conversational channel be erased without touching versioned artifacts.
-- Claude Code treats a message from another agent as data, never as consent. That matches Cairn's I2: a chat surface that agents read must envelope peer messages as untrusted.
+- Claude Code treats a message from another agent as data, never as consent. That matches ParleyInn's I2: a chat surface that agents read must envelope peer messages as untrusted.
 - Most "agent in Slack" integrations, such as Cursor's, do not give a chat-native session identity: each message can spawn a new session. A persistent thread-to-session binding, which Delta and Buzz both have, is the stronger model.
 
 ### Gaps
@@ -156,8 +156,8 @@ Matrix is the only mature protocol that standardizes a verifiable event DAG with
 ### Inferences
 
 - Matrix pairs a content hash, which is lost on redaction, with a reference hash computed over the redacted form, which is the event ID. This is the strongest standardized precedent for "append-only, verifiable structure with erasable content". It is also lightweight to adopt as a data-model idea without running a Matrix server.
-- A Matrix redacted event keeps the `hashes` key, which holds an unsalted SHA-256 over the full original event. For low-entropy content, someone holding a guess could confirm it against that hash. A Cairn design should commit to content with a keyed or salted hash, or commit to ciphertext, so that a shredded key leaves nothing to confirm guesses against.
-- Nostr's deletion is cooperative: it is a SHOULD, nothing guarantees it, and a tombstone stays. Static identity keys combined with NIP-44 also mean one key compromise exposes all past DMs. Neither is compatible with crypto-shredding as a guarantee unless Cairn controls the only relay and the keys.
+- A Matrix redacted event keeps the `hashes` key, which holds an unsalted SHA-256 over the full original event. For low-entropy content, someone holding a guess could confirm it against that hash. A ParleyInn design should commit to content with a keyed or salted hash, or commit to ciphertext, so that a shredded key leaves nothing to confirm guesses against.
+- Nostr's deletion is cooperative: it is a SHOULD, nothing guarantees it, and a tombstone stays. Static identity keys combined with NIP-44 also mean one key compromise exposes all past DMs. Neither is compatible with crypto-shredding as a guarantee unless ParleyInn controls the only relay and the keys.
 - For ephemeral cloud sandboxes, Matrix (homeserver-held history, sync tokens), Nostr (relay-held events, re-subscribe by filter) and NIP-17 ("fully recoverable" with the key) all work for offline or stateless clients. MLS and Double Ratchet clients must carry ratchet state, which is hard for disposable sandboxes. Matrix's MLS proof of concept losing state on reload shows the problem.
 - Go availability, from best to worst:
   1. Matrix client and appservice through mautrix-go (MPL-2.0).
@@ -200,8 +200,8 @@ Three event models recur. Hash-linked DAGs (Matrix) and signed-event logs (Nostr
 
 ### Inferences
 
-- For links from messages to code, Nostr NIP-34 (root-commit `r` tag plus patch content) and DeltaDB (op-level anchors that "survive any code transformation") are the two concrete models. NIP-34 fits a design built on a git interface. DeltaDB-style anchors would need Cairn to record operations between commits.
-- Every system that offers real deletion (Fossil, Claude Code teams, SimpleX queues, Buzz ephemeral kinds) gets it by not making the content part of a verifiable history. Every system with verifiable history (Matrix, Nostr, the Buzz audit chain) keeps a tombstone or skeleton. That is the trade-off Cairn has to resolve explicitly.
+- For links from messages to code, Nostr NIP-34 (root-commit `r` tag plus patch content) and DeltaDB (op-level anchors that "survive any code transformation") are the two concrete models. NIP-34 fits a design built on a git interface. DeltaDB-style anchors would need ParleyInn to record operations between commits.
+- Every system that offers real deletion (Fossil, Claude Code teams, SimpleX queues, Buzz ephemeral kinds) gets it by not making the content part of a verifiable history. Every system with verifiable history (Matrix, Nostr, the Buzz audit chain) keeps a tombstone or skeleton. That is the trade-off ParleyInn has to resolve explicitly.
 
 ### Gaps
 
@@ -226,7 +226,7 @@ Matrix redaction is the most direct prior art. The identity and DAG hashes cover
 
 ### Inferences
 
-- A pattern for Cairn, synthesized from the above:
+- A pattern for ParleyInn, synthesized from the above:
   1. Make each log entry an envelope: sender key, room or thread, parent hashes, timestamp, kind, and a commitment to the ciphertext, or a keyed MAC of the plaintext.
   2. Hash-chain or Merkle-link the envelopes, which is Matrix's reference-hash idea.
   3. Encrypt the content under a per-subject or per-session data key.
@@ -234,8 +234,8 @@ Matrix redaction is the most direct prior art. The identity and DAG hashes cover
 
   The log stays verifiable end to end, and the content becomes irrecoverable without rewriting history.
 - Do not copy Matrix's unsalted content hash into the envelope. After shredding it lets anyone confirm a guessed message. Commit to ciphertext, or use HMAC under the data key, so the commitment dies with the key.
-- Chat fan-out to external clients (Matrix, Nostr or Slack bridges) defeats erasure guarantees, because copies leave Cairn's custody, as NIP-09 and XEP-0424 both admit. It also conflicts with I4 if Cairn itself does the networking. Any chat interface should be a separate, opt-in process reading a projection, with erasure guaranteed only for the custody Cairn controls.
-- MLS gives forward secrecy and PCS for live group delivery, but it needs ordered epochs, which Matrix's proof of concept has not solved in a decentralized setting. A single-authority Cairn store would satisfy MLS's linear-epoch assumption trivially. The Go MLS implementations, however, are unaudited.
+- Chat fan-out to external clients (Matrix, Nostr or Slack bridges) defeats erasure guarantees, because copies leave ParleyInn's custody, as NIP-09 and XEP-0424 both admit. It also conflicts with I4 if ParleyInn itself does the networking. Any chat interface should be a separate, opt-in process reading a projection, with erasure guaranteed only for the custody ParleyInn controls.
+- MLS gives forward secrecy and PCS for live group delivery, but it needs ordered epochs, which Matrix's proof of concept has not solved in a decentralized setting. A single-authority ParleyInn store would satisfy MLS's linear-epoch assumption trivially. The Go MLS implementations, however, are unaudited.
 
 ### Gaps
 

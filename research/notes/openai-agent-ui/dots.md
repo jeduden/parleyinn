@@ -1,4 +1,4 @@
-# OpenAI dots: always-on agents, and what Cairn takes from them
+# OpenAI dots: always-on agents, and what ParleyInn takes from them
 
 OpenAI launched dots at DevDay on 29 September 2026: "remarkably
 capable, always-on agents built to handle everything", powered by
@@ -72,7 +72,7 @@ launch coverage).
   [Axios](https://www.axios.com/2026/09/30/openai-dots-ai-agent-safety)
   (headline only; the article refused automated fetches).
 
-## What Cairn takes from this
+## What ParleyInn takes from this
 
 1. The question of the moment is "what did my agent do?". A lossless,
    tamper-evident record of every agent action, kept by the user, is
@@ -89,7 +89,7 @@ launch coverage).
    first, hand off) give the owner's trust model a familiar shape for
    what an agent may do on its own, next to I2's rule on what it reads.
 6. Context mixing across channels is an injection path. A dot uses
-   context from every channel; in Cairn, content from another channel
+   context from every channel; in ParleyInn, content from another channel
    or participant stays untrusted and pull-only (I2).
 7. Dots need OpenAI's cloud, coordinate through it, and are not offered
-   in the EEA or UK. A self-hosted Cairn has neither limit.
+   in the EEA or UK. A self-hosted ParleyInn has neither limit.

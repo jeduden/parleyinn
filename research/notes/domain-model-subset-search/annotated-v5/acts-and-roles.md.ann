@@ -24,7 +24,7 @@ exactly one kind (LANE-31).
   do not qualify⟦f:stamps⟧ unstamped⟦/f⟧⟦f:moderation⟧, and a list removal only takes a pin off the pin list⟦/f⟧. A link act
   adds one range link⟦f:work-rooms⟧⟦f:git-tracking⟧, branch link⟦/f⟧⟦/f⟧⟦f:results-and-verdicts⟧⟦f:intent-criteria⟧ or criterion link⟦/f⟧⟦/f⟧. Create room is the first
   act of the creating seat's writer: a device seat's, creating its node's
-  personal room at Cairn's first start there (Personal room)⟦f:work-rooms⟧, or any seat's,
+  personal room at ParleyInn's first start there (Personal room)⟦f:work-rooms⟧, or any seat's,
   creating another room⟦/f⟧.⟦f:work-rooms⟧⟦f:segment-exchange⟧ A created room starts private⟦f:shared-rooms⟧⟦f:principal-keys⟧ and invite only⟦/f⟧⟦/f⟧;
   its create room act sets no visibility⟦f:shared-rooms⟧⟦f:principal-keys⟧ or admission⟦/f⟧⟦/f⟧, which only the
   owner's widening principal act changes.⟦/f⟧⟦/f⟧ Room acts are governance, not I2 trust: on
@@ -39,7 +39,7 @@ exactly one kind (LANE-31).
   surface⟦f:browser-room-view⟧, or the room-view component for the browser room view⟦/f⟧⟦f:paired-phone⟧, or a paired phone⟦/f⟧ records an `operator` event so marked; the
   hook handlers⟦f:compute-kernel⟧, the kernel worker⟦/f⟧ and the MCP server never do, and an `operator`
   event without that mark is never a principal act. A process of the same OS
-  user that signs with this node's device key or a seat key outside Cairn's code
+  user that signs with this node's device key or a seat key outside ParleyInn's code
   is §6.1's ⟦f:sandbox-risk⟧residual ⟦/f⟧risk R3⟦f:store-protection⟧: only a head receipt kept off the machine
   shows it⟦/f⟧. An act a seat key signs as
   the act, beyond sealing its writer, is a room act. A widening act lets more
@@ -109,7 +109,7 @@ exactly one kind (LANE-31).
   version of one restores, turns off restore blocks at any point Restore block
   names, lowers the pin budget, or stops this node recording its own runs'
   events, is widening whatever verb carries it, so
-  `cairn uninstall` records the widening act turning capture off before it
+  `parinn uninstall` records the widening act turning capture off before it
   removes the hook registrations (ADM-02)⟦f:access-tokens⟧, a structural event naming the
   uninstall standing in for that act on a token-key-only node⟦/f⟧. ⟦f:access-tokens⟧On an ephemeral node, PEER-01's
   environment variable, a structural event, stands in for ⟦f:peer-sync⟧turning on its peer

@@ -4,7 +4,7 @@ Scope: how OpenAI shows agent harnesses in a UI as of 3 October 2026. It
 covers the live session, its work results, several agents in one view, and
 how harnesses connect to UIs, to each other and to remote machines. Each
 item says where state lives, whether OpenAI's service is needed, and what
-Cairn could reuse. Status labels are **[PREVIEW]**, **[EXPERIMENTAL]**,
+ParleyInn could reuse. Status labels are **[PREVIEW]**, **[EXPERIMENTAL]**,
 **[BETA]**, **[DEPRECATED]** and **[REMOVED]**.
 
 Method and source notes:
@@ -77,7 +77,7 @@ Method and source notes:
     WebSocket or through an OpenAI rendezvous relay carrying
     Noise-encrypted frames — [exec-server README](https://github.com/openai/codex/blob/main/codex-rs/exec-server/README.md).
 
-## Three reusable ideas for Cairn's UI
+## Three reusable ideas for ParleyInn's UI
 
 1. **Thread/turn/item with server requests.** Model the live session as
    typed items with a started/delta/completed lifecycle, and model every
@@ -89,7 +89,7 @@ Method and source notes:
 2. **Results are views over durable state, not chat text.** Codex's review
    pane reads Git (unstaged, staged, commit, branch, last turn), and
    Symphony's dashboard reads only orchestrator state and "MUST NOT be
-   REQUIRED for correctness". Cairn can render tests, diffs and benchmarks
+   REQUIRED for correctness". ParleyInn can render tests, diffs and benchmarks
    from its record, so the UI stays an optional client — [Code review](https://learn.chatgpt.com/docs/code-review.md), [Symphony SPEC §13.7](https://github.com/openai/symphony/blob/main/SPEC.md).
 3. **A small, shared status vocabulary for the fleet.** Codex surfaces
    converge on four or five states: protocol `idle`, `active` with flags
@@ -179,9 +179,9 @@ goes to OpenAI unless a custom provider is configured.
 **Needs OpenAI.** Yes for the app (ChatGPT sign-in, see
 [Get started](https://learn.chatgpt.com/docs/app.md)). Local execution itself does not.
 
-**For Cairn.** The run-location switch (Local, Worktree, remote host)
+**For ParleyInn.** The run-location switch (Local, Worktree, remote host)
 sitting in the chat footer is a good fit for "lanes". The review pane's
-scopes map onto Cairn work results. The Activity view and the
+scopes map onto ParleyInn work results. The Activity view and the
 four-colour status lights show that a fleet view can stay small.
 
 ## 2. The Codex app-server protocol
@@ -306,7 +306,7 @@ plus SQLite metadata. The `ThreadStore` trait allows other stores
 **Needs OpenAI.** Not for the protocol. A model provider is needed;
 OpenAI is the default.
 
-**For Cairn.** Copy the shape, not the dependency. Typed items with an
+**For ParleyInn.** Copy the shape, not the dependency. Typed items with an
 authoritative completed state, server requests for approvals, a
 `resolved` broadcast so other clients clear their prompt, notification
 opt-out for thin clients, and generated schemas per version. Note the
@@ -360,10 +360,10 @@ history.
 
 **Needs OpenAI.** Yes, entirely. Codex cloud is not open source.
 
-**For Cairn.** The "published environment, isolated per-task workspace"
+**For ParleyInn.** The "published environment, isolated per-task workspace"
 split is a clean model for remote lanes. Handing off by Git state
 (worktree plus patch) rather than by moving a process is what lets
-Codex move chats between hosts. Cairn would do it from its own record.
+Codex move chats between hosts. ParleyInn would do it from its own record.
 
 ## 4. Remote, SSH and devbox modes
 
@@ -430,10 +430,10 @@ OpenAI. Work across devices: OpenAI cloud orchestrator.
 **Needs OpenAI.** SSH and direct exec-server: no. Codex Remote, pairing
 and the Noise rendezvous registry: yes.
 
-**For Cairn.** The SSH pattern (start the harness's server over SSH,
+**For ParleyInn.** The SSH pattern (start the harness's server over SSH,
 speak the same protocol) is self-hostable and fits requirement 3.
 Codex Remote shows the cost of a vendor relay: one account, one
-workspace, relay on `chatgpt.com`. Cairn would need a peer-to-peer or
+workspace, relay on `chatgpt.com`. ParleyInn would need a peer-to-peer or
 self-hosted relay. Under I4 that relay cannot live in the shipped
 binary.
 
@@ -489,10 +489,10 @@ per-issue workspaces on disk, orchestrator memory.
 **Needs OpenAI.** Only for model inference through Codex. The tracker is
 a third-party service.
 
-**For Cairn.** The strongest pattern here: the status surface draws only
+**For ParleyInn.** The strongest pattern here: the status surface draws only
 from orchestrator state and is never required. "Proof of work" as the
-result of a run matches Cairn's tests, diffs and benchmarks. Symphony's
-single orchestrator is a central point Cairn would replace with lanes.
+result of a run matches ParleyInn's tests, diffs and benchmarks. Symphony's
+single orchestrator is a central point ParleyInn would replace with lanes.
 
 ## 6. Subagents and multi-agent features
 
@@ -544,9 +544,9 @@ cloud.
 
 **Needs OpenAI.** Local subagents: model only. API Multi-agent: yes.
 
-**For Cairn.** Children are first-class threads with a parent link, and
+**For ParleyInn.** Children are first-class threads with a parent link, and
 approvals bubble up labelled with their source thread. That is the lane
-view in miniature. Cairn can render a lane as a tree using the same
+view in miniature. ParleyInn can render a lane as a tree using the same
 parent/ancestor queries.
 
 ## 7. Agents SDK sessions, tracing and the traces dashboard
@@ -585,9 +585,9 @@ OpenAI cloud by default, or the app's own exporter.
 
 **Needs OpenAI.** The dashboard does; the SDK does not.
 
-**For Cairn.** The span tree (run, turn, agent, generation, tool,
+**For ParleyInn.** The span tree (run, turn, agent, generation, tool,
 handoff) is a good shape for an after-the-fact timeline. The SDK's own
-warning about unauthenticated session rows is the problem Cairn's
+warning about unauthenticated session rows is the problem ParleyInn's
 append-only record already targets.
 
 ## 8. Collaboration, sharing and multiplayer
@@ -627,9 +627,9 @@ Team Tasks.
 
 **Needs OpenAI.** Yes for every sharing feature.
 
-**For Cairn.** Two takeaways. Requester-only controls in a shared channel
-are close to Cairn's "only the lane owner instructs the agent". Read-only
-snapshots that do not update are the floor; Cairn's lanes would need live
+**For ParleyInn.** Two takeaways. Requester-only controls in a shared channel
+are close to ParleyInn's "only the lane owner instructs the agent". Read-only
+snapshots that do not update are the floor; ParleyInn's lanes would need live
 replication across partitions, which OpenAI does not attempt.
 
 ## 9. Self-hosting, offline and data residency
@@ -661,9 +661,9 @@ Cited findings:
 - `clientInfo.name` should be registered with OpenAI for the Compliance
   Logs Platform if a new client targets enterprises — [App Server docs](https://learn.chatgpt.com/docs/app-server.md).
 
-**For Cairn.** A fully self-hosted Codex stack exists only at the
+**For ParleyInn.** A fully self-hosted Codex stack exists only at the
 CLI/app-server level, with SSH as the remote path. That is the layer
-Cairn's design resembles.
+ParleyInn's design resembles.
 
 ## 10. How untrusted content is handled
 
@@ -712,13 +712,13 @@ Cited findings:
   items, including `assistant` messages, to model-visible history without
   a turn — [App Server docs](https://learn.chatgpt.com/docs/app-server.md). Any client on the socket is fully trusted.
 
-**For Cairn.** The message-board rules are close to I2: attribute the
+**For ParleyInn.** The message-board rules are close to I2: attribute the
 sender, cap what is pushed, never auto-start a turn, keep the rest
 pull-only. `thread/inject_items` is the counter-example: a protocol that
 gives every client write access to model context cannot meet
 requirement 5 without a trust tier per client.
 
-## 11. Fit against Cairn's five UI requirements
+## 11. Fit against ParleyInn's five UI requirements
 
 - **R1, one view of live harness, results and lane or fleet.** Codex
   splits this across a chat view, the review pane, the Activity view and

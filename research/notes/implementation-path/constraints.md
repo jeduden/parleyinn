@@ -29,10 +29,10 @@ may share one executable, but each process runs exactly one of them.
 | Slot                               | Boundary         | Register rows   | Priority                      | Started by                                 |
 | ---------------------------------- | ---------------- | --------------- | ----------------------------- | ------------------------------------------ |
 | Core                               | B0               | 1–7             | P0; rows 3, 5, 6 P1; row 7 P2 | the harness (hooks, MCP); the person (CLI) |
-| Lane-view or room server           | B1               | 8, 9, 11        | P1                            | the person: `cairn ui`                     |
-| Run component                      | B1               | 10, 25, 26      | P1                            | the person: `cairn run -- <harness>`       |
+| Lane-view or room server           | B1               | 8, 9, 11        | P1                            | the person: `parinn ui`                    |
+| Run component                      | B1               | 10, 25, 26      | P1                            | the person: `parinn run -- <harness>`      |
 | Clients                            | through B1 or B0 | 4, 5, 9, 11, 17 | P1; row 17 P2                 | the person's browser, terminal or phone    |
-| Peer (B2), publish and bridge (B3) | B2, B3           | 12–23, 27       | P2                            | the person: `cairn peer on`, owner acts    |
+| Peer (B2), publish and bridge (B3) | B2, B3           | 12–23, 27       | P2                            | the person: `parinn peer on`, owner acts   |
 | Packaging                          | all              | all             | P0                            | the release pipeline and the plugin        |
 
 ### Core (B0)
@@ -64,7 +64,7 @@ What the SRS requires of it:
   enveloped and tainted output (CMP-06).
 - **CLI and TUI** (rows 4–6): every verb of [§9.5][ifc] with `--json`
   and exit codes 0–3; owner-act verbs refuse without a terminal
-  (OWN-12). `cairn lanes` is a full-screen TUI that reads the store
+  (OWN-12). `parinn lanes` is a full-screen TUI that reads the store
   directly and opens no socket, with the vocabulary and keymap of
   [§9.7][voc] (VIEW-14). Status line (VIEW-15) and terminal signals
   (VIEW-17) never reach the model.
@@ -131,11 +131,11 @@ What the SRS requires of it:
 - **Owner acts** (OWN-02, OWN-05, OWN-11, OWN-16): it writes `operator`
   events as an authenticated surface. It raises presence checks bound
   to its exact origin, port included, with attestation chaining to a
-  trust root Cairn ships. It enforces credential scopes on the server,
+  trust root ParleyInn ships. It enforces credential scopes on the server,
   the phone's included. An answer on any surface clears every other.
 - **Budgets and failures**: peak RSS ≤ 256 MiB and ≤ 5% of one core
   idle (NFR-09); every failure audited and counted, never only in a
-  browser (OPS-06); status in `cairn status` (ADM-16).
+  browser (OPS-06); status in `parinn status` (ADM-16).
 - **Beyond the SRS** (pitch decisions 8, 9, 11; [entity model][ent]):
   rooms ranked on the left, one conversation with every agent in the
   middle, the live outcome on the right (running-app preview, diff,
@@ -159,7 +159,7 @@ What the SRS requires of it:
   ACP, the Codex app-server or the hosted terminal (OWN-03, ASM-19,
   S10). A steer names its turn (OWN-13); no surface shows a stop before
   the harness acknowledges it (OWN-14); a control an adapter lacks is
-  shown as unavailable (OWN-15); `cairn install` can route every launch
+  shown as unavailable (OWN-15); `parinn install` can route every launch
   through the run component (OWN-15).
 - **Starting sessions**: new delegate sessions (OWN-23) and retries from
   a checkpoint (OWN-28) start here, never in the core; the launcher
@@ -192,7 +192,7 @@ What the SRS requires of each:
   same words, marks, ids and Needs you order (VIEW-14). A reduced
   surface says what it left out and where to see it.
 - **Phone, stage one** (row 11, P1): an owner-run tunnel to the loopback
-  lane view; `cairn ui --device phone` mints a credential that can only
+  lane view; `parinn ui --device phone` mints a credential that can only
   read, allow once and deny (OWN-16), by a widening act.
 - **Phone, stage two** (row 17, P2): a paired device writing signed
   allow and deny events in its own segments over B2 (OWN-17, PRV-10).
@@ -250,11 +250,11 @@ Deno. A proof marked "all" is language-neutral.
 | #     | Ids                                          | Constraint                                                                                                                                                                           | How an option proves it                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
 | ----- | -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | HC-1  | SEC-01, CON-04, I4                           | The core opens no socket and connects nowhere                                                                                                                                        | Go: per-component import closure (today's [imports_test.go][imports] and [depguard][lint]) plus a call graph from each entry. Rust: one crate per component, clippy `disallowed-types` and `disallowed-methods` on `std::net`, a symbol check of the build. TS: `fetch` and `WebSocket` are globals, so an import closure proves nothing; it needs lint bans on globals and a runtime permission such as Deno's `--deny-net`. All: an ENG-12 run under a network-denied sandbox |
-| HC-2  | SEC-01, X8                                   | One component per process, fixed at start; a core process never starts a B1–B3 component                                                                                             | All: a dispatch-table test (one subcommand, one component, chosen before any component code runs); reach evidence shows no program start in the core except `cairn kernel-worker`; `cairn open` and the TUI's `o` print, never start                                                                                                                                                                                                                                            |
+| HC-2  | SEC-01, X8                                   | One component per process, fixed at start; a core process never starts a B1–B3 component                                                                                             | All: a dispatch-table test (one subcommand, one component, chosen before any component code runs); reach evidence shows no program start in the core except `parinn kernel-worker`; `parinn open` and the TUI's `o` print, never start                                                                                                                                                                                                                                          |
 | HC-3  | SEC-19, ENG-16, ENG-27                       | Build-time reach evidence per component, start-up code included; CI fails when missing or wider than the register, or when an unlisted process exists                                | Go: `init` of every linked package runs in every process, so the evidence covers them. Rust: no code before `main` except `.init_array` constructors; ban constructor crates. TS: every module in the loaded graph evaluates its top level, so each component loads its own graph. All: a drift case that adds a socket to the core and turns CI red                                                                                                                            |
 | HC-4  | SEC-29, ENG-16, T24                          | Program start only in the run component (the kernel worker excepted)                                                                                                                 | HC-1's machinery for process APIs: Go `os/exec`, `syscall.ForkExec`; Rust `std::process::Command`, `posix_spawn`; TS `child_process`, `Bun.spawn`, `Deno.Command`. All: a sandbox that denies `execve` outside the run component in ENG-12                                                                                                                                                                                                                                      |
 | HC-5  | SEC-20, SEC-21, SEC-23, T15, T16             | Loopback only; per-launch credential; a session credential only its origin and port can read or send; `Host` and `Origin` checks; same-origin CSP; inert rendering; no config writes | All: black-box HTTP tests (rebinding `Host`, cross-origin request, replay from another loopback port, the credential absent from `/proc/<pid>/cmdline` and environ); a golden CSP header; fuzzing the renderer with HTML and script. Cookies give no port isolation (RFC 6265 §8.5), so a cookie-only design fails this                                                                                                                                                         |
-| HC-6  | ADR-01, NFR-09, VIEW-03, I9                  | No resident core process; hooks, MCP and recall never depend on a B1–B3 component                                                                                                    | All: no Cairn process left after a session ends; a scenario that kills the lane view mid-session with no hook degraded. Rules out a hook that calls a daemon                                                                                                                                                                                                                                                                                                                    |
+| HC-6  | ADR-01, NFR-09, VIEW-03, I9                  | No resident core process; hooks, MCP and recall never depend on a B1–B3 component                                                                                                    | All: no ParleyInn process left after a session ends; a scenario that kills the lane view mid-session with no hook degraded. Rules out a hook that calls a daemon                                                                                                                                                                                                                                                                                                                |
 | HC-7  | NFR-01, NFR-02, NFR-09                       | Hook budgets with process start included, ≤ 50 MiB RSS, lane view open, ten harnesses writing                                                                                        | All: the ENG-15 benchmark on the reference hardware (2 vCPU, 4 GiB) running the shipped binary at 1M events, cold and warm. Runtime start-up cost decides it                                                                                                                                                                                                                                                                                                                    |
 | HC-8  | I10, ENG-03, ENG-08, ADM-08, INJ-06, PEER-03 | Deterministic projections: no clock, no randomness, rebuild byte-identical in any arrival order                                                                                      | Go: a custom analyser banning `time.Now`, `math/rand`, `crypto/rand` and unsorted map ranges in projection packages. Rust: clippy bans on `SystemTime::now` and `HashMap` iteration. TS: lint bans on `Date.now`, `Math.random`, `crypto.getRandomValues`. All: the S12 property test, two writers in either order, run on linux and darwin                                                                                                                                     |
 | HC-9  | INJ-03, SEC-07, I2                           | Only `TrustedText` reaches a restore block, constructible only in the injection module                                                                                               | Go: an unexported constructor and a static check. Rust: a private field and a `pub(crate)` constructor; the compiler enforces it. TS: types vanish at runtime and a cast forges one; needs a lint ban on casts and a module-private runtime brand                                                                                                                                                                                                                               |
@@ -282,7 +282,7 @@ change rewords them, which is a stakeholder-approved SRS change
 | ----------------------------- | ---------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
 | CON-01, [index][srs] header   | "Implementation language is Go"                                  | The language OQ-32 selects                                                                                                            |
 | CON-02, ENG-01                | `CGO_ENABLED=0`, Go `toolchain` directive, `-trimpath`, VCS info | No dynamic dependency but the OS's system library; toolchain pinned in the repository; build paths stripped; source revision embedded |
-| ENG-02                        | `cmd/cairn` plus `internal/` packages                            | One entry module plus private modules of one responsibility each, import directions declared and enforced                             |
+| ENG-02                        | `cmd/parinn` plus `internal/` packages                           | One entry module plus private modules of one responsibility each, import directions declared and enforced                             |
 | ENG-03, §4.2                  | `context.Context` with a deadline; package-level state           | Every blocking call takes a cancellable deadline; no mutable module-level state                                                       |
 | ENG-04                        | Errors wrapped with `%w`; panics stop at entry points            | Errors keep their cause chain; typed per counter class; crashes stop at the hook and MCP entry points                                 |
 | ENG-05, OPS-05                | `log/slog`                                                       | Structured logging through redaction                                                                                                  |
@@ -293,10 +293,10 @@ change rewords them, which is a stakeholder-approved SRS change
 | REC-11, SEC-04, §8.2, ADR-05  | SQLite FTS5, FTS5 syntax                                         | A BM25 full-text index; the query compiler escapes the engine's syntax                                                                |
 | SEC-14                        | SQLite `secure_delete`                                           | Secure deletion and a rewrite of the index's files                                                                                    |
 | ADR-04, ADR-07, S2, S7, OQ-03 | Starlark in pure Go, pure-Go SQLite, the MCP Go SDK, a CGO build | The same questions asked of the chosen language                                                                                       |
-| Appendix B, §4.1 diagram      | "A Go test", "cairn core (Go library)"                           | Non-normative; follow the code                                                                                                        |
+| Appendix B, §4.1 diagram      | "A Go test", "parinn core (Go library)"                          | Non-normative; follow the code                                                                                                        |
 
 Repository records that assume Go: CLAUDE.md (Go, gofmt, scenario
-bindings in `cmd/cairn/bdd_<section>_test.go`), [development
+bindings in `cmd/parinn/bdd_<section>_test.go`), [development
 guide][dev], [DEPENDENCIES.md][deps] ("every direct Go dependency"),
 [.golangci.yml][lint], [imports_test.go][imports], [release.yml][release]
 and the gates under `internal/`. The ADRs split:
@@ -320,7 +320,7 @@ measure it.
 
 1. **Hook path under the full binary.** Traces: NFR-01, NFR-02,
    NFR-09, ADR-01; U2, U9, U1. Measure: p95 wall time and peak RSS of
-   `cairn hook` for `UserPromptSubmit`, `SessionStart` (compact) and
+   `parinn hook` for `UserPromptSubmit`, `SessionStart` (compact) and
    `PostToolUse` at 1M events on the reference hardware, from the one
    shipped binary, cold and warm, with the lane view open and ten
    writers; plus start-to-exit of a no-op subcommand.
@@ -367,7 +367,7 @@ measure it.
    server RSS and idle CPU, while NFR-01 holds; a strict CSP with no
    inline script or `eval`; HC-5's tests pass.
 9. **Terminal parity.** Traces: VIEW-14, register row 4, §9.7.7, §9.5,
-   OWN-12; U2, U1. Measure: `cairn lanes` with the page's statuses,
+   OWN-12; U2, U1. Measure: `parinn lanes` with the page's statuses,
    marks and keymap, built from the same projection code; start time;
    no socket; a link copied through the terminal's OSC 52 sequence,
    since a clipboard program would be a program start in B0.
@@ -418,7 +418,7 @@ The stakeholder's direction after revision 1 added these; the
 
 - **0. The app on five platforms.** Traces: the pitch, decisions 8 and 9;
   CON-02, NFR-10, OWN-16, OWN-17, NG4; every persona. Measure: start
-  Cairn on Linux, Windows, macOS, iOS and Android and see the person's
+  ParleyInn on Linux, Windows, macOS, iOS and Android and see the person's
   rooms; whether a phone verifies, syncs and signs with the core's own
   code ([five platforms](five-platform-apps.md)).
 - **16. Agent fluency.** Traces: ENG-21, ENG-25. Measure:
@@ -429,7 +429,7 @@ The stakeholder's direction after revision 1 added these; the
   review or fuzzing would otherwise have to catch.
 - **18. Iteration speed.** Traces: ENG-15, NFR-01.
   Measure: CPU and wall time per edit, build and test cycle at
-  Cairn's size ([compile times](compile-times-bun.md)).
+  ParleyInn's size ([compile times](compile-times-bun.md)).
 - **19. Toolchain stability.** Traces: ENG-01, ENG-20.
   Measure: breaking changes per release and the upgrade cost across
   five platform builds ([Zig](zig-option.md)).
@@ -495,8 +495,8 @@ it".
    depth; it does not replace the build-time evidence.
 5. **The core starts no component.** The only program the core starts
    is its own kernel worker (row 3), which a multi-call binary runs as
-   `cairn kernel-worker`. `cairn open` and the TUI print links; nothing
-   in B0 starts `cairn ui` or `cairn run` (X8).
+   `parinn kernel-worker`. `parinn open` and the TUI print links; nothing
+   in B0 starts `parinn ui` or `parinn run` (X8).
 6. **Policy before code.** The managed-policy lock is checked at
    dispatch, before component code runs; a refused start is audited
    and counted (SEC-22, ADM-04).
@@ -511,11 +511,11 @@ it".
    (ENG-19, ENG-20). A component still a prototype stays out of the
    release binary by build configuration (ENG-29).
 10. **Version skew handled.** After an upgrade replaces the file, a
-    long-running `cairn ui` or `cairn run` from the old version meets
+    long-running `parinn ui` or `parinn run` from the old version meets
     newer segments or schemas; it refuses them and says so (REC-21,
     ADM-05).
 11. **Residual risk unchanged.** An unsandboxed agent able to run
-    `cairn` can start `cairn ui` or `cairn run` (T21, R5); several
+    `parinn` can start `parinn ui` or `parinn run` (T21, R5); several
     executables on the PATH give it the same reach. Managed policy is
     the lock (SEC-22), and OWN-12 keeps a stopped component from
     lowering any confirmation.
@@ -543,7 +543,7 @@ Positions every option takes in step 2:
    from the one shipped artifact: call graph, symbol analysis, runtime
    permissions, or per-component link units fused after evidence; and
    whether it adds self-confinement at process start.
-2. **Who opens the browser.** `cairn ui` "opens the default browser" in
+2. **Who opens the browser.** `parinn ui` "opens the default browser" in
    [UX 7.5][ux], but starting `xdg-open` or `open` is a program start
    outside the run component (ENG-16), and the D-Bus portal is a
    socket. Print only (`--print` as the default), hand it to the run
@@ -592,7 +592,7 @@ Positions every option takes in step 2:
 12. **Presence checks.** WebAuthn takes a domain as its relying-party
     id, and an IP origin such as `127.0.0.1` is not one, so the lane
     view's origin is likely `localhost` (to verify in a spike).
-    Attestation verification (CBOR, COSE, X.509 chains to a root Cairn
+    Attestation verification (CBOR, COSE, X.509 chains to a root ParleyInn
     ships, OWN-11) is in-house or a dependency.
 13. **The phone at stage two.** Row 17 makes the phone a writer of
     signed segments under PRV-10: a native app, a web app with
@@ -634,17 +634,17 @@ Positions every option takes in step 2:
 [dlv]: ../../../docs/srs/12-delivery-plan.md
 [oq]: ../../../docs/srs/13-open-questions-and-risks.md
 [srs]: ../../../docs/srs/index.md
-[pitch]: ../../../plan/2610012322_cairn-for-agent-fleets/pitch.md
-[ux]: ../../../plan/2610012322_cairn-for-agent-fleets/ux/users-onboarding-surfaces.md
-[ent]: ../../../plan/2610012322_cairn-for-agent-fleets/entity-model.md
-[cpt]: ../../../plan/2610012322_cairn-for-agent-fleets/concepts.md
-[rp]: ../../../plan/2610012322_cairn-for-agent-fleets/room-protocol.md
-[net]: ../../../plan/2610022338_cairn-network-side/plan.md
+[pitch]: ../../../plan/2610012322_parinn-for-agent-fleets/pitch.md
+[ux]: ../../../plan/2610012322_parinn-for-agent-fleets/ux/users-onboarding-surfaces.md
+[ent]: ../../../plan/2610012322_parinn-for-agent-fleets/entity-model.md
+[cpt]: ../../../plan/2610012322_parinn-for-agent-fleets/concepts.md
+[rp]: ../../../plan/2610012322_parinn-for-agent-fleets/room-protocol.md
+[net]: ../../../plan/2610022338_parinn-network-side/plan.md
 [adr-dir]: ../../../docs/adr/
 [adr-test]: ../../../docs/adr/ADR-2609292234-test-stack.md
 [adr-review]: ../../../docs/adr/ADR-2609301941-agent-review.md
 [dev]: ../../../docs/development.md
 [deps]: ../../../DEPENDENCIES.md
 [lint]: ../../../.golangci.yml
-[imports]: ../../../cmd/cairn/imports_test.go
+[imports]: ../../../cmd/parinn/imports_test.go
 [release]: ../../../.github/workflows/release.yml

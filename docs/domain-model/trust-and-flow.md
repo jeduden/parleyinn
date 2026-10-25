@@ -38,7 +38,7 @@ summary: >-
   within its scope. An unsandboxed agent can still pass
   the CLI's or TUI's terminal test, through a terminal it opens or a process it
   did not start: that is §6.1's residual risk R7, and its writing the store or
-  signing outside Cairn's code is R3, which only a sandbox removes (Sandbox
+  signing outside ParleyInn's code is R3, which only a sandbox removes (Sandbox
   state).
 - **Presence proof**: A hardware-backed, user-verified proof of a person's
   presence, bound to one principal act (OWN-11, PRV-12).
@@ -51,7 +51,8 @@ summary: >-
   **continuation cursor** (`next_cursor`); passed back as `cursor`, it
   continues without gap or overlap (RCL-03). What else a tool call may return,
   RCL-04 says.
-- **Closed path**: One of the ways I2 lists by which Cairn writes to an agent
+- **Closed path**: One of the ways I2 lists by which ParleyInn writes to an
+agent
   without the agent's recall, such as a restore block, an opt-in notice or a
   delegated task in its template. No other write to an agent exists (I2).
 - **Recall scope**: `run`, `room` or `rooms`, or a foreign room named in the
@@ -122,7 +123,8 @@ summary: >-
   a run. **Terminal takeover**, the principal typing in the harness's terminal
   the launcher hosts, is the harness's own channel, never a principal act
   (OWN-02, OWN-19).
-- **Fixed template**: Wording Cairn ships, filled only with ids, counts, version
+- **Fixed template**: Wording ParleyInn ships, filled only with ids, counts,
+version
   numbers, key fingerprints, addresses and the principal-typed, endorsed or
   delegated text, or the text of a post a trust grant covers, its requirement
   names; **principal-typed text** is text a principal typed at a principal
@@ -132,11 +134,16 @@ summary: >-
   retry itself asks for (OWN-28, LANE-23).
 - **Counter**: A count of dropped, rejected, redacted, truncated, coalesced,
   timed-out or failed operations of one kind, each written to the node's
-  append-only **audit log** of Cairn's own operations (OPS-01), shown by
-  `cairn status` (ADM-11), failing `cairn doctor` until acknowledged
-  (`cairn counter ack`, I6, OPS-03). The audit log also records every purge
+  append-only **audit log** of ParleyInn's own operations (OPS-01), shown by
+  `parinn status` (ADM-11), failing `parinn doctor` until acknowledged
+  (`parinn counter ack`, I6, OPS-03). The audit log also records every purge
   (ADM-07).
-- **Canary**: `cairn canary`'s end-to-end test: it writes a **canary event**
+- **Structured log**: A line for each operation ParleyInn's components perform,
+  one JSON object a line in `logs/parinn.jsonl` or on stderr, a hook handler's
+  only in the file, every field redacted first (ENG-05, OPS-05). It is
+  neither the audit log nor a writer log: it holds no counter and no hash
+  chain, and nothing derived is built from it.
+- **Canary**: `parinn canary`'s end-to-end test: it writes a **canary event**
   through capture's ingest path and recalls it through the MCP server (OPS-04).
 - **Stat**: A count derived from the record within a recall scope, such as
   events, runs, compactions or recalls, read through `stat_list` (RCL-01).
@@ -164,7 +171,7 @@ summary: >-
   Unqualified, "fork" means this; the harness's own is always a harness fork.
 - **Presence hint**: An ephemeral sign that a seat is connected, or typing (a
   **typing hint**), never stored in the record (PEER-09).
-- **Watchdog observation**: Cairn's note, computed where shown and never
+- **Watchdog observation**: ParleyInn's note, computed where shown and never
   recorded, that a run looks stuck, shown as the `stuck?` freshness mark; it
   never starts or resumes a turn (OWN-09).
 - **Petname**: A name the person viewing chose for a key or a room, never one

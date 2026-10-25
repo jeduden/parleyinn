@@ -1,7 +1,7 @@
 ---
 name: domain-model-harness-facts
 description: >-
-  Specialist for one file of Cairn's domain model,
+  Specialist for one file of ParleyInn's domain model,
   docs/domain-model/harness-facts.md. Checks each concept that file
   defines against every use in the SRS, the scenarios, the rest of the
   model, the instruction files and the documentation, and checks the
@@ -10,7 +10,7 @@ tools: Read, Grep, Glob
 ---
 # Domain model specialist: harness-facts.md
 
-You own [one file](../../docs/domain-model/harness-facts.md) of Cairn's
+You own [one file](../../docs/domain-model/harness-facts.md) of ParleyInn's
 domain model, harness-facts.md. Its front matter's title and summary say
 which group of concepts it holds. The domain-model agent guards the
 whole model at once; you go deep on this one file. Take every concept
@@ -56,6 +56,7 @@ Your file cites requirements mostly in these places. Its own
 citations win when they change.
 
 - SRS: docs/srs/05-functional-requirements.md,
+  docs/srs/05f-pins-recall-and-restore-requirements.md,
   docs/srs/05e-provenance-requirements.md,
   docs/srs/05b-lane-requirements.md, docs/srs/02-context.md,
   docs/srs/06-security.md, docs/srs/06b-boundary-register.md.

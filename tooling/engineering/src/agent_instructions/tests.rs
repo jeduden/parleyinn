@@ -23,14 +23,14 @@ fn fenced(lines: &str) -> String {
 fn a_destructive_command_at_the_real_home_is_flagged_with_its_line() {
     let got = directives(
         "CLAUDE.md",
-        "Intro.\n\nClean up with `rm -rf ~/.cairn` first.\n",
+        "Intro.\n\nClean up with `rm -rf ~/.parinn` first.\n",
     );
 
     assert_eq!(
         got,
         vec![
             "CLAUDE.md:3: directs a destructive command at non-isolated state: \
-             Clean up with `rm -rf ~/.cairn` first."
+             Clean up with `rm -rf ~/.parinn` first."
                 .to_owned()
         ]
     );
@@ -42,10 +42,10 @@ fn every_way_to_reach_the_real_home_counts() {
         "~",
         "~/.claude",
         "~/.claude.json",
-        "$HOME/.cairn",
+        "$HOME/.parinn",
         "${HOME}/x",
-        "$CAIRN_HOME",
-        "${CAIRN_HOME}/log",
+        "$PARINN_HOME",
+        "${PARINN_HOME}/log",
         "$CLAUDE_CONFIG_DIR",
         "$USERPROFILE",
         "\"$HOME\"",
@@ -68,14 +68,14 @@ fn every_way_to_destroy_counts() {
         "trash ~/x",
         "find ~ -name x -delete",
         "git clean -fdx ~",
-        "cairn purge --home ~/.cairn",
-        "cairn uninstall ~/.claude",
+        "parinn purge --home ~/.parinn",
+        "parinn uninstall ~/.claude",
         "sed -i s/a/b/ ~/.claude/settings.json",
         "echo x | tee ~/.claude/x",
         "echo {} > ~/.claude/settings.json",
         "echo {} >| ~/.claude/settings.json",
         "echo {} >> $HOME/.claude.json",
-        "echo {} 2> ~/.cairn/err",
+        "echo {} 2> ~/.parinn/err",
     ] {
         assert_eq!(flagged(&fenced(command)), vec![4], "{command}");
     }
@@ -84,11 +84,11 @@ fn every_way_to_destroy_counts() {
 #[test]
 fn prose_that_tells_an_agent_to_destroy_is_flagged() {
     for sentence in [
-        "Delete `~/.cairn` before the run.",
-        "Wipe `$CAIRN_HOME` between runs.",
+        "Delete `~/.parinn` before the run.",
+        "Wipe `$PARINN_HOME` between runs.",
         "Remove the `HOME` directory afterwards.",
         "Then overwrite `~/.claude/settings.json` with the new one.",
-        "Purge `CAIRN_HOME` when done.",
+        "Purge `PARINN_HOME` when done.",
     ] {
         assert_eq!(flagged(sentence), vec![1], "{sentence}");
     }
@@ -97,12 +97,12 @@ fn prose_that_tells_an_agent_to_destroy_is_flagged() {
 #[test]
 fn a_statement_that_forbids_the_act_is_no_directive() {
     for sentence in [
-        "Never run a command that deletes from or purges `~/.cairn`.",
+        "Never run a command that deletes from or purges `~/.parinn`.",
         "Do not remove `$HOME`.",
         "Don't delete `~/.claude`.",
         "No instruction may direct an agent to wipe `~`.",
         "It must not overwrite `HOME`.",
-        "Tests refuse to delete the real `CAIRN_HOME`.",
+        "Tests refuse to delete the real `PARINN_HOME`.",
         "Avoid rm -rf ~.",
         "The guard cannot remove `$HOME`.",
         "A test can’t delete `$HOME`.",
@@ -114,8 +114,8 @@ fn a_statement_that_forbids_the_act_is_no_directive() {
 #[test]
 fn a_statement_that_isolates_first_is_no_directive() {
     for sentence in [
-        "Point `HOME` and `CAIRN_HOME` at a temporary directory, then delete `$HOME/.cairn`.",
-        "Remove `~/.cairn` of the isolated home.",
+        "Point `HOME` and `PARINN_HOME` at a temporary directory, then delete `$HOME/.parinn`.",
+        "Remove `~/.parinn` of the isolated home.",
         "Delete everything in `$HOME` made with mktemp.",
     ] {
         assert_eq!(flagged(sentence), Vec::<usize>::new(), "{sentence}");
@@ -125,9 +125,9 @@ fn a_statement_that_isolates_first_is_no_directive() {
 #[test]
 fn a_command_isolates_by_assigning_a_temporary_home() {
     for command in [
-        "HOME=$(mktemp -d) rm -rf $HOME/.cairn",
-        "CAIRN_HOME=\"$TMPDIR/c\" cairn purge ~/.cairn",
-        "export HOME=/tmp/h; rm -rf ~/.cairn",
+        "HOME=$(mktemp -d) rm -rf $HOME/.parinn",
+        "PARINN_HOME=\"$TMPDIR/c\" parinn purge ~/.parinn",
+        "export HOME=/tmp/h; rm -rf ~/.parinn",
         "env HOME=$tmp/home rm -rf ~/x",
     ] {
         assert_eq!(flagged(&fenced(command)), Vec::<usize>::new(), "{command}");
@@ -136,7 +136,10 @@ fn a_command_isolates_by_assigning_a_temporary_home() {
 
 #[test]
 fn a_real_home_assignment_does_not_isolate() {
-    for command in ["HOME=/root rm -rf ~", "CAIRN_HOME=$HOME/.cairn cairn purge"] {
+    for command in [
+        "HOME=/root rm -rf ~",
+        "PARINN_HOME=$HOME/.parinn parinn purge",
+    ] {
         assert_eq!(flagged(&fenced(command)), vec![4], "{command}");
     }
 }
@@ -164,7 +167,7 @@ fn state_inside_the_repository_is_no_real_home() {
     for command in [
         "rm -rf target",
         "rm -rf .claude/worktrees/x",
-        "rm -rf ./.cairn-test",
+        "rm -rf ./.parinn-test",
         "git clean -fdx",
         "echo done > out.txt",
         "cargo test 2>&1 | tee run.log",
@@ -190,28 +193,28 @@ fn reading_the_real_home_is_no_destruction() {
 
 #[test]
 fn a_wrapped_paragraph_is_read_as_one_statement() {
-    let body = "Never run a command that deletes from, or\npurges the real `~/.cairn` of the\nmachine you run on.\n";
+    let body = "Never run a command that deletes from, or\npurges the real `~/.parinn` of the\nmachine you run on.\n";
 
     assert_eq!(flagged(body), Vec::<usize>::new());
 }
 
 #[test]
 fn a_wrapped_directive_is_flagged_at_its_first_line() {
-    let body = "Intro.\n\nSometimes you should delete\nthe real `~/.cairn` by hand.\n";
+    let body = "Intro.\n\nSometimes you should delete\nthe real `~/.parinn` by hand.\n";
 
     assert_eq!(flagged(body), vec![3]);
 }
 
 #[test]
 fn each_sentence_stands_alone() {
-    let body = "Never rm `~/.cairn`. Then rm -rf `~/.claude`! Done?\n";
+    let body = "Never rm `~/.parinn`. Then rm -rf `~/.claude`! Done?\n";
 
     assert_eq!(directives("X.md", body).len(), 1);
 }
 
 #[test]
 fn each_list_item_stands_alone() {
-    let body = "- Never rm `~/x`\n* rm -rf `~/.cairn`\n1. Never rm `~/y`\n2. wipe `$HOME`\n";
+    let body = "- Never rm `~/x`\n* rm -rf `~/.parinn`\n1. Never rm `~/y`\n2. wipe `$HOME`\n";
 
     assert_eq!(flagged(body), vec![2, 4]);
 }
@@ -225,14 +228,14 @@ fn a_table_row_and_a_heading_stand_alone() {
 
 #[test]
 fn a_blank_line_ends_a_paragraph() {
-    let body = "Never\n\ndelete `~/.cairn`\n";
+    let body = "Never\n\ndelete `~/.parinn`\n";
 
     assert_eq!(flagged(body), vec![3]);
 }
 
 #[test]
 fn front_matter_is_read_as_a_paragraph_from_its_first_key() {
-    let body = "---\nname: x\ndescription: rm -rf ~/.cairn\n---\nBody.\n";
+    let body = "---\nname: x\ndescription: rm -rf ~/.parinn\n---\nBody.\n";
 
     assert_eq!(flagged(body), vec![2]);
 }
@@ -267,7 +270,7 @@ fn a_file_that_is_not_markdown_is_read_line_by_line() {
 
 #[test]
 fn a_destructive_command_inside_a_quoted_example_is_still_one() {
-    let body = "Example: `rm -rf ~/.cairn`\n";
+    let body = "Example: `rm -rf ~/.parinn`\n";
 
     assert_eq!(flagged(body), vec![1]);
 }
@@ -278,7 +281,7 @@ fn checkout(files: &[&str]) -> (TempDir, Checkout) {
     for file in files {
         let path = dir.path().join(file);
         fs::create_dir_all(path.parent().unwrap()).unwrap();
-        fs::write(path, "Run `rm -rf ~/.cairn`.\n").unwrap();
+        fs::write(path, "Run `rm -rf ~/.parinn`.\n").unwrap();
     }
     let c = Checkout::new(dir.path());
     (dir, c)
@@ -349,7 +352,7 @@ fn a_checkout_is_scanned_file_by_file() {
 #[test]
 fn a_checkout_with_clean_instructions_passes() {
     let (dir, c) = checkout(&[]);
-    fs::write(dir.path().join("CLAUDE.md"), "Never rm `~/.cairn`.\n").unwrap();
+    fs::write(dir.path().join("CLAUDE.md"), "Never rm `~/.parinn`.\n").unwrap();
 
     assert_eq!(no_destructive_instructions(&c), Vec::<String>::new());
 }

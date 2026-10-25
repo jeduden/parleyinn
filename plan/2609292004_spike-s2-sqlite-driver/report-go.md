@@ -34,7 +34,7 @@ M1's bounded ranking meets NFR-03.
 - Candidates: `modernc.org/sqlite` v1.60.1 and
   `github.com/ncruces/go-sqlite3` v0.35.6, both on SQLite 3.53.4.
 - Harness: the separate module in [bench-go](bench-go/main.go), so neither
-  driver enters cairn's module graph. It builds one seeded synthetic
+  driver enters parinn's module graph. It builds one seeded synthetic
   store per driver. The store holds §8.2's `events` record and its
   external-content FTS5 projection, chained by SHA-256.
 - Corpus: 10M events in 2,000 sessions, 4.61 GB of text. 60% are

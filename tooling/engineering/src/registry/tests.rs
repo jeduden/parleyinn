@@ -43,7 +43,7 @@ fn checkout_scenarios_are_the_bound_ones_opening_on_the_checkout() {
     let scenarios = [
         sc("ENG-01", false, &[CHECKOUT_STEP, "x"]),
         sc("ENG-02", true, &[CHECKOUT_STEP]),
-        sc("ENG-03", false, &["an isolated Cairn home"]),
+        sc("ENG-03", false, &["an isolated ParleyInn home"]),
         sc("ENG-04", false, &[]),
     ];
 

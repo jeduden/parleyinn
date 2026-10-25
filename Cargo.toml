@@ -1,5 +1,5 @@
 # The Cargo workspace (ENG-02): the product's crates under crates/,
-# the `cairn` core executable and the library crates it links, and the
+# the `parinn` core executable and the library crates it links, and the
 # repository tooling under tooling/. The product's other crates join it
 # as their plans land.
 #
@@ -24,26 +24,46 @@ ed25519-dalek = "3.0.0"
 getrandom = "0.4.3"
 # SQLite and FTS5 compiled in, extension loading compiled out through
 # LIBSQLITE3_FLAGS in .cargo/config.toml (ADR-2610110553).
+# The macOS Keychain, no TLS features (ADR-2610171300).
+security-framework = { version = "3.7.0", default-features = false }
 rusqlite = { version = "0.40.2", default-features = false, features = ["bundled"] }
 serde = { version = "1.0.229", features = ["derive"] }
 serde_json = "1.0.151"
 sha2 = "0.11.1"
+# DPAPI, the last error and the registry, for the platform shim alone (ADR-2610171300, ADR-2610171301).
+windows-sys = { version = "0.61.2", features = ["Win32_Foundation", "Win32_Security_Cryptography", "Win32_System_Registry"] }
+# Linear-time matching, Unicode classes and the literal fast paths
+# kept, nothing else (ADR-2610161200).
+regex = { version = "1.13.1", default-features = false, features = ["std", "unicode", "perf"] }
+# The events and their macros only: no proc-macro attributes, no log
+# bridge (ADR-2610161201).
+tracing = { version = "0.1.44", default-features = false, features = ["std"] }
 # Parsing only: no writer, the nesting limit kept (ADR-2610152132).
 toml = { version = "1.1.5", default-features = false, features = ["std", "parse", "serde"] }
 
 administration = { path = "crates/administration" }
+allowed_root = { path = "crates/allowed_root" }
 audit = { path = "crates/audit" }
 configuration = { path = "crates/configuration" }
+platform = { path = "crates/platform" }
 envelope = { path = "crates/envelope" }
 hook = { path = "crates/hook" }
 ingest = { path = "crates/ingest" }
 key = { path = "crates/key" }
 mcp = { path = "crates/mcp" }
+provenance = { path = "crates/provenance" }
 record = { path = "crates/record" }
+redaction = { path = "crates/redaction" }
+room = { path = "crates/room" }
+repository = { path = "crates/repository" }
+search = { path = "crates/search" }
 store = { path = "crates/store" }
+structured_log = { path = "crates/structured_log" }
+transcript = { path = "crates/transcript" }
 
 adr = { path = "tooling/adr" }
 benchmark = { path = "tooling/benchmark" }
+calibrate = { path = "tooling/calibrate" }
 drift = { path = "tooling/drift" }
 coverage = { path = "tooling/coverage" }
 engineering = { path = "tooling/engineering" }

@@ -108,9 +108,9 @@
     {
      "type": "security",
      "file": "docs/domain-model/trust-and-flow.md",
-     "quote": "One of the ways I2 lists by which Cairn writes to an agent",
+     "quote": "One of the ways I2 lists by which ParleyInn writes to an agent",
      "problem": "Some tool calls are not recall: room act tools such as `room_join` or `room_post`, delegation tools, a CLI verb that acts. Their results and errors reach the model, but neither Closed path nor Recall says what they may carry. An implementer may echo a room title, another seat's pin text or a post without an envelope, outside I2's closed paths.",
-     "fix": "Add to Recall: \"The result of any other tool call, its errors included, carries only fixed text Cairn ships, ids, counts and sanitized structural fields, or enveloped content as recall does.\"",
+     "fix": "Add to Recall: \"The result of any other tool call, its errors included, carries only fixed text ParleyInn ships, ids, counts and sanitized structural fields, or enveloped content as recall does.\"",
      "severity": "needs-fix"
     },
     {
@@ -126,7 +126,7 @@
      "file": "docs/domain-model/trust-and-flow.md",
      "quote": "that terminal, which the launcher hosts but never carries, so what the",
      "problem": "Keystrokes in the terminal the launcher hosts become `user` events, trusted in interactive mode, but the model never says who may type there. If the launcher lets a person attach to a hosted run over its loopback endpoint, another run or another OS user could also attach and create trusted input. The launcher would then carry text the core did not build.",
-     "fix": "that terminal, which the launcher hosts but never carries and which only the terminal `cairn launch` runs in reaches, so what the",
+     "fix": "that terminal, which the launcher hosts but never carries and which only the terminal `parinn launch` runs in reaches, so what the",
      "severity": "minor"
     },
     {
@@ -170,8 +170,8 @@
      "type": "useless",
      "file": "docs/domain-model/principals-and-agents.md",
      "quote": "run, of the same agent only where the harness gives a stable agent id.",
-     "problem": "When a harness resume starts a new harness session and the harness gives no stable agent id, the resumed conversation counts as a new agent whose only seat is in the personal room. Its restore block at that resume (INJ-02), and after its next compaction, leaves out every pin of the shared rooms the resumed run worked in, the intent included, and does not even count them as non-qualifying; recall cannot reach those rooms either. Cairn can tell which run it resumes, since it already carries that run's recall taint (SEC-13), so the constraint journey fails for no reason the model states.",
-     "fix": "run, of the same agent where the harness gives a stable agent id or, for a harness resume, where Cairn can tell the run it resumes (SEC-13).",
+     "problem": "When a harness resume starts a new harness session and the harness gives no stable agent id, the resumed conversation counts as a new agent whose only seat is in the personal room. Its restore block at that resume (INJ-02), and after its next compaction, leaves out every pin of the shared rooms the resumed run worked in, the intent included, and does not even count them as non-qualifying; recall cannot reach those rooms either. ParleyInn can tell which run it resumes, since it already carries that run's recall taint (SEC-13), so the constraint journey fails for no reason the model states.",
+     "fix": "run, of the same agent where the harness gives a stable agent id or, for a harness resume, where ParleyInn can tell the run it resumes (SEC-13).",
      "severity": "needs-fix"
     },
     {
@@ -279,7 +279,7 @@
     "index": 0,
     "theme": "NEW-9",
     "kind": "new",
-    "reason": "Nearest is DM-E (fixed: no stable agent id means each run is its own agent). The finding shows that text leaves a harness resume that starts a new harness session without its rooms' pins. It also rests on DM-AK's fact, added after DM-E closed, that Cairn can derive the resumed run for recall taint (SEC-13). The two closing texts do not agree, so DM-E's text does not answer it. It does not re-argue a closed theme, but it does reopen a stakeholder decision."
+    "reason": "Nearest is DM-E (fixed: no stable agent id means each run is its own agent). The finding shows that text leaves a harness resume that starts a new harness session without its rooms' pins. It also rests on DM-AK's fact, added after DM-E closed, that ParleyInn can derive the resumed run for recall taint (SEC-13). The two closing texts do not agree, so DM-E's text does not answer it. It does not re-argue a closed theme, but it does reopen a stakeholder decision."
    },
    {
     "lens": "usefulness",
@@ -333,7 +333,7 @@
    {
     "id": "NEW-9",
     "title": "A harness resume that starts a new harness session where the harness gives no stable agent id is a new agent whose restore block and recall omit the resumed run's rooms",
-    "settled_by": "none for the proposed change. REC-02 and decision E (stakeholder, round 1 NEW-10, option 1: restore stays per run, later runs inherit rooms by the harness's stable agent id, otherwise each run is its own agent) settle the current rule, which the finding asks to reopen for resumes. REG-7 (round-1 regression-verify.json) noted the hook gives only the new session id, so Cairn may be unable to tell which run a resume resumes. Nothing decides inferring the resumed run, so it is a stakeholder choice."
+    "settled_by": "none for the proposed change. REC-02 and decision E (stakeholder, round 1 NEW-10, option 1: restore stays per run, later runs inherit rooms by the harness's stable agent id, otherwise each run is its own agent) settle the current rule, which the finding asks to reopen for resumes. REG-7 (round-1 regression-verify.json) noted the hook gives only the new session id, so ParleyInn may be unable to tell which run a resume resumes. Nothing decides inferring the resumed run, so it is a stakeholder choice."
    },
    {
     "id": "NEW-10",

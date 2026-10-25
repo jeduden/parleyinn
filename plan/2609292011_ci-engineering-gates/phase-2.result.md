@@ -10,7 +10,7 @@ summary: >-
 
 What landed:
 
-- Every workspace manifest carries `[package.metadata.cairn]` with
+- Every workspace manifest carries `[package.metadata.parinn]` with
   `responsibility`, `may-depend-on` and `may-dev-depend-on`, beside
   what it governs. The tooling crates are covered too.
 - A product crate under `crates/` never depends on a `tooling/` crate

@@ -7,13 +7,13 @@ Feature: Provenance and trust (PRV)
 
   @PRV-01 @P0 @I2 @pending
   Scenario: every event carries its writer and exactly one provenance class from the closed set
-    Given an isolated Cairn home
+    Given an isolated ParleyInn home
     And an agent run with a Claude Code transcript "every-kind"
     And "every-kind" contains a user turn, assistant text, a tool call, Bash, WebFetch and MCP tool results, a file read, a subagent's delegate report, lifecycle metadata, a system reminder and a malformed line
     And a principal act, a pin written from a device seat, a pin a run seat wrote, a post from another seat and a room act of the run's seat are recorded in the run's room, and a retention purge's tombstone naming that room's content on the recording device's seat there
     And the Bash tool call of "every-kind" was ingested by an earlier ingest than its tool result
-    And the person ran "cairn canary" and "cairn backup create" on this node
-    When the person runs "cairn ingest --all"
+    And the person ran "parinn canary" and "parinn backup create" on this node
+    When the person runs "parinn ingest --all"
     Then every event carries its writer and exactly one provenance class
     And the Bash tool result carries provenance "tool_result:Bash"
     And the principal act and the device-seat pin carry provenance "operator", the post carries "post", the run-seat pin and the run seat's room act carry "assistant", and the tombstone, the canary event, the backup event and the device key's "minted" key event carry "structural"
@@ -36,18 +36,18 @@ Feature: Provenance and trust (PRV)
 
   @PRV-02 @P0 @I2 @I8 @pending
   Scenario Outline: the default trust policy trusts this node's unsigned trusted sources only on this node, and alike on all the principal's nodes the acts a device key it certified signed and the posts and pins from a device seat such a key certified (once PRV-10 ships), the posts and pins its trust grant covers and the pin versions it stamped
-    Given an isolated Cairn home
+    Given an isolated ParleyInn home
     And deployment mode "<mode>"
     When an event with provenance "<provenance>" written by <writer> is recorded
     Then the event is stored with provenance "<provenance>"
     And its trust level for this principal's agents on this node derives as "<trust>", and no trust level is stored with the event
-    And "cairn verify" <verify>
-    And the event shapes restore blocks and trust levels only if it is trusted and "cairn verify" reports nothing about it
+    And "parinn verify" <verify>
+    And the event shapes restore blocks and trust levels only if it is trusted and "parinn verify" reports nothing about it
     And a "user" line whose "promptSource" marks the harness's own notice is stored as untrusted "harness_text", and a "user" line this node's capture recorded live that matches no prompt commitment, carries another "promptId" or is marked "sdk" stays "user" but untrusted
     And the first line carrying a prompt commitment's prompt_id uses it up whatever its promptSource, so a later line carrying that prompt_id, typed or not, is untrusted, the counter "prompt_match_conflicts" increases by 1 and an audit entry records the conflict
     And each match is a structural event naming the "user" event and its prompt_id
     And a "harness_meta" event its capture read from a transcript line is untrusted, while its sanitized structural fields, such as model tokens, stay usable
-    And after "cairn rebuild" every event's trust level is unchanged
+    And after "parinn rebuild" every event's trust level is unchanged
     And a purge of a matched "user" event erases its prompt commitment and that commitment's key
     And the free text a cut or neutral principal act carries, such as a stated reason, is recalled as untrusted, while the act's own "operator" event keeps its trust level and shapes what the act changes
 
@@ -73,16 +73,16 @@ Feature: Provenance and trust (PRV)
       | interactive | a writer of this node                                                                                                                                                       | unparsed         | untrusted | reports nothing                                          |
       | interactive | a run seat's writer on this node                                                                                                                                            | post             | untrusted | reports nothing                                          |
       | automation  | a writer of this node, recorded live by its CLI                                                                                                                             | operator         | trusted   | reports nothing                                          |
-      | interactive | a writer of this node, ingested by "cairn ingest" from a transcript no MCP server ingested as it grew                                                                       | user             | untrusted | reports nothing                                          |
-      | automation  | a writer of this node, ingested by "cairn ingest" from a transcript no MCP server ingested as it grew                                                                       | harness_meta     | untrusted | reports nothing                                          |
+      | interactive | a writer of this node, ingested by "parinn ingest" from a transcript no MCP server ingested as it grew                                                                       | user             | untrusted | reports nothing                                          |
+      | automation  | a writer of this node, ingested by "parinn ingest" from a transcript no MCP server ingested as it grew                                                                       | harness_meta     | untrusted | reports nothing                                          |
       | interactive | a device seat of another node whose device key has no certificate from the principal key of this node's principal                                                           | operator         | untrusted | reports nothing                                          |
       | automation  | a run seat's writer on another node of this principal                                                                                                                       | harness_meta     | untrusted | reports nothing                                          |
       | interactive | a run seat's writer on another node of this principal                                                                                                                       | user             | untrusted | reports nothing                                          |
       | automation  | a writer of this node, widening beyond its recorded sandbox states and risk acceptance                                                                                      | operator         | trusted   | reports it as a widening principal act that fails OWN-22 |
 
-  @PRV-03 @P0 @I2 @pending
+  @PRV-03 @P0 @I2
   Scenario Outline: model-reproducible text no principal stamped, and harness-summarised text, is untrusted
-    Given an isolated Cairn home
+    Given an isolated ParleyInn home
     And deployment mode "interactive"
     When <item> is recorded
     Then the event is stored with provenance "<provenance>" and its trust level is "untrusted"
@@ -93,11 +93,11 @@ Feature: Provenance and trust (PRV)
       | a Bash tool call written by the assistant                          | tool_call    |
       | the compaction summary line the harness wrote to the transcript    | harness_text |
       | a system reminder in the transcript                                | harness_text |
-      | the restore block Cairn returned, written back into the transcript | harness_text |
+      | the restore block ParleyInn returned, written back into the transcript | harness_text |
 
   @PRV-04 @P0 @I2 @pending
   Scenario Outline: "automation" is the default deployment mode, and "interactive" an opt-in of the person's own configuration that applies only to a user turn whose hook handler found the attended mark
-    Given an isolated Cairn home
+    Given an isolated ParleyInn home
     And <configuration>
     When this node's capture records the "user" event of a user turn, matched to the prompt its "UserPromptSubmit" hook handler got <mark>
     Then the event is stored with provenance "user" and its trust level is "<trust>"
@@ -105,16 +105,16 @@ Feature: Provenance and trust (PRV)
 
     Examples:
       | configuration                                                                                                                                           | mark                      | trust     | audit                                                                                 |
-      | the person's configuration sets no deployment mode, and the repository's ".cairn.toml" sets "node.deployment_mode" to "interactive"                     | with the attended mark    | untrusted | an audit entry records "rejected repository setting node.deployment_mode"             |
+      | the person's configuration sets no deployment mode, and the repository's ".parinn.toml" sets "node.deployment_mode" to "interactive"                     | with the attended mark    | untrusted | an audit entry records "rejected repository setting node.deployment_mode"             |
       | the person's configuration sets "node.deployment_mode" to "interactive"                                                                                 | without the attended mark | untrusted | the counter "harness_session_not_attended" increases by 1 and an audit entry names it |
       | the person's configuration sets "node.deployment_mode" to "interactive", and the MCP server's environment has "CLAUDE_CODE_SESSION_ATTENDED" set to "1" | without the attended mark | untrusted | the counter "harness_session_not_attended" increases by 1 and an audit entry names it |
       | the person's configuration sets "node.deployment_mode" to "interactive"                                                                                 | with the attended mark    | trusted   | no audit entry names the deployment mode                                              |
 
   @PRV-05 @P0 @I2 @pending
   Scenario Outline: no settings layer can trust a provenance class beyond the default policy
-    Given an isolated Cairn home
+    Given an isolated ParleyInn home
     And deployment mode "interactive"
-    And managed policy, the person's configuration and the repository's ".cairn.toml" each set the trust of "<provenance>" to "trusted"
+    And managed policy, the person's configuration and the repository's ".parinn.toml" each set the trust of "<provenance>" to "trusted"
     When an event with provenance "<provenance>" is ingested
     Then the event is stored with provenance "<provenance>" and its trust level is "untrusted"
     And an audit entry for each settings layer records "rejected trust override for <provenance>"
@@ -135,7 +135,7 @@ Feature: Provenance and trust (PRV)
 
   @PRV-06 @P0 @I2 @pending
   Scenario Outline: a landmark, or kernel output, a recall result or an export built from events, records the events it comes from and inherits their taint
-    Given an isolated Cairn home
+    Given an isolated ParleyInn home
     And this node's record contains an event with provenance "harness_meta" its launcher recorded and one with provenance "web"
     When the <artifact> is made from both events
     Then the <artifact> records the addresses of both events it comes from
@@ -152,13 +152,16 @@ Feature: Provenance and trust (PRV)
 
   @PRV-07 @P1 @I5 @I6 @pending
   Scenario Outline: instruction-like untrusted content is flagged without blocking storage
-    Given an isolated Cairn home
+    Given an isolated ParleyInn home
     And an agent run with a Claude Code transcript "web-run"
     And "web-run" contains a WebFetch tool result carrying <content>
-    When the person runs "cairn ingest --all"
+    When the person runs "parinn ingest --all"
     Then the WebFetch tool result is stored as a "web" event flagged "instruction_like"
     And its hit from the MCP tool "event_search" carries the flag, and no landmark contains its text
-    And "cairn audit --flagged" lists its address (writer, seq)
+    And "parinn audit --flagged" lists its address (writer, seq)
+    Given the person's config.toml containing "flag.enabled = false" with no widening principal act accepting it recording that file's digest
+    When "web-run" gains a second WebFetch tool result carrying <content> and the person runs "parinn ingest --all"
+    Then "parinn audit --flagged" lists that event's address (writer, seq) as well: flags stay on until a widening principal act records that digest (ADM-04)
 
     Examples:
       | content                                                      |
@@ -170,7 +173,7 @@ Feature: Provenance and trust (PRV)
 
   @PRV-08 @P0 @I2 @pending
   Scenario Outline: provenance comes from a line's structure, and text markers only lower trust
-    Given an isolated Cairn home
+    Given an isolated ParleyInn home
     And deployment mode "interactive"
     When <item> is recorded
     Then the event is stored with provenance "<provenance>" and its trust level is "<trust>"
@@ -199,7 +202,7 @@ Feature: Provenance and trust (PRV)
 
   @PRV-09 @P0 @I2 @I8 @pending
   Scenario Outline: an event's writer comes from the key that verifiably signed it, never from a field
-    Given an isolated Cairn home
+    Given an isolated ParleyInn home
     And a peer that declared the writers "w-peer-1" and "w-peer-2"
     When this node receives <item> from the peer
     Then the item is <expected>
@@ -215,7 +218,7 @@ Feature: Provenance and trust (PRV)
 
   @PRV-10 @P1 @I2 @I8 @pending
   Scenario Outline: an "operator" event from another node is trusted only through a key chain rooted in the principal key of this node's principal
-    Given an isolated Cairn home
+    Given an isolated ParleyInn home
     And this principal's offline principal key certified the device key of its node on a laptop with scope "allow, deny, pin" and maximum rule level "act when told", and the device key of its paired phone with the scope "allow, deny"
     And the laptop's device key certified a token key that certified the device seat key and a run seat key of a token-key-only ephemeral node, limited to an access token's rooms, that node's own personal room and the access token's expiry
     When an event <event> arrives from another node
@@ -249,12 +252,12 @@ Feature: Provenance and trust (PRV)
       | by the phone's device key, allowing a held permission request                                                                  | trusted                                                                                    |
       | by the phone's device key, adding a pin                                                                                        | untrusted                                                                                  |
 
-  @PRV-11 @P0 @I2 @I8 @pending
+  @PRV-11 @P0 @I2 @I8
   Scenario: the node's device key certifies each seat key with a seat certificate naming its seat kind
-    Given an isolated Cairn home
+    Given an isolated ParleyInn home
     And a node whose device key no principal key has certified
     When a run's run seat starts in a room and the node's device seat starts in the same room
-    And the person runs "cairn verify --json"
+    And the person runs "parinn verify --json"
     Then the device key has certified the run seat's key with a seat certificate scoped to that room and naming the seat kind "run"
     And the device key has certified the device seat's key with a seat certificate scoped to that room and naming the seat kind "device"
     And each seat certificate names whether its seat is an ingest seat, and neither the run seat's nor the device seat's names it one
@@ -263,66 +266,66 @@ Feature: Provenance and trust (PRV)
 
   @PRV-12 @P0 @I2 @I6 @I10 @pending
   Scenario: the node's device keys form a key event log that only a recovery key or a proof the forger lacks extends
-    Given an isolated Cairn home with no authenticator
+    Given an isolated ParleyInn home with no authenticator
     And a managed-policy listing, recorded as a structural event, naming a confirmation key held off the node
-    When Cairn starts for the first time
+    When ParleyInn starts for the first time
     Then a "minted" key event, the first event of the device seat that created the personal room, starts the genesis log, committing to the digest of its recovery key's public key
-    And "cairn status" shows a recovery key awaiting "cairn recovery-key write"
+    And "parinn status" shows a recovery key awaiting "parinn recovery-key write"
     Given a witnessed run whose run seat the device key certified, with a certificate record, and a pin "P" written from the device seat
     And another process that can append to the store but cannot use the device key or the confirmation key
     When that process appends a "minted anew" naming the current device key, starts a seat certified by its own key, and appends a confirm naming its inception, signed by its own key
     Then the inception replaces nothing, the confirm counts for nothing and is audited and counted, the process's seat reads origin "peer", the witnessed run still reads "witnessed", and "P" still qualifies
-    And "cairn doctor" exits non-zero, and "cairn status" shows the inception awaiting a confirm and the seat that recorded it
-    When the person runs "cairn key-event-log reject" naming that inception, signed by the key it replaces
-    Then the inception is void and "cairn doctor" exits 0
+    And "parinn doctor" exits non-zero, and "parinn status" shows the inception awaiting a confirm and the seat that recorded it
+    When the person runs "parinn key-event-log reject" naming that inception, signed by the key it replaces
+    Then the inception is void and "parinn doctor" exits 0
     When that process appends a node identity change event naming the current device key, and a "minted" after it
-    Then "cairn status" shows the node identity change awaiting a confirm or reject, and "cairn doctor" exits non-zero
-    When the person runs "cairn key-event-log reject" naming that node identity change event, signed by the key it replaces
+    Then "parinn status" shows the node identity change awaiting a confirm or reject, and "parinn doctor" exits non-zero
+    When the person runs "parinn key-event-log reject" naming that node identity change event, signed by the key it replaces
     Then the event is void, stops nothing, and the witnessed run still reads "witnessed"
     When that process appends a "revoked" of the current device key signed by none of the revoked key, its recovery key or a principal key
     Then it is void, audited and counted, and later certificate records of that key still count
     When that process appends a "rotated" key event not signed by the committed recovery key
-    Then it is void, audited and counted, and "cairn verify" exits non-zero naming it
-    When the person runs "cairn key-event-log reject" acknowledging that void key event, signed by the current device key
-    Then "cairn verify" still reports it and exits 0
-    When the person runs "cairn device-key rotate" at the controlling terminal
+    Then it is void, audited and counted, and "parinn verify" exits non-zero naming it
+    When the person runs "parinn key-event-log reject" acknowledging that void key event, signed by the current device key
+    Then "parinn verify" still reports it and exits 0
+    When the person runs "parinn device-key rotate" at the controlling terminal
     Then a "rotated" key event follows the newest one, carries the recovery key's public key and the device seat writer's chain head, is signed by the recovery key and by the key it replaces, names a freshly minted device key, and a new recovery key is minted and written in the same act
     And certificate records of the replaced key at or before the carried chain head still count for "witnessed"
     When another process appends a certificate record of the replaced key after that chain head
     Then it counts for nothing, and the uncounted certificate record is audited and counted
-    When the device key goes missing with the node identity unchanged, and Cairn records a "minted anew" carrying the device seat writer's chain head
+    When the device key goes missing with the node identity unchanged, and ParleyInn records a "minted anew" carrying the device seat writer's chain head
     Then every writer the missing key certified still reads origin "witnessed", and the new key's writers read "peer"
     When a confirm naming that inception, signed by the managed-policy confirmation key, is recorded
-    Then the new key's writers read "witnessed", the confirm is audited, and "cairn doctor" exits 0
+    Then the new key's writers read "witnessed", the confirm is audited, and "parinn doctor" exits 0
     When the confirm's signature is copied into a reject or a choose naming the same inception
     Then each verifies as nothing, since every signature names its kind, and each is audited and counted
     When a confirm and a reject of one inception, neither following the other, are both signed by the confirmation key
-    Then they are a duplicity in which the reject holds, the inception's writers read "peer", and "cairn doctor" exits non-zero until a choose
+    Then they are a duplicity in which the reject holds, the inception's writers read "peer", and "parinn doctor" exits non-zero until a choose
     When a "minted anew" carries a chain head at a lower seq than a certificate record of the key it replaces
-    Then it is void, and "cairn verify" reports it as tampering
+    Then it is void, and "parinn verify" reports it as tampering
     When two "minted anew" inceptions in different device seats replace one key and both are confirmed
-    Then "cairn status" and "cairn verify" report a duplicity, it is counted and audited, "cairn doctor" exits non-zero, and no key after it certifies a "witnessed" writer
+    Then "parinn status" and "parinn verify" report a duplicity, it is counted and audited, "parinn doctor" exits non-zero, and no key after it certifies a "witnessed" writer
     When a choose naming the key event to keep, signed by the confirmation key, is recorded
-    Then the duplicity is resolved and "cairn doctor" exits 0
-    When two "minted anew" inceptions wait, and the person runs "cairn device-key rotate" to record a "recovered"
-    Then it is refused until the person names one "minted anew" by digest, after Cairn shows the seat that recorded each, whether the replaced key is in the key store and each pin that would start restoring
+    Then the duplicity is resolved and "parinn doctor" exits 0
+    When two "minted anew" inceptions wait, and the person runs "parinn device-key rotate" to record a "recovered"
+    Then it is refused until the person names one "minted anew" by digest, after ParleyInn shows the seat that recorded each, whether the replaced key is in the key store and each pin that would start restoring
     When ten processes of the home find the device key missing at once
     Then each checks and records under one lock, re-reading the key event logs under it, exactly one "minted anew" is recorded, and no hook handler waits on the lock beyond its budget
     When the device key's file exists but cannot be read
-    Then no "minted anew" is recorded, appends wait at an ingest marker, counted and audited, and "cairn doctor" exits non-zero
+    Then no "minted anew" is recorded, appends wait at an ingest marker, counted and audited, and "parinn doctor" exits non-zero
     When the file becomes readable again
     Then the waiting appends land and no "minted anew" was recorded
-    Given a second isolated Cairn home with no authenticator and no managed-policy recipient key
-    When Cairn starts there for the first time
-    Then its recovery key is kept in an entry of its own, and "cairn status" shows it is on the node
-    When the person runs "cairn recovery-key write" at the controlling terminal, naming a new file outside every worktree and the Cairn home, and types a passphrase twice
+    Given a second isolated ParleyInn home with no authenticator and no managed-policy recipient key
+    When ParleyInn starts there for the first time
+    Then its recovery key is kept in an entry of its own, and "parinn status" shows it is on the node
+    When the person runs "parinn recovery-key write" at the controlling terminal, naming a new file outside every worktree and the ParleyInn home, and types a passphrase twice
     Then the file is created exclusively, readable only by the person's OS user, holds none of the recovery key's bytes raw, hex or base64, its header names the key derivation's parameters, it is read back and checked against the committed digest, and only then is the recovery key erased from the node
     And the principal act is recorded with provenance "operator" and names no file
-    When "cairn recovery-key write" runs without a controlling terminal, or names a file that exists, or a path inside a worktree or the Cairn home
+    When "parinn recovery-key write" runs without a controlling terminal, or names a file that exists, or a path inside a worktree or the ParleyInn home
     Then it is refused, audited and counted, and the recovery key stays on the node
     When the read-back does not match
     Then the recovery key stays on the node, and the failure is counted and audited
-    When the person runs "cairn device-key rotate" with that file and a wrong passphrase
+    When the person runs "parinn device-key rotate" with that file and a wrong passphrase
     Then it is refused, counted and audited
     When a managed-policy listing naming a recipient key and a directory is recorded
     Then each new recovery key is written at once, encrypted to the recipient key, to a new file in that directory, audited, and erased from the node
@@ -335,16 +338,16 @@ Feature: Provenance and trust (PRV)
 
   @PRV-13 @P0 @I2 @I10 @pending
   Scenario: origin derives from the record and the key set, never from a stored value
-    Given an isolated Cairn home
+    Given an isolated ParleyInn home
     And a witnessed run and an ingested run on this node
     And a sealed range received from a peer, one imported in a bundle, one reinstated by a backup restore of this node's own copy, one range that arrived first from a peer and then in a bundle, and one that arrived first in a bundle and then from a peer
-    When the person runs "cairn rebuild"
+    When the person runs "parinn rebuild"
     Then each sealed range is named by exactly one arrival event per way it arrived, in this node's device seat in its personal room, carrying only the writer id, the seq range, a digest of the range's chained headers and how it arrived
     And the witnessed run's events read origin "witnessed", the ingested run's "ingested", the peer's "peer", the bundle's "bundle", the restored range's "peer", and both ranges that came both ways "bundle"
-    And "cairn rebuild" appends no arrival event
+    And "parinn rebuild" appends no arrival event
     When the origin the store keeps for a peer event is changed to "witnessed"
-    And the person runs "cairn verify"
-    Then it exits 3 naming the check "derived artifact consistency", until "cairn rebuild" derives "peer" again
+    And the person runs "parinn verify"
+    Then it exits 3 naming the check "derived artifact consistency", until "parinn rebuild" derives "peer" again
     When a peer delivers a range of another node's device seat holding only that node's arrival events, one of which names this node's witnessed run
     Then this node records no arrival event for that range, the witnessed run's events still read origin "witnessed", and a "minted anew" in that range naming this node's device key counts for nothing here
     When a bundle carries a writer whose seat certificate, made by a key no key event of this node names, claims an ingest seat
@@ -360,7 +363,7 @@ Feature: Provenance and trust (PRV)
 
   @PRV-14 @P0 @I2 @I6 @pending
   Scenario Outline: the MCP server finds the run that made a tool call only by the transcript line carrying its tool-use id
-    Given an isolated Cairn home
+    Given an isolated ParleyInn home
     And a harness session whose main run and one subagent's run each call "event_search", served by its harness session's MCP server
     When <case>
     Then <outcome>

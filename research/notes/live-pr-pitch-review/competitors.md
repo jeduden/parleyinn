@@ -1,7 +1,9 @@
-# Competitor review of the Cairn pitch
+# Competitor review of the ParleyInn pitch
 
 Lens: does an existing product already match the pitch, or come close?
-Reviewer stance: adversarial. Date: 2 October 2026.
+Reviewer stance: adversarial. Date: 2 October 2026. Multica, LobeHub and an
+updated Warp comparison were added on 20 October 2026; the original ranking
+and verdict below remain a dated snapshot.
 
 Provenance tags:
 
@@ -10,7 +12,8 @@ Provenance tags:
   notes in `notes/custom-storage-git-and-chat/`, and the reports). The URL
   given is the primary source the research cited.
 - **[W]**: the fact comes from a fresh web search or fetch made on
-  2 October 2026 for this review.
+  2 October 2026 for the original review, or on 20 October 2026 for the
+  dated Multica, LobeHub and Warp additions.
 
 Where the research and the web disagree, both are noted.
 
@@ -29,36 +32,120 @@ Where the research and the web disagree, both are noted.
 | C9  | Network-free core                                                               |
 | C10 | Erasure by key (crypto-shredding)                                               |
 
+C2 and its scores describe the 2 October "live pull request" pitch. They do
+not test whether one room holds discussion around an intent across linked
+issues and pull requests. The
+[20 October criterion below](#conversation-around-the-intent-a-missing-comparison-criterion)
+separately tests where issue discussion, review feedback and replies happen.
+
 ## 1. Feature matrix
 
 Legend: **Y** yes, **P** partial, **N** no, **?** unknown or undocumented.
 Each row's sources follow the table.
 
-| Product                                    | C1  | C2  | C3  | C4  | C5  | C6  | C7  | C8  | C9  | C10 |
-| ------------------------------------------ | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| Zed Delta / DeltaDB                        | Y   | Y   | Y   | Y   | P   | P   | N   | ?   | N   | N   |
-| Block Buzz                                 | P   | Y   | Y   | Y   | P   | Y   | P   | N   | N   | N   |
-| GitHub Copilot (Agents tab, Agent HQ, app) | P   | P   | Y   | P   | P   | Y   | P   | P   | N   | N   |
-| Cursor (cloud agents, Graphite, Origin)    | P   | Y   | Y   | P   | Y   | P   | N   | N   | N   | N   |
-| Conductor Cloud                            | Y   | Y   | Y   | Y   | P   | P   | N   | N   | N   | N   |
-| Agor (preset-io)                           | P   | Y   | Y   | Y   | P   | P   | N   | N   | N   | N   |
-| Warp shared agent sessions                 | P   | P   | Y   | P   | N   | N   | N   | N   | N   | N   |
-| Devin (Cognition)                          | P   | Y   | Y   | P   | P   | P   | N   | ?   | N   | N   |
-| Augment Cosmos                             | P   | P   | Y   | P   | P   | P   | N   | N   | N   | P   |
-| Coder Agents                               | P   | P   | Y   | P   | P   | P   | N   | N   | N   | N   |
-| Replit Agent                               | Y   | P   | Y   | P   | Y   | P   | N   | N   | N   | N   |
-| Entire CLI                                 | P   | N   | N   | N   | N   | Y   | P   | N   | N   | N   |
-| Claude Code (teams, cross-session, web)    | P   | N   | P   | P   | P   | Y   | N   | Y   | N   | N   |
-| Radicle                                    | N   | P   | N   | P   | N   | Y   | Y   | N   | P   | N   |
-| Tangled                                    | N   | P   | P   | P   | N   | Y   | P   | N   | N   | N   |
-| GitLab Duo Agent Platform                  | P   | P   | P   | P   | N   | P   | N   | N   | N   | N   |
-| Linear agent sessions                      | P   | P   | P   | P   | P   | P   | N   | N   | N   | N   |
-| GrayCodeAI/trace (alpha forge)             | P   | N   | N   | N   | N   | Y   | Y   | N   | N   | N   |
-| Happy                                      | P   | N   | Y   | N   | N   | N   | N   | N   | N   | N   |
-| Vibe Kanban, Sculptor (local)              | P   | N   | P   | P   | P   | P   | N   | N   | P   | N   |
-| Diversion (+ Claude Code plugin)           | P   | N   | Y   | P   | N   | P   | N   | N   | N   | N   |
+| Product                                     | C1  | C2  | C3  | C4  | C5  | C6  | C7  | C8  | C9  | C10 |
+| ------------------------------------------- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Zed Delta / DeltaDB                         | Y   | Y   | Y   | Y   | P   | P   | N   | ?   | N   | N   |
+| Block Buzz                                  | P   | Y   | Y   | Y   | P   | Y   | P   | N   | N   | N   |
+| GitHub Copilot (Agents tab, Agent HQ, app)  | P   | P   | Y   | P   | P   | Y   | P   | P   | N   | N   |
+| Cursor (cloud agents, Graphite, Origin)     | P   | Y   | Y   | P   | Y   | P   | N   | N   | N   | N   |
+| Conductor Cloud                             | Y   | Y   | Y   | Y   | P   | P   | N   | N   | N   | N   |
+| Multica (added 20 October 2026)             | P   | P   | P   | P   | P   | P   | ?   | N   | N   | ?   |
+| LobeHub (added 20 October 2026)             | P   | P   | P   | P   | P   | ?   | ?   | ?   | N   | ?   |
+| Agor (preset-io)                            | P   | Y   | Y   | Y   | P   | P   | N   | N   | N   | N   |
+| Warp (Agents and Factories; updated 20 Oct) | P   | P   | Y   | P   | P   | P   | ?   | N   | N   | ?   |
+| Devin (Cognition)                           | P   | Y   | Y   | P   | P   | P   | N   | ?   | N   | N   |
+| Augment Cosmos                              | P   | P   | Y   | P   | P   | P   | N   | N   | N   | P   |
+| Coder Agents                                | P   | P   | Y   | P   | P   | P   | N   | N   | N   | N   |
+| Replit Agent                                | Y   | P   | Y   | P   | Y   | P   | N   | N   | N   | N   |
+| Entire CLI                                  | P   | N   | N   | N   | N   | Y   | P   | N   | N   | N   |
+| Claude Code (teams, cross-session, web)     | P   | N   | P   | P   | P   | Y   | N   | Y   | N   | N   |
+| Radicle                                     | N   | P   | N   | P   | N   | Y   | Y   | N   | P   | N   |
+| Tangled                                     | N   | P   | P   | P   | N   | Y   | P   | N   | N   | N   |
+| GitLab Duo Agent Platform                   | P   | P   | P   | P   | N   | P   | N   | N   | N   | N   |
+| Linear agent sessions                       | P   | P   | P   | P   | P   | P   | N   | N   | N   | N   |
+| GrayCodeAI/trace (alpha forge)              | P   | N   | N   | N   | N   | Y   | Y   | N   | N   | N   |
+| Happy                                       | P   | N   | Y   | N   | N   | N   | N   | N   | N   | N   |
+| Vibe Kanban, Sculptor (local)               | P   | N   | P   | P   | P   | P   | N   | N   | P   | N   |
+| Diversion (+ Claude Code plugin)            | P   | N   | Y   | P   | N   | P   | N   | N   | N   | N   |
 
 ### Row sources and cell notes
+
+**LobeHub** (added 20 October 2026; [full note](../lobehub/lobehub.md))
+
+- C1 P, C2 P. LobeHub keeps agent conversations as Topics, with Tasks, Agent
+  Documents and Pages around them. Connected coding agents run through their
+  own runtimes; LobeHub shows their responses and may show tools, status and
+  diffs. The docs do not establish one event-addressed conversation tied to an
+  intent across several branches and forge objects. [W]
+  <https://github.com/lobehub/lobehub/blob/canary/docs/usage/start.mdx>,
+  <https://github.com/lobehub/lobehub/blob/canary/docs/usage/agent/connect-external-agents.mdx>
+- C3 P, C4 P, C5 P. Agent Groups, Workspaces, connected execution devices,
+  cross-device conversations and Pages overlap with ParleyInn's planned live and
+  fleet views. Progress details depend on the connected agent; the sources do
+  not establish live shared-branch editing or ParleyInn's result-evidence view. [W]
+  <https://github.com/lobehub/lobehub>,
+  <https://github.com/lobehub/lobehub/blob/canary/docs/usage/agent/connect-external-agents.mdx>
+- C6 ?, C7 ?, C10 ?. The docs reviewed do not establish a commit-to-story
+  back-link, a verifiable full record or erasure by key. These remain unknown.
+  [W] <https://github.com/lobehub/lobehub/blob/canary/docs/usage/start.mdx>,
+  <https://github.com/lobehub/lobehub/blob/canary/docs/self-hosting/start.mdx>
+- C8 ?. LobeHub documents its own connector permissions and delegates native
+  file, command and approval permissions to the connected agent. The docs do
+  not establish ParleyInn's pull-only untrusted-data rule for all content that can
+  reach an agent. [W]
+  <https://github.com/lobehub/lobehub/blob/canary/docs/usage/agent/connect-external-agents.mdx>
+- C9 N. Its self-hosted application uses a networked Next.js service and
+  PostgreSQL. Self-hosting gives deployment control, but not ParleyInn's
+  socket-free core. [W]
+  <https://github.com/lobehub/lobehub/blob/canary/docs/self-hosting/start.mdx>
+
+**Multica** (added 20 October 2026; [full note](../multica/multica.md))
+
+- C1 P. An issue keeps its description, discussion, status, linked pull
+  requests and run history together. Each run has a transcript with messages,
+  tool calls and errors. Linked pull requests show metadata and open on the
+  forge; their review threads are not documented as mirrored into the issue.
+  The sources do not establish an event-addressed record of every edit. [W]
+  <https://multica.ai/docs/comments>,
+  <https://multica.ai/docs/issues>,
+  <https://multica.ai/docs/tasks>,
+  <https://multica.ai/docs/github-integration>
+- C2 P, C3 P. People can reply to a running agent, and the transcript streams
+  while a run is active. The conversation is attached to an issue, and the
+  sources do not establish live file-edit replication inside a shared branch.
+  [W] <https://github.com/multica-ai/multica>,
+  <https://multica.ai/docs/tasks>
+- C4 P. People and agents share a workspace and issues; squads route work
+  through a leader, whose mentions can start member runs. This is coordinated
+  routing rather than several agents editing one shared branch in real time.
+  [W] <https://multica.ai/docs/squads>,
+  <https://multica.ai/docs/project-resources>
+- C5 P. Run transcripts, diffs, linked pull requests and CI status are visible.
+  No interactive result explorer is established by the sources reviewed. [W]
+  <https://multica.ai/docs/tasks>,
+  <https://multica.ai/docs/github-integration>
+- C6 P. Ordinary git worktrees and pull requests are supported. Multica
+  attaches a pull request to an issue when its title, branch name or body
+  carries the issue id, or a person links it manually. No commit-to-run
+  back-link is documented.
+  [W] <https://multica.ai/docs/project-resources>,
+  <https://multica.ai/docs/github-integration>
+- C7 ?, C10 ?. The sources reviewed do not establish a tamper-evident full
+  transcript or erasure by key. This is unknown, not proof of absence. [W]
+  <https://multica.ai/docs/tasks>,
+  <https://multica.ai/docs/security-model>
+- C8 N. Workspace and project context is supplied to runs; a squad leader can
+  cause another agent's run through a mention. No principal-controlled,
+  pull-only, untrusted envelope is documented for these paths. This rates
+  ParleyInn's specific C8 claim, not Multica's access controls. [W]
+  <https://multica.ai/docs/workspaces>,
+  <https://multica.ai/docs/project-resources>,
+  <https://multica.ai/docs/squads>
+- C9 N. A networked server and connected daemon coordinate runs. Self-hosted
+  deployments send a daily telemetry snapshot by default, which can be disabled.
+  [W] <https://multica.ai/docs/how-multica-works>,
+  <https://github.com/multica-ai/multica/blob/main/SELF_HOSTING.md>
 
 **Zed Delta / DeltaDB**
 
@@ -232,14 +319,14 @@ Each row's sources follow the table.
 - C7 N. C8 N. C9 N: it is self-hostable, but the daemon is networked. C10 N:
   only secrets are AES-GCM encrypted. [R]
 
-**Warp shared agent sessions**
+**Warp Agents and Factories**
 
-- C3 Y. "Any new agent output or terminal activity appears for all viewers in
-  real time." Editors can send their own agent queries. [W]
-  <https://docs.warp.dev/agent-platform/warp-agents/session-sharing>
-- C1 P, C2 P, C4 P: one shared terminal session, not a branch record. C6 N: the
-  link to the PR is a URL a human pastes. Shares expire after about a week. [R]
-  <https://docs.warp.dev/guides/agent-workflows/how-to-attach-agent-session-context-to-github-prs/>
+The row now covers Warp Agents and Factories, including product documentation
+published after the original review. See the [full note](../warp/warp.md) and
+the [20 October update](#update-warp-20-october-2026). [W]
+<https://github.com/warpdotdev/warp>,
+<https://docs.warp.dev/factories/how-factories-work/>,
+<https://docs.warp.dev/factories/integrations/github/>.
 
 **Devin**
 
@@ -449,7 +536,7 @@ git refs plus a commit trailer) cover every pitch claim except C8–C10.
   [R] `notes/custom-storage-git-and-chat/integrated-platforms.md`
 - **The combination** of C1–C6 with C7–C10. That is the only defensible
   novelty. The research names this quadrant as unoccupied:
-  "Cairn's I2 and crypto-shredding goals would put it in a quadrant nobody
+  "ParleyInn's I2 and crypto-shredding goals would put it in a quadrant nobody
   currently occupies" [R].
 
 The unoccupied claims are all in the pitch's fourth paragraph, the security
@@ -461,7 +548,7 @@ one-liner are the occupied part, and Zed shipped them first.
 **Zed (Delta):** "That's our launch post. 'Replacing pull requests' is our
 tagline. 'A message and the edit it produced are recorded side by side' is our
 DeltaDB design. Our public beta runs on four platforms, including the web, and
-we have landed 570 changes with PRs turned off. Cairn is pre-implementation. Our
+we have landed 570 changes with PRs turned off. ParleyInn is pre-implementation. Our
 CRDT worktrees let people and agents edit the same files live. A lane that
 'never touches the network' cannot be real-time multiplayer without a relay,
 and that relay is the product. Redaction runs before anything leaves the
@@ -487,7 +574,7 @@ in July."
 
 **Anthropic (Claude Code):** "Peer-agent messages already arrive marked as
 untrusted and can never count as consent. Commits already carry a
-Claude-Session trailer. Cairn's C8 is a policy our harness already applies."
+Claude-Session trailer. ParleyInn's C8 is a policy our harness already applies."
 
 **Common rebuttal to the security paragraph:** "Nobody buys a PR replacement for
 crypto-shredding. Tamper evidence over a transcript proves only that the log was
@@ -509,3 +596,149 @@ untrusted non-owner messages, a network-free core, tamper evidence over the full
 record, and erasure by key. Lead with that paragraph and treat Delta as the
 benchmark. Then answer two objections head-on: the tension between C8 and
 collaboration, and the tension between C9 and real time.
+
+### Update: Multica, 20 October 2026
+
+Multica adds a strong **issue-centered agent-workspace** competitor to the
+headline and product-surface claims. It already connects assignment, live run
+transcripts, issue comments, worktrees, pull request cards and CI status,
+with several agent CLIs and a self-hosting option [W]
+<https://github.com/multica-ai/multica>,
+<https://multica.ai/docs/project-resources>,
+<https://multica.ai/docs/github-integration>. Pull request review discussion
+stays on the forge; the issue card links to it [W]
+<https://multica.ai/docs/github-integration>. It is less direct than Delta as a
+live shared-branch record: its durable unit is an issue, and the documented
+collaboration is routing between runs, not replicated editing in one shared
+branch. The 2 October Delta ranking is therefore unchanged by this addition.
+
+The distinction on the security paragraph remains material but must be stated
+as a difference in documented contracts, not a claim that Multica has no
+security. Multica documents run-scoped API tokens and per-run working
+directories, while warning that its daemon's OS user is the execution boundary:
+by default agent processes can use that user's files, credentials and network,
+and unattended approval prompts are answered automatically [W]
+<https://multica.ai/docs/security-model>. Its workspace and project context
+enters runs automatically [W] <https://multica.ai/docs/workspaces>,
+<https://multica.ai/docs/project-resources>. No source reviewed establishes
+ParleyInn's pull-only untrusted-content rule, a tamper-evident full record, or
+erasure by key. ParleyInn's comparable room view, record and trust guarantees must
+ship before they can be tested against Multica's working experience.
+
+Multica's license is source-available with additional conditions on hosted
+services, commercial embedding and branding; it is not Apache-2.0 alone [W]
+<https://github.com/multica-ai/multica/blob/main/LICENSE>. This affects reuse,
+not the feature comparison.
+
+### Update: LobeHub, 20 October 2026
+
+LobeHub adds a broad **agent workspace and control-surface** competitor. It
+connects external coding agents, including Claude Code and Codex, to Topics;
+adds Tasks, Agent Groups, Pages, memory and shared Workspaces; and lets a
+conversation use an execution device other than the one showing it [W]
+<https://github.com/lobehub/lobehub>,
+<https://github.com/lobehub/lobehub/blob/canary/docs/usage/start.mdx>,
+<https://github.com/lobehub/lobehub/blob/canary/docs/usage/agent/connect-external-agents.mdx>.
+This makes it a closer competitor for the fleet and collaboration experience
+than for ParleyInn's full-record and trust guarantees. LobeHub documents that a
+connected runtime keeps its own session, memory and permissions, and that
+Topic history does not transfer that runtime state to another device [W]
+<https://github.com/lobehub/lobehub/blob/canary/docs/usage/agent/connect-external-agents.mdx>.
+Its sources do not establish an intent-centered room that includes every
+linked issue and review discussion. That is an unknown to test, not proof it
+cannot do it. The 2 October Delta ranking is unchanged by this addition.
+
+### Update: Warp, 20 October 2026
+
+Warp is now a stronger **agent workflow and review** comparison than the
+original shared-session row captured. Its open-source client hosts native and
+third-party agents, shared sessions, branch diffs and inline review feedback
+sent to an agent. Factories, currently marked early access, preserve one work
+item through triage, planning, implementation and review. GitHub issues, PRs
+and submitted reviews can start or continue Factory work; results return to
+the originating forge thread [W]
+<https://github.com/warpdotdev/warp>,
+<https://docs.warp.dev/agents/local-agents/interactive-code-review/>,
+<https://docs.warp.dev/factories/how-factories-work/>,
+<https://docs.warp.dev/factories/integrations/github/>.
+
+This narrows the distinction on review handling. Warp already reacts to a PR
+review and lets people review agent changes inline. The documented human PR
+path shares agent context by a link in the PR and keeps GitHub's diff as the
+merge authority [W]
+<https://docs.warp.dev/guides/agent-workflows/how-to-attach-agent-session-context-to-github-prs/>.
+The sources reviewed do not establish a single conversation that imports
+discussion from both a linked issue and its PR, with a person replying to
+either source comment from that conversation. The [full note](../warp/warp.md)
+sets out that question and the separate record, trust and network boundaries.
+
+### Conversation around the intent: a missing comparison criterion
+
+The original C2 asks whether people can chat with an agent on a branch or pull
+request. That is weaker than ParleyInn's intended experience: one room holds the
+conversation among people and agents around an intent, and may name branches
+and link forge issues; results, evidence and review appear in that room. An
+issue link does not set the intent. A pull request, when used,
+is the forge's review object for a branch, connected by a pull-request link;
+the ParleyInn conversation stays in the room. Future comparisons need to ask
+whether issue discussion, review feedback and the responses to both stay in
+that conversation without a person carrying words between threads.
+
+Multica does not meet this stronger criterion on the documented path. Its issue
+centralizes its own comments and runs, but a linked pull request opens on the
+forge and its review discussion is not mirrored into the issue [W]
+<https://multica.ai/docs/comments>,
+<https://multica.ai/docs/github-integration>. Delta is the closer comparison:
+its shared thread holds code and conversation and replaces the pull request in
+its own workflow [R] <https://zed.dev/blog/delta-public-beta>.
+
+LobeHub's Topic and Group conversations bring multiple agents into one
+workspace, but the sources reviewed do not establish that a Topic imports both
+linked issue comments and pull-request review threads and can send a reply to
+either forge discussion from there [W]
+<https://github.com/lobehub/lobehub/blob/canary/docs/usage/start.mdx>,
+<https://github.com/lobehub/lobehub/blob/canary/docs/usage/agent/connect-external-agents.mdx>.
+
+Warp's Factory resumes work on new activity in the originating issue, pull
+request or review thread and can post back there. Its documented path for a
+human reviewer still places the agent session beside the PR by link; it does
+not establish that the linked issue and PR become one discussion in a Warp
+session [W] <https://docs.warp.dev/factories/connect-your-factory/>,
+<https://docs.warp.dev/factories/integrations/github/>,
+<https://docs.warp.dev/guides/agent-workflows/how-to-attach-agent-session-context-to-github-prs/>.
+
+ParleyInn now specifies the stronger path for linked issues and pull requests: the
+forge bridge records review and issue items as untrusted events shown with
+the room's conversation after the forge read credential owner authorizes
+sharing that exact linked branch or issue with the room. A person can
+explicitly send a response written as a room post back to the forge. The
+bridge cannot send approvals or land code.
+This is an M9 requirement, not a shipped capability. The comparison therefore
+tests whether a competitor centralizes issue and review discussion and can
+answer either externally originated comment without leaving that conversation
+([LANE-08](../../../docs/srs/05b-lane-requirements.md),
+[LANE-34](../../../docs/srs/05b-room-collaboration-requirements.md),
+[SEC-28](../../../docs/srs/06-security.md)).
+
+### Lessons taken into ParleyInn's contract
+
+1. **Start from an issue without adopting its intent.** Multica's issue-first
+   path makes entry easy. ParleyInn's M9 issue flow lets a person choose or create a
+   room and add the issue link as a separate act; imported text never sets the
+   intent ([LANE-34](../../../docs/srs/05b-room-collaboration-requirements.md)).
+2. **Finish external discussions in the room.** The room shows issue and
+   review items, accepts a room post in response, and sends it only on that
+   person's explicit forge reply act. The M9 exit fixture covers the import,
+   send, echo and failure path; exact room grants guard credentialed reads
+   ([M9](../../../plan/2610112059_m9-review-publishing-bridges.md)).
+3. **Make a return visit actionable.** Catch up states what changed, what
+   needs the principal and which action can answer it; Needs you opens the
+   item with its evidence ([VIEW-05 and VIEW-08](../../../docs/srs/05b-room-view-requirements.md)).
+4. **Keep the source behind every short account.** Catch up lines and room
+   summary statements link exact event addresses. A room summary stays
+   untrusted, pull-only for agents, and cannot replace a pin or the record
+   ([VIEW-08](../../../docs/srs/05b-room-view-requirements.md),
+   [LANE-33](../../../docs/srs/05b-room-collaboration-requirements.md)).
+
+These are specified or planned behaviors, not shipping claims. The comparison
+should score competitors on these user paths and mark ParleyInn's delivery status.

@@ -104,7 +104,7 @@ records the choice.
 
 Deviations from the tasks:
 
-- Task 5 used a minimal binary per driver rather than the cairn
+- Task 5 used a minimal binary per driver rather than the parinn
   import test, which bans the whole `net/` prefix. ncruces needs
   `net/url` and `net/netip` allow-listed there when M1 first links
   the store.

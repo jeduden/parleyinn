@@ -13,11 +13,37 @@ pub enum EventKind {
     /// A certificate record: a seat certificate's digest, recorded in a
     /// device seat (PRV-11, PRV-12).
     CertificateRecord,
-    /// A transcript line recorded whole, before a parser reads it.
+    /// A transcript line recorded whole that the transcript parser
+    /// cannot parse, or whose type no supported version records
+    /// (REC-05).
     UnparsedLine,
+    /// A transcript line recorded whole, of the provenance class its
+    /// structure gives (PRV-08).
+    TranscriptLine,
     /// A principal act, recorded in the device seat of the device it
     /// was taken on (OWN-02, OWN-11).
     PrincipalAct,
+    /// A node identity change event, the first event of the device seat
+    /// a node whose node identity changed starts (REC-24).
+    NodeIdentityChange,
+    /// A repeat reference: a transcript line a harness fork repeats,
+    /// recorded by a run that does not own it as the address of the
+    /// event that holds it, never a copy (REC-04).
+    RepeatReference,
+    /// A repeat owner event: which run's writer owns a repeated line
+    /// when no fork observation names one, recorded in the device seat
+    /// (REC-04).
+    RepeatOwner,
+    /// A hook observation: the structural fields a hook handler kept,
+    /// held at a transcript's ingest marker until it reached the record
+    /// (REC-19, PRV-08).
+    HookObservation,
+    /// A prompt match: what became of a prompt commitment the first line
+    /// carrying its `prompt_id` used up (PRV-08).
+    PromptMatch,
+    /// A repository's identity, bound once at the first hook event that
+    /// shows it (LANE-02): a structural event, never an `operator` one.
+    RepositoryBind,
 }
 
 impl EventKind {
@@ -29,7 +55,14 @@ impl EventKind {
             Self::CreateRoom => "create_room",
             Self::CertificateRecord => "certificate_record",
             Self::UnparsedLine => "unparsed_line",
+            Self::TranscriptLine => "transcript_line",
             Self::PrincipalAct => "principal_act",
+            Self::NodeIdentityChange => "node_identity_change",
+            Self::RepeatReference => "repeat_reference",
+            Self::RepeatOwner => "repeat_owner",
+            Self::HookObservation => "hook_observation",
+            Self::PromptMatch => "prompt_match",
+            Self::RepositoryBind => "repository_bind",
         }
     }
 
@@ -41,7 +74,14 @@ impl EventKind {
             Self::CreateRoom,
             Self::CertificateRecord,
             Self::UnparsedLine,
+            Self::TranscriptLine,
             Self::PrincipalAct,
+            Self::NodeIdentityChange,
+            Self::RepeatReference,
+            Self::RepeatOwner,
+            Self::HookObservation,
+            Self::PromptMatch,
+            Self::RepositoryBind,
         ]
         .into_iter()
         .find(|k| k.as_str() == name)

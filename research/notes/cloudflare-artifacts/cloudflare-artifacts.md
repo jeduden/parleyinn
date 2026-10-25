@@ -55,9 +55,9 @@ not stated in what was read, so it is a gap, not a finding.
   - roles beyond read and write tokens;
   - how a person judges an outcome.
 
-## What it means for Cairn
+## What it means for ParleyInn
 
-| Artifacts                                             | Cairn                                                                                       |
+| Artifacts                                             | ParleyInn                                                                                   |
 | ----------------------------------------------------- | ------------------------------------------------------------------------------------------- |
 | A fork per agent task, diverging independently        | A workspace per agent, several serving one room: parallel attempts at one intent            |
 | Code and agent context persisted together in repos    | The record keeps the context beside git, signed per writer, never as repository files       |
@@ -70,18 +70,18 @@ not stated in what was read, so it is a gap, not a finding.
 - **It confirms the direction.** A large platform now treats many
   agents on one codebase, a fork per attempt, and persisted session
   context as the problem to solve, and asks openly what replaces the
-  pull request. Cairn's answer is the room: intent, live work,
+  pull request. ParleyInn's answer is the room: intent, live work,
   judgement and correction in one place.
 - **It sharpens the difference.**
   - Artifacts is a hosted store with git semantics and no stated trust
     model.
-  - Cairn is a local record with a trust boundary (I2), signed writers
+  - ParleyInn is a local record with a trust boundary (I2), signed writers
     and no central service.
   - Artifacts reads agent instructions from repository files, which is
     exactly the path by which a poisoned file becomes a command.
 - **It could be a publish target.** Since Artifacts speaks git, a
-  person could name an Artifacts repository as a B3 host for Cairn's
-  git carrier or a published bundle. Cairn would depend on it for
+  person could name an Artifacts repository as a B3 host for ParleyInn's
+  git carrier or a published bundle. ParleyInn would depend on it for
   nothing.
 - **It joins the comparison.** It sits beside Pierre Code Storage in
   the survey of agent version control

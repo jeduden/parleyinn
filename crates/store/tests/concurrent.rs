@@ -25,6 +25,7 @@ fn new_events(n: usize) -> Vec<NewEvent> {
             provenance: Provenance::Unparsed,
             content: json!({"text": format!("line {i}")}),
             commitment_key: CommitmentKey::from_bytes([1; 32]),
+            transcript_timestamp: None,
         })
         .collect()
 }

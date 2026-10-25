@@ -41,7 +41,7 @@ exactly one kind (LANE-31).
   hook handlers⟦f:compute-kernel⟧, the kernel worker⟦/f⟧ and the MCP server never do, and an `operator`
   event without that mark is never a principal act. A process of the same OS
   user that writes to the store, or signs with this node's device key or a seat
-  key, outside Cairn's code is §6.1's ⟦f:sandbox-risk⟧residual ⟦/f⟧risk R3⟦f:store-protection⟧: only a head receipt kept off the machine
+  key, outside ParleyInn's code is §6.1's ⟦f:sandbox-risk⟧residual ⟦/f⟧risk R3⟦f:store-protection⟧: only a head receipt kept off the machine
   shows it⟦/f⟧. An act a seat key signs as
   the act, beyond sealing its writer, is a room act. A widening act lets more
   reach an agent, or more act or leave the node; a cut act only stops, narrows
@@ -110,7 +110,7 @@ exactly one kind (LANE-31).
   version of one restores, turns off restore blocks at any point Restore block
   names, lowers the pin budget, or stops this node recording its own runs'
   events, is widening whatever verb carries it, so
-  `cairn uninstall` records the widening act turning capture off before it
+  `parinn uninstall` records the widening act turning capture off before it
   removes the hook registrations (ADM-02)⟦f:access-tokens⟧, a structural event naming the
   uninstall standing in for that act on a token-key-only node⟦/f⟧. ⟦f:access-tokens⟧On an ephemeral node, PEER-01's
   environment variable, a structural event, stands in for ⟦f:peer-sync⟧turning on its peer

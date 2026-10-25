@@ -189,7 +189,10 @@ fn heads_that_cite_each_other_in_a_cycle_have_no_causal_order() {
 
     assert_eq!(
         causal_order(&record),
-        Err(ChainError::new(Address::new(a, seq(1)), Fault::Cycle))
+        Err(ChainError::new(
+            Address::new(a.min(b), seq(1)),
+            Fault::Cycle
+        ))
     );
 }
 

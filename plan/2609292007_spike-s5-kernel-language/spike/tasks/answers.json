@@ -120,11 +120,11 @@
  ],
  "t10": [
   [
-   "crates/cairn/src/store/segment.rs",
+   "crates/parinn/src/store/segment.rs",
    25
   ],
   [
-   "crates/cairn/src/store/mod.rs",
+   "crates/parinn/src/store/mod.rs",
    24
   ],
   [
@@ -132,11 +132,11 @@
    23
   ],
   [
-   "crates/cairn/src/hook/handler.rs",
+   "crates/parinn/src/hook/handler.rs",
    21
   ],
   [
-   "crates/cairn/src/restore/block.rs",
+   "crates/parinn/src/restore/block.rs",
    20
   ]
  ],
@@ -226,7 +226,7 @@
    15
   ],
   [
-   "cargo test -p cairn",
+   "cargo test -p parinn",
    40,
    11
   ],

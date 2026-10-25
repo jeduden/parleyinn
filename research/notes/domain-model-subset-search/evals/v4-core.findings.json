@@ -11,7 +11,7 @@
  {
   "type": "gap",
   "quote": "only changes a cut act could make, never removing a pin from a restore block,",
-  "problem": "A cut act 'only stops, narrows or undoes a widening', yet removing a pin from a restore block is widening 'whatever verb carries it'. Nothing classes a settings change that stops a restore path (turning `restore_block.on_prompt` off) or shrinks the pin budget. So a repository's untrusted `.cairn.toml`, which takes effect without acceptance, may or may not be able to withhold the principal's constraints from the agent, depending on the implementer.",
+  "problem": "A cut act 'only stops, narrows or undoes a widening', yet removing a pin from a restore block is widening 'whatever verb carries it'. Nothing classes a settings change that stops a restore path (turning `restore_block.on_prompt` off) or shrinks the pin budget. So a repository's untrusted `.parinn.toml`, which takes effect without acceptance, may or may not be able to withhold the principal's constraints from the agent, depending on the implementer.",
   "fix": "Add to Principal act's widening list and to repository configuration: \"any change that turns off a restore path or lowers the pin budget is widening, and repository configuration never makes one\".",
   "severity": "needs-fix",
   "lens": "consistency",
@@ -56,8 +56,8 @@
  {
   "type": "contradiction",
   "quote": "Each recall tool's name, description and schema, and the MCP server's",
-  "problem": "The harness hands the tool definitions and the MCP server's instructions to the model without any recall call. They are neither restore blocks nor compaction guidance. That contradicts I2's 'No other write to an agent exists' and I4's exhaustive list of what Cairn's components send off the machine.",
-  "fix": "Add \"the MCP server's fixed instructions and tool definitions, fixed text Cairn ships\" to I2's closed paths and to Closed path, or state that serving them is not a write to an agent.",
+  "problem": "The harness hands the tool definitions and the MCP server's instructions to the model without any recall call. They are neither restore blocks nor compaction guidance. That contradicts I2's 'No other write to an agent exists' and I4's exhaustive list of what ParleyInn's components send off the machine.",
+  "fix": "Add \"the MCP server's fixed instructions and tool definitions, fixed text ParleyInn ships\" to I2's closed paths and to Closed path, or state that serving them is not a write to an agent.",
   "severity": "minor",
   "lens": "consistency",
   "model": "default"
@@ -73,9 +73,9 @@
  },
  {
   "type": "contradiction",
-  "quote": "**Room**: seats and pins. The unit Cairn shows and shares.",
-  "problem": "The only room in this candidate is the personal room, which 'stays private', and I4 (B0 only) gives no path for sharing. 'The unit Cairn ... shares' therefore contradicts Personal room and has no mechanism behind it.",
-  "fix": "Drop \"and shares\": \"The unit Cairn shows.\"",
+  "quote": "**Room**: seats and pins. The unit ParleyInn shows and shares.",
+  "problem": "The only room in this candidate is the personal room, which 'stays private', and I4 (B0 only) gives no path for sharing. 'The unit ParleyInn ... shares' therefore contradicts Personal room and has no mechanism behind it.",
+  "fix": "Drop \"and shares\": \"The unit ParleyInn shows.\"",
   "severity": "minor",
   "lens": "consistency",
   "model": "default"
@@ -101,7 +101,7 @@
  {
   "type": "security",
   "quote": "changes harness configuration only through explicit install and uninstall",
-  "problem": "Install is neither a principal act nor a device seat's room act, and the candidate exempts creating the personal room from the principal-surface rule. So nothing refuses `cairn install` from a run's tool process. A prompt-injected agent can change harness configuration, for example by re-pointing the hooks at a fresh home that holds no pins. That drops every constraint from restore blocks without the widening act the candidate requires for removing a pin.",
+  "problem": "Install is neither a principal act nor a device seat's room act, and the candidate exempts creating the personal room from the principal-surface rule. So nothing refuses `parinn install` from a run's tool process. A prompt-injected agent can change harness configuration, for example by re-pointing the hooks at a fresh home that holds no pins. That drops every constraint from restore blocks without the widening act the candidate requires for removing a pin.",
   "fix": "Add: \"install and uninstall run only at a principal surface, through the harness's own plugin install or through the managed install path; from a process the harness started they are refused and counted (I6).\"",
   "severity": "needs-fix",
   "lens": "security",
@@ -111,7 +111,7 @@
   "type": "gap",
   "quote": "or TUI call from inside a run is the agent's own tool call: never a principal",
   "problem": "Recall covers only CLI or TUI calls 'from inside a run', while the principal-surface exclusion covers every process the harness starts (hook commands, status lines). A CLI read called from a hook command is therefore neither a principal surface nor recall, and nothing says its output is enveloped. The harness can feed hook output into the model's context.",
-  "fix": "Add: \"Any CLI or TUI call from a process the harness started, other than Cairn's own hook handlers, MCP server and harness strip, is recall: enveloped, whatever its output.\"",
+  "fix": "Add: \"Any CLI or TUI call from a process the harness started, other than ParleyInn's own hook handlers, MCP server and harness strip, is recall: enveloped, whatever its output.\"",
   "severity": "minor",
   "lens": "security",
   "model": "default"
@@ -136,17 +136,17 @@
  },
  {
   "type": "useless",
-  "quote": "- **Room**: seats and pins. The unit Cairn shows and shares.",
+  "quote": "- **Room**: seats and pins. The unit ParleyInn shows and shares.",
   "problem": "Nothing in this candidate shares a room. The only room is the personal room, which \"stays private\", and I4 declares only B0, so no other node or principal can reach it. 'Shares' therefore names a capability nothing can use, and so does 'held by any node' in Writer.",
-  "fix": "Room: seats and pins in one home; the unit Cairn shows. (In Writer, change 'held by any node' to 'held by the node that wrote it'.)",
+  "fix": "Room: seats and pins in one home; the unit ParleyInn shows. (In Writer, change 'held by any node' to 'held by the node that wrote it'.)",
   "severity": "minor",
   "lens": "usefulness",
   "model": "default"
  },
  {
   "type": "gap",
-  "quote": "`.cairn.toml`, its **repository configuration**, declares no pins and may make",
-  "problem": "The candidate never says which repository's .cairn.toml applies to which runs, or at what scope its cut-only changes take effect (node, room or run). The Git group defines no repository concept. One implementer could apply a cloned repository's file node-wide, narrowing settings for unrelated runs. Another could apply it only to runs working in that repository.",
+  "quote": "`.parinn.toml`, its **repository configuration**, declares no pins and may make",
+  "problem": "The candidate never says which repository's .parinn.toml applies to which runs, or at what scope its cut-only changes take effect (node, room or run). The Git group defines no repository concept. One implementer could apply a cloned repository's file node-wide, narrowing settings for unrelated runs. Another could apply it only to runs working in that repository.",
   "fix": "Add: \"It applies only to runs whose working directory lies in that repository, and only to settings keys scoped to those runs.\"",
   "severity": "minor",
   "lens": "usefulness",

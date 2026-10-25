@@ -86,8 +86,8 @@
   "severity": "needs-fix",
   "type": "security",
   "quote": "or any CLI or TUI read from inside a run, whatever its output",
-  "problem": "Only reads count as recall. The room-act MCP tools (room_pin, room_edit, room_unpin, room_link, room_create) and CLI calls from inside a run that are not reads (cairn ingest, rebuild, migrate, a pin command) also return output that the harness sends to the model. That output is neither enveloped recall nor a closed path, and nothing bounds it: ingest could echo an attacker's unparsed line, or room_edit could echo pin text. This breaks I2's 'No other write to an agent exists' and I4's list of what leaves the machine.",
-  "fix": "Write 'or any CLI or TUI call from inside a run, and any MCP tool's result, whatever its output', or say that every other agent-facing output carries only fixed text Cairn ships, structural fields and ids."
+  "problem": "Only reads count as recall. The room-act MCP tools (room_pin, room_edit, room_unpin, room_link, room_create) and CLI calls from inside a run that are not reads (parinn ingest, rebuild, migrate, a pin command) also return output that the harness sends to the model. That output is neither enveloped recall nor a closed path, and nothing bounds it: ingest could echo an attacker's unparsed line, or room_edit could echo pin text. This breaks I2's 'No other write to an agent exists' and I4's list of what leaves the machine.",
+  "fix": "Write 'or any CLI or TUI call from inside a run, and any MCP tool's result, whatever its output', or say that every other agent-facing output carries only fixed text ParleyInn ships, structural fields and ids."
  },
  {
   "candidate": "g1-core",
@@ -166,8 +166,8 @@
   "severity": "minor",
   "type": "useless",
   "quote": "A capability, not an act: to edit and execute commands (LANE-16)",
-  "problem": "Nothing in the candidate checks or gates work. Every run seat is a contributor, device seats hold every capability, and Cairn never controls the harness's edits or commands. So the work capability has no effect.",
-  "fix": "Drop \"and work\" from Contributor and drop the Work entry, or state what Cairn gates on it."
+  "problem": "Nothing in the candidate checks or gates work. Every run seat is a contributor, device seats hold every capability, and ParleyInn never controls the harness's edits or commands. So the work capability has no effect.",
+  "fix": "Drop \"and work\" from Contributor and drop the Work entry, or state what ParleyInn gates on it."
  },
  {
   "candidate": "g1-core",
@@ -175,8 +175,8 @@
   "feature": "core",
   "severity": "minor",
   "type": "useless",
-  "quote": "A mark Cairn sets on an event whose text matches an injection",
-  "problem": "Cairn sets a flag, but nothing reads it: not the trust policy, trust marks, envelopes, restore blocks or any surface. No agent or person ever sees it.",
+  "quote": "A mark ParleyInn sets on an event whose text matches an injection",
+  "problem": "ParleyInn sets a flag, but nothing reads it: not the trust policy, trust marks, envelopes, restore blocks or any surface. No agent or person ever sees it.",
   "fix": "Append: shown with the event on Runs and inside the envelope of any recall that returns it."
  },
  {
@@ -185,9 +185,9 @@
   "feature": "browser-room-view",
   "severity": "needs-fix",
   "type": "contradiction",
-  "quote": "widening act at a principal surface (`cairn ui --phone`)",
-  "problem": "`cairn ui` is declared no part of the CLI, and Principal surface lists only the browser room view, the CLI or TUI at a terminal no run's tool process started, and a paired phone. So the act issuing a phone-scoped room-view secret is taken at no principal surface, and the 'never from inside a run' exclusion does not reach `cairn ui`: nothing stops a run's tool process from starting it and holding its launch secret.",
-  "fix": "In Principal surface add \"or `cairn ui` started at a terminal that no run's tool process started; `cairn ui` started from a run's tool process mints no room-view secret\"."
+  "quote": "widening act at a principal surface (`parinn ui --phone`)",
+  "problem": "`parinn ui` is declared no part of the CLI, and Principal surface lists only the browser room view, the CLI or TUI at a terminal no run's tool process started, and a paired phone. So the act issuing a phone-scoped room-view secret is taken at no principal surface, and the 'never from inside a run' exclusion does not reach `parinn ui`: nothing stops a run's tool process from starting it and holding its launch secret.",
+  "fix": "In Principal surface add \"or `parinn ui` started at a terminal that no run's tool process started; `parinn ui` started from a run's tool process mints no room-view secret\"."
  },
  {
   "candidate": "g1-all",
@@ -306,7 +306,7 @@
   "severity": "needs-fix",
   "type": "security",
   "quote": "the browser room view under SEC-20, the CLI or TUI at a terminal that no",
-  "problem": "Only CLI and TUI calls made from inside a run are excluded from principal acts. `cairn ui` is 'no part of the CLI', and nothing says a room-view component that a run's tool process started (`cairn ui --phone` included) is not a principal surface. An agent that starts one holds its launch secret and can take widening acts: trust grants, stamps, restoring pins, allows.",
+  "problem": "Only CLI and TUI calls made from inside a run are excluded from principal acts. `parinn ui` is 'no part of the CLI', and nothing says a room-view component that a run's tool process started (`parinn ui --phone` included) is not a principal surface. An agent that starts one holds its launch secret and can take widening acts: trust grants, stamps, restoring pins, allows.",
   "fix": "'the browser room view under SEC-20 of a room-view component that no run's tool process started, the CLI or TUI at a terminal that no run's tool process started'."
  },
  {

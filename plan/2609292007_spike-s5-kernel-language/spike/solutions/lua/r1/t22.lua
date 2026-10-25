@@ -1,5 +1,5 @@
 local counts = {}
-for _, e in ipairs(cairn.events()) do
+for _, e in ipairs(parinn.events()) do
   if e.kind == "tool_result" and e.tool == "Bash" and e.status == "error" and e.text then
     local c = re.capture(e.text, "exit code (-?\\d+)", 1)
     if c then

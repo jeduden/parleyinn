@@ -1,6 +1,6 @@
 # Git interface over custom storage and transport (as of October 2026)
 
-Scope: systems that keep git as the client-facing interface (wire protocol, smart HTTP, SSH, or a git remote helper) while owning storage and/or transport underneath. Written to feed Cairn (Go, security-first, append-only agent-session record, invariant I4 = no network in shipped code, crypto-shredding under consideration).
+Scope: systems that keep git as the client-facing interface (wire protocol, smart HTTP, SSH, or a git remote helper) while owning storage and/or transport underneath. Written to feed ParleyInn (Go, security-first, append-only agent-session record, invariant I4 = no network in shipped code, crypto-shredding under consideration).
 
 ## 1. Server-side engines that speak git but store differently
 
@@ -108,8 +108,8 @@ Scope: systems that keep git as the client-facing interface (wire protocol, smar
 
 ### Inferences
 
-- The 2026 agent-scale engines converge on one pattern: immutable log or content-addressed store as truth, CAS on refs for multi-writer safety, local git repo as a disposable cache. This matches Cairn's append-only record + rebuildable projections (I10) closely; Continuity is the most explicit published design to borrow from.
-- None of the commercial engines publish customer-held keys or crypto-erasure; deletion is per-repo lifecycle (Cloudflare, Code.Storage "cold archival") at best. Cairn would have to build per-key encryption itself.
+- The 2026 agent-scale engines converge on one pattern: immutable log or content-addressed store as truth, CAS on refs for multi-writer safety, local git repo as a disposable cache. This matches ParleyInn's append-only record + rebuildable projections (I10) closely; Continuity is the most explicit published design to borrow from.
+- None of the commercial engines publish customer-held keys or crypto-erasure; deletion is per-repo lifecycle (Cloudflare, Code.Storage "cold archival") at best. ParleyInn would have to build per-key encryption itself.
 - Content-addressed git objects make per-record erasure hard: deleting an object means rewriting every descendant commit and GC. Crypto-shredding fits better if encryption sits below git (Keybase/gcrypt style, encrypting packs/blocks), not inside git objects.
 
 ### Gaps
@@ -138,7 +138,7 @@ Remote helpers are the lightest way to keep `git push/fetch` while owning storag
 
 ### Inferences
 
-- A Cairn-owned `git-remote-cairn` helper speaking to a local store over stdio would keep git as the code interface without any `net` import, preserving I4; network sync would be a separate, opt-in component.
+- A ParleyInn-owned `git-remote-parinn` helper speaking to a local store over stdio would keep git as the code interface without any `net` import, preserving I4; network sync would be a separate, opt-in component.
 - gcrypt's per-pack key + encrypted manifest is the closest existing design to per-key crypto-shredding: destroying a pack key renders that pack unreadable. But repacking merges packs, so key granularity has to be designed so repack never re-encrypts shredded data under a live key.
 - gcrypt's implicit force-push and S3 helper's lock-TTL show the multi-writer weak point of helper-over-dumb-store designs; a CAS on a ref log (as Continuity and Entire do) is the safer primitive.
 
@@ -151,7 +151,7 @@ Remote helpers are the lightest way to keep `git push/fetch` while owning storag
 
 ### Takeaway
 
-go-git (Apache-2.0) is the main pure-Go option; v6 exposes server-side `UploadPack`/`ReceivePack` decoupled from transports and supports protocol v2, so it can serve git over a pipe/stdio. soft-serve, gitkit and Gitea all shell out to the `git` binary (an `os/exec` dependency, which Cairn's I4 bans in shipped code).
+go-git (Apache-2.0) is the main pure-Go option; v6 exposes server-side `UploadPack`/`ReceivePack` decoupled from transports and supports protocol v2, so it can serve git over a pipe/stdio. soft-serve, gitkit and Gitea all shell out to the `git` binary (an `os/exec` dependency, which ParleyInn's I4 bans in shipped code).
 
 ### Cited Findings
 
@@ -165,9 +165,9 @@ go-git (Apache-2.0) is the main pure-Go option; v6 exposes server-side `UploadPa
 
 ### Inferences
 
-- For Cairn, the I4-compatible route is go-git v6 core + a custom `storer` (encrypted, append-only) + server `UploadPack`/`ReceivePack` over stdio from a remote helper, importing no `net/http` or `ssh` transport subpackages. Whether the v6 root `transport` package's dependency closure is free of `net` must be checked with `go list -deps` against Cairn's import-closure test.
+- For ParleyInn, the I4-compatible route is go-git v6 core + a custom `storer` (encrypted, append-only) + server `UploadPack`/`ReceivePack` over stdio from a remote helper, importing no `net/http` or `ssh` transport subpackages. Whether the v6 root `transport` package's dependency closure is free of `net` must be checked with `go list -deps` against ParleyInn's import-closure test.
 - `packfile-uris` and `server-option` are protocol-level hooks a custom server could use for out-of-band encrypted pack delivery or passing a session/key id without breaking stock git clients.
-- Adding go-git counts against Cairn's ten-direct-dependency budget and needs an ADR (ENG-18, ENG-26).
+- Adding go-git counts against ParleyInn's ten-direct-dependency budget and needs an ADR (ENG-18, ENG-26).
 
 ### Gaps
 
@@ -194,7 +194,7 @@ Encryption with user-held keys exists only in Keybase (dormant) and git-remote-g
 ### Inferences
 
 - For crypto-shredding with a git interface, the workable layering is: git objects (plaintext to the client) → custom storer that encrypts per record/session under a per-key DEK → append-only log. Shredding the DEK makes the encrypted blocks unreadable, but any git object (tree/commit) that references the shredded content keeps its hash, so clones show dangling references; tools must tolerate missing objects (promisor/partial-clone semantics in protocol v2 are the nearest standard mechanism).
-- GPL-3.0 (gcrypt) is likely off Cairn's licence allow-list; its design can be reimplemented, not vendored.
+- GPL-3.0 (gcrypt) is likely off ParleyInn's licence allow-list; its design can be reimplemented, not vendored.
 - Every network-facing engine here conflicts with I4 as shipped code; borrowing designs (WAL + cache, CAS refs, per-pack keys) is compatible, embedding their servers is not.
 
 ### Gaps

@@ -1,7 +1,7 @@
 # Windows support: cost per language and slot
 
 Scope: what it costs, as of 4 October 2026, to make a Windows desktop
-a full Cairn node in Go and in Rust. Such a node holds the record,
+a full ParleyInn node in Go and in Rust. Such a node holds the record,
 receives Claude Code's hooks and MCP calls, hosts harness terminals in
 the run component and serves the room UI. It answers the stakeholder's
 new requirement against [CON-02][ctx] and [NFR-10][nfr], which name
@@ -55,7 +55,7 @@ Facts:
   hook processes go through libuv (inference). libuv's Windows search
   appends `.com`, then `.exe`, to a name without an extension
   ([libuv process.c][libuv-search]). Whether exec form therefore finds
-  `cairn.exe` from `${CLAUDE_PLUGIN_ROOT}/bin/cairn` is unverified.
+  `parinn.exe` from `${CLAUDE_PLUGIN_ROOT}/bin/parinn` is unverified.
 - MCP stdio servers: the MCP page has no Windows section today
   ([MCP][cc-mcp]). Community guides wrap `npx` in `cmd /c`
   ([guide][mcp-win-guide], secondary); a native `.exe` needs no
@@ -90,7 +90,7 @@ Facts:
   Drive: "Open now, scan now" ([Defender performance mode][def-perf]).
   How much that adds to a hook's process start and store opens is
   unmeasured.
-- WSL 2 is the cheap path: a Linux `cairn` inside WSL, and a Windows
+- WSL 2 is the cheap path: a Linux `parinn` inside WSL, and a Windows
   browser reaching its loopback server, since "you can access it from
   a Windows app … using `localhost`" ([WSL networking][wsl-net]). It
   does not serve native-Windows Claude Code.
@@ -274,7 +274,7 @@ same calls under `Win32_Security_Authorization`, as `unsafe` FFI
 ([Cargo.toml][ws-cargo]). The convenience crate windows-acl 0.3.0 was
 last released in January 2021 ([crates.io][winacl]).
 
-**Maturity.** The Win32 security API is old and stable; the Cairn code
+**Maturity.** The Win32 security API is old and stable; the ParleyInn code
 is new in both languages, and the SRS wording is POSIX-only.
 
 **SRS rows.** [SEC-02, SEC-03, SEC-18][sec], [§8.1 home layout][data],
@@ -308,7 +308,7 @@ Facts:
   passes SEC-10 needs a ruling, like the Keychain's daemon on macOS
   (inference).
 - Against a same-user agent, a DPAPI blob is no stronger than a `0600`
-  file, so `cairn status` must say so on Windows too (SEC-10).
+  file, so `parinn status` must say so on Windows too (SEC-10).
 
 **Go.** `x/sys/windows` binds `CryptProtectData` and
 `CryptUnprotectData` ([syscall_windows.go][xsys-dpapi]). Credential
@@ -326,7 +326,7 @@ costs Go no foreign-function bridge.
 
 **Maturity.** DPAPI dates from Windows 2000 and is stable; the
 `CRYPTPROTECT_PROMPTSTRUCT` prompt flow "will be removed in February
-2027" ([CryptProtectData][dpapi]), which Cairn would not use.
+2027" ([CryptProtectData][dpapi]), which ParleyInn would not use.
 
 **SRS rows.** [SEC-10, SEC-09, SEC-27][sec], [REC-18, REC-24][fr],
 PRV-10, VIEW-10.
@@ -346,7 +346,7 @@ Facts:
 - Named pipes: a `NULL` descriptor grants "read access to members of
   the Everyone group and the anonymous account", and the default,
   `PIPE_ACCEPT_REMOTE_CLIENTS`, accepts "connections from remote
-  clients" ([CreateNamedPipe][cnp]). A Cairn pipe must set
+  clients" ([CreateNamedPipe][cnp]). A ParleyInn pipe must set
   `PIPE_REJECT_REMOTE_CLIENTS` and an explicit descriptor, or B1 leaks
   onto the network (inference against I4).
 - `GetNamedPipeClientProcessId` gives the client PID (Vista+)
@@ -473,7 +473,7 @@ A windows/amd64 multi-call binary cross-built from Linux was 6.4 MB
 - Smart App Control blocks "unknown, unsigned code" and its "signature
   checks apply to all executable files, not just those downloaded from
   the Internet" ([Smart App Control][sac], [SmartScreen][smartscreen]).
-  An unsigned `cairn.exe` installed by the plugin can be blocked on
+  An unsigned `parinn.exe` installed by the plugin can be blocked on
   such machines; hooks then fail open and record nothing (inference).
 - SmartScreen: EV certificates no longer bypass it since 2024; Azure
   Artifact Signing costs about $9.99 a month and serves organizations
@@ -561,7 +561,7 @@ S under a week, M one to three weeks, L more than three weeks.
   recorded risk acceptance, until Claude Code adds one or the session
   runs in WSL 2.
 - **Go keeps its cross-build advantage and gains a new evidence cost.**
-  Every Windows API Cairn needs (ACLs, DPAPI, Credential Manager,
+  Every Windows API ParleyInn needs (ACLs, DPAPI, Credential Manager,
   ConPTY, pipes, job objects, AppContainer) is reachable without cgo;
   Windows is cheaper for Go than macOS's Keychain. But `x/sys/windows`
   holds `CreateProcess`, `Socket`, `Connect` and `WSAIoctl` in the same
@@ -592,7 +592,7 @@ S under a week, M one to three weeks, L more than three weeks.
   existing linux binary with Claude Code's sandbox, and a Windows
   browser reaches its loopback lane view. It covers developers who
   already use WSL, defers every item above but 9, and leaves
-  native-Windows Claude Code users without Cairn (inference).
+  native-Windows Claude Code users without ParleyInn (inference).
 
 [ctx]: ../../../docs/srs/02-context.md
 [fr]: ../../../docs/srs/05-functional-requirements.md

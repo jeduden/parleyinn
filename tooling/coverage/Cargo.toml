@@ -17,8 +17,8 @@ testkit.workspace = true
 [lints]
 workspace = true
 
-# ENG-02: see crates/cairn/Cargo.toml.
-[package.metadata.cairn]
+# ENG-02: see crates/parinn/Cargo.toml.
+[package.metadata.parinn]
 responsibility = "Measures line coverage per test layer and enforces the floors"
 may-depend-on = ["scenario"]
 may-dev-depend-on = ["testkit"]

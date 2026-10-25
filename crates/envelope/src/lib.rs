@@ -99,7 +99,7 @@ impl IntegrityStatus {
 }
 
 /// One recalled event.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Item {
     pub address: String,
     pub writer: String,
@@ -112,14 +112,18 @@ pub struct Item {
     pub trust: TrustLevel,
     pub flags: Vec<String>,
     pub integrity: IntegrityStatus,
-    /// The event's original content.
+    /// How relevant a search found the event, higher the better; none
+    /// for an event recalled by its address.
+    pub score: Option<f64>,
+    /// The event's original content; for a search hit, its preview.
     pub content: String,
 }
 
 impl Item {
     /// The item as JSON text, its content last.
     fn render(&self) -> String {
-        let fields = [
+        let score = self.score.map(|score| ("score", Value::from(score)));
+        let mut fields = vec![
             ("address", Value::from(self.address.as_str())),
             ("writer", Value::from(self.writer.as_str())),
             ("author", Value::from(self.author.as_str())),
@@ -130,8 +134,9 @@ impl Item {
             ("trust", Value::from(self.trust.as_str())),
             ("flags", json!(self.flags)),
             ("integrity", Value::from(self.integrity.as_str())),
-            ("content", Value::from(self.content.as_str())),
         ];
+        fields.extend(score);
+        fields.push(("content", Value::from(self.content.as_str())));
         let fields: Vec<String> = fields
             .iter()
             .map(|(name, value)| format!("\"{name}\":{value}"))
@@ -141,7 +146,7 @@ impl Item {
     }
 
     fn to_value(&self) -> Value {
-        json!({
+        let mut value = json!({
             "address": self.address,
             "writer": self.writer,
             "author": self.author,
@@ -153,12 +158,17 @@ impl Item {
             "flags": self.flags,
             "integrity": self.integrity.as_str(),
             "content": self.content,
-        })
+        });
+        if let Some(score) = self.score {
+            value["score"] = Value::from(score);
+        }
+
+        value
     }
 }
 
 /// An envelope of recalled events.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Envelope {
     pub items: Vec<Item>,
     /// Whether the call's limit cut the items short.
@@ -173,7 +183,7 @@ impl Envelope {
     #[must_use]
     pub fn to_value(&self) -> Value {
         json!({
-            "cairn_envelope": VERSION,
+            "parinn_envelope": VERSION,
             "warning": WARNING,
             "items": self.items.iter().map(Item::to_value).collect::<Vec<_>>(),
             "tombstones": [],
@@ -191,7 +201,7 @@ impl Envelope {
         let items: Vec<String> = self.items.iter().map(Item::render).collect();
 
         format!(
-            "{{\"cairn_envelope\":{VERSION},\"warning\":{},\"items\":[{}],\"tombstones\":[],\"truncated\":{},\"next_cursor\":{}}}",
+            "{{\"parinn_envelope\":{VERSION},\"warning\":{},\"items\":[{}],\"tombstones\":[],\"truncated\":{},\"next_cursor\":{}}}",
             Value::from(WARNING),
             items.join(","),
             self.truncated,

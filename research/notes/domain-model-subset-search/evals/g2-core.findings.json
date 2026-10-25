@@ -47,7 +47,7 @@
  {
   "type": "contradiction",
   "quote": "A node. A node's device key certifies the seats",
-  "problem": "Device is defined only as 'A node', so one concept has two names. This contradicts the hub rule that every Cairn concept has one name, and leaves 'device' and 'node' interchangeable throughout.",
+  "problem": "Device is defined only as 'A node', so one concept has two names. This contradicts the hub rule that every ParleyInn concept has one name, and leaves 'device' and 'node' interchangeable throughout.",
   "fix": "Drop Device as a separate concept and read 'device seat' and 'device key' as a node's seat and a node's key; or define a device as something distinct from a node.",
   "severity": "minor",
   "lens": "consistency",
@@ -83,7 +83,7 @@
  {
   "type": "gap",
   "quote": "its digest, except a change that only cuts; that acceptance adds, edits or",
-  "problem": "A cut-only change from configuration or a repository's .cairn.toml takes effect with no act recorded. 'Changes a cut act could make' include quarantining content and revoking a run seat's key. Text an untrusted repository supplies could then quarantine or revoke without a principal act, and the quarantine set would no longer derive from the writer logs, which breaks I10.",
+  "problem": "A cut-only change from configuration or a repository's .parinn.toml takes effect with no act recorded. 'Changes a cut act could make' include quarantining content and revoking a run seat's key. Text an untrusted repository supplies could then quarantine or revoke without a principal act, and the quarantine set would no longer derive from the writer logs, which breaks I10.",
   "fix": "Add: \"A settings layer's cut-only change only narrows settings; quarantine and key revocation happen only as recorded principal acts.\"",
   "severity": "minor",
   "lens": "security",
@@ -91,8 +91,8 @@
  },
  {
   "type": "contradiction",
-  "quote": "Cairn's components send data off the machine only as recalled content an agent",
-  "problem": "I4 says data leaves the machine only as recalled content or through the closed paths. But Recall says Cairn also gives agents other output: a non-recall MCP tool's return, or a non-read CLI call from inside a run. The harness sends that output to its model too.",
+  "quote": "ParleyInn's components send data off the machine only as recalled content an agent",
+  "problem": "I4 says data leaves the machine only as recalled content or through the closed paths. But Recall says ParleyInn also gives agents other output: a non-recall MCP tool's return, or a non-read CLI call from inside a run. The harness sends that output to its model too.",
   "fix": "Append to I4: \"or as the fixed text, sanitized structural fields and ids that any other tool call returns\".",
   "severity": "minor",
   "lens": "security",
@@ -127,9 +127,9 @@
  },
  {
   "type": "contradiction",
-  "quote": "range links. Any other output Cairn gives an agent outside the closed paths,",
+  "quote": "range links. Any other output ParleyInn gives an agent outside the closed paths,",
   "problem": "Recall admits a second output to an agent outside the closed paths: what a non-recall MCP tool (such as room_pin) or a non-read CLI call returns. But Closed path and I2 say \"No other write to an agent exists\", and I4 lets data leave the machine only as recalled content or through closed paths. A strict implementer would make the agent's own room_<act> tools return nothing, not even the pin id the agent needs to link or edit.",
-  "fix": "In I2, I4 and Closed path, add: \"...or as the reply to the agent's own non-recall tool call, built only from fixed text Cairn ships, sanitized structural fields and ids.\"",
+  "fix": "In I2, I4 and Closed path, add: \"...or as the reply to the agent's own non-recall tool call, built only from fixed text ParleyInn ships, sanitized structural fields and ids.\"",
   "severity": "needs-fix",
   "lens": "usefulness",
   "model": "default"

@@ -86,7 +86,7 @@ exactly one kind (LANE-31).
 
   Any principal act that removes a pin from a restore block, or stops this node
   recording its own runs' events, is widening whatever verb carries it, so
-  `cairn uninstall` records the widening act turning capture off before it
+  `parinn uninstall` records the widening act turning capture off before it
   removes the hook registrations (ADM-02). ⟦f:access-tokens⟧On an ephemeral node, PEER-01's
   environment variable, a structural event, stands in for turning on ⟦f:peer-sync⟧its peer
   component⟦f:git-carrier⟧ and⟦/f⟧⟦/f⟧⟦f:git-carrier⟧, for the git-carrier remotes its access token names, its publish

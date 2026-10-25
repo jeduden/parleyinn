@@ -149,6 +149,33 @@ fn a_crate_with_its_own_lints_escapes_the_limits_and_fails() {
 }
 
 #[test]
+fn the_unsafe_shim_holds_the_limits_through_its_own_lints() {
+    let shim = "[package]\nname = \"platform\"\n\n[lints.clippy]\ncognitive_complexity = \"deny\"\ntoo_many_lines = \"deny\"\nexcessive_nesting = \"deny\"\nfn_params_excessive_bools = \"deny\"\n";
+    let shim_crate = crate::static_analysis::UNSAFE_SHIM;
+    let (_d, c) = checkout(
+        &denying(),
+        &[(shim_crate, shim), ("tools/one", INHERITS)],
+        &holding(),
+    );
+    assert!(
+        crates_hold_limits(&c).is_empty(),
+        "{:?}",
+        crates_hold_limits(&c)
+    );
+
+    let loose = shim.replace("too_many_lines = \"deny\"\n", "");
+    let (_d, c) = checkout(
+        &denying(),
+        &[(shim_crate, &loose), ("tools/one", INHERITS)],
+        &holding(),
+    );
+    assert_eq!(
+        crates_hold_limits(&c),
+        ["crate crates/platform, the one unsafe shim, does not deny clippy::too_many_lines"]
+    );
+}
+
+#[test]
 fn the_workspace_failing_to_deny_a_lint_fails_the_crates() {
     let root = denying().replace("cognitive_complexity = \"deny\"\n", "");
     let (_d, c) = checkout(&root, &[("tools/one", INHERITS)], &holding());

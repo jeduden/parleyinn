@@ -12,7 +12,7 @@ depends-on: []
 
 ## Goal
 
-Choose how `cairn mcp` speaks MCP, weighing the SDK's fit against
+Choose how `parinn mcp` speaks MCP, weighing the SDK's fit against
 ENG-18's dependency budget and SEC-01's reach rules.
 
 ## Context
@@ -45,9 +45,9 @@ Deviations from the tasks:
 - The stub tool is `event_search`, §9.2's name, not `search`.
 - Task 2 measured each stub's graph with `cargo tree -e normal`, the
   reach test's rule, in a standalone crate under [spike](spike/),
-  rather than linking either into `cairn` before M1 needs it.
+  rather than linking either into `parinn` before M1 needs it.
 
-M1's task 6 links the server into `cairn`. It allows the five crates
+M1's task 6 links the server into `parinn`. It allows the five crates
 in the reach test and updates the ADR that lists `serde_json`. It also
 adds what the report lists: a deadline, `catch_unwind`, input bounds
 and a contract test.

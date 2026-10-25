@@ -33,7 +33,7 @@ summary: >-
   edit adds one⟦f:stamps⟧, unstamped⟦/f⟧.⟦f:stamps⟧
   What a stamp covers.⟦/f⟧
 ⟦f:pin-candidates⟧- **Pin candidate**: Proposed pin text an agent suggested (an `assistant` event,
-  PIN-02) or Cairn detected (a derived artifact over its creating `user` event,
+  PIN-02) or ParleyInn detected (a derived artifact over its creating `user` event,
   holding its text by address, with no provenance of its own, I10); not yet a
   pin, so it has no pin author (a pin's author being its first version's). The
   confirmation of its principal (of the agent that suggested it or the node that
@@ -85,12 +85,12 @@ summary: >-
 ⟦f:intent-criteria⟧- **Criterion**: One acceptance condition of an intent, with a stable id.⟦/f⟧
 ⟦f:work-rooms⟧- **Stake**: A pin of type `stake` stating what its author works on. Only its
   author, or for a device seat its author's principal, edits it; it is unpinned
-  as Unpin says, and it makes Cairn refuse no other seat's act.⟦/f⟧
+  as Unpin says, and it makes ParleyInn refuse no other seat's act.⟦/f⟧
 ⟦f:work-rooms⟧- **Title, labels**: Room state the owner's device seat⟦f:moderation⟧ or a moderator⟦/f⟧ sets: a
   display name and tags. They reach a model only enveloped, through recall,
   never in trusted text⟦f:notices⟧, an opt-in notice⟦/f⟧ or an envelope marked structural
   (⟦f:notices⟧LANE-30, ⟦/f⟧VIEW-15).⟦/f⟧
-⟦f:work-rooms⟧- **Assignment**: ⟦f:git-tracking⟧Room state asking a seat to work on a branch.⟦/f⟧ It makes Cairn
+⟦f:work-rooms⟧- **Assignment**: ⟦f:git-tracking⟧Room state asking a seat to work on a branch.⟦/f⟧ It makes ParleyInn
   refuse no seat's act; a role assignment is always named so.⟦/f⟧
 ⟦f:conversation⟧- **Post**: Text a seat writes to a room's conversation, with provenance `post`,
   reaching an agent only by recall⟦f:endorsement⟧, endorsement⟦/f⟧⟦f:trust-grants⟧ or a trust grant (OWN-29)⟦/f⟧. A
@@ -115,16 +115,16 @@ summary: >-
   "envelope": the wrapper that marks recalled content as untrusted historical
   data; the only way recalled content reaches a model. An envelope **marked
   structural** carries only structural fields, §9.7's closed status words and
-  marks, and Cairn's ids (`room_get`, VIEW-15).
+  marks, and ParleyInn's ids (`room_get`, VIEW-15).
 - **Envelope warning**: The fixed sentence at the head of every envelope (field
   `warning`).
 - **Trusted text** (`TrustedText`): text only the core's restore-block code
   constructs, the only text the **restore builder** accepts (INJ-03), built only
-  from qualifying pins, sanitized structural fields and fixed text Cairn ships:
+  from qualifying pins, sanitized structural fields and fixed text ParleyInn ships:
   restore blocks⟦f:notices⟧, opt-in notices⟦/f⟧⟦f:held-requests⟧, OWN-04's⟦f:away-policy⟧ and
   OWN-07's⟦/f⟧ templates⟦/f⟧ and compaction guidance⟦f:conversation⟧, never a post's text⟦/f⟧.
 - **Restore block**: Deterministic trusted text, built only from qualifying
-  pins, sanitized structural fields and fixed text Cairn ships, that Cairn
+  pins, sanitized structural fields and fixed text ParleyInn ships, that ParleyInn
   injects after compaction, at a run's start or harness resume (INJ-02), and on
   a prompt while `restore_block.on_prompt` is on (INJ-04), carrying among other
   things qualifying pins, their room ids and the run's seat ids where each is
@@ -136,8 +136,8 @@ summary: >-
   as a restore block lists them (INJ-01).⟦/f⟧
 - **Recall hint**: The one fixed line in a restore block saying that the recall
   tools reach the full history (INJ-01).
-⟦f:notices⟧- **Opt-in notice**: Trusted text built only from fixed text Cairn ships and
-  Cairn's own ids, version numbers, counts, key fingerprints and addresses,
+⟦f:notices⟧- **Opt-in notice**: Trusted text built only from fixed text ParleyInn ships and
+  ParleyInn's own ids, version numbers, counts, key fingerprints and addresses,
   saying ⟦f:conversation⟧posts⟦f:delegation-grants⟧ or a delegate report⟦/f⟧ wait, or ⟦/f⟧a room changed. Sent only while the
   owner's notice allowance and the agent's principal's notice opt-in both stand
   (INJ-10, LANE-30). The only meaning of "notice".⟦/f⟧
@@ -148,7 +148,7 @@ summary: >-
 - **Working view**: Whatever is currently in the model's context window. Never
   part of the record, never authoritative.
 ⟦f:held-requests⟧- **Held request**: A permission request, question or hand-off with a stable id,
-  answerable from any principal surface within its scope (OWN-05). Cairn keeps
+  answerable from any principal surface within its scope (OWN-05). ParleyInn keeps
   the agent waiting no longer than its **hold window**⟦f:away-policy⟧, then its away policy, if
   one is on, answers the agent⟦/f⟧; the held request stays open, and ⟦f:away-policy⟧with no away
   policy on, ⟦/f⟧the harness's own prompt keeps the agent waiting (OWN-06). A

@@ -1,9 +1,9 @@
 //! ENG-14: a guard aborts any test that touches real state, and nothing
-//! resolves the real `HOME`, a Cairn home or Claude Code's configuration
+//! resolves the real `HOME`, a ParleyInn home or Claude Code's configuration
 //! but the guard.
 //!
 //! The guard is `testkit::guard`: a test asks it for the user's `HOME`,
-//! a Cairn home or Claude Code's configuration, and it aborts the
+//! a ParleyInn home or Claude Code's configuration, and it aborts the
 //! process when the answer is not under the temporary directory. This
 //! module holds the two checks that make the guard binding. The probe
 //! runs a test executable that resolves each place, once with a `HOME`
@@ -23,7 +23,7 @@ use crate::Checkout;
 
 /// The variable that makes the scenario runner resolve a place and
 /// print it instead of running scenarios; its value names the place.
-pub const PROBE: &str = "CAIRN_GUARD_PROBE";
+pub const PROBE: &str = "PARINN_GUARD_PROBE";
 
 /// How long a probe may run: it resolves one path and exits.
 pub const PROBE_LIMIT: Duration = Duration::from_secs(60);
@@ -38,13 +38,13 @@ const REFUSAL: &str = "(ENG-14)";
 /// The sources that may read the user's `HOME` themselves: the guard,
 /// the scenario runner's own decision to start isolated, and the core
 /// executable's entry point, which finds the home the person runs it
-/// in. No test reaches that read: a unit test hands `cairn::run` its
+/// in. No test reaches that read: a unit test hands `parinn::run` its
 /// home, and every start of the executable goes through the testkit's
 /// isolation.
 pub const RESOLVERS: [&str; 3] = [
     "tooling/testkit/src/guard.rs",
     "tooling/scenario/tests/bdd/main.rs",
-    "crates/cairn/src/main.rs",
+    "crates/parinn/src/main.rs",
 ];
 
 /// The directories whose Rust sources the scan reads.
@@ -56,7 +56,7 @@ const READS: [&str; 4] = ["var(", "var_os(", "env!(", "option_env!("];
 /// The variables that lead to real state, quoted.
 const NAMES: [&str; 4] = [
     "\"HOME\"",
-    "\"CAIRN_HOME\"",
+    "\"PARINN_HOME\"",
     "\"CLAUDE_CONFIG_DIR\"",
     "\"USERPROFILE\"",
 ];
@@ -198,7 +198,7 @@ pub fn guard_holds(exe: &Path, scratch: &Path, places: &[&str]) -> Vec<String> {
 }
 
 /// The reads of real state in `body`, the text of the Rust source `file`
-/// that is not a resolver: a read of `HOME`, `CAIRN_HOME`, Claude Code's
+/// that is not a resolver: a read of `HOME`, `PARINN_HOME`, Claude Code's
 /// configuration directory or the profile directory by name, or a call
 /// to the standard library's `HOME` lookup. Each is a line: `file:line: ...`.
 #[must_use]

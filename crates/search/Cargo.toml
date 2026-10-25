@@ -1,0 +1,20 @@
+[package]
+name = "search"
+version = "0.0.0"
+description = "Search: caller text compiled to literal terms (SEC-04) and hits ranked by BM25 with per-run damping (RCL-02)"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+record.workspace = true
+
+[lints]
+workspace = true
+
+# ENG-02: see crates/parinn/Cargo.toml.
+[package.metadata.parinn]
+responsibility = "Compiles caller text to literal terms and ranks the hits of a search, without touching the store"
+may-depend-on = ["record"]
+may-dev-depend-on = []

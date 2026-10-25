@@ -11,7 +11,7 @@
  {
   "type": "security",
   "quote": "under a delegation grant, another agent of the same principal, an agent on",
-  "problem": "Delegation reaches 'an agent on another of its nodes', and Delegate report mentions a report 'from another node'. I4 declares only B0 and loopback B1, and has no peer boundary, import or other channel by which one node's Cairn hands a task to another node. The sentence implies an undeclared data path off the machine.",
+  "problem": "Delegation reaches 'an agent on another of its nodes', and Delegate report mentions a report 'from another node'. I4 declares only B0 and loopback B1, and has no peer boundary, import or other channel by which one node's ParleyInn hands a task to another node. The sentence implies an undeclared data path off the machine.",
   "fix": "Drop 'an agent on another of its nodes' and the 'from another node' clause in Delegate report, or add the declared boundary and path that carries them.",
   "severity": "needs-fix",
   "lens": "all",
@@ -38,7 +38,7 @@
  {
   "type": "contradiction",
   "quote": "such as what an MCP tool that is no recall tool returns, or a CLI call from",
-  "problem": "Recall defines output Cairn gives an agent 'outside the closed paths', such as non-recall tool results. I2 and Closed path say Cairn writes to an agent only through the closed set and that no other write to an agent exists, so the closed set is not closed as written.",
+  "problem": "Recall defines output ParleyInn gives an agent 'outside the closed paths', such as non-recall tool results. I2 and Closed path say ParleyInn writes to an agent only through the closed set and that no other write to an agent exists, so the closed set is not closed as written.",
   "fix": "Add non-recall tool results that carry only fixed text, sanitized structural fields and ids to I2's list and to Closed path, or say these are not writes to an agent.",
   "severity": "minor",
   "lens": "all",

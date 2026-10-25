@@ -97,7 +97,7 @@ fn run_lua(events: &[Json], code: &str) -> Result<Json, String> {
 
 /// A Lua state holding only the allow-listed globals: the base library
 /// without loaders, string, table, math without randomness, utf8, and
-/// the host's json, re and cairn tables. No io, os, package or debug.
+/// the host's json, re and parinn tables. No io, os, package or debug.
 fn sandbox() -> mlua::Result<Lua> {
     let lua = Lua::new_with(
         StdLib::STRING | StdLib::TABLE | StdLib::MATH | StdLib::UTF8,
@@ -163,12 +163,12 @@ fn regex(p: &str) -> mlua::Result<regex::Regex> {
     regex::Regex::new(p).map_err(|e| mlua::Error::runtime(format!("bad pattern: {e}")))
 }
 
-/// `cairn.events()` returns a fresh array of the record's events in
+/// `parinn.events()` returns a fresh array of the record's events in
 /// (writer, seq) order; null fields are absent (nil).
 fn install_record(lua: &Lua, events: &[Json]) -> mlua::Result<()> {
     let source: Vec<Json> = events.to_vec();
-    let cairn = lua.create_table()?;
-    cairn.set(
+    let parinn = lua.create_table()?;
+    parinn.set(
         "events",
         lua.create_function(move |lua, ()| {
             let arr = lua.create_table_with_capacity(source.len(), 0)?;
@@ -178,7 +178,7 @@ fn install_record(lua: &Lua, events: &[Json]) -> mlua::Result<()> {
             Ok(arr)
         })?,
     )?;
-    lua.globals().set("cairn", cairn)
+    lua.globals().set("parinn", parinn)
 }
 
 fn json_to_lua(lua: &Lua, v: &Json) -> mlua::Result<LuaValue> {

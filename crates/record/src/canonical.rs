@@ -4,7 +4,7 @@
 //! escaped as ECMAScript's `JSON.stringify` escapes them, and numbers
 //! as ECMAScript writes them.
 //!
-//! Cairn's field sets hold integers only, so a number must be an
+//! ParleyInn's field sets hold integers only, so a number must be an
 //! integer ECMAScript represents exactly, within ±(2^53 - 1), and is
 //! written in decimal. Any other number is refused rather than
 //! rounded: a value that would encode differently elsewhere never

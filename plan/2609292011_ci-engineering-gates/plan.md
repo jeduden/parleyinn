@@ -30,7 +30,7 @@ them. CI already gates on:
   starts, clocks and hash collections, held to every crate under
   `crates/` by the gate tests `the_product_crates_keep_their_bans`
   and `no_product_crate_keeps_mutable_global_state`
-- the core's reach test, `crates/cairn/tests/reach.rs`, which refuses
+- the core's reach test, `crates/parinn/tests/reach.rs`, which refuses
   any crate linked into it
 - the testkit's `isolate` and the scenario runner's `is_isolated`,
   which point every process a test starts at a temporary home
@@ -124,10 +124,10 @@ footer: |
 |     | ↳      | The benchmark harness, its unit-proven Mann-Whitney gate and the PR job landed; ENG-15 stays pending until NFR-01..05 have benchmarks of real code.                                                                                                                                  |
 | 5   | ✅     | [SLSA Build Level 3 provenance (ENG-20)](phase-5.md)                                                                                                                                                                                                                                 |
 |     | ↳      | Only the release-only release-build.yml attests build provenance, a verify job checks the published release against each signer's exact identity at main, and the ENG-20 scenario, reworded to the workflows it reads, is off pending.                                               |
-| 6   | 🔳     | [Main's protection and CODEOWNERS (ENG-21)](phase-6.md)                                                                                                                                                                                                                              |
-|     | ↳      | Main's ruleset is committed and checked against the live one nightly, CODEOWNERS is checked against the paths that enforce the SRS, and ENG-21 stays pending on the two-approval rule.                                                                                               |
-| 7   | 🔳     | [The core confined in the end-to-end suite (ENG-12)](phase-7.md)                                                                                                                                                                                                                     |
-|     | ↳      | The core's end-to-end tests run it with all network denied, and a socket probe fails the suite naming the core and the caller; the CI wiring awaits its first run on the hosted runner.                                                                                              |
+| 6   | ✅     | [Main's protection and CODEOWNERS (ENG-21)](phase-6.md)                                                                                                                                                                                                                              |
+|     | ↳      | Main's ruleset is committed and checked against the live one nightly, CODEOWNERS is checked against the paths that enforce the SRS and gives the security-sensitive crates to the security reviewer, and the ENG-21 scenario is off pending.                                         |
+| 7   | ✅     | [The core confined in the end-to-end suite (ENG-12)](phase-7.md)                                                                                                                                                                                                                     |
+|     | ↳      | The core's end-to-end tests run it with all network denied, and a socket probe fails the suite naming the core and the caller; the CI wiring has passed on the hosted runner.                                                                                                        |
 | 8   | ✅     | [The core's reach evidence and unsafe code (ENG-16)](phase-8.md)                                                                                                                                                                                                                     |
 |     | ↳      | Gate tests prove the core row: CI gates on the static checks under the ci job, every crate keeps the unsafe ban, the core's reach evidence and the determinism bans are in place; ENG-16 stays pending.                                                                              |
 <?/catalog?>
@@ -141,10 +141,10 @@ footer: |
   drift cases are caught; the stakeholder accepted its exemptions on
   2026-10-13 ([ruling]) and keeps it pending until M1 adds injectable
   I/O traits; M1's phase 16 ([plan 2609292012][m1]) closes it
-- [ ] @ENG-21 passes, off `@pending`: its first six steps pass; the
-  last, two approvals on the security-sensitive crates, needs a
-  required check that reads a pull request's reviews, which waits on
-  the stakeholder's ruling
+- [x] @ENG-21 passes, off `@pending`: the stakeholder ruled on
+  2026-10-23 that the security-sensitive crates are owned by the
+  security reviewer instead of needing two approvals, since one
+  reviewer account exists
 - [ ] @ENG-15 passes once benchmarks cover NFR-01..05; its gate is
   unit-proven, and its job waits on a first green run on GitHub. M1
   adds those benchmarks and its phase 16 closes this ([plan
@@ -159,5 +159,5 @@ footer: |
   and `cargo fmt --all --check` are clean
 - [x] `mdsmith check .` is clean
 
-[ruling]: https://github.com/jeduden/cairn/pull/44#issuecomment-6157262395
+[ruling]: https://github.com/jeduden/parleyinn/pull/44#issuecomment-6157262395
 [m1]: ../2609292012_m1-record-and-recall/plan.md

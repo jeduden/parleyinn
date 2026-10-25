@@ -29,7 +29,20 @@ pub struct Entry {
 const ENFORCING: &[(&str, &[&str])] = &[
     ("`docs/srs/`", &["docs/srs/"]),
     ("the requirement–scenario gate", &["tooling/"]),
-    ("gate, CI,", &[".github/", "scripts/"]),
+    // Every mise configuration and lockfile: CI's install step reads
+    // them all to refuse a tool that would build from source, and the
+    // developer pins install the tools agents run.
+    (
+        "gate, CI,",
+        &[
+            ".github/",
+            "scripts/",
+            "mise.toml",
+            "mise.lock",
+            "mise.dev.toml",
+            "mise.dev.lock",
+        ],
+    ),
     (
         "the lint and coverage configuration",
         &[

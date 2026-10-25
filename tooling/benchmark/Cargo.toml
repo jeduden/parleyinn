@@ -13,7 +13,7 @@ testkit.workspace = true
 [lints]
 workspace = true
 
-[package.metadata.cairn]
+[package.metadata.parinn]
 responsibility = "Samples the benchmark suite and decides the regression gate (ENG-15)"
 may-depend-on = []
 may-dev-depend-on = ["testkit"]

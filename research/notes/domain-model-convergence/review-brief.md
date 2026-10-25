@@ -1,8 +1,8 @@
 # Review brief: the final review of the domain model and SRS, M1 to M5
 
-You review one area of Cairn's domain model and SRS, once. There is no
+You review one area of ParleyInn's domain model and SRS, once. There is no
 later round. Each theme you find is either fixed now or carried into M1
-as a known gap. Cairn is a lossless, security-first context layer for
+as a known gap. ParleyInn is a lossless, security-first context layer for
 long-running Claude agents. It keeps an append-only record of every
 agent run, restores pins verbatim after compaction, gives exact recall
 on demand, and never lets stored history become a prompt-injection

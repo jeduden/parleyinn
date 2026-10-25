@@ -145,3 +145,56 @@ fn every_key_event_kind_round_trips_through_its_name() {
     }
     assert_eq!(KeyEventKind::parse("born"), None);
 }
+
+fn change() -> NodeIdentityChange {
+    let writer = record::id::WriterId::derive(&[4; 32]);
+    NodeIdentityChange {
+        replaces: Digest::of(&[b"old"]),
+        key: Digest::of(&[b"new"]),
+        chain_head: SeenHead::new(
+            Address::new(writer, Seq::new(3).unwrap()),
+            Digest::of(&[b"head"]),
+        ),
+    }
+}
+
+#[test]
+fn a_node_identity_change_event_carries_only_both_fingerprints_and_the_chain_head() {
+    let event = change();
+
+    let value = event.to_value();
+
+    let keys: Vec<&String> = value.as_object().unwrap().keys().collect();
+    assert_eq!(keys, ["chain_head", "key", "replaces"]);
+    let head: Vec<&String> = value["chain_head"].as_object().unwrap().keys().collect();
+    assert_eq!(head, ["head", "seq", "writer"]);
+    assert_eq!(NodeIdentityChange::from_value(&value).unwrap(), event);
+}
+
+#[test]
+fn a_node_identity_change_event_that_does_not_parse_names_its_field() {
+    let good = change().to_value();
+    for (field, bad) in [
+        ("replaces", json!({"replaces": 1})),
+        ("key", json!({"key": "zz"})),
+        ("chain_head", json!({"chain_head": {"writer": "x"}})),
+        ("chain_head", json!({"chain_head": {"seq": 0}})),
+        ("chain_head", json!({"chain_head": {"head": 1}})),
+    ] {
+        let mut value = good.clone();
+        for (k, v) in bad.as_object().unwrap() {
+            if k == "chain_head" {
+                for (hk, hv) in v.as_object().unwrap() {
+                    value["chain_head"][hk] = hv.clone();
+                }
+            } else {
+                value[k] = v.clone();
+            }
+        }
+        let err = NodeIdentityChange::from_value(&value).unwrap_err();
+        assert_eq!(
+            err.to_string(),
+            format!("malformed node identity change event: bad {field}")
+        );
+    }
+}

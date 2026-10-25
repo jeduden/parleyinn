@@ -1,2 +1,2 @@
-local events = cairn.events()
+local events = parinn.events()
 return #events

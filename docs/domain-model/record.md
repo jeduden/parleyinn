@@ -9,7 +9,7 @@ summary: >-
 - **Record**: The set of writer logs a node holds (I10); the audit log,
   counters and **configuration** sit beside it: the principal's settings
   (§9.6), some changes to which apply only once accepted (ADM-04), and which a
-  repository's `.cairn.toml`, its **repository configuration**, may only
+  repository's `.parinn.toml`, its **repository configuration**, may only
   tighten (SEC-11). Managed policy, configuration and repository configuration
   are the three **settings layers**. The **store** is the home's files
   containing the record, its derived artifacts and payloads (§8.1).
@@ -27,23 +27,35 @@ summary: >-
 - **seq**: An event's position in its writer: strictly increasing, gap-free and
   never reused (REC-06).
 - **Address**: (writer, seq), shown as short `A2·4812` (its writer label and
-  seq), range `A2·4812–5025` or full `cairn:room/<room>/w/<writer>/<seq>`. One
+  seq), range `A2·4812–5025` or full `parinn:room/<room>/w/<writer>/<seq>`. One
   ASCII input form, `<label>:<seq>` or `<label>:<from>-<to>`, the writer id
   allowed in place of the label, is accepted with them (RCL-08). A **writer
   label** is a writer's short display alias, unique per node, each
   **writer-label assignment** a structural event (RCL-08). An address range
   lies in one writer; "range" on its own means an address range. The only
   meaning of "address".
-- **Payload**: The full content of a large event, stored outside the event in
-  the store's **payload store**, under a name that confirms no guess at its
-  content (REC-09).
+- **Payload**: The full content of an event whose canonical encoding passes the
+  payload threshold (`payload.threshold_bytes`, REC-09), stored in the store's
+  **payload store** under a name that confirms no guess at its content. The
+  event keeps its preview, its **payload reference** (the payload's name and
+  size) and the event's commitment.
+- **Preview**: The first bytes of an event's or post's content, at most 512 by
+  default, cut at a character boundary (REC-09). It is what a payload event
+  keeps in place of its content, and what a recall hit, the kernel or a view
+  shows of any event or post (OWN-08). A preview is content: it carries its
+  event's trust level, is no structural field, and goes with the content under
+  purge (ADM-07).
 - **Segment**: A range of one writer, sealed as a unit when it closes; what
   peers exchange. A unit of the record, not a storage layout: a merge (REC-25)
   or a purge (ADM-07) rewrites closed segments without changing any address.
   The **open segment** is a writer's newest, still growing, closing as REC-19
   says; peers exchange its sealed prefix. A closed segment or an open segment's
   sealed prefix is a **sealed range**. A refused segment is recorded as a
-  structural event in this node's personal room (REC-21).
+  structural event in this node's personal room (REC-21). Each segment carries
+  a **format version** (REC-21), and the store a **schema version** (ADM-05,
+  ADM-11). A node refuses to open a store or segment newer than it supports
+  (ADM-05), and refuses and audits a segment of any version it does not support
+  (REC-21).
 - **Seal**: A seat key's signature over its writer id, a seq and the chain head
   at that seq (REC-18), made where that key lives (REC-19). Events after the
   newest seal are unsigned.
@@ -96,7 +108,8 @@ summary: >-
   restore block. Landmarks roll up into **tiers** of **landmark blocks**, each
   a sequence of landmarks; a full tier collapses its older ones to one line
   each, listing one address range per writer (LMK-05).
-- **Structural field**: A field Cairn derives from an event's shape, never from
+- **Structural field**: A field ParleyInn derives from an event's shape, never
+from
   its text: ids, kinds, counts, tool names, key fingerprints, addresses, version
   numbers, paths and exit status. Sanitized under LMK-03, it is trusted
   whatever the event's trust level (PRV-06).
@@ -108,17 +121,22 @@ summary: >-
 - **Capture**: This node's MCP servers and hook handlers recording its runs'
   events; turning it off is widening (OWN-11, ADM-02).
 - **Ingest marker**: What ingest leaves when it stops short of a transcript's
-  end, so the next MCP server or `cairn ingest` resumes it (REC-13); a hook
-  handler holds its observation there, at the offset where its hook fired, for
-  its MCP server to append (REC-19). A **start marker** is what a hook handler
-  leaves as it starts and clears as it finishes; one left behind is counted and
-  audited (NFR-02). **Ingest** is reading a transcript into the record, by the
-  harness session's MCP server as the transcript grows (REC-13) or by `cairn
-  ingest` (REC-22). A line a harness fork repeats is recorded once, in the
-  writer of the run it belongs to; every other run that repeats it records a
-  **repeat reference** to that event's address, never a copy (REC-04). A
-  transcript source's **ingest position** is how far ingest has read it
-  (REC-03).
+  end, so the next MCP server or `parinn ingest` resumes it (REC-13); a hook
+  handler holds its observation there, where its hook fired, for its MCP server
+  to append (REC-19). A **start marker** is what a hook handler
+  or MCP server leaves as it starts and clears as it finishes; one left behind
+  is counted and audited (NFR-02), an MCP server's with each transcript it left
+  short (REC-13). **Ingest** reads a transcript into the record: the MCP
+  server's **live ingest** as it grows (REC-13), or `parinn ingest` (REC-22). A
+  line a harness fork repeats is recorded once, in the writer of the run it
+  belongs to; every other run that repeats it records a **repeat reference**
+  to that event's address, never a copy (REC-04). The
+  run it belongs to is the one no **fork observation**, a `SessionStart` hook
+  observation with `source` = `fork`, names; with none, the run that first
+  recorded it, as a structural **repeat owner** event in the device seat
+  records. A fork's line read before its owner's is **held** at an ingest
+  marker until its owner's transcript is ingested or gone, or 30 s pass. An
+  **ingest position** is how far ingest read a transcript source (REC-03).
 - **Worktree checkpoint**: An event recording a worktree's commit, branch and
   redacted diff since the previous worktree checkpoint (REC-20).
 - **Derived artifact**: Anything computed from the record and the node's key
@@ -132,11 +150,16 @@ summary: >-
   holds quarantined.
 - **Redaction**: Removing secrets from content before it is stored, on import,
   or from what an export's, a publish's or an invite's review step sends,
-  recorded (I1, SEC-08).
+  recorded (I1, SEC-08). Three kinds of **redaction rule** apply: the
+  **redaction rule set**, ParleyInn's maintained and versioned rules for known
+  secret shapes; the **harness account identifiers**, the account email and
+  organization id a transcript's own harness fields name, learnt from each
+  transcript; and the principal's **redaction patterns**
+  (`redaction.extra_patterns`). Each match becomes a marker naming its rule.
 - **Retention policy**: A rule (`retention_policy.*`), set by the node's
   principal (ADM-04) or managed policy, that purges content per room and
   provenance class after a time (I1, SEC-22).
-- **Flag**: A mark Cairn sets on an event whose text matches an injection
+- **Flag**: A mark ParleyInn sets on an event whose text matches an injection
   pattern (PRV-07); flagged text contributes only counts to landmarks (LMK-04).
 - **Quarantine**: Recorded, reversible exclusion of an event, span, run, writer
   or derived artifact from every path that carries content to an agent and from
@@ -163,10 +186,10 @@ summary: >-
   VIEW-10 and SEC-27; a **purge receipt** states what a purge erased and what it
   could not (SEC-31).
 - **Backup**: A copy of a home's store and audit log, with none of its keys
-  (`cairn backup create`, ADM-06, SEC-10); reading it back is a backup
+  (`parinn backup create`, ADM-06, SEC-10); reading it back is a backup
   restore (Node). Creating one records no principal act, only an audited event
   (§9.5), and a copy the principal takes off the machine is its own tool,
-  outside Cairn's components (I4).
+  outside ParleyInn's components (I4).
 - **At-rest key**: The key that encrypts the store when encryption at rest is on
   (SEC-09).
 - **Bundle**: A reviewed export of a room, signed by the device key of the
@@ -175,13 +198,14 @@ summary: >-
 - **Trusted-only export**: The JSONL of the events trusted for the principal's
   agents, with full provenance, that downstream memory systems read (ADM-12,
   MEM-02); an export like a bundle (SEC-26).
-- **Export**: Writing a bundle, a rendering or a trusted-only export (`cairn
+- **Export**: Writing a bundle, a rendering or a trusted-only export (`parinn
   export`), a widening principal act under SEC-26. To **publish** is to serve a
   room's bundle read-only through the publish component, only as the room's
   visibility allows; it is widening, and stopping it cut (OWN-11).
 - **Rendering**: A room rendered for people to read, with no keys or commitments
-  (`cairn export --rendering`, SEC-26).
-- **Import**: Reading a bundle into this node's record (`cairn import`, REC-23).
+  (`parinn export --rendering`, SEC-26).
+- **Import**: Reading a bundle into this node's record (`parinn import`,
+REC-23).
   A transcript is ingested and a peer's segments are received; neither is
   imported.
 - **Kernel**: The hermetic environment where an agent runs code over

@@ -15,4 +15,4 @@ The findings: two gaps that break journeys (who counts as one agent, and subagen
 
 FINDINGS: 3
 
-The candidate reviewed is `/tmp/claude-0/-home-user-cairn/5fc5da51-26b9-5b8d-9e42-2c897763fec7/scratchpad/ga/out/g1-all/candidate.md`; I edited no file.
+The candidate reviewed is `/tmp/claude-0/-home-user-parinn/5fc5da51-26b9-5b8d-9e42-2c897763fec7/scratchpad/ga/out/g1-all/candidate.md`; I edited no file.

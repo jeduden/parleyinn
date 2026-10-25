@@ -19,9 +19,9 @@
  },
  {
   "type": "security",
-  "quote": "harness started, other than Cairn's own hook handlers, MCP server and harness strip",
-  "problem": "The harness strip (`cairn status --line`) is exempt from recall, but nothing tells it apart from the same command run by an agent's tool process. Hook calls have such a rule: from inside a run's tool process they are refused. Without one, an agent's tool call can get Health output unenveloped, a write to the agent outside I2's closed paths.",
-  "fix": "Add: \"the harness strip being only the status line the harness itself starts; a `cairn status --line` call from inside a run's tool process is recall, enveloped, like any other.\"",
+  "quote": "harness started, other than ParleyInn's own hook handlers, MCP server and harness strip",
+  "problem": "The harness strip (`parinn status --line`) is exempt from recall, but nothing tells it apart from the same command run by an agent's tool process. Hook calls have such a rule: from inside a run's tool process they are refused. Without one, an agent's tool call can get Health output unenveloped, a write to the agent outside I2's closed paths.",
+  "fix": "Add: \"the harness strip being only the status line the harness itself starts; a `parinn status --line` call from inside a run's tool process is recall, enveloped, like any other.\"",
   "severity": "needs-fix",
   "lens": "consistency",
   "model": "default"
@@ -55,16 +55,16 @@
  },
  {
   "type": "contradiction",
-  "quote": "a run's tool process started, directly or through descendants, `cairn ui` so",
-  "problem": "Principal surface counts `cairn ui` only when it is 'so started', that is at a terminal. Room-view component lets a service manager or an ephemeral node's entrypoint start it, and withholds a room-view secret only when the start comes from a harness-started process. The two rules disagree on whether a browser on a service-manager-started `cairn ui` is a principal surface.",
-  "fix": "Replace \"`cairn ui` so started\" with \"`cairn ui` started by a process that neither the harness nor a run's tool process started\".",
+  "quote": "a run's tool process started, directly or through descendants, `parinn ui` so",
+  "problem": "Principal surface counts `parinn ui` only when it is 'so started', that is at a terminal. Room-view component lets a service manager or an ephemeral node's entrypoint start it, and withholds a room-view secret only when the start comes from a harness-started process. The two rules disagree on whether a browser on a service-manager-started `parinn ui` is a principal surface.",
+  "fix": "Replace \"`parinn ui` so started\" with \"`parinn ui` started by a process that neither the harness nor a run's tool process started\".",
   "severity": "minor",
   "lens": "consistency",
   "model": "default"
  },
  {
   "type": "gap",
-  "quote": "`cairn uninstall` records the widening act turning capture off before it",
+  "quote": "`parinn uninstall` records the widening act turning capture off before it",
   "problem": "Install and uninstall may also run through the harness's plugin path or the managed install path, which are not principal surfaces. A principal act must be taken at a principal surface. Only token-key-only nodes get a structural event that stands in, so nothing marks the capture gap for the other uninstall paths.",
   "fix": "Extend the stand-in: \"a structural event naming the uninstall standing in for that act on a token-key-only node or when uninstall runs through the plugin or managed install path.\"",
   "severity": "minor",

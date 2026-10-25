@@ -176,12 +176,13 @@ jobs:
       # The release rust-toolchain.toml names, so the tool builds as CI
       # tested it. It is main's tool, built from main's tree; the pull
       # request's tree is only its input.
-      - name: Install the pinned Rust toolchain
+      - name: Install pinned Rust with mise
         if: steps.pull_head.outputs.number != ''
-        run: >-
-          rustup toolchain install
-          "$(sed -n 's/^channel = "\(.*\)"$/\1/p' rust-toolchain.toml)"
-          --profile minimal --no-self-update
+        uses: ./.github/actions/setup-mise
+        with:
+          tools: rust
+          # Jobs handling review credentials never restore executable caches.
+          cache: false
       # The review class sets how deep the review goes, from the paths that
       # changed: light for Markdown no stakeholder path holds, deep for
       # any path CODEOWNERS assigns, standard otherwise. A deep review
@@ -258,7 +259,7 @@ jobs:
       - name: Review
         id: agent
         if: steps.pull_head.outputs.number != ''
-        uses: anthropics/claude-code-action@6fed3ca145920b639991cb756090506e1bcaf515 # v1.0.245
+        uses: anthropics/claude-code-action@1d6de8cb0c237e7c15e9e1bdf973826ebae490cc # v1.0.248
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           github_token: ${{ github.token }}
@@ -298,24 +299,27 @@ jobs:
           persist-credentials: false
       # The release rust-toolchain.toml names, so the gate builds as CI
       # tested it.
-      - name: Install the pinned Rust toolchain
-        run: >-
-          rustup toolchain install
-          "$(sed -n 's/^channel = "\(.*\)"$/\1/p' rust-toolchain.toml)"
-          --profile minimal --no-self-update
+      - name: Install pinned Rust with mise
+        uses: ./.github/actions/setup-mise
+        with:
+          tools: rust
+          # Jobs handling review credentials never restore executable caches.
+          cache: false
       # Built, its crates fetched and their build scripts run, before the
       # app's token exists; the decide step below runs it offline.
       - name: Build the review gate
         run: cargo build --locked --quiet -p review-gate
       # The app's token, scoped to this repository and to what posting
-      # a review needs. A missing key fails the step, and the job.
+      # a review needs. With no `repositories` input the action scopes it
+      # to the repository the workflow runs in, so a rename of the
+      # repository cannot break the mint. A missing key fails the step,
+      # and the job.
       - name: Mint the reviewer app's token
         id: app
-        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
         with:
           client-id: Iv23lie5LIUdOU49SrG9
           private-key: ${{ secrets.JEDUDEN_REVIEW_AGENT_KEY }}
-          repositories: cairn
           permission-pull-requests: write
           permission-checks: read
       - name: Read the head and its checks

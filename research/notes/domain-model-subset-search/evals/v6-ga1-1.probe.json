@@ -2,9 +2,9 @@
   "findings": [
     {
       "type": "contradiction",
-      "quote": "registrations found removed without `cairn uninstall` are counted and shown,",
-      "problem": "I1 names the capture-off stretch as the only exception to nothing-is-lost, and Capture defines a capture gap as what a run does between the capture-off and capture-on acts. Yet removed hook registrations, with capture never turned off, are also shown as a node-wide capture gap, so events go missing outside I1's exception list. The model also does not say whether `cairn ingest` backfills that stretch: it appends nothing only while capture is off, so two implementers would build either a permanent gap or a backfill.",
-      "fix": "Extend I1's exception to 'while its principal had capture off or its hook registrations were found removed', and state in Capture whether `cairn ingest` backfills the removed-registration stretch as `ingested` (the gap then shows only until backfilled).",
+      "quote": "registrations found removed without `parinn uninstall` are counted and shown,",
+      "problem": "I1 names the capture-off stretch as the only exception to nothing-is-lost, and Capture defines a capture gap as what a run does between the capture-off and capture-on acts. Yet removed hook registrations, with capture never turned off, are also shown as a node-wide capture gap, so events go missing outside I1's exception list. The model also does not say whether `parinn ingest` backfills that stretch: it appends nothing only while capture is off, so two implementers would build either a permanent gap or a backfill.",
+      "fix": "Extend I1's exception to 'while its principal had capture off or its hook registrations were found removed', and state in Capture whether `parinn ingest` backfills the removed-registration stretch as `ingested` (the gap then shows only until backfilled).",
       "severity": "needs-fix"
     },
     {
@@ -17,7 +17,7 @@
     {
       "type": "undefined",
       "quote": "the managed install path; uninstall runs only at a principal surface (I7,",
-      "problem": "'Managed install path' is used twice as a way to install Cairn that skips the principal-surface rule, but it is never defined. Nothing says who runs it, whether it shows the harness configuration change first as I7 requires, or whether it may trigger the personal room's create room act.",
+      "problem": "'Managed install path' is used twice as a way to install ParleyInn that skips the principal-surface rule, but it is never defined. Nothing says who runs it, whether it shows the harness configuration change first as I7 requires, or whether it may trigger the personal room's create room act.",
       "fix": "Define it beside Managed policy (for example, an install managed policy performs, shown on Setup like any install) or drop it from Principal surface and Personal room.",
       "severity": "minor"
     },

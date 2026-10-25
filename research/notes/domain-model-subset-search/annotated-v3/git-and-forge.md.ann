@@ -9,7 +9,7 @@ summary: >-
 ⟦f:git-tracking⟧- **Repository**: A git repository, identified by its **repository identity**, a
   bound root commit, the same on every node with a git clone, shallow clones
   included, else a provisional node-local identity bound later (LANE-02). The
-  first bind is a structural event Cairn records at the first hook event;
+  first bind is a structural event ParleyInn records at the first hook event;
   binding by hand or rebinding is a widening principal act. It has remotes⟦f:work-rooms⟧ and
   may carry room trailers⟦f:export-bundles⟧, bundles as git refs⟦/f⟧⟦f:git-carrier⟧ and the git carrier's segments⟦/f⟧⟦/f⟧.⟦/f⟧
 ⟦f:git-tracking⟧- **Branch**: A git branch, identified by repository identity, remote URL and
@@ -21,7 +21,7 @@ summary: >-
   from hook input may name a run's worktree or its git directory only for
   reading (SEC-18).⟦/f⟧
 ⟦f:bridges⟧- **Forge**: The service that keeps remotes, pull requests, reviews and ⟦f:git-tracking⟧branch⟦/f⟧
-  protection. It approves and lands; Cairn does neither, and its **forge
+  protection. It approves and lands; ParleyInn does neither, and its **forge
   reports** count as `asserted` (LANE-08).⟦/f⟧
 ⟦f:bridges⟧- **Pull request**: The forge's review object for a ⟦f:git-tracking⟧branch⟦/f⟧.⟦/f⟧
 ⟦f:results-and-verdicts⟧- **Check**: A command executed, or expected to execute, on a tree, with its
@@ -46,26 +46,26 @@ summary: >-
   author and commit-signing identities its git configuration sets) authored no
   ⟦f:git-tracking⟧commit on the branch⟦/f⟧ since it left its base⟦f:git-tracking⟧ (a **commit author** is git's
   author of a commit, never a seat)⟦/f⟧. Where the platform cannot deny network or
-  such writes, Cairn refuses the witness check (OWN-18).⟦/f⟧⟦/f⟧
+  such writes, ParleyInn refuses the witness check (OWN-18).⟦/f⟧⟦/f⟧
 ⟦f:ci-attestation⟧- **CI attestation**: A ⟦f:results-and-verdicts⟧check's⟦/f⟧ exit status for the exact ⟦f:git-tracking⟧commit⟦/f⟧, signed by a CI
   key the room's owner enrolled, recorded in the room so every principal sees
   the same class (LANE-22); a ⟦f:results-and-verdicts⟧result⟦/f⟧ resting on one is `CI attested`.⟦/f⟧
 ⟦f:work-rooms⟧- **Landing**: Git⟦f:bridges⟧ or the forge⟦/f⟧ merging ⟦f:git-tracking⟧commits⟦/f⟧ into the ⟦f:git-tracking⟧repository's default
-  branch⟦/f⟧⟦f:bridges⟧ or a ⟦f:git-tracking⟧branch⟦/f⟧ the forge protects⟦/f⟧. Cairn never lands anything⟦f:results-and-verdicts⟧, and a
+  branch⟦/f⟧⟦f:bridges⟧ or a ⟦f:git-tracking⟧branch⟦/f⟧ the forge protects⟦/f⟧. ParleyInn never lands anything⟦f:results-and-verdicts⟧, and a
   landing is never a verdict⟦/f⟧. A ⟦f:git-tracking⟧branch⟦/f⟧ lands when its head lands.⟦/f⟧
 ⟦f:work-rooms⟧- **Landing link**: The qualified link from a landed ⟦f:git-tracking⟧commit⟦/f⟧ to a room, carrying
-  a proof class, derived by Cairn from the record alone: the clone facts it
+  a proof class, derived by ParleyInn from the record alone: the clone facts it
   reads (landed ⟦f:git-tracking⟧commits⟦/f⟧, patch ids, trees) are recorded as structural events.⟦/f⟧
 ⟦f:work-rooms⟧- **Proof class**: Of a landing link. Proven: `same ⟦f:git-tracking⟧commit⟦/f⟧`, `same patch`, `same
   tree`. Not proven: `likely`, `asserted`, and `not proven` with a reason
   (LANE-06). `asserted` is also the mark on⟦f:bridges⟧ forge reports and⟦/f⟧ room trailers.⟦/f⟧
-⟦f:work-rooms⟧- **Room trailer**: The `Cairn-Room:` line in a ⟦f:git-tracking⟧commit⟦/f⟧ message, naming a room;
-  Cairn adds one to every ⟦f:git-tracking⟧commit on a room's branch⟦/f⟧ (LANE-28). Each
-  `Cairn-Link:` line is a trailer link. It counts as `asserted` until proven
+⟦f:work-rooms⟧- **Room trailer**: The `ParleyInn-Room:` line in a ⟦f:git-tracking⟧commit⟦/f⟧ message, naming a room;
+  ParleyInn adds one to every ⟦f:git-tracking⟧commit on a room's branch⟦/f⟧ (LANE-28). Each
+  `ParleyInn-Link:` line is a trailer link. It counts as `asserted` until proven
   (LANE-28).⟦/f⟧
 - **Qualified links**: Every link is named by what it connects: ⟦f:work-rooms⟧⟦f:git-tracking⟧a branch link
   (room to branch), ⟦/f⟧⟦/f⟧⟦f:bridges⟧⟦f:git-tracking⟧a pull-request link (branch to its pull request, derived by
-  Cairn from forge bridge events), ⟦/f⟧⟦/f⟧⟦f:results-and-verdicts⟧⟦f:intent-criteria⟧a criterion link (result to criterion), ⟦/f⟧⟦/f⟧a
+  ParleyInn from forge bridge events), ⟦/f⟧⟦/f⟧⟦f:results-and-verdicts⟧⟦f:intent-criteria⟧a criterion link (result to criterion), ⟦/f⟧⟦/f⟧a
   range link (⟦f:conversation⟧post or ⟦/f⟧pin to an address range), a parent link (subagent run to
   parent run)⟦f:delegation-grants⟧, a delegation link (delegating run to the delegate's run, under a
   delegation grant)⟦/f⟧⟦f:shared-rooms⟧⟦f:principal-keys⟧⟦f:access-tokens⟧, an invite link (which connects nothing: it carries an
@@ -87,5 +87,5 @@ summary: >-
   version⟦/f⟧, the heads of every ⟦f:git-tracking⟧branch⟦/f⟧ the room names, and the results and
   evidence shown. It goes stale when any of them changes. It is never edited: a
   newer verdict of the same person on the same ⟦f:intent-criteria⟧criterion⟦/f⟧ supersedes it, and
-  unpinning one is neutral. Cairn never derives one⟦f:service-accounts⟧; service accounts contribute
+  unpinning one is neutral. ParleyInn never derives one⟦f:service-accounts⟧; service accounts contribute
   evidence instead⟦/f⟧.⟦/f⟧

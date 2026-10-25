@@ -92,7 +92,7 @@
  {
   "type": "security",
   "quote": "The one seat kind for acting without a run.",
-  "problem": "Only join is tied to a principal surface, and only principal acts are barred from an agent's tool call. So an agent, for example one injected through tool output, can run `cairn` from its shell and post or pin from the node's device seat. That content is `operator`-class trusted on this node. Once PRV-10 ships it is also a trusted source, and it reaches every agent whose principal holds a trust grant for this principal inside OWN-29's template: model output becomes trusted text and reaches other agents automatically.",
+  "problem": "Only join is tied to a principal surface, and only principal acts are barred from an agent's tool call. So an agent, for example one injected through tool output, can run `parinn` from its shell and post or pin from the node's device seat. That content is `operator`-class trusted on this node. Once PRV-10 ships it is also a trusted source, and it reaches every agent whose principal holds a trust grant for this principal inside OWN-29's template: model output becomes trusted text and reaches other agents automatically.",
   "fix": "The one seat kind for acting without a run; its room acts are taken only by its principal at a principal surface, never by an agent's tool call, which acts from its run seat.",
   "severity": "needs-fix",
   "lens": "security",

@@ -2,7 +2,7 @@
 //! makes (ADM-04):
 //!
 //! - the principal's configuration: `config.toml` in the home;
-//! - the repository configuration: `.cairn.toml` at the top of the git
+//! - the repository configuration: `.parinn.toml` at the top of the git
 //!   repository containing the working directory;
 //! - managed policy: one documented path per OS, refused when the
 //!   running OS user could write the file or its directory.
@@ -28,17 +28,17 @@ pub const MAX_LAYER_BYTES: u64 = 1 << 20;
 pub const CONFIGURATION: &str = "config.toml";
 
 /// The repository configuration's file name at a repository's top.
-pub const REPOSITORY_CONFIGURATION: &str = ".cairn.toml";
+pub const REPOSITORY_CONFIGURATION: &str = ".parinn.toml";
 
 /// Managed policy's documented path on this OS.
 #[cfg(target_os = "macos")]
-pub const MANAGED_POLICY: &str = "/Library/Application Support/Cairn/managed_policy.toml";
+pub const MANAGED_POLICY: &str = "/Library/Application Support/ParleyInn/managed_policy.toml";
 /// Managed policy's documented path on this OS.
 #[cfg(windows)]
-pub const MANAGED_POLICY: &str = r"C:\Program Files\Cairn\managed_policy.toml";
+pub const MANAGED_POLICY: &str = r"C:\Program Files\ParleyInn\managed_policy.toml";
 /// Managed policy's documented path on this OS.
 #[cfg(not(any(target_os = "macos", windows)))]
-pub const MANAGED_POLICY: &str = "/etc/cairn/managed_policy.toml";
+pub const MANAGED_POLICY: &str = "/etc/parinn/managed_policy.toml";
 
 /// Why a settings layer gives no settings.
 #[derive(Debug)]
@@ -59,7 +59,7 @@ pub enum Failure {
     /// The running OS user cannot be learnt, so nothing shows that it
     /// could not have written the file (ADM-04).
     OsUserUnknown,
-    /// The OS has no file modes Cairn checks yet, so nothing shows that
+    /// The OS has no file modes ParleyInn checks yet, so nothing shows that
     /// the running OS user could not have written the file (ADM-04).
     Unverifiable,
 }
@@ -125,7 +125,7 @@ pub enum OsUser {
     /// The OS has file modes, but the running OS user could not be
     /// learnt: any managed policy is refused, as nothing shows it safe.
     Unknown,
-    /// The OS has no file modes Cairn checks yet: any managed policy is
+    /// The OS has no file modes ParleyInn checks yet: any managed policy is
     /// refused until Windows' ACLs are checked.
     Unchecked,
 }
@@ -300,7 +300,7 @@ fn writable(meta: &fs::Metadata, running: u32) -> bool {
     meta.uid() == running || meta.mode() & 0o022 != 0
 }
 
-/// The repository configuration for `working`: `.cairn.toml` at the
+/// The repository configuration for `working`: `.parinn.toml` at the
 /// top of the git repository containing it, the nearest directory up
 /// from it containing `.git`; none outside a repository.
 #[must_use]

@@ -1,6 +1,6 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "$comment": "From Schema Store, https://www.schemastore.org/cargo.json, licensed under the Apache License 2.0. Changed for Cairn: the five $ref entries pointing at further Schema Store schemas (cargo-lints-rust, cargo-lints-rustdoc, cargo-lints-clippy, cargo-lints-cargo, quikrun) are removed, so the schema resolves without the network.",
+  "$comment": "From Schema Store, https://www.schemastore.org/cargo.json, licensed under the Apache License 2.0. Changed for ParleyInn: the five $ref entries pointing at further Schema Store schemas (cargo-lints-rust, cargo-lints-rustdoc, cargo-lints-clippy, cargo-lints-cargo, quikrun) are removed, so the schema resolves without the network.",
   "$id": "https://www.schemastore.org/cargo.json",
   "x-tombi-toml-version": "v1.1.0",
   "definitions": {

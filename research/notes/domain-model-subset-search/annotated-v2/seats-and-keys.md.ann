@@ -8,7 +8,7 @@ summary: >-
 
 - **Seat**: One run's or one device's place in one room, its **seat kind** `run`
   or `device`, named by its seat certificate, made when the seat starts
-  (PRV-11), the only source Cairn shows a seat's kind from; a seat key minted on
+  (PRV-11), the only source ParleyInn shows a seat's kind from; a seat key minted on
   a node identity change⟦f:store-protection⟧, a backup restore⟦/f⟧, a node clone, the loss of a run
   seat's key with its MCP server or the revocation of one of this node's own
   device seats' keys starts another (Seat key). The unit of membership, signing and authorship. A run's personal-room
@@ -26,9 +26,9 @@ summary: >-
   its subagents' runs and seals their writers (SEC-10); until then the core
   mints and keeps it like a device seat's key and seals its writer, and a key
   lost with its MCP server starts a new seat that names the old one (Seat key);
-  what `cairn ingest` appends, whether or not that
+  what `parinn ingest` appends, whether or not that
   server still runs, goes to the one seat and writer ingest starts beside that
-  run seat, which every later `cairn ingest` extends and the core seals, naming
+  run seat, which every later `parinn ingest` extends and the core seals, naming
   the run seat, in the same room, sharing its add, where it has one, and taking
   over its role⟦f:work-rooms⟧, so a ⟦f:moderation⟧kick or ⟦/f⟧leave of either seat ends that one add for both⟦/f⟧
   (REC-19); that seat is a run seat whose key the core keeps like a device
@@ -76,7 +76,7 @@ summary: >-
   device seat's pins qualify only on its own node and on nodes whose device
   seats have it among their predecessors, however far back (Pin)⟦/f⟧.
 ⟦f:principal-keys⟧- **Principal key**: A principal's root key, kept offline or in a
-  platform-protected key store and never kept by a Cairn component (the
+  platform-protected key store and never kept by a ParleyInn component (the
   principal's own key tooling signs with it), which certifies its device keys⟦f:service-accounts⟧
   and may certify a service account's principal key by a **service-account
   certificate**, which marks whether that account relays text others wrote⟦/f⟧

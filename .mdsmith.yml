@@ -1,4 +1,4 @@
-# mdsmith configuration for Cairn.
+# mdsmith configuration for ParleyInn.
 #
 # Started from `frit init --mdsmith` (the plan/proto.md schema and the
 # PLAN.md catalog it governs), extended with frit's skill kind and a
@@ -211,7 +211,7 @@ kinds:
         - heading: "Concepts"
         - heading: "Relations"
         - heading: "Names follow the model"
-        - heading: "Not Cairn concepts"
+        - heading: "Not ParleyInn concepts"
         - heading: "Changing the model"
     rules:
       token-budget:

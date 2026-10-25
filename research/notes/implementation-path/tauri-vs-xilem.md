@@ -1,8 +1,8 @@
 # Tauri 2, Electron and Xilem, for five platforms and the browser
 
-Scope: a full comparison of the two Rust UI paths for Cairn's app,
+Scope: a full comparison of the two Rust UI paths for ParleyInn's app,
 written 4 October 2026 for the stakeholder's target of Linux, Windows,
-macOS, iOS, Android and a browser (Cairn hosted as a web service).
+macOS, iOS, Android and a browser (ParleyInn hosted as a web service).
 Tauri 2 is option D's shell: the UI is a web page in the platform's
 webview. Xilem on Masonry and Vello is option I's toolkit: the core
 draws the UI on the GPU. Licences and crate counts were measured here
@@ -24,7 +24,7 @@ sourced.
 | Crates per target (measured)   | Linux 284, Windows 246, macOS 240, iOS 261, Android 258; 350 across all                                                 | Linux 265, Windows 192, macOS 186, iOS 189, Android 191; 348 across all                                                      |
 | Desktops                       | stable                                                                                                                  | through `masonry_winit`                                                                                                      |
 | iOS and Android                | supported since 2.0, "not on par" with desktop                                                                          | Android "not yet generally usable"; iOS not stated (winit supports it; unverified)                                           |
-| Browser                        | **the same page**, served by Cairn's own server                                                                         | **a second UI:** `xilem_web` renders the DOM with its own views (0.4.0, 1,458 downloads)                                     |
+| Browser                        | **the same page**, served by ParleyInn's own server                                                                     | **a second UI:** `xilem_web` renders the DOM with its own views (0.4.0, 1,458 downloads)                                     |
 | Maturity                       | 2.12.1, 34 million downloads, 3.0 in alpha                                                                              | "experimental"; last release 0.4.0 on 29 October 2025                                                                        |
 | Accessibility                  | the webview's own: every platform and the browser                                                                       | AccessKit on Windows, macOS, Linux, iOS and Android; no web adapter, so a canvas in a browser has none                       |
 | Text input and IME             | the webview's own                                                                                                       | Parley's editor and winit's IME; mobile soft keyboards unproven                                                              |
@@ -54,9 +54,9 @@ sourced.
 
 ## The browser decides most of it
 
-Hosting Cairn as a web service means a sixth surface, the browser.
+Hosting ParleyInn as a web service means a sixth surface, the browser.
 
-- **Tauri's page is already a web app.** Cairn's own server (Rust, in
+- **Tauri's page is already a web app.** ParleyInn's own server (Rust, in
   the core's boundary) serves the same bundle, and the calls the page
   makes through Tauri's IPC go over HTTP and a WebSocket instead. One
   UI codebase serves all six surfaces, with the browser's
@@ -87,7 +87,7 @@ but it changes what the page runs in on the desktop.
 | Licence                | Apache-2.0 OR MIT                                                                 | MIT for Electron, Chromium's BSD-3 and its third-party licences; Chromium's ffmpeg ships as a shared library under LGPL (unverified)                                                                                  |
 | SRS fit                | Rust shell, reach evidence by crate                                               | CON-03 bars a Node.js runtime for P0 features; Node's `fetch` and `child_process` leave no build-time reach evidence (HC-3), so the shell may hold no logic                                                           |
 | Calls home by default  | WebView2's and Android WebView's vendor diagnostics                               | none from Electron itself, but spellcheck dictionaries download "from a Google CDN by default" until the app sets its own URL ([Electron docs][el-spell])                                                             |
-| Security updates       | follow the operating system's webview                                             | Cairn ships each Chromium fix: a major every 8 weeks, the latest three supported ([Electron timelines][el-time])                                                                                                      |
+| Security updates       | follow the operating system's webview                                             | ParleyInn ships each Chromium fix: a major every 8 weeks, the latest three supported ([Electron timelines][el-time])                                                                                                  |
 | Precedent              | Vibe Kanban, Conductor, Block Buzz                                                | VS Code, Cursor, Goose, Superset; OpenCode moved from Tauri to Electron, reportedly over WebKit differences (secondary)                                                                                               |
 
 Electron's one real gain is a single rendering engine on the

@@ -21,7 +21,7 @@ The tooling runs every scenario under `features/`, keeps them in step
 with the SRS, and reads three JSON inputs: the reviewing agent's
 review outcome, GitHub's check runs, and the domain model's finding
 ledger. The review gate must refuse an unknown field in the review
-outcome (ENG-28). Until phase 4 of that plan, the `cairn version`
+outcome (ENG-28). Until phase 4 of that plan, the `parinn version`
 stub and its import-closure test stay Go. Nothing chosen here may link
 into a shipped executable (I4).
 

@@ -1,0 +1,57 @@
+name: Set up pinned tools
+description: Install selected tools from mise.toml and mise.lock through scripts/setup-tools.sh
+inputs:
+  tools:
+    description: Space-separated mise tool names to install
+    required: true
+  cache:
+    description: Whether CI may restore and save tool caches
+    required: false
+    default: "true"
+runs:
+  using: composite
+  steps:
+    # mise stores Rustup's proxy in its data directory, but Rustup's
+    # actual toolchain lives elsewhere. Cache only this project's exact
+    # toolchain, not every compiler on the runner image.
+    - name: Locate the pinned Rust toolchain
+      id: rust
+      if: inputs.cache == 'true' && startsWith(inputs.tools, 'rust')
+      shell: bash
+      run: |
+        version="$(sed -n 's/^channel = "\(.*\)"$/\1/p' rust-toolchain.toml)"
+        host="$(cd "$RUNNER_TEMP" && rustc -vV | sed -n 's/^host: //p')"
+        test -n "$version" && test -n "$host"
+        echo "path=$HOME/.rustup/toolchains/$version-$host" >> "$GITHUB_OUTPUT"
+    - name: Cache the pinned Rust toolchain
+      if: inputs.cache == 'true' && startsWith(inputs.tools, 'rust')
+      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ${{ steps.rust.outputs.path }}
+        key: rustup-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('rust-toolchain.toml') }}
+    # mise's installs, keyed on the pins and this job's tool selection.
+    - name: Name the tool cache
+      id: tools
+      if: inputs.cache == 'true'
+      shell: bash
+      env:
+        TOOLS: ${{ inputs.tools }}
+      run: echo "key=${TOOLS//[^a-zA-Z0-9.]/-}" >> "$GITHUB_OUTPUT"
+    - name: Cache the selected pinned tools
+      if: inputs.cache == 'true'
+      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ~/.local/share/mise
+        key: mise-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('scripts/mise.sha256', 'mise.lock') }}-${{ steps.tools.outputs.key }}
+    # scripts/setup-tools.sh is the one install path, shared with the
+    # Claude Code web environment: it verifies the mise binary pinned in
+    # scripts/mise.sha256, installs the tools from mise.lock and exports
+    # their PATH to the job's later steps.
+    - name: Install selected pinned tools
+      shell: bash
+      env:
+        TOOLS: ${{ inputs.tools }}
+        GITHUB_TOKEN: ${{ github.token }}
+      run: |
+        # shellcheck disable=SC2086 # TOOLS is a space-separated list
+        "$GITHUB_ACTION_PATH/../../../scripts/setup-tools.sh" $TOOLS

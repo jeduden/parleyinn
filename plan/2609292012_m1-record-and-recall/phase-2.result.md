@@ -6,7 +6,7 @@ result: true
 summary: >-
   @SEC-02, @SEC-03, @OPS-02, @OPS-03 and @ENG-04 off @pending and
   passing, confined. Every command checks the home first; the audit log
-  chains across rotation; cairn hook fails open and audits.
+  chains across rotation; parinn hook fails open and audits.
 ---
 # Phase 2 result
 
@@ -25,13 +25,13 @@ Inherited:
 
 - `Context::home()` locates the home, then `Home::check` (owner-only,
   the running OS user's, no symbolic link inside) and
-  `check_home_id` against `CAIRN_HOME_ID`. Every command goes through
+  `check_home_id` against `PARINN_HOME_ID`. Every command goes through
   it; the running OS user is a pipe's owner.
 - The `audit` crate: `Log::append(&Occurrence, time)`, `entries`,
   `verify`; `counters::counts`. An `Occurrence` holds only
   `&'static str`, so no content reaches the log. New counters join
   `audit::entry::Counter`; new kinds of failure each get a variant.
-- The `hook` crate: `Hook`, `Failure`, `handle`, `guarded`. `cairn
+- The `hook` crate: `Hook`, `Failure`, `handle`, `guarded`. `parinn
   hook` waits 500 ms for its whole hook input, and audits under its
   own panic guard.
 - `mcp::serve` takes the handler and a callback per caught panic; it
@@ -46,7 +46,7 @@ agent's review.
 
 For phase 3:
 
-- `cairn counter ack` refuses without a terminal on standard input
+- `parinn counter ack` refuses without a terminal on standard input
   and output (OWN-12), which the `@OPS-03` scenario proves with the
   agent's tool call, and the testkit's `run_at_terminal` gives a step
   one through `script`, outside the trace. It still only appends a
@@ -63,14 +63,14 @@ Parked:
 - Audit appends are not synced to disk, and a torn last entry fails
   every later append until repaired (ENG-06, phase 16).
 - A hook whose home is refused or whose audit log takes no entry
-  leaves no trace; `cairn status` and `cairn doctor` name the cause.
+  leaves no trace; `parinn status` and `parinn doctor` name the cause.
 - The home check walks every file, payloads included once phase 6
   writes them; it may need narrowing to fit the hook budget. An append
-  reads the whole last audit file, and `cairn status` and `cairn
+  reads the whole last audit file, and `parinn status` and `parinn
   doctor` re-check the whole log each run.
-- `cairn verify`, `status` and `doctor` read the audit log without its
+- `parinn verify`, `status` and `doctor` read the audit log without its
   lock, so an append mid-write can read as a torn entry.
-- `cairn verify` needs a store, so a home with only audit entries
+- `parinn verify` needs a store, so a home with only audit entries
   cannot have its audit chain checked.
 - Windows' ACLs are not checked yet.
 - The `@SEC-02` steps for another OS user need root or `sudo -n`.
@@ -78,5 +78,5 @@ Parked:
 - Counter names disagree across pending scenarios: `@OPS-01` counts a
   malformed hook input as `hook_rejected`, `@SEC-16` as
   `hook_input_rejected`. Settle them before either goes live.
-- The SRS names no variable for SEC-03's home id; `CAIRN_HOME_ID`
-  should join it beside `CAIRN_HOME`, in its own pull request.
+- The SRS names no variable for SEC-03's home id; `PARINN_HOME_ID`
+  should join it beside `PARINN_HOME`, in its own pull request.

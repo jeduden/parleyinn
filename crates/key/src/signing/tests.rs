@@ -100,7 +100,7 @@ fn public_keys_and_signatures_round_trip_through_hex() {
     assert_eq!(format!("{public:?}"), format!("PublicKey({public})"));
     assert_eq!(
         public.fingerprint(),
-        record::digest::Digest::of(&[b"cairn key fingerprint v1\0", public.as_bytes()])
+        record::digest::Digest::of(&[b"parinn key fingerprint v1\0", public.as_bytes()])
     );
     assert_eq!(Signature::from_hex(&sig.to_string()).unwrap(), sig);
     assert_eq!(format!("{sig:?}"), format!("Signature({sig})"));
@@ -152,4 +152,16 @@ fn errors_explain_themselves() {
     assert_eq!(KeyError::Encoding(enc.clone()).to_string(), enc.to_string());
     assert!(std::error::Error::source(&KeyError::Encoding(enc)).is_some());
     assert!(std::error::Error::source(&KeyError::Malformed("y".into())).is_none());
+}
+
+#[test]
+fn a_derived_secret_is_the_keys_own_and_each_label_has_its_own() {
+    let key = DeviceKey::mint(&mut Counted::default()).unwrap();
+    let again = DeviceKey::from_seed(&key.seed_hex()).unwrap();
+    let other = DeviceKey::from_seed(&"22".repeat(32)).unwrap();
+
+    assert_eq!(key.derive_secret(b"a"), again.derive_secret(b"a"));
+    assert_ne!(key.derive_secret(b"a"), key.derive_secret(b"b"));
+    assert_ne!(key.derive_secret(b"a"), other.derive_secret(b"a"));
+    assert_ne!(&key.derive_secret(b"a"), key.public().as_bytes());
 }

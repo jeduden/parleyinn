@@ -34,9 +34,9 @@ and the docs index. Every product scenario stays `@pending`.
    `features/`
 4. Keep SRS and scenarios in bijection with `internal/scenario`,
    priority and invariant tags included
-5. Run the scenarios from `cmd/cairn` with godog in strict mode, with an
-   isolated `HOME` and `CAIRN_HOME`
-6. Add `cairn version` as the one command, stamped by the release build
+5. Run the scenarios from `cmd/parinn` with godog in strict mode, with an
+   isolated `HOME` and `PARINN_HOME`
+6. Add `parinn version` as the one command, stamped by the release build
 7. Write ci.yml, nightly.yml and release.yml, plus dependabot,
    CODEOWNERS and codecov
 8. Scaffold frit's plan machinery and skills; write CLAUDE.md,

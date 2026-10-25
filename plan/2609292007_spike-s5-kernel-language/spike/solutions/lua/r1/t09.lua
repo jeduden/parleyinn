@@ -1,5 +1,5 @@
 local counts = {}
-for _, e in ipairs(cairn.events()) do
+for _, e in ipairs(parinn.events()) do
   if e.run ~= nil then
     if counts[e.run] == nil then counts[e.run] = 0 end
     if e.kind == "compaction" then

@@ -104,7 +104,7 @@
     "invariant_change": false
    }
   ],
-  "recommendation": "Tighten now with the single option: a writer can be retired by a principal act only from the principal its seat key chains to. Before PRV-10 ships, only a principal act recorded on the node whose device key certified that seat key, or the token key that certified it, can retire it. Any other principal act retiring it is void and shown (I6). Make the change in the model (record.md), in PEER-05, in the CLI row for `cairn writer retire`, and in the pending PEER-05 scenario. No deferral is needed: this is a tightening that follows from LANE-25, I8 and the expire-act limit. Run `mdsmith fix` afterwards to realign the PEER-05 and CLI table rows the longer cells shift. DM-BV's quote (\"marked delivered after retirement (open for the room merge: OQ-41)\") and DM-G's quotes stay intact.",
+  "recommendation": "Tighten now with the single option: a writer can be retired by a principal act only from the principal its seat key chains to. Before PRV-10 ships, only a principal act recorded on the node whose device key certified that seat key, or the token key that certified it, can retire it. Any other principal act retiring it is void and shown (I6). Make the change in the model (record.md), in PEER-05, in the CLI row for `parinn writer retire`, and in the pending PEER-05 scenario. No deferral is needed: this is a tightening that follows from LANE-25, I8 and the expire-act limit. Run `mdsmith fix` afterwards to realign the PEER-05 and CLI table rows the longer cells shift. DM-BV's quote (\"marked delivered after retirement (open for the room merge: OQ-41)\") and DM-G's quotes stay intact.",
   "edits": [
    {
     "file": "docs/domain-model/record.md",

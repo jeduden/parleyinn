@@ -24,8 +24,8 @@
     {
       "type": "undefined",
       "quote": "verbatim and restored verbatim after every compaction, or named by id and",
-      "problem": "I3 and the restore block name an omitted pin by id, and a closed path may carry only Cairn's own ids, but no pin id is defined: neither Pin nor Pin version assigns one or says who chooses it, and the only addressing the model defines is an event's address. The agent's fallback to recall an omitted pin then has no defined key, and an author-chosen id would put untrusted text into trusted restore text.",
-      "fix": "Add to Pin: a pin's id is the address of its creating event, assigned by Cairn and never chosen.",
+      "problem": "I3 and the restore block name an omitted pin by id, and a closed path may carry only ParleyInn's own ids, but no pin id is defined: neither Pin nor Pin version assigns one or says who chooses it, and the only addressing the model defines is an event's address. The agent's fallback to recall an omitted pin then has no defined key, and an author-chosen id would put untrusted text into trusted restore text.",
+      "fix": "Add to Pin: a pin's id is the address of its creating event, assigned by ParleyInn and never chosen.",
       "severity": "minor"
     },
     {

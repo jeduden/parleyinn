@@ -82,7 +82,7 @@ it shows what removal means.
   the same room as the evidence"
   (`research/notes/custom-storage-git-and-chat/integrated-platforms.md`;
   <https://github.com/block/buzz>).
-- Cairn's own SRS demands this gate for Cairn itself. ENG-21 requires
+- ParleyInn's own SRS demands this gate for ParleyInn itself. ENG-21 requires
   approval by a reviewer other than the author, CODEOWNERS approval for
   requirement and gate changes, two approvals for security-sensitive
   packages, and labelled AI changes. ENG-28 requires an agent approval to
@@ -417,7 +417,7 @@ not get a lane. Their policies also lean against session links.
   (`cursor.md`). The research rule: publish to open source "as
   projections, not raw segments" (rule 12 in
   `research/reports/agent-session-storage-beyond-git.md`).
-- The pitch has no story for a contributor who does not run Cairn,
+- The pitch has no story for a contributor who does not run ParleyInn,
   or for how a maintainer finds and joins a public lane.
 
 ## Minor gaps
@@ -466,7 +466,7 @@ post-merge rollback (`sheets.json`). No evidence covers deployment.
 - Legal holds: explicitly not researched
   (`research/reports/custom-storage-git-and-chat-interfaces.md`).
 - How branch protection and rulesets treat custom refs such as
-  `refs/cairn/*`: "No source covers" it
+  `refs/parinn/*`: "No source covers" it
   (`research/reports/git-as-agent-session-storage.md`). agentdiff notes
   that custom refs escape branch protection
   (`research/reports/interesting-ideas-digest.md`).

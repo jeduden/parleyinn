@@ -1,7 +1,7 @@
 //! The steps of SRS §5.10, observability (OPS). `@OPS-02` and
 //! `@OPS-03` are bound: the audit log's chain across a rotation, and
-//! `cairn doctor` failing while a counter rose since the counters were
-//! last acknowledged. A hook a step runs is the built core's `cairn
+//! `parinn doctor` failing while a counter rose since the counters were
+//! last acknowledged. A hook a step runs is the built core's `parinn
 //! hook`, confined, with the hook input on its stdin.
 
 use std::fs;
@@ -108,7 +108,7 @@ fn first_chains_to_last(w: &mut World, before: String) -> Result<(), String> {
 }
 
 #[then(
-    regex = r#"^every entry is RFC 8785 canonical JSON whose SHA-256 chain verifies with "cairn verify"$"#
+    regex = r#"^every entry is RFC 8785 canonical JSON whose SHA-256 chain verifies with "parinn verify"$"#
 )]
 fn every_entry_canonical_and_chained(w: &mut World) -> Result<(), String> {
     let log = Log::new(home(w)?.audit());
@@ -154,7 +154,7 @@ fn every_entry_canonical_and_chained(w: &mut World) -> Result<(), String> {
     let out = last_run(w)?;
     if !out.status.success() {
         return Err(format!(
-            "cairn verify exited {}: {}",
+            "parinn verify exited {}: {}",
             out.status,
             String::from_utf8_lossy(&out.stderr).trim()
         ));
@@ -164,13 +164,13 @@ fn every_entry_canonical_and_chained(w: &mut World) -> Result<(), String> {
         return Ok(());
     }
     Err(format!(
-        "cairn verify checked {} audit entries, not the {count} the log holds",
+        "parinn verify checked {} audit entries, not the {count} the log holds",
         report["audit"]["entries"]
     ))
 }
 
 #[given(
-    regex = r#"^the person has acknowledged the counters at a terminal with "cairn counter ack", a neutral principal act$"#
+    regex = r#"^the person has acknowledged the counters at a terminal with "parinn counter ack", a neutral principal act$"#
 )]
 fn acknowledged(w: &mut World) -> Result<(), String> {
     run_core_at_terminal(w, &["counter", "ack"])?;
@@ -179,7 +179,7 @@ fn acknowledged(w: &mut World) -> Result<(), String> {
         return Ok(());
     }
     Err(format!(
-        "cairn counter ack exited {}: {}",
+        "parinn counter ack exited {}: {}",
         out.status,
         String::from_utf8_lossy(&out.stdout).trim()
     ))

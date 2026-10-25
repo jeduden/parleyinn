@@ -10,7 +10,7 @@ import (
 	"time"
 )
 
-// cmdFTS5 probes the FTS5 features Cairn's recall relies on (ADR-05,
+// cmdFTS5 probes the FTS5 features ParleyInn's recall relies on (ADR-05,
 // RCL-01) on a small fresh store: BM25 ranking, snippet, phrase,
 // prefix and NEAR queries, the unicode61 and trigram tokenizers, and
 // rebuilding the projection from the record (I10).

@@ -1,6 +1,6 @@
 # UI stacks and one-binary packaging
 
-Scope: the components that could deliver Cairn's surfaces and ship them
+Scope: the components that could deliver ParleyInn's surfaces and ship them
 as one executable, read from primary sources on 4 October 2026. The
 surfaces are the three-pane room page served by a loopback-only
 component (the SRS's lane view, B1), a TUI for any terminal, and a
@@ -35,7 +35,7 @@ parts of the run component are in
   BSD or ISC; ENG-20 signs releases with Sigstore and SLSA L3
   provenance —
   [10-engineering-quality.md](../../../docs/srs/10-engineering-quality.md).
-  Cairn already holds three direct Go dependencies (godog,
+  ParleyInn already holds three direct Go dependencies (godog,
   cucumber messages, testify) in `go.mod`.
 - VIEW-03 makes every view an optional read-only client; VIEW-14 lets
   the TUI and phone be reduced surfaces that say what they left out;
@@ -77,8 +77,8 @@ parts of the run component are in
   "uses its invocation arguments (`os.Args`) to determine which command
   is being called"; cgo is not supported —
   [gobusybox README](https://github.com/u-root/gobusybox).
-- For Cairn the switch would be a subcommand (`cairn mcp`,
-  `cairn view`), chosen once at start, as SEC-01 asks.
+- For ParleyInn the switch would be a subcommand (`parinn mcp`,
+  `parinn view`), chosen once at start, as SEC-01 asks.
 - Measured here: the core-only program is 1.6 MB stripped; the same
   binary with the view branch is 6.2 MB. The extra 4.6 MB is
   `net/http` and the embedded assets. That code sits in every core
@@ -126,7 +126,7 @@ parts of the run component are in
   [0.16.0 release notes](https://ziglang.org/download/0.16.0/release-notes.html).
 - Reproducibility and binary size: not verified here.
 - Fit: Zig earns its place through libghostty-vt and OpenTUI's core
-  (sections D and E), not as Cairn's packaging language.
+  (sections D and E), not as ParleyInn's packaging language.
 
 ### A5. Bun build --compile
 
@@ -395,7 +395,7 @@ npm data is from each package's registry record
   Push goes through the browser's push service: the app server posts
   to the subscription's endpoint URL —
   [MDN Push API](https://developer.mozilla.org/en-US/docs/Web/API/Push_API).
-  VIEW-17 forbids a vendor push service, so Cairn's PWA gets no web
+  VIEW-17 forbids a vendor push service, so ParleyInn's PWA gets no web
   push.
 - Apple kept Home Screen web apps in the EU after a 17.4 beta removed
   them — [Apple developer support](https://developer.apple.com/support/dma-and-apps-in-the-eu#dev-qaa).
@@ -418,7 +418,7 @@ npm data is from each package's registry record
   Ed25519 on iOS Safari was not verified.
 - gomobile: "Only a subset of Go types are currently supported" in
   bindings — [Go wiki: Mobile](https://go.dev/wiki/Mobile). A gomobile
-  library could reuse Cairn's Go signing code inside a thin native app
+  library could reuse ParleyInn's Go signing code inside a thin native app
   (reasoning).
 - Compose Multiplatform 1.8.0 made iOS stable; it adds "~9 MB" to an
   iOS app against SwiftUI —
@@ -466,7 +466,7 @@ npm data is from each package's registry record
   Panel" — [Zed external agents](https://zed.dev/docs/ai/external-agents).
   ACP uses "JSON-RPC over stdio" for local agents and has types for
   diffs — [ACP introduction](https://agentclientprotocol.com/overview/introduction).
-- Fit: in Zed, Cairn appears as its MCP server; the room stays in the
+- Fit: in Zed, ParleyInn appears as its MCP server; the room stays in the
   browser.
 
 ### Ghostty
@@ -501,7 +501,7 @@ npm data is from each package's registry record
   renderer" — [bubbletea](https://github.com/charmbracelet/bubbletea).
   Its `go.mod` pins `charmbracelet/ultraviolet` at a pseudo-version —
   [module proxy](https://proxy.golang.org/charm.land/bubbletea/v2/@v/v2.0.10.mod).
-  Bubble Tea plus Lip Gloss would take Cairn to five of ten direct
+  Bubble Tea plus Lip Gloss would take ParleyInn to five of ten direct
   dependencies.
 - Ratatui offers "immediate-mode rendering"; Netflix, OpenAI and AWS
   are listed as users — [ratatui.rs](https://ratatui.rs/).
@@ -523,7 +523,7 @@ npm data is from each package's registry record
 ## How this note measured
 
 All builds ran in a scratch directory on linux/amd64 on 4 October
-2026; none touched Cairn's tree or any real home.
+2026; none touched ParleyInn's tree or any real home.
 
 - Go 1.26 (toolchain go1.26.0 selected by `go.mod`),
   `CGO_ENABLED=0 go build -trimpath -ldflags="-s -w"`; repeat build in
@@ -572,6 +572,6 @@ All builds ran in a scratch directory on linux/amd64 on 4 October
 | Phone, stage two (device key) | Tauri 2 mobile or Capacitor wrapping the same page, key in the platform keystore | PWA with a non-extractable WebCrypto key; gomobile or Wails v3 mobile to reuse Go crypto | reuses the web UI, holds a key the browser cannot lose             | a second language (Rust) or store packaging; Ed25519 in Safari unverified |
 | VS Code                       | thin TS webview extension framing the loopback page                              | none                                                                                     | `portMapping` covers HTTP and SSE                                  | a second signed artifact; remote tunnels widen the boundary               |
 | JetBrains                     | JCEF panel loading the loopback page                                             | none                                                                                     | Chromium inside the IDE                                            | loopback loading unverified                                               |
-| Zed                           | Cairn's MCP server as a Zed extension                                            | ACP, if Cairn ever fronts an agent                                                       | Zed has no webviews                                                | no room UI inside Zed                                                     |
+| Zed                           | ParleyInn's MCP server as a Zed extension                                        | ACP, if ParleyInn ever fronts an agent                                                   | Zed has no webviews                                                | no room UI inside Zed                                                     |
 | Ghostty                       | libghostty-vt reused (ghostty-web, wazero)                                       | AppleScript preview on macOS                                                             | Ghostty has no plugin API                                          | libghostty alpha, untagged                                                |
 | Desktop window (optional)     | the system browser opening the loopback page                                     | Tauri 2 window pointed at the loopback URL                                               | no extra artifact                                                  | a Tauri shell is a second binary                                          |

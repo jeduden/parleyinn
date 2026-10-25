@@ -1,7 +1,7 @@
 [
  {
   "type": "gap",
-  "quote": "Cairn counts principals by principal key: every device key,",
+  "quote": "ParleyInn counts principals by principal key: every device key,",
   "problem": "Ownership, admission (\"The owner's principal key always satisfies its room's admission, for its device and run seats alike\"), invites, bars and the owner's protection from kick, bar and mute are all defined by keys that chain to a principal key. But \"Before PRV-10 ships no principal key certifies a device key\", so before PRV-10 no seat chains to any principal key and none of these rules can be evaluated, not even a second run of the owner joining the owner's own room. One implementer would refuse every join and invite, another would substitute some other identity.",
   "fix": "Add: \"Before PRV-10 ships, a node's device key stands in for its principal's principal key when counting principals and for admission, invites, bars and ownership\" (or say that rooms with other seats than their creating one need PRV-10).",
   "severity": "needs-fix",
@@ -73,9 +73,9 @@
  },
  {
   "type": "gap",
-  "quote": "no acceptance and which `cairn configuration accept` records as the cut act",
-  "problem": "A configuration that turns off the room-view component or the launcher \"applies\" without acceptance, but its cut act is recorded only when `cairn configuration accept` runs, while the component \"runs only while the act turning it on stands\". Until someone accepts, the record still shows the turn-on act standing, so implementers will differ on whether the component stops, and the record misses the change.",
-  "fix": "Change it to: \"which needs no acceptance; Cairn records the cut act turning it off when that configuration applies\".",
+  "quote": "no acceptance and which `parinn configuration accept` records as the cut act",
+  "problem": "A configuration that turns off the room-view component or the launcher \"applies\" without acceptance, but its cut act is recorded only when `parinn configuration accept` runs, while the component \"runs only while the act turning it on stands\". Until someone accepts, the record still shows the turn-on act standing, so implementers will differ on whether the component stops, and the record misses the change.",
+  "fix": "Change it to: \"which needs no acceptance; ParleyInn records the cut act turning it off when that configuration applies\".",
   "severity": "minor",
   "lens": "consistency",
   "model": "default"
@@ -101,7 +101,7 @@
  {
   "type": "security",
   "quote": "- **Configuration pin**: A pin the principal's configuration declares, authored",
-  "problem": "A repository's `.cairn.toml` \"may only tighten\" the principal's configuration, and adding a `constraint` pin reads naturally as tightening. Nothing says whether repository configuration may declare pins. If it may, text from a repository file, which is untrusted under I2, would become a device-seat `operator` pin that restores verbatim.",
+  "problem": "A repository's `.parinn.toml` \"may only tighten\" the principal's configuration, and adding a `constraint` pin reads naturally as tightening. Nothing says whether repository configuration may declare pins. If it may, text from a repository file, which is untrusted under I2, would become a device-seat `operator` pin that restores verbatim.",
   "fix": "Append: \"Repository configuration declares no pins.\"",
   "severity": "minor",
   "lens": "consistency",
@@ -110,7 +110,7 @@
  {
   "type": "security",
   "quote": "CLI; a skill's call is the agent's own tool call, never a principal act.",
-  "problem": "A run-seat key lives only in the MCP server, and a room act counts \"wherever it is taken\". So when an agent's tool call runs `cairn`, the only key it can sign with is the device seat's, and nothing forbids that. Model output then becomes device-seat posts and pins. Before PRV-10 those pins are trusted `operator` events. Once PRV-10 ships, the posts are trusted for the principal's agents and reach trust-grantors' agents inside OWN-29's template, which breaks I2.",
+  "problem": "A run-seat key lives only in the MCP server, and a room act counts \"wherever it is taken\". So when an agent's tool call runs `parinn`, the only key it can sign with is the device seat's, and nothing forbids that. Model output then becomes device-seat posts and pins. Before PRV-10 those pins are trusted `operator` events. Once PRV-10 ships, the posts are trusted for the principal's agents and reach trust-grantors' agents inside OWN-29's template, which breaks I2.",
   "fix": "CLI; a skill's call is the agent's own tool call, never a principal act, and it never signs with a device seat's key: it acts as the run's seat or is refused.",
   "severity": "needs-fix",
   "lens": "security",
@@ -119,7 +119,7 @@
  {
   "type": "security",
   "quote": "or a read-only CLI verb the agent runs whose output is not a",
-  "problem": "Enveloping depends only on whether the output is a terminal. An agent's tool call can run `cairn` under a pseudo-terminal and get stored untrusted history back raw. That content reaches the model with no envelope, against I2.",
+  "problem": "Enveloping depends only on whether the output is a terminal. An agent's tool call can run `parinn` under a pseudo-terminal and get stored untrusted history back raw. That content reaches the model with no envelope, against I2.",
   "fix": "or a read-only CLI verb an agent's tool call runs, whatever its output",
   "severity": "needs-fix",
   "lens": "security",
@@ -137,7 +137,7 @@
  {
   "type": "security",
   "quote": "A pin the principal's configuration declares, authored",
-  "problem": "A configuration pin is authored by the device seat, so it is trusted and restores. Repository configuration 'only tightens', and adding a constraint pin reads as tightening. Nothing stops a repository's `.cairn.toml`, a file and so untrusted under I2, from declaring one that then restores verbatim as trusted text.",
+  "problem": "A configuration pin is authored by the device seat, so it is trusted and restores. Repository configuration 'only tightens', and adding a constraint pin reads as tightening. Nothing stops a repository's `.parinn.toml`, a file and so untrusted under I2, from declaring one that then restores verbatim as trusted text.",
   "fix": "A pin the principal's configuration declares, never repository configuration, authored",
   "severity": "needs-fix",
   "lens": "security",

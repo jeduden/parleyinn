@@ -2,10 +2,10 @@
 
 Scope: two questions raised by the stakeholder's new requirement of
 4 October 2026. The first is how a phone app reaches the owner's own
-Cairn nodes with no central or vendor service. The second is how a
+ParleyInn nodes with no central or vendor service. The second is how a
 person's chat message reaches a running, possibly idle harness session
-that the person started in their own terminal, not Cairn. The
-requirement asks for the same "start Cairn, then you see your stuff"
+that the person started in their own terminal, not ParleyInn. The
+requirement asks for the same "start ParleyInn, then you see your stuff"
 on Linux, Windows, macOS, iOS and Android. The phone must show the
 owner's rooms, chat and approve, and the UI must stay one more client,
 never a required hop. Sources were read on 4 October 2026: vendor
@@ -20,7 +20,7 @@ repeated:
 - the stacks of Happy, Omnara, T3 Code, Block Buzz and Remote Control:
   [prior art](prior-art-stacks.md) and the [T3 Code note](../t3code/t3code.md);
 - which hook points each harness offers:
-  [room protocol](../../../plan/2610012322_cairn-for-agent-fleets/room-protocol.md).
+  [room protocol](../../../plan/2610012322_parinn-for-agent-fleets/room-protocol.md).
 
 "(unverified)" marks a claim no primary source confirmed;
 "(inference)" marks a conclusion drawn from cited facts.
@@ -93,7 +93,7 @@ repeated:
 - **Approve.** Already in scope: allow once or deny, with the phone's
   own presence check bound to the answer (OWN-16).
 - **Notify.** VIEW-17 forbids a vendor push service; X4 rejects Web
-  Push and vendor relays; X7 rejects a Cairn relay host, but "any
+  Push and vendor relays; X7 rejects a ParleyInn relay host, but "any
   self-hosted node can be the reachable peer"
   ([§6.3](../../../docs/srs/06-security.md)).
 
@@ -164,10 +164,10 @@ repeated:
     ([Tailscale open source](https://tailscale.com/opensource)), so
     the iOS app is closed (inference).
   - Cost to the owner: a coordination server and a relay to keep up,
-    beside the Cairn node (inference).
+    beside the ParleyInn node (inference).
 - **Tailscale's own service.** Its coordination server and relays are
   Tailscale's. Row 11 leaves the tunnel to the owner, so an owner may
-  choose it; CON-06 forbids Cairn to depend on it (inference).
+  choose it; CON-06 forbids ParleyInn to depend on it (inference).
 - **Fit.** This is stage one as written (row 11): the phone opens the
   loopback lane view with a phone-scoped credential (OWN-16). It shows
   rooms only while the tunnel is up and the page is open.
@@ -206,7 +206,7 @@ repeated:
   behind NATs whose mapping depends on the destination
   ([how NAT traversal works](https://tailscale.com/blog/how-nat-traversal-works)).
   Carrier-grade NAT on phones makes that case common (unverified).
-- **Fit.** Cairn would write its own rendezvous on an enrolled peer
+- **Fit.** ParleyInn would write its own rendezvous on an enrolled peer
   with a public address; the direct path only saves relay bandwidth
   (inference).
 
@@ -291,7 +291,7 @@ repeated:
   `mediaProcessing` services may run "6 hours total in any 24-hour
   period"
   ([timeouts](https://developer.android.com/develop/background-work/services/fgs/timeout)).
-  A Cairn app syncing under `dataSync` would be stopped; which service
+  A ParleyInn app syncing under `dataSync` would be stopped; which service
   type ntfy declares was not checked (unverified).
 - **Local network.** `ACCESS_LOCAL_NETWORK` from Android 17, as above.
 
@@ -307,7 +307,7 @@ repeated:
   entitlement; and local notifications in refresh windows the system
   picks (inference). Timely notifications away from home need one of
   these:
-  - APNs through a gateway Cairn's publisher runs, a central service
+  - APNs through a gateway ParleyInn's publisher runs, a central service
     that CON-06 forbids;
   - APNs through the owner's own Apple developer account and own build
     of the app;
@@ -335,14 +335,14 @@ T3 Code also pairs on the LAN and supports Tailscale Serve and SSH
   ([Codex Remote](https://learn.chatgpt.com/docs/remote)).
 - No surveyed product notifies an iPhone without APNs.
 
-## Part 2: live delivery into a session Cairn did not start
+## Part 2: live delivery into a session ParleyInn did not start
 
 ### What the SRS asks of a delivery path
 
 - **OWN-03.** Owner text reaches an agent "only through the harness's
   own input interface (the Agent SDK, ACP, the Codex app-server, or the
-  terminal the run component hosts), never through Cairn hook output".
-- **I2.** With an owner act, Cairn writes "through the harness's own
+  terminal the run component hosts), never through ParleyInn hook output".
+- **I2.** With an owner act, ParleyInn writes "through the harness's own
   input, only owner-typed text, a fixed template that references ids,
   or a post a principal endorsed". Recall is pull-only and enveloped.
 - **I4.** B0 opens no socket. A stdio MCP server and hooks are B0
@@ -368,7 +368,7 @@ T3 Code also pairs on the LAN and supports Tailscale Serve and SSH
   (channels reference).
 - **Acknowledgement.** "Claude Code doesn't acknowledge notifications";
   if the session has not loaded the server as a channel, "Claude Code
-  drops the events silently" (channels reference). Cairn would have
+  drops the events silently" (channels reference). ParleyInn would have
   to record delivery itself (I6, inference).
 - **Permission relay.** Declaring `claude/channel/permission` makes
   Claude Code send `notifications/claude/channel/permission_request`
@@ -395,11 +395,11 @@ T3 Code also pairs on the LAN and supports Tailscale Serve and SSH
     can't deliver channel messages"
     ([MCP](https://code.claude.com/docs/en/mcp)). A channel stays on
     the older handshake.
-- **Fit.** Cairn's B0 MCP server could watch its store files and emit
+- **Fit.** ParleyInn's B0 MCP server could watch its store files and emit
   an owner message as a channel event: no socket, idle sessions woken.
   The text arrives as an MCP event, not as the harness's own user
   input, so OWN-03 and I2's closed list need amending (inference). The
-  user's own `claude` command must carry the flag, which `cairn
+  user's own `claude` command must carry the flag, which `parinn
   install` could add as a shown change under I7 (inference).
 
 ### The Claude Code cross-session inbox
@@ -431,7 +431,7 @@ T3 Code also pairs on the LAN and supports Tailscale Serve and SSH
 - **Fit.** This is the harness's own input and it wakes idle sessions.
   It labels the person's words as another session's, which lowers
   their authority rather than raising it. It is a socket, so the
-  sender must be B1 with a new register row. A Cairn `SessionStart`
+  sender must be B1 with a new register row. A ParleyInn `SessionStart`
   hook could record the exported path in the store for that sender
   (inference).
 
@@ -448,7 +448,7 @@ T3 Code also pairs on the LAN and supports Tailscale Serve and SSH
   ([glossary](https://code.claude.com/docs/en/glossary)).
   - Fit: B0, but the text is hook output, which OWN-03 forbids for
     owner text. It could carry only a fixed template that names ids,
-    asking Claude to fetch the message. Cairn would have to rearm the
+    asking Claude to fetch the message. ParleyInn would have to rearm the
     hook after each timeout, and the maximum `timeout` is not
     documented (unverified).
 - **`Stop` with `decision: "block"`.** `reason` "Tells Claude why it
@@ -461,7 +461,7 @@ T3 Code also pairs on the LAN and supports Tailscale Serve and SSH
   Code is running and idle", at least a minute apart, and recurring
   tasks expire after seven days
   ([scheduled tasks](https://code.claude.com/docs/en/scheduled-tasks)).
-  An agent could poll a Cairn tool, but the result is recall, which I2
+  An agent could poll a ParleyInn tool, but the result is recall, which I2
   envelopes as untrusted, and each poll is a model turn (inference).
 
 ### Claude Code Remote Control, the Agent SDK and background sessions
@@ -470,7 +470,7 @@ T3 Code also pairs on the LAN and supports Tailscale Serve and SSH
   The local session "registers with the Anthropic API and polls for
   work"; API keys are not supported
   ([Remote Control](https://code.claude.com/docs/en/remote-control)).
-  It fails CON-06 as a Cairn path; the person may still use it.
+  It fails CON-06 as a ParleyInn path; the person may still use it.
 - **Agent SDK and stream-json.** Streaming input gives "Queued
   messages: send multiple messages that process sequentially"
   ([streaming input](https://code.claude.com/docs/en/agent-sdk/streaming-vs-single-mode)).
@@ -511,7 +511,7 @@ T3 Code also pairs on the LAN and supports Tailscale Serve and SSH
   - `thread/inject_items` appends model-visible items of any role
     without a turn; the
     [OpenAI note](../openai-agent-ui/openai-agent-ui.md) explains why
-    Cairn should not use it.
+    ParleyInn should not use it.
 - **Transport.** Unix-socket listeners carry WebSocket framing; the
   WebSocket transport is "experimental and unsupported" (app-server).
 - **Hooks.** A finished background hook does not start a turn: "If no
@@ -558,9 +558,9 @@ prior art also needs a wrapper launch.
 ### Which paths stay on the machine
 
 - **No socket (B0):** channels over stdio, `asyncRewake` and `Stop`
-  hooks, `/loop` polling of a Cairn tool.
+  hooks, `/loop` polling of a ParleyInn tool.
 - **A local socket or loopback (B1):** the Claude Code inbox, the Codex
-  daemon, OpenCode's server, and stream-json or ACP when Cairn's run
+  daemon, OpenCode's server, and stream-json or ACP when ParleyInn's run
   component hosts the harness.
 - **Off the machine:** Remote Control and Codex Remote, both vendor
   relays.
@@ -569,20 +569,20 @@ prior art also needs a wrapper launch.
 
 ### Phone reach methods
 
-| Method                                    | Works off-LAN                                   | Central service needed                              | Runs on iOS/Android                                                      | Language/library                                      | License                                   | Fit                                                       |
-| ----------------------------------------- | ----------------------------------------------- | --------------------------------------------------- | ------------------------------------------------------------------------ | ----------------------------------------------------- | ----------------------------------------- | --------------------------------------------------------- |
-| mDNS/DNS-SD                               | no                                              | none                                                | yes: `NWBrowser` with a permission alert; `NsdManager`, permission on 17 | Go `hashicorp/mdns`, `brutella/dnssd`; Rust `mdns-sd` | MIT; MIT; Apache-2.0 OR MIT               | discovery at home only (row 13)                           |
-| WireGuard to the owner's endpoint         | yes, with a public address or forwarded port    | none; the owner's endpoint                          | yes: official apps; one VPN at a time on iOS                             | `wireguard-go`; WireGuard apps                        | MIT; Apache-2.0 (Android app)             | stage one (row 11); the owner keeps keys and a port       |
-| Tailscale with Headscale and own DERP     | yes                                             | the owner's Headscale and relay                     | yes: custom coordination server in the iOS app                           | Tailscale clients; Headscale                          | BSD-3-Clause; iOS GUI closed (inference)  | stage one; two services for the owner                     |
-| Tailscale's own service                   | yes                                             | yes: Tailscale's control and relays                 | yes                                                                      | Tailscale clients                                     | as above                                  | the owner's choice under row 11, never Cairn's dependency |
-| iroh with self-hosted relay               | yes, through the owner's relay                  | none; the owner's `iroh-relay` with a public name   | Swift package; Kotlin JVM artifact, Android built with the NDK           | Rust `iroh` 1.3; iroh-ffi                             | MIT OR Apache-2.0; UniFFI runtime MPL-2.0 | B2 phone-as-peer; relay on an enrolled peer (PEER-04)     |
-| Direct QUIC with hole punching            | often; fails when both NATs map per destination | a rendezvous both sides reach                       | iOS 15 QUIC; Android through a library                                   | `quic-go`, `quinn`                                    | MIT; MIT OR Apache-2.0                    | own protocol work; still needs a reachable peer           |
-| Owner-run relay on the home server        | yes, with a public address                      | none; the owner's node                              | yes while the app runs                                                   | Cairn's peer component                                | Cairn's                                   | fits X7, PEER-02, PEER-04, PEER-12                        |
-| Owner-run Nostr or Matrix relay           | yes                                             | the owner's relay; iOS push via a publisher gateway | yes                                                                      | Buzz relay (Rust); Sygnal                             | Apache-2.0; AGPL-3.0 or commercial        | a second protocol beside segments; lesson only            |
-| UnifiedPush to an owner-run ntfy (wake)   | yes                                             | none; the owner's ntfy                              | Android only                                                             | ntfy, UnifiedPush connectors                          | not checked                               | Android notifications under row 22                        |
-| Local Push Connectivity (wake)            | no: named Wi-Fi, private LTE, Ethernet          | none                                                | iOS 14 and later, entitlement from Apple                                 | `NEAppPushProvider`                                   | Apple SDK                                 | home-network notifications on iPhone                      |
-| APNs (wake)                               | yes                                             | yes: Apple, through the publisher's key             | iOS                                                                      | any APNs client                                       | Apple terms                               | breaks VIEW-17 and CON-06 unless the owner signs the app  |
-| Vendor relays (Remote Control, T3, Happy) | yes                                             | yes                                                 | yes                                                                      | their apps                                            | mixed                                     | rejected (X4, X7, CON-06)                                 |
+| Method                                    | Works off-LAN                                   | Central service needed                              | Runs on iOS/Android                                                      | Language/library                                      | License                                   | Fit                                                           |
+| ----------------------------------------- | ----------------------------------------------- | --------------------------------------------------- | ------------------------------------------------------------------------ | ----------------------------------------------------- | ----------------------------------------- | ------------------------------------------------------------- |
+| mDNS/DNS-SD                               | no                                              | none                                                | yes: `NWBrowser` with a permission alert; `NsdManager`, permission on 17 | Go `hashicorp/mdns`, `brutella/dnssd`; Rust `mdns-sd` | MIT; MIT; Apache-2.0 OR MIT               | discovery at home only (row 13)                               |
+| WireGuard to the owner's endpoint         | yes, with a public address or forwarded port    | none; the owner's endpoint                          | yes: official apps; one VPN at a time on iOS                             | `wireguard-go`; WireGuard apps                        | MIT; Apache-2.0 (Android app)             | stage one (row 11); the owner keeps keys and a port           |
+| Tailscale with Headscale and own DERP     | yes                                             | the owner's Headscale and relay                     | yes: custom coordination server in the iOS app                           | Tailscale clients; Headscale                          | BSD-3-Clause; iOS GUI closed (inference)  | stage one; two services for the owner                         |
+| Tailscale's own service                   | yes                                             | yes: Tailscale's control and relays                 | yes                                                                      | Tailscale clients                                     | as above                                  | the owner's choice under row 11, never ParleyInn's dependency |
+| iroh with self-hosted relay               | yes, through the owner's relay                  | none; the owner's `iroh-relay` with a public name   | Swift package; Kotlin JVM artifact, Android built with the NDK           | Rust `iroh` 1.3; iroh-ffi                             | MIT OR Apache-2.0; UniFFI runtime MPL-2.0 | B2 phone-as-peer; relay on an enrolled peer (PEER-04)         |
+| Direct QUIC with hole punching            | often; fails when both NATs map per destination | a rendezvous both sides reach                       | iOS 15 QUIC; Android through a library                                   | `quic-go`, `quinn`                                    | MIT; MIT OR Apache-2.0                    | own protocol work; still needs a reachable peer               |
+| Owner-run relay on the home server        | yes, with a public address                      | none; the owner's node                              | yes while the app runs                                                   | ParleyInn's peer component                            | ParleyInn's                               | fits X7, PEER-02, PEER-04, PEER-12                            |
+| Owner-run Nostr or Matrix relay           | yes                                             | the owner's relay; iOS push via a publisher gateway | yes                                                                      | Buzz relay (Rust); Sygnal                             | Apache-2.0; AGPL-3.0 or commercial        | a second protocol beside segments; lesson only                |
+| UnifiedPush to an owner-run ntfy (wake)   | yes                                             | none; the owner's ntfy                              | Android only                                                             | ntfy, UnifiedPush connectors                          | not checked                               | Android notifications under row 22                            |
+| Local Push Connectivity (wake)            | no: named Wi-Fi, private LTE, Ethernet          | none                                                | iOS 14 and later, entitlement from Apple                                 | `NEAppPushProvider`                                   | Apple SDK                                 | home-network notifications on iPhone                          |
+| APNs (wake)                               | yes                                             | yes: Apple, through the publisher's key             | iOS                                                                      | any APNs client                                       | Apple terms                               | breaks VIEW-17 and CON-06 unless the owner signs the app      |
+| Vendor relays (Remote Control, T3, Happy) | yes                                             | yes                                                 | yes                                                                      | their apps                                            | mixed                                     | rejected (X4, X7, CON-06)                                     |
 
 ### Live delivery paths
 
@@ -592,16 +592,16 @@ prior art also needs a wrapper launch.
 | Claude Code cross-session inbox                   | yes: starts a new turn              | harness input, labelled as another session     | same-user Unix socket, pipe (B1) | shipped v2.1.224; message format undocumented | new B1 row and OWN-03 change; spike the format |
 | Claude Code `asyncRewake` hook                    | yes: exit 2 wakes                   | no: hook output as a system reminder           | none (B0)                        | documented; timeout enforced                  | a fixed id-only template at most               |
 | Claude Code `Stop` block                          | no: turn end only                   | no: hook output                                | none (B0)                        | documented; eight-continuation cap            | not a delivery path                            |
-| Claude Code `/loop` polling a Cairn tool          | yes, a minute or more later         | no: tool result is enveloped recall            | none (B0)                        | documented; seven-day expiry                  | pull only; loses owner authority               |
-| Claude Code Remote Control                        | yes                                 | yes                                            | Anthropic relay                  | shipped; claude.ai login                      | rejected for Cairn (CON-06)                    |
-| Claude Agent SDK or stream-json                   | yes, for sessions it hosts          | yes                                            | none; run component (B1)         | SDK under Commercial Terms                    | only when launched through Cairn (OWN-15)      |
+| Claude Code `/loop` polling a ParleyInn tool      | yes, a minute or more later         | no: tool result is enveloped recall            | none (B0)                        | documented; seven-day expiry                  | pull only; loses owner authority               |
+| Claude Code Remote Control                        | yes                                 | yes                                            | Anthropic relay                  | shipped; claude.ai login                      | rejected for ParleyInn (CON-06)                |
+| Claude Agent SDK or stream-json                   | yes, for sessions it hosts          | yes                                            | none; run component (B1)         | SDK under Commercial Terms                    | only when launched through ParleyInn (OWN-15)  |
 | Codex daemon: `turn/start`, `thread/queue/add`    | yes, when the TUI uses the daemon   | yes: app-server                                | Unix socket (B1)                 | daemon and queue experimental                 | good where the daemon runs; else unavailable   |
 | Codex `turn/steer`                                | no: active turn only                | yes: app-server                                | Unix socket (B1)                 | documented                                    | mid-turn steer                                 |
 | Codex `thread/inject_items`                       | no turn starts                      | no: raw items of any role                      | Unix socket (B1)                 | documented                                    | reject                                         |
 | Codex `Stop` block or background hook             | no: turn end, or waits for the user | no: hook output                                | none                             | documented                                    | not a delivery path                            |
 | Codex Remote                                      | yes                                 | yes                                            | OpenAI relay                     | rolling out                                   | rejected                                       |
 | Gemini CLI `AfterAgent` deny                      | no: turn end only                   | no: hook output becomes a prompt               | none                             | documented                                    | not a delivery path                            |
-| ACP (`gemini --acp`, adapters) and `session/load` | only sessions a client launched     | yes: ACP                                       | stdio, run component (B1)        | ACP v1 stable                                 | only when launched through Cairn               |
+| ACP (`gemini --acp`, adapters) and `session/load` | only sessions a client launched     | yes: ACP                                       | stdio, run component (B1)        | ACP v1 stable                                 | only when launched through ParleyInn           |
 | ACP `session/attach`                              | would be                            | yes: ACP                                       | through a proxy                  | RFD open since February 2026                  | watch                                          |
 | OpenCode `prompt_async`                           | yes                                 | the harness's own server, not on OWN-03's list | loopback HTTP (B1)               | documented                                    | workable once the TUI port is fixed            |
 
@@ -610,8 +610,8 @@ prior art also needs a wrapper launch.
 - **The phone does not escape a reachable node.** Every option that
   works away from home needs a node the owner keeps reachable. Making
   the owner's always-on node the reachable peer (X7, PEER-04) keeps
-  Cairn free of central services. A tunnel the owner already runs
-  (WireGuard, Headscale) serves stage one without new Cairn code.
+  ParleyInn free of central services. A tunnel the owner already runs
+  (WireGuard, Headscale) serves stage one without new ParleyInn code.
 - **"See your stuff" on the phone favours the phone as a peer.** X2
   rules out a remote view over B2, and a tunnel shows rooms only while
   it is up. A phone that holds sealed ranges must derive byte-identical
@@ -631,17 +631,17 @@ prior art also needs a wrapper launch.
   (OWN-15), Local Push Connectivity at home, or admitting APNs with
   alias, class and count through a key the owner holds.
 - **Live delivery to Claude Code has a B0 path, but it is a
-  preview.** Channels wake idle sessions over stdio from Cairn's own
+  preview.** Channels wake idle sessions over stdio from ParleyInn's own
   MCP server and carry permission verdicts, which suits the phone's
   allow and deny. The inbox socket has shipped but needs B1 and labels
   the person as another session. Both need OWN-03 and I2 amended. A
   spike should check how the model treats a `<channel>` event and the
   inbox's undocumented message format.
-- **Codex fits OWN-03 today through its daemon.** Cairn would offer
+- **Codex fits OWN-03 today through its daemon.** ParleyInn would offer
   the daemon as a shown opt-in (I7) and mark delivery unavailable when
   the TUI embeds its server.
 - **Gemini CLI and ACP show the control as unavailable** until ACP's
-  attach proposal lands or Cairn's run component launches them
+  attach proposal lands or ParleyInn's run component launches them
   (OWN-15).
 - **The language choice is not decided here.** A channel is
   JSON-RPC over stdio with an experimental capability, which a

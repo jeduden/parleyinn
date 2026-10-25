@@ -4,7 +4,7 @@ title: "Spike S1: record the hook contract"
 status: "✅"
 summary: >-
   Record real hook payloads, output handling and budgets for every
-  hook Cairn uses, including subagent compaction.
+  hook ParleyInn uses, including subagent compaction.
 model: sonnet
 depends-on: []
 ---

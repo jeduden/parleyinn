@@ -23,7 +23,7 @@
     {
      "type": "gap",
      "file": "docs/domain-model/record.md",
-     "quote": "Reading a bundle into this node's record (`cairn import`, REC-23).",
+     "quote": "Reading a bundle into this node's record (`parinn import`, REC-23).",
      "problem": "Acts and roles says every principal act a requirement names is classed there, and it lists the cut 'reject a foreign room'. Yet no class holds importing a bundle, and the model never says import is no principal act. One implementer will let an agent's CLI call import a bundle; another will require a widening act at a principal surface.",
      "fix": "Add 'import a bundle' to the widening class in acts-and-roles.md, or state in Import: 'Import is no principal act.'",
      "severity": "minor"

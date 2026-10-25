@@ -8,7 +8,7 @@
      "type": "contradiction",
      "file": "docs/srs/05a-administration-requirements.md",
      "quote": "reinstate the segments, payloads and derived artifacts the copy contains",
-     "problem": "The copy's derived artifacts (trust levels, active pins, the quarantine set, landmarks' natural-language headlines) were computed while its events still counted as recorded on the node. ADM-06 now counts every one of those events as received, so under I10 the reinstated artifacts no longer derive from the writer logs and this node's key set. Reinstated as they are, they would keep an unauthenticated copy's pins qualifying for restore blocks, which is the I2 hole OQ-48 names, and they would contradict both the row's own list of pins that will not restore and its demand that `cairn verify` pass afterwards.",
+     "problem": "The copy's derived artifacts (trust levels, active pins, the quarantine set, landmarks' natural-language headlines) were computed while its events still counted as recorded on the node. ADM-06 now counts every one of those events as received, so under I10 the reinstated artifacts no longer derive from the writer logs and this node's key set. Reinstated as they are, they would keep an unauthenticated copy's pins qualifying for restore blocks, which is the I2 hole OQ-48 names, and they would contradict both the row's own list of pins that will not restore and its demand that `parinn verify` pass afterwards.",
      "fix": "Replace with: \"reinstate the segments and payloads the copy contains, rebuild every derived artifact from them and this node's key set (ADM-08, I10)\".",
      "severity": "needs-fix"
     },
@@ -47,8 +47,8 @@
     {
      "type": "gap",
      "file": "docs/srs/05a-administration-requirements.md",
-     "quote": "verify the copy and its audit chain with `cairn verify`",
-     "problem": "The backup captures the audit log and the restore verifies its chain, but ADM-06 reinstates only segments, payloads and derived artifacts, and neither it nor the Backup entry says what becomes of the copy's audit log. Restored into a fresh home, the counters and audit history in the copy are lost, so earlier unacknowledged failures stop failing `cairn doctor` (Counter, I6). The alternative, replacing the existing log, would break its append-only rule.",
+     "quote": "verify the copy and its audit chain with `parinn verify`",
+     "problem": "The backup captures the audit log and the restore verifies its chain, but ADM-06 reinstates only segments, payloads and derived artifacts, and neither it nor the Backup entry says what becomes of the copy's audit log. Restored into a fresh home, the counters and audit history in the copy are lost, so earlier unacknowledged failures stop failing `parinn doctor` (Counter, I6). The alternative, replacing the existing log, would break its append-only rule.",
      "fix": "Add: \"and append the copy's audit log, its chain verified, to this node's audit log, marked as restored\".",
      "severity": "minor"
     },
@@ -56,8 +56,8 @@
      "type": "contradiction",
      "file": "docs/domain-model/components-and-surfaces.md",
      "quote": "pins and pin candidates, and the audit log (§9.5)",
-     "problem": "Of the verbs listed, only `cairn pin list` could show pin candidates. But a pin candidate is \"not yet a pin\", the pin list holds only pins, and the naming rule `cairn <concept> <verb>` gives pin candidates their own verb. One implementer will fold candidates into `cairn pin list`; another will add `cairn pin-candidate list`.",
-     "fix": "Name the verb: \"`cairn pin list` and `cairn pin-candidate list` ... its pins and its pin candidates\".",
+     "problem": "Of the verbs listed, only `parinn pin list` could show pin candidates. But a pin candidate is \"not yet a pin\", the pin list holds only pins, and the naming rule `parinn <concept> <verb>` gives pin candidates their own verb. One implementer will fold candidates into `parinn pin list`; another will add `parinn pin-candidate list`.",
+     "fix": "Name the verb: \"`parinn pin list` and `parinn pin-candidate list` ... its pins and its pin candidates\".",
      "severity": "minor"
     }
    ]
@@ -84,7 +84,7 @@
     {
      "type": "security",
      "file": "docs/domain-model/components-and-surfaces.md",
-     "quote": "`cairn event search` and `expand`, `cairn landmark list`, `cairn pin list` and",
+     "quote": "`parinn event search` and `expand`, `parinn landmark list`, `parinn pin list` and",
      "problem": "Until the room view ships, these CLI verbs are the only display of the record and of pin candidates, yet nothing says how they render untrusted text at a terminal or that they mark trust (VIEW-07 is M7). Raw control or bidirectional characters in a pin candidate an agent suggested can redraw or reorder what the principal reads. The principal then confirms text other than what is stored, and that hidden text restores to its agents as trusted text (I2).",
      "fix": "Add: \"Each shows control and bidirectional characters in what it displays escaped, never interpreted, and marks each item's provenance and trust level.\"",
      "severity": "needs-fix"
@@ -101,7 +101,7 @@
      "type": "security",
      "file": "docs/domain-model/record.md",
      "quote": "principal act, only an audited event (§9.5), and a copy the principal takes",
-     "problem": "Creating a backup is no principal act, so an agent's tool call passes OWN-12 and can run `cairn backup create`. The model also does not fix where the copy is written or with what permissions (I8), or whether it stays encrypted when encryption at rest is on (SEC-09). A plaintext copy of every room, quarantined content included, can then land where the agent reads it outside any envelope, recall scope or quarantine (I2, I5).",
+     "problem": "Creating a backup is no principal act, so an agent's tool call passes OWN-12 and can run `parinn backup create`. The model also does not fix where the copy is written or with what permissions (I8), or whether it stays encrypted when encryption at rest is on (SEC-09). A plaintext copy of every room, quarantined content included, can then land where the agent reads it outside any envelope, recall scope or quarantine (I2, I5).",
      "fix": "Reword: \"Creating one inside the home, with its permissions and encrypted as the store is (SEC-09), records no principal act, only an audited event; writing a copy elsewhere or decrypted is a widening principal act.\"",
      "severity": "minor"
     }
@@ -129,9 +129,9 @@
     {
      "type": "undefined",
      "file": "docs/domain-model/trust-and-flow.md",
-     "quote": "`cairn status` (ADM-11), failing `cairn doctor` until acknowledged",
-     "problem": "The Counter entry says every counter, redacted, truncated and coalesced counts included, is shown by `cairn status` and fails `cairn doctor` until acknowledged. ADM-11 shows only non-zero failure counters, and OPS-03 fails doctor only when a failure counter rises; the model never defines a failure counter. One implementation would fail doctor on every routine redaction, and another would never show redaction counts in `cairn status`.",
-     "fix": "Write \"shown by `cairn status` while non-zero (ADM-11), and failing `cairn doctor` while it has risen since the last acknowledgement (`cairn counter ack`, I6, OPS-03); every counter is a **failure counter**\".",
+     "quote": "`parinn status` (ADM-11), failing `parinn doctor` until acknowledged",
+     "problem": "The Counter entry says every counter, redacted, truncated and coalesced counts included, is shown by `parinn status` and fails `parinn doctor` until acknowledged. ADM-11 shows only non-zero failure counters, and OPS-03 fails doctor only when a failure counter rises; the model never defines a failure counter. One implementation would fail doctor on every routine redaction, and another would never show redaction counts in `parinn status`.",
+     "fix": "Write \"shown by `parinn status` while non-zero (ADM-11), and failing `parinn doctor` while it has risen since the last acknowledgement (`parinn counter ack`, I6, OPS-03); every counter is a **failure counter**\".",
      "severity": "minor"
     },
     {
@@ -208,7 +208,7 @@
    {
     "id": "NEW-1",
     "title": "ADM-06 reinstates the copy's derived artifacts (trust levels, active pins, quarantine set, headlines) although it counts every reinstated event as received, so an edited copy could plant trusted pins and the artifacts stop being a function of the logs and key set",
-    "settled_by": "I10 (derived artifacts are a deterministic function of the writer logs a node holds and the node's own key set; rebuilding reproduces them exactly) and ADM-08 (`cairn rebuild` regenerates all derived artifacts from the record, depending only on the logs held and the key set). PRV-02 derives trust from origin and recorder. The stakeholder ruling on DM-DE (round 6, option A) makes the copy's events count as received. Writing it in means reinstating segments and payloads and rebuilding every derived artifact."
+    "settled_by": "I10 (derived artifacts are a deterministic function of the writer logs a node holds and the node's own key set; rebuilding reproduces them exactly) and ADM-08 (`parinn rebuild` regenerates all derived artifacts from the record, depending only on the logs held and the key set). PRV-02 derives trust from origin and recorder. The stakeholder ruling on DM-DE (round 6, option A) makes the copy's events count as received. Writing it in means reinstating segments and payloads and rebuilding every derived artifact."
    },
    {
     "id": "NEW-2",
@@ -227,7 +227,7 @@
    },
    {
     "id": "NEW-5",
-    "title": "Until the room view ships, the CLI verbs that show the record and pin candidates (`cairn event search` and `expand`, `cairn landmark list`, `cairn pin list`) have no rule to escape control and bidirectional characters or to mark provenance and trust, so a principal can confirm text other than what is stored",
+    "title": "Until the room view ships, the CLI verbs that show the record and pin candidates (`parinn event search` and `expand`, `parinn landmark list`, `parinn pin list`) have no rule to escape control and bidirectional characters or to mark provenance and trust, so a principal can confirm text other than what is stored",
     "settled_by": "none. The nearest rules are the room view's and ship in M7: VIEW-07 (trust marks, placeholders for zero-width, bidirectional and tag characters), VIEW-14 (reduced clients, the CLI included, use the same marks) and SEC-21 (inert rendering). RCL-04 exempts a CLI verb's output at a terminal from the fixed-text rule, and PRV-07 only flags such Unicode."
    }
   ]

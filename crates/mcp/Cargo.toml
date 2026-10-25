@@ -1,30 +1,32 @@
 [package]
 name = "mcp"
 version = "0.0.0"
-description = "cairn mcp: the stdio MCP server and its recall tools"
+description = "parinn mcp: the stdio MCP server and its recall tools"
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
 publish.workspace = true
 
 [dependencies]
+administration.workspace = true
 envelope.workspace = true
 key.workspace = true
 record.workspace = true
+search.workspace = true
 serde_json.workspace = true
 store.workspace = true
 
 [dev-dependencies]
-administration.workspace = true
 ingest.workspace = true
+redaction.workspace = true
 rusqlite.workspace = true
 testkit.workspace = true
 
 [lints]
 workspace = true
 
-# ENG-02: see crates/cairn/Cargo.toml.
-[package.metadata.cairn]
+# ENG-02: see crates/parinn/Cargo.toml.
+[package.metadata.parinn]
 responsibility = "Serves the MCP tools to one harness session over stdio"
-may-depend-on = ["envelope", "key", "record", "store"]
-may-dev-depend-on = ["administration", "ingest", "testkit"]
+may-depend-on = ["administration", "envelope", "key", "record", "search", "store"]
+may-dev-depend-on = ["ingest", "redaction", "testkit"]

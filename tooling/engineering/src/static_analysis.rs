@@ -57,11 +57,11 @@ const CLIPPY: (&str, &str) = STATIC_CHECKS[0];
 const CUSTOM: (&str, &str) = STATIC_CHECKS[4];
 
 /// The core's crate, by its directory under `crates/`.
-const CORE: &str = "cairn";
+const CORE: &str = "parinn";
 
 /// The core's reach test, and the test in it.
 const REACH_TEST: (&str, &str) = (
-    "crates/cairn/tests/reach.rs",
+    "crates/parinn/tests/reach.rs",
     "the_core_executable_links_only_crates_its_reach_allows",
 );
 
@@ -70,6 +70,12 @@ const MISSING: &str = "the core's reach evidence is missing: ";
 
 /// The attribute a crate root carries to forbid unsafe code itself.
 const FORBID: &str = "#![forbid(unsafe_code)]";
+
+/// The one crate that holds unsafe code: the shim through which Windows'
+/// key store calls DPAPI (ADR-2610171300). It denies unsafe code in its
+/// own lints instead of inheriting the workspace's forbid, allows it in
+/// one module, and Miri runs its tests (ENG-09).
+pub const UNSAFE_SHIM: &str = "crates/platform";
 
 /// The jobs `job` needs: an inline list or a single job.
 #[must_use]
@@ -257,6 +263,12 @@ pub fn workspace_forbids_unsafe(root_manifest: &str) -> Result<(), String> {
     }
 }
 
+/// Whether a crate's manifest denies unsafe code in its own lints.
+fn denies_unsafe(manifest: &str) -> bool {
+    value(&table(manifest, "lints.rust"), "unsafe_code").map(|v| v.replace(' ', ""))
+        == Some("\"deny\"".to_owned())
+}
+
 /// Whether a crate's manifest inherits the workspace lints.
 #[must_use]
 pub fn inherits_workspace_lints(manifest: &str) -> bool {
@@ -319,7 +331,8 @@ fn forbids_in_roots(c: &Checkout, member: &str) -> Vec<String> {
 
 /// Requires the workspace lints to forbid unsafe code, and every
 /// member crate to inherit them or forbid unsafe code in its own crate
-/// roots, so no crate can switch the ban off.
+/// roots, so no crate can switch the ban off; the one unsafe shim,
+/// [`UNSAFE_SHIM`], denies it in its own lints instead.
 #[must_use]
 pub fn crates_forbid_unsafe(c: &Checkout) -> Vec<String> {
     let root = match c.read("Cargo.toml") {
@@ -338,6 +351,13 @@ pub fn crates_forbid_unsafe(c: &Checkout) -> Vec<String> {
         match c.read(&format!("{member}/Cargo.toml")) {
             Err(e) => problems.push(e),
             Ok(manifest) if inherits_workspace_lints(&manifest) => {}
+            Ok(manifest) if member == UNSAFE_SHIM => {
+                if !denies_unsafe(&manifest) {
+                    problems.push(format!(
+                        "crate {member}, the one unsafe shim, does not deny unsafe code in its own lints"
+                    ));
+                }
+            }
             Ok(_) => problems.extend(forbids_in_roots(c, &member)),
         }
     }

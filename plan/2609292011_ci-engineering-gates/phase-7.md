@@ -1,7 +1,7 @@
 ---
 n: 7
 title: "The core confined in the end-to-end suite (ENG-12)"
-status: "🔳"
+status: "✅"
 result: false
 ---
 # Phase 7: the core confined in the end-to-end suite (ENG-12)

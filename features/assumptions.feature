@@ -68,7 +68,7 @@ Feature: Assumptions register (ASM)
       | partial compaction | a "compact_boundary" line is appended                                       |
 
   @ASM-05
-  Scenario: the harness deletes transcripts after cleanupPeriodDays, but not on a schedule Cairn controls (S3)
+  Scenario: the harness deletes transcripts after cleanupPeriodDays, but not on a schedule ParleyInn controls (S3)
     Given a recorded "~/.claude/projects" listing before and after harness starts with "cleanupPeriodDays" of 30 for Claude Code "supported"
     When the two trees are compared
     Then a transcript older than 30 days was deleted
@@ -100,7 +100,7 @@ Feature: Assumptions register (ASM)
 
   @ASM-07
   Scenario Outline: a plugin bundling hooks and an MCP server loads on each target (S4)
-    Given the stub Cairn plugin recorded for Claude Code "supported", bundling Cairn's hooks and a stub MCP server
+    Given the stub ParleyInn plugin recorded for Claude Code "supported", bundling ParleyInn's hooks and a stub MCP server
     When it is installed on "<target>"
     Then the recorded harness session shows every hook the stub plugin registers firing
     And the recorded harness session lists the stub plugin's MCP tools
@@ -232,7 +232,7 @@ Feature: Assumptions register (ASM)
   @ASM-20 @pending
   Scenario: a clone's root commit, HEAD, refs and trees are obtainable inside the core, with no socket and no program start (S11)
     Given a recorded git clone
-    When Cairn reads the clone with process creation and the network forbidden
+    When ParleyInn reads the clone with process creation and the network forbidden
     Then it resolves the root commit, HEAD, every ref and the tree of every ref
     And no process was started and no connection was opened
 
@@ -246,7 +246,7 @@ Feature: Assumptions register (ASM)
 
   @ASM-22
   Scenario Outline: the harness puts its attended mark only in its hook handlers' environment, and only in its own terminal interface (S4)
-    Given the stub Cairn plugin's recording "<recording>" for Claude Code "supported"
+    Given the stub ParleyInn plugin's recording "<recording>" for Claude Code "supported"
     When the environment its hook handlers and its MCP server saw is read
     Then every hook handler saw "CLAUDE_CODE_SESSION_ATTENDED" set to "<attended>" and "CLAUDE_CODE_ENTRYPOINT" set to "<entrypoint>"
     And the MCP server saw "CLAUDE_CODE_SESSION_ATTENDED" <server>

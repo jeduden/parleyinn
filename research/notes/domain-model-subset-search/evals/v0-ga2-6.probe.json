@@ -9,7 +9,7 @@
   {
     "type": "security",
     "quote": "or through a B2 component the node's principal turned on; whatever such a component brings",
-    "problem": "I4 lets Cairn components send data off the machine only as recalled content, I2 closed-path writes, or through a B2 component. The bridge component (forge, CI and notification bridges) makes outbound requests and sends a notification (petname or id, queue class, count) to a service the principal names, which I4 does not permit.",
+    "problem": "I4 lets ParleyInn components send data off the machine only as recalled content, I2 closed-path writes, or through a B2 component. The bridge component (forge, CI and notification bridges) makes outbound requests and sends a notification (petname or id, queue class, count) to a service the principal names, which I4 does not permit.",
     "fix": "Add the B3 component to this egress sentence (\"or through a B2 or B3 component the node's principal turned on\") and state that whatever a B3 component brings in is trusted only as I2 allows.",
     "severity": "needs-fix"
   },

@@ -38,7 +38,7 @@ by UTF-16 code units and refuses numbers that are not safe integers.
 
 ## Alternatives
 
-- **A JSON reader of Cairn's own.** Parser code the core must fuzz and
+- **A JSON reader of ParleyInn's own.** Parser code the core must fuzz and
   keep correct, for one dependency saved
   ([ADR-2610102211](ADR-2610102211-mcp-server-in-house.md) weighed
   it).

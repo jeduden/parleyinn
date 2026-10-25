@@ -24,6 +24,9 @@ pub enum Op {
     Remove,
     /// Copies the file to `new`, which must not exist yet.
     Copy,
+    /// Creates the file, which must not exist yet, holding `new`, and
+    /// the directories on its path.
+    Create,
 }
 
 /// One change to a file, its path relative to the repository.
@@ -44,6 +47,17 @@ impl Injection {
             file,
             old,
             new,
+        }
+    }
+
+    /// Creates `file`, with its directories, holding `body`.
+    #[must_use]
+    pub fn create(file: &'static str, body: &'static str) -> Self {
+        Self {
+            op: Op::Create,
+            file,
+            old: "",
+            new: body,
         }
     }
 
@@ -139,6 +153,17 @@ pub fn cargo_test(package: &str, target: &str, name: &str) -> Check {
     )
 }
 
+/// Runs the one unit test `name` in the library of `package`.
+#[must_use]
+pub fn cargo_lib_test(package: &str, name: &str) -> Check {
+    Check::new(
+        "cargo",
+        &[
+            "test", "--locked", "-p", package, "--lib", "--", "--exact", name,
+        ],
+    )
+}
+
 /// Lints `package`'s shipped code with clippy, every warning an error.
 #[must_use]
 pub fn clippy(package: &str) -> Check {
@@ -166,6 +191,13 @@ pub fn taplo_lint() -> Check {
     Check::new("taplo", &["lint"])
 }
 
+/// Checks the tool setup's records without installing anything: the
+/// mise pin for this platform, and that every tool is a released binary.
+#[must_use]
+pub fn setup_tools() -> Check {
+    Check::new("sh", &["scripts/setup-tools.sh", "--check"])
+}
+
 /// What validating or applying an injection can fail with.
 #[derive(Debug)]
 pub enum Error {
@@ -175,6 +207,8 @@ pub enum Error {
     NotFound { file: String, old: String },
     /// A copy's target exists already.
     CopyTargetExists { file: String, new: String },
+    /// A file to create exists already.
+    Exists { file: String },
 }
 
 impl fmt::Display for Error {
@@ -185,6 +219,7 @@ impl fmt::Display for Error {
             Self::CopyTargetExists { file, new } => {
                 write!(f, "drift: {file}: copy target {new} already exists")
             }
+            Self::Exists { file } => write!(f, "drift: {file}: already exists"),
         }
     }
 }
@@ -193,7 +228,7 @@ impl std::error::Error for Error {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match self {
             Self::Io { source, .. } => Some(source),
-            Self::NotFound { .. } | Self::CopyTargetExists { .. } => None,
+            Self::NotFound { .. } | Self::CopyTargetExists { .. } | Self::Exists { .. } => None,
         }
     }
 }
@@ -214,6 +249,13 @@ pub fn validate(root: &Path, injection: &Injection) -> Result<(), Error> {
 /// file's current contents.
 fn check_target(root: &Path, injection: &Injection) -> Result<String, Error> {
     let file = injection.file;
+    if injection.op == Op::Create {
+        return if root.join(file).exists() {
+            Err(Error::Exists { file: file.into() })
+        } else {
+            Ok(String::new())
+        };
+    }
     let body = fs::read_to_string(root.join(file)).map_err(|source| Error::Io {
         file: file.into(),
         source,
@@ -229,7 +271,7 @@ fn check_target(root: &Path, injection: &Injection) -> Result<String, Error> {
             file: file.into(),
             new: injection.new.into(),
         }),
-        Op::Replace | Op::Remove | Op::Copy => Ok(body),
+        Op::Replace | Op::Remove | Op::Copy | Op::Create => Ok(body),
     }
 }
 
@@ -244,6 +286,10 @@ pub fn apply(root: &Path, injection: &Injection) -> Result<(), Error> {
     let written = match injection.op {
         Op::Remove => fs::remove_file(path),
         Op::Copy => fs::write(root.join(injection.new), body),
+        Op::Create => path
+            .parent()
+            .map_or(Ok(()), fs::create_dir_all)
+            .and_then(|()| fs::write(&path, injection.new)),
         Op::Replace => fs::write(path, body.replacen(injection.old, injection.new, 1)),
     };
 

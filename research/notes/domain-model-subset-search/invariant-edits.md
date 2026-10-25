@@ -135,8 +135,8 @@ Before:
 > public: read-only publishing and outbound exchange with hosts the node's
 > principal names, off until turned on. Managed policy can disable B1, B2 and
 > B3. No component sends telemetry or depends on a central or third-party
-> service. Cairn's components send data off the machine only as recalled
-> content an agent receives through a tool call, or as what Cairn writes to an
+> service. ParleyInn's components send data off the machine only as recalled
+> content an agent receives through a tool call, or as what ParleyInn writes to an
 > agent through I2's closed paths, both of which the harness sends to its
 > model, or through a B2 or B3 component the node's principal turned on;
 > whatever such a component brings in is trusted only as I2 allows.
@@ -158,17 +158,17 @@ After:
 > bridge component's outbound exchange with hosts the node's principal names,
 > off until turned on and while managed policy disables it; what it brings in
 > is trusted only as I2 allows. No component sends telemetry or depends on a
-> central or third-party service. Cairn's components send data off the machine
+> central or third-party service. ParleyInn's components send data off the machine
 > only as recalled content an agent receives through a tool call, or as what
-> Cairn writes to an agent through I2's closed paths, both of which the harness
+> ParleyInn writes to an agent through I2's closed paths, both of which the harness
 > sends to its model, or through the peer component, or through the publish
 > component, or through the bridge component.
 
 Core only (unchanged in substance): "B0, the core (...), opens no socket and
 makes no outbound connection. No component sends telemetry or depends on a
-central or third-party service. Cairn's components send data off the machine
+central or third-party service. ParleyInn's components send data off the machine
 only as recalled content an agent receives through a tool call, or as what
-Cairn writes to an agent through I2's closed paths, both of which the harness
+ParleyInn writes to an agent through I2's closed paths, both of which the harness
 sends to its model."
 
 Why: spans can only add text when a feature is present, never when one of two

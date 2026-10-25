@@ -5,7 +5,7 @@ status: accepted
 scope: dependencies
 summary: >-
   Every settings layer, managed policy, the principal's configuration and
-  a repository's .cairn.toml, is read through the toml crate's parser
+  a repository's .parinn.toml, is read through the toml crate's parser
   into a table the configuration crate validates strictly itself. No
   serde derive, no writer, and the parser's nesting limit kept on.
 ---
@@ -15,7 +15,7 @@ summary: >-
 
 ADM-04 requires every settings layer to be TOML, validated strictly:
 an unknown key, a type error or a value out of range fails naming the
-key and the problem. A repository's `.cairn.toml` comes from whoever
+key and the problem. A repository's `.parinn.toml` comes from whoever
 can commit to the repository (T5), so the parser reads hostile input.
 Phase 3 of plan
 [2609292012](../../plan/2609292012_m1-record-and-recall/plan.md) builds
@@ -38,10 +38,10 @@ on the parser's leniency.
 
 ## Alternatives
 
-- **A TOML reader of Cairn's own.** Parser code the core must fuzz and
+- **A TOML reader of ParleyInn's own.** Parser code the core must fuzz and
   keep in step with TOML 1.1, for one dependency saved.
 - **`toml_edit`.** It keeps formatting and comments for writing back;
-  Cairn never writes a settings layer.
+  ParleyInn never writes a settings layer.
 - **`basic-toml`.** A smaller fork of an older parser, kept for
   compiler builds rather than for wide use.
 - **Another format, such as JSON.** ADM-04 names TOML.

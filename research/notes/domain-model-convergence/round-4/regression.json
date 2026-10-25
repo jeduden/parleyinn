@@ -24,7 +24,7 @@
      "type": "contradiction",
      "file": "docs/domain-model/trust-and-flow.md",
      "quote": "its configuration is accepted (ADM-04).",
-     "problem": "\"Changing it\" covers any settings layer, but \"configuration\" means the principal's settings. If a managed-policy change also waits for the principal's acceptance, Cairn overrides managed policy until then, against I7. The Retention policy entry avoids this by scoping its rule to \"the principal's change\".",
+     "problem": "\"Changing it\" covers any settings layer, but \"configuration\" means the principal's settings. If a managed-policy change also waits for the principal's acceptance, ParleyInn overrides managed policy until then, against I7. The Retention policy entry avoids this by scoping its rule to \"the principal's change\".",
      "fix": "the principal's change of it, loosening redaction or turning flags off applies only once its configuration is accepted (ADM-04); a managed-policy change applies as set.",
      "severity": "minor"
     },
@@ -152,7 +152,7 @@
    {
     "id": "NEW-2",
     "title": "The model does not say whose principal act may retire a writer, so a principal holding a room could retire another principal's writer, the owner's included, name a low last accepted seq, and bypass LANE-25's protection",
-    "settled_by": "none. PEER-05 and CLI `cairn writer retire` say only 'a principal act' and class it widening. The Retire a writer entry in docs/domain-model/record.md names no authorizing principal. LANE-25 protects the owner from kick, bar and mute but not from retirement. The plan notes (domain-model-review-blind-5, -7, -29, -30) record only that the entry was added, moved to record.md and extended to access-token expiry, with no authorization decision."
+    "settled_by": "none. PEER-05 and CLI `parinn writer retire` say only 'a principal act' and class it widening. The Retire a writer entry in docs/domain-model/record.md names no authorizing principal. LANE-25 protects the owner from kick, bar and mute but not from retirement. The plan notes (domain-model-review-blind-5, -7, -29, -30) record only that the entry was added, moved to record.md and extended to access-token expiry, with no authorization decision."
    },
    {
     "id": "NEW-3",

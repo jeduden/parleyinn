@@ -129,7 +129,7 @@
   "type": "security",
   "quote": "without the agent's recall: restore blocks and compaction guidance. No other write to an agent exists (I2),",
   "problem": "The MCP server's tool names, descriptions, schemas and server instructions reach the model at every harness session start without a recall call. They are not among the closed paths, and no rule limits their content. Either I2 is broken by the MCP server existing, or nothing stops an implementer from putting record or pin text into them.",
-  "fix": "In Recall, add: \"each recall tool's name, description and schema, and the MCP server's instructions, are fixed text Cairn ships\" (and count them under the closed paths).",
+  "fix": "In Recall, add: \"each recall tool's name, description and schema, and the MCP server's instructions, are fixed text ParleyInn ships\" (and count them under the closed paths).",
   "severity": "minor",
   "lens": "security",
   "model": "default"

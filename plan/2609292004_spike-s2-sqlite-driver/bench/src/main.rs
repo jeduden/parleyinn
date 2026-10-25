@@ -1,10 +1,10 @@
 //! Spike S2's harness for the Rust core: it builds the synthetic
-//! Cairn store with `rusqlite` and bundled SQLite and measures it
+//! ParleyInn store with `rusqlite` and bundled SQLite and measures it
 //! against NFR-03, NFR-04, NFR-05 and NFR-09. It ports ../bench-go,
 //! the Go harness that compared two pure-Go drivers, command for
 //! command, and generates the same corpus from the same seed.
 //!
-//! It is a standalone crate, so `rusqlite` enters cairn's workspace
+//! It is a standalone crate, so `rusqlite` enters parinn's workspace
 //! only with the M1 change that links the store.
 
 mod cmds;

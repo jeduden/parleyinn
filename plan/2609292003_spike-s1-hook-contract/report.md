@@ -82,17 +82,17 @@ The harness's own validation error lists the hooks whose
 `PostToolUse`, `PostToolBatch`, `Stop` and `SubagentStop`, beside
 `SessionStart`. The spike tested only the hooks in the table.
 
-For Cairn this means three things under I2:
+For ParleyInn this means three things under I2:
 
 - The `PostCompact` handler must write nothing to stdout, not even an
   error: whatever it writes reaches the model on a manual compaction.
 - The `PreCompact` handler's compaction guidance is plain text, and
   reaches both the summarizer and, on a manual compaction, the model.
-  PIN-07 already limits it to fixed text Cairn ships.
+  PIN-07 already limits it to fixed text ParleyInn ships.
 - A subagent's compaction fires `SessionStart` with `source` =
   `compact` under the main agent's identity, and the
   `additionalContext` it returns lands in the subagent's context.
-  Cairn cannot tell from the hook input which run compacted, so INJ-05
+  ParleyInn cannot tell from the hook input which run compacted, so INJ-05
   applies to every compaction while a subagent of the harness session
   runs.
 
@@ -121,7 +121,7 @@ the handler's start to its last tick.
 
 In print mode, whenever a `Stop` handler reached its timeout, no
 `SessionEnd` handler started, across three trials. A quick `Stop` handler
-left `SessionEnd` alone. Cairn therefore installs `SessionEnd` with its
+left `SessionEnd` alone. ParleyInn therefore installs `SessionEnd` with its
 own timeout, and its `Stop` handler stays within NFR-02's budget. The
 binary also reads `CLAUDE_CODE_SESSIONEND_HOOKS_TIMEOUT_MS`, which the
 spike did not test.
@@ -156,9 +156,9 @@ From the security officer:
   run (tracked from `SubagentStart` and `SubagentStop`), and trace
   INJ-05 to I2 and I8.
 - **A lost `SessionEnd` is silent (I6).** Any `Stop` handler that
-  reaches its timeout in print mode, Cairn's or another, suppresses
+  reaches its timeout in print mode, ParleyInn's or another, suppresses
   every `SessionEnd`. Draft: each handler leaves a start marker and
-  clears it; the next handler, the MCP server or `cairn status` counts
+  clears it; the next handler, the MCP server or `parinn status` counts
   and audits the unfinished ones.
 - **The compaction's own agent.** Its `SubagentStop` has an empty
   `agent_type` and no transcript. Draft: record it as a hook
@@ -173,7 +173,7 @@ From the security officer:
   email with role `user`. Draft: every `attachment` line is untrusted
   `harness_text`, and account identifiers are redacted before storage.
 - **Hook commands reach the model on failure.** Draft: the commands
-  Cairn installs carry no secret, home path or record content.
+  ParleyInn installs carry no secret, home path or record content.
 - **Fixture redaction.** Draft: recorded harness fixtures pass a
   residual-identifier check, proven by a drift case (ENG-27). The
   committed fixtures were stripped by hand of the account's skills and
@@ -187,6 +187,6 @@ From the domain model:
   on a manual compaction; the definition says only that it goes to
   the harness.
 - **The compaction's own agent.** Is it a subagent with a run, or a
-  harness internal Cairn records no run for?
+  harness internal ParleyInn records no run for?
 - **Whose restore block** a `SessionStart` with `source` = `compact`
   builds when a subagent compacted (INJ-01, INJ-05).

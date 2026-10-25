@@ -9,7 +9,7 @@
   {
     "type": "gap",
     "quote": "turning off restore blocks or lowering the pin budget, which take effect",
-    "problem": "The relative clause 'which take effect without acceptance' has no clear antecedent. It can mean repository configuration's cut-only changes need no acceptance, which differs from the preceding Record rule that even cut-only configuration changes wait for acceptance. It can also be read as applying to the very changes the sentence forbids. Two implementers could build different acceptance behaviour for `.cairn.toml`.",
+    "problem": "The relative clause 'which take effect without acceptance' has no clear antecedent. It can mean repository configuration's cut-only changes need no acceptance, which differs from the preceding Record rule that even cut-only configuration changes wait for acceptance. It can also be read as applying to the very changes the sentence forbids. Two implementers could build different acceptance behaviour for `.parinn.toml`.",
     "fix": "Reword: '...pin budget; the cut-only changes it does make take effect without acceptance (ADM-04).'",
     "severity": "minor"
   }

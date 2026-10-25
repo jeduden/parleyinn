@@ -32,6 +32,23 @@ fn apply_removes_and_copies() {
 }
 
 #[test]
+fn apply_creates_a_file_and_the_directories_on_its_path() {
+    let root = tree();
+
+    apply(root.path(), &Injection::create("vendor/x/LICENSE", "text")).unwrap();
+
+    assert_eq!(read(&root.path().join("vendor/x/LICENSE")), "text");
+    let err = apply(root.path(), &Injection::create("a.md", "x")).unwrap_err();
+    assert_eq!(err.to_string(), "drift: a.md: already exists");
+    assert!(std::error::Error::source(&err).is_none());
+    let err = apply(root.path(), &Injection::create("a.md/inner/f", "x")).unwrap_err();
+    assert!(
+        err.to_string().starts_with("drift: a.md/inner/f: "),
+        "{err}"
+    );
+}
+
+#[test]
 fn validate_refuses_an_injection_that_would_inject_nothing() {
     let root = tree();
     let cases = [
@@ -93,11 +110,19 @@ fn check_constructors_name_the_command() {
         cargo_test("srs", "gates", "x").to_string(),
         "cargo test --locked -p srs --test gates -- --exact x"
     );
+    assert_eq!(
+        cargo_lib_test("testkit", "relative::tests::x").to_string(),
+        "cargo test --locked -p testkit --lib -- --exact relative::tests::x"
+    );
     assert_eq!(mdsmith().to_string(), "mdsmith check .");
     assert_eq!(taplo_fmt().to_string(), "taplo fmt --check");
     assert_eq!(taplo_lint().to_string(), "taplo lint");
     assert_eq!(
-        clippy("cairn").to_string(),
-        "cargo clippy --locked -p cairn -- -D warnings"
+        setup_tools().to_string(),
+        "sh scripts/setup-tools.sh --check"
+    );
+    assert_eq!(
+        clippy("parinn").to_string(),
+        "cargo clippy --locked -p parinn -- -D warnings"
     );
 }

@@ -1,4 +1,4 @@
-# Crypto-shredding for append-only, hash-chained, replicated logs (design reference for Cairn)
+# Crypto-shredding for append-only, hash-chained, replicated logs (design reference for ParleyInn)
 
 Scope note: technical claims and legal analysis are kept in separate sections (Q1–Q3 technical, Q4 legal, Q5 Go libraries, Q6 scheme sketch). Sources marked "(not fetched this session)" are canonical URLs cited from background knowledge; the report writer should treat them as lower-confidence than fetched sources. Research date: 2026-10-02.
 
@@ -56,7 +56,7 @@ Every precedent uses the same shape: per-subject (or per-folder/per-epoch) data 
 
 ### Inferences
 
-- The pattern that best fits Cairn's I10 (rebuildable from record) and tamper evidence: the chain/Merkle leaf hashes a header that contains (a) non-sensitive metadata, (b) a hash of the ciphertext (KBFS-style), and (c) optionally a keyed commitment to plaintext. Shredding a key leaves the chain verifiable; ciphertext becomes noise; plaintext projections must be rebuilt (and will show a tombstone).
+- The pattern that best fits ParleyInn's I10 (rebuildable from record) and tamper evidence: the chain/Merkle leaf hashes a header that contains (a) non-sensitive metadata, (b) a hash of the ciphertext (KBFS-style), and (c) optionally a keyed commitment to plaintext. Shredding a key leaves the chain verifiable; ciphertext becomes noise; plaintext projections must be rebuilt (and will show a tombstone).
 - Committing to a plain (unsalted, unkeyed) hash of plaintext is a leakage risk: short or guessable content (e.g. "yes", file paths, known code) can be confirmed by brute force; EDPB explicitly says unsalted/unkeyed hashes are generally insufficient (para 52).
 - Chameleon-hash redaction is a poor fit for a security-first tool because it introduces a rewrite trapdoor; crypto-shredding with ciphertext commitment keeps the log strictly append-only.
 
@@ -85,7 +85,7 @@ Industry practice is two or three wrap levels: a root/KEK (KMS, hardware, or pas
 
 ### Inferences
 
-- For Cairn: a session DEK (random, stored wrapped) is the natural shred unit; per-event keys should be *derived* from it (HKDF with event sequence number) for nonce safety, not stored, unless per-event shredding is required. If per-event redaction is needed, store per-event random keys wrapped by the session key (the KBFS approach) so deleting one wrapped key shreds one event.
+- For ParleyInn: a session DEK (random, stored wrapped) is the natural shred unit; per-event keys should be *derived* from it (HKDF with event sequence number) for nonce safety, not stored, unless per-event shredding is required. If per-event redaction is needed, store per-event random keys wrapped by the session key (the KBFS approach) so deleting one wrapped key shreds one event.
 - A key hierarchy where project or tenant keys merely wrap session keys allows two shred granularities: delete one wrapped session key, or delete the project KEK (shreds all sessions it wraps, across all replicas, as long as no replica cached unwrapped session keys).
 - Wrapped keys must live outside the immutable record (a mutable keystore), otherwise the hash chain would preserve the key that is supposed to be destroyed.
 
@@ -113,8 +113,8 @@ Crypto-shredding only erases what the key protected and only if every copy of th
 ### Inferences
 
 - Deterministic encryption (e.g. SIV or convergent encryption for dedup) leaks equality of plaintexts and enables confirmation attacks; for chat/code logs with repeated content, use randomized AEAD with unique nonces (XChaCha20-Poly1305 or derived per-event keys).
-- Go cannot reliably zeroize memory (GC copies, no mlock by default); key lifetime in process memory should be minimized and swap/core dumps considered. Cairn hooks are short-lived processes, which helps.
-- For an AI agent, the model's context and any provider-side logs are plaintext derivatives outside Cairn's control; shredding cannot recall what was already sent to the model.
+- Go cannot reliably zeroize memory (GC copies, no mlock by default); key lifetime in process memory should be minimized and swap/core dumps considered. ParleyInn hooks are short-lived processes, which helps.
+- For an AI agent, the model's context and any provider-side logs are plaintext derivatives outside ParleyInn's control; shredding cannot recall what was already sent to the model.
 - Backups of the keystore defeat shredding unless the keystore backup itself is encrypted under a key that is rotated/destroyed on a schedule (the "backup retention window" becomes the effective erasure delay and should be documented).
 - Rotation in an immutable store = re-wrap DEKs (cheap) rather than re-encrypt payloads (expensive and breaks ciphertext-hash commitments unless the chain commits to plaintext commitments instead).
 
@@ -147,9 +147,9 @@ As of October 2026 no EU regulator has stated that key destruction alone *is* er
 
 ### Inferences
 
-- Defensible legal position for Cairn: crypto-shredding is a strong technical measure that makes residual ciphertext unintelligible and (post-SRB) arguably non-personal for any party without the key; pair it with deletion of plaintext derivatives, destruction of all key copies with an audit record (Recital 66 "traceability"), documented backup windows (ICO "beyond use"), and a crypto-agility/PQ plan (EDPB para 96). Do not market it as "GDPR-compliant erasure" outright.
+- Defensible legal position for ParleyInn: crypto-shredding is a strong technical measure that makes residual ciphertext unintelligible and (post-SRB) arguably non-personal for any party without the key; pair it with deletion of plaintext derivatives, destruction of all key copies with an audit record (Recital 66 "traceability"), documented backup windows (ICO "beyond use"), and a crypto-agility/PQ plan (EDPB para 96). Do not market it as "GDPR-compliant erasure" outright.
 - EDPB's steer "keep personal data off the immutable ledger" maps to: the hash chain should hold only ciphertext hashes/commitments and non-identifying metadata, with ciphertext in a deletable blob store, so key shredding plus optional blob deletion together approach "actual" deletion where storage allows.
-- Cairn users are mostly controllers of their own sessions; erasure obligations arise mainly when sessions contain third-party personal data (customer data in code, chat logs).
+- ParleyInn users are mostly controllers of their own sessions; erasure obligations arise mainly when sessions contain third-party personal data (customer data in code, chat logs).
 
 ### Gaps
 
@@ -161,7 +161,7 @@ As of October 2026 no EU regulator has stated that key destruction alone *is* er
 
 ### Takeaway
 
-A network-free Go stack is available entirely from the standard library plus golang.org/x/crypto and filippo.io/age; Tink Go core is local but its KMS integrations are networked; OS keyring libraries reach outside the process (D-Bus on Linux, and on macOS zalando/go-keyring shells out to `/usr/bin/security`, which would violate Cairn's I4 ban on `os/exec`). MLS in Go is immature.
+A network-free Go stack is available entirely from the standard library plus golang.org/x/crypto and filippo.io/age; Tink Go core is local but its KMS integrations are networked; OS keyring libraries reach outside the process (D-Bus on Linux, and on macOS zalando/go-keyring shells out to `/usr/bin/security`, which would violate ParleyInn's I4 ban on `os/exec`). MLS in Go is immature.
 
 ### Cited Findings
 
@@ -176,7 +176,7 @@ A network-free Go stack is available entirely from the standard library plus gol
 
 - Network-free and I4-compatible: stdlib `crypto/*` (AES-GCM, `crypto/hkdf`, `crypto/mlkem`, `crypto/ed25519`), `golang.org/x/crypto/chacha20poly1305`, `filippo.io/age` core (without plugins; plugins use `os/exec`), Tink Go core without KMS extensions.
 - Not I4-compatible as-is: KMS clients (network), age plugins and zalando/go-keyring on macOS (`os/exec`). Linux D-Bus is local IPC but uses unix sockets via `net`-family packages in godbus — would need a depguard exception and security review.
-- Simplest dependency-minimal choice for Cairn's ≤10-dependency budget: stdlib + x/crypto (already common) for AEAD/HKDF, age only if a file format and multi-recipient wrapping are wanted; keystore as files under `$CAIRN_HOME` protected by a passphrase/age identity, with optional TPM later.
+- Simplest dependency-minimal choice for ParleyInn's ≤10-dependency budget: stdlib + x/crypto (already common) for AEAD/HKDF, age only if a file format and multi-recipient wrapping are wanted; keystore as files under `$PARINN_HOME` protected by a passphrase/age identity, with optional TPM later.
 
 ### Gaps
 
@@ -203,7 +203,7 @@ Combine (1) a hash-chained/Merkle log whose leaves commit to non-sensitive heade
 Sketch (synthesis, not from a single source):
 
 1. Event record = `header || ciphertext`. Header: sequence number, previous-leaf hash, session ID, key ID, timestamp, kind, `SHA-256(ciphertext)`. Chain/Merkle leaf = hash(header). No plaintext hash in the header (or, if needed for dedupe/verification, an HMAC under the session key, which is shredded with it).
-2. Ciphertext = XChaCha20-Poly1305 (or AES-256-GCM) under `HKDF(session_DEK, "cairn/event", seq)`, header as associated data, so headers are authenticated and ciphertext cannot be replayed across positions.
+2. Ciphertext = XChaCha20-Poly1305 (or AES-256-GCM) under `HKDF(session_DEK, "parinn/event", seq)`, header as associated data, so headers are authenticated and ciphertext cannot be replayed across positions.
 3. Keystore (mutable, outside the log): `session_DEK` wrapped to each authorized device/host recipient (X25519, ideally hybrid ML-KEM for PQ) and/or to a project KEK. Shred = delete every wrapped copy of the DEK on every replica; append a signed `KeyDestroyed{key_id, reason, actor}` leaf to the log (I6 audit, Recital 66 traceability).
 4. Replication: logs replicate freely (ciphertext + headers are safe to copy to sandboxes); keystore replicates only to authorized devices; cloud sandboxes receive short-lived, session-scoped unwrapped keys or none (git interface over ciphertext-only clones).
 5. Revocation: new session DEKs for future data wrapped only to remaining devices (forward rotation); accept that revoked devices keep what they had — the only remedy is shredding the affected session keys everywhere.

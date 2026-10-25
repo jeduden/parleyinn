@@ -1,7 +1,7 @@
 [package]
 name = "ingest"
 version = "0.0.0"
-description = "cairn ingest: a transcript read into an ingest seat's writer"
+description = "parinn ingest: a transcript read into an ingest seat's writer"
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
@@ -10,9 +10,12 @@ publish.workspace = true
 [dependencies]
 administration.workspace = true
 key.workspace = true
+provenance.workspace = true
 record.workspace = true
+redaction.workspace = true
 serde_json.workspace = true
 store.workspace = true
+transcript.workspace = true
 
 [dev-dependencies]
 rusqlite.workspace = true
@@ -21,8 +24,8 @@ testkit.workspace = true
 [lints]
 workspace = true
 
-# ENG-02: see crates/cairn/Cargo.toml.
-[package.metadata.cairn]
+# ENG-02: see crates/parinn/Cargo.toml.
+[package.metadata.parinn]
 responsibility = "Reads harness transcripts into the record"
-may-depend-on = ["administration", "key", "record", "store"]
+may-depend-on = ["administration", "key", "provenance", "record", "redaction", "store", "transcript"]
 may-dev-depend-on = ["testkit"]

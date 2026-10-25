@@ -1,5 +1,5 @@
 local sums = {}
-for _, e in ipairs(cairn.events()) do
+for _, e in ipairs(parinn.events()) do
   if e.kind == "message" and e.provenance == "assistant" and e.run ~= nil then
     sums[e.run] = (sums[e.run] or 0) + (e.tokens or 0)
   end

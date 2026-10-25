@@ -2,7 +2,7 @@
  {
   "type": "contradiction",
   "quote": "surface: a principal act, a device seat's room act, an install or an",
-  "problem": "Principal surface refuses and counts every device seat's room act that comes from a process the harness starts. Device seat and Personal room exempt only the personal room's create room act, which is recorded 'at Cairn's first start there'. After a plugin or managed install, that first start is a hook handler or the MCP server, so read together the personal room is never created and runs' events have no seat to go to. 'Cairn's first start' is also never defined.",
+  "problem": "Principal surface refuses and counts every device seat's room act that comes from a process the harness starts. Device seat and Personal room exempt only the personal room's create room act, which is recorded 'at ParleyInn's first start there'. After a plugin or managed install, that first start is a hook handler or the MCP server, so read together the personal room is never created and runs' events have no seat to go to. 'ParleyInn's first start' is also never defined.",
   "fix": "Append to the refusal: \"but for the create room act of its node's personal room, which the first core component to run on the node records (Personal room)\", and say which component that is.",
   "severity": "needs-fix",
   "lens": "consistency",
@@ -10,8 +10,8 @@
  },
  {
   "type": "gap",
-  "quote": "than Cairn's own hook handlers, MCP server and harness strip, is recall: never",
-  "problem": "A hook call from inside a run's tool process is refused (Hook). Nothing says the same for `cairn status --line` or `cairn mcp` run from a run's tool process. An agent can therefore call the harness strip itself and get Health output back without an envelope, against I2 and against 'what it returns is enveloped'. Implementers will also recognise the exemption differently.",
+  "quote": "than ParleyInn's own hook handlers, MCP server and harness strip, is recall: never",
+  "problem": "A hook call from inside a run's tool process is refused (Hook). Nothing says the same for `parinn status --line` or `parinn mcp` run from a run's tool process. An agent can therefore call the harness strip itself and get Health output back without an envelope, against I2 and against 'what it returns is enveloped'. Implementers will also recognise the exemption differently.",
   "fix": "Add: \"A harness-strip or MCP-server call from inside a run's tool process is recall (enveloped), just as a hook call from one is refused and counted.\"",
   "severity": "needs-fix",
   "lens": "consistency",
@@ -20,17 +20,17 @@
  {
   "type": "gap",
   "quote": "Managed policy and repository configuration each override the",
-  "problem": "The candidate never says what happens to a value in managed policy or repository configuration that is not cut-only. Ignoring it silently breaks I6. Ignoring a managed value also conflicts with 'Cairn never overrides it (I7)'. Implementers will choose differently.",
-  "fix": "Add: \"A value in managed policy or repository configuration that is not cut-only is not applied; it is counted and shown on Setup (I6), and Cairn never rewrites the policy itself.\"",
+  "problem": "The candidate never says what happens to a value in managed policy or repository configuration that is not cut-only. Ignoring it silently breaks I6. Ignoring a managed value also conflicts with 'ParleyInn never overrides it (I7)'. Implementers will choose differently.",
+  "fix": "Add: \"A value in managed policy or repository configuration that is not cut-only is not applied; it is counted and shown on Setup (I6), and ParleyInn never rewrites the policy itself.\"",
   "severity": "minor",
   "lens": "consistency",
   "model": "default"
  },
  {
   "type": "gap",
-  "quote": "`cairn uninstall` records the widening act turning capture off before it",
+  "quote": "`parinn uninstall` records the widening act turning capture off before it",
   "problem": "Uninstall can also run through the harness's plugin path or the managed install path, where no principal act can be recorded. Recording then stops with no capture-off act and no capture gap. No install path records capture back on either, so after reinstalling, the record still says capture is off and implementers will differ on whether the hook handlers record.",
-  "fix": "Add: \"An uninstall outside a principal surface records no act, and its runs show `unrecorded`; `cairn install` at a principal surface records turning capture on while capture is off.\"",
+  "fix": "Add: \"An uninstall outside a principal surface records no act, and its runs show `unrecorded`; `parinn install` at a principal surface records turning capture on while capture is off.\"",
   "severity": "minor",
   "lens": "consistency",
   "model": "default"
@@ -38,8 +38,8 @@
  {
   "type": "gap",
   "quote": "This node's hook handlers recording its runs' events.",
-  "problem": "Capture covers only the hook handlers. Nothing says whether `cairn ingest`, including one an agent's tool process runs as recall, may append a witnessed run's events while capture is off. The capture-gap marker then moves the ingest position past those events and shows a gap that may already be recorded, so I1's exception is stated inconsistently.",
-  "fix": "Add: \"While capture is off, `cairn ingest` appends nothing for this node's witnessed runs.\"",
+  "problem": "Capture covers only the hook handlers. Nothing says whether `parinn ingest`, including one an agent's tool process runs as recall, may append a witnessed run's events while capture is off. The capture-gap marker then moves the ingest position past those events and shows a gap that may already be recorded, so I1's exception is stated inconsistently.",
+  "fix": "Add: \"While capture is off, `parinn ingest` appends nothing for this node's witnessed runs.\"",
   "severity": "minor",
   "lens": "consistency",
   "model": "default"
@@ -56,7 +56,7 @@
  {
   "type": "security",
   "quote": "the CLI or TUI started at a terminal by a process that neither the harness nor",
-  "problem": "A principal surface is defined only by which process started the CLI or TUI. A run's tool process can bypass that by having a process it did not start launch `cairn` at a pty (a running tmux or screen server, cron, a user service manager), or by sending keys into a TUI the person left open. It can then take widening principal acts: add a constraint pin that restores as the principal's constraint, release a quarantine, or turn capture off. Nothing says what makes the client \"authenticated\" beyond that ancestry.",
+  "problem": "A principal surface is defined only by which process started the CLI or TUI. A run's tool process can bypass that by having a process it did not start launch `parinn` at a pty (a running tmux or screen server, cron, a user service manager), or by sending keys into a TUI the person left open. It can then take widening principal acts: add a constraint pin that restores as the principal's constraint, release a quarantine, or turn capture off. Nothing says what makes the client \"authenticated\" beyond that ancestry.",
   "fix": "Add: \"authenticated by the person confirming each widening act there (OWN-02), never by process ancestry alone; a CLI or TUI started or driven on behalf of a run's tool process, through any other process, is never a principal surface.\"",
   "severity": "needs-fix",
   "lens": "security",
@@ -64,9 +64,9 @@
  },
  {
   "type": "security",
-  "quote": "than Cairn's own hook handlers, MCP server and harness strip, is recall: never",
-  "problem": "The harness strip is exempt from recall. Hook calls from inside a run's tool process are refused, but no rule separates the strip from the same `cairn status --line` that an agent runs in its tool process. That call's output (Health's failures and store locations, which are paths) would reach the model unenveloped and unrecorded. That is a write to an agent outside I2's closed paths.",
-  "fix": "Define the harness strip as only the status-line call the harness itself makes, and add: \"a `cairn status --line` call from a run's tool process or its descendants is recall.\"",
+  "quote": "than ParleyInn's own hook handlers, MCP server and harness strip, is recall: never",
+  "problem": "The harness strip is exempt from recall. Hook calls from inside a run's tool process are refused, but no rule separates the strip from the same `parinn status --line` that an agent runs in its tool process. That call's output (Health's failures and store locations, which are paths) would reach the model unenveloped and unrecorded. That is a write to an agent outside I2's closed paths.",
+  "fix": "Define the harness strip as only the status-line call the harness itself makes, and add: \"a `parinn status --line` call from a run's tool process or its descendants is recall.\"",
   "severity": "needs-fix",
   "lens": "security",
   "model": "default"
@@ -75,7 +75,7 @@
   "type": "security",
   "quote": "only at a principal surface or through the harness's own plugin install or",
   "problem": "An uninstall through the harness's plugin mechanism or the managed install path stops this node recording its runs' events. The candidate makes that a widening principal act 'whatever verb carries it', but only the CLI or TUI at a principal surface can record one, and managed policy may make only cut-only changes. Such an uninstall leaves no recorded act and no capture gap, so events go unrecorded silently, against I1's 'every exception is recorded' and I6.",
-  "fix": "\"Install runs only at a principal surface, through the harness's own plugin install or through the managed install path; uninstall runs only at a principal surface (ADM-02). Hook registrations found removed without that act are counted and shown at Cairn's next start as a node-wide capture gap on Runs and Health (I6).\"",
+  "fix": "\"Install runs only at a principal surface, through the harness's own plugin install or through the managed install path; uninstall runs only at a principal surface (ADM-02). Hook registrations found removed without that act are counted and shown at ParleyInn's next start as a node-wide capture gap on Runs and Health (I6).\"",
   "severity": "needs-fix",
   "lens": "security",
   "model": "default"
@@ -91,9 +91,9 @@
  },
  {
   "type": "security",
-  "quote": "user that signs with this node's device key or a seat key outside Cairn's code",
-  "problem": "R3 covers only signing outside Cairn's code. A same-user process (an agent's tool process) needs no key to append a marked `operator` event to the device seat's unsealed tail, and the core's next seal then covers it. The event becomes a sealed principal act, and its constraint pin qualifies and restores. The candidate neither rules this out nor names it as R3.",
-  "fix": "\"A process of the same OS user that writes to the store, or signs with this node's device key or a seat key, outside Cairn's code is \u00a76.1's risk R3\", or state that the core seals only events it appended itself.",
+  "quote": "user that signs with this node's device key or a seat key outside ParleyInn's code",
+  "problem": "R3 covers only signing outside ParleyInn's code. A same-user process (an agent's tool process) needs no key to append a marked `operator` event to the device seat's unsealed tail, and the core's next seal then covers it. The event becomes a sealed principal act, and its constraint pin qualifies and restores. The candidate neither rules this out nor names it as R3.",
+  "fix": "\"A process of the same OS user that writes to the store, or signs with this node's device key or a seat key, outside ParleyInn's code is \u00a76.1's risk R3\", or state that the core seals only events it appended itself.",
   "severity": "minor",
   "lens": "security",
   "model": "default"
@@ -110,8 +110,8 @@
  {
   "type": "useless",
   "quote": "create room needs none. The room acts are create room, link, pin, edit, unpin.",
-  "problem": "Create room is a general room act that needs no capability, so a principal could create a room other than the personal room. Such a room has no use: no act adds a seat to it, runs get seats only in the personal room, \"every event or pin goes\" to the personal room, so nothing there restores or can be recalled. Two implementers will differ on whether `cairn room create` exists and what it does.",
-  "fix": "State that create room is taken only once per node, by the device seat at Cairn's first start, creating that node's personal room, and that any other create room act is refused and counted (I6).",
+  "problem": "Create room is a general room act that needs no capability, so a principal could create a room other than the personal room. Such a room has no use: no act adds a seat to it, runs get seats only in the personal room, \"every event or pin goes\" to the personal room, so nothing there restores or can be recalled. Two implementers will differ on whether `parinn room create` exists and what it does.",
+  "fix": "State that create room is taken only once per node, by the device seat at ParleyInn's first start, creating that node's personal room, and that any other create room act is refused and counted (I6).",
   "severity": "needs-fix",
   "lens": "usefulness",
   "model": "default"

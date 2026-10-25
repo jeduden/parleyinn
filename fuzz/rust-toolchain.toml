@@ -1,0 +1,6 @@
+# ENG-01: the exact dated nightly cargo-fuzz builds the fuzz targets
+# with; the product builds with the release in ../rust-toolchain.toml.
+# Bump it and the nightly workflow's fuzz job together.
+[toolchain]
+channel = "nightly-2026-10-17"
+profile = "minimal"

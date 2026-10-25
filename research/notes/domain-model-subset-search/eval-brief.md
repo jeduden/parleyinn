@@ -1,7 +1,7 @@
 # Evaluation brief: review one candidate domain model
 
-You review one CANDIDATE version of Cairn's domain model, assembled from a
-subset of its features. Cairn is a lossless, security-first context layer
+You review one CANDIDATE version of ParleyInn's domain model, assembled from a
+subset of its features. ParleyInn is a lossless, security-first context layer
 for long-running Claude agents: an append-only record of every agent run,
 pins restored verbatim after compaction, exact recall on demand, and stored
 history never a prompt-injection channel.
@@ -22,7 +22,7 @@ rule and cites no requirement for something its own invariants depend on.
 
 Settled by the stakeholder, never a finding: the principal's own tunnel or
 `git push` carries data off the machine as the principal's tool, outside
-Cairn's components and outside I4; room trailers are always on.
+ParleyInn's components and outside I4; room trailers are always on.
 
 A concept that is absent from the candidate is not a finding. Judge the
 candidate as a complete model of a product that simply lacks what it does
@@ -33,7 +33,7 @@ Your lens: LENS.
 Report only real defects, each one of:
 
 - contradiction: two statements in the candidate cannot both hold;
-- undefined: a term the candidate uses as a Cairn concept but never defines,
+- undefined: a term the candidate uses as a ParleyInn concept but never defines,
   or a definition that relies on something the candidate lacks;
 - gap: a rule needed for two implementers to build the same thing is missing
   (say exactly what), or a concept that cannot work as defined;

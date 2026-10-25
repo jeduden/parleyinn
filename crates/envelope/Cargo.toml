@@ -13,8 +13,8 @@ serde_json.workspace = true
 [lints]
 workspace = true
 
-# ENG-02: see crates/cairn/Cargo.toml.
-[package.metadata.cairn]
+# ENG-02: see crates/parinn/Cargo.toml.
+[package.metadata.parinn]
 responsibility = "Renders the envelope that carries recalled content to a model"
 may-depend-on = []
 may-dev-depend-on = []

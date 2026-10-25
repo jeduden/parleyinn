@@ -22,6 +22,7 @@ fn new_event(n: usize) -> NewEvent {
         provenance: Provenance::Unparsed,
         content: json!({"text": format!("line {n}")}),
         commitment_key: CommitmentKey::from_bytes([1; 32]),
+        transcript_timestamp: None,
     }
 }
 

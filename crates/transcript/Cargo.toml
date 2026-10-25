@@ -1,0 +1,20 @@
+[package]
+name = "transcript"
+version = "0.0.0"
+description = "The transcript parser: each transcript line decoded and checked against the shape recorded for its harness version (REC-05, REC-26)"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+serde_json.workspace = true
+
+[lints]
+workspace = true
+
+# ENG-02: see crates/parinn/Cargo.toml.
+[package.metadata.parinn]
+responsibility = "Parses transcript lines and checks each against the shape recorded for its harness version"
+may-depend-on = []
+may-dev-depend-on = []

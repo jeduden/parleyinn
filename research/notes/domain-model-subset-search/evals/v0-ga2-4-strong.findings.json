@@ -10,7 +10,7 @@
  },
  {
   "type": "gap",
-  "quote": "Cairn counts principals by principal key: every device key,",
+  "quote": "ParleyInn counts principals by principal key: every device key,",
   "problem": "Before PRV-10 no principal key certifies a device key, so no key chains to a principal key. Yet the owner, admission (a list of principal keys), bars, the owner's immunity from kick, bar and mute, and 'the room's principals' all depend on that chain. The candidate expects multi-node rooms before PRV-10 but gives no rule for which principal a seat belongs to then.",
   "fix": "Add: 'Before PRV-10 ships, a node's device key stands in for its principal key; every other node counts each node as its own principal.'",
   "severity": "needs-fix",
@@ -73,9 +73,9 @@
  },
  {
   "type": "gap",
-  "quote": "no acceptance and which `cairn configuration accept` records as the cut act",
-  "problem": "A configuration turning the launcher off applies without acceptance, but its cut act is recorded only when `cairn configuration accept` runs. Until then the launcher is off while the record still shows the act that turned it on standing. Nothing says the cut act is ever recorded if no one runs accept.",
-  "fix": "which needs no acceptance and which Cairn records as the cut act turning it off when it first applies",
+  "quote": "no acceptance and which `parinn configuration accept` records as the cut act",
+  "problem": "A configuration turning the launcher off applies without acceptance, but its cut act is recorded only when `parinn configuration accept` runs. Until then the launcher is off while the record still shows the act that turned it on standing. Nothing says the cut act is ever recorded if no one runs accept.",
+  "fix": "which needs no acceptance and which ParleyInn records as the cut act turning it off when it first applies",
   "severity": "minor",
   "lens": "consistency",
   "model": "default"
@@ -128,7 +128,7 @@
  {
   "type": "security",
   "quote": "CLI; a skill's call is the agent's own tool call, never a principal act.",
-  "problem": "Only a skill's call is excluded. Nothing says that an agent's own tool call running `cairn` (for example under a pseudo-terminal, which makes it 'the CLI ... at a terminal') is never a principal surface and never acts through a device seat. The agent runs as the same OS user, so it could stamp, record a trust grant, add a device-seat constraint pin, or post from the device seat (a trusted source that a trust grant forwards). That turns model output into trusted content and breaks I2.",
+  "problem": "Only a skill's call is excluded. Nothing says that an agent's own tool call running `parinn` (for example under a pseudo-terminal, which makes it 'the CLI ... at a terminal') is never a principal surface and never acts through a device seat. The agent runs as the same OS user, so it could stamp, record a trust grant, add a device-seat constraint pin, or post from the device seat (a trusted source that a trust grant forwards). That turns model output into trusted content and breaks I2.",
   "fix": "CLI; any call an agent's tool call makes to the CLI, TUI or MCP tools, a skill's included and at a terminal or not, is the agent's own: never a principal act, and its room acts are signed by its run seat, never a device seat.",
   "severity": "needs-fix",
   "lens": "security",
@@ -199,9 +199,9 @@
  },
  {
   "type": "security",
-  "quote": "the node's append-only log of Cairn's own operations (OPS-01), shown on",
+  "quote": "the node's append-only log of ParleyInn's own operations (OPS-01), shown on",
   "problem": "Counters and the audit log sit beside the record, not in it, so they never reach the principal's other nodes. On an ephemeral or token-key-only node they vanish with the environment, and failures there are never visible to the node's principal, which breaks I6. Refused segments avoid this only because they are recorded as structural events.",
-  "fix": "the node's append-only log of Cairn's own operations (OPS-01), each also recorded as a structural event in this node's device seat's personal-room writer so the principal's other nodes show it, shown on",
+  "fix": "the node's append-only log of ParleyInn's own operations (OPS-01), each also recorded as a structural event in this node's device seat's personal-room writer so the principal's other nodes show it, shown on",
   "severity": "minor",
   "lens": "security",
   "model": "default"

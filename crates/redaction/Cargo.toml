@@ -1,0 +1,21 @@
+[package]
+name = "redaction"
+version = "0.0.0"
+description = "Redaction before anything is written: the maintained redaction rule set, the harness account identifiers and the principal's redaction patterns (SEC-08)"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+regex.workspace = true
+serde_json.workspace = true
+
+[lints]
+workspace = true
+
+# ENG-02: see crates/parinn/Cargo.toml.
+[package.metadata.parinn]
+responsibility = "Redacts secrets and harness account identifiers from text before anything is written"
+may-depend-on = []
+may-dev-depend-on = []

@@ -1,7 +1,7 @@
 //! The `review-bundle` executable as the review workflow runs it: two
 //! trees, a diff and the stakeholder's comments in, the review bundle
 //! and findings written, the review class on stdout and an exit code
-//! out. Each run has a temporary `HOME` and `CAIRN_HOME` and nothing
+//! out. Each run has a temporary `HOME` and `PARINN_HOME` and nothing
 //! else of the environment but a coverage run's profile path.
 
 #![allow(
@@ -24,7 +24,7 @@ fn review_bundle(home: &Path, args: &[&Path]) -> Output {
     command
         .env_clear()
         .env("HOME", home)
-        .env("CAIRN_HOME", home)
+        .env("PARINN_HOME", home)
         .args(args)
         .arg("--consent")
         .arg(&consent);

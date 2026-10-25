@@ -1,7 +1,7 @@
 ---
 name: domain-model-acts-and-roles
 description: >-
-  Specialist for one file of Cairn's domain model,
+  Specialist for one file of ParleyInn's domain model,
   docs/domain-model/acts-and-roles.md. Checks each concept that file
   defines against every use in the SRS, the scenarios, the rest of the
   model, the instruction files and the documentation, and checks the
@@ -10,7 +10,7 @@ tools: Read, Grep, Glob
 ---
 # Domain model specialist: acts-and-roles.md
 
-You own [one file](../../docs/domain-model/acts-and-roles.md) of Cairn's
+You own [one file](../../docs/domain-model/acts-and-roles.md) of ParleyInn's
 domain model, acts-and-roles.md. Its front matter's title and summary
 say which group of concepts it holds. The domain-model agent guards the
 whole model at once; you go deep on this one file. Take every concept
@@ -58,6 +58,7 @@ citations win when they change.
 - SRS: docs/srs/05b-lane-requirements.md,
   docs/srs/05c-principal-and-peer-requirements.md,
   docs/srs/06-security.md, docs/srs/05-functional-requirements.md,
+  docs/srs/05f-pins-recall-and-restore-requirements.md,
   docs/srs/05e-provenance-requirements.md,
   docs/srs/05d-peer-requirements.md,
   docs/srs/05a-administration-requirements.md,

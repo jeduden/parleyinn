@@ -1,6 +1,6 @@
 # ENG-01: the exact Rust release the workspace builds with. rustup
 # reads this file, so every cargo command in the checkout runs on it.
-# Bump the channel and CI's install step together.
+# mise and CI read the version and components from this file.
 [toolchain]
 channel = "1.99.0"
 profile = "minimal"

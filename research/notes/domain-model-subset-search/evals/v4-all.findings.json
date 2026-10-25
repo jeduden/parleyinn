@@ -46,7 +46,7 @@
  },
  {
   "type": "gap",
-  "quote": "Reading a bundle into this node's record (`cairn import`, REC-23).",
+  "quote": "Reading a bundle into this node's record (`parinn import`, REC-23).",
   "problem": "Importing a bundle is a principal action that REC-23 names and that brings a foreign room into the record. It is missing from the Cut, Neutral and Widening lists, even though the candidate says every principal act a requirement names is classed there.",
   "fix": "Add \"import a bundle\" to the Widening list, or to whichever class is intended.",
   "severity": "minor",
@@ -74,7 +74,7 @@
  {
   "type": "contradiction",
   "quote": "utilities keep one word: `install`, `uninstall`, `status`, `doctor`, `verify`,",
-  "problem": "The naming rule lists the one-word utilities but leaves out `cairn launch`, which is not `cairn <concept> <verb>` either. It also lists `ui` as a CLI command, while Components says `cairn ui` is no part of the CLI.",
+  "problem": "The naming rule lists the one-word utilities but leaves out `parinn launch`, which is not `parinn <concept> <verb>` either. It also lists `ui` as a CLI command, while Components says `parinn ui` is no part of the CLI.",
   "fix": "Add `launch` to the list and mark `ui` and `launch` as component entry points rather than CLI commands.",
   "severity": "minor",
   "lens": "consistency",
@@ -100,7 +100,7 @@
  },
  {
   "type": "security",
-  "quote": "personal room at Cairn's first start there (Personal room), or any seat's,",
+  "quote": "personal room at ParleyInn's first start there (Personal room), or any seat's,",
   "problem": "A run seat can create a room with no principal act, and create room needs no capability. Every later change of visibility or admission is widening, but the model never says what visibility and admission a newly created room starts with. An implementer who lets the create act set them lets an agent open a room to other principals' keys. Its own events, routed to a room it created, then sync to their nodes with no widening act.",
   "fix": "Add to Room act or Visibility: \"A created room starts private and invite only; a create room act sets neither, and only the owner's widening principal act changes them.\"",
   "severity": "needs-fix",
@@ -145,7 +145,7 @@
  },
  {
   "type": "gap",
-  "quote": "Reading a bundle into this node's record (`cairn import`, REC-23).",
+  "quote": "Reading a bundle into this node's record (`parinn import`, REC-23).",
   "problem": "The candidate says every principal act a requirement names is classed, but import, backup creation and ingest from outside transcript.roots appear in no class. So it is undefined whether they need a principal surface. If they don't, an agent's own CLI call from inside a run can pull an attacker's bundle into the record or write the whole store to a file outside any envelope.",
   "fix": "Class them: \"import a bundle, create a backup, ingest a transcript from outside transcript.roots\" as widening principal acts.",
   "severity": "minor",
@@ -173,7 +173,7 @@
  {
   "type": "gap",
   "quote": "Replay tab's **context lens** showing the working view at an event, what",
-  "problem": "The context lens must show what the model's context window held, yet the working view is never part of the record. No rule records what Cairn itself wrote to the agent (restore blocks, opt-in notices, templates, compaction guidance). A restore block rebuilt later can differ from the one injected, because stamps and revocations arrive afterwards. So neither the lens nor a person can reliably see what Cairn told an agent.",
+  "problem": "The context lens must show what the model's context window held, yet the working view is never part of the record. No rule records what ParleyInn itself wrote to the agent (restore blocks, opt-in notices, templates, compaction guidance). A restore block rebuilt later can differ from the one injected, because stamps and revocations arrive afterwards. So neither the lens nor a person can reliably see what ParleyInn told an agent.",
   "fix": "Add to Restore block (and Closed path): \"Each write through a closed path is recorded as a structural event in the run's writer, naming by id and commitment the pin versions and template it carried.\"",
   "severity": "minor",
   "lens": "usefulness",

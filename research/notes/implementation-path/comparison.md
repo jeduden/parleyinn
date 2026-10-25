@@ -13,7 +13,7 @@ the bake-off at the end.
 ## Decision so far
 
 On 4 October 2026 the stakeholder chose **Tauri 2 as the app shell**
-on five platforms, with the same page serving the browser when Cairn
+on five platforms, with the same page serving the browser when ParleyInn
 is hosted ([ADR-2610042341][adr-shell], proposed). The browser settled
 it: a web page reaches the browser unchanged, while a UI the core draws
 needs a second UI there ([shells](tauri-vs-xilem.md)). On 5 October
@@ -29,7 +29,7 @@ HTML, a C-ABI core) carry into the core's design.
 ## Ratings
 
 - **strong**: meets the criterion with maintained parts as they are.
-- **workable**: meets it with Cairn's own code, a vendored port, or one
+- **workable**: meets it with ParleyInn's own code, a vendored port, or one
   stated caveat.
 - **weak**: experimental, unmeasured on a risky point, or a poor fit.
 - **fails**: breaks a hard constraint as the SRS words it today.
@@ -136,7 +136,7 @@ against exist, not whether a library does.
 17. **Compiler as reviewer.** Rust's compiler rejects memory and data
     race errors that the others leave to review; Zig and Go reject
     ignored errors; TypeScript's types vanish at runtime.
-18. **Iteration speed.** Go builds a codebase of Cairn's size in
+18. **Iteration speed.** Go builds a codebase of ParleyInn's size in
     seconds; Zig rebuilds incrementally in hundreds of milliseconds on
     x86_64 Linux; Rust's incremental builds take seconds to tens of
     seconds, and Bun published none for its Rust port.
@@ -149,14 +149,14 @@ against exist, not whether a library does.
     tree give screen readers, IME and text selection largely for free.
     A UI the core draws must supply them: AccessKit covers screen readers
     on all five platforms, natively in Rust (I) and through its C API in
-    Zig (H), but IME and selection are the toolkit's or Cairn's own
+    Zig (H), but IME and selection are the toolkit's or ParleyInn's own
     work. Ghostty shows the pattern and its limits: the core hands its
     visible text to the host through the C API, and the macOS host
     exposes one terminal surface as an `AXTextArea` through NSAccessibility
     in `SurfaceView_AppKit.swift`, with selection and change
     notifications; position queries were still missing in 2026
     ([#9932][gh-9932]), and no Linux support was found (unverified).
-    Cairn needs a whole tree (rooms, messages, buttons), which is
+    ParleyInn needs a whole tree (rooms, messages, buttons), which is
     AccessKit's model. Among Rust GPU toolkits, Masonry and Xilem on
     Vello and egui are built on AccessKit; GPUI's support is
     experimental and absent in practice on Windows; Makepad has none
@@ -200,7 +200,7 @@ JavaScript in E are garbage-collected.
   has GPU toolkits to start from; H keeps Zig's build and terminal
   advantages with its safety and stability risks.
 - **The choice is reversible.** A factory ported Bun in 11 days against
-  its tests; Cairn's executable SRS, driving the binary through the CLI
+  its tests; ParleyInn's executable SRS, driving the binary through the CLI
   and MCP, is the same kind of oracle if the bindings stay black-box.
 
 ## Shortlist

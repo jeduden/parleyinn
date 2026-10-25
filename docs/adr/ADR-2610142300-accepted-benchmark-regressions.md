@@ -16,7 +16,7 @@ ENG-15's gate fails a significant regression of more than 10%. Phase
 1 of plan [2609292012](../../plan/2609292012_m1-record-and-recall/plan.md)
 linked SQLite, Ed25519, SHA-256 and serde_json into the core, and
 `core_start_up` grew 20.8% on the CI runner, from 506 to 612 µs. The
-cause is the larger image, measured on jeduden/cairn#48:
+cause is the larger image, measured on jeduden/parleyinn#48:
 
 - the `libm` load SQLite's `log` brings;
 - relocations;

@@ -1,28 +1,43 @@
 //! The node in a home. At its first start it mints its device key, the
 //! recovery key its genesis log commits to, and its device seat's key in
-//! the personal room. That seat's writer records, in one transaction,
-//! the genesis log's `minted` key event, then the personal room's create
+//! the personal room, and keeps each in its own entry of the home's key
+//! store (SEC-10). That seat's writer records, in one transaction, the
+//! genesis log's `minted` key event, then the personal room's create
 //! room act, then the certificate record of its own seat certificate
-//! (PRV-11, PRV-12). Later starts find that seat by the device key's
-//! `minted` key event.
+//! (PRV-11, PRV-12).
 //!
-//! A first start stages its keys and the personal room's nonce in one
-//! directory that appears whole, records the genesis, places the keys,
-//! the device key last, and removes the staging. A start that finds the
-//! staging finishes what an interrupted one began, so the store never
-//! names a key the home lost, and a crash never leaves a home with a
-//! device key but no genesis.
+//! Before each later start's first append it checks the node identity
+//! (REC-24). On a change it mints a new device key, recovery key and
+//! device seat key, and the new device seat, in the same personal room,
+//! records a node identity change event naming the replaced and the new
+//! key and the chain head of the key event log it leaves, then the new
+//! key's `minted`, then its certificate record (SEC-27). Nothing is
+//! appended under an old key again. A start finds its node by the
+//! device key's inception.
+//!
+//! A start stages its new keys in staged entries of the key store and
+//! writes the home's staged file, which names what it staged; then it
+//! records, places the keys, the device key last, and removes both. A
+//! start that finds the staged file finishes what an interrupted one
+//! began, so the store never names a key the home lost, and a crash
+//! never leaves a home with a device key but no inception.
+//!
+//! A device key missing from the key store is told apart from a key
+//! store that is locked or cannot be read; neither starts a second
+//! genesis (PRV-12).
 
 use std::fs;
-use std::path::Path;
 
+use key::KeyError;
 use key::certificate::{SeatCertificate, SeatKind};
-use key::file::{read_secret, staging, sync_directory, write_secret};
-use key::key_event::KeyEvent;
+use key::file::{read_secret, sync_directory, write_secret};
+use key::key_event::{KeyEvent, NodeIdentityChange};
+use key::key_store::{Entry, KeyStore};
 use key::random::{Entropy, draw};
 use key::signing::{DeviceKey, PublicKey, RecoveryKey, SeatKey};
+use record::chain::SeenHead;
 use record::commitment::CommitmentKey;
-use record::digest::{hex, unhex};
+use record::digest::{Digest, hex, unhex};
 use record::event::{EventKind, Provenance};
 use record::id::{Address, RoomId, Seq, WriterId};
 use serde_json::{Value, json};
@@ -30,6 +45,15 @@ use store::{NewEvent, Store, Stored, StoredSeat};
 
 use crate::AdminError;
 use crate::home::Home;
+use crate::node_identity::{self, IdentitySource};
+
+/// A node identity change a start recorded (REC-24): the fingerprints of
+/// the device key it replaced and of the new one.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct IdentityChange {
+    pub replaced: Digest,
+    pub key: Digest,
+}
 
 /// The node: its device key, its device seat's writer and its personal
 /// room.
@@ -38,50 +62,74 @@ pub struct Node {
     device: DeviceKey,
     device_writer: WriterId,
     room: RoomId,
+    change: Option<IdentityChange>,
 }
 
 impl Node {
-    /// The node in `home`, started for the first time when the home
-    /// holds no device key, and finished when a first start was
-    /// interrupted.
+    /// The node in `home`, its keys in the home's key store: started for
+    /// the first time when the home holds no device key and the store no
+    /// seat, moved to new keys when the node identity changed, and
+    /// finished when a start was interrupted.
     ///
     /// # Errors
     ///
-    /// Fails when a key cannot be minted, kept or read, when the staged
-    /// genesis does not read, when the store fails, or when the home
-    /// holds a device key whose genesis the store lacks.
+    /// Fails when a key cannot be minted, kept or read, when the device
+    /// key is missing but the store holds seats, when the staged start
+    /// does not read, when the store fails, or when the home holds a
+    /// device key whose inception the store lacks.
     pub fn open(
         home: &Home,
         store: &mut Store,
         entropy: &mut dyn Entropy,
     ) -> Result<Self, AdminError> {
-        let dir = home.genesis();
-        if !dir.exists() && !home.device_key().exists() {
-            stage(home, entropy)?;
-        }
-        if dir.exists() {
-            let genesis = Genesis::load(home)?;
-            genesis.record(store, entropy)?;
-            genesis.place(home)?;
-            fs::remove_dir_all(&dir).map_err(|source| io(&dir, source))?;
-            sync_directory(&dir).map_err(|source| io(&dir, source))?;
-        }
-
-        Self::find(home, store)
+        Self::open_in(home, home.key_store().as_ref(), store, entropy)
     }
 
-    /// The node whose device key `home` holds, by the device seat whose
-    /// log begins with that key's `minted` key event: its genesis. It
-    /// writes nothing, so it finds only a node a start made. A seat
-    /// whose certificate does not read is passed over: it cannot be the
-    /// seat the device key certified, and `cairn verify` reports it.
+    /// [`open`](Self::open), its keys in `keys`.
+    ///
+    /// # Errors
+    ///
+    /// As [`open`](Self::open).
+    pub fn open_in(
+        home: &Home,
+        keys: &dyn KeyStore,
+        store: &mut Store,
+        entropy: &mut dyn Entropy,
+    ) -> Result<Self, AdminError> {
+        if !home.staged().exists() {
+            prepare(home, keys, store, entropy)?;
+        }
+        let change = match Staged::load(home, keys)? {
+            Some(staged) => staged.finish(home, keys, store, entropy)?,
+            None => None,
+        };
+        let mut node = Self::find_in(keys, store)?;
+        node.change = change;
+
+        Ok(node)
+    }
+
+    /// The node whose device key `home`'s key store holds, by the device
+    /// seat whose log holds that key's inception. It writes nothing, so
+    /// it finds only a node a start made. A seat whose certificate does
+    /// not read is passed over: it cannot be the seat the device key
+    /// certified, and `parinn verify` reports it.
     ///
     /// # Errors
     ///
     /// Fails when the device key cannot be read, the store fails, or
-    /// the store holds no genesis of the device key.
+    /// the store holds no inception of the device key.
     pub fn find(home: &Home, store: &Store) -> Result<Self, AdminError> {
-        let device = DeviceKey::load(&home.device_key())?;
+        Self::find_in(home.key_store().as_ref(), store)
+    }
+
+    /// [`find`](Self::find), the device key read from `keys`.
+    ///
+    /// # Errors
+    ///
+    /// As [`find`](Self::find).
+    pub fn find_in(keys: &dyn KeyStore, store: &Store) -> Result<Self, AdminError> {
+        let device = DeviceKey::fetch(keys, &Entry::device())?;
         let key = device.public();
         for seat in store.seats()? {
             let Ok(cert) = SeatCertificate::from_value(&seat.certificate) else {
@@ -91,11 +139,14 @@ impl Node {
                 continue;
             }
             let first = store.event(Address::new(seat.writer, Seq::FIRST))?;
-            if begins_genesis(first.as_ref(), &key) {
+            let second_seq = Seq::FIRST.next().unwrap_or(Seq::FIRST);
+            let second = store.event(Address::new(seat.writer, second_seq))?;
+            if holds_inception(first.as_ref(), second.as_ref(), &key) {
                 return Ok(Self {
                     device,
                     device_writer: seat.writer,
                     room: seat.room,
+                    change: None,
                 });
             }
         }
@@ -123,10 +174,16 @@ impl Node {
         self.room
     }
 
+    /// The node identity change this start recorded, if it recorded one.
+    #[must_use]
+    pub fn identity_change(&self) -> Option<IdentityChange> {
+        self.change
+    }
+
     /// Starts an ingest seat in the personal room: mints its key, keeps
-    /// it in the home, certifies it with the device key, and records the
-    /// seat and the certificate record in the device seat in one
-    /// transaction.
+    /// it in the home's key store, certifies it with the device key, and
+    /// records the seat and the certificate record in the device seat in
+    /// one transaction.
     ///
     /// # Errors
     ///
@@ -138,15 +195,44 @@ impl Node {
         entropy: &mut dyn Entropy,
     ) -> Result<StoredSeat, AdminError> {
         let seat = SeatKey::mint(entropy)?;
-        let key = draw(entropy)?;
         let cert = SeatCertificate::issue(&self.device, &seat, self.room, SeatKind::Run, true)?;
-        seat.save(&home.seat_key(cert.seat_id()))?;
-        let record = seat_record(&cert);
+        seat.keep(home.key_store().as_ref(), &Entry::seat(cert.seat_id()))?;
+        self.record_seat(store, &cert, entropy)
+    }
+
+    /// Starts a run seat in the personal room for the key `seat`, which
+    /// its caller keeps in memory alone, as a witnessed run's MCP server
+    /// does (SEC-10): certifies it with the device key, naming it a run
+    /// seat and no ingest seat (PRV-11), and records the seat and the
+    /// certificate record in the device seat in one transaction.
+    ///
+    /// # Errors
+    ///
+    /// Fails when the random source or the store fails.
+    pub fn certify_run_seat(
+        &self,
+        store: &mut Store,
+        seat: &SeatKey,
+        entropy: &mut dyn Entropy,
+    ) -> Result<StoredSeat, AdminError> {
+        let cert = SeatCertificate::issue(&self.device, seat, self.room, SeatKind::Run, false)?;
+        self.record_seat(store, &cert, entropy)
+    }
+
+    /// Records the seat `cert` certifies, and its certificate record in
+    /// the device seat, in one transaction.
+    fn record_seat(
+        &self,
+        store: &mut Store,
+        cert: &SeatCertificate,
+        entropy: &mut dyn Entropy,
+    ) -> Result<StoredSeat, AdminError> {
+        let record = seat_record(cert);
         let new_events = [new_event(
-            key,
+            draw(entropy)?,
             EventKind::CertificateRecord,
             Provenance::Structural,
-            certificate_record(&cert),
+            certificate_record(cert),
         )];
         store.add_seat_and_append(&record, self.device_writer, &new_events)?;
 
@@ -154,99 +240,208 @@ impl Node {
     }
 }
 
-/// What a first start mints before it records anything.
-struct Genesis {
+/// Stages a first start's keys when the key store holds no device key
+/// and the store no seat, and a node identity change's when the device
+/// key is there and the node identity changed.
+fn prepare(
+    home: &Home,
+    keys: &dyn KeyStore,
+    store: &Store,
+    entropy: &mut dyn Entropy,
+) -> Result<(), AdminError> {
+    match keys.get(&Entry::device()) {
+        Err(e) if e.is_missing() => {
+            if !store.seats()?.is_empty() {
+                return Err(AdminError::DeviceKeyMissing);
+            }
+            Staged::mint(entropy, true)?.stage(home, keys)
+        }
+        Err(e) => Err(e.into()),
+        Ok(_) => match node_identity::changed(home)? {
+            Some(_) => Staged::mint(entropy, false)?.stage(home, keys),
+            None => Ok(()),
+        },
+    }
+}
+
+/// The device key `parinn verify` checks the record in `store` against:
+/// the one `home`'s key store holds, or, while an interrupted first
+/// start is staged, the key it staged, which its next start places, as
+/// a crash can leave it (ENG-06). The flag says the key is staged.
+/// `None` while no start has recorded anything: no key is placed and
+/// the store holds no seat, so the next start makes the node.
+///
+/// # Errors
+///
+/// Fails when the device key cannot be read, or is missing beside a
+/// record with no first start staged, or when the staged start or the
+/// store fails.
+pub fn verifying_key(home: &Home, store: &Store) -> Result<Option<(PublicKey, bool)>, AdminError> {
+    let keys = home.key_store();
+    let missing = match DeviceKey::fetch(keys.as_ref(), &Entry::device()) {
+        Ok(device) => return Ok(Some((device.public(), false))),
+        Err(e) if e.is_missing() => e,
+        Err(e) => return Err(e.into()),
+    };
+    if store.seats()?.is_empty() {
+        return Ok(None);
+    }
+    match Staged::load(home, keys.as_ref())? {
+        Some(staged) if staged.nonce.is_some() => Ok(Some((staged.device.public(), true))),
+        _ => Err(missing.into()),
+    }
+}
+
+/// What a start staged: a first start's keys and its personal room's
+/// nonce, or a node identity change's keys.
+struct Staged {
+    /// The personal room's nonce, for a first start alone.
+    nonce: Option<[u8; 16]>,
     device: DeviceKey,
     recovery: RecoveryKey,
     seat: SeatKey,
-    nonce: [u8; 16],
 }
 
-/// The staged files, by name.
-const DEVICE: &str = "device.key";
-const RECOVERY: &str = "recovery.key";
-const SEAT: &str = "seat.key";
-const NONCE: &str = "nonce";
+/// The staged file's text for a node identity change.
+const CHANGE: &str = "change";
+/// The staged file's text for a first start, before its nonce.
+const GENESIS: &str = "genesis ";
 
-/// Mints a first start's keys and the personal room's nonce, and stages
-/// them in the home's genesis directory, which appears whole or not at
-/// all: they are written to a directory beside it, then renamed into
-/// place.
-fn stage(home: &Home, entropy: &mut dyn Entropy) -> Result<(), AdminError> {
-    let device = DeviceKey::mint(entropy)?;
-    let recovery = RecoveryKey::mint(entropy)?;
-    let seat = SeatKey::mint(entropy)?;
-    let nonce: [u8; 16] = draw(entropy)?;
-    let dir = home.genesis();
-    let building = staging(&dir);
-    match fs::remove_dir_all(&building) {
-        Err(e) if e.kind() != std::io::ErrorKind::NotFound => return Err(io(&building, e)),
-        _ => {}
-    }
-    let mut builder = fs::DirBuilder::new();
-    #[cfg(unix)]
-    std::os::unix::fs::DirBuilderExt::mode(&mut builder, 0o700);
-    builder
-        .create(&building)
-        .map_err(|source| io(&building, source))?;
-    device.save(&building.join(DEVICE))?;
-    recovery.save(&building.join(RECOVERY))?;
-    seat.save(&building.join(SEAT))?;
-    write_secret(&building.join(NONCE), &hex(&nonce))?;
-    fs::rename(&building, &dir).map_err(|source| io(&dir, source))?;
-    sync_directory(&dir).map_err(|source| io(&dir, source))
-}
-
-impl Genesis {
-    /// The genesis staged in `home`.
-    fn load(home: &Home) -> Result<Self, AdminError> {
-        let dir = home.genesis();
-        let nonce = unhex(&read_secret(&dir.join(NONCE))?)
-            .map_err(|_| AdminError::Node("the staged genesis nonce is not 32 hex digits"))?;
-
+impl Staged {
+    /// Fresh keys from `entropy`, with a nonce for a first start.
+    fn mint(entropy: &mut dyn Entropy, genesis: bool) -> Result<Self, AdminError> {
         Ok(Self {
-            device: DeviceKey::load(&dir.join(DEVICE))?,
-            recovery: RecoveryKey::load(&dir.join(RECOVERY))?,
-            seat: SeatKey::load(&dir.join(SEAT))?,
-            nonce,
+            device: DeviceKey::mint(entropy)?,
+            recovery: RecoveryKey::mint(entropy)?,
+            seat: SeatKey::mint(entropy)?,
+            nonce: if genesis { Some(draw(entropy)?) } else { None },
         })
     }
 
-    /// The device seat's certificate. Its signatures are deterministic,
-    /// so every start that resumes the genesis issues the same one.
-    fn certificate(&self) -> Result<SeatCertificate, AdminError> {
-        let room = RoomId::derive(self.seat.public().as_bytes(), &self.nonce);
+    /// Keeps the keys in their staged entries, clearing what an earlier
+    /// start left there, then writes the staged file last.
+    fn stage(&self, home: &Home, keys: &dyn KeyStore) -> Result<(), AdminError> {
+        for entry in staged_entries() {
+            keys.remove(&entry)?;
+        }
+        self.device.keep(keys, &Entry::staged(&Entry::device()))?;
+        self.recovery
+            .keep(keys, &Entry::staged(&Entry::recovery()))?;
+        self.seat.keep(keys, &Entry::staged_seat())?;
+        let text = match self.nonce {
+            Some(nonce) => format!("{GENESIS}{}", hex(&nonce)),
+            None => CHANGE.to_owned(),
+        };
+        write_secret(&home.staged(), &text)?;
+        sync_directory(&home.staged()).map_err(|source| AdminError::io(&home.staged(), source))
+    }
 
+    /// What `home` staged, none when it staged nothing.
+    fn load(home: &Home, keys: &dyn KeyStore) -> Result<Option<Self>, AdminError> {
+        let path = home.staged();
+        let text = match read_secret(&path) {
+            Err(KeyError::File { source, .. }) if source.kind() == std::io::ErrorKind::NotFound => {
+                return Ok(None);
+            }
+            text => text?,
+        };
+        let nonce =
+            match text.strip_prefix(GENESIS) {
+                Some(nonce) => Some(unhex(nonce).map_err(|_| {
+                    AdminError::Node("the staged genesis nonce is not 32 hex digits")
+                })?),
+                None if text == CHANGE => None,
+                None => {
+                    return Err(AdminError::Node(
+                        "the staged start names neither a genesis nor a change",
+                    ));
+                }
+            };
+
+        Ok(Some(Self {
+            nonce,
+            device: DeviceKey::fetch(keys, &Entry::staged(&Entry::device()))?,
+            recovery: RecoveryKey::fetch(keys, &Entry::staged(&Entry::recovery()))?,
+            seat: SeatKey::fetch(keys, &Entry::staged_seat())?,
+        }))
+    }
+
+    /// Records what was staged, unless an earlier start recorded it,
+    /// places the keys, records the node identity the home now starts
+    /// under, and clears the staging.
+    fn finish(
+        &self,
+        home: &Home,
+        keys: &dyn KeyStore,
+        store: &mut Store,
+        entropy: &mut dyn Entropy,
+    ) -> Result<Option<IdentityChange>, AdminError> {
+        let (record, change) = match self.nonce {
+            Some(nonce) => (self.record_genesis(store, entropy, nonce)?, None),
+            None => {
+                let (record, change) = self.record_change(keys, store, entropy)?;
+                (record, Some(change))
+            }
+        };
+        self.place(keys, &record)?;
+        if *home.identity() != IdentitySource::Unsupported {
+            let observed = home.identity().observe();
+            node_identity::record(home, node_identity::digest(observed.as_deref()))?;
+        }
+        for entry in staged_entries() {
+            keys.remove(&entry)?;
+        }
+        let path = home.staged();
+        fs::remove_file(&path).map_err(|source| AdminError::io(&path, source))?;
+        sync_directory(&path).map_err(|source| AdminError::io(&path, source))?;
+
+        Ok(change)
+    }
+
+    /// The device seat's certificate in `room`. Its signatures are
+    /// deterministic, so every start that resumes issues the same one.
+    fn certificate(&self, room: RoomId) -> Result<SeatCertificate, AdminError> {
         SeatCertificate::issue(&self.device, &self.seat, room, SeatKind::Device, false)
             .map_err(AdminError::from)
     }
 
-    /// Records the device seat and its first three events in one
-    /// transaction, unless an earlier start recorded them.
-    fn record(&self, store: &mut Store, entropy: &mut dyn Entropy) -> Result<(), AdminError> {
-        let cert = self.certificate()?;
+    /// The writer of the device seat it starts, whose id derives from the
+    /// seat key alone.
+    fn writer(&self) -> WriterId {
+        WriterId::derive(self.seat.public().as_bytes())
+    }
+
+    /// Records a first start's device seat and its first three events in
+    /// one transaction, unless an earlier start recorded them.
+    fn record_genesis(
+        &self,
+        store: &mut Store,
+        entropy: &mut dyn Entropy,
+        nonce: [u8; 16],
+    ) -> Result<StoredSeat, AdminError> {
+        let room = RoomId::derive(self.seat.public().as_bytes(), &nonce);
+        let cert = self.certificate(room)?;
         let record = seat_record(&cert);
         if store.seat(record.writer)?.is_some() {
-            return Ok(());
+            return Ok(record);
         }
         let minted = KeyEvent::minted(&self.device, &self.recovery.public())?;
-        let keys: [[u8; 32]; 3] = [draw(entropy)?, draw(entropy)?, draw(entropy)?];
-        let room_act = json!({"room": cert.room.to_string(), "nonce": hex(&self.nonce)});
+        let room_act = json!({"room": room.to_string(), "nonce": hex(&nonce)});
         let new_events = [
             new_event(
-                keys[0],
+                draw(entropy)?,
                 EventKind::KeyEvent,
                 Provenance::Structural,
                 minted.to_value(),
             ),
             new_event(
-                keys[1],
+                draw(entropy)?,
                 EventKind::CreateRoom,
                 Provenance::Operator,
                 room_act,
             ),
             new_event(
-                keys[2],
+                draw(entropy)?,
                 EventKind::CertificateRecord,
                 Provenance::Structural,
                 certificate_record(&cert),
@@ -254,40 +449,143 @@ impl Genesis {
         ];
         store.add_seat_and_append(&record, record.writer, &new_events)?;
 
+        Ok(record)
+    }
+
+    /// Records a node identity change's device seat in the personal room
+    /// and its first three events in one transaction, unless an earlier
+    /// start recorded them: the node identity change event, the new
+    /// key's `minted` and the new seat's certificate record.
+    fn record_change(
+        &self,
+        keys: &dyn KeyStore,
+        store: &mut Store,
+        entropy: &mut dyn Entropy,
+    ) -> Result<(StoredSeat, IdentityChange), AdminError> {
+        if let Some(record) = store.seat(self.writer())? {
+            let first = store.event(Address::new(record.writer, Seq::FIRST))?;
+            let event = first
+                .as_ref()
+                .and_then(|s| s.content.as_ref())
+                .and_then(|c| NodeIdentityChange::from_value(c).ok())
+                .ok_or(AdminError::Node(
+                    "the staged change's device seat holds no node identity change event",
+                ))?;
+            return Ok((record, change_of(&event)));
+        }
+        let old = Node::find_in(keys, store)?;
+        let head = store
+            .log(old.device_writer)?
+            .last()
+            .map(|s| SeenHead::new(s.link.header.address, s.link.hash))
+            .ok_or(AdminError::Node(
+                "the device seat the change leaves holds no event",
+            ))?;
+        let event = NodeIdentityChange {
+            replaces: old.device.public().fingerprint(),
+            key: self.device.public().fingerprint(),
+            chain_head: head,
+        };
+        let cert = self.certificate(old.room)?;
+        let record = seat_record(&cert);
+        let minted = KeyEvent::minted(&self.device, &self.recovery.public())?;
+        let new_events = [
+            new_event(
+                draw(entropy)?,
+                EventKind::NodeIdentityChange,
+                Provenance::Structural,
+                event.to_value(),
+            ),
+            new_event(
+                draw(entropy)?,
+                EventKind::KeyEvent,
+                Provenance::Structural,
+                minted.to_value(),
+            ),
+            new_event(
+                draw(entropy)?,
+                EventKind::CertificateRecord,
+                Provenance::Structural,
+                certificate_record(&cert),
+            ),
+        ];
+        store.add_seat_and_append(&record, record.writer, &new_events)?;
+
+        Ok((record, change_of(&event)))
+    }
+
+    /// Places the keys in their entries, the device key last: the seat's
+    /// unless it is there, and the recovery and device keys in place of
+    /// any other key there.
+    fn place(&self, keys: &dyn KeyStore, record: &StoredSeat) -> Result<(), AdminError> {
+        let seat = Entry::seat(record.seat);
+        match keys.get(&seat) {
+            Err(e) if e.is_missing() => self.seat.keep(keys, &seat)?,
+            Err(e) => return Err(e.into()),
+            Ok(_) => {}
+        }
+        let recovery = Entry::recovery();
+        if RecoveryKey::fetch(keys, &recovery).map(|k| k.public()).ok()
+            != Some(self.recovery.public())
+        {
+            replace(keys, &recovery, |e| self.recovery.keep(keys, e))?;
+        }
+        let device = Entry::device();
+        if DeviceKey::fetch(keys, &device).map(|k| k.public()).ok() != Some(self.device.public()) {
+            replace(keys, &device, |e| self.device.keep(keys, e))?;
+        }
+
         Ok(())
     }
-
-    /// Places the device seat's key in the home, unless it is there.
-    fn place_seat_key(&self, home: &Home) -> Result<(), AdminError> {
-        let path = home.seat_key(self.certificate()?.seat_id());
-        place(&path, |p| self.seat.save(p))
-    }
-
-    /// Places the keys in the home, the device key last, each unless it
-    /// is there.
-    fn place(&self, home: &Home) -> Result<(), AdminError> {
-        self.place_seat_key(home)?;
-        place(&home.recovery_key(), |p| self.recovery.save(p))?;
-        place(&home.device_key(), |p| self.device.save(p))
-    }
 }
 
-/// Saves a key at `path` through `save`, unless a file is there.
-fn place(
-    path: &Path,
-    save: impl FnOnce(&Path) -> Result<(), key::KeyError>,
+/// Empties `entry` and keeps a key there through `keep`.
+fn replace(
+    keys: &dyn KeyStore,
+    entry: &Entry,
+    keep: impl FnOnce(&Entry) -> Result<(), KeyError>,
 ) -> Result<(), AdminError> {
-    if path.exists() {
-        return Ok(());
-    }
+    keys.remove(entry)?;
 
-    Ok(save(path)?)
+    Ok(keep(entry)?)
 }
 
-/// Whether `first`, a device seat's first event, is the `minted` key
-/// event of `key`: the event that makes that seat the key's genesis.
-pub(crate) fn begins_genesis(first: Option<&Stored>, key: &PublicKey) -> bool {
-    first
+/// The change a node identity change event records.
+fn change_of(event: &NodeIdentityChange) -> IdentityChange {
+    IdentityChange {
+        replaced: event.replaces,
+        key: event.key,
+    }
+}
+
+/// The staged entries a start keeps its new keys in.
+fn staged_entries() -> [Entry; 3] {
+    [
+        Entry::staged(&Entry::device()),
+        Entry::staged(&Entry::recovery()),
+        Entry::staged_seat(),
+    ]
+}
+
+/// Whether `first` and `second`, a device seat's first two events, hold
+/// the inception of `key`: its `minted` first, as the genesis log's, or
+/// a node identity change event naming it, then its `minted`.
+fn holds_inception(first: Option<&Stored>, second: Option<&Stored>, key: &PublicKey) -> bool {
+    if begins_genesis(first, key) {
+        return true;
+    }
+    let names_key = first
+        .filter(|s| s.link.header.kind == EventKind::NodeIdentityChange)
+        .and_then(|s| s.content.as_ref())
+        .and_then(|c| NodeIdentityChange::from_value(c).ok())
+        .is_some_and(|e| e.key == key.fingerprint());
+
+    names_key && begins_genesis(second, key)
+}
+
+/// Whether `event` is the `minted` key event of `key`.
+pub(crate) fn begins_genesis(event: Option<&Stored>, key: &PublicKey) -> bool {
+    event
         .filter(|s| s.link.header.kind == EventKind::KeyEvent)
         .and_then(|s| s.content.as_ref())
         .and_then(|c| KeyEvent::from_value(c).ok())
@@ -321,14 +619,7 @@ fn new_event(key: [u8; 32], kind: EventKind, provenance: Provenance, content: Va
         provenance,
         content,
         commitment_key: CommitmentKey::from_bytes(key),
-    }
-}
-
-/// The failure to make, rename or remove the directory at `path`.
-fn io(path: &Path, source: std::io::Error) -> AdminError {
-    AdminError::Io {
-        path: path.to_path_buf(),
-        source,
+        transcript_timestamp: None,
     }
 }
 

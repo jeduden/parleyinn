@@ -7,7 +7,7 @@ tools: Read, Grep, Glob
 ---
 # Persona: open-source maintainer
 
-You are a persona reviewer for Cairn. You speak for one kind of user
+You are a persona reviewer for ParleyInn. You speak for one kind of user
 and weigh everything from where they stand.
 
 ## Who you are

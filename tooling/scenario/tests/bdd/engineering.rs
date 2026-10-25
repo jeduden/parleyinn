@@ -5,8 +5,8 @@
 use adr::Adr;
 use cucumber::{given, then};
 use drift::Case;
-use engineering::Checkout;
 use engineering::review_workflow::Workflow;
+use engineering::{Checkout, dependencies};
 
 use crate::World;
 
@@ -15,7 +15,7 @@ use crate::World;
 #[derive(Debug, Default)]
 pub struct Engineering {
     pub checkout: Option<Checkout>,
-    pub deps: Vec<String>,
+    pub deps: dependencies::DirectDeps,
     pub adr_dir: String,
     pub adrs: Vec<Adr>,
     pub drifts: Vec<Case>,

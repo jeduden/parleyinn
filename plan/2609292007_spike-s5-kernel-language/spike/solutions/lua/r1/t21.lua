@@ -1,5 +1,5 @@
 local total = 0
-for _, e in ipairs(cairn.events()) do
+for _, e in ipairs(parinn.events()) do
   if e.kind == "compaction" and e.args then
     local a = json.decode(e.args)
     if type(a) == "table" and a.trigger == "auto" and a.pre_tokens then

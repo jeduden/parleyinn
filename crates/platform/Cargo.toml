@@ -1,0 +1,37 @@
+[package]
+name = "platform"
+version = "0.0.0"
+description = "Reads the host's own facts through native calls and protects a key's bytes through Windows' DPAPI: the one crate that holds unsafe code, in two modules (SEC-10, REC-24, ENG-09)"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[target.'cfg(windows)'.dependencies]
+windows-sys.workspace = true
+
+# The one crate that does not inherit the workspace lints, which forbid
+# unsafe code: it calls DPAPI through windows-sys (the plan's ruling 2).
+# It denies unsafe code instead, so only the two modules that allow it,
+# src/dpapi.rs and src/identity.rs, hold any, and every unsafe block says
+# why it is sound. Miri runs its tests over fakes of DPAPI and of the
+# host-id reads (ENG-09). The static-analysis
+# gate lists it, and holds it to the workspace's other lints.
+[lints.rust]
+unsafe_code = "deny"
+
+[lints.clippy]
+unwrap_used = "deny"
+expect_used = "deny"
+panic = "deny"
+cognitive_complexity = "deny"
+too_many_lines = "deny"
+excessive_nesting = "deny"
+fn_params_excessive_bools = "deny"
+undocumented_unsafe_blocks = "deny"
+
+# ENG-02: see crates/parinn/Cargo.toml.
+[package.metadata.parinn]
+responsibility = "Reads the host's node identity and protects a key's bytes for the running OS user, through the native calls only this crate may make"
+may-depend-on = []
+may-dev-depend-on = []

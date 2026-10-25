@@ -56,8 +56,7 @@ pub enum Counter {
     HookRejected,
     HookPanicked,
     McpPanicked,
-    /// A settings layer failed validation, and a recording command
-    /// went on without it (ADM-04, I9).
+    /// A settings layer failed validation (ADM-04).
     SettingsLayerInvalid,
     /// A repository configuration key that does more than tighten was
     /// ignored (SEC-11).
@@ -73,6 +72,133 @@ pub enum Counter {
     /// A principal act was refused: no terminal (OWN-12), or a widening
     /// act OWN-22 or managed policy does not permit (SEC-22).
     PrincipalActRefused,
+    /// A secret or harness account identifier was redacted before it
+    /// was written, once per redaction (SEC-08).
+    Redacted,
+    /// A principal's redaction pattern did not compile, or compiled past
+    /// the size limit, and was refused (SEC-08).
+    RedactionPatternRefused,
+    /// A hook input exceeded 1 MiB and was refused (SEC-05).
+    HookInputTooLarge,
+    /// A hook input nested deeper than 64 levels and was refused
+    /// (SEC-05).
+    HookInputTooDeep,
+    /// A path outside every allowed root was refused (SEC-18).
+    PathOutsideAllowedRoots,
+    /// A structured log line could not be written (ENG-05, I6).
+    LogLineDropped,
+    /// An ingest was refused while the principal's configuration or the
+    /// repository configuration failed, so the redaction patterns it
+    /// needs were unknown; the transcript stays for a later ingest
+    /// (SEC-08, I1).
+    IngestRefusedSettingsInvalid,
+    /// A transcript line was stored as an `unparsed` event: it cannot be
+    /// parsed, or its type is one no supported version records (REC-05).
+    EventsUnparsed,
+    /// A transcript line's shape differed from the one recorded for its
+    /// harness version (REC-26).
+    FormatDrift,
+    /// The node identity changed, and a new device key and device seat
+    /// replaced the old (REC-24).
+    NodeIdentityChanged,
+    /// The device key is missing from the key store beside this node's
+    /// record (SEC-10, PRV-12).
+    DeviceKeyMissing,
+    /// The key store is locked or cannot be read (PRV-12).
+    KeyStoreUnavailable,
+    /// A transcript source shrank or its consumed prefix changed, and a
+    /// new transcript generation started (REC-07).
+    NewTranscriptGeneration,
+    /// A transcript line repeated another source's `uuid` with other
+    /// content, and was recorded as its own event (REC-04).
+    RepeatConflicts,
+    /// No fork observation named the owner of repeated lines, so the run
+    /// that first recorded them owns them (REC-04).
+    RepeatOwnerChosen,
+    /// An ingest marker began to hold a harness fork's repeated lines
+    /// until their owner's transcript is ingested (REC-04).
+    RepeatHeld,
+    /// Held repeated lines were released into their own run's writer,
+    /// after 30 s or once their owner's transcript was gone (REC-04).
+    RepeatReleased,
+    /// A transcript source disappeared before it was fully ingested
+    /// (REC-08).
+    TranscriptSourceLost,
+    /// A field of a hook input a handler uses failed the schema
+    /// (SEC-16).
+    HookInputRejected,
+    /// A hook handler ran past its hook budget and answered empty
+    /// (NFR-02).
+    HookBudgetExceeded,
+    /// A hook handler failed to record its hook observation (I6).
+    HookFailed,
+    /// A start marker was left behind by a hook handler the harness
+    /// stopped before it finished (NFR-02).
+    HookUnfinished,
+    /// No MCP server took a harness session's session binding within
+    /// 30 s of its `SessionStart` hook observation (REC-19).
+    SessionBindingNotTaken,
+    /// A prompt commitment was dropped while a settings layer failed,
+    /// its redaction patterns unknown (PRV-08, SEC-08).
+    PromptCommitmentDropped,
+    /// A line carried the `prompt_id` of a prompt commitment already
+    /// used up (PRV-08).
+    PromptMatchConflicts,
+    /// A matched `user` event's hook handler found no attended mark in
+    /// deployment mode `interactive` (PRV-04).
+    HarnessSessionNotAttended,
+    /// The MCP server stopped short of a transcript's end, leaving the
+    /// rest past its ingest marker: no failure, as `parinn ingest` or the
+    /// next MCP server resumes it (REC-13).
+    IngestRemainderLeft,
+    /// A witnessed line repeating another transcript's event was
+    /// recorded as its own event, never a repeat reference (REC-04).
+    WitnessedRepeatRecorded,
+    /// A tool call carried no tool-use id, so its run was not found and
+    /// it was refused (PRV-14).
+    ToolCallWithoutToolUseId,
+    /// No transcript line carried a tool call's tool-use id within 2 s,
+    /// and the call was refused (PRV-14).
+    ToolCallRunNotFound,
+    /// Transcript lines of two runs carried a tool call's tool-use id,
+    /// and the call was refused (PRV-14).
+    ToolCallRunAmbiguous,
+    /// The MCP server failed to ingest a transcript of its harness
+    /// session; the next read tries again (REC-13, I6).
+    LiveIngestFailed,
+    /// A search ran past its deadline and was cancelled (SEC-04).
+    QueryCancelled,
+    /// The search index leaves out the events of a writer whose slot a
+    /// smaller writer id holds (REC-11, I6).
+    SearchIndexWriterUnindexed,
+    /// The search index leaves out the events of a writer from seq 2^28
+    /// on (REC-11, I6).
+    SearchIndexSeqBeyondLimit,
+    /// A history held two different events at one (writer, seq): the
+    /// later head was refused, the first kept (PEER-10, REC-21).
+    ForkConflict,
+    /// The search index's unreported gaps could not be looked up after
+    /// an ingest recorded its events (REC-11, I6).
+    SearchIndexGapLookupFailed,
+    /// The identity a directory's repository resolves to changed since
+    /// it was bound; no room's branch link is relinked for it (LANE-02,
+    /// I6).
+    RepositoryIdentityChanged,
+    /// A worktree was bound after the node's device key was replaced (a
+    /// node identity change, a rotation or a key minted anew): its kept
+    /// names went with the old key, so a worktree bound before and one
+    /// never bound are told apart by neither. A structural event, not a
+    /// widening principal act (LANE-02, I6).
+    RepositoryIdentityRebound,
+    /// A clone's git data could not be read, so its repository identity
+    /// stays as it was (LANE-02, I6).
+    RepositoryReadFailed,
+    /// The identity of a clone could not be bound: the record or the
+    /// random source failed, not the clone (LANE-02, I6).
+    RepositoryBindFailed,
+    /// A look at a clone ran out of its time, so its identity stays as it
+    /// was and the next look tries again (LANE-02, ENG-03, I6).
+    RepositoryReadTimedOut,
 }
 
 impl Counter {
@@ -89,11 +215,53 @@ impl Counter {
             Self::ConfigurationKeyIgnored => "configuration_key_ignored",
             Self::ManagedPolicyInvalid => "managed_policy_invalid",
             Self::PrincipalActRefused => "principal_act_refused",
+            Self::Redacted => "redacted",
+            Self::RedactionPatternRefused => "redaction_pattern_refused",
+            Self::HookInputTooLarge => "hook_input_too_large",
+            Self::HookInputTooDeep => "hook_input_too_deep",
+            Self::PathOutsideAllowedRoots => "path_outside_allowed_roots",
+            Self::LogLineDropped => "log_line_dropped",
+            Self::IngestRefusedSettingsInvalid => "ingest_refused_settings_invalid",
+            Self::EventsUnparsed => "events_unparsed",
+            Self::FormatDrift => "format_drift",
+            Self::NodeIdentityChanged => "node_identity_changed",
+            Self::DeviceKeyMissing => "device_key_missing",
+            Self::KeyStoreUnavailable => "key_store_unavailable",
+            Self::NewTranscriptGeneration => "new_transcript_generation",
+            Self::RepeatConflicts => "repeat_conflicts",
+            Self::RepeatOwnerChosen => "repeat_owner_chosen",
+            Self::RepeatHeld => "repeat_held",
+            Self::RepeatReleased => "repeat_released",
+            Self::TranscriptSourceLost => "transcript_source_lost",
+            Self::HookInputRejected => "hook_input_rejected",
+            Self::HookBudgetExceeded => "hook_budget_exceeded",
+            Self::HookFailed => "hook_failed",
+            Self::HookUnfinished => "hook_unfinished",
+            Self::SessionBindingNotTaken => "session_binding_not_taken",
+            Self::PromptCommitmentDropped => "prompt_commitment_dropped",
+            Self::PromptMatchConflicts => "prompt_match_conflicts",
+            Self::HarnessSessionNotAttended => "harness_session_not_attended",
+            Self::IngestRemainderLeft => "ingest_remainder_left",
+            Self::WitnessedRepeatRecorded => "witnessed_repeat_recorded",
+            Self::ToolCallWithoutToolUseId => "tool_call_without_tool_use_id",
+            Self::ToolCallRunNotFound => "tool_call_run_not_found",
+            Self::ToolCallRunAmbiguous => "tool_call_run_ambiguous",
+            Self::LiveIngestFailed => "live_ingest_failed",
+            Self::QueryCancelled => "query_cancelled",
+            Self::SearchIndexWriterUnindexed => "search_index_writer_unindexed",
+            Self::SearchIndexSeqBeyondLimit => "search_index_seq_beyond_limit",
+            Self::ForkConflict => "fork_conflict",
+            Self::SearchIndexGapLookupFailed => "search_index_gap_lookup_failed",
+            Self::RepositoryIdentityChanged => "repository_identity_changed",
+            Self::RepositoryIdentityRebound => "repository_identity_rebound",
+            Self::RepositoryReadFailed => "repository_read_failed",
+            Self::RepositoryBindFailed => "repository_bind_failed",
+            Self::RepositoryReadTimedOut => "repository_read_timed_out",
         }
     }
 }
 
-/// What one entry reports. Every field is text Cairn ships, or a
+/// What one entry reports. Every field is text ParleyInn ships, or a
 /// settings key's name, so no record content or secret can reach the
 /// log.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -105,9 +273,9 @@ pub enum Occurrence<'a> {
         detail: &'static str,
     },
     /// An operation degraded over one settings key: its detail is
-    /// `detail` followed by `key`, a settings key's name or a
-    /// provenance class, shown only when it holds nothing but the
-    /// characters those can.
+    /// `detail` followed by `key`, a settings key's name, a provenance
+    /// class or a format drift's description, shown only when it holds
+    /// nothing but the characters those can.
     Keyed {
         kind: Kind,
         counter: Counter,

@@ -39,7 +39,7 @@
   "type": "undefined",
   "quote": "whatever its output (OWN-02). Without the peer component, a",
   "problem": "The conditional implies the peer component is another way for a phone to reach the room view. Here a peer is only a node enrolled by key and B2 covers nodes only, so no phone path through the peer component exists. The clause refers to a concept the candidate lacks.",
-  "fix": "Drop the condition: 'A browser on the principal's phone reaches the room view only as the browser room view, through the principal's own tunnel, which is the principal's tool outside Cairn's components (I4).'",
+  "fix": "Drop the condition: 'A browser on the principal's phone reaches the room view only as the browser room view, through the principal's own tunnel, which is the principal's tool outside ParleyInn's components (I4).'",
   "severity": "minor",
   "lens": "all",
   "model": "sonnet"
@@ -47,7 +47,7 @@
  {
   "type": "useless",
   "quote": "**Bundle**: A reviewed export of a room, signed by the device key of the",
-  "problem": "Export can create a bundle, but nothing in the candidate reads one back. Origin has only witnessed, ingested and peer, and `cairn ingest` reads transcripts only. The carriage 'as a file or a git ref' and the exporter's chain to a principal key therefore serve no consumer here.",
+  "problem": "Export can create a bundle, but nothing in the candidate reads one back. Origin has only witnessed, ingested and peer, and `parinn ingest` reads transcripts only. The carriage 'as a file or a git ref' and the exporter's chain to a principal key therefore serve no consumer here.",
   "fix": "Name what consumes a bundle (an import or ingest path with its origin and trust rule), or drop Bundle from this model.",
   "severity": "minor",
   "lens": "all",

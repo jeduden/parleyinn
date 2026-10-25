@@ -111,7 +111,7 @@ The field splits into four camps: (a) new operation-level or CRDT stores that si
 
 - The only system whose *primary* data model is operation-level with real-time CRDT merge is Zed DeltaDB; every other agent-era host keeps a commit/snapshot DAG (git or git-like) and solves agent concurrency with cheap branches, namespaces or mounts.
 - "Agent-native" hosting (Pierre, Freestyle, Entire network, ERSC, Mesa, Oak, Diversion) mostly targets *throughput and isolation* (many concurrent branches, fast clone, lazy mounts), not provenance.
-- Radicle COBs are the closest prior art for Cairn's need: an append-only, multi-writer, mergeable non-code record stored in git refs and replicated without a central server.
+- Radicle COBs are the closest prior art for ParleyInn's need: an append-only, multi-writer, mergeable non-code record stored in git refs and replicated without a central server.
 
 ### Gaps
 
@@ -125,7 +125,7 @@ The field splits into four camps: (a) new operation-level or CRDT stores that si
 
 ### Takeaway
 
-Along every dimension Cairn cares about, the field converges on "git (or a content-addressed snapshot DAG) as the durable, portable record, plus a side channel for agent metadata". DeltaDB is the outlier: real-time, operation-level, CRDT, conversation-linked, but closed and server-backed so far. Multi-writer safety in the git-based tools comes from per-writer refs or branches, never from shared-branch appends.
+Along every dimension ParleyInn cares about, the field converges on "git (or a content-addressed snapshot DAG) as the durable, portable record, plus a side channel for agent metadata". DeltaDB is the outlier: real-time, operation-level, CRDT, conversation-linked, but closed and server-backed so far. Multi-writer safety in the git-based tools comes from per-writer refs or branches, never from shared-branch appends.
 
 ### Cited Findings
 
@@ -157,8 +157,8 @@ Sources for each row: Zed — [introducing-deltadb](https://zed.dev/blog/introdu
 
 ### Inferences
 
-- For Cairn's "many agents, worktrees, machines, cloud sandboxes" case, the proven git-transport pattern is per-writer, append-only refs (Entire refs backend, GitButler `refs/heads/claude/{session_id}`, Radicle per-node namespaces). A single shared append branch is the pattern Entire moved away from.
-- Real-time sync (DeltaDB) needs a CRDT plus a live service. Cairn's I4 (no network) rules out a Cairn-run live service, so git transport, driven by the user's own git, fits Cairn better than a DeltaDB-style live replica.
+- For ParleyInn's "many agents, worktrees, machines, cloud sandboxes" case, the proven git-transport pattern is per-writer, append-only refs (Entire refs backend, GitButler `refs/heads/claude/{session_id}`, Radicle per-node namespaces). A single shared append branch is the pattern Entire moved away from.
+- Real-time sync (DeltaDB) needs a CRDT plus a live service. ParleyInn's I4 (no network) rules out a ParleyInn-run live service, so git transport, driven by the user's own git, fits ParleyInn better than a DeltaDB-style live replica.
 - New non-git VCSs (Oak, Mesa, Diversion, DeltaDB's delta layer) all keep a git export or interop path, which suggests git stays the lingua franca for the durable record.
 
 ### Gaps
@@ -170,7 +170,7 @@ Sources for each row: Zed — [introducing-deltadb](https://zed.dev/blog/introdu
 
 ### Takeaway
 
-Six products store agent conversations as first-class data: Zed Delta/DeltaDB (live, operation-linked), Entire Checkpoints (full transcripts in git refs, commit trailer linkage, redaction), git-ai (git notes with a pointer to transcripts stored elsewhere), Diversion Trajectory (proprietary, "alongside your repo"), SpecStory (Markdown files in the repo), and Pierre Code Storage only as opaque "memory files". GitButler keeps just the prompt as a commit message. jj, Sapling, Pijul, Graphite, Oak, Mesa, Tangled and Oxen store no sessions. Entire is the closest precedent for Cairn's design: Go, MIT, git-native, multi-agent, with secret redaction before data hits git.
+Six products store agent conversations as first-class data: Zed Delta/DeltaDB (live, operation-linked), Entire Checkpoints (full transcripts in git refs, commit trailer linkage, redaction), git-ai (git notes with a pointer to transcripts stored elsewhere), Diversion Trajectory (proprietary, "alongside your repo"), SpecStory (Markdown files in the repo), and Pierre Code Storage only as opaque "memory files". GitButler keeps just the prompt as a commit message. jj, Sapling, Pijul, Graphite, Oak, Mesa, Tangled and Oxen store no sessions. Entire is the closest precedent for ParleyInn's design: Go, MIT, git-native, multi-agent, with secret redaction before data hits git.
 
 ### Cited Findings
 
@@ -222,10 +222,10 @@ Six products store agent conversations as first-class data: Zed Delta/DeltaDB (l
 
 ### Inferences
 
-- Two linkage patterns dominate: commit-level (Entire trailer, git-ai notes, GitButler message, Diversion commit link) and operation-level (DeltaDB deltas). Cairn's append-only session record is closer to Entire's: raw JSONL transcript per checkpoint, written outside the code branch.
+- Two linkage patterns dominate: commit-level (Entire trailer, git-ai notes, GitButler message, Diversion commit link) and operation-level (DeltaDB deltas). ParleyInn's append-only session record is closer to Entire's: raw JSONL transcript per checkpoint, written outside the code branch.
 - The tools split on whether transcripts go *into* git (Entire, SpecStory) or are only *pointed to* from git (git-ai `messages_url`). Pointers keep git small and keep sensitive text out of shared remotes. Entire offers a separate private checkpoint remote for the same reason.
-- Redaction before writing to git (Entire) is the only documented secret-handling control in this group. No product documents treating stored transcripts as untrusted when re-injected, which is Cairn's I2 concern. Diversion's isolated "analyst sub-agent" is the nearest analogue.
-- Entire's move from one shared branch to one ref per checkpoint, with time-sortable ids, is direct evidence for how Cairn should shape git transport across many writers: per-record or per-writer refs, never a contended branch.
+- Redaction before writing to git (Entire) is the only documented secret-handling control in this group. No product documents treating stored transcripts as untrusted when re-injected, which is ParleyInn's I2 concern. Diversion's isolated "analyst sub-agent" is the nearest analogue.
+- Entire's move from one shared branch to one ref per checkpoint, with time-sortable ids, is direct evidence for how ParleyInn should shape git transport across many writers: per-record or per-writer refs, never a contended branch.
 
 ### Gaps
 

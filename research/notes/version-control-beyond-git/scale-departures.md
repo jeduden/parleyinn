@@ -113,7 +113,7 @@ Microsoft moved Windows from Source Depot (40+ depots) to a single git repositor
 ### Inferences
 
 - Microsoft's case is the counterexample: git can host a 300 GB, 3.5M-file monorepo with about 8,400 pushes a day. It needed years of core-git work (commit-graph, multi-pack-index, partial clone, sparse index, fsmonitor), a proprietary server protocol and a fork. The work went into making reads lazy and partial. The write path (refs, pushes) was not fundamentally redesigned.
-- For a single-tenant tool like Cairn, Microsoft's lesson is that reaching git's scale features takes a lot of engineering and heavy client configuration. Its numbers (pushes a day) are also small next to agent-era write rates (pushes a second).
+- For a single-tenant tool like ParleyInn, Microsoft's lesson is that reaching git's scale features takes a lot of engineering and heavy client configuration. Its numbers (pushes a day) are also small next to agent-era write rates (pushes a second).
 
 ### Gaps
 
@@ -135,7 +135,7 @@ Large game studios mostly use Perforce, not git. Their assets are large binaries
 
 ### Inferences
 
-- The binary-asset failure mode is different from Cairn's workload. Agent session records are small, append-only text or JSON. They are not large unmergeable binaries. What carries over is the centralised model (a server-authoritative history plus partial sync), not locking.
+- The binary-asset failure mode is different from ParleyInn's workload. Agent session records are small, append-only text or JSON. They are not large unmergeable binaries. What carries over is the centralised model (a server-authoritative history plus partial sync), not locking.
 
 ### Gaps
 
@@ -174,7 +174,7 @@ Cargo, Homebrew, CocoaPods and Hugging Face's client all started by making users
   1. Per-key files fetched over HTTP.
   2. A CDN in front.
   3. An append-only per-key format: Cargo's newline-delimited JSON adds one line per version.
-- Go's checksum database is the template closest to Cairn's needs. It is an append-only Merkle transparency log with signed tree heads and tile-based retrieval. It gives tamper evidence without git, and its integrity proofs need no network peer. The same structure works locally.
+- Go's checksum database is the template closest to ParleyInn's needs. It is an append-only Merkle transparency log with signed tree heads and tile-based retrieval. It gives tamper evidence without git, and its integrity proofs need no network peer. The same structure works locally.
 - These moves were driven mainly by read and fetch load: clone size and host CPU. Write rate was not the driver. Package registries publish only thousands of versions a day.
 
 ### Gaps
@@ -253,7 +253,7 @@ GitHub's CTO said publicly in April 2026 that agentic workflows, which "accelera
 
 ### Inferences
 
-- The agent-era bottleneck at hosts is the server-side write path and all the indexing around it, not git's client data model. Push consensus, ref updates, repacking, webhooks, search indexes and MySQL metadata all strain. GitHub's own list of stressed subsystems is mostly derived indexes. That supports I10-style thinking in Cairn: keep one append-only log authoritative and make every index rebuildable from it.
+- The agent-era bottleneck at hosts is the server-side write path and all the indexing around it, not git's client data model. Push consensus, ref updates, repacking, webhooks, search indexes and MySQL metadata all strain. GitHub's own list of stressed subsystems is mostly derived indexes. That supports I10-style thinking in ParleyInn: keep one append-only log authoritative and make every index rebuildable from it.
 - Cursor kept git's wire protocol but rebuilt storage as a linearised write-ahead log (WAL) on object storage. This is a strong signal that an append-only log with compaction is the scalable core, and git is a compatibility view on top of it.
 - Agents create many tiny, short-lived repositories (GitHub saw 20M new repositories a month, and Cursor names "throwaway agent repos"). A design that assumes long-lived repositories pays fixed per-repository overhead each time.
 
@@ -298,13 +298,13 @@ Six failure modes recur, and each has a known replacement. Almost every successf
 
 ### Inferences
 
-- For Cairn, where sessions are small, appended at a high rate and need tamper evidence, the evidence points away from a git repository as the session store:
+- For ParleyInn, where sessions are small, appended at a high rate and need tamper evidence, the evidence points away from a git repository as the session store:
   - The patterns that survived scale are an append-only segmented log, content-addressed chunks, a Merkle or transparency-log structure for integrity (as in Go's sumdb), and indexes rebuildable from the log.
   - Git can remain an optional export or compatibility view, which is what Meta, Microsoft (GVFS protocol), Hugging Face and Cursor all do.
 - The cleanest precedents for "machines write more than humans" are Google (24k bot commits a day against 16k human changes in 2016, absorbed by a centralised, Paxos-replicated store plus Rosie's throttled sharding) and Cursor Continuity (a WAL on object storage, 120–300 pushes a second).
-- Moving Cairn's own source-code version control off git (as opposed to session history) has much weaker support. The organisations that left git ran repositories with millions of files and tens of thousands of engineers. Microsoft shows git stretching to 300 GB and 8,400 pushes a day. A small Go repository edited by agents is far below any documented git limit. The pain at GitHub is host-side capacity, not repository-format limits.
+- Moving ParleyInn's own source-code version control off git (as opposed to session history) has much weaker support. The organisations that left git ran repositories with millions of files and tens of thousands of engineers. Microsoft shows git stretching to 300 GB and 8,400 pushes a day. A small Go repository edited by agents is far below any documented git limit. The pain at GitHub is host-side capacity, not repository-format limits.
 
 ### Gaps
 
 - No source quantifies the ref-churn failure mode alone (millions of branches or refs per repository) with numbers. Cursor and GitHub discuss it only implicitly through push throughput and repack cost.
-- I found no published measurement of git behaviour under sustained machine-rate commits (for example, more than 10 commits a second) to one local repository, which is Cairn's single-machine case.
+- I found no published measurement of git behaviour under sustained machine-rate commits (for example, more than 10 commits a second) to one local repository, which is ParleyInn's single-machine case.

@@ -56,27 +56,27 @@ override, and that the harness takes the same path at it either way.
 - A harness session that read one file per prompt on `--resume` kept the context
   near 30k tokens: on a harness resume, the earlier `Read` results did
   not reach the model again, without any compaction or hook. Content
-  can leave the agent's context with no compaction for Cairn to see.
+  can leave the agent's context with no compaction for ParleyInn to see.
   SRS §13.2 tracks it as a risk, to be recorded before M2's restore
   relies on compaction alone.
 
-## What it means for Cairn
+## What it means for ParleyInn
 
 - **ASM-09 holds.** A `PreCompact` hook exiting 2 blocks compaction,
   manual and automatic, on Claude Code 2.1.296. The Morph plugin
   README's "cannot be prevented" does not hold for this version.
 - **Blocking only defers.** No hook removes anything from the agent's
   context, so a blocked compaction leaves the context to grow until the
-  full context window. There the harness refuses every prompt. Cairn would
+  full context window. There the harness refuses every prompt. ParleyInn would
   stop the agent, against I9, unless it then lets compaction through,
   which is what (a) already does, later and at the same cost.
 - **The block is a write to an agent.** On a manual compaction the
-  model reads the handler's command and stderr. A Cairn handler would
+  model reads the handler's command and stderr. A ParleyInn handler would
   have to write only fixed text there, as I2 requires, and exit 2,
   against OQ-51 (b), which has hook handlers exit 0 on every path and
   write nothing to stderr.
 - **Automatic blocks are silent.** The transcript records none of them,
-  so I6 would have Cairn count and audit each one itself.
+  so I6 would have ParleyInn count and audit each one itself.
 
 ## Recommendation for OQ-01
 

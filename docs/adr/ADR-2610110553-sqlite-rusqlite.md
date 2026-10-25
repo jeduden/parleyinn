@@ -76,7 +76,7 @@ reach test's allow-list in the change that links the store.
 - SQLite's own security fixes arrive through `libsqlite3-sys`
   releases, reviewed as dependency updates.
 - Encryption at rest needs a design of its own (OQ-04): SQLCipher on a
-  provider without sockets, a VFS of Cairn's own with authenticated
+  provider without sockets, a VFS of ParleyInn's own with authenticated
   encryption, or encryption outside SQLite.
 
 [report]: ../../plan/2609292004_spike-s2-sqlite-driver/report.md

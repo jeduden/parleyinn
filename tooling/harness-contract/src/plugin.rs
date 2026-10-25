@@ -1,4 +1,4 @@
-//! What spike S4 recorded of the stub Cairn plugin on each target
+//! What spike S4 recorded of the stub ParleyInn plugin on each target
 //! (ASM-07): the hooks its `hooks/hooks.json` registers, the MCP
 //! servers its `.mcp.json` bundles, and the hook inputs and the init
 //! message of each harness session it loaded into, and the environment

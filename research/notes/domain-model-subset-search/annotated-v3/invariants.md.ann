@@ -1,12 +1,12 @@
 ---
 title: "1.3 Invariants"
 summary: >-
-  The single source of Cairn's ten invariants, I1 to I10, which every
+  The single source of ParleyInn's ten invariants, I1 to I10, which every
   requirement serves; other files include it through mdsmith.
 ---
 # 1.3 Invariants
 
-The invariants are Cairn's contract. Every requirement serves at least one of
+The invariants are ParleyInn's contract. Every requirement serves at least one of
 them. A change that would break an invariant is a design change requiring
 security review and a new major version, not a bug fix.
 
@@ -36,11 +36,11 @@ security review and a new major version, not a bug fix.
   certified and ⟦f:conversation⟧posts and ⟦/f⟧pins written from a device seat such a key certified,
   within that key's scope⟦/f⟧⟦f:stamps⟧, a pin version a principal stamped, for that
   principal's own agents⟦/f⟧⟦f:trust-grants⟧, and the ⟦f:conversation⟧posts and ⟦/f⟧pins a trust grant of the agent's
-  principal covers⟦/f⟧. Cairn writes to an agent only through a closed set of paths⟦f:launcher⟧.
+  principal covers⟦/f⟧. ParleyInn writes to an agent only through a closed set of paths⟦f:launcher⟧.
   Without a principal act⟦/f⟧: restore blocks (INJ-01, INJ-02, INJ-04), built only
-  from qualifying pins, trusted structural fields and fixed text Cairn ships;
+  from qualifying pins, trusted structural fields and fixed text ParleyInn ships;
   and ⟦f:notices⟧opt-in notices (INJ-10), ⟦/f⟧compaction guidance (PIN-07)⟦f:held-requests⟧ and the fixed
-  templates of OWN-04⟦f:away-policy⟧ and OWN-07⟦/f⟧⟦/f⟧, each built only from fixed text Cairn ships,
+  templates of OWN-04⟦f:away-policy⟧ and OWN-07⟦/f⟧⟦/f⟧, each built only from fixed text ParleyInn ships,
   trusted structural fields and ids.⟦f:launcher⟧ On a principal act recorded at that time:
   through the harness's own input, only principal-typed text, a fixed template
   that references ids⟦f:endorsement⟧⟦f:conversation⟧, or a post a principal endorsed exactly as shown inside
@@ -52,7 +52,7 @@ security review and a new major version, not a bug fix.
   pins that principal wrote from device seats one of its device keys certified⟦f:principal-keys⟧,
   within that key's device scope,⟦/f⟧ then restore to those agents⟦f:conversation⟧, and its posts
   so written reach them inside the fixed
-  template of OWN-29⟦/f⟧. Cairn applies such grants and never grants trust itself.⟦/f⟧
+  template of OWN-29⟦/f⟧. ParleyInn applies such grants and never grants trust itself.⟦/f⟧
   No other write to an agent exists.
 - **I3 — Constraints are never summarized.** Every pin that restores is stored
   verbatim and restored verbatim after every compaction, or named by id and
@@ -78,8 +78,8 @@ security review and a new major version, not a bug fix.
   turned on and while managed policy disables it; what it brings in is trusted
   only as I2 allows.⟦/f⟧ No
   component sends telemetry or depends on a central or third-party service.
-  Cairn's components send data off the machine only as recalled content an agent
-  receives through a tool call, or as what Cairn writes to an agent through I2's
+  ParleyInn's components send data off the machine only as recalled content an agent
+  receives through a tool call, or as what ParleyInn writes to an agent through I2's
   closed paths, both of which the harness sends to its model⟦f:peer-sync⟧, or through
   the peer component⟦/f⟧⟦f:git-carrier⟧, or through the publish component⟦/f⟧⟦f:bridges⟧, or
   through the bridge component⟦/f⟧.
@@ -90,12 +90,12 @@ security review and a new major version, not a bug fix.
   node only as a quarantine request that node's principal applies.⟦/f⟧
 - **I6 — No silent failures.** Every dropped, rejected, redacted, timed-out,
   or failed operation is counted, logged, and visible to the node's principal.
-- **I7 — Harness configuration changes only on explicit instruction.** Cairn
+- **I7 — Harness configuration changes only on explicit instruction.** ParleyInn
   changes harness configuration only through explicit install and uninstall
   operations, shows the change first, and never overrides managed policy or the
   harness's managed settings.
 - **I8 — Isolation follows the principal.** All local state is bound to one
-  principal's home with strict permissions, and Cairn refuses to operate on a
+  principal's home with strict permissions, and ParleyInn refuses to operate on a
   home that does not belong to the OS user running it. Content another principal
   wrote, or another node wrote other than what a predecessor of this node's own
   device seats, however far back, wrote⟦f:principal-keys⟧, this principal's acts signed by a
@@ -103,8 +103,8 @@ security review and a new major version, not a bug fix.
   a key certified⟦/f⟧, is kept as theirs: attributed to its seat key, and untrusted⟦f:stamps⟧
   unless this principal's own stamp⟦f:trust-grants⟧ or trust grant⟦/f⟧ covers it⟦/f⟧. On its own it
   never makes this principal's agents trust it, nor extends their recall.
-- **I9 — Cairn never degrades the agent.** A Cairn failure never blocks or
-  slows the agent beyond defined budgets. Cairn fails open, except where
+- **I9 — ParleyInn never degrades the agent.** A ParleyInn failure never blocks or
+  slows the agent beyond defined budgets. ParleyInn fails open, except where
   continuing would violate I2, I4, or I8.
 - **I10 — Everything derived is rebuildable.** All derived artifacts (indexes⟦f:landmarks⟧,
   landmarks⟦/f⟧, active pins, quarantine set, room state, trust levels, run and

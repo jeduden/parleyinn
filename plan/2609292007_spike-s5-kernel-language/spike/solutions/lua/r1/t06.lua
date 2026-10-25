@@ -1,5 +1,5 @@
 local counts = {}
-for _, e in ipairs(cairn.events()) do
+for _, e in ipairs(parinn.events()) do
   if e.kind == "tool_call" and e.tool ~= nil then
     counts[e.tool] = (counts[e.tool] or 0) + 1
   end

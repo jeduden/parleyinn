@@ -161,7 +161,7 @@
    {
     "type": "undefined",
     "quote": "own entry point, which the person, a service manager or an ephemeral node's",
-    "problem": "\"Ephemeral node\" is used as if it were a Cairn concept. Node covers a machine, container or cloud environment, but nothing defines \"ephemeral\", so a reader cannot tell which nodes start a component's entry point this way.",
+    "problem": "\"Ephemeral node\" is used as if it were a ParleyInn concept. Node covers a machine, container or cloud environment, but nothing defines \"ephemeral\", so a reader cannot tell which nodes start a component's entry point this way.",
     "fix": "Replace \"an ephemeral node's entrypoint\" with \"a container's entrypoint\", or define ephemeral node under Node.",
     "severity": "minor"
    },
@@ -259,7 +259,7 @@
    {
     "type": "security",
     "quote": "or through a B2 component the node's principal turned on; whatever such a component brings",
-    "problem": "I4 lets Cairn components send data off the machine only as recalled content, I2 closed-path writes, or through a B2 component. The bridge component (forge, CI and notification bridges) makes outbound requests and sends a notification (petname or id, queue class, count) to a service the principal names, which I4 does not permit.",
+    "problem": "I4 lets ParleyInn components send data off the machine only as recalled content, I2 closed-path writes, or through a B2 component. The bridge component (forge, CI and notification bridges) makes outbound requests and sends a notification (petname or id, queue class, count) to a service the principal names, which I4 does not permit.",
     "fix": "Add the B3 component to this egress sentence (\"or through a B2 or B3 component the node's principal turned on\") and state that whatever a B3 component brings in is trusted only as I2 allows.",
     "severity": "needs-fix"
    },

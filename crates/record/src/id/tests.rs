@@ -10,15 +10,15 @@ fn ids_derive_from_keys_under_their_own_labels() {
 
     assert_eq!(
         writer.digest(),
-        &Digest::of(&[b"cairn writer id v1\0", &KEY])
+        &Digest::of(&[b"parinn writer id v1\0", &KEY])
     );
     assert_eq!(
         room.digest(),
-        &Digest::of(&[b"cairn room id v1\0", &KEY, &[1; 16]])
+        &Digest::of(&[b"parinn room id v1\0", &KEY, &[1; 16]])
     );
     assert_eq!(
         seat.digest(),
-        &Digest::of(&[b"cairn seat id v1\0", room.digest().as_bytes(), &KEY])
+        &Digest::of(&[b"parinn seat id v1\0", room.digest().as_bytes(), &KEY])
     );
     assert_ne!(writer.digest(), seat.digest());
     assert_ne!(RoomId::derive(&KEY, &[2; 16]), room);
@@ -71,7 +71,7 @@ fn an_address_shows_in_its_ascii_and_full_forms() {
     assert_eq!(address.to_string(), format!("{writer}:48213"));
     assert_eq!(
         address.full(&room),
-        format!("cairn:room/{room}/w/{writer}/48213")
+        format!("parinn:room/{room}/w/{writer}/48213")
     );
 }
 
@@ -99,11 +99,11 @@ fn a_malformed_address_is_refused_naming_the_forms() {
         format!("{writer}:x"),
         format!("{writer}:9007199254740992"),
         "short:1".to_owned(),
-        format!("cairn:room/{room}/w/{writer}"),
-        format!("cairn:room/{room}/x/{writer}/1"),
-        format!("cairn:room/zz/w/{writer}/1"),
-        format!("cairn:room/{room}/w/zz/1"),
-        format!("cairn:room/{room}/w/{writer}/0"),
+        format!("parinn:room/{room}/w/{writer}"),
+        format!("parinn:room/{room}/x/{writer}/1"),
+        format!("parinn:room/zz/w/{writer}/1"),
+        format!("parinn:room/{room}/w/zz/1"),
+        format!("parinn:room/{room}/w/{writer}/0"),
     ] {
         assert_eq!(Address::parse(&bad), Err(AddressError::new(&bad)), "{bad}");
     }
@@ -115,7 +115,7 @@ fn an_address_error_names_the_input_shortened_and_the_forms() {
 
     assert_eq!(
         AddressError::new("a:b").to_string(),
-        "not an address: \"a:b\"; want <writer id>:<seq> or cairn:room/<room id>/w/<writer id>/<seq>"
+        "not an address: \"a:b\"; want <writer id>:<seq> or parinn:room/<room id>/w/<writer id>/<seq>"
     );
     assert!(
         AddressError::new(&long)

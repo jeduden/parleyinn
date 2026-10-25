@@ -131,18 +131,18 @@ fn is_isolated_wants_the_marked_home_under_the_temporary_directory() {
     let temp = Path::new("/tmp");
     let os = |s: &'static str| Some(OsStr::new(s));
 
-    assert!(is_isolated(os("/tmp/cairn-1"), os("/tmp/cairn-1"), temp));
+    assert!(is_isolated(os("/tmp/parinn-1"), os("/tmp/parinn-1"), temp));
     assert!(
         !is_isolated(os("/home/me"), os("/home/me"), temp),
         "an exported marker cannot isolate a real home"
     );
-    assert!(!is_isolated(os("/tmp/cairn-1"), os("/tmp/cairn-2"), temp));
-    assert!(!is_isolated(os("/tmp/cairn-1"), None, temp));
-    assert!(!is_isolated(None, os("/tmp/cairn-1"), temp));
+    assert!(!is_isolated(os("/tmp/parinn-1"), os("/tmp/parinn-2"), temp));
+    assert!(!is_isolated(os("/tmp/parinn-1"), None, temp));
+    assert!(!is_isolated(None, os("/tmp/parinn-1"), temp));
 }
 
 #[test]
-fn isolate_points_home_cairn_home_and_the_marker_at_the_home() {
+fn isolate_points_home_parinn_home_and_the_marker_at_the_home() {
     let mut command = Command::new("x");
 
     isolate(&mut command, Path::new("/tmp/h"));
@@ -159,9 +159,9 @@ fn isolate_points_home_cairn_home_and_the_marker_at_the_home() {
     assert_eq!(
         envs,
         [
-            ("CAIRN_BDD_HOME".to_owned(), "/tmp/h".to_owned()),
-            ("CAIRN_HOME".to_owned(), "/tmp/h/.cairn".to_owned()),
             ("HOME".to_owned(), "/tmp/h".to_owned()),
+            ("PARINN_BDD_HOME".to_owned(), "/tmp/h".to_owned()),
+            ("PARINN_HOME".to_owned(), "/tmp/h/.parinn".to_owned()),
         ]
     );
 }

@@ -7,7 +7,7 @@ NIP-34 three times). The "where" and "lesson" fields are cut short in the
 file, so some claims below rest on the first few hundred characters of an
 entry. Weak entries are marked *(weak)*.
 
-## 1. Top 15 ideas, ranked by how much they would change Cairn's design
+## 1. Top 15 ideas, ranked by how much they would change ParleyInn's design
 
 1. **Git holds the pointer, not the live record.** Every big vendor that owns
    both git and an agent keeps transcripts out of git. In git they leave only
@@ -122,7 +122,7 @@ entry. Weak entries are marked *(weak)*.
     NIP-34 (<https://github.com/nostr-protocol/nips/blob/master/34.md>).
 15. **Compaction is an event: the record stays lossless and only the view
     shrinks.** Record compaction as its own event type, and apply limits only
-    on the read path. That matches Cairn's restore-after-compaction job.
+    on the read path. That matches ParleyInn's restore-after-compaction job.
     Shown by: Cloudflare Agents SDK (<https://developers.cloudflare.com/agents/api-reference/agents-api/>),
     GitLab DAP (<https://docs.gitlab.com/user/duo_>agent_platform/sessions/),
     OpenHands (<https://docs.openhands.dev/sdk/guides/convo-persistence.md>).
@@ -142,7 +142,7 @@ entry. Weak entries are marked *(weak)*.
   access can rewrite or delete another writer's ref. agentdiff notes that
   custom refs escape branch protection. Code.Storage and Tangled sell exactly
   the server-side rules GitHub lacks. A forge can also fork a log without
-  anyone noticing (gittuf). Cairn therefore needs signed checkpoints and some
+  anyone noticing (gittuf). ParleyInn therefore needs signed checkpoints and some
   out-of-band witness, not just per-writer refs.
 - **Whatever reaches a forge stays there.** whogitit's "retention delete"
   leaves every deleted prompt in the notes history on every remote. Raw
@@ -153,7 +153,7 @@ entry. Weak entries are marked *(weak)*.
   add` calls, all exited 0 and only 2–5 notes survived. A wildcard push sent
   memento's private transcripts to the remote.
 - **`git gc` breaks code anchors.** A tree hash written into the record
-  dangles after `gc --prune` unless Cairn pins it (OpenCode, Kilo).
+  dangles after `gc --prune` unless ParleyInn pins it (OpenCode, Kilo).
 - **Segment size needs a cap.** One 512 MB `events.jsonl` bricked a Copilot
   session. Syncestra's 2.6 GB mirror caused an out-of-memory kill. Roo's
   checkpoints grew from 40 GB into terabytes.

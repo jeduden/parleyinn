@@ -15,7 +15,7 @@ ie(ALL_SPEC + [HUB, WHOLE], "How you review (new first line)",
    "The hub template's step 4 says 'search the whole repository'; this round was scoped to the SRS and scenarios.",
    ["hub"])
 ie(ALL_SPEC + [HUB, WHOLE], "How you review (skip list)",
-   "Add: 'Skip what the hub's section on terms that are not Cairn concepts exempts: historical records, the SRS change log and the Status row in docs/srs/index.md included, and files an outside tool writes and maintains.'",
+   "Add: 'Skip what the hub's section on terms that are not ParleyInn concepts exempts: historical records, the SRS change log and the Status row in docs/srs/index.md included, and files an outside tool writes and maintains.'",
    "The whole-model reviewer searched docs/srs/index.md's change log, which the hub already treats as a historical record.",
    ["whole", "hub"])
 ie(ALL_SPEC + [HUB, WHOLE], "How you review (words that coincide with the model's)",
@@ -35,8 +35,8 @@ ie(ALL_SPEC, "How you review, step 6",
    "harness-facts reported the LANE-28 trace to I7 (C12) and PIN-07's wrong assumption gate (C11) without knowing they were in scope.",
    ["harness-facts", "principals-and-agents"])
 ie(ALL_SPEC, "How you review (scenarios)",
-   "Add: 'A scenario that leaves out a precondition one of your concepts decides is needs-fix. Drift between a requirement and its scenario about one of your concepts is in scope even when no word is wrong, and so is a @pending scenario that skips a clause about one. For a scenario without @pending, name its step binding in cmd/cairn/bdd_<section>_test.go and any drift case under internal/drift that quotes it; the fix changes them in the same commit.'",
-   "Role defaults omitted in two scenarios (C03); ENG-29 vs its scenario (C99); ENG-01 is bound at cmd/cairn/bdd_engineering_test.go:40 (C66).",
+   "Add: 'A scenario that leaves out a precondition one of your concepts decides is needs-fix. Drift between a requirement and its scenario about one of your concepts is in scope even when no word is wrong, and so is a @pending scenario that skips a clause about one. For a scenario without @pending, name its step binding in cmd/parinn/bdd_<section>_test.go and any drift case under internal/drift that quotes it; the fix changes them in the same commit.'",
+   "Role defaults omitted in two scenarios (C03); ENG-29 vs its scenario (C99); ENG-01 is bound at cmd/parinn/bdd_engineering_test.go:40 (C66).",
    ["pins-and-context", "acts-and-roles", "places", "trust-and-flow"])
 ie(ALL_SPEC, "How you review (unused concepts)",
    "Add: 'A concept your file defines that no requirement or scenario uses, or that the SRS names in other words, is a question: the SRS takes the model's name, or the concept goes.'",
@@ -55,7 +55,7 @@ ie(ALL_SPEC + [HUB], "How you report (finding fields)",
    "components-and-surfaces split one repeat into three findings; principals-and-agents packed several paths into `file`.",
    ["components-and-surfaces", "principals-and-agents"])
 ie(ALL_SPEC, "How you review, step 3",
-   "Add after 'any word the hub excludes in its favour': 'that is, each row of the hub's table of terms that are not Cairn concepts whose replacement your file defines.'",
+   "Add after 'any word the hub excludes in its favour': 'that is, each row of the hub's table of terms that are not ParleyInn concepts whose replacement your file defines.'",
    "acts-and-roles could not tell which excluded terms point to its file. Optional companion edit to the hub (docs/domain-model/index.md, a model edit the domain-model agent reviews; no new concept): a 'Defined in' column. Mapping found this round — acts-and-roles: operator as a role, owner act, read only; components-and-surfaces: run component, trusted boundary ('boundary'), Needs you as a status, hide; git-and-forge: project, attempt, own run and witness run, judge, approval gate; harness-facts: session; pins-and-context: claim of work, unqualified token (model token); places: lane, room board, project; principals-and-agents: tenant, bound human, bot, co-author, actor, poster, child agent, participant and player (member), operator as a person, session (run); record: import of a transcript or a peer's segments, imported run, work marker, operator (provenance class); seats-and-keys: writer key, writer certificate, service-account seat, owner key, participant and player (seat), unqualified token (access token); trust-and-flow: owner surface, trusted boundary, away mode, room alias, presence check, Needs you as a run status (Asking).",
    ["acts-and-roles"])
 
@@ -72,7 +72,7 @@ WTS = {
                "Peer, blind peer, sync and ephemeral node are defined against PEER rows; Foreign room and Personal room are used in lane-view and pins scenarios.", ["places"]),
     "harness-facts": ("SRS: add docs/srs/09-interfaces.md, docs/srs/13-open-questions-and-risks.md, docs/srs/appendix-b-invariant-coverage.md.",
                       "Derived from where this round's findings landed: §9.1's hook table, OQ-02 and the spikes, and the traces of C12.", ["harness-facts"]),
-    "pins-and-context": ("SRS: add docs/srs/09-interfaces.md, docs/srs/08-data-and-storage.md, docs/srs/05d-peer-requirements.md. Code: the step bindings in cmd/cairn/bdd_*_test.go.",
+    "pins-and-context": ("SRS: add docs/srs/09-interfaces.md, docs/srs/08-data-and-storage.md, docs/srs/05d-peer-requirements.md. Code: the step bindings in cmd/parinn/bdd_*_test.go.",
                          "Derived from this round: room_post and room_summary_* (§9.2, §9.6), §8.4, PEER-06, and the ENG-01 binding.", ["pins-and-context"]),
     "components-and-surfaces": ("SRS: add docs/srs/02-context.md, docs/srs/04-reference-architecture.md, docs/srs/09a-command-line-interface.md, docs/srs/12-delivery-plan.md.",
                                 "Derived from where this round's findings landed (CON-03, §4.2, §9.5, §12).", ["components-and-surfaces"]),
@@ -86,7 +86,7 @@ for s, (txt, why, src) in WTS.items():
 
 ie([".claude/agents/domain-model-components-and-surfaces.md", HUB], "How you report (who owns a meaning)",
    "Add: 'The concept file that defines a concept owns its meaning; the hub owns only the form of names. Where the hub's naming section uses a concept's word in another sense, report it to the hub specialist as other-specialist.'",
-   "The hub's Names section counts `ui` and `launch` among CLI commands while components-and-surfaces.md's Core excludes `cairn ui` from the CLI (C05).",
+   "The hub's Names section counts `ui` and `launch` among CLI commands while components-and-surfaces.md's Core excludes `parinn ui` from the CLI (C05).",
    ["components-and-surfaces"])
 ie([".claude/agents/domain-model-harness-facts.md"], "How you review (an outside program's words)",
    "Add: 'An outside program's own identifiers keep their names under the hub's rule on outside things. A word of an outside program written as prose that a requirement relies on normatively needs a model entry or a rewording: report it as a question.'",

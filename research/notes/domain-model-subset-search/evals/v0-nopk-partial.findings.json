@@ -101,7 +101,7 @@
  {
   "type": "security",
   "quote": "the browser room view under SEC-20, the CLI or TUI at a terminal, or a paired",
-  "problem": "The only thing that makes the CLI a principal surface is \"at a terminal\". An agent runs as the same OS user and can run `cairn` under a pseudo-terminal. It can then take widening principal acts (stamp its own pin, endorse a post to itself, loosen a rule level, turn capture off) and read record text with no envelope and no recall event. Nothing says a command a run issues is never a principal surface.",
+  "problem": "The only thing that makes the CLI a principal surface is \"at a terminal\". An agent runs as the same OS user and can run `parinn` under a pseudo-terminal. It can then take widening principal acts (stamp its own pin, endorse a post to itself, loosen a rule level, turn capture off) and read record text with no envelope and no recall event. Nothing says a command a run issues is never a principal surface.",
   "fix": "the CLI or TUI at a terminal that no run started (a command any run's process issues is that agent's own tool call, acting as its run seat, never a principal surface, whatever its terminal), or a paired",
   "severity": "needs-fix",
   "lens": "security",

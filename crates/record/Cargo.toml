@@ -14,8 +14,8 @@ sha2.workspace = true
 [lints]
 workspace = true
 
-# ENG-02: see crates/cairn/Cargo.toml.
-[package.metadata.cairn]
+# ENG-02: see crates/parinn/Cargo.toml.
+[package.metadata.parinn]
 responsibility = "Defines the record's laws: the canonical encoding, addresses, event headers, commitments and hash chains"
 may-depend-on = []
 may-dev-depend-on = []

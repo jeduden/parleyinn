@@ -3,9 +3,9 @@ id: ADR-2610042341
 title: "The app shell: Tauri 2 on five platforms, the same page in the browser"
 status: accepted
 summary: >-
-  Cairn's app is a Tauri 2 shell on Linux, Windows, macOS, iOS and
+  ParleyInn's app is a Tauri 2 shell on Linux, Windows, macOS, iOS and
   Android around one web page, and the same page serves the browser
-  when Cairn is hosted. It answers OQ-32's UI and packaging half;
+  when ParleyInn is hosted. It answers OQ-32's UI and packaging half;
   ADR-2610050528 answers the language. The stakeholder accepted it on
   14 October 2026.
 ---
@@ -13,9 +13,10 @@ summary: >-
 
 ## Context
 
-The stakeholder's target for Cairn is the same experience on Linux,
-Windows, macOS, iOS and Android, "start Cairn, then you see your
-stuff", plus a browser when Cairn is hosted as a web service. OQ-32 in
+The stakeholder's target for ParleyInn is the same experience on Linux,
+Windows, macOS, iOS and Android: "start ParleyInn, then you see your
+stuff". It also wants a browser when ParleyInn is hosted as a web service.
+OQ-32 in
 [§13](../srs/13-open-questions-and-risks.md) asks which language,
 runtime and storage fit the complete SRS; the shell that draws the UI
 is half of that question.
@@ -29,16 +30,16 @@ browser unchanged. A UI the core draws needs a second UI there.
 
 ## Decision
 
-- **Tauri 2 is the app shell** on all five platforms. Starting Cairn
+- **Tauri 2 is the app shell** on all five platforms. Starting ParleyInn
   opens it; on a desktop the app carries the static core executable
   that hooks and the MCP server run as (common ground item 1 of the
   options). The app shell, the app and the hosted browser surface
-  name packaging under OQ-32, not new concepts: how Cairn's
+  name packaging under OQ-32, not new concepts: how ParleyInn's
   components ship. The app shell and the app change no boundary
   (§6.3); the hosted browser surface needs its own row (below).
 - **The UI is one web page**, written once. In the app it reaches its
   backend through Tauri's IPC; in a browser the same page is served by
-  Cairn's own server and makes the same calls over HTTP and a
+  ParleyInn's own server and makes the same calls over HTTP and a
   WebSocket, behind one interface.
 - **Presentations open in a second webview** on their own origin,
   with no bridge into the core: an HTML report, a test page. A dev
@@ -56,13 +57,13 @@ browser unchanged. A UI the core draws needs a second UI there.
 - **Electron, with Capacitor on phones.** One Chromium on every
   desktop, but no phones, a Node.js runtime in the trusted path against
   CON-03 and HC-3, about 120 to 160 MB per desktop download, and a
-  Chromium release train Cairn would have to ship; WebKit stays a test
+  Chromium release train ParleyInn would have to ship; WebKit stays a test
   target through iOS anyway.
 - **A UI the core draws on the GPU** (options H and I: Zig, or Rust
   with Xilem on Vello), in Ghostty's shape. Cleaner licences, no HTML
   parsing of agent text and no webview frame, but the browser needs a
   second UI, Xilem's phones are "not yet generally usable", and
-  screen readers, IME and rich text become Cairn's work.
+  screen readers, IME and rich text become ParleyInn's work.
 - **Flutter** (option G). Stable on five platforms, but its terminal,
   diff and Linux webview are weak for the room's panes, and the browser
   build is a canvas.
@@ -86,14 +87,14 @@ browser unchanged. A UI the core draws needs a second UI there.
   needs widening, or `dirs` replacing. WebKitGTK on Linux is LGPL-2.1,
   loaded dynamically.
 - **Calls home (I4).** WebView2 and Android's WebView send vendor
-  diagnostics by default; the stakeholder rules on each, and Cairn
+  diagnostics by default; the stakeholder rules on each, and ParleyInn
   turns off what it can.
 - **Engines.** The page runs on WebKit (macOS, iOS), Chromium (Windows,
   Android) and WebKitGTK (Linux), so the test matrix covers all three.
   WebKitGTK's GPU problems on Linux are a known risk; Tauri 3's bundled
   Chromium runtime, in alpha, is the way out when it is stable.
 - **Phones.** Tauri's mobile support is "not on par" with desktop;
-  Cairn writes its own key plugin in Swift and Kotlin, and the iPhone's
+  ParleyInn writes its own key plugin in Swift and Kotlin, and the iPhone's
   hardware keys are P-256, not Ed25519.
 - **Accessibility, IME and copy** come from each webview and the
   browser.

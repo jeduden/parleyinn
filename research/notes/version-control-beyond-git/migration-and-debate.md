@@ -68,7 +68,7 @@ Every serious 2025–2026 entrant keeps git somewhere in the stack: as the stora
 - The dominant 2025–2026 pattern is "new model on top, git underneath or alongside": nobody with real users has removed git from the host/CI boundary. The deepest replacements (ERSC, GitLab) replace git's storage while keeping its wire protocol, because the protocol is what hosts, CI and editors depend on.
 - Side-by-side stores that ride git refs (Entire's orphan branch, git-ai's notes) inherit git's weakest properties for an audit record: refs and notes are mutable and force-pushable, squash merges break trailer links, and access control is all-or-nothing per repo. For a security-first append-only record, git is a poor primary store but a workable *mirror/carrier*.
 - Git notes (git-ai) survive rewrites better than trailers (Entire) only because git-ai actively rebuilds them; neither is tamper-evident.
-- The GitSpawn finding suggests that a tool which shells out to git, or which reads repos it did not create, takes on git's config-execution surface. That is relevant to any Cairn design that calls the `git` binary (and Cairn's I4 already forbids `os/exec`).
+- The GitSpawn finding suggests that a tool which shells out to git, or which reads repos it did not create, takes on git's config-execution surface. That is relevant to any ParleyInn design that calls the `git` binary (and ParleyInn's I4 already forbids `os/exec`).
 
 ### Gaps
 
@@ -137,7 +137,7 @@ The "git is unfit" camp (Zed, Entire, GitButler, GitLab, ERSC, Amplify, Oak, Div
 
 ### Inferences
 
-- The debate splits along a seam: almost no one argues git's *object model and wire protocol* must die; the argument is that git's *unit of record* (the commit snapshot) misses the agent session, and its *operational model* (full clones, refs as the only namespace) does not scale. That seam is exactly where Cairn sits: the session record is the missing artifact, and it need not live in git.
+- The debate splits along a seam: almost no one argues git's *object model and wire protocol* must die; the argument is that git's *unit of record* (the commit snapshot) misses the agent session, and its *operational model* (full clones, refs as the only namespace) does not scale. That seam is exactly where ParleyInn sits: the session record is the missing artifact, and it need not live in git.
 - The training-data counter-argument is strongest for the agent's *command surface*, and weak for a passive record the agent never has to drive. It argues for keeping git as the agent-facing interface while moving the record elsewhere.
 
 ### Gaps
@@ -194,7 +194,7 @@ The sources converge on five points. (1) Keep git compatibility at the edge: hos
 
 ### Inferences
 
-- For Cairn, the evidence argues for decoupling rather than a wholesale move. Keep version control of *code* on git, or on a git-backed layer like jj, for host/CI/model compatibility; the Gradle and Oak cases show the cost of leaving. Move the *session record* to a dedicated append-only store with tamper evidence (a tlog-tiles-style Merkle log with signed checkpoints, as Anthropic's own access log does). Bind it to code through stable identifiers (commit hash plus `change-id`) instead of trailers, which squash merges drop.
+- For ParleyInn, the evidence argues for decoupling rather than a wholesale move. Keep version control of *code* on git, or on a git-backed layer like jj, for host/CI/model compatibility; the Gradle and Oak cases show the cost of leaving. Move the *session record* to a dedicated append-only store with tamper evidence (a tlog-tiles-style Merkle log with signed checkpoints, as Anthropic's own access log does). Bind it to code through stable identifiers (commit hash plus `change-id`) instead of trailers, which squash merges drop.
 - Git refs or notes can then serve as an optional, export-only *carrier* (for example, Agent Trace or ATIF records projected into notes) without making git the system of record. This keeps I10-style rebuildability: the git projection is derived from the log.
 - A git-ref-based record (Entire style) conflicts with security-first goals in three documented ways: no per-reader access control, unbounded growth with no retention, and mutable refs. A separate store sidesteps all three. It also avoids GitSpawn-class exposure from invoking git on untrusted repos.
 - Standards to emit, not to adopt as storage: ATIF for session export (it has the broadest agent coverage) and Agent Trace for code attribution. Watch NIP-34/Buzz for signed agent-identity conventions.

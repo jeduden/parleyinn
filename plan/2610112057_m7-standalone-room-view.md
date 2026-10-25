@@ -54,7 +54,11 @@ Scope, by requirement family:
 ## Acceptance Criteria
 
 - [ ] §12.2's M7 exit criteria hold, the recorded-weekend fixture
-  through the CLI alone included
+  through the CLI alone included: for each room with activity since the
+  starting point, Catch up shows changes,
+  pending decisions and a next principal action or that none is needed, with
+  exact source addresses and visible capture and sync gaps; Needs you opens
+  each item in its room with evidence and no pre-filled verdict
 - [ ] Every scenario in scope is off @pending and passes
 - [ ] The two-week pilot with the room view in daily use is clean and
   the stakeholder signs off

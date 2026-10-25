@@ -1,12 +1,12 @@
-# Cairn pitch under review
+# ParleyInn pitch under review
 
-Cairn is the live pull request for the agent era. Each lane of work is
+ParleyInn is the live pull request for the agent era. Each lane of work is
 a branch with its worktree, its agents and its humans, held as one
 record. That record holds the conversation, every edit, every tool run
 and every result, in the order they happened, so code and talk can
 never drift apart.
 
-A PR today is a frozen diff with comments bolted on. A Cairn lane is
+A PR today is a frozen diff with comments bolted on. A ParleyInn lane is
 live:
 
 - Chat: people talk with the agents working on the branch, in the branch.
@@ -26,6 +26,6 @@ untrusted, and nothing stored is injected without being asked for. The
 core that feeds the model never touches the network. The lane's record
 is tamper-evident, and sensitive content can be erased by key.
 
-One line: Git keeps the code; Cairn keeps the lane: a live, multiplayer
+One line: Git keeps the code; ParleyInn keeps the lane: a live, multiplayer
 PR where agents and humans work in real time and the record never
 drifts from the code.

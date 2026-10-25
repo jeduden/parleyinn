@@ -6,10 +6,11 @@ summary: >-
 ---
 # Git and forge
 
-- **Repository**: A git repository, identified by its **repository identity**, a
-  bound root commit, the same on every node with a git clone, else a
-  provisional node-local identity bound later (LANE-02). It has remotes and may
-  carry room trailers in its commits and bundles as git refs.
+- **Repository**: A git repository, identified by its **repository identity**,
+  a bound parentless commit of its default branch, the same on every node with
+  a git clone, else a provisional node-local identity bound later by a
+  structural event that names the identity it replaces (LANE-02). It has
+  remotes and may carry room trailers in its commits and bundles as git refs.
 - **Branch**: A git branch, identified by repository identity, remote URL and
   branch name (LANE-01). It belongs to the first of this node's principal's
   rooms whose branch link names it, concurrent links resolving by Room merge
@@ -22,10 +23,50 @@ summary: >-
 - **Commit**: A git commit.
 - **Commit author**: Git's author of a commit, never a seat.
 - **Worktree**: A git working tree on a node, where a run edits a branch; its
-  repository's **git directory** is git's own store of objects and refs.
-- **Forge**: The service that keeps remotes, pull requests, reviews and branch
-  protection, and approves and lands; its **forge reports** count as `asserted`
-  (LANE-08).
+  repository's **git directory** is git's own store of objects and refs. Its
+  repository identity is recorded by a structural event that names it by a keyed
+  digest of its root path, so a node rebuilds which identity each worktree is
+  bound to from its writer logs (LANE-02).
+- **Forge**: The service that keeps remotes, issues, pull requests, reviews
+  and branch protection, and approves and lands; its **forge reports** count
+  as `asserted` (LANE-08). A **forge import grant** is the credential owner's
+  widening principal act authorizing one named room to receive observations
+  of one exact linked issue or branch. A branch is identified by repository
+  identity, remote URL and branch name; its grant includes the associated
+  pull request,
+  reviews, branch protection and checks for that branch. The principal sees
+  the target, room, forge account and current and future member scope before
+  granting it. The grant binds a nonsecret credential handle to that account,
+  target and room; the bridge resolves it to the exact credential it uses.
+  The room record contains no token or reusable secret-derived verifier.
+  A link or bridge enablement alone grants no disclosure. Only the issuing
+  credential owner may revoke the grant. A node stops imports when it records
+  or applies revocation; an observation recorded on a partitioned node before
+  it learns of revocation remains recoverable with a concurrent revocation
+  mark after sync. A **forge review item** is a review comment or
+  response on a linked pull request, recorded from the forge as an untrusted
+  `web` event with its forge, pull request, thread and item ids, asserted
+  author, location, time, body and revision. The room shows it in the
+  conversation as forge content, never as a post or an act by a room seat. A
+  later edit or deletion is another event; earlier versions remain in the
+  record, subject to redaction and purge.
+- **Forge issue**: The forge's issue object, independent of any room or branch.
+  An **issue link** connects a room to one forge issue by forge host,
+  repository and issue id; it neither creates an intent nor changes trust or
+  recall. A person may start from the issue by explicitly creating or choosing
+  a room and adding this link; the issue's text never sets the room's intent.
+  A **forge issue item** is a snapshot of the issue's title, body and
+  state or one of its comments, with its forge, repository, issue and item ids,
+  asserted author, time, body and revision. Under a grant, an importing member
+  node records it as an untrusted `web` event in its device seat's writer in
+  each authorized room. One issue linked to several rooms yields separate
+  events, never a copied event or a reference into another room. A node whose
+  principal has no member seat in a room cannot import there. Each room shows
+  its own items with its conversation by address, never as posts or acts by a
+  room seat. A later edit or deletion is another event; earlier versions
+  remain, subject to redaction and purge.
+- **Forge discussion item**: A forge review item or forge issue item,
+  retaining which kind it is and its forge attribution.
 - **Pull request**: The forge's review object for a branch.
 - **Check**: A command executed, or expected to execute because one of the
   intent's criteria names it (LANE-20), on a tree, with its exit status once it
@@ -56,12 +97,12 @@ summary: >-
 - **Proof class**: Of a landing link. Proven: `same commit`, `same patch`, `same
   tree`. Not proven: `likely`, `asserted`, and `not proven` with a reason
   (LANE-06).
-- **Room trailer**: The `Cairn-Room:` line Cairn adds to the message of each
-  commit on a room's branch, naming the room; each `Cairn-Link:` line is a
-  trailer link (LANE-28).
+- **Room trailer**: The `ParleyInn-Room:` line ParleyInn adds to the message of
+  each commit on a room's branch, naming the room; each `ParleyInn-Link:` line
+  is a trailer link (LANE-28).
 - **Qualified links**: Every link is named by what it connects: a branch link
   (room to branch), a pull-request link (branch to its pull request, derived by
-  Cairn from forge bridge events), a
+  ParleyInn from forge bridge events), an issue link (room to forge issue), a
   criterion link (result to criterion), a range link (post or pin to an address
   range), a parent link (subagent run to parent run), a delegation link
   (delegating run to the delegate's run, under a delegation grant), an invite

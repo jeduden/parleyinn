@@ -58,7 +58,7 @@ Lua 5.4, in a sandbox. These globals exist:
   `getmetatable`
 - the libraries `string`, `table`, `utf8`, and `math` without
   `math.random` and `math.randomseed`
-- `cairn.events()`: returns a new array of every event, each a table
+- `parinn.events()`: returns a new array of every event, each a table
   with the fields above, in writer then seq order
 - `json.decode(text)` and `json.encode(value)`; a JSON null decodes to
   nil

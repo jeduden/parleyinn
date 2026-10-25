@@ -15,12 +15,12 @@ summary: >-
 ## Context
 
 I10 said a rebuild reproduces every derived artifact "exactly", and
-ADM-08 had `cairn verify` confirm that a rebuild is byte-identical to the
+ADM-08 had `parinn verify` confirm that a rebuild is byte-identical to the
 state before it. PEER-03 asked two peers holding the same segments for
 byte-identical room state and index.
 
 Spike S12 is the gate of
-[plan 2610012322](../../plan/2610012322_cairn-for-agent-fleets/plan.md)'s
+[plan 2610012322](../../plan/2610012322_parinn-for-agent-fleets/plan.md)'s
 phase 1. It built two writers' record in SQLite with FTS5, as ADR-07
 and [ADR-2610110553](ADR-2610110553-sqlite-rusqlite.md) propose. From
 it, it derived the search index and room state in one file, the spike's
@@ -45,7 +45,7 @@ index file. Its [report][s12] found:
 The stakeholder chose, on 11 October 2026, to compare derived artifacts
 by content, and to narrow PEER-03 to what is the same on every node.
 
-[s12]: https://github.com/jeduden/cairn/pull/35
+[s12]: https://github.com/jeduden/parleyinn/pull/35
 [keri]: https://trustoverip.github.io/kswg-keri-specification/
 [ik]: ../../research/notes/identity-keys/identity-keys.md
 
@@ -64,10 +64,10 @@ With it, SRS 3.0-draft changes these requirements:
   can return, row by row in key order. Its schema and every stored
   setting that decides what a read returns, such as the search index's
   tokenizer and ranking configuration, are part of it.
-- **ADM-08.** `cairn verify` re-derives every derived artifact and
+- **ADM-08.** `parinn verify` re-derives every derived artifact and
   confirms it is identical in content, by its canonical digest. It also
   fails on the store's own integrity check, on a search index that
-  disagrees with the event text it indexes, on a schema object Cairn
+  disagrees with the event text it indexes, on a schema object ParleyInn
   does not ship, and while a setting the no-residue rule needs is off.
   No canonical digest, and no digest of any part of an artifact, is
   written to the audit log, a log, a receipt, a backup or an export, or
@@ -77,16 +77,16 @@ With it, SRS 3.0-draft changes these requirements:
   order.
 - **SEC-31.** However stored content is removed, by purge, retention,
   an applied erasure request or a backup restore that reapplies a
-  purge, no file Cairn or its storage engine writes may afterwards
+  purge, no file ParleyInn or its storage engine writes may afterwards
   contain the removed events' content, their commitment keys or a
   search index entry naming their addresses. No audit entry or log line
   carries event content. A purge that cannot reach that state in time
   does not report the range erased: it audits, counts and names each
   residue, stays pending and is retried outside every hook budget, and
-  `cairn doctor`, the Needs you queue and Catch up show it until a
+  `parinn doctor`, the Needs you queue and Catch up show it until a
   further purge receipt says it is gone. ADM-07's vacuum must reach
   that state.
-- **§8.1.** Every temporary file Cairn or its storage engine writes stays
+- **§8.1.** Every temporary file ParleyInn or its storage engine writes stays
   in memory or in the home, and, with encryption at rest on, in memory
   or encrypted.
 - **ENG-08.** Its property test compares canonical digests with a
@@ -160,8 +160,8 @@ the approved text, which in turn replaced
 [ADR-2610091555](ADR-2610091555-initial-invariants.md)'s.
 
 The stakeholder approved this record as security reviewer on 13 October
-2026 by a [comment on jeduden/cairn#39][approval], after
-ADR-2610112209 in the same comment, naming the record's id. The comment
+2026 by a [comment on jeduden/parleyinn#39][approval]. The comment
+listed ADR-2610112209 first and then named the record's id. It
 came at that pull request's head commit `de59777`, where invariants.md
 has the hash above, and on a later pull request than the one that adds
 this record. It names neither the hash nor the commit, so this record
@@ -169,7 +169,7 @@ binds the approval to both from the pull request's state at that time.
 
 Approval: [given][approval].
 
-[approval]: https://github.com/jeduden/cairn/pull/39#issuecomment-6149850310
+[approval]: https://github.com/jeduden/parleyinn/pull/39#issuecomment-6149850310
 
 ### Security analysis (author)
 

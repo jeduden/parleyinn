@@ -11,9 +11,14 @@ publish.workspace = true
 name = "protection-check"
 path = "src/main.rs"
 
+[[bin]]
+name = "license-check"
+path = "src/license_check_main.rs"
+
 [dependencies]
 adr.workspace = true
 benchmark.workspace = true
+calibrate.workspace = true
 drift.workspace = true
 review-gate.workspace = true
 scenario.workspace = true
@@ -26,8 +31,8 @@ testkit.workspace = true
 [lints]
 workspace = true
 
-# ENG-02: see crates/cairn/Cargo.toml.
-[package.metadata.cairn]
+# ENG-02: see crates/parinn/Cargo.toml.
+[package.metadata.parinn]
 responsibility = "Checks the repository against the requirements of SRS section 10 for the bound scenarios"
-may-depend-on = ["adr", "benchmark", "drift", "review-gate", "scenario", "srs"]
+may-depend-on = ["adr", "benchmark", "calibrate", "drift", "review-gate", "scenario", "srs"]
 may-dev-depend-on = ["testkit"]

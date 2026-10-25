@@ -1,0 +1,25 @@
+[package]
+name = "s12slice"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+# Spike S12, the proving slice of plan 2610012322 phase 1. It reuses
+# spike S2's corpus and its SQLite build (ADR-2610110553, proposed).
+[dependencies]
+rusqlite = { version = "=0.40.2", features = ["bundled"] }
+serde_json = "1.0.151"
+sha2 = "0.10"
+
+[profile.release]
+codegen-units = 1
+lto = "thin"
+
+# Standalone: kept out of the parinn workspace, so nothing here enters
+# parinn's module graph.
+[workspace]
+
+# The test runs SQLite and SHA-256 over megabytes; optimize the
+# dependencies in test builds too.
+[profile.dev.package."*"]
+opt-level = 2

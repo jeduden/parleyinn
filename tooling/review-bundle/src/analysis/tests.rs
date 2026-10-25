@@ -73,7 +73,7 @@ fn analyse_routes_by_the_paths_that_changed() {
         (vec!["features/notes.md"], Class::Standard),
         (vec![], Class::Standard),
         (
-            vec!["plan/x/plan.md", "crates/cairn/src/lib.rs"],
+            vec!["plan/x/plan.md", "crates/parinn/src/lib.rs"],
             Class::Standard,
         ),
         (vec!["features/record.feature"], Class::Standard),
@@ -126,7 +126,7 @@ fn analyse_reads_scenario_changes_and_mentions_into_the_touched_ids() {
     head.scenarios[1].steps.push("another".into());
     let diff = format!(
         "{}+see REC-01 and NFR-99\n",
-        header("crates/cairn/src/lib.rs")
+        header("crates/parinn/src/lib.rs")
     );
 
     let got = analyse(&base(), &head, &diff, false);
@@ -208,8 +208,8 @@ fn analyse_reads_an_unparsed_header_as_deep_and_names_it() {
 fn analyse_flags_each_file_that_lifts_a_ban() {
     let diff = format!(
         "+#[allow(clippy::disallowed_methods)] before any header\n{}+#[allow(clippy::disallowed_types)]\n+#![expect(clippy::disallowed_methods)]\n-#[allow(clippy::disallowed_types)]\n{}+ a line\n",
-        header("crates/cairn/src/a.rs"),
-        header("crates/cairn/src/b.rs")
+        header("crates/parinn/src/a.rs"),
+        header("crates/parinn/src/b.rs")
     );
 
     let got = analyse(&base(), &base(), &diff, false);
@@ -217,7 +217,7 @@ fn analyse_flags_each_file_that_lifts_a_ban() {
     assert_eq!(
         got.findings,
         [Finding {
-            path: "crates/cairn/src/a.rs".into(),
+            path: "crates/parinn/src/a.rs".into(),
             line: 0,
             severity: NIT,
             body: "lifts a reach or determinism ban: weigh its reason".into(),

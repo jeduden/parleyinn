@@ -31,4 +31,4 @@ scenario to what it checks: the release workflows sign, attest and
 verify every release they publish. `@ENG-20` is off `@pending` with
 that wording.
 
-[ruling]: https://github.com/jeduden/cairn/pull/44#issuecomment-6157262395
+[ruling]: https://github.com/jeduden/parleyinn/pull/44#issuecomment-6157262395

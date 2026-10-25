@@ -63,8 +63,8 @@
     {
      "type": "undefined",
      "file": "docs/domain-model/places.md",
-     "quote": "the node, by `cairn install`, the plugin or the managed install path, recorded",
-     "problem": "\"The plugin\" and \"the managed install path\" are used as Cairn install paths, which create the personal room and turn capture on, but are never defined. So it is unclear whether they are explicit install operations under I7, and whether removing them records capture off as Capture requires of `cairn uninstall`.",
+     "quote": "the node, by `parinn install`, the plugin or the managed install path, recorded",
+     "problem": "\"The plugin\" and \"the managed install path\" are used as ParleyInn install paths, which create the personal room and turn capture on, but are never defined. So it is unclear whether they are explicit install operations under I7, and whether removing them records capture off as Capture requires of `parinn uninstall`.",
      "fix": "Define both as install operations under I7, each showing its change first and each uninstall recording the capture-off act. Otherwise drop them.",
      "severity": "minor"
     }
@@ -93,7 +93,7 @@
      "type": "security",
      "file": "docs/domain-model/record.md",
      "quote": "or derived artifact from recall, restore blocks, landmark text (LMK-04 keeps",
-     "problem": "Quarantining an event does not take away the pin candidate built over it: either one Cairn detected from a quarantined `user` event, or an agent's quarantined pin-candidate event. The candidate can still be confirmed, and quarantined text then becomes a device-seat pin that restores, which undoes I5.",
+     "problem": "Quarantining an event does not take away the pin candidate built over it: either one ParleyInn detected from a quarantined `user` event, or an agent's quarantined pin-candidate event. The candidate can still be confirmed, and quarantined text then becomes a device-seat pin that restores, which undoes I5.",
      "fix": "…from recall, restore blocks, pin candidates (none over a quarantined event is offered for confirmation), landmark text (LMK-04 keeps…",
      "severity": "minor"
     },
@@ -101,8 +101,8 @@
      "type": "contradiction",
      "file": "docs/srs/invariants.md",
      "quote": "verbatim and restored verbatim after every compaction, or named by id and",
-     "problem": "I9 makes Cairn fail open except where I2, I4 or I8 would break, and I3 is not on that list. A restore that fails or runs out of time after compaction therefore leaves the agent without its constraints, and no rule restores them later, so I3 and I9 cannot both hold.",
-     "fix": "Append to I3: \"A restore that a Cairn failure prevents (I9) is counted (I6) and made at the run's next hook.\"",
+     "problem": "I9 makes ParleyInn fail open except where I2, I4 or I8 would break, and I3 is not on that list. A restore that fails or runs out of time after compaction therefore leaves the agent without its constraints, and no rule restores them later, so I3 and I9 cannot both hold.",
+     "fix": "Append to I3: \"A restore that a ParleyInn failure prevents (I9) is counted (I6) and made at the run's next hook.\"",
      "severity": "minor"
     },
     {
@@ -161,9 +161,9 @@
     {
      "type": "security",
      "file": "docs/domain-model/trust-and-flow.md",
-     "quote": "Health until acknowledged (`cairn counter ack`, I6, OPS-03)",
+     "quote": "Health until acknowledged (`parinn counter ack`, I6, OPS-03)",
      "problem": "I6 requires every dropped, rejected, redacted, timed-out or failed operation to be visible to the node's principal. Counter names Health as the only place a counter shows, and Health is a room-view surface dormant in M1 to M5, so in M1 to M5 quota crossings, hook-budget cuts, redactions and refusals are counted and logged but shown nowhere.",
-     "fix": "'shown on Health and by `cairn status` until acknowledged (`cairn counter ack`, I6, OPS-03).'",
+     "fix": "'shown on Health and by `parinn status` until acknowledged (`parinn counter ack`, I6, OPS-03).'",
      "severity": "needs-fix"
     },
     {
@@ -198,14 +198,14 @@
     "index": 0,
     "theme": "NEW-2",
     "kind": "new",
-    "reason": "No ledger theme covers the origin and trust of events a backup restore reinstates. DM-T covers a node clone, where pre-change events count as received. DM-O covers backup creation, not being a principal act. ADM-06 makes a restore a widening principal act that verifies the copy and its audit chain, and it starts new seats and writers. It says nothing about the origin of the reinstated events. They keep `witnessed` and count as this node's trusted `operator`, structural and `user` events. Seals are M7 (S-2), so the M1-M5 chain is unsigned and `cairn verify` cannot authenticate an edited copy."
+    "reason": "No ledger theme covers the origin and trust of events a backup restore reinstates. DM-T covers a node clone, where pre-change events count as received. DM-O covers backup creation, not being a principal act. ADM-06 makes a restore a widening principal act that verifies the copy and its audit chain, and it starts new seats and writers. It says nothing about the origin of the reinstated events. They keep `witnessed` and count as this node's trusted `operator`, structural and `user` events. Seals are M7 (S-2), so the M1-M5 chain is unsigned and `parinn verify` cannot authenticate an edited copy."
    },
    {
     "lens": "usefulness",
     "index": 0,
     "theme": "DM-CD",
     "kind": "closed",
-    "reason": "Same quote and same question as DM-CD: where a witnessed run's events go while no MCP server holds its run-seat key, deferred to OQ-43 (M1, spike S4). The SRS's OQ-43 interim rule already defines the gap the finding calls undefined. The hook handlers append nothing, leave an ingest marker, and count and audit the run until its events reach the record, by the MCP server or by `cairn ingest` (REC-22). Nothing is lost, so I1 holds. The finding proposes one of OQ-43's three listed options in place of the deferral, and a later finding of a closed theme does not reopen it."
+    "reason": "Same quote and same question as DM-CD: where a witnessed run's events go while no MCP server holds its run-seat key, deferred to OQ-43 (M1, spike S4). The SRS's OQ-43 interim rule already defines the gap the finding calls undefined. The hook handlers append nothing, leave an ingest marker, and count and audit the run until its events reach the record, by the MCP server or by `parinn ingest` (REC-22). Nothing is lost, so I1 holds. The finding proposes one of OQ-43's three listed options in place of the deferral, and a later finding of a closed theme does not reopen it."
    },
    {
     "lens": "usefulness",
@@ -226,7 +226,7 @@
     "index": 3,
     "theme": "NEW-3",
     "kind": "new",
-    "reason": "The Counter entry names only the Health surface, a room-view surface that is dormant in M1-M5. No ledger theme covers it: DM-O and DM-U concern what a quota does, not where counters are shown. It is the same defect as usefulness index 2, the person-facing displays resting on dormant room-view surfaces with the shipping CLI not named. The SRS already shows the counters in M1: ADM-11 and `cairn status`."
+    "reason": "The Counter entry names only the Health surface, a room-view surface that is dormant in M1-M5. No ledger theme covers it: DM-O and DM-U concern what a quota does, not where counters are shown. It is the same defect as usefulness index 2, the person-facing displays resting on dormant room-view surfaces with the shipping CLI not named. The SRS already shows the counters in M1: ADM-11 and `parinn status`."
    }
   ],
   "new_themes": [
@@ -243,7 +243,7 @@
    {
     "id": "NEW-3",
     "title": "In M1-M5 the model names only the dormant room view's surfaces (Room view, Health) as what shows a person the agents' work and the counters, and omits the shipping CLI verbs that do",
-    "settled_by": "Mostly settled by the SRS, which the model only needs to carry. ADM-11 (M1): `cairn status` MUST show store locations, sizes, schema version, deployment mode and non-zero failure counters. OPS-03 (M1): `cairn doctor` MUST exit non-zero while a failure counter has risen since `cairn counter ack`. §9.5 rows: `cairn status` shows 'Health, store locations and counters', `cairn event search|expand` and `cairn landmark list`. Stakeholder decision S-1, in §12.2, puts the room view and 'what did my agent do, answered from Catch up alone' in M7. The runs list and the Needs you queue (VIEW-04, VIEW-05) are M7 only."
+    "settled_by": "Mostly settled by the SRS, which the model only needs to carry. ADM-11 (M1): `parinn status` MUST show store locations, sizes, schema version, deployment mode and non-zero failure counters. OPS-03 (M1): `parinn doctor` MUST exit non-zero while a failure counter has risen since `parinn counter ack`. §9.5 rows: `parinn status` shows 'Health, store locations and counters', `parinn event search|expand` and `parinn landmark list`. Stakeholder decision S-1, in §12.2, puts the room view and 'what did my agent do, answered from Catch up alone' in M7. The runs list and the Needs you queue (VIEW-04, VIEW-05) are M7 only."
    }
   ]
  }

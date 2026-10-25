@@ -2,7 +2,7 @@ local counts = {}
 for i = 1, 6 do
   counts["r" .. i] = 0
 end
-for _, e in ipairs(cairn.events()) do
+for _, e in ipairs(parinn.events()) do
   if e.run ~= nil then
     if counts[e.run] == nil then
       counts[e.run] = 0

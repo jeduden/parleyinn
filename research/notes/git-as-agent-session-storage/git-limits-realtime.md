@@ -2,7 +2,7 @@
 
 Scope: whether git and git hosts (GitHub, Forgejo/Gitea) can hold millions of small
 append-only records (tens of GB over time), take frequent appends from many concurrent
-writers, and serve retrieval and near-real-time sharing for Cairn. Researched 2026-10-01.
+writers, and serve retrieval and near-real-time sharing for ParleyInn. Researched 2026-10-01.
 
 ## 1. Repository and object limits (GitHub, Forgejo/Gitea, very large repos)
 
@@ -65,7 +65,7 @@ GitHub stepping in when repos misuse git as a database.
 
 ### Inferences
 
-- A Cairn event stream at "millions of small messages, tens of GB" would cross GitHub's
+- A ParleyInn event stream at "millions of small messages, tens of GB" would cross GitHub's
   10 GB on-disk recommendation. It also leans on the costs that hurt Nixpkgs: object
   count, ref churn and server-side maintenance. Nothing hard-blocks it, but GitHub can and
   does intervene on repos that load its backend.
@@ -128,7 +128,7 @@ makes many refs much cheaper locally, but hosts still treat ref churn as a bottl
   fetch, rebase or merge, and retry. This is standard git semantics, not measured here.
   Append-only data never conflicts at the content level if each writer writes its own
   files, but retries still cost round trips and burn the 6-pushes/min budget.
-- Workable patterns: (a) one ref per writer or session, e.g. `refs/cairn/<machine>/<session>`,
+- Workable patterns: (a) one ref per writer or session, e.g. `refs/parinn/<machine>/<session>`,
   so pushes never contend; (b) batch events locally and push on session end or on a
   timer, never per event; (c) one repo per project or agent group to spread the per-repo
   push budget. Pattern (a) needs pruning or merging of old refs to stay under ~5,000 refs on
@@ -152,7 +152,7 @@ makes many refs much cheaper locally, but hosts still treat ref churn as a bottl
 Git has no query index. Content search over history (pickaxe, grep over revisions) walks
 and diffs every commit. Partial clones trade clone size against on-demand fetches that make
 history walks slow. That is why every package manager that used git as a database moved
-lookup to an indexed or HTTP layer. For Cairn, git could at most be a durable or
+lookup to an indexed or HTTP layer. For ParleyInn, git could at most be a durable or
 transport log, with a local index (such as SQLite FTS5) for recall.
 
 ### Cited Findings
@@ -176,10 +176,10 @@ transport log, with a local index (such as SQLite FTS5) for recall.
 
 - `git log -S/-G` and `git grep <pattern> $(git rev-list --all)` scale linearly with
   history size and need blobs present, which defeats blobless clones. For
-  millions of events this is far from the sub-second recall Cairn needs. This follows
+  millions of events this is far from the sub-second recall ParleyInn needs. This follows
   from how pickaxe works; no benchmark was found.
 - Natural split: git (if used) holds append-only segment files; each machine builds a
-  rebuildable local index (fits Cairn's I10: derived state rebuildable from the record).
+  rebuildable local index (fits ParleyInn's I10: derived state rebuildable from the record).
 
 ### Gaps
 
@@ -214,7 +214,7 @@ with git used, if at all, as the batched durable log.
 
 ### Inferences
 
-- Webhooks need an inbound HTTP endpoint, and receiving them conflicts with Cairn's I4
+- Webhooks need an inbound HTTP endpoint, and receiving them conflicts with ParleyInn's I4
   (no network). Even git push/fetch is network, so git transport would have to live
   outside the I4 core (e.g., the user's own git, invoked by the user, or a separate tool).
 - Rough budget: 6 pushes/min per repo, shared across all writers. With 20 agents on one
@@ -268,7 +268,7 @@ Append-only, content-addressed history is structurally at odds with erasure requ
 - Agent transcripts routinely contain tool output with tokens, env values, file contents
   and personal data. Committing them to a shared or public host risks (a) blocked pushes
   from push protection, which hurts I9 if the agent depends on them, and (b) permanent,
-  host-wide exposure that only Support can partly undo. That matters for Cairn's redaction
+  host-wide exposure that only Support can partly undo. That matters for ParleyInn's redaction
   (I6) and I2/I8 posture.
 - Encrypting segments before commit (as some git-based secret stores do) would sidestep
   push protection and public exposure, but erasure then depends on key destruction
@@ -308,18 +308,18 @@ default branches.
 
 ### Inferences
 
-- Cairn running in a cloud sandbox cannot assume push rights to arbitrary refs. A proxy
+- ParleyInn running in a cloud sandbox cannot assume push rights to arbitrary refs. A proxy
   like Claude Code's may allow only one branch, so a design with one custom ref per writer
-  (`refs/cairn/...`) may be rejected there. Cairn data riding on the session's own branch
+  (`refs/parinn/...`) may be rejected there. ParleyInn data riding on the session's own branch
   would mix session records into the code branch and PR, a privacy and noise problem.
-- Persisting Cairn state out of a sandbox via git would also put Cairn on the network
+- Persisting ParleyInn state out of a sandbox via git would also put ParleyInn on the network
   path, which I4 forbids for shipped code. It would have to be done by the host
-  environment or the user's git, not by Cairn.
+  environment or the user's git, not by ParleyInn.
 
 ### Gaps
 
 - No official Anthropic doc page on the exact branch-name rules was fetched; the `claude/*`
   restriction comes from community issue mirrors.
 - Did not research GitHub branch-protection or ruleset behaviour for custom ref
-  namespaces (`refs/cairn/*`), or whether hosts accept pushes to non-`refs/heads` refs
+  namespaces (`refs/parinn/*`), or whether hosts accept pushes to non-`refs/heads` refs
   without extra permissions.

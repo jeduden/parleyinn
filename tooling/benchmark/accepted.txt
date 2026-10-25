@@ -3,4 +3,4 @@
 # while no base line names its benchmark, so each lasts the one
 # change that adds it; see tooling/benchmark/src/accepted.rs and
 # docs/testing.md. Add one only with the stakeholder's acceptance.
-core_start_up 30 the core links SQLite, Ed25519, SHA-256 and serde_json (plan 2609292012, phase 1), accepted by the stakeholder on jeduden/cairn#48
+core_start_up 20 the core links regex with its Unicode tables, for redaction, and tracing, for its logs (plan 2609292012, phase 4), accepted by the stakeholder on jeduden/parleyinn#58

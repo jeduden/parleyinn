@@ -3,7 +3,7 @@ id: 2609292006
 title: "Spike S4: prove plugin distribution"
 status: "✅"
 summary: >-
-  Install a stub Cairn plugin on a workstation, a runner image and
+  Install a stub ParleyInn plugin on a workstation, a runner image and
   the Agent SDK, and check how runners seed ~/.claude.
 model: sonnet
 depends-on: []
@@ -12,7 +12,7 @@ depends-on: []
 
 ## Goal
 
-Show that Cairn can ship as a Claude Code plugin on every target ADR-06
+Show that ParleyInn can ship as a Claude Code plugin on every target ADR-06
 names, so ADM-01 and NFR-12 rest on a working install.
 
 ## Context
@@ -58,7 +58,7 @@ in isolated `HOME` directories and redacted, under its `plugin` directory. The
 
 Deviations from the tasks:
 
-- Task 1 registered §9.1's three hooks, not one, so every hook Cairn
+- Task 1 registered §9.1's three hooks, not one, so every hook ParleyInn
   installs is shown firing.
 - Task 2's runner image is a `~/.claude` baked with settings alone, as
   an image build would bake it, not a self-hosted runner.

@@ -1,0 +1,5 @@
+# cargo-fuzz's build output, the crashes it finds and its coverage;
+# the seed corpus under corpus/ is committed (ENG-07).
+/target/
+/artifacts/
+/coverage/

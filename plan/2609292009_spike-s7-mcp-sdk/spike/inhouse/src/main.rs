@@ -100,7 +100,7 @@ fn handle(line: &str, out: &Out, inflight: &Inflight) {
             send(out, &reply(&id, json!({
                 "protocolVersion": version,
                 "capabilities": {"tools": {}},
-                "serverInfo": {"name": "cairn", "version": "dev"},
+                "serverInfo": {"name": "parinn", "version": "dev"},
             })));
         }
         ("ping", Some(id)) => send(out, &reply(&id, json!({}))),

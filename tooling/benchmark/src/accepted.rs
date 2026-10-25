@@ -1,6 +1,6 @@
 //! Reviewed acceptances of a regression (ENG-15): a committed record
 //! that lets one benchmark's head run slower than the gate's 10%, up to
-//! a ceiling, for a stated reason. A change that makes Cairn slower on
+//! a ceiling, for a stated reason. A change that makes ParleyInn slower on
 //! purpose, such as linking the store into the core, records it in
 //! `tooling/benchmark/accepted.txt`, where review sees it.
 //!

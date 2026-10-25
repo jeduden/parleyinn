@@ -25,25 +25,74 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      # ENG-07: cargo-fuzz runs every target under fuzz/, on the exact
-      # dated nightly ENG-01 pins for it. Neither exists yet; the plan
-      # that adds the first fuzz target pins the nightly and puts the
-      # cargo-fuzz step here, and until then this step fails rather than
-      # skip a target it cannot run.
+      # ENG-01: the exact dated nightly fuzz/rust-toolchain.toml pins,
+      # and cargo-fuzz at an exact version.
+      - name: Install the pinned nightly and cargo-fuzz
+        shell: bash
+        run: |
+          rustup toolchain install \
+            "$(sed -n 's/^channel = "\(.*\)"$/\1/p' fuzz/rust-toolchain.toml)" \
+            --profile minimal --no-self-update
+          cargo install --locked cargo-fuzz@0.13.2
+      # ENG-07: cargo-fuzz runs every target under fuzz/, each for a
+      # fixed time from its committed corpus. New inputs land in the
+      # run's work directory, never in the committed corpus. A crash
+      # fails the job after every target ran, and its input is kept.
       - name: Fuzz every target
         shell: bash
         run: |
-          if [ ! -f fuzz/Cargo.toml ]; then
-            echo "no fuzz targets yet" | tee -a "$GITHUB_STEP_SUMMARY"
-            exit 0
-          fi
-          echo "::error::fuzz/ has targets, but this job does not run cargo-fuzz yet"
-          exit 1
+          nightly="$(sed -n 's/^channel = "\(.*\)"$/\1/p' fuzz/rust-toolchain.toml)"
+          status=0
+          for target in $(cargo +"$nightly" fuzz list --fuzz-dir fuzz); do
+            mkdir -p "fuzz-work/$target"
+            cargo +"$nightly" fuzz run --fuzz-dir fuzz "$target" \
+              "fuzz-work/$target" "fuzz/corpus/$target" \
+              -- -max_total_time=900 -rss_limit_mb=2048 || status=1
+            echo "fuzzed $target" | tee -a "$GITHUB_STEP_SUMMARY"
+          done
+          exit "$status"
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: failure()
         with:
           name: fuzz-crashers
           path: fuzz/artifacts/
+
+  # ENG-06: the crash-consistency test kills the built core with
+  # SIGKILL at a random point of `parinn ingest`, 10,000 times, each
+  # start confined (ENG-12), and fails unless `parinn verify` exits 0
+  # after every kill. A failing iteration names the seed that replays
+  # it; each night takes a new seed. Purge, migration and rebuild join
+  # it as their phases land.
+  crash-consistency:
+    runs-on: ubuntu-latest
+    timeout-minutes: 150
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install the pinned Rust toolchain
+        run: >-
+          rustup toolchain install
+          "$(sed -n 's/^channel = "\(.*\)"$/\1/p' rust-toolchain.toml)"
+          --profile minimal --no-self-update
+      # The confinement runs the core in a user and network namespace of
+      # its own, under strace. A runner may restrict unprivileged user
+      # namespaces, and its image may lack strace.
+      - name: Allow the confinement
+        run: |
+          if [ -e /proc/sys/kernel/apparmor_restrict_unprivileged_userns ]; then
+            sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+          fi
+          command -v strace >/dev/null || {
+            sudo apt-get update && sudo apt-get install -y --no-install-recommends strace
+          }
+      - name: Kill ingest 10,000 times and verify after each kill
+        env:
+          PARINN_CRASH_ITERATIONS: "10000"
+        run: |
+          export PARINN_CRASH_SEED="$GITHUB_RUN_ID"
+          echo "crash-consistency seed $PARINN_CRASH_SEED" | tee -a "$GITHUB_STEP_SUMMARY"
+          cargo test --locked -p parinn --test e2e_crash_consistency -- --nocapture
 
   # ENG-21: the rulesets, main's and the tag rulesets, are settings of
   # the repository on GitHub, not files, so they can weaken without a
@@ -61,11 +110,11 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - name: Install the pinned Rust toolchain
-        run: >-
-          rustup toolchain install
-          "$(sed -n 's/^channel = "\(.*\)"$/\1/p' rust-toolchain.toml)"
-          --profile minimal --no-self-update
+      - name: Install pinned Rust with mise
+        uses: ./.github/actions/setup-mise
+        with:
+          tools: rust
+          cache: true
       # Every committed ruleset, main's and the tag rulesets, against
       # the live one of the same name. A missing or weaker one fails the
       # job, after every ruleset was compared.

@@ -1,0 +1,1 @@
+foo OR bar NEAR(baz) AND "quoted" -not col:text

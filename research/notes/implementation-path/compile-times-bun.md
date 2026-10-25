@@ -57,7 +57,7 @@ measured here.
 - Runtime: 2.8 to 4.8% faster HTTP, 2.2 to 4.7% faster app workloads,
   about 20% smaller binaries ([Bun][bun]).
 
-## What this means for Cairn
+## What this means for ParleyInn
 
 - **The headline is about structure and linking, not the language.**
   Bun's 5.4 times faster CI build came mostly from leaving full LTO and
@@ -69,18 +69,18 @@ measured here.
   but only for x86_64 Linux debug builds; iOS, Android and arm64 macOS
   builds go through LLVM. Rust's incremental rebuilds are seconds to
   tens of seconds on large crates, and Bun published none. Go builds a
-  codebase of Cairn's size in seconds.
-- **At Cairn's size it matters less.** Cairn will be a tenth of Bun or
+  codebase of ParleyInn's size in seconds.
+- **At ParleyInn's size it matters less.** ParleyInn will be a tenth of Bun or
   smaller, so a clean Rust build is minutes, not half an hour. With
   dozens of agents in compile–test loops it is still CPU per attempt,
   so the bake-off measures it.
 - **The language choice is reversible.** A factory ported 535k lines
-  in 11 days against a strong test suite. Cairn's executable SRS, every
+  in 11 days against a strong test suite. ParleyInn's executable SRS, every
   requirement a scenario driving the binary through the CLI and MCP, is
   that oracle, language-neutral if the bindings stay black-box (open
   point 15). Starting in one language and porting later costs days, not
   a rewrite.
-- **Bun's own reason to leave Zig is Cairn's main risk.** Cairn parses
+- **Bun's own reason to leave Zig is ParleyInn's main risk.** ParleyInn parses
   hostile input; memory bugs are what drove the move to Rust.
 
 [zack]: https://zackoverflow.dev/writing/i-spent-181-minutes-waiting-for-the-zig-compiler-this-week/

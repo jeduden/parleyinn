@@ -31,10 +31,10 @@ S3 Structural fields that reach the model (finding 9): restore blocks and
    the closed paths may carry.
 S4 Principal acts in the record (finding 10): only the CLI or TUI at a
    principal surface records an `operator` event marked with a principal
-   surface. Cairn's hook handlers, MCP server and kernel worker never do,
+   surface. ParleyInn's hook handlers, MCP server and kernel worker never do,
    and an `operator` event without that mark is never a principal act. A
    process of the same OS user that signs with the device key outside
-   Cairn's code is residual risk R3 (§6.1): only a head receipt kept off
+   ParleyInn's code is residual risk R3 (§6.1): only a head receipt kept off
    the machine shows it. Do not invent a new key.
 S5 Install and uninstall (finding 11): they run only at a principal
    surface or through the harness's own plugin install or the managed
@@ -53,15 +53,15 @@ S5 Install and uninstall (finding 11): they run only at a principal
 - #5, #13: the capture-off and capture-on acts show the node-wide capture
   gap on Runs and Health, covering runs that began and ended within it.
 - #6: say that serving the MCP server's fixed tool definitions and
-  instructions is not a write to an agent: they are fixed text Cairn ships
+  instructions is not a write to an agent: they are fixed text ParleyInn ships
   and carry nothing from the record. Do not change I2's or I4's wording.
 - #7: "any other seat is kept as another node's or principal's, attributed
   to its seat key and untrusted (I8)".
-- #8, #15: Room: "the unit Cairn shows" in core; "and shares", and Writer's
+- #8, #15: Room: "the unit ParleyInn shows" in core; "and shares", and Writer's
   "held by any node", go into the spans of the features that share
   (work-rooms, peer-sync, segment-exchange, export-bundles as fits; nest).
 - #12: any CLI or TUI call from a process the harness started, other than
-  Cairn's own hook handlers, MCP server and harness strip, is recall:
+  ParleyInn's own hook handlers, MCP server and harness strip, is recall:
   enveloped, whatever its output.
 - #16: repository configuration applies only to runs whose working
   directory lies in that repository, and only to settings keys scoped to

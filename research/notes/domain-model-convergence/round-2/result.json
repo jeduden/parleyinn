@@ -47,7 +47,7 @@
     {
      "type": "gap",
      "file": "docs/domain-model/record.md",
-     "quote": "off is widening (OWN-11), so `cairn uninstall` records the widening act",
+     "quote": "off is widening (OWN-11), so `parinn uninstall` records the widening act",
      "problem": "A token-key-only node \"signs no principal or expire acts\", so once PRV-10 ships it cannot record the capture-off act that uninstall must record first, nor the configuration acceptance the launcher and room view need. Only the peer component gets a stand-in (PEER-01's variable).",
      "fix": "Add to Token key: \"On a token-key-only node, uninstall records capture off as a structural event, and components other than the peer component stay off.\" Alternatively, give the stand-in that applies.",
      "severity": "minor"

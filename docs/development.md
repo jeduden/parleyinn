@@ -7,38 +7,14 @@ summary: >-
 # Development
 
 Build and release reference, plus the mechanics behind the rules in
-[CLAUDE.md](../CLAUDE.md). How Cairn is tested, and how the tests are
+[CLAUDE.md](../CLAUDE.md). How ParleyInn is tested, and how the tests are
 measured, is in [testing.md](testing.md).
 
 ## Build & test commands
 
-The repository is one Cargo workspace: the product's crates under
-`crates/`, today the `cairn` core executable, and the repository
-tooling under `tooling/`. Its Rust release is fixed in
-[rust-toolchain.toml](../rust-toolchain.toml) (ENG-01), and rustup
-installs it on the first `cargo` command.
-
-- `cargo test --workspace` — every test, scenarios included
-- `cargo run -p cairn -- version` — the core executable, built for
-  this machine
-- `cargo test -p scenario --test bdd` — every scenario, pending ones
-  counted
-- `cargo test -p scenario --test bdd -- --tags @REC-03` — one scenario
-  by its requirement id
-- `cargo test -p srs --test gates` and `cargo test -p scenario --test
-  gate` — the gates alone
-- `cargo run -p coverage` — line coverage per test layer and per crate,
-  held to the floors (see [testing.md](testing.md))
-- `cargo build --release -p cairn && cargo run --release -p benchmark
-  -- run --core target/release/cairn` — sample the benchmark suite;
-  `cargo run -p benchmark -- gate --base FILE --head FILE` decides
-  from two samples files (ENG-15, see [testing.md](testing.md))
-- `cargo fmt --all --check` and `cargo clippy --workspace --all-targets
-  -- -D warnings` — layout and lint (ENG-16)
-- `cargo deny check licenses bans sources` and `cargo audit` — the
-  supply chain (ENG-16), with [deny.toml](../deny.toml)'s policy
-- `mdsmith check .` — lint the Markdown; `mdsmith fix .` rewrites
-  what it can, including the generated catalogs
+See [tooling.md](tooling.md) for setup, tool pins, check commands and
+cache behavior. Its configuration examples are imported from the source
+files; `mdsmith check .` rejects them when they drift.
 
 ## Static analysis
 
@@ -54,7 +30,7 @@ only source. cargo-audit refuses a crate with a known vulnerability.
 [CodeQL](../.github/workflows/codeql.yml) scans all but the tests.
 
 Crates may only depend on the crates they declare (ENG-02). Each
-crate's `Cargo.toml` holds a `cairn` metadata table with three keys:
+crate's `Cargo.toml` holds a `parinn` metadata table with three keys:
 
 - `responsibility`: the one thing the library crate does.
 - `may-depend-on`: the workspace crates it may depend on, an empty
@@ -77,12 +53,13 @@ does not exist yet (M7); its dependency boundary joins this check
 when it lands.
 
 The core executable's reach is held two ways (SEC-01, ENG-16). Its
-own [clippy.toml](../crates/cairn/clippy.toml) refuses the
+own [clippy.toml](../crates/parinn/clippy.toml) refuses the
 `std::net` socket types and `std::process::Command` in its code, and
-[its reach test](../crates/cairn/tests/reach.rs) refuses any crate
+[its reach test](../crates/parinn/tests/reach.rs) refuses any crate
 linked into it, so neither can arrive through a dependency. Both are
 the build-time half of SEC-01. With unsafe code forbidden, the core's
-own code cannot add code that runs as the process starts either.
+own code cannot add code that runs as the process starts either. The
+`platform` crate alone only denies it, its tests under Miri (ENG-09).
 
 The gate tests in the `engineering` crate's `static_analysis` target
 hold this in place. CI gates on clippy, rustfmt, cargo-deny,
@@ -90,6 +67,12 @@ cargo-audit and `cargo test --workspace`. Each runs in a job the `CI`
 job needs, and none may fail. Every workspace crate inherits the
 workspace's lints (`[lints] workspace = true`), or forbids unsafe code
 in its own crate roots. The core's bans and reach test are in place.
+`cargo run --locked -p engineering --bin license-check` holds every crate
+a release links to a license text that fits its declared license
+(ENG-30) and each target's `THIRD_PARTY_LICENSES` to equal its
+regeneration (ENG-31); the supply-chain job runs it on every pull request.
+It reads only the sources cargo has fetched, so run `cargo fetch --locked`
+first; `--write` rewrites the committed files after a dependency changes.
 Every product crate's clippy.toml refuses the clocks and the random
 order of the hash collections. These checks are ENG-16's core row,
 each with its drift case. The ENG-16 scenario stays pending until the
@@ -107,7 +90,7 @@ a test that starts the core any other way; a step needing a terminal gets one
 from `script`, outside the trace. It needs Linux, `unshare` and `script` from
 util-linux with unprivileged user namespaces, and `strace`; a machine without
 them fails the end-to-end tests with what is missing.
-Outside CI, `CAIRN_E2E_UNCONFINED=1` runs them unconfined instead, on
+Outside CI, `PARINN_E2E_UNCONFINED=1` runs them unconfined instead, on
 a machine that cannot confine; CI refuses it.
 
 The same clippy.toml holds the rest of ENG-03 in the product crates.
@@ -132,8 +115,9 @@ list exempts.
 ## CI, nightly and release
 
 Every workflow lives in `.github/workflows`. Every action is fixed
-to a commit SHA with its version in a trailing comment, and dependabot
-proposes the bumps after a seven-day cooldown.
+to a commit SHA with its version in a trailing comment. Dependabot
+proposes bumps under the policy in
+[dependabot.yml](../.github/dependabot.yml).
 
 [ci.yml](../.github/workflows/ci.yml) runs on every push and pull request to
 `main`. It runs every test and scenario, with `HOME` pointed at an empty
@@ -141,7 +125,8 @@ decoy that must stay empty (ENG-14), the core's end-to-end tests confined
 (ENG-12), clippy and rustfmt, cargo-deny and cargo-audit, the drift suite,
 the benchmark gate, and the release build of every target (NFR-10, CON-02).
 It also runs `mdsmith check .`, [taplo](../.taplo.toml), and zizmor over the
-workflows. A final job named `CI` passes only when every other job passed.
+workflows and local actions. A final job named `CI` passes only when
+every other job passed.
 It is the one check the branch and release-tag rulesets require, because
 GitHub names a required check after a job, never after the workflow.
 
@@ -149,20 +134,18 @@ The `benchmark` job (ENG-15) is described in
 [testing.md](testing.md#benchmarks-and-the-regression-gate).
 
 [nightly.yml](../.github/workflows/nightly.yml) is where
-cargo-fuzz runs every target under `fuzz/` (ENG-07). There are none
-yet; the job fails the night a `fuzz/` crate appears until the plan
-that adds it pins the nightly and adds the cargo-fuzz step. The
-crash-consistency test (ENG-06), the concurrency soak (ENG-09) and the
-live Claude Code contract test (ENG-17) join it as their plans land.
+cargo-fuzz runs each target under `fuzz/` (ENG-07) for 15 minutes,
+from its corpus under `fuzz/corpus`, on the nightly
+`fuzz/rust-toolchain.toml` pins. The crash-consistency test (ENG-06),
+the soak (ENG-09) and the live contract test (ENG-17) join it later.
 
 [build.yml](../.github/workflows/build.yml) is the release build.
-CI runs it on every change, and the release workflow runs it too. One
-x86_64 Linux runner builds `linux/amd64` and `linux/arm64`, linked
-statically against musl with the rust-lld Rust ships (CON-02), and
-`windows/amd64` with mingw-w64, pinned to Ubuntu 24.04's exact
-packages. One arm64 macOS runner builds `darwin/arm64`.
-`--remap-path-prefix` keeps the builder's paths out. `CAIRN_VERSION`
-and `CAIRN_COMMIT` stamp the version and the commit (ENG-01). Each
+CI runs it on every change, and the release workflow runs it too.
+The workflow defines the targets, builder platforms and exact system
+dependency pins. Linux binaries link statically against musl with the
+rust-lld Rust ships (CON-02).
+`--remap-path-prefix` keeps the builder's paths out. `PARINN_VERSION`
+and `PARINN_COMMIT` stamp the version and the commit (ENG-01). Each
 binary then runs once on its own platform and must report what it
 was stamped with. Each target is built once: the release build is not
 checked for reproducibility.
@@ -205,10 +188,13 @@ passed `CI`. `no-other-tags-allowed` refuses every other tag. The
 stakeholder applies the rulesets on GitHub. The nightly `protection`
 job runs `protection-check` on each file under `.github/rulesets`. It
 fails when the live ruleset of that name is missing or weaker. The
-workflow's token cannot see a ruleset's bypass actors. One approval
-count holds for the whole branch, so no ruleset can require two
-approvals for the security-sensitive crates alone. That part of ENG-21
-stays open until a required check, `Security approvals`, enforces it.
+workflow's token cannot see a ruleset's bypass actors. The
+security-sensitive crates are owned by the designated security
+reviewer, so a change to one needs that reviewer's approval as a code
+owner. The stakeholder holds the role. One approval count holds for the
+whole branch, so a second approval on those crates alone would need a
+second reviewer account and a check that counts reviews; ENG-21 does
+not ask for it until one is named.
 
 [release.yml](../.github/workflows/release.yml) runs from the Actions
 "Run workflow" button on `main`, with a version like `v0.1.0`. A pushed

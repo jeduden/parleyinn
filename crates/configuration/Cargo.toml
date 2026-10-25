@@ -18,8 +18,8 @@ testkit.workspace = true
 [lints]
 workspace = true
 
-# ENG-02: see crates/cairn/Cargo.toml.
-[package.metadata.cairn]
+# ENG-02: see crates/parinn/Cargo.toml.
+[package.metadata.parinn]
 responsibility = "Reads, validates and layers the settings layers"
 may-depend-on = ["record"]
 may-dev-depend-on = ["testkit"]

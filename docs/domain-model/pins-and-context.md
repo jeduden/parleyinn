@@ -20,7 +20,8 @@ summary: >-
   adds one, unstamped (PIN-04). At most one version of a pin restores to an
   agent, the one PIN-10 chooses.
 - **Pin candidate**: Proposed pin text, not yet a pin and so with no pin author,
-  that an agent suggested (an `assistant` event, PIN-02) or Cairn detected, as a
+  that an agent suggested (an `assistant` event, PIN-02) or ParleyInn detected,
+  as a
   derived artifact, only in a `user` event trusted on this node, never in an
   ingested or other untrusted one (PIN-05). The confirmation of its principal
   (of the agent that suggested it or the node that detected it), a widening act
@@ -65,14 +66,17 @@ summary: >-
 - **Title, labels**: Room state the owner's device seat or a moderator sets: a
   display name and tags, reaching a model only through recall, enveloped
   (LANE-30, VIEW-15).
-- **Assignment**: Room state asking a seat to work on a branch. It makes Cairn
+- **Assignment**: Room state asking a seat to work on a branch. It makes
+ParleyInn
   refuse no seat's act; a role assignment is always named so.
 - **Post**: Text a seat writes to a room's conversation, with provenance `post`,
   reaching an agent only by recall, endorsement or a trust grant (OWN-29). A
   post may carry range links; a **comment** is a post on a **marked range**, the
   address range a range link names. A seat's unsent post is a **draft**,
   ephemeral like a presence hint (PEER-09). A **cross-room post** is a post a
-  seat sends to another room, which shows it by address (LANE-29).
+  seat sends to another room, which shows it by address (LANE-29). A post
+  responding to a forge review or issue item stays in the room whether or not
+  its author's separate forge reply act succeeds (LANE-08, LANE-34).
 - **Directed post**: A post directed to one agent, waiting in its principal's
   Needs you queue for an endorsement (LANE-12).
 - **Room summary**: A facilitator's summary of a room, always untrusted, linked
@@ -86,15 +90,16 @@ summary: >-
   "envelope": the wrapper that marks recalled content as untrusted historical
   data; the only way recalled content reaches a model. An envelope **marked
   structural** carries only structural fields, §9.7's closed status words and
-  marks, and Cairn's ids (`room_get`, VIEW-15).
+  marks, and ParleyInn's ids (`room_get`, VIEW-15).
 - **Envelope warning**: The fixed sentence at the head of every envelope (field
   `warning`).
 - **Trusted text** (`TrustedText`): Text only the core's restore-block code
   constructs, the only text the **restore builder** accepts, built only from
-  qualifying pins, sanitized structural fields and fixed text Cairn ships
+  qualifying pins, sanitized structural fields and fixed text ParleyInn ships
   (INJ-03): restore blocks, opt-in notices and the fixed templates of OWN-04
   and OWN-07.
-- **Restore block**: Deterministic trusted text Cairn injects after compaction
+- **Restore block**: Deterministic trusted text ParleyInn injects after
+compaction
   (INJ-01), at a run's start or harness resume (INJ-02), and on a prompt while
   `restore_block.on_prompt` is on (INJ-04): qualifying pins, a landmark index, a
   recall hint and what else INJ-01, PIN-08, PIN-10, PIN-11, PEER-06, LANE-30 and
@@ -103,7 +108,8 @@ summary: >-
   each landmark with its address range, as a restore block lists them (INJ-01).
 - **Recall hint**: The one fixed line in a restore block saying that the recall
   tools reach the full history (INJ-01).
-- **Opt-in notice**: Trusted text, only fixed text Cairn ships and what LANE-30
+- **Opt-in notice**: Trusted text, only fixed text ParleyInn ships and what
+LANE-30
   allows, saying posts or a delegate report wait, or a room changed, sent only
   under the owner's notice allowance and the agent's principal's notice opt-in
   (INJ-10). The only meaning of "notice".
@@ -116,7 +122,8 @@ summary: >-
   part of the record, never authoritative.
 - **Held request**: A permission request, question or hand-off with a stable id,
   answerable from any principal surface within its scope (OWN-05). Its **hold
-  window** is the longest Cairn keeps the agent waiting on it before its away
+  window** is the longest ParleyInn keeps the agent waiting on it before its
+  away
   policy, if one is on, answers the agent (OWN-06, OWN-07). A **reply** answers
   a held request that is a question, with principal-typed text.
 - **Qualified requests**: A permission request (the harness's, recorded as a

@@ -2,7 +2,7 @@
   "name": "no-other-tags-allowed",
   "target": "tag",
   "source_type": "Repository",
-  "source": "jeduden/cairn",
+  "source": "jeduden/parleyinn",
   "enforcement": "active",
   "conditions": {
     "ref_name": {

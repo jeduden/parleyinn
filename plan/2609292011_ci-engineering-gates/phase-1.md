@@ -7,8 +7,8 @@ result: false
 # Phase 1: the isolation guard and the agent instruction check (ENG-14)
 
 Requirement. ENG-14 (P0, Ver T, I): tests run with isolated `HOME`
-and `CAIRN_HOME`; a guard aborts any test that touches the real
-`HOME`, a real Cairn home or real Claude Code configuration; no agent
+and `PARINN_HOME`; a guard aborts any test that touches the real
+`HOME`, a real ParleyInn home or real Claude Code configuration; no agent
 instruction file in the repository directs a destructive command at
 non-isolated state.
 

@@ -39,7 +39,7 @@ nonce, so its landing place is a fact, not an inference.
 | How does a `user` line mark a prompt's origin?                 | `promptSource`: `typed` for a prompt typed interactively, `sdk` for print mode, `system` for the harness's own; the compaction summary's line inherits a `turnOrigin` |
 | Does each compaction fire a `SubagentStop`?                    | Yes, with a fresh `agent_id` and an empty `agent_type`, as S1 found (ASM-06, R4)                                                                                      |
 
-## What it means for Cairn
+## What it means for ParleyInn
 
 - A compaction is ambiguous whenever a subagent of the harness session
   may be running. For a foreground subagent that is from its tool call

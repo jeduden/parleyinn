@@ -115,7 +115,7 @@ impl ResidualRisk {
         match self {
             Self::R1 => "the agent types into the harness's own prompt to approve itself",
             Self::R2 => {
-                "the agent edits the harness's settings or hooks, or replaces Cairn's executables"
+                "the agent edits the harness's settings or hooks, or replaces ParleyInn's executables"
             }
             Self::R3 => {
                 "the agent writes to, deletes or rolls back the home, or signs with its keys"
@@ -160,6 +160,12 @@ pub enum Act {
     RiskAcceptanceRecord { risks: BTreeSet<ResidualRisk> },
     /// Withdraw the risk acceptance; a cut act.
     RiskAcceptanceWithdraw,
+    /// Bind a repository's identity by hand, or rebind it after a change
+    /// (LANE-02): `identity` holds the commit it binds to as
+    /// `repository`, or a provisional one as `repository_provisional`.
+    /// Widening. It names the worktree by a keyed digest, never a path: the
+    /// act replicates.
+    RepositoryBind { identity: Value },
 }
 
 impl Act {
@@ -171,6 +177,7 @@ impl Act {
             Self::ConfigurationAccept { .. } => "configuration_accept",
             Self::RiskAcceptanceRecord { .. } => "risk_acceptance_record",
             Self::RiskAcceptanceWithdraw => "risk_acceptance_withdraw",
+            Self::RepositoryBind { .. } => "repository_bind",
         }
     }
 
@@ -205,6 +212,11 @@ impl Act {
                 content.insert("forgeable".into(), json!(FORGEABLE));
             }
             Self::RiskAcceptanceWithdraw => {}
+            Self::RepositoryBind { identity } => {
+                if let Value::Object(fields) = identity {
+                    content.extend(fields.clone());
+                }
+            }
         }
 
         Value::Object(content)
@@ -396,7 +408,7 @@ impl fmt::Display for Refusal {
                 write!(
                     f,
                     "refused: these residual risks are open and no risk acceptance names them \
-                     (OWN-22); record one with cairn risk-acceptance record:\n{risks}\
+                     (OWN-22); record one with parinn risk-acceptance record:\n{risks}\
                      runs leaving them open, as no run records a sandbox state: {}",
                     runs.join(", ")
                 )
@@ -458,6 +470,7 @@ pub fn record(
         provenance: Provenance::Operator,
         content: act.content(),
         commitment_key: CommitmentKey::from_bytes(draw(entropy)?),
+        transcript_timestamp: None,
     };
     let addresses = store.append(node.device_writer(), &[event])?;
 

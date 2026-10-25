@@ -42,7 +42,7 @@ not the driver.
   feature `bundled`, which compiles SQLite 3.53.2 with FTS5 and
   `dbstat` into the binary. The Go run used SQLite 3.53.4.
 - Harness: the standalone crate in [bench](bench/src/main.rs), outside
-  the cairn workspace. It ports [bench-go](bench-go/main.go) command
+  the parinn workspace. It ports [bench-go](bench-go/main.go) command
   for command: the same schema, connection settings (WAL,
   `synchronous=NORMAL`, a busy timeout, `BEGIN IMMEDIATE`), statements
   and query shapes.
@@ -204,7 +204,7 @@ therefore out. What stays open for OQ-04:
 - SQLCipher on a crypto provider without sockets: OpenSSL built
   `no-sock`, which the `openssl-src` crate does not offer, or another
   provider SQLCipher supports.
-- A VFS of Cairn's own with authenticated encryption from the RustCrypto
+- A VFS of ParleyInn's own with authenticated encryption from the RustCrypto
   crates, which would also close the gap the Go report found in
   ncruces's unauthenticated ciphers.
 - Application-level AEAD for payload files, or encrypted volumes only.

@@ -2,7 +2,7 @@
 
 What is known on 3 October 2026, before task 1 extends it. Each entry
 says what the technology confines, which residual risks of the
-[plan](plan.md) it can address, and where Cairn's record writer would
+[plan](plan.md) it can address, and where ParleyInn's record writer would
 sit.
 
 ## Named by the stakeholder

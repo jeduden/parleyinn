@@ -2,9 +2,9 @@
   "findings": [
     {
       "type": "contradiction",
-      "quote": "registrations found removed without `cairn uninstall` are counted and shown,",
-      "problem": "I1 names capture-off as the only loss exception and Capture defines a capture gap as the stretch between the two recorded capture acts, yet removed hook registrations (no capture-off act) are also shown as a node-wide capture gap. That stretch is not an I1 exception, only a counter records it (nothing in the record, so a rebuild cannot reproduce it, I10), and nothing says whether `cairn ingest` backfills it as `ingested`.",
-      "fix": "Add removed hook registrations to I1's exceptions, have the next core component append a structural capture-gap marker naming the last event seen so the gap derives from the record, and say whether `cairn ingest` backfills that stretch as `ingested`.",
+      "quote": "registrations found removed without `parinn uninstall` are counted and shown,",
+      "problem": "I1 names capture-off as the only loss exception and Capture defines a capture gap as the stretch between the two recorded capture acts, yet removed hook registrations (no capture-off act) are also shown as a node-wide capture gap. That stretch is not an I1 exception, only a counter records it (nothing in the record, so a rebuild cannot reproduce it, I10), and nothing says whether `parinn ingest` backfills it as `ingested`.",
+      "fix": "Add removed hook registrations to I1's exceptions, have the next core component append a structural capture-gap marker naming the last event seen so the gap derives from the record, and say whether `parinn ingest` backfills that stretch as `ingested`.",
       "severity": "needs-fix"
     },
     {
@@ -31,8 +31,8 @@
     {
       "type": "undefined",
       "quote": "verbatim and restored verbatim after every compaction, or named by id and",
-      "problem": "I3 and the restore block name an omitted pin by id, and a closed path may carry only Cairn's ids, but no pin id is defined: Pin and Pin version assign none and the only addressing defined is an event's address. Implementers would pick different ids, and a chosen id could carry untrusted text into trusted restore text.",
-      "fix": "Add to Pin: a pin's id is the address of its creating event, assigned by Cairn and never chosen.",
+      "problem": "I3 and the restore block name an omitted pin by id, and a closed path may carry only ParleyInn's ids, but no pin id is defined: Pin and Pin version assign none and the only addressing defined is an event's address. Implementers would pick different ids, and a chosen id could carry untrusted text into trusted restore text.",
+      "fix": "Add to Pin: a pin's id is the address of its creating event, assigned by ParleyInn and never chosen.",
       "severity": "minor"
     },
     {

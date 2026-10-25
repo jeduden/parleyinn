@@ -1,0 +1,2422 @@
+{
+  "themes": [
+    {
+      "id": "DM-A",
+      "title": "An agent's own parinn call acts as the device seat or passes the terminal test",
+      "status": "accepted",
+      "texts": [
+        {
+          "file": "docs/domain-model/seats-and-keys.md",
+          "quote": "Its room acts are taken only at a principal surface, as principal acts are, but those its node takes on its own (Personal room, Join)"
+        },
+        {
+          "file": "docs/domain-model/seats-and-keys.md",
+          "quote": "an agent's tool call acts only from its run seat (OWN-12)"
+        },
+        {
+          "file": "docs/domain-model/acts-and-roles.md",
+          "quote": "**Room act**: An act signed by a seat key, a device seat's taken only as Device seat says."
+        },
+        {
+          "file": "docs/domain-model/trust-and-flow.md",
+          "quote": "An unsandboxed agent can still pass the CLI's or TUI's terminal test, through a terminal it opens or a process it did not start"
+        },
+        {
+          "file": "docs/domain-model/trust-and-flow.md",
+          "quote": "that is §6.1's residual risk R7, and its writing the store or signing outside ParleyInn's code is R3, which only a sandbox removes"
+        },
+        {
+          "file": "docs/domain-model/index.md",
+          "quote": "a skill's call is the agent's own tool call, never a principal act, and acts only from its run seat (Device seat)"
+        },
+        {
+          "file": "docs/srs/05c-principal-and-peer-requirements.md",
+          "quote": "refuse unless its standard input and output are a terminal, except for the facilitator's program (SEC-32); an agent's tool call MUST act only from its run seat"
+        },
+        {
+          "file": "docs/srs/06-security.md",
+          "quote": "The agent confirms widening acts, or takes its principal's device seat's room acts, at a terminal, by design (OWN-12)"
+        },
+        {
+          "file": "docs/srs/06-security.md",
+          "quote": "**For principal acts and a device seat's room acts only**, under the residual risks below"
+        }
+      ],
+      "risk": "R7"
+    },
+    {
+      "id": "DM-B",
+      "title": "Ownership, admission and bars rest on principal-key chains that do not exist before PRV-10",
+      "status": "deferred",
+      "texts": [
+        {
+          "file": "docs/domain-model/principals-and-agents.md",
+          "quote": "No key chains to a principal key before PRV-10 ships, so until then a room admits no seat of another principal"
+        },
+        {
+          "file": "docs/domain-model/principals-and-agents.md",
+          "quote": "admission, invites, bars and the owner's protection, which name principal keys, apply only once it ships (OQ-42)"
+        },
+        {
+          "file": "docs/domain-model/acts-and-roles.md",
+          "quote": "keys, once PRV-10 ships; until then a room admits no other principal's seat (Principal)"
+        },
+        {
+          "file": "docs/domain-model/acts-and-roles.md",
+          "quote": "**Bar**: Once PRV-10 ships (Principal), names a principal key and keeps every key that chains to it out"
+        },
+        {
+          "file": "docs/domain-model/principals-and-agents.md",
+          "quote": "Once PRV-10 ships, no one may kick, bar or mute the owner or any key that chains to its principal key (LANE-25)."
+        },
+        {
+          "file": "docs/srs/05b-room-collaboration-requirements.md",
+          "quote": "Until PRV-10 ships, a room MUST admit no seat of another principal, and admission, invites, bars and the owner's protection"
+        },
+        {
+          "file": "docs/srs/13-open-questions-and-risks.md",
+          "quote": "What do admission, invites and bars mean before PRV-10 ships?"
+        }
+      ],
+      "oq": "OQ-42",
+      "milestone": "M7"
+    },
+    {
+      "id": "DM-C",
+      "title": "Revoking a seat key or an access token is cut while revoking a device is widening",
+      "status": "fixed",
+      "texts": [
+        {
+          "file": "docs/domain-model/acts-and-roles.md",
+          "quote": "revoke an access token, a seat key or a service account's certificate unless that removes a pin from a restore block or stops principal acts arriving"
+        },
+        {
+          "file": "docs/domain-model/acts-and-roles.md",
+          "quote": "although it undoes an enrollment, since it can drop pins and stop principal acts arriving."
+        },
+        {
+          "file": "docs/srs/06-security.md",
+          "quote": "revoking a seat key MUST be a cut principal act unless it removes a pin from a restore block or stops principal acts arriving, either of which makes it widening"
+        },
+        {
+          "file": "docs/srs/05d-peer-requirements.md",
+          "quote": "a cut one unless it removes a pin from a restore block, which makes it widening (OWN-11)"
+        }
+      ]
+    },
+    {
+      "id": "DM-D",
+      "title": "A run-seat key lost with its MCP server while the run continues",
+      "status": "deferred",
+      "texts": [
+        {
+          "file": "docs/domain-model/seats-and-keys.md",
+          "quote": "A run-seat key is lost with the MCP server that holds it, and a run that continues on a harness resume or a restart does so on a new run seat (Seat key; open: OQ-43)."
+        },
+        {
+          "file": "docs/domain-model/seats-and-keys.md",
+          "quote": "starts a new seat and writer that names the old one, inherits no add, role or appointment and is a member only as Seat says (SEC-27)."
+        },
+        {
+          "file": "docs/srs/06-security.md",
+          "quote": "as a run-seat key is once lost with its MCP server on a harness resume or a restart (open: OQ-43), MUST start a new seat and writer, audited, which names the old one, inherits no add, role or appointment, and is a member only as LANE-23 and LANE-25 say"
+        },
+        {
+          "file": "docs/srs/13-open-questions-and-risks.md",
+          "quote": "What does a continuing run's seat become when its run-seat key is lost with its MCP server"
+        },
+        {
+          "file": "docs/srs/13-open-questions-and-risks.md",
+          "quote": "until this closes, the continuing run starts a new run seat under SEC-27."
+        }
+      ],
+      "oq": "OQ-43",
+      "milestone": "M1"
+    },
+    {
+      "id": "DM-E",
+      "title": "Which runs are one agent",
+      "status": "fixed",
+      "texts": [
+        {
+          "file": "docs/domain-model/principals-and-agents.md",
+          "quote": "It is identified by its node, its harness and the harness's agent id across harness sessions"
+        },
+        {
+          "file": "docs/domain-model/principals-and-agents.md",
+          "quote": "where the harness gives no stable agent id, each run is its own agent"
+        },
+        {
+          "file": "docs/domain-model/principals-and-agents.md",
+          "quote": "Its later runs inherit its rooms for recall (the `rooms` scope), for restore and for its directed posts, never a seat, add or role"
+        },
+        {
+          "file": "docs/srs/05-functional-requirements.md",
+          "quote": "An agent MUST be identified by its node, its harness and the harness's agent id across harness sessions"
+        },
+        {
+          "file": "docs/srs/06-security.md",
+          "quote": "MUST pass from run to run, whatever agent each belongs to (REC-02)"
+        }
+      ]
+    },
+    {
+      "id": "DM-F",
+      "title": "Untrusted repository configuration may tighten; configuration pins without acceptance",
+      "status": "fixed",
+      "texts": [
+        {
+          "file": "docs/srs/05a-administration-requirements.md",
+          "quote": "A settings change that adds, edits or unpins a pin or otherwise removes one from a restore block"
+        },
+        {
+          "file": "docs/srs/05a-administration-requirements.md",
+          "quote": "Repository configuration MUST only tighten (SEC-11): a key of it making a change this row holds MUST be ignored, audited and counted"
+        },
+        {
+          "file": "docs/domain-model/pins-and-context.md",
+          "quote": "its device seat on that node adds, edits or unpins when that configuration is accepted (PIN-01, ADM-04)"
+        },
+        {
+          "file": "docs/domain-model/record.md",
+          "quote": "its **repository configuration**, may only tighten (SEC-11)"
+        }
+      ]
+    },
+    {
+      "id": "DM-G",
+      "title": "Access tokens cannot expire before PRV-10",
+      "status": "fixed",
+      "texts": [
+        {
+          "file": "docs/srs/05c-principal-and-peer-requirements.md",
+          "quote": "before PRV-10 ships, only that refusal applies"
+        },
+        {
+          "file": "docs/domain-model/seats-and-keys.md",
+          "quote": "or before PRV-10 ships only as that node's refusal of every later use of it (PEER-05)"
+        },
+        {
+          "file": "docs/srs/05d-peer-requirements.md",
+          "quote": "or, before PRV-10 ships, refuse every later use of the access token."
+        },
+        {
+          "file": "docs/srs/05b-room-collaboration-requirements.md",
+          "quote": "only a delegation or acceptance grant or an access token MAY set an expiry (OWN-23, PEER-05)"
+        }
+      ]
+    },
+    {
+      "id": "DM-H",
+      "title": "Which node records the expire act ending a bar, mute or handover offer",
+      "status": "fixed",
+      "texts": [
+        {
+          "file": "docs/srs/05b-room-collaboration-requirements.md",
+          "quote": "Once its clock passes the expiry of a bar, a mute or a handover offer, the setter's or offerer's node MUST record that expire act"
+        },
+        {
+          "file": "docs/srs/05b-room-collaboration-requirements.md",
+          "quote": "while it has not, another node of its principal or of the owner MAY (open: OQ-41), and no other node's expire act MAY end it."
+        }
+      ]
+    },
+    {
+      "id": "DM-I",
+      "title": "Pin-candidate confirmation without the exact text shown",
+      "status": "fixed",
+      "texts": [
+        {
+          "file": "docs/domain-model/pins-and-context.md",
+          "quote": "a widening act taken only after that principal is shown its exact text, pin type and priority, makes it a new pin its device seat authors"
+        },
+        {
+          "file": "docs/srs/05f-pins-recall-and-restore-requirements.md",
+          "quote": "taken only after that principal is shown its exact text, pin type and priority"
+        },
+        {
+          "file": "docs/srs/09a-command-line-interface.md",
+          "quote": "show a pin candidate's exact text, pin type and priority, then confirm it, its own widening principal act"
+        }
+      ]
+    },
+    {
+      "id": "DM-J",
+      "title": "No room view client must show every surface",
+      "status": "fixed",
+      "texts": [
+        {
+          "file": "docs/domain-model/components-and-surfaces.md",
+          "quote": "the browser, through the room-view component, the one client that shows every surface, and the TUI"
+        },
+        {
+          "file": "docs/srs/05b-room-view-requirements.md",
+          "quote": "The browser room view, the one client that is not reduced, MUST show every surface."
+        }
+      ]
+    },
+    {
+      "id": "DM-K",
+      "title": "Which pin version restores, and whether its own event must be trusted",
+      "status": "fixed",
+      "texts": [
+        {
+          "file": "docs/domain-model/pins-and-context.md",
+          "quote": "by a version PIN-10 lets qualify for the run, trusted for the run's principal on this node by its own event"
+        },
+        {
+          "file": "docs/domain-model/pins-and-context.md",
+          "quote": "But for a stamped version, it restores only by its newest version (PIN-10)"
+        },
+        {
+          "file": "docs/srs/05f-pins-recall-and-restore-requirements.md",
+          "quote": "its own event trusted on this node under its recorded deployment mode (for the intent, only its newest version"
+        }
+      ]
+    },
+    {
+      "id": "DM-L",
+      "title": "Service-account certificates without consent; managed-policy listings outside the key set",
+      "status": "fixed",
+      "texts": [
+        {
+          "file": "docs/domain-model/principals-and-agents.md",
+          "quote": "A service-account certificate counts only once the certified principal key countersigns it, and each managed-policy listing and each removal of one is recorded"
+        },
+        {
+          "file": "docs/domain-model/seats-and-keys.md",
+          "quote": "certificates (a service-account certificate once countersigned), revocations, and recorded managed-policy listings and their removals it holds (I10)"
+        },
+        {
+          "file": "docs/srs/05e-provenance-requirements.md",
+          "quote": "a service-account certificate MUST count only once the certified principal key countersigns it"
+        }
+      ]
+    },
+    {
+      "id": "DM-M",
+      "title": "Two rooms naming one branch",
+      "status": "fixed",
+      "texts": [
+        {
+          "file": "docs/domain-model/git-and-forge.md",
+          "quote": "It belongs to the first of this node's principal's rooms whose branch link names it, concurrent links resolving by Room merge"
+        },
+        {
+          "file": "docs/domain-model/git-and-forge.md",
+          "quote": "So only that room takes a run's events on it, and the room trailer of each commit on it names that room (LANE-28)."
+        }
+      ]
+    },
+    {
+      "id": "DM-N",
+      "title": "Who enables the git carrier and on which remote",
+      "status": "fixed",
+      "texts": [
+        {
+          "file": "docs/srs/index.md",
+          "quote": "PEER-08 retired, its id left unused: the git carrier is removed"
+        },
+        {
+          "file": "docs/srs/05a-administration-requirements.md",
+          "quote": "except the harness settings file that `parinn install --scope project` writes after confirmation, the commit hook, and the launcher's fresh checkouts"
+        }
+      ]
+    },
+    {
+      "id": "DM-O",
+      "title": "What happens at a quota; backup not classed as a principal act",
+      "status": "fixed",
+      "texts": [
+        {
+          "file": "docs/srs/05a-administration-requirements.md",
+          "quote": "refuse and audit anything received over one, recording each refused segment as REC-21 says, and never drop an accepted event to free space"
+        },
+        {
+          "file": "docs/srs/05a-administration-requirements.md",
+          "quote": "This node's own recording over a quota MUST raise a failure counter and a Needs you item and keep recording"
+        },
+        {
+          "file": "docs/domain-model/record.md",
+          "quote": "Creating one records no principal act, only an audited event (§9.5), and a copy the principal takes off the machine is its own tool, outside ParleyInn's components (I4)."
+        }
+      ]
+    },
+    {
+      "id": "DM-P",
+      "title": "Whether a room's visibility limits the git carrier, as it limits publishing and blind peers",
+      "status": "fixed",
+      "texts": [
+        {
+          "file": "docs/srs/index.md",
+          "quote": "the git carrier is removed, by the stakeholder's decision of 8 October 2026; ParleyInn writes no room segments to any git remote"
+        },
+        {
+          "file": "docs/srs/05a-administration-requirements.md",
+          "quote": "except the harness settings file that `parinn install --scope project` writes after confirmation, the commit hook, and the launcher's fresh checkouts"
+        }
+      ]
+    },
+    {
+      "id": "DM-Q",
+      "title": "An agent on the facilitator's own node could use the facilitator program's exemption from the terminal test",
+      "status": "accepted",
+      "risk": "R7",
+      "texts": [
+        {
+          "file": "docs/domain-model/principals-and-agents.md",
+          "quote": "An agent on that node can act through its CLI as the program does: §6.1's residual risk R7, which only a sandbox removes."
+        },
+        {
+          "file": "docs/srs/06-security.md",
+          "quote": "on a facilitator's node, it takes the facilitator's acts through that node's CLI as the program does (SEC-32)"
+        }
+      ]
+    },
+    {
+      "id": "DM-R",
+      "title": "A stamped pin version restores before PRV-10, though I2 and Trusted sources trust stamps only once PRV-10 ships",
+      "status": "fixed",
+      "texts": [
+        {
+          "file": "docs/domain-model/pins-and-context.md",
+          "quote": "trusted for the run's principal on this node by its own event or, once PRV-10 ships, by that principal's stamp"
+        },
+        {
+          "file": "docs/domain-model/acts-and-roles.md",
+          "quote": "Once PRV-10 ships, a stamped version of a type that restores restores to that principal's own agents only, as PIN-10 says"
+        },
+        {
+          "file": "docs/srs/05f-pins-recall-and-restore-requirements.md",
+          "quote": "or, once PRV-10 ships, one the run's principal stamped, its stamp so trusted"
+        },
+        {
+          "file": "docs/srs/05b-room-collaboration-requirements.md",
+          "quote": "Once PRV-10 ships, a stamped version of a type that restores MUST restore to the stamper's own agents only, as PIN-10 says"
+        }
+      ]
+    },
+    {
+      "id": "DM-S",
+      "title": "More than one version of one pin qualifies for an agent and no rule says which restores",
+      "status": "fixed",
+      "texts": [
+        {
+          "file": "docs/domain-model/pins-and-context.md",
+          "quote": "At most one version of a pin restores to an agent, the one PIN-10 chooses."
+        },
+        {
+          "file": "docs/srs/05f-pins-recall-and-restore-requirements.md",
+          "quote": "Of a pin's versions that qualify for a run, only the newest MAY restore, but one qualifying only through a trust grant MUST NOT displace one the run's principal stamped"
+        },
+        {
+          "file": "docs/srs/05b-room-collaboration-requirements.md",
+          "quote": "a cut principal act, or PIN-10 restores a newer one instead."
+        }
+      ]
+    },
+    {
+      "id": "DM-T",
+      "title": "The origin and trust of the events a node clone carries over",
+      "status": "fixed",
+      "texts": [
+        {
+          "file": "docs/srs/05a-administration-requirements.md",
+          "quote": "each of their events MUST count as received and not recorded on the node, each deriving origin `peer` or `bundle` (PRV-13), never `witnessed`"
+        },
+        {
+          "file": "docs/domain-model/record.md",
+          "quote": "else `peer` (such as a writer whose seat key a key that a node identity change replaced certified, Node, REC-24)"
+        },
+        {
+          "file": "docs/srs/05a-administration-requirements.md",
+          "quote": "A node's record from before its node identity changed (REC-24), and a backup copy's, MUST carry over to it thus"
+        },
+        {
+          "file": "docs/srs/05a-administration-requirements.md",
+          "quote": "each of their events MUST count as received and not recorded on the node, each deriving origin `peer` or `bundle` (PRV-13), never `witnessed`, so PRV-02 trusts it only as a received event (I2, I8)"
+        }
+      ]
+    },
+    {
+      "id": "DM-U",
+      "title": "A quota excess raises a Needs you item that is no function of the record (I10)",
+      "status": "fixed",
+      "texts": [
+        {
+          "file": "docs/srs/05a-administration-requirements.md",
+          "quote": "Its first crossing of each quota, at each limit set for it, MUST be recorded as a structural event in this node's device seat in its personal room"
+        }
+      ]
+    },
+    {
+      "id": "DM-V",
+      "title": "A trust grant covers a facilitator's posts, which its program writes while reading untrusted room text",
+      "status": "fixed",
+      "texts": [
+        {
+          "file": "docs/srs/05c-principal-and-peer-requirements.md",
+          "quote": "granting a facilitator MUST first show the grantor that the facilitator reads untrusted room text (T27)"
+        },
+        {
+          "file": "docs/domain-model/principals-and-agents.md",
+          "quote": "It posts only in its own words, pointing by range link to any marked range it names and never quoting or embedding it, so it relays no third party's text (SEC-32)"
+        },
+        {
+          "file": "docs/srs/06-security.md",
+          "quote": "Its posts MUST be in its own words only, shown as its own statements, that point by range link to the marked range each names and never quote or embed it, so it relays no third party's text"
+        }
+      ]
+    },
+    {
+      "id": "DM-W",
+      "title": "A trust grant's coverage of posts and pins omits the certifying device key's device scope",
+      "status": "fixed",
+      "texts": [
+        {
+          "file": "docs/domain-model/trust-and-flow.md",
+          "quote": "within that key's device scope (PRV-10), never a cross-room post"
+        },
+        {
+          "file": "docs/srs/05c-principal-and-peer-requirements.md",
+          "quote": "covers only the posts and pins that principal wrote from device seats a device key of that principal certified, within that key's device scope (PRV-10);"
+        }
+      ]
+    },
+    {
+      "id": "DM-X",
+      "title": "Nothing binds a room id to its creating seat, so a second create room act can take the room",
+      "status": "fixed",
+      "texts": [
+        {
+          "file": "docs/domain-model/seats-and-keys.md",
+          "quote": "a create room act whose seat's first key does not derive the room id it names is void and shown"
+        },
+        {
+          "file": "docs/srs/05b-lane-requirements.md",
+          "quote": "derive from its create room act's seat's first key and 128 random bits the creating node mints, never chosen; any other create room act naming it MUST be void and shown"
+        }
+      ]
+    },
+    {
+      "id": "DM-Y",
+      "title": "A subagent of a run working in a room has no seat there",
+      "status": "fixed",
+      "texts": [
+        {
+          "file": "docs/domain-model/principals-and-agents.md",
+          "quote": "among them a seat in each room its parent's run seat is a member of when it starts, joined then with that seat's role and no appointment, under its parent's join (LANE-23)"
+        },
+        {
+          "file": "docs/srs/05b-room-collaboration-requirements.md",
+          "quote": "a subagent's join MUST ride on its parent's: at its start it joins each room its parent's run seat is a member of, with that seat's role and no appointment."
+        }
+      ]
+    },
+    {
+      "id": "DM-Z",
+      "title": "Repository configuration may lower the pin budget, removing pins from a restore block with no principal act",
+      "status": "fixed",
+      "texts": [
+        {
+          "file": "docs/srs/05a-administration-requirements.md",
+          "quote": "otherwise removes one from a restore block, as lowering the pin budget does"
+        },
+        {
+          "file": "docs/srs/06-security.md",
+          "quote": "or make a change ADM-04 holds for acceptance"
+        }
+      ]
+    },
+    {
+      "id": "DM-AA",
+      "title": "A revocation that acts on no room never reaches another principal's node that holds a shared room",
+      "status": "deferred",
+      "oq": "OQ-41",
+      "milestone": "M7",
+      "texts": [
+        {
+          "file": "docs/srs/13-open-questions-and-risks.md",
+          "quote": "how a revocation of a device key or an access token, which acts on no room, reaches another principal's node that holds a room the revoking principal shares"
+        },
+        {
+          "file": "docs/srs/13-open-questions-and-risks.md",
+          "quote": "and how a revocation of a device key or an access token, which acts on no room, reaches another principal's node that holds a room the revoking principal shares"
+        },
+        {
+          "file": "docs/srs/05e-provenance-requirements.md",
+          "quote": "Revocations MUST be signed events that replicate like any other (open for another principal's node: OQ-41)."
+        }
+      ]
+    },
+    {
+      "id": "DM-AB",
+      "title": "A witness check runs others' code on the principal's node where the home and its keys cannot be denied",
+      "status": "fixed",
+      "texts": [
+        {
+          "file": "docs/srs/05c-principal-and-peer-requirements.md",
+          "quote": "ParleyInn MUST refuse the witness check before confirmation and say which it cannot deny"
+        },
+        {
+          "file": "docs/srs/05c-principal-and-peer-requirements.md",
+          "quote": "Unless the platform can deny all of them, ParleyInn MUST refuse the witness check before confirmation and say which it cannot deny."
+        },
+        {
+          "file": "docs/srs/06b-boundary-register.md",
+          "quote": "or ParleyInn refuses the check and says which it cannot deny"
+        }
+      ]
+    },
+    {
+      "id": "DM-AC",
+      "title": "A later run of an agent restores only its personal room's pins until it joins again; a retry's intent restore needs a join nothing gives",
+      "status": "fixed",
+      "texts": [
+        {
+          "file": "docs/domain-model/principals-and-agents.md",
+          "quote": "inherit its rooms for recall (the `rooms` scope), for restore and for its directed posts, never a seat, add or role"
+        },
+        {
+          "file": "docs/srs/05f-pins-recall-and-restore-requirements.md",
+          "quote": "MUST inject first the pins of the rooms the run has had a seat in during the run, its personal room included, then those of rooms only its agent's earlier runs had a seat in"
+        },
+        {
+          "file": "docs/domain-model/trust-and-flow.md",
+          "quote": "whose join to the room the retry itself asks for (OWN-28, LANE-23)"
+        },
+        {
+          "file": "docs/srs/05f-pins-recall-and-restore-requirements.md",
+          "quote": "and of every room its agent's earlier runs had a seat in (REC-02), name those rooms"
+        },
+        {
+          "file": "docs/srs/05-functional-requirements.md",
+          "quote": "an agent's later runs inherit its rooms for recall (RCL-05), for restore (PIN-10) and for its directed posts (LANE-12)"
+        },
+        {
+          "file": "docs/srs/05c-principal-and-peer-requirements.md",
+          "quote": "the retry being its principal's ask for that run's join to the room (LANE-23)"
+        }
+      ]
+    },
+    {
+      "id": "DM-AD",
+      "title": "A run seat of the owner's own agent that joins a room has no role, so it is a viewer with no work",
+      "status": "fixed",
+      "texts": [
+        {
+          "file": "docs/domain-model/principals-and-agents.md",
+          "quote": "its act joining its own run assigns that seat contributor (LANE-16)"
+        },
+        {
+          "file": "docs/srs/05b-room-collaboration-requirements.md",
+          "quote": "the owner's act joining its own run MUST assign that seat contributor"
+        }
+      ]
+    },
+    {
+      "id": "DM-AE",
+      "title": "Foreign room restores its principal's own pins only to runs that had a seat there, not to the agent's later runs",
+      "status": "fixed",
+      "texts": [
+        {
+          "file": "docs/srs/05f-pins-recall-and-restore-requirements.md",
+          "quote": "A restore block MUST contain the qualifying pins of every room its run has had a seat in during the run, its personal room included, and of every room its agent's earlier runs had a seat in (REC-02)"
+        }
+      ]
+    },
+    {
+      "id": "DM-AF",
+      "title": "A standing trust grant keeps covering a key the key set later marks relaying or lists unmarked",
+      "status": "fixed",
+      "texts": [
+        {
+          "file": "docs/srs/05c-principal-and-peer-requirements.md",
+          "quote": "a recorded trust grant MUST cover nothing once the node's key set holds such a certificate or listing for the principal key it names, whatever order they arrived in"
+        }
+      ]
+    },
+    {
+      "id": "DM-AG",
+      "title": "A run seat's leave, or another principal's kick or bar, makes a room foreign and drops trust-granted pins with no act of the agent's principal",
+      "status": "fixed",
+      "texts": [
+        {
+          "file": "docs/domain-model/places.md",
+          "quote": "Yet a leave, kick or bar that makes a room foreign drops no pin"
+        },
+        {
+          "file": "docs/domain-model/acts-and-roles.md",
+          "quote": "or bar never drops a pin from any restore block, even where it makes the room foreign (Foreign room)."
+        },
+        {
+          "file": "docs/srs/05f-pins-recall-and-restore-requirements.md",
+          "quote": "A branch switch, a leave, a kick or a bar MUST NOT drop a pin from any restore block"
+        }
+      ]
+    },
+    {
+      "id": "DM-AH",
+      "title": "After a node identity change, the home's own earlier quarantines stop applying",
+      "status": "fixed",
+      "texts": [
+        {
+          "file": "docs/srs/05a-administration-requirements.md",
+          "quote": "each quarantine in force in either, whichever node made the copy, MUST stay in force on the node until a release there"
+        }
+      ]
+    },
+    {
+      "id": "DM-AI",
+      "title": "A witness check's code can write outside its checkout, into the repository's git directory or other worktrees",
+      "status": "fixed",
+      "texts": [
+        {
+          "file": "docs/srs/05c-principal-and-peer-requirements.md",
+          "quote": "the repository's git directory and its other worktrees included"
+        },
+        {
+          "file": "docs/srs/05c-principal-and-peer-requirements.md",
+          "quote": "and every write outside that checkout (the repository's git directory and its other worktrees included) denied"
+        }
+      ]
+    },
+    {
+      "id": "DM-AJ",
+      "title": "The facilitator's own-words rule covers posts but not pins, which a trust grant restores",
+      "status": "fixed",
+      "texts": [
+        {
+          "file": "docs/domain-model/principals-and-agents.md",
+          "quote": "every pin version it writes is likewise in its own words"
+        },
+        {
+          "file": "docs/srs/06-security.md",
+          "quote": "Every pin version the facilitator writes MUST likewise be in its own words only"
+        }
+      ]
+    },
+    {
+      "id": "DM-AK",
+      "title": "A run a harness resume starts does not carry the resumed run's recall taint",
+      "status": "fixed",
+      "texts": [
+        {
+          "file": "docs/srs/06-security.md",
+          "quote": "MUST pass from run to run, whatever agent each belongs to (REC-02): forward through a harness resume or a harness clear"
+        }
+      ]
+    },
+    {
+      "id": "DM-AL",
+      "title": "Inherited rooms' pins can crowd the run's own rooms' pins out of the pin budget",
+      "status": "fixed",
+      "texts": [
+        {
+          "file": "docs/domain-model/pins-and-context.md",
+          "quote": "by which PIN-08 orders qualifying pins in the pin budget"
+        },
+        {
+          "file": "docs/srs/05f-pins-recall-and-restore-requirements.md",
+          "quote": "ParleyInn MUST inject first the pins of the rooms the run has had a seat in during the run, its personal room included, then those of rooms only its agent's earlier runs had a seat in"
+        }
+      ]
+    },
+    {
+      "id": "DM-AM",
+      "title": "A short-lived subagent's work on its parent's room's branch lands in the personal room until a per-subagent join",
+      "status": "fixed",
+      "texts": [
+        {
+          "file": "docs/domain-model/principals-and-agents.md",
+          "quote": "among them a seat in each room its parent's run seat is a member of when it starts, joined then with that seat's role and no appointment, under its parent's join (LANE-23)"
+        },
+        {
+          "file": "docs/srs/05b-room-collaboration-requirements.md",
+          "quote": "a subagent's join MUST ride on its parent's: at its start it joins each room its parent's run seat is a member of, with that seat's role and no appointment."
+        },
+        {
+          "file": "docs/domain-model/acts-and-roles.md",
+          "quote": "a subagent under its parent's (Subagent, LANE-23)"
+        }
+      ]
+    },
+    {
+      "id": "DM-AN",
+      "title": "Seats of an ended run or a lost device can never leave, so succession and a principal's own exit become unreachable once PRV-10 ships",
+      "status": "deferred",
+      "oq": "OQ-42",
+      "milestone": "M7",
+      "texts": [
+        {
+          "file": "docs/srs/13-open-questions-and-risks.md",
+          "quote": "how a seat of the owner whose key is lost, such as an ended run's or a lost device's, ends its add, which succession (LANE-11) and an owner's leaving need"
+        }
+      ]
+    },
+    {
+      "id": "DM-AO",
+      "title": "A foreign room's branch link counts in branch ownership and can take the principal's own room's branch",
+      "status": "fixed",
+      "texts": [
+        {
+          "file": "docs/srs/05b-lane-requirements.md",
+          "quote": "a foreign room's branch link MUST void none"
+        },
+        {
+          "file": "docs/srs/05b-lane-requirements.md",
+          "quote": "A branch MUST belong to the first of this node's principal's rooms whose branch link names it"
+        }
+      ]
+    },
+    {
+      "id": "DM-AP",
+      "title": "A managed-policy listing enters every holding node's key set with no consent",
+      "status": "fixed",
+      "texts": [
+        {
+          "file": "docs/domain-model/principals-and-agents.md",
+          "quote": "and another node's only once the listed key countersigns it"
+        },
+        {
+          "file": "docs/srs/05e-provenance-requirements.md",
+          "quote": "and another node's only once the listed principal key countersigns the listing"
+        }
+      ]
+    },
+    {
+      "id": "DM-AQ",
+      "title": "Turning off the peer component is cut though it stops principal acts arriving",
+      "status": "fixed",
+      "texts": [
+        {
+          "file": "docs/domain-model/components-and-surfaces.md",
+          "quote": "Turning it off, like any component, is cut: unlike a revocation, which makes a node refuse the revoked key's events it does not yet hold"
+        },
+        {
+          "file": "docs/srs/05d-peer-requirements.md",
+          "quote": "turning it off a cut one: unlike a revocation (PRV-10), it refuses no event and drops no pin"
+        }
+      ]
+    },
+    {
+      "id": "DM-AR",
+      "title": "Recall taint does not flow up from a subagent to the run that receives its report",
+      "status": "fixed",
+      "texts": [
+        {
+          "file": "docs/srs/06-security.md",
+          "quote": "and back through a delegate report (OWN-25) or that tool call's result"
+        },
+        {
+          "file": "docs/srs/05c-principal-and-peer-requirements.md",
+          "quote": "and carries the subagent's recall taint (SEC-13)"
+        }
+      ]
+    },
+    {
+      "id": "DM-AS",
+      "title": "Quarantine does not cover trust-grant posts, endorsed posts or delegated tasks",
+      "status": "fixed",
+      "texts": [
+        {
+          "file": "docs/srs/06-security.md",
+          "quote": "any other write to an agent carrying it, such as an endorsement (OWN-08), a trust grant's post (OWN-29) or a delegated task (OWN-24)"
+        }
+      ]
+    },
+    {
+      "id": "DM-AT",
+      "title": "Branch ownership moves on a join or a later lower-commitment link, not only on a room turning foreign",
+      "status": "fixed",
+      "texts": [
+        {
+          "file": "docs/domain-model/git-and-forge.md",
+          "quote": "It moves only when a room enters or leaves those rooms or a concurrent branch link arrives (LANE-01)"
+        },
+        {
+          "file": "docs/srs/05b-lane-requirements.md",
+          "quote": "MAY move only when a room enters or leaves them or concurrent branch links arrive"
+        }
+      ]
+    },
+    {
+      "id": "DM-AU",
+      "title": "A key can chain to two principal keys, since device, token and seat certificates need no countersignature",
+      "status": "fixed",
+      "texts": [
+        {
+          "file": "docs/domain-model/principals-and-agents.md",
+          "quote": "only once the key it certifies countersigns it"
+        },
+        {
+          "file": "docs/srs/05e-provenance-requirements.md",
+          "quote": "A device, token or seat certificate MUST count only once the key it certifies countersigns it"
+        }
+      ]
+    },
+    {
+      "id": "DM-AV",
+      "title": "A delegate whose node cannot derive the delegating run's recall taint has no fail-safe",
+      "status": "fixed",
+      "texts": [
+        {
+          "file": "docs/srs/06-security.md",
+          "quote": "the run reached carrying recall taint from its first event wherever its node cannot tell the run it comes from"
+        },
+        {
+          "file": "docs/srs/06-security.md",
+          "quote": "the run reached carrying recall taint from its first event wherever its node cannot tell the run it comes from or derive that run's recall taint from the writers it holds"
+        }
+      ]
+    },
+    {
+      "id": "DM-AW",
+      "title": "Quarantine does not keep content out of trusted-only exports",
+      "status": "fixed",
+      "texts": [
+        {
+          "file": "docs/domain-model/record.md",
+          "quote": "from every path that carries content to an agent and from trusted-only exports (SEC-12)"
+        },
+        {
+          "file": "docs/srs/06-security.md",
+          "quote": "restore blocks and trusted-only exports leave it out (RCL-06, CMP-07, LMK-04, PIN-10, ADM-12)"
+        },
+        {
+          "file": "docs/srs/05a-administration-requirements.md",
+          "quote": "MUST NOT write a quarantined one (SEC-12)"
+        }
+      ]
+    },
+    {
+      "id": "DM-AX",
+      "title": "A shared room can name different branches on two principals' nodes, so a verdict's binding and staleness differ",
+      "status": "fixed",
+      "texts": [
+        {
+          "file": "docs/domain-model/git-and-forge.md",
+          "quote": "It goes stale when one of them changes, never because the room names a branch it does not list, on another node or later."
+        },
+        {
+          "file": "docs/srs/05c-principal-and-peer-requirements.md",
+          "quote": "and never because the room names a branch it does not list"
+        }
+      ]
+    },
+    {
+      "id": "DM-AY",
+      "title": "Before PRV-10, nothing says which keys are another principal's",
+      "status": "deferred",
+      "oq": "OQ-42",
+      "milestone": "M7",
+      "texts": [
+        {
+          "file": "docs/srs/13-open-questions-and-risks.md",
+          "quote": "until PRV-10 ships, which keys count as another principal's, on which branch ownership, a join without admission and a node clone's rooms depend"
+        }
+      ]
+    },
+    {
+      "id": "DM-AZ",
+      "title": "Any principal's seat whose key is lost cannot leave, not only the owner's",
+      "status": "deferred",
+      "oq": "OQ-42",
+      "milestone": "M7",
+      "texts": [
+        {
+          "file": "docs/srs/13-open-questions-and-risks.md",
+          "quote": "how a seat of any other principal whose key is lost ends its add without a kick, which that principal's own leaving needs"
+        }
+      ]
+    },
+    {
+      "id": "DM-BA",
+      "title": "A relaying mark's fate after a listing's removal or a certificate's revocation, and its effect on standing grants",
+      "status": "fixed",
+      "texts": [
+        {
+          "file": "docs/domain-model/principals-and-agents.md",
+          "quote": "stays relaying once what marked or listed it is revoked or removed"
+        },
+        {
+          "file": "docs/srs/05c-principal-and-peer-requirements.md",
+          "quote": "no revocation of such a certificate or removal of such a listing MAY lift that"
+        },
+        {
+          "file": "docs/srs/05c-principal-and-peer-requirements.md",
+          "quote": "MUST make that grant cover nothing unless the grant causally follows it"
+        }
+      ]
+    },
+    {
+      "id": "DM-BB",
+      "title": "A pin whose newest qualifying version is quarantined: fall back or drop out",
+      "status": "fixed",
+      "texts": [
+        {
+          "file": "docs/srs/06-security.md",
+          "quote": "A quarantine and its release MUST NOT change room state or the key set, but for which pin version PIN-10 restores"
+        },
+        {
+          "file": "docs/srs/05f-pins-recall-and-restore-requirements.md",
+          "quote": "A version MUST count as absent wherever this requirement chooses which version of a pin restores, the intent's included, while it is quarantined (SEC-12)"
+        }
+      ]
+    },
+    {
+      "id": "DM-BC",
+      "title": "The foreign-room freeze (a leave, kick or bar drops no pin; pins keep restoring as they stood) also keeps restoring pins of a revoked key or a key the key set marks relaying",
+      "status": "fixed",
+      "texts": [
+        {
+          "file": "docs/srs/05f-pins-recall-and-restore-requirements.md",
+          "quote": "or until a certificate it qualified through is revoked (PRV-10) or the trust grant it qualified by covers nothing (OWN-29), as in any other room"
+        }
+      ]
+    },
+    {
+      "id": "DM-BD",
+      "title": "After a handover or succession, the new owner's stamp lifts the intent's restriction and restores the old version to the former owner's agents",
+      "status": "fixed",
+      "texts": [
+        {
+          "file": "docs/domain-model/pins-and-context.md",
+          "quote": "after a change of ownership, until the new owner revises it, it restores only to its stampers' agents (LANE-11)"
+        },
+        {
+          "file": "docs/srs/05b-lane-requirements.md",
+          "quote": "the intent MUST restore only to its stampers' agents until the new owner revises it (LANE-32)."
+        }
+      ]
+    },
+    {
+      "id": "DM-BE",
+      "title": "The model never says which sealed ranges a peer may receive: whether a private (personal) room syncs to the principal's own other nodes, and which ranges of other writers another principal's node may pull",
+      "status": "fixed",
+      "texts": [
+        {
+          "file": "docs/srs/05d-peer-requirements.md",
+          "quote": "serve each room's segments to the enrolled peers whose principal has a seat in that room (LANE-16)"
+        },
+        {
+          "file": "docs/srs/05d-peer-requirements.md",
+          "quote": "so a personal room's segments go only to its principal's other nodes"
+        }
+      ]
+    },
+    {
+      "id": "DM-BF",
+      "title": "A seat key whose countersigned certificates chain it to two principal keys chains to neither, so a barred principal can take its seat out of the bar, kick and owner protection and stay a member",
+      "status": "fixed",
+      "texts": [
+        {
+          "file": "docs/srs/05e-provenance-requirements.md",
+          "quote": "a key whose countersigned certificates chain it to two principal keys MUST chain to neither, its seat a member of no room (LANE-25)"
+        },
+        {
+          "file": "docs/srs/05e-provenance-requirements.md",
+          "quote": "its seat a member of no room (LANE-25)"
+        }
+      ]
+    },
+    {
+      "id": "DM-BG",
+      "title": "The seat ingest starts shares the named run seat's add and takes over its role, but nothing ties it to the key that certified that run seat",
+      "status": "fixed",
+      "texts": [
+        {
+          "file": "docs/domain-model/seats-and-keys.md",
+          "quote": "certified only by the key that certified that run seat"
+        },
+        {
+          "file": "docs/srs/05-functional-requirements.md",
+          "quote": "which only the key that certified the run seat it names, or the key a rotation names in its place (PRV-12), MAY certify"
+        }
+      ]
+    },
+    {
+      "id": "DM-BH",
+      "title": "The Provenance entry gives no class to a worktree checkpoint, recall event, canary event or backup event",
+      "status": "fixed",
+      "texts": [
+        {
+          "file": "docs/domain-model/record.md",
+          "quote": "REC-20, RCL-07, OWN-18 and PEER-11 class the events they name"
+        },
+        {
+          "file": "docs/srs/05e-provenance-requirements.md",
+          "quote": "Hook observations, seat-key rotations (SEC-27), key events and certificate records (PRV-12), tombstones, canary events (OPS-04), backup events (ADM-06), arrival events (PRV-13), node identity change events (REC-24), refused-segment events (REC-21) and time marks (REC-15) MUST carry `structural`"
+        }
+      ]
+    },
+    {
+      "id": "DM-BI",
+      "title": "The trusted-only export writes whole trusted events, so the untrusted free text of a cut or neutral principal act (a stated reason) reaches downstream memory systems marked trusted",
+      "status": "fixed",
+      "texts": [
+        {
+          "file": "docs/srs/05a-administration-requirements.md",
+          "quote": "or the free text of a cut or neutral principal act (OWN-11), each of which its review step shows as withheld (SEC-26)"
+        }
+      ]
+    },
+    {
+      "id": "DM-BJ",
+      "title": "The results and errors of tool calls that are not recall (room act tools, delegation tools, acting CLI verbs) have no rule on what they may carry",
+      "status": "fixed",
+      "texts": [
+        {
+          "file": "docs/srs/05f-pins-recall-and-restore-requirements.md",
+          "quote": "whatever ParleyInn returns to a tool call, its errors and a CLI verb's output that is not a terminal included, MUST carry only fixed text ParleyInn ships"
+        },
+        {
+          "file": "docs/srs/05f-pins-recall-and-restore-requirements.md",
+          "quote": "whatever ParleyInn returns to a tool call, its errors and a CLI verb's output that is not a terminal"
+        },
+        {
+          "file": "docs/srs/06-security.md",
+          "quote": "recall taint MUST be set on a run once untrusted content has been returned to it (RCL-04)"
+        }
+      ]
+    },
+    {
+      "id": "DM-BK",
+      "title": "A harness resume that starts a new harness session where the harness gives no stable agent id is a new agent whose restore block and recall omit the resumed run's rooms",
+      "status": "deferred",
+      "oq": "OQ-43",
+      "milestone": "M1",
+      "texts": [
+        {
+          "file": "docs/domain-model/principals-and-agents.md",
+          "quote": "without one, whether it is the resumed run's agent is open (OQ-43), and until then it is its own agent"
+        },
+        {
+          "file": "docs/srs/13-open-questions-and-risks.md",
+          "quote": "whether a run that a harness resume starts in a new harness session, where the harness gives no stable agent id, belongs to the agent of the run it resumes"
+        }
+      ]
+    },
+    {
+      "id": "DM-BL",
+      "title": "A purged pin version (by a principal act, a retention policy or an applied erasure request) has no rule when PIN-10 chooses which version of a pin restores",
+      "status": "fixed",
+      "texts": [
+        {
+          "file": "docs/srs/05f-pins-recall-and-restore-requirements.md",
+          "quote": "once it is purged, however purged (SEC-31), its tombstone never restoring"
+        }
+      ]
+    },
+    {
+      "id": "DM-BM",
+      "title": "Foreign room's trusted list leaves out the trust-grant pins a leave, kick or bar keeps",
+      "status": "fixed",
+      "texts": [
+        {
+          "file": "docs/srs/05f-pins-recall-and-restore-requirements.md",
+          "quote": "and the pins PIN-10 keeps after a leave, kick or bar, trusted for restore"
+        }
+      ]
+    },
+    {
+      "id": "DM-BN",
+      "title": "Foreign room's freeze keeps the former owner's intent restoring after a change of ownership, against LANE-11",
+      "status": "fixed",
+      "texts": [
+        {
+          "file": "docs/srs/05f-pins-recall-and-restore-requirements.md",
+          "quote": "after a change of ownership, the intent MUST restore in such a room only as LANE-11 says"
+        }
+      ]
+    },
+    {
+      "id": "DM-BO",
+      "title": "Peer's serving rule ignores a token-key-only node's token limits",
+      "status": "fixed",
+      "texts": [
+        {
+          "file": "docs/srs/05d-peer-requirements.md",
+          "quote": "A token-key-only node MUST get only the segments of the rooms its token key is limited to (PEER-06)"
+        }
+      ]
+    },
+    {
+      "id": "DM-BP",
+      "title": "A managed-policy listing or its removal never reaches another principal's node",
+      "status": "deferred",
+      "oq": "OQ-41",
+      "milestone": "M7",
+      "texts": [
+        {
+          "file": "docs/domain-model/principals-and-agents.md",
+          "quote": "how a listing or a removal reaches another principal's node rests on OQ-41"
+        },
+        {
+          "file": "docs/srs/13-open-questions-and-risks.md",
+          "quote": "managed-policy listing or its removal, a structural event in the personal room of the node that records it, reaches another principal's node"
+        }
+      ]
+    },
+    {
+      "id": "DM-BQ",
+      "title": "A delegation to another principal's agent has no path under Peer's serving rule",
+      "status": "deferred",
+      "oq": "OQ-14",
+      "milestone": "M8",
+      "texts": [
+        {
+          "file": "docs/domain-model/trust-and-flow.md",
+          "quote": "How a delegated task and its delegate report travel between two principals' nodes rests on OQ-14"
+        },
+        {
+          "file": "docs/srs/05c-principal-and-peer-requirements.md",
+          "quote": "how the delegated task and its delegate report travel between the two principals' nodes is open (OQ-14)"
+        }
+      ]
+    },
+    {
+      "id": "DM-BR",
+      "title": "A personal room's cross-room post could reach another principal's peer with no widening act",
+      "status": "deferred",
+      "oq": "OQ-41",
+      "milestone": "M8",
+      "texts": [
+        {
+          "file": "docs/srs/05d-peer-requirements.md",
+          "quote": "as do its cross-room posts until OQ-41 closes"
+        }
+      ]
+    },
+    {
+      "id": "DM-BS",
+      "title": "A purge or retention policy can erase an act and so undo its effect (quarantine, unpin, unstamp, revocation, listing)",
+      "status": "fixed",
+      "texts": [
+        {
+          "file": "docs/domain-model/index.md",
+          "quote": "A purge destroys content, never an act's effect: its tombstone keeps the"
+        },
+        {
+          "file": "docs/srs/05a-administration-requirements.md",
+          "quote": "and the structural fields, provenance and recorder of each purged act, tombstone and event the key set holds"
+        }
+      ]
+    },
+    {
+      "id": "DM-BT",
+      "title": "The deployment mode, redaction and flags change through the principal's configuration with no acceptance",
+      "status": "fixed",
+      "texts": [
+        {
+          "file": "docs/domain-model/trust-and-flow.md",
+          "quote": "set per node by managed policy or accepted configuration (PRV-02, PRV-04, ADM-04"
+        },
+        {
+          "file": "docs/srs/05a-administration-requirements.md",
+          "quote": "hold windows, turns flags off, or turns on a B1–B3 component MUST apply only from managed policy"
+        },
+        {
+          "file": "docs/srs/05e-provenance-requirements.md",
+          "quote": "explicit opt-in in the principal's configuration (ADM-04)"
+        }
+      ]
+    },
+    {
+      "id": "DM-BU",
+      "title": "The facilitator's program could author a pin that restores without a principal surface",
+      "status": "fixed",
+      "texts": [
+        {
+          "file": "docs/domain-model/principals-and-agents.md",
+          "quote": "its program writes no pin that restores unstamped"
+        }
+      ]
+    },
+    {
+      "id": "DM-BV",
+      "title": "Whether acts in a retired writer's later segments count in the room merge",
+      "status": "deferred",
+      "oq": "OQ-41",
+      "milestone": "M8",
+      "texts": [
+        {
+          "file": "docs/srs/05d-peer-requirements.md",
+          "quote": "marked delivered after retirement (open for the room merge: OQ-41)"
+        },
+        {
+          "file": "docs/srs/13-open-questions-and-risks.md",
+          "quote": "whether an act in a retired writer's segments past the seq its retirement names"
+        }
+      ]
+    },
+    {
+      "id": "DM-BW",
+      "title": "Recall scope for a room of the principal's that the agent's run seats have left",
+      "status": "deferred",
+      "oq": "OQ-45",
+      "milestone": "M8",
+      "texts": [
+        {
+          "file": "docs/srs/05f-pins-recall-and-restore-requirements.md",
+          "quote": "Whether a call may name a room of its principal's that every run seat of the agent has left or lost to a kick or a bar"
+        },
+        {
+          "file": "docs/srs/05f-pins-recall-and-restore-requirements.md",
+          "quote": "which neither scope reaches, is open (OQ-45)"
+        }
+      ]
+    },
+    {
+      "id": "DM-BX",
+      "title": "A token-key-only node's deployment mode has no stated default or source",
+      "status": "deferred",
+      "oq": "OQ-06",
+      "milestone": "M8",
+      "texts": [
+        {
+          "file": "docs/srs/05a-administration-requirements.md",
+          "quote": "A token-key-only node signs no principal act (PRV-10), so only managed policy makes such a change there (open: OQ-06)"
+        },
+        {
+          "file": "docs/srs/13-open-questions-and-risks.md",
+          "quote": "May the access token whose token key certifies its seat keys name the mode"
+        }
+      ]
+    },
+    {
+      "id": "DM-BY",
+      "title": "Whose principal act may retire a writer",
+      "status": "fixed",
+      "texts": [
+        {
+          "file": "docs/domain-model/record.md",
+          "quote": "by a principal act of the principal its seat key chains to, or by the expire act"
+        },
+        {
+          "file": "docs/srs/05d-peer-requirements.md",
+          "quote": "Only the principal a writer's seat key chains to MAY retire it by a principal act"
+        }
+      ]
+    },
+    {
+      "id": "DM-BZ",
+      "title": "The Agent entry's 'its rooms' covers recall and restore, which reach different sets",
+      "status": "fixed",
+      "texts": [
+        {
+          "file": "docs/srs/05-functional-requirements.md",
+          "quote": "For restore and directed posts, its rooms MUST be every room its earlier runs had a seat in, even one their seats all left or lost to a kick or a bar"
+        },
+        {
+          "file": "docs/srs/05-functional-requirements.md",
+          "quote": "for recall only the rooms where a seat of its runs is still a member (RCL-05; open: OQ-45)"
+        }
+      ]
+    },
+    {
+      "id": "DM-CA",
+      "title": "A whole-room mute may cover the owner's device seats and leave no seat able to unmute",
+      "status": "fixed",
+      "texts": [
+        {
+          "file": "docs/domain-model/principals-and-agents.md",
+          "quote": "No mute, a whole-room one included, covers its device seats"
+        },
+        {
+          "file": "docs/srs/05b-room-collaboration-requirements.md",
+          "quote": "from one seat or the whole room, never the owner's device seats"
+        }
+      ]
+    },
+    {
+      "id": "DM-CB",
+      "title": "Another principal's seat in a shared room can win the lower-commitment tie between concurrent branch links",
+      "status": "deferred",
+      "oq": "OQ-46",
+      "milestone": "M7",
+      "texts": [
+        {
+          "file": "docs/domain-model/git-and-forge.md",
+          "quote": "Whether a link another principal's seat wrote may win a concurrent tie over"
+        },
+        {
+          "file": "docs/srs/13-open-questions-and-risks.md",
+          "quote": "In a room two principals share, a seat of the other principal with the link capability"
+        }
+      ]
+    },
+    {
+      "id": "DM-CC",
+      "title": "The provenance of a subagent's delegated task is unstated and could be trusted `user`",
+      "status": "fixed",
+      "texts": [
+        {
+          "file": "docs/domain-model/principals-and-agents.md",
+          "quote": "Its run records that task as untrusted `harness_text`, never `user` (PRV-08)"
+        },
+        {
+          "file": "docs/srs/05e-provenance-requirements.md",
+          "quote": "MUST be classified untrusted `harness_text`, never `user` (OWN-24)"
+        }
+      ]
+    },
+    {
+      "id": "DM-CD",
+      "title": "Where a witnessed run's events go while no MCP server holds its run-seat key",
+      "status": "fixed",
+      "texts": [
+        {
+          "file": "docs/srs/05-functional-requirements.md",
+          "quote": "Until a witnessed run's MCP server holds its run-seat key, the hook handlers MUST append nothing for that run"
+        },
+        {
+          "file": "docs/domain-model/seats-and-keys.md",
+          "quote": "A witnessed run records nothing until its MCP server holds its run-seat key"
+        }
+      ]
+    },
+    {
+      "id": "DM-CE",
+      "title": "A stamp neither shows nor fixes the pin priority and type that order and gate restore",
+      "status": "fixed",
+      "texts": [
+        {
+          "file": "docs/domain-model/pins-and-context.md",
+          "quote": "A pin keeps the priority and pin type it was written with (PIN-04)"
+        },
+        {
+          "file": "docs/srs/05f-pins-recall-and-restore-requirements.md",
+          "quote": "changing a pin's type, priority or room MUST be an unpin then a new pin"
+        }
+      ]
+    },
+    {
+      "id": "DM-CF",
+      "title": "A token-key-only node's runs join no room, so its agents restore no constraints",
+      "status": "fixed",
+      "texts": [
+        {
+          "file": "docs/domain-model/places.md",
+          "quote": "Minting its access token is also its principal's ask for each of its runs to join"
+        },
+        {
+          "file": "docs/srs/05d-peer-requirements.md",
+          "quote": "Minting an access token that names a room to continue MUST be its principal's ask"
+        }
+      ]
+    },
+    {
+      "id": "DM-CG",
+      "title": "OQ-43's interim rule records nothing for a run whose MCP server holds no run-seat key, and counts and audits nothing either",
+      "status": "fixed",
+      "texts": [
+        {
+          "file": "docs/srs/05-functional-requirements.md",
+          "quote": "MUST be counted and audited until its events reach the record (I6)"
+        }
+      ]
+    },
+    {
+      "id": "DM-CH",
+      "title": "An access token carries a room's ask and pins but not the acts a token-key-only node derives their qualification and its runs' membership from",
+      "status": "deferred",
+      "oq": "OQ-47",
+      "milestone": "M8",
+      "texts": [
+        {
+          "file": "docs/domain-model/places.md",
+          "quote": "and the token carries that ask and those rooms' qualifying pins"
+        },
+        {
+          "file": "docs/srs/13-open-questions-and-risks.md",
+          "quote": "that arise only from features M6 to M9 ship need a change before those milestones start"
+        }
+      ]
+    },
+    {
+      "id": "DM-CI",
+      "title": "A token-key-only node's runs have no join when their first restore block is built, since the run-seat key that signs it may not exist yet",
+      "status": "deferred",
+      "oq": "OQ-47",
+      "milestone": "M8",
+      "texts": [
+        {
+          "file": "docs/domain-model/places.md",
+          "quote": "so those pins restore to its runs from their first"
+        },
+        {
+          "file": "docs/srs/13-open-questions-and-risks.md",
+          "quote": "that arise only from features M6 to M9 ship need a change before those milestones start"
+        }
+      ]
+    },
+    {
+      "id": "DM-CJ",
+      "title": "M5 held P1 rows that need the room view, results or worktree checkpoints (S-1)",
+      "status": "fixed",
+      "texts": [
+        {
+          "file": "docs/srs/12-delivery-plan.md",
+          "quote": "but not LANE-17, LANE-19, LANE-21, VIEW-20 and VIEW-21, which need the room view, results or worktree checkpoints and come in M7"
+        },
+        {
+          "file": "docs/srs/12-delivery-plan.md",
+          "quote": "a two-week pilot of many concurrent agents with the room view in daily use; §11.1 gains \"what did my agent do, answered from Catch up alone\""
+        }
+      ]
+    },
+    {
+      "id": "DM-CK",
+      "title": "M1 and M3 rows assumed seals, which ship with REC-18 in M7 (S-2)",
+      "status": "fixed",
+      "texts": [
+        {
+          "file": "docs/srs/05a-administration-requirements.md",
+          "quote": "the open segment up to its newest event (under a fresh seal once REC-18 ships)"
+        },
+        {
+          "file": "docs/srs/12-delivery-plan.md",
+          "quote": "Do two writers' closed segments, received in either order"
+        }
+      ]
+    },
+    {
+      "id": "DM-CL",
+      "title": "No sandbox state is recorded before the launcher ships (S-3)",
+      "status": "fixed",
+      "texts": [
+        {
+          "file": "docs/domain-model/trust-and-flow.md",
+          "quote": "write; a run with none recorded counts as unsandboxed (OWN-22)."
+        },
+        {
+          "file": "docs/srs/12-delivery-plan.md",
+          "quote": "Only the launcher (M7)"
+        }
+      ]
+    },
+    {
+      "id": "DM-CM",
+      "title": "Joins shipped only in M7, so subagents missed their parent's room pins (S-4)",
+      "status": "fixed",
+      "texts": [
+        {
+          "file": "docs/domain-model/acts-and-roles.md",
+          "quote": "when its principal asks for the join or accepts it, a subagent under its"
+        },
+        {
+          "file": "docs/domain-model/index.md",
+          "quote": "per room it joined or created"
+        }
+      ]
+    },
+    {
+      "id": "DM-CN",
+      "title": "Four P0 rows were named by no milestone (S-5)",
+      "status": "fixed",
+      "texts": [
+        {
+          "file": "docs/srs/12-delivery-plan.md",
+          "quote": "MEM-01, SEC-01..08, SEC-10 in part (keys kept on the node"
+        }
+      ]
+    },
+    {
+      "id": "DM-CO",
+      "title": "OWN-01, the one-principal rule for an agent, sat in M7 (S-6)",
+      "status": "fixed",
+      "texts": [
+        {
+          "file": "docs/srs/12-delivery-plan.md",
+          "quote": "OWN-01 (its clauses on other principals' text apply once their requirements ship)"
+        },
+        {
+          "file": "docs/srs/12-delivery-plan.md",
+          "quote": "OWN P1 rows but OWN-01, including OWN-21"
+        }
+      ]
+    },
+    {
+      "id": "DM-CP",
+      "title": "`parinn ingest` and its untrusted origin sat in M7 though M1 relied on them (S-7)",
+      "status": "fixed",
+      "texts": [
+        {
+          "file": "docs/srs/12-delivery-plan.md",
+          "quote": "REC-19 in part (the seat `parinn ingest` starts,"
+        },
+        {
+          "file": "docs/srs/12-delivery-plan.md",
+          "quote": "REC-18, the rest of REC-19, REC-20,"
+        }
+      ]
+    },
+    {
+      "id": "DM-CQ",
+      "title": "M1 and M2 checked roles and capabilities that LANE-16 brings only in M7 (S-8)",
+      "status": "fixed",
+      "texts": [
+        {
+          "file": "docs/srs/12-delivery-plan.md",
+          "quote": "LANE-16 in part (the owner's device seat with every capability, and the contributor role of a run's seat in its personal room"
+        },
+        {
+          "file": "docs/srs/12-delivery-plan.md",
+          "quote": "the rest of LANE-16 (the other roles and capabilities room acts are checked against"
+        }
+      ]
+    },
+    {
+      "id": "DM-CR",
+      "title": "LANE-01 relied on LANE-31's branch-link tie rule from M7 (S-9)",
+      "status": "fixed",
+      "texts": [
+        {
+          "file": "docs/srs/12-delivery-plan.md",
+          "quote": "LANE-31 in part (the rule for two branch links naming one branch)"
+        }
+      ]
+    },
+    {
+      "id": "DM-CS",
+      "title": "A managed policy could require an authenticator before presence proofs ship (S-10)",
+      "status": "fixed",
+      "texts": [
+        {
+          "file": "docs/srs/06-security.md",
+          "quote": "Until presence proofs ship (OWN-11, OWN-12), ParleyInn MUST refuse every widening act while managed policy requires an authenticator"
+        },
+        {
+          "file": "docs/srs/06-security.md",
+          "quote": "set quotas once ADM-15 ships, fix the deployment mode"
+        }
+      ]
+    },
+    {
+      "id": "DM-CT",
+      "title": "Scenarios of M1–M5 requirements exercised M6–M9 behaviour (S-11)",
+      "status": "fixed",
+      "texts": [
+        {
+          "file": "features/lane.feature",
+          "quote": "whose current run holds no seat in the room, though an earlier run of that agent had one"
+        },
+        {
+          "file": "features/security.feature",
+          "quote": "nothing in the bundle lets a reader confirm a guess at a payload's content from its payload name"
+        }
+      ]
+    },
+    {
+      "id": "DM-CU",
+      "title": "Action class, commit author and review step were defined inside later entries (S-12)",
+      "status": "fixed",
+      "texts": [
+        {
+          "file": "docs/domain-model/trust-and-flow.md",
+          "quote": "**Action class**: A kind of tool action, such as edits, commands or network"
+        },
+        {
+          "file": "docs/domain-model/git-and-forge.md",
+          "quote": "**Commit author**: Git's author of a commit, never a seat."
+        }
+      ]
+    },
+    {
+      "id": "DM-CV",
+      "title": "The invariants name concepts whose requirements ship after M5 (S-13)",
+      "status": "fixed",
+      "texts": [
+        {
+          "file": "docs/domain-model/index.md",
+          "quote": "The model keeps every concept defined, those"
+        },
+        {
+          "file": "docs/domain-model/index.md",
+          "quote": "and §12.2 decides when each one's requirements"
+        }
+      ]
+    },
+    {
+      "id": "DM-CW",
+      "title": "Address forms and writer labels (RCL-08) sat in M7 though M1 used them (S-14)",
+      "status": "fixed",
+      "texts": [
+        {
+          "file": "docs/srs/12-delivery-plan.md",
+          "quote": "RCL-05 changed, RCL-08, ADM-04 changed"
+        }
+      ]
+    },
+    {
+      "id": "DM-CX",
+      "title": "The trusted-only export had no review step before SEC-26 (M9) (S-15)",
+      "status": "fixed",
+      "texts": [
+        {
+          "file": "docs/srs/12-delivery-plan.md",
+          "quote": "SEC-26 in part (the trusted-only export as a widening principal act with its review step)"
+        },
+        {
+          "file": "docs/srs/06b-boundary-register.md",
+          "quote": "P2; trusted-only export P1"
+        }
+      ]
+    },
+    {
+      "id": "DM-CY",
+      "title": "The boundary register made the TUI P0 though it ships with VIEW-14 in M7 (S-16)",
+      "status": "fixed",
+      "texts": [
+        {
+          "file": "docs/srs/06b-boundary-register.md",
+          "quote": "P0; TUI P1"
+        }
+      ]
+    },
+    {
+      "id": "DM-CZ",
+      "title": "REC-21's refused segments (M3) were recorded under Integrity status (M7) (S-17)",
+      "status": "fixed",
+      "texts": [
+        {
+          "file": "docs/domain-model/record.md",
+          "quote": "**sealed range**. A refused segment is recorded as a structural event in"
+        },
+        {
+          "file": "docs/domain-model/record.md",
+          "quote": "one of §9.7.5's values (VIEW-10); `refused` shows a refused segment"
+        }
+      ]
+    },
+    {
+      "id": "DM-DA",
+      "title": "Seat ids derived under LANE-23 (M7) though quarantine and purge by seat need them in M1 (S-18)",
+      "status": "fixed",
+      "texts": [
+        {
+          "file": "docs/srs/12-delivery-plan.md",
+          "quote": "LANE-23 in part (how a seat id derives)"
+        },
+        {
+          "file": "docs/srs/12-delivery-plan.md",
+          "quote": "the room model's LANE-23..33 (the rest of LANE-23 and LANE-31)"
+        }
+      ]
+    },
+    {
+      "id": "DM-DB",
+      "title": "A join's consent covers branches another principal's seat links later in a shared room",
+      "status": "deferred",
+      "oq": "OQ-47",
+      "milestone": "M7",
+      "texts": [
+        {
+          "file": "docs/domain-model/acts-and-roles.md",
+          "quote": "branches the room names later by branch links, whose runs' events then go"
+        },
+        {
+          "file": "docs/srs/13-open-questions-and-risks.md",
+          "quote": "that arise only from features M6 to M9 ship need a change before those milestones start"
+        }
+      ]
+    },
+    {
+      "id": "DM-DC",
+      "title": "Nothing fixes a room's visibility and admission at creation, so a run seat's create room act could open a room",
+      "status": "deferred",
+      "oq": "OQ-47",
+      "milestone": "M7",
+      "texts": [
+        {
+          "file": "docs/domain-model/places.md",
+          "quote": "published or stored on blind peers (LANE-17). Changing it is a widening"
+        },
+        {
+          "file": "docs/srs/13-open-questions-and-risks.md",
+          "quote": "that arise only from features M6 to M9 ship need a change before those milestones start"
+        }
+      ]
+    },
+    {
+      "id": "DM-DD",
+      "title": "A node clone's carried-over quarantines read as another node's, against I5's request rule",
+      "status": "fixed",
+      "texts": [
+        {
+          "file": "docs/srs/05a-administration-requirements.md",
+          "quote": "MUST stay in force on the node until a release there, as its principal's own, recorded in its home"
+        }
+      ]
+    },
+    {
+      "id": "DM-DE",
+      "title": "A backup restore reinstates unauthenticated events as witnessed, so an edited copy plants trusted events (stakeholder: they count as received)",
+      "status": "fixed",
+      "texts": [
+        {
+          "file": "docs/srs/05a-administration-requirements.md",
+          "quote": "and a backup copy's, MUST carry over to it thus, even on the node that made the copy"
+        },
+        {
+          "file": "docs/srs/05a-administration-requirements.md",
+          "quote": "and a backup copy's, MUST carry over to it thus, even on the node that made the copy: each of their events MUST count as received and not recorded on the node"
+        }
+      ]
+    },
+    {
+      "id": "DM-DF",
+      "title": "The model names only dormant room-view surfaces as what shows a person the record and the counters in M1–M5",
+      "status": "fixed",
+      "texts": [
+        {
+          "file": "docs/domain-model/components-and-surfaces.md",
+          "quote": "`parinn status` shows Health's counters and store locations (ADM-11)"
+        },
+        {
+          "file": "docs/srs/05b-room-view-requirements.md",
+          "quote": "the CLI shows the record at a terminal"
+        }
+      ]
+    },
+    {
+      "id": "DM-DG",
+      "title": "A backup restore reinstated the copy's derived artifacts although its events now count as received (I10)",
+      "status": "fixed",
+      "texts": [
+        {
+          "file": "docs/srs/05a-administration-requirements.md",
+          "quote": "every derived artifact MUST derive from the writer logs the node holds and its key set, none reinstated from the copy"
+        },
+        {
+          "file": "docs/srs/05a-administration-requirements.md",
+          "quote": "every derived artifact MUST derive from the writer logs the node holds and its key set, none reinstated from the copy (ADM-08, I10)"
+        }
+      ]
+    },
+    {
+      "id": "DM-DH",
+      "title": "A restore on another node kept the copy's quarantines without a quarantine request (I5)",
+      "status": "fixed",
+      "texts": [
+        {
+          "file": "docs/srs/05a-administration-requirements.md",
+          "quote": "each quarantine in force in either, whichever node made the copy"
+        },
+        {
+          "file": "docs/srs/05a-administration-requirements.md",
+          "quote": "a copy's applied by the restore as its principal applies a quarantine request (SEC-12, PEER-11, I5)"
+        }
+      ]
+    },
+    {
+      "id": "DM-DI",
+      "title": "Restoring another node's copy leaves its personal room beside this node's, unreached by recall and runs",
+      "status": "deferred",
+      "oq": "OQ-45",
+      "milestone": "M8",
+      "texts": [
+        {
+          "file": "docs/domain-model/places.md",
+          "quote": "a backup restore of a copy another node made does not share that node's personal room"
+        },
+        {
+          "file": "docs/srs/13-open-questions-and-risks.md",
+          "quote": "such as one a backup restore of a copy that node made reinstates (ADM-06)"
+        }
+      ]
+    },
+    {
+      "id": "DM-DJ",
+      "title": "After a node identity change or a restore, principal acts other than quarantines had no stated effect, so a configuration acceptance could carry over",
+      "status": "fixed",
+      "texts": [
+        {
+          "file": "docs/srs/05a-administration-requirements.md",
+          "quote": "no widening one, a configuration acceptance (ADM-04) included, MAY take effect on the node until its principal takes it there again"
+        },
+        {
+          "file": "docs/srs/05-functional-requirements.md",
+          "quote": "and carry over earlier events only as ADM-06 says"
+        }
+      ]
+    },
+    {
+      "id": "DM-DK",
+      "title": "The CLI showed untrusted text raw at a terminal before the room view's placeholders ship",
+      "status": "fixed",
+      "texts": [
+        {
+          "file": "docs/srs/06-security.md",
+          "quote": "in text other than fixed text ParleyInn ships as a visible placeholder naming its code point, never written raw"
+        },
+        {
+          "file": "docs/srs/06-security.md",
+          "quote": "At a terminal, the CLI and the TUI MUST show every control character but the line feed"
+        }
+      ]
+    },
+    {
+      "id": "DM-DL",
+      "title": "Before PRV-10 no seat key chains to a principal key, so the model's rule voids every principal act retiring a writer",
+      "status": "deferred",
+      "oq": "OQ-47",
+      "milestone": "M8",
+      "texts": [
+        {
+          "file": "docs/srs/05d-peer-requirements.md",
+          "quote": "any other principal act retiring it MUST be void and shown"
+        },
+        {
+          "file": "docs/srs/13-open-questions-and-risks.md",
+          "quote": "that arise only from features M6 to M9 ship need a change before those milestones start"
+        }
+      ]
+    },
+    {
+      "id": "DM-DM",
+      "title": "A cut act kept after a clone or restore can leave a rule level looser than without the lapsed widening act",
+      "status": "deferred",
+      "oq": "OQ-47",
+      "milestone": "M7",
+      "texts": [
+        {
+          "file": "docs/srs/05a-administration-requirements.md",
+          "quote": "of the other principal acts in either, each cut or neutral one in force MUST keep its effect until undone on the node"
+        },
+        {
+          "file": "docs/srs/13-open-questions-and-risks.md",
+          "quote": "that arise only from features M6 to M9 ship need a change before those milestones start"
+        }
+      ]
+    },
+    {
+      "id": "DM-DN",
+      "title": "A harness session a run's tool call starts recorded its input as trusted user and carried none of the run's recall taint",
+      "status": "fixed",
+      "texts": [
+        {
+          "file": "docs/domain-model/harness-facts.md",
+          "quote": "descends from a run's tool call records no `user` event"
+        },
+        {
+          "file": "docs/domain-model/harness-facts.md",
+          "quote": "recall taint passes between its runs and that run (SEC-13)"
+        },
+        {
+          "file": "docs/srs/05e-provenance-requirements.md",
+          "quote": "So MUST the input of a harness session whose process descends from a run's tool call"
+        },
+        {
+          "file": "docs/srs/06-security.md",
+          "quote": "or the input a run's tool call gives a harness session (PRV-08), into each run so started from its first event"
+        }
+      ]
+    },
+    {
+      "id": "DM-DO",
+      "title": "A detected pin candidate seemed to be shown with no trust mark; the model omitted that ParleyInn detects only in trusted user events",
+      "status": "fixed",
+      "texts": [
+        {
+          "file": "docs/domain-model/pins-and-context.md",
+          "quote": "`user` event trusted on this node, never in an ingested or other untrusted"
+        },
+        {
+          "file": "docs/srs/05f-pins-recall-and-restore-requirements.md",
+          "quote": "ParleyInn SHOULD detect constraints stated in trusted `user` events as pin candidates"
+        }
+      ]
+    },
+    {
+      "id": "DM-DP",
+      "title": "The model never defined harness_text or which harness-added text counts as user",
+      "status": "fixed",
+      "texts": [
+        {
+          "file": "docs/domain-model/harness-facts.md",
+          "quote": "is `harness_text`, never `user` and never trusted"
+        },
+        {
+          "file": "docs/srs/05e-provenance-requirements.md",
+          "quote": "an `isMeta` line, command output the harness writes as a `user` line, a line the launcher carried in (LANE-14)"
+        }
+      ]
+    },
+    {
+      "id": "DM-DQ",
+      "title": "Kernel variables loaded before a quarantine or purge kept serving that content",
+      "status": "fixed",
+      "texts": [
+        {
+          "file": "docs/domain-model/record.md",
+          "quote": "reset when what it read is quarantined or purged (CMP-07)"
+        },
+        {
+          "file": "docs/srs/05f-pins-recall-and-restore-requirements.md",
+          "quote": "a quarantine or purge MUST reset each namespace that read what it covers (CMP-05)"
+        }
+      ]
+    },
+    {
+      "id": "DM-DR",
+      "title": "The model named only some of the configuration changes ADM-04 holds for acceptance",
+      "status": "fixed",
+      "texts": [
+        {
+          "file": "docs/srs/05a-administration-requirements.md",
+          "quote": "loosens redaction, recall scope, rule levels or hold windows, turns flags off"
+        },
+        {
+          "file": "docs/domain-model/record.md",
+          "quote": "some changes to which apply only once accepted (ADM-04)"
+        },
+        {
+          "file": "docs/domain-model/trust-and-flow.md",
+          "quote": "or accepted configuration (PRV-02, PRV-04, ADM-04"
+        }
+      ]
+    },
+    {
+      "id": "DM-DS",
+      "title": "The pin budget's order across rooms could cycle between intent-first and priority",
+      "status": "fixed",
+      "texts": [
+        {
+          "file": "docs/domain-model/pins-and-context.md",
+          "quote": "by which PIN-08 orders qualifying pins in the pin budget"
+        },
+        {
+          "file": "docs/srs/05f-pins-recall-and-restore-requirements.md",
+          "quote": "each with intents first (LANE-20), then by pin priority"
+        }
+      ]
+    },
+    {
+      "id": "DM-DT",
+      "title": "Which room a confirmed pin candidate's pin belongs to was unstated (the confirmation now shows it)",
+      "status": "fixed",
+      "texts": [
+        {
+          "file": "docs/srs/05f-pins-recall-and-restore-requirements.md",
+          "quote": "the pin's room (its creating event's room, or its principal's personal room where that principal has no member seat left there)"
+        },
+        {
+          "file": "docs/srs/13-open-questions-and-risks.md",
+          "quote": "Closed by the stakeholder (9 October 2026): the pin a confirmed pin candidate makes belongs to its creating event's room"
+        }
+      ]
+    },
+    {
+      "id": "DM-DU",
+      "title": "In M1–M5 nothing showed Needs you's items or pending join requests",
+      "status": "fixed",
+      "texts": [
+        {
+          "file": "docs/srs/05b-room-view-requirements.md",
+          "quote": "principal's ask is refused, audited and counted, never left waiting for"
+        },
+        {
+          "file": "docs/srs/12-delivery-plan.md",
+          "quote": "until the rest of LANE-23 ships, a join request made without that ask is refused, audited and counted"
+        }
+      ]
+    },
+    {
+      "id": "DM-DV",
+      "title": "A pin whose text holds a restore-block delimiter cannot be restored verbatim without breaking INJ-08",
+      "status": "fixed",
+      "texts": [
+        {
+          "file": "docs/srs/05f-pins-recall-and-restore-requirements.md",
+          "quote": "verbatim text (≤ 1,000 characters†, holding none of INJ-08's delimiter sequences)"
+        }
+      ]
+    },
+    {
+      "id": "DM-DW",
+      "title": "INJ-07's total limit cannot hold once the pins and names PIN-08 and PIN-10 make the restore block carry exceed it",
+      "status": "fixed",
+      "texts": [
+        {
+          "file": "docs/srs/05f-pins-recall-and-restore-requirements.md",
+          "quote": "which bounds all but what PIN-08 and PIN-10 make it carry"
+        }
+      ]
+    },
+    {
+      "id": "DM-DX",
+      "title": "Repository configuration could add redaction patterns that erase content that is not secret, outside I1",
+      "status": "fixed",
+      "texts": [
+        {
+          "file": "docs/srs/06-security.md",
+          "quote": "plus patterns the principal defines in its own configuration, never a repository's (§9.6)"
+        }
+      ]
+    },
+    {
+      "id": "DM-DY",
+      "title": "After a device key is lost with the node identity unchanged, no key may certify the seat `parinn ingest` needs for the rest of a run",
+      "status": "fixed",
+      "texts": [
+        {
+          "file": "docs/srs/05-functional-requirements.md",
+          "quote": "or once a key such a seat needs is missing (SEC-10), `parinn ingest` MUST append what remains of a run recorded before it"
+        }
+      ]
+    },
+    {
+      "id": "DM-DZ",
+      "title": "`parinn uninstall` after SEC-22 refuses turning capture off fell to ADM-02's branch that removes hooks with no act recorded",
+      "status": "fixed",
+      "texts": [
+        {
+          "file": "docs/srs/05a-administration-requirements.md",
+          "quote": "when ParleyInn refuses that act (OWN-22, SEC-22), `parinn uninstall` MUST change nothing, name why"
+        }
+      ]
+    },
+    {
+      "id": "DM-EA",
+      "title": "Binding a provisional repository or branch identity: which links follow it, and which event records it",
+      "status": "deferred",
+      "oq": "OQ-50",
+      "milestone": "M1",
+      "texts": [
+        {
+          "file": "docs/srs/13-open-questions-and-risks.md",
+          "quote": "(a) whether binding a provisional repository identity (LANE-02), or a branch's provisional identity on push (LANE-01), is a structural event naming both identities that moves"
+        }
+      ]
+    },
+    {
+      "id": "DM-EB",
+      "title": "A platform key store that holds a key but refuses access",
+      "status": "deferred",
+      "oq": "OQ-50",
+      "milestone": "M1",
+      "texts": [
+        {
+          "file": "docs/srs/13-open-questions-and-risks.md",
+          "quote": "(b) what the core certifies and appends while a platform key store holds a key but refuses access, which is neither a missing key (SEC-10) nor an unavailable identity (REC-24)"
+        }
+      ]
+    },
+    {
+      "id": "DM-EC",
+      "title": "Recall taint after a purge of what the recall returned",
+      "status": "deferred",
+      "oq": "OQ-50",
+      "milestone": "M1",
+      "texts": [
+        {
+          "file": "docs/srs/13-open-questions-and-risks.md",
+          "quote": "(c) whether a run's recall taint (SEC-13) survives a purge of what its recall returned, which would need RCL-07's recall event to record whether a returned item was untrusted"
+        }
+      ]
+    },
+    {
+      "id": "DM-ED",
+      "title": "Whether a quarantine withholds copies of covered content held in recorded recall results",
+      "status": "deferred",
+      "oq": "OQ-50",
+      "milestone": "M1",
+      "texts": [
+        {
+          "file": "docs/srs/13-open-questions-and-risks.md",
+          "quote": "(d) whether a quarantine (SEC-12) withholds the copies of covered content that SEC-31 names for a purge, such as items in recorded recall results"
+        }
+      ]
+    },
+    {
+      "id": "DM-EE",
+      "title": "The last span of a run whose end was never recorded",
+      "status": "deferred",
+      "oq": "OQ-50",
+      "milestone": "M1",
+      "texts": [
+        {
+          "file": "docs/srs/13-open-questions-and-risks.md",
+          "quote": "(e) when LMK-01 closes the last span of a run whose end no MCP server recorded (NFR-06)"
+        }
+      ]
+    },
+    {
+      "id": "DM-EF",
+      "title": "What `parinn ingest` does with a new transcript generation of a purged source when there is no at-rest key",
+      "status": "deferred",
+      "oq": "OQ-50",
+      "milestone": "M1",
+      "texts": [
+        {
+          "file": "docs/srs/13-open-questions-and-risks.md",
+          "quote": "(f) how `parinn ingest` keeps a purged range's lines out of a new transcript generation when no at-rest key exists (REC-07, SEC-31)"
+        }
+      ]
+    },
+    {
+      "id": "DM-EG",
+      "title": "The MCP server cannot tell which of its runs made a tool call",
+      "status": "deferred",
+      "oq": "OQ-50",
+      "milestone": "M1",
+      "texts": [
+        {
+          "file": "docs/srs/13-open-questions-and-risks.md",
+          "quote": "(g) how the harness session's one MCP server tells which of its runs made a tool call, and what it does when it cannot (RCL-05, RCL-07, LANE-01, ASM-21)"
+        }
+      ]
+    },
+    {
+      "id": "DM-EH",
+      "title": "Recall event and taint for a CLI read whose output is not a terminal",
+      "status": "deferred",
+      "oq": "OQ-50",
+      "milestone": "M1",
+      "texts": [
+        {
+          "file": "docs/srs/13-open-questions-and-risks.md",
+          "quote": "(h) which writer records the recall event of a read-only CLI verb whose output is not a terminal, and which run it taints (RCL-04, RCL-07, SEC-13)"
+        }
+      ]
+    },
+    {
+      "id": "DM-EI",
+      "title": "Which counters are failure counters",
+      "status": "deferred",
+      "oq": "OQ-50",
+      "milestone": "M1",
+      "texts": [
+        {
+          "file": "docs/srs/13-open-questions-and-risks.md",
+          "quote": "(i) which of OPS-01's named counters are failure counters (ADM-11, OPS-03), REC-13's cut counter being none"
+        }
+      ]
+    },
+    {
+      "id": "DM-EJ",
+      "title": "Pin priority has no stated range or default, and a pin candidate brings none",
+      "status": "deferred",
+      "oq": "OQ-50",
+      "milestone": "M1",
+      "texts": [
+        {
+          "file": "docs/srs/13-open-questions-and-risks.md",
+          "quote": "(j) the range of pin priority and the value recorded when the author gives none, for a confirmed pin candidate too (PIN-03, PIN-05)"
+        }
+      ]
+    },
+    {
+      "id": "DM-EK",
+      "title": "PIN-08 gives the order but not the fill rule for a pin that does not fit",
+      "status": "deferred",
+      "oq": "OQ-50",
+      "milestone": "M1",
+      "texts": [
+        {
+          "file": "docs/srs/13-open-questions-and-risks.md",
+          "quote": "(k) whether PIN-08 stops at the first ordered pin that does not fit the pin budget left, or skips it and takes later ones that fit"
+        }
+      ]
+    },
+    {
+      "id": "DM-EL",
+      "title": "A configuration acceptance has no matching rule or baseline for its declared pins",
+      "status": "deferred",
+      "oq": "OQ-50",
+      "milestone": "M1",
+      "texts": [
+        {
+          "file": "docs/srs/13-open-questions-and-risks.md",
+          "quote": "(l) how a configuration names each pin it declares, and what its acceptance compares them with to record each add, edit and unpin (ADM-04, ADM-06)"
+        }
+      ]
+    },
+    {
+      "id": "DM-EM",
+      "title": "No requirement says what a restore-building hook returns when its hook budget ends first",
+      "status": "deferred",
+      "oq": "OQ-50",
+      "milestone": "M1",
+      "texts": [
+        {
+          "file": "docs/srs/13-open-questions-and-risks.md",
+          "quote": "(m) what a restore-building hook handler returns when its hook budget ends before its restore block is complete, never output that depends on timing (INJ-06, NFR-02)"
+        }
+      ]
+    },
+    {
+      "id": "DM-EN",
+      "title": "No requirement says where the deployment mode that trust derives from is recorded",
+      "status": "deferred",
+      "oq": "OQ-50",
+      "milestone": "M1",
+      "texts": [
+        {
+          "file": "docs/srs/13-open-questions-and-risks.md",
+          "quote": "(n) where the deployment mode in force is recorded, so trust levels derive only from the record (PRV-02, ADM-04, SEC-22)"
+        }
+      ]
+    },
+    {
+      "id": "DM-EO",
+      "title": "Which settings apply while the managed-policy file is writable by the principal, unparsable or invalid",
+      "status": "deferred",
+      "oq": "OQ-50",
+      "milestone": "M1",
+      "texts": [
+        {
+          "file": "docs/srs/13-open-questions-and-risks.md",
+          "quote": "(o) which managed-policy settings apply while that file is writable by the principal, unparsable or invalid, and whether widening acts wait meanwhile (ADM-04, SEC-22)"
+        }
+      ]
+    },
+    {
+      "id": "DM-EP",
+      "title": "Loosening changes that ADM-04 does not list fall under neither of its clauses",
+      "status": "deferred",
+      "oq": "OQ-50",
+      "milestone": "M1",
+      "texts": [
+        {
+          "file": "docs/srs/13-open-questions-and-risks.md",
+          "quote": "(p) whether each loosening change ADM-04 does not list, such as raising `pin_budget.max_model_tokens` or SEC-10's opt-in to keys from the environment, waits for the widening"
+        }
+      ]
+    },
+    {
+      "id": "DM-EQ",
+      "title": "No scenario step covers losing a device key or device-seat key while the identity stays unchanged",
+      "status": "deferred",
+      "oq": "OQ-50",
+      "milestone": "M1",
+      "texts": [
+        {
+          "file": "docs/srs/13-open-questions-and-risks.md",
+          "quote": "(q) a scenario step for a device key and a device seat's key lost with the node identity unchanged (SEC-10, SEC-27, REC-24)"
+        }
+      ]
+    },
+    {
+      "id": "DM-ER",
+      "title": "Natural-language headlines and the restore block",
+      "status": "deferred",
+      "oq": "OQ-47",
+      "milestone": "M6",
+      "texts": [
+        {
+          "file": "docs/domain-model/record.md",
+          "quote": "whose every event is trusted; it is no structural field and never reaches a"
+        },
+        {
+          "file": "docs/srs/13-open-questions-and-risks.md",
+          "quote": "that arise only from features M6 to M9 ship need a change before those milestones start"
+        }
+      ]
+    },
+    {
+      "id": "DM-ES",
+      "title": "pin_list with room and recall scope",
+      "status": "deferred",
+      "oq": "OQ-47",
+      "milestone": "M7",
+      "texts": [
+        {
+          "file": "docs/srs/09-interfaces.md",
+          "quote": "With `room`: the room's pins, intent first, each with its pin type and pin versions"
+        },
+        {
+          "file": "docs/srs/13-open-questions-and-risks.md",
+          "quote": "that arise only from features M6 to M9 ship need a change before those milestones start"
+        }
+      ]
+    },
+    {
+      "id": "DM-ET",
+      "title": "CMP-09 sub-calls through harness mechanisms",
+      "status": "deferred",
+      "oq": "OQ-47",
+      "milestone": "M6",
+      "texts": [
+        {
+          "file": "docs/srs/05f-pins-recall-and-restore-requirements.md",
+          "quote": "Parallel model sub-calls over record data MAY be supported only through harness mechanisms. ParleyInn MUST NOT call model APIs itself."
+        },
+        {
+          "file": "docs/srs/13-open-questions-and-risks.md",
+          "quote": "that arise only from features M6 to M9 ship need a change before those milestones start"
+        }
+      ]
+    },
+    {
+      "id": "DM-EU",
+      "title": "No requirement stops a personal-room seat from leaving",
+      "status": "deferred",
+      "oq": "OQ-47",
+      "milestone": "M7",
+      "texts": [
+        {
+          "file": "docs/domain-model/principals-and-agents.md",
+          "quote": "people speaks of the room's principals. A personal-room seat can neither"
+        },
+        {
+          "file": "docs/srs/13-open-questions-and-risks.md",
+          "quote": "that arise only from features M6 to M9 ship need a change before those milestones start"
+        }
+      ]
+    },
+    {
+      "id": "DM-EV",
+      "title": "A rule level tightened through configuration versus OWN-10's principal act",
+      "status": "deferred",
+      "oq": "OQ-47",
+      "milestone": "M7",
+      "texts": [
+        {
+          "file": "docs/srs/05c-principal-and-peer-requirements.md",
+          "quote": "Every rule level change the principal makes MUST be a principal act."
+        },
+        {
+          "file": "docs/srs/13-open-questions-and-risks.md",
+          "quote": "that arise only from features M6 to M9 ship need a change before those milestones start"
+        }
+      ]
+    },
+    {
+      "id": "DM-EW",
+      "title": "Pins from device seats whose device key was lost before PRV-10 stop qualifying once PRV-10 ships",
+      "status": "deferred",
+      "oq": "OQ-47",
+      "milestone": "M7",
+      "texts": [
+        {
+          "file": "docs/srs/05e-provenance-requirements.md",
+          "quote": "A seat certificate a device key made before a principal key certified that key MUST stay valid once one does (PRV-10)."
+        },
+        {
+          "file": "docs/srs/13-open-questions-and-risks.md",
+          "quote": "that arise only from features M6 to M9 ship need a change before those milestones start"
+        }
+      ]
+    },
+    {
+      "id": "DM-EX",
+      "title": "No requirement says an assignment refuses no seat's act",
+      "status": "deferred",
+      "oq": "OQ-47",
+      "milestone": "M8",
+      "texts": [
+        {
+          "file": "docs/domain-model/pins-and-context.md",
+          "quote": "- **Assignment**: Room state asking a seat to work on a branch. It makes ParleyInn"
+        },
+        {
+          "file": "docs/srs/13-open-questions-and-risks.md",
+          "quote": "that arise only from features M6 to M9 ship need a change before those milestones start"
+        }
+      ]
+    }
+  ]
+}

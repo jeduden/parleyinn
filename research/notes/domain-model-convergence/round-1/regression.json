@@ -48,7 +48,7 @@
      "type": "undefined",
      "file": "record.md",
      "quote": "such as lowering a limit or turning an injection path off, never",
-     "problem": "\"Injection path\" and \"enabling injection\" are used as Cairn concepts but never defined; the model's name for the ways Cairn writes to an agent is closed path. It is unclear which closed paths repository configuration may turn off (restore on prompt, opt-in notices, compaction guidance) without falling under \"removing a pin from a restore block\".",
+     "problem": "\"Injection path\" and \"enabling injection\" are used as ParleyInn concepts but never defined; the model's name for the ways ParleyInn writes to an agent is closed path. It is unclear which closed paths repository configuration may turn off (restore on prompt, opt-in notices, compaction guidance) without falling under \"removing a pin from a restore block\".",
      "fix": "Write \"turning a closed path other than restore blocks off\" and \"never turning a closed path on\" in place of the two injection phrases.",
      "severity": "minor"
     },
@@ -57,7 +57,7 @@
      "file": "git-and-forge.md",
      "quote": "A check re-run through the launcher, outside any agent",
      "problem": "A witness check's independence (its node's git identity authored no commit on the branch) and its denials can be checked only on the node that ran it. Its structural record is untrusted on every other node. CI attestation states that every principal sees the same class; nothing says which evidence class another principal's node gives a received witness-check record, so one implementer shows `witness check` and another `claim`. The model also does not say what happens when this node's git identity did author a commit on the branch.",
-     "fix": "Add: \"A witness check recorded on another principal's node counts as `claim` there, and Cairn refuses a witness check on a node whose git identity authored a commit on the branch, as it refuses one whose platform cannot deny all three.\"",
+     "fix": "Add: \"A witness check recorded on another principal's node counts as `claim` there, and ParleyInn refuses a witness check on a node whose git identity authored a commit on the branch, as it refuses one whose platform cannot deny all three.\"",
      "severity": "minor"
     },
     {
@@ -155,7 +155,7 @@
      "file": "docs/domain-model/principals-and-agents.md",
      "quote": "writers, and no seat in its parent's rooms but those it joins as Join says,",
      "problem": "A subagent that edits its parent's room's branch has no seat in that room until its principal asks for or accepts a join for that one subagent run, usually after the short-lived subagent has finished. Until then its events, edits and checks go to the private personal room, outside the room's history and results. The room's constraints never reach the subagent's restore block, and the room's other principals never see the work behind commits that carry the room's trailer.",
-     "fix": "writers, and no seat in its parent's rooms but those it joins as Join says, which Cairn may suggest; its principal may opt in to have a join it asks for or accepts for a run cover that run's subagents (LANE-23).",
+     "fix": "writers, and no seat in its parent's rooms but those it joins as Join says, which ParleyInn may suggest; its principal may opt in to have a join it asks for or accepts for a run cover that run's subagents (LANE-23).",
      "severity": "needs-fix"
     },
     {
@@ -178,7 +178,7 @@
      "type": "contradiction",
      "file": "docs/domain-model/record.md",
      "quote": "names, such as lowering a limit or turning an injection path off, never",
-     "problem": "Repository configuration may tighten \"such as lowering a limit or turning an injection path off\", but the same sentence forbids removing a pin from a restore block. Lowering the restore block limit (INJ-07), which is a named limit, or turning off a restore-block path does exactly that. Implementers will disagree on whether a repository's .cairn.toml, which an outside branch can carry, may strip an agent's constraints.",
+     "problem": "Repository configuration may tighten \"such as lowering a limit or turning an injection path off\", but the same sentence forbids removing a pin from a restore block. Lowering the restore block limit (INJ-07), which is a named limit, or turning off a restore-block path does exactly that. Implementers will disagree on whether a repository's .parinn.toml, which an outside branch can carry, may strip an agent's constraints.",
      "fix": "names, such as lowering a limit other than the restore block limit or turning off an injection path other than a restore block, never",
      "severity": "minor"
     },
@@ -236,7 +236,7 @@
     "index": 1,
     "theme": "NEW-5",
     "kind": "new",
-    "reason": "The quoted sentence is DM-AB's closing text. DM-AB made Cairn refuse the witness check unless network, HOME and the principal's home are denied, but says nothing about writes elsewhere (the repository's git directory, other worktrees). OWN-18 and boundary register row 25 name only those three, so the closing text is incomplete."
+    "reason": "The quoted sentence is DM-AB's closing text. DM-AB made ParleyInn refuse the witness check unless network, HOME and the principal's home are denied, but says nothing about writes elsewhere (the repository's git directory, other worktrees). OWN-18 and boundary register row 25 name only those three, so the closing text is incomplete."
    },
    {
     "lens": "security",
@@ -271,7 +271,7 @@
     "index": 2,
     "theme": "NEW-9",
     "kind": "new",
-    "reason": "The quoted sentence is DM-Y's closing text. DM-Y made the model carry LANE-23: no subagent seat in its parent's rooms without a join the principal asks for or accepts, which Cairn may only suggest. The finding shows that this leaves a short-lived subagent's work in the personal room. LANE-23 says a join stays explicit and a subagent that joins gets its own seat id, but says nothing on whether one acceptance for a run may cover its subagents, so the closing text is incomplete and the choice is a design decision."
+    "reason": "The quoted sentence is DM-Y's closing text. DM-Y made the model carry LANE-23: no subagent seat in its parent's rooms without a join the principal asks for or accepts, which ParleyInn may only suggest. The finding shows that this leaves a short-lived subagent's work in the personal room. LANE-23 says a join stays explicit and a subagent that joins gets its own seat id, but says nothing on whether one acceptance for a run may cover its subagents, so the closing text is incomplete and the choice is a design decision."
    }
   ],
   "new_themes": [

@@ -28,30 +28,15 @@ fn the_installed_hooks_parse_and_name_their_operation() {
 }
 
 #[test]
-fn a_hook_input_that_is_a_json_object_injects_nothing() {
-    let input = r#"{"session_id":"s","hook_event_name":"SessionStart","source":"startup"}"#;
-
-    assert_eq!(handle(Hook::SessionStart, input), Ok(String::new()));
-}
-
-#[test]
-fn a_hook_input_that_is_no_json_object_is_rejected() {
-    for input in ["", "{\"session_id\": ", "[1]", "\"text\"", "{} {}"] {
-        assert_eq!(
-            handle(Hook::UserPromptSubmit, input),
-            Err(Failure::Malformed),
-            "{input:?}"
-        );
-    }
-}
-
-#[test]
 fn a_panic_in_the_handler_is_caught_as_its_own_failure() {
     let caught = guarded(|| -> Result<String, Failure> { panic!("boom") });
 
     assert_eq!(caught, Err(Failure::Panicked));
     assert_eq!(guarded(|| Ok("out".to_owned())), Ok("out".to_owned()));
-    assert_eq!(guarded(|| Err(Failure::Malformed)), Err(Failure::Malformed));
+    assert_eq!(
+        guarded(|| Err::<String, _>(Failure::Malformed)),
+        Err(Failure::Malformed)
+    );
 }
 
 #[test]
@@ -70,10 +55,28 @@ fn each_failure_is_audited_with_its_own_kind_and_counter() {
             "not a JSON object",
         ),
         (
+            Failure::Invalid,
+            Kind::Rejected,
+            Counter::HookInputRejected,
+            "hook input failed schema validation",
+        ),
+        (
             Failure::Panicked,
             Kind::Failed,
             Counter::HookPanicked,
             "panic recovered",
+        ),
+        (
+            Failure::TooLarge,
+            Kind::Rejected,
+            Counter::HookInputTooLarge,
+            "hook input exceeds 1 MiB",
+        ),
+        (
+            Failure::TooDeep,
+            Kind::Rejected,
+            Counter::HookInputTooDeep,
+            "hook input nesting exceeds depth 64",
         ),
     ];
     for (failure, kind, counter, detail) in cases {
@@ -88,5 +91,19 @@ fn each_failure_is_audited_with_its_own_kind_and_counter() {
         );
         assert_eq!(failure.to_string(), detail);
         assert!(failure.source().is_none());
+    }
+}
+
+#[test]
+fn each_hook_names_itself_with_a_budget_below_its_harness_timeout() {
+    for (hook, name, budget) in [
+        (Hook::SessionStart, "SessionStart", 150),
+        (Hook::UserPromptSubmit, "UserPromptSubmit", 50),
+        (Hook::PermissionRequest, "PermissionRequest", 50),
+    ] {
+        assert_eq!(hook.name(), name);
+        assert_eq!(Hook::parse(name), Some(hook));
+        assert_eq!(hook.budget(), std::time::Duration::from_millis(budget));
+        assert!(hook.budget() < hook.harness_timeout());
     }
 }

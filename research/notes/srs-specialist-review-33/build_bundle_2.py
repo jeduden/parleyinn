@@ -6,8 +6,8 @@ def fx(title, rids, owners, locations, problem, fix, touches, htr=False, conflic
 fx("LANE-01 sends every event to a run seat or personal-room seat, missing REC-19's seat that ingest starts",
    ["hub#1", "whole#3"], ["hub", "record"],
    [S+"05b-lane-requirements.md:14", M+"index.md:70-72", S+"05-functional-requirements.md:34"],
-   "Hub relation 6 and REC-19 send what `cairn ingest` appends for a witnessed run to the seat ingest starts beside that run seat. LANE-01's 'Each event MUST be written to exactly one seat's writer: ... else to its personal-room seat, never refused' has no such exception, so its MUST contradicts REC-19 for ingested appends.",
-   "LANE-01: after 'else to its personal-room seat, never refused' add '; what `cairn ingest` appends for a witnessed run goes instead to the seat ingest starts beside that run seat (REC-19)'.",
+   "Hub relation 6 and REC-19 send what `parinn ingest` appends for a witnessed run to the seat ingest starts beside that run seat. LANE-01's 'Each event MUST be written to exactly one seat's writer: ... else to its personal-room seat, never refused' has no such exception, so its MUST contradicts REC-19 for ingested appends.",
+   "LANE-01: after 'else to its personal-room seat, never refused' add '; what `parinn ingest` appends for a witnessed run goes instead to the seat ingest starts beside that run seat (REC-19)'.",
    [S+"05b-lane-requirements.md"], htr=True)
 
 fx("LANE-15 treats every foreign room as one read from a bundle",
@@ -77,7 +77,7 @@ fx("'every boundary disabled' includes B0, which managed policy cannot disable",
 fx("An administration outline's `component` column holds a CLI command",
    ["components-and-surfaces#6"], ["components-and-surfaces"],
    [F+"administration.feature:47", F+"administration.feature:48", F+"administration.feature:52"],
-   "Component is a closed set (core, room-view component, launcher, peer, publish, bridge); `cairn status` is a CLI command inside the core.",
+   "Component is a closed set (core, room-view component, launcher, peer, publish, bridge); `parinn status` is a CLI command inside the core.",
    "Rename the column and placeholder `<component>` to `<started>` (or 'component or command') at lines 47, 48 and 52.",
    [F+"administration.feature"])
 
@@ -91,7 +91,7 @@ fx("'UI' is a second name for the browser room view and its surfaces",
 fx("§12 says 'catch-up' for the Catch up surface",
    ["components-and-surfaces#10"], ["components-and-surfaces"],
    [S+"12-delivery-plan.md:50"],
-   "The surface is 'Catch up'; the kebab form belongs only to the CLI command (`cairn catch-up show`), per the hub's naming rule.",
+   "The surface is 'Catch up'; the kebab form belongs only to the CLI command (`parinn catch-up show`), per the hub's naming rule.",
    "12-delivery-plan.md:50: '... passes Catch up, search-to-replay and room verify'.",
    [S+"12-delivery-plan.md"])
 
@@ -137,10 +137,10 @@ fx("'Evidence' is used for build-time reach analysis and for receipts' tamper ev
    "SEC-01, SEC-19, ENG-12 and their scenarios: 'build-time reach analysis' / 'that analysis'. record.md:160: 'a head receipt lists every writer's chain head at a moment, which shows tampering under VIEW-10 and SEC-27'.",
    [S+"06-security.md", S+"10-engineering-quality.md", F+"security.feature", F+"engineering.feature", M+"record.md"])
 
-fx("NFR-15 'rebuilds a worktree', which Cairn never writes",
+fx("NFR-15 'rebuilds a worktree', which ParleyInn never writes",
    ["git-and-forge#9"], ["git-and-forge", "record"],
    [S+"07-non-functional-requirements.md:29", F+"non-functional.feature:166"],
-   "A worktree is a git working tree on a node, which ADM-13 bars Cairn from writing, and 'rebuild' is `cairn rebuild`'s word for derived artifacts. VIEW-12 reconstructs the worktree's state from the record.",
+   "A worktree is a git working tree on a node, which ADM-13 bars ParleyInn from writing, and 'rebuild' is `parinn rebuild`'s word for derived artifacts. VIEW-12 reconstructs the worktree's state from the record.",
    "NFR-15 and its scenario: 'reconstructs the worktree at an event within 500 ms† (VIEW-12)'.",
    [S+"07-non-functional-requirements.md", F+"non-functional.feature"])
 
@@ -189,7 +189,7 @@ fx("LANE-14 is cited for the harness_text classification, which is PRV-08",
 fx("§6.3 row 24 omits recalled content from what the harness sends its provider",
    ["harness-facts#10"], ["components-and-surfaces", "harness-facts"],
    [S+"06b-boundary-register.md:55"],
-   "I4, §2 and VIEW-18 say the harness sends its model both recalled content an agent receives through a tool call and what Cairn writes through I2's closed paths; row 24 names only the latter.",
+   "I4, §2 and VIEW-18 say the harness sends its model both recalled content an agent receives through a tool call and what ParleyInn writes through I2's closed paths; row 24 names only the latter.",
    "Row 24: 'carrying the recalled content agents receive through tool calls and what I2's closed paths write (I4)'.",
    [S+"06b-boundary-register.md"])
 
@@ -203,7 +203,7 @@ fx("RCL-07's scenario counts recalls with a 'counter'",
 fx("PIN-01 lists qualifying-pin sources too narrowly",
    ["pins-and-context#1"], ["pins-and-context"],
    [S+"05-functional-requirements.md:62", F+"pins.feature (PIN-01 Examples)"],
-   "Qualifying pins also come from the owner's intent principal act (LANE-20, `cairn intent set|revise`) and from confirming a pin candidate (PIN-05, LANE-26); read as exhaustive, PIN-01 excludes both.",
+   "Qualifying pins also come from the owner's intent principal act (LANE-20, `parinn intent set|revise`) and from confirming a pin candidate (PIN-05, LANE-26); read as exhaustive, PIN-01 excludes both.",
    "PIN-01: '... only from a principal (a pin or intent it sets at a principal surface, a pin candidate it confirms, its configuration or its stamp), never a harness skill's call.' Optionally add the two rows to the PIN-01 Examples.",
    [S+"05-functional-requirements.md", F+"pins.feature"])
 
@@ -244,10 +244,10 @@ fx("§3 says 'the view' for the working view",
 
 fx("The bound ENG-01 scenario says 'pinned' and 'stamped' for the toolchain and release builds",
    ["pins-and-context#9"], ["pins-and-context", "acts-and-roles"],
-   [F+"engineering.feature:11", F+"engineering.feature:13", "cmd/cairn/bdd_engineering_test.go:40"],
+   [F+"engineering.feature:11", F+"engineering.feature:13", "cmd/parinn/bdd_engineering_test.go:40"],
    "Pin and stamp are model words; ENG-01's own text avoids them ('fixed to an exact version'). This scenario is not @pending, so its step binding must change with it.",
-   "engineering.feature:11: 'Scenario: the toolchain is fixed to an exact version and release builds are static, trimmed and carry VCS information'; :13 'Then \"go.mod\" fixes the Go toolchain with a toolchain directive'; the step regex at cmd/cairn/bdd_engineering_test.go:40 in the same commit.",
-   [F+"engineering.feature", "cmd/cairn/bdd_engineering_test.go"])
+   "engineering.feature:11: 'Scenario: the toolchain is fixed to an exact version and release builds are static, trimmed and carry VCS information'; :13 'Then \"go.mod\" fixes the Go toolchain with a toolchain directive'; the step regex at cmd/parinn/bdd_engineering_test.go:40 in the same commit.",
+   [F+"engineering.feature", "cmd/parinn/bdd_engineering_test.go"])
 
 fx("A provenance outline coins 'model-reproducible text' and 'harness-summarised text'",
    ["pins-and-context#10"], ["pins-and-context", "record"],
@@ -295,7 +295,7 @@ fx("No requirement stops a personal-room seat leaving or being kicked",
    ["principals-and-agents#2"], ["principals-and-agents", "acts-and-roles"],
    [M+"principals-and-agents.md:70-71", S+"05b-lane-requirements.md:35", S+"09-interfaces.md:62"],
    "Member says a personal-room seat can neither leave nor be kicked, but LANE-23 makes every leave a room act and `room_leave` takes any room; before PRV-10, LANE-25 does not stop the owner's device seat kicking its run's personal-room seat. Either contradicts LANE-01's 'else to its personal-room seat, never refused'.",
-   "LANE-23: 'A personal-room seat MUST NOT leave or be kicked; Cairn MUST refuse and audit either act.' Add a step to the LANE-23 scenario in lane.feature, and note the refusal on `room_leave` in 09-interfaces.md.",
+   "LANE-23: 'A personal-room seat MUST NOT leave or be kicked; ParleyInn MUST refuse and audit either act.' Add a step to the LANE-23 scenario in lane.feature, and note the refusal on `room_leave` in 09-interfaces.md.",
    [S+"05b-lane-requirements.md", F+"lane.feature", S+"09-interfaces.md"])
 
 fx("Principal says only an agent's own principal widens what reaches it, which cross-principal delegation contradicts",
@@ -330,7 +330,7 @@ fx("A record scenario excludes the seat ingest starts from the core's sealing",
    ["record#2"], ["record"],
    [F+"record.feature:226"],
    "A witnessed run's run seats are sealed by its MCP server except the seat ingest starts, which the core seals; line 222 of the same scenario says so, line 226 contradicts it.",
-   "record.feature:226: '... every writer but the witnessed run's run seats' other than those \"cairn ingest\" started, and the paired phone's, ...'.",
+   "record.feature:226: '... every writer but the witnessed run's run seats' other than those \"parinn ingest\" started, and the paired phone's, ...'.",
    [F+"record.feature"])
 
 fx("An ADM-15 row refuses a single event where peers exchange segments, and omits the structural event",
@@ -350,7 +350,7 @@ fx("Integrity status is defined per room or writer, but VIEW-10, REC-18 and RCL-
 fx("PRV-01 classes every key rotation `structural`, but a device-key rotation is an `operator` principal act",
    ["record#6"], ["record", "seats-and-keys", "acts-and-roles"],
    [S+"05-functional-requirements.md:46", M+"record.md:75"],
-   "Rotating a device key is a widening principal act (OWN-11, `cairn device-key rotate`), recorded as `operator` (OWN-02). PRV-01 and record.md:75 make 'key rotations' `structural`, a second class for the same event; the class sits in the chained header (REC-10) and decides trust on the principal's other nodes.",
+   "Rotating a device key is a widening principal act (OWN-11, `parinn device-key rotate`), recorded as `operator` (OWN-02). PRV-01 and record.md:75 make 'key rotations' `structural`, a second class for the same event; the class sits in the chained header (REC-10) and decides trust on the principal's other nodes.",
    "PRV-01 and record.md:75: 'key rotations' -> 'seat-key rotations' (a seat key's rotation goes to its own writer, SEC-27; a device-key rotation stays an `operator` principal act).",
    [S+"05-functional-requirements.md", M+"record.md"], htr=True)
 
@@ -378,8 +378,8 @@ fx("The model's Payload promises more about the payload's name than REC-09",
 fx("The model's Flag covers every event; PRV-07 flags only untrusted ones",
    ["record#13"], ["record"],
    [M+"record.md:138-139"],
-   "PRV-07: 'Cairn SHOULD flag ... untrusted events that contain instruction-like content'.",
-   "record.md:138: 'A mark Cairn sets on an untrusted event whose text matches an injection pattern (PRV-07)'.",
+   "PRV-07: 'ParleyInn SHOULD flag ... untrusted events that contain instruction-like content'.",
+   "record.md:138: 'A mark ParleyInn sets on an untrusted event whose text matches an injection pattern (PRV-07)'.",
    [M+"record.md"])
 
 fx("record.md calls one event 'a witness check's record'",
@@ -483,8 +483,8 @@ fx("ENG-29 omits OWN-26 from the requirements marked for I2 review",
 fx("Counter says failures show on Health only until acknowledged; ADM-11 keeps them shown",
    ["trust-and-flow#9"], ["trust-and-flow"],
    [M+"trust-and-flow.md:140-141", S+"05a-administration-requirements.md:24", S+"09a-command-line-interface.md:16"],
-   "ADM-11 and `cairn status` keep non-zero failure counters shown; OPS-03 uses acknowledgement only as `cairn doctor`'s baseline.",
-   "Model: 'shown on Health; `cairn doctor` fails while one has risen since the node's principal last acknowledged them (`cairn counter ack`, I6, OPS-03)'.",
+   "ADM-11 and `parinn status` keep non-zero failure counters shown; OPS-03 uses acknowledgement only as `parinn doctor`'s baseline.",
+   "Model: 'shown on Health; `parinn doctor` fails while one has risen since the node's principal last acknowledged them (`parinn counter ack`, I6, OPS-03)'.",
    [M+"trust-and-flow.md"])
 
 fx("Continuation cursor is promised for every capped recall tool, and RCL-03 lacks 'without gap or overlap'",
@@ -553,8 +553,8 @@ fx("VIEW-21 gives agents the Idle run status",
 fx("OWN-27 says the room records no verdict; rooms record nothing",
    ["whole#8"], ["places", "git-and-forge"],
    [S+"05c-principal-and-peer-requirements.md:43"],
-   "A room is a place, not an actor (nodes record), and Verdict says Cairn never derives one (VIEW-22).",
-   "OWN-27: 'Cairn records no verdict of its own (VIEW-22).'",
+   "A room is a place, not an actor (nodes record), and Verdict says ParleyInn never derives one (VIEW-22).",
+   "OWN-27: 'ParleyInn records no verdict of its own (VIEW-22).'",
    [S+"05c-principal-and-peer-requirements.md"])
 
 fx("ENG-02's example crate `adapter-claudecode` drops the model's 'harness adapter'",
@@ -564,9 +564,9 @@ fx("ENG-02's example crate `adapter-claudecode` drops the model's 'harness adapt
    "ENG-02: rename the example crate `harness_adapter_claude_code` (matching `restore_block`'s form).",
    [S+"10-engineering-quality.md"])
 
-fx("ADR-06 in §4.5 says `cairn install` edits 'settings', which reads as Cairn's configuration",
+fx("ADR-06 in §4.5 says `parinn install` edits 'settings', which reads as ParleyInn's configuration",
    ["whole#10"], ["principals-and-agents", "record"],
    [S+"04-reference-architecture.md:157"],
    "Configuration is the principal's settings (§9.6); the harness's settings are part of harness configuration.",
-   "§4.5 ADR-06: '`cairn install` edits the harness's settings only as a fallback.'",
+   "§4.5 ADR-06: '`parinn install` edits the harness's settings only as a fallback.'",
    [S+"04-reference-architecture.md"])

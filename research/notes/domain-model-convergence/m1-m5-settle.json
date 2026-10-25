@@ -113,7 +113,7 @@
      {
       "file": "docs/srs/12-delivery-plan.md",
       "old": "REC-17, REC-24,",
-      "new": "REC-17, REC-19 in part (the seat `cairn ingest` starts) with REC-22, REC-24,"
+      "new": "REC-17, REC-19 in part (the seat `parinn ingest` starts) with REC-22, REC-24,"
      },
      {
       "file": "docs/srs/12-delivery-plan.md",
@@ -124,14 +124,14 @@
     "ledger_quotes": [
      {
       "file": "docs/srs/12-delivery-plan.md",
-      "quote": "REC-19 in part (the seat `cairn ingest` starts) with REC-22"
+      "quote": "REC-19 in part (the seat `parinn ingest` starts) with REC-22"
      },
      {
       "file": "docs/srs/12-delivery-plan.md",
       "quote": "REC-18, the rest of REC-19, REC-20,"
      }
     ],
-    "note": "REC-22 and the part of REC-19 for the seat `cairn ingest` starts move to M1's 2.0 clause. M7 keeps REC-18, REC-20 and the rest of REC-19, which is its seals (see S-2). The M7 edit sits next to S-14's 'RCL-08, RCL-09,' edit without overlapping it."
+    "note": "REC-22 and the part of REC-19 for the seat `parinn ingest` starts move to M1's 2.0 clause. M7 keeps REC-18, REC-20 and the rest of REC-19, which is its seals (see S-2). The M7 edit sits next to S-14's 'RCL-08, RCL-09,' edit without overlapping it."
    },
    {
     "id": "S-8",
@@ -208,8 +208,8 @@
      },
      {
       "file": "docs/srs/09a-command-line-interface.md",
-      "old": "| `cairn export --bundle\\|--rendering\\|--trusted-only`, `cairn bundle publish",
-      "new": "| `cairn export --trusted-only` (P1) | write the trusted-only JSONL export (ADM-12), a widening principal act that passes SEC-26's review step |\n| `cairn export --bundle\\|--rendering`, `cairn bundle publish"
+      "old": "| `parinn export --bundle\\|--rendering\\|--trusted-only`, `parinn bundle publish",
+      "new": "| `parinn export --trusted-only` (P1) | write the trusted-only JSONL export (ADM-12), a widening principal act that passes SEC-26's review step |\n| `parinn export --bundle\\|--rendering`, `parinn bundle publish"
      },
      {
       "file": "docs/srs/09a-command-line-interface.md",
@@ -238,10 +238,10 @@
      },
      {
       "file": "docs/srs/09a-command-line-interface.md",
-      "quote": "`cairn export --trusted-only` (P1)"
+      "quote": "`parinn export --trusted-only` (P1)"
      }
     ],
-    "note": "Register row 7 keeps its number and stays P2 for bundles, import and renderings; it marks the trusted-only export P1 and cites ADM-12. In §9.5, `cairn export --trusted-only` moves out of the P2 export row into its own row marked (P1), just before it, and the P2 row's purpose no longer mentions the trusted-only export. The P2 row still says every export is a widening principal act under SEC-26. A separate row keeps the command column within its current width, so mdsmith fix re-pads only those two rows. The register table, by contrast, is fully re-padded because its Pri column widens. M9 keeps the rest of SEC-26. Edits are listed per file in file order."
+    "note": "Register row 7 keeps its number and stays P2 for bundles, import and renderings; it marks the trusted-only export P1 and cites ADM-12. In §9.5, `parinn export --trusted-only` moves out of the P2 export row into its own row marked (P1), just before it, and the P2 row's purpose no longer mentions the trusted-only export. The P2 row still says every export is a widening principal act under SEC-26. A separate row keeps the command column within its current width, so mdsmith fix re-pads only those two rows. The register table, by contrast, is fully re-padded because its Pri column widens. M9 keeps the rest of SEC-26. Edits are listed per file in file order."
    },
    {
     "id": "S-16",
@@ -350,7 +350,7 @@
       "quote": "Do two writers' closed segments, merged in either order"
      }
     ],
-    "note": "I covered every M1–M5 row whose text assumes seals. The scope rule puts these rows in M1–M5: CON-05 (CON changes, M1), REC-17 (M1), REC-25 (M3), ADM-06 and ADM-07 (M3), SEC-10 (P0, M1 under S-5) and spike S12. Each seal clause now applies once REC-18 ships. Where a row only meant closing, \"sealed segments\" now reads \"closed segments\" (S12, ADM-06, ADM-07), and ADM-06's backup takes the open segment up to its newest event.\n\nLeft alone on purpose:\n- REC-18, REC-19, VIEW-10 and the PEER, SEC-24, SEC-25 and SEC-27 rows.\n- OWN-02. It is a P1 OWN row in M7, and its seal clause already cites REC-18.\n- SEC-10's \"who signs and seals what another component records (OQ-40)\". It concerns B1–B3 components, which ship in M7.\n- 02-context.md line 29 (ephemeral nodes, PEER-05, M8) and NG4.\n\nOutside my area, for the owners of those files:\n- In the model, record.md's Segment entry says \"sealed as a unit when it closes\", plus \"sealed prefix\" and \"sealed range\". acts-and-roles.md line 31 says \"`operator` event its device seat's seal covers\". seats-and-keys.md lines 25–55 also speak of sealing.\n- Pending scenarios with seal steps: administration.feature 84 and 87 (ADM-06), 100 and 104 (ADM-07); record.feature 200 (REC-17), 325 and 329 (REC-25); security.feature 128 and 130 (SEC-10).\n- The CLI table's `cairn verify` row says \"chains, seals\". The §9.1 SubagentStop row cites REC-19, which is already dormant.\n\nBudget check: I applied both settlements' edits to a scratch copy under the scratchpad (HOME and CAIRN_HOME set to a temp dir), then ran `mdsmith fix .` and `mdsmith check .`, which ended with 0 failures. 05-functional-requirements.md grows by 6 words to 5917 words, a heuristic 7870 of its 8000 tokens. That fits, so I tightened nothing to offset it."
+    "note": "I covered every M1–M5 row whose text assumes seals. The scope rule puts these rows in M1–M5: CON-05 (CON changes, M1), REC-17 (M1), REC-25 (M3), ADM-06 and ADM-07 (M3), SEC-10 (P0, M1 under S-5) and spike S12. Each seal clause now applies once REC-18 ships. Where a row only meant closing, \"sealed segments\" now reads \"closed segments\" (S12, ADM-06, ADM-07), and ADM-06's backup takes the open segment up to its newest event.\n\nLeft alone on purpose:\n- REC-18, REC-19, VIEW-10 and the PEER, SEC-24, SEC-25 and SEC-27 rows.\n- OWN-02. It is a P1 OWN row in M7, and its seal clause already cites REC-18.\n- SEC-10's \"who signs and seals what another component records (OQ-40)\". It concerns B1–B3 components, which ship in M7.\n- 02-context.md line 29 (ephemeral nodes, PEER-05, M8) and NG4.\n\nOutside my area, for the owners of those files:\n- In the model, record.md's Segment entry says \"sealed as a unit when it closes\", plus \"sealed prefix\" and \"sealed range\". acts-and-roles.md line 31 says \"`operator` event its device seat's seal covers\". seats-and-keys.md lines 25–55 also speak of sealing.\n- Pending scenarios with seal steps: administration.feature 84 and 87 (ADM-06), 100 and 104 (ADM-07); record.feature 200 (REC-17), 325 and 329 (REC-25); security.feature 128 and 130 (SEC-10).\n- The CLI table's `parinn verify` row says \"chains, seals\". The §9.1 SubagentStop row cites REC-19, which is already dormant.\n\nBudget check: I applied both settlements' edits to a scratch copy under the scratchpad (HOME and PARINN_HOME set to a temp dir), then ran `mdsmith fix .` and `mdsmith check .`, which ended with 0 failures. 05-functional-requirements.md grows by 6 words to 5917 words, a heuristic 7870 of its 8000 tokens. That fits, so I tightened nothing to offset it."
    },
    {
     "id": "S-10",
@@ -363,20 +363,20 @@
      {
       "file": "docs/srs/06-security.md",
       "old": "MUST refuse to start a component managed policy disables and MUST audit the refusal.",
-      "new": "MUST refuse to start a component managed policy disables and MUST audit the refusal. Until presence proofs ship (OWN-11, OWN-12), Cairn MUST refuse every widening act while managed policy requires an authenticator, and audit and count each refusal."
+      "new": "MUST refuse to start a component managed policy disables and MUST audit the refusal. Until presence proofs ship (OWN-11, OWN-12), ParleyInn MUST refuse every widening act while managed policy requires an authenticator, and audit and count each refusal."
      }
     ],
     "ledger_quotes": [
      {
       "file": "docs/srs/06-security.md",
-      "quote": "Until presence proofs ship (OWN-11, OWN-12), Cairn MUST refuse every widening act while managed policy requires an authenticator"
+      "quote": "Until presence proofs ship (OWN-11, OWN-12), ParleyInn MUST refuse every widening act while managed policy requires an authenticator"
      },
      {
       "file": "docs/srs/06-security.md",
       "quote": "set quotas once ADM-15 ships, fix the deployment mode"
      }
     ],
-    "note": "SEC-22 (P0, M1) now says two things. Quotas apply once ADM-15 ships. Until presence proofs ship (OWN-11, OWN-12, M7), a managed policy that requires an authenticator makes Cairn refuse every widening act, and each refusal is audited and counted (I6). The risk acceptance is a widening act, so it is refused too, which fits S-3.\n\nADM-04 mentions neither an authenticator nor quotas, so it needs no edit.\n\nThese edits come after S-2's SEC-10 edits in 06-security.md and do not overlap them. The file grows by 33 words, well under its budget. With S-2 applied as well, `mdsmith fix .` then `mdsmith check .` ended with 0 failures.\n\nOutside my area: SEC-22's pending scenario (security.feature 265–287) still has the \"a storage quota\" example. That step needs ADM-15 and should move to ADM-15's pending scenario under S-11. The \"an authenticator required for widening acts\" example still holds as written, because the act is refused."
+    "note": "SEC-22 (P0, M1) now says two things. Quotas apply once ADM-15 ships. Until presence proofs ship (OWN-11, OWN-12, M7), a managed policy that requires an authenticator makes ParleyInn refuse every widening act, and each refusal is audited and counted (I6). The risk acceptance is a widening act, so it is refused too, which fits S-3.\n\nADM-04 mentions neither an authenticator nor quotas, so it needs no edit.\n\nThese edits come after S-2's SEC-10 edits in 06-security.md and do not overlap them. The file grows by 33 words, well under its budget. With S-2 applied as well, `mdsmith fix .` then `mdsmith check .` ended with 0 failures.\n\nOutside my area: SEC-22's pending scenario (security.feature 265–287) still has the \"a storage quota\" example. That step needs ADM-15 and should move to ADM-15's pending scenario under S-11. The \"an authenticator required for widening acts\" example still holds as written, because the act is refused."
    }
   ]
  },
@@ -428,8 +428,8 @@
      },
      {
       "file": "docs/domain-model/git-and-forge.md",
-      "old": "  base (a **commit author** is git's author of a commit, never a seat). Unless\n  the platform can deny all of them, Cairn refuses the witness check before\n  confirmation and says which it cannot deny (OWN-18).\n",
-      "new": "  base (Commit author). Unless the platform can deny all of them, Cairn refuses\n  the witness check before confirmation and says which it cannot deny (OWN-18).\n"
+      "old": "  base (a **commit author** is git's author of a commit, never a seat). Unless\n  the platform can deny all of them, ParleyInn refuses the witness check before\n  confirmation and says which it cannot deny (OWN-18).\n",
+      "new": "  base (Commit author). Unless the platform can deny all of them, ParleyInn refuses\n  the witness check before confirmation and says which it cannot deny (OWN-18).\n"
      }
     ],
     "ledger_quotes": [
@@ -475,8 +475,8 @@
      },
      {
       "file": "docs/domain-model/record.md",
-      "old": "  off is widening (OWN-11), so `cairn uninstall` records the widening act\n  turning capture off before it removes the hook registrations (ADM-02).\n",
-      "new": "  off is widening (OWN-11), so `cairn uninstall` records that act before it\n  removes the hook registrations (ADM-02).\n"
+      "old": "  off is widening (OWN-11), so `parinn uninstall` records the widening act\n  turning capture off before it removes the hook registrations (ADM-02).\n",
+      "new": "  off is widening (OWN-11), so `parinn uninstall` records that act before it\n  removes the hook registrations (ADM-02).\n"
      },
      {
       "file": "docs/domain-model/record.md",
@@ -617,7 +617,7 @@
      {
       "file": "features/record.feature",
       "old": "    And events 21 to 30 of the first writer are shown and recalled as \"unsigned\"\n",
-      "new": "    And events 21 to 30 of the first writer are shown and recalled as \"unsigned\"\n    And each seal refers to event content only through the commitments its chain head covers\n    And merging the first writer's closed segments outside every hook budget, or rewriting them for a purge, keeps each of its seals verifiable\n    And \"cairn backup create\" copies an open segment only up to a fresh seal\n"
+      "new": "    And events 21 to 30 of the first writer are shown and recalled as \"unsigned\"\n    And each seal refers to event content only through the commitments its chain head covers\n    And merging the first writer's closed segments outside every hook budget, or rewriting them for a purge, keeps each of its seals verifiable\n    And \"parinn backup create\" copies an open segment only up to a fresh seal\n"
      },
      {
       "file": "features/record.feature",
@@ -626,8 +626,8 @@
      },
      {
       "file": "features/record.feature",
-      "old": "\"cairn verify\" checks every seal and exits 0",
-      "new": "\"cairn verify\" exits 0"
+      "old": "\"parinn verify\" checks every seal and exits 0",
+      "new": "\"parinn verify\" exits 0"
      },
      {
       "file": "features/administration.feature",
@@ -646,8 +646,8 @@
      },
      {
       "file": "features/administration.feature",
-      "old": "\"cairn verify\" confirms every rewritten segment's seals",
-      "new": "\"cairn verify\" exits 0"
+      "old": "\"parinn verify\" confirms every rewritten segment's seals",
+      "new": "\"parinn verify\" exits 0"
      },
      {
       "file": "features/security.feature",
@@ -671,7 +671,7 @@
      },
      {
       "file": "features/record.feature",
-      "quote": "And \"cairn backup create\" copies an open segment only up to a fresh seal"
+      "quote": "And \"parinn backup create\" copies an open segment only up to a fresh seal"
      }
     ],
     "note": "Seals ship with REC-18 and REC-19 (M7); per S-2 the M1-M5 record is hash-chained and unsigned. Took seal clauses out of REC-17, REC-25, ADM-06, ADM-07 and SEC-10 (closed segments instead of sealed ones). REC-17's, REC-25's, ADM-06's and ADM-07's seal clauses moved to REC-18; SEC-10's two seal clauses were deleted, since REC-19's scenario already has the MCP server sealing each run seat's writer and the core sealing the writer of the seat ingest starts."
@@ -898,7 +898,7 @@
      {
       "file": "features/principal-acts.feature",
       "old": "    When a principal act arrives from <channel>\n    Then the act is \"<expected>\"\n",
-      "new": "    When a principal act arrives from <channel>\n    Then the act is \"<expected>\"\n    And a widening act whose required presence proof does not verify takes effect in no derived artifact, and \"cairn verify\" reports it\n"
+      "new": "    When a principal act arrives from <channel>\n    Then the act is \"<expected>\"\n    And a widening act whose required presence proof does not verify takes effect in no derived artifact, and \"parinn verify\" reports it\n"
      }
     ],
     "ledger_quotes": [
@@ -920,22 +920,22 @@
      {
       "file": "features/principal-acts.feature",
       "old": "    And its reason comes from the fixed template set, references ids and is built as TrustedText\n",
-      "new": "    And its reason comes from the fixed template set, references ids and is built as TrustedText\n    And no untrusted event, nor an event \"cairn verify\" reports, shapes a rule level or a permission grant\n"
+      "new": "    And its reason comes from the fixed template set, references ids and is built as TrustedText\n    And no untrusted event, nor an event \"parinn verify\" reports, shapes a rule level or a permission grant\n"
      },
      {
       "file": "features/principal-acts.feature",
       "old": "    And the phone can only read, allow once and deny held permission requests\n",
-      "new": "    And the phone can only read, allow once and deny held permission requests\n    And no untrusted event, nor an event \"cairn verify\" reports, shapes an enrollment\n"
+      "new": "    And the phone can only read, allow once and deny held permission requests\n    And no untrusted event, nor an event \"parinn verify\" reports, shapes an enrollment\n"
      },
      {
       "file": "features/principal-acts.feature",
       "old": "    Then the delegation is <expected>\n",
-      "new": "    Then the delegation is <expected>\n    And no untrusted event, nor an event \"cairn verify\" reports, shapes a delegation grant\n"
+      "new": "    Then the delegation is <expected>\n    And no untrusted event, nor an event \"parinn verify\" reports, shapes a delegation grant\n"
      },
      {
       "file": "features/principal-acts.feature",
       "old": "    Then the trust grant is a widening principal act, shown in the room with its grantor, \"carol\"'s key and its scope\n",
-      "new": "    Then the trust grant is a widening principal act, shown in the room with its grantor, \"carol\"'s key and its scope\n    And no untrusted event, nor an event \"cairn verify\" reports, shapes a trust grant\n"
+      "new": "    Then the trust grant is a widening principal act, shown in the room with its grantor, \"carol\"'s key and its scope\n    And no untrusted event, nor an event \"parinn verify\" reports, shapes a trust grant\n"
      }
     ],
     "ledger_quotes": [
@@ -1007,7 +1007,7 @@
     "edits": [
      {
       "file": "features/security.feature",
-      "old": "    And each B1 to B3 component's own entry point, started by the person, a service manager or an ephemeral node's entrypoint, runs only while the act turning it on, which the CLI records, stands: for the room-view component and the launcher, the acceptance of the configuration that turns it on, and for the bridge component, a bridge enabled for a host, while any stands\n    And a configuration turning the room-view component or the launcher off applies with no acceptance, from then on that component's entry point does not run, and \"cairn configuration accept\", at a terminal with nothing more asked, records it as the cut act turning it off\n    And the room-view component listens only on loopback, and the launcher only on loopback or on a local endpoint only the same OS user can reach\n    And neither connects anywhere else\n",
+      "old": "    And each B1 to B3 component's own entry point, started by the person, a service manager or an ephemeral node's entrypoint, runs only while the act turning it on, which the CLI records, stands: for the room-view component and the launcher, the acceptance of the configuration that turns it on, and for the bridge component, a bridge enabled for a host, while any stands\n    And a configuration turning the room-view component or the launcher off applies with no acceptance, from then on that component's entry point does not run, and \"parinn configuration accept\", at a terminal with nothing more asked, records it as the cut act turning it off\n    And the room-view component listens only on loopback, and the launcher only on loopback or on a local endpoint only the same OS user can reach\n    And neither connects anywhere else\n",
       "new": ""
      },
      {
@@ -1023,7 +1023,7 @@
      {
       "file": "features/security.feature",
       "old": "    And it permits enveloped reading and cut or neutral principal acts, and widening ones only under OWN-11, until the instance stops\n",
-      "new": "    And it permits enveloped reading and cut or neutral principal acts, and widening ones only under OWN-11, until the instance stops\n    And it stays off until the person accepts the configuration that turns it on, and its entry point, whoever starts it, runs only while that acceptance stands\n    And a configuration turning it off applies with no acceptance, from then on its entry point does not run, and \"cairn configuration accept\", at a terminal with nothing more asked, records it as the cut act turning it off\n"
+      "new": "    And it permits enveloped reading and cut or neutral principal acts, and widening ones only under OWN-11, until the instance stops\n    And it stays off until the person accepts the configuration that turns it on, and its entry point, whoever starts it, runs only while that acceptance stands\n    And a configuration turning it off applies with no acceptance, from then on its entry point does not run, and \"parinn configuration accept\", at a terminal with nothing more asked, records it as the cut act turning it off\n"
      },
      {
       "file": "features/security.feature",
@@ -1033,7 +1033,7 @@
      {
       "file": "features/security.feature",
       "old": "    And on a home where no act turned it on, the launcher is off\n",
-      "new": "    And on a home where no act turned it on, the launcher is off\n    And a configuration turning it off applies with no acceptance, from then on its entry point does not run, and \"cairn configuration accept\", at a terminal with nothing more asked, records it as the cut act turning it off\n"
+      "new": "    And on a home where no act turned it on, the launcher is off\n    And a configuration turning it off applies with no acceptance, from then on its entry point does not run, and \"parinn configuration accept\", at a terminal with nothing more asked, records it as the cut act turning it off\n"
      }
     ],
     "ledger_quotes": [
@@ -1051,7 +1051,7 @@
      },
      {
       "file": "features/security.feature",
-      "quote": "and \"cairn configuration accept\", at a terminal with nothing more asked, records it as the cut act turning it off"
+      "quote": "and \"parinn configuration accept\", at a terminal with nothing more asked, records it as the cut act turning it off"
      }
     ],
     "note": "SEC-01 and SEC-19 (M1): steps on B1-B3 entry points, configuration acceptance, listeners and outbound reach need the room-view component (M7), the launcher (M7), the peer component (M8) and the bridge component (M9). Deleted from both. Moved to SEC-20 (room view: connects nowhere else, stays off until accepted, turning off as a cut act), SEC-28 (bridge: runs only while a bridge stands enabled) and SEC-29 (launcher: turning off). Already covered elsewhere: the room view's loopback listener (SEC-20), the launcher's listener, reach and staying off (SEC-29), the peer component and the ephemeral node's entrypoint (PEER-01), and the publish component, off by default (SEC-26)."
@@ -1116,8 +1116,8 @@
      },
      {
       "file": "features/record.feature",
-      "old": "    And Cairn obtained the worktree state and git data inside the core, with no socket opened and no program started, within the hook budget, leaving any rest to an ingest marker\n",
-      "new": "    And Cairn obtained the worktree state and git data inside the core, with no socket opened and no program started, within the hook budget, leaving any rest to an ingest marker\n    And it read the worktree's files, \"README.md\" among them, only inside the run's worktree and its repository's git directory, and wrote nothing in the repository\n"
+      "old": "    And ParleyInn obtained the worktree state and git data inside the core, with no socket opened and no program started, within the hook budget, leaving any rest to an ingest marker\n",
+      "new": "    And ParleyInn obtained the worktree state and git data inside the core, with no socket opened and no program started, within the hook budget, leaving any rest to an ingest marker\n    And it read the worktree's files, \"README.md\" among them, only inside the run's worktree and its repository's git directory, and wrote nothing in the repository\n"
      }
     ],
     "ledger_quotes": [
@@ -1133,17 +1133,17 @@
     "edits": [
      {
       "file": "features/administration.feature",
-      "old": "      | a managed policy file at the documented system path that the person can write                                                                       | the room-view component | refuses to start, and an audit entry and a counter record why                                 |\n      | a managed policy file in a directory the person can write                                                                                           | the launcher            | refuses to start, and an audit entry and a counter record why                                 |\n      | an unparsable managed policy file                                                                                                                   | the room-view component | refuses to start, and an audit entry and a counter record why                                 |\n      | a managed policy file with an unknown key                                                                                                           | the launcher            | refuses to start, and an audit entry and a counter record why                                 |\n      | a repository \".cairn.toml\" that turns on the room-view component and a widening act that recorded its digest                                        | the room-view component | stays off, and an audit entry and a counter record the ignored key                            |\n      | the person's config.toml that turns on the room-view component with no widening act recording its digest                                            | the room-view component | stays off                                                                                     |\n      | the person's config.toml that turns on the room-view component and a widening act that recorded its digest                                          | the room-view component | starts                                                                                        |\n      | a managed policy that turns off the room-view component and the person's config.toml that turns it on, with a widening act that recorded its digest | the room-view component | stays off                                                                                     |\n",
+      "old": "      | a managed policy file at the documented system path that the person can write                                                                       | the room-view component | refuses to start, and an audit entry and a counter record why                                 |\n      | a managed policy file in a directory the person can write                                                                                           | the launcher            | refuses to start, and an audit entry and a counter record why                                 |\n      | an unparsable managed policy file                                                                                                                   | the room-view component | refuses to start, and an audit entry and a counter record why                                 |\n      | a managed policy file with an unknown key                                                                                                           | the launcher            | refuses to start, and an audit entry and a counter record why                                 |\n      | a repository \".parinn.toml\" that turns on the room-view component and a widening act that recorded its digest                                        | the room-view component | stays off, and an audit entry and a counter record the ignored key                            |\n      | the person's config.toml that turns on the room-view component with no widening act recording its digest                                            | the room-view component | stays off                                                                                     |\n      | the person's config.toml that turns on the room-view component and a widening act that recorded its digest                                          | the room-view component | starts                                                                                        |\n      | a managed policy that turns off the room-view component and the person's config.toml that turns it on, with a widening act that recorded its digest | the room-view component | stays off                                                                                     |\n",
       "new": ""
      },
      {
       "file": "features/security.feature",
       "old": "    And an HTTP request whose Host or Origin is not its own, and any cross-origin HTTP request, is rejected and audited\n",
-      "new": "    And an HTTP request whose Host or Origin is not its own, and any cross-origin HTTP request, is rejected and audited\n    And it refuses to start while the core keeps recording, an audit entry and a counter recording why, when the managed policy file at the documented system path is one the person can write or is unparsable, or when managed policy disables B1\n    And it starts only from the person's config.toml after a widening act recorded that file's digest, stays off while managed policy turns it off, and stays off when a repository \".cairn.toml\" turns it on, an audit entry and a counter recording the ignored key\n"
+      "new": "    And an HTTP request whose Host or Origin is not its own, and any cross-origin HTTP request, is rejected and audited\n    And it refuses to start while the core keeps recording, an audit entry and a counter recording why, when the managed policy file at the documented system path is one the person can write or is unparsable, or when managed policy disables B1\n    And it starts only from the person's config.toml after a widening act recorded that file's digest, stays off while managed policy turns it off, and stays off when a repository \".parinn.toml\" turns it on, an audit entry and a counter recording the ignored key\n"
      },
      {
       "file": "features/security.feature",
-      "old": "      | B1 disabled                                 | the person starts the room-view component                                        | Cairn refuses to start it and audits the refusal                                        |\n      | B2 disabled                                 | the person starts the peer component                                             | Cairn refuses to start it and audits the refusal                                        |\n      | B3 disabled                                 | the person enables a bridge for a host, which would turn the bridge component on | Cairn refuses to start the bridge component and audits the refusal                      |\n      | the launcher disabled                       | the person starts the launcher                                                   | Cairn refuses to start it and audits the refusal                                        |\n      | a storage quota                             | ingest exceeds the quota                                                         | the quota is enforced                                                                   |\n",
+      "old": "      | B1 disabled                                 | the person starts the room-view component                                        | ParleyInn refuses to start it and audits the refusal                                        |\n      | B2 disabled                                 | the person starts the peer component                                             | ParleyInn refuses to start it and audits the refusal                                        |\n      | B3 disabled                                 | the person enables a bridge for a host, which would turn the bridge component on | ParleyInn refuses to start the bridge component and audits the refusal                      |\n      | the launcher disabled                       | the person starts the launcher                                                   | ParleyInn refuses to start it and audits the refusal                                        |\n      | a storage quota                             | ingest exceeds the quota                                                         | the quota is enforced                                                                   |\n",
       "new": ""
      },
      {
@@ -1154,7 +1154,7 @@
      {
       "file": "features/security.feature",
       "old": "    And every send and failure is counted and audited\n",
-      "new": "    And every send and failure is counted and audited\n    And with B3 disabled by managed policy, enabling a bridge for a host starts no bridge component, and Cairn audits the refusal\n"
+      "new": "    And every send and failure is counted and audited\n    And with B3 disabled by managed policy, enabling a bridge for a host starts no bridge component, and ParleyInn audits the refusal\n"
      },
      {
       "file": "features/security.feature",
@@ -1164,7 +1164,7 @@
      {
       "file": "features/peer.feature",
       "old": "    And on a home where the CLI recorded no act turning it on, the peer component stays off, even when the person or a service manager starts its own entry point\n",
-      "new": "    And on a home where the CLI recorded no act turning it on, the peer component stays off, even when the person or a service manager starts its own entry point\n    And with B2 disabled by managed policy, Cairn refuses to start the peer component and audits the refusal, and with every boundary disabled, turning it on is refused\n"
+      "new": "    And on a home where the CLI recorded no act turning it on, the peer component stays off, even when the person or a service manager starts its own entry point\n    And with B2 disabled by managed policy, ParleyInn refuses to start the peer component and audits the refusal, and with every boundary disabled, turning it on is refused\n"
      }
     ],
     "ledger_quotes": [
@@ -1186,7 +1186,7 @@
      },
      {
       "file": "features/peer.feature",
-      "quote": "with B2 disabled by managed policy, Cairn refuses to start the peer component"
+      "quote": "with B2 disabled by managed policy, ParleyInn refuses to start the peer component"
      }
     ],
     "note": "ADM-04 and SEC-22 (M1): example rows that start the room-view component or the launcher (M7), the peer component (M8) or the bridge component (M9), and SEC-22's storage-quota row (ADM-15, M7, per S-10). Moved them: the room-view rows and B1 to SEC-20, the launcher rows to SEC-29, B2 and 'every boundary' to PEER-01, B3 to SEC-28. The quota row was deleted, since ADM-15's 'node' row already enforces a storage quota set by managed policy. Finding: ADM-04's M1 part has no row left for a writable, unparsable or invalid managed policy file, whose only M1 effect is an audit entry and a counter while the core keeps recording. An M1 row would need a new step, so it is raised, not written here."
@@ -1196,7 +1196,7 @@
     "edits": [
      {
       "file": "features/security.feature",
-      "old": "      | a cap on an action class's rule level       | the principal sets a higher rule level for that class                            | the rule level stays at the cap                                                         |\n      | away policies disabled                      | the principal sets an away policy                                                | the change is refused                                                                   |\n      | hook permission decisions disabled          | the hook \"PermissionRequest\" runs                                                | Cairn makes no permission decision                                                      |\n      | keeping held requests waiting disabled      | the hook \"PermissionRequest\" runs                                                | the held request is recorded and only mirrored, and the agent is not kept waiting       |\n",
+      "old": "      | a cap on an action class's rule level       | the principal sets a higher rule level for that class                            | the rule level stays at the cap                                                         |\n      | away policies disabled                      | the principal sets an away policy                                                | the change is refused                                                                   |\n      | hook permission decisions disabled          | the hook \"PermissionRequest\" runs                                                | ParleyInn makes no permission decision                                                      |\n      | keeping held requests waiting disabled      | the hook \"PermissionRequest\" runs                                                | the held request is recorded and only mirrored, and the agent is not kept waiting       |\n",
       "new": ""
      },
      {
@@ -1206,8 +1206,8 @@
      },
      {
       "file": "features/principal-acts.feature",
-      "old": "      | Cairn fails while the permission request is held                         | the harness falls back to its own prompt and the action is not allowed |\n",
-      "new": "      | Cairn fails while the permission request is held                         | the harness falls back to its own prompt and the action is not allowed |\n      | managed policy disables keeping held requests waiting                    | it is recorded and only mirrored, and the agent is not kept waiting    |\n"
+      "old": "      | ParleyInn fails while the permission request is held                         | the harness falls back to its own prompt and the action is not allowed |\n",
+      "new": "      | ParleyInn fails while the permission request is held                         | the harness falls back to its own prompt and the action is not allowed |\n      | managed policy disables keeping held requests waiting                    | it is recorded and only mirrored, and the agent is not kept waiting    |\n"
      },
      {
       "file": "features/principal-acts.feature",
@@ -1245,8 +1245,8 @@
     "edits": [
      {
       "file": "features/security.feature",
-      "old": "an event whose content a steer sent, a recorded recall result names, and a worktree checkpoint, a payload, the index and a Cairn backup contain",
-      "new": "an event whose content a recorded recall result names, and a payload, the index and a Cairn backup contain"
+      "old": "an event whose content a steer sent, a recorded recall result names, and a worktree checkpoint, a payload, the index and a ParleyInn backup contain",
+      "new": "an event whose content a recorded recall result names, and a payload, the index and a ParleyInn backup contain"
      },
      {
       "file": "features/principal-acts.feature",
@@ -1282,43 +1282,43 @@
      {
       "file": "features/security.feature",
       "old": "    And its launch secret has at least 128 bits and is never sent to the server in an HTTP request line, nor placed in argv, an environment another UID can read, a log or a referrer\n",
-      "new": "    And its launch secret has at least 128 bits and is never sent to the server in an HTTP request line, nor placed in argv, an environment another UID can read, a log or a referrer\n    And \"cairn uninstall\" lists its room-view secrets, each with an offer to remove it\n"
+      "new": "    And its launch secret has at least 128 bits and is never sent to the server in an HTTP request line, nor placed in argv, an environment another UID can read, a log or a referrer\n    And \"parinn uninstall\" lists its room-view secrets, each with an offer to remove it\n"
      },
      {
       "file": "features/security.feature",
       "old": "    And the launcher carries into the harness input only text the core built and recorded, read from the record\n",
-      "new": "    And the launcher carries into the harness input only text the core built and recorded, read from the record\n    And \"cairn uninstall\" lists its endpoints, each with an offer to remove it\n"
+      "new": "    And the launcher carries into the harness input only text the core built and recorded, read from the record\n    And \"parinn uninstall\" lists its endpoints, each with an offer to remove it\n"
      },
      {
       "file": "features/principal-acts.feature",
       "old": "    And where an authenticator is required each allow carries the phone's own presence proof bound to that answer\n",
-      "new": "    And where an authenticator is required each allow carries the phone's own presence proof bound to that answer\n    And \"cairn uninstall\" lists the phone's enrollment, with an offer to remove it\n"
+      "new": "    And where an authenticator is required each allow carries the phone's own presence proof bound to that answer\n    And \"parinn uninstall\" lists the phone's enrollment, with an offer to remove it\n"
      },
      {
       "file": "features/peer.feature",
       "old": "    And discovery alone enrolls no peer, while enrolling one verifies the key on both nodes by matching words or a scanned code\n",
-      "new": "    And discovery alone enrolls no peer, while enrolling one verifies the key on both nodes by matching words or a scanned code\n    And \"cairn uninstall\" lists each enrollment, with an offer to remove it\n"
+      "new": "    And discovery alone enrolls no peer, while enrolling one verifies the key on both nodes by matching words or a scanned code\n    And \"parinn uninstall\" lists each enrollment, with an offer to remove it\n"
      }
     ],
     "ledger_quotes": [
      {
       "file": "features/security.feature",
-      "quote": "\"cairn uninstall\" lists its room-view secrets, each with an offer to remove it"
+      "quote": "\"parinn uninstall\" lists its room-view secrets, each with an offer to remove it"
      },
      {
       "file": "features/security.feature",
-      "quote": "\"cairn uninstall\" lists its endpoints, each with an offer to remove it"
+      "quote": "\"parinn uninstall\" lists its endpoints, each with an offer to remove it"
      },
      {
       "file": "features/principal-acts.feature",
-      "quote": "\"cairn uninstall\" lists the phone's enrollment, with an offer to remove it"
+      "quote": "\"parinn uninstall\" lists the phone's enrollment, with an offer to remove it"
      },
      {
       "file": "features/peer.feature",
-      "quote": "\"cairn uninstall\" lists each enrollment, with an offer to remove it"
+      "quote": "\"parinn uninstall\" lists each enrollment, with an offer to remove it"
      }
     ],
-    "note": "ADM-02 (M2): uninstall listing room-view secrets (SEC-20, M7), launcher endpoints (SEC-29, M7) and enrollments (OWN-16, M7; PEER-06, M8). Took those three out of the list, which keeps 'every other file Cairn wrote outside the store', and moved each to its pending scenario."
+    "note": "ADM-02 (M2): uninstall listing room-view secrets (SEC-20, M7), launcher endpoints (SEC-29, M7) and enrollments (OWN-16, M7; PEER-06, M8). Took those three out of the list, which keeps 'every other file ParleyInn wrote outside the store', and moved each to its pending scenario."
    },
    {
     "id": "S-11",
@@ -1330,14 +1330,14 @@
      },
      {
       "file": "features/peer.feature",
-      "old": "    And \"cairn status\" names where the access token is read from and no child process inherits the access token in its environment\n",
-      "new": "    And \"cairn status\" names where the access token is read from and no child process inherits the access token in its environment\n    And a backup \"cairn backup create\" makes on the node holds no token key\n"
+      "old": "    And \"parinn status\" names where the access token is read from and no child process inherits the access token in its environment\n",
+      "new": "    And \"parinn status\" names where the access token is read from and no child process inherits the access token in its environment\n    And a backup \"parinn backup create\" makes on the node holds no token key\n"
      }
     ],
     "ledger_quotes": [
      {
       "file": "features/peer.feature",
-      "quote": "And a backup \"cairn backup create\" makes on the node holds no token key"
+      "quote": "And a backup \"parinn backup create\" makes on the node holds no token key"
      }
     ],
     "note": "ADM-06 (M3): a token key exists only on a token-key-only node (PEER-06, M8). Took 'token' out of ADM-06's list of keys a backup leaves out and moved it to PEER-06's pending scenario."
@@ -1347,8 +1347,8 @@
     "edits": [
      {
       "file": "features/administration.feature",
-      "old": "\"cairn install --scope project\", every Cairn component runs and the launcher runs a witness check",
-      "new": "\"cairn install --scope project\" and every Cairn component runs"
+      "old": "\"parinn install --scope project\", every ParleyInn component runs and the launcher runs a witness check",
+      "new": "\"parinn install --scope project\" and every ParleyInn component runs"
      },
      {
       "file": "features/administration.feature",
@@ -1357,8 +1357,8 @@
      },
      {
       "file": "features/lane.feature",
-      "old": "    Then the commit message carries exactly one \"Cairn-Room:\" trailer with a \"cairn:\" reference naming only the room id\n",
-      "new": "    Then the commit message carries exactly one \"Cairn-Room:\" trailer with a \"cairn:\" reference naming only the room id\n    And the commit hook for room trailers, which the confirmed install set up, is the only git hook Cairn changed\n"
+      "old": "    Then the commit message carries exactly one \"ParleyInn-Room:\" trailer with a \"parinn:\" reference naming only the room id\n",
+      "new": "    Then the commit message carries exactly one \"ParleyInn-Room:\" trailer with a \"parinn:\" reference naming only the room id\n    And the commit hook for room trailers, which the confirmed install set up, is the only git hook ParleyInn changed\n"
      },
      {
       "file": "features/principal-acts.feature",
@@ -1373,7 +1373,7 @@
      },
      {
       "file": "features/lane.feature",
-      "quote": "the commit hook for room trailers, which the confirmed install set up, is the only git hook Cairn changed"
+      "quote": "the commit hook for room trailers, which the confirmed install set up, is the only git hook ParleyInn changed"
      },
      {
       "file": "features/principal-acts.feature",
@@ -1387,8 +1387,8 @@
     "edits": [
      {
       "file": "features/administration.feature",
-      "old": "    And two nodes that both hold the events that the seat \"s-alice\" of the principal \"alice\" wrote\n    When the person runs \"cairn purge <scope>\" on each node\n    Then neither node holds an event of the selected scope\n    And each node's audit log records the purge with its scope and ranges\n",
-      "new": "    And a node that holds the events that the seat \"s-alice\" of the principal \"alice\" wrote\n    When the person runs \"cairn purge <scope>\" on the node\n    Then the node holds no event of the selected scope\n    And its audit log records the purge with its scope and ranges\n"
+      "old": "    And two nodes that both hold the events that the seat \"s-alice\" of the principal \"alice\" wrote\n    When the person runs \"parinn purge <scope>\" on each node\n    Then neither node holds an event of the selected scope\n    And each node's audit log records the purge with its scope and ranges\n",
+      "new": "    And a node that holds the events that the seat \"s-alice\" of the principal \"alice\" wrote\n    When the person runs \"parinn purge <scope>\" on the node\n    Then the node holds no event of the selected scope\n    And its audit log records the purge with its scope and ranges\n"
      },
      {
       "file": "features/peer.feature",
@@ -1430,7 +1430,7 @@
     "id": "S-11",
     "edits": [],
     "ledger_quotes": [],
-    "note": "No edits: findings from the S-11 pass over this area, left for a ruling. Every M1-M5 scenario in these seven files is @pending, so none had to be reported on that ground. (1) PRV-09 (M1, named in M1's 2.0 row) is left unchanged. Its whole scenario receives segments from a peer (M8): the Given is a peer declaring writers and every example row is a segment that peer sends. Moving those steps to SEC-25 would leave PRV-09 with no step. Its M1 part, the writer taken from the key that signed or wrote an event on this node and never from a field, needs a new step on an M1 source, such as cairn ingest or REC-24's node identity change. That is a finding, not an S-11 move. (2) PRV-05 keeps its 'summary' example row. The step checks that no settings layer can trust a class, which is M1 behaviour, though a summary event first arises with LANE-33 (M7). (3) Requirements that are in M1-M5 only in part keep both parts in their own scenario: REC-19's (S-7) seals, paired phone, kick and leave, and OWN-11's and OWN-12's M7 parts. Such a scenario cannot leave @pending until its rest ships in M7; a stakeholder ruling is needed on how the in-part ids close. (4) Posts and run-seat pins (room_post and room_pin are P1 rows that no M7-M9 row names) were treated as M1-M5, so the post and run-seat-pin steps and rows of PRV-01, PRV-02 and PRV-05 stay. (5) Outside this area: LANE-20, which S-1 keeps in M5, has presence-proof and other-principal steps in lane.feature."
+    "note": "No edits: findings from the S-11 pass over this area, left for a ruling. Every M1-M5 scenario in these seven files is @pending, so none had to be reported on that ground. (1) PRV-09 (M1, named in M1's 2.0 row) is left unchanged. Its whole scenario receives segments from a peer (M8): the Given is a peer declaring writers and every example row is a segment that peer sends. Moving those steps to SEC-25 would leave PRV-09 with no step. Its M1 part, the writer taken from the key that signed or wrote an event on this node and never from a field, needs a new step on an M1 source, such as parinn ingest or REC-24's node identity change. That is a finding, not an S-11 move. (2) PRV-05 keeps its 'summary' example row. The step checks that no settings layer can trust a class, which is M1 behaviour, though a summary event first arises with LANE-33 (M7). (3) Requirements that are in M1-M5 only in part keep both parts in their own scenario: REC-19's (S-7) seals, paired phone, kick and leave, and OWN-11's and OWN-12's M7 parts. Such a scenario cannot leave @pending until its rest ships in M7; a stakeholder ruling is needed on how the in-part ids close. (4) Posts and run-seat pins (room_post and room_pin are P1 rows that no M7-M9 row names) were treated as M1-M5, so the post and run-seat-pin steps and rows of PRV-01, PRV-02 and PRV-05 stay. (5) Outside this area: LANE-20, which S-1 keeps in M5, has presence-proof and other-principal steps in lane.feature."
    }
   ]
  },
@@ -1455,7 +1455,7 @@
     "edits": [
      {
       "file": "features/pins.feature",
-      "old": "      | automation  | the person runs \"cairn pin add --room L2\" from its device seat, a viewer in \"L2\"           | 0          |\n",
+      "old": "      | automation  | the person runs \"parinn pin add --room L2\" from its device seat, a viewer in \"L2\"           | 0          |\n",
       "new": ""
      }
     ],
@@ -1489,8 +1489,8 @@
      },
      {
       "file": "features/principal-acts.feature",
-      "old": "    And Cairn pre-filled no verdict, and the agent's statement stays a claim\n",
-      "new": "    And Cairn pre-filled no verdict, and the agent's statement stays a claim\n    And the agent's next restore block includes no \"verdict\" pin, since only \"constraint\", \"preference\" and \"intent\" pins restore\n"
+      "old": "    And ParleyInn pre-filled no verdict, and the agent's statement stays a claim\n",
+      "new": "    And ParleyInn pre-filled no verdict, and the agent's statement stays a claim\n    And the agent's next restore block includes no \"verdict\" pin, since only \"constraint\", \"preference\" and \"intent\" pins restore\n"
      }
     ],
     "ledger_quotes": [
@@ -1687,19 +1687,19 @@
      },
      {
       "file": "features/kernel.feature",
-      "old": "    And \"cairn.event_search\", \"cairn.event_expand\" and \"cairn.event_get\" return the room summary's \"summary\" event only as its address, never its text\n",
+      "old": "    And \"parinn.event_search\", \"parinn.event_expand\" and \"parinn.event_get\" return the room summary's \"summary\" event only as its address, never its text\n",
       "new": ""
      },
      {
       "file": "features/lane.feature",
       "old": "    And \"event_search\", \"event_expand\", \"event_get\" and \"room_get\" with an id each leave out the room's \"summary\" events, returning only their addresses\n",
-      "new": "    And \"event_search\", \"event_expand\", \"event_get\" and \"room_get\" with an id each leave out the room's \"summary\" events, returning only their addresses\n    And so do the kernel built-ins \"cairn.event_search\", \"cairn.event_expand\" and \"cairn.event_get\" in a \"kernel_exec\" call\n"
+      "new": "    And \"event_search\", \"event_expand\", \"event_get\" and \"room_get\" with an id each leave out the room's \"summary\" events, returning only their addresses\n    And so do the kernel built-ins \"parinn.event_search\", \"parinn.event_expand\" and \"parinn.event_get\" in a \"kernel_exec\" call\n"
      }
     ],
     "ledger_quotes": [
      {
       "file": "features/lane.feature",
-      "quote": "so do the kernel built-ins \"cairn.event_search\", \"cairn.event_expand\" and \"cairn.event_get\" in a \"kernel_exec\" call"
+      "quote": "so do the kernel built-ins \"parinn.event_search\", \"parinn.event_expand\" and \"parinn.event_get\" in a \"kernel_exec\" call"
      }
     ]
    },
@@ -1715,13 +1715,13 @@
      {
       "file": "features/recall.feature",
       "old": "    And a following call without the room parameter, under any scope, returns no hit from \"vendor-room\"\n",
-      "new": "    And a following call without the room parameter, under any scope, returns no hit from \"vendor-room\"\n    And neither does the kernel built-in \"cairn.event_search\" in a \"kernel_exec\" call without the room parameter, under any scope\n"
+      "new": "    And a following call without the room parameter, under any scope, returns no hit from \"vendor-room\"\n    And neither does the kernel built-in \"parinn.event_search\" in a \"kernel_exec\" call without the room parameter, under any scope\n"
      }
     ],
     "ledger_quotes": [
      {
       "file": "features/recall.feature",
-      "quote": "neither does the kernel built-in \"cairn.event_search\" in a \"kernel_exec\" call without the room parameter, under any scope"
+      "quote": "neither does the kernel built-in \"parinn.event_search\" in a \"kernel_exec\" call without the room parameter, under any scope"
      }
     ]
    }
@@ -1988,8 +1988,8 @@
     "edits": [
      {
       "file": "features/principal-acts.feature",
-      "old": "    When the person runs \"cairn pin unpin\" at a terminal on a pin her own agent's run seat wrote, and on a verdict she recorded\n    Then each unpin is recorded as a neutral principal act with nothing more asked",
-      "new": "    When the person runs \"cairn pin unpin\" at a terminal on a pin her own agent's run seat wrote\n    Then the unpin is recorded as a neutral principal act with nothing more asked"
+      "old": "    When the person runs \"parinn pin unpin\" at a terminal on a pin her own agent's run seat wrote, and on a verdict she recorded\n    Then each unpin is recorded as a neutral principal act with nothing more asked",
+      "new": "    When the person runs \"parinn pin unpin\" at a terminal on a pin her own agent's run seat wrote\n    Then the unpin is recorded as a neutral principal act with nothing more asked"
      }
     ],
     "ledger_quotes": [
@@ -2005,26 +2005,26 @@
     "edits": [
      {
       "file": "features/principal-acts.feature",
-      "old": "    When the person runs \"cairn room mute\" on a seat at a terminal\n    Then the mute, a room act, is signed with the seat key of the person's device seat in that room, carries no OWN-11 class and names the room it acted in",
-      "new": "    When the person runs \"cairn room post\" at a terminal\n    Then the post, a room act, is signed with the seat key of the person's device seat in that room, carries no OWN-11 class and names the room it acted in"
+      "old": "    When the person runs \"parinn room mute\" on a seat at a terminal\n    Then the mute, a room act, is signed with the seat key of the person's device seat in that room, carries no OWN-11 class and names the room it acted in",
+      "new": "    When the person runs \"parinn room post\" at a terminal\n    Then the post, a room act, is signed with the seat key of the person's device seat in that room, carries no OWN-11 class and names the room it acted in"
      },
      {
       "file": "features/lane.feature",
       "old": "    And an opt-in notice of the kick reaches the agent only where the room's owner allows notices and \"bob\" opted in",
-      "new": "    And an opt-in notice of the kick reaches the agent only where the room's owner allows notices and \"bob\" opted in\n    When \"alice\" runs \"cairn room mute\" on a seat at a terminal\n    Then the mute, a room act, is signed with the seat key of her device seat in that room, carries no OWN-11 class and names the room it acted in"
+      "new": "    And an opt-in notice of the kick reaches the agent only where the room's owner allows notices and \"bob\" opted in\n    When \"alice\" runs \"parinn room mute\" on a seat at a terminal\n    Then the mute, a room act, is signed with the seat key of her device seat in that room, carries no OWN-11 class and names the room it acted in"
      }
     ],
     "ledger_quotes": [
      {
       "file": "features/principal-acts.feature",
-      "quote": "When the person runs \"cairn room post\" at a terminal"
+      "quote": "When the person runs \"parinn room post\" at a terminal"
      },
      {
       "file": "features/lane.feature",
       "quote": "the mute, a room act, is signed with the seat key of her device seat in that room"
      }
     ],
-    "note": "OWN-12 (M1 part): mutes ship with LANE-16 and LANE-25 (M7). The \"cairn room mute\" step moved to LANE-25's @pending scenario. So that OWN-12 keeps an M1 step for its rule on a CLI verb that writes a room act, that step now uses \"cairn room post\", the verb its next step already refuses to an agent."
+    "note": "OWN-12 (M1 part): mutes ship with LANE-16 and LANE-25 (M7). The \"parinn room mute\" step moved to LANE-25's @pending scenario. So that OWN-12 keeps an M1 step for its rule on a CLI verb that writes a room act, that step now uses \"parinn room post\", the verb its next step already refuses to an agent."
    },
    {
     "id": "S-11",

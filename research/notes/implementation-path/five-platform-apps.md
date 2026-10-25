@@ -3,7 +3,7 @@
 Scope: written 4 October 2026, from primary sources (release feeds,
 official docs, source code and repositories) read that day. The
 stakeholder added a requirement: the same experience on Linux, Windows,
-macOS, iOS and Android, "start Cairn, then you see your stuff". Desktop
+macOS, iOS and Android, "start ParleyInn, then you see your stuff". Desktop
 apps are nodes: they hold the record, receive Claude Code's hooks and
 MCP calls from harnesses the person starts as usual, and show the room
 (rooms left, conversation middle, outcome right: diff, terminal, test
@@ -174,7 +174,7 @@ note.
   - no official key-store, Secure Enclave or background-task plugin. A
     community plugin for Secure Enclave and StrongBox is at 0.1.0 —
     [tauri-plugin-crypto-hw](https://unpkg.com/@auvo/tauri-plugin-crypto-hw-api@0.1.0/README.md).
-    Cairn writes its own Swift and Kotlin key plugin (reasoning).
+    ParleyInn writes its own Swift and Kotlin key plugin (reasoning).
 - **IPC, no server.** Commands use "a JSON-RPC like protocol" over
   message passing — [IPC](https://v2.tauri.app/concept/inter-process-communication/);
   2.0 moved IPC onto custom protocols — [Tauri 2.0](https://v2.tauri.app/blog/tauri-20/).
@@ -183,7 +183,7 @@ note.
   ([v3 changelog](https://github.com/tauri-apps/tauri/blob/v3/crates/tauri/CHANGELOG.md)).
   A `localhost` plugin exists for apps that want a real server
   ([plugins-workspace](https://github.com/tauri-apps/plugins-workspace/blob/v2/README.md));
-  Cairn would not add it.
+  ParleyInn would not add it.
 - **Security model.** Capabilities grant permissions per window or
   webview and per platform; remote URLs get commands only when listed —
   [capabilities](https://v2.tauri.app/security/capabilities/). That fits
@@ -575,7 +575,7 @@ platform uncovered or break CON-03.
   loses on the room's panes, which are the product's centre.
 - **Tauri's risks** are platform ones: WebKitGTK rendering on Linux
   (CEF in 3.0 is the escape, alpha today), WebView2's diagnostics on
-  Windows, mobile plugin gaps Cairn fills itself, and a 3.0 migration
+  Windows, mobile plugin gaps ParleyInn fills itself, and a 3.0 migration
   already under way.
 
 ## Spikes that decide

@@ -1,0 +1,4 @@
+# Developer tools: loaded on top of mise.toml when MISE_ENV=dev, so CI
+# never installs them. Locked in mise.dev.lock.
+[tools]
+"github:jeduden/frit" = { version = "0.17.0", bin = "frit" }

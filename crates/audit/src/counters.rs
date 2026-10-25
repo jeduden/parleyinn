@@ -1,7 +1,7 @@
 //! The counters derived from the audit log (OPS-01, OPS-03): each
 //! named counter counts the entries that name it, and its rise counts
 //! those after the entry the last acknowledgement covered, which the
-//! counter acknowledgement act records in the device seat (OWN-11). Every counter Cairn names
+//! counter acknowledgement act records in the device seat (OWN-11). Every counter ParleyInn names
 //! so far is a failure counter (OQ-50 (i)). Counting reads no clock: the
 //! same entries always give the same counts (I10).
 
@@ -21,7 +21,7 @@ pub struct Counts {
 
 impl Counts {
     /// Whether any failure counter rose since the counters were last
-    /// acknowledged, which fails `cairn doctor` (OPS-03).
+    /// acknowledged, which fails `parinn doctor` (OPS-03).
     #[must_use]
     pub fn risen(&self) -> bool {
         !self.since_ack.is_empty()

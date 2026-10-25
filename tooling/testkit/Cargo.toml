@@ -10,7 +10,7 @@ publish.workspace = true
 [lints]
 workspace = true
 
-# ENG-02: see crates/cairn/Cargo.toml.
-[package.metadata.cairn]
+# ENG-02: see crates/parinn/Cargo.toml.
+[package.metadata.parinn]
 responsibility = "Gives the tooling crates their test-only helpers"
 may-depend-on = []

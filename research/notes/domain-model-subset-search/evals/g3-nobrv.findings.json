@@ -101,8 +101,8 @@
  {
   "type": "contradiction",
   "quote": "`canary`, `why`, `launch`, `hook`, `mcp` and `kernel-worker`.",
-  "problem": "Names lists `launch` among the CLI's node-wide utilities, but Launcher says its entry point `cairn launch` \"is no part of the CLI\" (the CLI is B0, the launcher B1).",
-  "fix": "Remove `launch` from the CLI utility list and add: \"`cairn launch` names the launcher's entry point, which is no CLI command\".",
+  "problem": "Names lists `launch` among the CLI's node-wide utilities, but Launcher says its entry point `parinn launch` \"is no part of the CLI\" (the CLI is B0, the launcher B1).",
+  "fix": "Remove `launch` from the CLI utility list and add: \"`parinn launch` names the launcher's entry point, which is no CLI command\".",
   "severity": "minor",
   "lens": "consistency",
   "model": "default"

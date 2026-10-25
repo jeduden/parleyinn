@@ -94,8 +94,8 @@ fn builds_with_wants_the_flag_in_the_release_build() {
         Ok(())
     );
     assert_eq!(
-        builds_with("a b", "CAIRN_COMMIT"),
-        Err(r#"the release build does not contain "CAIRN_COMMIT""#.to_owned())
+        builds_with("a b", "PARINN_COMMIT"),
+        Err(r#"the release build does not contain "PARINN_COMMIT""#.to_owned())
     );
 }
 

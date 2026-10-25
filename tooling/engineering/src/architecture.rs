@@ -3,7 +3,7 @@
 //! responsibility.
 //!
 //! The declaration sits in each crate's own manifest, beside what it
-//! governs, under `[package.metadata.cairn]`:
+//! governs, under `[package.metadata.parinn]`:
 //!
 //! - `responsibility`: the one thing a library crate does.
 //! - `may-depend-on`: the workspace crates it may depend on, as normal
@@ -22,14 +22,15 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use serde_json::Value;
 
-/// Where the product's crates live.
-const PRODUCT: &str = "crates/";
+/// Where the product's crates live: the one place the architecture and
+/// ENG-18 checks read it from.
+pub(crate) const PRODUCT: &str = "crates/";
 
 /// Where the repository tooling lives.
 const TOOLING: &str = "tooling/";
 
 /// One workspace crate as `cargo metadata` and its manifest's
-/// `[package.metadata.cairn]` table describe it.
+/// `[package.metadata.parinn]` table describe it.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct WorkspaceCrate {
     pub name: String,
@@ -93,7 +94,7 @@ fn member(root: &str, package: &Value) -> Result<WorkspaceCrate, String> {
         .and_then(|rest| rest.strip_suffix("Cargo.toml"))
         .map(|rest| rest.trim_matches('/').to_owned())
         .ok_or_else(|| format!("crate {name}: manifest {manifest} is outside the workspace"))?;
-    let declared = &package["metadata"]["cairn"];
+    let declared = &package["metadata"]["parinn"];
     let lists = |key| list_of_names(declared, key).map_err(|e| format!("crate {name}: {e}"));
 
     Ok(WorkspaceCrate {

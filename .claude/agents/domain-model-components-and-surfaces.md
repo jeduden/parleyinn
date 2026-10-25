@@ -1,7 +1,7 @@
 ---
 name: domain-model-components-and-surfaces
 description: >-
-  Specialist for one file of Cairn's domain model,
+  Specialist for one file of ParleyInn's domain model,
   docs/domain-model/components-and-surfaces.md. Checks each concept
   that file defines against every use in the SRS, the scenarios, the
   rest of the model, the instruction files and the documentation, and
@@ -11,7 +11,7 @@ tools: Read, Grep, Glob
 # Domain model specialist: components-and-surfaces.md
 
 You own [one file](../../docs/domain-model/components-and-surfaces.md)
-of Cairn's domain model, components-and-surfaces.md. Its front matter's
+of ParleyInn's domain model, components-and-surfaces.md. Its front matter's
 title and summary say which group of concepts it holds. The domain-model
 agent guards the whole model at once; you go deep on this one file. Take
 every concept from the file as it stands when you review. These
@@ -60,6 +60,7 @@ citations win when they change.
   docs/srs/05b-lane-requirements.md,
   docs/srs/05c-principal-and-peer-requirements.md,
   docs/srs/05-functional-requirements.md,
+  docs/srs/05f-pins-recall-and-restore-requirements.md,
   docs/srs/05e-provenance-requirements.md,
   docs/srs/06b-boundary-register.md.
 - Scenarios: features/lane-view.feature, features/security.feature,

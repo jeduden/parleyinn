@@ -19,14 +19,14 @@ fn owns_reads_an_anchored_directory_as_its_contents() {
 #[test]
 fn owns_reads_an_anchored_file() {
     assert!(owns("/Cargo.toml", "Cargo.toml"));
-    assert!(!owns("/Cargo.toml", "crates/cairn/Cargo.toml"));
+    assert!(!owns("/Cargo.toml", "crates/parinn/Cargo.toml"));
 }
 
 #[test]
 fn owns_matches_an_unanchored_pattern_at_any_depth() {
     assert!(owns("clippy.toml", "clippy.toml"));
-    assert!(owns("clippy.toml", "crates/cairn/clippy.toml"));
-    assert!(!owns("clippy.toml", "crates/cairn/clippy.toml.bak"));
+    assert!(owns("clippy.toml", "crates/parinn/clippy.toml"));
+    assert!(!owns("clippy.toml", "crates/parinn/clippy.toml.bak"));
 }
 
 #[test]
@@ -35,7 +35,7 @@ fn owns_globs_within_one_segment() {
     assert!(!owns("/crates/*/clippy.toml", "crates/pin/src/clippy.toml"));
     assert!(owns(
         "/crates/*/tests/reach.rs",
-        "crates/cairn/tests/reach.rs"
+        "crates/parinn/tests/reach.rs"
     ));
     assert!(owns("*.lock", "Cargo.lock"));
     assert!(!owns("*.lock", "Cargo.lockx"));

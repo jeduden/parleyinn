@@ -30,7 +30,7 @@ struct Forbidden {
 fn the_declared_directions(w: &mut World) -> Result<(), String> {
     let root = testkit::repo_root();
     let cargo = std::env::var_os("CARGO").unwrap_or_else(|| "cargo".into());
-    let metadata = dependencies::cargo_metadata(&cargo, &root.join("Cargo.toml"), &w.cairn_home)?;
+    let metadata = dependencies::cargo_metadata(&cargo, &root.join("Cargo.toml"), &w.parinn_home)?;
     let members = architecture::workspace(&metadata)?;
     outcome(architecture::directions(&members))?;
     w.section::<Architecture>().members = members;

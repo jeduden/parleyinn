@@ -10,7 +10,7 @@ fn file(name: &str, ns: u64, n: u64) -> String {
 /// Runs the command over `files` with a timer that answers 1 µs, and
 /// returns its code, stdout and stderr.
 fn invoke(args: &[&str], files: &BTreeMap<&str, String>) -> (u8, String, String) {
-    let time = |_: &Path, _: &[&str]| Ok(Duration::from_micros(1));
+    let time = |_: &Path, _: &suite::Benchmark| Ok(Duration::from_micros(1));
     invoke_timed(args, files, &time)
 }
 
@@ -50,14 +50,14 @@ fn gate_files(base_ns: u64, head_ns: u64) -> BTreeMap<&'static str, String> {
 #[test]
 fn run_writes_every_benchmark_s_samples_against_the_core() {
     let seen = RefCell::new(Vec::new());
-    let time = |core: &Path, args: &[&str]| {
+    let time = |core: &Path, b: &suite::Benchmark| {
         seen.borrow_mut()
-            .push(format!("{} {}", core.display(), args.join(" ")));
+            .push(format!("{} {}", core.display(), b.args.join(" ")));
         Ok(Duration::from_nanos(812))
     };
 
     let (code, out, err) = invoke_timed(
-        &["run", "--core", "target/release/cairn", "--samples=2"],
+        &["run", "--core", "target/release/parinn", "--samples=2"],
         &BTreeMap::new(),
         &time,
     );
@@ -65,16 +65,23 @@ fn run_writes_every_benchmark_s_samples_against_the_core() {
     assert_eq!((code, err.as_str()), (EXIT_OK, ""));
     assert_eq!(
         out,
-        "# benchmark nanoseconds\ncore_start_up 812\ncore_start_up 812\n"
+        "# benchmark nanoseconds\ncore_start_up 812\ncore_start_up 812\n\
+         ingest_transcript 812\ningest_transcript 812\n\
+         hook_session_start 812\nhook_session_start 812\n\
+         hook_user_prompt_submit 812\nhook_user_prompt_submit 812\n\
+         search_events 812\nsearch_events 812\n"
     );
-    // One warm-up and the two samples.
-    assert_eq!(seen.borrow().len(), 3);
-    assert_eq!(seen.borrow()[0], "target/release/cairn version");
+    // One warm-up and the two samples, of each benchmark.
+    assert_eq!(seen.borrow().len(), 15);
+    assert_eq!(seen.borrow()[0], "target/release/parinn version");
+    assert_eq!(seen.borrow()[3], "target/release/parinn ingest --all");
+    assert_eq!(seen.borrow()[6], "target/release/parinn hook SessionStart");
+    assert_eq!(seen.borrow()[12], "target/release/parinn mcp");
 }
 
 #[test]
 fn run_takes_ten_samples_unless_told() {
-    let (code, out, _) = invoke(&["run", "--core", "cairn"], &BTreeMap::new());
+    let (code, out, _) = invoke(&["run", "--core", "parinn"], &BTreeMap::new());
 
     assert_eq!(code, EXIT_OK);
     assert_eq!(
@@ -85,20 +92,20 @@ fn run_takes_ten_samples_unless_told() {
 
 #[test]
 fn run_fails_naming_the_benchmark_it_could_not_sample() {
-    let time = |_: &Path, _: &[&str]| Err("cairn version exited 3".to_owned());
+    let time = |_: &Path, _: &suite::Benchmark| Err("parinn version exited 3".to_owned());
 
-    let (code, out, err) = invoke_timed(&["run", "--core", "cairn"], &BTreeMap::new(), &time);
+    let (code, out, err) = invoke_timed(&["run", "--core", "parinn"], &BTreeMap::new(), &time);
 
     assert_eq!(code, EXIT_FAILURE);
     assert_eq!(out, "");
-    assert_eq!(err, "benchmark: core_start_up: cairn version exited 3\n");
+    assert_eq!(err, "benchmark: core_start_up: parinn version exited 3\n");
 }
 
 #[test]
 fn run_refuses_a_sample_count_that_is_not_positive() {
     for n in ["0", "-1", "ten"] {
         let (code, _, err) = invoke(
-            &["run", "--core", "cairn", "--samples", n],
+            &["run", "--core", "parinn", "--samples", n],
             &BTreeMap::new(),
         );
 
@@ -179,7 +186,7 @@ fn the_command_line_is_checked() {
         (&[][..], r#"unknown command """#),
         (&["bench"][..], r#"unknown command "bench""#),
         (&["run"][..], "--core is required"),
-        (&["run", "cairn"][..], r#"unexpected argument "cairn""#),
+        (&["run", "parinn"][..], r#"unexpected argument "parinn""#),
         (&["run", "--core"][..], "--core needs a value"),
         (&["run", "--core="][..], "--core needs a value"),
         (&["run", "--base", "x"][..], r#"unknown flag "--base""#),
@@ -210,11 +217,11 @@ impl Write for Refusing {
 fn a_refused_write_fails_the_command() {
     let files = gate_files(1000, 1000);
     let read = |path: &str| Ok(files[path].clone());
-    let time = |_: &Path, _: &[&str]| Ok(Duration::from_micros(1));
+    let time = |_: &Path, _: &suite::Benchmark| Ok(Duration::from_micros(1));
 
     for (args, want) in [
         (
-            ["run", "--core", "cairn", "", ""],
+            ["run", "--core", "parinn", "", ""],
             "write the samples: disk full",
         ),
         (

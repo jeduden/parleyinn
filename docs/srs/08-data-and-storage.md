@@ -15,7 +15,7 @@ illustrative; the implementation MAY differ as long as every constraint marked
 ## 8.1 Home layout
 
 ```text
-$CAIRN_HOME/                          0700, belonging to one OS user       (N)
+$PARINN_HOME/                          0700, belonging to one OS user       (N)
 ├── config.toml                       the principal's configuration        0600
 ├── home.json                         home id binding (home.id, SEC-03)    0600
 ├── audit/audit-NNNNNN.jsonl          hash-chained audit log               0600
@@ -27,7 +27,8 @@ $CAIRN_HOME/                          0700, belonging to one OS user       (N)
 
 A home contains one store, `store.db` with its payload store, partitioned by
 writer, never by repository or room (N). Names in the home MUST NOT reveal a
-repository's path or identity (N). Cairn and its storage engine MUST keep every
+repository's path or identity (N). ParleyInn and its storage engine MUST keep
+every
 temporary file in memory or in a directory in the home, never elsewhere, and,
 while encryption at rest is on, in memory or encrypted under the at-rest key
 (N).
@@ -68,7 +69,7 @@ are recorded in `meta` **(N)**.
 
 The pin budget (PIN-08) and the model-token caps of INJ-07, RCL-03 and
 CMP-06 depend on model-token counts.
-Cairn MUST use a conservative estimator, calibrated in M0 against
+ParleyInn MUST use a conservative estimator, calibrated in M0 against
 Claude's own model-token counts, such that the estimate is greater
 than or equal to the true count for at least 99% of a representative
 sample **(N)**.

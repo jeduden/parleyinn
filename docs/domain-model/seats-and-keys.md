@@ -2,7 +2,7 @@
 title: "Seats and keys"
 order: "06"
 summary: >-
-  Seats and the keys behind them: run and device seats, room and seat ids, seat, device, principal and token keys, key events and key event logs, recovery keys, certificates, access tokens, authenticators and CI keys.
+  Seats and the keys behind them: run and device seats, room and seat ids, seat, device, principal and token keys, key events and key event logs, recovery keys, key stores, certificates, access tokens, authenticators and CI keys.
 ---
 # Seats and keys
 
@@ -18,14 +18,14 @@ summary: >-
 - **Run seat**: A run's seat. A witnessed run's run-seat key, but for the seat
   ingest starts, lives only in the memory of its harness session's MCP server,
   which keeps those of the main run and its subagents' runs and seals their
-  writers (SEC-10). What `cairn ingest` appends for a witnessed run goes to the
+  writers (SEC-10). What `parinn ingest` appends for a witnessed run goes to the
   one run seat ingest starts beside each run seat it extends, in its room,
   naming it, sharing its add, where it has one, and taking over its role,
   certified only by the key that certified that run seat or the key a rotation
   key event names in its place, by a seat certificate naming
   it so; any other seat naming a run seat shares no add or role (REC-19). The
   core keeps that seat's key, and an ingested run's, like a device seat's key
-  and seals their writers (SEC-10). An **ingest seat** is a run seat `cairn
+  and seals their writers (SEC-10). An **ingest seat** is a run seat `parinn
   ingest` starts or mints, the one beside a run seat and an ingested run's
   included, which its seat certificate names so (REC-19, PRV-13). A run-seat key
   is lost with the MCP server that holds it, and a run that continues on a
@@ -54,9 +54,12 @@ summary: >-
   signs principal acts and expire acts once PRV-10 ships, and a blind peer holds
   a room's segments encrypted to its principals' device keys or a token-key-only
   node's token key (PEER-12). Before PRV-10 ships no principal key certifies
-  one, so a device seat's pins qualify only on its own node (PIN-10).
+  one, so a device seat's pins qualify only on its own node (PIN-10). A node
+  also derives from its device key the secret that keys its worktree digests
+  (LANE-02); that secret signs nothing and never leaves the node.
 - **Principal key**: A principal's root key, kept offline or in a
-  platform-protected key store and never by a Cairn component, which certifies
+  platform-protected key store and never by a ParleyInn component, which
+  certifies
   its device keys and may certify a service account's principal key by a
   **service-account certificate**, marking whether that account relays text
   others wrote (PRV-10).
@@ -102,11 +105,18 @@ summary: >-
   becomes the new key. Where an authenticator supplies it, its private half
   never touches the node. Otherwise a device key's leaves the node once:
   encrypted to a **recipient key** a recorded managed-policy listing names, or
-  by `cairn recovery-key write` under a passphrase. A token key's stays with
+  by `parinn recovery-key write` under a passphrase. A token key's stays with
   the node that issued its access token, which signs the rotation a later
   access token carries (PRV-12). A **confirmation key** is a key a recorded
   managed-policy listing names whose signature lets a confirm, choose or reject
   count without a presence proof (SEC-22, PRV-12).
+- **Key store**: Where the core keeps the keys SEC-10 binds to a home, each in
+  its own **entry**, named for that home so two homes never share a key: the
+  platform key store where one exists (the macOS Keychain; on Windows, a file
+  DPAPI protects for the OS user), else a file only the principal's OS user can
+  read, which `parinn status` names. A key missing from its entry is told apart
+  from a key store that is locked or cannot be read, which never counts as a
+  missing key (SEC-10, PRV-12).
 - **Seat certificate**: A device key's or token key's signature over a seat key,
   scoped to the seat's room and naming its seat kind and whether it is an ingest
   seat, that the seat key countersigns (PRV-10, PRV-11). Its **certificate
@@ -121,7 +131,7 @@ summary: >-
   device or peer, certify an ephemeral node's seats or carry an invite link
   (PEER-06, PRV-10, LANE-18). Its expiry ends it by the expire act the minting
   node records, or before PRV-10 ships only as that node's refusal of every
-  later use of it (PEER-05). Rotating one (`cairn access-token rotate`) mints a
+  later use of it (PEER-05). Rotating one (`parinn access-token rotate`) mints a
   later access token that carries the rotation of its token key the issuing node
   signed, never the recovery key (PRV-12). "Token" is always an access token, a
   model token, an access token's token key, a token certificate or a

@@ -1,5 +1,5 @@
 //! The isolation guard (ENG-14). Test code resolves the user's `HOME`, a
-//! Cairn home and Claude Code's configuration through [`resolve`] and
+//! ParleyInn home and Claude Code's configuration through [`resolve`] and
 //! nowhere else. Anything that does not lie under the system's temporary
 //! directory is real state, and resolving it aborts the process before
 //! a path to it exists.
@@ -17,8 +17,8 @@ use std::process;
 pub enum Place {
     /// The user's `HOME` directory.
     UserHome,
-    /// A Cairn home: `CAIRN_HOME`, else `.cairn` in the user's `HOME`.
-    CairnHome,
+    /// A ParleyInn home: `PARINN_HOME`, else `.parinn` in the user's `HOME`.
+    ParleyInnHome,
     /// Claude Code's configuration directory: `CLAUDE_CONFIG_DIR`, else
     /// `.claude` in the user's `HOME`.
     ClaudeConfig,
@@ -47,7 +47,7 @@ impl Place {
     /// Every place the guard keeps tests out of.
     pub const ALL: [Self; 4] = [
         Self::UserHome,
-        Self::CairnHome,
+        Self::ParleyInnHome,
         Self::ClaudeConfig,
         Self::ClaudeJson,
     ];
@@ -57,7 +57,7 @@ impl Place {
     pub fn name(self) -> &'static str {
         match self {
             Self::UserHome => "user-home",
-            Self::CairnHome => "cairn-home",
+            Self::ParleyInnHome => "parinn-home",
             Self::ClaudeConfig => "claude-config",
             Self::ClaudeJson => "claude-json",
         }
@@ -73,7 +73,7 @@ impl Place {
     fn describe(self) -> &'static str {
         match self {
             Self::UserHome => "the user's `HOME` directory",
-            Self::CairnHome => "the Cairn home",
+            Self::ParleyInnHome => "the ParleyInn home",
             Self::ClaudeConfig => "Claude Code's configuration directory",
             Self::ClaudeJson => "Claude Code's state file",
         }
@@ -87,7 +87,7 @@ impl fmt::Display for Refusal {
             Self::Outside { place, path, temp } => write!(
                 f,
                 "refusing to resolve {} at {}: it is not under the temporary directory {}; \
-                 point HOME and CAIRN_HOME at a testkit::TempDir first (ENG-14)",
+                 point HOME and PARINN_HOME at a testkit::TempDir first (ENG-14)",
                 place.describe(),
                 path.display(),
                 temp.display()
@@ -102,9 +102,9 @@ fn locate(place: Place, var: Var<'_>) -> Result<PathBuf, Refusal> {
     let config = || var("CLAUDE_CONFIG_DIR").map(PathBuf::from);
     match place {
         Place::UserHome => home(),
-        Place::CairnHome => match var("CAIRN_HOME") {
-            Some(cairn) => Ok(PathBuf::from(cairn)),
-            None => home().map(|h| h.join(".cairn")),
+        Place::ParleyInnHome => match var("PARINN_HOME") {
+            Some(parinn) => Ok(PathBuf::from(parinn)),
+            None => home().map(|h| h.join(".parinn")),
         },
         Place::ClaudeConfig => match config() {
             Some(dir) => Ok(dir),

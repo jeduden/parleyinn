@@ -1,7 +1,7 @@
 # Annotation brief: feature spans over the domain model
 
 Larger task: a genetic / simulated-annealing search for the largest subset of
-Cairn's domain model that is consistent, secure and useful. Candidates are
+ParleyInn's domain model that is consistent, secure and useful. Candidates are
 assembled by removing the text of excluded features. Your job: mark that text.
 
 Folder: this one, research/notes/domain-model-subset-search/
@@ -35,7 +35,7 @@ Never mark core (it is always present).
    both spans. A parenthetical citing a requirement id only of F goes with F.
 3. **Hub (index.md).** Relations items as features.json assigns them; inside
    core relations and every other section (verbs, Names follow the model, Not
-   Cairn concepts table rows), mark clauses and table rows that mention
+   ParleyInn concepts table rows), mark clauses and table rows that mention
    optional concepts. A table row goes in one span from `|` to end of line.
    Keep the catalog block as is (no markers inside `<?catalog ... ?>`).
 4. **Invariants.** Mark the clauses of I1–I10 that exist only for an optional

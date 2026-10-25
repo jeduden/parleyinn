@@ -1,13 +1,13 @@
 # Domain-model subset search
 
-The search for the largest subset of Cairn's domain model that is
+The search for the largest subset of ParleyInn's domain model that is
 consistent, secure and useful. A candidate subset is assembled from the
 model by dropping whole features, reviewed blind, scored, and repaired.
 The search stops when a candidate has no findings and adding any
 excluded feature brings findings back.
 
 Status: in progress, selection only. The stakeholder asked for it during
-the blind domain-model reviews of the cairn-for-agent-fleets plan, and then
+the blind domain-model reviews of the parinn-for-agent-fleets plan, and then
 ruled that the search selects feature combinations of the current model and
 never changes its text. `annotated/` is the original model with feature
 spans; `check_annotation.py` (run without `--no-orig`) proves it equals

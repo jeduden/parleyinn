@@ -13,7 +13,7 @@ build is no longer checked for reproducibility.
 
 What lands:
 
-- [x] `cairn version` as the Rust core executable, the `cairn` crate
+- [x] `parinn version` as the Rust core executable, the `parinn` crate
   under `crates/`: the same command line as the Go stub, and
   `--json` adds the commit the build stamped.
 - [x] The release build in one reusable workflow, `build.yml`, which
@@ -34,7 +34,7 @@ What lands:
   types and `std::process::Command`, and a reach test refuses any
   crate linked into it. Each has a drift case.
 - [x] `go.mod`, `go.sum`, `.golangci.yml`, `tools/`, `scripts/`'s Go
-  coverage gate and `cmd/cairn` go; CON-01, ENG-01 and ENG-16 drop
+  coverage gate and `cmd/parinn` go; CON-01, ENG-01 and ENG-16 drop
   their Go clauses (SRS 2.32-draft). testify leaves with them;
   ADR-2610101913 supersedes ADR-2610101442.
 - [x] The nightly job waits for cargo-fuzz targets instead of Go's.

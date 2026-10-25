@@ -35,4 +35,4 @@ summary: >-
 ## Next
 
 - Phase 4: the product's Rust executable, the release pipeline on
-  cargo, and the Go `cairn version` stub removed.
+  cargo, and the Go `parinn version` stub removed.

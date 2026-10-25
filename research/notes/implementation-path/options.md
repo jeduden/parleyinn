@@ -1,7 +1,7 @@
 # Implementation path: the options
 
 Scope: step 1 of answering OQ-32, revision 2, written 4 October 2026.
-Each option is one complete way to build Cairn: it fills every slot of
+Each option is one complete way to build ParleyInn: it fills every slot of
 the [evaluation frame](constraints.md) in the same template, so step 2
 can [compare](comparison.md) them criterion by criterion. The facts
 come from the component notes on
@@ -19,14 +19,14 @@ choice lands as an ADR and an SRS change.
 ## What changed since revision 1
 
 - **The target experience.** The stakeholder wants the same experience
-  on Linux, Windows, macOS, iOS and Android: start Cairn, then see your
-  stuff. Cairn becomes an app on five platforms. A desktop app is a
+  on Linux, Windows, macOS, iOS and Android: start ParleyInn, then see your
+  stuff. ParleyInn becomes an app on five platforms. A desktop app is a
   node; a phone app is a client of the owner's nodes.
 - **Harnesses connect directly.** Following the [pitch][pitch]
   (decision 8), a harness the person starts as usual joins through the
   plugin; the app is one more client, never a required hop. Hosting
   every agent in the run component is not the default.
-- **A software factory builds Cairn.** Agents write, port, review and
+- **A software factory builds ParleyInn.** Agents write, port, review and
   maintain the code, so a missing library weighs less than a good source
   to port from and an oracle to test against, as mdsmith's vendored
   goldmark fork shows. The language choice is reversible: a factory
@@ -37,7 +37,7 @@ choice lands as an ADR and an SRS change.
 - **New options.** G puts a Flutter UI over a Rust core. H takes
   Ghostty's shape: a Zig core library that renders on the GPU, under a
   thin native host per platform, with TigerStyle discipline and smalt's
-  tooling. Where Ghostty renders the terminal, Cairn's core renders the
+  tooling. Where Ghostty renders the terminal, ParleyInn's core renders the
   whole room: chat, diff and terminal, and an embedded browser shows
   results, as Steam's client embeds Chromium. I applies the same shape
   to a Rust core. Zig leaves "options left out".
@@ -72,17 +72,17 @@ does not depend on the language.
    On a phone, one app: view, sync and the device key, with no core
    B0 role. Whether "one binary" may mean "one download" is the
    stakeholder's ruling.
-2. **Starting Cairn opens the app** on all five platforms. Its window
+2. **Starting ParleyInn opens the app** on all five platforms. Its window
    reaches its backend through in-process IPC where the shell allows
    it, so the app's own view opens no loopback listener. A loopback page
    stays available for browsers and editor panels, under SEC-20 with a
    per-launch token and no cookie, since cookies cross ports.
 3. **Harnesses connect through the plugin.** The owner's message reaches
    an agent through the harness's own input where the harness offers
-   one: Claude Code's channels (a research preview, reached by Cairn's
+   one: Claude Code's channels (a research preview, reached by ParleyInn's
    own stdio MCP server) and Codex's local daemon. Elsewhere the agent
    gets a fixed notice and reads the message when it asks. Neither path
-   is on OWN-03's list yet. `cairn run` hosts a harness for takeover and
+   is on OWN-03's list yet. `parinn run` hosts a harness for takeover and
    witness runs.
 4. **One view model.** Statuses, the Needs you order and the vocabulary
    are computed once in the core and sent to every surface as data
@@ -103,10 +103,10 @@ does not depend on the language.
 9. **Running-app preview.** The app under test opens on its own origin,
    never inside the view's; a mark on it is a snapshot the run component
    takes. It needs a requirement and a SEC-21 decision in any option.
-10. **Kernel.** A hermetic, metered sandbox in the `cairn
+10. **Kernel.** A hermetic, metered sandbox in the `parinn
     kernel-worker` child process (CMP-03 to CMP-05); spike S5 decides
     the guest language (OQ-10).
-11. **Vendored forks.** A library Cairn changes, or ports into its
+11. **Vendored forks.** A library ParleyInn changes, or ports into its
     language, lives inside the repository as mdsmith keeps goldmark:
     never a `replace`, the upstream version recorded, every divergence
     listed with a guard test, an equivalence job in CI against the
@@ -161,7 +161,7 @@ on the server, so the node's release path has no JavaScript build.
   logic, so the phone cannot verify or sync on its own.
 - **Run component and TUI.** creack/pty with ConPTY packages on
   Windows; upstream `ghostty-vt.wasm` translated by wasm2go; Bubble Tea.
-- **Peer.** quic-go or Noise and Cairn's own sealed-range exchange; no
+- **Peer.** quic-go or Noise and ParleyInn's own sealed-range exchange; no
   cgo-free CRDT.
 - **Evidence and HC-23.** The import closure per entry point, checked
   per function on Windows where `x/sys/windows` mixes calls; `unsafe`
@@ -217,11 +217,11 @@ five platforms, with the TypeScript page talking to it over IPC.
   under wasmtime, whose fuel meters steps.
 - **Shells.** Tauri 2 (2.12) on desktop and phone; the phone runs the
   same core in process, so it verifies, syncs and signs like a node. A
-  key plugin in Swift and Kotlin is Cairn's own; Tauri 3's bundled
+  key plugin in Swift and Kotlin is ParleyInn's own; Tauri 3's bundled
   Chromium is the way out of WebKitGTK's GPU problems on Linux.
 - **Run component and TUI.** portable-pty (ConPTY included) and
   libghostty-vt linked natively, as herdr builds it; ratatui.
-- **Peer.** iroh, p2panda or Willow with Cairn's own relays (CON-06).
+- **Peer.** iroh, p2panda or Willow with ParleyInn's own relays (CON-06).
 - **Evidence and HC-23.** One crate per component, clippy bans on
   `std::net` and `std::process`, a symbol check; `forbid(unsafe_code)` in
   every hostile-input and trust crate, unsafe only in listed shims.
@@ -272,11 +272,11 @@ a web page, stable on all five platforms.
 
 ## Option H: Zig core library, Ghostty's shape
 
-**Thesis.** Build Cairn the way Ghostty is built, one step further.
+**Thesis.** Build ParleyInn the way Ghostty is built, one step further.
 Ghostty's core library does terminal emulation, font handling and GPU
 rendering, and each platform only hosts it: Swift with AppKit and
 SwiftUI on macOS over the libghostty C API, Zig against GTK 4 on Linux
-([About Ghostty][ghostty]). Cairn's core renders the whole room the same
+([About Ghostty][ghostty]). ParleyInn's core renders the whole room the same
 way, chat and diff as well as the terminal, so there is one UI, drawn
 once, on five platforms. The core
 is built with smalt's coverage, lint and gate tooling and TigerStyle's
@@ -372,13 +372,13 @@ browser for results, as in H. Rust has the GPU UI toolkits Zig lacks.
 | Addition                       | What it gives                                       | What it costs                                                                                                   | Verdict                                      |
 | ------------------------------ | --------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- | -------------------------------------------- |
 | VS Code webview extension      | the room beside the code                            | a second signed artifact; `asExternalUri` tunnels the loopback page off a remote machine, against SEC-01 and I4 | later, view only, local editors only         |
-| VS Code layout takeover        | an IDE-shaped Cairn                                 | fights the host; the agent often runs in the same extension host (T21)                                          | no                                           |
+| VS Code layout takeover        | an IDE-shaped ParleyInn                             | fights the host; the agent often runs in the same extension host (T21)                                          | no                                           |
 | Electron                       | a desktop window                                    | 120 MB or more; CON-03 bars Node.js; no phones                                                                  | no; Tauri covers the desktop shell           |
-| Ghostty fork or plugin         | Cairn inside a terminal people use                  | no plugin API; single-player                                                                                    | no; reuse libghostty-vt (A to D, G, H)       |
+| Ghostty fork or plugin         | ParleyInn inside a terminal people use              | no plugin API; single-player                                                                                    | no; reuse libghostty-vt (A to D, G, H)       |
 | herdr or tmux as followed host | agents the run component did not start, in the room | their sockets let any same-user process type and read (T21)                                                     | follow-only adapter, input shown unavailable |
 | JetBrains JCEF panel           | the room inside JetBrains IDEs                      | a second artifact                                                                                               | later                                        |
 | Zed                            | recall inside Zed                                   | no webviews                                                                                                     | MCP server only                              |
-| WSL 2 on Windows               | the Linux node unchanged                            | Windows users run Cairn inside WSL                                                                              | a cheaper first Windows stage                |
+| WSL 2 on Windows               | the Linux node unchanged                            | Windows users run ParleyInn inside WSL                                                                          | a cheaper first Windows stage                |
 
 ## Options left out
 
@@ -389,7 +389,7 @@ browser for results, as in H. Rust has the GPU UI toolkits Zig lacks.
   platforms ([five platforms](five-platform-apps.md)).
 - **Dioxus.** Watched: native phone APIs arrive only in 0.8.
 
-[pitch]: ../../../plan/2610012322_cairn-for-agent-fleets/pitch.md
+[pitch]: ../../../plan/2610012322_parinn-for-agent-fleets/pitch.md
 [ghostty]: https://ghostty.org/docs/about
 [elementx]: https://github.com/element-hq/element-x-android
 [elementx-ios]: https://github.com/element-hq/element-x-ios

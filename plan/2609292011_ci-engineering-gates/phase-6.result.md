@@ -1,10 +1,10 @@
 ---
 n: 6
 title: "Main's protection and CODEOWNERS (ENG-21)"
-status: "🔳"
+status: "✅"
 result: true
 summary: >-
-  Main's ruleset is committed and checked against the live one nightly, CODEOWNERS is checked against the paths that enforce the SRS, and ENG-21 stays pending on the two-approval rule.
+  Main's ruleset is committed and checked against the live one nightly, CODEOWNERS is checked against the paths that enforce the SRS and gives the security-sensitive crates to the security reviewer, and the ENG-21 scenario is off pending.
 ---
 ## Handoff
 
@@ -37,14 +37,19 @@ What landed:
   `~ALL` but the release tags, and a gate test refuses a ruleset with
   no include. The stakeholder applies it on GitHub again.
 
-Scenario: `@ENG-21` stays `@pending`. Its first five `Then` steps pass
-when run without the tag. The last, two approvals on the
-security-sensitive crates with the security reviewer as one, cannot be
-met by a ruleset and CODEOWNERS: the approval count is one number for
-the branch, and CODEOWNERS asks one owner per path. A required check,
-`Security approvals`, that reads the reviews of a pull request touching
-those crates would enforce it; the binding fails on it today and names
-it.
+Scenario: `@ENG-21` is off `@pending`, on the stakeholder's ruling of
+2026-10-23. The row asked two approvals on the security-sensitive
+crates, one from the security reviewer. A ruleset holds one approval
+count for the whole branch and CODEOWNERS one owner per path, so it
+took a required check that counted reviews, and only one reviewer
+account exists besides the stakeholder, who never counts as the author's
+approver: no pull request on those crates could have reached two. A
+`Security approvals` check was built, reviewed and closed unmerged
+(pull request 72). The row now reads that those crates are owned by the
+designated security reviewer, whose approval a change to them needs as
+a code owner, and the last step checks that ownership. The ruleset and
+CODEOWNERS already held it. A second approval returns as a change to the
+row when a second reviewer account is named; nothing here waits on it.
 
 For the stakeholder:
 

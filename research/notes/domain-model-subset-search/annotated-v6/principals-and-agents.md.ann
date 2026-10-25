@@ -2,14 +2,14 @@
 title: "Principals and agents"
 order: "01"
 summary: >-
-  Who acts in Cairn: principals⟦f:service-accounts⟧, persons and service accounts⟦/f⟧, managed policy, agents, runs and subagents⟦f:facilitator⟧, the facilitator⟦/f⟧, authors, members⟦f:delegation-grants⟧, delegates⟦/f⟧ and the owner.
+  Who acts in ParleyInn: principals⟦f:service-accounts⟧, persons and service accounts⟦/f⟧, managed policy, agents, runs and subagents⟦f:facilitator⟧, the facilitator⟦/f⟧, authors, members⟦f:delegation-grants⟧, delegates⟦/f⟧ and the owner.
 ---
 # Principals and agents
 
 - **Principal**: A person⟦f:service-accounts⟧ or a service account⟦/f⟧. It ⟦f:principal-keys⟧has a principal key, signs
   principal acts with a device key at a principal surface once PRV-10 ships,
   each recorded on a device seat, and ⟦/f⟧is the principal of every agent whose runs
-  its nodes record.⟦f:principal-keys⟧ Cairn counts principals by principal key: every device key⟦f:access-tokens⟧,
+  its nodes record.⟦f:principal-keys⟧ ParleyInn counts principals by principal key: every device key⟦f:access-tokens⟧,
   token key⟦/f⟧ and seat key that chains to one principal key through device⟦f:access-tokens⟧, token⟦/f⟧
   or seat certificates belongs to that principal; a chain never passes through
   another principal key.⟦/f⟧⟦f:service-accounts⟧ A certified service account is still its own principal;
@@ -26,7 +26,7 @@ summary: >-
   longer listing it; none starts uncertified. It can own rooms, have seats and
   be the principal of its own agents, such as CI or runner agents.⟦/f⟧
 - **Managed policy**: Settings belonging to root that an organisation sets on a
-  machine. Cairn never overrides it (I7). Among its powers, it may override
+  machine. ParleyInn never overrides it (I7). Among its powers, it may override
   the principal's settings⟦f:browser-room-view⟧, disable the room-view component⟦/f⟧⟦f:launcher⟧, disable the launcher⟦/f⟧⟦f:peer-sync⟧, disable
   the peer component⟦/f⟧⟦f:git-carrier⟧, disable the publish component⟦/f⟧⟦f:bridges⟧, disable the bridge component⟦/f⟧⟦f:sandbox-risk⟧, forbid risk acceptance⟦/f⟧⟦f:service-accounts⟧⟦f:principal-keys⟧ and certify
   service accounts by listing their principal keys, each listing marking, as a
@@ -34,13 +34,13 @@ summary: >-
   wrote; a listing without the mark counts as relaying, and each listing and
   each removal is recorded as a structural event that enters the node's key set
   (I10)⟦/f⟧⟦/f⟧. The harness's own
-  managed settings, which Cairn also never writes (ADM-03), are part of the
+  managed settings, which ParleyInn also never writes (ADM-03), are part of the
   **harness configuration**: the harness's settings, hooks and MCP registrations
   (I7). Managed policy and repository configuration each override the
   principal's settings only with cut-only changes, which only narrow settings
   (Record)⟦f:purge-retention⟧, managed policy also with a retention policy (I1)⟦/f⟧; neither declares
   pins. Any other value in either is not applied: it is counted and shown on
-  Setup (I6), and Cairn rewrites neither.
+  Setup (I6), and ParleyInn rewrites neither.
 - **Agent**: A worker a harness runs for exactly one principal: the principal of
   the node that records its runs (OWN-01). It receives restore blocks and
   recalls history; an agent is never a principal. Each harness session's main
@@ -66,8 +66,8 @@ summary: >-
   in its personal room.
 ⟦f:facilitator⟧- **Facilitator**: The ⟦f:service-accounts⟧service account⟦/f⟧, at most one per room, whose device seat,
   on its own node, the owner appoints as the room's facilitator, making that
-  device seat an ⟦f:moderation⟧appointed moderator⟦/f⟧ (SEC-32); its program, neither a Cairn
-  component nor an agent, acts through that node's CLI (`cairn room-summary
+  device seat an ⟦f:moderation⟧appointed moderator⟦/f⟧ (SEC-32); its program, neither a ParleyInn
+  component nor an agent, acts through that node's CLI (`parinn room-summary
   write`). It ⟦f:conversation⟧posts and ⟦/f⟧writes room summaries, answering summary requests
   (LANE-33).⟦/f⟧
 - **Author**: The seat that wrote an event or a pin. The author's principal

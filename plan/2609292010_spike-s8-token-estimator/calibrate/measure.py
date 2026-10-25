@@ -4,7 +4,7 @@ Each count is one headless Claude Code call in an isolated home whose user
 message is "<t>\\n" + text + "\\n</t>". The call's input usage (input, cache
 read and cache creation tokens) minus the same call's usage with an empty
 text is the sample's model-token count: the text and the two newlines that
-join it to its delimiters, as Cairn inserts text into a block. The baseline
+join it to its delimiters, as ParleyInn inserts text into a block. The baseline
 is measured before and after the run and must not move.
 
 Usage: python3 -I measure.py SAMPLE.jsonl MODEL [EVERY]

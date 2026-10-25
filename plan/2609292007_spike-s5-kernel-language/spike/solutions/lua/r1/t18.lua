@@ -1,4 +1,4 @@
-local evs = cairn.events()
+local evs = parinn.events()
 local lo, hi, runs = {}, {}, {}
 for _, e in ipairs(evs) do
   local r = e.run

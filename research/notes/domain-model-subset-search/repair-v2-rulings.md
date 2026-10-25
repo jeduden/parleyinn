@@ -4,12 +4,12 @@ Input: GA/evals/g1-repair-input.json (findings on g1-core and g1-all, both
 severities). Follow GA/repair-brief.md and the marker rules in
 GA/annotate-brief.md. GA/annotated/ is version 1 (snapshot GA/annotated-v1/).
 Settled by the stakeholder, keep as is: the principal's own tunnel to the
-loopback room view (`cairn ui --phone`, phone-scoped room-view secret) and
+loopback room view (`parinn ui --phone`, phone-scoped room-view secret) and
 `git push` are the principal's tools outside I4; room trailers are always on.
 
 Core rulings:
 C1 Create room in core is only the device seat's creation of its node's
-   personal room at Cairn's first start. `room_create`, creating any other
+   personal room at ParleyInn's first start. `room_create`, creating any other
    room and every other create room use go to work-rooms.
 C2 Range links: the room merge covers range links, and a recall that returns
    a pin returns its range links (so the link act has a use in core).
@@ -25,7 +25,7 @@ C5 Managed policy may override the principal's settings only with changes a
    cut act could make, and declares no pins.
 C6 Every agent-facing output that is not recall and not a closed path (the
    result of a non-recall MCP tool, of any CLI call from inside a run that is
-   not a read) carries only fixed text Cairn ships, structural fields and
+   not a read) carries only fixed text ParleyInn ships, structural fields and
    ids, never record text.
 C7 A pin qualifies only while neither its creating event nor the version that
    restores was written by a seat whose key is revoked; revoking a device
@@ -40,7 +40,7 @@ C9 Minor core uselessness: give Flag a use (shown with the event on Runs and
    feature uses it).
 
 Feature rulings:
-F1 browser-room-view: `cairn ui` started at a terminal that no run's tool
+F1 browser-room-view: `parinn ui` started at a terminal that no run's tool
    process started is a principal surface; started from a run's tool process
    it mints no room-view secret (covers `--phone`).
 F2 service-accounts: a service account whose certificate or listing,

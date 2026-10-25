@@ -108,7 +108,7 @@ Only **Keybase** ever shipped all three properties (git, chat, E2E encryption wi
 ### Inferences
 
 - Integration grid: (1) **git + chat + E2E + shredding**: Keybase only, now in maintenance. (2) **git + chat, signed, server-trusted**: Buzz, Delta, Fossil, Forgejo+Matrix. (3) **git + discussion, signed, p2p, plaintext at rest**: Radicle, Tangled, NIP-34. (4) **chat + E2E, no git**: Keet, any-sync, Peergos, SimpleX.
-- The agent-first entrants of 2026 (Buzz, Delta) both chose operator-readable storage, apparently to get search, moderation and server-side agents. Cairn's I2 and crypto-shredding goals would put it in a quadrant nobody currently occupies.
+- The agent-first entrants of 2026 (Buzz, Delta) both chose operator-readable storage, apparently to get search, moderation and server-side agents. ParleyInn's I2 and crypto-shredding goals would put it in a quadrant nobody currently occupies.
 - Keybase's exploding-message design is the best documented crypto-shredding precedent for multi-device users: daily per-device ephemeral keys, delete one generation later, and exclude stale devices. Fossil's "chat is not replicated, auto-expires" is a cheaper alternative: keep conversation out of the immutable record.
 - Signed append-only logs (Nostr, Radicle COBs, Hypercore, Peergos chat files) cannot delete what peers already replicated. Only per-key encryption can retract content, and only from parties who never received the key.
 
@@ -145,7 +145,7 @@ The recurring failures are mostly organisational and operational, not cryptograp
 
 ### Inferences
 
-- For Cairn: local-first, single-binary, no-network (I4) avoids vendor capture and relay centralisation by construction. The cost is that no hosted recovery path exists, so key-loss UX (escrow, paper keys, multi-device) must be designed up front.
+- For ParleyInn: local-first, single-binary, no-network (I4) avoids vendor capture and relay centralisation by construction. The cost is that no hosted recovery path exists, so key-loss UX (escrow, paper keys, multi-device) must be designed up front.
 - Crypto-shredding in an append-only record needs Keybase-style key generations plus a rule for stale holders, or Fossil-style separation of ephemeral conversation from the durable record.
 - Git over a custom sync layer needs its own ref-locking or CRDT layer (Keybase, DeltaDB). Putting a bare repo on generic synced storage is a known failure.
 
@@ -158,7 +158,7 @@ The recurring failures are mostly organisational and operational, not cryptograp
 
 ### Takeaway
 
-No. Zed Delta links agent conversations to code at operation granularity, Block Buzz gives agents keys and puts git and chat in one log, and Entire (Go, MIT) stores agent session transcripts in git refs. **None of the three offers end-to-end encryption or crypto-shredding.** Entire's redaction is explicitly "best-effort", which bears directly on Cairn's I2 and I6.
+No. Zed Delta links agent conversations to code at operation granularity, Block Buzz gives agents keys and puts git and chat in one log, and Entire (Go, MIT) stores agent session transcripts in git refs. **None of the three offers end-to-end encryption or crypto-shredding.** Entire's redaction is explicitly "best-effort", which bears directly on ParleyInn's I2 and I6.
 
 ### Cited Findings
 
@@ -168,8 +168,8 @@ No. Zed Delta links agent conversations to code at operation granularity, Block 
 
 ### Inferences
 
-- The market has converged on linking code to agent conversation (Delta: operation anchors; Buzz: branch channels; Entire: commit trailers and git refs). Security properties have not followed. Cairn could claim the security-first niche: a pull-only recall envelope (I2), encrypted per-key records with shredding, and no network (I4).
-- Entire is the nearest Go precedent and potential interop target: sessions as git refs plus commit trailers. Cairn could adopt the trailer/ref linkage pattern while adding encryption, which Entire lacks.
+- The market has converged on linking code to agent conversation (Delta: operation anchors; Buzz: branch channels; Entire: commit trailers and git refs). Security properties have not followed. ParleyInn could claim the security-first niche: a pull-only recall envelope (I2), encrypted per-key records with shredding, and no network (I4).
+- Entire is the nearest Go precedent and potential interop target: sessions as git refs plus commit trailers. ParleyInn could adopt the trailer/ref linkage pattern while adding encryption, which Entire lacks.
 
 ### Gaps
 

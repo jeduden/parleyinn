@@ -13,7 +13,8 @@ maps every individual concern to requirements.
 1. **Keep the record separate from the view.** The strongest published systems
    (Scroll, LCM, CWL) never let the prompt be the only copy of history. In
    Scroll's ablation, replacing history with summaries at ingestion dropped the
-   BEAM-10M score from 73.1 to 19.9. → Cairn is lossless and event-sourced (I1,
+   BEAM-10M score from 73.1 to 19.9. → ParleyInn is lossless and event-sourced
+   (I1,
    I10).
 2. **Summarization erases constraints.** *Governance Decay*: constraint
    violations rose from 0% to 30% after compaction, up to 59% for some models.

@@ -17,8 +17,8 @@ The best match is **Buzz by Block** (Jack Dorsey's company), announced 21 July 2
 
 ### Inferences
 
-- Buzz fits "a tool that stores agent data" next to Beads and Gas Town: it is a 2026 multi-agent coordination system with a durable, signed, append-only event log. Its storage model is "relay DB + signed events", **not** "inside the git repo". For Cairn it is a reference for signed append-only events and per-agent identity, not for git-as-storage.
-- Buzz treats agent messages as signed but unencrypted data searchable by the workspace. That is the same risk surface Cairn's I2 addresses (recalled content reaching a model). I found no Buzz statement on prompt-injection handling for searched history.
+- Buzz fits "a tool that stores agent data" next to Beads and Gas Town: it is a 2026 multi-agent coordination system with a durable, signed, append-only event log. Its storage model is "relay DB + signed events", **not** "inside the git repo". For ParleyInn it is a reference for signed append-only events and per-agent identity, not for git-as-storage.
+- Buzz treats agent messages as signed but unencrypted data searchable by the workspace. That is the same risk surface ParleyInn's I2 addresses (recalled content reaching a model). I found no Buzz statement on prompt-injection handling for searched history.
 
 ### Gaps
 
@@ -193,8 +193,8 @@ Secret and PII leakage is the most concretely documented problem: Entire's push 
 
 ### Inferences
 
-- Committed transcripts carry the worst of both: they are secrets-bearing (they leak outward) and instruction-bearing (they inject inward when another agent reads them). In-repo formats (SpecStory Markdown, agent-sessions `transcript.md`, Cline memory bank) sit in the working tree where agents read files by default. That is the automatic untrusted→model path Cairn's I2 forbids. Off-branch refs (Entire, claude-git-sessions, Beads) at least keep transcripts out of the checkout.
-- Silent fallback behaviour, as in Entire's remote election, breaks a Cairn-style "no silent failures" (I6) rule. Cairn should treat push destination ambiguity as a hard stop, not a warning.
+- Committed transcripts carry the worst of both: they are secrets-bearing (they leak outward) and instruction-bearing (they inject inward when another agent reads them). In-repo formats (SpecStory Markdown, agent-sessions `transcript.md`, Cline memory bank) sit in the working tree where agents read files by default. That is the automatic untrusted→model path ParleyInn's I2 forbids. Off-branch refs (Entire, claude-git-sessions, Beads) at least keep transcripts out of the checkout.
+- Silent fallback behaviour, as in Entire's remote election, breaks a ParleyInn-style "no silent failures" (I6) rule. ParleyInn should treat push destination ambiguity as a hard stop, not a warning.
 
 ### Gaps
 

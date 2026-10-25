@@ -21,7 +21,7 @@ struct Started {
 
 fn started() -> Started {
     let dir = TempDir::new().unwrap();
-    let home = Home::locate(Some(dir.path().join(".cairn").as_os_str()), None).unwrap();
+    let home = Home::locate(Some(dir.path().join(".parinn").as_os_str()), None).unwrap();
     home.create().unwrap();
     let mut store = Store::open(&home.store()).unwrap();
     let node = Node::open(&home, &mut store, &mut OsEntropy).unwrap();
@@ -391,4 +391,25 @@ fn each_refusal_says_why_and_has_a_fixed_detail() {
         assert!(refusal.to_string().contains(says), "{refusal}");
         assert_eq!(refusal.detail(), detail);
     }
+}
+
+#[test]
+fn a_repository_bind_is_a_widening_act_that_records_the_identity_it_names() {
+    let act = Act::RepositoryBind {
+        identity: json!({"repository": "1".repeat(40)}),
+    };
+
+    assert_eq!(act.name(), "repository_bind");
+    assert_eq!(act.class(), Class::Widening);
+    assert_eq!(
+        act.content(),
+        json!({
+            "act": "repository_bind", "class": "widening", "principal_surface": "cli",
+            "repository": "1".repeat(40),
+        })
+    );
+    let provisional = Act::RepositoryBind {
+        identity: json!({"repository_provisional": "ab"}),
+    };
+    assert_eq!(provisional.content()["repository_provisional"], "ab");
 }

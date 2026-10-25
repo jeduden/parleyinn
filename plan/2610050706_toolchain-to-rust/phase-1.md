@@ -25,7 +25,7 @@ What lands, a Cargo workspace under `tooling/`:
   tests, so the step bindings stay thin.
 - A `bdd` target with `harness = false` in `scenario`, running
   `features/` through cucumber-rs. It re-runs itself with `HOME` and
-  `CAIRN_HOME` in a fresh temporary directory (ENG-14). `@pending`
+  `PARINN_HOME` in a fresh temporary directory (ENG-14). `@pending`
   scenarios are skipped and counted; a step with no definition fails.
 - A proposed ADR for the three crates; ENG-18 still reads `go.mod`
   here, so the ADR is accepted with phase 2.

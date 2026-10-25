@@ -1,7 +1,7 @@
 ===== pins-and-context#1 | docs/srs/05-functional-requirements.md:62 | kind= needs-fix | inv= False | htr= False
 TERM: qualifying pin
-QUOTE: Qualifying pins MUST come only from a principal (`cairn pin add` at a principal surface, its configuration or its stamp), never a harness skill's call.
-BREAKS: Pin entry: qualifying pins also come from the owner's intent principal act (LANE-20, `cairn intent set|revise`; PIN-06's scenario refuses `cairn pin add --type intent`) and from a pin candidate's confirmation (PIN-05, LANE-26); read as exhaustive, PIN-01 excludes both
+QUOTE: Qualifying pins MUST come only from a principal (`parinn pin add` at a principal surface, its configuration or its stamp), never a harness skill's call.
+BREAKS: Pin entry: qualifying pins also come from the owner's intent principal act (LANE-20, `parinn intent set|revise`; PIN-06's scenario refuses `parinn pin add --type intent`) and from a pin candidate's confirmation (PIN-05, LANE-26); read as exhaustive, PIN-01 excludes both
 FIX: SRS PIN-01: "…only from a principal (a pin or intent it sets at a principal surface, a pin candidate it confirms, its configuration or its stamp), never a harness skill's call."; optionally add the two rows to features/pins.feature PIN-01 Examples
 ===== pins-and-context#2 | docs/srs/05-functional-requirements.md:66 | kind= needs-fix | inv= False | htr= False
 TERM: pin candidate
@@ -16,8 +16,8 @@ FIX: SRS PEER-06: "…MUST carry that room's qualifying pins (PIN-10) as the sig
 ===== pins-and-context#4 | docs/srs/09-interfaces.md:57 | kind= needs-fix | inv= False | htr= False
 TERM: directed post
 QUOTE: `text`, `room` (optional target room, LANE-29); writes a `post`, always untrusted (PRV-01)
-BREAKS: Directed post entry / LANE-12 need a post directed to one agent, but neither `room_post` nor `cairn room post` (09a-command-line-interface.md:56) can direct one, contrary to VIEW-03's rule that everything the room view does exists in the CLI or MCP
-FIX: SRS §9.2 `room_post`: add "`seat` (optional: directs the post to that run seat's agent, LANE-12)"; §9.5: "`cairn room post <room> [--seat <seat>]`" (stakeholder to confirm the parameter name)
+BREAKS: Directed post entry / LANE-12 need a post directed to one agent, but neither `room_post` nor `parinn room post` (09a-command-line-interface.md:56) can direct one, contrary to VIEW-03's rule that everything the room view does exists in the CLI or MCP
+FIX: SRS §9.2 `room_post`: add "`seat` (optional: directs the post to that run seat's agent, LANE-12)"; §9.5: "`parinn room post <room> [--seat <seat>]`" (stakeholder to confirm the parameter name)
 ===== pins-and-context#5 | features/lane.feature:515-516 | kind= needs-fix | inv= False | htr= False
 TERM: summary request / room summary
 QUOTE: Then the agent's run seat records a summary request to the facilitator, a room act, for 500 model tokens at most
@@ -41,8 +41,8 @@ FIX: SRS §3: "**Keep the record separate from the working view.**"
 ===== pins-and-context#9 | features/engineering.feature:11, 13 | kind= needs-fix | inv= False | htr= False
 TERM: pin (and stamp)
 QUOTE: Scenario: the toolchain is pinned and release builds are static, trimmed and stamped
-BREAKS: Pin entry and the hub's 'every word one meaning': "pinned"/"pins the Go toolchain" use the Cairn word in another sense, which ENG-01's own text avoids ("fixed to an exact version"); "stamped" is the acts-and-roles specialist's
-FIX: features/engineering.feature: title "the toolchain is fixed to an exact version and release builds are static, trimmed and carry VCS information", step "Then \"go.mod\" fixes the Go toolchain with a toolchain directive"; update the binding at cmd/cairn/bdd_engineering_test.go:40 in the same change
+BREAKS: Pin entry and the hub's 'every word one meaning': "pinned"/"pins the Go toolchain" use the ParleyInn word in another sense, which ENG-01's own text avoids ("fixed to an exact version"); "stamped" is the acts-and-roles specialist's
+FIX: features/engineering.feature: title "the toolchain is fixed to an exact version and release builds are static, trimmed and carry VCS information", step "Then \"go.mod\" fixes the Go toolchain with a toolchain directive"; update the binding at cmd/parinn/bdd_engineering_test.go:40 in the same change
 ===== pins-and-context#10 | features/provenance.feature:85 | kind= needs-fix | inv= False | htr= False
 TERM: model reply / compaction summary
 QUOTE: Scenario Outline: model-reproducible text no principal stamped, and harness-summarised text, is untrusted
@@ -55,7 +55,7 @@ BREAKS: Working view entry ('whatever is currently in the model's context window
 FIX: Stakeholder to rule: either the SRS says "working view" at these places, or the model's Working view entry states that "the model's context" is the harness's phrase for it
 ===== pins-and-context#12 | docs/srs/05-functional-requirements.md:109 | kind= question | inv= False | htr= True
 TERM: qualifying pin
-QUOTE: If Cairn cannot determine unambiguously which run a hook belongs to, it MUST inject qualifying pins only.
+QUOTE: If ParleyInn cannot determine unambiguously which run a hook belongs to, it MUST inject qualifying pins only.
 BREAKS: Pin entry / PIN-10 define qualifying pins per run (rooms the run has had a seat in during the run); with the run ambiguous the set is undefined, and pins of a room only another candidate run had a seat in would breach PIN-10 (scenario features/restore.feature:52-60 does not decide it)
 FIX: Stakeholder to rule, then SRS INJ-05, e.g. "…it MUST inject only the qualifying pins of rooms every candidate run has had a seat in, at least its personal room"
 ===== pins-and-context#13 | docs/srs/03-rationale.md:31 | kind= other-specialist | inv= False | htr= False
@@ -122,7 +122,7 @@ FIX: Stakeholder rules. Recommended: PRV-10 and the model (Managed policy, Servi
 TERM: Member
 QUOTE: A personal-room seat can neither leave nor be kicked.
 BREAKS: The Member rule has no requirement. LANE-23 makes every leave a room act after which acts under that id are refused, and room_leave takes any room. Before PRV-10, LANE-25's 'any key that chains to the owner's principal key' does not stop the owner's device seat kicking its run's personal-room seat. Either contradicts LANE-01 ('else to its personal-room seat, never refused').
-FIX: SRS LANE-23: add 'A personal-room seat MUST NOT leave or be kicked; Cairn MUST refuse and audit either act.' Add a step to the LANE-23 scenario in features/lane.feature, and note the refusal on room_leave in 09-interfaces.md.
+FIX: SRS LANE-23: add 'A personal-room seat MUST NOT leave or be kicked; ParleyInn MUST refuse and audit either act.' Add a step to the LANE-23 scenario in features/lane.feature, and note the refusal on room_leave in 09-interfaces.md.
 ===== principals-and-agents#3 | docs/srs/invariants.md:42-44 | kind= needs-fix | inv= True | htr= False
 TERM: Principal (whose principal records the delegation grant)
 QUOTE: Under a delegation grant its principal recorded (OWN-23), and, for an agent of another principal, an acceptance grant that agent's principal recorded (OWN-26)
@@ -167,7 +167,7 @@ FIX: features/record.feature:145 -> "And a second fresh home that ingests \"main
 TERM: Seal; run seat ingest starts
 QUOTE: And the core sealed every writer but the witnessed run's run seats' and the paired phone's, the ingested run's run seat's writer and this node's device seat's writer included, after each append to it
 BREAKS: Seal: a witnessed run's run seats are sealed by its MCP server except the seat ingest starts, which the core seals. Line 222 of the same scenario says so ('whose writer the core seals'), but line 226 excludes every run seat of the witnessed run from the core's sealing.
-FIX: features/record.feature:226 -> "...every writer but the witnessed run's run seats' other than those \"cairn ingest\" started, and the paired phone's, ..."
+FIX: features/record.feature:226 -> "...every writer but the witnessed run's run seats' other than those \"parinn ingest\" started, and the paired phone's, ..."
 ===== record#3 | features/administration.feature:205 | kind= needs-fix | inv= False | htr= False
 TERM: Segment; Integrity status (refused)
 QUOTE: | received writer     | a peer offers another event of that writer          | the event is refused and an audit entry records it                                        |
@@ -186,7 +186,7 @@ FIX: record.md:152 -> "What a room, writer or event shows about its chain and se
 ===== record#6 | docs/srs/05-functional-requirements.md:46 | kind= question | inv= False | htr= True
 TERM: Provenance (structural vs operator); key rotation
 QUOTE: Hook observations, key rotations and tombstones MUST carry `structural`
-BREAKS: Provenance: rotating a device key is a widening principal act (OWN-11, acts-and-roles Widening, 09a `cairn device-key rotate`), and OWN-02 records every principal act as `operator`. PRV-01 and record.md:75 ('hook observations, key rotations, tombstones ... are `structural`') give the same event a second class. The class is in the chained header (REC-10) and decides trust on the principal's other nodes.
+BREAKS: Provenance: rotating a device key is a widening principal act (OWN-11, acts-and-roles Widening, 09a `parinn device-key rotate`), and OWN-02 records every principal act as `operator`. PRV-01 and record.md:75 ('hook observations, key rotations, tombstones ... are `structural`') give the same event a second class. The class is in the chained header (REC-10) and decides trust on the principal's other nodes.
 FIX: PRV-01 (05-functional:46) and record.md:75: "key rotations" -> "seat-key rotations" (a seat key's rotation goes to its own writer, SEC-27; a device-key rotation stays an `operator` principal act)
 ===== record#7 | docs/srs/06-security.md:115 | kind= question | inv= False | htr= True
 TERM: recorder; Origin (witnessed)
@@ -196,7 +196,7 @@ FIX: Either SEC-25: "... MUST refuse and audit a segment failing either and pass
 ===== record#8 | docs/srs/06-security.md:109 | kind= question | inv= False | htr= False
 TERM: Receipt (head receipt, purge receipt)
 QUOTE: nor is a head or purge receipt, which carries only digests (VIEW-10)
-BREAKS: Receipt: SEC-31 (06-security:121) makes the purge receipt a signed statement of 'the scope, the ranges, the copies erased, and every copy Cairn knows of and cannot erase (harness transcript files, git-carrier refs, exported bundles, backups, and peers ...)', which is not only digests. The same words are at 06b-boundary-register.md:23. The model calls every receipt 'signed', which VIEW-10 and SEC-27 do not require for a head receipt.
+BREAKS: Receipt: SEC-31 (06-security:121) makes the purge receipt a signed statement of 'the scope, the ranges, the copies erased, and every copy ParleyInn knows of and cannot erase (harness transcript files, git-carrier refs, exported bundles, backups, and peers ...)', which is not only digests. The same words are at 06b-boundary-register.md:23. The model calls every receipt 'signed', which VIEW-10 and SEC-27 do not require for a head receipt.
 FIX: SEC-19 and 06b:23 -> "nor is a head receipt, which carries only digests (VIEW-10), or a purge receipt, which carries only ids, addresses, counts and the names of the copies it lists (SEC-31)", or give the purge receipt its own §6.3 row; record.md:158 -> state which receipts are signed
 ===== record#9 | docs/srs/09-interfaces.md:27 | kind= question | inv= False | htr= False
 TERM: Ingest
@@ -220,6 +220,6 @@ BREAKS: The cited REC-09 (and its scenario at record.feature:107) promises only 
 FIX: record.md:44-45 -> "under a name from which no one off this node can confirm a guess at its content (REC-09)"
 ===== record#13 | docs/domain-model/record.md:138-139 | kind= question | inv= False | htr= False
 TERM: Flag
-QUOTE: **Flag**: A mark Cairn sets on an event whose text matches an injection pattern (PRV-07)
-BREAKS: The cited PRV-07 flags only untrusted events ('Cairn SHOULD flag ... untrusted events that contain instruction-like content'). The model's definition covers any event.
-FIX: record.md:138 -> "A mark Cairn sets on an untrusted event whose text matches an injection pattern (PRV-07)"
+QUOTE: **Flag**: A mark ParleyInn sets on an event whose text matches an injection pattern (PRV-07)
+BREAKS: The cited PRV-07 flags only untrusted events ('ParleyInn SHOULD flag ... untrusted events that contain instruction-like content'). The model's definition covers any event.
+FIX: record.md:138 -> "A mark ParleyInn sets on an untrusted event whose text matches an injection pattern (PRV-07)"

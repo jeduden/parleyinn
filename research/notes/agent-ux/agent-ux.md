@@ -3,7 +3,7 @@
 Scope: the screen layout and interaction design of three products that
 show coding agents at work, read from their documentation, changelogs
 and (for T3 Code) source on 4 October 2026. The question is what
-Cairn's screen must match and where it can lead. Claims a source did
+ParleyInn's screen must match and where it can lead. Claims a source did
 not support are marked unverified.
 
 ## T3 Code
@@ -95,9 +95,9 @@ app or `claude --cloud`
   comments; teleport the session to the terminal; shared views are
   read-only snapshots. No multiplayer.
 
-## Synthesis for Cairn
+## Synthesis for ParleyInn
 
-| Pattern                                  | T3 Code                                 | Amp orbs                  | Claude Code web             | Cairn                                            |
+| Pattern                                  | T3 Code                                 | Amp orbs                  | Claude Code web             | ParleyInn                                        |
 | ---------------------------------------- | --------------------------------------- | ------------------------- | --------------------------- | ------------------------------------------------ |
 | Sessions left, chat centre, review right | yes                                     | yes                       | yes                         | intents left, room centre, work right            |
 | Live app preview                         | embedded, annotatable                   | portals, annotatable      | desktop only                | per agent's dev server                           |

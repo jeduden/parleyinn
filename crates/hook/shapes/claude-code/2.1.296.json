@@ -1,0 +1,254 @@
+{
+  "harness": "claude-code",
+  "shapes": {
+    "PostCompact": {
+      "allows": [
+        "compact_summary",
+        "cwd",
+        "hook_event_name",
+        "prompt_id",
+        "scratchpad_dir",
+        "session_id",
+        "transcript_path",
+        "trigger"
+      ],
+      "needs": [
+        "compact_summary",
+        "cwd",
+        "hook_event_name",
+        "prompt_id",
+        "session_id",
+        "transcript_path",
+        "trigger"
+      ]
+    },
+    "PostToolUse": {
+      "allows": [
+        "agent_id",
+        "agent_type",
+        "cwd",
+        "duration_ms",
+        "effort",
+        "hook_event_name",
+        "permission_mode",
+        "prompt_id",
+        "session_id",
+        "tool_input",
+        "tool_name",
+        "tool_response",
+        "tool_use_id",
+        "transcript_path"
+      ],
+      "needs": [
+        "cwd",
+        "duration_ms",
+        "effort",
+        "hook_event_name",
+        "permission_mode",
+        "prompt_id",
+        "session_id",
+        "tool_input",
+        "tool_name",
+        "tool_response",
+        "tool_use_id",
+        "transcript_path"
+      ]
+    },
+    "PreCompact": {
+      "allows": [
+        "custom_instructions",
+        "cwd",
+        "hook_event_name",
+        "prompt_id",
+        "scratchpad_dir",
+        "session_id",
+        "transcript_path",
+        "trigger"
+      ],
+      "needs": [
+        "custom_instructions",
+        "cwd",
+        "hook_event_name",
+        "prompt_id",
+        "session_id",
+        "transcript_path",
+        "trigger"
+      ]
+    },
+    "PreToolUse": {
+      "allows": [
+        "agent_id",
+        "agent_type",
+        "cwd",
+        "effort",
+        "hook_event_name",
+        "permission_mode",
+        "prompt_id",
+        "session_id",
+        "tool_input",
+        "tool_name",
+        "tool_use_id",
+        "transcript_path"
+      ],
+      "needs": [
+        "cwd",
+        "effort",
+        "hook_event_name",
+        "permission_mode",
+        "prompt_id",
+        "session_id",
+        "tool_input",
+        "tool_name",
+        "tool_use_id",
+        "transcript_path"
+      ]
+    },
+    "SessionEnd": {
+      "allows": [
+        "cwd",
+        "hook_event_name",
+        "prompt_id",
+        "reason",
+        "scratchpad_dir",
+        "session_id",
+        "transcript_path"
+      ],
+      "needs": [
+        "cwd",
+        "hook_event_name",
+        "reason",
+        "session_id",
+        "transcript_path"
+      ]
+    },
+    "SessionStart": {
+      "allows": [
+        "context_tokens",
+        "cwd",
+        "estimated_cache_write_usd",
+        "hook_event_name",
+        "model",
+        "prompt_cache_likely_expired",
+        "prompt_id",
+        "scratchpad_dir",
+        "seconds_since_last_response",
+        "session_id",
+        "source",
+        "transcript_path"
+      ],
+      "needs": [
+        "cwd",
+        "hook_event_name",
+        "session_id",
+        "source",
+        "transcript_path"
+      ]
+    },
+    "Stop": {
+      "allows": [
+        "background_tasks",
+        "cwd",
+        "effort",
+        "hook_event_name",
+        "last_assistant_message",
+        "permission_mode",
+        "prompt_id",
+        "scratchpad_dir",
+        "session_crons",
+        "session_id",
+        "stop_hook_active",
+        "transcript_path"
+      ],
+      "needs": [
+        "background_tasks",
+        "cwd",
+        "effort",
+        "hook_event_name",
+        "last_assistant_message",
+        "permission_mode",
+        "prompt_id",
+        "session_crons",
+        "session_id",
+        "stop_hook_active",
+        "transcript_path"
+      ]
+    },
+    "SubagentStart": {
+      "allows": [
+        "agent_id",
+        "agent_type",
+        "cwd",
+        "hook_event_name",
+        "prompt_id",
+        "session_id",
+        "transcript_path"
+      ],
+      "needs": [
+        "agent_id",
+        "agent_type",
+        "cwd",
+        "hook_event_name",
+        "prompt_id",
+        "session_id",
+        "transcript_path"
+      ]
+    },
+    "SubagentStop": {
+      "allows": [
+        "agent_id",
+        "agent_transcript_path",
+        "agent_type",
+        "background_tasks",
+        "cwd",
+        "effort",
+        "hook_event_name",
+        "last_assistant_message",
+        "permission_mode",
+        "prompt_id",
+        "scratchpad_dir",
+        "session_crons",
+        "session_id",
+        "stop_hook_active",
+        "transcript_path"
+      ],
+      "needs": [
+        "agent_id",
+        "agent_transcript_path",
+        "agent_type",
+        "background_tasks",
+        "cwd",
+        "effort",
+        "hook_event_name",
+        "last_assistant_message",
+        "permission_mode",
+        "prompt_id",
+        "session_crons",
+        "session_id",
+        "stop_hook_active",
+        "transcript_path"
+      ]
+    },
+    "UserPromptSubmit": {
+      "allows": [
+        "cwd",
+        "hook_event_name",
+        "permission_mode",
+        "prompt",
+        "prompt_id",
+        "scratchpad_dir",
+        "session_id",
+        "transcript_path"
+      ],
+      "needs": [
+        "cwd",
+        "hook_event_name",
+        "permission_mode",
+        "prompt",
+        "prompt_id",
+        "session_id",
+        "transcript_path"
+      ]
+    }
+  },
+  "version": "2.1.296"
+}

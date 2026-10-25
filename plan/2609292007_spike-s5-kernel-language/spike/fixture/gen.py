@@ -16,14 +16,14 @@ SEED = 2609292007
 BASE = int(datetime(2026, 10, 1, tzinfo=timezone.utc).timestamp())
 
 FILES = [
-    "crates/cairn/src/main.rs",
-    "crates/cairn/src/store/mod.rs",
-    "crates/cairn/src/store/segment.rs",
-    "crates/cairn/src/recall/search.rs",
-    "crates/cairn/src/recall/envelope.rs",
-    "crates/cairn/src/restore/block.rs",
-    "crates/cairn/src/hook/handler.rs",
-    "crates/cairn/tests/reach.rs",
+    "crates/parinn/src/main.rs",
+    "crates/parinn/src/store/mod.rs",
+    "crates/parinn/src/store/segment.rs",
+    "crates/parinn/src/recall/search.rs",
+    "crates/parinn/src/recall/envelope.rs",
+    "crates/parinn/src/restore/block.rs",
+    "crates/parinn/src/hook/handler.rs",
+    "crates/parinn/tests/reach.rs",
     "docs/srs/05-functional-requirements.md",
     "docs/testing.md",
     "features/recall.feature",
@@ -33,7 +33,7 @@ FILES = [
     "README.md",
 ]
 COMMANDS = [
-    "cargo test -p cairn",
+    "cargo test -p parinn",
     "cargo clippy --all-targets",
     "cargo fmt --check",
     "git status",

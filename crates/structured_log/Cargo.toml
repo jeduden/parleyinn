@@ -1,0 +1,25 @@
+[package]
+name = "structured_log"
+version = "0.0.0"
+description = "ParleyInn's structured logs: tracing events written as JSON lines to the home's log file, every field redacted first (ENG-05, OPS-05)"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+redaction.workspace = true
+serde_json.workspace = true
+tracing.workspace = true
+
+[dev-dependencies]
+testkit.workspace = true
+
+[lints]
+workspace = true
+
+# ENG-02: see crates/parinn/Cargo.toml.
+[package.metadata.parinn]
+responsibility = "Writes the structured logs: each tracing event one JSON line in the home's log file, its fields redacted"
+may-depend-on = ["redaction"]
+may-dev-depend-on = ["testkit"]

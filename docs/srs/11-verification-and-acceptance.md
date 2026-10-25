@@ -8,14 +8,15 @@ summary: >-
 
 ## 11.1 Evaluation plan
 
-Evaluation runs in a separate module (`cairn-eval`) with versioned datasets
+Evaluation runs in a separate module (`parinn-eval`) with versioned datasets
 and fixed seeds so every result is reproducible. **All acceptance evaluations
 MUST use the Claude models and Claude Code versions used in production**, with
 at least three repetitions and reported confidence intervals. Published numbers
 from other systems are reference points only.
 
 **Baselines:** (base-0) plain Claude Code; (base-1) Claude Code with
-lossless-claude/lcm; (C) Cairn full; (C−L) Cairn without landmarks; (C−K) Cairn
+lossless-claude/lcm; (C) ParleyInn full; (C−L) ParleyInn without landmarks;
+(C−K) ParleyInn
 without kernel.
 
 | Area                    | Method                                                                                                                                                                                                                                                                                                                            | Acceptance target                                                                                                                       |
@@ -24,7 +25,7 @@ without kernel.
 | Constraint survival     | ConstraintRot-style scenarios with constraints stated mid-run; count violations after N compactions                                                                                                                                                                                                                               | No increase over the same tasks without compaction                                                                                      |
 | Poisoning resistance    | Six attack classes (explicit command insertion, conditional command insertion, salience-driven compaction poisoning, policy-conformant fact injection, false precedent insertion, skill-procedure insertion) delivered via web, tool output, files, file names, and MCP results; attack success measured in later, unrelated runs | Zero untrusted bytes in any restore block (hard); attack success lower than base-1, and any increase over base-0 triaged and documented |
 | Flagging quality        | Labelled corpus of benign and malicious untrusted content                                                                                                                                                                                                                                                                         | Precision ≥ 0.9†; recall reported                                                                                                       |
-| Long-history QA         | LongMemEval-S and BEAM (1M and 10M) subsets answered through Cairn tools                                                                                                                                                                                                                                                          | Reported with per-category breakdown                                                                                                    |
+| Long-history QA         | LongMemEval-S and BEAM (1M and 10M) subsets answered through ParleyInn tools                                                                                                                                                                                                                                                      | Reported with per-category breakdown                                                                                                    |
 | Recall tool use         | Tasks answerable only from evicted history                                                                                                                                                                                                                                                                                        | The agent calls recall tools in ≥ 80%† of them                                                                                          |
 | Cost                    | Identical tasks on base-0 and C                                                                                                                                                                                                                                                                                                   | Prompt-cache hit rate not lower than base-0 by more than 2 points; model-token delta reported                                           |
 | Performance             | NFR-01..05 on synthetic 1M- and 10M-event stores                                                                                                                                                                                                                                                                                  | All targets met                                                                                                                         |

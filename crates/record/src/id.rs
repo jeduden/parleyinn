@@ -9,11 +9,11 @@ pub use crate::canonical::MAX_SAFE;
 pub use crate::digest::{Digest, HexError};
 
 /// The label a writer id is derived under.
-const WRITER_LABEL: &[u8] = b"cairn writer id v1\0";
+const WRITER_LABEL: &[u8] = b"parinn writer id v1\0";
 /// The label a room id is derived under.
-const ROOM_LABEL: &[u8] = b"cairn room id v1\0";
+const ROOM_LABEL: &[u8] = b"parinn room id v1\0";
 /// The label a seat id is derived under.
-const SEAT_LABEL: &[u8] = b"cairn seat id v1\0";
+const SEAT_LABEL: &[u8] = b"parinn seat id v1\0";
 
 /// The longest part of a refused address an error repeats.
 const SHOWN: usize = 80;
@@ -144,11 +144,11 @@ impl Address {
         Self { writer, seq }
     }
 
-    /// Its full form, `cairn:room/<room id>/w/<writer id>/<seq>`, for a
+    /// Its full form, `parinn:room/<room id>/w/<writer id>/<seq>`, for a
     /// writer whose seat is in `room`.
     #[must_use]
     pub fn full(&self, room: &RoomId) -> String {
-        format!("cairn:room/{room}/w/{}/{}", self.writer, self.seq)
+        format!("parinn:room/{room}/w/{}/{}", self.writer, self.seq)
     }
 
     /// The address `text` names, in the ASCII input form `<writer
@@ -159,7 +159,7 @@ impl Address {
     /// Fails on any other text.
     pub fn parse(text: &str) -> Result<(Self, Option<RoomId>), AddressError> {
         let refused = || AddressError::new(text);
-        if let Some(rest) = text.strip_prefix("cairn:room/") {
+        if let Some(rest) = text.strip_prefix("parinn:room/") {
             let parts: Vec<&str> = rest.split('/').collect();
             let [room, "w", writer, seq] = parts.as_slice() else {
                 return Err(refused());
@@ -212,7 +212,7 @@ impl fmt::Display for AddressError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "not an address: {:?}; want <writer id>:<seq> or cairn:room/<room id>/w/<writer id>/<seq>",
+            "not an address: {:?}; want <writer id>:<seq> or parinn:room/<room id>/w/<writer id>/<seq>",
             self.shown
         )
     }

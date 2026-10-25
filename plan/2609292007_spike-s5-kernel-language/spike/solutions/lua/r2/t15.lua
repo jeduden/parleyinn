@@ -1,4 +1,4 @@
-local events = cairn.events()
+local events = parinn.events()
 local result_status = {}
 for _, e in ipairs(events) do
   if e.kind == "tool_result" and e.call_id ~= nil and result_status[e.call_id] == nil then

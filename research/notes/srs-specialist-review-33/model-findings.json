@@ -24,9 +24,9 @@
   "rid": "git-and-forge#2"
  },
  {
-  "quote": "It approves and lands; Cairn does neither \u2026 Cairn never lands anything",
+  "quote": "It approves and lands; ParleyInn does neither \u2026 ParleyInn never lands anything",
   "severity": "needs-fix",
-  "problem": "The model states as permanent what OQ-37 (13-open-questions-and-risks.md:44, 'May Cairn run, push or merge code itself? Until this closes, ADM-13 applies \u2026 the forge lands and approves code') leaves o",
+  "problem": "The model states as permanent what OQ-37 (13-open-questions-and-risks.md:44, 'May ParleyInn run, push or merge code itself? Until this closes, ADM-13 applies \u2026 the forge lands and approves code') leaves o",
   "rid": "git-and-forge#4"
  },
  {
@@ -42,7 +42,7 @@
   "rid": "git-and-forge#14"
  },
  {
-  "quote": "The harness's callback into Cairn, carrying its **hook input**, a JSON object (\u00a79.1). The core's hook handlers answer it.",
+  "quote": "The harness's callback into ParleyInn, carrying its **hook input**, a JSON object (\u00a79.1). The core's hook handlers answer it.",
   "severity": "needs-fix",
   "problem": "Hook defines hook input but nothing names what the handlers return, yet 'hook output' carries normative rules: OWN-04 (05c:20 'Hook output MAY carry a permission decision'), OWN-03 (05c:19 'never thro",
   "rid": "harness-facts#1"
@@ -60,9 +60,9 @@
   "rid": "harness-facts#5"
  },
  {
-  "quote": "and opt-in notices (INJ-10), compaction guidance (PIN-07) and the fixed templates of OWN-04 and OWN-07, each built only from fixed text Cairn ships, trusted structural fields and ids.",
+  "quote": "and opt-in notices (INJ-10), compaction guidance (PIN-07) and the fixed templates of OWN-04 and OWN-07, each built only from fixed text ParleyInn ships, trusted structural fields and ids.",
   "severity": "needs-fix",
-  "problem": "harness-facts.md:44-46, PIN-07, \u00a79.1 (09-interfaces:20), \u00a74.4 (04:128-129) and the fifteenth-round decision (index.md:36) all say fixed text Cairn ships, never record content; I2 also admits structura",
+  "problem": "harness-facts.md:44-46, PIN-07, \u00a79.1 (09-interfaces:20), \u00a74.4 (04:128-129) and the fifteenth-round decision (index.md:36) all say fixed text ParleyInn ships, never record content; I2 also admits structura",
   "rid": "harness-facts#8"
  },
  {
@@ -126,9 +126,9 @@
   "rid": "record#12"
  },
  {
-  "quote": "**Flag**: A mark Cairn sets on an event whose text matches an injection pattern (PRV-07)",
+  "quote": "**Flag**: A mark ParleyInn sets on an event whose text matches an injection pattern (PRV-07)",
   "severity": "needs-fix",
-  "problem": "The cited PRV-07 flags only untrusted events ('Cairn SHOULD flag ... untrusted events that contain instruction-like content'). The model's definition covers any event.",
+  "problem": "The cited PRV-07 flags only untrusted events ('ParleyInn SHOULD flag ... untrusted events that contain instruction-like content'). The model's definition covers any event.",
   "rid": "record#13"
  },
  {
@@ -162,9 +162,9 @@
   "rid": "seats-and-keys#12"
  },
  {
-  "quote": "shown on Health until acknowledged (`cairn counter ack`, I6, OPS-03)",
+  "quote": "shown on Health until acknowledged (`parinn counter ack`, I6, OPS-03)",
   "severity": "needs-fix",
-  "problem": "ADM-11 (05a:24) and \u00a79.5 `cairn status` (09a:16) keep non-zero failure counters shown; OPS-03 uses acknowledgement only as cairn doctor's baseline",
+  "problem": "ADM-11 (05a:24) and \u00a79.5 `parinn status` (09a:16) keep non-zero failure counters shown; OPS-03 uses acknowledgement only as parinn doctor's baseline",
   "rid": "trust-and-flow#9"
  },
  {

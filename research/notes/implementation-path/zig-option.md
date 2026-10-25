@@ -3,7 +3,7 @@
 Scope: written 4 October 2026. It assesses Zig as a full option for
 OQ-32, "H. Zig core library + per-platform shell", against the
 [evaluation frame](constraints.md). The stakeholder now asks for the
-same app on Linux, Windows, macOS, iOS and Android: "start Cairn, then
+same app on Linux, Windows, macOS, iOS and Android: "start ParleyInn, then
 you see your stuff". That favours a core built as a library which each
 platform's shell links in process, the way Ghostty pairs a Zig core
 with native shells. The note extends, and does not repeat, the
@@ -44,7 +44,7 @@ Method:
 3. Memory safety is the gap. Safe mode stops out-of-bounds access,
    overflow and null, but not use after free, double free, uninitialised
    reads or data races. Bun left Zig for Rust in 2026 over exactly
-   those. TigerBeetle's discipline fits Cairn's short-lived hook path
+   those. TigerBeetle's discipline fits ParleyInn's short-lived hook path
    well and its long-lived components poorly.
 4. Measured: Zig's default `std.Io.Threaded` puts socket and
    process-spawn code into every program that uses it. A core can keep
@@ -134,7 +134,7 @@ Method:
 | zig-jni                                             | 0.14.0 minimum                           | last commit 15 May 2025                                                             | [zig-jni][zigjni]                                              |
 | smalt                                               | 0.16.0 pinned                            | `mise.toml` pin, the session hook's pin with SHA-256, and a `hook_pin_sync` gate    | smalt `mise.toml`, `.claude/hooks/session-start.sh` at c5903ed |
 
-A Zig Cairn would pin one release, carry its dependencies' upgrades
+A Zig ParleyInn would pin one release, carry its dependencies' upgrades
 itself, and upgrade once or twice a year (inference).
 
 ### Upstream and agents
@@ -145,14 +145,14 @@ itself, and upgrade once or twice a year (inference).
   LLM-generated content, whether it be code or prose" and "No LLMs for
   finding bugs", for the ziglang organisation on Codeberg, its IRC
   channel and its Zulip ([code of conduct][zig-coc]).
-- Cairn is built and reviewed by agents (ENG-21). A compiler bug an
+- ParleyInn is built and reviewed by agents (ENG-21). A compiler bug an
   agent finds must reach upstream through a person writing in their own
   words (inference). Ghostty, TigerBeetle and the libraries are not
   bound by the policy.
 
 ## 2. Targets
 
-### Support tiers for Cairn's targets
+### Support tiers for ParleyInn's targets
 
 From the 0.17.0 support table ([0.17.0 notes][rn17]):
 
@@ -201,7 +201,7 @@ external backend such as LLVM" (same).
 - zig-android-sdk 0.3.0 (MIT, Zig 0.16) builds an APK from one
   `.dynamic` library per ABI and needs the Android SDK, NDK and a JDK
   ([zig-android-sdk][zas]).
-- SQLite is C and needs libc, so Cairn's Android build needs the NDK
+- SQLite is C and needs libc, so ParleyInn's Android build needs the NDK
   (inference).
 
 ### Windows as a Zig target
@@ -245,7 +245,7 @@ ENG-19 (an ubuntu and a macos builder) was not run. The language
 reference lists "Reproducible build" for the safe, fast and small modes
 ([language reference][langref]).
 
-## 3. Libraries per Cairn slot
+## 3. Libraries per ParleyInn slot
 
 - **SQLite with FTS5.** The amalgamation compiles inside `zig build`
   with any `-D` option (measured above). The binding is a page of
@@ -284,7 +284,7 @@ reference lists "Reproducible build" for the safe, fast and small modes
 - **MCP and JSON-RPC over stdio.** No Zig SDK is on MCP's list
   ([protocol note](protocol-and-data-components.md)). Zig-written stdio
   MCP servers exist, such as [zig-mcp][zig-mcp], which bridges ZLS. A
-  Cairn server is own code on `std.json`, as in options A to C. ACP,
+  ParleyInn server is own code on `std.json`, as in options A to C. ACP,
   Claude Code's stream-json and the Codex app-server are hand-written
   too.
 - **Pty.** Ghostty's `src/pty.zig` (MIT, 519 lines) opens POSIX ptys
@@ -444,7 +444,7 @@ reference lists "Reproducible build" for the safe, fast and small modes
   ([clients][tb-clients]), and the Java client is "implemented via a
   JNI binding to a client library written in Zig" ([Jepsen][jepsen]).
 
-### How far TigerStyle fits Cairn
+### How far TigerStyle fits ParleyInn
 
 - **The hook path fits.** A hook is a short-lived process with one JSON
   object in and a 50 MiB RSS budget (NFR-09). It can take its budget
@@ -453,12 +453,12 @@ reference lists "Reproducible build" for the safe, fast and small modes
   build makes races impossible; SQLite takes a fixed memsys5 heap from
   the same budget (inference from the SQLite docs above).
 - **Projections and I10 fit.** The VOPR's stubbed clock, network and
-  disk are the shape of Cairn's S12 arrival-order test (PEER-03) and
+  disk are the shape of ParleyInn's S12 arrival-order test (PEER-03) and
   the ENG-06 kill loop. Zig 0.16 already passes clock, randomness,
   files and network as an `Io` value, so a simulator `Io` swaps them
   without a lint (inference; `Io.failing` is a stock example).
 - **Long-lived components fit poorly.** TigerBeetle has fixed-size
-  records and bounded batches. Cairn parses variable JSON transcripts
+  records and bounded batches. ParleyInn parses variable JSON transcripts
   and hook payloads up to SEC-05's limits, and its lane view, run
   component and peer run for days over unbounded lanes. They need an
   arena per request with a hard cap, freed whole; use after free then
@@ -585,7 +585,7 @@ Proposed wording, mechanism-neutral:
 - `GhosttyKit.xcframework` wraps the static library with `ghostty.h`
   and a `module.modulemap` so Swift imports it
   (`src/build/GhosttyXCFramework.zig`).
-- The lesson for Cairn: one core library; each host owns its event loop
+- The lesson for ParleyInn: one core library; each host owns its event loop
   and windows; the core reports through callbacks; the C API is private
   to first-party shells (inference).
 
@@ -601,7 +601,7 @@ Proposed wording, mechanism-neutral:
 | C webview on desktops | [webview/webview][webview] (MIT): GTK and WebKitGTK, Cocoa, WebView2; no mobile                 | none seen with Zig                                                                            | desktop only                                  |
 | Browser               | the loopback page from `std.http.Server`                                                        | options A to E                                                                                | unchanged                                     |
 
-### What iOS and Android change for Cairn
+### What iOS and Android change for ParleyInn
 
 - App Review guideline 2.5.2: "Apps should be self-contained in their
   bundles … nor may they download, install, or execute code which
@@ -614,7 +614,7 @@ Proposed wording, mechanism-neutral:
   483 KB iOS library (measured), so seals, canonical JSON and segment
   sync can run in process on both phones (inference).
 - `std.crypto` verifies P-256 and ML-DSA signatures, the Secure
-  Enclave's key types, with no dependency (inference; Cairn's chain is
+  Enclave's key types, with no dependency (inference; ParleyInn's chain is
   Ed25519 today).
 
 ## 7. Maintainers and hiring
@@ -626,7 +626,7 @@ Proposed wording, mechanism-neutral:
   ([§10](../../../docs/srs/10-engineering-quality.md)). The stakeholder
   runs smalt: Zig 0.16.0, 793 `.zig` files and about 266k lines
   (counted here), built by agents with the same frit and mdsmith
-  tooling as Cairn (smalt `CLAUDE.md`, `mise.toml`, `.claude/` at
+  tooling as ParleyInn (smalt `CLAUDE.md`, `mise.toml`, `.claude/` at
   c5903ed). One fluent maintainer exists; the second is open
   (inference).
 - Agents lag a moving language: the I/O, allocator and build APIs
@@ -686,7 +686,7 @@ Zig loses:
 ## How this note measured
 
 All builds ran on 4 October 2026 in a scratch directory on linux/amd64
-(4 vCPU), never in Cairn's tree or a real home.
+(4 vCPU), never in ParleyInn's tree or a real home.
 
 - Toolchains: `zig-x86_64-linux-0.17.0.tar.xz` and the 0.16.0 tarball
   from ziglang.org, each checked against the SHA-256 in
@@ -729,7 +729,7 @@ All builds ran on 4 October 2026 in a scratch directory on linux/amd64
 
 ## Option H in the options template
 
-**Thesis.** One Zig core library, `libcairn`, compiled for all five
+**Thesis.** One Zig core library, `libparinn`, compiled for all five
 platforms and linked in process by each platform's shell, plus the
 same core as the CLI, hook and MCP executable on desktops: the
 Ghostty and TigerBeetle shape, with libghostty-vt native.
@@ -743,23 +743,23 @@ Ghostty and TigerBeetle shape, with libghostty-vt native.
   until S5 answers (OQ-10).
 - **Lane view.** On desktops, `std.http.Server` on loopback serves the
   page to browsers and to the stage-one phone. Inside an app shell, the
-  same TypeScript page runs in the system webview and calls `libcairn`
+  same TypeScript page runs in the system webview and calls `libparinn`
   in process, with no port.
 - **Run component.** Ghostty's `pty.zig` (POSIX and ConPTY) and
   libghostty-vt as a Zig module; the same library compiled to wasm32
   feeds the page's terminal pane.
 - **TUI.** libvaxis over libghostty-vt.
-- **Phone, stage two.** `libcairn` for aarch64-ios in an xcframework
+- **Phone, stage two.** `libparinn` for aarch64-ios in an xcframework
   under a Swift shell, and for Android through the NDK under a Kotlin
   shell over JNI, sharing seals, canonical JSON and sync. The device
   key is a P-256 Secure Enclave key or a wrapped Ed25519 key (common
   ground item 10 of the [options](options.md)).
-- **Peer.** Cairn's own sealed-range exchange over zquic or a Noise
+- **Peer.** ParleyInn's own sealed-range exchange over zquic or a Noise
   handshake built from `std.crypto`; no CRDT without a second
   toolchain.
 - **One binary.** Per desktop target, one release holding the
-  single-threaded `cairn` core executable and an app shell that links
-  `libcairn`; a multi-call binary only at the cost of the evidence in
+  single-threaded `parinn` core executable and an app shell that links
+  `libparinn`; a multi-call binary only at the cost of the evidence in
   section 5.
 - **Evidence.** The core never takes `Io.Threaded` and overrides
   `std_options_debug_io`; a zlint-fork rule bans `std.posix`,

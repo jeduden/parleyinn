@@ -15,8 +15,8 @@ A = CLUSTERS.append
 A(c("I2 lets compaction guidance carry structural fields and ids; the model and PIN-07 allow only fixed text",
     ["harness-facts#8"], ["harness-facts", "trust-and-flow"],
     [S+"invariants.md:37-39", M+"harness-facts.md:44-46", S+"05-functional-requirements.md:68", S+"09-interfaces.md:20", S+"04-reference-architecture.md:128-129", M+"index.md:36"],
-    "I2 groups compaction guidance (PIN-07) with opt-in notices and the OWN-04/OWN-07 templates, all 'built only from fixed text Cairn ships, trusted structural fields and ids'. The model's Compaction guidance, PIN-07, §9.1, §4.4 and the fifteenth-round decision all say compaction guidance is fixed text Cairn ships and nothing else. The invariant and the model therefore do not read the same.",
-    "Narrow I2 by ADR and security review (ENG-29): '... and compaction guidance (PIN-07), built only from fixed text Cairn ships; and opt-in notices (INJ-10) and the fixed templates of OWN-04 and OWN-07, each built only from fixed text Cairn ships, trusted structural fields and ids.' Then run `mdsmith fix .` so CLAUDE.md's include follows.",
+    "I2 groups compaction guidance (PIN-07) with opt-in notices and the OWN-04/OWN-07 templates, all 'built only from fixed text ParleyInn ships, trusted structural fields and ids'. The model's Compaction guidance, PIN-07, §9.1, §4.4 and the fifteenth-round decision all say compaction guidance is fixed text ParleyInn ships and nothing else. The invariant and the model therefore do not read the same.",
+    "Narrow I2 by ADR and security review (ENG-29): '... and compaction guidance (PIN-07), built only from fixed text ParleyInn ships; and opt-in notices (INJ-10) and the fixed templates of OWN-04 and OWN-07, each built only from fixed text ParleyInn ships, trusted structural fields and ids.' Then run `mdsmith fix .` so CLAUDE.md's include follows.",
     "stakeholder", "",
     ["Narrow I2 as proposed (ADR, security review, mdsmith fix for CLAUDE.md); model and PIN-07 stay.",
      "Keep I2 as the ceiling and record in the model's Compaction guidance entry that PIN-07 deliberately allows less than I2 does; no invariant change."],
@@ -48,17 +48,17 @@ A(c("LANE-19's 'concurrently' uses the model's causal word for overlap in time",
     "The model defines Concurrent only for acts and events: neither causally after the other. Two subagents' edit events on one node are causally ordered through the writer heads each records (REC-10), so 'edit the same file concurrently' never fires as written. The requirement means overlap in time, and the window it should cover is a behaviour choice.",
     "Reword LANE-19's trigger in time terms and mirror it in its scenario.",
     "decide", "",
-    ["'When two subagents that share the worktree both edit the same file while both run, Cairn MUST raise a Needs you item naming both.'",
+    ["'When two subagents that share the worktree both edit the same file while both run, ParleyInn MUST raise a Needs you item naming both.'",
      "Bound the window by worktree checkpoints: '... both edit the same file between two worktree checkpoints ...'."],
     False, [S+"05b-lane-requirements.md", F+"lane.feature"]))
 
-A(c("`cairn ui --phone` takes a widening principal act outside the CLI and TUI, and 'CLI' has two meanings",
+A(c("`parinn ui --phone` takes a widening principal act outside the CLI and TUI, and 'CLI' has two meanings",
     ["components-and-surfaces#1"], ["components-and-surfaces", "trust-and-flow", "hub"],
     [S+"05c-principal-and-peer-requirements.md:32", S+"05c-principal-and-peer-requirements.md:18", M+"components-and-surfaces.md:12-13", M+"components-and-surfaces.md:31-33", M+"trust-and-flow.md:40-41", S+"09a-command-line-interface.md:80", S+"04-reference-architecture.md:65-67", S+"06b-boundary-register.md:39", F+"principal-acts.feature:204", M+"index.md:108-111"],
-    "OWN-16 makes issuing a phone-scoped room-view secret (`cairn ui --phone`) a widening principal act at a terminal. The model's Core says the CLI is `cairn` but for `cairn ui`, the Room-view component records only the browser room view's principal acts, and OWN-02 and Principal surface accept terminal acts only from the CLI or TUI, refusing any other. The hub's Names section meanwhile counts `ui` and `launch` among CLI commands, giving 'CLI' two meanings.",
+    "OWN-16 makes issuing a phone-scoped room-view secret (`parinn ui --phone`) a widening principal act at a terminal. The model's Core says the CLI is `parinn` but for `parinn ui`, the Room-view component records only the browser room view's principal acts, and OWN-02 and Principal surface accept terminal acts only from the CLI or TUI, refusing any other. The hub's Names section meanwhile counts `ui` and `launch` among CLI commands, giving 'CLI' two meanings.",
     "Choose where the act is taken; either way qualify the hub's Names list so `ui` and `launch` are commands of the room-view component and the launcher, not the core's CLI.",
     "decide", "The reviewer listed (a) first; (b) is put first here because it keeps OWN-02's closed set of principal surfaces inside the core (pick safety).",
-    ["(b) Move the issue into a core CLI verb named per the hub (`cairn <concept> <verb>`) that records the act; `cairn ui --phone` only reads it from the record. Edit OWN-16, §9.5 (09a:80), §4.2 (04:65-67) and principal-acts.feature:204.",
+    ["(b) Move the issue into a core CLI verb named per the hub (`parinn <concept> <verb>`) that records the act; `parinn ui --phone` only reads it from the record. Edit OWN-16, §9.5 (09a:80), §4.2 (04:65-67) and principal-acts.feature:204.",
      "(a) Add to the model's Room-view component 'and, at the terminal that starts it, the widening act issuing a phone-scoped room-view secret (OWN-16)'; add that entry point to OWN-02's surface list and to trust-and-flow.md's Principal surface; add it to §6.3 row 8's Reach (signing under OQ-40)."],
     True, [S+"05c-principal-and-peer-requirements.md", S+"09a-command-line-interface.md", S+"04-reference-architecture.md", S+"06b-boundary-register.md", F+"principal-acts.feature", M+"components-and-surfaces.md", M+"trust-and-flow.md", M+"index.md"]))
 
@@ -92,14 +92,14 @@ A(c("'Branch head' is undefined, and two scenarios stale a ready mark and a verd
      "Keep git's meaning and OWN-21/OWN-27 as written; both scenarios make the agent commit the edit ('the agent then commits an edit')."],
     False, [M+"git-and-forge.md", S+"05c-principal-and-peer-requirements.md", F+"principal-acts.feature"]))
 
-A(c("The model says Cairn never lands, while OQ-37 leaves that open",
+A(c("The model says ParleyInn never lands, while OQ-37 leaves that open",
     ["git-and-forge#4"], ["git-and-forge"],
     [M+"git-and-forge.md:22", M+"git-and-forge.md:51", S+"13-open-questions-and-risks.md:44"],
-    "git-and-forge.md states 'It approves and lands; Cairn does neither' and 'Cairn never lands anything' as permanent. OQ-37 ('May Cairn run, push or merge code itself? Until this closes, ADM-13 applies') leaves it open, so the model runs ahead of the SRS.",
+    "git-and-forge.md states 'It approves and lands; ParleyInn does neither' and 'ParleyInn never lands anything' as permanent. OQ-37 ('May ParleyInn run, push or merge code itself? Until this closes, ADM-13 applies') leaves it open, so the model runs ahead of the SRS.",
     "Hedge the model to OQ-37, or close OQ-37's merge part.",
     "decide", "",
-    ["Model, both places: 'Cairn lands nothing while OQ-37 is open (ADM-13)'.",
-     "Close OQ-37's merge part (Cairn never lands) and keep the model as is."],
+    ["Model, both places: 'ParleyInn lands nothing while OQ-37 is open (ADM-13)'.",
+     "Close OQ-37's merge part (ParleyInn never lands) and keep the model as is."],
     False, [M+"git-and-forge.md", S+"13-open-questions-and-risks.md"]))
 
 A(c("The Hook entry names hook input but not hook output or a hook's firing ('hook event'), which normative text relies on",
@@ -147,11 +147,11 @@ A(c("Foreign room versus the run and room recall scopes: rooms that turned forei
 A(c("No interface can write a directed post",
     ["pins-and-context#4"], ["pins-and-context", "hub"],
     [S+"09-interfaces.md:57", S+"09a-command-line-interface.md:56", S+"05b-lane-requirements.md:24"],
-    "LANE-12 and the model's Directed post need a post directed to one agent, but neither `room_post` nor `cairn room post` can direct one. That breaks VIEW-03's rule that everything the room view does exists in the CLI or MCP.",
-    "Add a target parameter to `room_post` and `cairn room post`, named by the hub's option rule.",
+    "LANE-12 and the model's Directed post need a post directed to one agent, but neither `room_post` nor `parinn room post` can direct one. That breaks VIEW-03's rule that everything the room view does exists in the CLI or MCP.",
+    "Add a target parameter to `room_post` and `parinn room post`, named by the hub's option rule.",
     "decide", "The reviewer asks the stakeholder to confirm the parameter name.",
-    ["`seat` (optional: directs the post to that run seat's agent, LANE-12) on `room_post`; `cairn room post <room> [--seat <seat>]`.",
-     "`run` / `--run` naming the target run; Cairn resolves its seat in the room."],
+    ["`seat` (optional: directs the post to that run seat's agent, LANE-12) on `room_post`; `parinn room post <room> [--seat <seat>]`.",
+     "`run` / `--run` naming the target run; ParleyInn resolves its seat in the room."],
     False, [S+"09-interfaces.md", S+"09a-command-line-interface.md"]))
 
 A(c("The LANE-33 scenario caps room_summary_request, which no requirement caps",
@@ -228,7 +228,7 @@ A(c("The model says a harness clear starts a new run; no requirement or assumpti
 A(c("Receipts: SEC-19 says a purge receipt carries only digests, and which receipts are signed is unsettled",
     ["record#8"], ["record"],
     [S+"06-security.md:109", S+"06-security.md:121", S+"06b-boundary-register.md:23", M+"record.md:158-162"],
-    "SEC-19 and §6.3 say 'nor is a head or purge receipt, which carries only digests (VIEW-10)'. SEC-31 makes the purge receipt state the scope, ranges, copies erased and every copy Cairn cannot erase, which is not only digests. The model calls every receipt signed, which VIEW-10 and SEC-27 do not require of a head receipt.",
+    "SEC-19 and §6.3 say 'nor is a head or purge receipt, which carries only digests (VIEW-10)'. SEC-31 makes the purge receipt state the scope, ranges, copies erased and every copy ParleyInn cannot erase, which is not only digests. The model calls every receipt signed, which VIEW-10 and SEC-27 do not require of a head receipt.",
     "Fix SEC-19's description and rule which receipts are signed.",
     "decide", "",
     ["SEC-19 and 06b:23: 'nor is a head receipt, which carries only digests (VIEW-10), or a purge receipt, which carries only ids, addresses, counts and the names of the copies it lists (SEC-31)'; VIEW-10/SEC-27 require the head receipt to be signed, so the model stands.",
@@ -334,8 +334,8 @@ def fx(title, rids, owners, locations, problem, fix, touches, htr=False, conflic
 fx("LANE-01 sends every event to a run seat or personal-room seat, missing REC-19's seat that ingest starts",
    ["hub#1", "whole#3"], ["hub", "record"],
    [S+"05b-lane-requirements.md:14", M+"index.md:70-72", S+"05-functional-requirements.md:34"],
-   "Hub relation 6 and REC-19 send what `cairn ingest` appends for a witnessed run to the seat ingest starts beside that run seat. LANE-01's 'Each event MUST be written to exactly one seat's writer: ... else to its personal-room seat, never refused' has no such exception, so its MUST contradicts REC-19 for ingested appends.",
-   "LANE-01: after 'else to its personal-room seat, never refused' add '; what `cairn ingest` appends for a witnessed run goes instead to the seat ingest starts beside that run seat (REC-19)'.",
+   "Hub relation 6 and REC-19 send what `parinn ingest` appends for a witnessed run to the seat ingest starts beside that run seat. LANE-01's 'Each event MUST be written to exactly one seat's writer: ... else to its personal-room seat, never refused' has no such exception, so its MUST contradicts REC-19 for ingested appends.",
+   "LANE-01: after 'else to its personal-room seat, never refused' add '; what `parinn ingest` appends for a witnessed run goes instead to the seat ingest starts beside that run seat (REC-19)'.",
    [S+"05b-lane-requirements.md"], htr=True)
 
 fx("LANE-15 treats every foreign room as one read from a bundle",
@@ -405,7 +405,7 @@ fx("'every boundary disabled' includes B0, which managed policy cannot disable",
 fx("An administration outline's `component` column holds a CLI command",
    ["components-and-surfaces#6"], ["components-and-surfaces"],
    [F+"administration.feature:47", F+"administration.feature:48", F+"administration.feature:52"],
-   "Component is a closed set (core, room-view component, launcher, peer, publish, bridge); `cairn status` is a CLI command inside the core.",
+   "Component is a closed set (core, room-view component, launcher, peer, publish, bridge); `parinn status` is a CLI command inside the core.",
    "Rename the column and placeholder `<component>` to `<started>` (or 'component or command') at lines 47, 48 and 52.",
    [F+"administration.feature"])
 
@@ -419,7 +419,7 @@ fx("'UI' is a second name for the browser room view and its surfaces",
 fx("§12 says 'catch-up' for the Catch up surface",
    ["components-and-surfaces#10"], ["components-and-surfaces"],
    [S+"12-delivery-plan.md:50"],
-   "The surface is 'Catch up'; the kebab form belongs only to the CLI command (`cairn catch-up show`), per the hub's naming rule.",
+   "The surface is 'Catch up'; the kebab form belongs only to the CLI command (`parinn catch-up show`), per the hub's naming rule.",
    "12-delivery-plan.md:50: '... passes Catch up, search-to-replay and room verify'.",
    [S+"12-delivery-plan.md"])
 
@@ -465,10 +465,10 @@ fx("'Evidence' is used for build-time reach analysis and for receipts' tamper ev
    "SEC-01, SEC-19, ENG-12 and their scenarios: 'build-time reach analysis' / 'that analysis'. record.md:160: 'a head receipt lists every writer's chain head at a moment, which shows tampering under VIEW-10 and SEC-27'.",
    [S+"06-security.md", S+"10-engineering-quality.md", F+"security.feature", F+"engineering.feature", M+"record.md"])
 
-fx("NFR-15 'rebuilds a worktree', which Cairn never writes",
+fx("NFR-15 'rebuilds a worktree', which ParleyInn never writes",
    ["git-and-forge#9"], ["git-and-forge", "record"],
    [S+"07-non-functional-requirements.md:29", F+"non-functional.feature:166"],
-   "A worktree is a git working tree on a node, which ADM-13 bars Cairn from writing, and 'rebuild' is `cairn rebuild`'s word for derived artifacts. VIEW-12 reconstructs the worktree's state from the record.",
+   "A worktree is a git working tree on a node, which ADM-13 bars ParleyInn from writing, and 'rebuild' is `parinn rebuild`'s word for derived artifacts. VIEW-12 reconstructs the worktree's state from the record.",
    "NFR-15 and its scenario: 'reconstructs the worktree at an event within 500 ms† (VIEW-12)'.",
    [S+"07-non-functional-requirements.md", F+"non-functional.feature"])
 
@@ -517,7 +517,7 @@ fx("LANE-14 is cited for the harness_text classification, which is PRV-08",
 fx("§6.3 row 24 omits recalled content from what the harness sends its provider",
    ["harness-facts#10"], ["components-and-surfaces", "harness-facts"],
    [S+"06b-boundary-register.md:55"],
-   "I4, §2 and VIEW-18 say the harness sends its model both recalled content an agent receives through a tool call and what Cairn writes through I2's closed paths; row 24 names only the latter.",
+   "I4, §2 and VIEW-18 say the harness sends its model both recalled content an agent receives through a tool call and what ParleyInn writes through I2's closed paths; row 24 names only the latter.",
    "Row 24: 'carrying the recalled content agents receive through tool calls and what I2's closed paths write (I4)'.",
    [S+"06b-boundary-register.md"])
 
@@ -531,7 +531,7 @@ fx("RCL-07's scenario counts recalls with a 'counter'",
 fx("PIN-01 lists qualifying-pin sources too narrowly",
    ["pins-and-context#1"], ["pins-and-context"],
    [S+"05-functional-requirements.md:62", F+"pins.feature (PIN-01 Examples)"],
-   "Qualifying pins also come from the owner's intent principal act (LANE-20, `cairn intent set|revise`) and from confirming a pin candidate (PIN-05, LANE-26); read as exhaustive, PIN-01 excludes both.",
+   "Qualifying pins also come from the owner's intent principal act (LANE-20, `parinn intent set|revise`) and from confirming a pin candidate (PIN-05, LANE-26); read as exhaustive, PIN-01 excludes both.",
    "PIN-01: '... only from a principal (a pin or intent it sets at a principal surface, a pin candidate it confirms, its configuration or its stamp), never a harness skill's call.' Optionally add the two rows to the PIN-01 Examples.",
    [S+"05-functional-requirements.md", F+"pins.feature"])
 
@@ -572,10 +572,10 @@ fx("§3 says 'the view' for the working view",
 
 fx("The bound ENG-01 scenario says 'pinned' and 'stamped' for the toolchain and release builds",
    ["pins-and-context#9"], ["pins-and-context", "acts-and-roles"],
-   [F+"engineering.feature:11", F+"engineering.feature:13", "cmd/cairn/bdd_engineering_test.go:40"],
+   [F+"engineering.feature:11", F+"engineering.feature:13", "cmd/parinn/bdd_engineering_test.go:40"],
    "Pin and stamp are model words; ENG-01's own text avoids them ('fixed to an exact version'). This scenario is not @pending, so its step binding must change with it.",
-   "engineering.feature:11: 'Scenario: the toolchain is fixed to an exact version and release builds are static, trimmed and carry VCS information'; :13 'Then \"go.mod\" fixes the Go toolchain with a toolchain directive'; the step regex at cmd/cairn/bdd_engineering_test.go:40 in the same commit.",
-   [F+"engineering.feature", "cmd/cairn/bdd_engineering_test.go"])
+   "engineering.feature:11: 'Scenario: the toolchain is fixed to an exact version and release builds are static, trimmed and carry VCS information'; :13 'Then \"go.mod\" fixes the Go toolchain with a toolchain directive'; the step regex at cmd/parinn/bdd_engineering_test.go:40 in the same commit.",
+   [F+"engineering.feature", "cmd/parinn/bdd_engineering_test.go"])
 
 fx("A provenance outline coins 'model-reproducible text' and 'harness-summarised text'",
    ["pins-and-context#10"], ["pins-and-context", "record"],
@@ -623,7 +623,7 @@ fx("No requirement stops a personal-room seat leaving or being kicked",
    ["principals-and-agents#2"], ["principals-and-agents", "acts-and-roles"],
    [M+"principals-and-agents.md:70-71", S+"05b-lane-requirements.md:35", S+"09-interfaces.md:62"],
    "Member says a personal-room seat can neither leave nor be kicked, but LANE-23 makes every leave a room act and `room_leave` takes any room; before PRV-10, LANE-25 does not stop the owner's device seat kicking its run's personal-room seat. Either contradicts LANE-01's 'else to its personal-room seat, never refused'.",
-   "LANE-23: 'A personal-room seat MUST NOT leave or be kicked; Cairn MUST refuse and audit either act.' Add a step to the LANE-23 scenario in lane.feature, and note the refusal on `room_leave` in 09-interfaces.md.",
+   "LANE-23: 'A personal-room seat MUST NOT leave or be kicked; ParleyInn MUST refuse and audit either act.' Add a step to the LANE-23 scenario in lane.feature, and note the refusal on `room_leave` in 09-interfaces.md.",
    [S+"05b-lane-requirements.md", F+"lane.feature", S+"09-interfaces.md"])
 
 fx("Principal says only an agent's own principal widens what reaches it, which cross-principal delegation contradicts",
@@ -658,7 +658,7 @@ fx("A record scenario excludes the seat ingest starts from the core's sealing",
    ["record#2"], ["record"],
    [F+"record.feature:226"],
    "A witnessed run's run seats are sealed by its MCP server except the seat ingest starts, which the core seals; line 222 of the same scenario says so, line 226 contradicts it.",
-   "record.feature:226: '... every writer but the witnessed run's run seats' other than those \"cairn ingest\" started, and the paired phone's, ...'.",
+   "record.feature:226: '... every writer but the witnessed run's run seats' other than those \"parinn ingest\" started, and the paired phone's, ...'.",
    [F+"record.feature"])
 
 fx("An ADM-15 row refuses a single event where peers exchange segments, and omits the structural event",
@@ -678,7 +678,7 @@ fx("Integrity status is defined per room or writer, but VIEW-10, REC-18 and RCL-
 fx("PRV-01 classes every key rotation `structural`, but a device-key rotation is an `operator` principal act",
    ["record#6"], ["record", "seats-and-keys", "acts-and-roles"],
    [S+"05-functional-requirements.md:46", M+"record.md:75"],
-   "Rotating a device key is a widening principal act (OWN-11, `cairn device-key rotate`), recorded as `operator` (OWN-02). PRV-01 and record.md:75 make 'key rotations' `structural`, a second class for the same event; the class sits in the chained header (REC-10) and decides trust on the principal's other nodes.",
+   "Rotating a device key is a widening principal act (OWN-11, `parinn device-key rotate`), recorded as `operator` (OWN-02). PRV-01 and record.md:75 make 'key rotations' `structural`, a second class for the same event; the class sits in the chained header (REC-10) and decides trust on the principal's other nodes.",
    "PRV-01 and record.md:75: 'key rotations' -> 'seat-key rotations' (a seat key's rotation goes to its own writer, SEC-27; a device-key rotation stays an `operator` principal act).",
    [S+"05-functional-requirements.md", M+"record.md"], htr=True)
 
@@ -706,8 +706,8 @@ fx("The model's Payload promises more about the payload's name than REC-09",
 fx("The model's Flag covers every event; PRV-07 flags only untrusted ones",
    ["record#13"], ["record"],
    [M+"record.md:138-139"],
-   "PRV-07: 'Cairn SHOULD flag ... untrusted events that contain instruction-like content'.",
-   "record.md:138: 'A mark Cairn sets on an untrusted event whose text matches an injection pattern (PRV-07)'.",
+   "PRV-07: 'ParleyInn SHOULD flag ... untrusted events that contain instruction-like content'.",
+   "record.md:138: 'A mark ParleyInn sets on an untrusted event whose text matches an injection pattern (PRV-07)'.",
    [M+"record.md"])
 
 fx("record.md calls one event 'a witness check's record'",
@@ -811,8 +811,8 @@ fx("ENG-29 omits OWN-26 from the requirements marked for I2 review",
 fx("Counter says failures show on Health only until acknowledged; ADM-11 keeps them shown",
    ["trust-and-flow#9"], ["trust-and-flow"],
    [M+"trust-and-flow.md:140-141", S+"05a-administration-requirements.md:24", S+"09a-command-line-interface.md:16"],
-   "ADM-11 and `cairn status` keep non-zero failure counters shown; OPS-03 uses acknowledgement only as `cairn doctor`'s baseline.",
-   "Model: 'shown on Health; `cairn doctor` fails while one has risen since the node's principal last acknowledged them (`cairn counter ack`, I6, OPS-03)'.",
+   "ADM-11 and `parinn status` keep non-zero failure counters shown; OPS-03 uses acknowledgement only as `parinn doctor`'s baseline.",
+   "Model: 'shown on Health; `parinn doctor` fails while one has risen since the node's principal last acknowledged them (`parinn counter ack`, I6, OPS-03)'.",
    [M+"trust-and-flow.md"])
 
 fx("Continuation cursor is promised for every capped recall tool, and RCL-03 lacks 'without gap or overlap'",
@@ -881,8 +881,8 @@ fx("VIEW-21 gives agents the Idle run status",
 fx("OWN-27 says the room records no verdict; rooms record nothing",
    ["whole#8"], ["places", "git-and-forge"],
    [S+"05c-principal-and-peer-requirements.md:43"],
-   "A room is a place, not an actor (nodes record), and Verdict says Cairn never derives one (VIEW-22).",
-   "OWN-27: 'Cairn records no verdict of its own (VIEW-22).'",
+   "A room is a place, not an actor (nodes record), and Verdict says ParleyInn never derives one (VIEW-22).",
+   "OWN-27: 'ParleyInn records no verdict of its own (VIEW-22).'",
    [S+"05c-principal-and-peer-requirements.md"])
 
 fx("ENG-02's example crate `adapter-claudecode` drops the model's 'harness adapter'",
@@ -892,11 +892,11 @@ fx("ENG-02's example crate `adapter-claudecode` drops the model's 'harness adapt
    "ENG-02: rename the example crate `harness_adapter_claude_code` (matching `restore_block`'s form).",
    [S+"10-engineering-quality.md"])
 
-fx("ADR-06 in §4.5 says `cairn install` edits 'settings', which reads as Cairn's configuration",
+fx("ADR-06 in §4.5 says `parinn install` edits 'settings', which reads as ParleyInn's configuration",
    ["whole#10"], ["principals-and-agents", "record"],
    [S+"04-reference-architecture.md:157"],
    "Configuration is the principal's settings (§9.6); the harness's settings are part of harness configuration.",
-   "§4.5 ADR-06: '`cairn install` edits the harness's settings only as a fallback.'",
+   "§4.5 ADR-06: '`parinn install` edits the harness's settings only as a fallback.'",
    [S+"04-reference-architecture.md"])
 # Part 3: ids, cross conflicts, instruction edits, validation, output.
 import json, os
@@ -959,7 +959,7 @@ CROSS = [
      'yes'),
     (["components-and-surfaces#1", "whole#11", "places#3"],
      S+"05c-principal-and-peer-requirements.md:27 (OWN-11), :32 (OWN-16)",
-     "The `cairn ui --phone` cluster's option (b) rewrites OWN-16's issuing sentence, which the 'origin' cluster's option 1 also edits ('web origin'); the authenticator fix and 'web origin' both edit OWN-11. Compatible if the origin rename is applied last.",
+     "The `parinn ui --phone` cluster's option (b) rewrites OWN-16's issuing sentence, which the 'origin' cluster's option 1 also edits ('web origin'); the authenticator fix and 'web origin' both edit OWN-11. Compatible if the origin rename is applied last.",
      "yes, if C31's rename is applied after C05 option (b) rewrites OWN-16"),
     (["components-and-surfaces#7", "whole#11"],
      S+"06-security.md:56 (T15)",
@@ -975,7 +975,7 @@ CROSS = [
      'yes'),
     (["git-and-forge#1", "git-and-forge#2", "whole#8"],
      S+"05c-principal-and-peer-requirements.md:37 (OWN-21), :43 (OWN-27) and "+M+"git-and-forge.md (Branch, tree)",
-     "The branch-head cluster's option 1 widens OWN-21/OWN-27 to the worktree's tree, which the tree-definition fix makes a defined term; the OWN-27 'Cairn records no verdict' fix edits another sentence of the same row. Compatible; option 1 relies on the tree fix landing first.",
+     "The branch-head cluster's option 1 widens OWN-21/OWN-27 to the worktree's tree, which the tree-definition fix makes a defined term; the OWN-27 'ParleyInn records no verdict' fix edits another sentence of the same row. Compatible; option 1 relies on the tree fix landing first.",
      'yes; C08 option 1 needs C45 to land first'),
     (["trust-and-flow#7", "trust-and-flow#12"],
      S+"05c-principal-and-peer-requirements.md:38 (OWN-22)",
@@ -1021,7 +1021,7 @@ ie(ALL_SPEC + [HUB, WHOLE], "How you review (new first line)",
    "The hub template's step 4 says 'search the whole repository'; this round was scoped to the SRS and scenarios.",
    ["hub"])
 ie(ALL_SPEC + [HUB, WHOLE], "How you review (skip list)",
-   "Add: 'Skip what the hub's section on terms that are not Cairn concepts exempts: historical records, the SRS change log and the Status row in docs/srs/index.md included, and files an outside tool writes and maintains.'",
+   "Add: 'Skip what the hub's section on terms that are not ParleyInn concepts exempts: historical records, the SRS change log and the Status row in docs/srs/index.md included, and files an outside tool writes and maintains.'",
    "The whole-model reviewer searched docs/srs/index.md's change log, which the hub already treats as a historical record.",
    ["whole", "hub"])
 ie(ALL_SPEC + [HUB, WHOLE], "How you review (words that coincide with the model's)",
@@ -1041,8 +1041,8 @@ ie(ALL_SPEC, "How you review, step 6",
    "harness-facts reported the LANE-28 trace to I7 (C12) and PIN-07's wrong assumption gate (C11) without knowing they were in scope.",
    ["harness-facts", "principals-and-agents"])
 ie(ALL_SPEC, "How you review (scenarios)",
-   "Add: 'A scenario that leaves out a precondition one of your concepts decides is needs-fix. Drift between a requirement and its scenario about one of your concepts is in scope even when no word is wrong, and so is a @pending scenario that skips a clause about one. For a scenario without @pending, name its step binding in cmd/cairn/bdd_<section>_test.go and any drift case under internal/drift that quotes it; the fix changes them in the same change.'",
-   "Role defaults omitted in two scenarios (C03); ENG-29 vs its scenario (C99); ENG-01 is bound at cmd/cairn/bdd_engineering_test.go:40 (C66).",
+   "Add: 'A scenario that leaves out a precondition one of your concepts decides is needs-fix. Drift between a requirement and its scenario about one of your concepts is in scope even when no word is wrong, and so is a @pending scenario that skips a clause about one. For a scenario without @pending, name its step binding in cmd/parinn/bdd_<section>_test.go and any drift case under internal/drift that quotes it; the fix changes them in the same change.'",
+   "Role defaults omitted in two scenarios (C03); ENG-29 vs its scenario (C99); ENG-01 is bound at cmd/parinn/bdd_engineering_test.go:40 (C66).",
    ["pins-and-context", "acts-and-roles", "places", "trust-and-flow"])
 ie(ALL_SPEC, "How you review (unused concepts)",
    "Add: 'A concept your file defines that no requirement or scenario uses, or that the SRS names in other words, is a question: the SRS takes the model's name, or the concept goes.'",
@@ -1061,7 +1061,7 @@ ie(ALL_SPEC + [HUB], "How you report (finding fields)",
    "components-and-surfaces split one repeat into three findings; principals-and-agents packed several paths into `file`.",
    ["components-and-surfaces", "principals-and-agents"])
 ie(ALL_SPEC, "How you review, step 3",
-   "Add after 'any word the hub excludes in its favour': 'that is, each row of the hub's table of terms that are not Cairn concepts whose replacement your file defines.'",
+   "Add after 'any word the hub excludes in its favour': 'that is, each row of the hub's table of terms that are not ParleyInn concepts whose replacement your file defines.'",
    "acts-and-roles could not tell which excluded terms point to its file. Optional companion edit to the hub (docs/domain-model/index.md, a model edit the domain-model agent reviews; no new concept): a 'Defined in' column. Mapping found this round — acts-and-roles: operator as a role, owner act, read only; components-and-surfaces: run component, trusted boundary ('boundary'), Needs you as a status, hide; git-and-forge: project, attempt, own run and witness run, judge, approval gate; harness-facts: session; pins-and-context: claim of work, unqualified token (model token); places: lane, room board, project; principals-and-agents: tenant, bound human, bot, co-author, actor, poster, child agent, participant and player (member), operator as a person, session (run); record: import of a transcript or a peer's segments, imported run, work marker, operator (provenance class); seats-and-keys: writer key, writer certificate, service-account seat, owner key, participant and player (seat), unqualified token (access token); trust-and-flow: owner surface, trusted boundary, away mode, room alias, presence check, Needs you as a run status (Asking).",
    ["acts-and-roles"])
 
@@ -1078,7 +1078,7 @@ WTS = {
                "Peer, blind peer, sync and ephemeral node are defined against PEER rows; Foreign room and Personal room are used in lane-view and pins scenarios.", ["places"]),
     "harness-facts": ("SRS: add docs/srs/09-interfaces.md, docs/srs/13-open-questions-and-risks.md, docs/srs/appendix-b-invariant-coverage.md.",
                       "Derived from where this round's findings landed: §9.1's hook table, OQ-02 and the spikes, and the traces of C12.", ["harness-facts"]),
-    "pins-and-context": ("SRS: add docs/srs/09-interfaces.md, docs/srs/08-data-and-storage.md, docs/srs/05d-peer-requirements.md. Code: the step bindings in cmd/cairn/bdd_*_test.go.",
+    "pins-and-context": ("SRS: add docs/srs/09-interfaces.md, docs/srs/08-data-and-storage.md, docs/srs/05d-peer-requirements.md. Code: the step bindings in cmd/parinn/bdd_*_test.go.",
                          "Derived from this round: room_post and room_summary_* (§9.2, §9.6), §8.4, PEER-06, and the ENG-01 binding.", ["pins-and-context"]),
     "components-and-surfaces": ("SRS: add docs/srs/02-context.md, docs/srs/04-reference-architecture.md, docs/srs/09a-command-line-interface.md, docs/srs/12-delivery-plan.md.",
                                 "Derived from where this round's findings landed (CON-03, §4.2, §9.5, §12).", ["components-and-surfaces"]),
@@ -1092,7 +1092,7 @@ for s, (txt, why, src) in WTS.items():
 
 ie([".claude/agents/domain-model-components-and-surfaces.md", HUB], "How you report (who owns a meaning)",
    "Add: 'The concept file that defines a concept owns its meaning; the hub owns only the form of names. Where the hub's naming section uses a concept's word in another sense, report it to the hub specialist as other-specialist.'",
-   "The hub's Names section counts `ui` and `launch` among CLI commands while components-and-surfaces.md's Core excludes `cairn ui` from the CLI (C05).",
+   "The hub's Names section counts `ui` and `launch` among CLI commands while components-and-surfaces.md's Core excludes `parinn ui` from the CLI (C05).",
    ["components-and-surfaces"])
 ie([".claude/agents/domain-model-harness-facts.md"], "How you review (an outside program's words)",
    "Add: 'An outside program's own identifiers keep their names under the hub's rule on outside things. A word of an outside program written as prose that a requirement relies on normatively needs a model entry or a rewording: report it as a question.'",

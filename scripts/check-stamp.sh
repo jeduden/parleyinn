@@ -1,5 +1,5 @@
 #!/bin/sh
-# Checks that a built cairn executable reports the version and the
+# Checks that a built parinn executable reports the version and the
 # commit the release build stamped into it (ENG-01). The build workflow
 # runs it on each binary, on the binary's own platform.
 #

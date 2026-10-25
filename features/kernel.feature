@@ -7,15 +7,15 @@ Feature: Compute kernel (CMP)
 
   @CMP-01 @P1 @pending
   Scenario: the kernel tools are listed by the MCP server
-    Given an isolated Cairn home
+    Given an isolated ParleyInn home
     And an agent run with a Claude Code transcript "run-a"
-    When the MCP server "cairn mcp" is asked to list its tools
+    When the MCP server "parinn mcp" is asked to list its tools
     Then the tool list contains "kernel_exec", "kernel_variable_list" and "kernel_reset"
     And each kernel tool runs SQL on a read-only connection to the store
 
   @CMP-02 @P1 @pending
   Scenario: kernel variables persist across executions until reset
-    Given an isolated Cairn home
+    Given an isolated ParleyInn home
     And an agent run with a Claude Code transcript "run-a"
     When the agent calls the MCP tool "kernel_exec" with code "CREATE TEMP TABLE x AS SELECT 41 AS v"
     And the agent calls the MCP tool "kernel_exec" with code "SELECT v + 1 FROM x"
@@ -26,7 +26,7 @@ Feature: Compute kernel (CMP)
 
   @CMP-03 @P1 @pending
   Scenario: read-only table functions return rows
-    Given an isolated Cairn home
+    Given an isolated ParleyInn home
     And an agent run with a Claude Code transcript "run-a" containing the word "migration"
     When the agent calls the MCP tool "kernel_exec" with code "CREATE TEMP TABLE hits AS SELECT * FROM event_search('migration'); SELECT count(*), min(address) FROM hits"
     Then the result is one row holding a count and an address (writer, seq)
@@ -37,7 +37,7 @@ Feature: Compute kernel (CMP)
 
   @CMP-04 @P1 @I4 @pending
   Scenario Outline: the kernel has no access to host resources
-    Given an isolated Cairn home
+    Given an isolated ParleyInn home
     And an agent run with a Claude Code transcript "run-a"
     When the agent calls the MCP tool "kernel_exec" with code "<code>"
     Then the tool returns an error naming "<resource>" as unavailable
@@ -55,13 +55,13 @@ Feature: Compute kernel (CMP)
 
   @CMP-05 @P1 @I9 @pending
   Scenario Outline: exceeding a kernel limit restarts the worker and reports the lost namespace
-    Given an isolated Cairn home
+    Given an isolated ParleyInn home
     And an agent run with a Claude Code transcript "run-a"
     And the agent has set the kernel variable "kept" with "kernel_exec"
     And the kernel's step budget is <budget>
     When the agent calls the MCP tool "kernel_exec" with code "<code>"
     Then the tool returns an error stating the <bound> was exceeded and the namespace was lost
-    And the "cairn kernel-worker" child process has been restarted
+    And the "parinn kernel-worker" child process has been restarted
     And an audit entry records "kernel <bound> exceeded"
 
     Examples:
@@ -72,7 +72,7 @@ Feature: Compute kernel (CMP)
 
   @CMP-06 @P1 @I2 @pending
   Scenario: only the last row-returning statement's rows return to the agent, capped, enveloped and tainted
-    Given an isolated Cairn home
+    Given an isolated ParleyInn home
     And an agent run with a Claude Code transcript "run-a" containing an untrusted "web" event
     When the agent calls the MCP tool "kernel_exec" with code "CREATE TEMP TABLE r AS SELECT * FROM event_search('web'); WITH RECURSIVE n(i) AS (SELECT 1 UNION ALL SELECT i + 1 FROM n WHERE i < 10000) SELECT r.* FROM r, n"
     Then the kernel output is wrapped in the envelope
@@ -83,11 +83,11 @@ Feature: Compute kernel (CMP)
 
   @CMP-07 @P1 @I5 @I8 @pending
   Scenario: kernel reads honour quarantine and recall scope
-    Given an isolated Cairn home
+    Given an isolated ParleyInn home
     And an agent run with a Claude Code transcript "run-a"
     And an agent run with a Claude Code transcript "run-b"
     And the agent has bound A1·7 to the kernel variable "held" with "CREATE TEMP TABLE held AS SELECT * FROM event_get('A1:7')"
-    And the person has quarantined A1·7 with "cairn quarantine add --range A1:7-7"
+    And the person has quarantined A1·7 with "parinn quarantine add --range A1:7-7"
     When the agent calls the MCP tool "kernel_exec" with code "SELECT * FROM event_get('A1:7'); SELECT * FROM event_search('x', 'rooms')"
     Then the kernel returns exactly what the MCP tools "event_get" and "event_search" return for the same arguments
     And A1·7 and rooms the agent has no seat in are absent
@@ -96,7 +96,7 @@ Feature: Compute kernel (CMP)
 
   @CMP-08 @P2 @I4 @pending
   Scenario: the opt-in Python kernel is confined, network-less and read-only
-    Given an isolated Cairn home
+    Given an isolated ParleyInn home
     And an agent run with a Claude Code transcript "run-a"
     And the external Python kernel is enabled in the person's configuration
     When the agent calls the MCP tool "kernel_exec" with code "import socket; socket.create_connection(('example.com', 80))"
@@ -105,8 +105,8 @@ Feature: Compute kernel (CMP)
     And the record is unchanged
 
   @CMP-09 @P2 @I4 @pending
-  Scenario: cairn never calls model APIs itself
-    Given an isolated Cairn home
+  Scenario: parinn never calls model APIs itself
+    Given an isolated ParleyInn home
     And an agent run with a Claude Code transcript "run-a"
     When the shipped binary's imports and outbound network calls are inspected
     Then no model API client or model endpoint is referenced

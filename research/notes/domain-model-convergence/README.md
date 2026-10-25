@@ -1,6 +1,6 @@
 # Domain-model convergence
 
-The work that makes Cairn's domain model and SRS ready to build at
+The work that makes ParleyInn's domain model and SRS ready to build at
 milestones M1 to M5. Rounds 0 to 7 ran a review loop that did not
 converge; [process-evaluation.md](process-evaluation.md) gives its numbers
 and [ledger-patterns.md](ledger-patterns.md) the patterns behind them.
@@ -28,7 +28,7 @@ From 9 October 2026 a fixed sequence of steps replaces that loop.
   source. `docs/srs/invariants.md` never changes; a finding that would
   need it goes to the stakeholder.
 - **One ledger.** Every theme gets one entry in
-  `plan/2610012322_cairn-for-agent-fleets/finding-ledger.json`, fixed,
+  `plan/2610012322_parinn-for-agent-fleets/finding-ledger.json`, fixed,
   deferred or accepted, citing the sentences that close it.
   `TestFindingLedgerIsCarried` fails when one of them leaves its file.
   When a step moves a cited sentence, it moves the citation with it.

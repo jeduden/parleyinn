@@ -262,6 +262,30 @@ fn a_crate_with_its_own_lints_forbids_unsafe_in_each_crate_root() {
 }
 
 #[test]
+fn the_one_unsafe_shim_denies_unsafe_code_in_its_own_lints() {
+    let shim = "[package]\nname = \"platform\"\n\n[lints.rust]\nunsafe_code = \"deny\"\n";
+    let (_dir, c) = checkout(
+        ROOT,
+        &[(UNSAFE_SHIM, shim, &[]), ("tools/one", INHERITS, &[])],
+    );
+    assert!(
+        crates_forbid_unsafe(&c).is_empty(),
+        "{:?}",
+        crates_forbid_unsafe(&c)
+    );
+
+    let allowing = shim.replace("\"deny\"", "\"allow\"");
+    let (_dir, c) = checkout(
+        ROOT,
+        &[(UNSAFE_SHIM, &allowing, &[]), ("tools/one", INHERITS, &[])],
+    );
+    assert_eq!(
+        crates_forbid_unsafe(&c),
+        ["crate crates/platform, the one unsafe shim, does not deny unsafe code in its own lints"]
+    );
+}
+
+#[test]
 fn a_workspace_that_stops_forbidding_unsafe_code_fails() {
     let root = ROOT.replace("\"forbid\"", "\"warn\"");
     let (_dir, c) = checkout(
@@ -301,7 +325,7 @@ fn an_unreadable_member_is_named() {
 /// and, when `reach` is set, the reach test with that body.
 fn core(clippy: &str, reach: Option<&str>) -> (TempDir, Checkout) {
     let dir = TempDir::new().unwrap();
-    let at = dir.path().join("crates/cairn");
+    let at = dir.path().join("crates/parinn");
     fs::create_dir_all(at.join("tests")).unwrap();
     fs::write(at.join("Cargo.toml"), INHERITS).unwrap();
     fs::write(at.join("clippy.toml"), clippy).unwrap();
@@ -349,7 +373,7 @@ fn the_core_s_reach_evidence_missing_its_reach_test_fails() {
     assert_eq!(problems.len(), 1, "{problems:?}");
     assert!(
         problems[0].starts_with(
-            "the core's reach evidence is missing: read crates/cairn/tests/reach.rs: "
+            "the core's reach evidence is missing: read crates/parinn/tests/reach.rs: "
         ),
         "{problems:?}"
     );
@@ -362,7 +386,7 @@ fn the_core_s_reach_test_must_hold_its_test() {
     assert_eq!(
         core_reach_evidence(&c, &gating()),
         [
-            "the core's reach evidence is missing: crates/cairn/tests/reach.rs has no test the_core_executable_links_only_crates_its_reach_allows"
+            "the core's reach evidence is missing: crates/parinn/tests/reach.rs has no test the_core_executable_links_only_crates_its_reach_allows"
         ]
     );
 }
@@ -375,7 +399,7 @@ fn the_core_s_reach_evidence_needs_every_reach_ban() {
     assert_eq!(
         core_reach_evidence(&c, &gating()),
         [
-            "the core's reach evidence is missing: crates/cairn/clippy.toml does not ban std::process::Command"
+            "the core's reach evidence is missing: crates/parinn/clippy.toml does not ban std::process::Command"
         ]
     );
 }
@@ -410,7 +434,7 @@ fn derived_code_may_not_lose_a_determinism_ban() {
     assert_eq!(
         derived_code_gated(&c, &flow),
         [
-            "code that computes derived artifacts may read a clock or randomness: crate cairn: crates/cairn/clippy.toml does not ban std::time::Instant::now in disallowed-methods",
+            "code that computes derived artifacts may read a clock or randomness: crate parinn: crates/parinn/clippy.toml does not ban std::time::Instant::now in disallowed-methods",
             "no CI job runs cargo clippy: cargo clippy --workspace --all-targets --locked -- -D warnings",
         ]
     );
@@ -430,7 +454,7 @@ fn derived_code_names_a_checkout_without_crates() {
 #[test]
 fn a_core_without_a_clippy_configuration_names_the_one_it_reads() {
     let (_dir, c) = core(&every_ban(), Some(REACH));
-    fs::remove_file(c.root.join("crates/cairn/clippy.toml")).unwrap();
+    fs::remove_file(c.root.join("crates/parinn/clippy.toml")).unwrap();
 
     let reach = core_reach_evidence(&c, &gating());
     let derived = derived_code_gated(&c, &gating());

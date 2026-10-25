@@ -3,7 +3,7 @@
 //! counts, and the hook handler timings NFR-01 needs, on the store
 //! spike S2 builds with `s2bench load`.
 //!
-//! A standalone crate: `rusqlite` enters cairn's workspace only with
+//! A standalone crate: `rusqlite` enters parinn's workspace only with
 //! the M1 change that links the store.
 //!
 //!   s8bench verify SAMPLE.jsonl

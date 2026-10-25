@@ -160,7 +160,7 @@ The reasons fall into four groups: (1) **granularity and provenance** — git se
 
 ### Takeaway
 
-**Zed DeltaDB** is the only shipping system designed to store the agent conversation and the code edits as one linked, replicated record. It is proprietary or undisclosed, it is git-backed today, and it treats conversations as first-class content to replay to agents, which conflicts with Cairn's I2 (no automatic path from untrusted content to the model). **Fossil** (append-only SQLite, no rebase, built-in tickets, wiki and chat) and **Lix** (SQL rows plus files, auto-commit, `account_id` attribution) are the strongest *structural* candidates for holding a session log next to code. **Perforce P4** offers per-file prompt and agent metadata. Patchwork shows the idea (versioned prompts, bot-attributed edits) but is research only.
+**Zed DeltaDB** is the only shipping system designed to store the agent conversation and the code edits as one linked, replicated record. It is proprietary or undisclosed, it is git-backed today, and it treats conversations as first-class content to replay to agents, which conflicts with ParleyInn's I2 (no automatic path from untrusted content to the model). **Fossil** (append-only SQLite, no rebase, built-in tickets, wiki and chat) and **Lix** (SQL rows plus files, auto-commit, `account_id` attribution) are the strongest *structural* candidates for holding a session log next to code. **Perforce P4** offers per-file prompt and agent metadata. Patchwork shows the idea (versioned prompts, bot-attributed edits) but is research only.
 
 ### Cited Findings
 
@@ -175,15 +175,15 @@ The reasons fall into four groups: (1) **granularity and provenance** — git se
 
 ### Inferences
 
-- For Cairn's constraints (Go, no network per I4, append-only, rebuildable projections per I10, untrusted content kept away from the model per I2):
+- For ParleyInn's constraints (Go, no network per I4, append-only, rebuildable projections per I10, untrusted content kept away from the model per I2):
   - Server or cloud systems are incompatible with I4 as an embedded store: Diversion, Grace, P4, Unity VCS, Delta, and Lore's service model.
   - Fossil and Pijul are local-first and append-oriented, but neither has a Go library. Integration would mean shelling out, which `os/exec` forbids under I4, or reimplementing the format.
   - Lix's model (SQL rows plus files, attributed changes) maps closely onto a session record, but its Go SDK is only planned and it is alpha.
-  - Fossil's "record exactly what happened, no rebase" philosophy matches Cairn's lossless append-only record most closely, conceptually.
-  - Delta's "replay the conversation to agents" design is the opposite of Cairn's pull-only, enveloped recall. It is a useful contrast for the security argument.
-- No requested system offers a Go-native, embeddable, local-only store for both code and session records. The realistic options are: (a) keep git or Fossil for code and a Cairn-owned append-only log for sessions, linked by content hashes (as Atlas does by patch-id on git); or (b) borrow a design such as Lore's Merkle revision chain, Fossil's SQLite artifacts or Lix's change table, rather than taking on the dependency.
+  - Fossil's "record exactly what happened, no rebase" philosophy matches ParleyInn's lossless append-only record most closely, conceptually.
+  - Delta's "replay the conversation to agents" design is the opposite of ParleyInn's pull-only, enveloped recall. It is a useful contrast for the security argument.
+- No requested system offers a Go-native, embeddable, local-only store for both code and session records. The realistic options are: (a) keep git or Fossil for code and a ParleyInn-owned append-only log for sessions, linked by content hashes (as Atlas does by patch-id on git); or (b) borrow a design such as Lore's Merkle revision chain, Fossil's SQLite artifacts or Lix's change table, rather than taking on the dependency.
 
 ### Gaps
 
-- None of the systems publishes a threat model for stored conversations being replayed into prompts (prompt injection through history). This is a notable gap relative to Cairn's I2.
+- None of the systems publishes a threat model for stored conversations being replayed into prompts (prompt injection through history). This is a notable gap relative to ParleyInn's I2.
 - No source found on tamper-evidence or signing of per-edit or session records in Delta, Lix or Grace.

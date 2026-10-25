@@ -73,7 +73,7 @@
  },
  {
   "type": "contradiction",
-  "quote": "`cairn uninstall` records the widening act turning capture off before it",
+  "quote": "`parinn uninstall` records the widening act turning capture off before it",
   "problem": "A token-key-only node 'signs no principal or expire acts', so on that node uninstall cannot record this widening act. It must either refuse (against I7's explicit uninstall) or remove the hooks with nothing recorded. The candidate gives no stand-in here, though it gives one for turning components on (PEER-01's environment variable).",
   "fix": "Add: 'on a token-key-only node, a structural event naming the uninstall stands in for that act, as PEER-01's environment variable does.'",
   "severity": "minor",
@@ -137,8 +137,8 @@
  },
  {
   "type": "gap",
-  "quote": "repository's `.cairn.toml`, its **repository configuration**, may only tighten",
-  "problem": "'Tighten' is never defined, and the candidate classes removing a pin from a restore block as widening. An untrusted repository's .cairn.toml could shrink the pin budget, omit restore blocks or declare pins and call it tightening, stripping or adding the principal's constraints.",
+  "quote": "repository's `.parinn.toml`, its **repository configuration**, may only tighten",
+  "problem": "'Tighten' is never defined, and the candidate classes removing a pin from a restore block as widening. An untrusted repository's .parinn.toml could shrink the pin budget, omit restore blocks or declare pins and call it tightening, stripping or adding the principal's constraints.",
   "fix": "may only tighten: make a change a cut act could make, never one that removes a pin from a restore block or declares a pin",
   "severity": "needs-fix",
   "lens": "security"
@@ -178,7 +178,7 @@
  {
   "type": "security",
   "quote": "the exact commit, with network denied, by a node whose **git identity** (the",
-  "problem": "Only network is denied. A witness check runs code from a branch another principal's agent may have written, as the same OS user. That code can rewrite the home (configuration, record, keys) and the harness configuration, breaking I2 and I7 through code Cairn ran.",
+  "problem": "Only network is denied. A witness check runs code from a branch another principal's agent may have written, as the same OS user. That code can rewrite the home (configuration, record, keys) and the harness configuration, breaking I2 and I7 through code ParleyInn ran.",
   "fix": "the exact commit, with network denied and no write access outside the fresh checkout, the home and harness configuration included, by a node whose",
   "severity": "needs-fix",
   "lens": "security"
@@ -186,7 +186,7 @@
  {
   "type": "security",
   "quote": "`harness_meta` events its hook handlers recorded, and the `user` events they",
-  "problem": "Trust rests on the recorder being the hook handlers, but `cairn hook` is a CLI entry point any process of the OS user can run, the agent's shell included. Forged hook input then records trusted user and harness_meta events, which feed trusted-only exports and the pin candidates Cairn detects.",
+  "problem": "Trust rests on the recorder being the hook handlers, but `parinn hook` is a CLI entry point any process of the OS user can run, the agent's shell included. Forged hook input then records trusted user and harness_meta events, which feed trusted-only exports and the pin candidates ParleyInn detects.",
   "fix": "`harness_meta` events its hook handlers recorded from hook input the harness itself delivered (a hook call from inside a run's tool process is refused and counted), and the `user` events they",
   "severity": "minor",
   "lens": "security"
@@ -267,7 +267,7 @@
   "type": "gap",
   "quote": "A signed statement about a node's record, made to be kept apart",
   "problem": "No key is named for signing a receipt, and nothing in the candidate makes a head receipt (no act, command or moment). Two implementers would sign and issue receipts differently, and the tamper evidence they carry could not be checked the same way.",
-  "fix": "A statement about a node's record, signed by the node's device key (its token key on a token-key-only node) and made at each purge and on `cairn verify`, made to be kept apart",
+  "fix": "A statement about a node's record, signed by the node's device key (its token key on a token-key-only node) and made at each purge and on `parinn verify`, made to be kept apart",
   "severity": "minor",
   "lens": "usefulness"
  },

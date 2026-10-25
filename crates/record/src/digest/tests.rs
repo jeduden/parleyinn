@@ -1,6 +1,23 @@
 use super::*;
 
 #[test]
+fn a_running_digest_is_the_digest_of_everything_fed_so_far() {
+    let mut running = Running::default();
+    assert_eq!(running.digest(), Digest::of(&[]));
+
+    running.update(b"a");
+    let partial = running.digest();
+    running.update(b"bc");
+
+    assert_eq!(partial, Digest::of(&[b"a"]));
+    assert_eq!(running.digest(), Digest::of(&[b"abc"]));
+    assert_eq!(
+        format!("{:?}", Running::default()),
+        format!("Running({})", Digest::of(&[]))
+    );
+}
+
+#[test]
 fn of_hashes_the_concatenation_of_its_parts_with_sha_256() {
     // FIPS 180-2's "abc" vector.
     let want = "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad";

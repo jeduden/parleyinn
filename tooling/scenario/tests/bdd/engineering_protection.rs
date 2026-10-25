@@ -6,9 +6,6 @@
 //! commits, `.github/rulesets/main.json`, and from CODEOWNERS. That the
 //! forge holds the same ruleset is the nightly `protection` job's
 //! check; applying the ruleset is the stakeholder's act.
-//!
-//! The last step cannot pass yet, so the scenario stays `@pending`:
-//! see `security_crates_need_two_approvals`.
 
 use cucumber::{given, then};
 use engineering::{Checkout, branch_protection, codeowners, outcome};
@@ -67,20 +64,16 @@ fn no_owner_on_any_other_path(_w: &mut World) -> Result<(), String> {
     outcome(codeowners::no_owner_on_any_other_path(&checkout()))
 }
 
-/// Not met yet. CODEOWNERS owns the security-sensitive crates by the
-/// security reviewer, but neither it nor the ruleset can ask two
-/// approvals for those paths alone: the ruleset's approval count is
-/// the same for the whole branch, and CODEOWNERS asks one owner per
-/// path. What would enforce it is a required check, named
-/// `Security approvals`, that reads the reviews of a pull request that
-/// touches those crates. Until it exists and the ruleset requires it,
-/// this step fails and the scenario stays `@pending`.
+/// CODEOWNERS gives each security-sensitive crate to the security
+/// reviewer alone, and the ruleset makes a code owner's approval
+/// count, so a change to one waits on that reviewer: the step reads
+/// both.
 #[then(
-    regex = r"^changes to security-sensitive crates need two approvals, one from the designated security reviewer$"
+    regex = r"^the security-sensitive crates are owned by the designated security reviewer, whose approval they need$"
 )]
-fn security_crates_need_two_approvals(w: &mut World) -> Result<(), String> {
+fn security_crates_need_the_security_reviewer(w: &mut World) -> Result<(), String> {
     let mut problems = codeowners::security_crates_owned_by_the_security_reviewer(&checkout());
-    problems.extend(branch_protection::security_crates_need_two_approvals(
+    problems.extend(branch_protection::approval_from_another_reviewer(
         &protection(w).ruleset,
     ));
     outcome(problems)

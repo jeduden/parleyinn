@@ -1,8 +1,8 @@
 // Command bench is spike S2's harness: it builds the same synthetic
-// Cairn store with modernc.org/sqlite and github.com/ncruces/go-sqlite3
+// ParleyInn store with modernc.org/sqlite and github.com/ncruces/go-sqlite3
 // and measures each against NFR-03, NFR-04, NFR-05 and NFR-09.
 //
-// It is a separate module, so neither driver enters cairn's module
+// It is a separate module, so neither driver enters parinn's module
 // graph before ADR-07's decision lands.
 package main
 

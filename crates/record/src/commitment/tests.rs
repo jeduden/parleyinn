@@ -11,7 +11,7 @@ fn commit_is_hmac_sha256_over_the_canonical_content_under_the_commitment_key() {
     let canonical = crate::canonical::encode(&content).unwrap();
     assert_eq!(
         c.digest(),
-        &hmac_sha256(&[3; 32], &[b"cairn commitment v1\0", canonical.as_bytes()])
+        &hmac_sha256(&[3; 32], &[b"parinn commitment v1\0", canonical.as_bytes()])
     );
 }
 
@@ -47,4 +47,16 @@ fn keys_and_commitments_round_trip_through_hex_and_a_key_never_shows_in_debug() 
     assert_eq!(Commitment::from_digest(*c.digest()), c);
     assert_eq!(format!("{c:?}"), format!("Commitment({c})"));
     assert!(CommitmentKey::from_hex("zz").is_err());
+}
+
+#[test]
+fn a_commitment_to_an_encoding_equals_the_commitment_to_its_content() {
+    let key = CommitmentKey::from_bytes([3; 32]);
+    let content = json!({"text": "hello", "line": 1});
+    let canonical = crate::canonical::encode(&content).unwrap();
+
+    assert_eq!(
+        commit_encoded(&key, &canonical),
+        commit(&key, &content).unwrap()
+    );
 }

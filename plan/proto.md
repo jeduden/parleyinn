@@ -62,7 +62,7 @@ filename: "*.md"
   - A gate catches a wrong answer in what the phase
     ships. A phase that claims a command's behavior
     gates by running the command against the built
-    cairn in an isolated CAIRN_HOME and confirming
+    parinn in an isolated PARINN_HOME and confirming
     the output matches the claim. Lint passes on a
     false claim, so it is never that gate.
   - Each phase names the SRS requirement ids it

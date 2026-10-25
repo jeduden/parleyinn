@@ -51,7 +51,7 @@ struct Version {
     timeouts: Value,
     cleanup: (Vec<measured::Aged>, Vec<measured::Aged>),
     cleanup_doc: Value,
-    /// The hook events the stub Cairn plugin registers, its name and its
+    /// The hook events the stub ParleyInn plugin registers, its name and its
     /// MCP server's (S4).
     registered: BTreeSet<String>,
     plugin: (String, String),
@@ -1164,7 +1164,7 @@ fn read_target(v: &mut Version, key: &str) -> Result<(), String> {
 }
 
 #[given(
-    regex = r#"^the stub Cairn plugin recorded for Claude Code "([^"]+)", bundling Cairn's hooks and a stub MCP server$"#
+    regex = r#"^the stub ParleyInn plugin recorded for Claude Code "([^"]+)", bundling ParleyInn's hooks and a stub MCP server$"#
 )]
 fn the_stub_plugin(w: &mut World, version: String) -> Result<(), String> {
     open_versions(w, &version)?;
@@ -1203,7 +1203,7 @@ fn every_registered_hook_fired(w: &mut World) -> Result<(), String> {
 }
 
 #[then(regex = r"^the recorded harness session lists the stub plugin's MCP tools$")]
-fn lists_the_cairn_tools(w: &mut World) -> Result<(), String> {
+fn lists_the_parinn_tools(w: &mut World) -> Result<(), String> {
     each(w, |v| {
         let (name, server) = (v.plugin.0.as_str(), v.plugin.1.as_str());
         let mut problems = none_unless(plugin::connected(&v.init, name, server), || {
@@ -1220,7 +1220,7 @@ fn lists_the_cairn_tools(w: &mut World) -> Result<(), String> {
 
 // ASM-22: the harness's attended mark (S4).
 
-#[given(regex = r#"^the stub Cairn plugin's recording "([^"]+)" for Claude Code "([^"]+)"$"#)]
+#[given(regex = r#"^the stub ParleyInn plugin's recording "([^"]+)" for Claude Code "([^"]+)"$"#)]
 fn a_plugin_recording(w: &mut World, recording: String, version: String) -> Result<(), String> {
     open_versions(w, &version)?;
     each(w, |v| {

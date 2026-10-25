@@ -1,4 +1,4 @@
-local events = cairn.events()
+local events = parinn.events()
 local call_tool = {}
 for _, e in ipairs(events) do
   if e.kind == "tool_call" and e.call_id then

@@ -1,7 +1,7 @@
 # Git-native collaboration data stores and their Go tooling (as of 2026-10)
 
 Scope: how git-bug, git-appraise, git notes, Radicle, Fossil, Forgejo/Gitea and a handful of
-git-like systems model append-only, multi-writer data, to inform Cairn's candidate design of
+git-like systems model append-only, multi-writer data, to inform ParleyInn's candidate design of
 "per-origin append-only log segments stored/transported via git, plus a local SQLite index".
 Local working copies of git-bug and go-git sources inspected in this session are under
 `scratchpad/gnc/`.
@@ -10,7 +10,7 @@ Local working copies of git-bug and go-git sources inspected in this session are
 
 ### Takeaway
 
-git-bug is the closest prior art to Cairn's design. It stores each entity as a hash-chained DAG of
+git-bug is the closest prior art to ParleyInn's design. It stores each entity as a hash-chained DAG of
 git commits under `refs/<namespace>/<id>`. Each commit carries one JSON "operation pack" blob plus
 Lamport clocks encoded in tree-entry names, and can be OpenPGP-signed. Concurrent edits become
 merge commits, and the DAG is replayed in a deterministic order. Search goes through a rebuildable
@@ -52,13 +52,13 @@ go-git.
 ### Inferences
 
 - git-bug's layout maps almost one-to-one onto "per-origin append-only segments":
-  - one ref per entity, which Cairn could make one ref per (origin, session);
+  - one ref per entity, which ParleyInn could make one ref per (origin, session);
   - one commit per append batch;
   - the content hash chain comes free from git parent links;
   - per-pack signatures.
-- The main difference is that git-bug lets many writers converge on a single ref through merge commits. Cairn's per-origin refs would avoid merge commits entirely, because each ref has exactly one writer, and leave the total-ordering problem to the index.
-- git-bug's "excerpt plus index, built from commit X, verified on load, wiped and rebuilt on mismatch" is a working precedent for Cairn's I10, where everything derived is rebuildable from the record.
-- One ref per entity means ref count grows with entity count. Cairn creating one ref per session per origin would hit the same many-refs scaling issues as Gerrit; see the git notes section and reftable.
+- The main difference is that git-bug lets many writers converge on a single ref through merge commits. ParleyInn's per-origin refs would avoid merge commits entirely, because each ref has exactly one writer, and leave the total-ordering problem to the index.
+- git-bug's "excerpt plus index, built from commit X, verified on load, wiped and rebuilt on mismatch" is a working precedent for ParleyInn's I10, where everything derived is rebuildable from the record.
+- One ref per entity means ref count grows with entity count. ParleyInn creating one ref per session per origin would hit the same many-refs scaling issues as Gerrit; see the git notes section and reftable.
 
 ### Gaps
 
@@ -131,8 +131,8 @@ automatic and lossless. Notes are known to be awkward at scale and in UX.
 
 ### Inferences
 
-- Notes suit "one small mutable annotation per existing commit". Cairn's events are not annotations on code commits. Using notes would add the fanout tree rewrite and a full blob rewrite per append, with no gain over a plain ref-plus-commits chain like git-bug's.
-- If Cairn uses git transport, it needs custom refspecs anyway, the same as notes. Non-default refs such as `refs/cairn/*` are invisible to ordinary `git clone`, which helps keep the record out of normal code repositories.
+- Notes suit "one small mutable annotation per existing commit". ParleyInn's events are not annotations on code commits. Using notes would add the fanout tree rewrite and a full blob rewrite per append, with no gain over a plain ref-plus-commits chain like git-bug's.
+- If ParleyInn uses git transport, it needs custom refspecs anyway, the same as notes. Non-default refs such as `refs/parinn/*` are invisible to ordinary `git clone`, which helps keep the record out of normal code repositories.
 
 ### Gaps
 
@@ -174,9 +174,9 @@ In March 2026 Radicle disclosed a replay flaw in sigrefs, which is directly rele
 
 ### Inferences
 
-- Radicle's "one namespace per writer, shared objects, union-then-reduce" is the strongest precedent for Cairn's "per-origin segments". Single-writer refs make merging trivial, and the reader builds the global order.
-- The sigrefs replay bug is a concrete warning for Cairn. Any signed snapshot or segment head must bind to its predecessor hash, with monotonic, chained signatures, or an attacker can roll back or truncate an origin's log while the signatures still verify. A hash chain inside each segment, as Cairn plans, plus a signature over the chain head with a parent link avoids this.
-- Radicle's real-time behaviour still depends on a network daemon and gossip, which is incompatible with Cairn's I4 (no network in shipped code). Cairn would need an external transport, such as a user-run git push or pull, outside the binary.
+- Radicle's "one namespace per writer, shared objects, union-then-reduce" is the strongest precedent for ParleyInn's "per-origin segments". Single-writer refs make merging trivial, and the reader builds the global order.
+- The sigrefs replay bug is a concrete warning for ParleyInn. Any signed snapshot or segment head must bind to its predecessor hash, with monotonic, chained signatures, or an attacker can roll back or truncate an origin's log while the signatures still verify. A hash chain inside each segment, as ParleyInn plans, plus a signature over the chain head with a parent link avoids this.
+- Radicle's real-time behaviour still depends on a network daemon and gossip, which is incompatible with ParleyInn's I4 (no network in shipped code). ParleyInn would need an external transport, such as a user-run git push or pull, outside the binary.
 
 ### Gaps
 
@@ -220,10 +220,10 @@ plus SQLite index in one file".
 
 ### Inferences
 
-- Fossil confirms that Cairn's I10 pattern works in production: immutable content-addressed records, with SQL tables as derived projections rebuilt automatically on receipt.
-- Fossil orders ticket changes by trusted wall-clock timestamps, which is weaker than Lamport or DAG order. Cairn should not copy that.
-- Fossil's sync is a pure set union (G-Set) by hash, with no per-writer refs. The equivalent for Cairn would be "union all segments, deduplicate by hash", which needs no merge logic at all.
-- Splitting chat from forum is a useful pattern for Cairn too: ephemeral real-time data stays out of the replicated record. Fossil reaches real-time only through a server endpoint, which Cairn's I4 forbids in-binary.
+- Fossil confirms that ParleyInn's I10 pattern works in production: immutable content-addressed records, with SQL tables as derived projections rebuilt automatically on receipt.
+- Fossil orders ticket changes by trusted wall-clock timestamps, which is weaker than Lamport or DAG order. ParleyInn should not copy that.
+- Fossil's sync is a pure set union (G-Set) by hash, with no per-writer refs. The equivalent for ParleyInn would be "union all segments, deduplicate by hash", which needs no merge logic at all.
+- Splitting chat from forum is a useful pattern for ParleyInn too: ephemeral real-time data stays out of the replicated record. Fossil reaches real-time only through a server endpoint, which ParleyInn's I4 forbids in-binary.
 
 ### Gaps
 
@@ -240,7 +240,7 @@ through HMAC-signed webhooks. Forgejo's ForgeFed federation remains partial in 2
 stars are the shipped feature found. go-git is pure Go and builds with CGO disabled. Measured in
 this session: its root package pulls in `net`, `net/http`, `crypto/tls`, `os/exec` and
 `x/crypto/ssh` through the transport registry. Importing only `plumbing/object` and
-`storage/filesystem` keeps all of those out, which matters for Cairn's I4.
+`storage/filesystem` keeps all of those out, which matters for ParleyInn's I4.
 
 ### Cited Findings
 
@@ -270,9 +270,9 @@ this session: its root package pulls in `net`, `net/http`, `crypto/tls`, `os/exe
 
 ### Inferences
 
-- With go-git, a Cairn binary can write commits, trees and refs into a local bare repository using only `plumbing/*` and `storage/filesystem`, staying inside I4 and its depguard and import-closure test. It must never import the root `git` package or `plumbing/transport/*`.
+- With go-git, a ParleyInn binary can write commits, trees and refs into a local bare repository using only `plumbing/*` and `storage/filesystem`, staying inside I4 and its depguard and import-closure test. It must never import the root `git` package or `plumbing/transport/*`.
 - Transport (push and pull) would then be left to the user's own `git` CLI or a separate, non-shipped tool. That matches I4 better than embedding a transport.
-- Forgejo and Gitea show that even Go forges built on go-git do not keep collaboration data in git; they use SQL plus webhooks. Their architecture is evidence for "git for code, database for chatty structured data". Forge webhooks would mean network listeners, which Cairn's I4 rules out.
+- Forgejo and Gitea show that even Go forges built on go-git do not keep collaboration data in git; they use SQL plus webhooks. Their architecture is evidence for "git for code, database for chatty structured data". Forge webhooks would mean network listeners, which ParleyInn's I4 rules out.
 
 ### Gaps
 
@@ -302,7 +302,7 @@ this session: its root package pulls in `net`, `net/http`, `crypto/tls`, `os/exe
 
 ### Inferences
 
-- jj's "empty file named by head ID" trick suits Cairn's local multi-process writers: writes are content-addressed and lock-free, and the head set is the union of head files. It is an alternative to SQLite-WAL write locking for the record itself.
+- jj's "empty file named by head ID" trick suits ParleyInn's local multi-process writers: writes are content-addressed and lock-free, and the head set is the union of head files. It is an alternative to SQLite-WAL write locking for the record itself.
 - Dolt and Irmin are heavyweight: Dolt is a full SQL engine, and Irmin is OCaml. They add little for an append-only log with a separate SQLite index.
 
 ### Gaps
@@ -339,14 +339,14 @@ tables, Radicle's node-side cache (not verified here), and Forgejo's SQL as the 
 
 ### Inferences
 
-- For Cairn's model (single-writer per origin, many origins), the safest and simplest synthesis is:
-  1. Each origin appends to its own ref chain, `refs/cairn/<origin>/<session>` or one ref per origin with a segment per commit. This copies Radicle's per-peer namespace and git-bug's commit-per-pack, with no merge commits.
+- For ParleyInn's model (single-writer per origin, many origins), the safest and simplest synthesis is:
+  1. Each origin appends to its own ref chain, `refs/parinn/<origin>/<session>` or one ref per origin with a segment per commit. This copies Radicle's per-peer namespace and git-bug's commit-per-pack, with no merge commits.
   2. Each segment is hash-chained inside its own commit and signed with a signature that binds the parent hash, avoiding Radicle's 2026 replay bug.
   3. Global order is computed only in the SQLite index, from (Lamport or causal links, then origin id and segment hash), as git-bug does. Wall-clock time is used only for display, unlike Fossil's tickets.
   4. The index records "built from" commit ids per ref and rebuilds on mismatch, as git-bug's excerpt-plus-bleve check does. This satisfies I10.
-  5. Cairn code uses only go-git `plumbing/*` and `storage/filesystem`. Push and fetch are delegated to an external `git`, keeping I4.
+  5. ParleyInn code uses only go-git `plumbing/*` and `storage/filesystem`. Push and fetch are delegated to an external `git`, keeping I4.
 - Watch ref-count growth: one ref per session across many machines becomes 10^4–10^5 refs. Prefer one ref per origin, or rely on reftable, which becomes the default in Git 3.0.
-- None of the git-native systems offer real-time, sub-second cross-machine propagation without a daemon (Radicle) or a server (Fossil chat, Forgejo webhooks). Git transport is inherently batch or pull. Near-real-time multi-agent visibility will need something outside the git record, which under I4 must sit outside the Cairn binary.
+- None of the git-native systems offer real-time, sub-second cross-machine propagation without a daemon (Radicle) or a server (Fossil chat, Forgejo webhooks). Git transport is inherently batch or pull. Near-real-time multi-agent visibility will need something outside the git record, which under I4 must sit outside the ParleyInn binary.
 
 ### Gaps
 

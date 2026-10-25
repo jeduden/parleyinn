@@ -2,7 +2,7 @@
   "name": "main",
   "target": "branch",
   "source_type": "Repository",
-  "source": "jeduden/cairn",
+  "source": "jeduden/parleyinn",
   "enforcement": "active",
   "conditions": {
     "ref_name": {

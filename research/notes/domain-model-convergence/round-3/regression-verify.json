@@ -296,8 +296,8 @@
    },
    {
     "file": "docs/domain-model/record.md",
-    "old": "token or at-rest key (ADM-06, SEC-10) (`cairn backup create`, ADM-06); reading",
-    "new": "token or at-rest key (`cairn backup create`, ADM-06, SEC-10); reading"
+    "old": "token or at-rest key (ADM-06, SEC-10) (`parinn backup create`, ADM-06); reading",
+    "new": "token or at-rest key (`parinn backup create`, ADM-06, SEC-10); reading"
    },
    {
     "file": "docs/srs/05-functional-requirements.md",
@@ -332,7 +332,7 @@
    {
     "file": "features/administration.feature",
     "old": "    And a tombstone event per purged range carries only addresses, counts, reason and commitments",
-    "new": "    And a tombstone event per purged range carries only addresses, counts, reason and commitments, and the structural fields, provenance, origin and recorder of each purged act, tombstone and event the key set holds, never their text\n    And \"cairn rebuild\" then derives room state, the key set and the quarantine set as before the purge, but for the purged content"
+    "new": "    And a tombstone event per purged range carries only addresses, counts, reason and commitments, and the structural fields, provenance, origin and recorder of each purged act, tombstone and event the key set holds, never their text\n    And \"parinn rebuild\" then derives room state, the key set and the quarantine set as before the purge, but for the purged content"
    },
    {
     "file": "features/administration.feature",

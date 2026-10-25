@@ -23,9 +23,9 @@
   },
   {
    "type": "undefined",
-   "quote": "the node, by `cairn install`, the plugin or the managed install path, recorded",
-   "problem": "'The plugin' and 'the managed install path' are install routes used as Cairn things but never defined, while I7 allows harness configuration changes only through explicit install and uninstall operations. It is unclear whether these routes are such operations and show the change first.",
-   "fix": "Say 'by `cairn install`, or by an install that I7 and managed policy allow', or define the plugin and managed install path as install forms of `cairn install`.",
+   "quote": "the node, by `parinn install`, the plugin or the managed install path, recorded",
+   "problem": "'The plugin' and 'the managed install path' are install routes used as ParleyInn things but never defined, while I7 allows harness configuration changes only through explicit install and uninstall operations. It is unclear whether these routes are such operations and show the change first.",
+   "fix": "Say 'by `parinn install`, or by an install that I7 and managed policy allow', or define the plugin and managed install path as install forms of `parinn install`.",
    "severity": "minor"
   },
   {

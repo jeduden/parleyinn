@@ -64,14 +64,14 @@ def concept_agent(stem):
     path=f'docs/domain-model/{stem}.md'
     srs,feat,inv=where(path)
     name=f'domain-model-{stem}'
-    d=(f'Specialist for one file of Cairn\'s domain model, {path}. '
+    d=(f'Specialist for one file of ParleyInn\'s domain model, {path}. '
        'Checks each concept that file defines against every use in the SRS, '
        'the scenarios, the rest of the model, the instruction files and the '
        'documentation, and checks the file against itself and the hub. '
        'Never approves.')
     L=[HEAD.format(name=name, desc=desc_lines(d)).rstrip('\n')]
     L+= [f'# Domain model specialist: {stem}.md','',
- *para(f"You own [one file](../../{path}) of Cairn's domain model, {stem}.md. "
+ *para(f"You own [one file](../../{path}) of ParleyInn's domain model, {stem}.md. "
    "Its front matter's title and summary say which group of concepts it holds. "
    "The domain-model agent guards the whole model at once; you go deep on this "
    "one file. Take every concept from the file as it stands when you review. "
@@ -121,14 +121,14 @@ def concept_agent(stem):
 def hub_agent():
     path='docs/domain-model/index.md'
     name='domain-model-hub'
-    d=('Specialist for the hub of Cairn\'s domain model, '
+    d=('Specialist for the hub of ParleyInn\'s domain model, '
        'docs/domain-model/index.md: its catalog of concept files, the '
        'relations that span them, how names follow the model, the terms that '
-       'are not Cairn concepts and how the model changes. Checks each against '
+       'are not ParleyInn concepts and how the model changes. Checks each against '
        'the concept files and every use in the repository. Never approves.')
     L=[HEAD.format(name=name, desc=desc_lines(d)).rstrip('\n')]
     L+=['# Domain model specialist: the hub','',
- 'You own the hub of Cairn\'s domain model,',
+ 'You own the hub of ParleyInn\'s domain model,',
  f'[index.md](../../{path}). Each concept file has its own',
  'specialist, an agent named for it; you own what spans them. Take',
  'every concept, relation and excluded term from the model as it stands',

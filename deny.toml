@@ -23,6 +23,12 @@ unused-allowed-license = "allow"
 # - Unicode-3.0: unicode-ident, which every proc-macro needs through
 #   proc-macro2, and the ICU crates gherkin's text wrapping uses.
 # - BlueOak-1.0.0: synthez, which cucumber's step macros use.
+# - NCSA: libfuzzer-sys alone ("(MIT OR Apache-2.0) AND NCSA"), the
+#   libFuzzer runtime of the fuzz/ workspace, which links into no
+#   shipped executable. A per-crate exception, not an allow-list entry,
+#   on the stakeholder's ruling of 19 October 2026 (ADR-2610171200).
+#   It applies when cargo-deny reads fuzz/Cargo.toml; the product's
+#   graph does not hold the crate.
 exceptions = [
   { crate = "unicode-ident", allow = ["Unicode-3.0"] },
   { crate = "icu_collections", allow = ["Unicode-3.0"] },
@@ -46,6 +52,7 @@ exceptions = [
   { crate = "synthez", allow = ["BlueOak-1.0.0"] },
   { crate = "synthez-codegen", allow = ["BlueOak-1.0.0"] },
   { crate = "synthez-core", allow = ["BlueOak-1.0.0"] },
+  { crate = "libfuzzer-sys", allow = ["NCSA"] },
 ]
 
 [licenses.private]

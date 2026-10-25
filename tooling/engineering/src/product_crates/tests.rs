@@ -216,7 +216,7 @@ fn missing_bans_reads_one_line_arrays() {
 #[test]
 fn mutable_globals_finds_interior_mutability_and_thread_locals() {
     let body = "\
-static NAME: &str = \"cairn\";
+static NAME: &str = \"parinn\";
 static CONFIG: std::sync::LazyLock<Vec<u8>> = std::sync::LazyLock::new(Vec::new);
 pub static COUNT: std::sync::atomic::AtomicU64 = AtomicU64::new(0);
   pub(crate) static CACHE: Mutex<Vec<u8>>
@@ -243,7 +243,7 @@ let staticky = 1;
 fn mutable_globals_finds_a_type_on_the_next_line() {
     let body = "\
 static NAME:
-    &str = \"cairn\";
+    &str = \"parinn\";
 pub static CACHE:
     std::sync::Mutex<Vec<u8>>
     = std::sync::Mutex::new(Vec::new());

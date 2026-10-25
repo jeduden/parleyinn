@@ -30,6 +30,10 @@
 /scripts/                     @jeduden
 /Cargo.toml                   @jeduden
 /rust-toolchain.toml          @jeduden
+/mise.toml                    @jeduden
+/mise.lock                    @jeduden
+/mise.dev.toml                @jeduden
+/mise.dev.lock                @jeduden
 /clippy.toml                  @jeduden
 /deny.toml                    @jeduden
 /codecov.yml                  @jeduden
@@ -46,11 +50,11 @@
 /AGENTS.md                    @jeduden
 /.claude/                     @jeduden
 
-# Security-sensitive packages (ENG-11), owned before they exist. They
-# need a second approval from the designated security reviewer. That
-# reviewer is still TBD (SRS front matter), so the stakeholder holds
-# the role until one is named: replace @jeduden on each line with the
-# reviewer's user or team then.
+# Security-sensitive packages (ENG-11), owned before they exist. Their
+# owner is the designated security reviewer, whose approval a change to
+# them needs as a code owner (ENG-21). That reviewer is still TBD (SRS
+# front matter), so the stakeholder holds the role until one is named:
+# replace @jeduden on each line with the reviewer's user or team then.
 /crates/provenance/           @jeduden
 /crates/redaction/            @jeduden
 /crates/flag/                 @jeduden

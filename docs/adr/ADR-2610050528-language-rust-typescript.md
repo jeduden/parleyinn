@@ -3,8 +3,8 @@ id: ADR-2610050528
 title: "The implementation language: Rust for the core, TypeScript for the page"
 status: accepted
 summary: >-
-  Every Cairn process is Rust, around one core library linked into the
-  Tauri shell on all five platforms and into Cairn's server for the
+  Every ParleyInn process is Rust, around one core library linked into the
+  Tauri shell on all five platforms and into ParleyInn's server for the
   browser; the one UI page is TypeScript and holds no logic. It closes
   OQ-32's language half and replaces CON-01's Go. The stakeholder
   accepted it on 14 October 2026.
@@ -15,8 +15,8 @@ summary: >-
 
 OQ-32 in [§13](../srs/13-open-questions-and-risks.md) asks which
 language fits the complete SRS. CON-01 names Go, written before the
-stakeholder set the target that Cairn must meet: the same app on
-Linux, Windows, macOS, iOS and Android, a browser when Cairn is
+stakeholder set the target that ParleyInn must meet: the same app on
+Linux, Windows, macOS, iOS and Android, a browser when ParleyInn is
 hosted, and a software factory of agents that builds it.
 
 [ADR-2610042341](ADR-2610042341-app-shell-tauri.md) chose Tauri 2 as
@@ -34,7 +34,7 @@ a node. The stakeholder chose Rust and TypeScript on 5 October 2026.
   component are Rust, built around one core library. The library
   links into the Tauri shell on all five platforms, so a phone
   verifies, syncs and signs with the node's code. The same library
-  runs in Cairn's own server for the browser.
+  runs in ParleyInn's own server for the browser.
 - **TypeScript for the page only.** The one UI is a TypeScript page. It
   draws the view model the core computes (VIEW-04, VIEW-05, VIEW-14)
   and holds no logic of its own.
@@ -51,7 +51,7 @@ a node. The stakeholder chose Rust and TypeScript on 5 October 2026.
   the hooks and the MCP server; the app executable carries the window.
   Both come in one download. This is the packaging proposed for
   OQ-32's open half; CON-02 leaves it open until that is ruled.
-- **Vendored forks.** A crate Cairn changes or ports lives in the
+- **Vendored forks.** A crate ParleyInn changes or ports lives in the
   repository with its upstream version, a divergence list and an
   equivalence job, as mdsmith keeps goldmark.
 - **The whole toolchain moves to Rust.** The stakeholder decided on 5
@@ -91,7 +91,7 @@ a node. The stakeholder chose Rust and TypeScript on 5 October 2026.
   [ADR-2609292234](ADR-2609292234-test-stack.md) (godog and testify;
   the successor picks a Rust test stack or keeps godog driving the
   binary). The Go SQLite driver record is withdrawn: ADR-07 takes
-  `rusqlite` with FTS5 bundled, and SQLCipher or a VFS of Cairn's own
+  `rusqlite` with FTS5 bundled, and SQLCipher or a VFS of ParleyInn's own
   for the encrypting VFS of OQ-04. Spike S2's measurements of FTS5 at
   10M events carry over.
 - **Dependencies (ENG-18).** Rust's standard library has no HTTP, JSON

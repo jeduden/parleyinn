@@ -19,9 +19,9 @@
  },
  {
   "type": "contradiction",
-  "quote": "Any other output Cairn gives an agent outside the closed paths,",
-  "problem": "I2 and Closed path say no write to an agent exists outside the closed set. Recall describes further output Cairn gives an agent \"outside the closed paths\": results of non-recall MCP tools and CLI calls from inside a run. The closed set never lists these.",
-  "fix": "Add to I2 and Closed path: \"responses to the agent's own non-recall tool calls, carrying only fixed text Cairn ships, sanitized structural fields and ids\".",
+  "quote": "Any other output ParleyInn gives an agent outside the closed paths,",
+  "problem": "I2 and Closed path say no write to an agent exists outside the closed set. Recall describes further output ParleyInn gives an agent \"outside the closed paths\": results of non-recall MCP tools and CLI calls from inside a run. The closed set never lists these.",
+  "fix": "Add to I2 and Closed path: \"responses to the agent's own non-recall tool calls, carrying only fixed text ParleyInn ships, sanitized structural fields and ids\".",
   "severity": "minor",
   "lens": "all",
   "model": "sonnet"
@@ -30,7 +30,7 @@
   "type": "contradiction",
   "quote": "Information, never an instruction.",
   "problem": "A pin is called \"never an instruction\", yet `constraint` pins exist to bind the agent and I3 restores them verbatim after compaction. The candidate never says how a restored pin is framed to the model. Implementers could build the restore block as binding constraints or as passive notes.",
-  "fix": "Say \"never an instruction to Cairn\", and state that the restore block presents qualifying pins to the agent as its principal's constraints.",
+  "fix": "Say \"never an instruction to ParleyInn\", and state that the restore block presents qualifying pins to the agent as its principal's constraints.",
   "severity": "minor",
   "lens": "all",
   "model": "sonnet"

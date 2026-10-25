@@ -2,30 +2,30 @@
 title: "Harness facts"
 order: "02"
 summary: >-
-  The harness's own facts that Cairn records and names: the harness, harness sessions and transcripts, hooks, turns and compaction.
+  The harness's own facts that ParleyInn records and names: the harness, harness sessions and transcripts, hooks, turns and compaction.
 ---
 # Harness facts
 
-The harness's own facts, which Cairn records and names but never manages; of
-them, Cairn changes only harness configuration, under I7.
+The harness's own facts, which ParleyInn records and names but never manages; of
+them, ParleyInn changes only harness configuration, under I7.
 
 - **Harness**: The external program that runs agents, such as Claude Code or the
   Agent SDK. It keeps their transcripts, compacts their context and reports to
-  Cairn through hooks. Cairn records it, changes its configuration only under I7
-  and never manages its transcripts or compaction⟦f:launcher⟧; of Cairn's components, only
+  ParleyInn through hooks. ParleyInn records it, changes its configuration only under I7
+  and never manages its transcripts or compaction⟦f:launcher⟧; of ParleyInn's components, only
   the launcher starts and controls runs in it⟦/f⟧.
 - **Harness session**: The harness's own unit, which yields one transcript, plus
   one per subagent where the harness writes them apart (ASM-03). Named only when
-  describing the harness, never as a Cairn unit.
+  describing the harness, never as a ParleyInn unit.
 - **Transcript**: The harness's file of what a harness session did. A
-  **transcript source** is a transcript Cairn ingests (Ingest marker, `cairn
+  **transcript source** is a transcript ParleyInn ingests (Ingest marker, `parinn
   ingest`); a shrunk transcript or a rewritten prefix starts a new **transcript
   generation** (REC-07). The **transcript roots** (`transcript.roots`) are the
   directories ingest reads transcripts from by default (REC-01, SEC-18). As a
-  Cairn term, "source" is a transcript source or a trusted source; the harness's
+  ParleyInn term, "source" is a transcript source or a trusted source; the harness's
   `source` field and §6.1's threat sources keep their own sense, as does a
   document's single source.
-- **Hook**: The harness's callback into Cairn, carrying its **hook input**, a
+- **Hook**: The harness's callback into ParleyInn, carrying its **hook input**, a
   JSON object (§9.1). The core's hook handlers answer it. Events count as
   recorded by the hook handlers only for hook input the harness itself
   delivered; a hook call from inside a run's tool process is refused and
@@ -45,8 +45,8 @@ them, Cairn changes only harness configuration, under I7.
   never the model reply, is a trusted source on the node whose hook handlers
   recorded it (I2, PRV-02).
 - **Compaction**: The harness replacing earlier context with a compaction
-  summary when the context window fills or when asked. Cairn neither performs
+  summary when the context window fills or when asked. ParleyInn neither performs
   nor controls it (NG1); it records it and restores pins after it (I3).
   **Compaction guidance** is the text a `PreCompact` hook handler returns to
-  the harness for its compaction, built only from fixed text Cairn ships,
+  the harness for its compaction, built only from fixed text ParleyInn ships,
   trusted structural fields and ids, never pin or record text (PIN-07, I2).

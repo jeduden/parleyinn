@@ -1,0 +1,82 @@
+# ENG-07: coverage-guided fuzzing with cargo-fuzz, its own cargo
+# workspace so libFuzzer and the nightly toolchain it needs stay out of
+# the product's build. Each target fuzzes one parser the core runs on
+# hostile input, from a seed corpus committed under corpus/<target>.
+# `cargo +<the nightly fuzz/rust-toolchain.toml pins> fuzz run <target>`
+# runs one; the nightly workflow runs every target.
+[package]
+name = "parinn-fuzz"
+version = "0.0.0"
+edition = "2021"
+license = "MIT"
+publish = false
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+# ADR-2610171200: libFuzzer's runtime and the fuzz_target! macro.
+libfuzzer-sys = "0.4.13"
+configuration = { path = "../crates/configuration" }
+hook = { path = "../crates/hook" }
+provenance = { path = "../crates/provenance" }
+redaction = { path = "../crates/redaction" }
+repository = { path = "../crates/repository" }
+search = { path = "../crates/search" }
+transcript = { path = "../crates/transcript" }
+
+# Its own workspace: the repository's does not build it.
+[workspace]
+members = ["."]
+
+[[bin]]
+name = "transcript_parser"
+path = "fuzz_targets/transcript_parser.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "redactor"
+path = "fuzz_targets/redactor.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "query_parser"
+path = "fuzz_targets/query_parser.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "configuration_parser"
+path = "fuzz_targets/configuration_parser.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "hook_input_decoder"
+path = "fuzz_targets/hook_input_decoder.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "field_sanitizer"
+path = "fuzz_targets/field_sanitizer.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "git_reader"
+path = "fuzz_targets/git_reader.rs"
+test = false
+doc = false
+bench = false
+
+[profile.release]
+debug = 1

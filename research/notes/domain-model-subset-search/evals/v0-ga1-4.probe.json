@@ -25,7 +25,7 @@
       "type": "gap",
       "quote": "- **Quota**: A limit on storage or events, per room, node or worktree checkpoint, that the node's principal or managed",
       "problem": "A quota limits events and storage, yet no sentence says what happens at the limit. I1 allows loss only through redaction, purge or retention policy. An implementer could drop or truncate events or checkpoint diffs at the quota, which breaks I1, while another stops capture or purges.",
-      "fix": "Add that at its limit Cairn refuses or stops new work with a counter and never drops or truncates a recorded event; only purge or a retention policy frees space.",
+      "fix": "Add that at its limit ParleyInn refuses or stops new work with a counter and never drops or truncates a recorded event; only purge or a retention policy frees space.",
       "severity": "minor"
     }
   ]

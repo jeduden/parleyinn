@@ -26,12 +26,6 @@ pub const RULESET: &str = ".github/rulesets/main.json";
 /// CI job passed.
 pub const CI_CHECK: &str = "CI";
 
-/// The check that would hold the second approval security-sensitive
-/// crates need. A ruleset holds one approval count for the whole
-/// branch, so a per-path count has to come from a required check that
-/// reads the pull request's reviews; no such check exists yet.
-pub const SECURITY_CHECK: &str = "Security approvals";
-
 /// Where the repository commits its rulesets, one JSON file each.
 pub const RULESETS: &str = ".github/rulesets";
 
@@ -265,24 +259,6 @@ pub fn approval_from_another_reviewer(ruleset: &Value) -> Vec<String> {
     }
 
     problems
-}
-
-/// Problems with the second approval security-sensitive crates need.
-/// The ruleset's approval count holds for the whole branch, and
-/// CODEOWNERS asks one owner per path, so neither can say "two
-/// approvals, one from the security reviewer" for some paths only. A
-/// required check named [`SECURITY_CHECK`], which reads the reviews of
-/// a pull request that touches those crates, can; without it the second
-/// approval is a convention, not a rule.
-#[must_use]
-pub fn security_crates_need_two_approvals(ruleset: &Value) -> Vec<String> {
-    if required_checks(ruleset).contains(&SECURITY_CHECK) {
-        Vec::new()
-    } else {
-        vec![format!(
-            "the ruleset requires no {SECURITY_CHECK:?} check, so nothing enforces two approvals on the security-sensitive crates"
-        )]
-    }
 }
 
 /// Problems where `live`, the ruleset GitHub holds, is weaker than

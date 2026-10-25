@@ -1,7 +1,10 @@
 //! The steps of SRS §6, security (SEC). `@SEC-02` and `@SEC-03` are
 //! bound: the core refuses a home, or a file in it, that another OS user
 //! can reach or owns, and a home bound to another home id, before it
-//! opens any store file.
+//! opens any store file. `@SEC-05`'s first two rows are bound: a hook
+//! input past 1 MiB or nested past depth 64 is refused and audited. Its
+//! third, a long line streamed to the payload store, is raised: SEC-08
+//! redacts each JSON string whole and PRV-08 parses the line whole.
 //!
 //! A path goes to another OS user directly when the scenarios run as
 //! root, else through `sudo -n`, as CI's runner allows; each is given
@@ -14,11 +17,11 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::time::SystemTime;
 
-use cucumber::{given, then};
+use cucumber::{given, then, when};
 use record::digest::Digest;
 
 use crate::World;
-use crate::record::{first_start, home, last_run, set_env};
+use crate::record::{first_start, home, last_run, run_core, set_env};
 
 /// What the security steps track.
 #[derive(Debug, Default)]
@@ -71,7 +74,7 @@ fn owner(path: &Path) -> Result<u32, String> {
 
 /// Gives `path` to the OS user `uid`: directly as root, else through
 /// `sudo -n`.
-fn give(path: &Path, uid: u32) -> Result<(), String> {
+pub(crate) fn give(path: &Path, uid: u32) -> Result<(), String> {
     if running_as_root()? {
         return std::os::unix::fs::chown(path, Some(uid), None)
             .map_err(|e| format!("chown {}: {e}", path.display()));
@@ -128,7 +131,7 @@ fn snapshot(root: &Path) -> Result<Snapshot, String> {
 }
 
 #[given(
-    regex = r#"^the store path "(CAIRN_HOME|store database|payload store)" has mode "([0-7]{4})" and belongs to the OS user "(running UID|another UID)"$"#
+    regex = r#"^the store path "(PARINN_HOME|store database|payload store)" has mode "([0-7]{4})" and belongs to the OS user "(running UID|another UID)"$"#
 )]
 fn store_path(w: &mut World, which: String, mode: String, user: String) -> Result<(), String> {
     use std::os::unix::fs::PermissionsExt;
@@ -144,7 +147,7 @@ fn store_path(w: &mut World, which: String, mode: String, user: String) -> Resul
     fs::set_permissions(&payload, fs::Permissions::from_mode(0o600)).map_err(|e| e.to_string())?;
 
     let path = match which.as_str() {
-        "CAIRN_HOME" => home.root().to_path_buf(),
+        "PARINN_HOME" => home.root().to_path_buf(),
         "store database" => home.store(),
         _ => payload,
     };
@@ -180,7 +183,7 @@ fn configured_home_id(w: &mut World, id: String) -> Result<(), String> {
 
 #[given(regex = r#"^the environment supplies home id "([^"]+)"$"#)]
 fn supplied_home_id(w: &mut World, id: String) {
-    set_env(w, "CAIRN_HOME_ID", &id);
+    set_env(w, "PARINN_HOME_ID", &id);
 }
 
 #[then(regex = r#"^the error names "([^"]+)" and the permission problem$"#)]
@@ -237,5 +240,42 @@ fn no_store_file_opened(w: &mut World) -> Result<(), String> {
     Err(format!(
         "the command changed the home: {}",
         changed.join(", ")
+    ))
+}
+
+/// A hook input that is `bytes` long: a JSON object with one string.
+fn hook_input_of(bytes: usize) -> Vec<u8> {
+    let mut input = b"{\"prompt\":\"".to_vec();
+    input.resize(bytes - 2, b'x');
+    input.extend_from_slice(b"\"}");
+    input
+}
+
+/// `@SEC-05`: the hook runs with an oversized or deeply nested hook
+/// input. The third row, a transcript line streamed to the payload
+/// store without holding it whole, is raised (plan 2609292012, phase 6).
+#[when(
+    regex = r#"^the hook "([A-Za-z]+)" runs with (stdin of 1 MiB plus one byte|a JSON object nested 65 levels deep)$"#
+)]
+fn hook_runs_with(w: &mut World, hook: String, input: String) -> Result<(), String> {
+    let input = if input.starts_with("stdin") {
+        hook_input_of((1 << 20) + 1)
+    } else {
+        format!("{}1{}", "{\"a\":".repeat(65), "}".repeat(65)).into_bytes()
+    };
+    run_core(w, &["hook", &hook], Some(&input))
+}
+
+#[then(regex = r"^the hook handler exits 0 with no injection$")]
+fn hook_exits_0_with_no_injection(w: &mut World) -> Result<(), String> {
+    let out = last_run(w)?;
+    if out.status.success() && out.stdout.is_empty() && out.stderr.is_empty() {
+        return Ok(());
+    }
+    Err(format!(
+        "the hook exited {} with stdout {:?} and stderr {:?}",
+        out.status,
+        String::from_utf8_lossy(&out.stdout),
+        String::from_utf8_lossy(&out.stderr)
     ))
 }

@@ -58,38 +58,38 @@ fn unfired_names_each_registered_event_that_did_not_fire() {
 fn tools_lists_the_tools_of_the_plugins_server() {
     let init = json!({"tools": [
         "Bash",
-        "mcp__plugin_cairn_cairn__event_search",
-        "mcp__plugin_other_cairn__event_search",
-        "mcp__cairn__event_get"
+        "mcp__plugin_parinn_parinn__event_search",
+        "mcp__plugin_other_parinn__event_search",
+        "mcp__parinn__event_get"
     ]});
 
     assert_eq!(
-        tools(&init, "cairn", "cairn"),
-        ["mcp__plugin_cairn_cairn__event_search"]
+        tools(&init, "parinn", "parinn"),
+        ["mcp__plugin_parinn_parinn__event_search"]
     );
-    assert!(tools(&json!({}), "cairn", "cairn").is_empty());
+    assert!(tools(&json!({}), "parinn", "parinn").is_empty());
 }
 
 #[test]
 fn connected_needs_the_plugins_server_connected() {
     let up = json!({"mcp_servers": [
-        {"name": "plugin:cairn:cairn", "status": "connected", "source": "plugin"}
+        {"name": "plugin:parinn:parinn", "status": "connected", "source": "plugin"}
     ]});
     let failed = json!({"mcp_servers": [
-        {"name": "plugin:cairn:cairn", "status": "failed"}
+        {"name": "plugin:parinn:parinn", "status": "failed"}
     ]});
 
-    assert!(connected(&up, "cairn", "cairn"));
-    assert!(!connected(&failed, "cairn", "cairn"));
-    assert!(!connected(&up, "cairn", "other"));
-    assert!(!connected(&json!({}), "cairn", "cairn"));
+    assert!(connected(&up, "parinn", "parinn"));
+    assert!(!connected(&failed, "parinn", "parinn"));
+    assert!(!connected(&up, "parinn", "other"));
+    assert!(!connected(&json!({}), "parinn", "parinn"));
 }
 
 #[test]
 fn servers_lists_the_mcp_servers_a_plugin_bundles() {
-    let mcp = json!({"mcpServers": {"cairn": {"command": "x"}, "b": {"command": "y"}}});
+    let mcp = json!({"mcpServers": {"parinn": {"command": "x"}, "b": {"command": "y"}}});
 
-    assert_eq!(servers(&mcp).unwrap(), ["b", "cairn"]);
+    assert_eq!(servers(&mcp).unwrap(), ["b", "parinn"]);
 }
 
 #[test]

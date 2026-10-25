@@ -1,7 +1,7 @@
 [package]
 name = "administration"
 version = "0.0.0"
-description = "The home and the node in it: its first start, the seats it certifies, and cairn verify"
+description = "The home and the node in it: its first start, the seats it certifies, and parinn verify"
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
@@ -9,7 +9,9 @@ publish.workspace = true
 
 [dependencies]
 key.workspace = true
+platform.workspace = true
 record.workspace = true
+repository.workspace = true
 serde_json.workspace = true
 store.workspace = true
 
@@ -20,8 +22,8 @@ testkit.workspace = true
 [lints]
 workspace = true
 
-# ENG-02: see crates/cairn/Cargo.toml.
-[package.metadata.cairn]
+# ENG-02: see crates/parinn/Cargo.toml.
+[package.metadata.parinn]
 responsibility = "Administers the home: the node's first start, the seats it certifies, and the record's verification"
-may-depend-on = ["key", "record", "store"]
+may-depend-on = ["key", "platform", "record", "repository", "store"]
 may-dev-depend-on = ["testkit"]

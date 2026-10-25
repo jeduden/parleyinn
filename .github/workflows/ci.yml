@@ -23,9 +23,8 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  # The repository is Rust (plan 2610050706). Every Rust job installs
-  # the release rust-toolchain.toml names (ENG-01), reading it from
-  # there, so no job names another.
+  # mise reads rust-toolchain.toml (ENG-01) and mise.lock; each job
+  # installs only its tools, with a cache key that includes the pins.
   #
   # Every unit and integration test, and every scenario through
   # cucumber-rs. Pending scenarios are skipped and counted, so the
@@ -38,12 +37,11 @@ jobs:
           # No job here pushes, and a checkout that leaves a token in
           # .git/config hands one to every later step.
           persist-credentials: false
-      - name: Install the pinned Rust toolchain
-        run: >-
-          rustup toolchain install
-          "$(sed -n 's/^channel = "\(.*\)"$/\1/p' rust-toolchain.toml)"
-          --profile minimal --component clippy,rustfmt,llvm-tools-preview
-          --no-self-update
+      - name: Install pinned tools with mise
+        uses: ./.github/actions/setup-mise
+        with:
+          tools: "rust"
+          cache: true
       # ENG-12: the end-to-end suite starts the core in a user and
       # network namespace of its own, under strace, and fails on any
       # socket. The runner's AppArmor refuses unprivileged user
@@ -57,6 +55,17 @@ jobs:
           command -v strace >/dev/null || {
             sudo apt-get update && sudo apt-get install -y --no-install-recommends strace
           }
+      # ENG-30: the license check reads only the sources cargo has
+      # already fetched, for every release target.
+      - run: cargo fetch --locked
+      # NFR-02: the scenario that holds a hook handler to its budget
+      # times the release build of the core, never the development
+      # build (testkit::release_core_executable), against the frozen
+      # calibration workload (testkit::calibrate_executable). Built once
+      # here, with the real HOME, before the suite; no cache, as in
+      # release.yml.
+      - name: Build the release core the budget rows time
+        run: cargo build --release --locked -p parinn -p calibrate
       # ENG-14: the suite runs with HOME pointed at an empty decoy
       # directory, the toolchain keeping its own homes. The isolation
       # guard (testkit::guard) aborts a test that resolves real
@@ -99,14 +108,11 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - name: Install the pinned Rust toolchain
-        run: >-
-          rustup toolchain install
-          "$(sed -n 's/^channel = "\(.*\)"$/\1/p' rust-toolchain.toml)"
-          --profile minimal --component clippy,rustfmt,llvm-tools-preview
-          --no-self-update
-      # An exact version from crates.io, built against its own
-      # lockfile. Bump it by hand, the way the zizmor version is.
+      - name: Install pinned tools with mise
+        uses: ./.github/actions/setup-mise
+        with:
+          tools: "rust github:taiki-e/cargo-llvm-cov"
+          cache: true
       # ENG-12: the end-to-end suite starts the core in a user and
       # network namespace of its own, under strace, and fails on any
       # socket. The runner's AppArmor refuses unprivileged user
@@ -120,7 +126,12 @@ jobs:
           command -v strace >/dev/null || {
             sudo apt-get update && sudo apt-get install -y --no-install-recommends strace
           }
-      - run: cargo install --locked cargo-llvm-cov@0.9.1
+      # ENG-30: the license check reads only the sources cargo has
+      # already fetched, for every release target.
+      - run: cargo fetch --locked
+      # NFR-02: the budget rows time the release core, which the
+      # instrumented run does not build.
+      - run: cargo build --release --locked -p parinn -p calibrate
       - run: cargo run --locked -p coverage
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: ${{ !cancelled() }}
@@ -165,6 +176,34 @@ jobs:
           disable_search: true
           fail_ci_if_error: false
 
+  # ENG-09: Miri runs the tests of the platform shim, the one crate with
+  # unsafe code, over its fake of DPAPI, on the exact dated nightly
+  # ENG-01 pins for Miri here. The Windows and macOS key stores
+  # (ADR-2610171300) then build for their own targets, which a Linux
+  # runner can check but not run.
+  miri:
+    runs-on: ubuntu-latest
+    env:
+      MIRI_NIGHTLY: nightly-2026-10-16
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install the pinned nightly with Miri
+        run: >-
+          rustup toolchain install "$MIRI_NIGHTLY"
+          --profile minimal --component miri,rust-src --no-self-update
+      - run: cargo "+$MIRI_NIGHTLY" miri test -p platform --locked
+      - name: Install the pinned Rust toolchain with the Windows and macOS targets
+        run: >-
+          rustup toolchain install
+          "$(sed -n 's/^channel = "\(.*\)"$/\1/p' rust-toolchain.toml)"
+          --profile minimal --component clippy,rustfmt,llvm-tools-preview
+          --target x86_64-pc-windows-gnu,aarch64-apple-darwin
+          --no-self-update
+      - run: cargo check -p key -p platform --all-targets --locked --target x86_64-pc-windows-gnu
+      - run: cargo check -p key --all-targets --locked --target aarch64-apple-darwin
+
   # ENG-16: clippy with warnings denied, and rustfmt's layout.
   lint:
     runs-on: ubuntu-latest
@@ -172,12 +211,11 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - name: Install the pinned Rust toolchain
-        run: >-
-          rustup toolchain install
-          "$(sed -n 's/^channel = "\(.*\)"$/\1/p' rust-toolchain.toml)"
-          --profile minimal --component clippy,rustfmt,llvm-tools-preview
-          --no-self-update
+      - name: Install pinned tools with mise
+        uses: ./.github/actions/setup-mise
+        with:
+          tools: "rust"
+          cache: true
       - run: cargo fmt --all --check
       - run: cargo clippy --workspace --all-targets --locked -- -D warnings
 
@@ -191,17 +229,22 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - name: Install the pinned Rust toolchain
-        run: >-
-          rustup toolchain install
-          "$(sed -n 's/^channel = "\(.*\)"$/\1/p' rust-toolchain.toml)"
-          --profile minimal --component clippy,rustfmt,llvm-tools-preview
-          --no-self-update
-      # Exact versions from crates.io, built against their own
-      # lockfiles. Bump them by hand, the way the zizmor version is.
-      - run: cargo install --locked cargo-deny@0.20.2 cargo-audit@0.22.2
+      - name: Install pinned tools with mise
+        uses: ./.github/actions/setup-mise
+        with:
+          tools: "rust github:EmbarkStudios/cargo-deny github:rustsec/rustsec"
+          cache: true
+      - run: cargo fetch --locked
       - run: cargo deny check licenses bans sources
+      # The fuzz workspace has its own manifest and lockfile (ENG-07),
+      # so the same policy reads them too.
+      - run: cargo deny --manifest-path fuzz/Cargo.toml check licenses bans sources
       - run: cargo audit
+      - run: cargo audit --file fuzz/Cargo.lock
+      # ENG-30: every crate a release links carries a license text that
+      # fits its declared license, so a dependency with none stops the
+      # pull request that adds it.
+      - run: cargo run --locked -p engineering --bin license-check
 
   # ENG-27: every check that keeps the specification, its scenarios
   # and the repository's records in step is proven here. The suite
@@ -214,22 +257,11 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - name: Install the pinned Rust toolchain
-        run: >-
-          rustup toolchain install
-          "$(sed -n 's/^channel = "\(.*\)"$/\1/p' rust-toolchain.toml)"
-          --profile minimal --component clippy,rustfmt,llvm-tools-preview
-          --no-self-update
-      # The same pinned mdsmith the markdown job lints with, installed
-      # onto PATH without running it. Bump the SHA and `version` together.
-      - uses: jeduden/mdsmith@0ca0d2f7c95ab53e3e9ed8851150af98b95088fb # v0.55.1
+      - name: Install pinned tools with mise
+        uses: ./.github/actions/setup-mise
         with:
-          version: v0.55.1
-      # The same taplo the toml job lints with, for the TOML drift
-      # cases. Bump it with the toml job's.
-      - run: >-
-          cargo install --locked taplo-cli@0.10.0
-          --no-default-features --features lint,rustls-tls
+          tools: "rust github:jeduden/mdsmith aqua:tamasfe/taplo"
+          cache: true
       # ENG-12: the end-to-end suite starts the core in a user and
       # network namespace of its own, under strace, and fails on any
       # socket. The runner's AppArmor refuses unprivileged user
@@ -243,6 +275,9 @@ jobs:
           command -v strace >/dev/null || {
             sudo apt-get update && sudo apt-get install -y --no-install-recommends strace
           }
+      # ENG-30: the license check reads only the sources cargo has
+      # already fetched, for every release target.
+      - run: cargo fetch --locked
       - run: cargo test --locked -p drift --test suite -- --ignored
 
   # ENG-15: the benchmark gate. The base is the head's first parent:
@@ -269,26 +304,27 @@ jobs:
           fetch-depth: 2
       - name: Check out the base beside the head
         run: git worktree add --detach "$RUNNER_TEMP/base" HEAD^1
-      # Each side builds with the release its own rust-toolchain.toml
-      # names (ENG-01).
+      - name: Install the head's pinned Rust with mise
+        uses: ./.github/actions/setup-mise
+        with:
+          tools: rust
+          cache: true
+      # The base predates mise.toml when this change first lands, so
+      # read its own Rust pin from rust-toolchain.toml.
       - name: Install the pinned Rust toolchains
         shell: bash
         run: |
-          for side in "$GITHUB_WORKSPACE" "$RUNNER_TEMP/base"; do
-            rustup toolchain install \
-              "$(sed -n 's/^channel = "\(.*\)"$/\1/p' "$side/rust-toolchain.toml")" \
-              --profile minimal --component clippy,rustfmt,llvm-tools-preview \
-              --no-self-update
-          done
+          base_version="$(sed -n 's/^channel = "\(.*\)"$/\1/p' "$RUNNER_TEMP/base/rust-toolchain.toml")"
+          mise install "rust@$base_version"
       - name: Build the head's suite and core
-        run: cargo build --release --locked -p benchmark -p cairn
+        run: cargo build --release --locked -p benchmark -p parinn
       # Until the suite reaches main, the base has none to build.
       - name: Build the base's suite and core
         shell: bash
         run: |
           cd "$RUNNER_TEMP/base"
           if [ -f tooling/benchmark/Cargo.toml ]; then
-            cargo build --release --locked -p benchmark -p cairn
+            cargo build --release --locked -p benchmark -p parinn
           fi
       - name: Sample both sides and gate
         shell: bash
@@ -299,7 +335,7 @@ jobs:
           out="$RUNNER_TEMP/samples"
           mkdir -p "$out"
           if [ ! -x "$base/benchmark" ]; then
-            "$head/benchmark" run --core "$head/cairn" --samples "$SAMPLES" > "$out/head.samples"
+            "$head/benchmark" run --core "$head/parinn" --samples "$SAMPLES" > "$out/head.samples"
             msg="the base has no benchmark suite to compare with; the head's suite ran"
             echo "::warning::$msg"
             echo "$msg" >> "$GITHUB_STEP_SUMMARY"
@@ -311,7 +347,26 @@ jobs:
             for side in $order; do
               bin="$head"
               [ "$side" = base ] && bin="$base"
-              "$bin/benchmark" run --core "$bin/cairn" --samples "$SAMPLES" >> "$out/$side.samples"
+              core="$bin/parinn"
+              # Only the base side is taken again: it runs main's
+              # benchmark, which fails a round when a stalled disk
+              # overruns the hook budget twice. The head's benchmark
+              # retries inside the round, and a head round that fails
+              # fails the gate.
+              tries=1
+              [ "$side" = base ] && tries=3
+              for try in $(seq "$tries"); do
+                if "$bin/benchmark" run --core "$core" --samples "$SAMPLES" \
+                  > "$out/round.samples" 2> "$out/round.err"; then
+                  cat "$out/round.samples" >> "$out/$side.samples"
+                  break
+                fi
+                cat "$out/round.err" >&2
+                if [ "$try" -eq "$tries" ] || ! grep -q "overran its hook budget" "$out/round.err"; then
+                  exit 1
+                fi
+                sleep 2
+              done
             done
           done
           status=0
@@ -349,12 +404,12 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      # Pinned to the mdsmith release the repository is linted with
-      # locally. Bump the SHA and `version` together.
-      - uses: jeduden/mdsmith@0ca0d2f7c95ab53e3e9ed8851150af98b95088fb # v0.55.1
+      - name: Install pinned tools with mise
+        uses: ./.github/actions/setup-mise
         with:
-          version: v0.55.1
-          args: check .
+          tools: "github:jeduden/mdsmith"
+          cache: true
+      - run: mdsmith check .
 
   # TOML files: Taplo holds each to the layout .taplo.toml sets, and
   # every Cargo.toml to Schema Store's Cargo schema, committed under
@@ -366,20 +421,11 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      # The same components as every job: rust-toolchain.toml lists
-      # them, so rustup would install them on the first cargo command.
-      - name: Install the pinned Rust toolchain
-        run: >-
-          rustup toolchain install
-          "$(sed -n 's/^channel = "\(.*\)"$/\1/p' rust-toolchain.toml)"
-          --profile minimal --component clippy,rustfmt,llvm-tools-preview
-          --no-self-update
-      # An exact version from crates.io, built against its own lockfile
-      # with the linter's features alone. Bump it by hand, with the
-      # drift job's.
-      - run: >-
-          cargo install --locked taplo-cli@0.10.0
-          --no-default-features --features lint,rustls-tls
+      - name: Install pinned tools with mise
+        uses: ./.github/actions/setup-mise
+        with:
+          tools: "rust aqua:tamasfe/taplo"
+          cache: true
       - run: taplo fmt --check
       - run: taplo lint
 
@@ -392,16 +438,15 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - name: Run zizmor
-        uses: zizmorcore/zizmor-action@cc914d7f3750a2d13d75c7f184a1060aa0e9d482 # v0.6.4
+      - name: Install pinned tools with mise
+        uses: ./.github/actions/setup-mise
         with:
-          # Pinned: the default is `latest`, which would make the job's
-          # result depend on the day it ran. Dependabot bumps the
-          # action's SHA but not this string, so it is a hand bump.
-          version: "1.29.0"
-          # Fail the job on findings instead of filing them into code
-          # scanning: the check itself is the gate.
-          advanced-security: false
+          tools: "aqua:zizmorcore/zizmor"
+          cache: true
+      - name: Run zizmor
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: zizmor .github
 
   # The one check the branch and release-tag rulesets require (main's is
   # committed as .github/rulesets/main.json, ENG-21). GitHub
@@ -414,7 +459,7 @@ jobs:
   ci:
     name: CI
     if: ${{ always() }}
-    needs: [test, coverage, lint, supply-chain, drift, benchmark, build, markdown, toml, workflows]
+    needs: [test, coverage, lint, supply-chain, drift, benchmark, build, markdown, toml, workflows, miri]
     runs-on: ubuntu-latest
     steps:
       - name: Fail unless every job passed

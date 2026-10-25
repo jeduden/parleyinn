@@ -20,8 +20,8 @@ testkit.workspace = true
 [lints]
 workspace = true
 
-# ENG-02: see crates/cairn/Cargo.toml.
-[package.metadata.cairn]
+# ENG-02: see crates/parinn/Cargo.toml.
+[package.metadata.parinn]
 responsibility = "Builds the review agent's bundle and the deterministic findings from main's tree, the pull request's tree and its diff"
 may-depend-on = ["adr", "scenario", "srs"]
 may-dev-depend-on = ["testkit"]

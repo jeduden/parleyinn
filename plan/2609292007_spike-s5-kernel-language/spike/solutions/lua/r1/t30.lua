@@ -1,5 +1,5 @@
 local byrun = {}
-for _, e in ipairs(cairn.events()) do
+for _, e in ipairs(parinn.events()) do
   if e.run then
     local list = byrun[e.run]
     if not list then

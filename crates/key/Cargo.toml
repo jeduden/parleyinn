@@ -13,14 +13,21 @@ getrandom.workspace = true
 record.workspace = true
 serde_json.workspace = true
 
+# The key stores of the plan's ruling 2 (ADR-2610171300).
+[target.'cfg(target_os = "macos")'.dependencies]
+security-framework.workspace = true
+
+[target.'cfg(windows)'.dependencies]
+platform.workspace = true
+
 [dev-dependencies]
 testkit.workspace = true
 
 [lints]
 workspace = true
 
-# ENG-02: see crates/cairn/Cargo.toml.
-[package.metadata.cairn]
+# ENG-02: see crates/parinn/Cargo.toml.
+[package.metadata.parinn]
 responsibility = "Mints and keeps keys, and makes and checks the signatures, seat certificates and key events they sign"
-may-depend-on = ["record"]
+may-depend-on = ["platform", "record"]
 may-dev-depend-on = ["testkit"]

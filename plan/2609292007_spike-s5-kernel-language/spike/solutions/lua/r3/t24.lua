@@ -1,5 +1,5 @@
 local counts = {}
-for _, e in ipairs(cairn.events()) do
+for _, e in ipairs(parinn.events()) do
   if e.kind == "tool_call" and e.tool == "Edit" and e.args ~= nil then
     local a = json.decode(e.args)
     if type(a) == "table" and type(a.file_path) == "string" then

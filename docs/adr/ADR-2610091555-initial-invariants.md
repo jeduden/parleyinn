@@ -4,7 +4,7 @@ title: "The initial invariants"
 status: superseded
 superseded-by: ADR-2610112209
 summary: >-
-  The security reviewer's record of Cairn's ten invariants as they stand
+  The security reviewer's record of ParleyInn's ten invariants as they stand
   in docs/srs/invariants.md: the initial contract, approved by the
   stakeholder by a comment on the pull request that adds it, on 9 October
   2026. It replaces the change records of the draft, and every later
@@ -14,7 +14,7 @@ summary: >-
 
 ## Context
 
-Cairn is pre-implementation. While the SRS and the domain model were
+ParleyInn is pre-implementation. While the SRS and the domain model were
 drafted, the invariants (§1.3, [invariants.md](../srs/invariants.md))
 were reworded many times, and each rewording got its own security-review
 record: 20 decision records from SRS 2.0 to 2.7. None of those wordings
@@ -27,7 +27,7 @@ reviewer's approval. Until a security reviewer is named, the stakeholder,
 
 ## Decision
 
-The ten invariants I1 to I10 are Cairn's initial contract. Their text is
+The ten invariants I1 to I10 are ParleyInn's initial contract. Their text is
 the one [docs/srs/invariants.md](../srs/invariants.md) holds in the commit
 that adds this record. The file's SHA-256 is:
 
@@ -36,7 +36,7 @@ that adds this record. The file's SHA-256 is:
 ```
 
 The stakeholder, @jeduden, approved this record as security reviewer on
-9 October 2026 by a [comment on jeduden/cairn#18][approval] naming the
+9 October 2026 by a [comment on jeduden/parleyinn#18][approval] naming the
 record's id and the hash above. That comment is the approval
 ENG-29 asks for, and it can be checked apart from this record.
 
@@ -47,7 +47,7 @@ which CLAUDE.md, AGENTS.md and README include.
 ## Alternatives
 
 - **Keep the 20 change records.** They document how a draft evolved, not
-  what Cairn promises, and every reader had to replay them to learn the
+  what ParleyInn promises, and every reader had to replay them to learn the
   current wording.
 - **Delete them with no replacement.** ENG-29 would then have no recorded
   approval for the wording every later change is measured against.
@@ -62,4 +62,4 @@ which CLAUDE.md, AGENTS.md and README include.
 - The file's hash above lets a reviewer check that invariants.md still
   matches what was approved.
 
-[approval]: https://github.com/jeduden/cairn/pull/18#issuecomment-6087607800
+[approval]: https://github.com/jeduden/parleyinn/pull/18#issuecomment-6087607800

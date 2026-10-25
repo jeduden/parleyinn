@@ -73,8 +73,8 @@ The topic has drawn a dozen large threads since early 2026. The central ones are
 
 ### Inferences
 
-- Attention clusters around funded launches (Entire, Zed, Cursor, Block) and around Claude Code's own default behaviour. The small open tools that do exactly what Cairn contemplates got little attention as stories: git-memento, git-ai, ccgs and Agent Trace. Their ideas mostly spread through comments in the bigger threads.
-- The Claude Code session-URL thread is the one most directly about Cairn's host agent. It shows how users react when session linkage appears in their git history by default.
+- Attention clusters around funded launches (Entire, Zed, Cursor, Block) and around Claude Code's own default behaviour. The small open tools that do exactly what ParleyInn contemplates got little attention as stories: git-memento, git-ai, ccgs and Agent Trace. Their ideas mostly spread through comments in the bigger threads.
+- The Claude Code session-URL thread is the one most directly about ParleyInn's host agent. It shows how users react when session linkage appears in their git history by default.
 
 ### Gaps
 
@@ -228,7 +228,7 @@ Most commenters oppose committing raw transcripts into the main history. The rea
 - A commenter links Debian's position on AI contributions (LWN). He argues responsibility lies with the contributor, which is why he dislikes session links — [HN 49498543](https://news.ycombinator.com/item?id=49498543); [LWN](https://lwn.net/Articles/1091231/)
 - On attribution as data: "Do not include co-authored-by Claude", so that AI companies cannot filter AI commits out of training sets. A reply says vendors can detect their outputs anyway — [HN 47840791](https://news.ycombinator.com/item?id=47840791); [HN 47842414](https://news.ycombinator.com/item?id=47842414)
 
-**Claude Code's session-URL default (direct relevance to Cairn's host)**
+**Claude Code's session-URL default (direct relevance to ParleyInn's host)**
 
 - One commenter says the maintainer limited the feature to web and Remote Control sessions; another reports it appeared from plain desktop CLI use, so the reports conflict. Enabling Remote Control once makes it global for all sessions — [HN 49498386](https://news.ycombinator.com/item?id=49498386); [HN 49506329](https://news.ycombinator.com/item?id=49506329); [HN 49498657](https://news.ycombinator.com/item?id=49498657)
 - Opt-out is documented as: "set commit and pr to empty strings and sessionUrl to false". A commenter also reports an env var, `CLAUDE_CODE_SUPPRESS_SESSION_ATTRIBUTION`, added in 2.1.202 (July 8, 2026). That claim rests on a gist and is not verified — [HN 49501534](https://news.ycombinator.com/item?id=49501534); [settings docs](https://code.claude.com/docs/en/settings-reference#attribution); [HN 49508415](https://news.ycombinator.com/item?id=49508415)
@@ -242,11 +242,11 @@ Most commenters oppose committing raw transcripts into the main history. The rea
 
 ### Inferences
 
-- The thread record supports a design that keeps the full, lossless session out of the main branch and the working tree. It still wants the session addressable from a commit, by ID or trailer, and queryable rather than read raw. That is close to what Entire, git-memento and ccgs do, and what Cairn's append-only record plus pull-only recall implies.
-- Commenters want privacy controls before sharing: redaction of secrets and PII, private-by-default, separate access tiers. That favours Cairn's security-first stance. A git transport that pushes session data to a shared remote by default would meet the same backlash as the Claude session-URL default.
-- Commenters distrust durability that depends on vendor URLs and want an open format in or beside the repository. Cairn's local, self-contained record answers that, provided the transport does not depend on a hosted service.
+- The thread record supports a design that keeps the full, lossless session out of the main branch and the working tree. It still wants the session addressable from a commit, by ID or trailer, and queryable rather than read raw. That is close to what Entire, git-memento and ccgs do, and what ParleyInn's append-only record plus pull-only recall implies.
+- Commenters want privacy controls before sharing: redaction of secrets and PII, private-by-default, separate access tiers. That favours ParleyInn's security-first stance. A git transport that pushes session data to a shared remote by default would meet the same backlash as the Claude session-URL default.
+- Commenters distrust durability that depends on vendor URLs and want an open format in or beside the repository. ParleyInn's local, self-contained record answers that, provided the transport does not depend on a hosted service.
 - The Beads experience shows that agent-written metadata in git meets real merge-conflict and concurrency problems at multi-agent scale. Append-only, per-session or per-agent files (or CRDT/union merges) avoid the case where "the agent kept one side".
-- Prompt injection through stored history is almost absent from HN discussion. Cairn's I2 concern is ahead of the community, so it is a point to explain rather than one that will resonate unprompted.
+- Prompt injection through stored history is almost absent from HN discussion. ParleyInn's I2 concern is ahead of the community, so it is a point to explain rather than one that will resonate unprompted.
 
 ### Gaps
 
@@ -308,7 +308,7 @@ The threads surface many small tools, most of them one-person projects with litt
 ### Inferences
 
 - Many people have independently built "Claude session JSONL → git notes or branch" tools, and several abandoned theirs. The capture mechanism is easy; the hard and unsolved parts are retrieval, redaction and an agreed format.
-- The repeated calls for a standard transcript format (ctx author, Agent Trace RFC, Universal Memory Protocol) suggest an opening for Cairn to adopt or emit an open, documented record format rather than a proprietary one.
+- The repeated calls for a standard transcript format (ctx author, Agent Trace RFC, Universal Memory Protocol) suggest an opening for ParleyInn to adopt or emit an open, documented record format rather than a proprietary one.
 
 ### Gaps
 
@@ -347,9 +347,9 @@ Three dissents are strong. One says sessions are the new source or the "most imp
 
 ### Inferences
 
-- For Cairn, the community view favours keeping the lossless record (dissenters and provenance advocates value it). It also favours keeping that record out of the human-facing history, private by default, redacted before any sharing, and reachable by a stable ID from commits. Using git as a transport for a separate ref namespace (orphan branch or notes) fits that consensus. Writing into the working tree or the main branch does not.
-- Vendor-neutral, self-hosted and open-format attributes count heavily with HN readers. Distrust of Cursor/SpaceX, Zed's hosted service and Claude session URLs suggests Cairn's "never talks to the network" invariant (I4) could be a selling point. That holds as long as any git push is something the user explicitly sets up, not something Cairn does itself.
-- Few commenters raise the risk of stored history becoming a prompt-injection channel, but memory-poisoning complaints are common. Cairn can frame I2 (pull-only, enveloped recall) as the fix for "one poisoned line affects everything downstream".
+- For ParleyInn, the community view favours keeping the lossless record (dissenters and provenance advocates value it). It also favours keeping that record out of the human-facing history, private by default, redacted before any sharing, and reachable by a stable ID from commits. Using git as a transport for a separate ref namespace (orphan branch or notes) fits that consensus. Writing into the working tree or the main branch does not.
+- Vendor-neutral, self-hosted and open-format attributes count heavily with HN readers. Distrust of Cursor/SpaceX, Zed's hosted service and Claude session URLs suggests ParleyInn's "never talks to the network" invariant (I4) could be a selling point. That holds as long as any git push is something the user explicitly sets up, not something ParleyInn does itself.
+- Few commenters raise the risk of stored history becoming a prompt-injection channel, but memory-poisoning complaints are common. ParleyInn can frame I2 (pull-only, enveloped recall) as the fix for "one poisoned line affects everything downstream".
 
 ### Gaps
 

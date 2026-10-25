@@ -69,7 +69,7 @@
      "type": "gap",
      "file": "docs/domain-model/principals-and-agents.md",
      "quote": "so until then a room admits no seat of another principal, and admission,",
-     "problem": "Cairn tells principals apart only by principal key, and before PRV-10 no key chains to one. So the model gives no way to decide which seat is 'another principal's'. One implementer admits every seat, since no chain differs; another admits only its own node's seats. Any peer's seat could also claim the join without admission that is meant for 'a device seat whose principal has a member seat there'.",
+     "problem": "ParleyInn tells principals apart only by principal key, and before PRV-10 no key chains to one. So the model gives no way to decide which seat is 'another principal's'. One implementer admits every seat, since no chain differs; another admits only its own node's seats. Any peer's seat could also claim the join without admission that is meant for 'a device seat whose principal has a member seat there'.",
      "fix": "Change to: \"so until then a room admits only seats whose certificates chain to the device key of the node whose seat created it, and admission,\"",
      "severity": "needs-fix"
     },
@@ -138,7 +138,7 @@
      "type": "gap",
      "file": "docs/domain-model/principals-and-agents.md",
      "quote": "so until then a room admits no seat of another principal",
-     "problem": "Cairn counts principals only by principal key, and before PRV-10 ships no key chains to one. A node therefore cannot tell whether a seat certified by a peer's device key (the same person's other machine) belongs to its principal or to another. Implementations will then differ on whether those seats may join without admission, whether that node's rooms are foreign here, and whether they fall in the `rooms` recall scope.",
+     "problem": "ParleyInn counts principals only by principal key, and before PRV-10 ships no key chains to one. A node therefore cannot tell whether a seat certified by a peer's device key (the same person's other machine) belongs to its principal or to another. Implementations will then differ on whether those seats may join without admission, whether that node's rooms are foreign here, and whether they fall in the `rooms` recall scope.",
      "fix": "Add: \"Until then a node counts as its principal's only the seats its own device key or token key certified, and those its home held before a node identity change; every other seat is another principal's, so a room another node created is foreign on it.\"",
      "severity": "needs-fix"
     },

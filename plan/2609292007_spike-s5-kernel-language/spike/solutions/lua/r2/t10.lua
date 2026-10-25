@@ -6,7 +6,7 @@ local function decode_args(e)
 end
 
 local counts = {}
-for _, e in ipairs(cairn.events()) do
+for _, e in ipairs(parinn.events()) do
   if e.kind == "tool_call" and e.tool == "Read" then
     local a = decode_args(e)
     local p = a and a.file_path

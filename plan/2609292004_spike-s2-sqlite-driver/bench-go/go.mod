@@ -1,4 +1,4 @@
-module github.com/jeduden/cairn/plan/s2bench
+module github.com/jeduden/parleyinn/plan/s2bench
 
 go 1.26.8
 

@@ -1,4 +1,4 @@
-//! The FTS5 features Cairn's recall relies on (ADR-05, RCL-01), on a
+//! The FTS5 features ParleyInn's recall relies on (ADR-05, RCL-01), on a
 //! small fresh store: BM25 ranking, snippet and highlight, phrase,
 //! prefix, NEAR and NOT queries, the unicode61, trigram and porter
 //! tokenizers, and rebuilding the projection from the record (I10).

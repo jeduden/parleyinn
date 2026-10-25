@@ -62,7 +62,7 @@ fn create_unique_passes_other_errors_on() {
 }
 
 #[test]
-fn isolate_points_home_and_cairn_home_at_the_directory() {
+fn isolate_points_home_parinn_home_and_the_working_directory_at_the_directory() {
     let mut command = Command::new("x");
 
     isolate(&mut command, Path::new("/tmp/h"));
@@ -79,10 +79,11 @@ fn isolate_points_home_and_cairn_home_at_the_directory() {
     assert_eq!(
         envs,
         [
-            ("CAIRN_HOME".into(), "/tmp/h/.cairn".into()),
-            ("HOME".into(), "/tmp/h".into())
+            ("HOME".into(), "/tmp/h".into()),
+            ("PARINN_HOME".into(), "/tmp/h/.parinn".into())
         ]
     );
+    assert_eq!(command.get_current_dir(), Some(Path::new("/tmp/h")));
 }
 
 #[test]
@@ -101,22 +102,22 @@ fn an_executable_is_found_beside_the_running_test_s_deps_directory() {
     let test = deps.join("bdd-0123");
     let exe = dir
         .path()
-        .join(format!("debug/cairn{}", std::env::consts::EXE_SUFFIX));
+        .join(format!("debug/parinn{}", std::env::consts::EXE_SUFFIX));
 
-    let missing = sibling_executable(&test, "cairn").unwrap_err();
+    let missing = sibling_executable(&test, "parinn").unwrap_err();
     fs::write(&exe, "").unwrap();
-    let found = sibling_executable(&test, "cairn").unwrap();
+    let found = sibling_executable(&test, "parinn").unwrap();
 
     assert_eq!(found, exe);
     assert_eq!(
         missing,
         format!(
-            "no cairn executable at {}: build it first, with cargo build -p cairn",
+            "no parinn executable at {}: build it first, with cargo build -p parinn",
             exe.display()
         )
     );
     assert_eq!(
-        sibling_executable(Path::new("bdd"), "cairn").unwrap_err(),
+        sibling_executable(Path::new("bdd"), "parinn").unwrap_err(),
         "the running test bdd lies in no deps directory"
     );
 }
@@ -125,5 +126,87 @@ fn an_executable_is_found_beside_the_running_test_s_deps_directory() {
 fn core_executable_looks_beside_the_running_test() {
     let test = std::env::current_exe().unwrap();
 
-    assert_eq!(core_executable(), sibling_executable(&test, "cairn"));
+    assert_eq!(core_executable(), sibling_executable(&test, "parinn"));
+}
+
+#[test]
+fn place_transcript_copies_under_the_default_transcript_root() {
+    let dir = TempDir::new().unwrap();
+    let source = dir.path().join("src").join("-w-app");
+    std::fs::create_dir_all(&source).unwrap();
+    std::fs::write(source.join("s.jsonl"), "{}\n").unwrap();
+    let home = dir.path().join("home");
+
+    let placed = place_transcript(&home, &source.join("s.jsonl")).unwrap();
+
+    assert_eq!(placed, home.join(".claude/projects/-w-app/s.jsonl"));
+    assert_eq!(std::fs::read_to_string(&placed).unwrap(), "{}\n");
+    assert!(place_transcript(&home, Path::new("/")).is_err());
+    assert!(place_transcript(&home, &source.join("missing.jsonl")).is_err());
+    let top = place_transcript(&home, Path::new("relative.jsonl"));
+    assert!(top.is_err());
+}
+
+#[test]
+fn the_release_executable_is_the_named_path_else_the_checkout_s_release_build() {
+    let dir = TempDir::new().unwrap();
+    let exe = format!("parinn{}", std::env::consts::EXE_SUFFIX);
+    let built = dir.path().join("target/release").join(&exe);
+    let named = dir.path().join("elsewhere").join(&exe);
+    fs::create_dir_all(built.parent().unwrap()).unwrap();
+    fs::create_dir_all(named.parent().unwrap()).unwrap();
+
+    let missing = release_executable(None, dir.path(), "parinn").unwrap_err();
+    fs::write(&built, "").unwrap();
+    let found = release_executable(None, dir.path(), "parinn").unwrap();
+    let unnamed = release_executable(Some(named.clone().into()), dir.path(), "parinn").unwrap_err();
+    fs::write(&named, "").unwrap();
+    let chosen = release_executable(Some(named.clone().into()), dir.path(), "parinn").unwrap();
+
+    assert_eq!(
+        missing,
+        format!(
+            "no release parinn executable at {}: build it first, with cargo build --release -p parinn, or name it in PARINN_RELEASE_CORE",
+            built.display()
+        )
+    );
+    assert_eq!(found, built);
+    assert!(unnamed.contains(&named.display().to_string()), "{unnamed}");
+    assert_eq!(chosen, named);
+}
+
+#[test]
+fn the_calibration_executable_is_found_as_the_release_core_is() {
+    let base = TempDir::new().unwrap();
+    let named = base.path().join("calibrate-here");
+    std::fs::write(&named, "").unwrap();
+
+    let found = release_executable(
+        Some(named.clone().into_os_string()),
+        base.path(),
+        "calibrate",
+    );
+    let missing = release_executable(None, base.path(), "calibrate").unwrap_err();
+
+    assert_eq!(found, Ok(named));
+    assert!(
+        missing.contains("cargo build --release -p calibrate"),
+        "{missing}"
+    );
+    assert!(missing.contains(CALIBRATE_VAR), "{missing}");
+    assert_eq!(CALIBRATE_VAR, "PARINN_CALIBRATE");
+    match calibrate_executable() {
+        Ok(path) => assert!(path.is_file()),
+        Err(e) => assert!(e.contains("cargo build --release -p calibrate"), "{e}"),
+    }
+}
+
+#[test]
+fn the_release_core_executable_reads_the_variable_and_the_checkout() {
+    // The unit run builds no release core, so the answer is a file or
+    // the error that says how to build one.
+    match release_core_executable() {
+        Ok(path) => assert!(path.is_file()),
+        Err(e) => assert!(e.contains("cargo build --release -p parinn"), "{e}"),
+    }
 }

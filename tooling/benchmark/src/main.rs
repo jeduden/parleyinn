@@ -16,7 +16,7 @@ fn main() -> ExitCode {
         &mut io::stdout(),
         &mut io::stderr(),
         &|path| fs::read_to_string(path),
-        &|program, args| measure::time_program(program, args, measure::DEADLINE),
+        &|program, benchmark| measure::time_benchmark(program, benchmark, measure::DEADLINE),
     );
 
     ExitCode::from(code)

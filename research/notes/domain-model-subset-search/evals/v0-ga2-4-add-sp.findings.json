@@ -2,7 +2,7 @@
  {
   "type": "gap",
   "quote": "PRV-10 ships no principal key certifies a device key, so a device seat's pins",
-  "problem": "Before PRV-10 nothing chains to a principal key. Yet admission (a list of principal keys), bars (\"every key that chains to it\"), the owner's protection and capabilities, and \"Cairn counts principals by principal key\" all depend on such chains. The candidate never says how a seat's principal is known before PRV-10, or that these rules wait for PRV-10, so nodes cannot agree which seats are the owner's or belong to an admitted principal.",
+  "problem": "Before PRV-10 nothing chains to a principal key. Yet admission (a list of principal keys), bars (\"every key that chains to it\"), the owner's protection and capabilities, and \"ParleyInn counts principals by principal key\" all depend on such chains. The candidate never says how a seat's principal is known before PRV-10, or that these rules wait for PRV-10, so nodes cannot agree which seats are the owner's or belong to an admitted principal.",
   "fix": "Add: \"Before PRV-10 ships, a seat's principal is the principal of the node whose device key certified it, and other nodes know it only by that enrolled device key; admission, invites and bars of other principals' keys apply once PRV-10 ships.\"",
   "severity": "needs-fix",
   "lens": "consistency",
@@ -127,9 +127,9 @@
  },
  {
   "type": "security",
-  "quote": "token or at-rest key (ADM-06, SEC-10) (`cairn backup create`, ADM-06); reading",
+  "quote": "token or at-rest key (ADM-06, SEC-10) (`parinn backup create`, ADM-06); reading",
   "problem": "Creating a backup copies the whole store and audit log out of the home, including every room, other principals' writers and quarantined content. Yet it appears in none of the principal-act classes, although the list says it classes every named principal act, and exporting a single room is a widening act with a review step.",
-  "fix": "Add 'create a backup' to the Widening class beside 'a backup restore', so `cairn backup create` is a widening principal act.",
+  "fix": "Add 'create a backup' to the Widening class beside 'a backup restore', so `parinn backup create` is a widening principal act.",
   "severity": "needs-fix",
   "lens": "security",
   "model": "default"
@@ -209,7 +209,7 @@
  {
   "type": "security",
   "quote": "the exact commit, with network denied, by a node whose **git identity** (the",
-  "problem": "A witness check runs code from an untrusted commit through Cairn's own launcher with only network denied. That code can write the home's store and configuration and the harness configuration, the anchors I2, I7 and I8 rest on. Runs carry sandbox state and need risk acceptance; witness checks have neither.",
+  "problem": "A witness check runs code from an untrusted commit through ParleyInn's own launcher with only network denied. That code can write the home's store and configuration and the harness configuration, the anchors I2, I7 and I8 rest on. Runs carry sandbox state and need risk acceptance; witness checks have neither.",
   "fix": "...with network denied and no write access outside its fresh checkout, by a node whose git identity...",
   "severity": "minor",
   "lens": "security",

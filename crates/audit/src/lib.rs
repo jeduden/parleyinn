@@ -1,4 +1,4 @@
-//! The home's audit log of Cairn's own operations (OPS-01, OPS-02),
+//! The home's audit log of ParleyInn's own operations (OPS-01, OPS-02),
 //! and the counters derived from it (OPS-03).
 //!
 //! - [`entry`]: one audit entry, its canonical line and its hash.
@@ -7,7 +7,7 @@
 //! - [`counters`]: each named counter, and how far it rose since the
 //!   counters were last acknowledged.
 //!
-//! Every field an entry is built from is text Cairn ships, so no record
+//! Every field an entry is built from is text ParleyInn ships, so no record
 //! content and no secret reaches the log.
 
 use std::fmt;

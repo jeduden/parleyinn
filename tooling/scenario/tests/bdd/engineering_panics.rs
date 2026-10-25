@@ -1,7 +1,7 @@
 //! The steps of ENG-04: a panic in a hook handler stops at the hook's
 //! entry point, which fails open, writes nothing to stderr, the default
 //! panic message included, and audits it. The development build of the
-//! core panics in its hook handler when `CAIRN_TEST_FAULT` is
+//! core panics in its hook handler when `PARINN_TEST_FAULT` is
 //! `hook-panic`; the scenarios start that build.
 
 use audit::log::Log;
@@ -12,7 +12,7 @@ use crate::record::{home, last_run, set_env};
 
 #[given(regex = r"^a hook handler that panics$")]
 fn hook_handler_panics(w: &mut World) {
-    set_env(w, "CAIRN_TEST_FAULT", "hook-panic");
+    set_env(w, "PARINN_TEST_FAULT", "hook-panic");
 }
 
 #[then(regex = r"^the hook output is empty$")]

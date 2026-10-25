@@ -3,7 +3,7 @@
   {
     "type": "security",
     "quote": "An authenticated client where principal acts are taken:",
-    "problem": "The candidate never says how the CLI or TUI authenticates the person, and no rule requires the presence proof it defines, so being 'at a terminal' is the only thing that separates the principal from the agent. An agent that runs `cairn` under a pseudo-terminal from its own shell can therefore take widening acts (add a constraint pin, confirm its own pin candidate, turn capture off, release a quarantine). It can also take neutral acts (acknowledge counters, dismiss Needs you items) that hide failures from Health.",
+    "problem": "The candidate never says how the CLI or TUI authenticates the person, and no rule requires the presence proof it defines, so being 'at a terminal' is the only thing that separates the principal from the agent. An agent that runs `parinn` under a pseudo-terminal from its own shell can therefore take widening acts (add a constraint pin, confirm its own pin candidate, turn capture off, release a quarantine). It can also take neutral acts (acknowledge counters, dismiss Needs you items) that hide failures from Health.",
     "fix": "Principal surface: a client the person authenticates to, never one an agent's tool call starts, whatever its output; every widening act carries a presence proof bound to it, and the core refuses and counts any act without one.",
     "severity": "needs-fix"
   },
@@ -17,14 +17,14 @@
   {
     "type": "security",
     "quote": "takes its seat's **pin class**, `operator` for a device seat and `assistant`",
-    "problem": "A device-seat room act gets provenance `operator`, which is a trusted source. Room acts are taken 'wherever', and the CLI can only sign as the device seat (run-seat keys live only in the MCP server). So text an agent passes to `cairn` from its shell (a `fact` or `decision` pin, a link, a created room) becomes trusted, which contradicts 'Room acts are governance, not I2 trust'.",
+    "problem": "A device-seat room act gets provenance `operator`, which is a trusted source. Room acts are taken 'wherever', and the CLI can only sign as the device seat (run-seat keys live only in the MCP server). So text an agent passes to `parinn` from its shell (a `fact` or `decision` pin, a link, a created room) becomes trusted, which contradicts 'Room acts are governance, not I2 trust'.",
     "fix": "Add to Device seat: 'A device seat signs room acts only at a principal surface.'",
     "severity": "needs-fix"
   },
   {
     "type": "security",
     "quote": "The text of a delegation: a subagent's from its harness.",
-    "problem": "No provenance class covers a delegated task. It arrives in the subagent's run as harness input, so the hook handlers record it as `user`, which is trusted in `interactive` mode, even though it is the parent model's reply. It then feeds trust marks and Cairn-detected pin candidates that are shown as the person's own words.",
+    "problem": "No provenance class covers a delegated task. It arrives in the subagent's run as harness input, so the hook handlers record it as `user`, which is trusted in `interactive` mode, even though it is the parent model's reply. It then feeds trust marks and ParleyInn-detected pin candidates that are shown as the person's own words.",
     "fix": "In the subagent's run a delegated task takes the provenance of the parent's `tool_call`, never `user`; `user` is only the prompt of a user turn.",
     "severity": "needs-fix"
   },
@@ -37,8 +37,8 @@
   },
   {
     "type": "security",
-    "quote": "repository's `.cairn.toml`, its **repository configuration**, may only tighten",
-    "problem": "'Tighten' has no defined direction for settings that shape restore blocks or capture (`restore_block.on_prompt`, the pin budget, capture). Fewer injections reads as tighter, yet removing a pin from a restore block or stopping capture is a widening act. A `.cairn.toml` written by an agent or an outside contributor could then drop the principal's constraints after compaction.",
+    "quote": "repository's `.parinn.toml`, its **repository configuration**, may only tighten",
+    "problem": "'Tighten' has no defined direction for settings that shape restore blocks or capture (`restore_block.on_prompt`, the pin budget, capture). Fewer injections reads as tighter, yet removing a pin from a restore block or stopping capture is a widening act. A `.parinn.toml` written by an agent or an outside contributor could then drop the principal's constraints after compaction.",
     "fix": "...may only tighten, and never removes a pin from a restore block, turns a restore point off or stops capture; those stay widening principal acts.",
     "severity": "needs-fix"
   },

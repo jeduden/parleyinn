@@ -1,0 +1,17 @@
+[node]
+deployment_mode = "interactive"
+
+[transcript]
+roots = ["~/.claude/projects", "/srv/transcripts"]
+
+[redaction]
+extra_patterns = ["ACME-[0-9]{8}", "("]
+
+[recall]
+max_k = 10
+
+[trust_policy]
+tool_call = "trusted"
+
+[retention_policy.personal]
+harness_text = "30d"

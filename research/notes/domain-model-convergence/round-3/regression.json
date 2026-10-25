@@ -125,8 +125,8 @@
      "type": "security",
      "file": "docs/domain-model/index.md",
      "quote": "this node holds when it records the event (LANE-01, LANE-16); else to its",
-     "problem": "Routing reads the room the run works in \"at that moment\", but uses the room state as of when the event is recorded. A hook handler resuming past an ingest marker, or `cairn ingest` backfilling a gap for the seat it starts beside the run seat, can record events after a join they came before. Those pre-join events would then go to a room that other principals' nodes hold.",
-     "fix": "Add: \"for an event recorded after later events of its run (past an ingest marker or by `cairn ingest`), per the room state this node held when it recorded the run's latest event preceding it in the transcript\"",
+     "problem": "Routing reads the room the run works in \"at that moment\", but uses the room state as of when the event is recorded. A hook handler resuming past an ingest marker, or `parinn ingest` backfilling a gap for the seat it starts beside the run seat, can record events after a join they came before. Those pre-join events would then go to a room that other principals' nodes hold.",
+     "fix": "Add: \"for an event recorded after later events of its run (past an ingest marker or by `parinn ingest`), per the room state this node held when it recorded the run's latest event preceding it in the transcript\"",
      "severity": "minor"
     },
     {
@@ -170,7 +170,7 @@
      "type": "gap",
      "file": "docs/domain-model/seats-and-keys.md",
      "quote": "the run seat, in the same room, sharing its add, where it has one, and taking",
-     "problem": "The text says the seat ingest starts \"shares\" the run seat's add but \"takes over\" its role, and Role and Seat key repeat \"takes over\". One implementer will read this as moving the role off the run seat, which `cairn ingest` can do while the MCP server still runs; the run seat then has no work and the live run's events fall back to its personal room. Another will copy the role, or keep it in step with the run seat's role.",
+     "problem": "The text says the seat ingest starts \"shares\" the run seat's add but \"takes over\" its role, and Role and Seat key repeat \"takes over\". One implementer will read this as moving the role off the run seat, which `parinn ingest` can do while the MCP server still runs; the run seat then has no work and the live run's events fall back to its personal room. Another will copy the role, or keep it in step with the run seat's role.",
      "fix": "Replace \"taking over its role\" (and \"takes over the role\" in Role and Seat key) with \"holding the same role as that run seat, which keeps it\".",
      "severity": "minor"
     },

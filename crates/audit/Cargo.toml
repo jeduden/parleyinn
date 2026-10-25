@@ -1,7 +1,7 @@
 [package]
 name = "audit"
 version = "0.0.0"
-description = "The home's audit log: hash-chained entries of Cairn's own degraded operations, and the counters derived from them"
+description = "The home's audit log: hash-chained entries of ParleyInn's own degraded operations, and the counters derived from them"
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
@@ -17,8 +17,8 @@ testkit.workspace = true
 [lints]
 workspace = true
 
-# ENG-02: see crates/cairn/Cargo.toml.
-[package.metadata.cairn]
+# ENG-02: see crates/parinn/Cargo.toml.
+[package.metadata.parinn]
 responsibility = "Keeps the home's audit log and the counters derived from it"
 may-depend-on = ["record"]
 may-dev-depend-on = ["testkit"]

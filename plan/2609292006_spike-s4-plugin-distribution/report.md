@@ -1,7 +1,7 @@
 ---
 title: "Spike S4 report"
 summary: >-
-  What Claude Code 2.1.296 and Agent SDK 0.3.296 do with a stub Cairn
+  What Claude Code 2.1.296 and Agent SDK 0.3.296 do with a stub ParleyInn
   plugin on a workstation, a baked runner image, an Agent SDK worker and
   the interactive terminal: every hook fires, one MCP server serves every run of a harness
   session, a tool call names no run, and a key in the harness's
@@ -11,7 +11,7 @@ summary: >-
 
 ## Method
 
-A stub Cairn plugin, in the `record/plugin` kit, registers §9.1's three
+A stub ParleyInn plugin, in the `record/plugin` kit, registers §9.1's three
 hooks, `SessionStart`, `UserPromptSubmit` and `PermissionRequest`, and
 one stub MCP server with one tool, `event_search`. Each hook handler
 saves its hook input and what its process sees, and answers nothing.
@@ -57,10 +57,10 @@ and `CLAUDE_CODE_ENTRYPOINT=cli` set.
 | What else differs in the interactive terminal?         | Its hook inputs add `scratchpad_dir`, and `SessionStart` adds `model`                                                                                                                                                                                                                                                                        |
 | Which OS user ran the hook handlers and the server?    | The OS user that started the harness: root in this cloud environment                                                                                                                                                                                                                                                                         |
 
-## What it means for Cairn
+## What it means for ParleyInn
 
 - ADM-01 holds on each target: the plugin needs no `settings.json` edit
-  by Cairn (I7). A runner image bakes it with settings alone.
+  by ParleyInn (I7). A runner image bakes it with settings alone.
 - SEC-10's run-seat keys can stay in the one MCP server of a harness
   session, as long as that server mints them. A key handed over at
   launch in the environment is open to the model's tools, so ASM-21 is

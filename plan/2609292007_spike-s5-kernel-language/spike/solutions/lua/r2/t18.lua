@@ -1,5 +1,5 @@
 local lo, hi, runs = {}, {}, {}
-for _, e in ipairs(cairn.events()) do
+for _, e in ipairs(parinn.events()) do
   local r = e.run
   if r ~= nil then
     if lo[r] == nil then

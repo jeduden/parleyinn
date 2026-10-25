@@ -12,7 +12,7 @@ Feature: Engineering quality (ENG)
     Given the repository checkout
     Then "rust-toolchain.toml" pins the Rust toolchain to an exact release
     And the release workflow builds with "--remap-path-prefix"
-    And the release workflow builds with "CAIRN_COMMIT"
+    And the release workflow builds with "PARINN_COMMIT"
     And the release workflow builds with "x86_64-unknown-linux-musl"
     And the release workflow builds with "aarch64-unknown-linux-musl"
 
@@ -33,7 +33,7 @@ Feature: Engineering quality (ENG)
 
   @ENG-04 @P0
   Scenario: errors keep their cause, are typed per counter, and panics stop at the entry points
-    Given an isolated Cairn home
+    Given an isolated ParleyInn home
     And a hook handler that panics
     When the hook "SessionStart" runs with a valid input
     Then the command exits 0
@@ -41,19 +41,19 @@ Feature: Engineering quality (ENG)
     And the hook handler wrote nothing to stderr, the default panic message included
     And an audit entry records "panic recovered"
 
-  @ENG-05 @P0 @pending
+  @ENG-05 @P0
   Scenario: structured logs pass through redaction
-    Given an isolated Cairn home
+    Given an isolated ParleyInn home
     And a log field containing an AWS access key
-    When Cairn writes the log line
+    When ParleyInn writes the log line
     Then the log line is JSON emitted through tracing
     And the key appears only as a "[REDACTED:" marker
 
   @ENG-06 @P0 @pending
-  Scenario: the crash-consistency test kills Cairn mid-operation and every invariant stays true
-    Given an isolated Cairn home
-    When the crash-consistency test kills Cairn at randomized points during ingestion, purge, migration and rebuild
-    Then after every kill "cairn verify" exits 0
+  Scenario: the crash-consistency test kills ParleyInn mid-operation and every invariant stays true
+    Given an isolated ParleyInn home
+    When the crash-consistency test kills ParleyInn at randomized points during ingestion, purge, migration and rebuild
+    Then after every kill "parinn verify" exits 0
     And each nightly job completes at least 10000 iterations
 
   @ENG-07 @P0 @pending
@@ -88,10 +88,10 @@ Feature: Engineering quality (ENG)
 
   @ENG-09 @P0 @pending
   Scenario: data races are excluded and the store survives a concurrency soak
-    Given an isolated Cairn home
+    Given an isolated ParleyInn home
     When 50 concurrent writers append 1000000 events
     Then no two events share an address (writer, seq), and no seq is duplicated or skipped within any writer's log
-    And "cairn verify" exits 0
+    And "parinn verify" exits 0
     And every unsafe block that shares memory between threads passes under Miri or ThreadSanitizer
 
   @ENG-10 @P0 @pending
@@ -174,12 +174,13 @@ Feature: Engineering quality (ENG)
   Scenario: every direct dependency is justified by an accepted ADR with an allow-listed license
     Given the repository checkout
     When the direct dependencies are read from "Cargo.toml"
+    And the direct dependencies are read from "fuzz/Cargo.toml"
     And the ADRs are read from "docs/adr"
     Then each direct dependency is named by exactly one accepted ADR
     And every module an accepted ADR names is a direct dependency
     And each named module has a purpose, a license and a maintenance status, and its ADR weighs alternatives
-    And each license is on the allow-list the ENG-18 requirement states
-    And the direct dependencies stay within the target the ENG-18 requirement states
+    And each license is on the allow-list the ENG-18 requirement states, or a crate's exception in "deny.toml"
+    And the direct dependencies linked into a shipped executable stay within the target the ENG-18 requirement states
     And "DEPENDENCIES.md" lists every ADR that names a module
 
   @ENG-20 @P0
@@ -190,7 +191,37 @@ Feature: Engineering quality (ENG)
     And only the release-only build workflow publishes each binary's SLSA Build Level 3 provenance as a GitHub artifact attestation, verified against that workflow's signing identity at main
     And an SPDX SBOM is attached, published as a GitHub artifact attestation and verified once published
 
-  @ENG-21 @P0 @pending
+  @ENG-30 @P0
+  Scenario: a dependency with no license text stops the build in the pull request that adds it
+    Given the repository checkout
+    When every crate linked into a shipped executable for a release target is read through "cargo metadata" and the sources cargo has fetched
+    Then each crate has a license file in its source
+    And the repository keeps no license text for any crate by name and version
+    And each license file's text fits the canonical text of a license in the crate's declared expression, from the allow-list in "deny.toml" or granted by one of its exceptions, ignoring case, whitespace and copyright lines, with holder, year and name left free and the Apache-2.0 appendix optional
+    And the CI workflow runs the check on every pull request, with the locked dependency tree
+    And the check adds no dependency to any shipped executable
+
+  @ENG-31 @P0
+  Scenario: the core executable carries the license texts of what it links for its own target, kept in step by CI
+    Given the repository checkout
+    When the release targets are read from the build workflow
+    Then each target has a committed "licenses/<target-triple>/THIRD_PARTY_LICENSES" and no other target has one
+    When each target's file is regenerated twice with "cargo metadata --filter-platform <target-triple>"
+    Then both regenerations give the same bytes, with no timestamp, host path or randomness
+    And the committed file equals the regeneration
+    And it holds the license text and copyright lines of every crate a normal-dependency path from a binary under "crates/" reaches for that target
+    And no build-only, proc-macro, test, fuzz or tooling crate appears in it
+    And it names SQLite, the Rust standard library, on the musl targets the C library, and any other runtime the target links statically
+    And the committed files of any two targets whose linked crates differ differ in bytes
+    When each target's build selects its embedded file
+    Then the embedded text equals that target's committed file
+    And the built core executable's "parinn licenses" output equals it
+    And any other executable a component ships in carries the same for the crates linked into it
+    And the CI workflow fails a pull request whose committed file differs from a regeneration
+    And the release build fails when a built executable's output differs from its target's regenerated file
+    And the core gains no dependency and opens no socket
+
+  @ENG-21 @P0
   Scenario: main only moves through reviewed, signed pull requests
     Given the repository's branch protection for main
     Then direct pushes are rejected
@@ -198,7 +229,7 @@ Feature: Engineering quality (ENG)
     And every pull request needs an approval from a reviewer other than its author
     And CODEOWNERS names the stakeholder on the requirement text and on every path that enforces it
     And CODEOWNERS names no code owner on any other path
-    And changes to security-sensitive crates need two approvals, one from the designated security reviewer
+    And the security-sensitive crates are owned by the designated security reviewer, whose approval they need
 
   @ENG-22 @P0 @pending
   Scenario: every privacy or data-flow statement cites its proving test

@@ -11,7 +11,7 @@ fn finding_ledger_is_carried() {
 
     let ledger = finding_ledger::load(
         read,
-        "plan/2610012322_cairn-for-agent-fleets/finding-ledger.json",
+        "plan/2610012322_parinn-for-agent-fleets/finding-ledger.json",
     )
     .unwrap();
 

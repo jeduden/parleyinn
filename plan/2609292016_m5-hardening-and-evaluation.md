@@ -32,7 +32,7 @@ evaluation, the external review and the pilot.
 4. Encryption at rest and the recall-taint policy hook: SEC-09, SEC-13.
    `store.db` holds content and commitment keys in clear until then; the
    stakeholder accepted CodeQL's cleartext-storage alert on
-   jeduden/cairn#48 until this task closes it
+   jeduden/parleyinn#48 until this task closes it
 5. Canary, structured logs, trusted-only export: OPS-04, OPS-05, ADM-12
 6. Mutation testing and the maintainer runbook: ENG-13, ENG-25
 7. Run the §11.1 evaluation and publish it

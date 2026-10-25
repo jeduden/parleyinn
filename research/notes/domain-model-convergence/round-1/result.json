@@ -40,7 +40,7 @@
      "type": "gap",
      "file": "docs/domain-model/principals-and-agents.md",
      "quote": "No key chains to a principal key before PRV-10 ships,",
-     "problem": "Cairn counts principals by principal key, but before PRV-10 no key chains to one. The model therefore gives no rule for whether a seat from another node, including the same person's second machine, belongs to 'another principal'. Three rules depend on that answer: 'a room admits no seat of another principal', a device seat joining 'without admission' because its principal has a member seat, and 'the room's principals'.",
+     "problem": "ParleyInn counts principals by principal key, but before PRV-10 no key chains to one. The model therefore gives no rule for whether a seat from another node, including the same person's second machine, belongs to 'another principal'. Three rules depend on that answer: 'a room admits no seat of another principal', a device seat joining 'without admission' because its principal has a member seat, and 'the room's principals'.",
      "fix": "Add: 'until then each node counts as its own principal, so a room admits only seats its creating node's device key certified', or whatever identity rule the stakeholder chooses.",
      "severity": "minor"
     },
@@ -64,7 +64,7 @@
      "type": "gap",
      "file": "docs/domain-model/acts-and-roles.md",
      "quote": "and reads within its device scope. The seat ingest starts takes over the role",
-     "problem": "'Takes over the role' (likewise 'taking over its role' in Run seat) can mean either copying the role or moving it away from the run seat. If the role moves, a run that is still live loses its work capability the first time `cairn ingest` resumes an ingest marker. Its later hook-recorded events would then route to its personal-room seat. Two implementers would route those events differently.",
+     "problem": "'Takes over the role' (likewise 'taking over its role' in Run seat) can mean either copying the role or moving it away from the run seat. If the role moves, a run that is still live loses its work capability the first time `parinn ingest` resumes an ingest marker. Its later hook-recorded events would then route to its personal-room seat. Two implementers would route those events differently.",
      "fix": "Reword to 'The seat ingest starts holds the same role as the run seat it names, which keeps its own', and use the same wording in Run seat and Seat key.",
      "severity": "minor"
     },
@@ -80,7 +80,7 @@
      "type": "contradiction",
      "file": "docs/srs/invariants.md",
      "quote": "verbatim and restored verbatim after every compaction, or named by id and",
-     "problem": "I3 promises that every restoring pin comes back after every compaction. I9 makes Cairn fail open on any failure except where I2, I4 or I8 would break, and I3 is not among those exceptions. A restore that overruns its hook budget therefore leaves the agent with neither its pins nor their ids, so the two invariants cannot both hold.",
+     "problem": "I3 promises that every restoring pin comes back after every compaction. I9 makes ParleyInn fail open on any failure except where I2, I4 or I8 would break, and I3 is not among those exceptions. A restore that overruns its hook budget therefore leaves the agent with neither its pins nor their ids, so the two invariants cannot both hold.",
      "fix": "Add to I3: 'or, where a failure I9 fails open on prevents it, the omission is counted (I6) and the restore block is given at the next hook that can carry it'. Alternatively, name I3 among I9's exceptions.",
      "severity": "minor"
     },
@@ -110,7 +110,7 @@
      "file": "docs/domain-model/git-and-forge.md",
      "quote": "the exact commit, with network denied, by a node whose **git identity** (the",
      "problem": "A witness check runs code from a branch that others authored, through the launcher, on the principal's own node. The model confines it only by denying network, so that code can read the home's keys and write the store. It can then forge principal acts or qualifying pins (R3), which is a path from untrusted content to the model.",
-     "fix": "\"the exact commit, with network denied and no access to the home or its key store, ...; where the platform cannot confine it so, Cairn refuses the witness check (OWN-18).\"",
+     "fix": "\"the exact commit, with network denied and no access to the home or its key store, ...; where the platform cannot confine it so, ParleyInn refuses the witness check (OWN-18).\"",
      "severity": "needs-fix"
     },
     {
@@ -173,7 +173,7 @@
      "type": "security",
      "file": "docs/domain-model/record.md",
      "quote": "it back is a backup restore. Creating one records no principal act, only an",
-     "problem": "Creating a backup is neither a principal act nor a seat act, so nothing stops an agent's tool call from running `cairn backup create` and reading the copy. That copy holds the whole store: quarantined content, foreign rooms and other principals' writers, all outside any envelope or recall scope (I2, I5, I8).",
+     "problem": "Creating a backup is neither a principal act nor a seat act, so nothing stops an agent's tool call from running `parinn backup create` and reading the copy. That copy holds the whole store: quarantined content, foreign rooms and other principals' writers, all outside any envelope or recall scope (I2, I5, I8).",
      "fix": "\"Creating one is taken only at a principal surface, never by an agent's tool call (OWN-12), and records no principal act, only an audited event\".",
      "severity": "minor"
     }
@@ -210,7 +210,7 @@
      "type": "security",
      "file": "docs/domain-model/record.md",
      "quote": "names, such as lowering a limit or turning an injection path off, never",
-     "problem": "The model classes any principal act that removes a pin from a restore block as widening. Yet repository configuration, an agent-writable file that may come from someone else's branch, counts as tightening when it lowers a limit, such as the restore block limit, or turns an injection path off. A .cairn.toml doing either drops the principal's constraints out of restore, leaving them named only by id and count, with no principal act.",
+     "problem": "The model classes any principal act that removes a pin from a restore block as widening. Yet repository configuration, an agent-writable file that may come from someone else's branch, counts as tightening when it lowers a limit, such as the restore block limit, or turns an injection path off. A .parinn.toml doing either drops the principal's constraints out of restore, leaving them named only by id and count, with no principal act.",
      "fix": "\"never enabling injection, lowering the pin budget or the restore block limit or otherwise removing a pin from a restore block, extending recall scope, changing the trust policy or the deployment mode, or disabling redaction or flags (SEC-11)\".",
      "severity": "needs-fix"
     },
@@ -218,8 +218,8 @@
      "type": "gap",
      "file": "docs/domain-model/components-and-surfaces.md",
      "quote": "Replay tab's **context lens** showing what the model's context window",
-     "problem": "No event kind records what Cairn wrote to an agent through a closed path, such as the pin versions a restore block carried, an opt-in notice or compaction guidance. Only the launcher's turn trigger records a commitment. A restore block depends on the room state the node held at that moment, and concurrent acts that arrive later change that state. So the context lens cannot show which constraints actually reached the model, and implementers will reconstruct it differently.",
-     "fix": "Add to Event \"a **restore record** (a structural event in the run's writer for each closed-path write Cairn makes through a hook, naming its kind and, for a restore block, the pin versions and omitted pin ids it carried)\", and have the context lens read it.",
+     "problem": "No event kind records what ParleyInn wrote to an agent through a closed path, such as the pin versions a restore block carried, an opt-in notice or compaction guidance. Only the launcher's turn trigger records a commitment. A restore block depends on the room state the node held at that moment, and concurrent acts that arrive later change that state. So the context lens cannot show which constraints actually reached the model, and implementers will reconstruct it differently.",
+     "fix": "Add to Event \"a **restore record** (a structural event in the run's writer for each closed-path write ParleyInn makes through a hook, naming its kind and, for a restore block, the pin versions and omitted pin ids it carried)\", and have the context lens read it.",
      "severity": "minor"
     }
    ]
@@ -309,7 +309,7 @@
     "index": 2,
     "theme": "NEW-12",
     "kind": "new",
-    "reason": "DM-E gives later runs no seat, but no ledger text covers a subagent's seats in its parent's rooms. LANE-23 settles it: Cairn may suggest joining a subagent to its parent's rooms but must not join it without acceptance."
+    "reason": "DM-E gives later runs no seat, but no ledger text covers a subagent's seats in its parent's rooms. LANE-23 settles it: ParleyInn may suggest joining a subagent to its parent's rooms but must not join it without acceptance."
    },
    {
     "lens": "usefulness",

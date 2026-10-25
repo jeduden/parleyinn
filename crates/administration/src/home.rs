@@ -1,35 +1,55 @@
-//! Where the home is and what it holds (§8.1): `CAIRN_HOME` when set,
-//! else `.cairn` in `HOME`. The home and its `keys` directory are
-//! readable only by their owner.
+//! Where the home is and what it holds (§8.1): `PARINN_HOME` when set,
+//! else `.parinn` in `HOME`. The home and its `keys` directory are
+//! readable only by their owner. Its keys are kept in this OS's key
+//! store, each in an entry named per home (SEC-10), and it remembers
+//! the digest of the node identity it was last started under (REC-24).
 
 use std::ffi::OsStr;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use record::id::SeatId;
+use key::key_store::{self, KeyStore};
 
 use crate::AdminError;
+use crate::node_identity::IdentitySource;
 
-/// A Cairn home.
+/// A ParleyInn home.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Home {
     root: PathBuf,
+    identity: IdentitySource,
 }
 
 impl Home {
-    /// The home `CAIRN_HOME` names, else `.cairn` in `HOME`; an empty
+    /// The home `PARINN_HOME` names, else `.parinn` in `HOME`; an empty
     /// variable counts as unset.
     ///
     /// # Errors
     ///
     /// Fails when neither names one.
-    pub fn locate(cairn_home: Option<&OsStr>, home: Option<&OsStr>) -> Result<Self, AdminError> {
+    pub fn locate(parinn_home: Option<&OsStr>, home: Option<&OsStr>) -> Result<Self, AdminError> {
         let set = |v: Option<&OsStr>| v.filter(|v| !v.is_empty()).map(PathBuf::from);
-        let root = set(cairn_home)
-            .or_else(|| set(home).map(|h| h.join(".cairn")))
+        let root = set(parinn_home)
+            .or_else(|| set(home).map(|h| h.join(".parinn")))
             .ok_or(AdminError::NoHome)?;
 
-        Ok(Self { root })
+        Ok(Self {
+            root,
+            identity: IdentitySource::platform(),
+        })
+    }
+
+    /// The home, its node identity read from `identity` instead of this
+    /// OS's source: a development build's seam for the tests.
+    #[must_use]
+    pub fn with_identity(self, identity: IdentitySource) -> Self {
+        Self { identity, ..self }
+    }
+
+    /// Where its node identity is read from (REC-24).
+    #[must_use]
+    pub fn identity(&self) -> &IdentitySource {
+        &self.identity
     }
 
     /// The home's directory.
@@ -44,29 +64,26 @@ impl Home {
         self.root.join("store.db")
     }
 
-    /// The device key's file.
+    /// The key store its keys are kept in: this OS's, each key in an
+    /// entry named for this home (SEC-10).
     #[must_use]
-    pub fn device_key(&self) -> PathBuf {
-        self.keys().join("device.key")
+    pub fn key_store(&self) -> Box<dyn KeyStore> {
+        key_store::platform(&self.keys(), &self.root)
     }
 
-    /// The device key's recovery key's file.
+    /// The file whose presence says a start staged new keys and has not
+    /// yet recorded and placed them: a first start's, or a node identity
+    /// change's. It names which, and holds no secret.
     #[must_use]
-    pub fn recovery_key(&self) -> PathBuf {
-        self.keys().join("recovery.key")
+    pub fn staged(&self) -> PathBuf {
+        self.keys().join("staged")
     }
 
-    /// The file of the key of the seat `seat`.
+    /// The file holding the digest of the node identity the home was last
+    /// started under (REC-24).
     #[must_use]
-    pub fn seat_key(&self, seat: SeatId) -> PathBuf {
-        self.keys().join(format!("seat-{seat}.key"))
-    }
-
-    /// The directory a first start stages its keys and its personal
-    /// room's nonce in before it records anything.
-    #[must_use]
-    pub fn genesis(&self) -> PathBuf {
-        self.keys().join("genesis")
+    pub fn node_identity(&self) -> PathBuf {
+        self.root.join("node-identity")
     }
 
     /// The audit log's directory (OPS-02).
@@ -175,7 +192,10 @@ impl Home {
         }
     }
 
-    fn keys(&self) -> PathBuf {
+    /// Its keys directory, where the files of a file-based key store
+    /// lie.
+    #[must_use]
+    pub fn keys(&self) -> PathBuf {
         self.root.join("keys")
     }
 

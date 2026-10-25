@@ -4,7 +4,7 @@
 //! everything under a `.claude/` directory (agents, skills, settings).
 //! A statement in them directs a destructive command when it names a
 //! way to delete or overwrite, names real state (`~`, `HOME`,
-//! `CAIRN_HOME`, Claude Code's configuration directory), and neither
+//! `PARINN_HOME`, Claude Code's configuration directory), and neither
 //! forbids it nor first points `HOME` at a temporary directory.
 //!
 //! A statement is a line of a code block, a line of a file that is not
@@ -34,7 +34,7 @@ const OTHER_CHECKOUTS: &str = "worktrees";
 const PRIVATE: &str = "settings.local.json";
 
 /// What names real state in a statement, as a word.
-const HOME_NAMES: [&str; 4] = ["HOME", "CAIRN_HOME", "CLAUDE_CONFIG_DIR", "USERPROFILE"];
+const HOME_NAMES: [&str; 4] = ["HOME", "PARINN_HOME", "CLAUDE_CONFIG_DIR", "USERPROFILE"];
 
 /// Words that delete or overwrite, whole.
 const DESTRUCTIVE: [&str; 7] = ["rm", "rmdir", "unlink", "shred", "tee", "trash", "-delete"];
@@ -345,7 +345,7 @@ fn says_isolated(text: &str) -> bool {
     lower.contains("isolat") || ISOLATION_WORDS.iter().any(|w| lower.contains(w))
 }
 
-/// Whether `text` sets `HOME` or `CAIRN_HOME` to a temporary directory.
+/// Whether `text` sets `HOME` or `PARINN_HOME` to a temporary directory.
 fn assigns_temp_home(text: &str) -> bool {
     text.match_indices("HOME=").any(|(i, assign)| {
         let value = text[i + assign.len()..].split_whitespace().next();

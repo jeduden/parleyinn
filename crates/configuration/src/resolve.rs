@@ -120,6 +120,15 @@ impl Settings {
         self.get("risk_acceptance.forbidden") == Some(&Value::Bool(true))
     }
 
+    /// The list the key named `name` holds; empty when it holds none.
+    #[must_use]
+    pub fn texts(&self, name: &str) -> &[String] {
+        match self.get(name) {
+            Some(Value::Texts(items)) => items,
+            _ => &[],
+        }
+    }
+
     /// Every key set, in key order.
     pub fn iter(&self) -> impl Iterator<Item = (&SettingsKey, &Value)> {
         self.values.iter()

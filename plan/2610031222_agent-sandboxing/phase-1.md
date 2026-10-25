@@ -14,23 +14,23 @@ BDD coverage: none yet. The probe's cases become the scenarios task 5
 adds as `@pending`.
 
 The probe is a small program in a separate module beside this plan,
-like spike S2's, so nothing enters Cairn's module graph. It runs as
+like spike S2's, so nothing enters ParleyInn's module graph. It runs as
 the agent would, inside the sandbox under test. `HOME` and
-`CAIRN_HOME` point at a temporary directory (ENG-14). That directory
+`PARINN_HOME` point at a temporary directory (ENG-14). That directory
 holds a fixture store, a fixture writer key, a fixture harness
 settings file and a stand-in loopback listener. The probe never
-touches the machine's real `~/.cairn` or `~/.claude`.
+touches the machine's real `~/.parinn` or `~/.claude`.
 
 RED: one case per residual risk. Each case is an attempt that must
 fail for the risk to count as blocked:
 
 - R1: inject keystrokes into a terminal multiplexer session outside
   the sandbox.
-- R2: write the harness settings file or Cairn's executables.
-- R3: delete or replace `CAIRN_HOME`.
+- R2: write the harness settings file or ParleyInn's executables.
+- R3: delete or replace `PARINN_HOME`.
 - R4: reach the browser profile or a GUI input socket.
 - R5: read the fixture store and key.
-- R6 and R7: signal Cairn's own processes, or reach the loopback
+- R6 and R7: signal ParleyInn's own processes, or reach the loopback
   listener.
 
 The probe fails until it reports each case as blocked or open, with

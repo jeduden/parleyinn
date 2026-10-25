@@ -1,4 +1,4 @@
-local evs = cairn.events()
+local evs = parinn.events()
 local function args_of(e)
   if type(e.args) ~= "string" then return nil end
   local ok, v = pcall(json.decode, e.args)

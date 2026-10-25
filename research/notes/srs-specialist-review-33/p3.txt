@@ -65,7 +65,7 @@ BREAKS: Seat key: a rotation keeps the seat's id and writer (SEC-27); only a key
 FIX: Hub (domain-model agent): 'a new one for each seat key minted on a node identity change, a node clone or a backup restore (Seat key)'.
 ===== trust-and-flow#1 | docs/srs/05c-principal-and-peer-requirements.md:44 | kind= needs-fix | inv= False | htr= False
 TERM: correction
-QUOTE: each correction a principal act naming the verdict it answers: send a correction (`cairn correction send`)
+QUOTE: each correction a principal act naming the verdict it answers: send a correction (`parinn correction send`)
 BREAKS: Correction, retry: correction is principal-typed text in a fixed template; OWN-28 also uses it as an umbrella over intent revision and retry, so one word has two meanings
 FIX: SRS OWN-28: 'each a principal act naming the verdict it answers: send a correction …'
 ===== trust-and-flow#2 | docs/srs/13-open-questions-and-risks.md:25 | kind= needs-fix | inv= False | htr= False
@@ -105,9 +105,9 @@ BREAKS: RCL-05 requires an explicit `scope` parameter and logging to extend reca
 FIX: Stakeholder: state in §9.2 whether naming `room` in these tools counts as an explicit, logged extension under RCL-05
 ===== trust-and-flow#9 | docs/domain-model/trust-and-flow.md:140-141 | kind= question | inv= False | htr= False
 TERM: Counter
-QUOTE: shown on Health until acknowledged (`cairn counter ack`, I6, OPS-03)
-BREAKS: ADM-11 (05a:24) and §9.5 `cairn status` (09a:16) keep non-zero failure counters shown; OPS-03 uses acknowledgement only as cairn doctor's baseline
-FIX: Model: 'shown on Health; `cairn doctor` fails while one has risen since the node's principal last acknowledged them (`cairn counter ack`, I6, OPS-03)'
+QUOTE: shown on Health until acknowledged (`parinn counter ack`, I6, OPS-03)
+BREAKS: ADM-11 (05a:24) and §9.5 `parinn status` (09a:16) keep non-zero failure counters shown; OPS-03 uses acknowledgement only as parinn doctor's baseline
+FIX: Model: 'shown on Health; `parinn doctor` fails while one has risen since the node's principal last acknowledged them (`parinn counter ack`, I6, OPS-03)'
 ===== trust-and-flow#10 | docs/domain-model/trust-and-flow.md:52-54 | kind= question | inv= False | htr= False
 TERM: continuation cursor
 QUOTE: A recall tool that stops at its per-call cap returns a **continuation cursor** (`next_cursor`); passed back as `cursor`, it continues without gap or overlap (RCL-03).
@@ -151,8 +151,8 @@ FIX: SRS PRV-02: insert "whether the event's room is foreign to that principal,"
 ===== whole#3 | docs/srs/05b-lane-requirements.md:14 | kind= needs-fix | inv= False | htr= True
 TERM: run seat / the seat ingest starts
 QUOTE: Each event MUST be written to exactly one seat's writer: a run's to its run seat in the room it works in, one it joined or created that names the branch of the run's latest preceding event naming its branch, while that seat is a member with work (its role, no mute) in this node's room state on recording it; else to its personal-room seat, never refused.
-BREAKS: Relations: 'what `cairn ingest` appends for a witnessed run goes instead to the seat ingest starts beside that run seat (Run seat)'. LANE-01 has no such exception, so its MUST conflicts with REC-19 for ingest appends, including those beside the personal-room seat
-FIX: SRS LANE-01: after "never refused" add "; what `cairn ingest` appends for a witnessed run goes instead to the seat ingest starts beside that run seat (REC-19)"
+BREAKS: Relations: 'what `parinn ingest` appends for a witnessed run goes instead to the seat ingest starts beside that run seat (Run seat)'. LANE-01 has no such exception, so its MUST conflicts with REC-19 for ingest appends, including those beside the personal-room seat
+FIX: SRS LANE-01: after "never refused" add "; what `parinn ingest` appends for a witnessed run goes instead to the seat ingest starts beside that run seat (REC-19)"
 ===== whole#4 | features/provenance.feature:37 | kind= needs-fix | inv= False | htr= False
 TERM: unsigned
 QUOTE: the default trust policy trusts this node's unsigned trusted sources only on this node
@@ -176,8 +176,8 @@ FIX: SRS VIEW-21: "A room whose runs all show Idle while …"; scenario: "When i
 ===== whole#8 | docs/srs/05c-principal-and-peer-requirements.md:43 | kind= needs-fix | inv= False | htr= False
 TERM: room / verdict
 QUOTE: The room records no verdict of its own (VIEW-22).
-BREAKS: Places → Room is a place, not an actor (nodes record); Git and forge → Verdict says 'Cairn never derives one', and VIEW-22 says Cairn records none
-FIX: SRS OWN-27: "Cairn records no verdict of its own (VIEW-22)."
+BREAKS: Places → Room is a place, not an actor (nodes record); Git and forge → Verdict says 'ParleyInn never derives one', and VIEW-22 says ParleyInn records none
+FIX: SRS OWN-27: "ParleyInn records no verdict of its own (VIEW-22)."
 ===== whole#9 | docs/srs/10-engineering-quality.md:17 | kind= needs-fix | inv= False | htr= False
 TERM: harness adapter
 QUOTE: `adapter-claudecode`
@@ -185,9 +185,9 @@ BREAKS: Components and surfaces → harness adapter; hub 'Names follow the model
 FIX: SRS ENG-02: rename the example crate `harness_adapter_claude_code` (matching `restore_block`'s form)
 ===== whole#10 | docs/srs/04-reference-architecture.md:157 | kind= needs-fix | inv= False | htr= False
 TERM: settings / harness configuration
-QUOTE: `cairn install` edits settings only as a fallback.
-BREAKS: Record → configuration is 'the principal's settings (§9.6)'; the harness's settings are part of harness configuration (Principals and agents → Managed policy). Unqualified 'settings' reads as Cairn's configuration
-FIX: SRS §4.5 ADR-06: "`cairn install` edits the harness's settings only as a fallback."
+QUOTE: `parinn install` edits settings only as a fallback.
+BREAKS: Record → configuration is 'the principal's settings (§9.6)'; the harness's settings are part of harness configuration (Principals and agents → Managed policy). Unqualified 'settings' reads as ParleyInn's configuration
+FIX: SRS §4.5 ADR-06: "`parinn install` edits the harness's settings only as a fallback."
 ===== whole#11 | docs/domain-model/record.md; docs/domain-model/components-and-surfaces.md; docs/srs/06-security.md; docs/srs/05c-principal-and-peer-requirements.md; docs/srs/05b-room-view-requirements.md; docs/srs/13-open-questions-and-risks.md:record.md:78; components-and-surfaces.md:35; 06-security.md:56,110,111; 05c:27,32; 05b-room-view:59; 13:45 | kind= question | inv= False | htr= False
 TERM: origin
 QUOTE: exchanged once for an **origin secret** only its own origin, port included, can read or send

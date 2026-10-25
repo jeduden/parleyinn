@@ -17,8 +17,8 @@ testkit.workspace = true
 [lints]
 workspace = true
 
-# ENG-02: see crates/cairn/Cargo.toml.
-[package.metadata.cairn]
+# ENG-02: see crates/parinn/Cargo.toml.
+[package.metadata.parinn]
 responsibility = "Gates the review the reviewer app posts on the reviewing agent's outcome"
 may-depend-on = []
 may-dev-depend-on = ["testkit"]

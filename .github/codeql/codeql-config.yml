@@ -2,7 +2,7 @@
 # product code and leaves out the tests, whose fixed keys, nonces and
 # commitment keys keep them deterministic and are no secret. Rust is
 # analyzed without a build, so these paths are not extracted at all.
-name: cairn
+name: parinn
 
 paths-ignore:
   # The unit tests beside each module.

@@ -1,0 +1,6 @@
+[node
+deployment_mode =
+unknown.key = { a = [1, 2, { b = "c" }] }
+[[transcript.roots]]
+"quoted key" = '''multi
+line'''

@@ -34,11 +34,11 @@ pub const RELEASE_REF: &str = "refs/heads/main";
 
 /// The repository the release belongs to, as `gh attestation verify`
 /// names it.
-const REPO: &str = "jeduden/cairn";
+const REPO: &str = "jeduden/parleyinn";
 
 /// A workflow of the repository as a Sigstore certificate names it,
 /// before its `@ref`.
-const WORKFLOWS: &str = "https://github.com/jeduden/cairn/.github/workflows/";
+const WORKFLOWS: &str = "https://github.com/jeduden/parleyinn/.github/workflows/";
 
 /// The call of the reusable build workflow.
 const CALLS_BUILD: &str = "uses: ./.github/workflows/build.yml";
@@ -52,8 +52,8 @@ const PROVENANCE: &str = "actions/attest-build-provenance@";
 /// The action that attests an SBOM.
 const ATTEST_SBOM: &str = "actions/attest-sbom@";
 
-/// The action that generates the SBOM.
-const MAKE_SBOM: &str = "anchore/sbom-action@";
+/// The pinned CLI command that generates the SBOM.
+const MAKE_SBOM: &str = "syft . --output ";
 
 /// The action that checks out the repository's code.
 const CHECKOUT: &str = "actions/checkout@";
@@ -351,10 +351,20 @@ impl Release {
             problems.push("release.yml does not generate an SBOM".to_owned());
             return None;
         };
-        if value_of(&job.text, "format").as_deref() != Some("spdx-json") {
+        let output = job.text.lines().find_map(|line| {
+            line.trim()
+                .strip_prefix("- ")
+                .unwrap_or(line.trim())
+                .strip_prefix("run: ")?
+                .strip_prefix(MAKE_SBOM)
+        });
+        let (format, file) = output
+            .and_then(|spec| spec.split_once('='))
+            .unwrap_or(("", ""));
+        if format != "spdx-json" {
             problems.push(format!("job {} does not generate an SPDX SBOM", job.name));
         }
-        let file = value_of(&job.text, "output-file");
+        let file = (!file.trim().is_empty()).then(|| file.trim().to_owned());
         if file.is_none() {
             problems.push(format!("job {} names no SBOM file", job.name));
         }
@@ -496,9 +506,9 @@ fn provenance_verify_problems(verify: &Job) -> Vec<String> {
             ));
         }
     }
-    if !verify.text.contains("cairn-*") {
+    if !verify.text.contains("parinn-*") {
         problems.push(format!(
-            "job {} does not verify every binary (cairn-*)",
+            "job {} does not verify every binary (parinn-*)",
             verify.name
         ));
     }

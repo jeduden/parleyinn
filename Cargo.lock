@@ -7,7 +7,9 @@ name = "administration"
 version = "0.0.0"
 dependencies = [
  "key",
+ "platform",
  "record",
+ "repository",
  "rusqlite",
  "serde_json",
  "store",
@@ -29,6 +31,13 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c982642fa9e8606056828ee9a8505737230110bb1099153c79efe865c59d12ba"
 dependencies = [
  "memchr",
+]
+
+[[package]]
+name = "allowed_root"
+version = "0.0.0"
+dependencies = [
+ "testkit",
 ]
 
 [[package]]
@@ -135,22 +144,8 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "175812e0be2bccb6abe50bb8d566126198344f707e304f45c648fd8f2cc0365e"
 
 [[package]]
-name = "cairn"
+name = "calibrate"
 version = "0.0.0"
-dependencies = [
- "administration",
- "audit",
- "configuration",
- "hook",
- "ingest",
- "key",
- "mcp",
- "record",
- "rusqlite",
- "serde_json",
- "store",
- "testkit",
-]
 
 [[package]]
 name = "cc"
@@ -251,6 +246,22 @@ checksum = "633458d4ef8c78b72454de2d54fd6ab2e60f9e02be22f3c6104cdc8a4e0fceb9"
 dependencies = [
  "unicode-segmentation",
 ]
+
+[[package]]
+name = "core-foundation"
+version = "0.10.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b2a6cd9ae233e7f62ba4e9353e81a88df7fc8a5987b8d445b4d90c879bd156f6"
+dependencies = [
+ "core-foundation-sys",
+ "libc",
+]
+
+[[package]]
+name = "core-foundation-sys"
+version = "0.8.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "773648b94d0e5d620f64f280777445740e61fe701025087ec8b57f45c791888b"
 
 [[package]]
 name = "coverage"
@@ -480,6 +491,7 @@ version = "0.0.0"
 dependencies = [
  "adr",
  "benchmark",
+ "calibrate",
  "drift",
  "review-gate",
  "scenario",
@@ -688,8 +700,12 @@ dependencies = [
 name = "harness-contract"
 version = "0.0.0"
 dependencies = [
+ "hook",
+ "provenance",
+ "redaction",
  "serde_json",
  "testkit",
+ "transcript",
 ]
 
 [[package]]
@@ -710,6 +726,8 @@ version = "0.0.0"
 dependencies = [
  "audit",
  "serde_json",
+ "testkit",
+ "transcript",
 ]
 
 [[package]]
@@ -852,11 +870,14 @@ version = "0.0.0"
 dependencies = [
  "administration",
  "key",
+ "provenance",
  "record",
+ "redaction",
  "rusqlite",
  "serde_json",
  "store",
  "testkit",
+ "transcript",
 ]
 
 [[package]]
@@ -895,7 +916,9 @@ version = "0.0.0"
 dependencies = [
  "ed25519-dalek",
  "getrandom",
+ "platform",
  "record",
+ "security-framework",
  "serde_json",
  "testkit",
 ]
@@ -950,7 +973,9 @@ dependencies = [
  "ingest",
  "key",
  "record",
+ "redaction",
  "rusqlite",
+ "search",
  "serde_json",
  "store",
  "testkit",
@@ -983,10 +1008,39 @@ dependencies = [
 ]
 
 [[package]]
+name = "once_cell"
+version = "1.21.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9f7c3e4beb33f85d45ae3e3a1792185706c8e16d043238c593331cc7cd313b50"
+
+[[package]]
 name = "once_cell_polyfill"
 version = "1.70.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "384b8ab6d37215f3c5301a95a4accb5d64aa607f1fcb26a11b5303878451b4fe"
+
+[[package]]
+name = "parinn"
+version = "0.0.0"
+dependencies = [
+ "administration",
+ "allowed_root",
+ "audit",
+ "configuration",
+ "hook",
+ "ingest",
+ "key",
+ "mcp",
+ "record",
+ "redaction",
+ "repository",
+ "rusqlite",
+ "serde_json",
+ "store",
+ "structured_log",
+ "testkit",
+ "tracing",
+]
 
 [[package]]
 name = "peg"
@@ -1048,6 +1102,13 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f6b464fbc74e149a392436b17d523f769e057cb6877f6a5c4618bc6f11800548"
 
 [[package]]
+name = "platform"
+version = "0.0.0"
+dependencies = [
+ "windows-sys",
+]
+
+[[package]]
 name = "potential_utf"
 version = "0.1.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1065,6 +1126,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "985e7ec9bb745e6ce6535b544d84d6cd6f7ad8bd711c398938ae983b91a766d9"
 dependencies = [
  "unicode-ident",
+]
+
+[[package]]
+name = "provenance"
+version = "0.0.0"
+dependencies = [
+ "record",
+ "redaction",
+ "serde_json",
+ "transcript",
 ]
 
 [[package]]
@@ -1088,6 +1159,14 @@ version = "0.0.0"
 dependencies = [
  "serde_json",
  "sha2",
+]
+
+[[package]]
+name = "redaction"
+version = "0.0.0"
+dependencies = [
+ "regex",
+ "serde_json",
 ]
 
 [[package]]
@@ -1140,6 +1219,13 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d6f6ff9a378485b298a5286656da665ba74413d36db0979633275d2e708145d4"
 
 [[package]]
+name = "repository"
+version = "0.0.0"
+dependencies = [
+ "testkit",
+]
+
+[[package]]
 name = "review-bundle"
 version = "0.0.0"
 dependencies = [
@@ -1158,6 +1244,14 @@ dependencies = [
  "serde",
  "serde_json",
  "testkit",
+]
+
+[[package]]
+name = "room"
+version = "0.0.0"
+dependencies = [
+ "provenance",
+ "record",
 ]
 
 [[package]]
@@ -1221,12 +1315,16 @@ dependencies = [
  "drift",
  "engineering",
  "harness-contract",
+ "ingest",
  "key",
  "record",
+ "redaction",
+ "rusqlite",
  "serde_json",
  "srs",
  "store",
  "testkit",
+ "transcript",
 ]
 
 [[package]]
@@ -1238,6 +1336,36 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.119",
+]
+
+[[package]]
+name = "search"
+version = "0.0.0"
+dependencies = [
+ "record",
+]
+
+[[package]]
+name = "security-framework"
+version = "3.7.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b7f4bc775c73d9a02cde8bf7b2ec4c9d12743edf609006c7facc23998404cd1d"
+dependencies = [
+ "bitflags",
+ "core-foundation",
+ "core-foundation-sys",
+ "libc",
+ "security-framework-sys",
+]
+
+[[package]]
+name = "security-framework-sys"
+version = "2.17.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6ce2691df843ecc5d231c0b14ece2acc3efb62c0a398c7e1d875f3983ce020e3"
+dependencies = [
+ "core-foundation-sys",
+ "libc",
 ]
 
 [[package]]
@@ -1278,9 +1406,9 @@ dependencies = [
 
 [[package]]
 name = "serde_json"
-version = "1.0.151"
+version = "1.0.154"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c841b55ecdae098c80dcae9cf767f6f8a0c2cdb3416bbef72181df4d0fe73f14"
+checksum = "e7e9cc8b1b85264074fbcc02a88680c4096b1e47df8f739dceb03bf482f04bd6"
 dependencies = [
  "itoa",
  "memchr",
@@ -1369,6 +1497,7 @@ version = "0.0.0"
 dependencies = [
  "record",
  "rusqlite",
+ "search",
  "serde_json",
  "testkit",
 ]
@@ -1378,6 +1507,16 @@ name = "strsim"
 version = "0.11.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7da8b5736845d9f2fcb837ea5d9e2628564b3b043a70948a3f0b778838c5fb4f"
+
+[[package]]
+name = "structured_log"
+version = "0.0.0"
+dependencies = [
+ "redaction",
+ "serde_json",
+ "testkit",
+ "tracing",
+]
 
 [[package]]
 name = "subtle"
@@ -1545,6 +1684,32 @@ name = "toml_writer"
 version = "1.1.3+spec-1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "06bdbd8cfc056b8d2e2e85f29b56a3bdbecb527cef81eb39e3e7b98af4652770"
+
+[[package]]
+name = "tracing"
+version = "0.1.44"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "63e71662fa4b2a2c3a26f570f037eb95bb1f85397f3cd8076caed2f026a6d100"
+dependencies = [
+ "pin-project-lite",
+ "tracing-core",
+]
+
+[[package]]
+name = "tracing-core"
+version = "0.1.36"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "db97caf9d906fbde555dd62fa95ddba9eecfd14cb388e4f491a66d74cd5fb79a"
+dependencies = [
+ "once_cell",
+]
+
+[[package]]
+name = "transcript"
+version = "0.0.0"
+dependencies = [
+ "serde_json",
+]
 
 [[package]]
 name = "typed-builder"

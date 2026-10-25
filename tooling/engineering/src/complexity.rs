@@ -9,7 +9,7 @@
 
 use crate::Checkout;
 use crate::product_crates::{clippy_config_of, strip_comment};
-use crate::static_analysis::{inherits_workspace_lints, members, table, value};
+use crate::static_analysis::{UNSAFE_SHIM, inherits_workspace_lints, members, table, value};
 
 /// The complexity lints the workspace lints deny. clippy leaves each
 /// off by default; `too_many_arguments` and `type_complexity`, on by
@@ -43,19 +43,22 @@ const DENYING: [&str; 2] = ["deny", "forbid"];
 /// [`LINTS`], and names each it does not.
 #[must_use]
 pub fn workspace_denies(root_manifest: &str) -> Vec<String> {
-    let lints = table(root_manifest, "workspace.lints.clippy");
-    LINTS
-        .iter()
-        .filter(|lint| {
-            let level = value(&lints, lint).map(|v| v.replace(' ', ""));
-            !level.is_some_and(|v| {
-                DENYING
-                    .iter()
-                    .any(|d| v == format!("\"{d}\"") || v.contains(&format!("level=\"{d}\"")))
-            })
-        })
+    undenied(&table(root_manifest, "workspace.lints.clippy"))
         .map(|lint| format!("the workspace lints do not deny clippy::{lint}"))
         .collect()
+}
+
+/// The lints of [`LINTS`] a lints table's `lines` neither deny nor
+/// forbid.
+fn undenied(lines: &[String]) -> impl Iterator<Item = &'static str> {
+    LINTS.into_iter().filter(|lint| {
+        let level = value(lines, lint).map(|v| v.replace(' ', ""));
+        !level.is_some_and(|v| {
+            DENYING
+                .iter()
+                .any(|d| v == format!("\"{d}\"") || v.contains(&format!("level=\"{d}\"")))
+        })
+    })
 }
 
 /// The integer a clippy.toml sets its top-level `key` to: a line before
@@ -115,11 +118,22 @@ pub fn crates_hold_limits(c: &Checkout) -> Vec<String> {
     problems
 }
 
-/// Requires the crate in `member` to inherit the workspace lints and
-/// its clippy configuration to hold every limit.
+/// Requires the crate in `member` to inherit the workspace lints, or as
+/// the one unsafe shim to deny the complexity lints in its own, and its
+/// clippy configuration to hold every limit.
 fn member_holds_limits(c: &Checkout, member: &str) -> Vec<String> {
     match c.read(&format!("{member}/Cargo.toml")) {
         Err(e) => return vec![e],
+        Ok(manifest) if member == UNSAFE_SHIM && !inherits_workspace_lints(&manifest) => {
+            let loose: Vec<String> = undenied(&table(&manifest, "lints.clippy"))
+                .map(|lint| {
+                    format!("crate {member}, the one unsafe shim, does not deny clippy::{lint}")
+                })
+                .collect();
+            if !loose.is_empty() {
+                return loose;
+            }
+        }
         Ok(manifest) if !inherits_workspace_lints(&manifest) => {
             return vec![format!(
                 "crate {member} does not inherit the workspace lints, so the complexity lints miss it"

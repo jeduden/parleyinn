@@ -33,4 +33,4 @@ I/O, in-process locks, standard output) are accepted. `@ENG-03` stays
 `@pending` until M1 adds the injectable I/O traits the row also
 requires, which no step checks yet.
 
-[ruling]: https://github.com/jeduden/cairn/pull/44#issuecomment-6157262395
+[ruling]: https://github.com/jeduden/parleyinn/pull/44#issuecomment-6157262395

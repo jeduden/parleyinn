@@ -1,6 +1,6 @@
 # Research
 
-Evidence behind Cairn's design decisions, kept verbatim. Each report
+Evidence behind ParleyInn's design decisions, kept verbatim. Each report
 answers one question and cites its sources. The notes under
 [notes](notes/) are the raw, sourced findings the reports were written
 from.
@@ -8,13 +8,13 @@ from.
 ## Reports
 
 - [Agent session storage beyond git](reports/agent-session-storage-beyond-git.md):
-  the merged answer. Cairn owns an append-only record and lets git
+  the merged answer. ParleyInn owns an append-only record and lets git
   carry copies. Code stays on git.
 - [Git as agent session storage](reports/git-as-agent-session-storage.md):
   20 systems compared on storing sessions in git, with twelve design
   rules.
 - [Custom storage, git and chat interfaces](reports/custom-storage-git-and-chat-interfaces.md):
-  Cairn owns the record and its keys. Git and chat are opt-in views
+  ParleyInn owns the record and its keys. Git and chat are opt-in views
   outside the shipped binary, and shredding works by destroying keys.
 - [Interesting ideas digest](reports/interesting-ideas-digest.md):
   the top ideas from a sweep of about 175 systems.
@@ -39,10 +39,19 @@ from.
   findings and lessons, plus every fact sheet in `sheets.json`.
 - [Amp orbs](notes/amp-orbs/amp-orbs.md): remote agent machines,
   agent-to-agent threads and multiplayer on Amp's service, compared with
-  Cairn's lane.
+  ParleyInn's lane.
 - [T3 Code](notes/t3code/t3code.md): a local GUI over coding agents,
   read from its source: event sourced in SQLite with no tamper
   evidence, remote access and telemetry built in.
+- [Multica](notes/multica/multica.md): an issue-centered agent workspace with
+  run transcripts, squads and review; compared with ParleyInn's record, trust and
+  network boundaries.
+- [LobeHub](notes/lobehub/lobehub.md): an agent workspace connecting coding
+  agents, Topics, Tasks, Groups and memory; compared with ParleyInn's room, record
+  and trust contract.
+- [Warp](notes/warp/warp.md): shared agent sessions, inline code review and
+  Factory work from issues and pull requests; compared with ParleyInn's
+  intent-centered room, forge discussion and trust boundaries.
 - [Live-PR pitch review](notes/live-pr-pitch-review/): a blind
   adversarial review of the "live pull request" pitch in three lenses:
   missing process, existing products, and inconsistencies with the
@@ -61,7 +70,7 @@ from.
   criteria and memory safety.
 - [OpenAI dots](notes/openai-agent-ui/dots.md): always-on agents with
   their own cloud computer, launched 29 September 2026, and what
-  Cairn's pitch and design take from them.
+  ParleyInn's pitch and design take from them.
 - [Domain-model subset search](notes/domain-model-subset-search/README.md):
   a genetic search, with repairs, for the largest consistent, secure and
   useful subset of the domain model. It holds the feature genes, the

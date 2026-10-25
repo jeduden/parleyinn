@@ -51,9 +51,9 @@ findings.
 - Nothing documented separates a teammate's message from the owner's:
   in multiplayer, anyone in the workspace instructs the agent directly.
 
-## Against Cairn
+## Against ParleyInn
 
-| Question         | Amp orbs                                                       | Cairn (2.0-draft)                                                     |
+| Question         | Amp orbs                                                       | ParleyInn (2.0-draft)                                                 |
 | ---------------- | -------------------------------------------------------------- | --------------------------------------------------------------------- |
 | Where agents run | Remote machines on Amp's service, or a local Amp runner        | The user's own machines and sandboxes                                 |
 | Shared channel   | One thread per agent; agents message each other across threads | One lane holds many agents and people                                 |
@@ -62,17 +62,17 @@ findings.
 | Topology         | Central: Amp's servers hold threads and run orbs               | No central service; peers enrolled by key                             |
 | Record           | Server-side threads                                            | One signed log per writer, on your nodes                              |
 
-## Lessons for Cairn
+## Lessons for ParleyInn
 
-- Orbs are the product shape of Cairn's ephemeral-sandbox persona (U3):
+- Orbs are the product shape of ParleyInn's ephemeral-sandbox persona (U3):
   agents keep working while the laptop sleeps, and wake with state in
-  place. Cairn's answer is the sealed segments a sandbox offers to an
+  place. ParleyInn's answer is the sealed segments a sandbox offers to an
   enrolled peer (PEER-05), with no vendor holding the machine.
-- Amp has the multiplayer Cairn plans, centrally and without a trust
+- Amp has the multiplayer ParleyInn plans, centrally and without a trust
   boundary: a teammate in the thread instructs the agent as the owner
-  does. Cairn's one-principal rule and endorsement (OWN-01, OWN-08) are
+  does. ParleyInn's one-principal rule and endorsement (OWN-01, OWN-08) are
   the difference to name in the pitch.
-- Agent-to-agent messaging is a channel Cairn has not specified: an
+- Agent-to-agent messaging is a channel ParleyInn has not specified: an
   agent's message to another agent is assistant text, untrusted under
   I2, and today reaches another agent only as a post. A requirement for
   agent-to-agent delegation inside a lane is a candidate for the next

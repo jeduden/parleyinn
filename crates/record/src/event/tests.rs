@@ -7,7 +7,14 @@ fn every_event_kind_round_trips_through_its_name() {
         (EventKind::CreateRoom, "create_room"),
         (EventKind::CertificateRecord, "certificate_record"),
         (EventKind::UnparsedLine, "unparsed_line"),
+        (EventKind::TranscriptLine, "transcript_line"),
         (EventKind::PrincipalAct, "principal_act"),
+        (EventKind::NodeIdentityChange, "node_identity_change"),
+        (EventKind::RepeatReference, "repeat_reference"),
+        (EventKind::RepeatOwner, "repeat_owner"),
+        (EventKind::HookObservation, "hook_observation"),
+        (EventKind::PromptMatch, "prompt_match"),
+        (EventKind::RepositoryBind, "repository_bind"),
     ] {
         assert_eq!(kind.as_str(), name);
         assert_eq!(EventKind::parse(name), Some(kind));

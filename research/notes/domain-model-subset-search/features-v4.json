@@ -130,14 +130,14 @@
    "principals-and-agents: Principal": "The party every invariant protects (I1, I2, I8); every agent, home and key belongs to exactly one.",
    "principals-and-agents: Person": "A single-node install's principal is a person; no one certifies its key, and only a person records a verdict.",
    "principals-and-agents: Managed policy": "I1, I4 and I7 name it; its item also defines harness configuration, the thing I7 governs.",
-   "principals-and-agents: Agent": "What restore blocks and recall serve; the reason Cairn exists.",
+   "principals-and-agents: Agent": "What restore blocks and recall serve; the reason ParleyInn exists.",
    "principals-and-agents: Run": "The unit the record is keyed by and a restore block is built for (I1, I3).",
    "principals-and-agents: Subagent": "The harness starts subagents; each has its own run and writer tied by a parent link, or their events are lost (I1).",
-   "principals-and-agents: Ingested run": "`cairn ingest` recovers what capture missed (I1, I9 fail-open); such runs must be named and untrusted (REC-22).",
+   "principals-and-agents: Ingested run": "`parinn ingest` recovers what capture missed (I1, I9 fail-open); such runs must be named and untrusted (REC-22).",
    "principals-and-agents: Author": "Every event and pin has one authoring seat; which pins qualify to restore depends on it (PIN-10, I3).",
    "principals-and-agents: Member": "Whether a seat is a member decides where a run's events go and which pins restore (hub Relations).",
    "principals-and-agents: Owner": "The principal owns its personal room; ownership gives its device seats every capability there.",
-   "harness-facts: Harness": "What Cairn records; I7 governs its configuration.",
+   "harness-facts: Harness": "What ParleyInn records; I7 governs its configuration.",
    "harness-facts: Harness session": "The harness unit that yields a transcript and keys a run.",
    "harness-facts: Transcript": "The source ingest reads (REC-01, REC-03).",
    "harness-facts: Hook": "How the harness reports to the core's hook handlers; capture rides on it.",
@@ -239,7 +239,7 @@
    "hub-relation: Every seat belongs to one": "Seat-principal-room-writer structure behind every address.",
    "hub-relation: Each event goes to exactly": "Event routing: every event in exactly one writer (I1, I10).",
    "hub-relation: A run's history spans its": "A run's history across writers; recall by address.",
-   "hub-relation: Principals and agents create rooms;": "Cairn never creates a room on its own; the personal room comes from install.",
+   "hub-relation: Principals and agents create rooms;": "ParleyInn never creates a room on its own; the personal room comes from install.",
    "hub-relation: A pin naming no room": "Roomless pins land in the personal room.",
    "hub-relation: Recall extends only to the": "Recall scope bound (I8)."
   }
@@ -433,7 +433,7 @@
   {
    "id": "pin-candidates",
    "name": "Pin candidates",
-   "description": "Agent-suggested or Cairn-detected proposed pin text that the principal confirms into a device-seat pin.",
+   "description": "Agent-suggested or ParleyInn-detected proposed pin text that the principal confirms into a device-seat pin.",
    "entries": [
     "pins-and-context: Pin candidate"
    ],
@@ -567,7 +567,7 @@
   {
    "id": "launcher",
    "name": "Launcher and run controls",
-   "description": "B1 `cairn launch`: starts, hosts and controls runs, steer/interrupt/pause/resume/stop, terminal takeover, corrections and retries, carrying in only text the core built.",
+   "description": "B1 `parinn launch`: starts, hosts and controls runs, steer/interrupt/pause/resume/stop, terminal takeover, corrections and retries, carrying in only text the core built.",
    "entries": [
     "components-and-surfaces: Launcher (B1):",
     "trust-and-flow: Run controls",
@@ -688,7 +688,7 @@
    ],
    "value": 3,
    "risk": 5,
-   "notes": "I2 ('what a trust grant of that principal covers'; 'Cairn applies such grants and never grants trust itself'), I8 ('unless this principal's own stamp or trust grant covers it'). Never in a foreign room; refuses relaying service accounts."
+   "notes": "I2 ('what a trust grant of that principal covers'; 'ParleyInn applies such grants and never grants trust itself'), I8 ('unless this principal's own stamp or trust grant covers it'). Never in a foreign room; refuses relaying service accounts."
   },
   {
    "id": "principal-keys",
@@ -919,7 +919,7 @@
    ],
    "value": 4,
    "risk": 2,
-   "notes": "I10 ('evidence and proof classes'). Verdicts are neutral principal acts by persons only; Cairn never derives one."
+   "notes": "I10 ('evidence and proof classes'). Verdicts are neutral principal acts by persons only; ParleyInn never derives one."
   },
   {
    "id": "witness-check",
@@ -979,7 +979,7 @@
    ],
    "value": 2,
    "risk": 2,
-   "notes": "No invariant names it; a presentation's URL is inert text never opened by Cairn."
+   "notes": "No invariant names it; a presentation's URL is inert text never opened by ParleyInn."
   },
   {
    "id": "needs-you",
@@ -1136,7 +1136,7 @@
   {
    "id": "export-bundles",
    "name": "Export and bundles",
-   "description": "Reviewed `cairn export` of a room as a signed bundle (file or git ref), a rendering, or a trusted-only export for downstream memory systems.",
+   "description": "Reviewed `parinn export` of a room as a signed bundle (file or git ref), a rendering, or a trusted-only export for downstream memory systems.",
    "entries": [
     "record: Export",
     "record: Rendering",

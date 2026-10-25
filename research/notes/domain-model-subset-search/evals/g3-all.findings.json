@@ -38,17 +38,17 @@
  {
   "type": "contradiction",
   "quote": "`canary`, `ui`, `why`, `open`, `launch`, `hook`, `mcp` and `kernel-worker`.",
-  "problem": "Names lists `ui` and `launch` among the CLI's one-word commands. Components says the entry points `cairn ui` and `cairn launch` are no part of the CLI, which is B0 and opens no socket, while the room-view component and the launcher listen on loopback.",
-  "fix": "Say these are words of the `cairn` command, and that `ui` and `launch` start the room-view component and the launcher (B1), not the CLI.",
+  "problem": "Names lists `ui` and `launch` among the CLI's one-word commands. Components says the entry points `parinn ui` and `parinn launch` are no part of the CLI, which is B0 and opens no socket, while the room-view component and the launcher listen on loopback.",
+  "fix": "Say these are words of the `parinn` command, and that `ui` and `launch` start the room-view component and the launcher (B1), not the CLI.",
   "severity": "minor",
   "lens": "consistency",
   "model": "default"
  },
  {
   "type": "gap",
-  "quote": "turning it off applies, which needs no acceptance and which `cairn",
-  "problem": "A configuration that turns the launcher off applies without acceptance, yet its cut act is recorded only when `cairn configuration accept` runs, and accepting configuration is classed as widening. If accept never runs, the launcher stops with no recorded act. The room-view component's turn-off has no recording rule at all.",
-  "fix": "\"...turning it off applies, needing no acceptance; Cairn records the cut act turning it off when that configuration applies\", and the same for the room-view component.",
+  "quote": "turning it off applies, which needs no acceptance and which `parinn",
+  "problem": "A configuration that turns the launcher off applies without acceptance, yet its cut act is recorded only when `parinn configuration accept` runs, and accepting configuration is classed as widening. If accept never runs, the launcher stops with no recorded act. The room-view component's turn-off has no recording rule at all.",
+  "fix": "\"...turning it off applies, needing no acceptance; ParleyInn records the cut act turning it off when that configuration applies\", and the same for the room-view component.",
   "severity": "minor",
   "lens": "consistency",
   "model": "default"
@@ -137,7 +137,7 @@
  {
   "type": "security",
   "quote": "the person's keystrokes are the harness's own input from",
-  "problem": "Text typed at the terminal the launcher hosts starts a user turn: the model takes it as its user's instruction, and in interactive mode it becomes a trusted `user` event. The launcher may listen on an endpoint the same OS user can reach. Hooks, the CLI and `cairn ui` each bar a run's tool process, but nothing bars one from typing into the hosted terminal, so an injected agent can instruct itself as the user.",
+  "problem": "Text typed at the terminal the launcher hosts starts a user turn: the model takes it as its user's instruction, and in interactive mode it becomes a trusted `user` event. The launcher may listen on an endpoint the same OS user can reach. Hooks, the CLI and `parinn ui` each bar a run's tool process, but nothing bars one from typing into the hosted terminal, so an injected agent can instruct itself as the user.",
   "fix": "Add: \"Only a terminal that no run's tool process started or reaches may type into a hosted terminal; the launcher refuses and counts input from a run's tool process (I6).\"",
   "severity": "needs-fix",
   "lens": "security",

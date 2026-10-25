@@ -2,7 +2,7 @@
  {
   "type": "security",
   "quote": "An authenticated client where principal acts are taken:",
-  "problem": "Nothing defines what authenticates the client. Being 'at a terminal' is the only thing separating the principal from an agent running `cairn` from its own tool call, and an agent can get a pseudo-terminal. So an agent can take widening principal acts, such as adding a `constraint` pin that then restores as trusted text, and can get recall output without an envelope. The rule 'a skill's call is the agent's own tool call, never a principal act' has nothing to enforce it.",
+  "problem": "Nothing defines what authenticates the client. Being 'at a terminal' is the only thing separating the principal from an agent running `parinn` from its own tool call, and an agent can get a pseudo-terminal. So an agent can take widening principal acts, such as adding a `constraint` pin that then restores as trusted text, and can get recall output without an envelope. The rule 'a skill's call is the agent's own tool call, never a principal act' has nothing to enforce it.",
   "fix": "Add: \"A client started from an agent's tool call is never a principal surface, whatever its output: it takes no principal act, acts only with that run's seat, and returns only enveloped output (OWN-02).\"",
   "severity": "needs-fix",
   "lens": "consistency"
@@ -18,7 +18,7 @@
  {
   "type": "contradiction",
   "quote": "only exceptions are secrets removed by redaction before storage.",
-  "problem": "I1 names redaction as the only exception. But the principal can turn capture off or pause it (a widening act, which `cairn uninstall` also records), and the candidate defines a capture gap as part of a run that capture did not record. Those events are not recoverable, so I1 and capture-off cannot both hold.",
+  "problem": "I1 names redaction as the only exception. But the principal can turn capture off or pause it (a widening act, which `parinn uninstall` also records), and the candidate defines a capture gap as part of a run that capture did not record. Those events are not recoverable, so I1 and capture-off cannot both hold.",
   "fix": "\"only exceptions are secrets removed by redaction before storage, and events of a run while its principal turned capture off or paused it, each shown as a capture gap.\"",
   "severity": "needs-fix",
   "lens": "consistency"
@@ -89,8 +89,8 @@
  },
  {
   "type": "useless",
-  "quote": "Wording Cairn ships, filled only with ids, counts, version",
-  "problem": "No closed path and no other concept uses a fixed template or principal-typed text. I2's paths are only restore blocks and compaction guidance, which use 'fixed text Cairn ships'.",
+  "quote": "Wording ParleyInn ships, filled only with ids, counts, version",
+  "problem": "No closed path and no other concept uses a fixed template or principal-typed text. I2's paths are only restore blocks and compaction guidance, which use 'fixed text ParleyInn ships'.",
   "fix": "Remove Fixed template and principal-typed text, or name the closed path that writes one.",
   "severity": "minor",
   "lens": "consistency"
@@ -114,7 +114,7 @@
  {
   "type": "security",
   "quote": "An authenticated client where principal acts are taken:",
-  "problem": "Nothing authenticates a principal surface except being \"the CLI or TUI at a terminal\". An agent's tool calls run the same `cairn` as the same OS user and can open a pseudo-terminal. Injected text can therefore drive widening principal acts (add a `constraint` pin, release a quarantine, accept configuration, turn capture off), whose results reach every later restore block as trusted text. It can also acknowledge counters, which hides failures (I6).",
+  "problem": "Nothing authenticates a principal surface except being \"the CLI or TUI at a terminal\". An agent's tool calls run the same `parinn` as the same OS user and can open a pseudo-terminal. Injected text can therefore drive widening principal acts (add a `constraint` pin, release a quarantine, accept configuration, turn capture off), whose results reach every later restore block as trusted text. It can also acknowledge counters, which hides failures (I6).",
   "fix": "\"An authenticated client where principal acts are taken: the CLI or TUI at a terminal, authenticated by a check no process a harness session started can pass; an act from such a process is refused and counted.\"",
   "severity": "needs-fix",
   "lens": "security"
@@ -137,8 +137,8 @@
  },
  {
   "type": "security",
-  "quote": "**Hook**: The harness's callback into Cairn, carrying its **hook input**, a",
-  "problem": "`user` and `harness_meta` events are trusted because \"its hook handlers recorded\" them, but `cairn hook` is a CLI verb any process of the OS user can call with any hook input. An agent can record its own text as a trusted `user` event in interactive mode, or forge hook observations into any run's writer.",
+  "quote": "**Hook**: The harness's callback into ParleyInn, carrying its **hook input**, a",
+  "problem": "`user` and `harness_meta` events are trusted because \"its hook handlers recorded\" them, but `parinn hook` is a CLI verb any process of the OS user can call with any hook input. An agent can record its own text as a trusted `user` event in interactive mode, or forge hook observations into any run's writer.",
   "fix": "Add: \"Events from a hook call the core cannot tell apart from an agent's own tool call (no per-harness-session credential the harness passes and its tools cannot read) are untrusted, and the call is counted.\"",
   "severity": "needs-fix",
   "lens": "security"
@@ -170,7 +170,7 @@
  {
   "type": "security",
   "quote": "A pin the principal's configuration declares, authored",
-  "problem": "Configuration is a file in the home that any process of the OS user can write, the agent's tool calls included. Its pins become trusted device-seat pins that restore, and its `node.deployment_mode` decides whether `user` events are trusted. Nothing says a configuration change applies only after an accept configuration act records its digest. Nothing stops an untrusted repository `.cairn.toml` from adding pins as \"tightening\".",
+  "problem": "Configuration is a file in the home that any process of the OS user can write, the agent's tool calls included. Its pins become trusted device-seat pins that restore, and its `node.deployment_mode` decides whether `user` events are trusted. Nothing says a configuration change applies only after an accept configuration act records its digest. Nothing stops an untrusted repository `.parinn.toml` from adding pins as \"tightening\".",
   "fix": "\"A pin the principal's configuration declares once an accept configuration act has recorded that configuration's digest, authored ...\". Add under Record: \"repository configuration declares no pin\".",
   "severity": "needs-fix",
   "lens": "security"
@@ -201,7 +201,7 @@
  },
  {
   "type": "useless",
-  "quote": "Wording Cairn ships, filled only with ids, counts, version",
+  "quote": "Wording ParleyInn ships, filled only with ids, counts, version",
   "problem": "In this candidate I2's closed paths are restore blocks and compaction guidance only, so no path uses a fixed template or principal-typed text. Any use would write to an agent outside the closed paths.",
   "fix": "Drop Fixed template and principal-typed text, or add the path that uses them to I2's closed set.",
   "severity": "minor",
@@ -210,7 +210,7 @@
  {
   "type": "contradiction",
   "quote": "Any agent that receives a delegation, a subagent included",
-  "problem": "Delegation is defined as handing a task to \"its subagent\" through the harness, yet Delegate implies non-subagent delegates. That suggests an agent-to-agent hand-off Cairn would deliver, a write I2 does not list.",
+  "problem": "Delegation is defined as handing a task to \"its subagent\" through the harness, yet Delegate implies non-subagent delegates. That suggests an agent-to-agent hand-off ParleyInn would deliver, a write I2 does not list.",
   "fix": "\"A subagent, which receives a delegation from its harness (OWN-24).\"",
   "severity": "minor",
   "lens": "security"
@@ -289,7 +289,7 @@
  },
  {
   "type": "useless",
-  "quote": "**Fixed template**: Wording Cairn ships, filled only with ids, counts, version",
+  "quote": "**Fixed template**: Wording ParleyInn ships, filled only with ids, counts, version",
   "problem": "No closed path in this candidate uses a fixed template or principal-typed text. Restore blocks and compaction guidance are built from fixed text, qualifying pins and structural fields only.",
   "fix": "Drop Fixed template and principal-typed text.",
   "severity": "minor",

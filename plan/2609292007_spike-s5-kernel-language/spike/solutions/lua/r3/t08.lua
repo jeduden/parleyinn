@@ -1,6 +1,6 @@
 local errors = {}
 local results = {}
-for _, e in ipairs(cairn.events()) do
+for _, e in ipairs(parinn.events()) do
   if e.kind == "tool_result" and e.tool ~= nil then
     results[e.tool] = (results[e.tool] or 0) + 1
     if e.status == "error" then

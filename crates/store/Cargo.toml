@@ -10,6 +10,7 @@ publish.workspace = true
 [dependencies]
 record.workspace = true
 rusqlite.workspace = true
+search.workspace = true
 serde_json.workspace = true
 
 [dev-dependencies]
@@ -18,8 +19,8 @@ testkit.workspace = true
 [lints]
 workspace = true
 
-# ENG-02: see crates/cairn/Cargo.toml.
-[package.metadata.cairn]
+# ENG-02: see crates/parinn/Cargo.toml.
+[package.metadata.parinn]
 responsibility = "Keeps the record's writer logs and seats in store.db"
-may-depend-on = ["record"]
+may-depend-on = ["record", "search"]
 may-dev-depend-on = ["testkit"]

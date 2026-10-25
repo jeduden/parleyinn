@@ -1,7 +1,7 @@
 [package]
 name = "hook"
 version = "0.0.0"
-description = "The hook handlers' entry point: the hook input checked, a panic caught, every failure typed for its counter"
+description = "The hook handlers' entry point: the hook input decoded against its schema and recorded shapes, the process ancestry read, a panic caught, every failure typed for its counter"
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
@@ -10,12 +10,16 @@ publish.workspace = true
 [dependencies]
 audit.workspace = true
 serde_json.workspace = true
+transcript.workspace = true
+
+[dev-dependencies]
+testkit.workspace = true
 
 [lints]
 workspace = true
 
-# ENG-02: see crates/cairn/Cargo.toml.
-[package.metadata.cairn]
-responsibility = "Runs the hook handlers: checks the hook input, catches a panic, and types each failure for its counter"
-may-depend-on = ["audit"]
-may-dev-depend-on = []
+# ENG-02: see crates/parinn/Cargo.toml.
+[package.metadata.parinn]
+responsibility = "Decodes each hook input against its schema and recorded shapes, reads the hook handler's process ancestry, catches a panic, and types each failure for its counter"
+may-depend-on = ["audit", "transcript"]
+may-dev-depend-on = ["testkit"]

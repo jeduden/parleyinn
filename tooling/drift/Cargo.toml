@@ -15,8 +15,8 @@ testkit.workspace = true
 [lints]
 workspace = true
 
-# ENG-02: see crates/cairn/Cargo.toml.
-[package.metadata.cairn]
+# ENG-02: see crates/parinn/Cargo.toml.
+[package.metadata.parinn]
 responsibility = "Registers and injects the drift each repository check exists to catch"
 may-depend-on = []
 may-dev-depend-on = ["testkit"]

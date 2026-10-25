@@ -47,9 +47,9 @@
     {
      "type": "gap",
      "file": "docs/srs/13-open-questions-and-risks.md",
-     "quote": "Until this closes, the hook handlers append nothing for such a run, leaving an ingest marker, and its events reach the record only once its MCP server holds the key or through `cairn ingest`.",
-     "problem": "What `cairn ingest` appends for a witnessed run goes to the seat it starts beside that run's run seat, and only the key that certified that run seat may certify it (REC-19, Run seat). A run whose MCP server never held a run-seat key has no run seat. So this interim rule names no seat or writer for the events that ingest appends. It also does not say that the run is counted and shown while unrecorded (I6), which only the recommended option says.",
-     "fix": "\"... or through `cairn ingest`, as an ingested run (REC-22), the run shown `unrecorded` (VIEW-04) and counted (I6) until then.\"",
+     "quote": "Until this closes, the hook handlers append nothing for such a run, leaving an ingest marker, and its events reach the record only once its MCP server holds the key or through `parinn ingest`.",
+     "problem": "What `parinn ingest` appends for a witnessed run goes to the seat it starts beside that run's run seat, and only the key that certified that run seat may certify it (REC-19, Run seat). A run whose MCP server never held a run-seat key has no run seat. So this interim rule names no seat or writer for the events that ingest appends. It also does not say that the run is counted and shown while unrecorded (I6), which only the recommended option says.",
+     "fix": "\"... or through `parinn ingest`, as an ingested run (REC-22), the run shown `unrecorded` (VIEW-04) and counted (I6) until then.\"",
      "severity": "minor"
     }
    ]
@@ -61,8 +61,8 @@
      "type": "security",
      "file": "docs/srs/13-open-questions-and-risks.md",
      "quote": "Until this closes, the hook handlers append nothing for such a run, leaving an ingest marker",
-     "problem": "The interim records nothing for a witnessed run while no MCP server holds its run-seat key. Where no server ever runs, for example because the harness's managed settings leave out Cairn's MCP server (I7 forbids overriding that), nothing is recorded at all. Unlike the recommended option, the interim counts, audits and shows nothing, and such a run has no seat in which VIEW-04's `unrecorded` mark could show it, so its whole capture gap goes unseen (I6) until someone runs `cairn ingest`.",
-     "fix": "Until this closes, the hook handlers append nothing for such a run, leaving an ingest marker; each such run is counted, audited and shown `unrecorded` on Fleet (I6) until its events reach the record, once its MCP server holds the key or through `cairn ingest`.",
+     "problem": "The interim records nothing for a witnessed run while no MCP server holds its run-seat key. Where no server ever runs, for example because the harness's managed settings leave out ParleyInn's MCP server (I7 forbids overriding that), nothing is recorded at all. Unlike the recommended option, the interim counts, audits and shows nothing, and such a run has no seat in which VIEW-04's `unrecorded` mark could show it, so its whole capture gap goes unseen (I6) until someone runs `parinn ingest`.",
+     "fix": "Until this closes, the hook handlers append nothing for such a run, leaving an ingest marker; each such run is counted, audited and shown `unrecorded` on Fleet (I6) until its events reach the record, once its MCP server holds the key or through `parinn ingest`.",
      "severity": "needs-fix"
     },
     {
@@ -138,7 +138,7 @@
      "type": "security",
      "file": "docs/srs/13-open-questions-and-risks.md",
      "quote": "Until this closes, the hook handlers append nothing for such a run, leaving an ingest marker",
-     "problem": "The recommended option shows the run as `unrecorded` and counts it (I6), but the interim rule leaves both out. In a harness session where no MCP server runs, capture then stops without any count, audit entry or mark until someone runs `cairn ingest`, a silent failure under I6.",
+     "problem": "The recommended option shows the run as `unrecorded` and counts it (I6), but the interim rule leaves both out. In a harness session where no MCP server runs, capture then stops without any count, audit entry or mark until someone runs `parinn ingest`, a silent failure under I6.",
      "fix": "Append \", the run shown `unrecorded` (VIEW-04) and counted (I6) until then\" to the interim sentence.",
      "severity": "minor"
     }

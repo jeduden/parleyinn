@@ -87,7 +87,7 @@ documentation. Claims resting on secondary sources are marked so.
 - **RFC 2811 safe channels** carry a server-generated id, so a split
   cannot recreate them under the same short name
   ([RFC 2811](https://www.rfc-editor.org/rfc/rfc2811.html)).
-- **Why it works for IRC and not for Cairn.** It relies on trusted
+- **Why it works for IRC and not for ParleyInn.** It relies on trusted
   servers with roughly agreeing clocks. Among peers, a timestamp is
   whatever the writer claims.
 
@@ -114,9 +114,9 @@ documentation. Claims resting on secondary sources are marked so.
 - **Impersonation.** The fixes moved from nicks to host masks, then to
   services accounts, then to capability checks on every command.
 
-## What Cairn takes
+## What ParleyInn takes
 
-| IRC                                   | Cairn                                                                   |
+| IRC                                   | ParleyInn                                                               |
 | ------------------------------------- | ----------------------------------------------------------------------- |
 | Topic, setter and time on join        | Room pins, intent first, each with author and time, shown on join       |
 | Member list with prefixes             | Roster with roles on join                                               |

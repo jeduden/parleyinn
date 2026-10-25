@@ -1,9 +1,9 @@
 [
  {
   "type": "contradiction",
-  "quote": "widening act at a principal surface (`cairn ui --phone`)",
-  "problem": "`cairn ui` is declared no part of the CLI, and Principal surface lists only the browser room view, the CLI or TUI at a terminal no run's tool process started, and a paired phone. So the act issuing a phone-scoped room-view secret is taken at no principal surface, and the 'never from inside a run' exclusion does not reach `cairn ui`: nothing stops a run's tool process from starting it and holding its launch secret.",
-  "fix": "In Principal surface add \"or `cairn ui` started at a terminal that no run's tool process started; `cairn ui` started from a run's tool process mints no room-view secret\".",
+  "quote": "widening act at a principal surface (`parinn ui --phone`)",
+  "problem": "`parinn ui` is declared no part of the CLI, and Principal surface lists only the browser room view, the CLI or TUI at a terminal no run's tool process started, and a paired phone. So the act issuing a phone-scoped room-view secret is taken at no principal surface, and the 'never from inside a run' exclusion does not reach `parinn ui`: nothing stops a run's tool process from starting it and holding its launch secret.",
+  "fix": "In Principal surface add \"or `parinn ui` started at a terminal that no run's tool process started; `parinn ui` started from a run's tool process mints no room-view secret\".",
   "severity": "needs-fix",
   "lens": "consistency"
  },
@@ -98,7 +98,7 @@
  {
   "type": "security",
   "quote": "the browser room view under SEC-20, the CLI or TUI at a terminal that no",
-  "problem": "Only CLI and TUI calls made from inside a run are excluded from principal acts. `cairn ui` is 'no part of the CLI', and nothing says a room-view component that a run's tool process started (`cairn ui --phone` included) is not a principal surface. An agent that starts one holds its launch secret and can take widening acts: trust grants, stamps, restoring pins, allows.",
+  "problem": "Only CLI and TUI calls made from inside a run are excluded from principal acts. `parinn ui` is 'no part of the CLI', and nothing says a room-view component that a run's tool process started (`parinn ui --phone` included) is not a principal surface. An agent that starts one holds its launch secret and can take widening acts: trust grants, stamps, restoring pins, allows.",
   "fix": "'the browser room view under SEC-20 of a room-view component that no run's tool process started, the CLI or TUI at a terminal that no run's tool process started'.",
   "severity": "needs-fix",
   "lens": "security"

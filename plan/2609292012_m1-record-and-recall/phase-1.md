@@ -12,7 +12,7 @@ own phases complete.
 
 The slice runs one Claude Code 2.1.296 transcript from
 `testdata/claude-code` through the whole record, in an isolated
-`CAIRN_HOME`:
+`PARINN_HOME`:
 
 - At its first start, the node mints its device key, kept in a `0600`
   file for now; phase 5 builds the key stores the plan's ruling 2
@@ -20,7 +20,7 @@ The slice runs one Claude Code 2.1.296 transcript from
   log's `minted` key event, its first event (PRV-12), then the
   personal room's create room act, then the certificate record of its
   own seat certificate (PRV-11).
-- `cairn ingest --path <transcript>` (§9.5) starts an ingest seat in
+- `parinn ingest --path <transcript>` (§9.5) starts an ingest seat in
   the personal room. Its seat certificate is signed by the device key
   and countersigned by the seat key, and its certificate record lands
   in the device seat.
@@ -30,17 +30,17 @@ The slice runs one Claude Code 2.1.296 transcript from
   commitment key, never content. The header is hashed as §8.3 says:
   RFC 8785 over SHA-256.
 - Events land in `store.db` through `rusqlite`, 100 per transaction.
-- `cairn mcp` over stdio answers `event_get` for an address with the
+- `parinn mcp` over stdio answers `event_get` for an address with the
   event's content inside the envelope of §9.3. Until phase 9 binds a
   session the server serves no run, so it answers only an explicit
   `scope` of `room` and shows the event's run as `other`.
-- `cairn verify` checks every writer's chain and seat certificate,
+- `parinn verify` checks every writer's chain and seat certificate,
   exits 0, and exits 3 (§9.5) naming the event when one header byte
   changes.
 
 The slice fixes what later phases copy. It splits the crates, with
 ENG-02's declared directions. It records the canonical field sets in
-`meta`. It shows how a scenario step drives `cairn` in an isolated
+`meta`. It shows how a scenario step drives `parinn` in an isolated
 home through the testkit, and how a test reads the store.
 
 Dependencies. The ADRs for the hash, the signatures and the random
@@ -55,7 +55,7 @@ Names. Ask the domain-model agent before naming a crate, type, CLI
 verb or MCP tool. Names follow ENG-02's list and the domain model.
 
 BDD coverage: `@REC-10` comes off `@pending`. Its steps bind two
-writers recorded under clocks an hour apart, and `cairn verify`. The
+writers recorded under clocks an hour apart, and `parinn verify`. The
 other rows stay pending until their phases.
 
 RED, each test failing first. Unit tests cover the header encoding,
@@ -64,9 +64,9 @@ store's 100-event transaction (`crates/store/tests`) and `event_get`'s
 envelope (`crates/mcp/tests`). Then the `@REC-10` steps, and one thin
 end-to-end test of the whole slice.
 
-GREEN: the crates, the store's first schema, `cairn ingest`, `cairn
-mcp`'s `event_get` and `cairn verify`, through the core executable.
+GREEN: the crates, the store's first schema, `parinn ingest`, `parinn
+mcp`'s `event_get` and `parinn verify`, through the core executable.
 
 Gate: the slice's end-to-end test passes in an isolated home, and
-`@REC-10` passes. A flipped header byte fails `cairn verify`, which
+`@REC-10` passes. A flipped header byte fails `parinn verify`, which
 names the event's address.

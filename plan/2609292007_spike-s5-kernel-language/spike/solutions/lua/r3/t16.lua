@@ -1,4 +1,4 @@
-local evs = cairn.events()
+local evs = parinn.events()
 table.sort(evs, function(x, y)
   if x.writer ~= y.writer then return x.writer < y.writer end
   return x.seq < y.seq

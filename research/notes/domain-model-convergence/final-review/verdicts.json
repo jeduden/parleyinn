@@ -53,7 +53,7 @@
     ],
     "case": "On a macOS node the login keychain is locked, because the principal works over SSH or the machine slept; on a Linux node the keyring is not yet unlocked. The device key and the seat keys the core keeps are still in the platform key store, but the core cannot read them when a hook handler or MCP server starts. A new run's personal-room seat needs a seat certificate from the device key (PRV-11).",
     "problem": "The SRS says what happens when a key is missing (mint a new one, with a new seat and writer under SEC-27) and when the node identity changes or is unavailable (the whole earlier record counts as received). It says nothing about a store that holds the key but refuses access. Three implementers can differ. One mints a new device key and seat keys: every device seat restarts with no add or role, and two device keys exist once the store unlocks. Another reads node identity from the store, counts a changed identity, and makes the whole record received, so the principal's pins stop restoring. A third appends nothing and waits. The key set, room state, membership, trust levels and active pins all differ.",
-    "fix": "A platform key store that holds a key but refuses access (locked or denied) MUST count neither as a missing key (SEC-10) nor as an unavailable node identity (REC-24). The core MUST mint no key and append nothing that needs the refused key; the hook handlers leave ingest markers as REC-19 says for a run whose MCP server does not yet hold its run-seat key. The core MUST audit and count the refusal, show it in `cairn status`, and resume once the store grants access.",
+    "fix": "A platform key store that holds a key but refuses access (locked or denied) MUST count neither as a missing key (SEC-10) nor as an unavailable node identity (REC-24). The core MUST mint no key and append nothing that needs the refused key; the hook handlers leave ingest markers as REC-19 says for a run whose MCP server does not yet hold its run-seat key. The core MUST audit and count the refusal, show it in `parinn status`, and resume once the store grants access.",
     "scope": "m1-m5"
    },
    {
@@ -76,7 +76,7 @@
       "text": "so that room state, the key set, the quarantine set and every other derived artifact derive as before but for the purged content"
      }
     ],
-    "case": "In M5 a long-running run R recalls a `web` event X that carries an injection. SEC-13 taints R, so the example PreToolUse hook handler asks for approval of sensitive action classes. Later the principal purges X, or a retention policy on `web` purges it (REC-15), and `cairn rebuild` runs. R keeps going with X's text still in its context.",
+    "case": "In M5 a long-running run R recalls a `web` event X that carries an injection. SEC-13 taints R, so the example PreToolUse hook handler asks for approval of sensitive action classes. Later the principal purges X, or a retention policy on `web` purges it (REC-15), and `parinn rebuild` runs. R keeps going with X's text still in its context.",
     "problem": "The recall event keeps only X's address, and a tombstone keeps no provenance, origin or recorder for an event that is not an act. After the purge, nothing in the record says the returned item was untrusted. An implementer that derives taint from the record clears R's taint, which removes SEC-13's approval step from a run that saw the injection. An implementer that keeps the taint set from before the purge gets a rebuild that differs (ADM-08, I10). The grid's Purge row names ADM-07 for trust levels, and ADM-07 does not decide this.",
     "fix": "RCL-07's recall event MUST record, as a structural field, whether any returned item was untrusted. Recall taint MUST derive from recall events alone, and a purge, retention purge or quarantine of what a recall returned MUST NOT clear it.",
     "scope": "m1-m5"
@@ -101,7 +101,7 @@
       "text": "quarantined from recall immediately on the node that records the quarantine,"
      }
     ],
-    "case": "In M1 run R calls `event_expand` and receives a `web` event X that carries an injection. The harness records the enveloped result as R's tool result T, which Cairn ingests and indexes. The principal then quarantines X. After a compaction, R calls `event_search` in its default `run` scope. The search matches T, and `event_expand` on T returns X's text again, enveloped.",
+    "case": "In M1 run R calls `event_expand` and receives a `web` event X that carries an injection. The harness records the enveloped result as R's tool result T, which ParleyInn ingests and indexes. The principal then quarantines X. After a compaction, R calls `event_search` in its default `run` scope. The search matches T, and `event_expand` on T returns X's text again, enveloped.",
     "problem": "SEC-12 withholds what its selector covers, and SEC-31 extends a purge to copies of the content in recorded recall results, but no requirement says whether a quarantine reaches those copies; 'as a purge keeps what it removes' can be read either way. One implementer withholds X's item inside T and another returns it. Under the second, the quarantine fails for the very run that recalled the content, against M1's exit criterion 'quarantine effective' and I5.",
     "fix": "A quarantine MUST also withhold, on every path it covers, each copy of covered content that SEC-31 would erase in a purge, such as the item naming a covered address in a recorded recall result, and return a quarantine marker in its place. Its release MUST make those copies available again.",
     "scope": "m1-m5"
@@ -123,7 +123,7 @@
      },
      {
       "file": "docs/srs/05-functional-requirements.md",
-      "text": "Cairn MUST produce one landmark per closed span containing only structural fields"
+      "text": "ParleyInn MUST produce one landmark per closed span containing only structural fields"
      }
     ],
     "case": "In M3 a run's `SessionEnd` hook handler hits an internal error, such as a full disk or a corrupt page, before it writes its ingest marker, and fails open as \u00a79.1 says ('Exit 0, audit'). The same happens when the harness is killed and no `SessionEnd` fires. The transcript lines are ingested later from the ingest position, but the end observation existed only in the hook's input and is lost.",
@@ -136,7 +136,7 @@
     "quotes": [
      {
       "file": "docs/srs/05-functional-requirements.md",
-      "text": "with no at-rest key, a new generation of a source with a purged range MUST wait for `cairn ingest`, audited and counted"
+      "text": "with no at-rest key, a new generation of a source with a purged range MUST wait for `parinn ingest`, audited and counted"
      },
      {
       "file": "docs/srs/05-functional-requirements.md",
@@ -144,12 +144,12 @@
      },
      {
       "file": "docs/srs/06-security.md",
-      "text": "Cairn MUST record a purged range's positions in each transcript source and refuse, with an audit entry, to ingest them again from a harness transcript."
+      "text": "ParleyInn MUST record a purged range's positions in each transcript source and refuse, with an audit entry, to ingest them again from a harness transcript."
      }
     ],
-    "case": "In M3 encryption at rest is off, the default until SEC-09 ships in M5. The principal purges a range of a run. Then a harness resume or rewind rewrites that run's transcript (ASM-04), which still holds the purged lines, now at new positions. As REC-07 says, the hook handlers leave the new generation to `cairn ingest`.",
-    "problem": "The purged lines' content is erased, so no prefix comparison can match them, and the earlier generation's positions do not locate them in the new one. Nothing says what `cairn ingest` does next. One implementer ingests the new generation past the equal prefix, bringing the purged content back into the store and the index as `ingested` and undoing a purge that SEC-31 says ingest must refuse. Another refuses the whole generation and loses the run's new lines (I1).",
-    "fix": "With no at-rest key, `cairn ingest` MUST ingest a new generation of a source with a purged range only after it shows the principal, by position and count, the lines past the equal prefix and takes the principal's confirmation at a terminal of which lines to ingest. Each line left out MUST be refused, audited and counted.",
+    "case": "In M3 encryption at rest is off, the default until SEC-09 ships in M5. The principal purges a range of a run. Then a harness resume or rewind rewrites that run's transcript (ASM-04), which still holds the purged lines, now at new positions. As REC-07 says, the hook handlers leave the new generation to `parinn ingest`.",
+    "problem": "The purged lines' content is erased, so no prefix comparison can match them, and the earlier generation's positions do not locate them in the new one. Nothing says what `parinn ingest` does next. One implementer ingests the new generation past the equal prefix, bringing the purged content back into the store and the index as `ingested` and undoing a purge that SEC-31 says ingest must refuse. Another refuses the whole generation and loses the run's new lines (I1).",
+    "fix": "With no at-rest key, `parinn ingest` MUST ingest a new generation of a source with a purged range only after it shows the principal, by position and count, the lines past the equal prefix and takes the principal's confirmation at a terminal of which lines to ingest. Each line left out MUST be refused, audited and counted.",
     "scope": "m1-m5"
    }
   ],
@@ -285,7 +285,7 @@
      },
      {
       "file": "docs/srs/05-functional-requirements.md",
-      "text": "Cairn MUST produce one landmark per closed span containing only structural fields"
+      "text": "ParleyInn MUST produce one landmark per closed span containing only structural fields"
      },
      {
       "file": "docs/srs/07-non-functional-requirements.md",
@@ -296,16 +296,16 @@
    },
    {
     "id": "record-6",
-    "title": "What `cairn ingest` does with a new transcript generation of a purged source when there is no at-rest key",
+    "title": "What `parinn ingest` does with a new transcript generation of a purged source when there is no at-rest key",
     "findings": [
      5
     ],
     "verdict": "known-gap",
-    "reason": "Confirmed. With no at-rest key, REC-07 defers the new generation to `cairn ingest` but says nothing about what that command does differently. Its general rule, ingest past the longest content-equal prefix, would re-ingest the purged lines. Their content and commitment key are erased (ADM-07), there is no keyed hash (SEC-08 needs the at-rest key), and SEC-31's recorded positions are positions in the earlier generation. This is not blocking. SEC-31's 'refuse ... to ingest them again' can be read narrowly as those recorded positions, which leaves REC-07 and SEC-31 both satisfiable, and re-ingesting breaks no invariant: I1 permits a purge but does not require that content to stay gone, and ingested events are untrusted under REC-22, so I2 holds. It still defeats the principal's purge. It occurs in M3 to M5, because SEC-09 at-rest encryption is a P1 SHOULD that arrives in M5 and is never the default.",
+    "reason": "Confirmed. With no at-rest key, REC-07 defers the new generation to `parinn ingest` but says nothing about what that command does differently. Its general rule, ingest past the longest content-equal prefix, would re-ingest the purged lines. Their content and commitment key are erased (ADM-07), there is no keyed hash (SEC-08 needs the at-rest key), and SEC-31's recorded positions are positions in the earlier generation. This is not blocking. SEC-31's 'refuse ... to ingest them again' can be read narrowly as those recorded positions, which leaves REC-07 and SEC-31 both satisfiable, and re-ingesting breaks no invariant: I1 permits a purge but does not require that content to stay gone, and ingested events are untrusted under REC-22, so I2 holds. It still defeats the principal's purge. It occurs in M3 to M5, because SEC-09 at-rest encryption is a P1 SHOULD that arrives in M5 and is never the default.",
     "quotes": [
      {
       "file": "docs/srs/05-functional-requirements.md",
-      "text": "with no at-rest key, a new generation of a source with a purged range MUST wait for `cairn ingest`, audited and counted"
+      "text": "with no at-rest key, a new generation of a source with a purged range MUST wait for `parinn ingest`, audited and counted"
      },
      {
       "file": "docs/srs/05-functional-requirements.md",
@@ -313,10 +313,10 @@
      },
      {
       "file": "docs/srs/06-security.md",
-      "text": "Cairn MUST record a purged range's positions in each transcript source and refuse, with an audit entry, to ingest them again from a harness transcript."
+      "text": "ParleyInn MUST record a purged range's positions in each transcript source and refuse, with an audit entry, to ingest them again from a harness transcript."
      }
     ],
-    "gap": "M3 must settle how `cairn ingest` keeps a purged range's lines out of a new transcript generation when no at-rest key exists (REC-07, SEC-31, ADM-07), since neither a keyed hash nor the purged range's earlier-generation positions can locate them, for example by showing the principal the lines past the equal prefix and taking confirmation at a terminal, with each refused line audited and counted."
+    "gap": "M3 must settle how `parinn ingest` keeps a purged range's lines out of a new transcript generation when no at-rest key exists (REC-07, SEC-31, ADM-07), since neither a keyed hash nor the purged range's earlier-generation positions can locate them, for example by showing the principal the lines past the equal prefix and taking confirmation at a terminal, with each refused line audited and counted."
    }
   ]
  },
@@ -332,11 +332,11 @@
      },
      {
       "file": "docs/srs/05-functional-requirements.md",
-      "text": "Cairn MAY generate natural-language headlines for spans whose every event is trusted, only by a deterministic template over trusted fields."
+      "text": "ParleyInn MAY generate natural-language headlines for spans whose every event is trusted, only by a deterministic template over trusted fields."
      },
      {
       "file": "docs/srs/05-functional-requirements.md",
-      "text": "only from qualifying pins, sanitized structural fields and fixed text Cairn ships"
+      "text": "only from qualifying pins, sanitized structural fields and fixed text ParleyInn ships"
      },
      {
       "file": "docs/srs/05-functional-requirements.md",
@@ -344,14 +344,14 @@
      },
      {
       "file": "docs/srs/invariants.md",
-      "text": "from qualifying pins, trusted structural fields and fixed text Cairn ships;"
+      "text": "from qualifying pins, trusted structural fields and fixed text ParleyInn ships;"
      },
      {
       "file": "docs/srs/05-functional-requirements.md",
-      "text": "Cairn MUST produce one landmark per closed span containing only structural fields"
+      "text": "ParleyInn MUST produce one landmark per closed span containing only structural fields"
      }
     ],
-    "case": "Requested check. Through M1 to M5 the rule holds without being written down: LMK-06 does not ship, and LMK-02 keeps every landmark, and so the landmark index INJ-01 puts in the restore block, structural only. Once LMK-06 ships, one implementer reads 'trusted fields' as the span's sanitized structural fields, which count as trusted whatever the event's trust level. That implementer renders a headline such as 'Edited fts.rs six times; 2 Bash errors' from a fixed template. That text is fixed text Cairn ships plus sanitized structural fields, so INJ-03 lets the restore builder take it as TrustedText, I2 admits it, and nothing in INJ-01, INJ-02 or INJ-07 keeps it off each landmark line of the restore block. A second implementer reads 'trusted fields' as trusted event text, such as a `user` line typed in interactive mode, and keeps headlines out of the block under INJ-03.",
+    "case": "Requested check. Through M1 to M5 the rule holds without being written down: LMK-06 does not ship, and LMK-02 keeps every landmark, and so the landmark index INJ-01 puts in the restore block, structural only. Once LMK-06 ships, one implementer reads 'trusted fields' as the span's sanitized structural fields, which count as trusted whatever the event's trust level. That implementer renders a headline such as 'Edited fts.rs six times; 2 Bash errors' from a fixed template. That text is fixed text ParleyInn ships plus sanitized structural fields, so INJ-03 lets the restore builder take it as TrustedText, I2 admits it, and nothing in INJ-01, INJ-02 or INJ-07 keeps it off each landmark line of the restore block. A second implementer reads 'trusted fields' as trusted event text, such as a `user` line typed in interactive mode, and keeps headlines out of the block under INJ-03.",
     "problem": "No requirement states the model's rule that a natural-language headline is no structural field and never reaches a restore block. INJ-03 and I2 accept a headline built from fixed text over structural fields, and LMK-06 never defines 'trusted fields', so INJ and LMK do not decide whether a headline reaches the restore block.",
     "fix": "Add to LMK-06: a natural-language headline is not a structural field and not part of a landmark. It MUST NOT appear in any restore block or other closed path, and reaches an agent only through `landmark_list`, inside the envelope. Name the fields its template may use.",
     "scope": "later (M6, LMK-06)"
@@ -369,7 +369,7 @@
      },
      {
       "file": "docs/srs/05-functional-requirements.md",
-      "text": "If Cairn cannot determine unambiguously which run a hook belongs to, it MUST inject only qualifying pins"
+      "text": "If ParleyInn cannot determine unambiguously which run a hook belongs to, it MUST inject only qualifying pins"
      },
      {
       "file": "docs/srs/05-functional-requirements.md",
@@ -398,7 +398,7 @@
      },
      {
       "file": "docs/srs/05-functional-requirements.md",
-      "text": "whatever Cairn returns to a tool call, its errors and a CLI verb's output that is not a terminal included"
+      "text": "whatever ParleyInn returns to a tool call, its errors and a CLI verb's output that is not a terminal included"
      },
      {
       "file": "docs/srs/06-security.md",
@@ -409,7 +409,7 @@
       "text": "A witnessed run's run-seat private key, but for the seat ingest starts, MUST live only in the memory of its harness session's MCP server"
      }
     ],
-    "case": "In M5 an agent runs `cairn event search token | head` through its Bash tool. Standard output is a pipe, so RCL-04 (M1) makes the CLI envelope the hits, and SEC-13 (M5) must taint the run they reached. The CLI holds no run-seat key (SEC-10), and no rule tells it which run started it. OWN-12 has the clause that makes such a verb a recall tool, records the recall event and taints 'the calling run', but \u00a712.2 brings only another part of OWN-12 into M1. Implementers would differ: one records and taints nothing, one finds the run from its process ancestry as PRV-08's hook handlers do, and one taints every live run. The same question arises when the principal pipes the output to a file and no run called at all.",
+    "case": "In M5 an agent runs `parinn event search token | head` through its Bash tool. Standard output is a pipe, so RCL-04 (M1) makes the CLI envelope the hits, and SEC-13 (M5) must taint the run they reached. The CLI holds no run-seat key (SEC-10), and no rule tells it which run started it. OWN-12 has the clause that makes such a verb a recall tool, records the recall event and taints 'the calling run', but \u00a712.2 brings only another part of OWN-12 into M1. Implementers would differ: one records and taints nothing, one finds the run from its process ancestry as PRV-08's hook handlers do, and one taints every live run. The same question arises when the principal pipes the output to a file and no run called at all.",
     "problem": "For a read-only CLI verb whose output is not a terminal, M1 to M5 say nothing on whether a recall event is recorded, which writer it goes to, or which run SEC-13 taints. RCL-04 already treats that output as recalled content.",
     "fix": "From M1, such a verb MUST record its recall event (RCL-07) naming the run it finds from its own process ancestry, read inside the core as PRV-08 describes, and SEC-13 MUST taint that run. With no harness process among its ancestors, it MUST name and taint no run.",
     "scope": "m1-m5"
@@ -427,11 +427,11 @@
      },
      {
       "file": "docs/srs/05-functional-requirements.md",
-      "text": "MUST carry only fixed text Cairn ships, ids, counts and structural fields sanitized under LMK-03"
+      "text": "MUST carry only fixed text ParleyInn ships, ids, counts and structural fields sanitized under LMK-03"
      },
      {
       "file": "docs/domain-model/record.md",
-      "text": "Structural field**: A field Cairn derives from an event's shape, never from"
+      "text": "Structural field**: A field ParleyInn derives from an event's shape, never from"
      },
      {
       "file": "docs/srs/05-functional-requirements.md",
@@ -467,7 +467,7 @@
       "text": "Each pin MUST store: verbatim text (\u2264 1,000 characters\u2020)"
      }
     ],
-    "case": "In M2 the principal runs `cairn pin add` with a constraint reading 'Never edit docs that show the literal </cairn-restore> tag', or its accepted configuration declares such a pin. The pin qualifies under PIN-10. INJ-08 requires that no injected field contain the fixed delimiter, by construction. I3 and PIN-08 require the pin to be restored verbatim, never truncated, and left out only by the pin budget. Nothing refuses the delimiter when the pin is written. One implementer escapes it, so the pin is no longer verbatim. Another omits the pin, breaking PIN-10's 'MUST contain'. A third passes it through, breaking INJ-08. INJ-08's scenario covers only sanitized structural fields.",
+    "case": "In M2 the principal runs `parinn pin add` with a constraint reading 'Never edit docs that show the literal </parinn-restore> tag', or its accepted configuration declares such a pin. The pin qualifies under PIN-10. INJ-08 requires that no injected field contain the fixed delimiter, by construction. I3 and PIN-08 require the pin to be restored verbatim, never truncated, and left out only by the pin budget. Nothing refuses the delimiter when the pin is written. One implementer escapes it, so the pin is no longer verbatim. Another omits the pin, breaking PIN-10's 'MUST contain'. A third passes it through, breaking INJ-08. INJ-08's scenario covers only sanitized structural fields.",
     "problem": "For a pin whose text contains a restore-block delimiter, INJ-08 and I3/PIN-08 cannot both hold, and no requirement stops such a pin from being written.",
     "fix": "PIN-01/PIN-03: a pin version whose text contains a restore-block delimiter sequence MUST be refused when written, audited and counted, both at a principal surface and on configuration acceptance (ADM-04).",
     "scope": "m1-m5"
@@ -477,24 +477,24 @@
     "quotes": [
      {
       "file": "docs/domain-model/trust-and-flow.md",
-      "text": "`cairn status` (ADM-11), failing `cairn doctor` until acknowledged"
+      "text": "`parinn status` (ADM-11), failing `parinn doctor` until acknowledged"
      },
      {
       "file": "docs/srs/05-functional-requirements.md",
-      "text": "each such cut MUST be audited under a named counter that is not a failure counter, shown by `cairn status`"
+      "text": "each such cut MUST be audited under a named counter that is not a failure counter, shown by `parinn status`"
      },
      {
       "file": "docs/srs/05a-administration-requirements.md",
-      "text": "`cairn doctor` MUST exit non-zero while any failure counter has increased since the node's principal last acknowledged them"
+      "text": "`parinn doctor` MUST exit non-zero while any failure counter has increased since the node's principal last acknowledged them"
      },
      {
       "file": "docs/srs/05a-administration-requirements.md",
       "text": "Every failed, dropped, rejected, redacted, timed-out, truncated or coalesced operation MUST append an entry to the audit log and increment a named counter derived from it."
      }
     ],
-    "case": "In M1, SEC-08 redacts an API key from a tool result, and OPS-01 counts it. In M5 a `PostToolUse` hook handler runs out of its 100 ms hook budget and leaves an ingest marker, and REC-13 counts that. The model's Counter says every counter fails `cairn doctor` until `cairn counter ack`. REC-13 says its cut counter is not a failure counter, so under OPS-03 it does not fail `cairn doctor`. Beyond REC-13, nothing says which of OPS-01's redacted, truncated or coalesced counters are failure counters. One implementer leaves `cairn doctor` red after every routine redaction or truncated recall; another keeps it green.",
-    "problem": "The model's Counter makes every counter fail `cairn doctor`, which REC-13's non-failure counter contradicts. The SRS also never says which of OPS-01's counters are the failure counters that OPS-03 and ADM-11 act on.",
-    "fix": "OPS-01 MUST name, for each counter, whether it is a failure counter. A counter of a failed, dropped, rejected or timed-out operation is one unless its requirement says otherwise, as REC-13 does. Only failure counters fail `cairn doctor` (OPS-03) and appear in ADM-11's list, and the model's Counter follows that rule.",
+    "case": "In M1, SEC-08 redacts an API key from a tool result, and OPS-01 counts it. In M5 a `PostToolUse` hook handler runs out of its 100 ms hook budget and leaves an ingest marker, and REC-13 counts that. The model's Counter says every counter fails `parinn doctor` until `parinn counter ack`. REC-13 says its cut counter is not a failure counter, so under OPS-03 it does not fail `parinn doctor`. Beyond REC-13, nothing says which of OPS-01's redacted, truncated or coalesced counters are failure counters. One implementer leaves `parinn doctor` red after every routine redaction or truncated recall; another keeps it green.",
+    "problem": "The model's Counter makes every counter fail `parinn doctor`, which REC-13's non-failure counter contradicts. The SRS also never says which of OPS-01's counters are the failure counters that OPS-03 and ADM-11 act on.",
+    "fix": "OPS-01 MUST name, for each counter, whether it is a failure counter. A counter of a failed, dropped, rejected or timed-out operation is one unless its requirement says otherwise, as REC-13 does. Only failure counters fail `parinn doctor` (OPS-03) and appear in ADM-11's list, and the model's Counter follows that rule.",
     "scope": "m1-m5"
    },
    {
@@ -523,20 +523,20 @@
     "quotes": [
      {
       "file": "docs/srs/05-functional-requirements.md",
-      "text": "Parallel model sub-calls over record data MAY be supported only through harness mechanisms. Cairn MUST NOT call model APIs itself."
+      "text": "Parallel model sub-calls over record data MAY be supported only through harness mechanisms. ParleyInn MUST NOT call model APIs itself."
      },
      {
       "file": "docs/srs/invariants.md",
-      "text": "Cairn's components send data off the machine only as recalled content an agent"
+      "text": "ParleyInn's components send data off the machine only as recalled content an agent"
      },
      {
       "file": "docs/srs/invariants.md",
-      "text": "receives through a tool call, or as what Cairn writes to an agent through I2's"
+      "text": "receives through a tool call, or as what ParleyInn writes to an agent through I2's"
      }
     ],
     "case": "Once CMP-09 ships, an implementer uses MCP sampling, a harness mechanism, for 'parallel model sub-calls'. The MCP server sends the harness a sampling request whose messages carry event text from the record, untrusted web results included, and the harness forwards it to its provider. That data leaves the machine neither as recalled content an agent receives through a tool call nor through a closed path, and it reaches a model outside any envelope.",
-    "problem": "CMP-09's 'harness mechanisms' does not exclude Cairn's MCP server asking the harness to call a model with record content, which I4 and I2 forbid.",
-    "fix": "CMP-09: only the agent itself MAY make sub-calls, for example through subagents it starts that call recall tools. No Cairn component MAY ask the harness to call a model, MCP sampling included.",
+    "problem": "CMP-09's 'harness mechanisms' does not exclude ParleyInn's MCP server asking the harness to call a model with record content, which I4 and I2 forbid.",
+    "fix": "CMP-09: only the agent itself MAY make sub-calls, for example through subagents it starts that call recall tools. No ParleyInn component MAY ask the harness to call a model, MCP sampling included.",
     "scope": "later (M6, CMP-09)"
    }
   ],
@@ -553,7 +553,7 @@
     "quotes": [
      {
       "file": "docs/srs/05-functional-requirements.md",
-      "text": "Cairn MAY generate natural-language headlines for spans whose every event is trusted, only by a deterministic template over trusted fields."
+      "text": "ParleyInn MAY generate natural-language headlines for spans whose every event is trusted, only by a deterministic template over trusted fields."
      },
      {
       "file": "docs/domain-model/record.md",
@@ -581,7 +581,7 @@
      },
      {
       "file": "docs/srs/05-functional-requirements.md",
-      "text": "If Cairn cannot determine unambiguously which run a hook belongs to, it MUST inject only qualifying pins"
+      "text": "If ParleyInn cannot determine unambiguously which run a hook belongs to, it MUST inject only qualifying pins"
      },
      {
       "file": "docs/srs/09-interfaces.md",
@@ -609,7 +609,7 @@
      },
      {
       "file": "docs/srs/05-functional-requirements.md",
-      "text": "whatever Cairn returns to a tool call, its errors and a CLI verb's output that is not a terminal included, MUST carry only fixed text Cairn ships, ids, counts and structural fields sanitized under LMK-03."
+      "text": "whatever ParleyInn returns to a tool call, its errors and a CLI verb's output that is not a terminal included, MUST carry only fixed text ParleyInn ships, ids, counts and structural fields sanitized under LMK-03."
      },
      {
       "file": "docs/srs/06-security.md",
@@ -624,15 +624,15 @@
      3
     ],
     "verdict": "not-real",
-    "reason": "Refuted by RCL-04 (P0, M1). It binds 'whatever Cairn returns to a tool call': outside the envelope, only fixed text Cairn ships, ids, counts and sanitized structural fields may appear. A kernel variable name is none of these. The model's structural field derives from an event's shape, never from its text, and a kernel variable is no event. So RCL-04 already requires `kernel_variable_list` to return its names inside the envelope. \u00a79.2's row names what is returned, not how it is wrapped, and says nothing against it, so the two statements both hold.",
+    "reason": "Refuted by RCL-04 (P0, M1). It binds 'whatever ParleyInn returns to a tool call': outside the envelope, only fixed text ParleyInn ships, ids, counts and sanitized structural fields may appear. A kernel variable name is none of these. The model's structural field derives from an event's shape, never from its text, and a kernel variable is no event. So RCL-04 already requires `kernel_variable_list` to return its names inside the envelope. \u00a79.2's row names what is returned, not how it is wrapped, and says nothing against it, so the two statements both hold.",
     "quotes": [
      {
       "file": "docs/srs/05-functional-requirements.md",
-      "text": "whatever Cairn returns to a tool call, its errors and a CLI verb's output that is not a terminal included, MUST carry only fixed text Cairn ships, ids, counts and structural fields sanitized under LMK-03."
+      "text": "whatever ParleyInn returns to a tool call, its errors and a CLI verb's output that is not a terminal included, MUST carry only fixed text ParleyInn ships, ids, counts and structural fields sanitized under LMK-03."
      },
      {
       "file": "docs/domain-model/record.md",
-      "text": "A field Cairn derives from an event's shape, never from"
+      "text": "A field ParleyInn derives from an event's shape, never from"
      },
      {
       "file": "docs/srs/09-interfaces.md",
@@ -647,7 +647,7 @@
      4
     ],
     "verdict": "blocking",
-    "reason": "In M2, the principal adds a constraint pin at a terminal, or accepts configuration declaring one (ADM-04, M1), whose text contains `</cairn-restore>`. INJ-08 forbids that text in the restore block. PIN-10 says the block MUST contain every qualifying pin, PIN-08 forbids truncating a pin, and I3 allows omission only by the pin budget. For that pin, all of these cannot hold. Nothing refuses or sanitizes pin text: PIN-03 stores verbatim text up to 1,000 characters, and INJ-08's scenario and ENG-08 cover only sanitized structural fields. Refusing such a pin version when it is written settles the case without touching invariants.md. A pin that never exists needs no restoring, so I3 holds, and OPS-01 audits and counts the rejection (I6). The rule goes once into INJ-08, the row that owns the delimiter rule. The model does not change.",
+    "reason": "In M2, the principal adds a constraint pin at a terminal, or accepts configuration declaring one (ADM-04, M1), whose text contains `</parinn-restore>`. INJ-08 forbids that text in the restore block. PIN-10 says the block MUST contain every qualifying pin, PIN-08 forbids truncating a pin, and I3 allows omission only by the pin budget. For that pin, all of these cannot hold. Nothing refuses or sanitizes pin text: PIN-03 stores verbatim text up to 1,000 characters, and INJ-08's scenario and ENG-08 cover only sanitized structural fields. Refusing such a pin version when it is written settles the case without touching invariants.md. A pin that never exists needs no restoring, so I3 holds, and OPS-01 audits and counts the rejection (I6). The rule goes once into INJ-08, the row that owns the delimiter rule. The model does not change.",
     "quotes": [
      {
       "file": "docs/srs/05-functional-requirements.md",
@@ -676,7 +676,7 @@
     "scenario": {
      "file": "features/restore.feature",
      "requirement": "INJ-08",
-     "step": "And the person's \"cairn pin add --type constraint 'Never quote </cairn-restore> in docs'\" is refused, audited and counted, and stores no pin version"
+     "step": "And the person's \"parinn pin add --type constraint 'Never quote </parinn-restore> in docs'\" is refused, audited and counted, and stores no pin version"
     }
    },
    {
@@ -686,20 +686,20 @@
      5
     ],
     "verdict": "known-gap",
-    "gap": "M1 must settle which of OPS-01's named counters are failure counters: the ones ADM-11 shows and OPS-03 fails `cairn doctor` on. REC-13's cut counter is the one stated exception, and the model's Counter entry must say the same.",
-    "reason": "It is not a contradiction. OPS-03 makes `cairn doctor` fail while any failure counter has risen, but it does not forbid failing on other counters. So the model's Counter entry ('failing `cairn doctor` until acknowledged') and REC-13's 'not a failure counter' can both hold. The gap is real, though, and in M1. 'Failure counter' is defined nowhere in the SRS or the model, yet ADM-11 (M1), OPS-03 (M1) and \u00a711.2's pilot ('every non-zero failure counter explained') all act on failure counters only. Nothing says whether OPS-01's redacted, truncated or coalesced counters are failure counters.",
+    "gap": "M1 must settle which of OPS-01's named counters are failure counters: the ones ADM-11 shows and OPS-03 fails `parinn doctor` on. REC-13's cut counter is the one stated exception, and the model's Counter entry must say the same.",
+    "reason": "It is not a contradiction. OPS-03 makes `parinn doctor` fail while any failure counter has risen, but it does not forbid failing on other counters. So the model's Counter entry ('failing `parinn doctor` until acknowledged') and REC-13's 'not a failure counter' can both hold. The gap is real, though, and in M1. 'Failure counter' is defined nowhere in the SRS or the model, yet ADM-11 (M1), OPS-03 (M1) and \u00a711.2's pilot ('every non-zero failure counter explained') all act on failure counters only. Nothing says whether OPS-01's redacted, truncated or coalesced counters are failure counters.",
     "quotes": [
      {
       "file": "docs/domain-model/trust-and-flow.md",
-      "text": "`cairn status` (ADM-11), failing `cairn doctor` until acknowledged"
+      "text": "`parinn status` (ADM-11), failing `parinn doctor` until acknowledged"
      },
      {
       "file": "docs/srs/05-functional-requirements.md",
-      "text": "each such cut MUST be audited under a named counter that is not a failure counter, shown by `cairn status`"
+      "text": "each such cut MUST be audited under a named counter that is not a failure counter, shown by `parinn status`"
      },
      {
       "file": "docs/srs/05a-administration-requirements.md",
-      "text": "`cairn doctor` MUST exit non-zero while any failure counter has increased since the node's principal last acknowledged them"
+      "text": "`parinn doctor` MUST exit non-zero while any failure counter has increased since the node's principal last acknowledged them"
      },
      {
       "file": "docs/srs/05a-administration-requirements.md",
@@ -735,19 +735,19 @@
     ],
     "verdict": "later",
     "milestone": "M6, CMP-09 (P2 parallel model sub-calls)",
-    "reason": "CMP-09 is P2, which \u00a712.2 puts in M6. I4 already limits data leaving the machine to recalled content an agent receives through a tool call, or what Cairn writes through I2's closed paths. An MCP sampling request carrying record content is neither, so a MAY in CMP-09 cannot permit it. Any change to the wording belongs to CMP-09's own proposal.",
+    "reason": "CMP-09 is P2, which \u00a712.2 puts in M6. I4 already limits data leaving the machine to recalled content an agent receives through a tool call, or what ParleyInn writes through I2's closed paths. An MCP sampling request carrying record content is neither, so a MAY in CMP-09 cannot permit it. Any change to the wording belongs to CMP-09's own proposal.",
     "quotes": [
      {
       "file": "docs/srs/05-functional-requirements.md",
-      "text": "Parallel model sub-calls over record data MAY be supported only through harness mechanisms. Cairn MUST NOT call model APIs itself."
+      "text": "Parallel model sub-calls over record data MAY be supported only through harness mechanisms. ParleyInn MUST NOT call model APIs itself."
      },
      {
       "file": "docs/srs/invariants.md",
-      "text": "Cairn's components send data off the machine only as recalled content an agent"
+      "text": "ParleyInn's components send data off the machine only as recalled content an agent"
      },
      {
       "file": "docs/srs/invariants.md",
-      "text": "receives through a tool call, or as what Cairn writes to an agent through I2's"
+      "text": "receives through a tool call, or as what ParleyInn writes to an agent through I2's"
      }
     ]
    }
@@ -784,7 +784,7 @@
       "text": "Each pin MUST store: verbatim text (\u2264 1,000 characters\u2020), pin type, pin priority, room"
      }
     ],
-    "case": "The model's rule that pin priority runs lower first does not hold against the SRS: no requirement states it. Example: two constraint pins in the personal room, priority 1 and priority 9, and a pin budget with room for one. Implementer A, following the model, restores the priority-1 pin. Implementer B reads LANE-20's 'highest priority' as the largest integer and restores the priority-9 pin. A pin made by `cairn pin add` with no priority given, or a confirmed pin candidate, also gets whatever default each implementer picks: `pin_candidate_propose` takes no priority and PIN-05 detection supplies none, yet the confirmation must show one.",
+    "case": "The model's rule that pin priority runs lower first does not hold against the SRS: no requirement states it. Example: two constraint pins in the personal room, priority 1 and priority 9, and a pin budget with room for one. Implementer A, following the model, restores the priority-1 pin. Implementer B reads LANE-20's 'highest priority' as the largest integer and restores the priority-9 pin. A pin made by `parinn pin add` with no priority given, or a confirmed pin candidate, also gets whatever default each implementer picks: `pin_candidate_propose` takes no priority and PIN-05 detection supplies none, yet the confirmation must show one.",
     "problem": "PIN-08 orders by pin priority without saying which way, and no requirement gives the range, the default, or the value LANE-20's 'highest priority' stores. So which constraints survive the budget (M2's constraint survival target and golden tests) depends on the implementer, and the model's 'lower first' is a rule no requirement states.",
     "fix": "PIN-03/PIN-08: pin priority MUST be an integer in a stated range, lower restoring first, with a stated default for a pin whose author gives none. A pin candidate's confirmation MUST show the priority it will record, the default unless the confirming principal sets one. The intent MUST carry the lowest value.",
     "scope": "m1-m5"
@@ -794,7 +794,7 @@
     "quotes": [
      {
       "file": "docs/srs/05-functional-requirements.md",
-      "text": "If qualifying pins exceed the pin budget (`pin_budget.max_model_tokens`, default 1,000 model tokens\u2020), Cairn MUST inject first"
+      "text": "If qualifying pins exceed the pin budget (`pin_budget.max_model_tokens`, default 1,000 model tokens\u2020), ParleyInn MUST inject first"
      },
      {
       "file": "docs/srs/05-functional-requirements.md",
@@ -803,7 +803,7 @@
     ],
     "case": "Pin budget 1,000 model tokens. The qualifying pins in PIN-08 order are A (600 tokens), B (500) and C (100). An implementer that stops at the first pin that does not fit restores A and omits B and C. An implementer that skips a pin that does not fit and keeps going restores A and C and omits B.",
     "problem": "PIN-08 gives the order but not the fill rule, that is, whether a pin that does not fit ends the selection or is skipped. Two careful implementers restore different constraints from the same record, so the M2 constraint survival target and golden restore blocks depend on that choice.",
-    "fix": "PIN-08: Cairn MUST take the ordered qualifying pins one at a time and inject each whose model-token estimate fits the pin budget still left, omitting (and naming) each that does not and continuing with the next.",
+    "fix": "PIN-08: ParleyInn MUST take the ordered qualifying pins one at a time and inject each whose model-token estimate fits the pin budget still left, omitting (and naming) each that does not and continuing with the next.",
     "scope": "m1-m5"
    },
    {
@@ -815,7 +815,7 @@
      },
      {
       "file": "docs/srs/05-functional-requirements.md",
-      "text": "When over it, Cairn MUST remove landmark detail deterministically, coarsest tier last, and MUST NOT reduce pins below the PIN-08 rule."
+      "text": "When over it, ParleyInn MUST remove landmark detail deterministically, coarsest tier last, and MUST NOT reduce pins below the PIN-08 rule."
      },
      {
       "file": "docs/srs/05-functional-requirements.md",
@@ -834,7 +834,7 @@
       "text": "Every pin MUST belong to exactly one room, by default its principal's personal room on the node that wrote it."
      }
     ],
-    "case": "Case (a): a repository's `.cairn.toml` lowers `restore_block.max_model_tokens` to 300, which repository configuration may do ('Only lower'), while the pin budget stays at 1,000 and the principal's pins fill it. Case (b): a principal accumulates 400 constraint pins in its personal room, where every pin goes by default. About 380 omitted pin ids, each with its room id, plus PIN-10's room ids and other-pin statements, exceed 2,000 model tokens even after every landmark is removed.",
+    "case": "Case (a): a repository's `.parinn.toml` lowers `restore_block.max_model_tokens` to 300, which repository configuration may do ('Only lower'), while the pin budget stays at 1,000 and the principal's pins fill it. Case (b): a principal accumulates 400 constraint pins in its personal room, where every pin goes by default. About 380 omitted pin ids, each with its room id, plus PIN-10's room ids and other-pin statements, exceed 2,000 model tokens even after every landmark is removed.",
     "problem": "INJ-07 must keep the total limit, but it may remove only landmark detail, and it must keep the pins and PIN-08's naming of omitted pins, which I3 requires. Once the pins and the required lists alone exceed the limit, both cannot hold. One implementer exceeds the limit (a defined I9 limit), another drops pins or ids (I3), and a repository configuration could then strip constraints.",
     "fix": "INJ-07: the limit MUST bound only what INJ-07 may remove. The qualifying pins within the pin budget, and the ids, counts and room ids PIN-08 and PIN-10 require, MUST always be carried, outside the pin budget for the omitted pins' names. A restore block they push past the limit MUST be audited and counted. No settings layer MAY set `restore_block.max_model_tokens` below `pin_budget.max_model_tokens`.",
     "scope": "m1-m5"
@@ -852,7 +852,7 @@
      },
      {
       "file": "docs/srs/05-functional-requirements.md",
-      "text": "Qualifying pins MUST come only from a principal (`cairn pin add` at a principal surface, its accepted configuration or its stamp), never a harness skill's call."
+      "text": "Qualifying pins MUST come only from a principal (`parinn pin add` at a principal surface, its accepted configuration or its stamp), never a harness skill's call."
      },
      {
       "file": "docs/srs/05-functional-requirements.md",
@@ -892,7 +892,7 @@
       "text": "changing a pin's type, priority or room MUST be an unpin then a new pin"
      }
     ],
-    "case": "A configuration declares constraint X and is accepted, so pin X is added. Example 1: the principal unpins X with `cairn pin unpin`, then changes an unrelated setting and accepts again. An implementer that compares the configuration with the active pins re-adds X; one that compares it with the last accepted configuration does not. Example 2: after a node identity change, ADM-06 voids the old acceptance and its pin acts. Re-accepting the same configuration adds every declared pin again under the first reading, and none under the second (the same digest, so no change), so the constraints never restore.",
+    "case": "A configuration declares constraint X and is accepted, so pin X is added. Example 1: the principal unpins X with `parinn pin unpin`, then changes an unrelated setting and accepts again. An implementer that compares the configuration with the active pins re-adds X; one that compares it with the last accepted configuration does not. Example 2: after a node identity change, ADM-06 voids the old acceptance and its pin acts. Re-accepting the same configuration adds every declared pin again under the first reading, and none under the second (the same digest, so no change), so the constraints never restore.",
     "problem": "The grid names ADM-04 for what a configuration acceptance does to active pins, but ADM-04 does not say how a declared pin matches an existing pin, or which baseline the added, edited and unpinned pins are measured against. Two careful implementers derive different active pins from the same acceptance.",
     "fix": "ADM-04: a configuration MUST name each pin it declares by a key. Accepting it MUST add a pin for each declared key that has no configuration pin active on this node, edit each whose text changed (an unpin then a new pin when its type, priority or room changed, PIN-04), and unpin each active configuration pin whose key it no longer declares.",
     "scope": "m1-m5"
@@ -946,9 +946,9 @@
       "text": "sanitized fields never contain restore delimiters"
      }
     ],
-    "case": "An agent proposes, through `pin_candidate_propose`, a candidate whose text contains `</cairn-restore>`, and the principal confirms it exactly as shown. Or the principal pins such text with `cairn pin add`. At the next compaction the pin must be restored verbatim (I3, M2's 'word for word'), but INJ-08 forbids any injected field from containing the delimiter. One implementer escapes the text (no longer verbatim); another emits it (a broken delimiter).",
+    "case": "An agent proposes, through `pin_candidate_propose`, a candidate whose text contains `</parinn-restore>`, and the principal confirms it exactly as shown. Or the principal pins such text with `parinn pin add`. At the next compaction the pin must be restored verbatim (I3, M2's 'word for word'), but INJ-08 forbids any injected field from containing the delimiter. One implementer escapes the text (no longer verbatim); another emits it (a broken delimiter).",
     "problem": "Pin text is stored and restored verbatim and is not a sanitized field, so for a pin containing a delimiter sequence INJ-08 and I3 cannot both hold. No rule refuses such text when a pin is created.",
-    "fix": "PIN-03: a pin version's text MUST NOT contain a restore-block delimiter sequence. `cairn pin add`, `cairn pin edit`, configuration acceptance and a pin candidate's confirmation MUST refuse such text, audited and counted.",
+    "fix": "PIN-03: a pin version's text MUST NOT contain a restore-block delimiter sequence. `parinn pin add`, `parinn pin edit`, configuration acceptance and a pin candidate's confirmation MUST refuse such text, audited and counted.",
     "scope": "m1-m5"
    },
    {
@@ -983,7 +983,7 @@
       "text": "A kick MUST revoke the current add."
      }
     ],
-    "case": "A run calls `room_leave` naming its personal room, or the principal runs `cairn room leave <personal room>`. Nothing refuses either. After the leave, LANE-23 refuses acts under that seat id, so the run's later join requests, which are room acts of its personal-room seat, would be refused. Principal acts LANE-01 routes to the device seat in the personal room would be too, against LANE-01's 'never refused'. LANE-25 makes these seats members with no add, so it is also unclear what a leave ends.",
+    "case": "A run calls `room_leave` naming its personal room, or the principal runs `parinn room leave <personal room>`. Nothing refuses either. After the leave, LANE-23 refuses acts under that seat id, so the run's later join requests, which are room acts of its personal-room seat, would be refused. Principal acts LANE-01 routes to the device seat in the personal room would be too, against LANE-01's 'never refused'. LANE-25 makes these seats members with no add, so it is also unclear what a leave ends.",
     "problem": "Only half of the model's rule holds. 'Nor be kicked' holds once PRV-10 ships, because LANE-25's owner protection covers every personal-room seat (LANE-17 keeps the room private). 'Neither leave' is stated by no requirement, and the SRS at most implies it through LANE-16's check of a leave against the add.",
     "fix": "LANE-23: a leave by a seat in a personal room MUST be refused, audited and counted. LANE-25: no one MAY kick, bar or mute a seat in a personal room.",
     "scope": "later (M7: leave and kick ship with the rest of LANE-23 and LANE-25)"
@@ -997,7 +997,7 @@
      0
     ],
     "verdict": "known-gap",
-    "reason": "The direction is settled. The model defines pin priority as 'lower first', and the PIN-08 scenario uses it the same way ('each with a lower pin priority number than any of those 4'). LANE-20's 'at the highest priority' does not contradict this: the highest priority is the value that sorts first, and PIN-08 puts intents first ('intents first (LANE-20)') whatever their number. So the intent's stored value never changes the order. What remains is real and ships in M2 and M5. No requirement gives the range, or the value recorded when the author gives none. `cairn pin add` names no priority, `pin_candidate_propose` takes none, and PIN-05 detection supplies none, yet PIN-05's confirmation must show a priority. No invariant breaks: either default restores or names every pin under I3.",
+    "reason": "The direction is settled. The model defines pin priority as 'lower first', and the PIN-08 scenario uses it the same way ('each with a lower pin priority number than any of those 4'). LANE-20's 'at the highest priority' does not contradict this: the highest priority is the value that sorts first, and PIN-08 puts intents first ('intents first (LANE-20)') whatever their number. So the intent's stored value never changes the order. What remains is real and ships in M2 and M5. No requirement gives the range, or the value recorded when the author gives none. `parinn pin add` names no priority, `pin_candidate_propose` takes none, and PIN-05 detection supplies none, yet PIN-05's confirmation must show a priority. No invariant breaks: either default restores or names every pin under I3.",
     "quotes": [
      {
       "file": "docs/domain-model/pins-and-context.md",
@@ -1012,7 +1012,7 @@
       "text": "taken only after that principal is shown its exact text, pin type and priority"
      }
     ],
-    "gap": "M2 must settle the range of pin priority and the value recorded when the author gives none, for `cairn pin add` without a priority and for a confirmed pin candidate, which PIN-05 must show before confirmation (PIN-03, PIN-05, PIN-08); the order stays the model's lower first."
+    "gap": "M2 must settle the range of pin priority and the value recorded when the author gives none, for `parinn pin add` without a priority and for a confirmed pin candidate, which PIN-05 must show before confirmation (PIN-03, PIN-05, PIN-08); the order stays the model's lower first."
    },
    {
     "id": "pins-2",
@@ -1025,7 +1025,7 @@
     "quotes": [
      {
       "file": "docs/srs/05-functional-requirements.md",
-      "text": "If qualifying pins exceed the pin budget (`pin_budget.max_model_tokens`, default 1,000 model tokens\u2020), Cairn MUST inject first"
+      "text": "If qualifying pins exceed the pin budget (`pin_budget.max_model_tokens`, default 1,000 model tokens\u2020), ParleyInn MUST inject first"
      },
      {
       "file": "docs/srs/05-functional-requirements.md",
@@ -1049,7 +1049,7 @@
      },
      {
       "file": "docs/srs/05-functional-requirements.md",
-      "text": "When over it, Cairn MUST remove landmark detail deterministically, coarsest tier last, and MUST NOT reduce pins below the PIN-08 rule."
+      "text": "When over it, ParleyInn MUST remove landmark detail deterministically, coarsest tier last, and MUST NOT reduce pins below the PIN-08 rule."
      },
      {
       "file": "docs/srs/05-functional-requirements.md",
@@ -1067,8 +1067,8 @@
     "edits": [
      {
       "file": "docs/srs/05-functional-requirements.md",
-      "old": "The restore block MUST respect a total limit (`restore_block.max_model_tokens`, default 2,000 model tokens\u2020). When over it, Cairn MUST remove landmark detail deterministically, coarsest tier last, and MUST NOT reduce pins below the PIN-08 rule.",
-      "new": "The restore block MUST respect a total limit (`restore_block.max_model_tokens`, default 2,000 model tokens\u2020), save for what PIN-08 and PIN-10 make it carry, which no limit reduces. When over it, Cairn MUST remove landmark detail deterministically, coarsest tier last, and audit and count a block still over it."
+      "old": "The restore block MUST respect a total limit (`restore_block.max_model_tokens`, default 2,000 model tokens\u2020). When over it, ParleyInn MUST remove landmark detail deterministically, coarsest tier last, and MUST NOT reduce pins below the PIN-08 rule.",
+      "new": "The restore block MUST respect a total limit (`restore_block.max_model_tokens`, default 2,000 model tokens\u2020), save for what PIN-08 and PIN-10 make it carry, which no limit reduces. When over it, ParleyInn MUST remove landmark detail deterministically, coarsest tier last, and audit and count a block still over it."
      }
     ],
     "scenario": {
@@ -1084,11 +1084,11 @@
      3
     ],
     "verdict": "not-real",
-    "reason": "ADM-04's 'MUST apply only from managed policy ... or from the principal's configuration once the widening principal act accepting it records ...' limits where such a change may come from. It grants managed policy no power to add, edit or unpin a pin. PIN-01 closes that path: qualifying pins come 'only from a principal (`cairn pin add` at a principal surface, its accepted configuration or its stamp)', and 'Adding, editing or unpinning a pin MUST be the act OWN-11 and OWN-12 name for its type and author'. Managed policy is no principal and takes no act. PIN-10 also lets only a version written from a device seat qualify. SEC-22's list of what managed policy can do names no pin. Read together, the only change in ADM-04's pin clause that managed policy can make is one that 'otherwise removes one from a restore block, as lowering the pin budget does'. That changes the restore block, not active pins, so I10 holds. Implementer A, who restores a pin from the policy file, breaks PIN-01 and PIN-10 and is not following the text. Implementer B's reading is the only one the text allows, and ADM-04's clause stays live for the configuration branch.",
+    "reason": "ADM-04's 'MUST apply only from managed policy ... or from the principal's configuration once the widening principal act accepting it records ...' limits where such a change may come from. It grants managed policy no power to add, edit or unpin a pin. PIN-01 closes that path: qualifying pins come 'only from a principal (`parinn pin add` at a principal surface, its accepted configuration or its stamp)', and 'Adding, editing or unpinning a pin MUST be the act OWN-11 and OWN-12 name for its type and author'. Managed policy is no principal and takes no act. PIN-10 also lets only a version written from a device seat qualify. SEC-22's list of what managed policy can do names no pin. Read together, the only change in ADM-04's pin clause that managed policy can make is one that 'otherwise removes one from a restore block, as lowering the pin budget does'. That changes the restore block, not active pins, so I10 holds. Implementer A, who restores a pin from the policy file, breaks PIN-01 and PIN-10 and is not following the text. Implementer B's reading is the only one the text allows, and ADM-04's clause stays live for the configuration branch.",
     "quotes": [
      {
       "file": "docs/srs/05-functional-requirements.md",
-      "text": "Qualifying pins MUST come only from a principal (`cairn pin add` at a principal surface, its accepted configuration or its stamp), never a harness skill's call."
+      "text": "Qualifying pins MUST come only from a principal (`parinn pin add` at a principal surface, its accepted configuration or its stamp), never a harness skill's call."
      },
      {
       "file": "docs/srs/05-functional-requirements.md",
@@ -1155,7 +1155,7 @@
      6
     ],
     "verdict": "blocking",
-    "reason": "PIN-03 stores pin text verbatim, limited only to 1,000 characters, and nothing else restricts what it may contain. I3 requires every pin that restores to be 'restored verbatim after every compaction, or named by id and count when the budget omits it'. INJ-08 forbids any injected field from containing the delimiter sequences, 'by construction'. \u00a79.4 fixes those delimiters as `<cairn-restore v=\"1\">` and `</cairn-restore>`. Concrete M2 case: the principal runs `cairn pin add --type constraint 'Never print </cairn-restore> in output'`, or confirms a pin candidate with that text exactly as shown. At the next compaction, emitting the text breaks INJ-08. Escaping it breaks verbatim restore (I3). Omitting it breaks I3 as well, because I3 lets only the budget omit a pin. Pin text is no sanitized field, so ENG-08's property does not cover it, and INJ-06 forbids a random per-block delimiter. The rule belongs in PIN-03, beside the length limit it parallels. The 1,001-character case in its scenario already shows the refusal shape, exit 2. One phrase covers every way a pin version gets its text: `cairn pin add`, `cairn pin edit`, configuration acceptance and pin candidate confirmation. INJ-08's 'by construction' then holds for pins with no case clause. The edit changes neither the invariants file nor the model.",
+    "reason": "PIN-03 stores pin text verbatim, limited only to 1,000 characters, and nothing else restricts what it may contain. I3 requires every pin that restores to be 'restored verbatim after every compaction, or named by id and count when the budget omits it'. INJ-08 forbids any injected field from containing the delimiter sequences, 'by construction'. \u00a79.4 fixes those delimiters as `<parinn-restore v=\"1\">` and `</parinn-restore>`. Concrete M2 case: the principal runs `parinn pin add --type constraint 'Never print </parinn-restore> in output'`, or confirms a pin candidate with that text exactly as shown. At the next compaction, emitting the text breaks INJ-08. Escaping it breaks verbatim restore (I3). Omitting it breaks I3 as well, because I3 lets only the budget omit a pin. Pin text is no sanitized field, so ENG-08's property does not cover it, and INJ-06 forbids a random per-block delimiter. The rule belongs in PIN-03, beside the length limit it parallels. The 1,001-character case in its scenario already shows the refusal shape, exit 2. One phrase covers every way a pin version gets its text: `parinn pin add`, `parinn pin edit`, configuration acceptance and pin candidate confirmation. INJ-08's 'by construction' then holds for pins with no case clause. The edit changes neither the invariants file nor the model.",
     "quotes": [
      {
       "file": "docs/srs/invariants.md",
@@ -1171,7 +1171,7 @@
      },
      {
       "file": "docs/srs/09-interfaces.md",
-      "text": "</cairn-restore>"
+      "text": "</parinn-restore>"
      }
     ],
     "edits": [
@@ -1184,7 +1184,7 @@
     "scenario": {
      "file": "features/pins.feature",
      "requirement": "PIN-03",
-     "step": "And adding a pin whose text contains \"</cairn-restore>\" exits 2, is audited and counted, and leaves the qualifying pin count at 1"
+     "step": "And adding a pin whose text contains \"</parinn-restore>\" exits 2, is audited and counted, and leaves the qualifying pin count at 1"
     }
    },
    {
@@ -1194,7 +1194,7 @@
      7
     ],
     "verdict": "later",
-    "reason": "Leave, kick and bar belong to the rest of LANE-23 and to LANE-25, which \u00a712.2's M7 row names ('the room model's LANE-23..33 (the rest of LANE-23 and LANE-31)'). M1 brings forward only how a seat id derives, and M2 only the own-principal join. `room_leave` and `cairn room leave` record 'the seat's leave (LANE-23)', so they ship with that part in M7. Until then no seat can leave, and PIN-10's leave and kick clauses are dormant. The gap the reviewer found is real for M7: no requirement states the model's 'neither leave' rule, and a leave by a run's personal-room seat would cut off its join requests and LANE-01's routing. It goes to M7's ENG-29 review.",
+    "reason": "Leave, kick and bar belong to the rest of LANE-23 and to LANE-25, which \u00a712.2's M7 row names ('the room model's LANE-23..33 (the rest of LANE-23 and LANE-31)'). M1 brings forward only how a seat id derives, and M2 only the own-principal join. `room_leave` and `parinn room leave` record 'the seat's leave (LANE-23)', so they ship with that part in M7. Until then no seat can leave, and PIN-10's leave and kick clauses are dormant. The gap the reviewer found is real for M7: no requirement states the model's 'neither leave' rule, and a leave by a run's personal-room seat would cut off its join requests and LANE-01's routing. It goes to M7's ENG-29 review.",
     "quotes": [
      {
       "file": "docs/domain-model/principals-and-agents.md",
@@ -1209,7 +1209,7 @@
       "text": "| `room_leave`                 | P1  | `room`; records the seat's leave (LANE-23)"
      }
     ],
-    "milestone": "M7: leave, kick and bar ship with the rest of LANE-23 and with LANE-25 (room model LANE-23..33), together with `room_leave` and `cairn room leave`"
+    "milestone": "M7: leave, kick and bar ship with the rest of LANE-23 and with LANE-25 (room model LANE-23..33), together with `room_leave` and `parinn room leave`"
    }
   ]
  },
@@ -1236,7 +1236,7 @@
       "text": "only exceptions are secrets removed by redaction before storage or on import,"
      }
     ],
-    "case": "A repository the agent works in carries a `.cairn.toml` with `redaction.extra_patterns = [\"(?s).+\"]`. It may be a cloned third-party repository, a contribution under review, or a file the agent itself writes into its worktree. \u00a79.6 accepts the key because adding a pattern counts as tightening, and SEC-11 allows tightening. Under SEC-08, every text field, payload and hook input of every later event of runs there is then replaced by `[REDACTED:<rule>]` before it is written. None of that text was a secret, yet what the agent saw and did there can never be recovered. T5 treats commit authors who control `.cairn.toml` as a threat, but it only considers loosening.",
+    "case": "A repository the agent works in carries a `.parinn.toml` with `redaction.extra_patterns = [\"(?s).+\"]`. It may be a cloned third-party repository, a contribution under review, or a file the agent itself writes into its worktree. \u00a79.6 accepts the key because adding a pattern counts as tightening, and SEC-11 allows tightening. Under SEC-08, every text field, payload and hook input of every later event of runs there is then replaced by `[REDACTED:<rule>]` before it is written. None of that text was a secret, yet what the agent saw and did there can never be recovered. T5 treats commit authors who control `.parinn.toml` as a threat, but it only considers loosening.",
     "problem": "A pattern that only tightens redaction can still destroy content that is not secret, and repository commit authors control the patterns. I1 allows redaction to remove secrets only. SEC-08 also names only patterns the principal defines, but \u00a79.6 lets the repository add them too.",
     "fix": "Repository configuration MUST NOT set `redaction.extra_patterns`. Such a key MUST be ignored, audited and counted (\u00a79.6 'No', SEC-11). Only the principal's configuration adds redaction patterns (SEC-08).",
     "scope": "m1-m5"
@@ -1265,7 +1265,7 @@
       "text": "deterministic function of the set of writer logs a node holds and the node's"
      }
     ],
-    "case": "The principal accepts a configuration with `node.deployment_mode = \"interactive\"` (digest D1), and `user` events recorded after that are trusted. Later the principal edits the file back to `automation` and accepts it (D2). `cairn rebuild` must then re-derive the trust levels of the `user` events recorded between the two acceptances. The record holds only D1's digest and the file now says automation, so no writer log says which mode was in force. The same holds when managed policy fixes the mode (SEC-22) and later changes it, which records nothing at all.",
+    "case": "The principal accepts a configuration with `node.deployment_mode = \"interactive\"` (digest D1), and `user` events recorded after that are trusted. Later the principal edits the file back to `automation` and accepts it (D2). `parinn rebuild` must then re-derive the trust levels of the `user` events recorded between the two acceptances. The record holds only D1's digest and the file now says automation, so no writer log says which mode was in force. The same holds when managed policy fixes the mode (SEC-22) and later changes it, which records nothing at all.",
     "problem": "PRV-02 and PIN-10 derive trust from the 'recorded deployment mode', but no requirement records it. The grid's trust-level cell for configuration acceptance names PRV-02 and PRV-04, and neither says how the mode is recorded. One implementer reads the current file and breaks I10; another stores configuration content outside the writer logs.",
     "fix": "Each `user` event MUST record, as a structural field the hook handlers write, the deployment mode in force when it is recorded, and trust levels MUST derive from that field. A configuration acceptance or managed-policy change that sets the mode MUST name the mode in a recorded structural event.",
     "scope": "m1-m5"
@@ -1279,7 +1279,7 @@
      },
      {
       "file": "docs/srs/05-functional-requirements.md",
-      "text": "Qualifying pins MUST come only from a principal (`cairn pin add` at a principal surface, its accepted configuration or its stamp)"
+      "text": "Qualifying pins MUST come only from a principal (`parinn pin add` at a principal surface, its accepted configuration or its stamp)"
      },
      {
       "file": "docs/srs/05a-administration-requirements.md",
@@ -1300,7 +1300,7 @@
     "quotes": [
      {
       "file": "docs/srs/05a-administration-requirements.md",
-      "text": "When that file or its directory is writable by the principal, or the file is unparsable or invalid, Cairn MUST refuse to start a B1\u2013B3 component, keep the core recording"
+      "text": "When that file or its directory is writable by the principal, or the file is unparsable or invalid, ParleyInn MUST refuse to start a B1\u2013B3 component, keep the core recording"
      },
      {
       "file": "docs/srs/invariants.md",
@@ -1313,7 +1313,7 @@
     ],
     "case": "Managed policy fixes `automation`, forbids risk acceptance and sets a retention policy. Then an update leaves the file unparsable, or a permission change leaves its directory writable by the principal. ADM-04 only says to refuse B1\u2013B3 components, keep the core recording, and audit and count the condition.",
     "problem": "ADM-04 does not say which settings the core applies meanwhile. Implementers will diverge. One keeps applying a principal-writable file, so any process of that OS user can add pins, set `interactive` or set a zero-day retention policy with no acceptance. Another drops managed policy and lets the principal's accepted `interactive` mode and risk acceptance override the organisation's policy (I7).",
-    "fix": "While the managed-policy file is writable by the principal, unparsable or invalid, Cairn MUST apply none of its settings. It MUST refuse every widening principal act and every change ADM-04 holds for acceptance, audited and counted. The core MUST keep recording under the defaults, as tightened by the principal's configuration.",
+    "fix": "While the managed-policy file is writable by the principal, unparsable or invalid, ParleyInn MUST apply none of its settings. It MUST refuse every widening principal act and every change ADM-04 holds for acceptance, audited and counted. The core MUST keep recording under the defaults, as tightened by the principal's configuration.",
     "scope": "m1-m5"
    },
    {
@@ -1325,7 +1325,7 @@
      },
      {
       "file": "docs/srs/05-functional-requirements.md",
-      "text": "after a node identity change (REC-24), `cairn ingest` MUST append what remains of a run recorded before it to such a seat in the personal room"
+      "text": "after a node identity change (REC-24), `parinn ingest` MUST append what remains of a run recorded before it to such a seat in the personal room"
      },
      {
       "file": "docs/srs/05-functional-requirements.md",
@@ -1344,9 +1344,9 @@
       "text": "- **I1 \u2014 Nothing is lost.** Every event an agent saw or produced remains"
      }
     ],
-    "case": "A witnessed run's MCP server stops with part of its transcript past an ingest marker. Before `cairn ingest` runs, the device key is deleted from the platform key store. SEC-10 mints a new device key, and REC-24 counts no identity change. The new key did not certify the run seat and does not replace the old key by rotation, so REC-19 permits no seat certificate for the seat ingest starts beside it. REC-19's personal-room exception covers only an identity change. The case is similar when the key of the seat ingest started goes missing. SEC-27's replacement seat shares no add, yet REC-19 has every later ingest extend that one seat.",
-    "problem": "After such a loss, no rule gives `cairn ingest` a seat for what remains of the run. The remainder never reaches the record (I1), REC-19 counts it forever, and ADM-07 refuses every purge of its scope. The grid names REC-19 for this row's integrity status, but REC-19 does not decide the case.",
-    "fix": "REC-19: when the key that certified a run seat, or the key of the seat ingest started beside it, is missing (SEC-10), `cairn ingest` MUST append what remains of that run as after a node identity change. It goes to such a seat in the personal room, certified by the node's current device key and naming the seats it replaces, audited.",
+    "case": "A witnessed run's MCP server stops with part of its transcript past an ingest marker. Before `parinn ingest` runs, the device key is deleted from the platform key store. SEC-10 mints a new device key, and REC-24 counts no identity change. The new key did not certify the run seat and does not replace the old key by rotation, so REC-19 permits no seat certificate for the seat ingest starts beside it. REC-19's personal-room exception covers only an identity change. The case is similar when the key of the seat ingest started goes missing. SEC-27's replacement seat shares no add, yet REC-19 has every later ingest extend that one seat.",
+    "problem": "After such a loss, no rule gives `parinn ingest` a seat for what remains of the run. The remainder never reaches the record (I1), REC-19 counts it forever, and ADM-07 refuses every purge of its scope. The grid names REC-19 for this row's integrity status, but REC-19 does not decide the case.",
+    "fix": "REC-19: when the key that certified a run seat, or the key of the seat ingest started beside it, is missing (SEC-10), `parinn ingest` MUST append what remains of that run as after a node identity change. It goes to such a seat in the personal room, certified by the node's current device key and naming the seats it replaces, audited.",
     "scope": "m1-m5"
    },
    {
@@ -1362,7 +1362,7 @@
      }
     ],
     "case": "The principal's config.toml makes a change that loosens something not on ADM-04's held list. Examples: SEC-10's opt-in to taking the device key or a seat key from the environment, raising `pin_budget.max_model_tokens` or `recall.max_k`, or turning on `restore_block.on_prompt` or `restore_block.landmarks_on_start`.",
-    "problem": "ADM-04 rules only on the changes it lists and on changes that only tighten. A loosening it does not list falls under neither clause, so one implementer applies it at once and another waits for `cairn configuration accept`. Among these is SEC-10's opt-in to taking keys from the environment.",
+    "problem": "ADM-04 rules only on the changes it lists and on changes that only tighten. A loosening it does not list falls under neither clause, so one implementer applies it at once and another waits for `parinn configuration accept`. Among these is SEC-10's opt-in to taking keys from the environment.",
     "fix": "ADM-04: every settings change that does not only tighten MUST wait for the widening acceptance, as the listed changes do.",
     "scope": "m1-m5"
    },
@@ -1395,7 +1395,7 @@
      }
     ],
     "case": "A run's MCP server restarts, or a harness resume keeps the harness session. The run continues on a new run seat in its personal room that names the old one. LANE-25 (M7) lists the run's first personal-room seat and a device seat a new key started there as members with no add, but not a run seat. SEC-27 says the new seat inherits no role, while LANE-16 gives 'a run's personal-room seat' contributor. The REC-24 scenario makes every personal-room seat a member.",
-    "problem": "In M1\u2013M5, nothing decides whether this new seat is a member or which role it has. The grid cells for run-seat key loss and for MCP server restart name SEC-27 and LANE-23, and neither decides it. So it is open whether the restore block names its seat id, and whether the join request that `cairn run join` (M2) makes from it is valid. Once LANE-24 ships, a run could never join a room after any restart.",
+    "problem": "In M1\u2013M5, nothing decides whether this new seat is a member or which role it has. The grid cells for run-seat key loss and for MCP server restart name SEC-27 and LANE-23, and neither decides it. So it is open whether the restore block names its seat id, and whether the join request that `parinn run join` (M2) makes from it is valid. Once LANE-24 ships, a run could never join a room after any restart.",
     "fix": "LANE-25, and SEC-27's M1 part: a run seat a new key started in the personal room MUST be a member from its first event, with no add and the contributor role, as the run's first personal-room seat is.",
     "scope": "m1-m5"
    },
@@ -1404,20 +1404,20 @@
     "quotes": [
      {
       "file": "docs/srs/05a-administration-requirements.md",
-      "text": "when OWN-22 refuses that act, `cairn uninstall` MUST change nothing, name the open residual risks and the runs that leave them open"
+      "text": "when OWN-22 refuses that act, `parinn uninstall` MUST change nothing, name the open residual risks and the runs that leave them open"
      },
      {
       "file": "docs/srs/05a-administration-requirements.md",
-      "text": "Otherwise it MUST list every artifact any Cairn component created"
+      "text": "Otherwise it MUST list every artifact any ParleyInn component created"
      },
      {
       "file": "docs/srs/06-security.md",
-      "text": "Until presence proofs ship (OWN-11, OWN-12), Cairn MUST refuse every widening act while managed policy requires an authenticator"
+      "text": "Until presence proofs ship (OWN-11, OWN-12), ParleyInn MUST refuse every widening act while managed policy requires an authenticator"
      }
     ],
-    "case": "From M2 to M5, on a machine whose managed policy requires an authenticator, the principal runs `cairn uninstall`. SEC-22 refuses the widening act turning capture off. OWN-22 did not refuse it, so ADM-02's 'Otherwise' branch applies, and that branch removes the hook registrations only after recording the act that was just refused.",
+    "case": "From M2 to M5, on a machine whose managed policy requires an authenticator, the principal runs `parinn uninstall`. SEC-22 refuses the widening act turning capture off. OWN-22 did not refuse it, so ADM-02's 'Otherwise' branch applies, and that branch removes the hook registrations only after recording the act that was just refused.",
     "problem": "ADM-02 covers only OWN-22's refusal. One implementer changes nothing, and another removes the hook registrations with no recorded act turning capture off.",
-    "fix": "ADM-02: when the act turning capture off is refused for any reason (OWN-22 or SEC-22), `cairn uninstall` MUST change nothing, name the reason, audit the refusal and point to the harness's own plugin removal.",
+    "fix": "ADM-02: when the act turning capture off is refused for any reason (OWN-22 or SEC-22), `parinn uninstall` MUST change nothing, name the reason, audit the refusal and point to the harness's own plugin removal.",
     "scope": "m1-m5"
    },
    {
@@ -1458,7 +1458,7 @@
      }
     ],
     "case": "Once OWN-10 ships, the principal tightens the push action class from ask first to hand off by editing config.toml. ADM-04 applies the change at once with no act. OWN-10 requires a principal act, and an edited TOML file is no principal surface (OWN-02).",
-    "problem": "One implementer applies the tightening unrecorded (ADM-04). Another ignores it until `cairn rule-level set` records a cut act (OWN-10). Rule levels take effect only with OWN-04 and OWN-10, both in M7.",
+    "problem": "One implementer applies the tightening unrecorded (ADM-04). Another ignores it until `parinn rule-level set` records a cut act (OWN-10). Rule levels take effect only with OWN-04 and OWN-10, both in M7.",
     "fix": "OWN-10: every rule level change the principal makes at a principal surface MUST be a principal act. A tightening its configuration makes MUST apply as ADM-04 says, with no act.",
     "scope": "later M7"
    },
@@ -1488,11 +1488,11 @@
     "quotes": [
      {
       "file": "docs/domain-model/pins-and-context.md",
-      "text": "- **Assignment**: Room state asking a seat to work on a branch. It makes Cairn"
+      "text": "- **Assignment**: Room state asking a seat to work on a branch. It makes ParleyInn"
      },
      {
       "file": "docs/srs/05b-lane-requirements.md",
-      "text": "Cairn MUST check every room act against the seat's role and the room state"
+      "text": "ParleyInn MUST check every room act against the seat's role and the room state"
      },
      {
       "file": "docs/srs/05b-lane-requirements.md",
@@ -1500,12 +1500,12 @@
      },
      {
       "file": "docs/srs/05b-lane-requirements.md",
-      "text": "it MUST NOT make Cairn refuse any other seat's act"
+      "text": "it MUST NOT make ParleyInn refuse any other seat's act"
      }
     ],
     "case": "A moderator assigns branch B to seat S1. Seat S2, a contributor, then links or presents a result on B. LANE-16 checks every room act against 'the room state', which includes assignments (LANE-31).",
-    "problem": "Only the model says an assignment makes Cairn refuse no seat's act. LANE-26 states that rule for a stake, but no requirement states it for an assignment, so an implementer may refuse S2's act.",
-    "fix": "LANE-09: an assignment MUST NOT make Cairn refuse any seat's act.",
+    "problem": "Only the model says an assignment makes ParleyInn refuse no seat's act. LANE-26 states that rule for a stake, but no requirement states it for an assignment, so an implementer may refuse S2's act.",
+    "fix": "LANE-09: an assignment MUST NOT make ParleyInn refuse any seat's act.",
     "scope": "later M8"
    }
   ],
@@ -1517,7 +1517,7 @@
      0
     ],
     "verdict": "blocking",
-    "reason": "The finding holds up. I1 exempts only secrets that redaction removes. \u00a79.6 lets `.cairn.toml`, which the commit authors control (a threat source \u00a76.1 puts in scope), add redaction patterns. ADM-04 and SEC-11 treat adding a pattern as tightening, so it applies with no acceptance. SEC-08 then applies it to every text field, payload and hook input before anything is written. Concrete case: a repository sets `redaction.extra_patterns = [\"(?s).+\"]`. Every later event of runs in that repository is stored as `[REDACTED:<rule>]`, and that content was never secret, so it can never be recovered. A hostile repository can use this to wipe the record of its own injection. I found no rule that limits repository patterns. T5 only considers loosening. SEC-08, SEC-11 and \u00a79.6 all ship in M1 and M2. The fix belongs in SEC-08, the row that governs redaction patterns, and \u00a79.6 drops the permission that conflicts with it. invariants.md does not change.",
+    "reason": "The finding holds up. I1 exempts only secrets that redaction removes. \u00a79.6 lets `.parinn.toml`, which the commit authors control (a threat source \u00a76.1 puts in scope), add redaction patterns. ADM-04 and SEC-11 treat adding a pattern as tightening, so it applies with no acceptance. SEC-08 then applies it to every text field, payload and hook input before anything is written. Concrete case: a repository sets `redaction.extra_patterns = [\"(?s).+\"]`. Every later event of runs in that repository is stored as `[REDACTED:<rule>]`, and that content was never secret, so it can never be recovered. A hostile repository can use this to wipe the record of its own injection. I found no rule that limits repository patterns. T5 only considers loosening. SEC-08, SEC-11 and \u00a79.6 all ship in M1 and M2. The fix belongs in SEC-08, the row that governs redaction patterns, and \u00a79.6 drops the permission that conflicts with it. invariants.md does not change.",
     "quotes": [
      {
       "file": "docs/srs/invariants.md",
@@ -1547,7 +1547,7 @@
     "scenario": {
      "file": "features/security.feature",
      "requirement": "SEC-08",
-     "step": "And a repository \".cairn.toml\" adding the redaction pattern \"(?s).+\" redacts nothing, and an audit entry records \"rejected repository setting redaction.extra_patterns\""
+     "step": "And a repository \".parinn.toml\" adding the redaction pattern \"(?s).+\" redacts nothing, and an audit entry records \"rejected repository setting redaction.extra_patterns\""
     }
    },
    {
@@ -1581,11 +1581,11 @@
      2
     ],
     "verdict": "not-real",
-    "reason": "PIN-01 settles it. Qualifying pins come only from a principal, through `cairn pin add`, its accepted configuration or its stamp. Every add, edit or unpin must be the act OWN-11 and OWN-12 name for its author. The model defines managed policy as settings that belong to root, not as a principal, and it records no act. ADM-04's 'MUST apply only from managed policy \u2026 or from the principal's configuration' limits where such a change may come from. It does not give managed policy a power over pins, and SEC-22's list of managed-policy powers names none. An implementer can follow ADM-04 and PIN-01 together: a pin set by managed policy qualifies nothing, so active pins still derive from the record.",
+    "reason": "PIN-01 settles it. Qualifying pins come only from a principal, through `parinn pin add`, its accepted configuration or its stamp. Every add, edit or unpin must be the act OWN-11 and OWN-12 name for its author. The model defines managed policy as settings that belong to root, not as a principal, and it records no act. ADM-04's 'MUST apply only from managed policy \u2026 or from the principal's configuration' limits where such a change may come from. It does not give managed policy a power over pins, and SEC-22's list of managed-policy powers names none. An implementer can follow ADM-04 and PIN-01 together: a pin set by managed policy qualifies nothing, so active pins still derive from the record.",
     "quotes": [
      {
       "file": "docs/srs/05-functional-requirements.md",
-      "text": "Qualifying pins MUST come only from a principal (`cairn pin add` at a principal surface, its accepted configuration or its stamp)"
+      "text": "Qualifying pins MUST come only from a principal (`parinn pin add` at a principal surface, its accepted configuration or its stamp)"
      },
      {
       "file": "docs/srs/05-functional-requirements.md",
@@ -1608,7 +1608,7 @@
     "quotes": [
      {
       "file": "docs/srs/05a-administration-requirements.md",
-      "text": "When that file or its directory is writable by the principal, or the file is unparsable or invalid, Cairn MUST refuse to start a B1\u2013B3 component, keep the core recording, and audit and count the condition."
+      "text": "When that file or its directory is writable by the principal, or the file is unparsable or invalid, ParleyInn MUST refuse to start a B1\u2013B3 component, keep the core recording, and audit and count the condition."
      },
      {
       "file": "docs/srs/invariants.md",
@@ -1619,7 +1619,7 @@
    },
    {
     "id": "cfg-5",
-    "title": "After the device key is lost with the identity unchanged, `cairn ingest` has no seat for the rest of a run",
+    "title": "After the device key is lost with the identity unchanged, `parinn ingest` has no seat for the rest of a run",
     "findings": [
      4
     ],
@@ -1650,14 +1650,14 @@
     "edits": [
      {
       "file": "docs/srs/05-functional-requirements.md",
-      "old": "after a node identity change (REC-24), `cairn ingest` MUST append what remains of a run recorded before it",
-      "new": "after a node identity change (REC-24), or once the key that certified a run seat is missing (SEC-10), `cairn ingest` MUST append what remains of a run recorded before it"
+      "old": "after a node identity change (REC-24), `parinn ingest` MUST append what remains of a run recorded before it",
+      "new": "after a node identity change (REC-24), or once the key that certified a run seat is missing (SEC-10), `parinn ingest` MUST append what remains of a run recorded before it"
      }
     ],
     "scenario": {
      "file": "features/record.feature",
      "requirement": "REC-19",
-     "step": "And when the device key that certified a run seat goes missing with the node identity unchanged, before \"cairn ingest\" brings in what remains of that run past its ingest marker, \"cairn ingest\" appends that remainder to a seat it starts in the personal room naming that run seat, certified by the device key minted anew, and stops counting the run"
+     "step": "And when the device key that certified a run seat goes missing with the node identity unchanged, before \"parinn ingest\" brings in what remains of that run past its ingest marker, \"parinn ingest\" appends that remainder to a seat it starts in the personal room naming that run seat, certified by the device key minted anew, and stops counting the run"
     }
    },
    {
@@ -1705,7 +1705,7 @@
    },
    {
     "id": "cfg-8",
-    "title": "`cairn uninstall` after a SEC-22 refusal: ADM-02's 'Otherwise' branch requires removing hooks with no act recorded",
+    "title": "`parinn uninstall` after a SEC-22 refusal: ADM-02's 'Otherwise' branch requires removing hooks with no act recorded",
     "findings": [
      7
     ],
@@ -1718,7 +1718,7 @@
      },
      {
       "file": "docs/srs/05a-administration-requirements.md",
-      "text": "Otherwise it MUST list every artifact any Cairn component created"
+      "text": "Otherwise it MUST list every artifact any ParleyInn component created"
      },
      {
       "file": "docs/srs/05a-administration-requirements.md",
@@ -1726,20 +1726,20 @@
      },
      {
       "file": "docs/srs/06-security.md",
-      "text": "Until presence proofs ship (OWN-11, OWN-12), Cairn MUST refuse every widening act while managed policy requires an authenticator"
+      "text": "Until presence proofs ship (OWN-11, OWN-12), ParleyInn MUST refuse every widening act while managed policy requires an authenticator"
      }
     ],
     "edits": [
      {
       "file": "docs/srs/05a-administration-requirements.md",
-      "old": "when OWN-22 refuses that act, `cairn uninstall` MUST change nothing, name the open residual risks and the runs that leave them open, audit the refusal",
-      "new": "when Cairn refuses that act, `cairn uninstall` MUST change nothing, name the reason (under OWN-22, the open residual risks and the runs that leave them open), audit the refusal"
+      "old": "when OWN-22 refuses that act, `parinn uninstall` MUST change nothing, name the open residual risks and the runs that leave them open, audit the refusal",
+      "new": "when ParleyInn refuses that act, `parinn uninstall` MUST change nothing, name the reason (under OWN-22, the open residual risks and the runs that leave them open), audit the refusal"
      }
     ],
     "scenario": {
      "file": "features/administration.feature",
      "requirement": "ADM-02",
-     "step": "And \"cairn uninstall\" run at a terminal while managed policy required an authenticator for widening acts changed nothing, named that policy as the reason, recorded an audit entry of the refusal and pointed to the harness's own plugin removal"
+     "step": "And \"parinn uninstall\" run at a terminal while managed policy required an authenticator for widening acts changed nothing, named that policy as the reason, recorded an audit entry of the refusal and pointed to the harness's own plugin removal"
     }
    },
    {

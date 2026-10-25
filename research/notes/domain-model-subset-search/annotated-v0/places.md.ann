@@ -2,12 +2,12 @@
 title: "Places"
 order: "03"
 summary: >-
-  Where Cairn's state lives and is shared: homes, nodes, devices⟦f:paired-phone⟧ and paired phones⟦/f⟧⟦f:sandbox-risk⟧, sandboxes⟦/f⟧, rooms and their kinds⟦f:work-rooms⟧, visibility⟦/f⟧⟦f:peer-sync⟧, peers⟦f:blind-peer⟧ and blind peers⟦/f⟧⟦/f⟧.
+  Where ParleyInn's state lives and is shared: homes, nodes, devices⟦f:paired-phone⟧ and paired phones⟦/f⟧⟦f:sandbox-risk⟧, sandboxes⟦/f⟧, rooms and their kinds⟦f:work-rooms⟧, visibility⟦/f⟧⟦f:peer-sync⟧, peers⟦f:blind-peer⟧ and blind peers⟦/f⟧⟦/f⟧.
 ---
 # Places
 
-- **Home**: The directory with one principal's Cairn state on a node
-  (`CAIRN_HOME`, default `~/.cairn`), to which the keys SEC-10 keeps in a
+- **Home**: The directory with one principal's ParleyInn state on a node
+  (`PARINN_HOME`, default `~/.parinn`), to which the keys SEC-10 keeps in a
   platform key store, named per home, or only in an MCP server's memory are
   bound, belonging to one OS user and optionally bound to a **home id**
   (`home.id`) that the environment must supply to open it (SEC-03). The unit of
@@ -34,11 +34,11 @@ summary: >-
   (OWN-22).⟦/f⟧
 - **Room**: ⟦f:intent-criteria⟧Where an intent is worked on: at most one intent, ⟦/f⟧⟦f:conversation⟧a **conversation**
   (its ordered posts), ⟦/f⟧seats, pins⟦f:work-rooms⟧⟦f:git-tracking⟧, and branches in any repositories, each named
-  by a branch link⟦/f⟧⟦/f⟧. The unit Cairn shows and shares.
+  by a branch link⟦/f⟧⟦/f⟧. The unit ParleyInn shows and shares.
 - **Personal room**: A principal's private room on each of its nodes, created as
-  the first act of its device seat there when the principal installs Cairn on
-  the node, by `cairn install`, the plugin or the managed install path, recorded
-  at Cairn's first start there, or carried over to a node clone, which shares
+  the first act of its device seat there when the principal installs ParleyInn on
+  the node, by `parinn install`, the plugin or the managed install path, recorded
+  at ParleyInn's first start there, or carried over to a node clone, which shares
   it. It stays private⟦f:work-rooms⟧: no ⟦f:shared-rooms⟧⟦f:principal-keys⟧invite, admission or ⟦/f⟧⟦/f⟧visibility change applies to it
   (LANE-17)⟦/f⟧. Its create room act is the device seat's add there. Every run its
   node records has a seat in it from its first event⟦f:work-rooms⟧, without a join⟦/f⟧, and every

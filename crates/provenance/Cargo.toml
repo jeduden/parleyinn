@@ -1,0 +1,23 @@
+[package]
+name = "provenance"
+version = "0.0.0"
+description = "Provenance from a transcript line's structural fields: one class from PRV-01's closed set per line, never from its rendered role or text (PRV-03, PRV-08)"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+record.workspace = true
+redaction.workspace = true
+serde_json.workspace = true
+transcript.workspace = true
+
+[lints]
+workspace = true
+
+# ENG-02: see crates/parinn/Cargo.toml.
+[package.metadata.parinn]
+responsibility = "Classifies each transcript line's provenance from its structural fields"
+may-depend-on = ["record", "redaction", "transcript"]
+may-dev-depend-on = []

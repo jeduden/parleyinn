@@ -2,7 +2,7 @@
  {
   "type": "security",
   "quote": "An act signed by a seat key, wherever it is taken.",
-  "problem": "Device-seat room acts may be taken anywhere, and the facilitator shows the CLI taking them with no person at a terminal. An agent can therefore run `cairn` from its own shell (the run-seat key sits only in the MCP server, so the CLI signs as the device seat) and turn its model reply into a device-seat pin, which is `operator` and trusted on this node, or into a device-seat post. Once PRV-10 ships, such a post is a trusted source, and a trust grant pushes it into another principal's agents through OWN-29's template. Untrusted content then reaches a model outside I2's closed paths, and it also lands in the trusted-only export.",
+  "problem": "Device-seat room acts may be taken anywhere, and the facilitator shows the CLI taking them with no person at a terminal. An agent can therefore run `parinn` from its own shell (the run-seat key sits only in the MCP server, so the CLI signs as the device seat) and turn its model reply into a device-seat pin, which is `operator` and trusted on this node, or into a device-seat post. Once PRV-10 ships, such a post is a trusted source, and a trust grant pushes it into another principal's agents through OWN-29's template. Untrusted content then reaches a model outside I2's closed paths, and it also lands in the trusted-only export.",
   "fix": "Add: \"A device seat's room act is taken only at a principal surface, or by the facilitator's program for its own device seat; an agent's tool call, a CLI call included, never signs with a device seat's key.\"",
   "severity": "needs-fix",
   "lens": "consistency",
@@ -10,7 +10,7 @@
  },
  {
   "type": "gap",
-  "quote": "Cairn counts principals by principal key: every device key and seat key that chains to one principal key",
+  "quote": "ParleyInn counts principals by principal key: every device key and seat key that chains to one principal key",
   "problem": "Principals are counted only through chains to a principal key, yet before PRV-10 no principal key certifies a device key, so no seat chains to anything. The candidate still describes pre-PRV-10 behavior and leaves rules that need a seat's principal with nothing to go on: admission and invite (lists of principal keys), bar ('every key that chains to it'), protecting the owner from kick, bar and mute, and a device seat joining without admission.",
   "fix": "State the pre-PRV-10 rule, e.g. \"Before PRV-10 ships, a seat's principal is known only on the node whose device key certified it; admission, invites and bars, which name principal keys, apply once PRV-10 ships.\"",
   "severity": "needs-fix",
@@ -83,7 +83,7 @@
  {
   "type": "security",
   "quote": "the harness next raises it at its permission prompt (OWN-07). Separate from",
-  "problem": "A permission grant answers a later permission prompt with no principal act recorded at that time. But I2, Trusted text and Closed path list only restore blocks, opt-in notices, compaction guidance and OWN-04's templates as writes without a principal act, so whatever Cairn returns for the agent at that prompt is either a write outside the closed set or impossible.",
+  "problem": "A permission grant answers a later permission prompt with no principal act recorded at that time. But I2, Trusted text and Closed path list only restore blocks, opt-in notices, compaction guidance and OWN-04's templates as writes without a principal act, so whatever ParleyInn returns for the agent at that prompt is either a write outside the closed set or impossible.",
   "fix": "Add the permission grant's fixed template to I2's writes without a principal act, to Trusted text and to Closed path, or say that an answer under a permission grant carries no text to the agent.",
   "severity": "needs-fix",
   "lens": "security",
@@ -118,7 +118,7 @@
  },
  {
   "type": "gap",
-  "quote": "repository's `.cairn.toml`, its **repository configuration**, may only tighten",
+  "quote": "repository's `.parinn.toml`, its **repository configuration**, may only tighten",
   "problem": "\"Tighten\" is never defined in this model's act classes. A cloned repository's file is untrusted content, yet it could turn capture off, lower the pin budget or turn restore_block.on_prompt off, or set retention, all while claiming to tighten. The candidate classes each of these as widening.",
   "fix": "\"may only tighten: make only a change a cut principal act could make, never one this model classes widening (turning capture off, removing a pin from a restore block, a retention policy)\".",
   "severity": "needs-fix",
@@ -219,7 +219,7 @@
   "type": "useless",
   "quote": "The principal's act accepting the residual risks a run",
   "problem": "No rule says what an open, unaccepted residual risk blocks or what accepting it unlocks. So the widening act, its withdrawal and managed policy's power to forbid it have no effect within the candidate.",
-  "fix": "Add: \"; until a run's open residual risks are accepted, Cairn refuses the widening acts they expose on that run (OWN-22).\"",
+  "fix": "Add: \"; until a run's open residual risks are accepted, ParleyInn refuses the widening acts they expose on that run (OWN-22).\"",
   "severity": "minor",
   "lens": "usefulness",
   "model": "default"

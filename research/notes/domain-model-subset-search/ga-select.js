@@ -14,7 +14,7 @@ export const meta = {
 // feature spans, so only genomes are bred and reviewed.
 const { ga, work, repo, gen, k } = args
 const tag = `v0-ga${gen}`
-const env = `CAIRN_REPO=${repo}`
+const env = `PARINN_REPO=${repo}`
 
 const NAMES = { type: 'object', properties: { cands: { type: 'array', items: { type: 'string' } }, surrogate: { type: 'string' } }, required: ['cands', 'surrogate'] }
 const FINDINGS = {

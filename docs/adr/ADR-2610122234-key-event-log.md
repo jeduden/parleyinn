@@ -6,7 +6,7 @@ summary: >-
   PRV-12 makes a node's device keys, or a token-key-only node's token
   keys, a hash-linked key event log whose keys commit to an offsite
   recovery key, closing OQ-52. A process that can append to the store,
-  but can neither use the device key, drive Cairn's CLI at the
+  but can neither use the device key, drive ParleyInn's CLI at the
   principal's terminal, nor produce a presence proof, can no longer make
   its own writers `witnessed` or strip the principal's pins. The
   security reviewer approved it on 13 October 2026 (ENG-29).
@@ -34,8 +34,8 @@ this record:
   its principal, or by a confirmation key managed policy names, without
   a terminal on the node.
 - An inception awaiting a confirm, a duplicity or a recovery key still
-  on the node shows in the Needs you queue, Catch up and `cairn doctor`,
-  not only in `cairn status`.
+  on the node shows in the Needs you queue, Catch up and `parinn doctor`,
+  not only in `parinn status`.
 
 [keri]: https://trustoverip.github.io/kswg-keri-specification/
 [ik]: ../../research/notes/identity-keys/identity-keys.md
@@ -66,7 +66,7 @@ October 2026 on its review shape it:
   writer derives, and a concurrent confirm and reject leave the reject
   holding until a choose. Every signature names its kind, so one kind
   never verifies as another.
-- **Reject.** `cairn key-event-log reject`, a cut act, voids an
+- **Reject.** `parinn key-event-log reject`, a cut act, voids an
   inception no confirm or `recovered` has counted, voids a node identity
   change event the key it replaces signs it for, and acknowledges a void
   key event. Before a confirm, choose, reject or `recovered`, the
@@ -87,16 +87,16 @@ October 2026 on its review shape it:
 - **The recovery key comes from off the node when it can.** Where an
   authenticator is enrolled, its public half comes from there and its
   private half never touches the node. Where managed policy names a
-  recipient key, Cairn writes each new recovery key at once, encrypted
-  to it. Otherwise `cairn recovery-key write` writes it once, encrypted
-  under a passphrase, and `cairn device-key rotate` writes the new one
+  recipient key, ParleyInn writes each new recovery key at once, encrypted
+  to it. Otherwise `parinn recovery-key write` writes it once, encrypted
+  under a passphrase, and `parinn device-key rotate` writes the new one
   in the same act. A token key's stays with the issuing node, which signs the
   rotation a later access token carries.
 - **Robustness.** Checking for a missing key and recording a key event
   happen under one lock, re-read under it, never past a hook's budget.
   A locked key store is never a missing key.
-- **Surfacing, by milestone.** In M1, `cairn status`, `cairn verify` and
-  `cairn doctor` show an inception awaiting a confirm, a duplicity, a
+- **Surfacing, by milestone.** In M1, `parinn status`, `parinn verify` and
+  `parinn doctor` show an inception awaiting a confirm, a duplicity, a
   void key event and a stalled key store, each counted. There are no
   presence proofs before M7, so in M1 a confirm needs a managed-policy
   confirmation key, or a `recovered` rotation brings a key back. The
@@ -122,36 +122,36 @@ requirements listed above.
 
 Approval: [given][approval].
 
-[approval]: https://github.com/jeduden/cairn/pull/39#issuecomment-6149850310
+[approval]: https://github.com/jeduden/parleyinn/pull/39#issuecomment-6149850310
 
 ### Security analysis (author)
 
 This is the author's analysis for the security reviewer, not the review
 itself. The attacker it assumes can append to the store but can neither
-use the device key, drive Cairn's CLI at the principal's terminal, nor
+use the device key, drive ParleyInn's CLI at the principal's terminal, nor
 produce a presence proof. The PRV-12 scenario, still `@pending`, is to
 prove each row.
 
-| Attack                                                          | What answers it                                                                    |
-| --------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
-| forge a rotation to add one's own key                           | a rotation needs the recovery key, off the node where an authenticator gives it    |
-| append a `minted anew` and a confirm for it                     | the confirm needs a presence proof or an independent key, so it counts for nothing |
-| sign that confirm with the key the inception replaces           | the replaced key may reject, never confirm                                         |
-| append a node identity change event to demote every writer      | a reject signed by the key it replaces voids it                                    |
-| append a `revoked` to stop later certificate records counting   | a `revoked` counts only signed by the revoked key, its recovery key or principal   |
-| append a backup restore act to demote reinstated writers        | the restore's effects on origin wait until its `minted anew` counts                |
-| lure the principal into a `recovered` joining a forgery         | `recovered` names its `minted anew` by digest, after Cairn shows what it changes   |
-| adopt another node's token key from the same issuer             | a token certificate must name the token key it succeeds and this personal room     |
-| use the same forgery to strip the principal's pins              | an uncounted inception replaces nothing; earlier writers keep counting             |
-| backdate a `minted anew`'s chain head to demote later seats     | a chain head below a certificate record of the replaced key voids it               |
-| keep a node clone's source writers `witnessed`                  | a node identity change starts a new key event log that counts only when confirmed  |
-| certify new seats with a replaced or revoked key                | certificate records count only at or before the chain head that replaced it        |
-| deliver key events naming this node's key from a peer or bundle | only key events this node recorded count                                           |
-| cause a duplicity by starting ten processes at once             | the missing-key check and the key event are recorded under one lock                |
-| turn a locked key store into a lost key                         | a locked store is never a missing key; appends wait at an ingest marker            |
+| Attack                                                          | What answers it                                                                      |
+| --------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| forge a rotation to add one's own key                           | a rotation needs the recovery key, off the node where an authenticator gives it      |
+| append a `minted anew` and a confirm for it                     | the confirm needs a presence proof or an independent key, so it counts for nothing   |
+| sign that confirm with the key the inception replaces           | the replaced key may reject, never confirm                                           |
+| append a node identity change event to demote every writer      | a reject signed by the key it replaces voids it                                      |
+| append a `revoked` to stop later certificate records counting   | a `revoked` counts only signed by the revoked key, its recovery key or principal     |
+| append a backup restore act to demote reinstated writers        | the restore's effects on origin wait until its `minted anew` counts                  |
+| lure the principal into a `recovered` joining a forgery         | `recovered` names its `minted anew` by digest, after ParleyInn shows what it changes |
+| adopt another node's token key from the same issuer             | a token certificate must name the token key it succeeds and this personal room       |
+| use the same forgery to strip the principal's pins              | an uncounted inception replaces nothing; earlier writers keep counting               |
+| backdate a `minted anew`'s chain head to demote later seats     | a chain head below a certificate record of the replaced key voids it                 |
+| keep a node clone's source writers `witnessed`                  | a node identity change starts a new key event log that counts only when confirmed    |
+| certify new seats with a replaced or revoked key                | certificate records count only at or before the chain head that replaced it          |
+| deliver key events naming this node's key from a peer or bundle | only key events this node recorded count                                             |
+| cause a duplicity by starting ten processes at once             | the missing-key check and the key event are recorded under one lock                  |
+| turn a locked key store into a lost key                         | a locked store is never a missing key; appends wait at an ingest marker              |
 
 What stays open: a process that can use the device key, read the key
-store or drive Cairn's CLI at the principal's terminal, residual risks
+store or drive ParleyInn's CLI at the principal's terminal, residual risks
 R3 and R7 (§6.1). It can certify seats directly, sign as the replaced
 key, and, where the recovery key was minted on the node, read it until
 it leaves. M1 leaves R3 open for every run, so until sandboxes ship
@@ -175,9 +175,9 @@ recovery-key window; only a sandbox closes the rest.
 ## Consequences
 
 - M1 ships the device key's key event log, its certificate records, its
-  recovery key, `cairn recovery-key write`, `cairn device-key rotate`
-  and `cairn key-event-log confirm|choose|reject`, surfaced through
-  `cairn status`, `cairn verify` and `cairn doctor`.
+  recovery key, `parinn recovery-key write`, `parinn device-key rotate`
+  and `parinn key-event-log confirm|choose|reject`, surfaced through
+  `parinn status`, `parinn verify` and `parinn doctor`.
 - M3 brings the backup restore's `minted anew`, M8 token keys, and
   PRV-10 confirmation from another device; VIEW-05, VIEW-08 and PIN-10
   bring the Needs you, Catch up and restore-block clauses.

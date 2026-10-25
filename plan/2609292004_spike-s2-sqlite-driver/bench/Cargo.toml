@@ -19,5 +19,5 @@ cipher = ["rusqlite/bundled-sqlcipher-vendored-openssl"]
 codegen-units = 1
 lto = "thin"
 
-# Standalone: kept out of the cairn workspace.
+# Standalone: kept out of the parinn workspace.
 [workspace]

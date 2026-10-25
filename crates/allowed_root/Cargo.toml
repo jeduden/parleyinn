@@ -1,0 +1,20 @@
+[package]
+name = "allowed_root"
+version = "0.0.0"
+description = "The allowed roots every path ParleyInn receives must lie within once resolved, symbolic links included (SEC-18)"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dev-dependencies]
+testkit.workspace = true
+
+[lints]
+workspace = true
+
+# ENG-02: see crates/parinn/Cargo.toml.
+[package.metadata.parinn]
+responsibility = "Resolves each path ParleyInn receives and refuses one outside every allowed root"
+may-depend-on = []
+may-dev-depend-on = ["testkit"]

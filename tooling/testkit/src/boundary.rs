@@ -32,12 +32,12 @@ use std::process::{Command, Output, Stdio};
 use crate::{TempDir, isolate};
 
 /// The opt-out: set, outside CI, the end-to-end tests run unconfined.
-pub const UNCONFINED: &str = "CAIRN_E2E_UNCONFINED";
+pub const UNCONFINED: &str = "PARINN_E2E_UNCONFINED";
 
 /// Given as its first argument, an executable that hosts the probe
 /// runs [`probe`] instead of itself: the scenario runner's way to stand
 /// in for a component that opens a socket.
-pub const PROBE: &str = "--cairn-boundary-probe";
+pub const PROBE: &str = "--parinn-boundary-probe";
 
 /// The variable CI sets.
 const CI: &str = "CI";
@@ -142,7 +142,7 @@ impl Confinement {
         self.component
     }
 
-    /// Starts `program` with `args` and a `HOME` and `CAIRN_HOME` under
+    /// Starts `program` with `args` and a `HOME` and `PARINN_HOME` under
     /// `home` (ENG-14), confined, and waits for it. The caller, the
     /// test thread and the place that called, is named in a failure.
     ///
@@ -214,6 +214,98 @@ impl Confinement {
     ) -> Result<Output, Error> {
         let caller = caller(std::thread::current().name(), Location::caller());
         self.start(program, args, home, env, Stdin::Terminal, caller)
+    }
+
+    /// Starts `program` as [`run_in`](Self::run_in) does, with no input,
+    /// and kills it and every process it started once `after` passed,
+    /// unless it exited by then: the crash-consistency test's kill
+    /// (ENG-06). Returns whether it was still running. Its trace is
+    /// checked as any start's.
+    ///
+    /// # Errors
+    ///
+    /// As [`run`](Self::run), and when the kill cannot be sent.
+    #[track_caller]
+    pub fn run_killed(
+        &self,
+        program: &Path,
+        args: &[&str],
+        home: &Path,
+        env: &[(&str, &str)],
+        after: std::time::Duration,
+    ) -> Result<bool, Error> {
+        let caller = caller(std::thread::current().name(), Location::caller());
+        let dir = TempDir::new().map_err(|source| Error::Trace { source })?;
+        let trace = dir.path().join("trace");
+        let mut command = self.command(program, args, &trace);
+        command.envs(env.iter().copied());
+        isolate(&mut command, home);
+        let started = |source| Error::Start {
+            program: program.to_path_buf(),
+            source,
+        };
+        let running = kill_after(&mut command, after).map_err(started)?;
+        if self.mode == Mode::Unconfined {
+            return Ok(running);
+        }
+        let quiet = Output {
+            status: std::process::ExitStatus::default(),
+            stdout: Vec::new(),
+            stderr: Vec::new(),
+        };
+
+        // A start killed before the trace began leaves none: nothing ran
+        // to make a call.
+        let trace = match fs::read_to_string(&trace) {
+            Err(e) if running && e.kind() == io::ErrorKind::NotFound => Ok(String::new()),
+            read => read,
+        };
+
+        self.finish(quiet, trace, caller).map(|_| running)
+    }
+
+    /// Starts `program` as [`run_in`](Self::run_in) does, in a process
+    /// group of its own, and leaves it running with its standard input
+    /// and output piped to the caller: a server a test talks to, such as
+    /// the MCP server under a stand-in harness. Its trace is checked as
+    /// it ends, through [`Started::finish`] or [`Started::kill`].
+    ///
+    /// # Errors
+    ///
+    /// Fails when the program, or the tools around it, cannot start.
+    #[track_caller]
+    pub fn spawn(
+        &self,
+        program: &Path,
+        args: &[&str],
+        home: &Path,
+        env: &[(&str, &str)],
+    ) -> Result<Started, Error> {
+        let caller = caller(std::thread::current().name(), Location::caller());
+        let dir = TempDir::new().map_err(|source| Error::Trace { source })?;
+        let trace = dir.path().join("trace");
+        let mut command = self.command(program, args, &trace);
+        command.envs(env.iter().copied());
+        isolate(&mut command, home);
+        #[cfg(unix)]
+        std::os::unix::process::CommandExt::process_group(&mut command, 0);
+        let child = command
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::null())
+            .spawn()
+            .map_err(|source| Error::Start {
+                program: program.to_path_buf(),
+                source,
+            })?;
+
+        Ok(Started {
+            child,
+            confinement: *self,
+            trace,
+            _dir: dir,
+            caller,
+        })
     }
 
     fn start(
@@ -291,6 +383,113 @@ impl Confinement {
     }
 }
 
+/// A program [`Confinement::spawn`] started, still running.
+#[derive(Debug)]
+pub struct Started {
+    child: std::process::Child,
+    confinement: Confinement,
+    trace: PathBuf,
+    _dir: TempDir,
+    caller: String,
+}
+
+/// A program still running when its handle drops, because a test
+/// failed before stopping it, is killed with everything it started, so
+/// no confined process outlives its test.
+impl Drop for Started {
+    fn drop(&mut self) {
+        if matches!(self.child.try_wait(), Ok(None)) {
+            let _ = self.kill_group();
+        }
+    }
+}
+
+impl Started {
+    /// The program's standard input, until it is closed.
+    pub fn stdin(&mut self) -> Option<&mut std::process::ChildStdin> {
+        self.child.stdin.as_mut()
+    }
+
+    /// The program's standard output, taken once.
+    pub fn take_stdout(&mut self) -> Option<std::process::ChildStdout> {
+        self.child.stdout.take()
+    }
+
+    /// Closes the program's standard input and waits up to `deadline`
+    /// for it to exit, killing it and everything it started past that;
+    /// whether it exited by itself. Its trace is then checked.
+    ///
+    /// # Errors
+    ///
+    /// Fails when it cannot be waited for or killed, when its trace
+    /// cannot be read, or when it, or anything it started, made a
+    /// network call.
+    pub fn finish(mut self, deadline: std::time::Duration) -> Result<bool, Error> {
+        drop(self.child.stdin.take());
+        let started = std::time::Instant::now();
+        let exited = loop {
+            let status = self
+                .child
+                .try_wait()
+                .map_err(|source| Error::Trace { source })?;
+            match status {
+                Some(_) => break true,
+                None if started.elapsed() >= deadline => break false,
+                None => std::thread::sleep(std::time::Duration::from_millis(20)),
+            }
+        };
+        if !exited {
+            self.kill_group()?;
+        }
+        self.checked().map(|()| exited)
+    }
+
+    /// Kills the program and everything it started with `SIGKILL`, as a
+    /// crash would, then checks its trace.
+    ///
+    /// # Errors
+    ///
+    /// As [`finish`](Self::finish).
+    pub fn kill(mut self) -> Result<(), Error> {
+        self.kill_group()?;
+        self.checked()
+    }
+
+    fn kill_group(&mut self) -> Result<(), Error> {
+        let group = format!("-{}", self.child.id());
+        let killed = Command::new("kill")
+            .args(["-KILL", "--", &group])
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .status();
+        killed.map_err(|source| Error::Trace { source })?;
+        let _ = self.child.kill();
+        self.child
+            .wait()
+            .map(drop)
+            .map_err(|source| Error::Trace { source })
+    }
+
+    fn checked(&self) -> Result<(), Error> {
+        if self.confinement.mode == Mode::Unconfined {
+            return Ok(());
+        }
+        let trace = match fs::read_to_string(&self.trace) {
+            Err(e) if e.kind() == io::ErrorKind::NotFound => Ok(String::new()),
+            read => read,
+        };
+        let quiet = Output {
+            status: std::process::ExitStatus::default(),
+            stdout: Vec::new(),
+            stderr: Vec::new(),
+        };
+
+        self.confinement
+            .finish(quiet, trace, self.caller.clone())
+            .map(drop)
+    }
+}
+
 /// What a start gives the program on its standard input.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Stdin<'a> {
@@ -317,6 +516,36 @@ fn shell_line(command: &Command) -> String {
     std::iter::once(command.get_program())
         .chain(command.get_args())
         .fold("exec".to_owned(), |line, word| line + " " + &quote(word))
+}
+
+/// Starts `command` in a process group of its own, its output
+/// discarded, and kills the whole group with `SIGKILL` once `after`
+/// passed, unless it exited by then, so neither the trace nor the
+/// program outlives the other; whether it was still running.
+fn kill_after(command: &mut Command, after: std::time::Duration) -> io::Result<bool> {
+    #[cfg(unix)]
+    std::os::unix::process::CommandExt::process_group(command, 0);
+    let mut child = command
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .spawn()?;
+    std::thread::sleep(after);
+    let running = child.try_wait()?.is_none();
+    if running {
+        let group = format!("-{}", child.id());
+        Command::new("kill")
+            .args(["-KILL", "--", &group])
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .status()?;
+    }
+    // The group may have exited between the look and its kill; a kill of
+    // a program that exited does nothing.
+    let _ = child.kill();
+    child.wait()?;
+
+    Ok(running)
 }
 
 /// Starts `command` with `input` on its stdin, closes it, and waits
@@ -396,9 +625,18 @@ fn network_calls(trace: &str) -> Vec<String> {
                 .trim_start_matches(|c: char| c.is_ascii_digit())
                 .trim()
         })
-        .filter(|l| !l.is_empty())
+        .filter(|l| !l.is_empty() && !is_unnamed_detach(l))
         .map(str::to_owned)
         .collect()
+}
+
+/// Whether `line` is strace's note of a thread in a call it could not
+/// name, left unfinished or detached from (`???( <detached ...>`): the
+/// trace shows no call, a note a thread still running when the program
+/// exits leaves now and then.
+fn is_unnamed_detach(line: &str) -> bool {
+    line.starts_with("???(")
+        && (line.ends_with("<detached ...>") || line.ends_with("<unfinished ...>"))
 }
 
 /// Names the caller: the thread, which libtest names after the test,

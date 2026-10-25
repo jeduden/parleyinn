@@ -21,7 +21,7 @@ pub use host::Cargo;
 /// The variable every cargo a measurement starts carries. A `coverage`
 /// run that finds it set is running inside a measurement, a test
 /// started by one, and refuses: measuring again would recurse.
-pub const MEASURING: &str = "CAIRN_COVERAGE_MEASURING";
+pub const MEASURING: &str = "PARINN_COVERAGE_MEASURING";
 
 /// What a measurement does to the machine: run cargo and write files.
 /// The tests put a fake in its place.

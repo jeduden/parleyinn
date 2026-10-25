@@ -1,9 +1,17 @@
 use super::*;
 use std::ffi::OsStr;
+
+#[cfg(not(any(target_os = "macos", windows)))]
+#[test]
+fn its_keys_are_files_in_its_keys_directory_on_this_os() {
+    let home = Home::locate(Some(OsStr::new("/c")), None).unwrap();
+
+    assert_eq!(home.key_store().kind(), key::key_store::KeyStoreKind::File);
+}
 use testkit::TempDir;
 
 #[test]
-fn the_home_is_cairn_home_when_set_else_dot_cairn_in_home() {
+fn the_home_is_parinn_home_when_set_else_dot_parinn_in_home() {
     assert_eq!(
         Home::locate(Some(OsStr::new("/c")), Some(OsStr::new("/h")))
             .unwrap()
@@ -12,13 +20,13 @@ fn the_home_is_cairn_home_when_set_else_dot_cairn_in_home() {
     );
     assert_eq!(
         Home::locate(None, Some(OsStr::new("/h"))).unwrap().root(),
-        Path::new("/h/.cairn")
+        Path::new("/h/.parinn")
     );
     assert_eq!(
         Home::locate(Some(OsStr::new("")), Some(OsStr::new("/h")))
             .unwrap()
             .root(),
-        Path::new("/h/.cairn")
+        Path::new("/h/.parinn")
     );
 }
 
@@ -26,29 +34,25 @@ fn the_home_is_cairn_home_when_set_else_dot_cairn_in_home() {
 fn no_home_at_all_is_refused() {
     for home in [None, Some(OsStr::new(""))] {
         let err = Home::locate(None, home).unwrap_err();
-        assert_eq!(err.to_string(), "no home: set CAIRN_HOME or HOME");
+        assert_eq!(err.to_string(), "no home: set PARINN_HOME or HOME");
     }
 }
 
 #[test]
 fn a_home_names_its_files() {
     let home = Home::locate(Some(OsStr::new("/c")), None).unwrap();
-    let room = record::id::RoomId::derive(&[1; 32], &[2; 16]);
-    let seat = record::id::SeatId::derive(&room, &[1; 32]);
 
     assert_eq!(home.store(), Path::new("/c/store.db"));
-    assert_eq!(home.device_key(), Path::new("/c/keys/device.key"));
-    assert_eq!(home.recovery_key(), Path::new("/c/keys/recovery.key"));
-    assert_eq!(
-        home.seat_key(seat),
-        PathBuf::from(format!("/c/keys/seat-{seat}.key"))
-    );
+    assert_eq!(home.keys(), Path::new("/c/keys"));
+    assert_eq!(home.staged(), Path::new("/c/keys/staged"));
+    assert_eq!(home.node_identity(), Path::new("/c/node-identity"));
+    assert_eq!(home.identity(), &IdentitySource::platform());
 }
 
 #[test]
 fn create_makes_the_home_and_its_keys_directory_for_its_owner_alone() {
     let dir = TempDir::new().unwrap();
-    let home = Home::locate(Some(dir.path().join("a/.cairn").as_os_str()), None).unwrap();
+    let home = Home::locate(Some(dir.path().join("a/.parinn").as_os_str()), None).unwrap();
 
     home.create().unwrap();
     home.create().unwrap();
@@ -76,10 +80,16 @@ fn create_fails_where_a_file_stands() {
 }
 
 #[test]
-fn a_first_start_stages_its_genesis_in_one_directory_of_keys() {
+fn a_home_reads_its_node_identity_where_it_is_told() {
     let home = Home::locate(Some(OsStr::new("/c")), None).unwrap();
 
-    assert_eq!(home.genesis(), Path::new("/c/keys/genesis"));
+    let other = home
+        .clone()
+        .with_identity(IdentitySource::Files(vec![PathBuf::from("/id")]));
+    assert_eq!(
+        other.identity(),
+        &IdentitySource::Files(vec![PathBuf::from("/id")])
+    );
 }
 
 #[test]
@@ -93,7 +103,7 @@ fn a_home_names_its_audit_log_and_its_home_id_binding() {
 /// A home made by `create`, with a file in it, readable only by this
 /// OS user.
 fn made_home(dir: &TempDir) -> Home {
-    let home = Home::locate(Some(dir.path().join(".cairn").as_os_str()), None).unwrap();
+    let home = Home::locate(Some(dir.path().join(".parinn").as_os_str()), None).unwrap();
     home.create().unwrap();
     owner_only_file(&home.store());
     home
@@ -288,13 +298,13 @@ fn a_bound_home_opens_only_for_its_own_home_id() {
     assert!(matches!(err, AdminError::HomeIdMismatch), "{err:?}");
     assert_eq!(
         err.to_string(),
-        "the home id CAIRN_HOME_ID supplies does not match the home's"
+        "the home id PARINN_HOME_ID supplies does not match the home's"
     );
     let err = home.check_home_id(None).unwrap_err();
     assert!(matches!(err, AdminError::HomeIdMissing), "{err:?}");
     assert_eq!(
         err.to_string(),
-        "the home is bound to a home id, and CAIRN_HOME_ID supplies none"
+        "the home is bound to a home id, and PARINN_HOME_ID supplies none"
     );
 }
 

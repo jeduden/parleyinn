@@ -56,7 +56,7 @@ step by a 5-second debounced auto-export and an auto-import after `git pull`.
 
 ### Inferences
 
-- Beads moved from "git is the database, SQLite is a cache" to "a versioned database is the database, git is only a transport ref". For Cairn, Beads is evidence that a two-store design (local DB + git-tracked text file) is hard to keep consistent; but Beads' data is mutable rows, whereas Cairn's record is append-only, which avoids the delete/resurrection and field-merge problems that drove Beads away.
+- Beads moved from "git is the database, SQLite is a cache" to "a versioned database is the database, git is only a transport ref". For ParleyInn, Beads is evidence that a two-store design (local DB + git-tracked text file) is hard to keep consistent; but Beads' data is mutable rows, whereas ParleyInn's record is append-only, which avoids the delete/resurrection and field-merge problems that drove Beads away.
 - The opt-in events journal (same-transaction, sequence-numbered, resumable) is the closest analogue in Beads to an append-only session record, and it is explicitly clone-local and not synced.
 
 ### Gaps
@@ -90,7 +90,7 @@ primary keys added to make clones merge-safe.
 ### Inferences
 
 - Content-hash IDs need no coordination but are not content-addressed in the strict sense (timestamp and nonce are inputs), so identical content created twice gets two IDs. For an append-only record, a random or ULID-style ID per event plus a per-writer namespace would give the same no-coordination property more simply.
-- The random-UUID primary key bug shows that any per-clone nondeterminism in keys breaks merges; Cairn's I10 (no clock or randomness in projections) points the same way.
+- The random-UUID primary key bug shows that any per-clone nondeterminism in keys breaks merges; ParleyInn's I10 (no clock or randomness in projections) points the same way.
 
 ### Gaps
 
@@ -127,7 +127,7 @@ and Agent Mail integration are all removed.
 
 ### Inferences
 
-- Storing a database under a non-branch git ref (`refs/dolt/data`) on the same remote is a notable pattern: it reuses the repo's hosting and auth, avoids branch protection, and keeps code history clean. Cairn could store its record under a custom ref (e.g. `refs/cairn/...`) for the same reasons without adopting Dolt. Note that Cairn's I4 forbids network access, so any push would have to be the user's own `git push` of that ref, not Cairn's.
+- Storing a database under a non-branch git ref (`refs/dolt/data`) on the same remote is a notable pattern: it reuses the repo's hosting and auth, avoids branch protection, and keeps code history clean. ParleyInn could store its record under a custom ref (e.g. `refs/parinn/...`) for the same reasons without adopting Dolt. Note that ParleyInn's I4 forbids network access, so any push would have to be the user's own `git push` of that ref, not ParleyInn's.
 - Beads' current model is still "sync by explicit push/pull with merge"; it has no real-time channel between machines. In Gas Town real-time sharing comes from a single shared Dolt server on one host, not from git.
 
 ### Gaps
@@ -160,7 +160,7 @@ substring/filter search, not full-text ranking or vectors.
 
 ### Inferences
 
-- Beads deliberately trades losslessness for context budget (summaries replace originals). That is the opposite of Cairn's lossless record; Cairn can still borrow the idea as a derived, rebuildable projection while keeping the original.
+- Beads deliberately trades losslessness for context budget (summaries replace originals). That is the opposite of ParleyInn's lossless record; ParleyInn can still borrow the idea as a derived, rebuildable projection while keeping the original.
 - Per-write commits in a versioned store make history, not data, the cost driver. An append-only log on git would hit the same problem if every event became a git commit; batching events into fewer commits (or one file per session) matters.
 
 ### Gaps
@@ -187,7 +187,7 @@ Gas Town's JSONL backup exports are described as "scrubbed".
 
 ### Inferences
 
-- Beads provides no model for "stored history must not become a prompt-injection channel": `bd prime` injects stored memories directly into the session. That is a contrast point for Cairn's I2.
+- Beads provides no model for "stored history must not become a prompt-injection channel": `bd prime` injects stored memories directly into the session. That is a contrast point for ParleyInn's I2.
 
 ### Gaps
 
@@ -233,7 +233,7 @@ a predecessor's session through `claude --fork-session --resume <id>`.
 ### Inferences
 
 - Gas Town is the clearest evidence that git is **not** the real-time channel for a multi-agent fleet: live state is a shared SQL server on one host, git is used for code (worktrees) and for a periodic append-only ledger export. That is a "hot store + cold git archive" split.
-- Gas Town has exactly the gap Cairn targets: it has no durable, unified, append-only session record. It scrapes Claude Code's transcripts at session end, with three independent parsers and no correlation ID.
+- Gas Town has exactly the gap ParleyInn targets: it has no durable, unified, append-only session record. It scrapes Claude Code's transcripts at session end, with three independent parsers and no correlation ID.
 
 ### Gaps
 

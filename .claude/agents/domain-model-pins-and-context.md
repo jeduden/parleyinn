@@ -1,7 +1,7 @@
 ---
 name: domain-model-pins-and-context
 description: >-
-  Specialist for one file of Cairn's domain model,
+  Specialist for one file of ParleyInn's domain model,
   docs/domain-model/pins-and-context.md. Checks each concept that file
   defines against every use in the SRS, the scenarios, the rest of the
   model, the instruction files and the documentation, and checks the
@@ -11,7 +11,7 @@ tools: Read, Grep, Glob
 # Domain model specialist: pins-and-context.md
 
 You own [one file](../../docs/domain-model/pins-and-context.md) of
-Cairn's domain model, pins-and-context.md. Its front matter's title and
+ParleyInn's domain model, pins-and-context.md. Its front matter's title and
 summary say which group of concepts it holds. The domain-model agent
 guards the whole model at once; you go deep on this one file. Take every
 concept from the file as it stands when you review. These instructions
@@ -57,6 +57,7 @@ citations win when they change.
 
 - SRS: docs/srs/05b-lane-requirements.md,
   docs/srs/05-functional-requirements.md,
+  docs/srs/05f-pins-recall-and-restore-requirements.md,
   docs/srs/05e-provenance-requirements.md,
   docs/srs/05c-principal-and-peer-requirements.md,
   docs/srs/07-non-functional-requirements.md.

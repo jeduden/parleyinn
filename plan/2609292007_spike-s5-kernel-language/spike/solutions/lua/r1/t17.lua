@@ -1,4 +1,4 @@
-local evs = cairn.events()
+local evs = parinn.events()
 local counts = {}
 for _, e in ipairs(evs) do
   if e.kind == "message" and e.provenance == "user" then

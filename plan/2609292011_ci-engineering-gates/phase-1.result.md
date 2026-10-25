@@ -14,7 +14,7 @@ summary: >-
 ### Done
 
 - The isolation guard is `testkit::guard`. A test resolves the home, a
-  Cairn home, Claude Code's configuration directory or its state file
+  ParleyInn home, Claude Code's configuration directory or its state file
   through it, and it aborts the process unless the answer lies strictly
   under the system's temporary directory (`..` and symlinks counted).
   The testkit is test-only, so linking it arms the guard: no test opts
@@ -26,7 +26,7 @@ summary: >-
   agent instruction files.
 - Only the guard reads the home. The gate test
   `only_the_isolation_guard_reads_the_home` fails when a Rust source
-  under `crates/` or `tooling/` reads `HOME`, `CAIRN_HOME`,
+  under `crates/` or `tooling/` reads `HOME`, `PARINN_HOME`,
   `CLAUDE_CONFIG_DIR`, `USERPROFILE` or the standard library's home
   lookup, but the guard and the scenario runner's own start. That is
   what makes the guard cover every test.
@@ -42,7 +42,7 @@ summary: >-
 - Seven drift cases: the guard letting the real home through, the guard
   refusing every home, a helper reading the home around the guard, CI
   dropping the decoy, `CLAUDE.md` losing its "Never", a skill with
-  `rm -rf ~/.cairn`, and a settings hook clearing `~/.claude`.
+  `rm -rf ~/.parinn`, and a settings hook clearing `~/.claude`.
 - Shape: unit 462, integration 41, end-to-end 38 (22 scenarios).
 
 ### Next

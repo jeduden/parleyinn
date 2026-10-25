@@ -1,16 +1,16 @@
 ---
 summary: >-
-  Cairn's domain model: the closed set of concepts with their
-  definitions, how they relate, the terms that are not Cairn concepts,
+  ParleyInn's domain model: the closed set of concepts with their
+  definitions, how they relate, the terms that are not ParleyInn concepts,
   and how names in code, docs and UI follow the model. The SRS links
   here for every term, and the domain-model agent reviews against it.
 ---
 # Domain model
 
-Cairn speaks in a small, closed set of concepts. Requirements, scenarios, code,
+ParleyInn speaks in a small, closed set of concepts. Requirements, scenarios, code,
 documentation and every screen use only them. These files are their one source;
 the [specification](../srs/index.md) defines no terms and links here. Every
-Cairn concept has one name and every word one meaning. Where English uses one
+ParleyInn concept has one name and every word one meaning. Where English uses one
 word for several things, each sense gets a qualified name⟦f:work-rooms⟧⟦f:git-tracking⟧, such as a branch link⟦f:held-requests⟧
 or a held request⟦/f⟧⟦/f⟧⟦/f⟧. An outside thing keeps its own name when its domain qualifies
 it: a network or email address, a command-line flag, a code owner or a persona
@@ -39,16 +39,16 @@ sort: order
 header: ""
 row: "- [{title}]({filename}) — {summary}"
 ?>
-- [Principals and agents](principals-and-agents.md) — Who acts in Cairn: principals, persons and service accounts, managed policy, agents, runs and subagents, the facilitator, authors, members, the owner and delegates.
-- [Harness facts](harness-facts.md) — The harness's own facts that Cairn records and names: the harness, harness sessions and transcripts, hooks, turns and compaction.
-- [Places](places.md) — Where Cairn's state lives and is shared: homes, nodes, devices and paired phones, sandboxes, rooms and their kinds, visibility, peers and blind peers.
+- [Principals and agents](principals-and-agents.md) — Who acts in ParleyInn: principals, persons and service accounts, managed policy, agents, runs and subagents, the facilitator, authors, members, the owner and delegates.
+- [Harness facts](harness-facts.md) — The harness's own facts that ParleyInn records and names: the harness, harness sessions and transcripts, hooks, turns and compaction.
+- [Places](places.md) — Where ParleyInn's state lives and is shared: homes, nodes, devices and paired phones, sandboxes, rooms and their kinds, visibility, peers and blind peers.
 - [Record](record.md) — The record and what derives from it: writers, events, addresses, segments, seals, provenance and origin, spans and landmarks, quarantine and purge, receipts, backups, bundles and exports.
 - [Pins and context](pins-and-context.md) — What may reach a model: pins and their versions, types and budget, the intent, stakes, posts, room summaries, envelopes, restore blocks, opt-in notices and held requests.
 - [Seats and keys](seats-and-keys.md) — Seats and the keys behind them: run and device seats, room and seat ids, seat, device, principal and token keys, certificates, access tokens, authenticators and CI keys.
 - [Acts and roles](acts-and-roles.md) — The three act kinds and what they may do: room acts, principal acts and their classes, expire acts, roles, appointments, joins, moderation, handover, stamps and the room merge.
 - [Git and forge](git-and-forge.md) — Repositories, branches and commits, the forge, results with their evidence and proof classes, qualified links, comparisons, outcomes and verdicts.
 - [Trust and flow](trust-and-flow.md) — Trust and how content reaches an agent: trust levels and sources, recall, endorsement, trust grants, delegation, rule levels, away policies, fixed templates, sandbox state and risk acceptance, quotas and spend, counters, canary and stats, run status and room status, the Needs you queue and focus set, overlap, forks, presence hints and petnames.
-- [Components and surfaces](components-and-surfaces.md) — Cairn's components inside their network boundaries, the room view's surfaces and the outcome window.
+- [Components and surfaces](components-and-surfaces.md) — ParleyInn's components inside their network boundaries, the room view's surfaces and the outcome window.
 <?/catalog?>
 
 ## Relations
@@ -77,7 +77,7 @@ row: "- [{title}]({filename}) — {summary}"
   names the branch of the run's latest preceding event naming its branch, while
   that seat is a member and has work (its role⟦f:moderation⟧, no mute⟦/f⟧), per the room state
   this node holds when it records the event (LANE-01, LANE-16); else to ⟦/f⟧⟦/f⟧its
-  personal-room seat; what `cairn ingest` appends for a witnessed run goes
+  personal-room seat; what `parinn ingest` appends for a witnessed run goes
   instead to the seat ingest starts beside that run seat (Run seat). A room act
   goes to the writer of the seat that signs it. A principal act⟦f:principal-keys⟧ or an expire act⟦/f⟧
   goes to the device seat of the device that ⟦f:principal-keys⟧signs it, or before PRV-10 ships
@@ -97,9 +97,9 @@ row: "- [{title}]({filename}) — {summary}"
   exchange segments, so a room contains only the events routed to its seats and
   shows others by address (LANE-01).⟦/f⟧
 - ⟦f:work-rooms⟧Principals and agents create rooms; an agent's room is owned by its principal.
-  ⟦/f⟧Cairn never creates a room on its own initiative; a node's personal room comes
-  from the principal installing Cairn there (Personal room), or is carried over
-  to a node clone⟦f:work-rooms⟧, and Cairn may suggest a room or a join⟦/f⟧.
+  ⟦/f⟧ParleyInn never creates a room on its own initiative; a node's personal room comes
+  from the principal installing ParleyInn there (Personal room), or is carried over
+  to a node clone⟦f:work-rooms⟧, and ParleyInn may suggest a room or a join⟦/f⟧.
 - A pin naming no room belongs to its author's principal's personal room on the
   node that wrote it.
 - Recall extends only to the principal's
@@ -116,7 +116,7 @@ errors and logs use the model's words.
   for create room⟦/f⟧.
   Every other MCP tool is `<concept>_<verb>`, with the reading verbs `get`,
   `list`, `search` and `expand`.
-- A CLI command that acts on a concept is `cairn <concept> <verb>`. Node-wide
+- A CLI command that acts on a concept is `parinn <concept> <verb>`. Node-wide
   utilities keep one word: `install`, `uninstall`, `status`, `doctor`, `verify`,
   `rebuild`, `migrate`, `ingest`⟦f:bundle-import⟧⟦f:export-bundles⟧, `import`⟦/f⟧⟦/f⟧⟦f:export-bundles⟧, `export`⟦/f⟧⟦f:purge-retention⟧, `purge`⟦/f⟧, `audit`,
   `canary`⟦f:browser-room-view⟧, `ui`⟦/f⟧⟦f:work-rooms⟧, `why`⟦/f⟧⟦f:browser-room-view⟧, `open`⟦/f⟧⟦f:launcher⟧, `launch`⟦/f⟧, `hook`, `mcp`⟦f:compute-kernel⟧ and `kernel-worker`⟦/f⟧.
@@ -129,15 +129,15 @@ errors and logs use the model's words.
   and settings keys, kebab case in CLI commands.
 - Layout words (such as tab, panel, pane, gutter, sheet, stack, tile, pill,
   rail, composer and command palette) name parts of a screen, never concepts.
-- Cairn defines no slash commands. A harness skill may call MCP tools or the
+- ParleyInn defines no slash commands. A harness skill may call MCP tools or the
   CLI; a skill's call is the agent's own tool call, never a principal act.
 
-## Not Cairn concepts
+## Not ParleyInn concepts
 
 | Term                                                                              | Why                                                                                            | Where else it may appear                                                                                                 |
 | --------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
-| session                                                                           | It belongs to the harness; Cairn speaks of runs.                                               | As "harness session", or inside a harness's own names, such as `SessionStart`, `session_id` and `allow-session`.         |
-⟦f:work-rooms⟧⟦f:git-tracking⟧| project                                                                           | A room names branches in repositories; nothing is scoped to a project.                         | The harness's `~/.claude/projects` path, the harness settings scope `--scope project`, and Cairn's own software project. |
+| session                                                                           | It belongs to the harness; ParleyInn speaks of runs.                                               | As "harness session", or inside a harness's own names, such as `SessionStart`, `session_id` and `allow-session`.         |
+⟦f:work-rooms⟧⟦f:git-tracking⟧| project                                                                           | A room names branches in repositories; nothing is scoped to a project.                         | The harness's `~/.claude/projects` path, the harness settings scope `--scope project`, and ParleyInn's own software project. |
 ⟦/f⟧⟦/f⟧| tenant                                                                            | Replaced by principal.                                                                         | Nowhere else.                                                                                                            |
 ⟦f:moderation⟧| operator, as a role or a person                                                   | The role is moderator; the person running a node is the node's principal.                      | Only as the `operator` provenance class.                                                                                 |
 ⟦/f⟧⟦f:principal-keys⟧| owner act, owner key, owner surface                                               | Replaced by principal act, principal key and principal surface.                                | Nowhere else.                                                                                                            |

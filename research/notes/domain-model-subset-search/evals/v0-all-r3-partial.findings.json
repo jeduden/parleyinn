@@ -2,7 +2,7 @@
  {
   "type": "security",
   "quote": "the browser room view under SEC-20, the CLI or TUI at a terminal, or a paired",
-  "problem": "The agent runs `cairn` through its own tools as the same OS user and can give it a pseudo-terminal, and the candidate itself uses \"output is not a terminal\" as the test that separates an agent's CLI call from a person's. So \"at a terminal\" is the only stated check on CLI principal acts, and the agent can pass it. The agent could then stamp, add device-seat pins, record trust grants or accept configuration for itself, which breaks I2's closed set. A presence proof is defined but never required.",
+  "problem": "The agent runs `parinn` through its own tools as the same OS user and can give it a pseudo-terminal, and the candidate itself uses \"output is not a terminal\" as the test that separates an agent's CLI call from a person's. So \"at a terminal\" is the only stated check on CLI principal acts, and the agent can pass it. The agent could then stamp, add device-seat pins, record trust grants or accept configuration for itself, which breaks I2's closed set. A presence proof is defined but never required.",
   "fix": "\"the CLI or TUI at a terminal, where a widening act also needs a presence proof (OWN-11) or another check an agent's own tool call cannot pass; a terminal alone never makes a principal surface\"",
   "severity": "needs-fix",
   "lens": "security",
@@ -74,7 +74,7 @@
  {
   "type": "contradiction",
   "quote": "budget is the pin budget, and I9's defined budgets are these named budgets and",
-  "problem": "Budget gives a closed list of I9's defined budgets (hook, step and delegation budgets plus the named limits), and the hold window is not on it. Yet Held request has Cairn keep the agent waiting up to its hold window. As written, every held request slows the agent beyond a defined budget (I9), unless the hold window fits inside the hook budget, which nothing says.",
+  "problem": "Budget gives a closed list of I9's defined budgets (hook, step and delegation budgets plus the named limits), and the hold window is not on it. Yet Held request has ParleyInn keep the agent waiting up to its hold window. As written, every held request slows the agent beyond a defined budget (I9), unless the hold window fits inside the hook budget, which nothing says.",
   "fix": "Add the hold window to the list (\"\u2026the step budget, the hold window (OWN-06) or the delegation budget\"), or state that the hold window never exceeds the hook budget.",
   "severity": "needs-fix",
   "lens": "consistency",
@@ -118,7 +118,7 @@
  },
  {
   "type": "gap",
-  "quote": "its nodes record. Cairn counts principals by principal key: every device key,",
+  "quote": "its nodes record. ParleyInn counts principals by principal key: every device key,",
   "problem": "Principals are counted only by chains to a principal key, but before PRV-10 no principal key certifies a device key, so nothing chains. Pre-PRV-10 rooms can still hold other principals' nodes (accepting a join sends events to them). Ownership rights, admission, bars, re-adding after a kick and \"the room's principals\" then have no rule for deciding which principal a seat from another node belongs to.",
   "fix": "Add a pre-PRV-10 rule, for example \"Before PRV-10 ships, a seat belongs to the principal of the node whose device key certified it, as this node's principal enrolled that key\", or state that rooms are shared only among one principal's nodes until PRV-10 ships.",
   "severity": "needs-fix",

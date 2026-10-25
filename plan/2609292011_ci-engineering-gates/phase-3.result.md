@@ -10,7 +10,7 @@ summary: >-
 
 What landed:
 
-- `crates/cairn/clippy.toml` bans the standard library's blocking
+- `crates/parinn/clippy.toml` bans the standard library's blocking
   calls that take no deadline, each reason naming the deadline form:
   channel receive and send, condition and barrier waits, thread join
   and park, child waits, `Command::output` and `status`, file locks and
@@ -34,4 +34,4 @@ What remains: "all I/O through injectable traits" has no mechanical
 check, and a crate's own blocking loop or a dependency's is not seen by
 the list.
 
-[ruling]: https://github.com/jeduden/cairn/pull/44#issuecomment-6157262395
+[ruling]: https://github.com/jeduden/parleyinn/pull/44#issuecomment-6157262395

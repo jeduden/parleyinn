@@ -16,7 +16,7 @@ summary: >-
 
 Phase 4 of plan
 [2610050706](../../plan/2610050706_toolchain-to-rust/plan.md) ports
-the `cairn version` stub to the Rust core executable and removes the
+the `parinn version` stub to the Rust core executable and removes the
 last Go source, as
 [ADR-2610050528](ADR-2610050528-language-rust-typescript.md) decided.
 testify, which asserted in the Go tests, leaves with them. The

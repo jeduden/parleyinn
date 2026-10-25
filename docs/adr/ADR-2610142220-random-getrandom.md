@@ -4,7 +4,7 @@ title: "The random source: the OS's, through getrandom"
 status: accepted
 scope: dependencies
 summary: >-
-  Every random bit Cairn draws, for keys, commitment keys and room-id
+  Every random bit ParleyInn draws, for keys, commitment keys and room-id
   nonces, comes from the OS's random source through getrandom, behind
   a trait a test replaces. No user-space generator stands between.
 ---

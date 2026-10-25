@@ -7,6 +7,7 @@ fn ids(list: &[&str]) -> Vec<String> {
 
 fn bench(name: &'static str, requirement: &'static str, coverage: Coverage) -> Benchmark {
     Benchmark {
+        fixture: benchmark::suite::Fixture::None,
         name,
         requirement,
         coverage,
@@ -110,7 +111,7 @@ jobs:
   benchmark:
     steps:
       - run: |
-          \"$bin/benchmark\" run --core \"$bin/cairn\"
+          \"$bin/benchmark\" run --core \"$bin/parinn\"
           \"$head/benchmark\" gate --base base --head head
   ci:
     needs: [test, benchmark, build]

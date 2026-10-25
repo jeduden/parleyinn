@@ -237,7 +237,7 @@ fn missing_inputs_are_named() {
 #[test]
 fn an_owner_on_any_other_path_is_named() {
     for extra in [
-        "/crates/cairn/src/ @boss",
+        "/crates/parinn/src/ @boss",
         "* @boss",
         "/docs/ @boss",
         "/docs/adr/x/ @boss",

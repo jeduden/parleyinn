@@ -2,14 +2,15 @@
 title: "Principals and agents"
 order: "01"
 summary: >-
-  Who acts in Cairn: principals, persons and service accounts, managed policy, agents, runs and subagents, the facilitator, authors, members, the owner and delegates.
+  Who acts in ParleyInn: principals, persons and service accounts, managed policy, agents, runs and subagents, the facilitator, authors, members, the owner and delegates.
 ---
 # Principals and agents
 
 - **Principal**: A person or a service account. It has a principal key, signs
   principal acts with a device key at a principal surface once PRV-10 ships,
   each recorded on a device seat, and is the principal of every agent whose runs
-  its nodes record. Cairn counts principals by principal key: every device key,
+  its nodes record. ParleyInn counts principals by principal key: every device
+  key,
   token key and seat key that chains to one principal key through device, token
   or seat certificates belongs to that principal, each certificate counting
   only once the key it certifies countersigns it; a key whose countersigned
@@ -39,10 +40,11 @@ summary: >-
   (Trust grant). It can own rooms, have seats and be the principal of its own
   agents, such as CI or runner agents.
 - **Managed policy**: Settings belonging to root that an organisation sets on a
-  machine, overriding every other settings layer (ADM-04). Cairn never overrides
+  machine, overriding every other settings layer (ADM-04). ParleyInn never
+  overrides
   it (I7). Among its powers are SEC-22's and certifying service accounts by
   listing their principal keys (PRV-10). The harness's own managed settings,
-  which Cairn also never writes (ADM-03), are part of the **harness
+  which ParleyInn also never writes (ADM-03), are part of the **harness
   configuration**: the harness's settings, hooks and MCP registrations (I7).
 - **Agent**: A worker a harness runs for exactly one principal: the principal of
   the node that records its runs (OWN-01). It receives restore blocks and
@@ -76,8 +78,8 @@ summary: >-
   it grew, with origin `ingested`, whose events are untrusted (REC-22).
 - **Facilitator**: The service account, at most one per room, whose device seat,
   on its own node, the owner appoints as the room's facilitator, making that
-  device seat an appointed moderator (SEC-32); its program, neither a Cairn
-  component nor an agent, acts through that node's CLI (`cairn room-summary
+  device seat an appointed moderator (SEC-32); its program, neither a ParleyInn
+  component nor an agent, acts through that node's CLI (`parinn room-summary
   write`). It writes room summaries, answering summary requests (LANE-33). It
   posts only in its own words, pointing by range link to any marked range it
   names and never quoting or embedding it, so it relays no third party's text

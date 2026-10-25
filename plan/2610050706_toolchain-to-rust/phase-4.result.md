@@ -4,7 +4,7 @@ title: "The core executable in Rust; Go removed"
 status: "✅"
 result: true
 summary: >-
-  `cairn version` is the Rust core executable, built by one workflow
+  `parinn version` is the Rust core executable, built by one workflow
   CI and the release share: one Linux and one macOS builder, four
   targets, each run on its own platform. Its clippy config and reach test hold
   it to no socket, no program start and no linked crate. Go is gone
@@ -15,9 +15,9 @@ summary: >-
 
 ## Done
 
-- The `cairn` crate under `crates/` is the core executable. Its unit
+- The `parinn` crate under `crates/` is the core executable. Its unit
   tests hold it at 100%, an end-to-end test runs the built binary, and
-  `cairn version --json` prints `{"version": ..., "commit": ...}`.
+  `parinn version --json` prints `{"version": ..., "commit": ...}`.
 - `.github/workflows/build.yml` builds `linux/amd64`, `linux/arm64`
   and `darwin/arm64` on an x86_64 and an arm64 Linux runner with Rust
   1.99.0, zig 0.15.2 and cargo-zigbuild 0.23.4, compares the two
@@ -27,11 +27,11 @@ summary: >-
   Mach-O UUID. Later, zig left, `windows/amd64` joined, and with
   ENG-19 withdrawn each target is built once, so the second builders
   and the comparison are gone.
-- ENG-01's scenario checks `--remap-path-prefix`, `CAIRN_COMMIT` and
+- ENG-01's scenario checks `--remap-path-prefix`, `PARINN_COMMIT` and
   both musl targets in the release workflow and the workflow it calls,
   comments left out.
-- Reach evidence for the core crate: `crates/cairn/clippy.toml` and
-  `crates/cairn/tests/reach.rs`, each with a drift case. The suite
+- Reach evidence for the core crate: `crates/parinn/clippy.toml` and
+  `crates/parinn/tests/reach.rs`, each with a drift case. The suite
   holds 35 cases.
 - Go removed: `cmd/`, `go.mod`, `go.sum`, `tools/`, `.golangci.yml`,
   the Go coverage scripts, the Go CI jobs, dependabot's gomod entries

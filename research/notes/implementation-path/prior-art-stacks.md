@@ -1,10 +1,10 @@
 # Prior art: the stacks agent UIs and orchestrators chose
 
 Scope: the implementation stacks of 27 agent-UI, agent-orchestration and
-terminal products, surveyed on 4 October 2026 to inform Cairn's
+terminal products, surveyed on 4 October 2026 to inform ParleyInn's
 implementation path (Go core, one binary, a room UI). For each: core
 language, UI technology per surface, how it ships, its size, how it hosts
-agents, multiplayer, license, and one lesson for Cairn. Method:
+agents, multiplayer, license, and one lesson for ParleyInn. Method:
 
 - Open repositories were shallow-cloned at the commit named in each
   section. Language shares are bytes of code files by extension at that
@@ -220,7 +220,7 @@ ee72524 of 4 October 2026, v0.79.1, MIT.
   Executables Will Be Published Soon" although a v0.2.0 tag exists.
 - **Multiplayer:** none.
 - **Lesson:** one Rust core can serve both a Tauri window and a browser
-  over loopback, which is the shape Cairn's B1 room UI would take.
+  over loopback, which is the shape ParleyInn's B1 room UI would take.
 
 ## Sculptor
 
@@ -351,7 +351,7 @@ Proprietary; npm
   Anthropic servers" while connected
   ([Remote Control](https://code.claude.com/docs/en/remote-control)).
 - **Multiplayer:** none in a live session.
-- **Lesson:** the harness Cairn sits under is Bun-compiled TypeScript,
+- **Lesson:** the harness ParleyInn sits under is Bun-compiled TypeScript,
   and its official phone path is a vendor relay over outbound HTTPS.
 
 ## Gemini CLI
@@ -498,7 +498,7 @@ together, on a relay you own."
   events to AI agents".
 - **Multiplayer:** yes; people and agents share rooms on a
   self-hostable relay.
-- **Lesson:** the nearest stack to a Cairn room (Rust core, ACP bridge,
+- **Lesson:** the nearest stack to a ParleyInn room (Rust core, ACP bridge,
   signed events), but every room depends on a relay server.
 
 ## Happy
@@ -615,13 +615,13 @@ Seven stack shapes recur. Each proved something and failed at something.
   string, and herdr reads "what they draw on screen" before adding a
   self-report socket, which Crush, OpenCode and others now call. No
   product in this shape keeps a structured record of tool calls. For
-  Cairn this is a fallback for unknown agents. Nothing scraped from a
+  ParleyInn this is a fallback for unknown agents. Nothing scraped from a
   pane can carry the trust labels I2 needs.
 - **Compiled core serving an embedded web client** (Vibe Kanban: Rust,
   axum, `rust-embed`; opcode: Tauri plus `opcode-web`; Codex:
   app-server; Crush: Go server on a Unix socket; Zed's remote server).
   It proved one static download, the server as the only source of
-  truth, and many thin clients. It is the shape nearest Cairn: a Go
+  truth, and many thin clients. It is the shape nearest ParleyInn: a Go
   core with `embed.FS`, and the room UI as a loopback-only B1 listener
   apart from the socket-free B0 core (I4). It failed only where the
   product did: Vibe Kanban's executors and its hosted board, not the
@@ -647,7 +647,7 @@ Seven stack shapes recur. Each proved something and failed at something.
 - **Native GPU UI in Rust or Zig** (Zed's GPUI, Warp's warpui, Ghostty
   with Swift and GTK shells). It proved speed, and now a browser target
   (`gpui_web`, Warp's `serve-wasm`, `libghostty-vt` on WebAssembly). It
-  took funded teams years, which a small team cannot spend. What Cairn
+  took funded teams years, which a small team cannot spend. What ParleyInn
   can reuse is `libghostty-vt` as a component, as herdr does.
 - **Editor extension** (Cline, Roo Code, Codex and Gemini companions).
   It meets users where they work, but the host owns the UI: Roo Code
@@ -666,11 +666,11 @@ Three findings cut across the shapes:
   Socket.IO relay, self-hostable), T3 Code and Superset (Cloudflare),
   Nimbalyst (a sync server) and Cursor (cloud VMs). None is peer to
   peer. Expo React Native is the usual mobile client, with SwiftUI
-  (Nimbalyst) and Flutter (Block Buzz) as exceptions. For Cairn, mobile
+  (Nimbalyst) and Flutter (Block Buzz) as exceptions. For ParleyInn, mobile
   is a B2 or B3 component the tenant turns on, never part of the core.
 - **Every multiplayer product has a server in the middle.** Zed's collab
   server and Delta on Cloudflare, Amp, Conductor Cloud, Cursor, Warp,
   Nimbalyst, Superset, Agor's daemon and Block Buzz's relay all have
   one. Only Block Buzz and Agor can be self-hosted. No surveyed
   product syncs a multi-person, multi-agent room peer to peer, which
-  leaves that place open for Cairn.
+  leaves that place open for ParleyInn.

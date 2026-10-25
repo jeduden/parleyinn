@@ -178,7 +178,7 @@ pub fn gate_fails_naming(base: &str, head: &str, benchmark: &str) -> Result<(), 
     let read = |path: &str| -> io::Result<String> {
         Ok(if path == "base" { base } else { head }.to_owned())
     };
-    let time = |_: &Path, _: &[&str]| Err("the gate starts no program".to_owned());
+    let time = |_: &Path, _: &Benchmark| Err("the gate starts no program".to_owned());
     let args = ["gate", "--base", "base", "--head", "head"].map(str::to_owned);
     let (mut out, mut err) = (Vec::new(), Vec::new());
 

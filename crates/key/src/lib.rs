@@ -9,6 +9,7 @@
 pub mod certificate;
 pub mod file;
 pub mod key_event;
+pub mod key_store;
 pub mod random;
 pub mod signing;
 

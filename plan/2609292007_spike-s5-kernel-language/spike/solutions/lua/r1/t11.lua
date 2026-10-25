@@ -1,4 +1,4 @@
-local evs = cairn.events()
+local evs = parinn.events()
 local count, maxseq, writers = {}, {}, {}
 for _, e in ipairs(evs) do
   local w = e.writer

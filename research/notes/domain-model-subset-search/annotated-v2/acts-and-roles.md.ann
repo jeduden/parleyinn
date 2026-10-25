@@ -23,7 +23,7 @@ exactly one kind (LANE-31).
   unstamped⟦/f⟧⟦f:moderation⟧, and a list removal only takes a pin off the pin list⟦/f⟧. A link act
   adds one range link⟦f:work-rooms⟧⟦f:git-tracking⟧, branch link⟦/f⟧⟦/f⟧⟦f:results-and-verdicts⟧⟦f:intent-criteria⟧ or criterion link⟦/f⟧⟦/f⟧. Create room is the first
   act of the creating seat's writer: a device seat's, creating its node's
-  personal room at Cairn's first start there (Personal room)⟦f:work-rooms⟧, or any seat's,
+  personal room at ParleyInn's first start there (Personal room)⟦f:work-rooms⟧, or any seat's,
   creating another room⟦/f⟧. Room acts are governance, not I2 trust: on
   their own they never widen what reaches an agent, which only principal acts⟦f:stamps⟧
   such as ⟦f:trust-grants⟧a trust grant, ⟦/f⟧⟦f:endorsement⟧an endorsement or ⟦/f⟧a stamp⟦/f⟧ do, and OWN-11's classes do
@@ -91,7 +91,7 @@ exactly one kind (LANE-31).
 
   Any principal act that removes a pin from a restore block, or stops this node
   recording its own runs' events, is widening whatever verb carries it, so
-  `cairn uninstall` records the widening act turning capture off before it
+  `parinn uninstall` records the widening act turning capture off before it
   removes the hook registrations (ADM-02)⟦f:access-tokens⟧, a structural event naming the
   uninstall standing in for that act on a token-key-only node⟦/f⟧. ⟦f:access-tokens⟧On an ephemeral node, PEER-01's
   environment variable, a structural event, stands in for turning on ⟦f:peer-sync⟧its peer

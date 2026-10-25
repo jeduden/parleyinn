@@ -174,9 +174,9 @@
    },
    {
     "type": "undefined",
-    "quote": "the node, by `cairn install`, the plugin or the managed install path, recorded",
-    "problem": "'The plugin' and 'the managed install path' are install routes used as Cairn things but never defined, while I7 allows harness configuration changes only through explicit install and uninstall operations. It is unclear whether these routes are such operations and show the change first.",
-    "fix": "Say 'by `cairn install`, or by an install that I7 and managed policy allow', or define the plugin and managed install path as install forms of `cairn install`.",
+    "quote": "the node, by `parinn install`, the plugin or the managed install path, recorded",
+    "problem": "'The plugin' and 'the managed install path' are install routes used as ParleyInn things but never defined, while I7 allows harness configuration changes only through explicit install and uninstall operations. It is unclear whether these routes are such operations and show the change first.",
+    "fix": "Say 'by `parinn install`, or by an install that I7 and managed policy allow', or define the plugin and managed install path as install forms of `parinn install`.",
     "severity": "minor"
    },
    {
@@ -239,7 +239,7 @@
     "type": "gap",
     "quote": "and writer live under I8 rests on OQ-39.",
     "problem": "A paired phone is a device with no home that holds its own device key and seals its own writer, yet I8 binds all local state to one principal's home. The candidate leaves open where the phone's keys live and how they are protected, so two implementers will build different custody and I8 is not upheld for this concept.",
-    "fix": "State the rule: the phone's keys live only in the phone's platform key store, its writer is held in the paired node's home, and the phone keeps no other Cairn state.",
+    "fix": "State the rule: the phone's keys live only in the phone's platform key store, its writer is held in the paired node's home, and the phone keeps no other ParleyInn state.",
     "severity": "needs-fix"
    },
    {

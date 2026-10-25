@@ -1,7 +1,7 @@
 //! Administration of the home (§8.1, §9.5): where the home is, the
-//! node's first start in it, the seats the node certifies, the
-//! principal acts its CLI takes, and `cairn verify`'s check of the
-//! whole record.
+//! node's first start in it and its node identity, the seats the node
+//! certifies, the principal acts its CLI takes, and `parinn verify`'s
+//! check of the whole record.
 
 use std::fmt;
 use std::path::PathBuf;
@@ -9,12 +9,17 @@ use std::path::PathBuf;
 pub mod act;
 pub mod home;
 pub mod node;
+pub mod node_identity;
+pub mod origin;
+pub mod repository;
+pub mod role;
+pub mod trust_policy;
 pub mod verify;
 
 /// What can go wrong administering the home.
 #[derive(Debug)]
 pub enum AdminError {
-    /// Neither `CAIRN_HOME` nor `HOME` names a home.
+    /// Neither `PARINN_HOME` nor `HOME` names a home.
     NoHome,
     /// A directory of the home cannot be made.
     Io {
@@ -27,6 +32,18 @@ pub enum AdminError {
     Store(store::StoreError),
     /// The home and the store disagree about the node.
     Node(&'static str),
+    /// A repository's identity cannot be bound (LANE-02).
+    Repository(&'static str),
+    /// A repository's git data cannot be read (LANE-02).
+    RepositoryRead(::repository::Error),
+    /// A worktree or directory cannot be resolved to one name (LANE-02).
+    Unresolved {
+        what: &'static str,
+        source: std::io::Error,
+    },
+    /// The device key is missing from the key store, but the store holds
+    /// this node's record: no second genesis starts (PRV-12).
+    DeviceKeyMissing,
     /// A directory or file of the home lets other OS users in (SEC-02).
     LoosePermissions { path: PathBuf, mode: u32 },
     /// A directory or file of the home belongs to OS user `uid`, not
@@ -51,11 +68,18 @@ pub enum AdminError {
 impl fmt::Display for AdminError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::NoHome => f.write_str("no home: set CAIRN_HOME or HOME"),
+            Self::NoHome => f.write_str("no home: set PARINN_HOME or HOME"),
             Self::Io { path, source } => write!(f, "{}: {source}", path.display()),
             Self::Key(e) => write!(f, "{e}"),
             Self::Store(e) => write!(f, "{e}"),
-            Self::Node(why) => f.write_str(why),
+            Self::Node(why) | Self::Repository(why) => f.write_str(why),
+            Self::RepositoryRead(e) => write!(f, "the repository's git data cannot be read: {e}"),
+            Self::Unresolved { what, source } => {
+                write!(f, "the {what} cannot be resolved: {source}")
+            }
+            Self::DeviceKeyMissing => f.write_str(
+                "the device key is missing from the key store, but the store holds this node's record; no second genesis starts",
+            ),
             Self::LoosePermissions { path, mode } => write!(
                 f,
                 "{}: mode {mode:04o} lets other OS users in; the home wants owner-only permissions",
@@ -74,10 +98,10 @@ impl fmt::Display for AdminError {
                 write!(f, "{}: want {{\"id\": \"<home id>\"}}", path.display())
             }
             Self::HomeIdMismatch => {
-                f.write_str("the home id CAIRN_HOME_ID supplies does not match the home's")
+                f.write_str("the home id PARINN_HOME_ID supplies does not match the home's")
             }
             Self::HomeIdMissing => {
-                f.write_str("the home is bound to a home id, and CAIRN_HOME_ID supplies none")
+                f.write_str("the home is bound to a home id, and PARINN_HOME_ID supplies none")
             }
         }
     }
@@ -86,17 +110,34 @@ impl fmt::Display for AdminError {
 impl std::error::Error for AdminError {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match self {
-            Self::Io { source, .. } | Self::OsUser(source) => Some(source),
+            Self::Io { source, .. } | Self::OsUser(source) | Self::Unresolved { source, .. } => {
+                Some(source)
+            }
+            Self::RepositoryRead(e) => Some(e),
             Self::Key(e) => Some(e),
             Self::Store(e) => Some(e),
             Self::NoHome
             | Self::Node(_)
+            | Self::Repository(_)
+            | Self::DeviceKeyMissing
             | Self::LoosePermissions { .. }
             | Self::OtherOsUser { .. }
             | Self::SymbolicLink { .. }
             | Self::HomeIdBinding { .. }
             | Self::HomeIdMismatch
             | Self::HomeIdMissing => None,
+        }
+    }
+}
+
+impl AdminError {
+    /// The failure to read, write or remove the file or directory at
+    /// `path`.
+    #[must_use]
+    pub fn io(path: &std::path::Path, source: std::io::Error) -> Self {
+        Self::Io {
+            path: path.to_path_buf(),
+            source,
         }
     }
 }

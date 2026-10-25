@@ -2,28 +2,28 @@
 title: "Components and surfaces"
 order: "10"
 summary: >-
-  Cairn's components inside their network boundaries, the room view's surfaces⟦f:presentations⟧ and the outcome window⟦/f⟧.
+  ParleyInn's components inside their network boundaries, the room view's surfaces⟦f:presentations⟧ and the outcome window⟦/f⟧.
 ---
 # Components and surfaces
 
-- **Component**: A part Cairn plays, inside exactly one network boundary (I4).
+- **Component**: A part ParleyInn plays, inside exactly one network boundary (I4).
   The set is closed, listed here and in §6.3; how the components ship is open
   (OQ-32), and a new one is a model change and a §6.3 row.
   - **Core (B0):** the **hook handlers** (answering hooks), the **CLI**
-    (`cairn`), each harness adapter's transcript and hook
+    (`parinn`), each harness adapter's transcript and hook
     part among them, the **MCP server** (the MCP tools of §9.2, one per harness
     session, serving its runs), ⟦f:compute-kernel⟧the **kernel worker** (running the kernel's
     executions), ⟦/f⟧the **TUI** (the terminal room view), ⟦f:work-rooms⟧the **commit hook**
     (LANE-28, run as the CLI), ⟦/f⟧and everything that builds what reaches the
     model.
-  - The **harness adapter** is no component: Cairn's code for one harness⟦f:launcher⟧, split
+  - The **harness adapter** is no component: ParleyInn's code for one harness⟦f:launcher⟧, split
     between the core and the launcher⟦/f⟧: its transcript and hook part in the core
     (it parses, opens no socket, starts no process)⟦f:launcher⟧; its run part in the
     launcher, which starts, hosts and controls runs, pauses them at the harness
     prompt⟦f:sandbox-risk⟧, records sandbox state⟦/f⟧ and carries in only text the core built⟦/f⟧.
   ⟦f:browser-room-view⟧- **Room-view component (B1):** serves the browser room view on loopback only
     (SEC-20), and records the principal acts taken in it, marked with their
-    principal surface (VIEW-03). Its entry point, `cairn ui`, is no part of the CLI: the person or a service
+    principal surface (VIEW-03). Its entry point, `parinn ui`, is no part of the CLI: the person or a service
     manager⟦f:access-tokens⟧, or an ephemeral node's entrypoint,⟦/f⟧ starts it, and it runs only
     while the configuration acceptance turning the component on stands, until a
     configuration turning it off applies (ADM-04, SEC-01). A **room-view
@@ -32,22 +32,22 @@ summary: >-
     secret** only its own origin, port included, can read or send, which lasts
     until the component stops; a phone-scoped one serves a browser on the
     principal's phone through the principal's own tunnel (OWN-16), issued by a
-    widening act at a principal surface (`cairn ui --phone`). Started from a
-    run's tool process, `cairn ui` mints no room-view secret, a phone-scoped one
+    widening act at a principal surface (`parinn ui --phone`). Started from a
+    run's tool process, `parinn ui` mints no room-view secret, a phone-scoped one
     included.⟦/f⟧
-  ⟦f:launcher⟧- **Launcher (B1):** `cairn launch`, which starts, hosts and controls runs
+  ⟦f:launcher⟧- **Launcher (B1):** `parinn launch`, which starts, hosts and controls runs
     through each harness adapter's run part, carrying into the harness input
     only text the core built and recorded, read from the record⟦f:browser-room-view⟧, never text from
     the room-view component, whose loopback connection to it carries no text for
     the model⟦/f⟧⟦f:witness-check⟧; and runs witness checks⟦/f⟧; the only component that starts programs⟦f:compute-kernel⟧,
-    but for the core's own kernel worker (CMP-05)⟦/f⟧. Its entry point, `cairn launch`, is no part of the CLI: the person or a service
+    but for the core's own kernel worker (CMP-05)⟦/f⟧. Its entry point, `parinn launch`, is no part of the CLI: the person or a service
     manager⟦f:access-tokens⟧, or an ephemeral node's entrypoint,⟦/f⟧ starts it, and it runs only
     while the configuration acceptance turning it on stands, until a configuration
-    turning it off applies, which needs no acceptance and which `cairn
+    turning it off applies, which needs no acceptance and which `parinn
     configuration accept` records as the cut act turning it off (ADM-04,
     SEC-01).⟦/f⟧
   ⟦f:peer-sync⟧- **Peer component (B2):** exchanges segments with peers (sync)⟦f:paired-phone⟧ and serves
-    paired phones; on a paired phone it is Cairn's only code, with the room
+    paired phones; on a paired phone it is ParleyInn's only code, with the room
     view's reduced client inside it⟦/f⟧. Its entry point is no part of the CLI: the person or a service
     manager⟦f:access-tokens⟧, or an ephemeral node's entrypoint,⟦/f⟧ starts it, and it runs only
     while the act turning the component on stands.⟦/f⟧
@@ -71,7 +71,7 @@ summary: >-
   qualified, such as ⟦f:landmarks⟧a span boundary or ⟦/f⟧a crate boundary.
 - **Room view**: What shows rooms to a person: ⟦f:browser-room-view⟧the browser, through the
   room-view component, and ⟦/f⟧the TUI, the CLI⟦f:paired-phone⟧, the paired phone⟦/f⟧ and the **harness
-  strip** (a status line the harness shows, printed by `cairn status --line`
+  strip** (a status line the harness shows, printed by `parinn status --line`
   from Health)⟦f:browser-room-view⟧ as reduced clients that say what
   they leave out (VIEW-14)⟦/f⟧. A client of the record. Its surfaces are a closed
   set, and unqualified, "surface" means one of them; where principal acts are

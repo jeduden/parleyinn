@@ -27,11 +27,11 @@ K3 Pin list surface (core): add a core surface, or extend Runs, so the TUI and
 K4 Configuration pins after a device seat revocation: accepting a
    configuration (even unchanged) re-records its pins from the node's current
    device seat, so they qualify again.
-K5 Tool results: every result Cairn returns to an agent's tool call (an MCP
+K5 Tool results: every result ParleyInn returns to an agent's tool call (an MCP
    tool, or a CLI or TUI call from inside a run) is recall: enveloped and
    recorded as a recall event; replace the "any other output ... outside the
    closed paths" sentence with this, so I2's and I4's channels cover it
-   without invariant edits. A recall tool is any tool Cairn serves to an
+   without invariant edits. A recall tool is any tool ParleyInn serves to an
    agent; define it so.
 K6 Revoked device seat and predecessors: a revoked device seat no longer
    counts as one of this node's own device seats; only predecessors of its
@@ -83,7 +83,7 @@ F8 Delegation across nodes (F1 above): in local candidates delegation reaches
    only agents on this node; the cross-node reach and the "from another node"
    delegate report sit in segment-exchange spans.
 F9 Pin "Information, never an instruction": say "never an instruction to
-   Cairn", and the restore block presents qualifying pins to the agent as its
+   ParleyInn", and the restore block presents qualifying pins to the agent as its
    principal's constraints.
 F10 Foreign room's "reject a foreign room" cut act: define it under Foreign
    room (it stops showing the room; it removes no pin from a restore block) or

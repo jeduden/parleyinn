@@ -1,6 +1,6 @@
 //! Seat certificates (PRV-11): the device key's signature over a seat
 //! key, scoped to the seat's room and naming its seat kind and whether
-//! it is an ingest seat, which the seat key countersigns. Cairn shows
+//! it is an ingest seat, which the seat key countersigns. ParleyInn shows
 //! a seat's kind only from its certificate.
 
 use record::canonical;

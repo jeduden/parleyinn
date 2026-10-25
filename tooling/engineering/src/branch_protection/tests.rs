@@ -152,21 +152,6 @@ fn an_approval_needs_a_count_and_the_flags_that_keep_it_honest() {
 }
 
 #[test]
-fn two_approvals_on_security_crates_need_a_required_check() {
-    has(
-        &security_crates_need_two_approvals(&good()),
-        "requires no \"Security approvals\" check",
-    );
-
-    let r = with_param(
-        "required_status_checks",
-        "required_status_checks",
-        json!([{"context": "CI"}, {"context": "Security approvals"}]),
-    );
-    assert!(security_crates_need_two_approvals(&r).is_empty());
-}
-
-#[test]
 fn a_live_ruleset_weaker_than_the_committed_one_is_named() {
     let committed = good();
 

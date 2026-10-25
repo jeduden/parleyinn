@@ -21,7 +21,7 @@ decision:
   its run-seat key.** The events are held, then ingested. The hook
   handlers append nothing until the server holds the key, leaving an
   ingest marker. A run no MCP server serves reaches the record only
-  through `cairn ingest`, and is counted and audited until then
+  through `parinn ingest`, and is counted and audited until then
   (REC-19). This closes DM-CD.
 - **OQ-43, a lost run-seat key, and a resume with no stable agent id.**
   The interim rules stand for M1, and spike S4 reopens them. DM-D and
@@ -49,7 +49,7 @@ The stakeholder decided four questions:
 - **Quarantine selectors** stay live for recall, landmark text and
   trusted-only exports. A pin version or landmark recorded after a cut
   quarantine leaves restore only through a widening one. A seat selector
-  covers the seat `cairn ingest` starts beside it, never a successor seat
+  covers the seat `parinn ingest` starts beside it, never a successor seat
   (SEC-12).
 - **Retention** ages events by the node's structural time marks, never by
   a transcript timestamp (REC-15, SEC-22, PRV-01).
@@ -72,7 +72,7 @@ The stakeholder's rule that a recommendation decides settled the rest:
   counter derives from it (ADM-06).
 - A run's last span closes at its end, recorded as a structural hook
   observation (LMK-01).
-- `cairn status` names each setting waiting for acceptance (ADM-11).
+- `parinn status` names each setting waiting for acceptance (ADM-11).
 - A principal may dismiss a pin candidate by a neutral act (PIN-05).
 - A device key or seat key lost while the node identity is unchanged is
   minted anew without counting as a changed identity (REC-24, SEC-10).
@@ -97,7 +97,7 @@ way:
   ingested, and a purged line is refused by a keyed hash (REC-07).
 - An event a hook's input makes waits in the ingest marker at its
   transcript offset (REC-13).
-- `cairn verify` reports a source past its ingest position as pending,
+- `parinn verify` reports a source past its ingest position as pending,
   and fails only for one nothing can resume (ADM-09).
 - A hook handler's budget cut is audited under a counter that is not a
   failure counter (REC-13).
@@ -171,7 +171,7 @@ review to weigh:
 - the direction of pin priority, lower first;
 - a personal-room seat can neither leave nor be kicked;
 - every change of visibility, admission or a room setting is widening;
-- a role assignment makes Cairn refuse no seat's act;
+- a role assignment makes ParleyInn refuse no seat's act;
 - the naming rules for budgets, runs, sources and the harness's hooks;
 - a natural-language landmark headline never reaches a restore block;
 - an event from a peer or a bundle records no recorder.
@@ -205,14 +205,14 @@ each with a step in that row's pending scenario:
   against PIN-08 and I3). The limit bounds all but what PIN-08 and
   PIN-10 make the block carry; a block those alone keep over it is
   audited and counted.
-- **Repository redaction patterns** (I1). A repository's `.cairn.toml`
+- **Repository redaction patterns** (I1). A repository's `.parinn.toml`
   could add a pattern that erases text that is not secret; only the
   principal's own configuration defines patterns (SEC-08, §9.6).
-- **`cairn ingest` after a lost key** (I1 against PRV-11). With the node
+- **`parinn ingest` after a lost key** (I1 against PRV-11). With the node
   identity unchanged, no key could certify the seat that carries the
   rest of a run; REC-19's personal-room route now covers a missing key
   such a seat needs. The grid's row for a lost key cites REC-19.
-- **`cairn uninstall` after a SEC-22 refusal** (ADM-02 against itself).
+- **`parinn uninstall` after a SEC-22 refusal** (ADM-02 against itself).
   Any refusal of the act turning capture off changes nothing.
 
 The verifiers refuted three themes: `kernel_variable_list` names outside

@@ -1,4 +1,4 @@
-# Identity and key certification: prior art for Cairn's key chain
+# Identity and key certification: prior art for ParleyInn's key chain
 
 Scope: how standard systems certify delegated keys, read on 4 October
 2026 from their specifications, source and documentation: Nostr,
@@ -114,9 +114,9 @@ to peer.
   - **Forges differ on revocation.** GitHub keeps a commit verified
     after its key is revoked; GitLab flips it to unverified.
 
-## What Cairn takes
+## What ParleyInn takes
 
-| Idea                                   | From                          | In Cairn                                                                        |
+| Idea                                   | From                          | In ParleyInn                                                                    |
 | -------------------------------------- | ----------------------------- | ------------------------------------------------------------------------------- |
 | Pre-rotation in a key event log        | KERI                          | The owner key's log commits to its next key, held offline for recovery          |
 | Reverse signature on certification     | OpenPGP, Keybase              | A device countersigns its certificate, so nobody claims a key they lack         |
@@ -140,9 +140,9 @@ chain starts from it instead of a new key.
 
 1. **Owner key: the person's existing SSH signing key.** It is used
    through ssh-agent, so the private key never leaves the agent or the
-   hardware token, and Cairn never holds it. Cairn signs with it the
+   hardware token, and ParleyInn never holds it. ParleyInn signs with it the
    way git does, `ssh-keygen -Y sign` under its own namespaces
-   (`cairn-device`, `cairn-participant@<room>`), so a Cairn signature
+   (`parinn-device`, `parinn-participant@<room>`), so a ParleyInn signature
    can never pass as a git signature or the reverse. The same key in
    the person's git allowed-signers file, or listed by their forge,
    is evidence of who they are, never authority.

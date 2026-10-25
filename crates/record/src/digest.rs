@@ -149,5 +149,29 @@ pub fn hmac_sha256(key: &[u8], message: &[&[u8]]) -> Digest {
     Digest::of(&[&outer_pad, inner.as_bytes()])
 }
 
+/// SHA-256 over bytes fed a piece at a time, readable after each: the
+/// consumed prefix of a transcript source as ingest reads it (REC-03).
+#[derive(Clone, Default)]
+pub struct Running(Sha256);
+
+impl Running {
+    /// Feeds `bytes` after what came before.
+    pub fn update(&mut self, bytes: &[u8]) {
+        self.0.update(bytes);
+    }
+
+    /// The digest of every byte fed so far.
+    #[must_use]
+    pub fn digest(&self) -> Digest {
+        Digest(self.0.clone().finalize().into())
+    }
+}
+
+impl fmt::Debug for Running {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Running({})", self.digest())
+    }
+}
+
 #[cfg(test)]
 mod tests;

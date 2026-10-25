@@ -2,7 +2,7 @@
 
 Scope: components that could host a coding-agent harness in a pty,
 model its screen headlessly, render it in a browser, or adapt an
-existing multiplexer, for Cairn's run component, as of 4 October 2026.
+existing multiplexer, for ParleyInn's run component, as of 4 October 2026.
 Read from source where possible: shallow clones of
 [herdrdev/herdr](https://github.com/herdrdev/herdr) at e35f3937b0ef
 (4 Oct 2026), its vendored libghostty-vt (Ghostty commit 44f2a44df),
@@ -16,7 +16,7 @@ libapps (hterm); versions come from crates.io, npm and the Go module
 proxy on the same day. Anything not read at its source is marked
 "unverified".
 
-## What Cairn asks of these parts
+## What ParleyInn asks of these parts
 
 - Terminal hosting and takeover live only in the run component, on the
   harness's machine; no takeover from another machine before PEER —
@@ -143,7 +143,7 @@ of owning the pty).
 - The pty layer is a patched, vendored `portable-pty` pinned to 0.9.0
   — [Cargo.toml](https://github.com/herdrdev/herdr/blob/e35f3937b0ef/Cargo.toml).
 
-### herdr against Cairn
+### herdr against ParleyInn
 
 - As a run component: no. Any same-UID process can type into any pane
   and read its screen through `pane.send_input` and `pane.read`, which
@@ -238,11 +238,11 @@ of owning the pty).
   [awesome-libghostty](https://github.com/Uzaaft/awesome-libghostty);
   each unverified beyond that list.
 
-### libghostty-vt against Cairn
+### libghostty-vt against ParleyInn
 
 - The strongest headless VT model found: correct, maintained, MIT, one
   core usable natively, in Go via WASM and in the browser via WASM.
-- Risk: unstable API, so pin a commit and wrap it behind a Cairn
+- Risk: unstable API, so pin a commit and wrap it behind a ParleyInn
   interface. Building it needs Zig 0.16 in the release pipeline, or a
   checked-in, hash-verified `.wasm`, as hauntty does.
 
@@ -266,7 +266,7 @@ of owning the pty).
 - browstty, vscode-bootty, webterm and RemoteTTYs are further
   libghostty WASM terminals, unverified beyond
   [awesome-libghostty](https://github.com/Uzaaft/awesome-libghostty).
-- A Cairn-owned renderer is also feasible: upstream
+- A ParleyInn-owned renderer is also feasible: upstream
   `ghostty-vt.wasm` built with render-state only, drawn to a canvas or
   DOM grid; the `wasm.h` notes cover memory growth for JS hosts —
   [wasm.h](https://github.com/ghostty-org/ghostty/blob/44f2a44df7e8/include/ghostty/vt/wasm.h).
@@ -330,7 +330,7 @@ of owning the pty).
   [0.43 announcement](https://dev.to/imsnif/zellij-043-brings-the-terminal-to-your-browser-57lg).
   The browser side ships `xterm.js` —
   [zellij-client/assets](https://github.com/zellij-org/zellij/tree/4ba55d724837/zellij-client/assets).
-  Fit: the closest existing model of Cairn's room (read-only versus
+  Fit: the closest existing model of ParleyInn's room (read-only versus
   input credentials), but a same-user `zellij action write-chars` path
   exists (unverified here) and its tokens are not owner acts.
 
@@ -513,7 +513,7 @@ simdutf, Highway, uucode and Wuffs.
    go-sqlite3 precedent) or hosted by wazero (one Apache-2.0
    dependency, SIMD kept). The snapshot API serves late joiners, the
    formatter gives recall a text form, the render-state API drives
-   diffs. In the browser, the same `.wasm` behind a small Cairn
+   diffs. In the browser, the same `.wasm` behind a small ParleyInn
    renderer, or ghostty-web if its patched ABI is adopted on both sides.
    hauntty shows the Go half working.
 2. **Go with cgo.** go-libghostty linked statically, Zig as the C cross

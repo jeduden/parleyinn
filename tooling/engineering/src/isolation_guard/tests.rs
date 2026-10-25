@@ -48,7 +48,7 @@ fn a_probe_that_failed_for_another_reason_was_not_refused() {
 fn a_probe_that_printed_a_path_under_the_isolated_home_was_allowed() {
     let got = not_allowed(
         "user-home",
-        &probe(true, "/t/home/.cairn\n", ""),
+        &probe(true, "/t/home/.parinn\n", ""),
         Path::new("/t/home"),
     );
 
@@ -103,7 +103,7 @@ fn script(dir: &Path, name: &str, body: &str) -> PathBuf {
 /// directory, and refuses any other.
 #[cfg(unix)]
 const GOOD_GUARD: &str = r#"case "$HOME" in
-  "$TMPDIR"/*) echo "$HOME/$CAIRN_GUARD_PROBE"; exit 0 ;;
+  "$TMPDIR"/*) echo "$HOME/$PARINN_GUARD_PROBE"; exit 0 ;;
   *) echo "refusing to resolve $HOME (ENG-14)" >&2; exit 134 ;;
 esac"#;
 
@@ -115,7 +115,7 @@ fn a_probe_runs_with_nothing_but_its_home_its_temporary_directory_and_its_place(
 
     let got = run_probe(
         &exe,
-        "cairn-home",
+        "parinn-home",
         Path::new("/h"),
         Path::new("/t"),
         Duration::from_secs(30),
@@ -129,7 +129,7 @@ fn a_probe_runs_with_nothing_but_its_home_its_temporary_directory_and_its_place(
             // A coverage run's profile file, which the probe keeps.
             .filter(|l| !l.starts_with("PWD=") && !l.starts_with("LLVM_PROFILE_FILE="))
             .collect::<Vec<_>>(),
-        ["CAIRN_GUARD_PROBE=cairn-home", "HOME=/h", "TMPDIR=/t"]
+        ["HOME=/h", "PARINN_GUARD_PROBE=parinn-home", "TMPDIR=/t"]
     );
 }
 
@@ -205,11 +205,11 @@ fn a_guard_that_lets_the_real_home_through_does_not_hold() {
     let exe = script(dir.path(), "open.sh", r#"echo "$HOME""#);
     let scratch = dir.path().join("scratch");
 
-    let got = guard_holds(&exe, &scratch, &["user-home", "cairn-home"]);
+    let got = guard_holds(&exe, &scratch, &["user-home", "parinn-home"]);
 
     assert_eq!(got.len(), 2, "{got:?}");
     assert!(got[0].starts_with("place user-home: resolved real state"));
-    assert!(got[1].starts_with("place cairn-home: resolved real state"));
+    assert!(got[1].starts_with("place parinn-home: resolved real state"));
 }
 
 #[cfg(unix)]
@@ -270,7 +270,7 @@ fn a_read_of_the_home_by_name_is_found_with_its_line() {
 fn every_variable_that_leads_to_the_real_home_is_found() {
     for (read, name) in [
         ("var", "HOME"),
-        ("var_os", "CAIRN_HOME"),
+        ("var_os", "PARINN_HOME"),
         ("var", "CLAUDE_CONFIG_DIR"),
         ("var_os", "USERPROFILE"),
         ("env!", "HOME"),
@@ -301,7 +301,7 @@ fn the_standard_library_s_home_lookup_is_found() {
 
 #[test]
 fn two_hits_on_one_line_are_one_finding() {
-    let body = "let _ = (var(\"HOME\"), var(\"CAIRN_HOME\"));\n";
+    let body = "let _ = (var(\"HOME\"), var(\"PARINN_HOME\"));\n";
 
     assert_eq!(unguarded_reads("x.rs", body).len(), 1);
 }

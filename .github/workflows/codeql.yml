@@ -4,7 +4,7 @@ name: CodeQL
 # GitHub's default setup, so that .github/codeql/codeql-config.yml can
 # leave the tests out. The tests hold fixed keys, nonces and commitment
 # keys on purpose, to stay deterministic, and default setup flagged
-# each one as a hard-coded cryptographic value (jeduden/cairn#48).
+# each one as a hard-coded cryptographic value (jeduden/parleyinn#48).
 # Product code is scanned as before, for the same languages and on the
 # same events. Default setup must be off in the repository's settings:
 # GitHub refuses this workflow's results while it is on.

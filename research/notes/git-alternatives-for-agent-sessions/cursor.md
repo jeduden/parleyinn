@@ -72,7 +72,7 @@ Origin stores ordinary git repositories: commits, trees, blobs and refs. It does
 
 ### Inferences
 
-- Continuity follows the same principle as Cairn's I10, but on a server. The append-only log is the record, and every git repo on disk is a derived, rebuildable projection. Compaction is a derived artifact written back to the log, not a mutation of history.
+- Continuity follows the same principle as ParleyInn's I10, but on a server. The append-only log is the record, and every git repo on disk is a derived, rebuildable projection. Compaction is a derived artifact written back to the log, not a mutation of history.
 - The unit of the log is a whole push (a packfile plus a ref transaction), not a fine-grained event. Agent session events would need their own record, because Origin does not capture them.
 - Linearizability comes from one CAS'd index object per repo. That is a single-writer-per-repo design: any node can be primary, and contention is resolved by CAS retry.
 
@@ -140,7 +140,7 @@ Origin itself does not store or link agent conversations. The changelog promises
 ### Inferences
 
 - Cursor splits three concerns. Code history goes in git (Origin/Continuity). Attribution and conversation links live in a sidecar: server-side for Cursor Blame, storage-agnostic for Agent Trace. Full conversations stay in Cursor's own backend. Conversation data never travels inside the git record.
-- Agent Trace is the closest published schema for linking a session to a commit. Cairn could export it, for example as git notes keyed by commit SHA, without making git its primary record.
+- Agent Trace is the closest published schema for linking a session to a commit. ParleyInn could export it, for example as git notes keyed by commit SHA, without making git its primary record.
 - InfoQ's "SpaceX/xAI-controlled infrastructure" is a corporate-ownership statement. The S3 Express One Zone benchmarks suggest AWS, but Cursor did not name a cloud.
 
 ### Gaps
@@ -195,8 +195,8 @@ The launch thread had 597 points and 454 comments. It was dominated by trust and
 
 ### Inferences
 
-- The technical community accepted the storage idea (an append-only log on object storage, rebuildable caches) as sound, and called it well-known event sourcing. The objections were about trust, custody and lock-in, which are exactly the axes Cairn's I2, I4 and I6 invariants address.
-- The criticism that "S3 is a proprietary product" maps onto Cairn. A record transport whose correctness depends on a hosted service's CAS and durability guarantees conflicts with a local-first, no-network design (I4). Origin's pattern carries over to Cairn only if the CAS'd log lives locally or in git refs, not in a cloud bucket.
+- The technical community accepted the storage idea (an append-only log on object storage, rebuildable caches) as sound, and called it well-known event sourcing. The objections were about trust, custody and lock-in, which are exactly the axes ParleyInn's I2, I4 and I6 invariants address.
+- The criticism that "S3 is a proprietary product" maps onto ParleyInn. A record transport whose correctness depends on a hosted service's CAS and durability guarantees conflicts with a local-first, no-network design (I4). Origin's pattern carries over to ParleyInn only if the CAS'd log lives locally or in git refs, not in a cloud bucket.
 
 ### Gaps
 

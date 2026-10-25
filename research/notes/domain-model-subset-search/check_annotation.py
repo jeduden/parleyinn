@@ -11,8 +11,8 @@ import re, json, os, sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from assemble import strip, TOK
 GA=os.path.dirname(os.path.abspath(__file__))
-# the repository root; CAIRN_REPO overrides it when this folder is copied elsewhere
-REPO=os.environ.get('CAIRN_REPO') or os.path.join(os.path.dirname(os.path.abspath(__file__)), '../../..')
+# the repository root; PARINN_REPO overrides it when this folder is copied elsewhere
+REPO=os.environ.get('PARINN_REPO') or os.path.join(os.path.dirname(os.path.abspath(__file__)), '../../..')
 SRC={f: f'{REPO}/docs/domain-model/{f}' for f in os.listdir(f'{REPO}/docs/domain-model') if f.endswith('.md')}
 SRC['invariants.md']=f'{REPO}/docs/srs/invariants.md'
 feats=json.load(open(f'{GA}/features.json'))

@@ -7,18 +7,21 @@ Feature: Recall (RCL)
 
   @RCL-01 @P0 @I1 @pending
   Scenario: the MCP server's tool list includes the six P0 recall tools
-    Given an isolated Cairn home
+    Given an isolated ParleyInn home
     And an agent run with a Claude Code transcript "short-run"
-    When the agent lists the tools of the MCP server started by "cairn mcp"
+    When the agent lists the tools of the MCP server started by "parinn mcp"
     Then the tool list includes "event_search", "event_expand", "event_get", "landmark_list", "pin_list" and "stat_list", among the other tools SRS section 9.2 specifies
     And each tool declares the parameters specified in SRS section 9.2
     When the agent calls each of those six tools
     Then each returns its content in the envelope, "stat_list" its counts in an envelope marked structural
     And each call is recorded as a recall event
+    When the agent calls "mcp_server_get", with a session binding held and with none
+    Then it returns "session_binding" as "held" or "not_held", "search_index" as "readable" or "unreadable", "searches_timed_out" as a count and "version", and no recalled content or envelope, whether or not a run is found for the call
+    And the call is recorded as no recall event
 
   @RCL-02 @P0 @pending
   Scenario Outline: event search honours its filters and caps hits at k
-    Given an isolated Cairn home
+    Given an isolated ParleyInn home
     And an agent run with a Claude Code transcript "mixed-provenance"
     When the agent calls the MCP tool "event_search" with <args>
     Then the recall result is wrapped in the envelope
@@ -39,7 +42,7 @@ Feature: Recall (RCL)
 
   @RCL-03 @P0 @I1 @pending
   Scenario: event expand returns exact post-redaction content under the model-token cap
-    Given an isolated Cairn home
+    Given an isolated ParleyInn home
     And an agent run with a Claude Code transcript "large-payloads"
     When the agent calls the MCP tool "event_expand" with range "A1:1-400"
     Then the recall result is wrapped in the envelope
@@ -49,11 +52,11 @@ Feature: Recall (RCL)
 
   @RCL-04 @P0 @I2 @pending
   Scenario Outline: every recall tool wraps its content in the envelope
-    Given an isolated Cairn home
+    Given an isolated ParleyInn home
     And an agent run with a Claude Code transcript "mixed-provenance"
     When the agent calls the MCP tool "<tool>" with <args>
     Then the recall result is wrapped in the envelope
-    And the envelope carries "cairn_envelope" 1 and the fixed envelope warning in its field "warning"
+    And the envelope carries "parinn_envelope" 1 and the fixed envelope warning in its field "warning"
 
     Examples:
       | tool         | args                         |
@@ -63,7 +66,7 @@ Feature: Recall (RCL)
 
   @RCL-05 @P0 @I8 @pending
   Scenario: recall defaults to the agent's current run and extending it to its rooms is explicit and logged
-    Given an isolated Cairn home
+    Given an isolated ParleyInn home
     And a run with seats in its personal room and in room "L1", whose writers this node holds beside those of other runs in "L1" on two worktrees and of room "L2" where the run has no seat
     When the agent calls the MCP tool "event_search" with query "deploy" and no scope
     Then every hit belongs to the calling run, across the writers of both its seats
@@ -75,17 +78,17 @@ Feature: Recall (RCL)
 
   @RCL-06 @P0 @I5 @pending
   Scenario: quarantined events are never recalled and purged ranges return a tombstone
-    Given an isolated Cairn home
+    Given an isolated ParleyInn home
     And an agent run with a Claude Code transcript "poisoned-web"
-    And the person runs "cairn quarantine add --range A1:12-12"
-    And the person runs "cairn purge --range A1:30-40"
+    And the person runs "parinn quarantine add --range A1:12-12"
+    And the person runs "parinn purge --range A1:30-40"
     When the agent calls the MCP tool "event_expand" with range "A1:1-50"
     Then the recall result is wrapped in the envelope
     And no item has address A1·12 and no item lies in A1·30–40, which appears as a tombstone with reason "purged"
 
   @RCL-07 @P0 @I6 @pending
   Scenario: every recall call is appended to the record
-    Given an isolated Cairn home
+    Given an isolated ParleyInn home
     And an agent run with a Claude Code transcript "short-run"
     When the agent calls the MCP tool "event_search" with query "deploy"
     Then the record gains one recall event with provenance "assistant" carrying the query
@@ -93,14 +96,14 @@ Feature: Recall (RCL)
     And the counter "recall_calls" increases by 1
 
   @RCL-08 @P1 @I1 @pending
-  Scenario Outline: every address Cairn shows, and its ASCII input form, resolves wherever an address is taken
-    Given an isolated Cairn home
+  Scenario Outline: every address ParleyInn shows, and its ASCII input form, resolves wherever an address is taken
+    Given an isolated ParleyInn home
     And an agent run with a Claude Code transcript "short-run"
     And an event address shown to a person or an agent in <form> form
     When the agent calls the MCP tool "<tool>" with that address
     Then the recall result contains exactly the events the address names
     And an address of a purged or quarantined event resolves to its tombstone or quarantine marker
-    And "cairn event expand" given the same address in the same form returns the same events
+    And "parinn event expand" given the same address in the same form returns the same events
     And no two writers this node holds share a writer label, and each writer-label assignment is a structural event in the personal-room writer of the device seat that assigned it
 
     Examples:
@@ -113,7 +116,7 @@ Feature: Recall (RCL)
 
   @RCL-09 @P1 @I2 @I6 @pending
   Scenario Outline: every recalled item carries its writer, author, trust, origin and integrity status
-    Given an isolated Cairn home
+    Given an isolated ParleyInn home
     And a node whose record contains <item>
     When the agent recalls that item with the MCP tool "event_get"
     Then the item carries its writer, its author and its trust level, or "untrusted" in its place for an item from a foreign room
@@ -124,8 +127,8 @@ Feature: Recall (RCL)
       | a sealed event this node witnessed                                     | witnessed | verified    |
       | a sealed principal act this node's CLI recorded                        | witnessed | verified    |
       | an event past its writer's newest seal                                 | witnessed | unsigned    |
-      | a sealed event "cairn ingest" read from a transcript                   | ingested  | verified    |
-      | a sealed event "cairn ingest" read past an ingest marker               | ingested  | verified    |
+      | a sealed event "parinn ingest" read from a transcript                   | ingested  | verified    |
+      | a sealed event "parinn ingest" read past an ingest marker               | ingested  | verified    |
       | a sealed event imported from a room bundle                             | bundle    | verified    |
       | a sealed event of a paired phone's device seat                         | peer      | verified    |
       | a peer's event after a break in its writer's chain                     | peer      | unverified  |
@@ -135,7 +138,7 @@ Feature: Recall (RCL)
 
   @RCL-10 @P2 @I2 @I8 @pending
   Scenario: a foreign room is recalled only by naming it in the call, enveloped, every item untrusted and tainting
-    Given an isolated Cairn home
+    Given an isolated ParleyInn home
     And a node holding a foreign room "vendor-room" imported from a room bundle
     And the node's principal has recorded a trust grant covering the bundle's principal key
     And a foreign room "left-room" that every seat of the node's principal has left, holding a "constraint" pin the principal wrote there from its device seat
@@ -143,12 +146,12 @@ Feature: Recall (RCL)
     Then the hits come from "vendor-room", wrapped in the envelope, each marked "untrusted" though the trust grant covers the foreign room's keys
     And an audit entry logs the call and the calling run is tainted under SEC-13
     And a following call without the room parameter, under any scope, returns no hit from "vendor-room"
-    And neither does the kernel built-in "cairn.event_search" in a "kernel_exec" call without the room parameter, under any scope
+    And neither does the kernel built-in "parinn.event_search" in a "kernel_exec" call without the room parameter, under any scope
     And a "pin_list" call naming room "left-room" returns the principal's "constraint" pin marked "untrusted", though that pin still restores to the runs that had a seat in "left-room" and to their agents' later runs (PIN-10, REC-02)
 
   @RCL-11 @P2 @I6 @pending
   Scenario: recalling another seat's post is recorded and shown in the room view
-    Given an isolated Cairn home
+    Given an isolated ParleyInn home
     And a room owned by "owner-a" whose conversation has a post written by the seat "bob"
     When an agent on this node calls the MCP tool "event_get" with the post's address
     Then the writer of the calling run's seat gains the recall event, listing the post's address among the returned events

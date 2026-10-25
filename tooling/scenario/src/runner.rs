@@ -134,7 +134,7 @@ pub fn block_on<F: Future>(future: F) -> F::Output {
 
 /// The variable that marks the runner's own process as isolated: its
 /// value is the home the parent created for it.
-pub const ISOLATED_HOME: &str = "CAIRN_BDD_HOME";
+pub const ISOLATED_HOME: &str = "PARINN_BDD_HOME";
 
 /// Whether a process with `HOME` set to `home`, and the marker set to
 /// `marker`, runs isolated (ENG-14): the marker names its `HOME`, and
@@ -148,12 +148,12 @@ pub fn is_isolated(home: Option<&OsStr>, marker: Option<&OsStr>, temp: &Path) ->
     }
 }
 
-/// Points `command` at `home`: its `HOME`, a `CAIRN_HOME` inside it,
+/// Points `command` at `home`: its `HOME`, a `PARINN_HOME` inside it,
 /// and the marker that says the process is isolated.
 pub fn isolate<'a>(command: &'a mut Command, home: &Path) -> &'a mut Command {
     command
         .env("HOME", home)
-        .env("CAIRN_HOME", home.join(".cairn"))
+        .env("PARINN_HOME", home.join(".parinn"))
         .env(ISOLATED_HOME, home)
 }
 

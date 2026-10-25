@@ -25,7 +25,7 @@ fn sources(dir: &Path) -> Sources {
     fs::set_permissions(dir.join("managed"), fs::Permissions::from_mode(0o755)).unwrap();
     Sources {
         configuration: dir.join("config.toml"),
-        repository: Some(dir.join(".cairn.toml")),
+        repository: Some(dir.join(".parinn.toml")),
         managed: dir.join("managed").join("managed_policy.toml"),
         running: OsUser::Known(me(dir) + 1),
     }
@@ -43,7 +43,7 @@ fn failure(loaded: &Loaded) -> &LayerFailure {
 
 #[test]
 fn the_managed_policy_path_is_the_documented_one() {
-    assert_eq!(MANAGED_POLICY, "/etc/cairn/managed_policy.toml");
+    assert_eq!(MANAGED_POLICY, "/etc/parinn/managed_policy.toml");
 }
 
 #[test]
@@ -323,10 +323,10 @@ fn repository_configuration_is_at_the_top_of_the_repository() {
     fs::create_dir(top.join(".git")).unwrap();
     assert_eq!(
         repository_configuration(&deep),
-        Some(top.join(".cairn.toml"))
+        Some(top.join(".parinn.toml"))
     );
     assert_eq!(
         repository_configuration(&top),
-        Some(top.join(".cairn.toml"))
+        Some(top.join(".parinn.toml"))
     );
 }

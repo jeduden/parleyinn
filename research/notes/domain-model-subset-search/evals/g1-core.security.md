@@ -3,8 +3,8 @@
   {
     "type": "security",
     "quote": "or any CLI or TUI read from inside a run, whatever its output",
-    "problem": "Only reads count as recall. The room-act MCP tools (room_pin, room_edit, room_unpin, room_link, room_create) and CLI calls from inside a run that are not reads (cairn ingest, rebuild, migrate, a pin command) also return output that the harness sends to the model. That output is neither enveloped recall nor a closed path, and nothing bounds it: ingest could echo an attacker's unparsed line, or room_edit could echo pin text. This breaks I2's 'No other write to an agent exists' and I4's list of what leaves the machine.",
-    "fix": "Write 'or any CLI or TUI call from inside a run, and any MCP tool's result, whatever its output', or say that every other agent-facing output carries only fixed text Cairn ships, structural fields and ids.",
+    "problem": "Only reads count as recall. The room-act MCP tools (room_pin, room_edit, room_unpin, room_link, room_create) and CLI calls from inside a run that are not reads (parinn ingest, rebuild, migrate, a pin command) also return output that the harness sends to the model. That output is neither enveloped recall nor a closed path, and nothing bounds it: ingest could echo an attacker's unparsed line, or room_edit could echo pin text. This breaks I2's 'No other write to an agent exists' and I4's list of what leaves the machine.",
+    "fix": "Write 'or any CLI or TUI call from inside a run, and any MCP tool's result, whatever its output', or say that every other agent-facing output carries only fixed text ParleyInn ships, structural fields and ids.",
     "severity": "needs-fix"
   },
   {

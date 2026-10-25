@@ -53,7 +53,7 @@ recorded from Claude Code 2.1.296 together with spike S1's.
   `uuid`s.
 - ASM-05 is re-planned: the harness deleted a 40-day-old subagent
   transcript at a start, but kept 40-day-old harness session transcripts over
-  four starts. When its retention sweep runs is not visible to Cairn.
+  four starts. When its retention sweep runs is not visible to ParleyInn.
 - OQ-12 stays moot: the three working directories share one transcript
   directory, which REC-04 no longer depends on, since runs are keyed by
   harness session and agent id.
@@ -66,7 +66,7 @@ Deviations from the tasks:
   demand; the observation is recorded as data (`cleanup.json`), not as
   a tree.
 - The scenarios for ASM-04 and ASM-05 replay the fixtures alone. As
-  first drafted they ran `cairn ingest`, which belongs to REC-07's and
+  first drafted they ran `parinn ingest`, which belongs to REC-07's and
   REC-08's own scenarios.
 
 Handed on:

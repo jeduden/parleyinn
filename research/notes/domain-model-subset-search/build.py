@@ -16,17 +16,17 @@ J("principals-and-agents", [
  ("Principal", "The party every invariant protects (I1, I2, I8); every agent, home and key belongs to exactly one."),
  ("Person", "A single-node install's principal is a person; no one certifies its key, and only a person records a verdict."),
  ("Managed policy", "I1, I4 and I7 name it; its item also defines harness configuration, the thing I7 governs."),
- ("Agent", "What restore blocks and recall serve; the reason Cairn exists."),
+ ("Agent", "What restore blocks and recall serve; the reason ParleyInn exists."),
  ("Run", "The unit the record is keyed by and a restore block is built for (I1, I3)."),
  ("Subagent", "The harness starts subagents; each has its own run and writer tied by a parent link, or their events are lost (I1)."),
- ("Ingested run", "`cairn ingest` recovers what capture missed (I1, I9 fail-open); such runs must be named and untrusted (REC-22)."),
+ ("Ingested run", "`parinn ingest` recovers what capture missed (I1, I9 fail-open); such runs must be named and untrusted (REC-22)."),
  ("Author", "Every event and pin has one authoring seat; which pins qualify to restore depends on it (PIN-10, I3)."),
  ("Member", "Whether a seat is a member decides where a run's events go and which pins restore (hub Relations)."),
  ("Owner", "The principal owns its personal room; ownership gives its device seats every capability there."),
  ("Delegate", "A subagent is a delegate; recording its delegated task and report needs the term (OWN-24, OWN-25)."),
 ])
 J("harness-facts", [
- ("Harness", "What Cairn records; I7 governs its configuration."),
+ ("Harness", "What ParleyInn records; I7 governs its configuration."),
  ("Harness session", "The harness unit that yields a transcript and keys a run."),
  ("Transcript", "The source ingest reads (REC-01, REC-03)."),
  ("Hook", "How the harness reports to the core's hook handlers; capture rides on it."),
@@ -146,7 +146,7 @@ for h, why in [
  ("Every seat belongs to one", "Seat-principal-room-writer structure behind every address."),
  ("Each event goes to exactly", "Event routing: every event in exactly one writer (I1, I10)."),
  ("A run's history spans its", "A run's history across writers; recall by address."),
- ("Principals and agents create rooms;", "Cairn never creates a room on its own; the personal room comes from install."),
+ ("Principals and agents create rooms;", "ParleyInn never creates a room on its own; the personal room comes from install."),
  ("A pin naming no room", "Roomless pins land in the personal room."),
  ("Recall extends only to the", "Recall scope bound (I8)."),
 ]:
@@ -231,7 +231,7 @@ feat("intent-criteria", "Intent and criteria",
  soft=["ownership-transfer", "trust-grants", "results-and-verdicts", "pin-candidates"])
 
 feat("pin-candidates", "Pin candidates",
- "Agent-suggested or Cairn-detected proposed pin text that the principal confirms into a device-seat pin.",
+ "Agent-suggested or ParleyInn-detected proposed pin text that the principal confirms into a device-seat pin.",
  E("pins-and-context", "Pin candidate"),
  [], 3, 2,
  "I2: an agent's suggestion is an untrusted `assistant` event; only the principal's widening confirmation makes a trusted pin. I10: a detected candidate is a derived artifact.",
@@ -279,7 +279,7 @@ feat("rule-levels", "Rule levels and recall taint",
  soft=["delegation-grants", "launcher"])
 
 feat("launcher", "Launcher and run controls",
- "B1 `cairn launch`: starts, hosts and controls runs, steer/interrupt/pause/resume/stop, terminal takeover, corrections and retries, carrying in only text the core built.",
+ "B1 `parinn launch`: starts, hosts and controls runs, steer/interrupt/pause/resume/stop, terminal takeover, corrections and retries, carrying in only text the core built.",
  E("components-and-surfaces", "Launcher (B1):") + E("trust-and-flow", "Run controls", "Correction, retry"),
  [], 4, 4,
  "I4 B1 ('the launcher carries into the harness's input only text the core built'), I2 ('through the harness's own input, only principal-typed text, a fixed template ..., or a post a principal endorsed'). The only component that starts programs. Corrections answer verdicts; retries start from worktree checkpoints.",
@@ -317,7 +317,7 @@ feat("trust-grants", "Trust grants",
  "A principal trusts another principal's key for its own agents, in one room or everywhere: that principal's device-seat pins restore and its posts arrive in OWN-29's template.",
  E("trust-and-flow", "Trust grant"),
  ["principal-keys", "shared-rooms"], 3, 5,
- "I2 ('what a trust grant of that principal covers'; 'Cairn applies such grants and never grants trust itself'), I8 ('unless this principal's own stamp or trust grant covers it'). Never in a foreign room; refuses relaying service accounts.",
+ "I2 ('what a trust grant of that principal covers'; 'ParleyInn applies such grants and never grants trust itself'), I8 ('unless this principal's own stamp or trust grant covers it'). Never in a foreign room; refuses relaying service accounts.",
  soft=["conversation", "service-accounts", "launcher"])
 
 feat("principal-keys", "Principal keys and expire acts (PRV-10)",
@@ -392,7 +392,7 @@ feat("results-and-verdicts", "Results, comparisons and verdicts",
  "Checks and results with evidence classes, own checks, branch comparisons with exposure, outcomes, and a person's met/not met/needs changes verdict per criterion.",
  E("git-and-forge", "Check", "Result", "Evidence", "Evidence class", "Own check", "Comparison", "Outcome", "Verdict") + E("trust-and-flow", "Exposure"),
  ["intent-criteria", "work-rooms"], 4, 2,
- "I10 ('evidence and proof classes'). Verdicts are neutral principal acts by persons only; Cairn never derives one.",
+ "I10 ('evidence and proof classes'). Verdicts are neutral principal acts by persons only; ParleyInn never derives one.",
  soft=["witness-check", "ci-attestation", "room-view-surfaces", "rule-levels", "launcher"])
 
 feat("witness-check", "Witness checks",
@@ -412,7 +412,7 @@ feat("presentations", "Outcome window and presentations",
  "Seats present a dev server URL, build artifact, file or diff in the Room page's outcome window; moderators pick which shows.",
  E("acts-and-roles", "Present", "Pick") + E("git-and-forge", "Presentation") + E("components-and-surfaces", "Outcome window"),
  ["work-rooms", "room-view-surfaces"], 2, 2,
- "No invariant names it; a presentation's URL is inert text never opened by Cairn.",
+ "No invariant names it; a presentation's URL is inert text never opened by ParleyInn.",
  soft=["moderation", "facilitator"])
 
 feat("needs-you", "Needs you queue",
@@ -470,7 +470,7 @@ feat("store-protection", "Store protection",
  soft=["purge-retention", "peer-sync"])
 
 feat("export-bundles", "Export and bundles",
- "Reviewed `cairn export` of a room as a signed bundle (file or git ref), a rendering, or a trusted-only export for downstream memory systems.",
+ "Reviewed `parinn export` of a room as a signed bundle (file or git ref), a rendering, or a trusted-only export for downstream memory systems.",
  E("record", "Export", "Rendering", "Trusted-only export", "Bundle"),
  ["principal-keys"], 3, 4,
  "Data leaves the home as a file (outside I4's network channels); export is widening with a review step applying redaction (SEC-26, SEC-08). Outputs carry taint.",

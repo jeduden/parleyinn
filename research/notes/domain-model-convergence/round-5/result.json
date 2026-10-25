@@ -49,7 +49,7 @@
      "file": "docs/domain-model/principals-and-agents.md",
      "quote": "resume that starts a new harness session, or a **harness clear**, starts a new",
      "problem": "A run is keyed by harness session and agent id, yet a harness clear starts a new run, and the model never says that a clear starts a new harness session. For a harness that keeps its session across a clear, two runs share one key.",
-     "fix": "resume that starts a new harness session, or a **harness clear**, which Cairn treats as starting a new harness session, starts a new",
+     "fix": "resume that starts a new harness session, or a **harness clear**, which ParleyInn treats as starting a new harness session, starts a new",
      "severity": "minor"
     },
     {
@@ -109,7 +109,7 @@
      "type": "contradiction",
      "file": "docs/domain-model/record.md",
      "quote": "names, such as lowering a limit or turning an injection path off, never",
-     "problem": "Restore blocks, including the on-prompt one, are injection paths, and the restore block limit is a limit. The examples therefore let an untrusted repository's .cairn.toml drop pins from restore blocks, which the same sentence forbids. \"Injection path\" is also never defined.",
+     "problem": "Restore blocks, including the on-prompt one, are injection paths, and the restore block limit is a limit. The examples therefore let an untrusted repository's .parinn.toml drop pins from restore blocks, which the same sentence forbids. \"Injection path\" is also never defined.",
      "fix": "\"such as lowering a limit that bounds no restore block or turning off opt-in notices, never ...\"",
      "severity": "minor"
     }
@@ -130,7 +130,7 @@
      "type": "gap",
      "file": "docs/domain-model/seats-and-keys.md",
      "quote": "lives only in the memory of its harness session's MCP server,",
-     "problem": "A run's personal-room seat and writer exist from its first event, and the writer id derives from the seat's first key. That key lives only in the MCP server's memory. No rule says where a witnessed run's events go when hooks fire before that server holds a key, or when the harness session runs no Cairn MCP server. The seat ingest starts needs that run seat to exist, so in a hook-only setup the events are either lost (I1) or written to a writer the model does not define.",
+     "problem": "A run's personal-room seat and writer exist from its first event, and the writer id derives from the seat's first key. That key lives only in the MCP server's memory. No rule says where a witnessed run's events go when hooks fire before that server holds a key, or when the harness session runs no ParleyInn MCP server. The seat ingest starts needs that run seat to exist, so in a hook-only setup the events are either lost (I1) or written to a writer the model does not define.",
      "fix": "Add to Run seat: \"Until its harness session's MCP server holds its run-seat key, or where none runs, a witnessed run's events go to a run seat whose key the core keeps, as an ingested run's, and the core seals its writer.\"",
      "severity": "needs-fix"
     },
@@ -154,7 +154,7 @@
      "type": "gap",
      "file": "docs/domain-model/components-and-surfaces.md",
      "quote": "Replay tab's **context lens** showing what the model's context window",
-     "problem": "Apart from the launcher's turn trigger, no rule records what Cairn wrote to an agent through a closed path: a restore block, an opt-in notice, compaction guidance or a fixed template a hook handler returned. A restore block depends on what the node held at that moment, which the record does not fix. So the context lens cannot show what an agent was told, and a person cannot see it either.",
+     "problem": "Apart from the launcher's turn trigger, no rule records what ParleyInn wrote to an agent through a closed path: a restore block, an opt-in notice, compaction guidance or a fixed template a hook handler returned. A restore block depends on what the node held at that moment, which the record does not fix. So the context lens cannot show what an agent was told, and a person cannot see it either.",
      "fix": "Add to Restore block (and Closed path): \"Each closed-path write is recorded as a structural event in the run's writer, naming by id the pins, versions and template it carried, and its text by commitment.\"",
      "severity": "minor"
     },
@@ -213,7 +213,7 @@
     "index": 1,
     "theme": "NEW-4",
     "kind": "new",
-    "reason": "The finding is about where a witnessed run's events go before its MCP server holds the run-seat key, or when no Cairn MCP server runs. DM-D (deferred, OQ-43) covers a key lost with its MCP server while a run continues, on a resume or a restart. Closing DM-D would not say where hook-recorded events go at run start or in a hook-only setup. REC-18 only says events after the newest seal show as unsigned. Blind-23 section 3 parked 'who mints a run seat's key before the MCP server starts' on ASM-21 and spike S4, which tests only that the server can hold the keys. The repair-v1 ruling R13 drafted a fix (core mints and keeps the key until the server holds it) that never reached docs/."
+    "reason": "The finding is about where a witnessed run's events go before its MCP server holds the run-seat key, or when no ParleyInn MCP server runs. DM-D (deferred, OQ-43) covers a key lost with its MCP server while a run continues, on a resume or a restart. Closing DM-D would not say where hook-recorded events go at run start or in a hook-only setup. REC-18 only says events after the newest seal show as unsigned. Blind-23 section 3 parked 'who mints a run seat's key before the MCP server starts' on ASM-21 and spike S4, which tests only that the server can hold the keys. The repair-v1 ruling R13 drafted a fix (core mints and keeps the key until the server holds it) that never reached docs/."
    },
    {
     "lens": "usefulness",
@@ -248,7 +248,7 @@
    },
    {
     "id": "NEW-4",
-    "title": "Where a witnessed run's events go before its harness session's MCP server holds its run-seat key, or when no Cairn MCP server runs",
+    "title": "Where a witnessed run's events go before its harness session's MCP server holds its run-seat key, or when no ParleyInn MCP server runs",
     "settled_by": "none"
    },
    {

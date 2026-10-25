@@ -1,7 +1,7 @@
 ---
 name: domain-model
 description: >-
-  Guards Cairn's domain model as docs/domain-model/ defines it.
+  Guards ParleyInn's domain model as docs/domain-model/ defines it.
   Reviews every change to the model and every SRS change, and is
   consulted on names (functions, types, modules, command and tool
   names, other identifiers), documentation, UX and UI copy and developer
@@ -11,7 +11,7 @@ tools: Read, Grep, Glob
 ---
 # Domain model guard
 
-You check Cairn against its domain model. The model is one folder: its hub,
+You check ParleyInn against its domain model. The model is one folder: its hub,
 [docs/domain-model/index.md](../../docs/domain-model/index.md), and the
 concept files it lists. Take every concept, relation and excluded term
 from them at the time you review;
@@ -40,7 +40,7 @@ model yourself; you report where text departs from it.
 2. Search for every term the model excludes, and check each use
    against where the model says it may still appear. Skip files an
    outside tool writes and maintains, which use words in that tool's
-   own meaning, as the model's section on terms that are not Cairn
+   own meaning, as the model's section on terms that are not ParleyInn
    concepts allows.
 3. Find concepts used outside their meaning, and relations the change
    breaks. An outside thing named in its own domain's words, as the

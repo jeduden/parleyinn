@@ -15,11 +15,11 @@ exactly one kind (LANE-31).
   create room, join, a join request, leave, a role request, post, link, pin,
   edit, unpin, list removal, present, pick, kick, bar, unbar, mute and unmute;
   set title, labels or an assignment; and write a room summary or a summary
-  request. A leave, kick or bar never drops a pin from any restore block, even
-  where it makes the room foreign (Foreign room). A link act adds one range
-  link, branch link or criterion link. Room acts are governance, not I2 trust:
-  they carry no class and on their own never widen what reaches an agent
-  (LANE-24).
+  request. A link act adds one range link, branch link, criterion link or issue
+  link. A leave, kick or bar never drops a pin from any restore block, even
+  where it makes the room foreign (Foreign room). Room acts are governance,
+  not I2 trust: they carry no class and on their own never widen what reaches
+  an agent (LANE-24).
 - **Principal act**: An act of a kind OWN-11 classes, taken at a principal
   surface, signed by a device key once PRV-10 ships and recorded as OWN-02 says.
   A widening act lets more reach an agent, or more act or leave the node; a cut
@@ -31,7 +31,8 @@ exactly one kind (LANE-31).
     rule level, revoke a role assignment, revoke a CI key, stop publishing a
     room, quarantine content without removing anything from a restore block,
     withdraw a risk acceptance, revoke a trust grant, end a delegation grant or
-    an acceptance grant, turn an away policy off, withdraw a named successor,
+    an acceptance grant, revoke a forge import grant, turn an away policy
+    off, withdraw a named successor,
     revoke an appointment, unstamp a pin version, turn notices off, reject an
     inception no confirm or `recovered` rotation has counted, a node identity
     change event or a void key event (PRV-12), decline a handover, withdraw as
@@ -46,7 +47,9 @@ exactly one kind (LANE-31).
     purge request, choose a branch to compare, acknowledge counters, dismiss a
     Q3 or Q4 item other than a directed post, unpin a pin its own agent's run
     seat wrote, and add a room to or remove it from the focus set.
-  - **Widening:** allow, answer a hand-off (a hand-back), reply, steer, confirm
+  - **Widening:** allow, answer a hand-off (a hand-back), reply, forge reply,
+    forge import grant,
+    steer, confirm
     a steer for a later turn (OWN-13), send a correction, retry from a worktree
     checkpoint, set or revise an intent, resume, record a delegation grant or an
     acceptance grant, add, edit or unpin a pin of a type that restores written
@@ -73,10 +76,16 @@ exactly one kind (LANE-31).
     (OWN-18), and a backup restore. Revoking a device or a peer stays widening
     although it undoes an enrollment, since it can drop pins and stop principal
     acts arriving.
-
   Applying a quarantine request takes the class of the quarantine it applies
   (PEER-11). Every principal act a requirement names is classed here, and
   OWN-11 follows and classes the rest.
+- **Forge reply**: A widening principal act of a person, taken after a
+  principal surface shows the exact post their own device seat wrote, the
+  target forge review or issue item, and the forge account that will send it.
+  It authorizes the forge bridge to send that post's text to the review thread
+  or as a comment on the linked issue, using the person's own forge credential
+  on the enabled host (LANE-08, LANE-34, SEC-28). The act is not a forge
+  approval or landing request; the post alone authorizes no send.
 - **Expire act**: Once PRV-10 ships, an act a node records, signed with its
   device key, ending only an expiry its original act set. It ends a bar, a mute
   or a handover offer (LANE-25), an access token (PEER-05), or a delegation
@@ -132,7 +141,8 @@ exactly one kind (LANE-31).
 - **Active pin**: A pin on its room's pin list (I10).
 - **Room merge**: The one rule deriving all room state from the three act kinds,
   in causal order (LANE-31). It covers membership, roles, appointments, pins,
-  pin versions, stamps, branch links (Branch), mutes, presentations, picks,
+  pin versions, stamps, branch links (Branch), issue links and active or
+  revoked forge import grants (Forge), mutes, presentations, picks,
   bars, handovers and their offers, OWN-21's ready and abandoned marks and the
   CI keys enrolled in the room. It covers the successor, title, labels,
   assignment, visibility, admission, the notice allowance and the **room

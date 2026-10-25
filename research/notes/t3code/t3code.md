@@ -1,6 +1,6 @@
 # T3 Code: a local GUI over coding agents
 
-Scope: what T3 Code is and how it compares with Cairn, read from its
+Scope: what T3 Code is and how it compares with ParleyInn, read from its
 source at [pingdotgg/t3code](https://github.com/pingdotgg/t3code)
 commit 00eb8f6 (MIT, T3 Tools Inc.) on 3 October 2026, after a first
 pass over secondary sources. Paths are relative to that repository.
@@ -120,7 +120,7 @@ pass over secondary sources. Paths are relative to that repository.
 - The T3 server runs as the user, holds forge tokens and its signing
   key under `~/.t3/secrets`, and starts the agents as its children, so
   an unsandboxed agent of the same user faces the same residual risks
-  as with Cairn (Cairn's SRS §6.1, R1–R7).
+  as with ParleyInn (ParleyInn's SRS §6.1, R1–R7).
 
 ## Untrusted content and history
 
@@ -135,9 +135,9 @@ pass over secondary sources. Paths are relative to that repository.
   by its schema, cannot approve a permission.
 - It imports existing Claude Code and other agents' sessions.
 
-## Against Cairn
+## Against ParleyInn
 
-| Question          | T3 Code                                                     | Cairn (2.0-draft)                                                              |
+| Question          | T3 Code                                                     | ParleyInn (2.0-draft)                                                          |
 | ----------------- | ----------------------------------------------------------- | ------------------------------------------------------------------------------ |
 | Where it sits     | A GUI that drives the harnesses                             | A record under the harnesses, and a lane view that steers them                 |
 | People            | One person, several devices                                 | Co-authors, reviewers and watchers in one lane (P2)                            |
@@ -151,9 +151,9 @@ pass over secondary sources. Paths are relative to that repository.
 | Untrusted content | Sanitized rendering; history recalled raw                   | Pull-only recall in an untrusted envelope (I2)                                 |
 | Constraints       | None found                                                  | Pins restored verbatim after compaction (I3)                                   |
 | Erasure           | Soft tombstone; no redaction                                | Redaction before storage; purge that leaves no confirming value                |
-| Harness control   | Agent SDK and Codex app-server, rich steering               | Through the harness's input interfaces (OWN-03), in `cairn-run`                |
+| Harness control   | Agent SDK and Codex app-server, rich steering               | Through the harness's input interfaces (OWN-03), in `parinn-run`               |
 
-## Lessons for Cairn
+## Lessons for ParleyInn
 
 - Worth reusing:
   - committing event, projection and receipt in one transaction;
@@ -165,19 +165,19 @@ pass over secondary sources. Paths are relative to that repository.
   - a forge token pinned to its verified host;
   - an MCP tool whose schema cannot approve a permission, which is
     OWN-04's rule expressed in a type.
-- Its harness control is the shape Cairn's adapters need (ASM-19): the
+- Its harness control is the shape ParleyInn's adapters need (ASM-19): the
   Agent SDK's streaming queue for steer, `canUseTool` for approvals,
   and Codex's app-server requests.
-- It competes directly with Cairn's lane view, owner controls and
-  review tab (VIEW, OWN, `cairn-run`): it ships today what plan
-  2610022338 plans. Only Cairn's core, the record, sits beneath whatever
+- It competes directly with ParleyInn's lane view, owner controls and
+  review tab (VIEW, OWN, `parinn-run`): it ships today what plan
+  2610022338 plans. Only ParleyInn's core, the record, sits beneath whatever
   drives the harnesses; the lane view and T3 Code are rival surfaces.
-- Where Cairn differs is the lane as a shared channel: several agents
+- Where ParleyInn differs is the lane as a shared channel: several agents
   and several people in one lane, peer to peer, with endorsement. T3
   Code keeps one agent per thread and one person per environment.
 - Its handoff docs tell users to repeat important constraints by hand
-  after a switch: the gap Cairn's pins close (I3).
-- Its gaps are Cairn's pitch: no tamper evidence, no Origin or Host
+  after a switch: the gap ParleyInn's pins close (I3).
+- Its gaps are ParleyInn's pitch: no tamper evidence, no Origin or Host
   check on a port it also exposes remotely, telemetry and cloud
   services by default, no redaction, raw history recall, and full
   access as the default permission mode.

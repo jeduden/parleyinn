@@ -11,7 +11,7 @@ summary: >-
   **configuration** sit beside it: the principal's settings (§9.6). A change to
   configuration takes effect only once the widening act accepting it records
   its digest, except a change that only cuts; that acceptance adds, edits or
-  unpins its configuration pins (ADM-04). A repository's `.cairn.toml`, its
+  unpins its configuration pins (ADM-04). A repository's `.parinn.toml`, its
   **repository configuration**, declares no pins and may make only changes a
   cut act could make, never removing a pin from a restore block (ADM-04). Managed policy, configuration and repository configuration are the
   three **settings layers**. The **store** is the home's files containing the
@@ -35,7 +35,7 @@ summary: >-
 - **seq**: An event's position in its writer: strictly increasing, gap-free and
   never reused (REC-06).
 - **Address**: (writer, seq), shown as short `A2·4812` (its writer label and
-  seq), range `A2·4812–5025` or full `cairn:room/<room>/w/<writer>/<seq>`. Every
+  seq), range `A2·4812–5025` or full `parinn:room/<room>/w/<writer>/<seq>`. Every
   shown form is accepted wherever an address is taken, and so is one ASCII input
   form, `<label>:<seq>` or `<label>:<from>-<to>` (for example `A2:12`,
   `A2:30-40`), with the writer id accepted in place of the label (RCL-08). A
@@ -82,7 +82,7 @@ summary: >-
   structural fields⟦/f⟧.
 - **Origin**: How an event reached this node's record: `witnessed` (recorded
   live on this node: by its hook handlers, its CLI, TUI, MCP server⟦f:launcher⟧, launcher⟦/f⟧⟦f:browser-room-view⟧,
-  room-view component⟦/f⟧⟦f:bridges⟧ or bridge component⟦/f⟧) or `ingested` (appended by `cairn
+  room-view component⟦/f⟧⟦f:bridges⟧ or bridge component⟦/f⟧) or `ingested` (appended by `parinn
   ingest`, whatever transcript it reads, past an ingest marker included)⟦f:bundle-import⟧⟦f:export-bundles⟧,
   or `bundle` (read by import)⟦/f⟧⟦/f⟧⟦f:segment-exchange⟧, or `peer` (received ⟦f:peer-sync⟧from a peer⟦f:paired-phone⟧, a paired phone⟦/f⟧⟦f:git-carrier⟧ or
   ⟦/f⟧⟦/f⟧⟦f:git-carrier⟧through the git carrier⟦/f⟧)⟦/f⟧ (RCL-09); the trust policy reads only whether an
@@ -111,7 +111,7 @@ summary: >-
   into **tiers** of at most `k` **landmark blocks**, each a sequence of
   landmarks; a full tier collapses its older landmark blocks to one line each,
   listing one address range per writer, into the next tier (LMK-05).⟦/f⟧
-- **Structural field**: A field Cairn derives from an event's shape, never from
+- **Structural field**: A field ParleyInn derives from an event's shape, never from
   its text: ids, kinds, counts, tool names, key fingerprints, addresses, version
   numbers, sanitized paths and exit status, sanitized under LMK-03. Sanitized,
   it is trusted whatever the event's trust level (PRV-06, LMK-03).
@@ -126,9 +126,9 @@ summary: >-
   (I1): once it is back on, the hook handlers' ingest position moves past what
   the run wrote meanwhile.
 - **Ingest marker**: What a hook handler leaves when its hook budget cuts it
-  short, so the next hook handler or `cairn ingest` resumes it (NFR-02).
+  short, so the next hook handler or `parinn ingest` resumes it (NFR-02).
   **Ingest** is reading a transcript into the record, by the hook handlers
-  incrementally (REC-13) or by `cairn ingest`; what `cairn ingest` appends takes
+  incrementally (REC-13) or by `parinn ingest`; what `parinn ingest` appends takes
   origin `ingested` and is never recorded by the hook handlers, even past an
   ingest marker. A transcript source's **ingest position** is how far ingest has
   read it: a byte offset and a hash of the consumed prefix (REC-03).
@@ -148,7 +148,7 @@ summary: >-
   principal or managed policy, that purges content per room and provenance class
   after a time (I1, SEC-22); the principal's change to one is widening and
   applies only once its configuration is accepted (ADM-04).⟦/f⟧
-- **Flag**: A mark Cairn sets on an event whose text matches an injection
+- **Flag**: A mark ParleyInn sets on an event whose text matches an injection
   pattern (PRV-07), shown with the event on Runs and inside the envelope of any
   recall that returns it⟦f:landmarks⟧; flagged text contributes only counts to landmarks (LMK-04)⟦/f⟧.
 - **Quarantine**: Recorded, reversible exclusion of an event⟦f:landmarks⟧, span⟦/f⟧, run, writer
@@ -175,7 +175,7 @@ summary: >-
   VIEW-10 and SEC-27⟦f:purge-retention⟧; a **purge receipt** states what a purge erased and what it
   could not (SEC-31)⟦/f⟧.⟦/f⟧
 ⟦f:store-protection⟧- **Backup**: A copy of a home's store and audit log, with no seat, device⟦f:access-tokens⟧,
-  token⟦/f⟧ or at-rest key (ADM-06, SEC-10) (`cairn backup create`, ADM-06); reading
+  token⟦/f⟧ or at-rest key (ADM-06, SEC-10) (`parinn backup create`, ADM-06); reading
   it back is a backup restore. A backup restore takes a seat as a predecessor
   only once the seat's writer verifies, up to its newest seal, against a head
   receipt the principal kept apart; events past that seal, and every event of a
@@ -189,15 +189,15 @@ summary: >-
   agents, without the free text of cut or neutral principal acts, with full
   provenance, that downstream memory systems read (ADM-12,
   MEM-02); an export like a bundle (SEC-26).⟦/f⟧
-⟦f:export-bundles⟧- **Export**: Writing a bundle, a rendering or a trusted-only export (`cairn
+⟦f:export-bundles⟧- **Export**: Writing a bundle, a rendering or a trusted-only export (`parinn
   export`), a widening principal act under SEC-26. Its review step shows the
   acting principal, before it takes effect, what will leave, SEC-08 applied.⟦f:publishing⟧ To **publish** is to serve a
   room's bundle read-only through the publish component⟦f:work-rooms⟧, only as the room's
   visibility allows⟦/f⟧; a widening principal act under SEC-26, and stopping it is
   cut.⟦/f⟧⟦/f⟧
 ⟦f:export-bundles⟧- **Rendering**: A room rendered for people to read, with no keys or commitments
-  (`cairn export --rendering`, SEC-26).⟦/f⟧
-⟦f:bundle-import⟧⟦f:export-bundles⟧- **Import**: Reading a bundle into this node's record (`cairn import`, REC-23).⟦f:peer-sync⟧
+  (`parinn export --rendering`, SEC-26).⟦/f⟧
+⟦f:bundle-import⟧⟦f:export-bundles⟧- **Import**: Reading a bundle into this node's record (`parinn import`, REC-23).⟦f:peer-sync⟧
   A transcript is ingested and a peer's segments are received; neither is
   imported.⟦/f⟧⟦/f⟧⟦/f⟧
 ⟦f:compute-kernel⟧- **Kernel**: The hermetic compute environment in which an agent runs code over

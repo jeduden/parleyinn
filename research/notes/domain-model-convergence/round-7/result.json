@@ -84,8 +84,8 @@
     {
      "type": "security",
      "file": "docs/domain-model/pins-and-context.md",
-     "quote": "or Cairn detected (a derived artifact over its creating `user` event,",
-     "problem": "Only an agent's pin candidate has to be shown marked untrusted. A candidate Cairn detects over an untrusted `user` event (in automation mode, or from an ingested transcript an agent can hand to `cairn ingest`) is shown at confirmation with no trust mark. Untrusted text can then become a trusted device-seat constraint that restores verbatim, through a confirmation that looks like the principal's own words.",
+     "quote": "or ParleyInn detected (a derived artifact over its creating `user` event,",
+     "problem": "Only an agent's pin candidate has to be shown marked untrusted. A candidate ParleyInn detects over an untrusted `user` event (in automation mode, or from an ingested transcript an agent can hand to `parinn ingest`) is shown at confirmation with no trust mark. Untrusted text can then become a trusted device-seat constraint that restores verbatim, through a confirmation that looks like the principal's own words.",
      "fix": "After the agent-candidate sentence add: \"A detected pin candidate is shown with its creating event's provenance and trust level, marked untrusted where that event is, in every list of pin candidates and at its confirmation (PIN-05).\"",
      "severity": "needs-fix"
     },
@@ -118,7 +118,7 @@
      "file": "docs/domain-model/pins-and-context.md",
      "quote": "by its device seat on that node (PIN-01), which takes effect only once the",
      "problem": "A configuration pin restores verbatim as trusted text once its configuration's digest is accepted. Unlike a pin candidate or a stamp, nothing requires showing the principal its exact text, type and priority first, except the dormant Setup surface. A declared pin still awaiting acceptance is shown nowhere either, so a constraint the principal configured can silently never restore.",
-     "fix": "\"...which takes effect only once the principal's widening act accepting that configuration, taken after it is shown each declared pin's exact text, pin type and priority, records its digest; until then `cairn status` shows it as awaiting acceptance.\"",
+     "fix": "\"...which takes effect only once the principal's widening act accepting that configuration, taken after it is shown each declared pin's exact text, pin type and priority, records its digest; until then `parinn status` shows it as awaiting acceptance.\"",
      "severity": "minor"
     },
     {
@@ -134,7 +134,7 @@
      "file": "docs/domain-model/record.md",
      "quote": "**Gap marker**: What stands where content is missing: a tombstone for a purged",
      "problem": "The gap markers form a closed list: tombstone, quarantine marker and truncation marker. A capture gap, such as a run's events while capture was paused or off, gets no marker. Recall then returns the run's history with an unmarked hole, which the agent takes as exact history.",
-     "fix": "Extend the list: \"..., a truncation marker on capped kernel output, or a capture-gap marker where a run's capture was off or paused, or a gap Cairn detected.\"",
+     "fix": "Extend the list: \"..., a truncation marker on capped kernel output, or a capture-gap marker where a run's capture was off or paused, or a gap ParleyInn detected.\"",
      "severity": "minor"
     }
    ]
@@ -161,9 +161,9 @@
     {
      "type": "useless",
      "file": "docs/domain-model/components-and-surfaces.md",
-     "quote": "`cairn status` shows Health's counters and store locations (ADM-11)",
+     "quote": "`parinn status` shows Health's counters and store locations (ADM-11)",
      "problem": "In M1 to M5 the Needs you surface is dormant with the room view, and the CLI list that stands in for it shows no Needs you item. An overlap (LANE-13) does nothing except raise a Needs you item, so no person ever sees it and 'acknowledge an overlap' has nothing to act on. The same is true of a list removal's LANE-26 item. A run's join request needs its principal's acceptance, but no M1 to M5 place shows it to that principal.",
-     "fix": "\"`cairn status` shows Health's counters, store locations, the Needs you queue's items and pending join requests (ADM-11)\".",
+     "fix": "\"`parinn status` shows Health's counters, store locations, the Needs you queue's items and pending join requests (ADM-11)\".",
      "severity": "needs-fix"
     },
     {
@@ -240,7 +240,7 @@
     "index": 2,
     "theme": "NEW-9",
     "kind": "new",
-    "reason": "Nearest is DM-DF (fixed), whose closing text is the quoted `cairn status` sentence covering counters and store locations. The finding shows it is incomplete for Needs you items and pending join requests in M1 to M5. DM-U covers only the I10 derivation of a quota item."
+    "reason": "Nearest is DM-DF (fixed), whose closing text is the quoted `parinn status` sentence covering counters and store locations. The finding shows it is incomplete for Needs you items and pending join requests in M1 to M5. DM-U covers only the I10 derivation of a quota item."
    }
   ],
   "new_themes": [
@@ -256,8 +256,8 @@
    },
    {
     "id": "NEW-3",
-    "title": "A pin candidate Cairn detected is shown at confirmation with no provenance or trust mark, so untrusted text could be confirmed as a trusted constraint",
-    "settled_by": "PIN-05 (SRS): Cairn detects candidates only over trusted `user` events (PRV-02, PRV-04), so none arises from an untrusted `user` or ingested event. The model's Pin candidate entry omits the word trusted."
+    "title": "A pin candidate ParleyInn detected is shown at confirmation with no provenance or trust mark, so untrusted text could be confirmed as a trusted constraint",
+    "settled_by": "PIN-05 (SRS): ParleyInn detects candidates only over trusted `user` events (PRV-02, PRV-04), so none arises from an untrusted `user` or ingested event. The model's Pin candidate entry omits the word trusted."
    },
    {
     "id": "NEW-4",
@@ -282,12 +282,12 @@
    {
     "id": "NEW-8",
     "title": "Which room the pin made by a confirmed pin candidate belongs to, and which room's intent an intent or criterion candidate versions, is unstated",
-    "settled_by": "none. PIN-10 defaults a pin to its principal's personal room, but `pin_candidate_propose` carries no room and PIN-05, LANE-20 and `cairn pin-candidate confirm` do not say which room a confirmed candidate or an intent candidate lands in."
+    "settled_by": "none. PIN-10 defaults a pin to its principal's personal room, but `pin_candidate_propose` carries no room and PIN-05, LANE-20 and `parinn pin-candidate confirm` do not say which room a confirmed candidate or an intent candidate lands in."
    },
    {
     "id": "NEW-9",
     "title": "In M1 to M5 nothing shows a person the Needs you queue's items or pending join requests",
-    "settled_by": "12-delivery-plan (SRS) ships VIEW-05, LANE-13, LANE-23's join-request rest, LANE-26 and ADM-15 in M7, so none of these raises a Needs you item before M7. 09a already lists `cairn needs-you list` and `cairn join-request accept|decline`. The model's Room view entry does not list them."
+    "settled_by": "12-delivery-plan (SRS) ships VIEW-05, LANE-13, LANE-23's join-request rest, LANE-26 and ADM-15 in M7, so none of these raises a Needs you item before M7. 09a already lists `parinn needs-you list` and `parinn join-request accept|decline`. The model's Room view entry does not list them."
    }
   ]
  }

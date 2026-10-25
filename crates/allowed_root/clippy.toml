@@ -1,0 +1,65 @@
+# The core executable's reach (SEC-01, ENG-16): the core (B0) opens no
+# socket and starts no program but its own kernel worker (CMP-05),
+# which joins with its own crate and an entry here under review. clippy
+# reads this file for this crate alone, so it repeats the workspace's
+# clippy.toml.
+allow-unwrap-in-tests = true
+allow-expect-in-tests = true
+allow-panic-in-tests = true
+
+# Small functions (CLAUDE.md): the ceilings for the complexity lints
+# the workspace lints deny. A function's cognitive complexity, its
+# lines of code (comments and blank lines left out), a block's nesting
+# depth and a function's bool parameters. The engineering gate test
+# `every_crate_holds_the_complexity_limits` refuses a higher one.
+cognitive-complexity-threshold = 15
+too-many-lines-threshold = 80
+excessive-nesting-threshold = 5
+max-fn-params-bools = 3
+
+disallowed-types = [
+  { path = "std::net::TcpListener", reason = "the core opens no socket (SEC-01)" },
+  { path = "std::net::TcpStream", reason = "the core opens no socket (SEC-01)" },
+  { path = "std::net::UdpSocket", reason = "the core opens no socket (SEC-01)" },
+  { path = "std::os::unix::net::UnixDatagram", reason = "the core opens no socket (SEC-01)" },
+  { path = "std::os::unix::net::UnixListener", reason = "the core opens no socket (SEC-01)" },
+  { path = "std::os::unix::net::UnixStream", reason = "the core opens no socket (SEC-01)" },
+  { path = "std::process::Command", reason = "the core starts no program but its kernel worker (SEC-01, CMP-05)" },
+  { path = "std::collections::HashMap", reason = "its order is random per process; use BTreeMap (I10)" },
+  { path = "std::collections::HashSet", reason = "its order is random per process; use BTreeSet (I10)" },
+  { path = "std::hash::RandomState", reason = "a random seed breaks a rebuild (I10)" },
+]
+
+# Derived artifacts read no clock and no random order (I10, ENG-03):
+# a rebuild reproduces their content exactly. A call site that must read a clock,
+# such as one stamping a structural event, says so with
+# an `expect` of the `disallowed_methods` lint and a reason, under review.
+# BTreeMap and BTreeSet keep a stable order where the hash collections
+# would not.
+#
+# Every blocking operation takes a deadline (ENG-03). The calls below
+# wait on another thread, process or file lock with none, so each names
+# the form that takes one. A site that has to block says so the same
+# way, with a reason, under review. Local file reads and writes are not
+# banned: the disk bounds them and the hook's time budget covers them
+# (I9). `std::thread::sleep` carries its own bound, and the in-process
+# `Mutex` and `RwLock` guard short critical sections.
+disallowed-methods = [
+  { path = "std::time::SystemTime::now", reason = "derived artifacts read no clock (I10)" },
+  { path = "std::time::Instant::now", reason = "derived artifacts read no clock (I10)" },
+  { path = "std::sync::mpsc::Receiver::recv", reason = "it waits with no deadline; use recv_timeout (ENG-03)" },
+  { path = "std::sync::mpsc::Receiver::iter", reason = "it waits with no deadline; loop on recv_timeout (ENG-03)" },
+  { path = "std::sync::mpsc::SyncSender::send", reason = "it waits on a full channel with no deadline; use try_send (ENG-03)" },
+  { path = "std::sync::Condvar::wait", reason = "it waits with no deadline; use wait_timeout (ENG-03)" },
+  { path = "std::sync::Condvar::wait_while", reason = "it waits with no deadline; use wait_timeout_while (ENG-03)" },
+  { path = "std::sync::Barrier::wait", reason = "it waits with no deadline; coordinate over a channel and recv_timeout (ENG-03)" },
+  { path = "std::thread::JoinHandle::join", reason = "it waits with no deadline; have the thread send its result and recv_timeout, then join once is_finished (ENG-03)" },
+  { path = "std::thread::park", reason = "it waits with no deadline; use park_timeout (ENG-03)" },
+  { path = "std::process::Child::wait", reason = "it waits with no deadline; poll try_wait up to a deadline (ENG-03)" },
+  { path = "std::process::Child::wait_with_output", reason = "it waits with no deadline; poll try_wait up to a deadline (ENG-03)" },
+  { path = "std::process::Command::output", reason = "it waits with no deadline; spawn and poll try_wait up to a deadline (ENG-03)" },
+  { path = "std::process::Command::status", reason = "it waits with no deadline; spawn and poll try_wait up to a deadline (ENG-03)" },
+  { path = "std::fs::File::lock", reason = "it waits for another process with no deadline; poll try_lock up to a deadline (ENG-03)" },
+  { path = "std::fs::File::lock_shared", reason = "it waits for another process with no deadline; poll try_lock_shared up to a deadline (ENG-03)" },
+  { path = "std::io::stdin", reason = "a read of it waits with no deadline; read on a thread and recv_timeout (ENG-03)" },
+]

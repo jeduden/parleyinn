@@ -5,6 +5,8 @@
 //! - [`suite`] registers each benchmark against the NFR id it measures
 //!   toward, and declares each NFR id ENG-15 names that has no
 //!   benchmark of real code yet, with what it waits on.
+//! - [`fixture`] makes what a benchmark's core runs over: a fresh home
+//!   holding a transcript, for ingestion.
 //! - [`measure`] times one sample of a benchmark.
 //! - [`samples`] is the file format the samples travel in, one sample
 //!   per line.
@@ -17,6 +19,7 @@
 
 pub mod accepted;
 pub mod cli;
+pub mod fixture;
 pub mod gate;
 pub mod measure;
 pub mod samples;

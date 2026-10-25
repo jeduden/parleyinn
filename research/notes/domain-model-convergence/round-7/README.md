@@ -9,7 +9,7 @@ closed theme; each formed a new theme, closed as follows (`verify.json`).
 | DM-DL | deferred: OQ-47, M8 (`later`: retiring a writer before PRV-10)            |
 | DM-DM | deferred: OQ-47, M7 (a kept cut act and a lapsed rule-level loosening)    |
 | DM-DN | fixed: a nested harness session's input is `harness_text` (PRV-08)        |
-| DM-DO | fixed: Cairn detects pin candidates only in trusted `user` events         |
+| DM-DO | fixed: ParleyInn detects pin candidates only in trusted `user` events     |
 | DM-DP | fixed: the model defines `harness_text` (PRV-08)                          |
 | DM-DQ | fixed: a quarantine or purge resets kernel variables (CMP-07)             |
 | DM-DR | fixed: the model carries ADM-04's full set of held changes                |

@@ -1,7 +1,7 @@
 # Spike S7 report: rmcp or an in-house MCP server
 
-Spike S7 asks how `cairn mcp` speaks MCP over stdio: through the Rust
-MCP SDK `rmcp` with HTTP off, or through a minimal server of Cairn's
+Spike S7 asks how `parinn mcp` speaks MCP over stdio: through the Rust
+MCP SDK `rmcp` with HTTP off, or through a minimal server of ParleyInn's
 own (§9.2, §12.1). The decision record is ADR-2610102211.
 
 ## Decision
@@ -14,7 +14,7 @@ client. The reach decides:
 - `rmcp` puts 50 crates in the core executable's normal dependency
   graph, among them `tokio`, `tokio-util`, `futures`, `chrono`,
   `uuid`, `getrandom` and `schemars`. The reach test
-  ([reach.rs](../../crates/cairn/tests/reach.rs)) would need an entry
+  ([reach.rs](../../crates/parinn/tests/reach.rs)) would need an entry
   for each.
 - The in-house server puts 5 there: `serde_json` and its own
   `serde_core`, `itoa`, `memchr` and `zmij`.
@@ -34,7 +34,7 @@ a millisecond.
   1.53.2 with `rt`, `macros`, `io-std` and `time`; and an in-house
   server on `serde_json` 1.0.152 and std threads.
 - Both stubs live in [spike](spike/), each a standalone crate outside
-  the cairn workspace: [sdk](spike/sdk/src/main.rs) and
+  the parinn workspace: [sdk](spike/sdk/src/main.rs) and
   [inhouse](spike/inhouse/src/main.rs). Each serves one tool,
   `event_search`, whose answer is a stub envelope with
   `structuredContent` and the same JSON as a text block. The query
@@ -91,7 +91,7 @@ Neither binary imports `socket`, `connect`, `bind`, `listen`, `accept`,
 
 ## What the in-house server must carry
 
-The stub is the whole protocol surface `cairn mcp` needs for §9.2:
+The stub is the whole protocol surface `parinn mcp` needs for §9.2:
 `initialize` with version negotiation, `notifications/initialized`,
 `ping`, `tools/list`, `tools/call` with structured content and
 `isError`, and `notifications/cancelled`. M1 adds, beyond the stub:
@@ -113,4 +113,4 @@ The stub is the whole protocol surface `cairn mcp` needs for §9.2:
 - The import-closure test is the Rust reach test now. The spike
   measured each stub's graph by the same rule, normal edges from the
   root, with `cargo tree -e normal`, rather than linking either into
-  `cairn` before M1 needs it.
+  `parinn` before M1 needs it.

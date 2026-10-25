@@ -26,7 +26,7 @@ happen" (L13), "Multiplayer" (L14) and "a live, multiplayer PR" (L30).
 
 **Conflicting sources:**
 
-- `docs/srs/01-introduction.md:38`: I4 says "**Cairn** never talks to
+- `docs/srs/01-introduction.md:38`: I4 says "**ParleyInn** never talks to
   the network". Its meaning column says "No listening sockets, no
   outbound connections … Data leaves the machine **only** when Claude
   receives recalled content through a tool call."
@@ -39,24 +39,24 @@ happen" (L13), "Multiplayer" (L14) and "a live, multiplayer PR" (L30).
   provenance-gated sharing design first (OQ-07)".
 - `docs/srs/04-reference-architecture.md:98`: ADR-01, "Daemonless". It
   removes "the port, token, stale-daemon, and wedged-daemon failure
-  classes". `cairn-sync` is a resident process on every host, and the
+  classes". `parinn-sync` is a resident process on every host, and the
   relay and the lane server are servers.
-- `plan/2610022338_cairn-network-side/plan.md:31`: "I4 is about the
+- `plan/2610022338_parinn-network-side/plan.md:31`: "I4 is about the
   core binary, not the project". The plan rewrites the invariant rather
   than meeting it.
 
-**Conflict.** As written, I4 is a property of Cairn and of the machine:
+**Conflict.** As written, I4 is a property of ParleyInn and of the machine:
 data leaves only through recall to the model provider. A live,
 multiplayer lane means the record leaves the machine continuously,
-through `cairn-sync` to a relay and on to other people's nodes. The
+through `parinn-sync` to a relay and on to other people's nodes. The
 pitch's sentence is literally true of the planned design, because the
 core reads an inbox and never opens a socket. But it gets there by
-moving the boundary from "Cairn" to "the core that feeds the model".
+moving the boundary from "ParleyInn" to "the core that feeds the model".
 The pitch then offers that narrower boundary as if it were the
-contract. If the project ships `cairn-relay`, `cairn-sync` and a lane
+contract. If the project ships `parinn-relay`, `parinn-sync` and a lane
 server, SEC-01 is broken, since those are shipped binaries. The
 network plan does admit the SRS change must come first
-(`plan/2610022338_cairn-network-side/plan.md:65-67`). The pitch does
+(`plan/2610022338_parinn-network-side/plan.md:65-67`). The pitch does
 not admit it.
 
 **Minimal fix.** Pick one:
@@ -66,7 +66,7 @@ not admit it.
   CON-04 to "the core binary". Lift NG4, and settle ADR-01 for the
   sync agent. All of this goes through security review and a major
   version, as CLAUDE.md requires.
-- **Rewording.** Say "Cairn's core never touches the network; optional,
+- **Rewording.** Say "ParleyInn's core never touches the network; optional,
   separately reviewed companions move sealed, encrypted segments
   between machines", and mark live sharing as post-v1.
 
@@ -90,10 +90,10 @@ pitch's implied trust rule.
 - `docs/srs/05-functional-requirements.md:43`: PRV-05 says
   "Configuration MUST NOT be able to classify any provenance class as
   trusted beyond PRV-02."
-- `plan/2610012322_cairn-for-agent-fleets/plan.md:55-56` and
-  `plan/2610022338_cairn-network-side/plan.md:83-84` both adopt the
+- `plan/2610012322_parinn-for-agent-fleets/plan.md:55-56` and
+  `plan/2610022338_parinn-network-side/plan.md:83-84` both adopt the
   rule "only the lane owner's messages are trusted".
-- `plan/2610022338_cairn-network-side/plan.md:44-46`: "A compromised
+- `plan/2610022338_parinn-network-side/plan.md:44-46`: "A compromised
   network component can only deliver bytes … treats every foreign
   event as untrusted".
 
@@ -159,7 +159,7 @@ and ADR-03 rule out. So either:
 
 - agents never notice collaborators, and "chat" and "work together"
   become comments the agent may or may not read; or
-- Cairn adds a push notification. That is an automatic path, and even
+- ParleyInn adds a push notification. That is an automatic path, and even
   a sanitized one is a new injection surface that needs an SRS change.
 
 And when the agent does read a collaborator's message, SEC-13 taints
@@ -173,7 +173,7 @@ contradiction holds.
 **Minimal fix.** A design decision, plus rewording:
 
 - Decide whether a structural, `TrustedText`-only "N unread lane
-  messages; call `cairn.lane_messages`" notice is allowed. If it is,
+  messages; call `parinn.lane_messages`" notice is allowed. If it is,
   it needs its own requirement, a scenario and an audit trail, along
   the lines of INJ-04.
 - Reword the bullet: "Chat: people post to the lane; agents read posts
@@ -190,12 +190,12 @@ from the code" (L30-31).
 
 **Conflicting sources:**
 
-- `plan/2610012322_cairn-for-agent-fleets/plan.md:24-27`: "the
+- `plan/2610012322_parinn-for-agent-fleets/plan.md:24-27`: "the
   conversation and the code changes in one order, **never two
   histories joined by a link**. Git stays where code lands." The plan
   contradicts itself: once code lands in git, git's history and the
   record are two histories, joined by landed commit ids (`plan.md:53`).
-- `plan/2610012322_cairn-for-agent-fleets/plan.md:50-52`: the plan
+- `plan/2610012322_parinn-for-agent-fleets/plan.md:50-52`: the plan
   itself cites "links broken by squash".
 - `research/notes/agent-session-storage-sweep/catalog.md:367-371`,
   Lesson 9: attribution is "a derived index with **typed
@@ -204,7 +204,7 @@ from the code" (L30-31).
   link from evidence the record already holds, and never depend on a
   trailer.
 
-**Conflict.** After landing, git is a second history that Cairn does
+**Conflict.** After landing, git is a second history that ParleyInn does
 not control. Many things change code without the record seeing them:
 
 - a squash merge or rebase on the forge, which creates a SHA the
@@ -261,8 +261,8 @@ can be erased by key" (L26-27).
   and `:280`: data keys are wrapped to every authorised device, and "a
   revoked device keeps what it had". Key loss leaves an unresolved
   choice between I1 and I9.
-- Neither `plan/2610012322_cairn-for-agent-fleets/plan.md` nor
-  `plan/2610022338_cairn-network-side/plan.md` has a task for a
+- Neither `plan/2610012322_parinn-for-agent-fleets/plan.md` nor
+  `plan/2610022338_parinn-network-side/plan.md` has a task for a
   keystore or for shredding.
 
 **Conflict.**
@@ -279,7 +279,7 @@ can be erased by key" (L26-27).
   - the model provider got whatever was recalled;
   - anything that became code is in git.
 
-   Within one lane, "erased by key" means "erased where Cairn has
+   Within one lane, "erased by key" means "erased where ParleyInn has
    custody, on devices not yet revoked".
 4. **No plan builds the feature.**
 
@@ -296,7 +296,7 @@ suspicion is dropped, and the unsalted-hash part stands.
   kept outside the record, and a shred that deletes the ciphertext and
   appends a signed tombstone. Add a plan task for it.
 - **Rewording.** "Sensitive content can be crypto-shredded wherever
-  Cairn holds it; copies already sent to the model, pushed to git or
+  ParleyInn holds it; copies already sent to the model, pushed to git or
   held by other participants cannot be recalled."
 
 ---
@@ -321,7 +321,7 @@ run and every result" (L5-6).
   resumed sessions copy messages into new files.
 - `docs/srs/02-context.md:43-44`: ASM-04 (transcripts can be truncated
   or rewritten) and ASM-05 (they can be deleted after 30 days).
-- `plan/2610012322_cairn-for-agent-fleets/plan.md:39-40`: sandboxes
+- `plan/2610012322_parinn-for-agent-fleets/plan.md:39-40`: sandboxes
   are reclaimed, but §2.2 assumes durable volumes.
 - `docs/srs/09-interfaces.md:24`: `SessionEnd` gets about 1 s ("ingests
   what fits"). `docs/srs/04-reference-architecture.md:106`, ADR-09:
@@ -364,7 +364,7 @@ they happen" (L13).
   ("SHOULD").
 - `plan/2609292012_m1-record-and-recall.md:40-42`: M1 batches a hook's
   events into one commit for throughput.
-- `plan/2610022338_cairn-network-side/plan.md:90`: the gate is "in
+- `plan/2610022338_parinn-network-side/plan.md:90`: the gate is "in
   under 5 s", for a **sealed** segment.
 - `research/notes/agent-session-storage-sweep/catalog.md:113-115`: a
   file watcher is "real time on one machine and nowhere else".
@@ -385,7 +385,7 @@ the durable record").
 
 ## F8. The headline product, a live PR with a web interface, is a v1 non-goal, and the research recommended against building it (serious)
 
-**Pitch:** "Cairn is the live pull request for the agent era" (L3).
+**Pitch:** "ParleyInn is the live pull request for the agent era" (L3).
 "Interactive results … live views you can explore" (L16-17). "one
 click away" (L20).
 
@@ -398,16 +398,16 @@ click away" (L20).
   recovery after compaction are the core loop
   (`04-reference-architecture.md:70-83`). The pitch mentions neither.
 - `research/reports/custom-storage-git-and-chat-interfaces.md:3`:
-  "Cairn should own its storage and its keys, but not the network, and
+  "ParleyInn should own its storage and its keys, but not the network, and
   it should not become a forge or a chat server". `:301`: "Owning the
-  network is not Cairn's job; I4 forbids it". `:282` lists "Scope
+  network is not ParleyInn's job; I4 forbids it". `:282` lists "Scope
   creep" as a risk, noting that Buzz needs Postgres, Redis and object
   storage.
 - `research/reports/agent-session-storage-beyond-git.md:167`:
   "Real-time sharing is a separate product, the relay".
 - `research/notes/agent-session-storage-sweep/catalog.md:377-384`,
   Lesson 11: "The local record must outlive every vendor and every
-  share link". `plan/2610022338_cairn-network-side/plan.md:19-20`:
+  share link". `plan/2610022338_parinn-network-side/plan.md:19-20`:
   components "built and run by this project".
 
 **Conflict.** The pitch leads with the very things that:
@@ -426,24 +426,24 @@ pins, recovery after compaction).
   identity, lifts NG5 for a separate binary, and records why the
   research's "not a chat server" advice is overridden.
 - **Rewording.** Lead with the context layer, and offer the live lane
-  as a planned companion: "Cairn keeps every lane's exact history safe
+  as a planned companion: "ParleyInn keeps every lane's exact history safe
   to recall; a separately built lane server can show it live."
 
 ---
 
 ## F9. The pitch says "is", but nothing it describes has a requirement id, and every plan behind it is 🔲 (serious)
 
-**Pitch:** "Cairn is the live pull request" (L3). "A Cairn lane is
+**Pitch:** "ParleyInn is the live pull request" (L3). "A ParleyInn lane is
 live" (L9-10). "It is built so that" (L23).
 
 **Conflicting sources:**
 
 - `CLAUDE.md`, Project: "Status: pre-implementation".
-- `plan/2610012322_cairn-for-agent-fleets/phase-1.md:9`: "No SRS id
+- `plan/2610012322_parinn-for-agent-fleets/phase-1.md:9`: "No SRS id
   closes, and no scenario leaves `@pending`". The lane, its identity
   and the owner trust model are still only a proposal
   (`plan.md:98-101`).
-- `plan/2610022338_cairn-network-side/phase-1.md:9-11`: "None closes
+- `plan/2610022338_parinn-network-side/phase-1.md:9-11`: "None closes
   yet". Phase 1 proves only that a relay can exchange segments.
   Chat, presence, result views and the public host are unphased
   tasks 4–6.
@@ -455,7 +455,7 @@ SRS. Under CLAUDE.md's reporting rule, a capability exists only when
 its scenario is off `@pending`. None of these even has a scenario.
 
 **Minimal fix.** Reword into the future tense, or as a design target
-("Cairn is designed to …"), and name the release that carries each
+("ParleyInn is designed to …"), and name the release that carries each
 feature.
 
 ---
@@ -538,7 +538,7 @@ tamper-evident" (L26-27).
   turns 'the log is consistent today' into 'the log has been
   consistent since you started watching'". `:148`, rule 5: keys must
   be "pinned out of band".
-- `plan/2610022338_cairn-network-side/plan.md:42`: the public host
+- `plan/2610022338_parinn-network-side/plan.md:42`: the public host
   serves bundles read-only. Nothing in the plans makes them searchable
   by third parties.
 
@@ -570,7 +570,7 @@ hidden".
 - `research/notes/agent-session-storage-sweep/catalog.md:330-334`,
   Lesson 3: "One writer per chain … merge only at read time into a
   rebuildable index".
-- `plan/2610012322_cairn-for-agent-fleets/plan.md:65-71`: the record is
+- `plan/2610012322_parinn-for-agent-fleets/plan.md:65-71`: the record is
   per-origin log segments, and the index is a local SQLite database.
 
 **Conflict.** A multi-writer lane is many records, one per origin,
@@ -592,8 +592,8 @@ its worktree, its agents and its humans, held as one record" (L3-5).
 **Conflicting sources:**
 
 - `docs/srs/01-introduction.md:42`: I8 says "All state is bound to one
-  tenant's home … Cairn refuses to operate on state it does not own."
-  Imported segments from other people are state Cairn does not own.
+  tenant's home … ParleyInn refuses to operate on state it does not own."
+  Imported segments from other people are state ParleyInn does not own.
 - `docs/srs/08-data-and-storage.md:22`: a project is keyed by
   "SHA-256(canonical project path)", so worktrees hash to separate
   stores (acknowledged in `plan/2610012322…/plan.md:37-38`).

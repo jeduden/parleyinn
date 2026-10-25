@@ -43,6 +43,9 @@ fn defaults_apply_when_no_layer_sets_a_key() {
     assert!(!s.risk_acceptance_forbidden());
     assert_eq!(s.get("recall.max_k"), Some(&Value::Integer(50)));
     assert_eq!(s.get("home.id"), None);
+    assert_eq!(s.texts("transcript.roots"), ["~/.claude/projects"]);
+    assert!(s.texts("redaction.extra_patterns").is_empty());
+    assert!(s.texts("recall.max_k").is_empty());
     assert_eq!(s.iter().count(), 17);
     assert!(resolved.ignored.is_empty() && resolved.awaiting_acceptance.is_empty());
 }

@@ -1,5 +1,5 @@
 local counts = {}
-for _, e in ipairs(cairn.events()) do
+for _, e in ipairs(parinn.events()) do
   if e.kind == "message" and e.provenance == "user" then
     local ts = math.tointeger(e.ts) or math.floor(e.ts)
     local h = (ts // 3600) % 24

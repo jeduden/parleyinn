@@ -17,12 +17,12 @@ T1 Same-OS-user boundary (finding 6, and minor 10): the SRS (§6.1) accepts
    that a run's tool process running unsandboxed as its principal's own OS
    user can do what that user can do, under residual risks R1–R7; only a
    sandbox removes them. Say this once, in Principal surface: ancestry is
-   the test Cairn applies; a run's tool process that drives a CLI or TUI
+   the test ParleyInn applies; a run's tool process that drives a CLI or TUI
    through a process it did not start (a terminal multiplexer, a scheduler,
-   keys sent to an open TUI) or writes the store outside Cairn's code is
+   keys sent to an open TUI) or writes the store outside ParleyInn's code is
    §6.1's residual risk (R1, R3, R7), which only a sandbox removes. Extend
    the R3 sentence in Principal act to "writes to the store, or signs with
-   this node's device key or a seat key, outside Cairn's code". Do not
+   this node's device key or a seat key, outside ParleyInn's code". Do not
    invent authentication.
 T2 Harness-started roles (findings 1, 7, and minor 9): only a process the
    harness itself starts from its configuration runs as a hook handler,
@@ -50,8 +50,8 @@ T5 Create room in core (finding 12): create room is taken only once per
 
 - #2: a value in managed policy or repository configuration that is not
   cut-only is not applied; it is counted and shown on Setup (I6), and
-  Cairn never rewrites the policy itself.
-- #4: while capture is off, `cairn ingest` appends nothing for this node's
+  ParleyInn never rewrites the policy itself.
+- #4: while capture is off, `parinn ingest` appends nothing for this node's
   witnessed runs.
 - #5: settled by T5 (every pin belongs to the personal room in core).
 - #11: "kinds" on closed paths means event kinds, seat kinds, pin types and

@@ -17,7 +17,7 @@ export const meta = {
 const { ga, work, repo, branch, ver, gen, k, trailer } = args
 const next = ver + 1
 const tag = `v${ver}-ga${gen}`
-const env = `CAIRN_REPO=${repo}`
+const env = `PARINN_REPO=${repo}`
 
 const NAMES = { type: 'object', properties: { cands: { type: 'array', items: { type: 'string' } }, surrogate: { type: 'string' } }, required: ['cands', 'surrogate'] }
 const FINDINGS = {

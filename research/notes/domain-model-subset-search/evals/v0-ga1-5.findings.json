@@ -2,7 +2,7 @@
  {
   "type": "undefined",
   "quote": "own entry point, which the person, a service manager or an ephemeral node's",
-  "problem": "\"Ephemeral node\" is used as a Cairn term but never defined; Node is defined only as one home on one machine, container or cloud environment, with no notion of an ephemeral one.",
+  "problem": "\"Ephemeral node\" is used as a ParleyInn term but never defined; Node is defined only as one home on one machine, container or cloud environment, with no notion of an ephemeral one.",
   "fix": "Replace with \"a cloud environment's entrypoint\", or define ephemeral node under Node.",
   "severity": "minor",
   "lens": "all",

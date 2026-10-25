@@ -1,17 +1,28 @@
 use super::*;
+use crate::key_store::{Entry, FileKeyStore};
 use crate::random::Counted;
 use crate::signing::DeviceKey;
 use testkit::TempDir;
 
+/// The key store of `dir`, and the file its device key is kept in.
+fn kept(dir: &TempDir) -> (FileKeyStore, std::path::PathBuf) {
+    let store = FileKeyStore::new(dir.path().to_path_buf());
+    let path = store.path(&Entry::device());
+    (store, path)
+}
+
 #[test]
 fn a_saved_key_loads_back_from_a_file_only_its_owner_reads() {
     let dir = TempDir::new().unwrap();
-    let path = dir.path().join("device.key");
+    let (store, path) = kept(&dir);
     let key = DeviceKey::mint(&mut Counted::default()).unwrap();
 
-    key.save(&path).unwrap();
+    key.keep(&store, &Entry::device()).unwrap();
 
-    assert_eq!(DeviceKey::load(&path).unwrap().public(), key.public());
+    assert_eq!(
+        DeviceKey::fetch(&store, &Entry::device()).unwrap().public(),
+        key.public()
+    );
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
@@ -23,11 +34,17 @@ fn a_saved_key_loads_back_from_a_file_only_its_owner_reads() {
 #[test]
 fn a_key_file_is_never_overwritten() {
     let dir = TempDir::new().unwrap();
-    let path = dir.path().join("device.key");
+    let (store, path) = kept(&dir);
     let mut e = Counted::default();
-    DeviceKey::mint(&mut e).unwrap().save(&path).unwrap();
+    DeviceKey::mint(&mut e)
+        .unwrap()
+        .keep(&store, &Entry::device())
+        .unwrap();
 
-    let err = DeviceKey::mint(&mut e).unwrap().save(&path).unwrap_err();
+    let err = DeviceKey::mint(&mut e)
+        .unwrap()
+        .keep(&store, &Entry::device())
+        .unwrap_err();
 
     assert!(matches!(err, KeyError::File { .. }), "{err}");
     assert!(
@@ -40,12 +57,12 @@ fn a_key_file_is_never_overwritten() {
 #[test]
 fn a_missing_or_malformed_key_file_is_refused() {
     let dir = TempDir::new().unwrap();
-    let path = dir.path().join("device.key");
-    assert!(matches!(DeviceKey::load(&path), Err(KeyError::File { .. })));
+    let (store, path) = kept(&dir);
+    assert!(matches!(read_secret(&path), Err(KeyError::File { .. })));
 
     write_secret(&path, "not hex").unwrap();
     assert!(matches!(
-        DeviceKey::load(&path),
+        DeviceKey::fetch(&store, &Entry::device()),
         Err(KeyError::Malformed(_))
     ));
 }
@@ -55,14 +72,14 @@ fn a_missing_or_malformed_key_file_is_refused() {
 fn a_key_file_others_can_read_is_refused() {
     use std::os::unix::fs::PermissionsExt;
     let dir = TempDir::new().unwrap();
-    let path = dir.path().join("device.key");
+    let (store, path) = kept(&dir);
     DeviceKey::mint(&mut Counted::default())
         .unwrap()
-        .save(&path)
+        .keep(&store, &Entry::device())
         .unwrap();
     fs::set_permissions(&path, fs::Permissions::from_mode(0o644)).unwrap();
 
-    let err = DeviceKey::load(&path).unwrap_err();
+    let err = DeviceKey::fetch(&store, &Entry::device()).unwrap_err();
 
     assert!(
         matches!(err, KeyError::Permissions { mode: 0o644, .. }),

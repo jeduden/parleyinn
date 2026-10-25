@@ -47,7 +47,8 @@ review** (only after the principal act of OWN-21 marking the room ready),
 **Quiet** (never while a run is `unrecorded` or `behind`, VIEW-04). The
 pull-request states a forge reports (Pre-review, In review, Changes requested,
 Approved, Queued, Merging) live on the pull-request pill (P2, LANE-08), marked
-`asserted`, not in the room status; Cairn keeps no approval state of its own. A
+`asserted`, not in the room status; ParleyInn keeps no approval state of its
+own. A
 check's check state, computed where shown, is one of Pending, Executing, Passed,
 Failed, Stale and Absent; a result resting on edits not fully recorded is marked
 `unbound` (LANE-05), a mark like `from checkpoint` and `outside intent`, not a
@@ -160,7 +161,7 @@ field sends text, not shortcuts.
 | `I`                   | interrupt (run pane)                                            | `W`             | witness check                                                            |
 | `p`                   | pause / resume                                                  | `c` / `C`       | post on the selection / verdict sheet                                    |
 | `S`                   | stop (opens the stop sheet)                                     | `P`             | pick what the outcome window shows                                       |
-| `F`                   | follow a seat                                                   | `l`             | branch and pull-request links                                            |
+| `F`                   | follow a seat                                                   | `l`             | branch, pull-request and issue links                                     |
 | `t`                   | terminal takeover, only at the launcher's own terminal (OWN-19) | `V` / `s`       | compare versions / since my verdict                                      |
 | `h`                   | hand back                                                       | `(` / `)`       | previous / next post with a range link                                   |
 | `Q`                   | turn an away policy on / off                                    | `<` / `>`       | down / up the stack                                                      |

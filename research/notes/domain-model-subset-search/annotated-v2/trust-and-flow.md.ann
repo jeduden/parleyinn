@@ -40,7 +40,7 @@ summary: >-
   inherited from the delegating run (OWN-24), which tightens the rule levels of
   the action classes SEC-13 configures as sensitive (OWN-10).⟦/f⟧
 - **Principal surface**: An authenticated client where principal acts are taken:
-  ⟦f:browser-room-view⟧the browser room view under SEC-20, `cairn ui` started at a terminal that
+  ⟦f:browser-room-view⟧the browser room view under SEC-20, `parinn ui` started at a terminal that
   no run's tool process started, ⟦/f⟧the CLI or TUI at a terminal that no
   run's tool process started⟦f:paired-phone⟧, or a paired phone⟦f:principal-keys⟧ within its scope⟦/f⟧⟦/f⟧. A CLI
   or TUI call from inside a run is the agent's own tool call: never a principal
@@ -48,7 +48,7 @@ summary: >-
   whatever its output (OWN-02).⟦f:browser-room-view⟧⟦f:peer-sync⟧ Without the peer component,⟦/f⟧ a
   browser on the principal's phone reaches the room view only as the browser
   room view, through the principal's own tunnel, which is the principal's tool
-  outside Cairn's components (I4).⟦/f⟧
+  outside ParleyInn's components (I4).⟦/f⟧
 ⟦f:presence-proof⟧- **Presence proof**: A hardware-backed, user-verified proof of a person's
   presence, bound to one widening act (OWN-11).⟦/f⟧
 - **Recall**: An agent's call to a **recall tool**: an MCP tool that returns
@@ -57,13 +57,13 @@ summary: >-
   (CMP-03)⟦/f⟧; or any CLI or TUI read from inside a run, whatever its output
   (OWN-12); each records a recall event (RCL-07). Pull-only, and it
   defaults to the agent's current run. A recall that returns a pin returns its
-  range links. Any other output Cairn gives an agent outside the closed paths,
+  range links. Any other output ParleyInn gives an agent outside the closed paths,
   such as what an MCP tool that is no recall tool returns, or a CLI call from
-  inside a run that is no read, carries only fixed text Cairn ships, sanitized
+  inside a run that is no read, carries only fixed text ParleyInn ships, sanitized
   structural fields and ids, never record text. A recall tool that stops at its per-call
   cap returns a **continuation cursor** (`next_cursor`); passed back as
   `cursor`, it continues without gap or overlap (RCL-03).
-- **Closed path**: One of the ways I2 lists by which Cairn writes to an agent
+- **Closed path**: One of the ways I2 lists by which ParleyInn writes to an agent
   without the agent's recall: restore blocks⟦f:notices⟧, opt-in notices⟦/f⟧⟦f:held-requests⟧, OWN-04's⟦f:away-policy⟧ and
   OWN-07's⟦/f⟧ templates⟦/f⟧ and compaction guidance⟦f:launcher⟧; on a principal act recorded at
   that time, through the harness's own input, principal-typed text, a fixed
@@ -85,7 +85,7 @@ summary: >-
   another room, ⟦/f⟧run seats⟦f:access-tokens⟧, token-key-only nodes⟦/f⟧⟦f:facilitator⟧, the facilitator's device seat
   or room summaries⟦/f⟧; never in a foreign room⟦f:conversation⟧; and a post it
   covers reaches only the grantor's agents whose run has a seat in the post's
-  room, inside OWN-29's template: wording Cairn ships, filled only with ids, key
+  room, inside OWN-29's template: wording ParleyInn ships, filled only with ids, key
   fingerprints, addresses and that post's text⟦/f⟧⟦f:service-accounts⟧. A grant naming a service account whose certificate or managed-policy
   listing, standing or revoked, marks it as relaying text others wrote, whose
   listing is unmarked, or that no standing certificate or listing covers, is
@@ -146,7 +146,7 @@ summary: >-
   (OWN-02, OWN-19): the person's keystrokes are the harness's own input from
   that terminal, which the launcher hosts but never carries, so what the
   launcher carries into the harness's input stays text the core built (I4).⟦/f⟧
-⟦f:launcher⟧- **Fixed template**: Wording Cairn ships, filled only with ids, counts, version
+⟦f:launcher⟧- **Fixed template**: Wording ParleyInn ships, filled only with ids, counts, version
   numbers, key fingerprints, addresses and the principal-typed⟦f:endorsement⟧, endorsed⟦/f⟧⟦f:delegation-grants⟧ or
   delegated⟦/f⟧ text⟦f:trust-grants⟧⟦f:conversation⟧, or the text of a post a trust grant covers⟦/f⟧⟦/f⟧, its requirement
   names; **principal-typed text** is text a principal typed at a principal
@@ -155,9 +155,9 @@ summary: >-
   template⟦f:git-tracking⟧, or a new run from a worktree checkpoint⟦/f⟧ (OWN-28).⟦/f⟧
 - **Counter**: A count of dropped, rejected, redacted, truncated, coalesced,
   timed-out or failed operations of one kind, each also written to the **audit
-  log**, the node's append-only log of Cairn's own operations (OPS-01), shown on
-  Health until acknowledged (`cairn counter ack`, I6, OPS-03).
-- **Canary**: `cairn canary`'s end-to-end test: it writes a **canary event**
+  log**, the node's append-only log of ParleyInn's own operations (OPS-01), shown on
+  Health until acknowledged (`parinn counter ack`, I6, OPS-03).
+- **Canary**: `parinn canary`'s end-to-end test: it writes a **canary event**
   through the hook path and recalls it through the MCP server (OPS-04).
 ⟦f:landmarks⟧- **Stat**: A count derived from the record within a recall scope, such as
   events, runs, compactions or recalls, read through `stat_list` (RCL-01).⟦/f⟧
@@ -188,7 +188,7 @@ summary: >-
   forensics; the node's principal chooses which fork to keep (PEER-10).⟦/f⟧
 ⟦f:conversation⟧- **Presence hint**: An ephemeral sign that a seat is connected, or typing (a
   **typing hint**), never stored in the record (PEER-09).⟦/f⟧
-⟦f:room-view-surfaces⟧- **Watchdog observation**: Cairn's note, computed where shown and never
+⟦f:room-view-surfaces⟧- **Watchdog observation**: ParleyInn's note, computed where shown and never
   recorded, that a run looks stuck, shown as the `stuck?` freshness mark; it
   never starts or resumes a turn (OWN-09).⟦/f⟧
 ⟦f:room-view-surfaces⟧- **Petname**: A name the person viewing chose for a key or a room, never one
