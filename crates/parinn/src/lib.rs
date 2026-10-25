@@ -1607,14 +1607,14 @@ fn verified_line(
     } else if index_checked {
         format!(
             "; a purge was cut short before it finished, so its residue stays until the next \
-             purge, ingest or rebuild clears it, and the search index is checked outside its \
-             ranges: {}",
+             purge, ingest or rebuild clears it, and the search index was checked outside the \
+             address ranges of pending purges: {}",
             checks.unfinished.join(", ")
         )
     } else {
         format!(
             "; a purge was cut short before it finished, so its residue stays until the next \
-             purge, ingest or rebuild clears it: {}",
+             purge, ingest or rebuild clears it, in the address ranges of pending purges: {}",
             checks.unfinished.join(", ")
         )
     };

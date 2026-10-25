@@ -498,8 +498,8 @@ fn verify_reports_a_purge_a_kill_left_unfinished_exits_0_and_changes_nothing() {
     assert!(
         out.contains(&format!(
             "; a purge was cut short before it finished, so its residue stays until the next \
-             purge, ingest or rebuild clears it, and the search index is checked outside its \
-             ranges: {range}"
+             purge, ingest or rebuild clears it, and the search index was checked outside the \
+             address ranges of pending purges: {range}"
         )),
         "{out}"
     );
@@ -589,7 +589,8 @@ fn a_pending_purge_and_an_index_not_derived_in_time_leave_the_whole_index_unchec
     assert!(
         out.contains(&format!(
             "; a purge was cut short before it finished, so its residue stays until the next \
-             purge, ingest or rebuild clears it: {range}; the search index was not derived \
+             purge, ingest or rebuild clears it, in the address ranges of pending purges: \
+             {range}; the search index was not derived \
              again in time, so it is unchecked: run parinn verify again"
         )),
         "{out}"

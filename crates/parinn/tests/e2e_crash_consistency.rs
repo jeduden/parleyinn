@@ -9,7 +9,7 @@
 //! names present and opening its commitment, every purged event's
 //! erasure confirmed by its tombstone, and every writer's segments
 //! tiling its log. A purge a kill left unfinished is reported, the
-//! search index is checked outside its ranges, and the next rebuild
+//! search index is checked outside its address ranges, and the next rebuild
 //! finishes it, after which verify reports none. A kill before the store exists leaves nothing to
 //! verify.
 //!
