@@ -143,7 +143,7 @@ Feature: Administration and lifecycle (ADM)
     When SQLite's "secure_delete" is turned off in the store
     Then "parinn verify" fails
 
-  @ADM-09 @P0 @I6 @I10 @pending
+  @ADM-09 @P0 @I1 @I6 @I10 @pending
   Scenario Outline: verify names each failed check and fails no source an ingest resumes
     Given an isolated ParleyInn home
     And an agent run with a Claude Code transcript "run-a"
@@ -153,20 +153,20 @@ Feature: Administration and lifecycle (ADM)
     And <outcome>
 
     Examples:
-      | state                                                                                               | exit | outcome                                                                          |
-      | the transcript has lines not in the record                                                          | 3    | the output names the failed check "transcript source completeness"               |
-      | an event row's hash has been altered                                                                | 3    | the output names the failed check "hash chain"                                   |
-      | a payload file's bytes have been altered                                                            | 3    | the output names the failed check "payload integrity"                            |
-      | a landmark row has been altered                                                                     | 3    | the output names the failed check "derived artifact consistency"                 |
-      | a trust level has been altered in place                                                             | 3    | the output names the failed check "derived artifact consistency"                 |
-      | a schema object ParleyInn does not ship has been added to the store                                 | 3    | the output names the failed check "derived artifact consistency"                 |
-      | the search index's ranking configuration has been altered                                           | 3    | the output names the failed check "derived artifact consistency"                 |
-      | a search index entry names an event whose text lacks the term                                       | 3    | the output names the failed check "derived artifact consistency"                 |
-      | a running MCP server's live ingest is short of the transcript's end and left no ingest marker yet   | 0    | the output reports the transcript "run-a" short of its end, which ingest resumes |
-      | an ingest killed during ingestion left an ingest marker short of the transcript's end               | 0    | the output reports the transcript "run-a" short of its end, which ingest resumes |
-      | an ingest left an ingest marker in the transcript over 10 minutes ago and no ingest resumed from it | 3    | the output names the failed check "transcript source completeness"               |
-      | the transcript holds fewer bytes than its ingest position                                           | 3    | the output names the failed check "transcript source completeness"               |
-      | the transcript's bytes up to its ingest position differ from its consumed-prefix hash               | 3    | the output names the failed check "transcript source completeness"               |
+      | state                                                                                                                                                     | exit | outcome                                                                          |
+      | the transcript has lines not in the record                                                                                                                | 3    | the output names the failed check "transcript source completeness"               |
+      | an event row's hash has been altered                                                                                                                      | 3    | the output names the failed check "hash chain"                                   |
+      | a payload file's bytes have been altered                                                                                                                  | 3    | the output names the failed check "payload integrity"                            |
+      | a landmark row has been altered                                                                                                                           | 3    | the output names the failed check "derived artifact consistency"                 |
+      | a trust level has been altered in place                                                                                                                   | 3    | the output names the failed check "derived artifact consistency"                 |
+      | a schema object ParleyInn does not ship has been added to the store                                                                                       | 3    | the output names the failed check "derived artifact consistency"                 |
+      | the search index's ranking configuration has been altered                                                                                                 | 3    | the output names the failed check "derived artifact consistency"                 |
+      | a search index entry names an event whose text lacks the term                                                                                             | 3    | the output names the failed check "derived artifact consistency"                 |
+      | a running MCP server's live ingest is short of the transcript's end and left no ingest marker yet                                                         | 0    | the output reports the transcript "run-a" short of its end, which ingest resumes |
+      | an ingest killed during ingestion left an ingest marker short of the transcript's end                                                                     | 0    | the output reports the transcript "run-a" short of its end, which ingest resumes |
+      | an ingest left an ingest marker short of the transcript's end over 10 minutes ago on the node's wall clock and no running MCP server holds the transcript | 3    | the output names the failed check "transcript source completeness"               |
+      | the transcript holds fewer bytes than its ingest position                                                                                                 | 3    | the output names the failed check "transcript source completeness"               |
+      | the transcript's bytes up to its ingest position differ from its consumed-prefix hash                                                                     | 3    | the output names the failed check "transcript source completeness"               |
 
   @ADM-10 @P0 @I7 @pending
   Scenario: doctor is read-only and doctor --fix shows each change first
