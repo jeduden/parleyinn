@@ -158,6 +158,35 @@ fn a_purge_erases_the_range_records_its_act_and_tombstone_and_the_record_still_v
     assert!(!shown.contains("two") && !shown.contains("three"));
 }
 
+/// A finding, raised in the threat model (T-erasure residue) and to the
+/// stakeholder: a purge leaves its transcript source's ingest position,
+/// whose prefix hash is an unkeyed SHA-256 of the transcript's bytes,
+/// erased lines among them, so it confirms a guess of those bytes; and
+/// each erased line's place, its byte offset and `uuid`. When a purge
+/// clears or keys them, this test changes with it.
+#[test]
+fn a_purge_leaves_the_prefix_hash_and_places_of_its_transcript_source() {
+    let (p, writer) = with_a_run();
+
+    let (code, _, err) = p.invoke(&["purge", "--range", &format!("{writer}:2-3")], &DEV);
+
+    assert_eq!((code, err.as_str()), (EXIT_OK, ""));
+    let (_, store) = open(&p);
+    let source = store.sources().unwrap().remove(0);
+    assert_eq!(
+        source.position.prefix,
+        record::digest::Digest::of(&[LINES.as_bytes()]),
+        "confirms a guess of every byte ingested, the erased lines' too"
+    );
+    let offsets: Vec<u64> = store
+        .placed(source.id)
+        .unwrap()
+        .iter()
+        .map(|p| p.place.offset)
+        .collect();
+    assert_eq!(offsets, [0, 4, 8, 14], "the erased lines' lengths");
+}
+
 #[test]
 fn a_range_written_by_label_is_purged_and_json_names_what_it_did() {
     let (p, writer) = with_a_run();
