@@ -55,6 +55,22 @@ fn ingestion_is_timed_over_a_transcript_in_a_fresh_home() {
 }
 
 #[test]
+fn the_store_taking_fifty_runs_is_a_floor_of_nfr_05() {
+    let scale = SUITE.iter().find(|b| b.requirement == "NFR-05").unwrap();
+
+    assert_eq!(scale.coverage, Coverage::Floor);
+    assert_eq!(scale.args, ["ingest", "--all"]);
+    assert_eq!(
+        scale.fixture,
+        Fixture::Runs {
+            runs: SCALE_RUNS,
+            lines: SCALE_LINES
+        }
+    );
+    assert_eq!(SCALE_RUNS, 50, "as many runs as NFR-05 has write at once");
+}
+
+#[test]
 fn the_core_start_up_is_a_floor_not_a_hook_handler() {
     let start_up = SUITE.iter().find(|b| b.name == "core_start_up").unwrap();
 

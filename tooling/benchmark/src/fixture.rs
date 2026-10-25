@@ -41,6 +41,20 @@ pub fn transcript(lines: usize) -> String {
     out
 }
 
+/// The harness session the recorded transcript belongs to.
+const RECORDED_SESSION: &str = "686aa14f-b535-45bc-9ed0-5400ea84bec7";
+
+/// [`transcript`] of `lines` lines as run `run`'s own: its harness
+/// session id and every `uuid` made the run's, so `n` of them are `n`
+/// runs.
+#[must_use]
+pub fn run_transcript(lines: usize, run: usize) -> String {
+    let session = format!("{run:08x}{}", &RECORDED_SESSION[8..]);
+    transcript(lines)
+        .replace(RECORDED_SESSION, &session)
+        .replace("\"uuid\":\"c", &format!("\"uuid\":\"r{run}c"))
+}
+
 /// A fresh home for one sample, removed when dropped.
 #[derive(Debug)]
 pub struct Home {
@@ -58,6 +72,17 @@ impl Home {
     ///
     /// Fails when the home or the transcript cannot be written.
     pub fn with_transcript(base: &Path, transcript: &str) -> io::Result<Self> {
+        Self::with_transcripts(base, &[("bench", transcript.to_owned())])
+    }
+
+    /// A fresh home as [`with_transcript`](Self::with_transcript) makes,
+    /// holding each of `transcripts`, a name and its text, as
+    /// `<name>.jsonl` under its default transcript root.
+    ///
+    /// # Errors
+    ///
+    /// Fails when the home or a transcript cannot be written.
+    pub fn with_transcripts(base: &Path, transcripts: &[(&str, String)]) -> io::Result<Self> {
         let n = MADE.fetch_add(1, Ordering::Relaxed);
         let root = base.join(format!("parinn-benchmark-{}-{n}", std::process::id()));
         let projects = root.join(".claude").join("projects").join("-w-bench");
@@ -68,9 +93,28 @@ impl Home {
             use std::os::unix::fs::PermissionsExt;
             fs::set_permissions(&home.root, fs::Permissions::from_mode(0o700))?;
         }
-        fs::write(projects.join("bench.jsonl"), transcript)?;
+        for (name, text) in transcripts {
+            fs::write(projects.join(format!("{name}.jsonl")), text)?;
+        }
 
         Ok(home)
+    }
+
+    /// A fresh home holding `runs` transcripts of `lines` lines, each its
+    /// own run's ([`run_transcript`]).
+    ///
+    /// # Errors
+    ///
+    /// As [`with_transcripts`](Self::with_transcripts).
+    pub fn with_runs(base: &Path, runs: usize, lines: usize) -> io::Result<Self> {
+        let transcripts: Vec<(String, String)> = (0..runs)
+            .map(|r| (format!("run-{r}"), run_transcript(lines, r)))
+            .collect();
+        let named: Vec<(&str, String)> = transcripts
+            .iter()
+            .map(|(n, t)| (n.as_str(), t.clone()))
+            .collect();
+        Self::with_transcripts(base, &named)
     }
 
     /// The hook input of `hook` in Claude Code 2.1.296's recorded shape,
