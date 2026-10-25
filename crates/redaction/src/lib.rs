@@ -54,6 +54,14 @@ pub struct Redacted {
     pub rules: Vec<String>,
 }
 
+/// How many times the length of a text its scans may read together: a
+/// clean text takes one, and the text around matches about one more.
+const SCAN_BUDGET_FACTOR: usize = 8;
+
+/// The rule name of the marker that stands for text left unscanned
+/// when the scan budget ends.
+const SCAN_LIMIT_RULE: &str = "scan_limit";
+
 /// One step of [`Redactor::redact_text`]: text to scan, or the marker
 /// of the rule that matched.
 enum Work<'a> {
@@ -109,13 +117,19 @@ impl Redactor {
     /// secret beside it from matching (a key's word boundary hidden by
     /// a principal's pattern after it). A marker is never scanned, so
     /// no pattern matches inside one, and each rescan is of strictly
-    /// less text, so it settles.
+    /// less text, so it settles. The scans together may read at most
+    /// [`SCAN_BUDGET_FACTOR`] times the text, so a chain where every
+    /// match uncovers only the next stays linear (I9); text left
+    /// unscanned when the budget ends is replaced by one
+    /// `[REDACTED:scan_limit]` marker, counted like any other, rather
+    /// than stored unredacted (I6).
     #[must_use]
     pub fn redact_text(&self, text: &str) -> Redacted {
         let mut out = Redacted {
             text: String::with_capacity(text.len()),
             rules: Vec::new(),
         };
+        let mut budget = text.len().saturating_mul(SCAN_BUDGET_FACTOR);
         let mut work = vec![Work::Scan(text)];
         while let Some(item) = work.pop() {
             match item {
@@ -124,7 +138,15 @@ impl Redactor {
                     out.text.push_str(&format!("[REDACTED:{name}]"));
                     out.rules.push(name.to_owned());
                 }
-                Work::Scan(piece) => self.scan(piece, &mut out, &mut work),
+                Work::Scan("") => {}
+                Work::Scan(piece) if piece.len() > budget => {
+                    out.text.push_str(&format!("[REDACTED:{SCAN_LIMIT_RULE}]"));
+                    out.rules.push(SCAN_LIMIT_RULE.to_owned());
+                }
+                Work::Scan(piece) => {
+                    budget -= piece.len();
+                    self.scan(piece, &mut out, &mut work);
+                }
             }
         }
 

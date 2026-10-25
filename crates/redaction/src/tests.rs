@@ -183,19 +183,27 @@ fn redact_text_lists_rules_in_marker_order_across_uncovered_secrets() {
     let out = r.redact_text(&format!(
         "ACME-11111111 {AWS}ACME-22222222 {AWS}ACME-33333333"
     ));
-    assert_eq!(out.rules.len(), 5);
-    assert_eq!(out.text.matches("[REDACTED:aws_access_key]").count(), 2);
-    assert!(
-        out.rules
-            .starts_with(&["extra_pattern_1".to_owned(), "aws_access_key".to_owned()])
+    assert_eq!(
+        out.rules,
+        [
+            "extra_pattern_1",
+            "aws_access_key",
+            "extra_pattern_1",
+            "aws_access_key",
+            "extra_pattern_1"
+        ]
     );
 }
 
 #[test]
 fn redact_text_never_matches_inside_a_marker() {
-    let r = redactor(&["REDACTED", "[a-z_]{4,}"]);
+    let r = redactor(&["ACME-[0-9]{8}", "REDACTED", "[a-z_]{4,}"]);
     let out = r.redact_text(&format!("{AWS}ACME-12345678"));
-    assert_eq!(out.rules.len(), out.text.matches("[REDACTED:").count());
+    assert_eq!(
+        out.text,
+        "[REDACTED:aws_access_key][REDACTED:extra_pattern_1]"
+    );
+    assert_eq!(out.rules, ["aws_access_key", "extra_pattern_1"]);
     let single = r.redact_text(AWS);
     assert_eq!(single.text, "[REDACTED:aws_access_key]");
     assert_eq!(single.rules, ["aws_access_key"]);
@@ -207,4 +215,25 @@ fn redact_text_settles_many_secrets_each_hidden_by_a_pattern() {
     let out = r.redact_text(&format!("{AWS}ACME-12345678").repeat(500));
     assert_eq!(out.rules.len(), 1000);
     assert!(!out.text.contains("AKIA"));
+}
+
+#[test]
+fn redact_text_bounds_a_chain_where_each_match_uncovers_only_the_next() {
+    let r = redactor(&[]);
+    let key = format!("AIza{}", "a".repeat(35));
+    let out = r.redact_text(&key.repeat(20_000));
+    assert!(out.rules.len() < 64, "{} markers", out.rules.len());
+    assert_eq!(out.rules[0], "google_api_key");
+    assert_eq!(out.rules.last().map(String::as_str), Some("scan_limit"));
+    assert!(!out.text.contains("AIza"));
+    assert!(out.text.ends_with("[REDACTED:scan_limit]"));
+}
+
+#[test]
+fn redact_text_settles_a_short_chain_within_the_budget() {
+    let r = redactor(&[]);
+    let key = format!("AIza{}", "a".repeat(35));
+    let out = r.redact_text(&key.repeat(4));
+    assert_eq!(out.rules, ["google_api_key"; 4]);
+    assert_eq!(out.text, "[REDACTED:google_api_key]".repeat(4));
 }
