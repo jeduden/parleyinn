@@ -1334,7 +1334,9 @@ fn query_cancelled(home: &Home, time: u64) -> Result<Entry, AuditError> {
 /// `parinn verify [--json]`: checks the record against this node's
 /// device key, exiting 3 at the first failure, which it names. No log
 /// is signed yet, so a record that passes is `unsigned` (§9.7.5). It
-/// first finishes a purge a kill cut short, as ingest and rebuild do.
+/// changes nothing it checks: a purge a kill cut short is reported,
+/// with the search index its residue leaves unchecked, for the next
+/// purge, ingest or rebuild to finish (ADM-09, ENG-06).
 fn verify_command(
     args: impl Iterator<Item = String>,
     ctx: &Context,
@@ -1344,33 +1346,25 @@ fn verify_command(
     let Some(as_json) = json_flag("verify", args, stderr) else {
         return EXIT_USAGE;
     };
-    let home = match ctx.home() {
-        Ok(home) => home,
-        Err(e) => return failed("verify", &e, stderr),
-    };
-    if !home.store().exists() {
-        return failed(
-            "verify",
-            &format!("no store at {}", home.store().display()),
-            stderr,
-        );
-    }
-    let store = match Store::open(&home.store()) {
-        Ok(store) => store,
-        Err(e) => return store_failed("verify", &e, stderr),
+    let (home, store) = match verified_store(ctx, stderr) {
+        Ok(opened) => opened,
+        Err(code) => return code,
     };
     let incomplete = match completeness(ctx, &home, &store) {
         Ok(found) => found,
         Err(e) => return failed("verify", &e, stderr),
     };
-    let forks = match store.refused_forks() {
-        Ok(forks) => forks,
+    let read = store
+        .refused_forks()
+        .and_then(|forks| Ok((forks, unfinished_purges(ctx, &store)?)));
+    let (forks, unfinished) = match read {
+        Ok(read) => read,
         Err(e) => return failed("verify", &e, stderr),
     };
     let mut shape = Shape::Checked;
     let verified = match verify_record(&home, &store) {
         Ok(verified) => verified.and_then(|(r, staged)| {
-            shape = checked_shape(ctx, &store)?;
+            shape = shape_beside(ctx, &store, &unfinished)?;
             Ok((r, staged))
         }),
         Err(e) => return failed("verify", &e, stderr),
@@ -1396,7 +1390,17 @@ fn verify_command(
         ),
         Ok((r, staged, a)) => (
             EXIT_OK,
-            verified_line(as_json, &r, staged, &a, &incomplete, shape),
+            verified_line(
+                as_json,
+                &r,
+                staged,
+                &a,
+                &incomplete,
+                Checks {
+                    shape,
+                    unfinished: &unfinished,
+                },
+            ),
         ),
         Err(Ok(VerifyError::Store(e))) => return failed("verify", &e, stderr),
         Err(Err(e @ AuditError::Broken { .. })) => {
@@ -1422,6 +1426,19 @@ fn verify_command(
     }
 }
 
+/// The home and the store `parinn verify` checks, or the exit code of
+/// the failure it reported on `stderr`.
+fn verified_store(ctx: &Context, stderr: &mut dyn Write) -> Result<(Home, Store), u8> {
+    let home = ctx.home().map_err(|e| failed("verify", &e, stderr))?;
+    if !home.store().exists() {
+        let missing = format!("no store at {}", home.store().display());
+        return Err(failed("verify", &missing, stderr));
+    }
+    let store = Store::open(&home.store()).map_err(|e| store_failed("verify", &e, stderr))?;
+
+    Ok((home, store))
+}
+
 /// How far the transcript sources of `store` fall short (ADM-09), as
 /// `parinn verify` finds them now.
 fn completeness(
@@ -1435,6 +1452,37 @@ fn completeness(
         &sources::look,
         (ctx.clock)().saturating_mul(1000),
     ))
+}
+
+/// The ranges a purge a kill cut short has still to clear from the
+/// search index, audited and counted when there are any (I6): the next
+/// purge, ingest or rebuild finishes them.
+fn unfinished_purges(ctx: &Context, store: &Store) -> Result<Vec<String>, store::StoreError> {
+    let unfinished = store.unfinished_purges()?;
+    if !unfinished.is_empty() {
+        purge::audit_residue(ctx);
+    }
+
+    Ok(unfinished)
+}
+
+/// The shape of `store` beside the ranges a purge left `unfinished`:
+/// while there are any, their residue is in the search index, which is
+/// left unchecked, and the rest of the shape is checked.
+fn shape_beside(ctx: &Context, store: &Store, unfinished: &[String]) -> Result<Shape, VerifyError> {
+    if unfinished.is_empty() {
+        checked_shape(ctx, store)
+    } else {
+        administration::verify::verify_shape(store, &|| false)
+    }
+}
+
+/// What `parinn verify` checked beside the record: the store's shape,
+/// and the ranges an unfinished purge leaves in the search index.
+#[derive(Debug, Clone, Copy)]
+struct Checks<'a> {
+    shape: Shape,
+    unfinished: &'a [String],
 }
 
 /// How long `parinn verify` derives the search index again before it
@@ -1502,9 +1550,9 @@ fn verified_line(
     staged: bool,
     a: &audit::log::Checked,
     incomplete: &sources::Completeness,
-    shape: Shape,
+    checks: Checks<'_>,
 ) -> String {
-    let index_checked = shape == Shape::Checked;
+    let index_checked = checks.shape == Shape::Checked;
     if as_json {
         return json!({
             "integrity": "unsigned",
@@ -1514,6 +1562,7 @@ fn verified_line(
             "seats": seats_json(&r.seats),
             "open_segments": segments::open_json(&r.open_segments),
             "short_sources": incomplete.short,
+            "unfinished_purges": checks.unfinished,
             "index_checked": index_checked,
             "staged": staged,
             "audit": {"files": a.files, "entries": a.entries},
@@ -1528,10 +1577,17 @@ fn verified_line(
         ""
     };
     let unchecked = if index_checked {
-        ""
-    } else {
+        String::new()
+    } else if checks.unfinished.is_empty() {
         "; the search index was not derived again in time, so it is unchecked: \
          run parinn verify again"
+            .to_owned()
+    } else {
+        format!(
+            "; a purge was cut short before it finished, so its residue stays until the next \
+             purge, ingest or rebuild clears it, and the search index is unchecked: {}",
+            checks.unfinished.join(", ")
+        )
     };
 
     format!(
