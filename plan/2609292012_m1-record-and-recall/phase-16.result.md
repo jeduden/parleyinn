@@ -25,10 +25,12 @@ Outcome:
 - S12: `crates/store/tests/s12_rebuild.rs` covers either order, row ids
   from addresses, secure-delete and truncated logs. The trust policy's
   unit tests show trust needs the mode.
-- ENG-06: kills of purge, at a terminal, and of rebuild. They found that
-  verify exited 3 after a kill between a purge's transaction and its
-  finishing. Verify now finishes the purge first, as ingest and rebuild
-  do.
+- ENG-06: kills of purge, at a terminal, and of rebuild. They found
+  verify exiting 3 after a kill between a purge's transaction and its
+  finishing. Verify stays read-only: it names the unfinished purge
+  (`unfinished_purges`), counts it, leaves the index unchecked and exits
+  0; the next purge, ingest or rebuild finishes it. A built case and
+  the seeded kills both check it.
 - ENG-09: a soak of 50 writers; at 1M events (release, 13 min), 4,293 of
   10,000 appends passed the 5 s busy deadline and were retried, as live
   ingest retries. It runs nightly.
@@ -53,14 +55,15 @@ For the stakeholder:
   `run_killed_at_terminal`. No counter added or renamed.
 - ENG-03's hold on injectable I/O: the seams are listed in
   development.md.
-- Verify now writes, finishing a purge's journalled residue.
+- Verify no longer writes (ruled); wording on PR #90.
 - §11.1 measurement wording on claude/m1-phase-16-docs (PR #90).
 - Stakeholder paths: `.github/workflows/ci.yml` and `nightly.yml`,
   `tooling/`, `Cargo.toml`, `tooling/*/Cargo.toml`.
 - Inherited items untouched: S2 `integrity`, phase 14/15 counters and
   renames, `tombstones`.
 
-Plan close (stays 🔳): met are recall, S12, purge, dependencies, ENG-11,
-fuzzing, frozen targets, tests and checks. Open: the full-row scenarios
-still raised (SEC-12, ADM-09, RCL-02, PRV-09, REC-24, LANE-02), the
-in-part rows' audit, verify's landmark row, and ENG-15.
+Plan close (stays 🔳): met are recall, S12, dependencies, ENG-11,
+fuzzing, frozen targets, tests and checks. Open: the raised full-row
+scenarios (SEC-12, SEC-17, SEC-19, ENG-22, ADM-09, RCL-02, PRV-09,
+REC-24, LANE-02), the in-part rows' audit, verify's landmark row, the
+erasure residue (phase 15), and ENG-15.

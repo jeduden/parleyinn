@@ -283,8 +283,8 @@ fn describe(refusals: &[Refusal], limit: usize) -> String {
 }
 
 /// Finishes a purge a crash or a busy log cut short, when `store`
-/// holds one (ADM-07, SEC-14): the next ingest, rebuild or verify does
-/// it. A
+/// holds one (ADM-07, SEC-14): the next purge, ingest or rebuild does
+/// it; verify only reports it. A
 /// step that still cannot finish is audited and counted (I6), and
 /// never stops the command that found it (I9).
 pub(crate) fn finish(ctx: &Context, store: &mut Store) {

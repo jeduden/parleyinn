@@ -17,7 +17,9 @@ record what fails and what each needs before building.
 - ENG-03: the steps are bound and pass; the stakeholder held it until
   M1 adds injectable I/O. Name the seams M1 added and ask.
 - ENG-06: the nightly kills of ingest gain kills of purge and rebuild.
-  Migration waits for M3 (ruling 3), so the scenario stays `@pending`.
+  Verify stays read-only: it reports a purge a kill left unfinished and
+  exits 0; the next purge, ingest or rebuild finishes it. Migration
+  waits for M3 (ruling 3), so the scenario stays `@pending`.
 - ENG-07: bind the steps to `fuzz/`, its corpora and the nightly loop.
 - ENG-09: a soak of 50 writers appending 1M events, then `verify`'s
   checks, beside the Miri job over the platform shim.
