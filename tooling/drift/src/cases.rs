@@ -1708,7 +1708,7 @@ fn release_budget_cases() -> Vec<Case> {
             RELEASE,
             Injection::replace(
                 CI,
-                "--core \"$head/parinn\"",
+                "--core \"$1/parinn\"",
                 "--core \"$GITHUB_WORKSPACE/target/debug/parinn\"",
             ),
             cargo_test("engineering", "benchmark_gate", RELEASE),
@@ -1771,6 +1771,17 @@ fn benchmark_cases() -> Vec<Case> {
                 Injection::replace(CI, "\"$head/benchmark\" gate --base", "true --base"),
                 cargo_test("engineering", "benchmark_gate", GATED),
                 "job benchmark does not run",
+            ),
+            case(
+                "the suite's run dropped from the shards the gate job needs",
+                GATED,
+                Injection::replace(
+                    CI,
+                    "\"$1/benchmark\" run --core",
+                    "\"$1/benchmark\" ran --core",
+                ),
+                cargo_test("engineering", "benchmark_gate", GATED),
+                "nor does a job it needs",
             ),
             case(
                 "the benchmark job left out of the CI aggregator",

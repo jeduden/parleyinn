@@ -1,5 +1,6 @@
 use super::*;
 use crate::accepted::Acceptance;
+use crate::samples::Samples;
 
 const NAME: &str = "core_start_up";
 
@@ -21,8 +22,13 @@ fn noisy() -> Vec<u64> {
     ]
 }
 
-fn one(name: &str, samples: Vec<u64>) -> Samples {
-    Samples::from([(name.to_owned(), samples)])
+/// `samples` as the one stratum of one file.
+fn strata(samples: Samples) -> Strata {
+    Strata::from([(String::new(), samples)])
+}
+
+fn one(name: &str, samples: Vec<u64>) -> Strata {
+    strata(Samples::from([(name.to_owned(), samples)]))
 }
 
 fn compare(base: Vec<u64>, head: Vec<u64>) -> Delta {
@@ -97,7 +103,7 @@ fn exactly_ten_percent_slower_holds_since_the_gate_wants_more() {
 
 #[test]
 fn a_benchmark_the_head_did_not_sample_fails() {
-    let all = decide(&one(NAME, clean(10_000, 30)), &Samples::new(), &[]);
+    let all = decide(&one(NAME, clean(10_000, 30)), &Strata::new(), &[]);
 
     assert_eq!(all[0].status, Status::Missing);
     assert_eq!(
@@ -108,7 +114,7 @@ fn a_benchmark_the_head_did_not_sample_fails() {
 
 #[test]
 fn a_benchmark_the_head_retired_is_reported_not_failed() {
-    let all = decide(&one(NAME, clean(10_000, 30)), &Samples::new(), &[NAME]);
+    let all = decide(&one(NAME, clean(10_000, 30)), &Strata::new(), &[NAME]);
 
     assert_eq!(all[0].status, Status::Retired);
     assert!(failures(&all).is_empty());
@@ -126,7 +132,7 @@ fn a_retired_benchmark_the_head_still_samples_is_compared() {
 
 #[test]
 fn a_benchmark_new_on_the_head_is_reported_not_failed() {
-    let all = decide(&Samples::new(), &one(NAME, clean(10_000, 30)), &[]);
+    let all = decide(&Strata::new(), &one(NAME, clean(10_000, 30)), &[]);
 
     assert_eq!(all[0].status, Status::New);
     assert!(failures(&all).is_empty());
@@ -150,18 +156,18 @@ fn too_few_samples_on_either_side_fail() {
 #[test]
 fn nothing_sampled_on_either_side_fails() {
     assert_eq!(
-        failures(&decide(&Samples::new(), &Samples::new(), &[])),
+        failures(&decide(&Strata::new(), &Strata::new(), &[])),
         ["no benchmark was sampled on the base or the head"]
     );
 }
 
 #[test]
 fn decide_orders_its_comparisons_by_benchmark() {
-    let base = Samples::from([
+    let base = strata(Samples::from([
         ("b".to_owned(), clean(10, 10)),
         ("a".to_owned(), clean(10, 10)),
-    ]);
-    let head = Samples::from([("c".to_owned(), clean(10, 10))]);
+    ]));
+    let head = strata(Samples::from([("c".to_owned(), clean(10, 10))]));
 
     let names: Vec<String> = decide(&base, &head, &["a", "b"])
         .into_iter()
@@ -176,11 +182,11 @@ fn decide_orders_its_comparisons_by_benchmark() {
 /// 100 / 12 * (21 - 1980 / 380), so z = 49.5 / sqrt(131.58) = 4.32.
 #[test]
 fn the_report_has_a_row_per_benchmark() {
-    let base = Samples::from([
+    let base = strata(Samples::from([
         (NAME.to_owned(), vec![1000; 10]),
         ("gone".to_owned(), vec![1000; 10]),
-    ]);
-    let head = Samples::from([(NAME.to_owned(), vec![1500; 10])]);
+    ]));
+    let head = strata(Samples::from([(NAME.to_owned(), vec![1500; 10])]));
 
     let report = report(&decide(&base, &head, &[]));
 
@@ -202,6 +208,7 @@ fn each_status_has_its_words_in_the_report() {
         Status::Retired,
         Status::New,
         Status::TooFew,
+        Status::Unpaired,
     ]
     .into_iter()
     .map(Status::describe)
@@ -216,7 +223,59 @@ fn each_status_has_its_words_in_the_report() {
             "retired",
             "new on the head",
             "too few samples",
+            "no common stratum",
         ]
+    );
+}
+
+/// Three runners of very different speed, each shard of the CI job one
+/// of them, the head 12% slower on each: pooled, the spread between
+/// runners would hide the slowdown; paired by stratum, the gate sees it.
+#[test]
+fn the_gate_pairs_each_stratum_s_base_and_head() {
+    let side = |slower: u64| {
+        [1_000, 3_000, 9_000]
+            .into_iter()
+            .enumerate()
+            .map(|(i, ns)| {
+                (
+                    i.to_string(),
+                    Samples::from([(NAME.to_owned(), clean(ns * slower / 100, 10))]),
+                )
+            })
+            .collect::<Strata>()
+    };
+
+    let mut all = decide(&side(100), &side(112), &[]);
+    let c = all.remove(0);
+
+    assert_eq!(c.status, Status::Regressed, "{c:?}");
+    assert!(c.z.is_some_and(|z| z > Z_CRITICAL));
+    assert!(
+        c.failure()
+            .unwrap()
+            .starts_with(&format!("{NAME} regressed by 12.0%"))
+    );
+}
+
+#[test]
+fn a_benchmark_on_no_common_stratum_fails() {
+    let on = |stratum: &str| {
+        Strata::from([(
+            stratum.to_owned(),
+            Samples::from([(NAME.to_owned(), clean(1000, 10))]),
+        )])
+    };
+
+    let c = decide(&on("0"), &on("1"), &[]).remove(0);
+
+    assert_eq!(c.status, Status::Unpaired);
+    assert!(c.fails());
+    assert_eq!(
+        c.failure().unwrap(),
+        format!(
+            "{NAME} was sampled on no stratum both sides share: the gate pairs each shard's base and head"
+        )
     );
 }
 

@@ -47,6 +47,13 @@ pub trait Host {
     /// Fails when the file cannot be written.
     fn write(&self, path: &Path, text: &str) -> Result<(), String>;
 
+    /// Reads `path`, or `None` when there is no such file.
+    ///
+    /// # Errors
+    ///
+    /// Fails when the file exists and cannot be read.
+    fn read(&self, path: &Path) -> Result<Option<String>, String>;
+
     /// Appends `text` to `path`, creating it if need be.
     ///
     /// # Errors
