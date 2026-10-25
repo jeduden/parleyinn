@@ -17,6 +17,19 @@ Outcome:
 
 - ENG-03, ENG-07, ENG-11: passing (cucumber); ENG-07 and ENG-11 have two
   drift cases each.
+- ENG-03's hold on injectable I/O: ruled met by the stakeholder's
+  [consent on PR #91][consent]; the seams are listed in
+  development.md. No
+  ENG-03 step checks the "all I/O through injectable traits" clause
+  mechanically, as plan 2609292011's phase 3 also records.
+- Verify and the start markers' readers open a transcript source or a
+  marker through ingest's guarded open: a link swapped in is not
+  followed and a FIFO is not waited on; verify reports such a source as
+  failed, unreadable (ADM-09, SEC-18, ENG-03).
+- Store schema: `transcript_sources` gained `marked_at` with no schema
+  version bump or migration. Nothing is released yet, so a store made
+  by main's build gets SQLite's column error, not ADM-05's named
+  refusal; acceptable before the first release.
 - parinn-eval: seeded runs in the 2.1.296 line shapes; a scripted agent
   asks event_search then event_get. Within ten hits, 72/72 at each depth
   (Wilson 95% from 94.9%). Within five, depth 3 falls to 87.5%. Without
@@ -65,8 +78,6 @@ For the stakeholder:
   (`INDEX_CHECK_SECS`). On a store whose derivation always takes longer,
   ADM-09's derived artifact check never runs (NFR-05). A ruling on the
   bound is wanted.
-- ENG-03's hold on injectable I/O: the seams are listed in
-  development.md.
 - Verify no longer writes (ruled); wording on PR #90.
 - §11.1 measurement wording on claude/m1-phase-16-docs (PR #90).
 - Stakeholder paths: `.github/workflows/ci.yml` and `nightly.yml`,
@@ -79,3 +90,5 @@ fuzzing, frozen targets, tests and checks. Open: the raised full-row
 scenarios (SEC-12, SEC-17, SEC-19, ENG-22, ADM-09, RCL-02, PRV-09,
 REC-24, LANE-02), the in-part rows' audit, verify's landmark row, the
 erasure residue (phase 15), and ENG-15.
+
+[consent]: https://github.com/jeduden/parleyinn/pull/91#issuecomment-6402652493
