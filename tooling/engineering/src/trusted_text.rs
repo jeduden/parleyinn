@@ -303,7 +303,9 @@ fn methods(code: &str, open: usize, close: usize) -> Vec<Method> {
             '}' => depth -= 1,
             'f' if depth == 1 && code[i..].starts_with("fn") && word_at(code, i, "fn") => {
                 let method = method_at(code, i, close);
-                i = method.body.map_or(i + 2, |(_, end)| end);
+                // Past the body's closing brace, which closes no level
+                // of the impl block.
+                i = method.body.map_or(i + 2, |(_, end)| end + 1);
                 out.push(method);
                 continue;
             }

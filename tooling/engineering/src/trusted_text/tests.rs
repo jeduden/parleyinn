@@ -374,13 +374,36 @@ fn inside_the_crate_self_anywhere_else_is_refused() {
 }
 
 #[test]
+fn every_method_of_an_impl_is_checked_not_the_first_alone() {
+    let text = "\
+impl TrustedText {
+    pub fn fixed(text: &'static str) -> Self { Self(text.to_owned()) }
+    pub fn len(&self) -> usize { self.0.len() }
+    pub fn wrap(recalled: &str) -> Self { Self(recalled.into()) }
+    pub fn append(&mut self, recalled: &str) {}
+}
+";
+
+    let got = problems(text, true);
+
+    assert_eq!(got.len(), 2, "{got:?}");
+    assert!(got[0].starts_with("src/lib.rs:4: "), "{got:?}");
+    assert!(got[0].contains("Self(..) in wrap"), "{got:?}");
+    assert!(got[1].starts_with("src/lib.rs:5: "), "{got:?}");
+    assert!(got[1].contains("the method append"), "{got:?}");
+}
+
+#[test]
 fn an_impl_that_builds_and_changes_nothing_passes_however_it_is_cut() {
     for text in [
-        "impl TrustedText {\n    fn len(&self) -> usize;\n    fn max() -> u8 { Self::MAX }\n    fn same(&self) -> bool { let x: Self = y; Self::len(x) == 0 }\n}",
+        "impl TrustedText {\n    fn len(&self) -> usize;\n    fn max() -> u8 { Self::MAX }\n    fn same(&self) -> bool { let x: Self = y; x.len() == 0 }\n}",
         "impl<T: Into<String>> Other<T> for Mine { fn f() { Self(t) } }",
         "impl Other for Mine;",
         "struct S; impl",
         "impl<T TrustedText",
+        "impl<T TrustedText {}",
+        "fn simple() {} struct Implied;",
+        "impl TrustedText {\n    const C: P = P { a: 1 };\n    fn me() -> u8 { MySelf::new() }\n}",
         "impl TrustedText {\n    fn len(&self) -> usize { 0",
     ] {
         assert_eq!(problems(text, true), Vec::<String>::new(), "{text:?}");
