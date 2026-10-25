@@ -339,12 +339,17 @@ impl Running {
         if new {
             self.marker = StartMarker::leave(&self.capture.home, &transcripts, self.marker.take());
         }
+        // Each read leaves its ingest marker at the time it reads (ADM-09).
+        let inputs = ingest::Inputs {
+            now_ms: (self.capture.clock)().saturating_mul(1000),
+            ..self.capture.inputs.clone()
+        };
         for path in transcripts {
             let read = ingest_live(
                 &self.capture.home,
                 &path,
                 &self.capture.redactor,
-                &self.capture.inputs,
+                &inputs,
                 &mut self.seats,
                 self.capture.limit,
                 &mut OsEntropy,

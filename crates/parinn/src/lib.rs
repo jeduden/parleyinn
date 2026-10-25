@@ -7,6 +7,11 @@
 //! command in the SRS's §9.5 is a pending scenario under features/, and
 //! lands with the plan that makes its scenario pass.
 
+// A lint the core's code would quiet says so with an expectation and a
+// reason, which fails once nothing trips it; a bare allow does not
+// (SEC-01, ENG-16).
+#![deny(clippy::allow_attributes)]
+
 use std::cell::RefCell;
 use std::collections::BTreeMap;
 use std::ffi::OsString;
@@ -1359,9 +1364,12 @@ fn verify_command(
     // residue leaves the search index and the payload store (ENG-06).
     purge::finish(ctx, &mut store);
     let incomplete = match store.sources() {
-        Ok(found) => sources::completeness(&found, &capture::served(&home), &|p| {
-            fs::metadata(p).ok().map(|m| m.len())
-        }),
+        Ok(found) => sources::completeness(
+            &found,
+            &capture::served(&home),
+            &sources::look,
+            (ctx.clock)().saturating_mul(1000),
+        ),
         Err(e) => return failed("verify", &e, stderr),
     };
     let forks = match store.refused_forks() {
@@ -1470,7 +1478,7 @@ fn verified_line(
             "order": r.full_order(),
             "seats": seats_json(&r.seats),
             "open_segments": segments::open_json(&r.open_segments),
-            "pending_sources": incomplete.pending,
+            "short_sources": incomplete.short,
             "staged": staged,
             "audit": {"files": a.files, "entries": a.entries},
             "refused": [],
@@ -1486,13 +1494,14 @@ fn verified_line(
 
     format!(
         "checked {} writers and {} events: every chain, commitment and seat certificate \
-         holds; integrity unsigned, as no log is signed yet; the audit log's chain holds \
-         over {} entries{}{}{staged}",
+         holds; integrity unsigned, as no log is signed yet, so a log cut at its tail or \
+         rewritten whole goes unseen until seals; completeness covers only the transcript \
+         sources the record names; the audit log's chain holds over {} entries{}{}{staged}",
         r.writers,
         r.events,
         a.entries,
         open_text(&r.open_segments),
-        incomplete.pending_text()
+        incomplete.short_text()
     )
 }
 

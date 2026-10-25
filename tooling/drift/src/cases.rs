@@ -71,7 +71,8 @@ pub fn cases() -> Vec<Case> {
         static_analysis_cases(),
         boundary_cases(),
         telemetry_cases(),
-        documentation_cases(),
+        threat_model_cases(),
+        privacy_cases(),
         complexity_cases(),
         trusted_text_cases(),
         toml_cases(),
@@ -964,7 +965,8 @@ fn core_wait_cases() -> Vec<Case> {
                 "checkout",
                 "no_product_crate_keeps_mutable_global_state",
             ),
-            "crates/parinn/src/lib.rs:16: mutable global state: pub static SEQ",
+            // The line number moves with the file; the finding is stable.
+            ": mutable global state: pub static SEQ",
         ),
     ]
 }
@@ -1126,6 +1128,17 @@ fn static_analysis_cases() -> Vec<Case> {
             check("derived_code_is_refused_a_clock_or_randomness_at_build_time"),
             "code that computes derived artifacts may read a clock or randomness: crate parinn: crates/parinn/clippy.toml does not ban std::time::Instant::now in disallowed-methods",
         ),
+        case(
+            "the core's code quieting a lint with a bare allow",
+            "the core's #![deny(clippy::allow_attributes)]",
+            Injection::replace(
+                "crates/parinn/src/licenses.rs",
+                "\nuse std::io::Write;\n",
+                "\n#[allow(unused_imports)]\nuse std::io::Write;\n",
+            ),
+            clippy("parinn"),
+            "#[allow] attribute found",
+        ),
     ]
 }
 
@@ -1183,7 +1196,14 @@ fn boundary_cases() -> Vec<Case> {
                 "[[bin]]\nname = \"rogue\"\npath = \"src/lib.rs\"\n\n[lints]\nworkspace = true\n",
             ),
             gate(BOUNDARY),
-            "the process audit runs as no component the register lists",
+            "the process rogue runs as no component the register lists",
+        ),
+        case(
+            "a second executable in the core's crate, under src/bin",
+            BOUNDARY,
+            Injection::create("crates/parinn/src/bin/rogue.rs", "fn main() {}\n"),
+            gate(BOUNDARY),
+            "the process rogue runs as no component the register lists",
         ),
         case(
             "the core's clippy.toml no longer banning a socket",
@@ -1205,7 +1225,7 @@ fn boundary_cases() -> Vec<Case> {
                 "[[bin]]\nname = \"rogue\"\npath = \"src/lib.rs\"\n\n[lints]\nworkspace = true\n",
             ),
             gate(BUILT),
-            "left: [\"audit\", \"parinn\"]",
+            "left: [\"parinn\", \"rogue\"]",
         ),
     ]
 }
@@ -1236,12 +1256,25 @@ fn telemetry_cases() -> Vec<Case> {
             gate(TELEMETRY),
             "no rejected register row names update checks and telemetry under SEC-15",
         ),
+        // The workspace's own lockfile cannot hold a crate its graph does
+        // not resolve under `--locked`; the fuzz workspace's is read the
+        // same way.
+        case(
+            "a network-client crate in a lockfile",
+            TELEMETRY,
+            Injection::replace(
+                "fuzz/Cargo.lock",
+                "name = \"arbitrary\"",
+                "name = \"reqwest\"",
+            ),
+            gate(TELEMETRY),
+            "fuzz/Cargo.lock resolves reqwest, a crate that reports, checks for updates or reaches a remote host",
+        ),
     ]
 }
 
-/// The drifts the threat model (SEC-17) and the privacy statements
-/// (ENG-22) exist to catch.
-fn documentation_cases() -> Vec<Case> {
+/// The drifts the threat model (SEC-17) exists to catch.
+fn threat_model_cases() -> Vec<Case> {
     vec![
         case(
             "a register row the threat model does not cover",
@@ -1257,6 +1290,67 @@ fn documentation_cases() -> Vec<Case> {
             gate(THREATS),
             "the comparison with Zed Delta leaves out Key custody",
         ),
+        case(
+            "a threat source the threat model names otherwise than §6.1",
+            THREATS,
+            Injection::replace(
+                MODEL,
+                "| S9  | Web page in the person's own browser ",
+                "| S9  | Web page in a browser ",
+            ),
+            gate(THREATS),
+            "differ from those of docs/srs/06-security.md",
+        ),
+        case(
+            "a register row whose sources the threat model leaves empty",
+            THREATS,
+            Injection::replace(
+                MODEL,
+                "| 3   | Kernel worker                             | B0       | S1 ",
+                "| 3   | Kernel worker                             | B0       |    ",
+            ),
+            gate(THREATS),
+            "register row 3 names no known threat source",
+        ),
+        case(
+            "a register row enforced in M1 that cites no test",
+            THREATS,
+            Injection::replace(
+                MODEL,
+                "(CMP-05, ENG-03)                  | pending, M4 ",
+                "(CMP-05, ENG-03)                  | enforced in M1 ",
+            ),
+            gate(THREATS),
+            "register row 3 is enforced in M1 and cites no test",
+        ),
+        case(
+            "no review row for the current minor release",
+            THREATS,
+            Injection::replace(
+                MODEL,
+                "| 0.0     | the agent that wrote phase 15 ",
+                "| 0.9     | the agent that wrote phase 15 ",
+            ),
+            gate(THREATS),
+            "records no review of release 0.0",
+        ),
+        case(
+            "a release reviewed by the one who wrote its threat model",
+            THREATS,
+            Injection::replace(
+                MODEL,
+                "| no one yet  | Written against the register of M1; awaiting the security reviewer |",
+                "| the agent that wrote phase 15 | Reviewed: holds |",
+            ),
+            gate(THREATS),
+            "release 0.0 is reviewed by the one who wrote its threat model",
+        ),
+    ]
+}
+
+/// The drifts the privacy statements (ENG-22) exist to catch.
+fn privacy_cases() -> Vec<Case> {
+    vec![
         case(
             "a privacy statement citing no test",
             PRIVACY,
@@ -1278,6 +1372,17 @@ fn documentation_cases() -> Vec<Case> {
             ),
             gate(PRIVACY),
             "cites a_test_nobody_wrote, which is no test that exists and runs",
+        ),
+        case(
+            "a privacy statement citing a test that is ignored",
+            PRIVACY,
+            Injection::replace(
+                "crates/parinn/tests/reach.rs",
+                "#[test]\nfn the_core_executable_links_only_crates_its_reach_allows() {",
+                "#[test]\n#[ignore = \"drift\"]\nfn the_core_executable_links_only_crates_its_reach_allows() {",
+            ),
+            gate(PRIVACY),
+            "cites the_core_executable_links_only_crates_its_reach_allows, which is no test that exists and runs",
         ),
     ]
 }
@@ -1434,6 +1539,16 @@ fn trusted_text_cases() -> Vec<Case> {
             ),
             gate(),
             "crates/store/src/alias.rs:1: TrustedText is named by a `use .. as` alias, which hides how it is built, outside the restore_block crate",
+        ),
+        case(
+            "a crate implementing a trait that adds to TrustedText",
+            GATE,
+            Injection::create(
+                "crates/store/src/extend.rs",
+                "impl Extend<String> for TrustedText {\n    fn extend<I>(&mut self, recalled: I) {}\n}\n",
+            ),
+            gate(),
+            "crates/store/src/extend.rs:1: TrustedText is changed by the trait Extend, though trusted text is built whole by its four constructors and never added to",
         ),
     ]
 }

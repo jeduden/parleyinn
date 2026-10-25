@@ -36,16 +36,22 @@ fn the_lockfile_names_its_crates() {
 
 #[test]
 fn a_crate_that_reports_updates_or_reaches_a_host_is_denied_by_name_or_family() {
-    let found = denied_crates(LOCK);
+    let found = denied_crates("Cargo.lock", LOCK);
 
     assert_eq!(found.len(), 3, "{found:?}");
     assert!(found[0].starts_with("Cargo.lock resolves sentry-core"));
     assert!(found[1].contains("resolves hyper,"));
     assert!(found[2].contains("resolves self_update"));
     assert_eq!(
-        denied_crates("name = \"serde_json\"\n"),
+        denied_crates("fuzz/Cargo.lock", "name = \"serde_json\"\n"),
         Vec::<String>::new()
     );
+}
+
+#[test]
+fn every_lockfile_the_repository_commits_is_read() {
+    assert_eq!(LOCKFILES, ["Cargo.lock", "fuzz/Cargo.lock"]);
+    assert!(denied_crates("fuzz/Cargo.lock", LOCK)[0].starts_with("fuzz/Cargo.lock resolves"));
 }
 
 #[test]
@@ -164,6 +170,10 @@ fn the_check_reads_the_lockfile_the_code_and_the_register() {
     let (_dir, c) = product(&[]);
     let problems = check(&c);
     assert!(problems[0].starts_with("read Cargo.lock"), "{problems:?}");
+    assert!(
+        problems[1].starts_with("read fuzz/Cargo.lock"),
+        "{problems:?}"
+    );
     assert!(
         problems.iter().any(|p| p.starts_with("read docs/srs")),
         "{problems:?}"

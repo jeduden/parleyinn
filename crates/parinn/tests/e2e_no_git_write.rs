@@ -81,6 +81,9 @@ fn no_component_of_the_core_writes_to_a_repository() {
         "{\"type\":\"atis-latch\",\"atis\":\"\",\"sessionId\":\"s1\"}\n",
     )
     .unwrap();
+    // The fixture's git runs with auto-maintenance and gc off, so no
+    // detached git of its own writes the repository between the two
+    // snapshots: a change between them is the core's.
     let mut before = BTreeMap::new();
     snapshot(&repo, &mut before);
 

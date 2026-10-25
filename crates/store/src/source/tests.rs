@@ -76,6 +76,45 @@ fn a_source_starts_at_generation_1_and_each_new_generation_counts_on() {
 }
 
 #[test]
+fn each_ingest_marker_keeps_when_ingest_left_it_there() {
+    let dir = TempDir::new().unwrap();
+    let mut store = open(&dir).with_marker_time(1_000);
+    let source = store.start_generation("/t/a.jsonl", "/t").unwrap();
+    assert_eq!(source.marked_at, 1_000);
+    assert_eq!(
+        store.source("/t/a.jsonl").unwrap().unwrap().marked_at,
+        1_000
+    );
+
+    let mut store = store.with_marker_time(2_000);
+    store
+        .append_lines(
+            writer(1),
+            &[event(EventKind::TranscriptLine, 1)],
+            &[place(1, None)],
+            &[true],
+            source.id,
+            &position(10, 1),
+        )
+        .unwrap();
+    assert_eq!(
+        store.source("/t/a.jsonl").unwrap().unwrap().marked_at,
+        2_000
+    );
+
+    let mut store = store.with_marker_time(3_000);
+    store.advance(source.id, &position(10, 1)).unwrap();
+    assert_eq!(
+        store.source("/t/a.jsonl").unwrap().unwrap().marked_at,
+        3_000
+    );
+    assert_eq!(
+        open(&dir).source("/t/a.jsonl").unwrap().unwrap().marked_at,
+        3_000
+    );
+}
+
+#[test]
 fn appended_lines_keep_their_places_and_move_the_position_with_them() {
     let dir = TempDir::new().unwrap();
     let mut store = open(&dir);
@@ -315,6 +354,7 @@ fn a_corrupt_row_names_what_does_not_parse() {
             0,
             None,
             false,
+            0,
         )
     };
     let err = source(row("zz")).unwrap_err();

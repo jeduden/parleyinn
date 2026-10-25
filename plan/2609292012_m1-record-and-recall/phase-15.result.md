@@ -7,6 +7,7 @@ summary: >-
   @ADM-11, @OPS-01, @SEC-15, @SEC-17, @SEC-19 and @ENG-22 off @pending
   and passing. SEC-01's core row passes as gate tests. @ADM-09 passes
   seven rows of eight and stays @pending: no landmark exists before M2.
+  The security and domain-model reviews are fixed or raised below.
 ---
 # Phase 15 result
 
@@ -15,43 +16,40 @@ summary: >-
 Outcome:
 
 - ADM-11, OPS-01, SEC-15, SEC-17, SEC-19, ENG-22: off `@pending`,
-  passing (cucumber, built core and repository checkout). `parinn
-  status` adds the store's schema version and what fork detection
-  covers; OPS-01's five operations each audit and count once.
-- ADM-09: seven rows pass (run with the tag lifted); the landmark row
-  cannot run before M2, so the scenario stays `@pending` and is raised.
-  `parinn verify` now checks the store's shape (foreign schema objects,
-  the index's ranking, the index against a derivation rolled back),
-  names the check it failed, and finds transcript sources short of
-  their end.
-- SEC-01's core row: gate tests in `tooling/engineering/tests/boundary.rs`
-  (the scenario stays pending, as ENG-12 and ENG-16). SEC-19, SEC-15,
-  SEC-17 and ENG-22 each have a check, a gate test and drift cases.
+  passing (cucumber). ADM-09: seven rows pass with the tag lifted; the
+  landmark row waits for M2, so it stays `@pending`. SEC-01's core row:
+  gate tests in `tooling/engineering/tests/boundary.rs`.
 - Gates run: scenario gate, fmt, clippy `-D warnings`, `mdsmith check .`,
-  `cargo run -p coverage` (100% in all layers, unit 99% or more).
+  unit tests, `e2e_crash_consistency` (80 kills); the drift suite in CI.
 
-Findings, fixed on the way:
+After the reviews:
 
-- A writer with a seat and no event got an index slot on rebuild and
-  none on first indexing: the index differed by arrival (I10).
-- Counter `redacted` is now `redactions`, as OPS-01 names it.
-- A transcript path that cannot be looked at is `hook_failed`, not a
-  path outside the roots.
+- ADM-09's bound (A1): a source with a whole line past its position is
+  short only while a running MCP server holds it, or while an ingest
+  left its ingest marker there under 10 minutes ago; else exit 3. Each
+  marker keeps when ingest left it (`marked_at`, ingest's clock), and
+  verify reads its own clock: a command, so I10 holds. Ten minutes
+  covers a kill and a rerun (ENG-06) and bounds a lost record.
+- Verify hashes each recorded source's consumed prefix once and fails
+  one cut, replaced or rewritten (A3, I1). Paths are shown escaped (T16).
+- `short_sources`, `VerifyError::Unshipped`; the search index is current
+  only when no event-less writer holds a slot (I10).
+- Threat model: a status per row, test-checked; S5 controls; the
+  threats M1's record adds; review rows name their author.
+- The boundary check reads executables from `cargo metadata`; the
+  telemetry check reads `fuzz/Cargo.lock`; the core denies a bare
+  `allow`. Drift cases for each.
 
 For the stakeholder:
 
-- Names for review (no domain-model agent here): `redactions`, check
-  names in `parinn verify`, `pending_sources`, `docs/security/`.
-- Rulings wanted: ADM-09 says an unserved source past its position
-  fails. ENG-06 needs verify to pass after a kill mid-ingest, so a
-  source an ingest stopped short of is pending; a lost source now
-  fails verify (exit 3, was 0). "Replaced first" is not checked.
-- The review row in the threat model names an agent as reviewer; the
-  security reviewer's review is still to be given.
-- Stakeholder paths touched: `tooling/`, `SECURITY.md` (one citation).
-- OQ-50: raising `hook_budget_exceeded` in ADM-11's scenario fails
-  `doctor` until acknowledged; the scenario does not run doctor.
-- S2 (item `integrity`) untouched; the phase 14 counters reused.
+- Erasure residue: a purge leaves the source's prefix hash, an unkeyed
+  SHA-256 over bytes erased lines are among, and their offsets (test
+  `a_purge_leaves_the_prefix_hash_and_places_of_its_transcript_source`).
+  Clearing it breaks REC-07 resume: a ruling is needed.
+- Does ADM-09 list a `store` check, or does that failure name none?
+- CI clippy `--all-features` is a `.github` change (no crate has
+  features). The release gate refusing an awaiting review needs it too.
+- The served marker is forgeable by a same-user process (threat model).
 
-Parked: landmark rows (M2), the other components' evidence (M7 to M9),
-SEC-01 whole (M7).
+Deferred: ENG-22's phrase and file set, reach.rs textual evidence,
+telemetry deny-list and URL scan, the release gate.

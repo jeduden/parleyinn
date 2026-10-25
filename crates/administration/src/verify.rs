@@ -127,7 +127,7 @@ pub enum VerifyError {
     /// digest, or one the record holds and the store does not.
     DerivedWorktree { worktree: String },
     /// The store holds schema objects this build does not ship (ADM-09).
-    Foreign { objects: Vec<String> },
+    Unshipped { objects: Vec<String> },
     /// The search index differs from what the record derives, or from
     /// the ranking a new one has (ADM-09, I10).
     Index { reason: &'static str },
@@ -159,7 +159,7 @@ impl VerifyError {
             Self::Genesis(_) => "genesis",
             Self::Derived { .. }
             | Self::DerivedWorktree { .. }
-            | Self::Foreign { .. }
+            | Self::Unshipped { .. }
             | Self::Index { .. } => "derived_artifact_consistency",
             Self::NewerSegment(_) => "newer_segment",
             Self::Segments { .. } => "segment",
@@ -186,7 +186,7 @@ impl VerifyError {
             Self::Content { .. } | Self::Payload { .. } => "payload integrity",
             Self::Derived { .. }
             | Self::DerivedWorktree { .. }
-            | Self::Foreign { .. }
+            | Self::Unshipped { .. }
             | Self::Index { .. } => "derived artifact consistency",
             Self::Corrupt(_) | Self::Store(_) => "store",
         }
@@ -208,7 +208,7 @@ impl VerifyError {
             | Self::Genesis(_)
             | Self::Derived { .. }
             | Self::DerivedWorktree { .. }
-            | Self::Foreign { .. }
+            | Self::Unshipped { .. }
             | Self::Index { .. }
             | Self::NewerSegment(_)
             | Self::Segments { .. }
@@ -266,7 +266,7 @@ impl fmt::Display for VerifyError {
                 f,
                 "the identity kept for worktree {worktree} differs from the record's: run parinn rebuild"
             ),
-            Self::Foreign { objects } => write!(
+            Self::Unshipped { objects } => write!(
                 f,
                 "the store holds schema objects this parinn does not ship: {}",
                 objects.join(", ")
@@ -306,7 +306,7 @@ impl From<StoreError> for VerifyError {
 pub fn verify_shape(store: &mut Store) -> Result<(), VerifyError> {
     let objects = store.foreign_schema_objects()?;
     if !objects.is_empty() {
-        return Err(VerifyError::Foreign { objects });
+        return Err(VerifyError::Unshipped { objects });
     }
     let ranks = match store.search_index_ranking_is_shipped() {
         Err(StoreError::NoIndex) => return Ok(()),

@@ -14,6 +14,16 @@ fn checkout() -> Checkout {
     Checkout::new(&testkit::repo_root())
 }
 
+/// The workspace's `cargo metadata`, read with `PARINN_HOME` in a
+/// temporary directory (ENG-14).
+fn metadata() -> Result<String, String> {
+    let home = testkit::TempDir::new().map_err(|e| e.to_string())?;
+    let cargo = std::env::var_os("CARGO").unwrap_or_else(|| "cargo".into());
+    let manifest = testkit::repo_root().join("Cargo.toml");
+
+    engineering::dependencies::cargo_metadata(&cargo, &manifest, home.path())
+}
+
 fn ci(c: &Checkout) -> Workflow {
     review_workflow::parse(&c.read(static_analysis::CI_WORKFLOW).unwrap_or_default())
 }
@@ -25,7 +35,7 @@ fn ci(c: &Checkout) -> Workflow {
 fn the_boundary_register_assigns_each_component_once_and_the_core_keeps_its_evidence() {
     let c = checkout();
 
-    let problems = boundary::check(&c, &ci(&c));
+    let problems = boundary::check(&c, &ci(&c), &metadata().unwrap());
 
     assert!(problems.is_empty(), "{}", problems.join("\n"));
 }
@@ -51,7 +61,7 @@ fn only_the_core_is_built_and_it_sits_in_b0() {
     let c = checkout();
     let rows = boundary::register(&c).unwrap();
 
-    let found = boundary::executables(&c).unwrap();
+    let found = boundary::executables(&metadata().unwrap()).unwrap();
 
     assert_eq!(found, ["parinn"]);
     assert!(

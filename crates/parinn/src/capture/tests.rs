@@ -209,6 +209,23 @@ fn live_ingest_takes_only_its_own_harness_process_s_binding_and_reads_its_tool_u
 }
 
 #[test]
+fn each_live_read_leaves_its_ingest_marker_at_the_time_on_the_server_s_clock() {
+    let f = Fixture::new();
+    std::fs::write(f.main(), line(1, None)).unwrap();
+    f.bind(SESSION, &f.main(), HARNESS);
+    let mut running = f.running(Some(HARNESS), None);
+    running.bind();
+
+    running.poll();
+
+    let sources = Store::open(&f.home.store()).unwrap().sources().unwrap();
+    assert_eq!(
+        sources.iter().map(|s| s.marked_at).collect::<Vec<_>>(),
+        [1_760_000_000_000]
+    );
+}
+
+#[test]
 fn a_stop_short_of_a_transcript_s_end_is_audited_by_the_server() {
     let f = Fixture::new();
     std::fs::write(f.main(), (1..=4).map(|n| line(n, None)).collect::<String>()).unwrap();

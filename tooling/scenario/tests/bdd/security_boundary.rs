@@ -52,7 +52,10 @@ fn the_register(w: &mut World) -> Result<(), String> {
 fn boundary_check_runs(w: &mut World) -> Result<(), String> {
     let c = checkout(w)?;
     let flow = review_workflow::parse(&c.read(static_analysis::CI_WORKFLOW)?);
-    ops(w).problems = boundary::check(&c, &flow);
+    let cargo = std::env::var_os("CARGO").unwrap_or_else(|| "cargo".into());
+    let manifest = c.root.join("Cargo.toml");
+    let metadata = engineering::dependencies::cargo_metadata(&cargo, &manifest, &w.parinn_home)?;
+    ops(w).problems = boundary::check(&c, &flow, &metadata);
     Ok(())
 }
 

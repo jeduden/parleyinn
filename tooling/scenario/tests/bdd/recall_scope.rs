@@ -68,12 +68,15 @@ pub fn serves_a_run(w: &mut World) -> bool {
     steps(w).bound
 }
 
-/// A seat in `room` for `writer`, with `count` events saying `deploy`.
+/// A seat in `room` for `writer`, with `count` events saying `deploy`,
+/// and, when `run` names one, the run ingest recorded in it: its harness
+/// session, and the worktree its transcript lies under, a run's
+/// transcript path being where the record keeps its worktree.
 fn seat_with_events(
     store: &mut Store,
     writer: WriterId,
     room: RoomId,
-    run: Option<&str>,
+    run: Option<(&str, &str)>,
     count: u64,
 ) -> Result<(), String> {
     store
@@ -84,11 +87,11 @@ fn seat_with_events(
             certificate: json!({}),
         })
         .map_err(|e| e.to_string())?;
-    if let Some(run) = run {
+    if let Some((run, worktree)) = run {
         store
             .add_run(&IngestedRun {
                 writer,
-                path: format!("/w/app/{run}.jsonl"),
+                path: format!("{worktree}/{run}.jsonl"),
                 harness_session: run.to_owned(),
                 agent_id: None,
             })
@@ -158,10 +161,30 @@ fn the_world(w: &mut World) -> Result<(), String> {
         l1,
         l2,
     };
-    seat_with_events(&mut store, world.own[1], l1, Some(&own.harness_session), 3)?;
-    seat_with_events(&mut store, world.others[0], l1, Some("other-a"), 6)?;
-    seat_with_events(&mut store, world.others[1], l1, Some("other-b"), 3)?;
-    seat_with_events(&mut store, world.elsewhere, l2, Some("other-c"), 3)?;
+    // The other runs in L1 lie on two worktrees of their own.
+    let own_run = (own.harness_session.as_str(), "/w/app");
+    seat_with_events(&mut store, world.own[1], l1, Some(own_run), 3)?;
+    seat_with_events(
+        &mut store,
+        world.others[0],
+        l1,
+        Some(("other-a", "/w/app-a")),
+        6,
+    )?;
+    seat_with_events(
+        &mut store,
+        world.others[1],
+        l1,
+        Some(("other-b", "/w/app-b")),
+        3,
+    )?;
+    seat_with_events(
+        &mut store,
+        world.elsewhere,
+        l2,
+        Some(("other-c", "/w/app")),
+        3,
+    )?;
     // The labels the device seat assigned: A1 is the run's own writer,
     // A2 an other run's in L1.
     let node = administration::node::Node::find(&home(w)?, &store).map_err(|e| e.to_string())?;

@@ -6,8 +6,6 @@
 //! core is the one component the repository builds; the rows of the
 //! components that follow need their evidence when their crates land.
 
-use std::fs;
-
 use crate::review_workflow::Workflow;
 use crate::{Checkout, static_analysis};
 
@@ -143,21 +141,40 @@ pub fn tunnel_has_its_own_row(rows: &[Row]) -> Vec<String> {
     problems
 }
 
-/// The executables the product crates build: each crate with a
-/// `src/main.rs` or a `[[bin]]` target, by its binary's name.
+/// The executables the product crates build, by name, sorted: every
+/// target of kind `bin` that `cargo metadata` lists for a package under
+/// `crates/`, whether a `[[bin]]` table, `src/main.rs` or a file under
+/// `src/bin/` declares it.
 ///
 /// # Errors
 ///
-/// Fails when `crates/` cannot be listed.
-pub fn executables(c: &Checkout) -> Result<Vec<String>, String> {
-    let mut found = Vec::new();
-    for name in crate::product_crates::crates(c)? {
-        let dir = c.root.join("crates").join(&name);
-        let manifest = fs::read_to_string(dir.join("Cargo.toml")).unwrap_or_default();
-        if dir.join("src/main.rs").is_file() || manifest.contains("[[bin]]") {
-            found.push(name);
-        }
-    }
+/// Fails when `metadata` is not cargo's JSON.
+pub fn executables(metadata: &str) -> Result<Vec<String>, String> {
+    let value: serde_json::Value =
+        serde_json::from_str(metadata).map_err(|e| format!("read cargo metadata: {e}"))?;
+    let root = value["workspace_root"].as_str().unwrap_or_default();
+    let product = std::path::Path::new(root).join(crate::architecture::PRODUCT);
+    let mut found: Vec<String> = value["packages"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter(|p| {
+            p["manifest_path"]
+                .as_str()
+                .is_some_and(|m| std::path::Path::new(m).starts_with(&product))
+        })
+        .flat_map(|p| p["targets"].as_array().into_iter().flatten())
+        .filter(|t| {
+            t["kind"]
+                .as_array()
+                .into_iter()
+                .flatten()
+                .any(|k| k == "bin")
+        })
+        .filter_map(|t| t["name"].as_str().map(str::to_owned))
+        .collect();
+    found.sort();
+    found.dedup();
 
     Ok(found)
 }
@@ -200,14 +217,15 @@ pub fn evidence(c: &Checkout, flow: &Workflow, found: &[String]) -> Vec<String> 
 }
 
 /// The CI boundary check: every problem of the register, the processes
-/// and the evidence, in the checkout (SEC-19).
+/// `metadata`, the workspace's `cargo metadata`, lists, and the
+/// evidence, in the checkout (SEC-19).
 #[must_use]
-pub fn check(c: &Checkout, flow: &Workflow) -> Vec<String> {
+pub fn check(c: &Checkout, flow: &Workflow, metadata: &str) -> Vec<String> {
     let rows = match register(c) {
         Ok(rows) => rows,
         Err(e) => return vec![e],
     };
-    let found = match executables(c) {
+    let found = match executables(metadata) {
         Ok(found) => found,
         Err(e) => return vec![e],
     };

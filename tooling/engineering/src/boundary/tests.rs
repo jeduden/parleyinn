@@ -119,24 +119,56 @@ fn checkout_with(bins: &[&str]) -> (TempDir, Checkout) {
         std::fs::write(krate.join("Cargo.toml"), "[package]\n").unwrap();
         std::fs::write(krate.join("src/main.rs"), "fn main() {}").unwrap();
     }
-    let lib = dir.path().join("crates/library");
-    std::fs::create_dir_all(lib.join("src")).unwrap();
-    std::fs::write(lib.join("Cargo.toml"), "[package]\n").unwrap();
-    std::fs::write(lib.join("src/lib.rs"), "").unwrap();
-    let declared = dir.path().join("crates/declared");
-    std::fs::create_dir_all(&declared).unwrap();
-    std::fs::write(declared.join("Cargo.toml"), "[[bin]]\nname = \"x\"\n").unwrap();
     let c = Checkout::new(dir.path());
 
     (dir, c)
 }
 
-#[test]
-fn executables_are_the_crates_with_a_main_or_a_bin_target() {
-    let (_dir, c) = checkout_with(&["parinn"]);
+/// `cargo metadata` of a workspace at `/w`, each package with its
+/// directory and its targets by name and kind.
+fn metadata(packages: &[(&str, &[(&str, &str)])]) -> String {
+    let packages: Vec<serde_json::Value> = packages
+        .iter()
+        .map(|(dir, targets)| {
+            let targets: Vec<serde_json::Value> = targets
+                .iter()
+                .map(|(name, kind)| serde_json::json!({"name": name, "kind": [kind]}))
+                .collect();
+            serde_json::json!({"manifest_path": format!("/w/{dir}/Cargo.toml"), "targets": targets})
+        })
+        .collect();
 
-    assert_eq!(executables(&c).unwrap(), ["declared", "parinn"]);
-    assert!(executables(&Checkout::new(std::path::Path::new("/nonexistent"))).is_err());
+    serde_json::json!({"workspace_root": "/w", "packages": packages}).to_string()
+}
+
+/// The repository's own `cargo metadata`.
+fn repository_metadata() -> String {
+    let home = TempDir::new().unwrap();
+    let cargo = std::env::var_os("CARGO").unwrap_or_else(|| "cargo".into());
+
+    crate::dependencies::cargo_metadata(
+        &cargo,
+        &testkit::repo_root().join("Cargo.toml"),
+        home.path(),
+    )
+    .unwrap()
+}
+
+#[test]
+fn executables_are_the_bin_targets_of_the_product_crates_however_declared() {
+    let found = metadata(&[
+        (
+            "crates/parinn",
+            &[("parinn", "bin"), ("parinn", "lib"), ("rogue", "bin")],
+        ),
+        ("crates/library", &[("library", "lib")]),
+        ("crates/declared", &[("x", "bin")]),
+        ("tooling/engineering", &[("protection-check", "bin")]),
+    ]);
+
+    assert_eq!(executables(&found).unwrap(), ["parinn", "rogue", "x"]);
+    assert!(executables("nope").is_err());
+    assert_eq!(executables(&repository_metadata()).unwrap(), ["parinn"]);
 }
 
 #[test]
@@ -181,10 +213,11 @@ fn the_core_needs_its_reach_evidence_and_an_unknown_process_has_none() {
 #[test]
 fn the_check_reports_a_missing_register_and_the_repository_passes_it() {
     let (_dir, c) = checkout_with(&["parinn"]);
-    assert!(check(&c, &flow())[0].starts_with("read docs/srs"));
+    let declared = metadata(&[("crates/parinn", &[("parinn", "bin"), ("declared", "bin")])]);
+    assert!(check(&c, &flow(), &declared)[0].starts_with("read docs/srs"));
     std::fs::create_dir_all(_dir.path().join("docs/srs")).unwrap();
     std::fs::write(_dir.path().join(REGISTER), TABLE).unwrap();
-    let problems = check(&c, &flow());
+    let problems = check(&c, &flow(), &declared);
     assert!(
         problems.iter().any(|p| p.contains("the process declared")),
         "{problems:?}"
@@ -192,17 +225,23 @@ fn the_check_reports_a_missing_register_and_the_repository_passes_it() {
 
     let real = Checkout::new(&testkit::repo_root());
     let ci = parse(&real.read(static_analysis::CI_WORKFLOW).unwrap());
-    assert_eq!(check(&real, &ci), Vec::<String>::new());
+    assert_eq!(
+        check(&real, &ci, &repository_metadata()),
+        Vec::<String>::new()
+    );
 }
 
 #[test]
-fn a_checkout_without_crates_fails_the_check_naming_the_listing() {
+fn metadata_that_does_not_parse_fails_the_check_saying_so() {
     let dir = TempDir::new().unwrap();
     std::fs::create_dir_all(dir.path().join("docs/srs")).unwrap();
     std::fs::write(dir.path().join(REGISTER), TABLE).unwrap();
 
-    let problems = check(&Checkout::new(dir.path()), &flow());
+    let problems = check(&Checkout::new(dir.path()), &flow(), "nope");
 
     assert_eq!(problems.len(), 1);
-    assert!(problems[0].starts_with("list crates"), "{problems:?}");
+    assert!(
+        problems[0].starts_with("read cargo metadata"),
+        "{problems:?}"
+    );
 }

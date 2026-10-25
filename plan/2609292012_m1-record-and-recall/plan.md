@@ -46,8 +46,7 @@ how the components ship.
 
 ### Scope
 
-§12.2 lists M1's scope, and this plan takes all of it. These rows
-land in full:
+§12.2 lists M1's scope, and this plan takes all of it. These rows land in full:
 
 - REC P0, PRV P0 (PRV-01 to PRV-06, PRV-08, PRV-09, PRV-11, PRV-14)
   and RCL P0, with RCL-08
@@ -90,21 +89,22 @@ ENG-08 prove CON-05.
 
 ### What the spikes left
 
-- **S2** ([ADR-2610110553], proposed): `rusqlite` without default
-  features, SQLite without extension loading, a C compiler and both musl
-  targets' headers pinned on the Linux builder.
+- **S2** ([ADR-2610110553], proposed): `rusqlite` without default features,
+  SQLite without extension loading, a C compiler and both musl targets' headers
+  pinned on the Linux builder. BM25 ranks the newest 2,000 matches, 172 ms p95
+  (NFR-03).
 - **S7** ([ADR-2610102211], proposed): an in-house stdio MCP server.
-- **S1, S3 and S13**: Claude Code 2.1.296's hook inputs and transcripts
-  under `testdata/claude-code`. The parser's cargo-fuzz target is seeded
-  from them (ENG-07). A fork's repeated lines are recorded once (REC-04),
-  the MCP server ingests live (REC-13), and a drifting line stays
-  untrusted `harness_text` (REC-26).
-- **S8**: the conservative model-token estimator of §8.4. Six targets
-  freeze when M1 builds what uses them (§12.3): NFR-09's overhead, REC-11's
-  cap, REC-17's secret, RCL-02's hits, RCL-03's cap and SEC-04's terms.
-- **S12** (plan 2610012322): index row ids derive from addresses; a purge
-  sets `secure_delete` and FTS5's `secure-delete` and checkpoints the WAL;
-  a `user` event's trust needs the deployment mode.
+- **S1, S3 and S13**: Claude Code 2.1.296's hook inputs and transcripts under
+  `testdata/claude-code`. The parser's cargo-fuzz target is seeded from them
+  (ENG-07). A fork's repeated lines are recorded once (REC-04), the MCP server
+  ingests live (REC-13), and a drifting line stays untrusted `harness_text`
+  (REC-26).
+- **S8**: the conservative model-token estimator of §8.4. Six targets freeze
+  when M1 builds what uses them (§12.3): NFR-09's overhead, REC-11's cap,
+  REC-17's secret, RCL-02's hits, RCL-03's cap and SEC-04's terms.
+- **S12** (plan 2610012322): index row ids derive from addresses; a purge sets
+  `secure_delete` and FTS5's `secure-delete` and checkpoints the WAL; a `user`
+  event's trust needs the deployment mode.
 
 ### The stakeholder's rulings of 14 October 2026
 
@@ -274,8 +274,9 @@ footer: |
 | 14  | ✅     | [Quarantine and parinn purge --range](phase-14.md)                                                                                                                                                                                                                                                                                                                                                                     |
 |     | ↳      | @RCL-06, @REC-17 and @SEC-22 off @pending and passing; so are @RCL-08 and @REC-06, whose purged-range steps now run. A purge erases a range and records a tombstone in one transaction, a quarantine holds events out of recall by selector, and an ingest purges what a retention policy has aged out. @SEC-12 passes seven rows of eight and stays @pending: its flag row needs PRV-07 (M5).                         |
 | 15  | ✅     | [Operations: verify, status, audit, the boundary and the threat model](phase-15.md)                                                                                                                                                                                                                                                                                                                                    |
-|     | ↳      | @ADM-11, @OPS-01, @SEC-15, @SEC-17, @SEC-19 and @ENG-22 off @pending and passing. SEC-01's core row passes as gate tests. @ADM-09 passes seven rows of eight and stays @pending: no landmark exists before M2.                                                                                                                                                                                                         |
+|     | ↳      | @ADM-11, @OPS-01, @SEC-15, @SEC-17, @SEC-19 and @ENG-22 off @pending and passing. SEC-01's core row passes as gate tests. @ADM-09 passes seven rows of eight and stays @pending: no landmark exists before M2. The security and domain-model reviews are fixed or raised below.                                                                                                                                        |
 | 16  | 🔳     | [Exit: the engineering gates, the recall evaluation and the S12 rebuild test](phase-16.md)                                                                                                                                                                                                                                                                                                                             |
+|     | ↳      | @ENG-03, @ENG-07 and @ENG-11 off @pending and passing. parinn-eval recalls 216 of 216 planted values after one to three compactions within ten hits; the S12 rebuild test passes. @ENG-06, @ENG-09, @ENG-15, @ENG-23 and @ENG-29 stay @pending, each raised.                                                                                                                                                           |
 <?/catalog?>
 
 ## Acceptance Criteria

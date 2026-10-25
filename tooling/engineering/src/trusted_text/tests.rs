@@ -310,3 +310,144 @@ fn a_comment_or_literal_the_file_ends_in_is_blanked_to_its_end() {
         assert!(!blanked.contains("open"), "{text:?}");
     }
 }
+
+#[test]
+fn inside_the_crate_self_builds_one_only_in_the_four_constructors() {
+    let allowed = "\
+pub struct TrustedText(String);
+impl TrustedText {
+    pub fn fixed(text: &'static str) -> Self { Self(text.to_owned()) }
+    pub fn pin(pin: &Pin) -> Self { Self(pin.text().to_owned()) }
+    pub fn field(field: &Field) -> Self { Self { s: field.sanitized() } }
+    pub fn join(parts: &[Self]) -> Self { Self(parts.iter().map(|p| p.0.as_str()).collect()) }
+    pub fn hint() -> Self { Self::fixed(\"recall with event_get\") }
+    pub fn as_str(&self) -> &str { let Self(s) = self; s }
+    pub fn len(&self) -> usize { self.0.len() }
+}
+";
+
+    assert_eq!(problems(allowed, true), Vec::<String>::new());
+}
+
+#[test]
+fn inside_the_crate_self_anywhere_else_is_refused() {
+    for (text, how) in [
+        (
+            "impl TrustedText {\n    pub fn wrap(s: &str) -> Self { Self(s.into()) }\n}",
+            "Self(..) in wrap",
+        ),
+        (
+            "impl TrustedText {\n    pub fn wrap(s: &str) -> Self { Self { s: s.into() } }\n}",
+            "Self { .. } in wrap",
+        ),
+        (
+            "impl TrustedText {\n    pub fn pin(p: &Pin) -> Self { Self::wrap(p) }\n}",
+            "Self::wrap",
+        ),
+        (
+            "impl restore_block::TrustedText {\n    fn hint() -> Self { Self::new(x) }\n}",
+            "Self::new",
+        ),
+        (
+            "impl Clone for TrustedText {\n    fn clone(&self) -> Self { Self(self.0.clone()) }\n}",
+            "Self(..) in clone",
+        ),
+    ] {
+        let got = problems(text, true);
+
+        assert_eq!(got.len(), 1, "{text:?}: {got:?}");
+        assert!(got[0].starts_with("src/lib.rs:2: "), "{got:?}");
+        assert!(
+            got[0].contains(&format!("builds TrustedText by {how}")),
+            "{how}: {got:?}"
+        );
+    }
+    let got = problems(
+        "impl TrustedText {\n    fn hint(recalled: &str) -> Self { Self::fixed(recalled) }\n}",
+        true,
+    );
+    assert_eq!(got.len(), 1, "{got:?}");
+    assert!(
+        got[0].contains("fixed from something but a string literal"),
+        "{got:?}"
+    );
+}
+
+#[test]
+fn every_method_of_an_impl_is_checked_not_the_first_alone() {
+    let text = "\
+impl TrustedText {
+    pub fn fixed(text: &'static str) -> Self { Self(text.to_owned()) }
+    pub fn len(&self) -> usize { self.0.len() }
+    pub fn wrap(recalled: &str) -> Self { Self(recalled.into()) }
+    pub fn append(&mut self, recalled: &str) {}
+}
+";
+
+    let got = problems(text, true);
+
+    assert_eq!(got.len(), 2, "{got:?}");
+    assert!(got[0].starts_with("src/lib.rs:4: "), "{got:?}");
+    assert!(got[0].contains("Self(..) in wrap"), "{got:?}");
+    assert!(got[1].starts_with("src/lib.rs:5: "), "{got:?}");
+    assert!(got[1].contains("the method append"), "{got:?}");
+}
+
+#[test]
+fn an_impl_that_builds_and_changes_nothing_passes_however_it_is_cut() {
+    for text in [
+        "impl TrustedText {\n    fn len(&self) -> usize;\n    fn max() -> u8 { Self::MAX }\n    fn same(&self) -> bool { let x: Self = y; x.len() == 0 }\n}",
+        "impl<T: Into<String>> Other<T> for Mine { fn f() { Self(t) } }",
+        "impl Other for Mine;",
+        "struct S; impl",
+        "impl<T TrustedText",
+        "impl<T TrustedText {}",
+        "fn simple() {} struct Implied;",
+        "impl TrustedText {\n    const C: P = P { a: 1 };\n    fn me() -> u8 { MySelf::new() }\n}",
+        "impl TrustedText {\n    fn len(&self) -> usize { 0",
+    ] {
+        assert_eq!(problems(text, true), Vec::<String>::new(), "{text:?}");
+    }
+}
+
+#[test]
+fn a_change_to_trusted_text_is_refused_inside_the_crate_and_out() {
+    for (text, what) in [
+        (
+            "impl std::ops::Add<&str> for TrustedText {\n    type Output = Self;\n}",
+            "the trait Add",
+        ),
+        (
+            "impl AddAssign<String> for TrustedText {}",
+            "the trait AddAssign",
+        ),
+        (
+            "impl<'a> Extend<&'a str> for TrustedText {}",
+            "the trait Extend",
+        ),
+        ("impl fmt::Write for TrustedText {}", "the trait Write"),
+        ("impl DerefMut for TrustedText {}", "the trait DerefMut"),
+        (
+            "impl TrustedText {\n    pub fn append(&mut self, s: &str) { self.0.push_str(s) }\n}",
+            "the method append, which takes mut self",
+        ),
+        (
+            "impl TrustedText {\n    pub fn then(mut self, s: &str) -> Self { self.0 += s; self }\n}",
+            "the method then, which takes mut self",
+        ),
+        (
+            "impl TrustedText {\n    pub fn push_str(&self, s: &str) {}\n}",
+            "the method push_str",
+        ),
+    ] {
+        for inside in [true, false] {
+            let got = problems(text, inside);
+
+            assert_eq!(got.len(), 1, "{text:?} inside {inside}: {got:?}");
+            assert!(
+                got[0].contains(&format!("TrustedText is changed by {what}")),
+                "{what}: {got:?}"
+            );
+        }
+    }
+}

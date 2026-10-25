@@ -15,6 +15,16 @@
 //! construction: `fn f(t: &TrustedText)` and `-> TrustedText` are how a
 //! restore builder takes and passes trusted text.
 //!
+//! Inside an `impl` block for the type, `Self(..)` and `Self { .. }`
+//! build one only in the bodies of those four constructors of the
+//! inherent `impl`, and `Self::name(..)` is held to what
+//! `TrustedText::name(..)` would be. Nothing changes trusted text once
+//! built: an implementation of a trait that adds to it (`Add`,
+//! `AddAssign`, `Extend`, `fmt::Write` and the rest of [`CHANGING`]),
+//! and a method that takes `mut self` or is named for adding in place
+//! (`push_str`, `append` ...), are refused inside the crate and out. A
+//! `let Self(..)` pattern takes one apart and builds nothing.
+//!
 //! Three forms hide a construction behind another name and are refused
 //! wherever they stand: `use .. TrustedText as X`, `type X = TrustedText`
 //! and the qualified path `<TrustedText>::name`. This is a text check,
@@ -41,6 +51,30 @@ const BUILDING: [&str; 6] = [
     "Default",
     "FromIterator",
     "Deserialize",
+];
+
+/// The traits whose implementation for `TrustedText` changes one after
+/// it is built, adding to it what a constructor never vetted.
+const CHANGING: [&str; 9] = [
+    "Add",
+    "AddAssign",
+    "Extend",
+    "Write",
+    "DerefMut",
+    "AsMut",
+    "BorrowMut",
+    "IndexMut",
+    "Sub",
+];
+
+/// The methods whose names say they add to a value in place.
+const CHANGING_METHODS: [&str; 6] = [
+    "push",
+    "push_str",
+    "append",
+    "extend",
+    "insert",
+    "write_str",
 ];
 
 /// The type's name.
@@ -123,8 +157,286 @@ fn check_file(file: &str, text: &str, inside: bool) -> Vec<String> {
             problems.push(format!("{file}:{line}: {why}"));
         }
     }
+    for (offset, why) in impl_problems(&code) {
+        let line = code[..offset].matches('\n').count() + 1;
+        problems.push(format!("{file}:{line}: {why}"));
+    }
 
     problems
+}
+
+/// What the `impl` blocks for `TrustedText` in `code` do that the rule
+/// refuses, each at its offset: an implementation of a trait that
+/// changes one, a method that changes one, and a value built through
+/// `Self` anywhere but the four constructors of the inherent `impl`.
+fn impl_problems(code: &str) -> Vec<(usize, String)> {
+    let mut out = Vec::new();
+    for (at, _) in code.match_indices("impl") {
+        if !word_at(code, at, "impl") {
+            continue;
+        }
+        let Some(open) = code[at..].find(['{', ';']).map(|i| at + i) else {
+            continue;
+        };
+        if code[open..].starts_with(';') {
+            continue;
+        }
+        let (implemented, target) = impl_header(&code[at + "impl".len()..open]);
+        if last_segment(target) != NAME {
+            continue;
+        }
+        let close = matching(code, open);
+        if let Some(name) = implemented.map(last_segment)
+            && CHANGING.contains(&name)
+        {
+            out.push((
+                at,
+                format!("TrustedText is changed by the trait {name}, {CHANGED}"),
+            ));
+        }
+        for item in methods(code, open, close) {
+            out.extend(method_problems(code, &item, implemented.is_none()));
+        }
+    }
+
+    out
+}
+
+/// Why a change after building is refused.
+const CHANGED: &str =
+    "though trusted text is built whole by its four constructors and never added to";
+
+/// Whether `word` stands alone at `at` in `code`.
+fn word_at(code: &str, at: usize, word: &str) -> bool {
+    let id = |c: char| c.is_alphanumeric() || c == '_';
+    !code[..at].chars().next_back().is_some_and(id)
+        && !code[at + word.len()..].chars().next().is_some_and(id)
+}
+
+/// The trait an `impl` header implements, if it names one, and the type
+/// it implements it for; the header is the text between `impl` and the
+/// block.
+fn impl_header(header: &str) -> (Option<&str>, &str) {
+    let header = skip_generics(header.trim_start());
+    let mut depth = 0i32;
+    for (i, c) in header.char_indices() {
+        match c {
+            '<' => depth += 1,
+            '>' => depth -= 1,
+            _ if depth == 0 && header[i..].starts_with("for") && word_at(header, i, "for") => {
+                return (Some(header[..i].trim()), header[i + 3..].trim());
+            }
+            _ => {}
+        }
+    }
+
+    (None, header.trim())
+}
+
+/// `text` past the generic parameters it starts with, if any.
+fn skip_generics(text: &str) -> &str {
+    if !text.starts_with('<') {
+        return text;
+    }
+    let mut depth = 0;
+    for (i, c) in text.char_indices() {
+        match c {
+            '<' => depth += 1,
+            '>' => {
+                depth -= 1;
+                if depth == 0 {
+                    return &text[i + 1..];
+                }
+            }
+            _ => {}
+        }
+    }
+
+    ""
+}
+
+/// The last segment of the path `path` names, its generic arguments and
+/// a `where` clause left off.
+fn last_segment(path: &str) -> &str {
+    let path = path.split(['<', ' ', '\n']).next().unwrap_or_default();
+    path.rsplit("::").next().unwrap_or_default().trim()
+}
+
+/// The offset of the brace that closes the one at `open`, or the end.
+fn matching(code: &str, open: usize) -> usize {
+    let mut depth = 0;
+    for (i, c) in code[open..].char_indices() {
+        match c {
+            '{' => depth += 1,
+            '}' => {
+                depth -= 1;
+                if depth == 0 {
+                    return open + i;
+                }
+            }
+            _ => {}
+        }
+    }
+
+    code.len()
+}
+
+/// One method of an `impl` block.
+struct Method {
+    at: usize,
+    name: String,
+    receiver_mut: bool,
+    /// Its body's braces, when it has one.
+    body: Option<(usize, usize)>,
+}
+
+/// The methods the `impl` block whose braces are at `open` and `close`
+/// holds, at its top level.
+fn methods(code: &str, open: usize, close: usize) -> Vec<Method> {
+    let mut out = Vec::new();
+    let mut depth = 0;
+    let mut i = open;
+    while i < close {
+        let c = code[i..].chars().next().unwrap_or(' ');
+        match c {
+            '{' => depth += 1,
+            '}' => depth -= 1,
+            'f' if depth == 1 && code[i..].starts_with("fn") && word_at(code, i, "fn") => {
+                let method = method_at(code, i, close);
+                // Past the body's closing brace, which closes no level
+                // of the impl block.
+                i = method.body.map_or(i + 2, |(_, end)| end + 1);
+                out.push(method);
+                continue;
+            }
+            _ => {}
+        }
+        i += c.len_utf8();
+    }
+
+    out
+}
+
+/// The method whose `fn` is at `at`, its block ending by `close`.
+fn method_at(code: &str, at: usize, close: usize) -> Method {
+    let rest = code[at + 2..close].trim_start();
+    let name: String = rest
+        .chars()
+        .take_while(|c| c.is_alphanumeric() || *c == '_')
+        .collect();
+    let params = code[at..close]
+        .find('(')
+        .map(|p| {
+            let p = at + p;
+            let end = code[p..close].find(')').map_or(close, |e| p + e);
+            code[p + 1..end]
+                .split_whitespace()
+                .collect::<Vec<_>>()
+                .join(" ")
+        })
+        .unwrap_or_default();
+    let receiver = params.split(',').next().unwrap_or_default().trim();
+    let receiver_mut = receiver.ends_with("mut self") || receiver.starts_with("mut self");
+    let body = code[at..close]
+        .find(['{', ';'])
+        .map(|b| at + b)
+        .filter(|b| code[*b..].starts_with('{'))
+        .map(|b| (b, matching(code, b)));
+
+    Method {
+        at,
+        name,
+        receiver_mut,
+        body,
+    }
+}
+
+/// What the rule refuses in `method`, of the inherent `impl` or not.
+fn method_problems(code: &str, method: &Method, inherent: bool) -> Vec<(usize, String)> {
+    let mut out = Vec::new();
+    let name = &method.name;
+    if inherent && method.receiver_mut {
+        out.push((
+            method.at,
+            format!("TrustedText is changed by the method {name}, which takes mut self, {CHANGED}"),
+        ));
+    } else if inherent && CHANGING_METHODS.contains(&name.as_str()) {
+        out.push((
+            method.at,
+            format!("TrustedText is changed by the method {name}, {CHANGED}"),
+        ));
+    }
+    let Some((open, close)) = method.body else {
+        return out;
+    };
+    let constructor = inherent && CONSTRUCTORS.contains(&name.as_str());
+    for (at, _) in code[open..close].match_indices("Self") {
+        let at = open + at;
+        if !word_at(code, at, "Self") {
+            continue;
+        }
+        let before = code[..at].trim_end();
+        if before.ends_with("let") && word_at(code, before.len() - 3, "let") {
+            continue;
+        }
+        let rest = code[at + 4..].trim_start();
+        let how = if rest.starts_with('(') {
+            format!("Self(..) in {name}")
+        } else if rest.starts_with('{') {
+            format!("Self {{ .. }} in {name}")
+        } else if let Some(path) = rest.strip_prefix("::") {
+            let called: String = path
+                .trim_start()
+                .chars()
+                .take_while(|c| c.is_alphanumeric() || *c == '_')
+                .collect();
+            let after = path.trim_start()[called.len()..].trim_start();
+            if !after.starts_with('(') {
+                continue;
+            }
+            if CONSTRUCTORS.contains(&called.as_str()) {
+                if called == "fixed" && !fixed_argument_ok(after) {
+                    out.push((at, fixed_refusal()));
+                }
+                continue;
+            }
+            format!("Self::{called}")
+        } else {
+            continue;
+        };
+        if !(constructor && !how.starts_with("Self::")) {
+            out.push((at, building_refusal(&how)));
+        }
+    }
+
+    out
+}
+
+/// The refusal of a construction inside the crate by `how`.
+fn building_refusal(how: &str) -> String {
+    format!(
+        "the {RESTORE_BLOCK} crate builds TrustedText by {how}, not from qualifying pins, sanitized structural fields or fixed text ParleyInn ships"
+    )
+}
+
+/// The refusal of `fixed` taking something but fixed text.
+fn fixed_refusal() -> String {
+    format!(
+        "the {RESTORE_BLOCK} crate builds TrustedText::fixed from something but a string literal of fixed text ParleyInn ships"
+    )
+}
+
+/// Whether `call`, the text from `fixed`'s opening parenthesis, passes
+/// a string literal or a constant.
+fn fixed_argument_ok(call: &str) -> bool {
+    let argument = call
+        .strip_prefix('(')
+        .map(str::trim_start)
+        .unwrap_or_default();
+    let literal =
+        argument.starts_with('"') || argument.starts_with("r\"") || argument.starts_with("r#");
+
+    literal || names_a_constant(argument)
 }
 
 /// Whether the name at `offset` stands alone as an identifier.
@@ -144,7 +456,15 @@ fn construction(code: &str, offset: usize) -> Option<String> {
     if let Some(how) = aliasing(before, rest) {
         return Some(how.to_owned());
     }
-    let previous = before
+    // A path such as `restore_block::TrustedText` reads as its name: the
+    // word before the path is the one that says how the name is used.
+    let unpathed = if before.ends_with("::") {
+        before.trim_end_matches(|c: char| c.is_alphanumeric() || c == '_' || c == ':')
+    } else {
+        before
+    };
+    let previous = unpathed
+        .trim_end()
         .rsplit(char::is_whitespace)
         .next()
         .unwrap_or_default();
@@ -241,27 +561,18 @@ fn refused_inside(code: &str, offset: usize, how: &str) -> Option<String> {
     }
     let constructor = how.strip_prefix("TrustedText::").unwrap_or_default();
     if !CONSTRUCTORS.contains(&constructor) {
-        return Some(format!(
-            "the {RESTORE_BLOCK} crate builds TrustedText by {how}, not from qualifying pins, sanitized structural fields or fixed text ParleyInn ships"
-        ));
+        return Some(building_refusal(how));
     }
     if constructor == "fixed" {
-        let after = &code[offset + NAME.len()..];
-        let argument = after
+        let call = code[offset + NAME.len()..]
             .trim_start()
             .strip_prefix("::")
             .map(str::trim_start)
             .and_then(|p| p.strip_prefix("fixed"))
             .map(str::trim_start)
-            .and_then(|p| p.strip_prefix('('))
-            .map(str::trim_start)
             .unwrap_or_default();
-        let literal =
-            argument.starts_with('"') || argument.starts_with("r\"") || argument.starts_with("r#");
-        if !(literal || names_a_constant(argument)) {
-            return Some(format!(
-                "the {RESTORE_BLOCK} crate builds TrustedText::fixed from something but a string literal of fixed text ParleyInn ships"
-            ));
+        if !fixed_argument_ok(call) {
+            return Some(fixed_refusal());
         }
     }
 
