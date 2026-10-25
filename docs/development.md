@@ -126,8 +126,9 @@ decoy that must stay empty (ENG-14), the core's end-to-end tests confined
 the benchmark gate, and the release build of every target (NFR-10, CON-02).
 It also runs `mdsmith check .`, [taplo](../.taplo.toml), and zizmor over the
 workflows and local actions. Every job has five minutes: the release
-core is built once and handed to the jobs that run it, the scenarios,
-each coverage layer and each benchmark shard run in jobs of their own,
+core is built once and handed to the jobs that run it, the scenarios and
+the end-to-end coverage layer each run as four shards, each other coverage
+layer and each benchmark shard in jobs of their own,
 and `build.yml` builds one target per job ([ci.md](ci.md)). A final job
 named `CI` passes only when every other job passed, and names each job
 that did not. It is the one check the branch and release-tag rulesets
