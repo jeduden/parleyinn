@@ -612,6 +612,36 @@ fn a_start_killed_while_it_runs_is_killed_with_everything_it_started() {
 }
 
 #[test]
+fn a_start_killed_at_a_terminal_had_one_and_is_killed_with_its_whole_session() {
+    let home = TempDir::new().unwrap();
+    let (seen, left) = (home.path().join("seen"), home.path().join("left"));
+    let script = format!(
+        "[ -t 0 ] && touch {}; sleep 0.5; touch {}",
+        seen.display(),
+        left.display()
+    );
+    let starts: Vec<Confinement> = confined().into_iter().chain([unconfined()]).collect();
+
+    for c in starts {
+        let running = c
+            .run_killed_at_terminal(
+                Path::new("sh"),
+                &["-c", &script],
+                home.path(),
+                &[],
+                std::time::Duration::from_millis(250),
+            )
+            .unwrap();
+
+        assert!(running);
+        assert!(seen.exists(), "it ran at a terminal");
+        std::thread::sleep(std::time::Duration::from_millis(700));
+        assert!(!left.exists(), "nothing in the session outlived the kill");
+        let _ = std::fs::remove_file(&seen);
+    }
+}
+
+#[test]
 fn a_start_that_exits_before_its_kill_is_left_to_finish() {
     let home = TempDir::new().unwrap();
     let starts: Vec<Confinement> = confined().into_iter().chain([unconfined()]).collect();
