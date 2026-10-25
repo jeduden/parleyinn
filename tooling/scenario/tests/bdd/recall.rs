@@ -46,8 +46,13 @@ pub struct RecallSteps {
     before: usize,
     /// The "recalls" stat `stat_list` gave before the first search.
     recalls_before: Option<u64>,
+    /// How many recall events the record held just before, and just
+    /// after, that first read.
+    recall_events_around_read: (usize, usize),
     /// The pages of an `event_expand` followed by its cursor.
     pages: Vec<Value>,
+    /// The reply text of each of those pages, as the agent receives it.
+    page_texts: Vec<String>,
     /// What `mcp_server_get` answered, without a session binding and
     /// with one held.
     states: Vec<String>,
@@ -177,8 +182,11 @@ fn recalls_stat(w: &mut World) -> Result<u64, String> {
 /// and keeps the recall events it leaves out of the call's count.
 pub fn note_recalls_stat(w: &mut World) -> Result<(), String> {
     if recall(w).recalls_before.is_none() {
+        let held = recall_events(w)?.len();
         let stat = recalls_stat(w)?;
+        let left = recall_events(w)?.len();
         recall(w).recalls_before = Some(stat);
+        recall(w).recall_events_around_read = (held, left);
     }
     recall(w).before = recall_events(w)?.len();
 
@@ -656,10 +664,13 @@ fn each_recorded(w: &mut World) -> Result<(), String> {
 fn follow_cursor(w: &mut World) -> Result<(), String> {
     let mut page = envelope_of(w)?;
     recall(w).pages = vec![page.clone()];
+    recall(w).page_texts = vec![last_reply(w)?.text];
     while let Some(cursor) = page["next_cursor"].as_str().map(str::to_owned) {
         call_tool(w, "event_expand", json!({"cursor": cursor}))?;
         page = envelope_of(w)?;
         recall(w).pages.push(page.clone());
+        let text = last_reply(w)?.text;
+        recall(w).page_texts.push(text);
         if recall(w).pages.len() > 400 {
             return Err("the cursor never ends".to_owned());
         }
@@ -756,9 +767,9 @@ fn cursor_continues(w: &mut World) -> Result<(), String> {
     follow_cursor(w)?;
     let store = Store::open(&home(w)?.store()).map_err(|e| e.to_string())?;
     let pages = recall(w).pages.clone();
-    for (n, page) in pages.iter().enumerate() {
-        let spent = tokens::estimate(&page.to_string());
-        if n > 0 && spent > 8_100 {
+    for (n, text) in recall(w).page_texts.iter().enumerate() {
+        let spent = tokens::estimate(text);
+        if spent > 8_000 {
             return Err(format!("page {n} is {spent} estimated model tokens"));
         }
     }
@@ -869,16 +880,20 @@ fn recalls_stat_increases(w: &mut World) -> Result<(), String> {
     let before = recall(w)
         .recalls_before
         .ok_or("no step read the recalls stat before the call")?;
+    let (held, left) = recall(w).recall_events_around_read;
+    // Reading the stat leaves a recall event of its own, which the
+    // later read counts beside the search. The record, not the stat,
+    // says how many of each there were; the second read comes after
+    // both are counted, so it is the stat's own answer to compare.
+    let searched = recall_events(w)?.len().saturating_sub(left);
     let after = recalls_stat(w)?;
-    // Reading the stat first left a recall event of its own, which the
-    // later read counts beside the search.
-    if after == before + 2 {
+    let want = before + (left - held) as u64 + searched as u64;
+    if searched == 1 && after == want {
         return Ok(());
     }
     Err(format!(
-        "stat_list gave {before} recalls before the search and {after} after, \
-         wanting {} (the search, and the first read's own recall)",
-        before + 2
+        "the search left {searched} recall events; stat_list gave {before} recalls before it \
+         and {after} after, wanting {want}"
     ))
 }
 

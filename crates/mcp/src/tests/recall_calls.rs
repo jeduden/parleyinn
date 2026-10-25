@@ -747,6 +747,38 @@ fn an_unreadable_record_refuses_in_fixed_text() {
 }
 
 #[test]
+fn a_label_that_cannot_be_assigned_is_a_noted_failure_not_a_missing_label() {
+    let f = fixture_of(&lines(3, 5));
+    let mut server = f.server().with_labeller(device(&f));
+    f.sql(
+        "CREATE TRIGGER no_label BEFORE INSERT ON events WHEN NEW.kind = 'writer_label' \
+         BEGIN SELECT RAISE(ABORT, 'no'); END",
+    );
+
+    let result = tool(
+        &mut server,
+        "event_expand",
+        json!({"range": "A1:1-2", "scope": "room"}),
+    );
+
+    assert_eq!(
+        refusal(&result),
+        "the writer labels cannot be assigned: run parinn verify"
+    );
+    let notes = server.take_notes();
+    let failed: Vec<_> = notes
+        .iter()
+        .filter_map(|n| match n {
+            Note::LabelsFailed { tool, cause } => Some((*tool, cause.clone())),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(failed.len(), 1, "{notes:?}");
+    assert_eq!(failed[0].0, "event_expand");
+    assert!(!failed[0].1.is_empty());
+}
+
+#[test]
 fn a_server_that_only_labels_assigns_labels_and_records_no_recall() {
     let f = fixture_of(&lines(3, 5));
     let mut server = f.server().with_labeller(device(&f));

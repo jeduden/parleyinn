@@ -79,6 +79,7 @@ const NO_TOOL: &str = "no such tool: this server offers event_search, event_expa
 const CANCELLED: &str = "the search ran past its deadline of 2 s and was cancelled";
 /// The refusal for a record that cannot be read at an address.
 pub(crate) const UNREADABLE: &str = "the record cannot be read at this address: run parinn verify";
+const NO_LABELS: &str = "the writer labels cannot be assigned: run parinn verify";
 const NO_INDEX: &str = "the search index cannot be read: run parinn verify";
 
 /// What a recall tool served: the envelope, and the scope it served in.

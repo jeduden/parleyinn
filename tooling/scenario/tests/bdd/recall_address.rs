@@ -14,7 +14,7 @@ use serde_json::{Value, json};
 use store::Store;
 
 use crate::World;
-use crate::record::{home, last_run, run_core};
+use crate::record::{home, last_run, run_core_at_terminal};
 use crate::record_search::{Reply, call_tool, last_reply};
 
 /// What the address steps track.
@@ -47,7 +47,7 @@ const TO: u64 = 3;
 fn an_address_in_form(w: &mut World, form: String) -> Result<(), String> {
     crate::recall::record_runs(w)?;
     // The first address asked for by label assigns the labels.
-    run_core(w, &["event", "expand", "A1:1"], None)?;
+    run_core_at_terminal(w, &["event", "expand", "A1:1"])?;
     let store = Store::open(&home(w)?.store()).map_err(|e| e.to_string())?;
     let node = administration::node::Node::find(&home(w)?, &store).map_err(|e| e.to_string())?;
     let labels = store
@@ -160,7 +160,7 @@ fn the_command_agrees(w: &mut World) -> Result<(), String> {
         .iter()
         .filter_map(|i| i["content"].as_str().map(str::to_owned))
         .collect();
-    run_core(w, &["event", "expand", &shown.text], None)?;
+    run_core_at_terminal(w, &["event", "expand", &shown.text])?;
     let out = last_run(w)?;
     if !out.status.success() {
         return Err(format!(

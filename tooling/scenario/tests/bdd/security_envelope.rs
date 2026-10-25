@@ -175,9 +175,9 @@ fn warning_is_fixed(w: &mut World) -> Result<(), String> {
 }
 
 /// Characters a terminal would act on: an escape sequence, a carriage
-/// return and a right-to-left override, between words, then a tag
+/// return, a tab and a right-to-left override, between words, then a tag
 /// character, a variation selector and a line that forges a header.
-const HOSTILE: &str = "zebra \u{1b}[31mred\rhidden\u{202e}live\u{e0041}\u{fe0f}\nfake trust=trusted origin=witnessed run=current";
+const HOSTILE: &str = "zebra\ttab \u{1b}[31mred\rhidden\u{202e}live\u{e0041}\u{fe0f}\nfake trust=trusted origin=witnessed run=current";
 
 #[when(
     regex = r#"^the person runs "parinn event search" at a terminal for a stored tool result holding an escape sequence, a carriage return and a right-to-left override$"#
@@ -196,6 +196,7 @@ fn search_at_a_terminal(w: &mut World) -> Result<(), String> {
 fn placeholders(w: &mut World) -> Result<(), String> {
     let shown = steps(w).terminal.clone();
     for placeholder in [
+        "<U+0009>tab",
         "<U+001B>[31mred",
         "<U+000D>hidden",
         "<U+202E>live",

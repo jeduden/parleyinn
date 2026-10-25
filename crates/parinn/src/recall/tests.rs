@@ -82,16 +82,23 @@ fn a_call_refused_for_its_scope_or_a_gap_is_counted_as_refused() {
         &[
             Note::ScopeRefused("event_get"),
             Note::RecordGap("event_expand"),
+            Note::LabelsFailed {
+                tool: "event_get",
+                cause: "store failed".to_owned(),
+            },
         ],
     );
 
-    assert_eq!(got.len(), 2);
+    assert_eq!(got.len(), 3);
     assert_eq!(got[0].0, "rejected");
     assert_eq!(got[0].1.as_deref(), Some("recall_refused"));
     assert_eq!(got[0].2, "event_get");
     assert_eq!(got[1].0, "failed");
     assert_eq!(got[1].1.as_deref(), Some("recall_refused"));
     assert_eq!(got[1].2, "event_expand");
+    assert_eq!(got[2].0, "failed");
+    assert_eq!(got[2].1.as_deref(), Some("recall_refused"));
+    assert_eq!(got[2].2, "event_get");
 }
 
 #[test]

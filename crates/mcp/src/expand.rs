@@ -65,7 +65,7 @@ impl Server {
             return Err(NOT_ONE.to_owned());
         }
         let asked = match arguments["cursor"].as_str() {
-            Some(text) => self.continuing(given, text)?,
+            Some(text) => self.continuing(given, text, "event_get")?,
             None => asked_of(given.ok_or(NO_ADDRESS)?),
         };
 
@@ -81,7 +81,7 @@ impl Server {
     ) -> Result<Served, String> {
         let given = optional_range(arguments)?;
         let asked = match arguments["cursor"].as_str() {
-            Some(text) => self.continuing(given, text)?,
+            Some(text) => self.continuing(given, text, "event_expand")?,
             None => asked_of(given.ok_or(NO_RANGE)?),
         };
 
@@ -90,10 +90,15 @@ impl Server {
 
     /// The position a cursor continues, which a range or an address the
     /// call also names must agree with in its writer.
-    fn continuing(&mut self, given: Option<Range>, text: &str) -> Result<Asked, String> {
+    fn continuing(
+        &mut self,
+        given: Option<Range>,
+        text: &str,
+        tool: &'static str,
+    ) -> Result<Asked, String> {
         let cursor = Cursor::decode(text)?;
         if let Some(range) = given {
-            let writer = self.resolve_writer(range.writer)?;
+            let writer = self.resolve_writer(range.writer, tool)?;
             if writer != cursor.writer {
                 return Err(CURSOR_MISMATCH.to_owned());
             }
@@ -116,7 +121,7 @@ impl Server {
         tool: &'static str,
         asked: Asked,
     ) -> Result<Served, String> {
-        let writer = self.resolve_writer(asked.writer)?;
+        let writer = self.resolve_writer(asked.writer, tool)?;
         let (scope, seat) = {
             let call = Call {
                 store: &self.store,
@@ -153,7 +158,7 @@ impl Server {
     }
 
     /// The writer a range names, by id or by label.
-    fn resolve_writer(&mut self, writer: Writer) -> Result<WriterId, String> {
+    fn resolve_writer(&mut self, writer: Writer, tool: &'static str) -> Result<WriterId, String> {
         let label = match writer {
             Writer::Id(id) => return Ok(id),
             Writer::Label(label) => label,
@@ -169,7 +174,7 @@ impl Server {
         if let Some(found) = find(self)? {
             return Ok(found);
         }
-        self.assign_labels();
+        self.assign_labels(tool)?;
 
         find(self)?.ok_or_else(|| NO_LABEL.to_owned())
     }

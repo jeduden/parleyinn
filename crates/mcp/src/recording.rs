@@ -58,6 +58,10 @@ pub enum Note {
     /// The call was refused because the record has no event inside the
     /// range it asked for, though later ones exist (RCL-04).
     RecordGap(&'static str),
+    /// The call named a writer by label and the labels could not be
+    /// assigned: the store failed, which is no missing label (RCL-08,
+    /// I6). The cause is kept for the log.
+    LabelsFailed { tool: &'static str, cause: String },
     /// A secret was redacted from the call's arguments before they were
     /// recorded, by the rule named (SEC-08).
     Redacted(String),
@@ -155,11 +159,22 @@ impl Server {
     }
 
     /// Assigns a label to each writer that has none, when this server
-    /// may; a failure leaves the label unresolved, which the call
-    /// answers.
-    pub(crate) fn assign_labels(&mut self) {
-        if let Some(device) = self.labeller {
-            let _ = administration::label::assign_missing(&mut self.store, device, &mut OsEntropy);
+    /// may. A failure is noted with its cause and answered as what it
+    /// is, never as a label no writer has.
+    pub(crate) fn assign_labels(&mut self, tool: &'static str) -> Result<(), String> {
+        let Some(device) = self.labeller else {
+            return Ok(());
+        };
+        match administration::label::assign_missing(&mut self.store, device, &mut OsEntropy) {
+            Ok(_) => Ok(()),
+            Err(e) => {
+                self.notes.borrow_mut().push(Note::LabelsFailed {
+                    tool,
+                    cause: e.to_string(),
+                });
+
+                Err(crate::NO_LABELS.to_owned())
+            }
         }
     }
 }
