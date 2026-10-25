@@ -1328,7 +1328,8 @@ fn query_cancelled(home: &Home, time: u64) -> Result<Entry, AuditError> {
 
 /// `parinn verify [--json]`: checks the record against this node's
 /// device key, exiting 3 at the first failure, which it names. No log
-/// is signed yet, so a record that passes is `unsigned` (§9.7.5).
+/// is signed yet, so a record that passes is `unsigned` (§9.7.5). It
+/// first finishes a purge a kill cut short, as ingest and rebuild do.
 fn verify_command(
     args: impl Iterator<Item = String>,
     ctx: &Context,
@@ -1353,6 +1354,10 @@ fn verify_command(
         Ok(store) => store,
         Err(e) => return store_failed("verify", &e, stderr),
     };
+    // A purge a kill cut short after its transaction is finished first,
+    // as the next ingest or rebuild would: the erasure stands, and its
+    // residue leaves the search index and the payload store (ENG-06).
+    purge::finish(ctx, &mut store);
     let incomplete = match store.sources() {
         Ok(found) => sources::completeness(&found, &capture::served(&home), &|p| {
             fs::metadata(p).ok().map(|m| m.len())

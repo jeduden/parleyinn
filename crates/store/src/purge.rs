@@ -13,7 +13,8 @@
 //!
 //! What cannot be done inside the transaction is journalled in it and
 //! finished after it, by [`Store::finish_purge`], which the next purge,
-//! ingest or rebuild also runs when a crash cut the first attempt short:
+//! ingest, rebuild or verify also runs when a crash cut the first
+//! attempt short:
 //! the search index's postings of the erased events, the payload files,
 //! and, once both are gone, a checkpoint of the write-ahead logs and a
 //! vacuum of both database files with SQLite's secure delete on, so no

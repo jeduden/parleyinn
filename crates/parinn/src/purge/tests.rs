@@ -443,7 +443,7 @@ fn cut_short_after_its_transaction(p: &Process, writer: WriterId, seq: u64, text
     let record = rusqlite::Connection::open(home.store()).unwrap();
     record
         .execute(
-            "INSERT INTO purge_journal (kind, target) VALUES ('index', ?1)",
+            "INSERT INTO purge_journal (kind, target) VALUES ('index', ?1), ('vacuum', '')",
             [format!("{writer}:{seq}-{seq}")],
         )
         .unwrap();
