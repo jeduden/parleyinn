@@ -245,6 +245,19 @@ const ERASE: &str = "UPDATE events SET content = NULL, commitment_key = NULL, pr
 const FORGET_PROMPT: &str = "UPDATE prompt_commitments SET commitment_key = '', commitment = ''
     WHERE prompt_id = ?1 AND used = 1";
 
+/// The ranges whose search index postings a purge has still to take
+/// out, as `conn` reads them: each writer, first and last seq.
+pub(crate) fn pending_ranges(conn: &Connection) -> Result<Vec<(WriterId, Seq, Seq)>, StoreError> {
+    if !has_journal(conn)? {
+        return Ok(Vec::new());
+    }
+
+    Ok(journalled(conn, INDEX)?
+        .iter()
+        .filter_map(|(_, target)| parse_range(target))
+        .collect())
+}
+
 /// Whether the store made the journal.
 fn has_journal(conn: &Connection) -> Result<bool, StoreError> {
     Ok(conn.query_row(HAS_JOURNAL, [], |r| r.get::<_, bool>(0))?)

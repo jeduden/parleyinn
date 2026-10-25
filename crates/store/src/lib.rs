@@ -766,9 +766,12 @@ impl Store {
     /// Whether the search index holds what the record derives (ADM-09,
     /// I10): the index derived again from the record alone, into an
     /// index in memory, has the canonical digest of the one the store
-    /// keeps. Both are read in one read transaction, which takes no
-    /// write lock: live ingest and the hook handlers append meanwhile
-    /// (I9). `time_left` is asked before each chunk of events.
+    /// keeps. The entries of the events inside a pending purge's ranges
+    /// are left out of both digests: the purge's residue stays in the
+    /// index until it is finished ([`Store::unfinished_purges`] names
+    /// those ranges). Everything is read in one read transaction, which
+    /// takes no write lock: live ingest and the hook handlers append
+    /// meanwhile (I9). `time_left` is asked before each chunk of events.
     ///
     /// # Errors
     ///
@@ -783,10 +786,11 @@ impl Store {
             return Err(StoreError::NoIndex);
         }
         self.conn.execute_batch("BEGIN DEFERRED")?;
-        let compared = search_index::digest(&self.conn).and_then(|kept| {
+        let compared = purge::pending_ranges(&self.conn).and_then(|pending| {
+            let kept = search_index::digest_outside(&self.conn, &pending)?;
             let index = search_index::in_memory()?;
             self.reindex_into(&index, time_left)?;
-            Ok(search_index::digest(&index)? == kept)
+            Ok(search_index::digest_outside(&index, &pending)? == kept)
         });
         let _ = self.conn.execute_batch("ROLLBACK");
 
