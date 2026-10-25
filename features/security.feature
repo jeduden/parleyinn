@@ -101,7 +101,7 @@ Feature: Security (SEC)
     And no stored text field contains the account's email address or organization id
     And each secret is replaced by "[REDACTED:<rule>]", with no hash or other value derived from the secret
     And no stored event, segment or export carries a value from which the secret could be confirmed
-    And that text of adjacent Google API keys is audited and counted as "redaction_scan_limited", not "redacted", and a marker stands for all of it in the store
+    And that text of adjacent Google API keys is audited and counted as "redaction_scan_limited", not "redacted", and a marker stands for the string that reached the limit
     And any correlation of the repeated AWS access key lives only in a node-local index keyed under this node's own at-rest key
     And with a repository ".parinn.toml" adding the redaction pattern "(?s).+", no stored text is redacted by that pattern, and an audit entry and a counter record the repository setting as ignored
     When the person runs "parinn purge --run secrets"

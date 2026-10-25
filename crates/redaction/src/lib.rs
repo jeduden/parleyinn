@@ -64,6 +64,14 @@ pub const SCAN_LIMIT_MARKER: &str = "[REDACTED:redaction_scan_limit]";
 /// How many times the length of a text its scans may read together.
 const SCAN_LIMIT_FACTOR: usize = 8;
 
+/// `redacted` with its text written as a JSON string.
+fn quoted(redacted: Redacted) -> Redacted {
+    Redacted {
+        text: Value::String(redacted.text.clone()).to_string(),
+        ..redacted
+    }
+}
+
 /// The result of a text that reached the redaction scan limit.
 fn limited() -> Redacted {
     Redacted {
@@ -231,9 +239,6 @@ impl Redactor {
             out.rules.extend(r.rules);
             out.limited |= r.limited;
         }
-        if out.limited {
-            return limited();
-        }
 
         out
     }
@@ -242,11 +247,12 @@ impl Redactor {
     /// it decodes, else as it stands.
     fn redact_literal(&self, literal: &str) -> Redacted {
         let Ok(decoded) = serde_json::from_str::<String>(literal) else {
-            return self.redact_text(literal);
+            let r = self.redact_text(literal);
+            return if r.limited { quoted(r) } else { r };
         };
         let r = self.redact_text(&decoded);
         if r.limited {
-            return r;
+            return quoted(r);
         }
         if r.rules.is_empty() {
             return Redacted {
@@ -255,10 +261,7 @@ impl Redactor {
             };
         }
 
-        Redacted {
-            text: Value::String(r.text).to_string(),
-            ..r
-        }
+        quoted(r)
     }
 }
 

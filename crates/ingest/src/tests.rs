@@ -236,7 +236,13 @@ fn a_line_that_reaches_the_scan_limit_is_held_back_and_counted() {
         .as_str()
         .unwrap()
         .to_owned();
-    assert_eq!(text, redaction::SCAN_LIMIT_MARKER);
+    assert_eq!(
+        text,
+        format!(
+            r#"{{"message":{{"content":"{}"}}}}"#,
+            redaction::SCAN_LIMIT_MARKER
+        )
+    );
     let bytes = std::fs::read(home.store()).unwrap();
     assert!(!bytes.windows(4).any(|w| w == b"AIza"));
 }

@@ -240,16 +240,25 @@ fn redact_text_settles_a_short_chain_within_the_budget() {
 }
 
 #[test]
-fn redact_line_holds_the_whole_line_when_a_string_of_it_was_limited() {
+fn redact_line_replaces_only_the_string_that_reached_the_scan_limit() {
     let r = redactor(&[]);
     let key = format!("AIza{}", "a".repeat(35));
-    let line = format!("{{\"a\":\"{}\",\"b\":\"x\"}}", key.repeat(20_000));
+    let line = format!(
+        "{{\"a\":\"{}\",\"b\":\"x\",\"c\":\"{AWS}\"}}",
+        key.repeat(20_000)
+    );
     let out = r.redact_line(&line);
     assert!(out.limited);
-    assert_eq!(out.text, SCAN_LIMIT_MARKER);
-    assert!(out.rules.is_empty());
+    assert_eq!(
+        out.text,
+        "{\"a\":\"[REDACTED:redaction_scan_limit]\",\"b\":\"x\",\"c\":\"[REDACTED:aws_access_key]\"}"
+    );
+    assert_eq!(out.rules, ["aws_access_key"]);
+    serde_json::from_str::<serde_json::Value>(&out.text).unwrap();
     let raw = r.redact_line(&format!("{{broken {}", key.repeat(20_000)));
     assert_eq!(raw.text, SCAN_LIMIT_MARKER);
+    let undecodable = r.redact_line(&format!("\"{}", key.repeat(20_000)));
+    assert_eq!(undecodable.text, format!("\"{SCAN_LIMIT_MARKER}\""));
     assert!(!r.redact_line(r#"{"a":"x"}"#).limited);
 }
 

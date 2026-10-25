@@ -245,6 +245,23 @@ fn a_drift_description_that_reaches_the_scan_limit_is_counted() {
 }
 
 #[test]
+fn a_cwd_that_reaches_the_scan_limit_is_marked_and_counted() {
+    let mut p = Process::new();
+    let mut input: Value = serde_json::from_str(&session_start(&p, "s1", "startup")).unwrap();
+    input["cwd"] = json!(format!("AIza{}", "a".repeat(35)).repeat(5_000));
+
+    let ran = hook(&mut p, "SessionStart", |_| input.to_string());
+
+    assert_eq!(ran, (EXIT_OK, String::new(), String::new()));
+    let counters: Vec<_> = entries(&p).into_iter().map(|e| e.0).collect();
+    assert!(
+        counters.contains(&Some("redaction_scan_limited".into())),
+        "{counters:?}"
+    );
+    assert_eq!(held(&p)[0].observation.cwd, redaction::SCAN_LIMIT_MARKER);
+}
+
+#[test]
 fn an_unknown_source_is_recorded_as_other() {
     let mut p = Process::new();
 
