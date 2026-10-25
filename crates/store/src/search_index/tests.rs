@@ -1062,3 +1062,61 @@ fn an_event_a_purge_erased_is_no_match_though_its_postings_remain() {
     assert_eq!(seqs(&find(&store, "wombat")), Vec::<u64>::new());
     assert_eq!(seqs(&find(&store, "quiet")), [2]);
 }
+
+#[test]
+fn a_slot_a_writer_with_no_events_holds_leaves_the_index_not_current() {
+    let dir = TempDir::new().unwrap();
+    let mut store = open(&dir);
+    seat(&mut store, writer(1), room());
+    store.append(writer(1), &texts(&["a"])).unwrap();
+    store
+        .conn
+        .execute(
+            CLAIM_SLOT,
+            params![slot_of(writer(2)), writer(2).to_string()],
+        )
+        .unwrap();
+
+    assert!(!current(&store, &[(writer(1), 1), (writer(2), 0)]));
+}
+
+#[test]
+fn the_next_opener_drops_a_slot_a_writer_with_no_events_holds() {
+    let dir = TempDir::new().unwrap();
+    let mut store = open(&dir);
+    seat(&mut store, writer(1), room());
+    store.append(writer(1), &texts(&["a"])).unwrap();
+    let canonical = store.search_index_digest().unwrap();
+    seat(&mut store, writer(2), room());
+    store
+        .conn
+        .execute(
+            CLAIM_SLOT,
+            params![slot_of(writer(2)), writer(2).to_string()],
+        )
+        .unwrap();
+    assert!(!store.search_index_is_derived().unwrap());
+    drop(store);
+
+    let again = open(&dir);
+
+    assert_eq!(again.search_index_digest().unwrap(), canonical);
+}
+
+#[test]
+fn an_append_of_no_events_claims_no_slot_and_evicts_no_writer() {
+    let (a, b) = (writer(1), sharing_the_slot(0));
+    let (small, large) = if a < b { (a, b) } else { (b, a) };
+    let dir = TempDir::new().unwrap();
+    let mut store = open(&dir);
+    seat(&mut store, large, room());
+    store.append(large, &texts(&["shared"])).unwrap();
+    seat(&mut store, small, room());
+    let kept = store.search_index_digest().unwrap();
+
+    let _ = store.append(small, &[]);
+
+    assert_eq!(store.search_index_digest().unwrap(), kept);
+    assert!(current(&store, &[(large, 1), (small, 0)]));
+    assert_eq!(seqs(&find(&store, "shared")), [1]);
+}
