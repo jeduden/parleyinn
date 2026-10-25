@@ -117,10 +117,9 @@ changed M1's row in §12.2.
    fuzz and tooling crates still need an accepted ADR and an allowed
    license, but do not count. ENG-18 and its gate are stakeholder
    paths, so their rewording, with a drift case, lands as its own pull
-   request before phases 4, 5 and 7 add crates past ten. The
-   core then holds about nine: `rusqlite`, `serde_json`, `tracing`,
-   `toml`, `sha2`, `ed25519-dalek`, `getrandom` and one key-store crate
-   per OS.
+   request before phases 4, 5 and 7 add crates past ten. The core then
+   holds about nine: `rusqlite`, `serde_json`, `tracing`, `toml`, `sha2`,
+   `ed25519-dalek`, `getrandom` and one key-store crate per OS.
 2. **Key stores (SEC-10).** macOS keeps keys in its Keychain through
    `security-framework`, whose `unsafe` stays inside that crate. Windows
    keeps them in a file DPAPI protects, through `windows-sys` in one
@@ -276,6 +275,7 @@ footer: |
 |     | ↳      | @REC-11 and @SEC-04 off @pending and passing. Event and payload text is indexed in the append transaction up to 1 MiB, and event_search finds it by literal terms, ranked by BM25 over the newest 2,000 matches, damped per run. @RCL-02 cannot pass in M1 and is raised; NFR-03 is benchmarked; the index is a derived file of its own, so the record holds 1.42x its text, within NFR-09's 1.5x; the index is 0.75x. |
 | 13  | ✅     | [Recall and the envelope: the six recall tools, scopes and recall events](phase-13.md)                                                                                                                                                                                                                                                                                                                                 |
 |     | ↳      | @RCL-01, @RCL-03, @RCL-04, @RCL-05, @RCL-07, @SEC-06 and @SEC-07 off @pending and passing. The six recall tools answer in the envelope under the 8,000-token cap and a cursor, in the calling run's scope unless the call widens it, and each leaves a recall event; the envelope's golden files match. @RCL-08 stays @pending on purge and quarantine (phase 14).                                                     |
+| 14  | 🔲     | [Quarantine and parinn purge --range](phase-14.md)                                                                                                                                                                                                                                                                                                                                                                     |
 <?/catalog?>
 
 ## Acceptance Criteria
