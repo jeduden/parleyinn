@@ -113,6 +113,16 @@ fn fixture(name: &str) -> Result<Vec<Value>, String> {
                 lines.extend(pair(n, &format!("deploy step {n}: ok"))?);
             }
         }
+        "run-a" => {
+            // Forty results of about 2,000 characters: a range of them
+            // passes the cap of 8,000 estimated model tokens.
+            for n in 1..=40 {
+                lines.extend(pair(
+                    n,
+                    &format!("result {n} {}", "lorem ipsum ".repeat(170)),
+                )?);
+            }
+        }
         "poisoned-web" => {
             // Fifty small lines, so a range of them fits one page of the
             // cap: the line at seq 12 is a web page that tells the agent
@@ -282,6 +292,10 @@ fn addresses_of_kind(path: &std::path::Path, kind: EventKind) -> Result<Vec<Addr
 /// The arguments a step text names for `tool`: `range from "A" to "B"`
 /// is two addresses, the rest key and value pairs.
 fn tool_arguments(w: &mut World, text: &str) -> Result<Value, String> {
+    if text == "a range above 8,000 estimated model tokens" {
+        crate::record_transcript::remember_counters(w)?;
+        return Ok(json!({"range": {"from": "A1:1", "to": "A1:80"}}));
+    }
     if let Some(ends) = text.strip_prefix("range from ") {
         let (from, to) = ends
             .split_once(" to ")

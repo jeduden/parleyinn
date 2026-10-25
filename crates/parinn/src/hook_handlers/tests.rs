@@ -256,6 +256,27 @@ fn a_transcript_path_outside_the_roots_is_refused_and_never_read() {
     assert_eq!(held(&p)[0].observation.offset, None);
 }
 
+#[test]
+fn a_transcript_path_below_a_file_cannot_be_read_and_is_counted_as_a_failure() {
+    let mut p = Process::new();
+    let file = transcript_path(&p, "s1");
+    fs::write(&file, "x").unwrap();
+    let mut input: Value = serde_json::from_str(&session_start(&p, "s1", "startup")).unwrap();
+    input["transcript_path"] = json!(file.join("below.jsonl"));
+
+    let (code, ..) = hook(&mut p, "SessionStart", |_| input.to_string());
+
+    assert_eq!(code, 0);
+    assert_eq!(
+        entries(&p),
+        [(
+            Some("hook_failed".into()),
+            "transcript path could not be read".into()
+        )]
+    );
+    assert_eq!(held(&p)[0].observation.offset, None);
+}
+
 #[cfg(unix)]
 #[test]
 fn a_transcript_that_cannot_be_read_holds_no_offset_and_is_counted() {

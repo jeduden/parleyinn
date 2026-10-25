@@ -1,10 +1,10 @@
 ---
 n: 3
 title: "Deadlines on every blocking operation (ENG-03)"
-status: "🔳"
+status: "✅"
 result: true
 summary: >-
-  The core's clippy configuration bans 15 blocking calls that take no deadline and a gate test holds every product crate to them; the stakeholder accepted its exemptions, and the ENG-03 scenario stays pending until M1 adds injectable I/O traits.
+  The core's clippy configuration bans 15 blocking calls that take no deadline and a gate test holds every product crate to them; the stakeholder accepted its exemptions, and has since ruled the hold for injectable I/O met: the ENG-03 scenario is live from M1's phase 16 (its consenting comment on PR #91, 2026-10-25).
 ---
 ## Handoff
 
@@ -27,11 +27,14 @@ What landed:
   and clock steps to the existing checks, but stays `@pending`. Its
   deadline step is a ban list that exempts local file I/O, in-process
   locks and standard output. The stakeholder accepted those exemptions
-  on 2026-10-13 ([ruling]), and kept the scenario pending until M1 adds the
-  injectable I/O traits the row also requires.
+  on 2026-10-13 ([ruling]), and kept the scenario pending until M1 added
+  the injectable I/O traits the row also requires; the stakeholder has
+  since ruled that hold met ([consent]), and M1's phase 16 takes the
+  scenario off `@pending`.
 
 What remains: "all I/O through injectable traits" has no mechanical
 check, and a crate's own blocking loop or a dependency's is not seen by
 the list.
 
 [ruling]: https://github.com/jeduden/parleyinn/pull/44#issuecomment-6157262395
+[consent]: https://github.com/jeduden/parleyinn/pull/91#issuecomment-6402652493

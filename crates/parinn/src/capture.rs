@@ -339,12 +339,17 @@ impl Running {
         if new {
             self.marker = StartMarker::leave(&self.capture.home, &transcripts, self.marker.take());
         }
+        // Each read leaves its ingest marker at the time it reads (ADM-09).
+        let inputs = ingest::Inputs {
+            now_ms: (self.capture.clock)().saturating_mul(1000),
+            ..self.capture.inputs.clone()
+        };
         for path in transcripts {
             let read = ingest_live(
                 &self.capture.home,
                 &path,
                 &self.capture.redactor,
-                &self.capture.inputs,
+                &inputs,
                 &mut self.seats,
                 self.capture.limit,
                 &mut OsEntropy,
@@ -679,6 +684,58 @@ pub(crate) fn count_stopped(
     }
 
     audited
+}
+
+/// The start markers of the MCP servers, as `parinn verify` reads them:
+/// behind this seam, so a test sets them out (ENG-03).
+pub(crate) trait Markers {
+    /// Every file in the markers' directory; none without one.
+    fn list(&self) -> Vec<PathBuf>;
+    /// What the marker at `path` names while its server holds its lock;
+    /// none for a marker whose lock is free or that cannot be read. It
+    /// only tries the lock, never waits for it.
+    fn held(&self, path: &Path) -> Option<String>;
+}
+
+/// The start markers in a home's markers' directory.
+struct HomeMarkers(PathBuf);
+
+impl Markers for HomeMarkers {
+    fn list(&self) -> Vec<PathBuf> {
+        fs::read_dir(&self.0)
+            .map(|listing| listing.flatten().map(|e| e.path()).collect())
+            .unwrap_or_default()
+    }
+
+    /// The marker is opened as ingest opens a transcript, so a link
+    /// is not followed and a FIFO not waited on (ENG-03), and what it
+    /// names is read from the file whose lock was tried.
+    fn held(&self, path: &Path) -> Option<String> {
+        let file = ingest::read::regular_file(path).ok()?;
+        if file.try_lock().is_ok() {
+            return None;
+        }
+
+        Some(io::read_to_string(file).unwrap_or_default())
+    }
+}
+
+/// The transcripts the running MCP servers ingest: those their start
+/// markers name while the server holds the marker's lock (ADM-09,
+/// REC-13). A marker a stopped server left names none.
+pub(crate) fn served(home: &Home) -> Vec<PathBuf> {
+    served_by(&HomeMarkers(home.root().join(MARKERS)))
+}
+
+/// The transcripts the held start markers of `markers` name.
+pub(crate) fn served_by(markers: &dyn Markers) -> Vec<PathBuf> {
+    markers
+        .list()
+        .iter()
+        .filter(|path| path.extension().is_some_and(|e| e == "marker"))
+        .filter_map(|path| markers.held(path))
+        .flat_map(|named| named.lines().map(PathBuf::from).collect::<Vec<_>>())
+        .collect()
 }
 
 #[cfg(test)]

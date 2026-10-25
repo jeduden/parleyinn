@@ -7,6 +7,11 @@
 //! command in the SRS's §9.5 is a pending scenario under features/, and
 //! lands with the plan that makes its scenario pass.
 
+// A lint the core's code would quiet says so with an expectation and a
+// reason, which fails once nothing trips it; a bare allow does not
+// (SEC-01, ENG-16).
+#![deny(clippy::allow_attributes)]
+
 use std::cell::RefCell;
 use std::collections::BTreeMap;
 use std::ffi::OsString;
@@ -20,7 +25,7 @@ use administration::act as act_record;
 use administration::home::Home;
 use administration::node::Node;
 use administration::node_identity::IdentitySource;
-use administration::verify::{Report, VerifyError, verify};
+use administration::verify::{Report, Shape, VerifyError, verify};
 use allowed_root::{Access, AllowedPath, AllowedRoots};
 use audit::AuditError;
 use audit::counters::{Counts, counts};
@@ -1328,7 +1333,10 @@ fn query_cancelled(home: &Home, time: u64) -> Result<Entry, AuditError> {
 
 /// `parinn verify [--json]`: checks the record against this node's
 /// device key, exiting 3 at the first failure, which it names. No log
-/// is signed yet, so a record that passes is `unsigned` (§9.7.5).
+/// is signed yet, so a record that passes is `unsigned` (§9.7.5). It
+/// changes nothing it checks: a purge a kill cut short is reported,
+/// with the search index its residue leaves unchecked, for the next
+/// purge, ingest or rebuild to finish (ADM-09, ENG-06).
 fn verify_command(
     args: impl Iterator<Item = String>,
     ctx: &Context,
@@ -1338,31 +1346,27 @@ fn verify_command(
     let Some(as_json) = json_flag("verify", args, stderr) else {
         return EXIT_USAGE;
     };
-    let home = match ctx.home() {
-        Ok(home) => home,
+    let (home, store) = match verified_store(ctx, stderr) {
+        Ok(opened) => opened,
+        Err(code) => return code,
+    };
+    let incomplete = match completeness(ctx, &home, &store) {
+        Ok(found) => found,
         Err(e) => return failed("verify", &e, stderr),
     };
-    if !home.store().exists() {
-        return failed(
-            "verify",
-            &format!("no store at {}", home.store().display()),
-            stderr,
-        );
-    }
-    let store = match Store::open(&home.store()) {
-        Ok(store) => store,
-        Err(e) => return store_failed("verify", &e, stderr),
-    };
-    let lost = match sources::of(&store) {
-        Ok(status) => status.lost,
+    let read = store
+        .refused_forks()
+        .and_then(|forks| Ok((forks, unfinished_purges(ctx, &store)?)));
+    let (forks, unfinished) = match read {
+        Ok(read) => read,
         Err(e) => return failed("verify", &e, stderr),
     };
-    let forks = match store.refused_forks() {
-        Ok(forks) => forks,
-        Err(e) => return failed("verify", &e, stderr),
-    };
+    let mut shape = Shape::Checked;
     let verified = match verify_record(&home, &store) {
-        Ok(verified) => verified,
+        Ok(verified) => verified.and_then(|(r, staged)| {
+            shape = shape_beside(ctx, &store, &unfinished)?;
+            Ok((r, staged))
+        }),
         Err(e) => return failed("verify", &e, stderr),
     };
     let checked = match verified {
@@ -1376,15 +1380,37 @@ fn verify_command(
         Ok((r, staged, _)) if !forks.is_empty() => {
             refused_report(as_json, &r, staged, &forks, stderr)
         }
-        Ok((r, staged, a)) => (EXIT_OK, verified_line(as_json, &r, staged, &a, &lost)),
+        Ok(_) if incomplete.failure().is_some() => broken_json(
+            as_json,
+            "transcript_source_completeness",
+            "transcript source completeness",
+            None,
+            &incomplete.failure().unwrap_or_default(),
+            stderr,
+        ),
+        Ok((r, staged, a)) => (
+            EXIT_OK,
+            verified_line(
+                as_json,
+                &r,
+                staged,
+                &a,
+                &incomplete,
+                Checks {
+                    shape,
+                    unfinished: &unfinished,
+                },
+            ),
+        ),
         Err(Ok(VerifyError::Store(e))) => return failed("verify", &e, stderr),
         Err(Err(e @ AuditError::Broken { .. })) => {
-            broken_json(as_json, "audit", None, &e.to_string(), stderr)
+            broken_json(as_json, "audit", "hash chain", None, &e.to_string(), stderr)
         }
         Err(Err(e)) => return failed("verify", &e, stderr),
         Err(Ok(broken)) => broken_json(
             as_json,
             broken.class(),
+            broken.check(),
             broken.address(),
             &broken.to_string(),
             stderr,
@@ -1398,6 +1424,87 @@ fn verify_command(
         EXIT_OK => code,
         other => other,
     }
+}
+
+/// The home and the store `parinn verify` checks, or the exit code of
+/// the failure it reported on `stderr`.
+fn verified_store(ctx: &Context, stderr: &mut dyn Write) -> Result<(Home, Store), u8> {
+    let home = ctx.home().map_err(|e| failed("verify", &e, stderr))?;
+    if !home.store().exists() {
+        let missing = format!("no store at {}", home.store().display());
+        return Err(failed("verify", &missing, stderr));
+    }
+    let store = Store::open(&home.store()).map_err(|e| store_failed("verify", &e, stderr))?;
+
+    Ok((home, store))
+}
+
+/// How far the transcript sources of `store` fall short (ADM-09), as
+/// `parinn verify` finds them now.
+fn completeness(
+    ctx: &Context,
+    home: &Home,
+    store: &Store,
+) -> Result<sources::Completeness, store::StoreError> {
+    Ok(sources::completeness(
+        &store.sources()?,
+        &capture::served(home),
+        &sources::look,
+        (ctx.clock)().saturating_mul(1000),
+    ))
+}
+
+/// The ranges a purge a kill cut short has still to clear from the
+/// search index, audited and counted when there are any (I6): the next
+/// purge, ingest or rebuild finishes them.
+fn unfinished_purges(ctx: &Context, store: &Store) -> Result<Vec<String>, store::StoreError> {
+    let unfinished = store.unfinished_purges()?;
+    if !unfinished.is_empty() {
+        purge::audit_residue(ctx);
+    }
+
+    Ok(unfinished)
+}
+
+/// The shape of `store` beside the ranges a purge left `unfinished`:
+/// while there are any, their residue is in the search index, which is
+/// left unchecked, and the rest of the shape is checked.
+fn shape_beside(ctx: &Context, store: &Store, unfinished: &[String]) -> Result<Shape, VerifyError> {
+    if unfinished.is_empty() {
+        checked_shape(ctx, store)
+    } else {
+        administration::verify::verify_shape(store, &|| false)
+    }
+}
+
+/// What `parinn verify` checked beside the record: the store's shape,
+/// and the ranges an unfinished purge leaves in the search index.
+#[derive(Debug, Clone, Copy)]
+struct Checks<'a> {
+    shape: Shape,
+    unfinished: &'a [String],
+}
+
+/// How long `parinn verify` derives the search index again before it
+/// leaves the index unchecked (ADM-09, ENG-03), in seconds on its clock.
+const INDEX_CHECK_SECS: u64 = 60;
+
+/// The shape of `store`, its search index derived again while
+/// [`INDEX_CHECK_SECS`] last on `ctx`'s clock; a derivation that ran out
+/// of time is audited and counted (I6).
+fn checked_shape(ctx: &Context, store: &Store) -> Result<Shape, VerifyError> {
+    let ends = (ctx.clock)().saturating_add(INDEX_CHECK_SECS);
+    let shape = administration::verify::verify_shape(store, &|| (ctx.clock)() < ends)?;
+    if shape == Shape::IndexUnfinished {
+        let _ = ctx.audit(&Occurrence::Degraded {
+            kind: Kind::TimedOut,
+            counter: Counter::VerifyTimedOut,
+            operation: "verify",
+            detail: "the search index was not derived again in time and is unchecked",
+        });
+    }
+
+    Ok(shape)
 }
 
 /// The record in `store`, verified against the device key `home` keeps,
@@ -1442,8 +1549,10 @@ fn verified_line(
     r: &Report,
     staged: bool,
     a: &audit::log::Checked,
-    lost: &[String],
+    incomplete: &sources::Completeness,
+    checks: Checks<'_>,
 ) -> String {
+    let index_checked = checks.shape == Shape::Checked;
     if as_json {
         return json!({
             "integrity": "unsigned",
@@ -1452,7 +1561,9 @@ fn verified_line(
             "order": r.full_order(),
             "seats": seats_json(&r.seats),
             "open_segments": segments::open_json(&r.open_segments),
-            "lost_sources": lost,
+            "short_sources": incomplete.short,
+            "pending_purges": checks.unfinished,
+            "index_checked": index_checked,
             "staged": staged,
             "audit": {"files": a.files, "entries": a.entries},
             "refused": [],
@@ -1465,16 +1576,31 @@ fn verified_line(
     } else {
         ""
     };
+    let unchecked = if index_checked {
+        String::new()
+    } else if checks.unfinished.is_empty() {
+        "; the search index was not derived again in time, so it is unchecked: \
+         run parinn verify again"
+            .to_owned()
+    } else {
+        format!(
+            "; a purge was cut short before it finished, so its residue stays until the next \
+             purge, ingest or rebuild clears it, and the search index is unchecked: {}",
+            checks.unfinished.join(", ")
+        )
+    };
 
     format!(
         "checked {} writers and {} events: every chain, commitment and seat certificate \
-         holds; integrity unsigned, as no log is signed yet; the audit log's chain holds \
-         over {} entries{}{}{staged}",
+         holds; integrity unsigned, as no log is signed yet, so a log cut at its tail or \
+         rewritten whole goes unseen until seals; completeness covers only the transcript \
+         sources the record names; the audit log's chain holds over {} entries{}{}{unchecked}\
+         {staged}",
         r.writers,
         r.events,
         a.entries,
         open_text(&r.open_segments),
-        lost_line(lost)
+        incomplete.short_text()
     )
 }
 
@@ -1506,16 +1632,6 @@ fn refused_report(
     });
 
     (EXIT_INTEGRITY, line.to_string())
-}
-
-/// What `parinn verify` adds for transcript sources gone before they
-/// were fully ingested: nothing when none was (REC-08).
-fn lost_line(lost: &[String]) -> String {
-    if lost.is_empty() {
-        return String::new();
-    }
-
-    format!("; {}", sources::lost_text(lost))
 }
 
 /// What `parinn verify` adds for writer chains that ended without a
@@ -1556,11 +1672,12 @@ fn seats_json(seats: &[administration::verify::SeatReport]) -> Value {
 fn broken_json(
     as_json: bool,
     class: &str,
+    check: &str,
     address: Option<&str>,
     message: &str,
     stderr: &mut dyn Write,
 ) -> (u8, String) {
-    let _ = writeln!(stderr, "parinn verify: {message}");
+    let _ = writeln!(stderr, "parinn verify: {check}: {message}");
     if !as_json {
         return (EXIT_INTEGRITY, String::new());
     }
@@ -1571,7 +1688,7 @@ fn broken_json(
         "order": null,
         "seats": null,
         "audit": null,
-        "broken": {"class": class, "address": address, "message": message},
+        "broken": {"class": class, "check": check, "address": address, "message": message},
     });
 
     (EXIT_INTEGRITY, line.to_string())
@@ -1797,6 +1914,8 @@ struct Status {
     home: String,
     /// The store's path and size, once the home exists.
     store: Option<(String, Option<u64>)>,
+    /// The schema version of the store, once it is made.
+    schema_version: Option<u32>,
     /// The audit log's path and number of entries, once the home exists.
     audit: Option<(String, u64)>,
     /// Each counter's total and rise since the last acknowledgement.
@@ -1827,7 +1946,9 @@ impl Status {
             .collect();
         let mut status = json!({
             "home": self.home,
-            "store": self.store.as_ref().map(|(p, b)| json!({"path": p, "bytes": b})),
+            "store": self.store.as_ref().map(|(p, b)| {
+                json!({"path": p, "bytes": b, "schema_version": self.schema_version})
+            }),
             "audit": self.audit.as_ref().map(|(p, n)| json!({"path": p, "entries": n})),
             "counters": counters,
             "deployment_mode": self.deployment_mode,
@@ -1855,7 +1976,12 @@ impl Status {
         let mut lines = Vec::new();
         match (&self.store, &self.audit) {
             (Some((store, bytes)), Some((audit, entries))) => {
-                let size = bytes.map_or("none yet".to_owned(), |b| format!("{b} bytes"));
+                let size = bytes.map_or("none yet".to_owned(), |b| {
+                    let schema = self
+                        .schema_version
+                        .map_or(String::new(), |v| format!(", schema version {v}"));
+                    format!("{b} bytes{schema}")
+                });
                 lines.push(format!("home: {}", self.home));
                 lines.push(format!("store: {store} ({size})"));
                 lines.push(format!("audit log: {audit} ({entries} entries)"));
@@ -1962,6 +2088,7 @@ fn status(
     };
     let refused = segments.as_ref().is_some_and(|s| !s.newer.is_empty());
     let mut status = status_of(&home, counted, &in_force);
+    status.schema_version = segments.as_ref().map(|s| s.schema_version);
     status.segments = segments;
     status.bindings = store
         .as_ref()
@@ -1991,6 +2118,7 @@ fn status_of(home: &Home, counted: Option<(Counts, u64)>, in_force: &settings::I
     let mut status = Status {
         home: home.root().display().to_string(),
         store: None,
+        schema_version: None,
         audit: None,
         counters: Vec::new(),
         deployment_mode: in_force.resolved.settings.deployment_mode().to_owned(),

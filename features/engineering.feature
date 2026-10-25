@@ -23,7 +23,7 @@ Feature: Engineering quality (ENG)
     Then the architecture check fails naming both crates
     And every library crate has exactly one declared responsibility
 
-  @ENG-03 @P0 @pending
+  @ENG-03 @P0
   Scenario: no mutable global state, injectable I/O and deadlines everywhere
     Given the repository's code
     When the static analyzers run
@@ -56,7 +56,7 @@ Feature: Engineering quality (ENG)
     Then after every kill "parinn verify" exits 0
     And each nightly job completes at least 10000 iterations
 
-  @ENG-07 @P0 @pending
+  @ENG-07 @P0
   Scenario Outline: coverage-guided fuzzing covers every parser with a committed corpus
     Given the cargo-fuzz target for the <input>
     Then its seed corpus is committed under fuzz/corpus
@@ -100,7 +100,7 @@ Feature: Engineering quality (ENG)
     When the restore block and an envelope are rendered
     Then both equal their committed golden files byte for byte
 
-  @ENG-11 @P0 @pending
+  @ENG-11 @P0
   Scenario: line coverage meets the floor per crate class
     Given a coverage profile of the whole suite
     Then every security-sensitive crate is at least 90% covered

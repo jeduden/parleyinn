@@ -195,7 +195,7 @@ Feature: Security (SEC)
     And the run's payload files no longer exist
     And the documentation states that SSD erasure is not guaranteed without encryption at rest
 
-  @SEC-15 @P0 @I4 @pending
+  @SEC-15 @P0 @I4
   Scenario: no telemetry, remote crash reporting, or update check ships
     Given the import graph and code of every component, whether the components ship in one executable or several
     When the CI telemetry check runs

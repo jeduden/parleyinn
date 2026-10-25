@@ -19,6 +19,7 @@
 //!   transaction and searched under a deadline (REC-11, RCL-02).
 
 pub mod hook;
+mod integrity;
 mod origin;
 pub mod payload;
 mod purge;
@@ -290,6 +291,9 @@ pub struct Store {
     /// Content whose canonical encoding is longer goes to the payload
     /// store.
     threshold: usize,
+    /// When, in milliseconds on ingest's clock, an ingest marker this
+    /// store leaves is left (ADM-09).
+    marker_time: u64,
 }
 
 impl fmt::Debug for Store {
@@ -403,6 +407,7 @@ impl Store {
             conn,
             payloads: Payloads::new(dir.join("payloads"), Box::new(OsDisk)),
             threshold: DEFAULT_PAYLOAD_THRESHOLD,
+            marker_time: 0,
         })
     }
 
@@ -411,6 +416,15 @@ impl Store {
     #[must_use]
     pub fn with_payload_threshold(mut self, threshold: usize) -> Self {
         self.threshold = threshold;
+        self
+    }
+
+    /// This store, each ingest marker it leaves, as a generation starts
+    /// or a position moves, recorded as left at `ms`, in milliseconds on
+    /// ingest's clock (ADM-09). The store reads no clock itself.
+    #[must_use]
+    pub fn with_marker_time(mut self, ms: u64) -> Self {
+        self.marker_time = ms;
         self
     }
 
@@ -554,20 +568,43 @@ impl Store {
     /// Empties the index and fills it from every writer's log, inside a
     /// transaction already begun.
     fn reindex(&self) -> Result<u64, StoreError> {
-        search_index::clear(&self.conn)?;
+        self.reindex_into(&self.conn, &|| true)
+    }
+
+    /// Derives the search index from the record into the index tables
+    /// `index` holds, cleared first, while `time_left` says time remains
+    /// before each chunk of events: [`StoreError::Cancelled`] once it no
+    /// longer does (ENG-03). Returns how many events it read.
+    fn reindex_into(
+        &self,
+        index: &Connection,
+        time_left: &dyn Fn() -> bool,
+    ) -> Result<u64, StoreError> {
+        search_index::clear(index)?;
         let mut count = 0;
         for writer in self.writers()? {
-            let mut indexing = search_index::Indexing::open(&self.conn, writer)?;
+            // A writer with no event holds no slot, as when it was first
+            // indexed (I10).
+            let mut indexing = None;
             let mut after = 0;
             loop {
+                if !time_left() {
+                    return Err(StoreError::Cancelled);
+                }
                 let chunk =
                     self.rows_limited(writer, "AND seq > ?2", after, search_index::CHUNK)?;
                 let Some(last) = chunk.last() else { break };
                 after = sql(last.link.header.address.seq);
-                index_chunk(&mut indexing, &chunk)?;
+                let open = match indexing.as_mut() {
+                    Some(open) => open,
+                    None => indexing.insert(search_index::Indexing::open(index, writer)?),
+                };
+                index_chunk(open, &chunk)?;
                 count += chunk.len() as u64;
             }
-            indexing.done_to(u64::try_from(after).unwrap_or(0))?;
+            if let Some(open) = indexing {
+                open.done_to(u64::try_from(after).unwrap_or(0))?;
+            }
         }
 
         Ok(count)
@@ -702,6 +739,60 @@ impl Store {
         search_index::digest(&self.conn)
     }
 
+    /// The schema objects the store holds that this build does not
+    /// ship, as `schema.name` (ADM-09).
+    ///
+    /// # Errors
+    ///
+    /// Fails when SQLite does.
+    pub fn foreign_schema_objects(&self) -> Result<Vec<String>, StoreError> {
+        integrity::foreign(&self.conn)
+    }
+
+    /// Whether the search index ranks as a new index does (ADM-09): no
+    /// ranking function was set in its configuration.
+    ///
+    /// # Errors
+    ///
+    /// Fails when SQLite does or the store has no search index.
+    pub fn search_index_ranking_is_shipped(&self) -> Result<bool, StoreError> {
+        if !search_index::exists(&self.conn)? {
+            return Err(StoreError::NoIndex);
+        }
+
+        integrity::ranking_is_shipped(&self.conn)
+    }
+
+    /// Whether the search index holds what the record derives (ADM-09,
+    /// I10): the index derived again from the record alone, into an
+    /// index in memory, has the canonical digest of the one the store
+    /// keeps. Both are read in one read transaction, which takes no
+    /// write lock: live ingest and the hook handlers append meanwhile
+    /// (I9). `time_left` is asked before each chunk of events.
+    ///
+    /// # Errors
+    ///
+    /// Fails when SQLite does, when an event cannot be read, when the
+    /// store has no search index, or with [`StoreError::Cancelled`] once
+    /// `time_left` says the time is up (ENG-03).
+    pub fn search_index_is_derived(
+        &self,
+        time_left: &dyn Fn() -> bool,
+    ) -> Result<bool, StoreError> {
+        if !search_index::exists(&self.conn)? {
+            return Err(StoreError::NoIndex);
+        }
+        self.conn.execute_batch("BEGIN DEFERRED")?;
+        let compared = search_index::digest(&self.conn).and_then(|kept| {
+            let index = search_index::in_memory()?;
+            self.reindex_into(&index, time_left)?;
+            Ok(search_index::digest(&index)? == kept)
+        });
+        let _ = self.conn.execute_batch("ROLLBACK");
+
+        compared
+    }
+
     /// The writers whose events the search index leaves out, because
     /// another writer's id holds their slot.
     ///
@@ -760,14 +851,24 @@ impl Store {
         search_index::unmark_reported(&self.conn, gaps)
     }
 
+    /// The schema version this store was made with (ADM-05, ADM-11).
+    ///
+    /// # Errors
+    ///
+    /// Fails when SQLite does or the version does not parse.
+    pub fn schema_version(&self) -> Result<u32, StoreError> {
+        let version: String = self.conn.query_row(VERSION, [], |r| r.get(0))?;
+
+        version.parse().map_err(|_| StoreError::Corrupt {
+            address: None,
+            what: format!("schema_version {version:?}"),
+        })
+    }
+
     /// Checks the store's schema version, header field set and encoding
     /// against this parinn's (§8.3, ADM-05).
     fn check_format(&self) -> Result<(), StoreError> {
-        let version: String = self.conn.query_row(VERSION, [], |r| r.get(0))?;
-        let found: u32 = version.parse().map_err(|_| StoreError::Corrupt {
-            address: None,
-            what: format!("schema_version {version:?}"),
-        })?;
+        let found = self.schema_version()?;
         if found > SCHEMA_VERSION {
             return Err(StoreError::Newer { found });
         }
@@ -1280,7 +1381,7 @@ impl Store {
     ///
     /// Fails when SQLite does.
     pub fn start_generation(&mut self, path: &str, directory: &str) -> Result<Source, StoreError> {
-        source::start(&self.conn, path, directory)
+        source::start(&self.conn, path, directory, self.marker_time)
     }
 
     /// Moves the position of the transcript source generation `id` to
@@ -1291,7 +1392,7 @@ impl Store {
     ///
     /// Fails when SQLite does.
     pub fn advance(&mut self, id: i64, position: &Position) -> Result<(), StoreError> {
-        source::advance(&self.conn, id, position)
+        source::advance(&self.conn, id, position, self.marker_time)
     }
 
     /// Marks the transcript source generation `id` held at its ingest
@@ -1357,7 +1458,7 @@ impl Store {
             }
         }
         source::place(&tx, id, &out, places)?;
-        source::advance(&tx, id, position)?;
+        source::advance(&tx, id, position, self.marker_time)?;
         tx.commit()?;
 
         Ok(out)
@@ -1625,9 +1726,12 @@ impl Store {
             .read(name)
             .map_err(|source| StoreError::Payload { address, source })?;
 
-        String::from_utf8(bytes).map_err(|_| StoreError::Corrupt {
-            address: Some(address),
-            what: "content: its payload is not UTF-8".to_owned(),
+        String::from_utf8(bytes).map_err(|_| StoreError::Payload {
+            address,
+            source: std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                "its payload is not UTF-8",
+            ),
         })
     }
 
@@ -1683,7 +1787,9 @@ impl Out<'_> {
             event: tx.prepare(INSERT_EVENT)?,
             head: tx.prepare(INSERT_HEAD)?,
         };
-        let mut indexing = search_index::Indexing::open(tx, writer)?;
+        // The index opens for the writer's first event: a writer with no
+        // events claims no slot, nor evicts the writer holding it (I10).
+        let mut indexing = None;
         for new in new_events {
             let seq = Seq::new(next).ok_or(StoreError::Full(writer))?;
             let address = Address::new(writer, seq);
@@ -1699,12 +1805,18 @@ impl Out<'_> {
             let hash = header.hash();
             let body = self.body(address, new, canonical)?;
             insert_event(&mut inserts, &header, hash, new, &body)?;
-            indexing.add(seq, &new.content)?;
+            let open = match indexing.as_mut() {
+                Some(open) => open,
+                None => indexing.insert(search_index::Indexing::open(tx, writer)?),
+            };
+            open.add(seq, &new.content)?;
             out.push(address);
             prev_hash = hash;
             next += 1;
         }
-        indexing.done_to(next - 1)?;
+        if let Some(open) = &indexing {
+            open.done_to(next - 1)?;
+        }
         if let (Some(first), Some(last)) = (out.first(), out.last()) {
             segment::extend(tx, writer, first.seq, last.seq, close)?;
         }

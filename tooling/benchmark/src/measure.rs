@@ -61,6 +61,11 @@ pub fn time_benchmark(
             let input = fixture::SEARCH_REQUESTS.as_bytes().to_vec();
             time_program_fed(program, benchmark.args, &home.env(), input, deadline)
         }
+        Fixture::Runs { runs, lines } => {
+            let home = fixture::Home::with_runs(&std::env::temp_dir(), runs, lines)
+                .map_err(|e| format!("make the fixture of {}: {e}", benchmark.name))?;
+            time_program_in(program, benchmark.args, &home.env(), deadline)
+        }
         Fixture::HookInput { hook } => retried(ATTEMPTS, settle, || {
             hook_sample(program, benchmark, hook, deadline)
         }),

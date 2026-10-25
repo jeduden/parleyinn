@@ -370,6 +370,36 @@ fn a_purge_cut_short_is_finished_by_the_next_attempt() {
 }
 
 #[test]
+fn the_ranges_a_purge_left_unfinished_are_named_until_it_finishes() {
+    let dir = TempDir::new().unwrap();
+    let mut store = filled(&dir, &["one", "two", "three"]);
+    assert_eq!(
+        store.unfinished_purges().unwrap(),
+        Vec::<String>::new(),
+        "no journal yet"
+    );
+    store
+        .purge(writer(2), &[recorded(1)], &[range(2, 3)])
+        .unwrap();
+    assert_eq!(store.unfinished_purges().unwrap(), Vec::<String>::new());
+    store
+        .conn
+        .execute_batch(&format!(
+            "INSERT INTO purge_journal (kind, target) VALUES ('index', '{0}:3-3'), \
+             ('index', '{0}:2-2'), ('vacuum', '')",
+            writer(1)
+        ))
+        .unwrap();
+
+    assert_eq!(
+        store.unfinished_purges().unwrap(),
+        [format!("{}:2-2", writer(1)), format!("{}:3-3", writer(1))]
+    );
+    store.finish_purge().unwrap();
+    assert_eq!(store.unfinished_purges().unwrap(), Vec::<String>::new());
+}
+
+#[test]
 fn a_store_that_never_purged_has_nothing_to_finish() {
     let dir = TempDir::new().unwrap();
     let mut store = filled(&dir, &["one"]);

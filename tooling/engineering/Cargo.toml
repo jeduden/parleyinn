@@ -19,6 +19,7 @@ path = "src/license_check_main.rs"
 adr.workspace = true
 benchmark.workspace = true
 calibrate.workspace = true
+coverage.workspace = true
 drift.workspace = true
 review-gate.workspace = true
 scenario.workspace = true
@@ -34,5 +35,5 @@ workspace = true
 # ENG-02: see crates/parinn/Cargo.toml.
 [package.metadata.parinn]
 responsibility = "Checks the repository against the requirements of SRS section 10 for the bound scenarios"
-may-depend-on = ["adr", "benchmark", "calibrate", "drift", "review-gate", "scenario", "srs"]
+may-depend-on = ["adr", "benchmark", "calibrate", "coverage", "drift", "review-gate", "scenario", "srs"]
 may-dev-depend-on = ["testkit"]

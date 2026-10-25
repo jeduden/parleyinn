@@ -21,11 +21,12 @@ pub const CHECKOUT_STEP: &str = "the repository checkout";
 /// the suite with, and the scan of the agent instruction files; and the
 /// gates that prove what a pending scenario cannot yet: the core rows
 /// of ENG-12 and ENG-16, ENG-15's benchmark gate, and ENG-21's ruleset
-/// and CODEOWNERS; and the gates behind ENG-03, pending until M1 adds
-/// injectable I/O traits, ENG-20's three workflow gates, the gate that
+/// and CODEOWNERS; and the gates behind ENG-03, ENG-20's three
+/// workflow gates, the gate that
 /// holds every crate to the complexity limits, and the gate that holds
-/// CI to the TOML checks.
-pub const GATE_TESTS: [&str; 36] = [
+/// CI to the TOML checks; and the gates behind SEC-01's core row,
+/// SEC-15, SEC-17, SEC-19 and ENG-22.
+pub const GATE_TESTS: [&str; 42] = [
     "specification_parses",
     "decision_records_parse",
     "specification_and_features_agree",
@@ -62,6 +63,12 @@ pub const GATE_TESTS: [&str; 36] = [
     "the_checkout_s_release_signs_its_checksums_keyless",
     "the_checkout_s_release_attests_provenance_only_in_the_release_build_workflow",
     "the_checkout_s_release_attaches_and_attests_an_sbom",
+    "the_boundary_register_assigns_each_component_once_and_the_core_keeps_its_evidence",
+    "the_core_opens_no_socket_and_starts_no_program_but_its_kernel_worker",
+    "only_the_core_is_built_and_it_sits_in_b0",
+    "no_telemetry_crash_report_or_update_check_ships",
+    "the_threat_model_covers_the_register_and_compares_with_zed_delta",
+    "every_privacy_statement_cites_a_test_that_exists",
 ];
 
 /// Refuses a case whose injection no longer finds its target, so a case

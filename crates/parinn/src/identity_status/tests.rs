@@ -30,10 +30,10 @@ fn each_source_says_what_the_node_identity_is_checked_against() {
 }
 
 #[test]
-fn the_fork_detection_line_says_what_is_local_and_what_waits_for_the_peer_network() {
+fn the_fork_detection_line_says_what_is_refused_and_what_waits_for_seals_and_the_peer_network() {
     assert_eq!(
         FORK_DETECTION_LINE,
-        "fork detection: local scan by parinn verify; peer detection with the peer network"
+        "fork detection: a second event at one (writer, seq) is refused for the segments the node holds, found by a local scan with parinn verify; the equivocated mark waits for seals; the check between peers arrives with the peer network"
     );
 }
 
@@ -51,7 +51,9 @@ fn the_json_carries_the_same_facts() {
         fork_detection_json(),
         serde_json::json!({
             "local": "parinn verify",
-            "peer": "with the peer network",
+            "refused": "a second event at one (writer, seq), for the segments the node holds",
+            "equivocated": "the mark waits for seals",
+            "peer": "the check between peers arrives with the peer network",
         })
     );
 }

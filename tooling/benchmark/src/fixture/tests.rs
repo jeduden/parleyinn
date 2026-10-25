@@ -20,6 +20,48 @@ fn a_transcript_repeats_the_recorded_lines_each_copy_with_its_own_uuids() {
 }
 
 #[test]
+fn a_run_s_transcript_is_its_own_harness_session_with_its_own_uuids() {
+    let first = run_transcript(3, 0);
+    let second = run_transcript(3, 7);
+
+    assert_eq!(first.lines().count(), 3);
+    assert!(!first.contains(RECORDED_SESSION) && !second.contains(RECORDED_SESSION));
+    assert!(first.contains("\"sessionId\":\"00000000-b535-45bc-9ed0-5400ea84bec7\""));
+    assert!(second.contains("\"sessionId\":\"00000007-b535-45bc-9ed0-5400ea84bec7\""));
+    let uuids = |t: &str| -> Vec<String> {
+        t.match_indices("\"uuid\":\"")
+            .map(|(at, _)| t[at..at + 20].to_owned())
+            .collect()
+    };
+    assert!(
+        uuids(&second)
+            .iter()
+            .all(|u| u.starts_with("\"uuid\":\"r7c0-"))
+    );
+    assert!(uuids(&first).iter().all(|u| !uuids(&second).contains(u)));
+}
+
+#[test]
+fn a_home_of_runs_holds_one_transcript_for_each() {
+    let base = TempDir::new().unwrap();
+
+    let home = Home::with_runs(base.path(), 3, 2).unwrap();
+
+    let projects = home.env()[0].1.join(".claude/projects/-w-bench");
+    let mut names: Vec<String> = fs::read_dir(&projects)
+        .unwrap()
+        .map(|e| e.unwrap().file_name().to_string_lossy().into_owned())
+        .collect();
+    names.sort();
+    assert_eq!(names, ["run-0.jsonl", "run-1.jsonl", "run-2.jsonl"]);
+    assert_eq!(
+        fs::read_to_string(projects.join("run-1.jsonl")).unwrap(),
+        run_transcript(2, 1)
+    );
+    assert!(Home::with_runs(&base.path().join("f\0"), 1, 1).is_err());
+}
+
+#[test]
 fn a_hook_input_names_the_homes_transcript_in_its_hooks_recorded_shape() {
     let base = TempDir::new().unwrap();
     let home = Home::with_transcript(base.path(), "x\n").unwrap();

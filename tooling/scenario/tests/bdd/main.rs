@@ -14,6 +14,8 @@
 //! scenario by its requirement id.
 
 mod administration;
+mod administration_status;
+mod administration_verify;
 mod assumptions;
 mod engineering;
 mod engineering_adr;
@@ -22,7 +24,9 @@ mod engineering_architecture;
 mod engineering_benchmark;
 mod engineering_boundary;
 mod engineering_contract;
+mod engineering_coverage;
 mod engineering_drift;
+mod engineering_fuzz;
 mod engineering_isolation;
 mod engineering_licenses;
 mod engineering_logs;
@@ -58,6 +62,7 @@ mod record_search;
 mod record_store;
 mod record_transcript;
 mod security;
+mod security_boundary;
 mod security_envelope;
 mod security_hooks;
 mod security_keys;

@@ -1,0 +1,19 @@
+recall after compaction, dataset v1, seeds [1, 2, 3], 216 questions, 10 hits read per question
+within 10 hits, depth 1: 72/72 recalled, 100.0% (95% interval 94.9% to 100.0%)
+within 10 hits, depth 2: 72/72 recalled, 100.0% (95% interval 94.9% to 100.0%)
+within 10 hits, depth 3: 72/72 recalled, 100.0% (95% interval 94.9% to 100.0%)
+within 5 hits, depth 1: 71/72 recalled, 98.6% (95% interval 92.5% to 99.8%)
+within 5 hits, depth 2: 71/72 recalled, 98.6% (95% interval 92.5% to 99.8%)
+within 5 hits, depth 3: 63/72 recalled, 87.5% (95% interval 77.9% to 93.3%)
+without recall, in the context after the last compaction, depth 1: 0/72
+without recall, in the context after the last compaction, depth 2: 0/72
+without recall, in the context after the last compaction, depth 3: 0/72
+seed 1, depth 1: 24/24
+seed 1, depth 2: 24/24
+seed 1, depth 3: 24/24
+seed 2, depth 1: 24/24
+seed 2, depth 2: 24/24
+seed 2, depth 3: 24/24
+seed 3, depth 1: 24/24
+seed 3, depth 2: 24/24
+seed 3, depth 3: 24/24

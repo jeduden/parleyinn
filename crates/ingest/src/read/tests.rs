@@ -124,3 +124,31 @@ fn a_file_swapped_between_the_look_and_the_open_is_refused() {
     let not_a_file = std::fs::metadata(dir.path()).unwrap();
     assert!(same_file(&not_a_file, &not_a_file).is_err());
 }
+
+#[test]
+fn a_regular_file_opens_and_anything_else_is_refused() {
+    let dir = TempDir::new().unwrap();
+    let path = dir.path().join("t.jsonl");
+    std::fs::write(&path, "x\n").unwrap();
+    let mut read = String::new();
+
+    regular_file(&path)
+        .unwrap()
+        .read_to_string(&mut read)
+        .unwrap();
+
+    assert_eq!(read, "x\n");
+    assert_eq!(
+        regular_file(dir.path()).unwrap_err().to_string(),
+        "not a regular file"
+    );
+    #[cfg(unix)]
+    {
+        let fifo = dir.path().join("fifo");
+        mkfifo(&fifo);
+        assert_eq!(
+            regular_file(&fifo).unwrap_err().to_string(),
+            "not a regular file"
+        );
+    }
+}

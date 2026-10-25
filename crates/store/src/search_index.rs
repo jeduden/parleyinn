@@ -160,6 +160,17 @@ pub(crate) fn exists(conn: &Connection) -> Result<bool, StoreError> {
     Ok(found?)
 }
 
+/// An empty search index in memory, under the shipped settings: what
+/// verify derives the record's index into, apart from the store (ADM-09).
+pub(crate) fn in_memory() -> Result<Connection, StoreError> {
+    let conn = Connection::open_in_memory()?;
+    conn.execute_batch(&format!("ATTACH DATABASE ':memory:' AS {SCHEMA_NAME};"))?;
+    conn.execute_batch(SCHEMA)?;
+    write_settings(&conn)?;
+
+    Ok(conn)
+}
+
 /// Records the settings the index is built under.
 pub(crate) fn write_settings(conn: &Connection) -> Result<(), StoreError> {
     for (key, value) in settings() {
@@ -174,9 +185,9 @@ pub(crate) fn write_settings(conn: &Connection) -> Result<(), StoreError> {
 
 /// Whether the index holds what the record does, given each writer's
 /// newest seq (none for a writer with no events): every writer that
-/// holds a slot is indexed to its newest event and no further, no slot
-/// is held by a writer the record lacks, and a writer without a slot
-/// has lost it to a smaller writer id.
+/// holds a slot has events and is indexed to its newest and no further,
+/// no slot is held by a writer the record lacks or one with no events,
+/// and a writer without a slot has lost it to a smaller writer id.
 pub(crate) fn is_current(conn: &Connection, heads: &[(WriterId, u64)]) -> Result<bool, StoreError> {
     let mut held = std::collections::BTreeMap::new();
     let mut statement = conn.prepare("SELECT writer, slot, indexed_to FROM search_writers")?;
@@ -197,6 +208,9 @@ pub(crate) fn is_current(conn: &Connection, heads: &[(WriterId, u64)]) -> Result
     for (writer, newest) in heads {
         let name = writer.to_string();
         match held.get(&name) {
+            // A writer with no events holds no slot in the index the
+            // record derives (I10).
+            Some(_) if *newest == 0 => return Ok(false),
             Some((_, indexed)) => {
                 known += 1;
                 if u64::try_from(*indexed).ok() != Some(*newest) {

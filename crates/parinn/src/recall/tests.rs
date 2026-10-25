@@ -69,7 +69,7 @@ fn an_unrecorded_recall_and_a_redacted_argument_are_counted() {
     assert_eq!(got[0].0, "dropped");
     assert_eq!(got[0].1.as_deref(), Some("recall_not_recorded"));
     assert_eq!(got[1].0, "redacted");
-    assert_eq!(got[1].1.as_deref(), Some("redacted"));
+    assert_eq!(got[1].1.as_deref(), Some("redactions"));
     assert!(got[1].3.ends_with(" aws_access_key"), "{}", got[1].3);
 }
 

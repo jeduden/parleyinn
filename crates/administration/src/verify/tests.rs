@@ -1173,7 +1173,7 @@ fn a_kept_origin_that_differs_from_the_derived_one_is_named_by_its_writer() {
     assert_eq!(
         err.to_string(),
         format!(
-            "derived artifact consistency: the origin kept for writer {} differs from the record's: run parinn rebuild",
+            "the origin kept for writer {} differs from the record's: run parinn rebuild",
             f.ingest.writer
         )
     );
@@ -1222,7 +1222,7 @@ fn a_worktree_the_record_binds_and_the_store_does_not_keep_is_named_by_its_diges
     assert_eq!(err.address(), None);
     assert_eq!(
         err.to_string(),
-        "derived artifact consistency: the identity kept for worktree w1 differs from the record's: run parinn rebuild"
+        "the identity kept for worktree w1 differs from the record's: run parinn rebuild"
     );
 }
 
@@ -1413,4 +1413,137 @@ fn a_tombstone_that_names_other_commitments_or_holds_no_range_is_named() {
             .ends_with("it holds no range, count and digest"),
         "{err}"
     );
+}
+
+#[test]
+fn a_store_made_by_this_build_has_the_shape_it_ships() {
+    let f = fixture();
+
+    assert!(matches!(
+        verify_shape(&f.store, &|| true),
+        Ok(Shape::Checked)
+    ));
+}
+
+#[test]
+fn a_schema_object_this_build_does_not_ship_fails_the_shape_naming_it() {
+    let f = fixture();
+    let conn = rusqlite::Connection::open(f.home.store()).unwrap();
+    conn.execute_batch("CREATE TABLE exfil (x TEXT)").unwrap();
+
+    let err = verify_shape(&f.store, &|| true).unwrap_err();
+
+    assert_eq!(
+        err.to_string(),
+        "the store holds schema objects this parinn does not ship: main.exfil"
+    );
+    assert_eq!(err.class(), "derived_artifact_consistency");
+    assert_eq!(err.check(), "derived artifact consistency");
+    assert_eq!(err.address(), None);
+}
+
+#[test]
+fn an_altered_ranking_or_a_changed_entry_fails_the_shape_as_a_search_index_fault() {
+    let f = fixture();
+    let conn = rusqlite::Connection::open(f.home.store()).unwrap();
+    conn.execute(
+        "ATTACH DATABASE ?1 AS idx",
+        [f.home
+            .root()
+            .join(store::search_index::FILE)
+            .to_str()
+            .unwrap()],
+    )
+    .unwrap();
+    let row = store::search_index::row_id_of(Address::new(f.ingest.writer, Seq::new(1).unwrap()))
+        .unwrap();
+    conn.execute("DELETE FROM idx.events_fts WHERE rowid = ?1", [row])
+        .unwrap();
+    conn.execute(
+        "INSERT INTO idx.events_fts (rowid, text) VALUES (?1, 'zebra')",
+        [row],
+    )
+    .unwrap();
+
+    let err = verify_shape(&f.store, &|| true).unwrap_err();
+
+    assert_eq!(
+        err.to_string(),
+        "the search index differs from what the record derives: run parinn rebuild"
+    );
+    conn.execute(
+        "INSERT INTO idx.events_fts (events_fts, rank) VALUES ('rank', 'bm25(0.0)')",
+        [],
+    )
+    .unwrap();
+    let err = verify_shape(&f.store, &|| true).unwrap_err();
+    assert_eq!(
+        err.to_string(),
+        "the search index ranks in a way this parinn does not ship: run parinn rebuild"
+    );
+}
+
+#[test]
+fn a_derivation_out_of_time_leaves_the_index_unchecked_neither_passed_nor_failed() {
+    let f = fixture();
+
+    assert!(matches!(
+        verify_shape(&f.store, &|| false),
+        Ok(Shape::IndexUnfinished)
+    ));
+}
+
+#[test]
+fn a_store_without_a_search_index_passes_the_shape() {
+    let f = fixture();
+    drop(f.store);
+    std::fs::remove_file(f.home.root().join(store::search_index::FILE)).unwrap();
+    let fresh = Store::open_read_only_made(&f.home.store())
+        .unwrap()
+        .unwrap();
+
+    assert!(matches!(verify_shape(&fresh, &|| true), Ok(Shape::Checked)));
+}
+
+#[test]
+fn each_failure_belongs_to_one_of_the_checks_of_adm_09() {
+    let address = || "a".to_owned();
+    let hash_chain = [
+        VerifyError::Broken {
+            address: address(),
+            reason: String::new(),
+        },
+        VerifyError::Tombstone {
+            address: address(),
+            reason: String::new(),
+        },
+        VerifyError::KeyEvent {
+            address: address(),
+            reason: String::new(),
+        },
+        VerifyError::Record { address: address() },
+        VerifyError::Provenance {
+            address: address(),
+            provenance: String::new(),
+        },
+        VerifyError::Genesis("g"),
+    ];
+    for err in hash_chain {
+        assert_eq!(err.check(), "hash chain", "{err}");
+    }
+    let payload = [
+        VerifyError::Content {
+            address: address(),
+            removed: false,
+        },
+        VerifyError::Payload {
+            address: address(),
+            reason: String::new(),
+        },
+    ];
+    for err in payload {
+        assert_eq!(err.check(), "payload integrity", "{err}");
+    }
+    assert_eq!(VerifyError::Corrupt(StoreError::NoIndex).check(), "store");
+    assert_eq!(VerifyError::Store(StoreError::NoIndex).check(), "store");
 }

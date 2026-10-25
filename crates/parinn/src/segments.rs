@@ -10,6 +10,8 @@ use store::{Segment, Store, StoreError};
 /// The segments `parinn status` reports.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct SegmentsStatus {
+    /// The schema version the store was made with.
+    pub(crate) schema_version: u32,
     /// Each writer's open segment.
     pub(crate) open: Vec<Segment>,
     /// Each segment of a newer format version, refused.
@@ -34,6 +36,7 @@ pub(crate) fn read(home: &Home) -> Result<Option<SegmentsStatus>, StoreError> {
     };
 
     Ok(Some(SegmentsStatus {
+        schema_version: store.schema_version()?,
         open: store.open_segments()?,
         newer: store.newer_segments()?,
     }))

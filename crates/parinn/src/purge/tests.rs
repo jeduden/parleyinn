@@ -158,6 +158,35 @@ fn a_purge_erases_the_range_records_its_act_and_tombstone_and_the_record_still_v
     assert!(!shown.contains("two") && !shown.contains("three"));
 }
 
+/// A finding, raised in the threat model (T-erasure residue) and to the
+/// stakeholder: a purge leaves its transcript source's ingest position,
+/// whose prefix hash is an unkeyed SHA-256 of the transcript's bytes,
+/// erased lines among them, so it confirms a guess of those bytes; and
+/// each erased line's place, its byte offset and `uuid`. When a purge
+/// clears or keys them, this test changes with it.
+#[test]
+fn a_purge_leaves_the_prefix_hash_and_places_of_its_transcript_source() {
+    let (p, writer) = with_a_run();
+
+    let (code, _, err) = p.invoke(&["purge", "--range", &format!("{writer}:2-3")], &DEV);
+
+    assert_eq!((code, err.as_str()), (EXIT_OK, ""));
+    let (_, store) = open(&p);
+    let source = store.sources().unwrap().remove(0);
+    assert_eq!(
+        source.position.prefix,
+        record::digest::Digest::of(&[LINES.as_bytes()]),
+        "confirms a guess of every byte ingested, the erased lines' too"
+    );
+    let offsets: Vec<u64> = store
+        .placed(source.id)
+        .unwrap()
+        .iter()
+        .map(|p| p.place.offset)
+        .collect();
+    assert_eq!(offsets, [0, 4, 8, 14], "the erased lines' lengths");
+}
+
 #[test]
 fn a_range_written_by_label_is_purged_and_json_names_what_it_did() {
     let (p, writer) = with_a_run();
@@ -423,6 +452,91 @@ fn the_next_rebuild_or_ingest_finishes_what_a_purge_left_and_a_stuck_step_is_cou
     );
     let (_, store) = open(&p);
     assert!(!store.purge_pending().unwrap());
+}
+
+/// Puts a purged event's posting back in the search index and its step
+/// back in the purge journal: what a kill after the purge's transaction
+/// and before its finishing steps leaves (ENG-06).
+fn cut_short_after_its_transaction(p: &Process, writer: WriterId, seq: u64, text: &str) {
+    let (home, store) = open(p);
+    assert!(!store.purge_pending().unwrap());
+    drop(store);
+    let address = Address {
+        writer,
+        seq: Seq::new(seq).unwrap(),
+    };
+    let row = store::search_index::row_id_of(address).unwrap();
+    let index = rusqlite::Connection::open(home.root().join("search_index")).unwrap();
+    index
+        .execute(
+            "INSERT INTO events_fts (rowid, text) VALUES (?1, ?2)",
+            rusqlite::params![row, text],
+        )
+        .unwrap();
+    let record = rusqlite::Connection::open(home.store()).unwrap();
+    record
+        .execute(
+            "INSERT INTO purge_journal (kind, target) VALUES ('index', ?1), ('vacuum', '')",
+            [format!("{writer}:{seq}-{seq}")],
+        )
+        .unwrap();
+}
+
+#[test]
+fn verify_reports_a_purge_a_kill_left_unfinished_exits_0_and_changes_nothing() {
+    let (p, writer) = with_a_run();
+    let range = format!("{writer}:2-2");
+    assert_eq!(p.invoke(&["purge", "--range", &range], &DEV).0, EXIT_OK);
+    cut_short_after_its_transaction(&p, writer, 2, "two");
+    let (home, _) = open(&p);
+    let before = std::fs::read(home.root().join("search_index")).unwrap();
+    let counted_before = counted(&p, "purge_unfinished").len();
+
+    let (code, out, err) = p.invoke(&["verify"], &DEV);
+
+    assert_eq!((code, err.as_str()), (EXIT_OK, ""));
+    assert!(
+        out.contains(&format!(
+            "; a purge was cut short before it finished, so its residue stays until the next \
+             purge, ingest or rebuild clears it, and the search index is unchecked: {range}"
+        )),
+        "{out}"
+    );
+    let (_, store) = open(&p);
+    assert!(store.purge_pending().unwrap(), "verify finishes nothing");
+    drop(store);
+    assert_eq!(
+        std::fs::read(home.root().join("search_index")).unwrap(),
+        before,
+        "verify leaves the index as it found it"
+    );
+    assert_eq!(counted(&p, "purge_unfinished").len(), counted_before + 1);
+    let (_, json, _) = p.invoke(&["verify", "--json"], &DEV);
+    let report: Value = serde_json::from_str(&json).unwrap();
+    assert_eq!(report["pending_purges"], serde_json::json!([range]));
+    assert_eq!(report["index_checked"], false);
+}
+
+#[test]
+fn once_the_next_rebuild_finishes_the_purge_verify_finds_nothing_unfinished() {
+    let (p, writer) = with_a_run();
+    let range = format!("{writer}:2-2");
+    assert_eq!(p.invoke(&["purge", "--range", &range], &DEV).0, EXIT_OK);
+    cut_short_after_its_transaction(&p, writer, 2, "two");
+    assert_eq!(p.invoke(&["rebuild"], &DEV).0, EXIT_OK);
+
+    let (code, json, err) = p.invoke(&["verify", "--json"], &DEV);
+
+    assert_eq!((code, err.as_str()), (EXIT_OK, ""));
+    let report: Value = serde_json::from_str(&json).unwrap();
+    assert_eq!(report["pending_purges"], serde_json::json!([]));
+    assert_eq!(report["index_checked"], true);
+    let (home, _) = open(&p);
+    let index = std::fs::read(home.root().join("search_index")).unwrap();
+    assert!(
+        !index.windows(3).any(|w| w == b"two"),
+        "no posting of the purged text stays"
+    );
 }
 
 #[test]
