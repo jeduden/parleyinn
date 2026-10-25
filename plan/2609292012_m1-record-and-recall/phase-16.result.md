@@ -91,4 +91,8 @@ scenarios (SEC-12, SEC-17, SEC-19, ENG-22, ADM-09, RCL-02, PRV-09,
 REC-24, LANE-02), the in-part rows' audit, verify's landmark row, the
 erasure residue (phase 15), and ENG-15.
 
+- [ ] The phase closing ADM-09 binds the rows PR #90 adds: a pending
+  purge with the search index untampered (exit 0) or tampered outside
+  its ranges (exit 3), and an index derivation past verify's deadline
+
 [consent]: https://github.com/jeduden/parleyinn/pull/91#issuecomment-6402652493
