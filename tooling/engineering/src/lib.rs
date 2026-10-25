@@ -25,6 +25,7 @@ pub mod review_workflow;
 pub mod static_analysis;
 pub mod third_party;
 pub mod toolchain;
+pub mod trusted_text;
 
 use std::fs;
 use std::path::{Path, PathBuf};

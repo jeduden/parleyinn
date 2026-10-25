@@ -367,3 +367,16 @@ fn a_run_whose_writer_does_not_parse_is_corrupt() {
 
     assert!(store.ingested_runs().is_err());
 }
+
+#[test]
+fn a_run_is_named_by_its_harness_session_and_a_subagent_by_its_agent_id_too() {
+    let run = |agent_id: Option<&str>| IngestedRun {
+        writer: WriterId::derive(&[1; 32]),
+        path: "/t/s.jsonl".into(),
+        harness_session: "s1".into(),
+        agent_id: agent_id.map(str::to_owned),
+    };
+
+    assert_eq!(run(None).run_name(), "s1");
+    assert_eq!(run(Some("a7")).run_name(), "s1/a7");
+}

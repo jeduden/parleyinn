@@ -18,6 +18,7 @@
 pub mod hook;
 mod origin;
 pub mod payload;
+mod recall;
 mod refusal;
 mod repository;
 pub mod search_index;
@@ -46,6 +47,7 @@ use serde_json::Value;
 
 pub use hook::{Held, Observation, PromptCommitment};
 pub use payload::{Disk, OsDisk, Payloads};
+pub use recall::{RecallReach, Stats};
 pub use search::rank::Hit;
 pub use search_index::{GapClass, IndexGap, Search};
 pub use segment::{SEGMENT_VERSION, Segment};
@@ -589,6 +591,38 @@ impl Store {
         keep: &dyn Fn(Address) -> bool,
     ) -> Result<Vec<Hit>, StoreError> {
         search_index::run(&self.conn, search, Some(keep))
+    }
+
+    /// The writer labels `device`, a device seat's writer, assigned
+    /// (RCL-08): derived from its assignment events alone.
+    ///
+    /// # Errors
+    ///
+    /// Fails when SQLite does.
+    pub fn writer_labels(
+        &self,
+        device: WriterId,
+    ) -> Result<BTreeMap<WriterId, record::range::Label>, StoreError> {
+        recall::labels(&self.conn, device)
+    }
+
+    /// The writers `device`'s certificate records name, in the order it
+    /// recorded them.
+    ///
+    /// # Errors
+    ///
+    /// Fails when SQLite does.
+    pub fn certified_writers(&self, device: WriterId) -> Result<Vec<WriterId>, StoreError> {
+        recall::certified(&self.conn, device)
+    }
+
+    /// The counts of the events `reach` reaches (`stat_list`).
+    ///
+    /// # Errors
+    ///
+    /// Fails when SQLite does.
+    pub fn stats(&self, reach: &RecallReach) -> Result<Stats, StoreError> {
+        recall::stats(&self.conn, reach)
     }
 
     /// The search index's canonical digest (§8.3): the same for any two
@@ -1333,6 +1367,16 @@ impl Store {
     /// Fails when SQLite does or a row does not parse.
     pub fn ingested_runs(&self) -> Result<Vec<IngestedRun>, StoreError> {
         source::runs(&self.conn, "WHERE ?1 = ?2", "", "")
+    }
+
+    /// The seq of the last event of `writer`'s log; none for an empty
+    /// log.
+    ///
+    /// # Errors
+    ///
+    /// Fails when SQLite does.
+    pub fn head(&self, writer: WriterId) -> Result<Option<Seq>, StoreError> {
+        recall::head(&self.conn, writer)
     }
 
     /// The event at `address`.

@@ -73,8 +73,8 @@ fn found(store: &Store, word: &str) -> Vec<(String, u64)> {
     store
         .search(&Search {
             query: &query,
-            room: room(),
-            writer: None,
+            rooms: &[room()],
+            writers: &[],
             provenance: &[],
             kinds: &[],
             since: None,

@@ -1478,7 +1478,7 @@ pub(crate) fn owner_only_dirs(path: &std::path::Path) {
 
 /// Writes a store file that is no database, readable by its owner alone
 /// so the store reads it rather than refuse its permissions (SEC-02).
-fn junk_store(p: &Process) {
+pub(crate) fn junk_store(p: &Process) {
     let path = p.parinn_home().join("store.db");
     std::fs::write(&path, "not a database, but long enough to read a header").unwrap();
     #[cfg(unix)]

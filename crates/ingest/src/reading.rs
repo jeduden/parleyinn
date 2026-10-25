@@ -405,6 +405,17 @@ impl<'r> Runs<'r> {
         if let Some(seats) = self.live.as_mut() {
             let writer = seats.ensure(store, node, key, entropy)?;
             self.of_source.insert(key.agent_id.clone(), writer);
+            // The run's writers are those ingest recorded for it, so a
+            // recall scoped to the run reaches this seat (RCL-05).
+            let kept = store.ingested_run(&self.path, key.agent_id.as_deref())?;
+            if kept.is_none_or(|run| run.writer != writer) {
+                store.add_run(&IngestedRun {
+                    writer,
+                    path: self.path.clone(),
+                    harness_session: key.harness_session.clone(),
+                    agent_id: key.agent_id.clone(),
+                })?;
+            }
             return Ok(writer);
         }
         // After a node identity change, what remains of a run goes to a

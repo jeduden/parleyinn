@@ -447,10 +447,11 @@ pub(crate) fn unindexed_writers(conn: &Connection) -> Result<Vec<String>, StoreE
 #[derive(Debug, Clone, Copy)]
 pub struct Search<'a> {
     pub query: &'a Compiled,
-    /// The room whose writers are searched.
-    pub room: RoomId,
-    /// One writer: a run, until runs derive from their seats.
-    pub writer: Option<WriterId>,
+    /// The rooms whose writers are searched; none means any room.
+    pub rooms: &'a [RoomId],
+    /// The writers searched; none means any writer: a run's, which
+    /// span its seats' rooms (RCL-05).
+    pub writers: &'a [WriterId],
     /// Provenance classes, by name; none means any.
     pub provenance: &'a [String],
     /// Event kinds, by name; none means any.
@@ -475,15 +476,18 @@ fn ranked_matches(search: &Search<'_>, limited: bool) -> (String, Vec<Sql>) {
          JOIN search_writers w ON w.slot = (events_fts.rowid & 34359738367)
          JOIN seats s ON s.writer = w.writer
          JOIN events e ON e.writer = w.writer AND e.seq = (events_fts.rowid >> 35)
-         WHERE events_fts MATCH ? AND s.room = ?",
+         WHERE events_fts MATCH ?",
     );
-    let mut args = vec![
-        Sql::Text(search.query.expression().to_owned()),
-        Sql::Text(search.room.to_string()),
-    ];
-    if let Some(writer) = search.writer {
-        sql.push_str(" AND w.writer = ?");
-        args.push(Sql::Text(writer.to_string()));
+    let mut args = vec![Sql::Text(search.query.expression().to_owned())];
+    if !search.rooms.is_empty() {
+        let marks = vec!["?"; search.rooms.len()].join(", ");
+        sql.push_str(&format!(" AND s.room IN ({marks})"));
+        args.extend(search.rooms.iter().map(|r| Sql::Text(r.to_string())));
+    }
+    if !search.writers.is_empty() {
+        sql.push_str(" AND w.writer IN (SELECT value FROM json_each(?))");
+        let writers: Vec<String> = search.writers.iter().map(ToString::to_string).collect();
+        args.push(Sql::Text(serde_json::Value::from(writers).to_string()));
     }
     for (column, values) in [("provenance", search.provenance), ("kind", search.kinds)] {
         if !values.is_empty() {
