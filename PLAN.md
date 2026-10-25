@@ -70,7 +70,7 @@ empty: |
 | 2609292156 | 🔳     | sonnet | [The repository's knowledge follows ParleyInn's layers](plan/2609292156_knowledge-follows-parinn-layers/plan.md)        |
 | 2609301942 | ✅     | sonnet | [Agent review through the reviewer app](plan/2609301942_agent-review-app/plan.md)                                       |
 | 2610012322 | ✅     | opus   | [Scope ParleyInn for agent fleets: shared, real-time, public sessions](plan/2610012322_parinn-for-agent-fleets/plan.md) |
-| 2610022338 | 🔲     | opus   | [ParleyInn's lane experience and peer network: no central service](plan/2610022338_parinn-network-side/plan.md)         |
+| 2610022338 | ⛔     | opus   | [ParleyInn's lane experience and peer network: no central service](plan/2610022338_parinn-network-side/plan.md)         |
 | 2610031222 | 🔲     | opus   | [Sandboxed agents: the boundary ParleyInn's owner acts rest on](plan/2610031222_agent-sandboxing/plan.md)               |
 | 2610050706 | ✅     | sonnet | [Move the whole toolchain from Go to Rust](plan/2610050706_toolchain-to-rust/plan.md)                                   |
 | 2610112057 | 🔲     | opus   | [M7: standalone room view](plan/2610112057_m7-standalone-room-view.md)                                                  |
