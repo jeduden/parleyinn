@@ -222,6 +222,10 @@ pub enum Counter {
     /// Applying the retention policies failed: the store or the random
     /// source did; the next ingest tries again (SEC-22, I6).
     RetentionFailed,
+    /// `parinn verify` ran out of time deriving the search index again:
+    /// the index was left unchecked, neither passed nor failed (ADM-09,
+    /// ENG-03, I6).
+    VerifyUnfinished,
 }
 
 impl Counter {
@@ -287,6 +291,7 @@ impl Counter {
             Self::PurgeUnfinished => "purge_unfinished",
             Self::RetentionPurged => "retention_purged",
             Self::RetentionFailed => "retention_failed",
+            Self::VerifyUnfinished => "verify_unfinished",
         }
     }
 }

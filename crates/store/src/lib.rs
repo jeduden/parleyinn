@@ -568,7 +568,19 @@ impl Store {
     /// Empties the index and fills it from every writer's log, inside a
     /// transaction already begun.
     fn reindex(&self) -> Result<u64, StoreError> {
-        search_index::clear(&self.conn)?;
+        self.reindex_into(&self.conn, &|| true)
+    }
+
+    /// Derives the search index from the record into the index tables
+    /// `index` holds, cleared first, while `time_left` says time remains
+    /// before each chunk of events: [`StoreError::Cancelled`] once it no
+    /// longer does (ENG-03). Returns how many events it read.
+    fn reindex_into(
+        &self,
+        index: &Connection,
+        time_left: &dyn Fn() -> bool,
+    ) -> Result<u64, StoreError> {
+        search_index::clear(index)?;
         let mut count = 0;
         for writer in self.writers()? {
             // A writer with no event holds no slot, as when it was first
@@ -576,13 +588,16 @@ impl Store {
             let mut indexing = None;
             let mut after = 0;
             loop {
+                if !time_left() {
+                    return Err(StoreError::Cancelled);
+                }
                 let chunk =
                     self.rows_limited(writer, "AND seq > ?2", after, search_index::CHUNK)?;
                 let Some(last) = chunk.last() else { break };
                 after = sql(last.link.header.address.seq);
                 let open = match indexing.as_mut() {
                     Some(open) => open,
-                    None => indexing.insert(search_index::Indexing::open(&self.conn, writer)?),
+                    None => indexing.insert(search_index::Indexing::open(index, writer)?),
                 };
                 index_chunk(open, &chunk)?;
                 count += chunk.len() as u64;
@@ -749,26 +764,33 @@ impl Store {
     }
 
     /// Whether the search index holds what the record derives (ADM-09,
-    /// I10): the index derived again from the record alone, in a
-    /// transaction rolled back, has the canonical digest of the one the
-    /// store keeps. Nothing of it stays.
+    /// I10): the index derived again from the record alone, into an
+    /// index in memory, has the canonical digest of the one the store
+    /// keeps. Both are read in one read transaction, which takes no
+    /// write lock: live ingest and the hook handlers append meanwhile
+    /// (I9). `time_left` is asked before each chunk of events.
     ///
     /// # Errors
     ///
-    /// Fails when SQLite does, when an event cannot be read, or when the
-    /// store has no search index.
-    pub fn search_index_is_derived(&mut self) -> Result<bool, StoreError> {
+    /// Fails when SQLite does, when an event cannot be read, when the
+    /// store has no search index, or with [`StoreError::Cancelled`] once
+    /// `time_left` says the time is up (ENG-03).
+    pub fn search_index_is_derived(
+        &self,
+        time_left: &dyn Fn() -> bool,
+    ) -> Result<bool, StoreError> {
         if !search_index::exists(&self.conn)? {
             return Err(StoreError::NoIndex);
         }
-        let kept = search_index::digest(&self.conn)?;
-        self.conn.execute_batch("BEGIN IMMEDIATE")?;
-        let derived = self
-            .reindex()
-            .and_then(|_| search_index::digest(&self.conn));
+        self.conn.execute_batch("BEGIN DEFERRED")?;
+        let compared = search_index::digest(&self.conn).and_then(|kept| {
+            let index = search_index::in_memory()?;
+            self.reindex_into(&index, time_left)?;
+            Ok(search_index::digest(&index)? == kept)
+        });
         let _ = self.conn.execute_batch("ROLLBACK");
 
-        Ok(derived? == kept)
+        compared
     }
 
     /// The writers whose events the search index leaves out, because

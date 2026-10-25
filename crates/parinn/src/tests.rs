@@ -42,6 +42,8 @@ pub(crate) struct Process {
     pub(crate) hook_budget: Option<std::time::Duration>,
     /// The time the clock reads.
     pub(crate) now: u64,
+    /// How far the clock moves on each read: none by default.
+    pub(crate) clock_step: u64,
     /// The process ancestry a hook handler reads.
     pub(crate) ancestry: fn() -> Option<hook::ancestry::Ancestry>,
     /// How many lines of a transcript live ingest reads at most.
@@ -96,6 +98,7 @@ impl Process {
             ancestry: own_harness,
             live_limit: None,
             now: NOW,
+            clock_step: 0,
             query_deadline: None,
             working_dir: None,
         }
@@ -125,7 +128,12 @@ impl Process {
 
     /// Runs `f` with the context an invocation of this process gets.
     pub(crate) fn with_context<T>(&self, build: &Build, f: impl FnOnce(&Context) -> T) -> T {
-        let now = self.now;
+        let (now, step) = (std::cell::Cell::new(self.now), self.clock_step);
+        let clock = move || {
+            let t = now.get();
+            now.set(t.saturating_add(step));
+            t
+        };
         let (lines, input_error, held_open, too_large) = (
             self.lines.clone(),
             self.input_error,
@@ -167,7 +175,7 @@ impl Process {
             node_identity: self.node_identity.clone(),
             os_user: self.os_user,
             input: &input,
-            clock: &|| now,
+            clock: &clock,
             attended: self.attended,
             hook_budget: self.hook_budget,
             ancestry: self.ancestry,
@@ -787,6 +795,34 @@ fn a_source_an_ingest_left_short_fails_verify_once_its_marker_is_old() {
             sources::STALE
         )
     );
+}
+
+#[test]
+fn verify_that_runs_out_of_time_deriving_the_index_leaves_it_unchecked_and_counts_it() {
+    let mut p = Process::new();
+    p.invoke(&["ingest", "--path", &p.transcript(CLEAN_LINE)], &DEV);
+    p.clock_step = 100;
+
+    let (code, out, err) = p.invoke(&["verify"], &DEV);
+    assert_eq!((code, err.as_str()), (EXIT_OK, ""));
+    assert!(
+        out.contains("; the search index was not derived again in time, so it is unchecked"),
+        "{out}"
+    );
+    let (code, out, _) = p.invoke(&["verify", "--json"], &DEV);
+    assert_eq!(code, EXIT_OK);
+    let v: serde_json::Value = serde_json::from_str(&out).unwrap();
+    assert_eq!(v["index_checked"], false);
+    let counted = audited(&p)
+        .into_iter()
+        .filter(|e| e.counter.as_deref() == Some("verify_unfinished"))
+        .count();
+    assert_eq!(counted, 2);
+
+    p.clock_step = 0;
+    let (_, out, _) = p.invoke(&["verify", "--json"], &DEV);
+    let v: serde_json::Value = serde_json::from_str(&out).unwrap();
+    assert_eq!(v["index_checked"], true);
 }
 
 #[test]

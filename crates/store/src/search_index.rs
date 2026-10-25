@@ -160,6 +160,17 @@ pub(crate) fn exists(conn: &Connection) -> Result<bool, StoreError> {
     Ok(found?)
 }
 
+/// An empty search index in memory, under the shipped settings: what
+/// verify derives the record's index into, apart from the store (ADM-09).
+pub(crate) fn in_memory() -> Result<Connection, StoreError> {
+    let conn = Connection::open_in_memory()?;
+    conn.execute_batch(&format!("ATTACH DATABASE ':memory:' AS {SCHEMA_NAME};"))?;
+    conn.execute_batch(SCHEMA)?;
+    write_settings(&conn)?;
+
+    Ok(conn)
+}
+
 /// Records the settings the index is built under.
 pub(crate) fn write_settings(conn: &Connection) -> Result<(), StoreError> {
     for (key, value) in settings() {
