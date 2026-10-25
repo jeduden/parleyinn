@@ -49,4 +49,6 @@ built core in worlds the steps build; `@SEC-01`, `@SEC-15`, `@SEC-17`,
 as written stays `@pending` and is raised.
 
 Gate: `@ADM-09`, `@ADM-11`, `@OPS-01`, `@SEC-15`, `@SEC-17`, `@SEC-19`
-and `@ENG-22` pass; SEC-01's core row passes.
+and `@ENG-22` pass; SEC-01's core row passes. As built, `@SEC-17`,
+`@SEC-19` and `@ENG-22` cover more than M1 builds and stay `@pending`,
+raised in the result.

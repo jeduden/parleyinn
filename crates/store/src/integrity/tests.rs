@@ -113,8 +113,8 @@ fn a_new_index_ranks_as_shipped_and_an_altered_ranking_does_not() {
 #[test]
 fn an_index_that_the_record_derives_is_derived_and_a_changed_entry_is_not() {
     let dir = TempDir::new().unwrap();
-    let mut store = with_events(&dir, &["alpha beta", "gamma"]);
-    assert!(store.search_index_is_derived().unwrap());
+    let store = with_events(&dir, &["alpha beta", "gamma"]);
+    assert!(store.search_index_is_derived(&|| true).unwrap());
     let row = search_index::row_id_of(record::id::Address::new(
         WriterId::derive(&[1; 32]),
         record::id::Seq::new(1).unwrap(),
@@ -132,9 +132,9 @@ fn an_index_that_the_record_derives_is_derived_and_a_changed_entry_is_not() {
         )
         .unwrap();
 
-    assert!(!store.search_index_is_derived().unwrap());
+    assert!(!store.search_index_is_derived(&|| true).unwrap());
     // The check changed nothing: the entry is still the wrong one.
-    assert!(!store.search_index_is_derived().unwrap());
+    assert!(!store.search_index_is_derived(&|| true).unwrap());
 }
 
 #[test]
@@ -155,7 +155,7 @@ fn a_store_without_its_index_file_attached_has_only_its_own_objects() {
 #[test]
 fn a_store_without_an_index_has_nothing_to_check() {
     let dir = TempDir::new().unwrap();
-    let mut store = open(&dir);
+    let store = open(&dir);
     store.conn.execute_batch("DETACH DATABASE idx").unwrap();
 
     assert!(matches!(
@@ -163,7 +163,7 @@ fn a_store_without_an_index_has_nothing_to_check() {
         Err(StoreError::NoIndex)
     ));
     assert!(matches!(
-        store.search_index_is_derived(),
+        store.search_index_is_derived(&|| true),
         Err(StoreError::NoIndex)
     ));
 }
@@ -171,7 +171,48 @@ fn a_store_without_an_index_has_nothing_to_check() {
 #[test]
 fn a_seat_without_events_leaves_the_index_derived() {
     let dir = TempDir::new().unwrap();
-    let mut store = with_events(&dir, &[]);
+    let store = with_events(&dir, &[]);
 
-    assert!(store.search_index_is_derived().unwrap());
+    assert!(store.search_index_is_derived(&|| true).unwrap());
+}
+
+#[test]
+fn another_connection_writes_both_files_while_the_index_is_derived_again() {
+    let dir = TempDir::new().unwrap();
+    let store = with_events(&dir, &["alpha", "beta"]);
+    let wrote = std::cell::Cell::new(0);
+    // Asked between chunks whether time is left: a writer that waits for
+    // no lock must get both files' write lock then (I9, ENG-03).
+    let time_left = || {
+        let other = rusqlite::Connection::open(dir.path().join("store.db")).unwrap();
+        other.busy_timeout(std::time::Duration::ZERO).unwrap();
+        let index = dir.path().join(search_index::FILE);
+        other
+            .execute("ATTACH DATABASE ?1 AS idx", [index.to_string_lossy()])
+            .unwrap();
+        let took = other
+            .execute_batch(
+                "BEGIN IMMEDIATE; CREATE TABLE IF NOT EXISTS main.t (x); \
+                 CREATE TABLE IF NOT EXISTS idx.t (x); ROLLBACK;",
+            )
+            .is_ok();
+        wrote.set(wrote.get() + usize::from(took));
+        true
+    };
+
+    assert!(store.search_index_is_derived(&time_left).unwrap());
+    assert!(wrote.get() > 0, "another connection could not write");
+}
+
+#[test]
+fn an_index_check_out_of_time_is_cancelled_and_changes_nothing() {
+    let dir = TempDir::new().unwrap();
+    let store = with_events(&dir, &["alpha", "beta"]);
+    let kept = store.search_index_digest().unwrap();
+
+    assert!(matches!(
+        store.search_index_is_derived(&|| false),
+        Err(StoreError::Cancelled)
+    ));
+    assert_eq!(store.search_index_digest().unwrap(), kept);
 }

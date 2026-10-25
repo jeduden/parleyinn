@@ -1095,7 +1095,7 @@ fn the_next_opener_drops_a_slot_a_writer_with_no_events_holds() {
             params![slot_of(writer(2)), writer(2).to_string()],
         )
         .unwrap();
-    assert!(!store.search_index_is_derived().unwrap());
+    assert!(!store.search_index_is_derived(&|| true).unwrap());
     drop(store);
 
     let again = open(&dir);

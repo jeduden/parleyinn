@@ -1417,18 +1417,21 @@ fn a_tombstone_that_names_other_commitments_or_holds_no_range_is_named() {
 
 #[test]
 fn a_store_made_by_this_build_has_the_shape_it_ships() {
-    let mut f = fixture();
+    let f = fixture();
 
-    assert!(verify_shape(&mut f.store).is_ok());
+    assert!(matches!(
+        verify_shape(&f.store, &|| true),
+        Ok(Shape::Checked)
+    ));
 }
 
 #[test]
 fn a_schema_object_this_build_does_not_ship_fails_the_shape_naming_it() {
-    let mut f = fixture();
+    let f = fixture();
     let conn = rusqlite::Connection::open(f.home.store()).unwrap();
     conn.execute_batch("CREATE TABLE exfil (x TEXT)").unwrap();
 
-    let err = verify_shape(&mut f.store).unwrap_err();
+    let err = verify_shape(&f.store, &|| true).unwrap_err();
 
     assert_eq!(
         err.to_string(),
@@ -1441,7 +1444,7 @@ fn a_schema_object_this_build_does_not_ship_fails_the_shape_naming_it() {
 
 #[test]
 fn an_altered_ranking_or_a_changed_entry_fails_the_shape_as_a_search_index_fault() {
-    let mut f = fixture();
+    let f = fixture();
     let conn = rusqlite::Connection::open(f.home.store()).unwrap();
     conn.execute(
         "ATTACH DATABASE ?1 AS idx",
@@ -1462,7 +1465,7 @@ fn an_altered_ranking_or_a_changed_entry_fails_the_shape_as_a_search_index_fault
     )
     .unwrap();
 
-    let err = verify_shape(&mut f.store).unwrap_err();
+    let err = verify_shape(&f.store, &|| true).unwrap_err();
 
     assert_eq!(
         err.to_string(),
@@ -1473,7 +1476,7 @@ fn an_altered_ranking_or_a_changed_entry_fails_the_shape_as_a_search_index_fault
         [],
     )
     .unwrap();
-    let err = verify_shape(&mut f.store).unwrap_err();
+    let err = verify_shape(&f.store, &|| true).unwrap_err();
     assert_eq!(
         err.to_string(),
         "the search index ranks in a way this parinn does not ship: run parinn rebuild"
@@ -1481,15 +1484,25 @@ fn an_altered_ranking_or_a_changed_entry_fails_the_shape_as_a_search_index_fault
 }
 
 #[test]
+fn a_derivation_out_of_time_leaves_the_index_unchecked_neither_passed_nor_failed() {
+    let f = fixture();
+
+    assert!(matches!(
+        verify_shape(&f.store, &|| false),
+        Ok(Shape::IndexUnfinished)
+    ));
+}
+
+#[test]
 fn a_store_without_a_search_index_passes_the_shape() {
     let f = fixture();
     drop(f.store);
     std::fs::remove_file(f.home.root().join(store::search_index::FILE)).unwrap();
-    let mut fresh = Store::open_read_only_made(&f.home.store())
+    let fresh = Store::open_read_only_made(&f.home.store())
         .unwrap()
         .unwrap();
 
-    assert!(verify_shape(&mut fresh).is_ok());
+    assert!(matches!(verify_shape(&fresh, &|| true), Ok(Shape::Checked)));
 }
 
 #[test]

@@ -295,21 +295,34 @@ impl From<StoreError> for VerifyError {
     }
 }
 
+/// How far [`verify_shape`] got.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Shape {
+    /// Every part of the shape was checked and holds.
+    Checked,
+    /// The schema and the ranking hold, but deriving the search index
+    /// again ran out of time: the index is neither passed nor failed
+    /// (ENG-03, I6).
+    IndexUnfinished,
+}
+
 /// Checks the store's own shape (ADM-09): it holds no schema object this
 /// build does not ship, and its search index has the shipped
 /// ranking and is what the record derives (I10). A store with no
-/// search index has none to check.
+/// search index has none to check. The index is derived again on a read
+/// of the store, holding no write lock, while `time_left` says time
+/// remains.
 ///
 /// # Errors
 ///
 /// Fails at the first difference, naming it, or when the store fails.
-pub fn verify_shape(store: &mut Store) -> Result<(), VerifyError> {
+pub fn verify_shape(store: &Store, time_left: &dyn Fn() -> bool) -> Result<Shape, VerifyError> {
     let objects = store.foreign_schema_objects()?;
     if !objects.is_empty() {
         return Err(VerifyError::Unshipped { objects });
     }
     let ranks = match store.search_index_ranking_is_shipped() {
-        Err(StoreError::NoIndex) => return Ok(()),
+        Err(StoreError::NoIndex) => return Ok(Shape::Checked),
         other => other?,
     };
     if !ranks {
@@ -317,8 +330,12 @@ pub fn verify_shape(store: &mut Store) -> Result<(), VerifyError> {
             reason: "ranks in a way this parinn does not ship",
         });
     }
-    if store.search_index_is_derived()? {
-        return Ok(());
+    let derived = match store.search_index_is_derived(time_left) {
+        Err(StoreError::Cancelled) => return Ok(Shape::IndexUnfinished),
+        other => other?,
+    };
+    if derived {
+        return Ok(Shape::Checked);
     }
 
     Err(VerifyError::Index {

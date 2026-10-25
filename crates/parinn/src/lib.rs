@@ -25,7 +25,7 @@ use administration::act as act_record;
 use administration::home::Home;
 use administration::node::Node;
 use administration::node_identity::IdentitySource;
-use administration::verify::{Report, VerifyError, verify};
+use administration::verify::{Report, Shape, VerifyError, verify};
 use allowed_root::{Access, AllowedPath, AllowedRoots};
 use audit::AuditError;
 use audit::counters::{Counts, counts};
@@ -1355,30 +1355,23 @@ fn verify_command(
             stderr,
         );
     }
-    let mut store = match Store::open(&home.store()) {
+    let store = match Store::open(&home.store()) {
         Ok(store) => store,
         Err(e) => return store_failed("verify", &e, stderr),
     };
-    // A purge a kill cut short after its transaction is finished first,
-    // as the next ingest or rebuild would: the erasure stands, and its
-    // residue leaves the search index and the payload store (ENG-06).
-    purge::finish(ctx, &mut store);
-    let incomplete = match store.sources() {
-        Ok(found) => sources::completeness(
-            &found,
-            &capture::served(&home),
-            &sources::look,
-            (ctx.clock)().saturating_mul(1000),
-        ),
+    let incomplete = match completeness(ctx, &home, &store) {
+        Ok(found) => found,
         Err(e) => return failed("verify", &e, stderr),
     };
     let forks = match store.refused_forks() {
         Ok(forks) => forks,
         Err(e) => return failed("verify", &e, stderr),
     };
+    let mut shape = Shape::Checked;
     let verified = match verify_record(&home, &store) {
         Ok(verified) => verified.and_then(|(r, staged)| {
-            administration::verify::verify_shape(&mut store).map(|()| (r, staged))
+            shape = checked_shape(ctx, &store)?;
+            Ok((r, staged))
         }),
         Err(e) => return failed("verify", &e, stderr),
     };
@@ -1401,7 +1394,10 @@ fn verify_command(
             &incomplete.failure().unwrap_or_default(),
             stderr,
         ),
-        Ok((r, staged, a)) => (EXIT_OK, verified_line(as_json, &r, staged, &a, &incomplete)),
+        Ok((r, staged, a)) => (
+            EXIT_OK,
+            verified_line(as_json, &r, staged, &a, &incomplete, shape),
+        ),
         Err(Ok(VerifyError::Store(e))) => return failed("verify", &e, stderr),
         Err(Err(e @ AuditError::Broken { .. })) => {
             broken_json(as_json, "audit", "hash chain", None, &e.to_string(), stderr)
@@ -1424,6 +1420,43 @@ fn verify_command(
         EXIT_OK => code,
         other => other,
     }
+}
+
+/// How far the transcript sources of `store` fall short (ADM-09), as
+/// `parinn verify` finds them now.
+fn completeness(
+    ctx: &Context,
+    home: &Home,
+    store: &Store,
+) -> Result<sources::Completeness, store::StoreError> {
+    Ok(sources::completeness(
+        &store.sources()?,
+        &capture::served(home),
+        &sources::look,
+        (ctx.clock)().saturating_mul(1000),
+    ))
+}
+
+/// How long `parinn verify` derives the search index again before it
+/// leaves the index unchecked (ADM-09, ENG-03), in seconds on its clock.
+const INDEX_CHECK_SECS: u64 = 60;
+
+/// The shape of `store`, its search index derived again while
+/// [`INDEX_CHECK_SECS`] last on `ctx`'s clock; a derivation that ran out
+/// of time is audited and counted (I6).
+fn checked_shape(ctx: &Context, store: &Store) -> Result<Shape, VerifyError> {
+    let ends = (ctx.clock)().saturating_add(INDEX_CHECK_SECS);
+    let shape = administration::verify::verify_shape(store, &|| (ctx.clock)() < ends)?;
+    if shape == Shape::IndexUnfinished {
+        let _ = ctx.audit(&Occurrence::Degraded {
+            kind: Kind::TimedOut,
+            counter: Counter::VerifyUnfinished,
+            operation: "verify",
+            detail: "the search index was not derived again in time and is unchecked",
+        });
+    }
+
+    Ok(shape)
 }
 
 /// The record in `store`, verified against the device key `home` keeps,
@@ -1469,7 +1502,9 @@ fn verified_line(
     staged: bool,
     a: &audit::log::Checked,
     incomplete: &sources::Completeness,
+    shape: Shape,
 ) -> String {
+    let index_checked = shape == Shape::Checked;
     if as_json {
         return json!({
             "integrity": "unsigned",
@@ -1479,6 +1514,7 @@ fn verified_line(
             "seats": seats_json(&r.seats),
             "open_segments": segments::open_json(&r.open_segments),
             "short_sources": incomplete.short,
+            "index_checked": index_checked,
             "staged": staged,
             "audit": {"files": a.files, "entries": a.entries},
             "refused": [],
@@ -1491,12 +1527,19 @@ fn verified_line(
     } else {
         ""
     };
+    let unchecked = if index_checked {
+        ""
+    } else {
+        "; the search index was not derived again in time, so it is unchecked: \
+         run parinn verify again"
+    };
 
     format!(
         "checked {} writers and {} events: every chain, commitment and seat certificate \
          holds; integrity unsigned, as no log is signed yet, so a log cut at its tail or \
          rewritten whole goes unseen until seals; completeness covers only the transcript \
-         sources the record names; the audit log's chain holds over {} entries{}{}{staged}",
+         sources the record names; the audit log's chain holds over {} entries{}{}{unchecked}\
+         {staged}",
         r.writers,
         r.events,
         a.entries,

@@ -4,7 +4,9 @@
 //! repository checkout through the `engineering` crate's checks, which
 //! the gate tests of `tooling/engineering/tests/boundary.rs` run too.
 //! SEC-01 stays pending until the B1 components exist; its core row is
-//! those gate tests.
+//! those gate tests. SEC-17, SEC-19 and ENG-22 stay pending too: these
+//! bindings check part of each (phase 15's findings say which part is
+//! missing), and they run as tripwires while the rest is built.
 
 use cucumber::{given, then, when};
 use engineering::boundary::{self, Row};
