@@ -32,12 +32,16 @@ Outcome:
 - RCL-07: each call that returns an envelope appends a recall event to
   the device seat's writer (provenance `assistant`, redacted arguments,
   the returned addresses), no `text`. The scenario reads the stat
-  "recalls" through `stat_list` before and after.
+  "recalls" through `stat_list` before and after. The step wording
+  "increases by 1" holds the search alone to one new recall event in the
+  record, and the stat to the count the record gives, the first read's own
+  recall event included.
 - SEC-06, SEC-07 pass. The static check refuses `TrustedText` built
   outside `restore_block`, and aliased by `as`, `type` or `<..>::`
   anywhere; a text check, no type-level guarantee. `parinn event` indents
-  every content line, so none reads as a header, and shows tag
-  characters and variation selectors as placeholders. Golden files
+  every content line, so none reads as a header, and shows tags, tabs and
+  variation selectors as placeholders; off a terminal it refuses with
+  fixed text and counts `recall_refused` (RCL-04). Golden files
   cover a continued item and a tombstone; the round trip and
   `envelope_encoder` cover score, structural, continuation, tombstones.
 - Live ingest records its run seats' writers (REC-13); the S8 estimator

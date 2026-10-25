@@ -15,6 +15,7 @@
 use std::io::Write;
 
 use administration::node::Node;
+use audit::entry::{Counter, Kind, Occurrence};
 use serde_json::{Value, json};
 
 use crate::{Context, EXIT_FAILURE, EXIT_USAGE, failed, start_node, written};
@@ -76,6 +77,9 @@ pub(crate) fn event(
             return EXIT_USAGE;
         }
     };
+    if !ctx.terminal {
+        return refuse_off_a_terminal(ctx, stderr);
+    }
     let home = match ctx.home() {
         Ok(home) => home,
         Err(e) => return failed("event", &e, stderr),
@@ -110,6 +114,30 @@ pub(crate) fn event(
     let envelope: Value = serde_json::from_str(text).unwrap_or(Value::Null);
 
     written(stdout.write_all(render(&envelope).as_bytes()), stderr)
+}
+
+/// Why a call off a terminal is counted.
+const REFUSED_OFF_A_TERMINAL: &str = "a recall verb was refused: its output is not a terminal, so it could not carry recalled content";
+
+/// Refuses a call whose output is no terminal: what it would write is
+/// recalled content outside the envelope, which an agent running the
+/// verb through its shell would get (RCL-04). Counts and audits it (I6).
+fn refuse_off_a_terminal(ctx: &Context, stderr: &mut dyn Write) -> u8 {
+    let occurrence = Occurrence::Degraded {
+        kind: Kind::Rejected,
+        counter: Counter::RecallRefused,
+        operation: "event",
+        detail: REFUSED_OFF_A_TERMINAL,
+    };
+    if let Err(e) = ctx.audit(&occurrence) {
+        let _ = writeln!(stderr, "parinn event: audit the refusal: {e}");
+    }
+
+    failed(
+        "event",
+        &"refused: recalled content is written to a terminal only",
+        stderr,
+    )
 }
 
 /// What starts each line of an item's content, so that no content line
@@ -171,18 +199,16 @@ fn indented(text: &str) -> String {
 }
 
 /// `text` safe to put on a header line: as [`safe`], and a line break
-/// or a tab shown as a placeholder too.
+/// shown as a placeholder too.
 fn inline(text: &str) -> String {
-    safe(text)
-        .replace('\n', "<U+000A>")
-        .replace('\t', "<U+0009>")
+    safe(text).replace('\n', "<U+000A>")
 }
 
 /// `text` with each character a terminal would act on shown as
-/// `<U+XXXX>`, naming its code point: controls but the line break and
-/// the tab, and the invisible format characters that reorder or hide
-/// text, such as the direction overrides, the tag characters and the
-/// variation selectors (SEC-06).
+/// `<U+XXXX>`, naming its code point: controls but the line break, and
+/// the invisible format characters that reorder or hide text, such as
+/// the direction overrides, the tag characters and the variation
+/// selectors (SEC-06).
 pub(crate) fn safe(text: &str) -> String {
     let mut out = String::with_capacity(text.len());
     for c in text.chars() {
@@ -199,7 +225,7 @@ pub(crate) fn safe(text: &str) -> String {
 /// Whether a terminal may act on `c`, or `c` hides or reorders what is
 /// shown.
 fn acts(c: char) -> bool {
-    if c == '\n' || c == '\t' {
+    if c == '\n' {
         return false;
     }
 

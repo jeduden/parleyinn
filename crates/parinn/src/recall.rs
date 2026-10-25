@@ -87,6 +87,15 @@ pub(crate) fn audit_notes(ctx: &Context, notes: &[mcp::Note]) {
                 operation: tool,
                 detail: "a recall call was refused: the record has a gap inside the range asked for",
             },
+            mcp::Note::LabelsFailed { tool, cause } => {
+                tracing::warn!(tool = *tool, cause = cause.as_str(), "writer labels failed");
+                Occurrence::Degraded {
+                    kind: Kind::Failed,
+                    counter: Counter::RecallRefused,
+                    operation: tool,
+                    detail: "a recall call was refused: the writer labels could not be assigned",
+                }
+            }
             mcp::Note::Redacted(rule) => Occurrence::Keyed {
                 kind: Kind::Redacted,
                 counter: Counter::Redacted,

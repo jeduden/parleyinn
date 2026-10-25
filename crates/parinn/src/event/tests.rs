@@ -65,10 +65,8 @@ fn a_terminal_never_gets_a_character_it_would_act_on() {
         shown,
         "a<U+001B>[2Jb<U+000D>c<U+202E>d<U+2028>e<U+007F>f<U+009B>g<U+FEFF>h<U+200B>"
     );
-    assert_eq!(
-        safe("line\nbreak\tand tab é東🚀"),
-        "line\nbreak\tand tab é東🚀"
-    );
+    assert_eq!(safe("line\nbreak and é東🚀"), "line\nbreak and é東🚀");
+    assert_eq!(safe("a\tb"), "a<U+0009>b");
 }
 
 #[test]
@@ -261,4 +259,33 @@ fn the_command_reports_a_home_it_cannot_find() {
 
     assert_eq!(code, crate::EXIT_FAILURE);
     assert!(String::from_utf8_lossy(&err).starts_with("parinn event: "));
+}
+
+#[test]
+fn off_a_terminal_the_command_refuses_with_fixed_text_and_counts_it() {
+    let mut p = Process::new();
+    p.invoke(&["ingest", "--path", &p.transcript("two needle\n")], &DEV);
+    p.terminal = false;
+
+    let (code, out, err) = p.invoke(&["event", "search", "needle"], &DEV);
+    let (code_expand, out_expand, _) = p.invoke(&["event", "expand", "A1:1"], &DEV);
+
+    assert_eq!((code, out.as_str()), (crate::EXIT_FAILURE, ""));
+    assert_eq!(
+        err,
+        "parinn event: refused: recalled content is written to a terminal only\n"
+    );
+    assert_eq!(
+        (code_expand, out_expand.as_str()),
+        (crate::EXIT_FAILURE, "")
+    );
+    let counted: Vec<_> = crate::tests::audited(&p)
+        .into_iter()
+        .filter(|e| e.counter.as_deref() == Some("recall_refused"))
+        .map(|e| (e.kind, e.detail))
+        .collect();
+    assert_eq!(
+        counted,
+        vec![("rejected".to_owned(), REFUSED_OFF_A_TERMINAL.to_owned()); 2]
+    );
 }
