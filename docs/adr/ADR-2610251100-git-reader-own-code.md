@@ -1,6 +1,6 @@
 ---
 id: ADR-2610251100
-title: "Git reading stays own code in the repository crate; no git library"
+title: "Git reading stays own code, no git library"
 status: proposed
 summary: >-
   The core keeps reading git data with its own dependency-free code in
@@ -10,7 +10,7 @@ summary: >-
   rules and the real-git oracle that code must meet, and records why the
   original C code is not a source.
 ---
-# ADR-2610251100: Git reading stays own code in the repository crate; no git library
+# ADR-2610251100: Git reading stays own code, no git library
 
 Proposal. It stays `proposed` until the stakeholder rules on the pull
 request. The SRS cites a "git-reader ADR" (S11 in the delivery plan);
@@ -18,15 +18,19 @@ this is that record.
 
 ## Context
 
-The core needs read-only git data: LANE-02 (repository identity, done in
-M1), LANE-06 and the landed-commit check (tree diff, patch-id) and REC-20
-(a worktree checkpoint: checked-out commit, branch, and a diff of tracked
-and non-ignored untracked files). It writes no git object or ref and
-fetches nothing; fresh checkouts belong to the launcher (ADM-13), outside
-the core. I4 and ENG-16 forbid a socket or a program start in the core,
-SEC-18 bounds what it may read, ENG-03 puts a deadline on every blocking
-call, and ENG-18 and ENG-26 require an accepted ADR for every direct
-dependency.
+The core needs read-only git data for three rows. LANE-02 is repository
+identity, done in M1. LANE-06 and the landed-commit check need a tree
+diff and patch-id. REC-20 needs a worktree checkpoint: the checked-out
+commit, the branch, and a diff of tracked and non-ignored untracked
+files.
+
+The core writes no git object or ref and fetches nothing. Fresh
+checkouts belong to the launcher (ADM-13), outside the core.
+
+Several rules bound the choice. I4 and ENG-16 forbid a socket or a
+program start in the core. SEC-18 bounds what the core may read. ENG-03
+puts a deadline on every blocking call. ENG-18 and ENG-26 require an
+accepted ADR for every direct dependency.
 
 ## Decision
 
