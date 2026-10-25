@@ -16,7 +16,12 @@ use cucumber::{given, then, when};
 use serde_json::Value;
 
 use crate::World;
-use crate::record::{first_start, home, last_run, run_core, run_core_at_terminal};
+use crate::record::{
+    HOOK_BUDGET, first_start, home, last_run, run_core, run_core_at_terminal, set_env,
+};
+use crate::record_hooks::{session_path, session_start};
+use crate::record_transcript::{ingest, remember_counters};
+use crate::security_redaction::{append, transcript};
 
 /// A recorded Claude Code 2.1.296 `SessionStart` hook input.
 const SESSION_START: &str = "testdata/claude-code/2.1.296/hooks/clear/01-SessionStart.json";
@@ -193,5 +198,56 @@ fn hook_runs(w: &mut World, hook: String, input: String) -> Result<(), String> {
     } else {
         MALFORMED.as_bytes().to_vec()
     };
+    remember_counters(w)?;
     run_core(w, &["hook", &hook], Some(&input))
+}
+
+/// The hook budget of `SessionStart`, as NFR-02 fixes it.
+const SESSION_START_BUDGET_MS: u64 = 150;
+
+#[when(regex = r#"^the hook "SessionStart" runs past its (\d+) ms hook budget$"#)]
+fn hook_runs_past_budget(w: &mut World, budget: u64) -> Result<(), String> {
+    if budget != SESSION_START_BUDGET_MS {
+        return Err(format!(
+            "the SessionStart hook budget is {SESSION_START_BUDGET_MS} ms, not {budget} ms"
+        ));
+    }
+    remember_counters(w)?;
+    // The development build's seam sets a budget no handler can keep.
+    set_env(w, HOOK_BUDGET, "0");
+    let input = session_start(w, "ops-run", "startup")?;
+    run_core(
+        w,
+        &["hook", "SessionStart"],
+        Some(input.to_string().as_bytes()),
+    )
+}
+
+#[when(regex = r#"^the hook "SessionStart" runs with an unreadable transcript path$"#)]
+fn hook_runs_unreadable(w: &mut World) -> Result<(), String> {
+    remember_counters(w)?;
+    // A path below a file is no directory entry the handler can look at.
+    let file = session_path(w, "ops-file")?;
+    fs::write(&file, "").map_err(|e| e.to_string())?;
+    let mut input = session_start(w, "ops-run", "startup")?;
+    input["transcript_path"] = serde_json::json!(file.join("below.jsonl"));
+    run_core(
+        w,
+        &["hook", "SessionStart"],
+        Some(input.to_string().as_bytes()),
+    )
+}
+
+/// An AWS access key, as AWS documents an example one.
+const AWS_SECRET: &str = "AKIAIOSFODNN7EXAMPLE";
+
+#[when(regex = r"^the transcript contains an AWS secret key and is ingested$")]
+fn ingests_a_secret(w: &mut World) -> Result<(), String> {
+    let line = serde_json::json!({
+        "type": "attachment",
+        "attachment": {"type": "note", "text": format!("key {AWS_SECRET}")},
+    });
+    append(w, "run-a", &line)?;
+    let path = transcript(w, "run-a")?;
+    ingest(w, &path)
 }

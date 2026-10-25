@@ -5,7 +5,7 @@ Feature: Observability (OPS)
   declared but not yet written: its steps are bound when the plan that
   implements the requirement lands.
 
-  @OPS-01 @P0 @I6 @pending
+  @OPS-01 @P0 @I6
   Scenario Outline: every degraded operation is audited and counted
     Given an isolated ParleyInn home
     And an agent run with a Claude Code transcript "run-a"
