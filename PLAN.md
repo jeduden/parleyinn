@@ -78,4 +78,5 @@ empty: |
 | 2610112059 | 🔲     | opus   | [M9: review, publishing, bridges](plan/2610112059_m9-review-publishing-bridges.md)                                      |
 | 2610112203 | ✅     | sonnet | [Spike S13: can a hook tell which run compacted](plan/2610112203_spike-s13-compaction-ambiguity/plan.md)                |
 | 2610190944 | ✅     | sonnet | [Ship third-party license texts inside every executable](plan/2610190944_third-party-licenses/plan.md)                  |
+| 2610251015 | 🔲     | sonnet | [Hold every CI job under four minutes](plan/2610251015_ci-jobs-under-four-minutes/plan.md)                              |
 <?/catalog?>
