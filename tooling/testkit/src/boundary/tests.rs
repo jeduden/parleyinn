@@ -154,6 +154,7 @@ fn a_confined_command_runs_the_program_under_the_namespace_and_the_trace() {
             "--",
             "strace",
             "-f",
+            "--seccomp-bpf",
             "-qq",
             "-e",
             "signal=none",

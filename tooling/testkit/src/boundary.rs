@@ -56,9 +56,18 @@ const SCRIPT: &str = "script";
 /// The trace, up to its output file: every process followed, attach
 /// and exit notes and signals left out, every network call recorded,
 /// and each way to open a socket failed.
-const TRACE: [&str; 10] = [
+///
+/// `--seccomp-bpf` stops a traced process only at the calls the trace
+/// names, through a seccomp filter every process it starts inherits,
+/// instead of at every system call: a confined start that reads a store
+/// of a million events no longer runs ten times slower than an
+/// unconfined one. The calls traced, recorded and failed are the same.
+/// Where strace cannot set the filter up, it stops at every call as
+/// before, so the trace never misses one.
+const TRACE: [&str; 11] = [
     "strace",
     "-f",
+    "--seccomp-bpf",
     "-qq",
     "-e",
     "signal=none",
