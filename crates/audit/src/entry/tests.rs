@@ -41,7 +41,7 @@ fn each_kind_and_counter_has_its_name() {
         ),
         (Counter::ManagedPolicyInvalid, "managed_policy_invalid"),
         (Counter::PrincipalActRefused, "principal_act_refused"),
-        (Counter::Redacted, "redacted"),
+        (Counter::Redacted, "redactions"),
         (
             Counter::RedactionPatternRefused,
             "redaction_pattern_refused",

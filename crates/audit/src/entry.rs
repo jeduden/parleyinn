@@ -238,7 +238,7 @@ impl Counter {
             Self::ConfigurationKeyIgnored => "configuration_key_ignored",
             Self::ManagedPolicyInvalid => "managed_policy_invalid",
             Self::PrincipalActRefused => "principal_act_refused",
-            Self::Redacted => "redacted",
+            Self::Redacted => "redactions",
             Self::RedactionPatternRefused => "redaction_pattern_refused",
             Self::HookInputTooLarge => "hook_input_too_large",
             Self::HookInputTooDeep => "hook_input_too_deep",

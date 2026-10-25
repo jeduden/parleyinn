@@ -333,7 +333,7 @@ fn what_live_ingest_found_is_audited_entry_by_entry() {
     running.poll();
     let first = f.counted();
     assert!(first.contains(&"events_unparsed".to_owned()), "{first:?}");
-    assert!(first.contains(&"redacted".to_owned()), "{first:?}");
+    assert!(first.contains(&"redactions".to_owned()), "{first:?}");
 
     // The transcript is rewritten: a new generation.
     std::fs::write(f.main(), line(9, None)).unwrap();

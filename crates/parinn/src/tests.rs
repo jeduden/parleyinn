@@ -442,8 +442,8 @@ fn ingest_redacts_by_the_principals_patterns_and_audits_each_redaction() {
                 "redaction_pattern_refused",
                 "refused redaction pattern extra_pattern_1"
             ),
-            entry("redacted", "redacted", "redacted by rule aws_access_key"),
-            entry("redacted", "redacted", "redacted by rule extra_pattern_2"),
+            entry("redacted", "redactions", "redacted by rule aws_access_key"),
+            entry("redacted", "redactions", "redacted by rule extra_pattern_2"),
             // The line has no type, so it is stored unparsed (REC-05).
             entry(
                 "failed",
