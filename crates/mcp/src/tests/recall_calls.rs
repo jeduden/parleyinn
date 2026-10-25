@@ -743,3 +743,46 @@ fn a_server_that_only_labels_assigns_labels_and_records_no_recall() {
             .contains(&Note::NotRecorded("event_expand"))
     );
 }
+
+#[test]
+fn event_get_takes_a_cursor_for_the_rest_of_one_event_and_checks_it_names_the_same_writer() {
+    let whole = format!("start {}", "ab ".repeat(30_000));
+    let f = fixture_of(&[whole.clone(), "second".to_owned()]);
+    let mut server = f.server();
+    let w = f.ingested.writer;
+    let mut joined = String::new();
+    let mut arguments = json!({"address": format!("{w}:1"), "scope": "room"});
+
+    loop {
+        let envelope = envelope_of(&tool(&mut server, "event_get", arguments));
+        joined.push_str(&contents(&envelope)[0]);
+        assert_eq!(
+            contents(&envelope).len(),
+            1,
+            "an event_get returns one event"
+        );
+        match envelope["next_cursor"].as_str() {
+            Some(cursor) => arguments = json!({"cursor": cursor, "scope": "room"}),
+            None => break,
+        }
+    }
+
+    assert_eq!(joined, whole);
+    let other = WriterId::derive(&[9; 32]);
+    let mismatched = tool(
+        &mut server,
+        "event_get",
+        json!({"cursor": cursor::Cursor { writer: w, seq: Seq::FIRST, offset: 0, to: Seq::FIRST }.encode(),
+               "address": format!("{other}:1"), "scope": "room"}),
+    );
+    assert_eq!(
+        refusal(&mismatched),
+        "the cursor belongs to another writer than the range"
+    );
+    let range = tool(
+        &mut server,
+        "event_get",
+        json!({"address": format!("{w}:1-2"), "scope": "room"}),
+    );
+    assert_eq!(refusal(&range), "event_get takes one address, not a range");
+}

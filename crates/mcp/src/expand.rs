@@ -34,7 +34,7 @@ const NO_RANGE: &str = "event_expand needs a range or a cursor";
 pub(crate) const BAD_RANGE: &str =
     "the range is not an address range such as A1:3-9, nor two addresses from and to of one writer";
 const NOT_ONE: &str = "event_get takes one address, not a range";
-const NO_ADDRESS: &str = "event_get needs an address";
+const NO_ADDRESS: &str = "event_get needs an address or a cursor";
 const NO_LABEL: &str = "no writer has that label";
 pub(crate) const OUTSIDE_SCOPE: &str =
     "the address lies outside the current scope: pass scope \"room\" or \"rooms\" to extend it";
@@ -54,23 +54,23 @@ struct Asked {
 }
 
 impl Server {
-    /// `event_get`: the event at an address, in the envelope.
+    /// `event_get`: the event at an address, or the rest of one a cursor
+    /// continues, in the envelope.
     pub(crate) fn event_get(
         &mut self,
         arguments: &Value,
         run: Option<&str>,
     ) -> Result<Served, String> {
-        let text = arguments["address"].as_str().ok_or(NO_ADDRESS)?;
-        let range = Range::parse(text).map_err(|_| crate::BAD_ADDRESS)?;
-        if !range.is_single() {
+        let given = match arguments["address"].as_str() {
+            Some(text) => Some(Range::parse(text).map_err(|_| crate::BAD_ADDRESS)?),
+            None => None,
+        };
+        if given.is_some_and(|range| !range.is_single()) {
             return Err(NOT_ONE.to_owned());
         }
-        let asked = Asked {
-            writer: range.writer,
-            from: range.from,
-            to: range.to,
-            offset: 0,
-            named: range.room,
+        let asked = match arguments["cursor"].as_str() {
+            Some(text) => self.continuing(given, text)?,
+            None => asked_of(given.ok_or(NO_ADDRESS)?),
         };
 
         self.read(arguments, run, "event_get", asked)
@@ -83,19 +83,20 @@ impl Server {
         arguments: &Value,
         run: Option<&str>,
     ) -> Result<Served, String> {
+        let given = optional_range(arguments)?;
         let asked = match arguments["cursor"].as_str() {
-            Some(text) => self.continuing(arguments, text)?,
-            None => ranged(arguments)?,
+            Some(text) => self.continuing(given, text)?,
+            None => asked_of(given.ok_or(NO_RANGE)?),
         };
 
         self.read(arguments, run, "event_expand", asked)
     }
 
-    /// The position a cursor continues, which a range the call also
-    /// names must agree with in its writer.
-    fn continuing(&mut self, arguments: &Value, text: &str) -> Result<Asked, String> {
+    /// The position a cursor continues, which a range or an address the
+    /// call also names must agree with in its writer.
+    fn continuing(&mut self, given: Option<Range>, text: &str) -> Result<Asked, String> {
         let cursor = Cursor::decode(text)?;
-        if let Some(range) = optional_range(arguments)? {
+        if let Some(range) = given {
             let writer = self.resolve_writer(range.writer)?;
             if writer != cursor.writer {
                 return Err(CURSOR_MISMATCH.to_owned());
@@ -241,17 +242,15 @@ impl Server {
     }
 }
 
-/// The range a call names, or a refusal; one is required.
-fn ranged(arguments: &Value) -> Result<Asked, String> {
-    let range = optional_range(arguments)?.ok_or(NO_RANGE)?;
-
-    Ok(Asked {
+/// What a range asks for, from its first event.
+fn asked_of(range: Range) -> Asked {
+    Asked {
         writer: range.writer,
         from: range.from,
         to: range.to,
         offset: 0,
         named: range.room,
-    })
+    }
 }
 
 /// The range the `range` argument names, as one string or as `from`

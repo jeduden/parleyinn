@@ -128,11 +128,13 @@ fn a_range_is_one_string_or_two_addresses_of_one_writer() {
 }
 
 #[test]
-fn a_range_is_required_when_no_cursor_continues_one() {
+fn what_a_range_asks_for_starts_at_its_first_event() {
     let w = writer();
+    let range = Range::parse(&format!("{w}:2-5")).unwrap();
 
-    assert_eq!(ranged(&json!({})).err(), Some(NO_RANGE.to_owned()));
-    let asked = ranged(&json!({"range": format!("{w}:2-5")})).unwrap();
+    let asked = asked_of(range);
+
     assert_eq!((asked.from.get(), asked.to.get(), asked.offset), (2, 5, 0));
     assert!(asked.named.is_none());
+    assert_eq!(asked.writer, Writer::Id(w));
 }
