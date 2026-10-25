@@ -46,6 +46,7 @@ fn each_kind_and_counter_has_its_name() {
             Counter::RedactionPatternRefused,
             "redaction_pattern_refused",
         ),
+        (Counter::RedactionScanLimited, "redaction_scan_limited"),
         (Counter::HookInputTooLarge, "hook_input_too_large"),
         (Counter::HookInputTooDeep, "hook_input_too_deep"),
         (

@@ -26,8 +26,9 @@ use store::NewEvent;
 use crate::{Served, Server};
 
 /// Removes secrets from a text (SEC-08): the text with its secrets
-/// replaced, and the rule of each replacement.
-pub type Redact = Box<dyn Fn(&str) -> (String, Vec<String>)>;
+/// replaced, the rule of each replacement, and whether the redaction
+/// scan limit was reached, when a marker stands for the whole text.
+pub type Redact = Box<dyn Fn(&str) -> (String, Vec<String>, bool)>;
 
 /// What records the recalls of a server.
 pub struct RecallWriter {
@@ -65,6 +66,10 @@ pub enum Note {
     /// A secret was redacted from the call's arguments before they were
     /// recorded, by the rule named (SEC-08).
     Redacted(String),
+    /// The redaction scan limit was reached on a text of the call's
+    /// arguments, so a marker stands for the text in what was recorded;
+    /// once per text (SEC-08, I6).
+    RedactionLimited,
 }
 
 /// The recall event of `content`, under a key of its own.
@@ -80,32 +85,36 @@ fn recall_event(content: Value) -> Option<NewEvent> {
     })
 }
 
-/// `text` redacted by `redact`, the rule of each redaction added to
-/// `rules`.
-fn scrub(
-    text: &str,
-    redact: &dyn Fn(&str) -> (String, Vec<String>),
-    rules: &mut Vec<String>,
-) -> String {
-    let (out, found) = redact(text);
-    rules.extend(found);
+/// What redacting the texts of one call found: the rule of each
+/// redaction, and how many texts reached the redaction scan limit.
+#[derive(Default)]
+struct Found {
+    rules: Vec<String>,
+    limited: usize,
+}
+
+/// A redaction of one text: the text, the rule of each redaction, and
+/// whether the redaction scan limit was reached.
+type Scrubbed = (String, Vec<String>, bool);
+
+/// `text` redacted by `redact`, what it found added to `found`.
+fn scrub(text: &str, redact: &dyn Fn(&str) -> Scrubbed, found: &mut Found) -> String {
+    let (out, rules, limited) = redact(text);
+    found.rules.extend(rules);
+    found.limited += usize::from(limited);
 
     out
 }
 
-/// `value` with every text in it redacted by `redact`, the rule of each
-/// redaction added to `rules`.
-fn redacted(
-    value: &Value,
-    redact: &dyn Fn(&str) -> (String, Vec<String>),
-    rules: &mut Vec<String>,
-) -> Value {
+/// `value` with every text in it redacted by `redact`, what it found
+/// added to `found`.
+fn redacted(value: &Value, redact: &dyn Fn(&str) -> Scrubbed, found: &mut Found) -> Value {
     match value {
-        Value::String(text) => Value::String(scrub(text, redact, rules)),
-        Value::Array(items) => items.iter().map(|v| redacted(v, redact, rules)).collect(),
+        Value::String(text) => Value::String(scrub(text, redact, found)),
+        Value::Array(items) => items.iter().map(|v| redacted(v, redact, found)).collect(),
         Value::Object(fields) => fields
             .iter()
-            .map(|(name, v)| (scrub(name, redact, rules), redacted(v, redact, rules)))
+            .map(|(name, v)| (scrub(name, redact, found), redacted(v, redact, found)))
             .collect(),
         other => other.clone(),
     }
@@ -125,11 +134,11 @@ impl Server {
             return;
         };
         let writer = recall_writer.writer;
-        let mut rules = Vec::new();
+        let mut found = Found::default();
         let event = recall_writer.redact.as_deref().and_then(|redact| {
             let content = json!({
                 "tool": tool,
-                "arguments": redacted(arguments, redact, &mut rules),
+                "arguments": redacted(arguments, redact, &mut found),
                 "run": run,
                 "scope": served.scope.map(crate::scope::RecallScope::as_str),
                 "returned": served.envelope.items.iter().map(|i| i.address.as_str()).collect::<Vec<_>>(),
@@ -140,7 +149,8 @@ impl Server {
         });
         let appended = event.is_some_and(|event| self.store.append(writer, &[event]).is_ok());
         let mut notes = self.notes.borrow_mut();
-        notes.extend(rules.into_iter().map(Note::Redacted));
+        notes.extend(found.rules.into_iter().map(Note::Redacted));
+        notes.extend((0..found.limited).map(|_| Note::RedactionLimited));
         if !appended {
             notes.push(Note::NotRecorded(tool));
         }

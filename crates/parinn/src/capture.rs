@@ -408,6 +408,9 @@ impl Running {
                 rule,
             ));
         }
+        for _ in 0..ingested.scan_limited {
+            self.audit(&crate::scan_limited_occurrence("mcp"));
+        }
         for _ in 0..ingested.unparsed {
             self.audit(&Occurrence::Degraded {
                 kind: Kind::Failed,

@@ -16,6 +16,7 @@
 //!   it owns, so the entry point answers within the hook budget whatever
 //!   the work waits on.
 
+use std::cell::Cell;
 use std::fs;
 use std::io::{self, Write};
 use std::panic::{self, AssertUnwindSafe};
@@ -263,6 +264,32 @@ impl<'j> Recording<'j> {
         }
     }
 
+    /// Audits each of `texts` that reached the redaction scan limit
+    /// (SEC-08, I6).
+    fn audit_limited(&self, texts: usize) {
+        for _ in 0..texts {
+            self.audit(&crate::scan_limited_occurrence(self.job.hook.operation()));
+        }
+    }
+
+    /// Audits the drift of `decoded`, described through `redactor`, and
+    /// each part of it that reached the redaction scan limit (REC-26, SEC-08, I6).
+    fn audit_drift(&self, decoded: &Decoded, redactor: &Redactor) {
+        let Some(drift) = &decoded.drift else {
+            return;
+        };
+        let limited = Cell::new(0);
+        let described = drift.describe(&counting(redactor, &limited));
+        self.audit_limited(limited.get());
+        self.audit(&Occurrence::Keyed {
+            kind: Kind::Rejected,
+            counter: Counter::FormatDrift,
+            operation: self.job.hook.operation(),
+            detail: "format drift",
+            key: &described,
+        });
+    }
+
     /// [`Self::record`]'s work, failing with what could not be done.
     fn held(&self, decoded: &Decoded) -> Result<(), &'static str> {
         let loaded = configuration::load(self.sources);
@@ -294,17 +321,9 @@ impl<'j> Recording<'j> {
         // it); were it not to, nothing could be written.
         let redactor = redactor_for(&patterns, compiling.recv_timeout(self.remaining()).ok())
             .ok_or("redaction rules could not be built")?;
-        let redact = |t: &str| redactor.redact_text(t).text;
-        if let Some(drift) = &decoded.drift {
-            let described = drift.describe(&redact);
-            self.audit(&Occurrence::Keyed {
-                kind: Kind::Rejected,
-                counter: Counter::FormatDrift,
-                operation: self.job.hook.operation(),
-                detail: "format drift",
-                key: &described,
-            });
-        }
+        let limited = Cell::new(0);
+        let redact = counting(&redactor, &limited);
+        self.audit_drift(decoded, &redactor);
         if let Some(store) = opened.as_mut() {
             count_untaken(store, self.job.now, &|o| self.audit(o));
         }
@@ -329,6 +348,7 @@ impl<'j> Recording<'j> {
             harness: ancestry.and_then(|a| a.harness),
             at: self.job.now,
         };
+        self.audit_limited(limited.get());
         let usable = !in_force.loaded.principal_layer_failed();
         let commitment = match (self.job.hook, usable) {
             (Hook::UserPromptSubmit, true) => committed(input, &redactor),
@@ -432,6 +452,16 @@ fn redactor_for(patterns: &[String], compiled: Option<Compiled>) -> Option<Redac
     match compiled {
         Some((built_for, Some(redactor))) if built_for == patterns => Some(redactor),
         _ => Redactor::new(patterns).ok().map(|(r, _)| r),
+    }
+}
+
+/// `redactor` as a function of text to its redacted text, adding one to
+/// `limited` for each text that reaches the redaction scan limit.
+fn counting<'a>(redactor: &'a Redactor, limited: &'a Cell<usize>) -> impl Fn(&str) -> String + 'a {
+    move |text| {
+        let redacted = redactor.redact_text(text);
+        limited.set(limited.get() + usize::from(redacted.limited));
+        redacted.text
     }
 }
 
