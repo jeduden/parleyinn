@@ -121,6 +121,7 @@ fn a_purge_erases_what_confirms_a_guess_and_keeps_the_chain() {
     let after = store.log(writer(1)).unwrap();
     assert_eq!(purged.events, 1);
     assert_eq!(purged.appended, [Address::new(writer(2), seq(1))]);
+    assert!(purged.finished.vacuumed && !purged.finished.nothing);
     assert_eq!(after[1].content, None);
     assert_eq!(after[1].commitment_key, None);
     assert_eq!(after[1].payload, None);

@@ -55,6 +55,8 @@ pub struct Purged {
     pub appended: Vec<Address>,
     /// How many events the ranges held.
     pub events: u64,
+    /// What finishing the purge did straight after it.
+    pub finished: Finished,
 }
 
 /// What finishing a purge did.
@@ -111,9 +113,13 @@ impl Store {
         };
         journal(&tx, VACUUM, "")?;
         tx.commit()?;
-        self.finish_purge()?;
+        let finished = self.finish_purge()?;
 
-        Ok(Purged { appended, events })
+        Ok(Purged {
+            appended,
+            events,
+            finished,
+        })
     }
 
     /// Finishes what a purge journalled and a crash may have cut short:

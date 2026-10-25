@@ -208,6 +208,17 @@ pub enum Counter {
     /// A recall call was refused: its scope was not served, or the record
     /// holds a gap inside the range it asked for (RCL-04, RCL-05, I6).
     RecallRefused,
+    /// A purge of a range was refused: the range holds an event a purge
+    /// keeps, none that holds content, or lies in a run with a pending
+    /// ingest marker (ADM-07, I6).
+    PurgeRefused,
+    /// A purge erased what it was asked to, but a step after its
+    /// transaction could not finish: the residue stays journalled for the
+    /// next attempt (ADM-07, SEC-14, I6).
+    PurgeUnfinished,
+    /// A retention policy aged a range out and the node purged it
+    /// (REC-15, SEC-22).
+    RetentionPurged,
 }
 
 impl Counter {
@@ -269,6 +280,9 @@ impl Counter {
             Self::RecallTruncated => "recall_truncated",
             Self::RecallNotRecorded => "recall_not_recorded",
             Self::RecallRefused => "recall_refused",
+            Self::PurgeRefused => "purge_refused",
+            Self::PurgeUnfinished => "purge_unfinished",
+            Self::RetentionPurged => "retention_purged",
         }
     }
 }
@@ -307,6 +321,17 @@ pub enum Occurrence<'a> {
         operation: &'static str,
         detail: &'static str,
     },
+    /// A purge erased the content of the range `scope`, for `reason`,
+    /// `by` the principal act or retention policy `behind` it; a
+    /// retention policy's purge feeds `counter` (ADM-07, SEC-22). The
+    /// entry names no content.
+    Purged {
+        scope: &'a str,
+        reason: &'static str,
+        by: &'static str,
+        behind: &'a str,
+        counter: Option<Counter>,
+    },
 }
 
 /// The kind of an entry noting a principal act.
@@ -315,6 +340,9 @@ pub const PRINCIPAL_ACT: &str = "principal_act";
 /// The kind of an entry noting a recall whose scope extends past the
 /// calling run.
 pub const RECALL_EXTENDED: &str = "recall_extended";
+
+/// The kind of an entry noting a purge.
+pub const PURGE: &str = "purge";
 
 /// `key` as an entry may hold it: as it is when it holds only the
 /// characters a settings key or a provenance class can, else a fixed
@@ -390,6 +418,22 @@ impl Entry {
             Occurrence::RecallExtended { operation, detail } => {
                 (RECALL_EXTENDED, None, operation, detail.to_owned())
             }
+            Occurrence::Purged {
+                scope,
+                reason,
+                by,
+                behind,
+                counter,
+            } => (
+                PURGE,
+                counter.map(Counter::as_str),
+                "purge",
+                format!(
+                    "purged {} ({reason}) by {by} {}",
+                    shown(scope),
+                    shown(behind)
+                ),
+            ),
         };
         let mut entry = Self {
             number,

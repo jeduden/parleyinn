@@ -80,6 +80,21 @@ impl Taking {
         })
     }
 
+    /// Checks that the gate permits `act`: audits and reports the refusal
+    /// when it does not.
+    pub(crate) fn permit(
+        &self,
+        ctx: &Context,
+        operation: &'static str,
+        act: &Act,
+        stderr: &mut dyn Write,
+    ) -> Result<(), u8> {
+        let gate = self
+            .gate(ctx, act)
+            .map_err(|e| failed(operation, &e, stderr))?;
+        permit(act, &gate).map_err(|refusal| refuse(ctx, operation, &refusal, stderr))
+    }
+
     /// Takes `act` if the gate permits it: records it, or audits and
     /// reports the refusal.
     pub(crate) fn take(
@@ -89,12 +104,7 @@ impl Taking {
         act: &Act,
         stderr: &mut dyn Write,
     ) -> Result<Address, u8> {
-        let gate = self
-            .gate(ctx, act)
-            .map_err(|e| failed(operation, &e, stderr))?;
-        if let Err(refusal) = permit(act, &gate) {
-            return Err(refuse(ctx, operation, &refusal, stderr));
-        }
+        self.permit(ctx, operation, act, stderr)?;
         act::record(&mut self.store, &self.node, act, &mut OsEntropy)
             .map_err(|e| failed(operation, &e, stderr))
     }

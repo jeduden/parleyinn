@@ -310,6 +310,9 @@ pub struct Done {
     pub tombstone: Address,
     /// How many events lost their content.
     pub erased: u64,
+    /// What finishing the purge did: whether the logs were checkpointed
+    /// and both files vacuumed (SEC-14).
+    pub finished: store::Finished,
 }
 
 /// Purges the planned range: records `act` if there is one, then the
@@ -348,6 +351,7 @@ pub fn carry_out(
         act,
         tombstone,
         erased: purged.events,
+        finished: purged.finished,
     })
 }
 
