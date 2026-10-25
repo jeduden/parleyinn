@@ -2011,7 +2011,7 @@ fn status_shows_the_home_the_store_the_audit_log_and_the_counters() {
     assert_eq!(
         out,
         format!(
-            "home: {home}\nstore: {home}/store.db ({bytes} bytes)\naudit log: {home}/audit (1 entries)\n\
+            "home: {home}\nstore: {home}/store.db ({bytes} bytes, schema version 1)\naudit log: {home}/audit (1 entries)\n\
              counters: hook_rejected 1 (1 since acknowledged)\ndeployment mode: automation\nkeys: files only this OS user can read; an unsandboxed agent of the same OS user could read them\n{id}"
         )
     );
@@ -2022,7 +2022,7 @@ fn status_shows_the_home_the_store_the_audit_log_and_the_counters() {
         v,
         serde_json::json!({
             "home": home,
-            "store": {"path": format!("{home}/store.db"), "bytes": bytes},
+            "store": {"path": format!("{home}/store.db"), "bytes": bytes, "schema_version": 1},
             "audit": {"path": format!("{home}/audit"), "entries": 1},
             "counters": {"hook_rejected": {"total": 1, "since_ack": 1}},
             "deployment_mode": "automation",
@@ -3271,7 +3271,7 @@ fn identity_lines() -> String {
     };
 
     format!(
-        "node identity: {against}\nfork detection: local scan by parinn verify; peer detection with the peer network\n"
+        "node identity: {against}\nfork detection: a second event at one (writer, seq) is refused for the segments the node holds, found by a local scan with parinn verify; the equivocated mark waits for seals; the check between peers arrives with the peer network\n"
     )
 }
 
@@ -3297,7 +3297,12 @@ fn identity_json() -> serde_json::Value {
 
 /// `parinn status --json`'s fork detection.
 fn fork_detection_json() -> serde_json::Value {
-    serde_json::json!({"local": "parinn verify", "peer": "with the peer network"})
+    serde_json::json!({
+        "local": "parinn verify",
+        "refused": "a second event at one (writer, seq), for the segments the node holds",
+        "equivocated": "the mark waits for seals",
+        "peer": "the check between peers arrives with the peer network",
+    })
 }
 
 /// How many events the store holds.

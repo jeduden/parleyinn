@@ -1797,6 +1797,8 @@ struct Status {
     home: String,
     /// The store's path and size, once the home exists.
     store: Option<(String, Option<u64>)>,
+    /// The schema version of the store, once it is made.
+    schema_version: Option<u32>,
     /// The audit log's path and number of entries, once the home exists.
     audit: Option<(String, u64)>,
     /// Each counter's total and rise since the last acknowledgement.
@@ -1827,7 +1829,9 @@ impl Status {
             .collect();
         let mut status = json!({
             "home": self.home,
-            "store": self.store.as_ref().map(|(p, b)| json!({"path": p, "bytes": b})),
+            "store": self.store.as_ref().map(|(p, b)| {
+                json!({"path": p, "bytes": b, "schema_version": self.schema_version})
+            }),
             "audit": self.audit.as_ref().map(|(p, n)| json!({"path": p, "entries": n})),
             "counters": counters,
             "deployment_mode": self.deployment_mode,
@@ -1855,7 +1859,12 @@ impl Status {
         let mut lines = Vec::new();
         match (&self.store, &self.audit) {
             (Some((store, bytes)), Some((audit, entries))) => {
-                let size = bytes.map_or("none yet".to_owned(), |b| format!("{b} bytes"));
+                let size = bytes.map_or("none yet".to_owned(), |b| {
+                    let schema = self
+                        .schema_version
+                        .map_or(String::new(), |v| format!(", schema version {v}"));
+                    format!("{b} bytes{schema}")
+                });
                 lines.push(format!("home: {}", self.home));
                 lines.push(format!("store: {store} ({size})"));
                 lines.push(format!("audit log: {audit} ({entries} entries)"));
@@ -1962,6 +1971,7 @@ fn status(
     };
     let refused = segments.as_ref().is_some_and(|s| !s.newer.is_empty());
     let mut status = status_of(&home, counted, &in_force);
+    status.schema_version = segments.as_ref().map(|s| s.schema_version);
     status.segments = segments;
     status.bindings = store
         .as_ref()
@@ -1991,6 +2001,7 @@ fn status_of(home: &Home, counted: Option<(Counts, u64)>, in_force: &settings::I
     let mut status = Status {
         home: home.root().display().to_string(),
         store: None,
+        schema_version: None,
         audit: None,
         counters: Vec::new(),
         deployment_mode: in_force.resolved.settings.deployment_mode().to_owned(),

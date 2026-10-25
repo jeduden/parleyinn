@@ -112,6 +112,14 @@ fn a_store_closed_without_a_checkpoint_leaves_its_log_to_the_next_opener() {
 }
 
 #[test]
+fn the_store_tells_its_schema_version() {
+    let dir = TempDir::new().unwrap();
+    let store = open(&dir);
+
+    assert_eq!(store.schema_version().unwrap(), SCHEMA_VERSION);
+}
+
+#[test]
 fn a_store_of_a_newer_version_is_refused_and_named() {
     let dir = TempDir::new().unwrap();
     let store = open(&dir);

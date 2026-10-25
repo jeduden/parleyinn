@@ -104,7 +104,7 @@ fn keys_stay_in_the_key_store_and_a_changed_node_identity_starts_a_new_device_se
     assert!(text.contains("node identity: checked (a file)\n"), "{text}");
     assert!(
         text.contains(
-            "fork detection: local scan by parinn verify; peer detection with the peer network\n"
+            "fork detection: a second event at one (writer, seq) is refused for the segments the node holds, found by a local scan with parinn verify; the equivocated mark waits for seals; the check between peers arrives with the peer network\n"
         ),
         "{text}"
     );

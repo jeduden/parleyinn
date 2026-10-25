@@ -760,14 +760,24 @@ impl Store {
         search_index::unmark_reported(&self.conn, gaps)
     }
 
+    /// The schema version this store was made with (ADM-05, ADM-11).
+    ///
+    /// # Errors
+    ///
+    /// Fails when SQLite does or the version does not parse.
+    pub fn schema_version(&self) -> Result<u32, StoreError> {
+        let version: String = self.conn.query_row(VERSION, [], |r| r.get(0))?;
+
+        version.parse().map_err(|_| StoreError::Corrupt {
+            address: None,
+            what: format!("schema_version {version:?}"),
+        })
+    }
+
     /// Checks the store's schema version, header field set and encoding
     /// against this parinn's (§8.3, ADM-05).
     fn check_format(&self) -> Result<(), StoreError> {
-        let version: String = self.conn.query_row(VERSION, [], |r| r.get(0))?;
-        let found: u32 = version.parse().map_err(|_| StoreError::Corrupt {
-            address: None,
-            what: format!("schema_version {version:?}"),
-        })?;
+        let found = self.schema_version()?;
         if found > SCHEMA_VERSION {
             return Err(StoreError::Newer { found });
         }
