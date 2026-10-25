@@ -111,6 +111,7 @@ Feature: Administration and lifecycle (ADM)
     And the store is vacuumed and "parinn verify" exits 0
     And once the purge reports the range erased, with encryption at rest on and off, no file in the home or the storage engine's temporary directory, read decrypted, contains a canary token only the purged events carried, their commitment keys or a search index entry naming a purged address
     And while another process holds a read transaction on the store, the purge does not report the range erased and audits and counts each residue; once that transaction closes, the purge reports the range erased and the residue check passes
+    And when a kill stops the purge after its erasure is recorded, the purge stays pending, "event_search" matches no purged event, and the next "parinn purge", "parinn ingest" or "parinn rebuild" each finishes it before its own work, after which "parinn verify" reports no pending purge
     And the audit log records the purge with its scope, ranges, reason and the principal act behind it, never the purged content
     And no arrival event, node identity change event, key event or certificate record is purged, whatever the scope, and the origin of every remaining event derives as before
 
@@ -140,28 +141,31 @@ Feature: Administration and lifecycle (ADM)
     And no canonical digest appears in the audit log, a log, a receipt, a backup or an export, and none is kept once "parinn verify" completes
     When a purge covers events a kept canonical digest covers, between "parinn rebuild" and "parinn verify"
     Then "parinn verify" names that purge and does not report the comparison passed
+    When a kill left a purge pending before "parinn rebuild" runs
+    Then "parinn rebuild" finishes the purge before it derives anything, and "parinn verify" then reports no pending purge
     When SQLite's "secure_delete" is turned off in the store
     Then "parinn verify" fails
 
   @ADM-09 @P0 @I6 @I10 @pending
-  Scenario Outline: verify exits non-zero on any integrity failure
+  Scenario Outline: verify exits non-zero on any integrity failure and reports a pending purge without failing
     Given an isolated ParleyInn home
     And an agent run with a Claude Code transcript "run-a"
     And <damage>
     When the person runs "parinn verify"
-    Then the command exits 3
-    And the output names the failed check "<check>"
+    Then the command exits <exit>
+    And the output <outcome>
 
     Examples:
-      | damage                                                          | check                          |
-      | the transcript has lines not in the record                      | transcript source completeness |
-      | an event row's hash has been altered                            | hash chain                     |
-      | a payload file's bytes have been altered                        | payload integrity              |
-      | a landmark row has been altered                                 | derived artifact consistency   |
-      | a trust level has been altered in place                         | derived artifact consistency   |
-      | a schema object ParleyInn does not ship has been added to the store | derived artifact consistency   |
-      | the search index's ranking configuration has been altered       | derived artifact consistency   |
-      | a search index entry names an event whose text lacks the term   | derived artifact consistency   |
+      | damage                                                          | exit | outcome                                                  |
+      | the transcript has lines not in the record                      | 3    | names the failed check "transcript source completeness" |
+      | an event row's hash has been altered                            | 3    | names the failed check "hash chain"                     |
+      | a payload file's bytes have been altered                        | 3    | names the failed check "payload integrity"              |
+      | a landmark row has been altered                                 | 3    | names the failed check "derived artifact consistency"   |
+      | a trust level has been altered in place                         | 3    | names the failed check "derived artifact consistency"   |
+      | a schema object ParleyInn does not ship has been added to the store | 3    | names the failed check "derived artifact consistency"   |
+      | the search index's ranking configuration has been altered       | 3    | names the failed check "derived artifact consistency"   |
+      | a search index entry names an event whose text lacks the term   | 3    | names the failed check "derived artifact consistency"   |
+      | a kill stopped a purge after its erasure was recorded           | 0    | reports the purge pending, names the ranges whose search index entries it has still to remove and names no failed check, the purge is audited and counted as failed, and verify repaired nothing |
 
   @ADM-10 @P0 @I7 @pending
   Scenario: doctor is read-only and doctor --fix shows each change first
