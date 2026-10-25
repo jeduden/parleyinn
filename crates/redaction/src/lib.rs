@@ -52,7 +52,7 @@ pub struct Redacted {
     pub text: String,
     /// One rule name per marker, in the order they appear.
     pub rules: Vec<String>,
-    /// Whether the scan budget ended ([`SCAN_BUDGET_FACTOR`]) before
+    /// Whether the scan budget ended (`SCAN_BUDGET_FACTOR`) before
     /// the text beside the last matches was scanned again, so a secret
     /// a match hid from the boundary rules may stand in `text`. The
     /// caller counts it (I6); `text` loses nothing for it.
@@ -123,10 +123,15 @@ impl Redactor {
     /// a principal's pattern after it). A marker is never scanned, so
     /// no pattern matches inside one, and each rescan is of strictly
     /// less text, so it settles. The scans together read at most
-    /// [`SCAN_BUDGET_FACTOR`] times the text, so a chain where every
+    /// `SCAN_BUDGET_FACTOR` times the text, so a chain where every
     /// match uncovers only the next stays linear (I9); once the budget
     /// ends, the rest is scanned one last time without rescans and
     /// [`Redacted::limited`] says so. No text is dropped for it (I1).
+    ///
+    /// `REDACTION_RULE_SET_VERSION` stays as it is: it names the
+    /// patterns, which this leaves alone, and a text the rescans
+    /// change is one the patterns already matched under the same rule
+    /// names, so the record's rule names still say which rules ran.
     #[must_use]
     pub fn redact_text(&self, text: &str) -> Redacted {
         let mut out = Redacted {
