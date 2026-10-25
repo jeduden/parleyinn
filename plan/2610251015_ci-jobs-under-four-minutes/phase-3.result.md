@@ -40,14 +40,19 @@ Verified, by mechanism:
   fail in the whole run and in their shards here: they need the release
   core CI builds.
 
-Not verified here, left to CI:
+Verified in CI, on two consecutive green runs (40198728851 and
+40199668108) of one head:
 
-- Job times. The shards divide only the scenario run; the build and
-  setup each job repeats do not shrink. Read the `ci-timings` of two
-  consecutive runs, then flip this phase and the plan to ✅.
-- `cargo run -p coverage` end to end. A local instrumented run filled
-  the disk, so the coverage jobs are the first full run of the shards.
-- zizmor and actionlint were not run locally.
+- Job times. The slowest job took 175 s and 171 s; the `scenarios` and
+  `coverage (e2e shard K)` jobs took 92 to 134 s. The gate of two runs
+  under four minutes holds.
+- `cargo run -p coverage` end to end. The four shard jobs and the
+  merging `coverage` job passed, the floors held at 100% in every layer
+  together, and the scenario count read 50 bound, 256 pending as on
+  main. The line totals differ from main's only by this branch's own
+  code and tests.
+- zizmor, in the `workflows` job. actionlint is not a CI job and was
+  not run.
 
 Next: if a shard job still tops four minutes, raise N in both matrices;
 `strategy.job-total` follows.

@@ -130,7 +130,10 @@ footer: |
 - [x] Each phase that changes `/tooling/` keeps its crates at their
   coverage floors and adds a drift case where it checks the
   repository's records
-- [ ] The `scenarios` and `coverage (e2e shard K)` jobs finish in four
+- [x] The `scenarios` and `coverage (e2e shard K)` jobs finish in four
   minutes or less in two consecutive runs, with the scenario count and
-  the coverage table unchanged (phase 3)
+  the coverage table unchanged (phase 3). CI runs 40198728851 and
+  40199668108 on one head: the slowest job took 175 s and 171 s, the
+  count line read 50 bound, 256 pending in both and in main's run
+  40194189315, and the floors held at 100% in every layer together
 - [x] `mdsmith check .` passes
