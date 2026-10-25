@@ -8,13 +8,84 @@ use crate::Host;
 use crate::lcov::{self, Lines};
 use crate::plan::{Plan, TestLayer};
 
+pub use scenario::runner::Shard;
+
+/// The file a shard's lcov is written to, such as `e2e-2-of-4.lcov`.
+#[must_use]
+pub fn shard_file_name(layer: TestLayer, shard: Shard) -> String {
+    format!("{layer}-{}-of-{}.lcov", shard.index, shard.total)
+}
+
+/// The shard a file name spells for `layer`, or `None` for a name that
+/// is not a shard file of the layer.
+#[must_use]
+pub fn shard_from_file_name(layer: TestLayer, name: &str) -> Option<Shard> {
+    let (index, total) = name
+        .strip_prefix(layer.name())?
+        .strip_prefix('-')?
+        .strip_suffix(".lcov")?
+        .split_once("-of-")?;
+    format!("{index}/{total}").parse().ok()
+}
+
+/// The scenario runner, the one end-to-end target that shards.
+const BDD: &str = "bdd";
+
+/// The start of every cargo command that runs tests without a report.
+fn base_args() -> Vec<String> {
+    words(&["llvm-cov", "--no-report", "--workspace", "--locked"])
+}
+
+/// The cargo commands that run `layer`'s tests, in order; none when the
+/// layer has no tests. A `shard` of the end-to-end layer runs `bdd`
+/// with `--shard K/N`, and the layer's other targets once, in the first
+/// shard, so the shards together run each test once. The scenarios start
+/// the instrumented core, which cargo builds only beside a target of its
+/// own crate, so every other shard lists those targets' tests, which
+/// builds them and the core and runs no test.
+///
+/// # Errors
+///
+/// Fails when a shard is asked of a layer but the end-to-end one, or of
+/// an end-to-end layer without a `bdd` target to divide.
+pub fn test_runs(
+    plan: &Plan,
+    layer: TestLayer,
+    shard: Option<Shard>,
+) -> Result<Vec<Vec<String>>, String> {
+    let Some(shard) = shard else {
+        return Ok(test_args(plan, layer).into_iter().collect());
+    };
+    let targets = plan
+        .targets
+        .get(&layer)
+        .filter(|_| layer == TestLayer::EndToEnd);
+    let Some(targets) = targets.filter(|t| t.iter().any(|t| t == BDD)) else {
+        return Err(format!("no bdd target in the {layer} test layer to shard"));
+    };
+    let mut runs = Vec::new();
+    let others = targets.iter().filter(|t| *t != BDD);
+    if others.clone().next().is_some() {
+        let mut args = base_args();
+        args.extend(others.flat_map(|t| ["--test".to_owned(), t.clone()]));
+        if shard.index != 1 {
+            args.extend(["--", "--list"].map(str::to_owned));
+        }
+        runs.push(args);
+    }
+    let mut args = base_args();
+    args.extend(["--test", BDD, "--", "--shard"].map(str::to_owned));
+    args.push(format!("{}/{}", shard.index, shard.total));
+    runs.push(args);
+
+    Ok(runs)
+}
+
 /// The cargo arguments that run `layer`'s tests without a report, or
 /// `None` when the layer has no tests.
 #[must_use]
 pub fn test_args(plan: &Plan, layer: TestLayer) -> Option<Vec<String>> {
-    let mut args: Vec<String> = ["llvm-cov", "--no-report", "--workspace", "--locked"]
-        .map(str::to_owned)
-        .into();
+    let mut args = base_args();
     match layer {
         TestLayer::Unit => args.extend(["--lib", "--bins"].map(str::to_owned)),
         layer => {
@@ -57,7 +128,7 @@ pub fn measure(
     host.cargo(&words(&["llvm-cov", "clean", "--workspace"]))?;
     let mut layers = Vec::new();
     for layer in TestLayer::ALL {
-        let Some(lines) = run_layer(host, plan, layer, out)? else {
+        let Some(lines) = run_layer(host, plan, layer, None, out)? else {
             continue;
         };
         layers.push((layer, lines));
@@ -71,34 +142,41 @@ pub fn measure(
 /// Measures one test layer on a fresh build, writing its lcov to
 /// `out/<layer>.lcov`, or `None` when the layer has no tests. CI runs
 /// each layer this way in a job of its own, then merges them with
-/// [`merge_layers`].
+/// [`merge_layers`]. A `shard` of the end-to-end layer measures its
+/// share alone and writes `out/e2e-K-of-N.lcov` instead.
 ///
 /// # Errors
 ///
-/// Fails as [`measure`] does.
+/// Fails as [`measure`] does, and when a shard is asked of a layer that
+/// does not shard.
 pub fn measure_layer(
     host: &dyn Host,
     plan: &Plan,
     layer: TestLayer,
+    shard: Option<Shard>,
     out: &Path,
 ) -> Result<Option<Lines>, String> {
     host.cargo(&words(&["llvm-cov", "clean", "--workspace"]))?;
-    run_layer(host, plan, layer, out)
+    run_layer(host, plan, layer, shard, out)
 }
 
 /// Reads the layers [`measure_layer`] wrote under `out`, leaving out a
 /// layer with no file, and writes all of them together to
-/// `out/all.lcov`.
+/// `out/all.lcov`. A layer measured in shards is read from all its
+/// `<layer>-K-of-N.lcov` files, which must be every shard of the one
+/// count; their sum is written to `out/<layer>.lcov`, replacing the
+/// merge of an earlier run.
 ///
 /// # Errors
 ///
-/// Fails when a file cannot be read or is not lcov, or when no layer
-/// was written.
+/// Fails when a file cannot be read or is not lcov, when a layer's
+/// shards are not complete, or when no layer was written.
 pub fn merge_layers(host: &dyn Host, out: &Path) -> Result<Vec<(TestLayer, Lines)>, String> {
+    let names = host.files(out)?;
     let mut layers = Vec::new();
     for layer in TestLayer::ALL {
-        if let Some(text) = host.read(&out.join(format!("{layer}.lcov")))? {
-            layers.push((layer, lcov::parse(&text)?));
+        if let Some(lines) = read_layer(host, layer, &names, out)? {
+            layers.push((layer, lines));
         }
     }
     if layers.is_empty() {
@@ -109,20 +187,66 @@ pub fn merge_layers(host: &dyn Host, out: &Path) -> Result<Vec<(TestLayer, Lines
     Ok(layers)
 }
 
+/// One layer's lines from the files under `out` named `names`: its
+/// shard files when it has any, else its own `<layer>.lcov`.
+fn read_layer(
+    host: &dyn Host,
+    layer: TestLayer,
+    names: &[String],
+    out: &Path,
+) -> Result<Option<Lines>, String> {
+    let shards: Vec<Shard> = names
+        .iter()
+        .filter_map(|n| shard_from_file_name(layer, n))
+        .collect();
+    let Some(first) = shards.first() else {
+        let text = host.read(&out.join(format!("{layer}.lcov")))?;
+        return text.map(|t| lcov::parse(&t)).transpose();
+    };
+    let total = first.total;
+    if let Some(odd) = shards.iter().find(|s| s.total != total) {
+        return Err(format!(
+            "the {layer} shards under {} disagree on their count: {total} and {}",
+            out.display(),
+            odd.total
+        ));
+    }
+    let mut parts = Vec::new();
+    for index in 1..=total {
+        let path = out.join(shard_file_name(layer, Shard { index, total }));
+        let Some(text) = host.read(&path)? else {
+            return Err(format!(
+                "the {layer} shards under {} lack shard {index} of {total}",
+                out.display()
+            ));
+        };
+        parts.push(lcov::parse(&text)?);
+    }
+    let merged = lcov::merge(&parts);
+    host.write(&out.join(format!("{layer}.lcov")), &render(&merged))?;
+
+    Ok(Some(merged))
+}
+
 /// Runs `layer`'s tests, exports and writes their lcov, and returns
 /// what it parsed; `None` when the layer has no tests.
 fn run_layer(
     host: &dyn Host,
     plan: &Plan,
     layer: TestLayer,
+    shard: Option<Shard>,
     out: &Path,
 ) -> Result<Option<Lines>, String> {
-    let Some(args) = test_args(plan, layer) else {
+    let runs = test_runs(plan, layer, shard)?;
+    if runs.is_empty() {
         return Ok(None);
-    };
-    host.cargo(&args)?;
+    }
+    for args in &runs {
+        host.cargo(args)?;
+    }
     let text = host.cargo_output(&report_args(plan))?;
-    host.write(&out.join(format!("{layer}.lcov")), &text)?;
+    let name = shard.map_or_else(|| format!("{layer}.lcov"), |s| shard_file_name(layer, s));
+    host.write(&out.join(name), &text)?;
 
     Ok(Some(lcov::parse(&text)?))
 }

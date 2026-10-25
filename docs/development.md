@@ -82,14 +82,17 @@ TrustedText (plan 2609292013) land.
 The run-time half is ENG-12's core row. Every end-to-end test of the
 core starts it through the testkit's `boundary` confinement: in a
 user and network namespace of its own (`unshare --map-current-user
---net`), under `strace -f`, which fails every `socket`, `socketpair`
-and `io_uring_setup` with `EACCES` and records every network call.
-Any recorded call fails the test, naming the core and the test that
-started it. The gate test `the_core_s_tests_start_it_confined` refuses
-a test that starts the core any other way; a step needing a terminal gets one
+--net`), under `strace -f --seccomp-bpf`. The trace fails every
+`socket`, `socketpair` and `io_uring_setup` with `EACCES`, records every
+network call, and stops the program at those calls alone. Any recorded
+call fails the test, naming the core and the test that started it.
+Before the first start, a `bash` subshell opens a socket under the
+trace; unless the trace records it failed, every start fails. The gate
+test `the_core_s_tests_start_it_confined` refuses a test that starts
+the core any other way; a step needing a terminal gets one
 from `script`, outside the trace. It needs Linux, `unshare` and `script` from
-util-linux with unprivileged user namespaces, and `strace`; a machine without
-them fails the end-to-end tests with what is missing.
+util-linux with unprivileged user namespaces, `bash`, and `strace` 5.3 or
+later; a machine without them fails the end-to-end tests with what is missing.
 Outside CI, `PARINN_E2E_UNCONFINED=1` runs them unconfined instead, on
 a machine that cannot confine; CI refuses it.
 
@@ -126,8 +129,9 @@ decoy that must stay empty (ENG-14), the core's end-to-end tests confined
 the benchmark gate, and the release build of every target (NFR-10, CON-02).
 It also runs `mdsmith check .`, [taplo](../.taplo.toml), and zizmor over the
 workflows and local actions. Every job has five minutes: the release
-core is built once and handed to the jobs that run it, the scenarios,
-each coverage layer and each benchmark shard run in jobs of their own,
+core is built once and handed to the jobs that run it, the scenarios and
+the end-to-end coverage layer each run as four shards, each other coverage
+layer and each benchmark shard in jobs of their own,
 and `build.yml` builds one target per job ([ci.md](ci.md)). A final job
 named `CI` passes only when every other job passed, and names each job
 that did not. It is the one check the branch and release-tag rulesets

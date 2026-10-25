@@ -2,8 +2,8 @@
 //! handlers, the MCP server and the CLI so far.
 //!
 //! It runs `version`, `ingest`, `mcp`, `verify`, `hook`,
-//! `status`, `doctor`, and the principal acts `counter ack`,
-//! `configuration accept` and `risk-acceptance`. Every other
+//! `status`, `doctor`, `purge`, `quarantine`, and the principal acts
+//! `counter ack`, `configuration accept` and `risk-acceptance`. Every other
 //! command in the SRS's §9.5 is a pending scenario under features/, and
 //! lands with the plan that makes its scenario pass.
 
@@ -82,10 +82,16 @@ commands:
   configuration accept [--json]          accept the configuration (widening)
   counter ack [--json]                   acknowledge the counters (neutral)
   doctor [--json]                        fail while a counter rose since the last acknowledgement
+  event search WORDS [--room ID] [--k N] find events by their text, as event_search does
+  event expand RANGE [--room ID]         read an address range, as event_expand does; --cursor C continues one
   hook <hook>                            run the hook handler on the hook input on stdin
   ingest --all | --path P [--json]       record every transcript under the roots, or the one at P
   licenses                               print the third-party license texts built in
   mcp                                    serve the MCP tools over stdio
+  purge --range RANGE [--reason TEXT]    erase the content of an address range (widening)
+  quarantine add SELECTOR [--reason T]   hold events out of recall (cut)
+  quarantine release SELECTOR            take a quarantine back (widening)
+  quarantine list [--json]               show the quarantines in force
   repository show [DIR] [--json]         show the repository identity of DIR, the working directory by default
   repository bind [DIR] [--commit ID]    bind or rebind the repository identity (widening)
   rebuild [--json]                       derive the origins and the search index again from the record
@@ -308,10 +314,13 @@ pub fn run(
         Some("configuration") => act::configuration(args, ctx, stdout, stderr),
         Some("counter") => act::counter(args, ctx, stdout, stderr),
         Some("doctor") => doctor(args, ctx, stdout, stderr),
+        Some("event") => event::event(args, ctx, stdout, stderr),
         Some("hook") => hook_handlers::hook_command(args.next().as_deref(), ctx, stdout),
         Some("ingest") => ingest(args, ctx, stdout, stderr),
         Some("licenses") => licenses::licenses(args, stdout, stderr),
         Some("mcp") => mcp(args, ctx, stdout, stderr),
+        Some("purge") => purge::purge(args, ctx, stdout, stderr),
+        Some("quarantine") => quarantine::quarantine(args, ctx, stdout, stderr),
         Some("rebuild") => rebuild::rebuild(args, ctx, stdout, stderr),
         Some("repository") => repository_identity::repository(args, ctx, stdout, stderr),
         Some("risk-acceptance") => act::risk_acceptance(args, ctx, stdout, stderr),
@@ -375,6 +384,14 @@ pub(crate) fn json_flag(
     }
 
     Some(as_json)
+}
+
+/// Logs the failure of `result`, if it failed, as what `what` says: for
+/// work that must not stop the command it runs in (I9).
+pub(crate) fn logged<T, E: std::fmt::Display>(what: &str, result: Result<T, E>) {
+    if let Err(e) = result {
+        tracing::warn!(error = e.to_string().as_str(), what, "failed");
+    }
 }
 
 /// Reports a failure of `command` on `stderr`.
@@ -468,7 +485,10 @@ fn ingest(
     // not to, each transcript would fail with why.
     let redactor = redactor(ctx, settings, stderr);
     match start_node(ctx, &home, stderr) {
-        Ok(mut store) => count_untaken_bindings(ctx, &mut store),
+        Ok(mut store) => {
+            purge::finish(ctx, &mut store);
+            count_untaken_bindings(ctx, &mut store);
+        }
         Err(e) => return failed("ingest", &e, stderr),
     }
     // What an MCP server killed before it stopped left is audited by
@@ -490,6 +510,7 @@ fn ingest(
     let held = held_sources(ctx, settings, &home, stderr);
     let held: Vec<&Path> = held.iter().map(AllowedPath::path).collect();
     failures += ingest_all(ctx, &home, &held, &redactor, &inputs, stderr).1;
+    apply_retention(ctx, &home, settings, stderr);
     if target == IngestTarget::All {
         audit_lost(ctx, &home, stderr);
     }
@@ -497,6 +518,25 @@ fn ingest(
     let code = written(write!(stdout, "{shown}"), stderr);
 
     if failures > 0 { EXIT_FAILURE } else { code }
+}
+
+/// Applies the retention policies in force once the ingest is done
+/// (SEC-22); a failure to open the store again is audited and counted,
+/// and stops nothing (I9).
+fn apply_retention(
+    ctx: &Context,
+    home: &Home,
+    settings: &configuration::resolve::Settings,
+    stderr: &mut dyn Write,
+) {
+    if retention::policies(settings).is_empty() {
+        return;
+    }
+    let opened = start_node(ctx, home, stderr).and_then(|store| {
+        let node = Node::find(home, &store).map_err(|e| e.to_string())?;
+        Ok((store, node))
+    });
+    retention::apply_opened(ctx, opened, settings, &mut OsEntropy);
 }
 
 /// Ingests each transcript source at `paths`. Returns a report of each
@@ -1082,15 +1122,16 @@ fn mcp(
     let served = start_node(ctx, &home, stderr).and_then(|mut store| {
         repository_identity::bind_observed(ctx, &home, &mut store);
         let node = Node::find(&home, &store).map_err(|e| e.to_string())?;
-        Ok(mcp::Server::new(
+        let server = mcp::Server::new(
             store,
             ctx.build.version,
             node.device().public(),
             node.personal_room(),
-        ))
+        );
+        Ok((server, node.device_writer()))
     });
-    let server = match served {
-        Ok(server) => server,
+    let (server, device_writer) = match served {
+        Ok(served) => served,
         Err(e) => return failed("mcp", &e, stderr),
     };
     // What an MCP server killed before it stopped left is audited by
@@ -1099,8 +1140,15 @@ fn mcp(
         let _ = ctx.audit(o);
     });
     let shared = std::sync::Arc::new(capture::Shared::default());
-    let mut server = server.with_runs(Box::new(capture::Finder(shared.clone())));
-    let live = live_capture(ctx, &home, &shared, stderr)
+    // Neither a recall event nor a line of a transcript may be written
+    // without the redaction patterns in force (SEC-08).
+    let in_force = audit_settings(ctx, &home, stderr);
+    let redactor = recall::redactor(ctx, &in_force, stderr);
+    let mut server = server
+        .with_runs(Box::new(capture::Finder(shared.clone())))
+        .with_recall_writer(recall::recall_writer(device_writer, redactor.clone()));
+    let live = redactor
+        .map(|r| live_capture(ctx, &home, &shared, &in_force, r))
         .map(capture::Capture::start)
         .map(spawn_capture);
     if let Some(deadline) = ctx.query_deadline {
@@ -1116,6 +1164,7 @@ fn mcp(
             let reply = server.handle(l);
             record_found(ctx, &server.take_found());
             cancelled(server.take_cancelled());
+            recall::audit_notes(ctx, &server.take_notes());
             reply
         },
         &(ctx.input)(),
@@ -1141,22 +1190,16 @@ const CAPTURE_STOP: Duration = Duration::from_secs(5);
 
 /// The MCP server's live ingest in `home` (REC-13): its own harness
 /// process's session bindings, its transcripts resolved within the
-/// transcript roots, redacted by the settings in force. None while a
-/// settings layer fails, as no line may be written without the
-/// redaction patterns it names (SEC-08); the refusal is audited.
+/// transcript roots, redacted by `redactor`, the patterns of the
+/// settings in force.
 fn live_capture(
     ctx: &Context,
     home: &Home,
     shared: &std::sync::Arc<capture::Shared>,
-    stderr: &mut dyn Write,
-) -> Option<capture::Capture> {
-    let in_force = audit_settings(ctx, home, stderr);
-    if in_force.loaded.principal_layer_failed() {
-        refuse_ingest(ctx, stderr);
-        return None;
-    }
+    in_force: &settings::InForce,
+    redactor: Redactor,
+) -> capture::Capture {
     let settings = &in_force.resolved.settings;
-    let redactor = redactor(ctx, settings, stderr).ok()?;
     let os_home = ctx.home.as_deref().map(Path::new);
     let roots = settings
         .texts("transcript.roots")
@@ -1167,7 +1210,7 @@ fn live_capture(
     let base = (ctx.clock)();
     let started = now_instant();
 
-    Some(capture::Capture {
+    capture::Capture {
         ceiling: ctx.home.as_deref().map(PathBuf::from),
         home: home.clone(),
         roots,
@@ -1182,7 +1225,7 @@ fn live_capture(
         limit: ctx.live_limit,
         clock: Box::new(move || base + started.elapsed().as_secs()),
         shared: shared.clone(),
-    })
+    }
 }
 
 /// Now, for live ingest's audit clock.
@@ -2030,13 +2073,18 @@ pub(crate) fn invalid_layers(command: &str, loaded: &Loaded, stderr: &mut dyn Wr
 
 mod act;
 mod capture;
+mod event;
 pub mod forks;
 mod hook_handlers;
 mod identity_status;
 mod index_gaps;
 mod licenses;
+mod purge;
+mod quarantine;
 mod rebuild;
+mod recall;
 mod repository_identity;
+mod retention;
 mod segments;
 mod settings;
 mod sources;

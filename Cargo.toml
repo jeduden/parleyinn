@@ -123,3 +123,18 @@ pyramid = true
 codegen-units = 1
 lto = "thin"
 strip = true
+
+# The development build optimizes the signature and hash crates alone:
+# unoptimized, an Ed25519 verify costs milliseconds, and a development
+# core checks seat certificates and event signatures on every recall
+# call, so the end-to-end scenarios spent most of their time there.
+# The workspace's own crates stay unoptimized, as tests and coverage
+# need them; the release build is unchanged.
+[profile.dev.package.curve25519-dalek]
+opt-level = 3
+
+[profile.dev.package.ed25519-dalek]
+opt-level = 3
+
+[profile.dev.package.sha2]
+opt-level = 3

@@ -72,16 +72,19 @@ records, it adds a drift case too (ENG-27).
 3. The drift cases sharded across four jobs (phase 1)
 4. The benchmark gate stratified by shard, so the runners' speed
    differences do not blunt it (phase 2)
+5. The scenarios and the end-to-end coverage layer sharded in four,
+   once the growth of the suite took both over the cap (phase 3)
 
 Later phases are declared when the prior phase's result shows the real
 shape.
 
 ## Execution
 
-| Phase | Model  | Gate                                                                                                                     |
-| ----- | ------ | ------------------------------------------------------------------------------------------------------------------------ |
-| 1     | sonnet | The `ci-timings` of two consecutive runs show every job under four minutes; the summaries and the provenance hold        |
-| 2     | sonnet | A three-runner fixture fails the pooled test and passes the stratified one; the single-stratum fixtures decide as before |
+| Phase | Model  | Gate                                                                                                                                 |
+| ----- | ------ | ------------------------------------------------------------------------------------------------------------------------------------ |
+| 1     | sonnet | The `ci-timings` of two consecutive runs show every job under four minutes; the summaries and the provenance hold                    |
+| 2     | sonnet | A three-runner fixture fails the pooled test and passes the stratified one; the single-stratum fixtures decide as before             |
+| 3     | sonnet | The shards partition the scenarios in unit tests and on the real suite; two consecutive runs show every shard job under four minutes |
 
 ## Phases
 
@@ -104,10 +107,12 @@ footer: |
 
 ?>
 
-| #   | Status | Phase                                                                     |
-| --- | ------ | ------------------------------------------------------------------------- |
-| 1   | ✅     | [Every job of ci.yml and build.yml under its five-minute cap](phase-1.md) |
-| 2   | ✅     | [The benchmark gate stratified by shard](phase-2.md)                      |
+| #   | Status | Phase                                                                                                                                                                                                       |
+| --- | ------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | ✅     | [Every job of ci.yml and build.yml under its five-minute cap](phase-1.md)                                                                                                                                   |
+| 2   | ✅     | [The benchmark gate stratified by shard](phase-2.md)                                                                                                                                                        |
+| 3   | ✅     | [The scenarios and the end-to-end coverage layer sharded](phase-3.md)                                                                                                                                       |
+|     | ↳      | The scenarios and the end-to-end coverage layer run as four shards each. The shards partition the suite; two consecutive runs on the same head kept every job under four minutes (slowest 175 s and 171 s). |
 <?/catalog?>
 
 ## Acceptance Criteria
@@ -125,4 +130,10 @@ footer: |
 - [x] Each phase that changes `/tooling/` keeps its crates at their
   coverage floors and adds a drift case where it checks the
   repository's records
+- [x] The `scenarios` and `coverage (e2e shard K)` jobs finish in four
+  minutes or less in two consecutive runs, with the scenario count and
+  the coverage table unchanged (phase 3). CI runs 40198728851 and
+  40199668108 on one head: the slowest job took 175 s and 171 s, the
+  count line read 50 bound, 256 pending in both and in main's run
+  40194189315, and the floors held at 100% in every layer together
 - [x] `mdsmith check .` passes

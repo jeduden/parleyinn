@@ -53,6 +53,9 @@ impl Origin {
 /// its own, and the certificate records each one's device seat holds.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct KeySet {
+    /// The writer of the device seat of this node's key, while the key
+    /// is one of its own.
+    device: Option<WriterId>,
     /// The certificate records of each own device key's device seat, by
     /// the key's fingerprint: the certificate's digest and its writer.
     records: BTreeMap<Digest, BTreeSet<(String, String)>>,
@@ -91,11 +94,20 @@ impl KeySet {
                 .is_some_and(|change| change.replaces == fingerprint);
         }
         let mut records = BTreeMap::new();
-        if let (Some(writer), false) = (device, replaced) {
+        let device = device.filter(|_| !replaced);
+        if let Some(writer) = device {
             records.insert(fingerprint, certificate_records(&store.log(writer)?));
         }
 
-        Ok(Self { records })
+        Ok(Self { device, records })
+    }
+
+    /// The writer of the device seat of this node's key: the one whose
+    /// principal acts this node's principal took. None when the key is
+    /// not one of the node's own (REC-24).
+    #[must_use]
+    pub fn device_writer(&self) -> Option<WriterId> {
+        self.device
     }
 
     /// The origin of the writer of `seat`.

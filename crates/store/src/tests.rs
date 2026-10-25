@@ -778,6 +778,9 @@ fn a_payload_goes_through_the_store_s_disk() {
         fn read(&self, path: &Path) -> std::io::Result<Vec<u8>> {
             OsDisk.read(path)
         }
+        fn remove(&self, path: &Path) -> std::io::Result<()> {
+            OsDisk.remove(path)
+        }
     }
     let dir = TempDir::new().unwrap();
     let count = Count::default();

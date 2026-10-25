@@ -14,6 +14,7 @@
 use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::sync::OnceLock;
 
 use ::record::event::{EventKind, Provenance};
 use ::record::id::{Address, Seq, WriterId};
@@ -51,22 +52,34 @@ fn steps(w: &mut World) -> &mut TranscriptSteps {
 }
 
 /// Every line the recordings of [`VERSION`] hold, by transcript.
-fn recorded_transcripts() -> Result<Vec<Vec<Value>>, String> {
-    let version = testkit::repo_root()
-        .join("testdata/claude-code")
-        .join(VERSION);
-    shapes::transcripts(&version)?
-        .iter()
-        .map(|path| recording::lines(path))
-        .collect()
+///
+/// The recordings are checked-in test data no step writes, so the run
+/// parses them once, on first use, and every step reads that one parse:
+/// a fixture of a hundred lines no longer parses megabytes of JSON per
+/// line. A failed parse is kept too, and fails every step that asks.
+fn recorded_transcripts() -> Result<&'static [Vec<Value>], String> {
+    static PARSED: OnceLock<Result<Vec<Vec<Value>>, String>> = OnceLock::new();
+    PARSED
+        .get_or_init(|| {
+            let version = testkit::repo_root()
+                .join("testdata/claude-code")
+                .join(VERSION);
+            shapes::transcripts(&version)?
+                .iter()
+                .map(|path| recording::lines(path))
+                .collect()
+        })
+        .as_deref()
+        .map_err(Clone::clone)
 }
 
 /// The first recorded line `pick` accepts.
 pub fn recorded(what: &str, pick: impl Fn(&Value) -> bool) -> Result<Value, String> {
     recorded_transcripts()?
-        .into_iter()
+        .iter()
         .flatten()
         .find(|line| pick(line))
+        .cloned()
         .ok_or_else(|| format!("no recorded line is {what}"))
 }
 
@@ -74,7 +87,7 @@ pub fn recorded(what: &str, pick: impl Fn(&Value) -> bool) -> Result<Value, Stri
 /// result, from one transcript.
 pub fn recorded_call(tool: &str) -> Result<(Value, Value), String> {
     for lines in recorded_transcripts()? {
-        for call in &lines {
+        for call in lines {
             let Some(id) = tool_use_id(call, tool) else {
                 continue;
             };

@@ -78,8 +78,8 @@ Spike S8 calibrated one: each character adds the weight of one of
 eleven character classes, split by script and kind, and each change
 between lowercase, uppercase and digit from one letter or digit to the
 next adds another; the sum, rounded up, plus 6 is the estimate. Its
-weights and the committed sample are in the spike's report until M1
-moves them into the core and `testdata/`, with a test of this bound. The pin
+weights are in the core (`crates/envelope/src/tokens.rs`) and the committed
+sample in `testdata/model-tokens/`, with a test of this bound. The pin
 budget, the restore block limit and the output caps of RCL-03 and CMP-06
 count the estimate, not the true count; spend counts the true count.
 

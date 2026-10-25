@@ -66,8 +66,8 @@ fn found(store: &Store, word: &str) -> usize {
     store
         .search(&Search {
             query: &query,
-            room: room(),
-            writer: None,
+            rooms: &[room()],
+            writers: &[],
             provenance: &[],
             kinds: &[],
             since: None,

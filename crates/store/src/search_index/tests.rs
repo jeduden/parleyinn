@@ -60,11 +60,17 @@ fn find(store: &Store, text: &str) -> Vec<Hit> {
     store.search(&base(&query)).unwrap()
 }
 
+/// The test room, as a slice a search borrows.
+fn rooms() -> &'static [RoomId] {
+    static ROOMS: std::sync::OnceLock<[RoomId; 1]> = std::sync::OnceLock::new();
+    ROOMS.get_or_init(|| [room()])
+}
+
 fn base(query: &Compiled) -> Search<'_> {
     Search {
         query,
-        room: room(),
-        writer: None,
+        rooms: rooms(),
+        writers: &[],
         provenance: &[],
         kinds: &[],
         since: None,
@@ -295,19 +301,64 @@ fn a_run_filter_keeps_one_writer() {
 
     let none = store
         .search(&Search {
-            writer: Some(writer(2)),
+            writers: &[writer(2)],
             ..base(&query)
         })
         .unwrap();
     let one = store
         .search(&Search {
-            writer: Some(writer(1)),
+            writers: &[writer(1)],
             ..base(&query)
         })
         .unwrap();
 
     assert!(none.is_empty(), "writer 2 is in another room");
     assert_eq!(one.len(), 3);
+}
+
+#[test]
+fn a_search_reaches_every_room_it_names_and_every_writer_it_names() {
+    let dir = TempDir::new().unwrap();
+    let store = mixed(&dir);
+    let query = compiled("deploy");
+    let other = RoomId::derive(&[3; 32], &[4; 16]);
+    let count = |search: Search<'_>| store.search(&search).unwrap().len();
+
+    let both = [room(), other];
+    assert_eq!(
+        count(Search {
+            rooms: &both,
+            ..base(&query)
+        }),
+        4,
+        "two rooms hold all four events"
+    );
+    assert_eq!(
+        count(Search {
+            rooms: &[],
+            ..base(&query)
+        }),
+        4,
+        "no room means any room"
+    );
+    assert_eq!(
+        count(Search {
+            rooms: &[],
+            writers: &[writer(2)],
+            ..base(&query)
+        }),
+        1,
+        "a writer is searched in whatever room its seat is in"
+    );
+    assert_eq!(
+        count(Search {
+            rooms: &[],
+            writers: &[writer(1), writer(2)],
+            ..base(&query)
+        }),
+        4,
+        "a run's writers span rooms"
+    );
 }
 
 #[test]
@@ -992,4 +1043,22 @@ fn a_search_over_the_matches_a_caller_keeps_chooses_them_before_the_cut() {
         .unwrap();
 
     assert_eq!(seqs(&kept), [oldest]);
+}
+
+#[test]
+fn an_event_a_purge_erased_is_no_match_though_its_postings_remain() {
+    let dir = TempDir::new().unwrap();
+    let store = with(&dir, &texts(&["the wombat rolled back", "a quiet day"]));
+    assert_eq!(seqs(&find(&store, "wombat")), [1]);
+
+    store
+        .conn
+        .execute(
+            "UPDATE events SET content = NULL, commitment_key = NULL WHERE seq = 1",
+            [],
+        )
+        .unwrap();
+
+    assert_eq!(seqs(&find(&store, "wombat")), Vec::<u64>::new());
+    assert_eq!(seqs(&find(&store, "quiet")), [2]);
 }

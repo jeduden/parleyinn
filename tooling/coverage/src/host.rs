@@ -77,6 +77,23 @@ impl Host for Cargo {
         }
     }
 
+    fn files(&self, dir: &Path) -> Result<Vec<String>, String> {
+        let read = |e: std::io::Error| format!("read {}: {e}", dir.display());
+        let entries = match fs::read_dir(dir) {
+            Ok(entries) => entries,
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(Vec::new()),
+            Err(e) => return Err(read(e)),
+        };
+        let mut names = Vec::new();
+        for entry in entries {
+            let entry = entry.map_err(read)?;
+            names.push(entry.file_name().to_string_lossy().into_owned());
+        }
+        names.sort();
+
+        Ok(names)
+    }
+
     fn append(&self, path: &Path, text: &str) -> Result<(), String> {
         fs::OpenOptions::new()
             .create(true)

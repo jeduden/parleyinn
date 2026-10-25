@@ -10,6 +10,9 @@
 //!   payload store beside `store.db` (REC-09).
 //! - [`hook`]: the hook observations and prompt commitments the hook
 //!   handlers hold beside the record (REC-19, PRV-08).
+//! - [`Store::purge`]: erasing the content of address ranges with the
+//!   tombstones that record it, finished by [`Store::finish_purge`]
+//!   (ADM-07, REC-17).
 //! - [`segment`]: each writer's log in segments, each with its format
 //!   version; a core append closes the segment it ends (REC-19).
 //! - [`index`]: the search index over event text, kept in the append
@@ -18,6 +21,8 @@
 pub mod hook;
 mod origin;
 pub mod payload;
+mod purge;
+mod recall;
 mod refusal;
 mod repository;
 pub mod search_index;
@@ -46,6 +51,8 @@ use serde_json::Value;
 
 pub use hook::{Held, Observation, PromptCommitment};
 pub use payload::{Disk, OsDisk, Payloads};
+pub use purge::{Erase, Finished, Purged};
+pub use recall::{EventFacts, RangeEvent, RecallReach, Stats};
 pub use search::rank::Hit;
 pub use search_index::{GapClass, IndexGap, Search};
 pub use segment::{SEGMENT_VERSION, Segment};
@@ -589,6 +596,95 @@ impl Store {
         keep: &dyn Fn(Address) -> bool,
     ) -> Result<Vec<Hit>, StoreError> {
         search_index::run(&self.conn, search, Some(keep))
+    }
+
+    /// The writer labels `device`, a device seat's writer, assigned
+    /// (RCL-08): derived from its assignment events alone.
+    ///
+    /// # Errors
+    ///
+    /// Fails when SQLite does.
+    pub fn writer_labels(
+        &self,
+        device: WriterId,
+    ) -> Result<BTreeMap<WriterId, record::range::Label>, StoreError> {
+        recall::labels(&self.conn, device)
+    }
+
+    /// The writers `device`'s certificate records name, in the order it
+    /// recorded them.
+    ///
+    /// # Errors
+    ///
+    /// Fails when SQLite does.
+    pub fn certified_writers(&self, device: WriterId) -> Result<Vec<WriterId>, StoreError> {
+        recall::certified(&self.conn, device)
+    }
+
+    /// The content of each event of kind `kind` in `writer`'s log, in seq
+    /// order, with its seq: what a derivation over one kind of event
+    /// reads without parsing the whole log. An event whose content was
+    /// erased by a purge is left out.
+    ///
+    /// # Errors
+    ///
+    /// Fails when SQLite does.
+    pub fn contents(
+        &self,
+        writer: WriterId,
+        kind: EventKind,
+    ) -> Result<Vec<(Seq, Value)>, StoreError> {
+        recall::contents(&self.conn, writer, kind)
+    }
+
+    /// The events of `writer` from `first` to `last`, in seq order, as
+    /// the log holds them, none of their content read: a purge's plan
+    /// and its tombstone read them.
+    ///
+    /// # Errors
+    ///
+    /// Fails when SQLite does or a row does not parse.
+    pub fn range_events(
+        &self,
+        writer: WriterId,
+        first: Seq,
+        last: Seq,
+    ) -> Result<Vec<RangeEvent>, StoreError> {
+        recall::range_events(&self.conn, writer, first, last)
+    }
+
+    /// The heads of `writer` that events of `device` cited, as pairs of
+    /// the citing event's seq and the seq of the cited event of `writer`,
+    /// in the order they were cited.
+    ///
+    /// # Errors
+    ///
+    /// Fails when SQLite does.
+    pub fn citations(
+        &self,
+        device: WriterId,
+        writer: WriterId,
+    ) -> Result<Vec<(Seq, Seq)>, StoreError> {
+        recall::citations(&self.conn, device, writer)
+    }
+
+    /// The kind, provenance class and transcript timestamp of the event
+    /// at `address`, and whether a purge erased it.
+    ///
+    /// # Errors
+    ///
+    /// Fails when SQLite does or the row does not parse.
+    pub fn event_facts(&self, address: Address) -> Result<Option<EventFacts>, StoreError> {
+        recall::event_facts(&self.conn, address)
+    }
+
+    /// The counts of the events `reach` reaches (`stat_list`).
+    ///
+    /// # Errors
+    ///
+    /// Fails when SQLite does.
+    pub fn stats(&self, reach: &RecallReach) -> Result<Stats, StoreError> {
+        recall::stats(&self.conn, reach)
     }
 
     /// The search index's canonical digest (§8.3): the same for any two
@@ -1333,6 +1429,16 @@ impl Store {
     /// Fails when SQLite does or a row does not parse.
     pub fn ingested_runs(&self) -> Result<Vec<IngestedRun>, StoreError> {
         source::runs(&self.conn, "WHERE ?1 = ?2", "", "")
+    }
+
+    /// The seq of the last event of `writer`'s log; none for an empty
+    /// log.
+    ///
+    /// # Errors
+    ///
+    /// Fails when SQLite does.
+    pub fn head(&self, writer: WriterId) -> Result<Option<Seq>, StoreError> {
+        recall::head(&self.conn, writer)
     }
 
     /// The event at `address`.

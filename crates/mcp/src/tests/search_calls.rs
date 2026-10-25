@@ -72,7 +72,7 @@ fn event_search_shows_at_most_the_start_of_the_text() {
 }
 
 #[test]
-fn event_search_refuses_the_default_scope_and_the_rooms_scope() {
+fn event_search_refuses_the_scopes_a_server_serving_no_run_cannot_serve() {
     let f = fixture();
     let mut server = f.server();
 
@@ -81,9 +81,17 @@ fn event_search_refuses_the_default_scope_and_the_rooms_scope() {
         &mut server,
         json!({"query": "instructions", "scope": "rooms"}),
     );
+    let unknown = event_search(
+        &mut server,
+        json!({"query": "instructions", "scope": "world"}),
+    );
 
     assert_eq!(refusal(&default), event_search::NEEDS_RUN);
-    assert_eq!(refusal(&rooms), event_search::NO_ROOMS);
+    assert_eq!(
+        refusal(&rooms),
+        "scope \"rooms\" needs a run, and this server serves none yet"
+    );
+    assert_eq!(refusal(&unknown), scope::BAD_SCOPE);
 }
 
 #[test]
@@ -158,7 +166,12 @@ fn the_filters_narrow_the_hits() {
     let run = f.ingested.writer.to_string();
     assert_eq!(count(&mut server, json!({"run": run})), 1);
     assert_eq!(count(&mut server, json!({"run": "ab".repeat(32)})), 0);
-    assert_eq!(count(&mut server, json!({"room": "ab".repeat(32)})), 0);
+    let elsewhere = ask(
+        &mut server,
+        "instructions",
+        json!({"room": "ab".repeat(32)}),
+    );
+    assert_eq!(elsewhere["isError"], true, "no room but the personal room");
     assert_eq!(count(&mut server, json!({"since": "2999-01-01"})), 0);
 }
 
@@ -362,4 +375,23 @@ fn the_trust_filter_finds_a_trusted_event_ranked_below_fifty_untrusted_matches()
     let items = envelope_of(&trusted)["items"].as_array().unwrap().clone();
     assert_eq!(items.len(), 1, "{items:?}");
     assert_eq!(items[0]["trust"], "trusted");
+}
+
+#[test]
+fn an_event_whose_trust_cannot_be_derived_is_left_out_of_a_trust_filtered_search() {
+    let f = fixture();
+    let mut server = f.server();
+    // A row whose kind no kind of ParleyInn's names.
+    f.sql(&format!(
+        "UPDATE events SET kind = 'not_a_kind' WHERE seq = 2 AND writer = '{}'",
+        f.ingested.writer
+    ));
+
+    let filtered = ask(&mut server, "instructions", json!({"trust": "untrusted"}));
+    let unfiltered = ask(&mut server, "instructions", json!({}));
+
+    // The filter fails closed: what it cannot place is not kept as a
+    // match. Without the filter the same event fails its item.
+    assert_eq!(envelope_of(&filtered)["items"], json!([]));
+    assert_eq!(refusal(&unfiltered), NO_INDEX);
 }
