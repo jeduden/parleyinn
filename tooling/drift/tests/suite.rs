@@ -20,7 +20,7 @@ use std::fs::{self, File};
 use std::path::Path;
 use std::process::{Command, Stdio};
 use std::thread;
-use std::time::{Duration, Instant};
+use std::time::{Duration, Instant, SystemTime};
 
 use drift::{Check, apply, build_core, cases, shard};
 use testkit::TempDir;
@@ -56,8 +56,16 @@ fn every_drift_is_caught() {
     }
 
     let mut problems = Vec::new();
+    let mut injected: Option<&'static str> = None;
     for c in selected {
         sync_copy(&testkit::repo_root(), &work);
+        // The copy restores the last case's file with its original,
+        // older time, which cargo reads as unchanged since the build
+        // that case made from the injected text. Touching it makes the
+        // next build see the restored source.
+        if let Some(file) = injected.replace(c.injection.file) {
+            freshen(&work.join(file));
+        }
         apply(&work, &c.injection).unwrap();
 
         let (ok, out) = run(&work, &target, &c.check);
@@ -121,6 +129,15 @@ fn run(dir: &Path, target: &Path, check: &Check) -> (bool, String) {
             false,
             format!("{check} timed out after {RUN_TIMEOUT:?}\n{output}"),
         ),
+    }
+}
+
+/// Sets `path`'s modification time to now, so cargo rebuilds from it;
+/// a file the injection removed and the copy did not restore needs no
+/// such mark.
+fn freshen(path: &Path) {
+    if let Ok(file) = File::options().write(true).open(path) {
+        file.set_modified(SystemTime::now()).unwrap();
     }
 }
 
