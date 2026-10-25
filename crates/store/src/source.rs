@@ -137,6 +137,18 @@ pub struct IngestedRun {
     pub agent_id: Option<String>,
 }
 
+impl IngestedRun {
+    /// The run's name, as a tool call's finding gives it: its harness
+    /// session, and the harness's agent id for a subagent's run.
+    #[must_use]
+    pub fn run_name(&self) -> String {
+        match &self.agent_id {
+            Some(agent) => format!("{}/{agent}", self.harness_session),
+            None => self.harness_session.clone(),
+        }
+    }
+}
+
 /// One transcript source row as SQLite returns it.
 type SourceRow = (
     i64,
