@@ -112,6 +112,102 @@ fn run_measures_one_layer_and_writes_only_its_lcov() {
     assert_eq!(out, "no integration tests to measure\n");
 }
 
+/// A host whose workspace has a `bdd` target, as the real one does.
+fn host_with_bdd(report: &str) -> FakeHost {
+    FakeHost {
+        metadata: METADATA.replace(
+            r#""targets": []"#,
+            r#""targets": [{"name": "bdd", "kind": ["test"]}]"#,
+        ),
+        ..host(report)
+    }
+}
+
+#[test]
+fn run_measures_one_shard_of_the_end_to_end_layer() {
+    let host = host_with_bdd("SF:/w/srs/src/lib.rs\nDA:1,1\n");
+
+    let (code, out, err) = invoke(
+        &["--out", "cov", "--layer=e2e", "--shard", "2/4"],
+        &host,
+        None,
+    );
+
+    assert_eq!(code, EXIT_OK, "{err}");
+    assert_eq!(out, "wrote cov/e2e-2-of-4.lcov\n");
+    assert!(host.calls.borrow().contains(
+        &"cargo llvm-cov --no-report --workspace --locked --test bdd -- --shard 2/4".to_owned()
+    ));
+    assert!(
+        host.files
+            .borrow()
+            .contains_key(Path::new("cov/e2e-2-of-4.lcov"))
+    );
+
+    let (code, out, _) = invoke(&["--shard=1/2", "--layer", "e2e"], &host, None);
+    assert_eq!(code, EXIT_OK);
+    assert_eq!(out, "wrote target/coverage/e2e-1-of-2.lcov\n");
+}
+
+#[test]
+fn run_merges_the_shards_of_the_end_to_end_layer() {
+    let host = host("");
+    for index in 1..=2 {
+        host.files.borrow_mut().insert(
+            format!("cov/e2e-{index}-of-2.lcov").into(),
+            format!("SF:/w/srs/src/lib.rs\nDA:{index},1\n"),
+        );
+    }
+
+    let (code, out, err) = invoke(&["--merge", "--out", "cov"], &host, None);
+
+    assert_eq!(code, EXIT_OK, "{err}");
+    assert!(
+        out.contains("| srs | 2 | 0.0% | 0.0% | 100.0% | 100.0% |"),
+        "{out}"
+    );
+    assert!(
+        out.contains("end-to-end 1 (1 scenarios)"),
+        "scenarios are counted once, not per shard: {out}"
+    );
+    assert!(host.files.borrow().contains_key(Path::new("cov/e2e.lcov")));
+
+    host.files
+        .borrow_mut()
+        .remove(Path::new("cov/e2e-2-of-2.lcov"));
+    let (code, _, err) = invoke(&["--merge", "--out", "cov"], &host, None);
+    assert_eq!(code, EXIT_FAILURE);
+    assert!(err.contains("lack shard 2 of 2"), "{err}");
+}
+
+#[test]
+fn run_refuses_a_shard_it_cannot_use() {
+    let host = host("");
+
+    for (args, want) in [
+        (&["--shard"][..], "--shard needs K/N"),
+        (
+            &["--layer", "e2e", "--shard", "5/4"],
+            r#""5/4" is no shard"#,
+        ),
+        (&["--layer", "e2e", "--shard", "x"], r#""x" is no shard"#),
+        (&["--shard", "1/2"], "--shard goes with --layer e2e"),
+        (
+            &["--layer", "unit", "--shard", "1/2"],
+            "--shard goes with --layer e2e",
+        ),
+        (
+            &["--merge", "--shard", "1/2"],
+            "--shard goes with --layer e2e",
+        ),
+    ] {
+        let (code, _, err) = invoke(args, &host, None);
+        assert_eq!(code, EXIT_USAGE, "{args:?}");
+        assert!(err.contains(want), "{err}");
+    }
+    assert!(host.calls.borrow().is_empty());
+}
+
 #[test]
 fn run_merges_the_layers_written_and_holds_the_floors() {
     let host = host("");
