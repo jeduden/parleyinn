@@ -198,6 +198,50 @@ pub fn recall_events(w: &World) -> Result<Vec<(Address, Value)>, String> {
         }
         out.push((address, stored.content.unwrap_or_default()));
     }
+    // The `kind` column picks the events out; on a store small enough to
+    // scan, every recall scenario checks it against the events the store
+    // decodes, so a column out of step with them fails the step.
+    if events_held(&path)? <= SCANNED {
+        let scanned = scanned_recall_events(&store)?;
+        if scanned != out {
+            return Err(format!(
+                "the kind column names recall events {:?}, the logs hold {:?}",
+                out.iter().map(|(a, _)| a.to_string()).collect::<Vec<_>>(),
+                scanned
+                    .iter()
+                    .map(|(a, _)| a.to_string())
+                    .collect::<Vec<_>>()
+            ));
+        }
+    }
+
+    Ok(out)
+}
+
+/// The most events a store may hold for [`recall_events`] to check its
+/// query against a scan of every log.
+const SCANNED: i64 = 10_000;
+
+/// How many events the store at `path` holds.
+fn events_held(path: &std::path::Path) -> Result<i64, String> {
+    let flags = rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY;
+    let conn = rusqlite::Connection::open_with_flags(path, flags).map_err(|e| e.to_string())?;
+    conn.query_row("SELECT count(*) FROM events", [], |r| r.get(0))
+        .map_err(|e| e.to_string())
+}
+
+/// The recall events every writer's log holds, decoded, in the order of
+/// [`recall_events`].
+fn scanned_recall_events(store: &Store) -> Result<Vec<(Address, Value)>, String> {
+    let mut out = Vec::new();
+    for writer in store.writers().map_err(|e| e.to_string())? {
+        for stored in store.log(writer).map_err(|e| e.to_string())? {
+            if stored.link.header.kind == EventKind::Recall {
+                let address = stored.link.header.address;
+                out.push((address, stored.content.unwrap_or_default()));
+            }
+        }
+    }
 
     Ok(out)
 }
@@ -646,28 +690,63 @@ fn each_recorded(w: &mut World) -> Result<(), String> {
 
 // RCL-03.
 
+/// How many pages a cursor walk keeps before its server is replaced.
+const HALFWAY: usize = 20;
+
 /// Fetches every page of the `event_expand` the last step started, by
 /// its cursor, keeping each answer. The agent calls one MCP server for
 /// the whole walk, as a harness keeps one through its session: a page
-/// costs a request, not a server start. The server serves the scope
-/// `room`, as the first call's did.
+/// costs a request, not a server start. After [`HALFWAY`] pages, that server
+/// stops and a new one takes the next cursor, so a cursor that worked
+/// only on the server that issued it fails the walk. The servers serve
+/// the scope `room`, as the first call's did. Each is stopped, its
+/// trace checked (ENG-12), even when the walk fails.
 fn follow_cursor(w: &mut World) -> Result<(), String> {
-    let mut page = envelope_of(w)?;
+    let page = envelope_of(w)?;
     recall(w).pages = vec![page.clone()];
     recall(w).page_texts = vec![last_reply(w)?.text];
+    let Some(cursor) = page["next_cursor"].as_str().map(str::to_owned) else {
+        return Ok(());
+    };
     let mut harness = Harness::start(w, true, &[])?;
-    while let Some(cursor) = page["next_cursor"].as_str().map(str::to_owned) {
+    let walked = walk(w, &mut harness, cursor, HALFWAY);
+    let stopped = harness.stop();
+    let Some(cursor) = walked? else {
+        return stopped;
+    };
+    stopped?;
+    let mut harness = Harness::start(w, true, &[])?;
+    let walked = walk(w, &mut harness, cursor, usize::MAX);
+    let stopped = harness.stop();
+    walked?;
+    stopped
+}
+
+/// Follows `cursor` on `harness`'s MCP server, keeping each page, until
+/// the pages kept reach `until` or the walk ends; the cursor left to
+/// follow, none at the end.
+fn walk(
+    w: &mut World,
+    harness: &mut Harness,
+    mut cursor: String,
+    until: usize,
+) -> Result<Option<String>, String> {
+    loop {
         let arguments = json!({"cursor": cursor, "scope": "room"});
-        let text = page_text(&mut harness, arguments)?;
-        page = serde_json::from_str(&text)
+        let text = page_text(harness, arguments)?;
+        let page: Value = serde_json::from_str(&text)
             .map_err(|e| format!("event_expand answered no envelope: {e}: {text}"))?;
         recall(w).pages.push(page.clone());
         recall(w).page_texts.push(text);
         if recall(w).pages.len() > 400 {
             return Err("the cursor never ends".to_owned());
         }
+        match page["next_cursor"].as_str() {
+            None => return Ok(None),
+            Some(next) if recall(w).pages.len() >= until => return Ok(Some(next.to_owned())),
+            Some(next) => cursor = next.to_owned(),
+        }
     }
-    harness.stop()
 }
 
 /// The text `event_expand` answers `arguments` with on `harness`'s MCP
