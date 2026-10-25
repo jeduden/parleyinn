@@ -60,6 +60,7 @@ mod record_search;
 mod record_store;
 mod record_transcript;
 mod security;
+mod security_boundary;
 mod security_envelope;
 mod security_hooks;
 mod security_keys;

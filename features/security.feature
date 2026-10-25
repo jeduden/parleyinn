@@ -195,7 +195,7 @@ Feature: Security (SEC)
     And the run's payload files no longer exist
     And the documentation states that SSD erasure is not guaranteed without encryption at rest
 
-  @SEC-15 @P0 @I4 @pending
+  @SEC-15 @P0 @I4
   Scenario: no telemetry, remote crash reporting, or update check ships
     Given the import graph and code of every component, whether the components ship in one executable or several
     When the CI telemetry check runs
@@ -210,7 +210,7 @@ Feature: Security (SEC)
     And an audit entry records "hook input failed schema validation"
     And the counter "hook_input_rejected" increases by 1
 
-  @SEC-17 @P0 @pending
+  @SEC-17 @P0
   Scenario: the threat model covers every boundary and compares ParleyInn with Zed Delta
     Given the repository at a minor release tag
     When the release checklist is inspected
@@ -234,7 +234,7 @@ Feature: Security (SEC)
       | ~/src/app/.git/HEAD                                      | the file is read, and nothing in the repository is written                                             |
       | ~/src/app/docs/key (a symlink to ~/.ssh/id_ed25519)      | the path is rejected, nothing is read from it, and an audit entry records "path outside allowed roots" |
 
-  @SEC-19 @P0 @I4 @pending
+  @SEC-19 @P0 @I4
   Scenario: every component, process and protocol sits in exactly one boundary of the register
     Given an isolated ParleyInn home
     And the boundary register kept in the repository

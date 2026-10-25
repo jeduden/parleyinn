@@ -231,7 +231,7 @@ Feature: Engineering quality (ENG)
     And CODEOWNERS names no code owner on any other path
     And the security-sensitive crates are owned by the designated security reviewer, whose approval they need
 
-  @ENG-22 @P0 @pending
+  @ENG-22 @P0
   Scenario: every privacy or data-flow statement cites its proving test
     Given the documentation
     When every privacy or data-flow statement is listed
