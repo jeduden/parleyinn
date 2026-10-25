@@ -1,7 +1,7 @@
 ---
 n: 1
 title: "Every job of ci.yml and build.yml under its five-minute cap"
-status: "🔳"
+status: "✅"
 result: false
 ---
 # Phase 1: every job of ci.yml and build.yml under its five-minute cap
@@ -44,9 +44,19 @@ of `ci.yml` and `build.yml` under four minutes; the scenario count, the
 coverage table and the benchmark report still appear in the job
 summaries; the release provenance covers the same binaries.
 
-Measured so far. CI run 805 on this branch: every job green, the
-slowest `coverage (e2e)` at 3.4 minutes, then `benchmark-suites`,
-`drift (shard 1)` and `scenarios` at 2.8 to 2.9, every `build (...)` at
-1.9 to 2.6, every `benchmark (shard N)` at 1.2 to 1.9. The run took
-6 minutes 56 seconds end to end, against 15 minutes before. One more
-consecutive run closes the gate.
+## Result
+
+Closed on CI runs 805, 806 and 811 of the pull request. Three runs in a
+row had every job of `ci.yml` and `build.yml` green and none over four
+minutes. The slowest were 3.4, 2.9 and 3.1 minutes: `coverage (e2e)`,
+`scenarios` and `drift (shard 2)`. A whole run takes 5 to 7 minutes,
+against 15 before. The scenario count, the coverage table and the
+benchmark report still land in the job summaries. The release
+provenance covers the same binaries, under per-target artifact names.
+
+The drift suite had two latent order dependencies, which the shards
+surfaced. The development core is now built before any check. A source
+a case restores after an injection is touched, so cargo rebuilds from
+it. Pooling the benchmark shards' samples lowers the gate's power to
+see a regression and adds no false alarm. testing.md records that; the
+stakeholder decides whether to gate per shard or stratify.
