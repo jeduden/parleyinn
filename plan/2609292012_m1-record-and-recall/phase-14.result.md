@@ -55,13 +55,18 @@ For the stakeholder:
   `doctor` until acknowledged (OQ-50 (i)).
 - A tombstone keeps a digest over the commitments, not each (the headers
   keep them); SRS wording on branch claude/m1-phase-14-docs. The
-  envelope's `quarantined` reason is new there too.
+  envelope's `quarantined` tombstone reason this phase shipped is replaced
+  by a separate `quarantine_markers` array (task below).
 - A purge, as a widening act, needs the standing risk acceptance; the
   scenario steps record it first. A page of `event_expand` holds about
   15 items, so RCL-06's step follows the cursor.
 - `--since` compares transcript timestamps to the second; no event
   without one lies in a window.
 - S2 (item `integrity`) untouched.
+
+Tracked task: split quarantine markers out of `tombstones` (§9.3): draft
+PR #92 changes the envelope, recall and the RCL-06 and RCL-08 bindings, and
+lands with or after the SRS pull request.
 
 Parked: SEC-31 copies, other purge scopes, seal rewrites (M3); flags and
 REC-15's rest (M5).
