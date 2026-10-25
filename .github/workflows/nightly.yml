@@ -58,14 +58,20 @@ jobs:
           path: fuzz/artifacts/
 
   # ENG-06: the crash-consistency test kills the built core with
-  # SIGKILL at a random point of `parinn ingest`, 10,000 times, each
-  # start confined (ENG-12), and fails unless `parinn verify` exits 0
-  # after every kill. A failing iteration names the seed that replays
-  # it; each night takes a new seed. Purge, migration and rebuild join
-  # it as their phases land.
+  # SIGKILL at a random point of `parinn ingest`, of `parinn purge
+  # --range` at a terminal and of `parinn rebuild`, 10,000 times each,
+  # one job each, every start confined (ENG-12), and fails unless
+  # `parinn verify` exits 0 after every kill. A failing iteration names
+  # the seed that replays it; each night takes a new seed. Migration
+  # joins when M3 ships the first one (ADM-05).
   crash-consistency:
+    name: crash-consistency (${{ matrix.operation }})
     runs-on: ubuntu-latest
     timeout-minutes: 150
+    strategy:
+      fail-fast: false
+      matrix:
+        operation: [ingest, purge, rebuild]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -86,13 +92,40 @@ jobs:
           command -v strace >/dev/null || {
             sudo apt-get update && sudo apt-get install -y --no-install-recommends strace
           }
-      - name: Kill ingest 10,000 times and verify after each kill
+      - name: Kill the operation 10,000 times and verify after each kill
         env:
           PARINN_CRASH_ITERATIONS: "10000"
+          OPERATION: ${{ matrix.operation }}
         run: |
           export PARINN_CRASH_SEED="$GITHUB_RUN_ID"
-          echo "crash-consistency seed $PARINN_CRASH_SEED" | tee -a "$GITHUB_STEP_SUMMARY"
-          cargo test --locked -p parinn --test e2e_crash_consistency -- --nocapture
+          echo "crash-consistency seed $PARINN_CRASH_SEED ($OPERATION)" | tee -a "$GITHUB_STEP_SUMMARY"
+          cargo test --locked -p parinn --test e2e_crash_consistency -- --nocapture \
+            --exact "every_kill_during_${OPERATION}_leaves_a_record_that_verifies"
+
+  # ENG-09: the concurrency soak, 50 writers appending 1,000,000 events
+  # at once, each through a connection of its own, in a release build;
+  # it fails unless every writer's log is gap-free, no two events share
+  # an address and every chain and cited head checks. It prints how
+  # many appends it retried past the store's busy deadline.
+  soak:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install the pinned Rust toolchain
+        run: >-
+          rustup toolchain install
+          "$(sed -n 's/^channel = "\(.*\)"$/\1/p' rust-toolchain.toml)"
+          --profile minimal --no-self-update
+      - name: Append 1,000,000 events from 50 writers at once
+        shell: bash
+        env:
+          PARINN_SOAK_EVENTS: "1000000"
+        run: |
+          set -o pipefail
+          cargo test --locked --release -p store --test soak -- --nocapture | tee -a "$GITHUB_STEP_SUMMARY"
 
   # ENG-21: the rulesets, main's and the tag rulesets, are settings of
   # the repository on GitHub, not files, so they can weaken without a
