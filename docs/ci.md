@@ -19,9 +19,10 @@ and the `ci-review` skill measures them.
   key that changes every run, or a cache nothing reads, is waste.
 - No job repeats another's build, download or install. Work too slow for a
   pull request moves to the nightly job.
-- Every job sets `timeout-minutes` at about three times its median, so a
-  hang fails in minutes. A job that grows toward its timeout is a finding
-  before it is a failure.
+- Every job in `ci.yml` and `build.yml` sets `timeout-minutes: 5`. A job
+  that cannot finish in five minutes fails, and that failure is the signal
+  to speed it up or split it, not to raise the limit. The other workflows
+  keep limits sized to their work.
 - The `CI` job records each job's duration and result in its job summary
   and uploads them as the `ci-timings` artifact. Read those; do not
   measure again.
