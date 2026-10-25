@@ -240,3 +240,19 @@ fn the_repository_itself_builds_no_trusted_text_outside_its_crate() {
 
     assert_eq!(constructions(&c), Vec::<String>::new());
 }
+
+#[test]
+fn a_comment_or_literal_the_file_ends_in_is_blanked_to_its_end() {
+    for text in [
+        "a /* open",
+        "a \"open",
+        "a \"open\\",
+        "a r#\"open",
+        "a // open",
+    ] {
+        let blanked = blank(text);
+
+        assert_eq!(blanked.chars().count(), text.chars().count(), "{text:?}");
+        assert!(!blanked.contains("open"), "{text:?}");
+    }
+}

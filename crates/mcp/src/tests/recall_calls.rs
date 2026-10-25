@@ -786,3 +786,24 @@ fn event_get_takes_a_cursor_for_the_rest_of_one_event_and_checks_it_names_the_sa
     );
     assert_eq!(refusal(&range), "event_get takes one address, not a range");
 }
+
+#[test]
+fn a_cursor_may_come_with_the_range_it_continues() {
+    let f = fixture_of(&lines(100, 400));
+    let mut server = f.server();
+    let w = f.ingested.writer;
+    let range = format!("{w}:1-100");
+    let first = envelope_of(&tool(
+        &mut server,
+        "event_expand",
+        json!({"range": range, "scope": "room"}),
+    ));
+
+    let next = tool(
+        &mut server,
+        "event_expand",
+        json!({"range": range, "cursor": first["next_cursor"], "scope": "room"}),
+    );
+
+    assert!(!contents(&envelope_of(&next)).is_empty());
+}

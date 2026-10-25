@@ -157,11 +157,9 @@ impl Server {
 
     /// The writer a range names, by id or by label.
     fn resolve_writer(&mut self, writer: Writer) -> Result<WriterId, String> {
-        let Writer::Label(label) = writer else {
-            return match writer {
-                Writer::Id(id) => Ok(id),
-                Writer::Label(_) => Err(NO_LABEL.to_owned()),
-            };
+        let label = match writer {
+            Writer::Id(id) => return Ok(id),
+            Writer::Label(label) => label,
         };
         let find = |server: &Server| -> Result<Option<WriterId>, String> {
             let labels = server.labels()?;

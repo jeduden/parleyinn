@@ -201,3 +201,19 @@ fn the_command_reports_a_home_or_a_store_it_cannot_use() {
     assert_eq!(code, crate::EXIT_FAILURE);
     assert!(err.starts_with("parinn event: "), "{err}");
 }
+
+#[test]
+fn the_command_reports_a_home_it_cannot_find() {
+    let p = Process::new();
+    let ctx = Context {
+        parinn_home: None,
+        home: None,
+        ..crate::settings::tests::ctx_of(&p)
+    };
+    let (mut out, mut err) = (Vec::new(), Vec::new());
+
+    let code = event(args(&["search", "x"]), &ctx, &mut out, &mut err);
+
+    assert_eq!(code, crate::EXIT_FAILURE);
+    assert!(String::from_utf8_lossy(&err).starts_with("parinn event: "));
+}

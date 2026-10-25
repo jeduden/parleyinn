@@ -65,13 +65,11 @@ pub(crate) fn labels(
 pub(crate) fn certified(conn: &Connection, device: WriterId) -> Result<Vec<WriterId>, StoreError> {
     let mut statement =
         conn.prepare("SELECT content FROM events WHERE writer = ?1 AND kind = ?2 ORDER BY seq")?;
-    let rows = statement.query_map(
-        [
-            device.to_string(),
-            EventKind::CertificateRecord.as_str().to_owned(),
-        ],
-        |r| r.get::<_, Option<String>>(0),
-    )?;
+    let args = [
+        device.to_string(),
+        EventKind::CertificateRecord.as_str().to_owned(),
+    ];
+    let rows = statement.query_map(args, |r| r.get::<_, Option<String>>(0))?;
     let mut out = Vec::new();
     for row in rows {
         let writer = row?
@@ -102,14 +100,12 @@ fn clause(reach: &Reach) -> (&'static str, String) {
 /// line of subtype `compact_boundary` the harness wrote.
 pub(crate) fn counts(conn: &Connection, reach: &Reach) -> Result<Counts, StoreError> {
     let (filter, argument) = clause(reach);
-    let (events, recalls) = conn.query_row(
-        &format!(
-            "SELECT count(*), coalesce(sum(e.kind = 'recall'), 0)
-             FROM events e JOIN seats s ON s.writer = e.writer WHERE {filter}"
-        ),
-        [&argument],
-        |r| Ok((r.get::<_, i64>(0)?, r.get::<_, i64>(1)?)),
-    )?;
+    let sql = format!(
+        "SELECT count(*), coalesce(sum(e.kind = 'recall'), 0)
+         FROM events e JOIN seats s ON s.writer = e.writer WHERE {filter}"
+    );
+    let both = |r: &rusqlite::Row<'_>| Ok((r.get::<_, i64>(0)?, r.get::<_, i64>(1)?));
+    let (events, recalls) = conn.query_row(&sql, [&argument], both)?;
     let mut statement = conn.prepare(&format!(
         "SELECT e.content FROM events e JOIN seats s ON s.writer = e.writer
          WHERE {filter} AND e.provenance = 'harness_text' AND e.content LIKE '%compact_boundary%'"

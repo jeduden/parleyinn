@@ -106,9 +106,7 @@ pub(crate) fn event(
         let _ = writeln!(stderr, "parinn event: {}", safe(text));
         return EXIT_FAILURE;
     }
-    let Ok(envelope) = serde_json::from_str::<Value>(text) else {
-        return failed("event", &"the tool answered no envelope", stderr);
-    };
+    let envelope: Value = serde_json::from_str(text).unwrap_or(Value::Null);
 
     written(stdout.write_all(render(&envelope).as_bytes()), stderr)
 }

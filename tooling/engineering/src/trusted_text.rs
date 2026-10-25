@@ -76,10 +76,7 @@ pub fn constructions(c: &Checkout) -> Vec<String> {
 
 /// Every Rust file under `dir`, build output left out.
 fn collect(dir: &Path, out: &mut Vec<std::path::PathBuf>) {
-    let Ok(entries) = fs::read_dir(dir) else {
-        return;
-    };
-    for entry in entries.flatten() {
+    for entry in fs::read_dir(dir).into_iter().flatten().flatten() {
         let path = entry.path();
         if path.is_dir() && path.file_name().is_some_and(|n| n != "target") {
             collect(&path, out);
