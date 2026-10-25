@@ -207,7 +207,7 @@ fn indented(text: &str) -> String {
 
 /// `text` safe to put on a header line: as [`safe`], and a line break
 /// shown as a placeholder too.
-fn inline(text: &str) -> String {
+pub(crate) fn inline(text: &str) -> String {
     safe(text).replace('\n', "<U+000A>")
 }
 

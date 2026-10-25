@@ -750,6 +750,68 @@ fn ingest_says_which_lost_transcript_source_it_cannot_audit() {
     );
 }
 
+/// What `parinn verify --json` says, and its exit code.
+fn verified(p: &Process) -> (u8, serde_json::Value) {
+    let (code, out, _) = p.invoke(&["verify", "--json"], &DEV);
+
+    (code, serde_json::from_str(&out).unwrap())
+}
+
+#[test]
+fn a_transcript_source_an_ingest_stopped_short_of_fails_verify_once_its_marker_is_old() {
+    let mut p = Process::new();
+    let path = transcript_in(&p, "-w-a", "stopped.jsonl", b"{\"a\":1}\n{\"b\":2}\n");
+    assert_eq!(p.invoke(&["ingest", "--all"], &DEV).0, EXIT_OK);
+    // As an ingest killed after its first line's transaction leaves it.
+    let conn = rusqlite::Connection::open(p.parinn_home().join("store.db")).unwrap();
+    conn.execute(
+        "UPDATE transcript_sources SET byte_offset = 8, prefix_hash = ?1, lines = 1, seen = 16",
+        [record::digest::Digest::of(&[b"{\"a\":1}\n"]).to_hex()],
+    )
+    .unwrap();
+    drop(conn);
+
+    let (code, v) = verified(&p);
+    assert_eq!(code, EXIT_OK, "{v}");
+    assert_eq!(v["short_sources"], json!([path.display().to_string()]));
+
+    p.now = NOW + 10 * 60 + 1;
+    let (code, v) = verified(&p);
+    assert_eq!(code, EXIT_INTEGRITY);
+    assert_eq!(v["broken"]["check"], "transcript source completeness");
+    assert_eq!(
+        v["broken"]["message"],
+        format!(
+            "transcript sources fall short: {} {}",
+            path.display(),
+            sources::STALE
+        )
+    );
+}
+
+#[test]
+fn a_transcript_source_cut_or_rewritten_after_ingest_fails_verify() {
+    let p = Process::new();
+    let path = transcript_in(&p, "-w-a", "main-run.jsonl", b"{\"a\":1}\n{\"b\":2}\n");
+    assert_eq!(p.invoke(&["ingest", "--all"], &DEV).0, EXIT_OK);
+    assert_eq!(verified(&p).0, EXIT_OK);
+
+    for damage in [&b"{\"a\":1}\n"[..], b"{\"a\":9}\n{\"b\":2}\n", b""] {
+        std::fs::write(&path, damage).unwrap();
+        let (code, v) = verified(&p);
+
+        assert_eq!(code, EXIT_INTEGRITY, "{damage:?}");
+        assert_eq!(
+            v["broken"]["message"],
+            format!(
+                "transcript sources fall short: {} {}",
+                path.display(),
+                sources::REPLACED
+            )
+        );
+    }
+}
+
 #[test]
 fn transcript_sources_that_cannot_be_read_fail_verify_and_status_and_are_said_by_ingest() {
     let p = Process::new();
@@ -854,8 +916,9 @@ fn verify_checks_the_record_and_counts_it() {
         (
             EXIT_OK,
             "checked 2 writers and 6 events: every chain, commitment and seat certificate holds; \
-             integrity unsigned, as no log is signed yet; the audit log's chain holds over 0 \
-             entries\n"
+             integrity unsigned, as no log is signed yet, so a log cut at its tail or rewritten \
+             whole goes unseen until seals; completeness covers only the transcript sources the \
+             record names; the audit log's chain holds over 0 entries\n"
                 .into(),
             String::new()
         )

@@ -291,6 +291,9 @@ pub struct Store {
     /// Content whose canonical encoding is longer goes to the payload
     /// store.
     threshold: usize,
+    /// When, in milliseconds on ingest's clock, an ingest marker this
+    /// store leaves is left (ADM-09).
+    marker_time: u64,
 }
 
 impl fmt::Debug for Store {
@@ -404,6 +407,7 @@ impl Store {
             conn,
             payloads: Payloads::new(dir.join("payloads"), Box::new(OsDisk)),
             threshold: DEFAULT_PAYLOAD_THRESHOLD,
+            marker_time: 0,
         })
     }
 
@@ -412,6 +416,15 @@ impl Store {
     #[must_use]
     pub fn with_payload_threshold(mut self, threshold: usize) -> Self {
         self.threshold = threshold;
+        self
+    }
+
+    /// This store, each ingest marker it leaves, as a generation starts
+    /// or a position moves, recorded as left at `ms`, in milliseconds on
+    /// ingest's clock (ADM-09). The store reads no clock itself.
+    #[must_use]
+    pub fn with_marker_time(mut self, ms: u64) -> Self {
+        self.marker_time = ms;
         self
     }
 
@@ -1346,7 +1359,7 @@ impl Store {
     ///
     /// Fails when SQLite does.
     pub fn start_generation(&mut self, path: &str, directory: &str) -> Result<Source, StoreError> {
-        source::start(&self.conn, path, directory)
+        source::start(&self.conn, path, directory, self.marker_time)
     }
 
     /// Moves the position of the transcript source generation `id` to
@@ -1357,7 +1370,7 @@ impl Store {
     ///
     /// Fails when SQLite does.
     pub fn advance(&mut self, id: i64, position: &Position) -> Result<(), StoreError> {
-        source::advance(&self.conn, id, position)
+        source::advance(&self.conn, id, position, self.marker_time)
     }
 
     /// Marks the transcript source generation `id` held at its ingest
@@ -1423,7 +1436,7 @@ impl Store {
             }
         }
         source::place(&tx, id, &out, places)?;
-        source::advance(&tx, id, position)?;
+        source::advance(&tx, id, position, self.marker_time)?;
         tx.commit()?;
 
         Ok(out)
