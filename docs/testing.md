@@ -67,11 +67,11 @@ crate, where the unit tests reach it. Every cargo the tool starts
 carries `PARINN_COVERAGE_MEASURING`, and a run that finds it set refuses
 to start, so a test cannot set off a measurement inside a measurement.
 
-CI measures each test layer in a `coverage (<layer>)` job of its own,
-under the budget [ci.md](ci.md) sets. The `coverage` job merges them,
-writes the table and the test counts into its summary, holds the
-floors, and uploads one Codecov flag per test layer. Codecov's
-thresholds in [codecov.yml](../codecov.yml) are a soft ratchet on top.
+CI measures each test layer in a job of its own, the end-to-end layer in
+four shards ([ci.md](ci.md)). The `coverage` job merges them, adds the
+shards up, fails on a missing one, writes the table and the test counts
+into its summary, holds the floors, and uploads one Codecov flag per
+test layer. Codecov's [thresholds](../codecov.yml) are a soft ratchet.
 
 ## The executable requirement matrix
 
@@ -100,7 +100,7 @@ is skipped and counted, never counted as a pass. The `bdd` target in
 [tooling/scenario](../tooling/scenario/tests/bdd/main.rs) runs the rest
 through cucumber-rs, and a step whose text matches no binding fails
 instead of being skipped. It prints `scenarios: N bound, M pending`
-first, and CI's test job writes that line into its summary.
+first; each of CI's four `scenarios` jobs writes it into its summary.
 
 The runner reads features with the same gherkin parser as the gate.
 That parser is stricter than godog's in two places. A description line

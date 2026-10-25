@@ -54,6 +54,14 @@ pub trait Host {
     /// Fails when the file exists and cannot be read.
     fn read(&self, path: &Path) -> Result<Option<String>, String>;
 
+    /// The names of the files directly under `dir`, sorted; none when
+    /// there is no such directory.
+    ///
+    /// # Errors
+    ///
+    /// Fails when the directory exists and cannot be read.
+    fn files(&self, dir: &Path) -> Result<Vec<String>, String>;
+
     /// Appends `text` to `path`, creating it if need be.
     ///
     /// # Errors
