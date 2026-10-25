@@ -686,30 +686,53 @@ pub(crate) fn count_stopped(
     audited
 }
 
+/// The start markers of the MCP servers, as `parinn verify` reads them:
+/// behind this seam, so a test sets them out (ENG-03).
+pub(crate) trait Markers {
+    /// Every file in the markers' directory; none without one.
+    fn list(&self) -> Vec<PathBuf>;
+    /// What the marker at `path` names while its server holds its lock;
+    /// none for a marker whose lock is free or that cannot be read. It
+    /// only tries the lock, never waits for it.
+    fn held(&self, path: &Path) -> Option<String>;
+}
+
+/// The start markers in a home's markers' directory.
+struct HomeMarkers(PathBuf);
+
+impl Markers for HomeMarkers {
+    fn list(&self) -> Vec<PathBuf> {
+        fs::read_dir(&self.0)
+            .map(|listing| listing.flatten().map(|e| e.path()).collect())
+            .unwrap_or_default()
+    }
+
+    fn held(&self, path: &Path) -> Option<String> {
+        let file = fs::File::open(path).ok()?;
+        if file.try_lock().is_ok() {
+            return None;
+        }
+
+        Some(fs::read_to_string(path).unwrap_or_default())
+    }
+}
+
 /// The transcripts the running MCP servers ingest: those their start
 /// markers name while the server holds the marker's lock (ADM-09,
 /// REC-13). A marker a stopped server left names none.
 pub(crate) fn served(home: &Home) -> Vec<PathBuf> {
-    let Ok(listing) = fs::read_dir(home.root().join(MARKERS)) else {
-        return Vec::new();
-    };
-    let mut served = Vec::new();
-    for entry in listing.flatten() {
-        let path = entry.path();
-        if path.extension().is_none_or(|e| e != "marker") {
-            continue;
-        }
-        let Ok(file) = fs::File::open(&path) else {
-            continue;
-        };
-        if file.try_lock().is_ok() {
-            continue;
-        }
-        let named = fs::read_to_string(&path).unwrap_or_default();
-        served.extend(named.lines().map(PathBuf::from));
-    }
+    served_by(&HomeMarkers(home.root().join(MARKERS)))
+}
 
-    served
+/// The transcripts the held start markers of `markers` name.
+pub(crate) fn served_by(markers: &dyn Markers) -> Vec<PathBuf> {
+    markers
+        .list()
+        .iter()
+        .filter(|path| path.extension().is_some_and(|e| e == "marker"))
+        .filter_map(|path| markers.held(path))
+        .flat_map(|named| named.lines().map(PathBuf::from).collect::<Vec<_>>())
+        .collect()
 }
 
 #[cfg(test)]

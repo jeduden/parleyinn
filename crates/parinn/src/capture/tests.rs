@@ -284,6 +284,41 @@ fn only_a_running_server_serves_the_transcripts_its_marker_names() {
     assert_eq!(served(&f.home), Vec::<PathBuf>::new());
 }
 
+/// Start markers as a test sets them out: each path with what it names
+/// while its server holds its lock, none for a free one.
+struct FakeMarkers(Vec<(PathBuf, Option<&'static str>)>);
+
+impl Markers for FakeMarkers {
+    fn list(&self) -> Vec<PathBuf> {
+        self.0.iter().map(|(p, _)| p.clone()).collect()
+    }
+
+    fn held(&self, path: &Path) -> Option<String> {
+        self.0
+            .iter()
+            .find(|(p, _)| p == path)
+            .and_then(|(_, named)| named.map(str::to_owned))
+    }
+}
+
+#[test]
+fn the_served_transcripts_are_those_held_markers_name() {
+    let markers = FakeMarkers(vec![
+        (
+            PathBuf::from("/m/a.marker"),
+            Some("/t/a.jsonl\n/t/b.jsonl\n"),
+        ),
+        (PathBuf::from("/m/free.marker"), None),
+        (PathBuf::from("/m/c.staged"), Some("/t/c.jsonl\n")),
+    ]);
+
+    assert_eq!(
+        served_by(&markers),
+        [PathBuf::from("/t/a.jsonl"), PathBuf::from("/t/b.jsonl")]
+    );
+    assert_eq!(served_by(&FakeMarkers(Vec::new())), Vec::<PathBuf>::new());
+}
+
 #[test]
 fn no_marker_directory_and_files_that_are_not_markers_are_passed_over() {
     let f = Fixture::new();
