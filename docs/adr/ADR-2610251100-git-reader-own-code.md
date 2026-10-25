@@ -38,9 +38,10 @@ Extend `crates/repository` with its own code for the remaining rows. Do
 not depend on `gix`, `gix-*`, Grit, `git2`, `weavatrix-git` or any other
 git crate. Operations the reader does not support (alternates, multi-pack
 index, reftable, SHA-256, sparse index, submodule contents) return
-`Error::Unsupported`, which the caller counts (I6) and then falls back
-by row (I9). LANE-02 falls to a provisional identity. REC-20 leaves
-the rest to an ingest marker, as the row says.
+`Error::Unsupported`, which the caller counts and audits (I6). This ADR
+adds no fallback of its own. What happens next is whatever each row
+already allows, and the Open questions below name where the SRS says
+nothing.
 
 The code meets four rules.
 
@@ -67,10 +68,6 @@ The code meets four rules.
    documentation and from black-box output of the real binary. Do not
    copy or translate git's C source (see Alternatives).
 
-Also record, and then decide, SHA-1 collision detection: the reader
-verifies object ids with plain SHA-1. Either add collision detection or
-state in SEC-18's notes why a planted colliding object is out of scope.
-
 ## Alternatives
 
 - **gix (gitoxide), whole crate.** 0.x with frequent breaking releases;
@@ -93,8 +90,9 @@ state in SEC-18's notes why a planted colliding object is out of scope.
 - **weavatrix-git.** Dependency-free and read-only like ours, but
   pre-1.0, one maintainer, no ignore matching. Useful as a reference
   to compare our output against, not as a dependency.
-- **git2 (libgit2 bindings).** C code, where CON-01 names Rust for the
-  product, under GPL-2.0 with a linking exception.
+- **git2 (libgit2 bindings).** The crate is MIT OR Apache-2.0. It binds
+  the libgit2 C library, which is GPL-2.0 with a linking exception, and
+  CON-01 names Rust for the product.
 - **Own code from git's C source.** Refused. git is GPL-2.0-only. A
   translation of its code, or code written while following it, is
   likely a derivative work, which would put the repository's MIT licence
@@ -112,7 +110,22 @@ state in SEC-18's notes why a planted colliding object is out of scope.
   3,000 to 4,000 more shipped lines for tree diff, patch-id, index v2 to
   v4, wildmatch ignore rules and a blob diff.
 - The budget gate may show a repository size beyond which the reader is
-  too slow. The ceiling is then documented and the caller falls to a
-  provisional identity (I9) instead of widening the budget.
+  too slow. The ceiling is then documented, and REC-20 leaves the rest
+  to an ingest marker, as the row says, instead of widening the budget.
 - If the spike misses its budget, a later ADR supersedes this one for the
   three modules named above.
+
+## Open questions
+
+- **Unsupported formats under LANE-02.** The row gives a provisional
+  identity only to a repository with no commit, or a shallow clone with
+  neither. A clone that holds the bound commit in a format the reader
+  does not support (SHA-256, reftable, alternates) has no fallback, and
+  the row says to use the bound identity. An SRS change should say what
+  the node does then.
+- **Unsupported reads under LANE-06.** A `not proven` link takes one of
+  six closed reasons. None names a read the reader does not support. An
+  SRS change should add a reason or say which one applies.
+- **SHA-1 collision detection.** The reader verifies object ids with
+  plain SHA-1. Decide before this ADR is accepted: add collision
+  detection, or state why a planted colliding object is out of scope.
