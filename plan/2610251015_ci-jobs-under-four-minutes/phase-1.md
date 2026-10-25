@@ -43,3 +43,10 @@ Gate. The `ci-timings` artifacts of two consecutive runs show every job
 of `ci.yml` and `build.yml` under four minutes; the scenario count, the
 coverage table and the benchmark report still appear in the job
 summaries; the release provenance covers the same binaries.
+
+Measured so far. CI run 805 on this branch: every job green, the
+slowest `coverage (e2e)` at 3.4 minutes, then `benchmark-suites`,
+`drift (shard 1)` and `scenarios` at 2.8 to 2.9, every `build (...)` at
+1.9 to 2.6, every `benchmark (shard N)` at 1.2 to 1.9. The run took
+6 minutes 56 seconds end to end, against 15 minutes before. One more
+consecutive run closes the gate.
