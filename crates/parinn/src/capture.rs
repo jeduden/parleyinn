@@ -681,5 +681,31 @@ pub(crate) fn count_stopped(
     audited
 }
 
+/// The transcripts the running MCP servers ingest: those their start
+/// markers name while the server holds the marker's lock (ADM-09,
+/// REC-13). A marker a stopped server left names none.
+pub(crate) fn served(home: &Home) -> Vec<PathBuf> {
+    let Ok(listing) = fs::read_dir(home.root().join(MARKERS)) else {
+        return Vec::new();
+    };
+    let mut served = Vec::new();
+    for entry in listing.flatten() {
+        let path = entry.path();
+        if path.extension().is_none_or(|e| e != "marker") {
+            continue;
+        }
+        let Ok(file) = fs::File::open(&path) else {
+            continue;
+        };
+        if file.try_lock().is_ok() {
+            continue;
+        }
+        let named = fs::read_to_string(&path).unwrap_or_default();
+        served.extend(named.lines().map(PathBuf::from));
+    }
+
+    served
+}
+
 #[cfg(test)]
 mod tests;

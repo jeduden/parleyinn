@@ -212,7 +212,7 @@ fn a_changed_header_byte_fails_verify_naming_the_event_s_address() {
     assert_eq!(
         String::from_utf8_lossy(&out.stderr),
         format!(
-            "parinn verify: chain broken at parinn:room/{room}/w/{writer}/10: the stored hash does not match the event's header\n"
+            "parinn verify: hash chain: chain broken at parinn:room/{room}/w/{writer}/10: the stored hash does not match the event's header\n"
         )
     );
 }

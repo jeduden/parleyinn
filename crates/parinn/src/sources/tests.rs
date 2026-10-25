@@ -105,3 +105,82 @@ fn a_store_holding_no_schema_yet_has_no_sources() {
 
     assert_eq!(read(&home).unwrap(), None);
 }
+
+fn length_of(sizes: &[(&Path, u64)]) -> impl Fn(&Path) -> Option<u64> {
+    let sizes: Vec<(PathBuf, u64)> = sizes.iter().map(|(p, n)| (p.to_path_buf(), *n)).collect();
+    move |path| sizes.iter().find(|(p, _)| p == path).map(|(_, n)| *n)
+}
+
+#[test]
+fn a_source_with_every_byte_ingested_is_complete() {
+    let path = Path::new("/t/a.jsonl");
+    let found = completeness(&[source(path, 5, 5)], &[], &length_of(&[(path, 5)]));
+
+    assert_eq!(found, Completeness::default());
+    assert_eq!(found.failure(), None);
+    assert_eq!(found.pending_text(), "");
+}
+
+#[test]
+fn a_source_past_its_position_is_pending_while_a_server_holds_it_and_fails_else() {
+    let (held, free) = (Path::new("/t/held.jsonl"), Path::new("/t/free.jsonl"));
+    let sources = [source(held, 5, 5), source(free, 5, 5)];
+    let served = [held.to_path_buf()];
+
+    let found = completeness(&sources, &served, &length_of(&[(held, 9), (free, 9)]));
+
+    assert_eq!(found.pending, ["/t/held.jsonl"]);
+    assert_eq!(
+        found.failed,
+        [(
+            "/t/free.jsonl".to_owned(),
+            "holds lines the record lacks and no running MCP server ingests them"
+        )]
+    );
+    assert_eq!(
+        found.pending_text(),
+        "; transcript sources pending, a running MCP server ingests them: /t/held.jsonl"
+    );
+    assert_eq!(
+        found.failure().as_deref(),
+        Some(
+            "transcript sources fall short: /t/free.jsonl holds lines the record lacks and no running MCP server ingests them"
+        )
+    );
+}
+
+#[test]
+fn a_source_an_ingest_stopped_short_of_is_pending_whatever_holds_it() {
+    let dir = TempDir::new().unwrap();
+    let (short, begun) = (
+        dir.path().join("short.jsonl"),
+        dir.path().join("begun.jsonl"),
+    );
+    std::fs::write(&short, "x").unwrap();
+    std::fs::write(&begun, "x").unwrap();
+    let sources = [source(&short, 5, 9), source(&begun, 0, 0)];
+
+    let found = completeness(&sources, &[], &length_of(&[(&short, 9), (&begun, 9)]));
+
+    assert_eq!(
+        found.pending,
+        [short.display().to_string(), begun.display().to_string()]
+    );
+    assert_eq!(found.failed, []);
+}
+
+#[test]
+fn a_source_that_disappeared_before_it_was_fully_ingested_fails_and_one_that_shrank_does_not() {
+    let (gone, shrunk) = (Path::new("/t/gone.jsonl"), Path::new("/t/shrunk.jsonl"));
+    let sources = [source(gone, 5, 9), source(shrunk, 5, 5)];
+
+    let found = completeness(&sources, &[], &length_of(&[(shrunk, 2)]));
+
+    assert_eq!(
+        found.failed,
+        [(
+            "/t/gone.jsonl".to_owned(),
+            "disappeared before it was fully ingested"
+        )]
+    );
+}

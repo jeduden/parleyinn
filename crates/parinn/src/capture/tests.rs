@@ -248,6 +248,23 @@ fn a_killed_server_s_remainder_is_audited_once_by_the_next_reader() {
 }
 
 #[test]
+fn only_a_running_server_serves_the_transcripts_its_marker_names() {
+    let f = Fixture::new();
+    assert_eq!(served(&f.home), Vec::<PathBuf>::new());
+    std::fs::create_dir_all(f.home.root().join(MARKERS)).unwrap();
+    std::fs::write(f.home.root().join(MARKERS).join("x.staged"), "a\n").unwrap();
+    std::fs::create_dir(f.home.root().join(MARKERS).join("d.marker")).unwrap();
+    assert_eq!(served(&f.home), Vec::<PathBuf>::new());
+
+    let marker = StartMarker::leave(&f.home, &[f.main(), f.subagent("a")], None).unwrap();
+    assert_eq!(served(&f.home), [f.main(), f.subagent("a")]);
+
+    // Killed: the marker stays, its lock released.
+    drop(marker);
+    assert_eq!(served(&f.home), Vec::<PathBuf>::new());
+}
+
+#[test]
 fn no_marker_directory_and_files_that_are_not_markers_are_passed_over() {
     let f = Fixture::new();
     let audit = |_: &Occurrence| panic!("nothing to audit");

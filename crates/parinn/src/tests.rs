@@ -700,17 +700,18 @@ fn a_transcript_source_gone_before_it_was_fully_ingested_is_reported_and_audited
     std::fs::remove_file(&cut).unwrap();
     std::fs::remove_file(&whole).unwrap();
 
-    let (code, out, _) = p.invoke(&["verify", "--json"], &DEV);
-    assert_eq!(code, EXIT_OK);
+    let (code, out, err) = p.invoke(&["verify", "--json"], &DEV);
+    assert_eq!(code, EXIT_INTEGRITY);
     let v: serde_json::Value = serde_json::from_str(&out).unwrap();
-    assert_eq!(
-        v["lost_sources"],
-        serde_json::json!([cut.display().to_string()])
+    assert_eq!(v["broken"]["check"], "transcript source completeness");
+    let named = format!(
+        "transcript sources fall short: {} disappeared before it was fully ingested",
+        cut.display()
     );
-    let (_, text, _) = p.invoke(&["verify"], &DEV);
-    assert!(
-        text.contains("transcript sources gone before they were fully ingested: "),
-        "{text}"
+    assert_eq!(v["broken"]["message"], named);
+    assert_eq!(
+        err,
+        format!("parinn verify: transcript source completeness: {named}\n")
     );
     let (_, status, _) = p.invoke(&["status"], &DEV);
     assert!(
@@ -901,7 +902,7 @@ fn verify_exits_3_naming_where_the_chain_breaks() {
 
     assert_eq!((code, out.as_str()), (EXIT_INTEGRITY, ""));
     assert!(
-        err.starts_with("parinn verify: chain broken at parinn:room/"),
+        err.starts_with("parinn verify: hash chain: chain broken at parinn:room/"),
         "{err}"
     );
     assert!(
@@ -912,11 +913,13 @@ fn verify_exits_3_naming_where_the_chain_breaks() {
     let v: serde_json::Value = serde_json::from_str(&json).unwrap();
     assert_eq!(
         format!(
-            "parinn verify: {}\n",
+            "parinn verify: {}: {}\n",
+            v["broken"]["check"].as_str().unwrap(),
             v["broken"]["message"].as_str().unwrap()
         ),
         err
     );
+    assert_eq!(v["broken"]["check"], "hash chain");
     assert_eq!(
         (&v["integrity"], &v["broken"]["class"], &v["order"]),
         (
@@ -1049,7 +1052,10 @@ fn verify_names_a_broken_chain_before_a_refused_fork() {
     let (code, _, err) = p.invoke(&["verify"], &DEV);
 
     assert_eq!(code, EXIT_INTEGRITY);
-    assert!(err.starts_with("parinn verify: chain broken at"), "{err}");
+    assert!(
+        err.starts_with("parinn verify: hash chain: chain broken at"),
+        "{err}"
+    );
 }
 
 #[test]
@@ -1085,7 +1091,7 @@ fn verify_reports_a_store_error_met_while_checking() {
 
     assert_eq!(code, EXIT_INTEGRITY);
     assert!(
-        err.starts_with("parinn verify: the store is corrupt"),
+        err.starts_with("parinn verify: store: the store is corrupt"),
         "{err}"
     );
     let v: serde_json::Value = serde_json::from_str(&json).unwrap();
@@ -2150,7 +2156,7 @@ fn verify_checks_the_audit_chain_too() {
     assert_eq!(code, EXIT_INTEGRITY);
     assert_eq!(
         err,
-        "parinn verify: audit log audit-000001.jsonl line 1: hash does not match\n"
+        "parinn verify: hash chain: audit log audit-000001.jsonl line 1: hash does not match\n"
     );
     let (code, out, _) = p.invoke(&["verify", "--json"], &DEV);
     assert_eq!(code, EXIT_INTEGRITY);
@@ -2159,6 +2165,7 @@ fn verify_checks_the_audit_chain_too() {
         v["broken"],
         serde_json::json!({
             "class": "audit",
+            "check": "hash chain",
             "address": null,
             "message": "audit log audit-000001.jsonl line 1: hash does not match",
         })
@@ -2919,7 +2926,10 @@ fn status_and_verify_exit_3_naming_a_newer_segment() {
     let (code, _, err) = p.invoke(&["verify"], &DEV);
     assert_eq!(
         (code, err),
-        (EXIT_INTEGRITY, format!("parinn verify: {named}\n"))
+        (
+            EXIT_INTEGRITY,
+            format!("parinn verify: hash chain: {named}\n")
+        )
     );
 }
 

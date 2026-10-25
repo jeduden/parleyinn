@@ -3,7 +3,7 @@
 //! holds repeated lines of, and each source that disappeared before it
 //! was fully ingested.
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use administration::home::Home;
 use serde_json::{Value, json};
@@ -67,6 +67,89 @@ pub(crate) fn lost(sources: &[Source]) -> Vec<&Source> {
             s.lost || (gone && (!s.position.complete() || s.held_since.is_some()))
         })
         .collect()
+}
+
+/// How far `parinn verify` finds the transcript sources short of their
+/// ends (ADM-09).
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub(crate) struct Completeness {
+    /// Sources past their ingest position that a running MCP server
+    /// holds the session binding of: it ingests the rest.
+    pub(crate) pending: Vec<String>,
+    /// Sources short of their end that nothing will finish: the path
+    /// and why.
+    pub(crate) failed: Vec<(String, &'static str)>,
+}
+
+/// Which of `sources` are short of their ends, given the transcripts the
+/// running MCP servers hold and the length of a file now (REC-13,
+/// REC-07, REC-08): one past its ingest position is pending while a
+/// server holds it, else it fails; one that disappeared before it was
+/// fully ingested fails. A source an ingest stopped short of, or began
+/// and consumed nothing of, is pending too: it left an ingest marker at
+/// its position, from which the next `parinn ingest` resumes (REC-13,
+/// ENG-06).
+pub(crate) fn completeness(
+    sources: &[Source],
+    served: &[PathBuf],
+    length: &dyn Fn(&Path) -> Option<u64>,
+) -> Completeness {
+    let mut found = Completeness::default();
+    let gone = lost(sources);
+    for source in sources {
+        let path = Path::new(&source.path);
+        if gone.contains(&source) {
+            found.failed.push((
+                source.path.clone(),
+                "disappeared before it was fully ingested",
+            ));
+        } else if length(path).is_some_and(|len| len > source.position.offset) {
+            let stopped_short = !source.position.complete() || source.position.offset == 0;
+            if stopped_short || served.iter().any(|s| s == path) {
+                found.pending.push(source.path.clone());
+            } else {
+                found.failed.push((
+                    source.path.clone(),
+                    "holds lines the record lacks and no running MCP server ingests them",
+                ));
+            }
+        }
+    }
+
+    found
+}
+
+impl Completeness {
+    /// What `parinn verify` says of the sources that fail, one clause
+    /// each; none while they all hold.
+    pub(crate) fn failure(&self) -> Option<String> {
+        if self.failed.is_empty() {
+            return None;
+        }
+        let each: Vec<String> = self
+            .failed
+            .iter()
+            .map(|(path, why)| format!("{path} {why}"))
+            .collect();
+
+        Some(format!(
+            "transcript sources fall short: {}",
+            each.join("; ")
+        ))
+    }
+
+    /// What `parinn verify` adds for sources still pending: nothing when
+    /// none is.
+    pub(crate) fn pending_text(&self) -> String {
+        if self.pending.is_empty() {
+            return String::new();
+        }
+
+        format!(
+            "; transcript sources pending, a running MCP server ingests them: {}",
+            self.pending.join(", ")
+        )
+    }
 }
 
 impl SourcesStatus {

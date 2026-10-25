@@ -1188,7 +1188,7 @@ fn a_read_only_store_without_its_schema_is_corrupt() {
 }
 
 #[test]
-fn a_payload_that_is_not_utf_8_is_corrupt() {
+fn a_payload_that_is_not_utf_8_is_a_payload_fault() {
     let dir = TempDir::new().unwrap();
     let mut store = open(&dir);
     store.append(writer(1), &[sized_event(1, 9000)]).unwrap();
@@ -1202,7 +1202,7 @@ fn a_payload_that_is_not_utf_8_is_corrupt() {
     let err = store.log(writer(1)).unwrap_err();
 
     assert!(
-        matches!(&err, StoreError::Corrupt { address: Some(_), what } if what.contains("not UTF-8")),
+        matches!(&err, StoreError::Payload { source, .. } if source.to_string().contains("not UTF-8")),
         "{err}"
     );
 }

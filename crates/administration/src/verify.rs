@@ -126,6 +126,11 @@ pub enum VerifyError {
     /// derives (I10): the identity kept for this worktree, named by its
     /// digest, or one the record holds and the store does not.
     DerivedWorktree { worktree: String },
+    /// The store holds schema objects this build does not ship (ADM-09).
+    Foreign { objects: Vec<String> },
+    /// The search index differs from what the record derives, or from
+    /// the ranking a new one has (ADM-09, I10).
+    Index { reason: &'static str },
     /// A segment is of a newer format version than this parinn's: it is
     /// refused and left as it is (ADM-05).
     NewerSegment(Segment),
@@ -152,12 +157,38 @@ impl VerifyError {
             Self::Provenance { .. } => "provenance",
             Self::Seat { .. } => "seat",
             Self::Genesis(_) => "genesis",
-            Self::Derived { .. } | Self::DerivedWorktree { .. } => "derived_artifact_consistency",
+            Self::Derived { .. }
+            | Self::DerivedWorktree { .. }
+            | Self::Foreign { .. }
+            | Self::Index { .. } => "derived_artifact_consistency",
             Self::NewerSegment(_) => "newer_segment",
             Self::Segments { .. } => "segment",
             Self::Payload { .. } => "payload",
             Self::Corrupt(_) => "corrupt",
             Self::Store(_) => "store",
+        }
+    }
+
+    /// The check of ADM-09 the failure belongs to, as `parinn verify`
+    /// names it.
+    #[must_use]
+    pub fn check(&self) -> &'static str {
+        match self {
+            Self::Broken { .. }
+            | Self::Tombstone { .. }
+            | Self::KeyEvent { .. }
+            | Self::Record { .. }
+            | Self::Provenance { .. }
+            | Self::Seat { .. }
+            | Self::Genesis(_)
+            | Self::Segments { .. }
+            | Self::NewerSegment(_) => "hash chain",
+            Self::Content { .. } | Self::Payload { .. } => "payload integrity",
+            Self::Derived { .. }
+            | Self::DerivedWorktree { .. }
+            | Self::Foreign { .. }
+            | Self::Index { .. } => "derived artifact consistency",
+            Self::Corrupt(_) | Self::Store(_) => "store",
         }
     }
 
@@ -177,6 +208,8 @@ impl VerifyError {
             | Self::Genesis(_)
             | Self::Derived { .. }
             | Self::DerivedWorktree { .. }
+            | Self::Foreign { .. }
+            | Self::Index { .. }
             | Self::NewerSegment(_)
             | Self::Segments { .. }
             | Self::Corrupt(_)
@@ -227,12 +260,18 @@ impl fmt::Display for VerifyError {
             Self::Genesis(why) => f.write_str(why),
             Self::Derived { writer } => write!(
                 f,
-                "derived artifact consistency: the origin kept for writer {writer} differs from the record's: run parinn rebuild"
+                "the origin kept for writer {writer} differs from the record's: run parinn rebuild"
             ),
             Self::DerivedWorktree { worktree } => write!(
                 f,
-                "derived artifact consistency: the identity kept for worktree {worktree} differs from the record's: run parinn rebuild"
+                "the identity kept for worktree {worktree} differs from the record's: run parinn rebuild"
             ),
+            Self::Foreign { objects } => write!(
+                f,
+                "the store holds schema objects this parinn does not ship: {}",
+                objects.join(", ")
+            ),
+            Self::Index { reason } => write!(f, "the search index {reason}: run parinn rebuild"),
             Self::Corrupt(e) | Self::Store(e) => write!(f, "{e}"),
         }
     }
@@ -254,6 +293,38 @@ impl From<StoreError> for VerifyError {
             e => Self::Store(e),
         }
     }
+}
+
+/// Checks the store's own shape (ADM-09): it holds no schema object this
+/// build does not ship, and its search index has the shipped
+/// ranking and is what the record derives (I10). A store with no
+/// search index has none to check.
+///
+/// # Errors
+///
+/// Fails at the first difference, naming it, or when the store fails.
+pub fn verify_shape(store: &mut Store) -> Result<(), VerifyError> {
+    let objects = store.foreign_schema_objects()?;
+    if !objects.is_empty() {
+        return Err(VerifyError::Foreign { objects });
+    }
+    match store.search_index_ranking_is_shipped() {
+        Ok(true) => {}
+        Ok(false) => {
+            return Err(VerifyError::Index {
+                reason: "ranks in a way this parinn does not ship",
+            });
+        }
+        Err(StoreError::NoIndex) => return Ok(()),
+        Err(e) => return Err(e.into()),
+    }
+    if store.search_index_is_derived()? {
+        return Ok(());
+    }
+
+    Err(VerifyError::Index {
+        reason: "differs from what the record derives",
+    })
 }
 
 /// The provenance classes only a device seat records, and, for

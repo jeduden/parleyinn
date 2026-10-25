@@ -1,0 +1,177 @@
+use super::*;
+use crate::{NewEvent, SeatId, Store, StoredSeat};
+use record::commitment::CommitmentKey;
+use record::event::{EventKind, Provenance};
+use record::id::{RoomId, WriterId};
+use serde_json::json;
+use testkit::TempDir;
+
+fn open(dir: &TempDir) -> Store {
+    Store::open(&dir.path().join("store.db")).unwrap()
+}
+
+fn with_events(dir: &TempDir, texts: &[&str]) -> Store {
+    let mut store = open(dir);
+    let (room, writer) = (
+        RoomId::derive(&[1; 32], &[2; 16]),
+        WriterId::derive(&[1; 32]),
+    );
+    store
+        .add_seat(&StoredSeat {
+            writer,
+            seat: SeatId::derive(&room, writer.digest().as_bytes()),
+            room,
+            certificate: json!({}),
+        })
+        .unwrap();
+    let events: Vec<NewEvent> = texts
+        .iter()
+        .zip(1..)
+        .map(|(text, n)| NewEvent {
+            kind: EventKind::TranscriptLine,
+            provenance: Provenance::Unparsed,
+            content: json!({"line": n, "text": text}),
+            commitment_key: CommitmentKey::from_bytes([n as u8; 32]),
+            transcript_timestamp: None,
+        })
+        .collect();
+    store.append(writer, &events).unwrap();
+    store
+}
+
+fn raw(dir: &TempDir) -> Connection {
+    let conn = Connection::open(dir.path().join("store.db")).unwrap();
+    conn.execute(
+        "ATTACH DATABASE ?1 AS idx",
+        [dir.path().join(search_index::FILE).to_str().unwrap()],
+    )
+    .unwrap();
+    conn
+}
+
+#[test]
+fn a_store_made_by_this_build_holds_no_foreign_object() {
+    let dir = TempDir::new().unwrap();
+    let store = with_events(&dir, &["one"]);
+
+    assert_eq!(
+        store.foreign_schema_objects().unwrap(),
+        Vec::<String>::new()
+    );
+}
+
+#[test]
+fn every_lazily_made_table_is_shipped_too() {
+    let dir = TempDir::new().unwrap();
+    let store = with_events(&dir, &["one"]);
+    for schema in [origin::SCHEMA, refusal::SCHEMA, purge::SCHEMA] {
+        store.conn.execute_batch(schema).unwrap();
+    }
+    for schema in repository::schemas() {
+        store.conn.execute_batch(&schema).unwrap();
+    }
+
+    assert_eq!(
+        store.foreign_schema_objects().unwrap(),
+        Vec::<String>::new()
+    );
+}
+
+#[test]
+fn an_object_this_build_does_not_ship_is_named_in_either_file() {
+    let dir = TempDir::new().unwrap();
+    let store = with_events(&dir, &["one"]);
+    store
+        .conn
+        .execute_batch("CREATE TABLE exfil (x TEXT); CREATE TABLE idx.extra (y TEXT);")
+        .unwrap();
+
+    assert_eq!(
+        store.foreign_schema_objects().unwrap(),
+        ["idx.extra", "main.exfil"]
+    );
+}
+
+#[test]
+fn a_new_index_ranks_as_shipped_and_an_altered_ranking_does_not() {
+    let dir = TempDir::new().unwrap();
+    let store = with_events(&dir, &["one"]);
+    assert!(store.search_index_ranking_is_shipped().unwrap());
+
+    store
+        .conn
+        .execute(
+            "INSERT INTO idx.events_fts (events_fts, rank) VALUES ('rank', 'bm25(0.0)')",
+            [],
+        )
+        .unwrap();
+
+    assert!(!store.search_index_ranking_is_shipped().unwrap());
+    assert_eq!(ranking(&raw(&dir)).unwrap().len(), 1);
+}
+
+#[test]
+fn an_index_that_the_record_derives_is_derived_and_a_changed_entry_is_not() {
+    let dir = TempDir::new().unwrap();
+    let mut store = with_events(&dir, &["alpha beta", "gamma"]);
+    assert!(store.search_index_is_derived().unwrap());
+    let row = search_index::row_id_of(record::id::Address::new(
+        WriterId::derive(&[1; 32]),
+        record::id::Seq::new(1).unwrap(),
+    ))
+    .unwrap();
+    store
+        .conn
+        .execute("DELETE FROM idx.events_fts WHERE rowid = ?1", [row])
+        .unwrap();
+    store
+        .conn
+        .execute(
+            "INSERT INTO idx.events_fts (rowid, text) VALUES (?1, 'zebra')",
+            [row],
+        )
+        .unwrap();
+
+    assert!(!store.search_index_is_derived().unwrap());
+    // The check changed nothing: the entry is still the wrong one.
+    assert!(!store.search_index_is_derived().unwrap());
+}
+
+#[test]
+fn a_store_without_its_index_file_attached_has_only_its_own_objects() {
+    let dir = TempDir::new().unwrap();
+    drop(with_events(&dir, &["one"]));
+    std::fs::remove_file(dir.path().join(search_index::FILE)).unwrap();
+    let store = Store::open_read_only_made(&dir.path().join("store.db"))
+        .unwrap()
+        .unwrap();
+
+    assert_eq!(
+        store.foreign_schema_objects().unwrap(),
+        Vec::<String>::new()
+    );
+}
+
+#[test]
+fn a_store_without_an_index_has_nothing_to_check() {
+    let dir = TempDir::new().unwrap();
+    let mut store = open(&dir);
+    store.conn.execute_batch("DETACH DATABASE idx").unwrap();
+
+    assert!(matches!(
+        store.search_index_ranking_is_shipped(),
+        Err(StoreError::NoIndex)
+    ));
+    assert!(matches!(
+        store.search_index_is_derived(),
+        Err(StoreError::NoIndex)
+    ));
+}
+
+#[test]
+fn a_seat_without_events_leaves_the_index_derived() {
+    let dir = TempDir::new().unwrap();
+    let mut store = with_events(&dir, &[]);
+
+    assert!(store.search_index_is_derived().unwrap());
+}

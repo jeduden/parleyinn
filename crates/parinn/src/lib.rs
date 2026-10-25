@@ -1349,12 +1349,14 @@ fn verify_command(
             stderr,
         );
     }
-    let store = match Store::open(&home.store()) {
+    let mut store = match Store::open(&home.store()) {
         Ok(store) => store,
         Err(e) => return store_failed("verify", &e, stderr),
     };
-    let lost = match sources::of(&store) {
-        Ok(status) => status.lost,
+    let incomplete = match store.sources() {
+        Ok(found) => sources::completeness(&found, &capture::served(&home), &|p| {
+            fs::metadata(p).ok().map(|m| m.len())
+        }),
         Err(e) => return failed("verify", &e, stderr),
     };
     let forks = match store.refused_forks() {
@@ -1362,7 +1364,9 @@ fn verify_command(
         Err(e) => return failed("verify", &e, stderr),
     };
     let verified = match verify_record(&home, &store) {
-        Ok(verified) => verified,
+        Ok(verified) => verified.and_then(|(r, staged)| {
+            administration::verify::verify_shape(&mut store).map(|()| (r, staged))
+        }),
         Err(e) => return failed("verify", &e, stderr),
     };
     let checked = match verified {
@@ -1376,15 +1380,24 @@ fn verify_command(
         Ok((r, staged, _)) if !forks.is_empty() => {
             refused_report(as_json, &r, staged, &forks, stderr)
         }
-        Ok((r, staged, a)) => (EXIT_OK, verified_line(as_json, &r, staged, &a, &lost)),
+        Ok(_) if incomplete.failure().is_some() => broken_json(
+            as_json,
+            "transcript_source_completeness",
+            "transcript source completeness",
+            None,
+            &incomplete.failure().unwrap_or_default(),
+            stderr,
+        ),
+        Ok((r, staged, a)) => (EXIT_OK, verified_line(as_json, &r, staged, &a, &incomplete)),
         Err(Ok(VerifyError::Store(e))) => return failed("verify", &e, stderr),
         Err(Err(e @ AuditError::Broken { .. })) => {
-            broken_json(as_json, "audit", None, &e.to_string(), stderr)
+            broken_json(as_json, "audit", "hash chain", None, &e.to_string(), stderr)
         }
         Err(Err(e)) => return failed("verify", &e, stderr),
         Err(Ok(broken)) => broken_json(
             as_json,
             broken.class(),
+            broken.check(),
             broken.address(),
             &broken.to_string(),
             stderr,
@@ -1442,7 +1455,7 @@ fn verified_line(
     r: &Report,
     staged: bool,
     a: &audit::log::Checked,
-    lost: &[String],
+    incomplete: &sources::Completeness,
 ) -> String {
     if as_json {
         return json!({
@@ -1452,7 +1465,7 @@ fn verified_line(
             "order": r.full_order(),
             "seats": seats_json(&r.seats),
             "open_segments": segments::open_json(&r.open_segments),
-            "lost_sources": lost,
+            "pending_sources": incomplete.pending,
             "staged": staged,
             "audit": {"files": a.files, "entries": a.entries},
             "refused": [],
@@ -1474,7 +1487,7 @@ fn verified_line(
         r.events,
         a.entries,
         open_text(&r.open_segments),
-        lost_line(lost)
+        incomplete.pending_text()
     )
 }
 
@@ -1506,16 +1519,6 @@ fn refused_report(
     });
 
     (EXIT_INTEGRITY, line.to_string())
-}
-
-/// What `parinn verify` adds for transcript sources gone before they
-/// were fully ingested: nothing when none was (REC-08).
-fn lost_line(lost: &[String]) -> String {
-    if lost.is_empty() {
-        return String::new();
-    }
-
-    format!("; {}", sources::lost_text(lost))
 }
 
 /// What `parinn verify` adds for writer chains that ended without a
@@ -1556,11 +1559,12 @@ fn seats_json(seats: &[administration::verify::SeatReport]) -> Value {
 fn broken_json(
     as_json: bool,
     class: &str,
+    check: &str,
     address: Option<&str>,
     message: &str,
     stderr: &mut dyn Write,
 ) -> (u8, String) {
-    let _ = writeln!(stderr, "parinn verify: {message}");
+    let _ = writeln!(stderr, "parinn verify: {check}: {message}");
     if !as_json {
         return (EXIT_INTEGRITY, String::new());
     }
@@ -1571,7 +1575,7 @@ fn broken_json(
         "order": null,
         "seats": null,
         "audit": null,
-        "broken": {"class": class, "address": address, "message": message},
+        "broken": {"class": class, "check": check, "address": address, "message": message},
     });
 
     (EXIT_INTEGRITY, line.to_string())

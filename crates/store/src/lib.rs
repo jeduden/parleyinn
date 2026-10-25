@@ -19,6 +19,7 @@
 //!   transaction and searched under a deadline (REC-11, RCL-02).
 
 pub mod hook;
+mod integrity;
 mod origin;
 pub mod payload;
 mod purge;
@@ -557,17 +558,25 @@ impl Store {
         search_index::clear(&self.conn)?;
         let mut count = 0;
         for writer in self.writers()? {
-            let mut indexing = search_index::Indexing::open(&self.conn, writer)?;
+            // A writer with no event holds no slot, as when it was first
+            // indexed (I10).
+            let mut indexing = None;
             let mut after = 0;
             loop {
                 let chunk =
                     self.rows_limited(writer, "AND seq > ?2", after, search_index::CHUNK)?;
                 let Some(last) = chunk.last() else { break };
                 after = sql(last.link.header.address.seq);
-                index_chunk(&mut indexing, &chunk)?;
+                let open = match indexing.as_mut() {
+                    Some(open) => open,
+                    None => indexing.insert(search_index::Indexing::open(&self.conn, writer)?),
+                };
+                index_chunk(open, &chunk)?;
                 count += chunk.len() as u64;
             }
-            indexing.done_to(u64::try_from(after).unwrap_or(0))?;
+            if let Some(open) = indexing {
+                open.done_to(u64::try_from(after).unwrap_or(0))?;
+            }
         }
 
         Ok(count)
@@ -700,6 +709,53 @@ impl Store {
         }
 
         search_index::digest(&self.conn)
+    }
+
+    /// The schema objects the store holds that this build does not
+    /// ship, as `schema.name` (ADM-09).
+    ///
+    /// # Errors
+    ///
+    /// Fails when SQLite does.
+    pub fn foreign_schema_objects(&self) -> Result<Vec<String>, StoreError> {
+        integrity::foreign(&self.conn)
+    }
+
+    /// Whether the search index ranks as a new index does (ADM-09): no
+    /// ranking function was set in its configuration.
+    ///
+    /// # Errors
+    ///
+    /// Fails when SQLite does or the store has no search index.
+    pub fn search_index_ranking_is_shipped(&self) -> Result<bool, StoreError> {
+        if !search_index::exists(&self.conn)? {
+            return Err(StoreError::NoIndex);
+        }
+
+        integrity::ranking_is_shipped(&self.conn)
+    }
+
+    /// Whether the search index holds what the record derives (ADM-09,
+    /// I10): the index derived again from the record alone, in a
+    /// transaction rolled back, has the canonical digest of the one the
+    /// store keeps. Nothing of it stays.
+    ///
+    /// # Errors
+    ///
+    /// Fails when SQLite does, when an event cannot be read, or when the
+    /// store has no search index.
+    pub fn search_index_is_derived(&mut self) -> Result<bool, StoreError> {
+        if !search_index::exists(&self.conn)? {
+            return Err(StoreError::NoIndex);
+        }
+        let kept = search_index::digest(&self.conn)?;
+        self.conn.execute_batch("BEGIN IMMEDIATE")?;
+        let derived = self
+            .reindex()
+            .and_then(|_| search_index::digest(&self.conn));
+        let _ = self.conn.execute_batch("ROLLBACK");
+
+        Ok(derived? == kept)
     }
 
     /// The writers whose events the search index leaves out, because
@@ -1635,9 +1691,12 @@ impl Store {
             .read(name)
             .map_err(|source| StoreError::Payload { address, source })?;
 
-        String::from_utf8(bytes).map_err(|_| StoreError::Corrupt {
-            address: Some(address),
-            what: "content: its payload is not UTF-8".to_owned(),
+        String::from_utf8(bytes).map_err(|_| StoreError::Payload {
+            address,
+            source: std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                "its payload is not UTF-8",
+            ),
         })
     }
 
