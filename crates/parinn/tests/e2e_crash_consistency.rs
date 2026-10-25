@@ -4,10 +4,12 @@
 //! purge --range` erases one of its events at a terminal, and while
 //! `parinn rebuild` derives the derived artifacts again, in an isolated
 //! home, every start confined (ENG-12). After every kill `parinn verify`
-//! exits 0: every writer's chain gap-free and whole, every payload its
-//! event names present and opening its commitment, every purged event's
+//! exits 0 on the state the kill left, which it repairs nothing of:
+//! every writer's chain gap-free and whole, every payload its event
+//! names present and opening its commitment, every purged event's
 //! erasure confirmed by its tombstone, and every writer's segments
-//! tiling its log. A kill before the store exists leaves nothing to
+//! tiling its log. A purge a kill left unfinished is reported, and the
+//! next rebuild finishes it, after which verify reports none. A kill before the store exists leaves nothing to
 //! verify.
 //!
 //! The kill points come from a seeded generator, so a failing iteration
@@ -153,10 +155,12 @@ fn every_kill_during_ingest_leaves_a_record_that_verifies() {
     );
 }
 
-/// Asserts that `parinn verify` exits 0 in `home`.
-fn verified(home: &Path, after: Duration, label: &str) {
+/// Asserts that `parinn verify --json` exits 0 in `home`, on the state
+/// as it is: verify repairs nothing. Returns the ranges it reports a
+/// purge left unfinished.
+fn verified(home: &Path, after: Duration, label: &str) -> Vec<String> {
     let out = core()
-        .run(program(), &["verify"], home)
+        .run(program(), &["verify", "--json"], home)
         .unwrap_or_else(|e| panic!("{label}: {e}"));
     assert!(
         out.status.success(),
@@ -164,6 +168,32 @@ fn verified(home: &Path, after: Duration, label: &str) {
         out.status,
         String::from_utf8_lossy(&out.stderr)
     );
+    let report: serde_json::Value = serde_json::from_slice(&out.stdout)
+        .unwrap_or_else(|e| panic!("{label}: parinn verify --json printed no JSON: {e}"));
+    // The unit tests hold the report's fields; here a report without
+    // the field reads as one naming no unfinished purge.
+    report["unfinished_purges"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .map(|r| r.as_str().unwrap_or_default().to_owned())
+        .collect()
+}
+
+/// After a kill left a purge unfinished, runs the command that finishes
+/// it, `parinn rebuild`, and asserts verify then reports none and exits
+/// 0.
+fn finished(home: &Path, after: Duration, label: &str) {
+    let out = core()
+        .run(program(), &["rebuild"], home)
+        .unwrap_or_else(|e| panic!("{label}: {e}"));
+    assert!(
+        out.status.success(),
+        "{label}: parinn rebuild exited {}",
+        out.status
+    );
+    let left = verified(home, after, label);
+    assert!(left.is_empty(), "{label}: rebuild left {left:?} unfinished");
 }
 
 /// A fresh home that ingested the transcript whole and recorded the
@@ -248,11 +278,18 @@ fn iterate_act(act: Act, first: u64, threads: u64, iterations: u64, seed: u64) -
             Act::Rebuild => core().run_killed(program(), &args, home.0.path(), &[], after),
         };
         killed += u64::from(run.unwrap_or_else(|e| panic!("{label}: {e}")));
-        verified(home.0.path(), after, &label);
+        if !verified(home.0.path(), after, &label).is_empty() {
+            UNFINISHED.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+            finished(home.0.path(), after, &label);
+        }
     }
 
     killed
 }
+
+/// How many kills left a purge unfinished, which verify reported and the
+/// next rebuild finished.
+static UNFINISHED: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
 
 /// Kills `act` at `PARINN_CRASH_ITERATIONS` points on as many threads
 /// as the machine has cores; how many iterations ran and how many were
@@ -276,10 +313,54 @@ fn kill_act(act: Act) -> (u64, u64) {
     (iterations, killed.into_inner())
 }
 
+/// The state a kill between a purge's transaction and its finishing
+/// steps leaves, made on purpose: a purge of `writer`'s event 2 that
+/// finished, its posting put back in the search index and its steps back
+/// in the journal. The seeded kills reach this window only now and then.
+fn cut_short_purge(home: &Path, writer: &str) {
+    let range = format!("{writer}:2-2");
+    let out = core()
+        .run_at_terminal(program(), &["purge", "--range", &range], home, &[])
+        .unwrap_or_else(|e| panic!("{e}"));
+    assert!(out.status.success(), "parinn purge exited {}", out.status);
+    let address = store::Address::parse(&format!("{writer}:2")).unwrap().0;
+    let row = store::search_index::row_id_of(address).unwrap();
+    let parinn = home.join(".parinn");
+    rusqlite::Connection::open(parinn.join("search_index"))
+        .unwrap()
+        .execute(
+            "INSERT INTO events_fts (rowid, text) VALUES (?1, 'residue')",
+            [row],
+        )
+        .unwrap();
+    rusqlite::Connection::open(parinn.join("store.db"))
+        .unwrap()
+        .execute(
+            "INSERT INTO purge_journal (kind, target) VALUES ('index', ?1), ('vacuum', '')",
+            [&range],
+        )
+        .unwrap();
+}
+
+#[test]
+fn a_purge_cut_short_after_its_transaction_verifies_and_the_next_rebuild_finishes_it() {
+    let (home, writer) = ingested();
+    cut_short_purge(home.path(), &writer);
+    let label = "a purge cut short";
+
+    let left = verified(home.path(), Duration::ZERO, label);
+
+    assert_eq!(left, [format!("{writer}:2-2")], "verify names what is left");
+    finished(home.path(), Duration::ZERO, label);
+}
+
 #[test]
 fn every_kill_during_purge_leaves_a_record_that_verifies() {
     let (iterations, killed) = kill_act(Act::Purge);
-    println!("{iterations} purge iterations, {killed} killed mid-purge");
+    let unfinished = UNFINISHED.load(std::sync::atomic::Ordering::Relaxed);
+    println!(
+        "{iterations} purge iterations, {killed} killed mid-purge, {unfinished} left it unfinished"
+    );
 }
 
 #[test]
