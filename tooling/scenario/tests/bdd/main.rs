@@ -62,7 +62,7 @@ use std::env;
 use std::ffi::OsStr;
 use std::fmt;
 use std::io;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::{Command, ExitCode};
 
 use ::engineering::isolation_guard;
@@ -174,10 +174,12 @@ fn isolate() -> ExitCode {
 /// Runs the scenarios the command line selects.
 fn run() -> ExitCode {
     let args: Vec<String> = env::args().skip(1).collect();
-    let options = match runner::parse_args(&args) {
+    let options = match runner::options(&args, env::var_os(runner::SHARD_ENV).as_deref()) {
         Ok(options) => options,
         Err(err) => {
-            eprintln!("bdd: {err}\nusage: bdd [--tags EXPR] [--skip FILTER]... [FILTER]...");
+            eprintln!(
+                "bdd: {err}\nusage: bdd [--tags EXPR] [--skip FILTER]... [--shard K/N] [FILTER]..."
+            );
             return ExitCode::from(2);
         }
     };
@@ -185,8 +187,14 @@ fn run() -> ExitCode {
     match scenario::scenarios(&features) {
         Ok(all) => {
             let pending = all.iter().filter(|s| s.pending).count();
+            // Every shard counts the whole suite, so the line reads the
+            // same in each and a summary reports it once.
+            let shard = options
+                .shard
+                .map(|s| format!(" (shard {}/{})", s.index, s.total))
+                .unwrap_or_default();
             println!(
-                "scenarios: {} bound, {pending} pending",
+                "scenarios: {} bound, {pending} pending{shard}",
                 all.len() - pending
             );
         }
@@ -196,6 +204,7 @@ fn run() -> ExitCode {
         }
     }
 
+    let root = features.clone();
     let writer = runner::block_on(
         World::cucumber()
             .fail_on_skipped()
@@ -206,7 +215,12 @@ fn run() -> ExitCode {
                     .iter()
                     .chain(rule.into_iter().flat_map(|r| &r.tags))
                     .chain(&sc.tags);
-                options.selects(&sc.name, tags)
+                // A row of an outline is told apart by its own line.
+                let row = (!sc.examples.is_empty()).then_some(sc.position.line);
+                let file = feature.path.as_deref().unwrap_or(Path::new(""));
+                let key =
+                    runner::shard_key(file.strip_prefix(&root).unwrap_or(file), &sc.name, row);
+                options.selects(&sc.name, tags) && options.in_shard(&key)
             }),
     );
 

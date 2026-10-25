@@ -56,6 +56,17 @@ impl Host for FakeHost {
         Ok(self.files.borrow().get(path).cloned())
     }
 
+    fn files(&self, dir: &Path) -> Result<Vec<String>, String> {
+        self.call(format!("files {}", dir.display()))?;
+        Ok(self
+            .files
+            .borrow()
+            .keys()
+            .filter(|p| p.parent() == Some(dir))
+            .filter_map(|p| Some(p.file_name()?.to_string_lossy().into_owned()))
+            .collect())
+    }
+
     fn append(&self, path: &Path, text: &str) -> Result<(), String> {
         self.call(format!("append {}", path.display()))?;
         self.files

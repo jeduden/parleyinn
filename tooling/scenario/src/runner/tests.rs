@@ -191,3 +191,174 @@ fn sections_hold_one_value_per_type() {
         "another scenario, another value"
     );
 }
+
+fn shard(index: u64, total: u64) -> Shard {
+    Shard { index, total }
+}
+
+#[test]
+fn parse_args_reads_a_shard() {
+    let got = parse_args(&args(&["--shard", "2/4"])).unwrap();
+    let inline = parse_args(&args(&["--shard=4/4", "x"])).unwrap();
+
+    assert_eq!(got.shard, Some(shard(2, 4)));
+    assert_eq!(inline.shard, Some(shard(4, 4)));
+    assert_eq!(inline.filters, ["x"]);
+    assert_eq!(parse_args(&[]).unwrap().shard, None);
+    assert_eq!(
+        parse_args(&args(&["--shard"])).unwrap_err(),
+        "--shard needs a value"
+    );
+}
+
+#[test]
+fn parse_args_refuses_a_shard_that_is_not_k_of_n() {
+    for bad in [
+        "", "2", "0/4", "5/4", "1/0", "-1/4", "+1/4", "a/4", "1/b", "1/2/3", "1/",
+    ] {
+        let err = parse_args(&args(&["--shard", bad])).unwrap_err();
+        assert_eq!(
+            err,
+            format!("--shard: want K/N with 1 <= K <= N, not {bad:?}")
+        );
+    }
+}
+
+#[test]
+fn options_take_the_shard_from_the_environment_unless_the_flag_names_one() {
+    let env = |s: &'static str| Some(OsStr::new(s));
+
+    assert_eq!(options(&[], env("3/4")).unwrap().shard, Some(shard(3, 4)));
+    assert_eq!(options(&[], None).unwrap().shard, None);
+    assert_eq!(
+        options(&args(&["--shard", "1/2"]), env("3/4"))
+            .unwrap()
+            .shard,
+        Some(shard(1, 2)),
+        "the flag wins"
+    );
+    assert_eq!(
+        options(&[], env("5/4")).unwrap_err(),
+        format!(r#"{SHARD_ENV}: want K/N with 1 <= K <= N, not "5/4""#)
+    );
+    assert_eq!(
+        options(&args(&["--bogus"]), None).unwrap_err(),
+        r#"unknown flag "--bogus""#
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn options_refuse_a_shard_variable_that_is_not_text() {
+    use std::os::unix::ffi::OsStrExt as _;
+
+    let err = options(&[], Some(OsStr::from_bytes(b"\xff/2"))).unwrap_err();
+
+    assert_eq!(err, format!("{SHARD_ENV}: not unicode"));
+}
+
+#[test]
+fn fnv1a_is_the_published_hash() {
+    // The reference vectors of the FNV-1a 64-bit hash.
+    assert_eq!(fnv1a(b""), 0xcbf2_9ce4_8422_2325);
+    assert_eq!(fnv1a(b"a"), 0xaf63_dc4c_8601_ec8c);
+    assert_eq!(fnv1a(b"foobar"), 0x8594_4171_f739_67e8);
+}
+
+#[test]
+fn shard_key_joins_path_name_and_row() {
+    let path = Path::new("administration.feature");
+
+    assert_eq!(
+        shard_key(path, "a name", None),
+        "administration.feature\0a name"
+    );
+    assert_eq!(
+        shard_key(path, "a name", Some(7)),
+        "administration.feature\0a name\x007"
+    );
+    assert_eq!(
+        shard_key(Path::new("sub/x.feature"), "n", None),
+        "sub/x.feature\0n"
+    );
+}
+
+#[test]
+fn an_unsharded_run_holds_every_scenario() {
+    assert!(Options::default().in_shard("anything"));
+}
+
+/// A suite of scenarios across files, some outlines with many rows.
+fn suite() -> Vec<String> {
+    let mut keys = Vec::new();
+    for file in 0..12 {
+        let path = std::path::PathBuf::from(format!("section{file}.feature"));
+        for scenario in 0..9 {
+            let name = format!("scenario {scenario}");
+            keys.push(shard_key(&path, &name, None));
+            keys.push(shard_key(&path, &name, Some(10 + scenario)));
+            keys.push(shard_key(&path, &name, Some(20 + scenario)));
+        }
+    }
+
+    keys
+}
+
+#[test]
+fn the_shards_partition_the_suite_in_any_order() {
+    let keys = suite();
+    let mut reversed = keys.clone();
+    reversed.reverse();
+    let mut want: Vec<&String> = keys.iter().collect();
+    want.sort();
+
+    for total in 1..=8 {
+        for order in [&keys, &reversed] {
+            let mut held: Vec<&String> = Vec::new();
+            for index in 1..=total {
+                let options = parse_args(&args(&["--shard", &format!("{index}/{total}")])).unwrap();
+                held.extend(order.iter().filter(|k| options.in_shard(k)));
+            }
+            held.sort();
+            assert_eq!(
+                held, want,
+                "{total} shards hold every scenario exactly once"
+            );
+        }
+    }
+}
+
+#[test]
+fn the_shards_each_hold_a_fair_share() {
+    let keys = suite();
+    for total in 2..=4 {
+        for index in 1..=total {
+            let mine = keys.iter().filter(|k| shard(index, total).holds(k)).count();
+            let share = keys.len() / usize::try_from(total).unwrap();
+            assert!(
+                mine * 2 > share && mine < share * 2,
+                "shard {index}/{total} holds {mine} of {}",
+                keys.len()
+            );
+        }
+    }
+}
+
+#[test]
+fn a_shard_composes_with_tags_filters_and_skips() {
+    let key = "k";
+    let index = if shard(1, 2).holds(key) { 1 } else { 2 };
+    let bound = tags(&["ENG-24"]);
+    let run = |extra: &[&str], index: u64| {
+        let mut all = vec!["--shard".to_owned(), format!("{index}/2")];
+        all.extend(args(extra));
+        let options = parse_args(&all).unwrap();
+        options.selects("name", bound.iter()) && options.in_shard(key)
+    };
+
+    assert!(run(&["--tags", "@ENG-24"], index));
+    assert!(!run(&["--tags", "@ENG-24"], 3 - index));
+    assert!(!run(&["--tags", "@ENG-01"], index));
+    assert!(!run(&["--skip", "name"], index));
+    assert!(run(&["name"], index));
+}
