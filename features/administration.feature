@@ -144,24 +144,29 @@ Feature: Administration and lifecycle (ADM)
     Then "parinn verify" fails
 
   @ADM-09 @P0 @I6 @I10 @pending
-  Scenario Outline: verify exits non-zero on any integrity failure
+  Scenario Outline: verify names each failed check and fails no source an ingest resumes
     Given an isolated ParleyInn home
     And an agent run with a Claude Code transcript "run-a"
-    And <damage>
+    And <state>
     When the person runs "parinn verify"
-    Then the command exits 3
-    And the output names the failed check "<check>"
+    Then the command exits <exit>
+    And <outcome>
 
     Examples:
-      | damage                                                          | check                          |
-      | the transcript has lines not in the record                      | transcript source completeness |
-      | an event row's hash has been altered                            | hash chain                     |
-      | a payload file's bytes have been altered                        | payload integrity              |
-      | a landmark row has been altered                                 | derived artifact consistency   |
-      | a trust level has been altered in place                         | derived artifact consistency   |
-      | a schema object ParleyInn does not ship has been added to the store | derived artifact consistency   |
-      | the search index's ranking configuration has been altered       | derived artifact consistency   |
-      | a search index entry names an event whose text lacks the term   | derived artifact consistency   |
+      | state                                                                                               | exit | outcome                                                                          |
+      | the transcript has lines not in the record                                                          | 3    | the output names the failed check "transcript source completeness"               |
+      | an event row's hash has been altered                                                                | 3    | the output names the failed check "hash chain"                                   |
+      | a payload file's bytes have been altered                                                            | 3    | the output names the failed check "payload integrity"                            |
+      | a landmark row has been altered                                                                     | 3    | the output names the failed check "derived artifact consistency"                 |
+      | a trust level has been altered in place                                                             | 3    | the output names the failed check "derived artifact consistency"                 |
+      | a schema object ParleyInn does not ship has been added to the store                                 | 3    | the output names the failed check "derived artifact consistency"                 |
+      | the search index's ranking configuration has been altered                                           | 3    | the output names the failed check "derived artifact consistency"                 |
+      | a search index entry names an event whose text lacks the term                                       | 3    | the output names the failed check "derived artifact consistency"                 |
+      | a running MCP server's live ingest is short of the transcript's end and left no ingest marker yet   | 0    | the output reports the transcript "run-a" short of its end, which ingest resumes |
+      | an ingest killed during ingestion left an ingest marker short of the transcript's end               | 0    | the output reports the transcript "run-a" short of its end, which ingest resumes |
+      | an ingest left an ingest marker in the transcript over 10 minutes ago and no ingest resumed from it | 3    | the output names the failed check "transcript source completeness"               |
+      | the transcript holds fewer bytes than its ingest position                                           | 3    | the output names the failed check "transcript source completeness"               |
+      | the transcript's bytes up to its ingest position differ from its consumed-prefix hash               | 3    | the output names the failed check "transcript source completeness"               |
 
   @ADM-10 @P0 @I7 @pending
   Scenario: doctor is read-only and doctor --fix shows each change first
