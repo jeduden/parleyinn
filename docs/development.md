@@ -82,14 +82,17 @@ TrustedText (plan 2609292013) land.
 The run-time half is ENG-12's core row. Every end-to-end test of the
 core starts it through the testkit's `boundary` confinement: in a
 user and network namespace of its own (`unshare --map-current-user
---net`), under `strace -f`, which fails every `socket`, `socketpair`
-and `io_uring_setup` with `EACCES` and records every network call.
-Any recorded call fails the test, naming the core and the test that
-started it. The gate test `the_core_s_tests_start_it_confined` refuses
+--net`), under `strace -f --seccomp-bpf`, which fails every `socket`,
+`socketpair` and `io_uring_setup` with `EACCES` and records every
+network call, stopping the program only at those calls. Any recorded
+call fails the test, naming the core and the test that started it.
+Before the first start, a preflight has `bash` fork a subshell that
+opens a socket under the trace, and fails unless the trace recorded
+it failed. The gate test `the_core_s_tests_start_it_confined` refuses
 a test that starts the core any other way; a step needing a terminal gets one
 from `script`, outside the trace. It needs Linux, `unshare` and `script` from
-util-linux with unprivileged user namespaces, and `strace`; a machine without
-them fails the end-to-end tests with what is missing.
+util-linux with unprivileged user namespaces, `bash`, and `strace` 5.3 or
+later; a machine without them fails the end-to-end tests with what is missing.
 Outside CI, `PARINN_E2E_UNCONFINED=1` runs them unconfined instead, on
 a machine that cannot confine; CI refuses it.
 

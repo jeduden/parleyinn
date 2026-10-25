@@ -737,7 +737,7 @@ fn a_confined_start_killed_before_its_trace_began_made_no_call() {
     started.confinement.mode = Mode::Confined;
     started.trace = dir.path().join("never-written");
 
-    assert!(started.checked().is_ok());
+    assert!(started.checked(false).is_ok());
 }
 
 #[test]
@@ -768,4 +768,179 @@ fn a_spawned_program_that_opens_a_socket_fails_its_end() {
         .unwrap_err();
 
     assert!(matches!(err, Error::Socket { .. }), "{err}");
+}
+
+// The trace stops a process only at the calls it names, through a
+// seccomp filter (`--seccomp-bpf`): the tests below prove the filter
+// reaches every process and thread a confined start makes, and every
+// kind of socket. They need confinement and never skip: a machine that
+// cannot confine, or an opt-out, fails them (ENG-12, I6).
+
+/// The core's confinement on this machine; panics where there is none,
+/// the opt-out included, so the test fails instead of skipping.
+fn must_confine() -> Confinement {
+    match Confinement::of(Component::Core) {
+        Ok(c) if c.mode == Mode::Confined => c,
+        Ok(_) => panic!("ENG-12: this test runs only confined: unset {UNCONFINED}"),
+        Err(e) => panic!("{e}"),
+    }
+}
+
+/// The calls a start that must fail on a socket recorded.
+fn socket_calls(got: Result<Output, Error>) -> Vec<String> {
+    match got {
+        Err(Error::Socket { calls, .. }) => calls,
+        Err(e) => panic!("want a socket outside the boundary, got {e}"),
+        Ok(out) => panic!("want a socket outside the boundary, the start passed: {out:?}"),
+    }
+}
+
+/// Whether `calls` holds a call to `call` the trace failed with an
+/// injected `EACCES`.
+fn denied(calls: &[String], call: &str) -> bool {
+    calls
+        .iter()
+        .any(|c| c.starts_with(call) && c.contains("EACCES") && c.contains("(INJECTED)"))
+}
+
+/// The shell line that runs the probe test `test` of this binary.
+fn probe_line(test: &str) -> String {
+    format!(
+        "'{}' --exact {test} --ignored",
+        this_test_binary().display()
+    )
+}
+
+#[test]
+#[ignore = "the probe a confined start runs: a thread of its own opens a socket"]
+fn probe_in_a_thread_opens_a_socket() {
+    let _ = std::thread::spawn(probe).join();
+}
+
+#[test]
+#[ignore = "the probe a confined start runs: it opens a Unix socket"]
+fn probe_opens_a_unix_socket() {
+    let _ = std::os::unix::net::UnixDatagram::unbound();
+}
+
+#[test]
+#[ignore = "the probe a confined start runs: it opens a socket pair"]
+fn probe_opens_a_socket_pair() {
+    let _ = std::os::unix::net::UnixStream::pair();
+}
+
+#[test]
+fn a_socket_a_grandchild_opens_fails_the_start() {
+    let c = must_confine();
+    let home = TempDir::new().unwrap();
+    // Each shell runs one more command after its child, so each forks:
+    // the probe runs two processes below the one the trace started.
+    let line = format!("sh -c \"{}; true\"; true", probe_line(PROBE_TEST));
+
+    let calls = socket_calls(c.run(Path::new("sh"), &["-c", &line], home.path()));
+
+    assert!(denied(&calls, "socket("), "{calls:?}");
+}
+
+#[test]
+fn a_socket_a_thread_of_the_program_opens_fails_the_start() {
+    let c = must_confine();
+    let home = TempDir::new().unwrap();
+    let args = [
+        "--exact",
+        "boundary::tests::probe_in_a_thread_opens_a_socket",
+        "--ignored",
+    ];
+
+    let calls = socket_calls(c.run(&this_test_binary(), &args, home.path()));
+
+    assert!(denied(&calls, "socket("), "{calls:?}");
+}
+
+#[test]
+fn a_socket_a_program_the_traced_one_execs_opens_fails_the_start() {
+    let c = must_confine();
+    let home = TempDir::new().unwrap();
+    let line = format!("exec {}", probe_line(PROBE_TEST));
+
+    let calls = socket_calls(c.run(Path::new("sh"), &["-c", &line], home.path()));
+
+    assert!(denied(&calls, "socket("), "{calls:?}");
+}
+
+#[test]
+fn a_unix_socket_and_a_socket_pair_are_denied_under_the_trace() {
+    let c = must_confine();
+    let home = TempDir::new().unwrap();
+    let run = |test: &str| {
+        let args = ["--exact", test, "--ignored"];
+        socket_calls(c.run(&this_test_binary(), &args, home.path()))
+    };
+
+    let unix = run("boundary::tests::probe_opens_a_unix_socket");
+    let pair = run("boundary::tests::probe_opens_a_socket_pair");
+
+    assert!(denied(&unix, "socket(AF_UNIX"), "{unix:?}");
+    assert!(denied(&pair, "socketpair("), "{pair:?}");
+}
+
+#[test]
+fn preflight_fails_unless_the_trace_failed_a_socket() {
+    let injected =
+        "socket(AF_INET, SOCK_STREAM, IPPROTO_TCP) = -1 EACCES (Permission denied) (INJECTED)";
+    let let_through = "socket(AF_INET, SOCK_STREAM, IPPROTO_TCP) = 3";
+
+    assert_eq!(judge_preflight(&format!("123 {injected}\n")), Ok(()));
+    for trace in ["", "\n", let_through] {
+        let err = judge_preflight(trace).unwrap_err();
+        assert!(
+            err.starts_with("the trace did not fail the preflight's socket"),
+            "{err}"
+        );
+    }
+}
+
+#[test]
+fn preflight_fails_a_trace_that_follows_no_child() {
+    let _ = must_confine();
+    let unfollowed: Vec<&str> = TRACE.iter().copied().filter(|a| *a != "-f").collect();
+
+    let err = preflight_traced(UNSHARE, &unfollowed).unwrap_err();
+
+    assert!(
+        err.starts_with("the trace did not fail the preflight's socket"),
+        "{err}"
+    );
+}
+
+#[test]
+fn preflight_refuses_a_strace_older_than_its_minimum() {
+    assert_eq!(
+        strace_new_enough("strace -- version 6.8\nCopyright"),
+        Ok(())
+    );
+    assert_eq!(strace_new_enough("strace -- version 5.3"), Ok(()));
+    assert_eq!(strace_new_enough("strace -- version 10.0"), Ok(()));
+    for old in [
+        "strace -- version 5.2",
+        "strace -- version 4.26",
+        "no version",
+    ] {
+        let err = strace_new_enough(old).unwrap_err();
+        assert!(err.contains("needs strace 5.3 or later"), "{err}");
+    }
+}
+
+#[test]
+fn a_spawned_program_that_exited_by_itself_with_no_trace_fails() {
+    let dir = TempDir::new().unwrap();
+    let mut started = unconfined()
+        .spawn(Path::new("/bin/true"), &[], dir.path(), &[])
+        .unwrap();
+    started.confinement.mode = Mode::Confined;
+    started.trace = dir.path().join("never-written");
+
+    let err = started.checked(true).unwrap_err();
+
+    assert!(matches!(err, Error::Trace { .. }), "{err}");
 }

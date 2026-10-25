@@ -57,13 +57,17 @@ const SCRIPT: &str = "script";
 /// and exit notes and signals left out, every network call recorded,
 /// and each way to open a socket failed.
 ///
-/// `--seccomp-bpf` stops a traced process only at the calls the trace
-/// names, through a seccomp filter every process it starts inherits,
-/// instead of at every system call: a confined start that reads a store
-/// of a million events no longer runs ten times slower than an
-/// unconfined one. The calls traced, recorded and failed are the same.
-/// Where strace cannot set the filter up, it stops at every call as
-/// before, so the trace never misses one.
+/// `--seccomp-bpf` (strace 5.3 or later, [`STRACE_MINIMUM`]) stops a
+/// traced process only at the calls the trace names, through a seccomp
+/// filter every process and thread it starts inherits, instead of at
+/// every system call: a confined start that reads a store of a million
+/// events no longer runs ten times slower than an unconfined one. The
+/// tests prove a socket is recorded and failed when a thread of the
+/// program, a program it execs, or a process two forks below it opens
+/// one, and for Unix sockets and socket pairs too. strace documents
+/// that where it cannot set the filter up it stops at every call
+/// instead; either way the [`preflight`] fails every start unless the
+/// trace recorded and failed a socket call first.
 const TRACE: [&str; 11] = [
     "strace",
     "-f",
@@ -450,7 +454,7 @@ impl Started {
         if !exited {
             self.kill_group()?;
         }
-        self.checked().map(|()| exited)
+        self.checked(exited).map(|()| exited)
     }
 
     /// Kills the program and everything it started with `SIGKILL`, as a
@@ -461,7 +465,7 @@ impl Started {
     /// As [`finish`](Self::finish).
     pub fn kill(mut self) -> Result<(), Error> {
         self.kill_group()?;
-        self.checked()
+        self.checked(false)
     }
 
     fn kill_group(&mut self) -> Result<(), Error> {
@@ -479,12 +483,15 @@ impl Started {
             .map_err(|source| Error::Trace { source })
     }
 
-    fn checked(&self) -> Result<(), Error> {
+    /// Checks its trace. A program killed may have died before strace
+    /// began its trace, leaving none; one that `exited` by itself ran
+    /// under the trace, so a missing trace fails it.
+    fn checked(&self, exited: bool) -> Result<(), Error> {
         if self.confinement.mode == Mode::Unconfined {
             return Ok(());
         }
         let trace = match fs::read_to_string(&self.trace) {
-            Err(e) if e.kind() == io::ErrorKind::NotFound => Ok(String::new()),
+            Err(e) if !exited && e.kind() == io::ErrorKind::NotFound => Ok(String::new()),
             read => read,
         };
         let quiet = Output {
@@ -591,25 +598,80 @@ fn mode(
     }
 }
 
-/// Whether this machine can confine: `true` runs in the namespace
-/// under the trace.
+/// The oldest strace the trace runs on: the first with `--seccomp-bpf`.
+pub const STRACE_MINIMUM: (u32, u32) = (5, 3);
+
+/// The program the preflight runs confined: a subshell it forks opens a
+/// TCP socket, so the trace must follow a child to see it, and it exits
+/// 0 whatever became of the socket. Were the socket let through, its
+/// connect would find the namespace's loopback down, so even a trace
+/// that fails nothing sends nothing anywhere.
+const PREFLIGHT_PROBE: [&str; 3] = [
+    "bash",
+    "-c",
+    "exec 2>/dev/null; (true < /dev/tcp/127.0.0.1/9); exit 0",
+];
+
+/// Whether this machine can confine: strace is new enough, and a
+/// socket the probe opens in the namespace under the trace is recorded
+/// and failed.
 fn preflight() -> Result<(), String> {
+    let strace = TRACE[0];
+    let version = Command::new(strace)
+        .arg("-V")
+        .stdin(Stdio::null())
+        .output()
+        .map_err(|e| format!("start {strace}: {e}"))?;
+    strace_new_enough(&String::from_utf8_lossy(&version.stdout))?;
     preflight_with(UNSHARE)
 }
 
-/// [`preflight`] with the namespace tool `unshare`.
+/// Fails unless `version`, what `strace -V` printed, names a version at
+/// least [`STRACE_MINIMUM`].
+fn strace_new_enough(version: &str) -> Result<(), String> {
+    let found = version
+        .split_whitespace()
+        .skip_while(|w| *w != "version")
+        .nth(1)
+        .and_then(|v| {
+            let mut parts = v.split('.').map(str::parse::<u32>);
+            Some((parts.next()?.ok()?, parts.next()?.ok()?))
+        });
+    let (major, minor) = STRACE_MINIMUM;
+    match found {
+        Some(found) if found >= STRACE_MINIMUM => Ok(()),
+        _ => Err(format!(
+            "the trace needs strace {major}.{minor} or later, for --seccomp-bpf; strace -V printed {:?}",
+            version.lines().next().unwrap_or_default()
+        )),
+    }
+}
+
+/// [`preflight`] with the namespace tool `unshare`, the version check
+/// aside.
 fn preflight_with(unshare: &str) -> Result<(), String> {
+    preflight_traced(unshare, &TRACE)
+}
+
+/// [`preflight_with`] under the trace `trace`, up to its output file.
+fn preflight_traced(unshare: &str, trace_args: &[&str]) -> Result<(), String> {
+    let dir = TempDir::new().map_err(|e| format!("make the preflight's trace: {e}"))?;
+    let trace = dir.path().join("trace");
     let mut command = Command::new(unshare);
     command
         .args(NAMESPACE)
-        .args(TRACE)
-        .args(["/dev/null", "--", "true"]);
+        .args(trace_args)
+        .arg(&trace)
+        .arg("--")
+        .args(PREFLIGHT_PROBE);
     let out = command
         .stdin(Stdio::null())
         .output()
         .map_err(|e| format!("start {unshare}: {e}"))?;
     if out.status.success() {
-        return Ok(());
+        let read =
+            fs::read_to_string(&trace).map_err(|e| format!("read the preflight's trace: {e}"))?;
+        return judge_preflight(&read);
     }
     let line: Vec<String> = std::iter::once(command.get_program())
         .chain(command.get_args())
@@ -621,6 +683,23 @@ fn preflight_with(unshare: &str) -> Result<(), String> {
         line.join(" "),
         out.status,
         String::from_utf8_lossy(&out.stderr).trim()
+    ))
+}
+
+/// Fails unless the preflight's `trace` recorded a socket call the trace
+/// failed with an injected `EACCES`: an empty trace, or a socket let
+/// through, would mean the trace confines nothing.
+fn judge_preflight(trace: &str) -> Result<(), String> {
+    let failed = network_calls(trace)
+        .iter()
+        .any(|c| c.starts_with("socket(") && c.contains("EACCES") && c.contains("(INJECTED)"));
+    if failed {
+        return Ok(());
+    }
+
+    Err(format!(
+        "the trace did not fail the preflight's socket; it recorded: {:?}",
+        trace.trim()
     ))
 }
 
