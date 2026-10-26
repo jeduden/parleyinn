@@ -38,7 +38,7 @@ pub fn every_dispatched_agent_is_defined(checkout: &Checkout) -> Vec<String> {
     want.extend(
         FIXED_SPECIALISTS
             .iter()
-            .map(|n| ((*n).to_owned(), SPECIALIST_EFFORT, None)),
+            .map(|(n, _)| ((*n).to_owned(), SPECIALIST_EFFORT, None)),
     );
     match markdown_files(checkout, "docs/srs") {
         Ok(paths) => want.extend(paths.into_iter().filter_map(|path| {
@@ -88,9 +88,12 @@ fn check(checkout: &Checkout, name: &str, effort: &str, names: Option<&str>) -> 
         return Some(format!("{name} runs at effort {has}, want {effort}"));
     }
     if let Some(want) = generalist_of(name) {
-        let named = field("generalist");
-        if named != want {
-            return Some(format!("{name} names generalist {named}, want {want}"));
+        match field("generalist") {
+            "" => return Some(format!("{name} names no generalist, want {want}")),
+            named if named != want => {
+                return Some(format!("{name} names generalist {named}, want {want}"));
+            }
+            _ => {}
         }
     }
     names

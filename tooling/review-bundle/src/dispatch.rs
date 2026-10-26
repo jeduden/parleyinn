@@ -38,22 +38,24 @@ const NON_FUNCTIONAL: &str = "NFR-";
 /// The invariant that ParleyInn never degrades the agent.
 const NEVER_DEGRADES: &str = "I9";
 
-/// Every specialist the dispatch names whatever the tree contains; the
-/// section and domain-model specialists follow their files.
-pub const FIXED_SPECIALISTS: [&str; 13] = [
-    RUST,
-    TOML,
-    SHELL,
-    ACTIONS,
-    GHERKIN,
-    MARKDOWN,
-    CI,
-    UNIT,
-    INTEGRATION,
-    END_TO_END,
-    OFFICER,
-    MODEL_HUB,
-    PERFORMANCE,
+/// Every specialist the dispatch names whatever the tree contains, each
+/// with the generalist that weighs its findings: the single source of
+/// both, so no specialist is listed without its route. The section and
+/// domain-model specialists follow their files.
+pub const FIXED_SPECIALISTS: [(&str, &str); 13] = [
+    (RUST, CODE),
+    (TOML, CODE),
+    (SHELL, CODE),
+    (ACTIONS, CODE),
+    (GHERKIN, SPEC),
+    (MARKDOWN, SPEC),
+    (CI, CODE),
+    (UNIT, CODE),
+    (INTEGRATION, CODE),
+    (END_TO_END, CODE),
+    (OFFICER, SECURITY),
+    (MODEL_HUB, SPEC),
+    (PERFORMANCE, CODE),
 ];
 
 /// Each generalist the review consults, with the specialists whose
@@ -84,17 +86,14 @@ pub const EVERY_CRATE: &str = "*";
 /// a name that is no specialist.
 #[must_use]
 pub fn generalist_of(specialist: &str) -> Option<&'static str> {
-    match specialist {
-        RUST | TOML | SHELL | ACTIONS | CI | UNIT | INTEGRATION | END_TO_END | PERFORMANCE => {
-            Some(CODE)
-        }
-        GHERKIN | MARKDOWN | MODEL_HUB => Some(SPEC),
-        OFFICER => Some(SECURITY),
-        _ if specialist.starts_with("srs-") || specialist.starts_with("domain-model-") => {
-            Some(SPEC)
-        }
-        _ => None,
-    }
+    FIXED_SPECIALISTS
+        .iter()
+        .find(|(name, _)| *name == specialist)
+        .map(|(_, generalist)| *generalist)
+        .or_else(|| {
+            (specialist.starts_with("srs-") || specialist.starts_with("domain-model-"))
+                .then_some(SPEC)
+        })
 }
 
 /// The specialist for the SRS section at `path`: `srs-` and the file's

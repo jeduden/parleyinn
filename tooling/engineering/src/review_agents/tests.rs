@@ -25,7 +25,7 @@ fn files() -> Vec<(String, String)> {
             "Read docs/domain-model/record.md.",
         ),
     ];
-    files.extend(FIXED_SPECIALISTS.iter().map(|n| agent(n, "low", "x")));
+    files.extend(FIXED_SPECIALISTS.iter().map(|(n, _)| agent(n, "low", "x")));
     files.extend(GENERALISTS.iter().map(|n| agent(n, "medium", "x")));
     files
 }
@@ -158,6 +158,6 @@ fn a_specialist_that_names_the_wrong_generalist_is_named() {
     ));
     assert_eq!(
         problems(&f),
-        ["srs-security names generalist , want review-spec"]
+        ["srs-security names no generalist, want review-spec"]
     );
 }

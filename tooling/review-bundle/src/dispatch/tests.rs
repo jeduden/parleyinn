@@ -257,7 +257,7 @@ fn every_specialist_has_one_generalist() {
     ] {
         assert_eq!(generalist_of(specialist), want, "{specialist}");
     }
-    for specialist in FIXED_SPECIALISTS {
-        assert!(generalist_of(specialist).is_some(), "{specialist}");
+    for (specialist, generalist) in FIXED_SPECIALISTS {
+        assert_eq!(generalist_of(specialist), Some(generalist), "{specialist}");
     }
 }
