@@ -36,6 +36,11 @@
 /clippy.toml                  @jeduden
 /deny.toml                    @jeduden
 /codecov.yml                  @jeduden
+
+# The gate data the stakeholder accepts: the benchmark regressions
+# ADR-2610142300 lets through and the recall evaluation's baseline.
+/tooling/benchmark/accepted.txt @jeduden
+/tooling/eval/recall-v1.txt   @jeduden
 /.mdsmith.yml                 @jeduden
 
 # The supply-chain and disclosure policy: every new direct dependency

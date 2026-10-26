@@ -119,10 +119,9 @@ log sink and clock.
 
 ## CI, nightly and release
 
-Every workflow lives in `.github/workflows`. Every action is fixed
-to a commit SHA with its version in a trailing comment. Dependabot
-proposes bumps under the policy in
-[dependabot.yml](../.github/dependabot.yml).
+Every workflow lives in `.github/workflows`. Every action is fixed to a commit
+SHA with its version in a trailing comment. Dependabot proposes bumps under
+the policy in [dependabot.yml](../.github/dependabot.yml).
 
 [ci.yml](../.github/workflows/ci.yml) runs on every push and pull request to
 `main`. It runs every test and scenario, with `HOME` pointed at an empty
@@ -183,7 +182,9 @@ outcome. The post job alone has the reviewer app's key. It runs the
 outcome with no blocking finding, its own or a deterministic one, on the
 reviewed head, with `CI` green there; otherwise it requests changes. It
 posts the same decision as the `review-gate` check.
-[ADR-2609301941](adr/ADR-2609301941-agent-review.md) records why.
+[ADR-2609301941](adr/ADR-2609301941-agent-review.md) records why, and
+[ADR-2610262245](adr/ADR-2610262245-layered-agent-review.md) proposes
+the layers.
 
 Main's protection is committed as a ruleset,
 [main.json](../.github/rulesets/main.json), in GitHub's export format

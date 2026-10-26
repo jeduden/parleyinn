@@ -34,9 +34,10 @@ The words of every invariant are unchanged; three things about their
 form change. Each list marker goes. Each id leaves the bold lead-in
 and becomes the section's heading: `- **I1 — Nothing is lost.** ...`
 becomes `## I1`, then `**Nothing is lost.** ...`. The paragraphs
-reflow. Four files
-include the invariants in full: CLAUDE.md, AGENTS.md, README.md and the
-SRS introduction. They show the same text under ten headings. CLAUDE.md
+reflow. Three files
+include the invariants in full: CLAUDE.md, AGENTS.md and README.md; the
+SRS introduction links to them. They show the same text under ten
+headings. CLAUDE.md
 and AGENTS.md may run to 330 lines to hold them.
 
 ## Alternatives

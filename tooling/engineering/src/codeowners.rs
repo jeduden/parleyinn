@@ -54,6 +54,8 @@ const ENFORCING: &[(&str, &[&str])] = &[
             "crates/*/clippy.toml",
             "crates/*/Cargo.toml",
             "tooling/*/Cargo.toml",
+            "tooling/benchmark/accepted.txt",
+            "tooling/eval/recall-v1.txt",
         ],
     ),
     (
