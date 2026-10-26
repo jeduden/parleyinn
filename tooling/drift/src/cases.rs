@@ -600,8 +600,8 @@ fn review_gate_cases() -> Vec<Case> {
             "ENG-28",
             Injection::replace(
                 REVIEW_WORKFLOW,
-                "            --consulted consulted.json > review.json",
-                "            > review.json",
+                "            --consulted consulted.json --reports",
+                "            --reports",
             ),
             scenario("ENG-28"),
             r#"job post does not run "--consulted consulted.json""#,
