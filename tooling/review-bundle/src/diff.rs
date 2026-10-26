@@ -181,9 +181,10 @@ pub fn mentioned_ids(diff: &str) -> Vec<String> {
 }
 
 /// Every requirement id an added or removed line of a file other than
-/// Markdown names, sorted and each once: code and configuration that
-/// name a row, not prose that quotes one. Lines before any header
-/// belong to no file and are left out.
+/// Markdown or a test names, sorted and each once: code and
+/// configuration that name a row, not prose that quotes one or a test
+/// that takes one as its data. Lines before any header belong to no
+/// file and are left out.
 #[must_use]
 pub fn ids_in_code(diff: &str) -> Vec<String> {
     let mut file: Option<String> = None;
@@ -193,6 +194,8 @@ pub fn ids_in_code(diff: &str) -> Vec<String> {
             file = Some(header(line).map_or_else(|| line.to_owned(), |(_, b)| b));
         } else if let Some(f) = &file
             && !f.ends_with(".md")
+            && !f.ends_with("/tests.rs")
+            && !f.contains("/tests/")
             && (line.starts_with('+') || line.starts_with('-'))
             && !line.starts_with("+++")
             && !line.starts_with("---")

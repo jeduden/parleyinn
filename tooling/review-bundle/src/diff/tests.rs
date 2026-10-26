@@ -143,6 +143,10 @@ diff --git a/crates/pin/src/lib.rs b/crates/pin/src/lib.rs
 +++ b/crates/pin/src/lib.rs
 +// PIN-03 holds
 -// PIN-04 held
+diff --git a/crates/pin/src/lib/tests.rs b/crates/pin/src/lib/tests.rs
++ fixture(\"PIN-05\")
+diff --git a/crates/pin/tests/e2e.rs b/crates/pin/tests/e2e.rs
++ fixture(\"PIN-06\")
 ";
 
     assert_eq!(ids_in_code(diff), ["PIN-03", "PIN-04"]);
