@@ -332,23 +332,24 @@ struct Sources {
 /// is named, so the check never passes without having looked.
 fn rust_sources(checkout: &Checkout, dir: &str) -> Sources {
     let mut found = Sources::default();
-    let entries = match fs::read_dir(checkout.root.join(dir)) {
+    // One read of the directory and all its entries, so an error in
+    // either is the same named problem.
+    let entries = fs::read_dir(checkout.root.join(dir))
+        .and_then(|entries| entries.collect::<Result<Vec<_>, _>>());
+    let entries = match entries {
         Ok(entries) => entries,
         Err(e) => {
             found.unread.push(format!("read {dir}: {e}"));
             return found;
         }
     };
-    let mut names: Vec<(String, bool)> = Vec::new();
-    for entry in entries {
-        match entry {
-            Ok(e) => {
-                let is_dir = e.file_type().is_ok_and(|t| t.is_dir());
-                names.extend(e.file_name().into_string().ok().map(|n| (n, is_dir)));
-            }
-            Err(e) => found.unread.push(format!("read {dir}: {e}")),
-        }
-    }
+    let mut names: Vec<(String, bool)> = entries
+        .iter()
+        .filter_map(|e| {
+            let is_dir = e.file_type().is_ok_and(|t| t.is_dir());
+            Some((e.file_name().into_string().ok()?, is_dir))
+        })
+        .collect();
     names.sort();
     for (name, is_dir) in names {
         let path = if dir.is_empty() {
