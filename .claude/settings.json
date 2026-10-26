@@ -3,7 +3,8 @@
     "mdsmith": {
       "source": {
         "source": "github",
-        "repo": "jeduden/mdsmith"
+        "repo": "jeduden/mdsmith",
+        "ref": "v0.55.1"
       }
     }
   },
