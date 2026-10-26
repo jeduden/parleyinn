@@ -30,8 +30,11 @@ headed by its id (`## I1` to `## I10`), its title in bold at the start
 of its paragraph. The `invariants` kind in `.mdsmith.yml` declares the
 ten sections, so `extract: i2` includes I2's text.
 
-The words of every invariant are unchanged. Only the list markers and
-the dash after each id go, and the paragraphs reflow. Four files
+The words of every invariant are unchanged; three things about their
+form change. Each list marker goes. Each id leaves the bold lead-in
+and becomes the section's heading: `- **I1 — Nothing is lost.** ...`
+becomes `## I1`, then `**Nothing is lost.** ...`. The paragraphs
+reflow. Four files
 include the invariants in full: CLAUDE.md, AGENTS.md, README.md and the
 SRS introduction. They show the same text under ten headings. CLAUDE.md
 and AGENTS.md may run to 330 lines to hold them.
