@@ -14,12 +14,23 @@ effort: medium
 You weigh the code a pull request changes: the Rust, its tests, and
 the build and CI configuration. These specialists report to you:
 
-- the languages: `lang-rust`, `lang-toml`, `lang-shell` and
-  `lang-github-actions`;
-- the pipelines: `ci-engineer`;
-- the budgets: `performance`;
-- the test layers: `test-engineer-unit`, `test-engineer-integration`
-  and `test-engineer-end-to-end`.
+<?catalog
+glob: "*.md"
+where: 'generalist: "review-code"'
+sort: name
+header: ""
+row: "- [`{name}`]({filename})"
+?>
+- [`ci-engineer`](ci-engineer.md)
+- [`lang-github-actions`](lang-github-actions.md)
+- [`lang-rust`](lang-rust.md)
+- [`lang-shell`](lang-shell.md)
+- [`lang-toml`](lang-toml.md)
+- [`performance`](performance.md)
+- [`test-engineer-end-to-end`](test-engineer-end-to-end.md)
+- [`test-engineer-integration`](test-engineer-integration.md)
+- [`test-engineer-unit`](test-engineer-unit.md)
+<?/catalog?>
 
 ## What you weigh
 

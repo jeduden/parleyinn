@@ -1,9 +1,12 @@
 use super::*;
 
 fn agent(name: &str, effort: &str, body: &str) -> (String, String) {
+    let generalist = generalist_of(name)
+        .map(|g| format!("generalist: {g}\n"))
+        .unwrap_or_default();
     (
         format!("{AGENTS}/{name}.md"),
-        format!("---\nname: {name}\ndescription: d\neffort: {effort}\n---\n{body}\n"),
+        format!("---\nname: {name}\ndescription: d\neffort: {effort}\n{generalist}---\n{body}\n"),
     )
 }
 
@@ -120,7 +123,8 @@ fn the_front_matter_reads_quoted_values_and_only_its_own_block() {
     let mut f = without("lang-toml");
     f.push((
         format!("{AGENTS}/lang-toml.md"),
-        "---\nname: \"lang-toml\"\neffort: 'low'\n---\nname: other\n".to_owned(),
+        "---\nname: \"lang-toml\"\neffort: 'low'\ngeneralist: \"review-code\"\n---\nname: other\n"
+            .to_owned(),
     ));
     assert_eq!(problems(&f), Vec::<String>::new());
 
@@ -132,5 +136,28 @@ fn the_front_matter_reads_quoted_values_and_only_its_own_block() {
     assert_eq!(
         problems(&f),
         ["lang-toml's front matter does not read: no front matter"]
+    );
+}
+
+#[test]
+fn a_specialist_that_names_the_wrong_generalist_is_named() {
+    let mut f = without("lang-rust");
+    f.push((
+        format!("{AGENTS}/lang-rust.md"),
+        "---\nname: lang-rust\neffort: low\ngeneralist: review-spec\n---\n".to_owned(),
+    ));
+    assert_eq!(
+        problems(&f),
+        ["lang-rust names generalist review-spec, want review-code"]
+    );
+
+    let mut f = without("srs-security");
+    f.push((
+        format!("{AGENTS}/srs-security.md"),
+        "---\nname: srs-security\neffort: low\n---\ndocs/srs/06-security.md\n".to_owned(),
+    ));
+    assert_eq!(
+        problems(&f),
+        ["srs-security names generalist , want review-spec"]
     );
 }

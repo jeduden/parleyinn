@@ -233,3 +233,31 @@ fn a_non_functional_row_or_one_tracing_i9_brings_the_performance_specialist() {
         assert_eq!(got[CODE], names(&[PERFORMANCE]), "{}", row.id);
     }
 }
+
+#[test]
+fn every_specialist_has_one_generalist() {
+    for (specialist, want) in [
+        ("lang-rust", Some(CODE)),
+        ("lang-toml", Some(CODE)),
+        ("lang-shell", Some(CODE)),
+        ("lang-github-actions", Some(CODE)),
+        ("ci-engineer", Some(CODE)),
+        ("performance", Some(CODE)),
+        ("test-engineer-unit", Some(CODE)),
+        ("test-engineer-integration", Some(CODE)),
+        ("test-engineer-end-to-end", Some(CODE)),
+        ("lang-gherkin", Some(SPEC)),
+        ("lang-markdown", Some(SPEC)),
+        ("domain-model-hub", Some(SPEC)),
+        ("domain-model-record", Some(SPEC)),
+        ("srs-security", Some(SPEC)),
+        ("persona-security-officer", Some(SECURITY)),
+        ("review-code", None),
+        ("persona-agent", None),
+    ] {
+        assert_eq!(generalist_of(specialist), want, "{specialist}");
+    }
+    for specialist in FIXED_SPECIALISTS {
+        assert!(generalist_of(specialist).is_some(), "{specialist}");
+    }
+}

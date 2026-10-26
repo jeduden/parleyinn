@@ -271,10 +271,10 @@ What `review-bundle` decides, comparing the pull request with main:
 
 One Sonnet agent at low effort orchestrates the review. The bundle
 dispatches, from the changed paths and touched rows, the low-effort
-specialists (`lang-*`, `srs-*`, the domain-model and test-layer
-agents) and the medium-effort generalists (`review-code`,
-`review-spec`, `review-security`) that weigh their findings. The gate
-fails a review whose consulted list lacks a dispatched agent. The class sets
+specialists under [.claude/agents](../.claude/agents) and the
+medium-effort generalist each names in its front matter, which weighs
+their findings. The gate fails a review whose consulted list lacks a
+dispatched agent. The class sets
 the turn budget: light for Markdown outside the stakeholder's paths,
 deep for those paths, the gates and the security-sensitive code.
 The review bundle quotes only the touched rows, their scenarios and

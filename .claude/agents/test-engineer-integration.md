@@ -8,6 +8,7 @@ description: >-
 tools: Read, Grep, Glob
 model: haiku
 effort: low
+generalist: review-code
 ---
 # Test engineer: integration tests
 

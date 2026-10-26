@@ -490,6 +490,16 @@ fn review_agent_cases() -> Vec<Case> {
             "the_checkout_s_review_agents_are_all_defined",
             "lang-rust runs at effort medium, want low",
         ),
+        protection_case(
+            "a specialist naming another generalist than the dispatch",
+            Injection::replace(
+                ".claude/agents/lang-rust.md",
+                "generalist: review-code\n",
+                "generalist: review-spec\n",
+            ),
+            "the_checkout_s_review_agents_are_all_defined",
+            "lang-rust names generalist review-spec, want review-code",
+        ),
     ]
 }
 

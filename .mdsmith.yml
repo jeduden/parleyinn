@@ -217,6 +217,7 @@ kinds:
         tools: '"Read, Grep, Glob"'
         "model?": '=~"^(haiku|sonnet|opus)$"'
         "effort?": '=~"^(low|medium|high)$"'
+        "generalist?": '=~"^review-(code|spec|security)$"'
     rules:
       required-frontmatter:
         fields: [name, description]
@@ -242,6 +243,7 @@ kinds:
         tools: '"Read, Grep, Glob"'
         "model?": '=~"^(haiku|sonnet|opus)$"'
         "effort?": '=~"^(low|medium|high)$"'
+        "generalist?": '=~"^review-(code|spec|security)$"'
       closed: false
       sections:
         - heading: null

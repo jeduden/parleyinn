@@ -14,7 +14,19 @@ effort: medium
 You weigh the invariants
 [I1](../../docs/srs/invariants.md#i1)–[I10](../../docs/srs/invariants.md#i10)
 and the security requirements as a pull request touches them. Your specialists
-are `persona-security-officer`, and every finding another specialist traced to
+are these:
+
+<?catalog
+glob: "*.md"
+where: 'generalist: "review-security"'
+sort: name
+header: ""
+row: "- [`{name}`]({filename})"
+?>
+- [`persona-security-officer`](persona-security-officer.md)
+<?/catalog?>
+
+You also weigh every finding another specialist traced to
 [I2](../../docs/srs/invariants.md#i2), [I4](../../docs/srs/invariants.md#i4),
 [I6](../../docs/srs/invariants.md#i6) or [I8](../../docs/srs/invariants.md#i8).
 

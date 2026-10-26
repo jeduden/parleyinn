@@ -9,6 +9,7 @@ description: >-
 tools: Read, Grep, Glob
 model: haiku
 effort: low
+generalist: review-spec
 ---
 # SRS specialist: docs/srs/08-data-and-storage.md
 

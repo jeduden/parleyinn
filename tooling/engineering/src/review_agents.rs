@@ -7,7 +7,7 @@
 use std::fs;
 
 use review_bundle::dispatch::{
-    FIXED_SPECIALISTS, GENERALISTS, MODEL, model_specialist, section_specialist,
+    FIXED_SPECIALISTS, GENERALISTS, MODEL, generalist_of, model_specialist, section_specialist,
 };
 
 use crate::Checkout;
@@ -21,7 +21,8 @@ const SPECIALIST_EFFORT: &str = "low";
 const GENERALIST_EFFORT: &str = "medium";
 
 /// Problems with the agents the review bundle can dispatch: one that is
-/// not defined, names itself otherwise, runs at the wrong effort, or,
+/// not defined, names itself otherwise, runs at the wrong effort, names
+/// another generalist than the dispatch routes it to, or,
 /// for a section or domain-model specialist, does not name its file.
 /// A directory of sections or model files that cannot be read is named,
 /// so the check never passes without having looked.
@@ -85,6 +86,12 @@ fn check(checkout: &Checkout, name: &str, effort: &str, names: Option<&str>) -> 
     let has = field("effort");
     if has != effort {
         return Some(format!("{name} runs at effort {has}, want {effort}"));
+    }
+    if let Some(want) = generalist_of(name) {
+        let named = field("generalist");
+        if named != want {
+            return Some(format!("{name} names generalist {named}, want {want}"));
+        }
     }
     names
         .filter(|file| !text.contains(file))

@@ -7,6 +7,7 @@ description: >-
 tools: Read, Grep, Glob
 model: haiku
 effort: low
+generalist: review-code
 ---
 # Language specialist: Shell
 

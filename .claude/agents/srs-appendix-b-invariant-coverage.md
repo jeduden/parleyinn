@@ -9,6 +9,7 @@ description: >-
 tools: Read, Grep, Glob
 model: haiku
 effort: low
+generalist: review-spec
 ---
 # SRS specialist: docs/srs/appendix-b-invariant-coverage.md
 

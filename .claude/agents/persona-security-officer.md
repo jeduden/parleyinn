@@ -6,6 +6,7 @@ description: >-
 tools: Read, Grep, Glob
 model: haiku
 effort: low
+generalist: review-security
 ---
 # Persona: security officer
 

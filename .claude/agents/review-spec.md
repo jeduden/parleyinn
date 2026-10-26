@@ -12,9 +12,19 @@ effort: medium
 # Review generalist: specification
 
 You weigh the SRS, the scenarios, the decision records and the domain
-model as a pull request changes them or the code it builds. Your
-specialists are the SRS section specialists (`srs-*`), the domain-model
-specialists (`domain-model-*`), `lang-gherkin` and `lang-markdown`.
+model. Each SRS section has its specialist (`srs-*`), and so does each
+domain-model file (`domain-model-*`). These report to you as well:
+
+<?catalog
+glob: "*.md"
+where: 'generalist: "review-spec", name: !~"^(srs|domain-model)-"'
+sort: name
+header: ""
+row: "- [`{name}`]({filename})"
+?>
+- [`lang-gherkin`](lang-gherkin.md)
+- [`lang-markdown`](lang-markdown.md)
+<?/catalog?>
 
 ## What you weigh
 

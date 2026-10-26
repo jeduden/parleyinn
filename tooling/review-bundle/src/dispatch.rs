@@ -79,6 +79,24 @@ const REACH_TEST: &str = "tests/reach.rs";
 /// when main's ENG-11 row names none the analysis can read.
 pub const EVERY_CRATE: &str = "*";
 
+/// The generalist that weighs `specialist`'s findings, the single source
+/// of the routing the agents' `generalist` front matter repeats. None for
+/// a name that is no specialist.
+#[must_use]
+pub fn generalist_of(specialist: &str) -> Option<&'static str> {
+    match specialist {
+        RUST | TOML | SHELL | ACTIONS | CI | UNIT | INTEGRATION | END_TO_END | PERFORMANCE => {
+            Some(CODE)
+        }
+        GHERKIN | MARKDOWN | MODEL_HUB => Some(SPEC),
+        OFFICER => Some(SECURITY),
+        _ if specialist.starts_with("srs-") || specialist.starts_with("domain-model-") => {
+            Some(SPEC)
+        }
+        _ => None,
+    }
+}
+
 /// The specialist for the SRS section at `path`: `srs-` and the file's
 /// name without its leading section number. None for a path that is
 /// not a section file.
@@ -135,29 +153,31 @@ pub fn dispatch(
     security_crates: &[String],
 ) -> Dispatch {
     let mut out = Dispatch::new();
-    let mut add = |generalist: &str, specialist: &str| {
-        out.entry(generalist.to_owned())
-            .or_default()
-            .insert(specialist.to_owned());
+    let mut add = |specialist: &str| {
+        if let Some(generalist) = generalist_of(specialist) {
+            out.entry(generalist.to_owned())
+                .or_default()
+                .insert(specialist.to_owned());
+        }
     };
     for path in paths {
-        for (generalist, specialist) in by_path(path, security_crates) {
-            add(generalist, &specialist);
+        for specialist in by_path(path, security_crates) {
+            add(&specialist);
         }
     }
     for row in rows {
         if let Some(section) = row.path.to_str().and_then(section_specialist) {
-            add(SPEC, &section);
+            add(&section);
         }
         if row
             .traces
             .iter()
             .any(|t| SECURITY_INVARIANTS.contains(&t.as_str()))
         {
-            add(SECURITY, OFFICER);
+            add(OFFICER);
         }
         if row.id.starts_with(NON_FUNCTIONAL) || row.traces.iter().any(|t| t == NEVER_DEGRADES) {
-            add(CODE, PERFORMANCE);
+            add(PERFORMANCE);
         }
     }
 
@@ -175,9 +195,9 @@ pub fn agents(dispatch: &Dispatch) -> BTreeSet<String> {
         .collect()
 }
 
-/// The generalist and specialist pairs one changed `path` brings.
-fn by_path(path: &str, security_crates: &[String]) -> Vec<(&'static str, String)> {
-    let mut out: Vec<(&'static str, String)> = Vec::new();
+/// The specialists one changed `path` brings.
+fn by_path(path: &str, security_crates: &[String]) -> Vec<String> {
+    let mut out: Vec<String> = Vec::new();
     let ext = Path::new(path)
         .extension()
         .and_then(|e| e.to_str())
@@ -185,35 +205,35 @@ fn by_path(path: &str, security_crates: &[String]) -> Vec<(&'static str, String)
     let workflow = path.starts_with(".github/workflows/") || path.starts_with(".github/actions/");
     match ext {
         "rs" => {
-            out.push((CODE, RUST.to_owned()));
-            out.push((CODE, test_layer(path).to_owned()));
+            out.push(RUST.to_owned());
+            out.push(test_layer(path).to_owned());
         }
-        "toml" | "lock" => out.push((CODE, TOML.to_owned())),
-        "sh" => out.push((CODE, SHELL.to_owned())),
+        "toml" | "lock" => out.push(TOML.to_owned()),
+        "sh" => out.push(SHELL.to_owned()),
         "yml" | "yaml" if workflow => {
-            out.push((CODE, ACTIONS.to_owned()));
-            out.push((CODE, CI.to_owned()));
+            out.push(ACTIONS.to_owned());
+            out.push(CI.to_owned());
         }
         "feature" => {
-            out.push((SPEC, GHERKIN.to_owned()));
-            out.push((SPEC, MODEL_HUB.to_owned()));
-            out.push((CODE, END_TO_END.to_owned()));
+            out.push(GHERKIN.to_owned());
+            out.push(MODEL_HUB.to_owned());
+            out.push(END_TO_END.to_owned());
         }
-        "md" => out.push((SPEC, MARKDOWN.to_owned())),
+        "md" => out.push(MARKDOWN.to_owned()),
         _ => {}
     }
     if let Some(section) = section_specialist(path) {
-        out.push((SPEC, section));
-        out.push((SPEC, MODEL_HUB.to_owned()));
+        out.push(section);
+        out.push(MODEL_HUB.to_owned());
     }
     if let Some(file) = path.strip_prefix(MODEL).and_then(|f| f.strip_suffix(".md")) {
-        out.extend(model_specialist(file).map(|s| (SPEC, s)));
+        out.extend(model_specialist(file));
     }
     if BENCHMARKS.iter().any(|b| path.starts_with(b)) || (ext == "rs" && product_code(path)) {
-        out.push((CODE, PERFORMANCE.to_owned()));
+        out.push(PERFORMANCE.to_owned());
     }
     if path == INVARIANTS || security_code(path, security_crates) {
-        out.push((SECURITY, OFFICER.to_owned()));
+        out.push(OFFICER.to_owned());
     }
 
     out
