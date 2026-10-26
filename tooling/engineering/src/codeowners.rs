@@ -58,7 +58,13 @@ const ENFORCING: &[(&str, &[&str])] = &[
     ),
     (
         "the agent instructions",
-        &["CLAUDE.md", "AGENTS.md", ".claude/"],
+        &[
+            "CLAUDE.md",
+            "AGENTS.md",
+            ".claude/",
+            "docs/agents/",
+            "docs/personas/",
+        ],
     ),
     ("`CODEOWNERS` itself", &[".github/CODEOWNERS"]),
 ];

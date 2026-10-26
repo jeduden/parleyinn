@@ -44,7 +44,9 @@
 /SECURITY.md                  @jeduden
 /DEPENDENCIES.md              @jeduden
 
-# The agent instructions.
+# The agent instructions, and the shared sections they include.
 /CLAUDE.md                    @jeduden
 /AGENTS.md                    @jeduden
 /.claude/                     @jeduden
+/docs/agents/                 @jeduden
+/docs/personas/               @jeduden
