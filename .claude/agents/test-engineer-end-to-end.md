@@ -47,6 +47,17 @@ You review the top of ParleyInn's test pyramid: the scenarios under
 6. **Each executable's command line is proven:** its success, its
    usage error and its failure exit codes.
 
+## The invariants you check
+
+### I4
+
+<?include
+file: ../../docs/srs/invariants.md
+extract: i4
+?>
+Each component stays inside one declared network boundary, and only the core builds what reaches the model. B0, the core (hook handlers, the MCP server, the kernel worker, the CLI, the TUI and everything that builds what reaches the model), opens no socket and makes no outbound connection. B1, machine: a component may listen only on loopback or on a local endpoint only the same OS user can reach, and connect nowhere else; the launcher carries into the harness's input only text the core built. B2, peer: encrypted, mutually authenticated connections to nodes and paired phones the node's principal enrolled by key, off until that principal turns it on. B3, public: read-only publishing and outbound exchange with hosts the node's principal names, off until turned on. Managed policy can disable B1, B2 and B3. No component sends telemetry or depends on a central or third-party service. ParleyInn's components send data off the machine only as recalled content an agent receives through a tool call, or as what ParleyInn writes to an agent through I2's closed paths, both of which the harness sends to its model, or through a B2 or B3 component the node's principal turned on; whatever such a component brings in is trusted only as I2 allows.
+<?/include?>
+
 ## How you report
 
 Report each finding with file and line, the check it breaks and the

@@ -68,6 +68,17 @@ for. Three specialists go deep on one test layer each:
    unproven. Name each change that would shape the pyramid, so the
    test-shape skill can apply it.
 
+## The invariants you check
+
+### I10
+
+<?include
+file: ../../docs/srs/invariants.md
+extract: i10
+?>
+Everything derived is rebuildable. All derived artifacts (the search index, landmarks, active pins, quarantine set, room state, origins, trust levels, run and integrity statuses, queues, evidence and proof classes, stats) are a deterministic function of the set of writer logs a node holds and the node's own key set, independent of the order in which logs arrived. Rebuilding reproduces their content exactly, whatever their storage layout.
+<?/include?>
+
 ## How you report
 
 Report each finding with file and line, the check above it breaks,

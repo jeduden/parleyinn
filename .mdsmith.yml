@@ -81,6 +81,53 @@ kinds:
       paragraph-readability: false
       required-frontmatter:
         fields: [summary]
+  invariants:
+    # The ten invariants, one section each, so an agent includes exactly
+    # the invariants it cites with `extract: i<n>` (I2 as i2). The SRS
+    # kind's rules apply first; this one adds the structure.
+    rules:
+      table-readability: false
+      paragraph-readability: false
+      required-frontmatter:
+        fields: [summary]
+      required-structure:
+        inline-schema:
+          frontmatter:
+            title: string
+            summary: string
+          closed: true
+          sections:
+            - heading: null
+            - heading: { regex: 'I1' }
+              content:
+                - kind: paragraph
+            - heading: { regex: 'I2' }
+              content:
+                - kind: paragraph
+            - heading: { regex: 'I3' }
+              content:
+                - kind: paragraph
+            - heading: { regex: 'I4' }
+              content:
+                - kind: paragraph
+            - heading: { regex: 'I5' }
+              content:
+                - kind: paragraph
+            - heading: { regex: 'I6' }
+              content:
+                - kind: paragraph
+            - heading: { regex: 'I7' }
+              content:
+                - kind: paragraph
+            - heading: { regex: 'I8' }
+              content:
+                - kind: paragraph
+            - heading: { regex: 'I9' }
+              content:
+                - kind: paragraph
+            - heading: { regex: 'I10' }
+              content:
+                - kind: paragraph
   doc:
     # Every other doc carries the one-line summary the CLAUDE.md
     # catalog lists, so an agent reads the index and opens only what
@@ -331,6 +378,8 @@ kind-assignment:
     kinds: [adr]
   - glob: ["docs/srs/*.md"]
     kinds: [srs]
+  - glob: ["docs/srs/invariants.md"]
+    kinds: [invariants]
   - glob: [".claude/skills/*/SKILL.md"]
     kinds: [skill]
   - glob: [".claude/agents/*.md"]
@@ -349,6 +398,13 @@ kind-assignment:
     kinds: [phase-record]
 
 overrides:
+  # The agent instructions include the ten invariants in full, one
+  # section each, which the default length leaves no room for.
+  - glob: ["CLAUDE.md", "AGENTS.md"]
+    rules:
+      max-file-length:
+        max: 330
+
   # A plan folder's companion files (research, fixtures, diagrams) are
   # freeform; plan.md keeps the plan kind and its full checks, and
   # phase-N.md/phase-N.result.md keep their own kinds above, so both

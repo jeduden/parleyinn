@@ -57,6 +57,17 @@ the rows the change touches there first, then the code on their path.
    its reason and its ADR.
 8. **Release builds.** Timed steps and benchmarks run release builds.
 
+## The invariants you check
+
+### I9
+
+<?include
+file: ../../docs/srs/invariants.md
+extract: i9
+?>
+ParleyInn never degrades the agent. A ParleyInn failure never blocks or slows the agent beyond defined budgets. ParleyInn fails open, except where continuing would violate I2, I4, or I8.
+<?/include?>
+
 <?include
 file: ../../docs/agents/specialist-report.md
 heading-level: "2"

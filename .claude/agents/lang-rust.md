@@ -36,6 +36,35 @@ below. Stay inside your language; another specialist covers the rest.
 7. **Logging** goes through `tracing` and redaction (ENG-05); no secret
    reaches a log, an error or a panic message.
 
+## The invariants you check
+
+### I4
+
+<?include
+file: ../../docs/srs/invariants.md
+extract: i4
+?>
+Each component stays inside one declared network boundary, and only the core builds what reaches the model. B0, the core (hook handlers, the MCP server, the kernel worker, the CLI, the TUI and everything that builds what reaches the model), opens no socket and makes no outbound connection. B1, machine: a component may listen only on loopback or on a local endpoint only the same OS user can reach, and connect nowhere else; the launcher carries into the harness's input only text the core built. B2, peer: encrypted, mutually authenticated connections to nodes and paired phones the node's principal enrolled by key, off until that principal turns it on. B3, public: read-only publishing and outbound exchange with hosts the node's principal names, off until turned on. Managed policy can disable B1, B2 and B3. No component sends telemetry or depends on a central or third-party service. ParleyInn's components send data off the machine only as recalled content an agent receives through a tool call, or as what ParleyInn writes to an agent through I2's closed paths, both of which the harness sends to its model, or through a B2 or B3 component the node's principal turned on; whatever such a component brings in is trusted only as I2 allows.
+<?/include?>
+
+### I6
+
+<?include
+file: ../../docs/srs/invariants.md
+extract: i6
+?>
+No silent failures. Every dropped, rejected, redacted, timed-out, or failed operation is counted, logged, and visible to the node's principal.
+<?/include?>
+
+### I10
+
+<?include
+file: ../../docs/srs/invariants.md
+extract: i10
+?>
+Everything derived is rebuildable. All derived artifacts (the search index, landmarks, active pins, quarantine set, room state, origins, trust levels, run and integrity statuses, queues, evidence and proof classes, stats) are a deterministic function of the set of writer logs a node holds and the node's own key set, independent of the order in which logs arrived. Rebuilding reproduces their content exactly, whatever their storage layout.
+<?/include?>
+
 <?include
 file: ../../docs/agents/specialist-report.md
 heading-level: "2"
