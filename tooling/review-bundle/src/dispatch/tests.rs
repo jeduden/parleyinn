@@ -174,8 +174,77 @@ fn a_model_file_whose_name_is_no_agent_name_brings_only_the_hub() {
 
 #[test]
 fn a_path_no_specialist_reads_dispatches_nothing() {
-    assert!(of(&["testdata/a.json", "LICENSE"]).is_empty());
+    assert!(of(&["testdata/a.json", "LICENSE", "plan/x/spike.go"]).is_empty());
     assert!(of(&[]).is_empty());
+}
+
+#[test]
+fn json_and_yaml_configuration_route_to_their_specialists() {
+    assert_eq!(
+        of(&[".taplo/schemas/cargo.json"])[CODE],
+        names(&["lang-json"])
+    );
+    assert_eq!(of(&["codecov.yml"])[CODE], names(&["lang-yaml"]));
+    assert_eq!(of(&[".github/dependabot.yml"])[CODE], names(&["lang-yaml"]));
+    assert_eq!(of(&["fuzz/corpus/a/b.json"]), Dispatch::new());
+}
+
+#[test]
+fn the_files_that_govern_approval_bring_the_officer_and_ci() {
+    for path in [
+        ".github/CODEOWNERS",
+        ".github/rulesets/main.json",
+        ".claude/settings.json",
+    ] {
+        let got = of(&[path]);
+        assert_eq!(got[SECURITY], names(&[OFFICER]), "{path}");
+        assert!(got[CODE].contains(CI), "{path}");
+    }
+}
+
+#[test]
+fn a_language_is_named_for_source_and_configuration_alone() {
+    for (path, want) in [
+        ("a/b.rs", Some(RUST)),
+        ("Cargo.lock", Some(TOML)),
+        ("scripts/a.sh", Some(SHELL)),
+        (".github/workflows/ci.yml", Some(ACTIONS)),
+        (".github/actions/x/action.yml", Some(ACTIONS)),
+        (".mdsmith.yml", Some(YAML)),
+        ("x.yaml", Some(YAML)),
+        ("features/a.feature", Some(GHERKIN)),
+        ("README.md", Some(MARKDOWN)),
+        (".claude/settings.json", Some(JSON)),
+        ("testdata/a.json", None),
+        ("plan/a/b.md", Some(MARKDOWN)),
+        ("plan/a/spike.go", None),
+        ("LICENSE", None),
+    ] {
+        assert_eq!(language_specialist(path), want, "{path}");
+    }
+}
+
+#[test]
+fn only_source_and_configuration_outside_the_data_needs_a_language() {
+    for (path, want) in [
+        ("a/b.rs", true),
+        ("x.go", true),
+        (".env", true),
+        ("testdata/a.json", false),
+        ("fuzz/corpus/a/seed", false),
+        ("research/notes/a.py", false),
+        ("plan/a/spike.go", false),
+        ("LICENSE", false),
+        ("licenses/x/THIRD_PARTY_LICENSES", false),
+        (".github/CODEOWNERS", false),
+        ("tooling/eval/recall-v1.txt", false),
+        ("scripts/mise.sha256", false),
+        (".gitignore", false),
+        ("fuzz/.gitignore", false),
+        (".gitattributes", false),
+    ] {
+        assert_eq!(needs_a_language(path), want, "{path}");
+    }
 }
 
 #[test]

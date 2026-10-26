@@ -34,6 +34,8 @@ const SHELL: &str = "lang-shell";
 const ACTIONS: &str = "lang-github-actions";
 const GHERKIN: &str = "lang-gherkin";
 const MARKDOWN: &str = "lang-markdown";
+const JSON: &str = "lang-json";
+const YAML: &str = "lang-yaml";
 const CI: &str = "ci-engineer";
 const UNIT: &str = "test-engineer-unit";
 const INTEGRATION: &str = "test-engineer-integration";
@@ -43,6 +45,20 @@ pub const PERFORMANCE: &str = "performance";
 /// The benchmark and calibration tooling, which the performance
 /// specialist reads whatever the file's language.
 const BENCHMARKS: [&str; 2] = ["tooling/benchmark/", "tooling/calibrate/"];
+/// The fixtures, corpora, research notes and spikes: data, whose files
+/// no language specialist reads, Markdown aside.
+pub const DATA_ROOTS: [&str; 4] = ["testdata/", "fuzz/corpus/", "research/", "plan/"];
+/// The files written in no language: license texts, lists, checksums
+/// and git's own files, by extension or by name.
+const PLAIN_TEXT: [&str; 4] = ["txt", "sha256", "gitignore", "gitattributes"];
+const PLAIN_NAMES: [&str; 3] = ["LICENSE", "THIRD_PARTY_LICENSES", "CODEOWNERS"];
+/// The files that decide who approves what and what the agents load:
+/// the officer and the CI engineer read them whatever their language.
+const GOVERNANCE: [&str; 3] = [
+    ".github/CODEOWNERS",
+    ".github/rulesets/",
+    ".claude/settings.json",
+];
 /// The prefix of the non-functional requirements, which set the budgets.
 const NON_FUNCTIONAL: &str = "NFR-";
 /// The invariant that ParleyInn never degrades the agent.
@@ -52,9 +68,11 @@ const NEVER_DEGRADES: &str = "I9";
 /// with the generalist that weighs its findings: the single source of
 /// both, so no specialist is listed without its route. The section and
 /// domain-model specialists follow their files.
-pub const FIXED_SPECIALISTS: [(&str, &str); 13] = [
+pub const FIXED_SPECIALISTS: [(&str, &str); 15] = [
     (RUST, CODE),
     (TOML, CODE),
+    (JSON, CODE),
+    (YAML, CODE),
     (SHELL, CODE),
     (ACTIONS, CODE),
     (GHERKIN, SPEC),
@@ -224,29 +242,27 @@ pub fn agents(dispatch: &Dispatch) -> BTreeSet<String> {
 /// The specialists one changed `path` brings.
 fn by_path(path: &str, security_crates: &[String]) -> Vec<String> {
     let mut out: Vec<String> = Vec::new();
-    let ext = Path::new(path)
-        .extension()
-        .and_then(|e| e.to_str())
-        .unwrap_or("");
-    let workflow = path.starts_with(".github/workflows/") || path.starts_with(".github/actions/");
-    match ext {
-        "rs" => {
+    let ext = extension(path);
+    match language_specialist(path) {
+        Some(RUST) => {
             out.push(RUST.to_owned());
             out.push(test_layer(path).to_owned());
         }
-        "toml" | "lock" => out.push(TOML.to_owned()),
-        "sh" => out.push(SHELL.to_owned()),
-        "yml" | "yaml" if workflow => {
+        Some(ACTIONS) => {
             out.push(ACTIONS.to_owned());
             out.push(CI.to_owned());
         }
-        "feature" => {
+        Some(GHERKIN) => {
             out.push(GHERKIN.to_owned());
             out.push(MODEL_HUB.to_owned());
             out.push(END_TO_END.to_owned());
         }
-        "md" => out.push(MARKDOWN.to_owned()),
-        _ => {}
+        Some(language) => out.push(language.to_owned()),
+        None => {}
+    }
+    if GOVERNANCE.iter().any(|g| path.starts_with(g)) {
+        out.push(OFFICER.to_owned());
+        out.push(CI.to_owned());
     }
     if let Some(section) = section_specialist(path) {
         out.push(section);
@@ -263,6 +279,51 @@ fn by_path(path: &str, security_crates: &[String]) -> Vec<String> {
     }
 
     out
+}
+
+/// The language specialist for the file at `path`: by its extension,
+/// workflows apart from other YAML. None for a file in no language the
+/// specialists read, and for data under [`DATA_ROOTS`], Markdown aside.
+#[must_use]
+pub fn language_specialist(path: &str) -> Option<&'static str> {
+    let ext = extension(path);
+    if ext == "md" {
+        return Some(MARKDOWN);
+    }
+    if DATA_ROOTS.iter().any(|d| path.starts_with(d)) {
+        return None;
+    }
+    let workflow = path.starts_with(".github/workflows/") || path.starts_with(".github/actions/");
+    match ext {
+        "rs" => Some(RUST),
+        "toml" | "lock" => Some(TOML),
+        "sh" => Some(SHELL),
+        "yml" | "yaml" if workflow => Some(ACTIONS),
+        "yml" | "yaml" => Some(YAML),
+        "json" => Some(JSON),
+        "feature" => Some(GHERKIN),
+        _ => None,
+    }
+}
+
+/// Whether the file at `path` is source or configuration, which ENG-28
+/// wants a language specialist for: anything outside [`DATA_ROOTS`]
+/// that is not plain text.
+#[must_use]
+pub fn needs_a_language(path: &str) -> bool {
+    let name = path.rsplit('/').next().unwrap_or(path);
+    !DATA_ROOTS.iter().any(|d| path.starts_with(d))
+        && !PLAIN_NAMES.contains(&name)
+        && !PLAIN_TEXT.contains(&extension(path))
+}
+
+/// The extension of the file at `path`, or of a dot file its name.
+fn extension(path: &str) -> &str {
+    Path::new(path)
+        .extension()
+        .or_else(|| Path::new(path).file_name())
+        .and_then(|e| e.to_str())
+        .map_or("", |e| e.trim_start_matches('.'))
 }
 
 /// The test-layer specialist for a Rust file at `path`.

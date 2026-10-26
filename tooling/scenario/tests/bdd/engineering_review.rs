@@ -58,6 +58,13 @@ fn key_job_posts_check(w: &mut World, check: String) -> Result<(), String> {
 }
 
 #[then(
+    regex = r"^every language the repository's source and configuration are written in has its specialist$"
+)]
+fn every_language_has_its_specialist(w: &mut World) -> Result<(), String> {
+    outcome(engineering::review_languages::every_language_has_its_specialist(eng(w).checkout()?))
+}
+
+#[then(
     regex = r"^every agent the review bundle can dispatch is defined, specialists at low effort, generalists at medium and their deep instances on opus at high effort with 40 turns$"
 )]
 fn review_agents_defined(w: &mut World) -> Result<(), String> {

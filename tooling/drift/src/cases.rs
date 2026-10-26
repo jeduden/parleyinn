@@ -502,6 +502,12 @@ fn review_agent_cases() -> Vec<Case> {
             "lang-rust runs at effort medium, want low",
         ),
         protection_case(
+            "a language no review specialist reads",
+            Injection::create("scripts/rogue.py", "print()\n"),
+            "the_checkout_s_languages_each_have_their_specialist",
+            "scripts/rogue.py is in no language a review specialist reads",
+        ),
+        protection_case(
             "a deep review's generalist run on a weaker model",
             Injection::replace(
                 ".claude/agents/review-code-deep.md",

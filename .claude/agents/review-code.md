@@ -17,8 +17,7 @@ heading-level: "absolute"
 ?>
 ## Your scope
 
-You weigh the code a pull request changes: the Rust, its tests, and
-the build and CI configuration. These specialists report to you:
+You weigh the code, its tests and the build and CI configuration, from:
 
 <?catalog
 source-dir: "docs/agents"
@@ -30,9 +29,11 @@ row: "- [`{name}`](../../docs/agents/{filename})"
 ?>
 - [`ci-engineer`](ci-engineer.md)
 - [`lang-github-actions`](lang-github-actions.md)
+- [`lang-json`](lang-json.md)
 - [`lang-rust`](lang-rust.md)
 - [`lang-shell`](lang-shell.md)
 - [`lang-toml`](lang-toml.md)
+- [`lang-yaml`](lang-yaml.md)
 - [`performance`](performance.md)
 - [`test-engineer-end-to-end`](test-engineer-end-to-end.md)
 - [`test-engineer-integration`](test-engineer-integration.md)
@@ -46,9 +47,8 @@ row: "- [`{name}`](../../docs/agents/{filename})"
 - Do errors keep their cause, blocking calls take a deadline, and I/O
   sit behind a seam a test injects
   ([ENG-03, ENG-04](../../docs/srs/10-engineering-quality.md))?
-- Does the change stay inside its budgets, grow no worse than
-  `O(n log n)` in the store's size, add no costly crossing to a
-  budgeted call's path, and keep its benchmark?
+- Does it stay inside its budgets, grow no worse than `O(n log n)` in
+  the store's size, and keep its benchmark?
 - Does CI build fast and fail with output that tells the author what to do?
 
 <?include

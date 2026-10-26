@@ -248,3 +248,12 @@ fn the_checkout_s_rulesets_each_name_themselves_their_target_and_refs() {
     );
     assert_eq!(names, ["main", "no-other-tags-allowed", "releases-semver"]);
 }
+
+/// Every language the checkout's source and configuration are written
+/// in has its review specialist (ENG-28).
+#[test]
+fn the_checkout_s_languages_each_have_their_specialist() {
+    let problems = engineering::review_languages::every_language_has_its_specialist(&checkout());
+
+    assert!(problems.is_empty(), "{}", problems.join("\n"));
+}
