@@ -27,12 +27,16 @@ below. Stay inside your language; another specialist covers the rest.
 5. **Agent instructions** direct no destructive command at
    non-isolated state, and change only with the stakeholder.
 
+<?include
+file: ../../docs/agents/specialist-report.md
+heading-level: "2"
+?>
 ## How you report
 
 You are a specialist: the review's orchestrator hands your findings to
-a generalist, who weighs them. Read only the files the diff touches in
-your language and what they name. Report each finding on one line:
-`path:line — blocking|nit — the rule it breaks — the ids it touches`,
-`blocking` when it breaks a rule here or masks a bug, `nit` otherwise.
-Report `none` when you find nothing. You give no verdict and never
-approve.
+a generalist, who weighs them. Report each finding on one line:
+`path:line — blocking|nit — what it breaks — the ids it touches`.
+Mark it `blocking` when it breaks a check above or masks a bug, `nit`
+otherwise. Report `none` when you find nothing. You give no verdict and
+never approve.
+<?/include?>

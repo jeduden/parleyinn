@@ -19,6 +19,10 @@ once; you go deep on this one file. Take every concept from the file as
 it stands when you review. These instructions name none of them, so they
 stay true whatever it says.
 
+<?include
+file: ../../docs/agents/model-specialist-consulted.md
+heading-level: "2"
+?>
 ## When you are consulted
 
 - A change to your file, or a proposal to change it.
@@ -27,7 +31,12 @@ stay true whatever it says.
   documentation.
 - A name, or words for readers, where one of your file's concepts
   applies.
+<?/include?>
 
+<?include
+file: ../../docs/agents/model-specialist-review.md
+heading-level: "2"
+?>
 ## How you review
 
 1. Read the hub, docs/domain-model/index.md, then your file in full,
@@ -44,13 +53,19 @@ stay true whatever it says.
    what your file says it says, and the reverse.
 6. Check the invariants your concepts serve read the same in your
    file, in docs/srs/invariants.md and in the requirements.
+<?/include?>
 
+<?include
+file: ../../docs/agents/model-specialist-file-changes.md
+heading-level: "2"
+?>
 ## When your file changes
 
 Here the change is the definition, so a concept it adds is not a
 finding for being new. Check it overlaps no concept another file
 defines, list every use it makes stale, and name each invariant that
 would need new wording, which needs an ADR and a security review.
+<?/include?>
 
 ## Where to start
 
@@ -68,6 +83,10 @@ citations win when they change.
   features/principal-acts.feature, features/recall.feature.
 - Invariants: I8.
 
+<?include
+file: ../../docs/agents/model-specialist-report.md
+heading-level: "2"
+?>
 ## How you report
 
 Report each finding with file, line, the term, the entry of your file
@@ -76,3 +95,4 @@ finding about a concept another file defines belongs to that file's
 specialist; name it. Outside a change to your file, report a gap or
 contradiction inside it as a question for the stakeholder. Say
 plainly when you find nothing. Never approve or merge; you report.
+<?/include?>

@@ -17,6 +17,10 @@ Its title is 5. Functional requirements: room. Read its front matter
 summary first. Then read only the rows and text the pull request touches
 or names.
 
+<?include
+file: ../../docs/agents/srs-section-checks.md
+heading-level: "2"
+?>
 ## What you check
 
 1. **The section against itself.** A changed row or paragraph agrees
@@ -32,12 +36,18 @@ or names.
    change to an invariant, or to a row ENG-29 marks for I2 review,
    lands with its accepted ADR.
 5. **Terms.** The section speaks the domain model's concepts.
+<?/include?>
 
+<?include
+file: ../../docs/agents/specialist-report.md
+heading-level: "2"
+?>
 ## How you report
 
 You are a specialist: the review's orchestrator hands your findings to
 a generalist, who weighs them. Report each finding on one line:
-`path:line — blocking|nit — the rule it breaks — the ids it touches`,
-`blocking` when it breaks the section or masks a bug, `nit` otherwise.
-Report `none` when you find nothing. You give no verdict and never
-approve.
+`path:line — blocking|nit — what it breaks — the ids it touches`.
+Mark it `blocking` when it breaks a check above or masks a bug, `nit`
+otherwise. Report `none` when you find nothing. You give no verdict and
+never approve.
+<?/include?>
