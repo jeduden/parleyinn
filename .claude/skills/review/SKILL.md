@@ -43,7 +43,7 @@ the gate fails a review that leaves one out.
    the paths and ids of its scope; each reads `review/bundle.md` and
    `pr.diff`.
 3. Then call every listed generalist at once, with its specialists'
-   findings quoted verbatim under each name.
+   findings and outcomes quoted verbatim under each name.
 4. Keep the generalists' findings; drop one only where the diff
    plainly contradicts it, and say why. With no agent listed, review
    the diff yourself. Repeat nothing CI or the bundle already decided.

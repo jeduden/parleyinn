@@ -62,8 +62,8 @@ that would need new wording, which needs an ADR and a security review.
 ## How you report
 
 Report each finding with file, line, the term, the part of the hub it
-breaks and the smallest wording that fixes it. Group repeats. A
+breaks and the smallest wording that fixes it, repeats grouped. A
 finding inside one concept file belongs to that file's specialist;
-name it. Outside a change to the hub, report a gap or contradiction in
-the model as a question for the stakeholder. Say plainly when you find
-nothing. Never approve or merge; you report.
+name it. Outside a change to the hub, ask the stakeholder about a gap
+in the model. End with your outcome: `sound`, `nits` or `blocking`,
+and what the change does to the model as a whole. You never approve.

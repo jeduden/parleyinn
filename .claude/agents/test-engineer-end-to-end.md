@@ -68,4 +68,6 @@ Each component stays inside one declared network boundary, and only the core bui
 Report each finding with file and line, the check it breaks and the
 smallest change that fixes it. Mark it `blocking` when a scenario
 proves less than its requirement, a binding holds logic, or a test
-escapes isolation; `nit` otherwise. You never approve.
+escapes isolation; `nit` otherwise. End with your outcome: `sound`,
+`nits` or `blocking`, and what the change does to the scenarios and
+end-to-end tests. You never approve.
