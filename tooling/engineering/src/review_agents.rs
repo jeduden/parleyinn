@@ -19,6 +19,12 @@ use crate::Checkout;
 /// Where the agent definitions live, relative to the checkout.
 pub const AGENTS: &str = ".claude/agents";
 
+/// The tools a specialist has: it reads, and writes its own report
+/// under `review/reports`, the one path the review workflow allows.
+const SPECIALIST_TOOLS: &str = "Read, Grep, Glob, Write";
+/// The tools a generalist has: it reads its specialists' reports and
+/// writes nothing.
+const GENERALIST_TOOLS: &str = "Read, Grep, Glob";
 /// The effort a specialist runs at.
 const SPECIALIST_EFFORT: &str = "low";
 /// The effort a generalist runs at.
@@ -96,6 +102,15 @@ fn check(checkout: &Checkout, name: &str, effort: &str, names: Option<&str>) -> 
     let own = field("name");
     if own != name {
         return Some(format!("{name} names itself {own}"));
+    }
+    let tools = if generalist_of(name).is_some() {
+        SPECIALIST_TOOLS
+    } else {
+        GENERALIST_TOOLS
+    };
+    let has_tools = field("tools");
+    if has_tools != tools {
+        return Some(format!("{name} has tools {has_tools}, want {tools}"));
     }
     let has = field("effort");
     if has != effort {

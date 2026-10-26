@@ -6,7 +6,7 @@ description: >-
   defines against every use in the SRS, the scenarios, the rest of the
   model, the instruction files and the documentation, and checks the
   file against itself and the hub. Never approves.
-tools: Read, Grep, Glob
+tools: Read, Grep, Glob, Write
 model: haiku
 effort: low
 generalist: review-spec
@@ -90,10 +90,11 @@ heading-level: "2"
 ?>
 ## How you report
 
-Send at most ten findings, no preamble: file, line, term, the entry it
-breaks and the smallest fix, repeats grouped. A concept another file
-defines belongs to that file's specialist; name it. Outside a change
-to your file, ask the stakeholder about a gap in it. End with your
-outcome: `sound`, `nits` or `blocking`, and what the change does to
-your file's concepts. You never approve.
+Write your report to `review/reports/<your name>.md`, the one file you may
+write, and answer with the same text. Send at most ten findings, no preamble:
+file, line, term, the entry it breaks and the smallest fix, repeats grouped. A
+concept another file defines belongs to that file's specialist; name it.
+Outside a change to your file, ask the stakeholder about a gap in it. End with
+your outcome: `sound`, `nits` or `blocking`, and what the change does to your
+file's concepts. You never approve.
 <?/include?>

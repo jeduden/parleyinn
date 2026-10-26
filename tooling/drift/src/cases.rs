@@ -508,6 +508,16 @@ fn review_agent_cases() -> Vec<Case> {
             "scripts/rogue.py is in no language a review specialist reads",
         ),
         protection_case(
+            "a generalist allowed to write",
+            Injection::replace(
+                ".claude/agents/review-security.md",
+                "tools: Read, Grep, Glob\n",
+                "tools: Read, Grep, Glob, Write\n",
+            ),
+            "the_checkout_s_review_agents_are_all_defined",
+            "review-security has tools Read, Grep, Glob, Write, want Read, Grep, Glob",
+        ),
+        protection_case(
             "a deep review's generalist run on a weaker model",
             Injection::replace(
                 ".claude/agents/review-code-deep.md",

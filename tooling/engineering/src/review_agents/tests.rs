@@ -4,6 +4,11 @@ fn agent(name: &str, effort: &str, body: &str) -> (String, String) {
     let generalist = generalist_of(name)
         .map(|g| format!("generalist: {g}\n"))
         .unwrap_or_default();
+    let tools = if generalist_of(name).is_some() {
+        "Read, Grep, Glob, Write"
+    } else {
+        "Read, Grep, Glob"
+    };
     let deep = if DEEP_GENERALISTS.contains(&name) {
         "model: opus\nmaxTurns: 40\n"
     } else {
@@ -12,7 +17,7 @@ fn agent(name: &str, effort: &str, body: &str) -> (String, String) {
     (
         format!("{AGENTS}/{name}.md"),
         format!(
-            "---\nname: {name}\ndescription: d\neffort: {effort}\n{deep}{generalist}---\n{body}\n"
+            "---\nname: {name}\ndescription: d\ntools: {tools}\neffort: {effort}\n{deep}{generalist}---\n{body}\n"
         ),
     )
 }
@@ -99,7 +104,7 @@ fn an_agent_whose_name_is_not_its_file_is_named() {
     let mut f = without("lang-toml");
     f.push((
         format!("{AGENTS}/lang-toml.md"),
-        "---\nname: lang-tom\neffort: low\n---\n".to_owned(),
+        "---\nname: lang-tom\ntools: Read, Grep, Glob, Write\neffort: low\n---\n".to_owned(),
     ));
 
     assert_eq!(problems(&f), ["lang-toml names itself lang-tom"]);
@@ -132,7 +137,7 @@ fn the_front_matter_reads_quoted_values_and_only_its_own_block() {
     let mut f = without("lang-toml");
     f.push((
         format!("{AGENTS}/lang-toml.md"),
-        "---\nname: \"lang-toml\"\neffort: 'low'\ngeneralist: \"review-code\"\n---\nname: other\n"
+        "---\nname: \"lang-toml\"\ntools: Read, Grep, Glob, Write\neffort: 'low'\ngeneralist: \"review-code\"\n---\nname: other\n"
             .to_owned(),
     ));
     assert_eq!(problems(&f), Vec::<String>::new());
@@ -153,7 +158,7 @@ fn a_specialist_that_names_the_wrong_generalist_is_named() {
     let mut f = without("lang-rust");
     f.push((
         format!("{AGENTS}/lang-rust.md"),
-        "---\nname: lang-rust\neffort: low\ngeneralist: review-spec\n---\n".to_owned(),
+        "---\nname: lang-rust\ntools: Read, Grep, Glob, Write\neffort: low\ngeneralist: review-spec\n---\n".to_owned(),
     ));
     assert_eq!(
         problems(&f),
@@ -163,7 +168,7 @@ fn a_specialist_that_names_the_wrong_generalist_is_named() {
     let mut f = without("srs-security");
     f.push((
         format!("{AGENTS}/srs-security.md"),
-        "---\nname: srs-security\neffort: low\n---\ndocs/srs/06-security.md\n".to_owned(),
+        "---\nname: srs-security\ntools: Read, Grep, Glob, Write\neffort: low\n---\ndocs/srs/06-security.md\n".to_owned(),
     ));
     assert_eq!(
         problems(&f),
@@ -177,7 +182,9 @@ fn a_deep_generalist_on_another_model_or_turn_budget_is_named() {
         let mut f = without("review-spec-deep");
         f.push((
             format!("{AGENTS}/review-spec-deep.md"),
-            format!("---\nname: review-spec-deep\neffort: high\n{front}---\n"),
+            format!(
+                "---\nname: review-spec-deep\ntools: Read, Grep, Glob\neffort: high\n{front}---\n"
+            ),
         ));
         problems(&f)
     };
@@ -193,5 +200,29 @@ fn a_deep_generalist_on_another_model_or_turn_budget_is_named() {
     assert_eq!(
         problems(&replaced("review-spec-deep", "medium", "x")),
         ["review-spec-deep runs at effort medium, want high"]
+    );
+}
+
+#[test]
+fn a_specialist_that_cannot_write_its_report_or_a_generalist_that_can_is_named() {
+    let mut f = without("lang-shell");
+    f.push((
+        format!("{AGENTS}/lang-shell.md"),
+        "---\nname: lang-shell\ntools: Read, Grep, Glob\neffort: low\ngeneralist: review-code\n---\n"
+            .to_owned(),
+    ));
+    assert_eq!(
+        problems(&f),
+        ["lang-shell has tools Read, Grep, Glob, want Read, Grep, Glob, Write"]
+    );
+
+    let mut f = without("review-code");
+    f.push((
+        format!("{AGENTS}/review-code.md"),
+        "---\nname: review-code\ntools: Read, Grep, Glob, Write\neffort: medium\n---\n".to_owned(),
+    ));
+    assert_eq!(
+        problems(&f),
+        ["review-code has tools Read, Grep, Glob, Write, want Read, Grep, Glob"]
     );
 }

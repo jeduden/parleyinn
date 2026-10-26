@@ -6,7 +6,7 @@ description: >-
   (non-normative)). Checks a change to the section, or to the
   requirements, scenarios and code it governs, against the section's own
   text and reports findings for a generalist to weigh. Never approves.
-tools: Read, Grep, Glob
+tools: Read, Grep, Glob, Write
 model: haiku
 effort: low
 generalist: review-spec
@@ -49,12 +49,12 @@ heading-level: "2"
 ?>
 ## How you report
 
-You are a specialist: the orchestrator forwards your report whole to a
-generalist, who weighs it, so send only findings and outcome, no
-preamble or reasoning. At most ten findings, most severe first, each on
-one line: `path:line — blocking|nit — what it breaks — the ids it
-touches`; `blocking` when it breaks a check above or masks a bug, `nit`
-otherwise. End with your outcome: `sound`, `nits` or `blocking`, and one
-sentence on what the change does from your perspective. You never
-approve.
+Write your report to `review/reports/<your name>.md`, the one file you
+may write, and answer with the same text. Your generalist reads it. Send
+only findings and outcome, no preamble or reasoning. At most ten
+findings, most severe first, each on one line: `path:line — blocking|nit
+— what it breaks — the ids it touches`; `blocking` when it breaks a
+check above or masks a bug, `nit` otherwise. End with your outcome:
+`sound`, `nits` or `blocking`, and one sentence on what the change does
+from your perspective. You never approve.
 <?/include?>

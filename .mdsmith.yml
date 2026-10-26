@@ -207,14 +207,15 @@ kinds:
     # persona reviewer. Skills hold objective procedures; agents hold
     # subjective viewpoints. A subagent's file loads into its own
     # context, not the session's, so its caps are looser than a skill's.
-    # Every agent here reviews: it reads, and never writes, runs or
-    # fetches.
+    # Every agent here reviews: it reads, and never runs or fetches. A
+    # review specialist also writes its own report under review/reports,
+    # the one path the review workflow lets it write.
     path-pattern: ".claude/agents/*.md"
     schema:
       frontmatter:
         name: '=~"^[a-z][a-z-]*$"'
         description: nonEmpty
-        tools: '"Read, Grep, Glob"'
+        tools: '"Read, Grep, Glob" | "Read, Grep, Glob, Write"'
         "model?": '=~"^(haiku|sonnet|opus)$"'
         "effort?": '=~"^(low|medium|high)$"'
         "generalist?": '=~"^review-(code|spec|security)$"'
@@ -241,7 +242,7 @@ kinds:
       frontmatter:
         name: '=~"^persona-[a-z-]+$"'
         description: nonEmpty
-        tools: '"Read, Grep, Glob"'
+        tools: '"Read, Grep, Glob" | "Read, Grep, Glob, Write"'
         "model?": '=~"^(haiku|sonnet|opus)$"'
         "effort?": '=~"^(low|medium|high)$"'
         "generalist?": '=~"^review-(code|spec|security)$"'
