@@ -51,6 +51,12 @@ fn key_job_runs(w: &mut World, cmd: String) -> Result<(), String> {
     e.flow.key_job_runs(e.key()?, &cmd)
 }
 
+#[then(regex = r#"^that job posts its decision as the "([^"]+)" check$"#)]
+fn key_job_posts_check(w: &mut World, check: String) -> Result<(), String> {
+    let e = eng(w);
+    outcome(e.flow.key_job_posts_check(e.key()?, &check)?)
+}
+
 #[then(
     regex = r"^every agent the review bundle can dispatch is defined, specialists at low effort and generalists at medium$"
 )]

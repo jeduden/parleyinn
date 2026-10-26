@@ -171,6 +171,15 @@ fn the_checkout_s_ruleset_needs_an_approval_from_another_reviewer() {
     assert!(problems.is_empty(), "{}", problems.join("\n"));
 }
 
+/// The committed ruleset needs the review gate's check from the reviewer
+/// app (ENG-21).
+#[test]
+fn the_checkout_s_ruleset_needs_the_review_gate_check() {
+    let problems = engineering::branch_protection::review_gate_required(&ruleset());
+
+    assert!(problems.is_empty(), "{}", problems.join("\n"));
+}
+
 /// CODEOWNERS names the stakeholder on the requirement text and on the
 /// paths that enforce it (ENG-21).
 #[test]

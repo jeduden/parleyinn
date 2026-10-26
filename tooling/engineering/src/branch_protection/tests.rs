@@ -22,7 +22,10 @@ fn good() -> Value {
             }},
             {"type": "required_status_checks", "parameters": {
                 "strict_required_status_checks_policy": false,
-                "required_status_checks": [{"context": "CI"}]
+                "required_status_checks": [
+                    {"context": "CI"},
+                    {"context": "review-gate", "integration_id": 5140085}
+                ]
             }}
         ]
     })
@@ -62,7 +65,32 @@ fn the_good_ruleset_has_no_problem() {
     assert!(direct_pushes_rejected(&r).is_empty());
     assert!(commits_signed(&r).is_empty());
     assert!(approval_from_another_reviewer(&r).is_empty());
+    assert!(review_gate_required(&r).is_empty());
     assert!(weaker_than(&r, &r).is_empty());
+}
+
+#[test]
+fn the_review_gate_check_is_required_from_the_reviewer_app_alone() {
+    let checks = |c: Value| with_param("required_status_checks", "required_status_checks", c);
+
+    has(
+        &review_gate_required(&checks(json!([{"context": "CI"}]))),
+        "the ruleset does not require the review-gate check",
+    );
+    has(
+        &review_gate_required(&checks(json!([{"context": "review-gate"}]))),
+        "the ruleset takes the review-gate check from any app, want app 5140085",
+    );
+    has(
+        &review_gate_required(&checks(
+            json!([{"context": "review-gate", "integration_id": 15368}]),
+        )),
+        "the ruleset takes the review-gate check from app 15368, want app 5140085",
+    );
+    has(
+        &review_gate_required(&without("required_status_checks")),
+        "does not require the review-gate check",
+    );
 }
 
 #[test]
@@ -230,12 +258,40 @@ fn a_live_ruleset_weaker_than_the_committed_one_is_named() {
         ),
         "live does not require the CI check",
     );
-
     let mut live = good();
     live["bypass_actors"] = json!([{"actor_id": 5}]);
     has(
         &weaker_than(&committed, &live),
         "live lets a bypass actor bypass",
+    );
+}
+
+#[test]
+fn a_live_check_taken_from_another_app_than_committed_is_weaker() {
+    let committed = good();
+
+    has(
+        &weaker_than(
+            &committed,
+            &with_param(
+                "required_status_checks",
+                "required_status_checks",
+                json!([{"context": "CI"}, {"context": "review-gate"}]),
+            ),
+        ),
+        "live takes the review-gate check from any app, committed app 5140085",
+    );
+    has(
+        &weaker_than(
+            &committed,
+            &with_param(
+                "required_status_checks",
+                "required_status_checks",
+                json!([{"context": "CI", "integration_id": 15368},
+                       {"context": "review-gate", "integration_id": 1}]),
+            ),
+        ),
+        "live takes the review-gate check from app 1, committed app 5140085",
     );
 }
 
@@ -289,6 +345,14 @@ fn a_stronger_live_ruleset_or_one_without_bypass_actors_is_not_weaker() {
         }
     }
     assert!(weaker_than(&committed, &live).is_empty());
+
+    let pinned = with_param(
+        "required_status_checks",
+        "required_status_checks",
+        json!([{"context": "CI", "integration_id": 15368},
+               {"context": "review-gate", "integration_id": 5140085}]),
+    );
+    assert!(weaker_than(&committed, &pinned).is_empty());
 
     let mut weird = good();
     weird["rules"] = json!([{"type": "deletion", "parameters": 3}, {"type": "pull_request"}]);

@@ -263,6 +263,28 @@ impl Workflow {
         Ok(problems)
     }
 
+    /// Requires the key's job to post its decision as the check `name`:
+    /// to mint a token that writes checks, post to the check-runs
+    /// endpoint under that name, and fail the check unless it approves.
+    ///
+    /// # Errors
+    ///
+    /// Fails when the key's job cannot be found.
+    pub fn key_job_posts_check(&self, key: &str, name: &str) -> Result<Vec<String>, String> {
+        let j = self.key_job(key)?;
+        let named = format!("name={name}");
+        Ok([
+            ("mint", "permission-checks: write"),
+            ("post to", "repos/$REPO/check-runs"),
+            ("name the check", named.as_str()),
+            ("fail the check by default:", "conclusion=failure"),
+        ]
+        .into_iter()
+        .filter(|(_, text)| !j.text.contains(text))
+        .map(|(what, text)| format!("job {} does not {what} {text}", j.name))
+        .collect())
+    }
+
     /// Requires the key's job to run `cmd`.
     ///
     /// # Errors

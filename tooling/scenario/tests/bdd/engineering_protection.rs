@@ -53,6 +53,15 @@ fn approval_from_another_reviewer(w: &mut World) -> Result<(), String> {
 }
 
 #[then(
+    regex = r#"^every pull request needs the "review-gate" check, taken from the reviewer app alone$"#
+)]
+fn review_gate_required(w: &mut World) -> Result<(), String> {
+    outcome(branch_protection::review_gate_required(
+        &protection(w).ruleset,
+    ))
+}
+
+#[then(
     regex = r"^CODEOWNERS names the stakeholder on the specification, the decision records, the scenarios and the process that builds and checks the code$"
 )]
 fn stakeholder_owns_the_enforcing_paths(_w: &mut World) -> Result<(), String> {

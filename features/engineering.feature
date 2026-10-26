@@ -227,6 +227,7 @@ Feature: Engineering quality (ENG)
     Then direct pushes are rejected
     And commits must be signed
     And every pull request needs an approval from a reviewer other than its author
+    And every pull request needs the "review-gate" check, taken from the reviewer app alone
     And CODEOWNERS names the stakeholder on the specification, the decision records, the scenarios and the process that builds and checks the code
     And CODEOWNERS names no code owner on any other path
     And CODEOWNERS names no code owner on Rust source, so a code change needs only a reviewer other than its author
@@ -289,6 +290,7 @@ Feature: Engineering quality (ENG)
     And that job decides the review with "--checked checked.json"
     And that job decides the review with "--dispatch dispatch.json"
     And that job decides the review with "--consulted consulted.json"
+    And that job posts its decision as the "review-gate" check
     And every agent the review bundle can dispatch is defined, specialists at low effort and generalists at medium
     And the review gate decides:
       | verdict         | finding  | check finding | head    | CI     | other check | consulted | dispatch  | review          |

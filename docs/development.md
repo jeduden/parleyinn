@@ -164,48 +164,47 @@ binary then runs once on its own platform and must report what it
 was stamped with. Each target is built once: the release build is not
 checked for reproducibility.
 
-[review.yml](../.github/workflows/review.yml) reviews each pull
-request from a branch of this repository once its CI passes (ENG-21,
-ENG-28). It skips drafts, so a pull request is reviewed when it is
-marked ready, which reruns CI. The agent runs on the stakeholder's
-Claude subscription, not an API key billed per model token. It triggers on
-`workflow_run`, so GitHub runs it as `main` defines it, never as the
-pull request does. It also triggers on `issue_comment`, which GitHub
-runs as `main` defines it too: a code owner's comment on a pull
-request whose CI passed reviews it again. Consent to a stakeholder
-path is such a comment, so the review that reads it follows at once.
-The review job first runs main's `review-bundle` over main's tree and
-the pull request's: it writes the review bundle the agent reads, sets
-the review's class and makes the deterministic findings (see Review).
-The agent then runs with read-only tools on the pull request's tree,
-following [the review skill](../.claude/skills/review/SKILL.md). It only
-writes a review outcome. The post job alone has the reviewer app's
-key. It runs the `review-gate` crate's executable, which approves only an
-approving review outcome with no blocking finding, its own or a
-deterministic one, on the reviewed head, with `CI` green there;
-otherwise it requests changes.
+[review.yml](../.github/workflows/review.yml) reviews each pull request from
+a branch of this repository once its CI passes (ENG-21, ENG-28). It skips
+drafts, so a pull request is reviewed when it is marked ready, which reruns
+CI. The agent runs on the stakeholder's Claude subscription, not an API key
+billed per model token. It triggers on `workflow_run`, so GitHub runs it as
+`main` defines it, never as the pull request does. It also triggers on
+`issue_comment`, which GitHub runs as `main` defines it too: a code owner's
+comment on a pull request whose CI passed reviews it again. Consent to a
+stakeholder path is such a comment, so the review that reads it follows at
+once. The review job first runs main's `review-bundle` over main's tree and
+the pull request's: it writes the review bundle the agent reads, sets the
+review's class and makes the deterministic findings (see Review). The agent
+then runs with read-only tools on the pull request's tree, following [the
+review skill](../.claude/skills/review/SKILL.md). It only writes a review
+outcome. The post job alone has the reviewer app's key. It runs the
+`review-gate` crate's executable, which approves only an approving review
+outcome with no blocking finding, its own or a deterministic one, on the
+reviewed head, with `CI` green there; otherwise it requests changes. It
+posts the same decision as the `review-gate` check.
 [ADR-2609301941](adr/ADR-2609301941-agent-review.md) records why.
 
 Main's protection is committed as a ruleset,
 [main.json](../.github/rulesets/main.json), in GitHub's export format
 (ENG-21). It allows no direct push and no bypass, and requires signed
-commits, `CI`, one approval from a reviewer other than the author, and
-a code owner's approval where [CODEOWNERS](../.github/CODEOWNERS) names
-one. The ENG-21 gate tests read it, and CODEOWNERS: it names the
-stakeholder as code owner of the specification, the decision records,
-the scenarios and every path of the process that builds and checks
-the code, a code owner on nothing else but the supply-chain policy,
-and no code owner on Rust source. Two tag rulesets sit beside it.
-`releases-semver` keeps each `v*.*.*` tag fixed on a signed commit that
-passed `CI`. `no-other-tags-allowed` refuses every other tag. The
-stakeholder applies the rulesets on GitHub. The nightly `protection`
-job runs `protection-check` on each file under `.github/rulesets`. It
-fails when the live ruleset of that name is missing or weaker. The
-workflow's token cannot see a ruleset's bypass actors. A code change,
-the gates and the security-sensitive crates included, lands on one
-approval from a reviewer other than its author, which an agent may
-give; the review class below keeps those deep. A change to an
-invariant still needs a named human security reviewer's ADR (ENG-29).
+commits, `CI`, the reviewer app's `review-gate` check (pinned to its app
+id), one approval from a reviewer other than the author, and a code owner's
+approval where [CODEOWNERS](../.github/CODEOWNERS) names one. The ENG-21
+gate tests read it, and CODEOWNERS: it names the stakeholder as code owner
+of the specification, the decision records, the scenarios and every path of
+the process that builds and checks the code, a code owner on nothing else
+but the supply-chain policy, and no code owner on Rust source. Two tag
+rulesets sit beside it. `releases-semver` keeps each `v*.*.*` tag fixed on a
+signed commit that passed `CI`. `no-other-tags-allowed` refuses every other
+tag. The stakeholder applies the rulesets on GitHub. The nightly
+`protection` job runs `protection-check` on each file under
+`.github/rulesets`. It fails when the live ruleset of that name is missing
+or weaker. The workflow's token cannot see a ruleset's bypass actors. A code
+change, the gates and the security-sensitive crates included, lands on one
+approval from a reviewer other than its author, which an agent may give; the
+review class below keeps those deep. A change to an invariant still needs a
+named human security reviewer's ADR (ENG-29).
 
 [release.yml](../.github/workflows/release.yml) runs from the Actions
 "Run workflow" button on `main`, with a version like `v0.1.0`. A pushed

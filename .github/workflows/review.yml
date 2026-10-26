@@ -342,7 +342,7 @@ jobs:
       - name: Build the review gate
         run: cargo build --locked --quiet -p review-gate
       # The app's token, scoped to this repository and to what posting
-      # a review needs. With no `repositories` input the action scopes it
+      # a review and its check needs. With no `repositories` input the action scopes it
       # to the repository the workflow runs in, so a rename of the
       # repository cannot break the mint. A missing key fails the step,
       # and the job.
@@ -353,7 +353,7 @@ jobs:
           client-id: Iv23lie5LIUdOU49SrG9
           private-key: ${{ secrets.JEDUDEN_REVIEW_AGENT_KEY }}
           permission-pull-requests: write
-          permission-checks: read
+          permission-checks: write
       - name: Read the head and its checks
         env:
           GH_TOKEN: ${{ steps.app.outputs.token }}
@@ -390,4 +390,26 @@ jobs:
         run: |
           if [ -s review.json ]; then
             gh api --method POST "repos/$REPO/pulls/$PULL/reviews" --input review.json
+          fi
+      # The decision again as the review-gate check on the reviewed head,
+      # which main's ruleset takes from this app alone (ENG-21): it
+      # passes only on an approval, so no other approval stands in for
+      # the gate's. A gate that posted no review posts no check, and the
+      # pull request stays blocked.
+      - name: Post the review-gate check
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+          REPO: ${{ github.repository }}
+          HEAD_SHA: ${{ needs.review.outputs.head_sha }}
+        run: |
+          if [ -s review.json ]; then
+            conclusion=failure
+            title="Changes requested"
+            if [ "$(jq -r .event review.json)" = APPROVE ]; then
+              conclusion=success
+              title="Approved"
+            fi
+            gh api --method POST "repos/$REPO/check-runs" -f name=review-gate \
+              -f head_sha="$HEAD_SHA" -f status=completed -f conclusion="$conclusion" \
+              -f "output[title]=$title" -f "output[summary]=The review gate's review on this head says why."
           fi

@@ -203,6 +203,37 @@ fn key_job_runs_wants_the_command() {
 }
 
 #[test]
+fn key_job_posts_check_wants_the_permission_the_post_and_a_failing_default() {
+    let posts = format!(
+        "{REVIEW_FLOW}      - with:
+          permission-checks: write
+        run: |
+          conclusion=failure
+          gh api --method POST \"repos/$REPO/check-runs\" -f name=review-gate
+"
+    );
+    assert_eq!(
+        parse(&posts).key_job_posts_check(KEY, "review-gate"),
+        Ok(vec![])
+    );
+
+    assert_eq!(
+        parse(REVIEW_FLOW).key_job_posts_check(KEY, "review-gate"),
+        Ok(vec![
+            "job post does not mint permission-checks: write".to_owned(),
+            "job post does not post to repos/$REPO/check-runs".to_owned(),
+            "job post does not name the check name=review-gate".to_owned(),
+            "job post does not fail the check by default: conclusion=failure".to_owned(),
+        ])
+    );
+    assert!(
+        parse(REVIEW_FLOW)
+            .key_job_posts_check("OTHER", "review-gate")
+            .is_err()
+    );
+}
+
+#[test]
 fn gate_decides_compares_every_row() {
     let right = table_rows(&rows(&[
         HEADER,

@@ -26,6 +26,14 @@ pub const RULESET: &str = ".github/rulesets/main.json";
 /// CI job passed.
 pub const CI_CHECK: &str = "CI";
 
+/// The check the review gate posts on a pull request's head (ENG-28):
+/// it passes only where the gate approves.
+pub const REVIEW_GATE_CHECK: &str = "review-gate";
+
+/// The reviewer app, `jeduden-review-agent`, by its GitHub App id: the
+/// one app whose [`REVIEW_GATE_CHECK`] the ruleset accepts.
+pub const REVIEWER_APP_ID: u64 = 5_140_085;
+
 /// Where the repository commits its rulesets, one JSON file each.
 pub const RULESETS: &str = ".github/rulesets";
 
@@ -162,16 +170,34 @@ fn strings<'a>(value: &'a Value, path: &[&str]) -> Vec<&'a str> {
         .unwrap_or_default()
 }
 
-/// The contexts of the required status checks.
-fn required_checks(ruleset: &Value) -> Vec<&str> {
+/// The required status checks: each one's context, and the app it is
+/// taken from, None for any app.
+fn required_checks(ruleset: &Value) -> Vec<(&str, Option<u64>)> {
     param(ruleset, "required_status_checks", "required_status_checks")
         .and_then(Value::as_array)
         .map(|a| {
             a.iter()
-                .filter_map(|c| c.get("context")?.as_str())
+                .filter_map(|c| {
+                    let app = c.get("integration_id").and_then(Value::as_u64);
+                    Some((c.get("context")?.as_str()?, app))
+                })
                 .collect()
         })
         .unwrap_or_default()
+}
+
+/// The app the required check `context` is taken from: None when the
+/// check is not required, Some(None) when any app's counts.
+fn required_from(ruleset: &Value, context: &str) -> Option<Option<u64>> {
+    required_checks(ruleset)
+        .into_iter()
+        .find(|(c, _)| *c == context)
+        .map(|(_, app)| app)
+}
+
+/// How a check's app reads in a message.
+fn app(id: Option<u64>) -> String {
+    id.map_or_else(|| "any app".to_owned(), |id| format!("app {id}"))
 }
 
 /// Whether the ruleset has a rule of this type.
@@ -215,7 +241,7 @@ pub fn direct_pushes_rejected(ruleset: &Value) -> Vec<String> {
             problems.push(format!("the ruleset has no {kind} rule"));
         }
     }
-    if !required_checks(ruleset).contains(&CI_CHECK) {
+    if required_from(ruleset, CI_CHECK).is_none() {
         problems.push(format!("the ruleset does not require the {CI_CHECK} check"));
     }
 
@@ -230,6 +256,23 @@ pub fn commits_signed(ruleset: &Value) -> Vec<String> {
         Vec::new()
     } else {
         vec!["the ruleset has no required_signatures rule".to_owned()]
+    }
+}
+
+/// Problems with the review gate's check (ENG-28): every pull request
+/// needs it, taken from the reviewer app alone, so no other approval,
+/// app or workflow stands in for the gate's.
+#[must_use]
+pub fn review_gate_required(ruleset: &Value) -> Vec<String> {
+    match required_from(ruleset, REVIEW_GATE_CHECK) {
+        None => vec![format!(
+            "the ruleset does not require the {REVIEW_GATE_CHECK} check"
+        )],
+        Some(Some(REVIEWER_APP_ID)) => Vec::new(),
+        Some(other) => vec![format!(
+            "the ruleset takes the {REVIEW_GATE_CHECK} check from {}, want app {REVIEWER_APP_ID}",
+            app(other)
+        )],
     }
 }
 
@@ -355,13 +398,17 @@ fn weaker_parameters(committed: &Value, live: &Value, kind: &str) -> Vec<String>
         }
     }
     if kind == "required_status_checks" {
-        let live_checks = required_checks(live);
-        problems.extend(
-            required_checks(committed)
-                .into_iter()
-                .filter(|c| !live_checks.contains(c))
-                .map(|c| format!("live does not require the {c} check")),
-        );
+        for (check, want) in required_checks(committed) {
+            match (required_from(live, check), want) {
+                (None, _) => problems.push(format!("live does not require the {check} check")),
+                (Some(got), Some(_)) if got != want => problems.push(format!(
+                    "live takes the {check} check from {}, committed {}",
+                    app(got),
+                    app(want)
+                )),
+                _ => {}
+            }
+        }
     }
 
     problems

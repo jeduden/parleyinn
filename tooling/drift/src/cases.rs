@@ -452,6 +452,17 @@ fn review_cases() -> Vec<Case> {
             "agent job review reads JEDUDEN_REVIEW_AGENT_KEY",
         ),
         case(
+            "the review gate's check no longer posted",
+            "ENG-28",
+            Injection::replace(
+                REVIEW_WORKFLOW,
+                "          permission-checks: write\n",
+                "          permission-checks: read\n",
+            ),
+            scenario("ENG-28"),
+            "job post does not mint permission-checks: write",
+        ),
+        case(
             "the review posted after the agent failed",
             "ENG-28",
             Injection::replace(
@@ -2000,6 +2011,19 @@ fn signed_commits_case() -> Case {
     )
 }
 
+fn review_gate_check_case() -> Case {
+    protection_case(
+        "the review gate's check taken from any app",
+        Injection::replace(
+            RULESET,
+            "{ \"context\": \"review-gate\", \"integration_id\": 5140085 }",
+            "{ \"context\": \"review-gate\" }",
+        ),
+        "the_checkout_s_ruleset_needs_the_review_gate_check",
+        "the ruleset takes the review-gate check from any app, want app 5140085",
+    )
+}
+
 /// The drifts ENG-21 exists to catch: main's committed ruleset or
 /// CODEOWNERS weaker than the requirement says.
 fn protection_cases() -> Vec<Case> {
@@ -2035,6 +2059,7 @@ fn protection_cases() -> Vec<Case> {
             "the_checkout_s_ruleset_needs_an_approval_from_another_reviewer",
             "the pull_request rule requires no approving review",
         ),
+        review_gate_check_case(),
         protection_case(
             "a code owner's approval no longer required",
             Injection::replace(
