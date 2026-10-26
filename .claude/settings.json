@@ -1,6 +1,16 @@
 {
+  "extraKnownMarketplaces": {
+    "mdsmith": {
+      "source": {
+        "source": "github",
+        "repo": "jeduden/mdsmith"
+      }
+    }
+  },
   "enabledPlugins": {
-    "gopls-lsp@claude-plugins-official": true
+    "rust-analyzer-lsp@claude-plugins-official": true,
+    "mdsmith-skills@mdsmith": true,
+    "mdsmith-audit@mdsmith": true
   },
   "permissions": {
     "allow": [
