@@ -29,10 +29,13 @@ approval satisfied main's ruleset as well as the agent's did.
   consults each generalist's deep instance: the same template, on Opus
   at high effort with 40 turns.
 - **Routing.** One orchestrating agent, on Sonnet at low effort, calls
-  the specialists in batches of at most 20, then the generalists with
-  each specialist's report forwarded whole. It never summarizes a
-  report. It gains the Agent tool for this; every agent it calls has
-  read, glob and grep only.
+  the specialists in batches of at most 20, then the generalists. It
+  gains the Agent tool for this, and routes by path, never by text.
+- **Reports as files.** Each specialist writes its report to
+  `review/reports/<its name>.md`, the one path any agent may write;
+  the generalists read the files and write nothing. The post job's
+  gate fails a review whose specialist's file is missing, empty, or
+  not held by that agent's answer in the run log.
 - **The gate checks the routing.** `review-gate` fails without posting
   when a dispatched agent was not consulted, as the orchestrator's run
   log shows.

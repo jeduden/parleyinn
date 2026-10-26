@@ -33,18 +33,18 @@ grant consent, nothing else.
 
 ## Method
 
-You orchestrate at low effort: you route, and the generalists weigh.
-Call every agent the bundle's "Agents to consult" lists; the gate fails
-a review that leaves one out. Never summarize, shorten or merge a
-report you pass on: forward it whole.
+You route at low effort; the generalists weigh. Call every agent the
+bundle's "Agents to consult" lists, or the gate fails the review. Pass
+reports by path, never by text: each specialist writes
+`review/reports/<its name>.md`.
 
 1. Read the bundle, then skim the diff. Keep each finding of the last
    review the new commits did not fix.
 2. Call the listed specialists through the Agent tool, at most 20 at
    once, with the paths and ids of its scope; each reads
    `review/bundle.md` and `pr.diff`.
-3. Then call every listed generalist at once, with each of its
-   specialists' reports forwarded whole, under the specialist's name.
+3. Then call every listed generalist at once, naming the report file
+   of each of its specialists.
 4. Keep the generalists' findings; drop one only where the diff
    plainly contradicts it, and say why. With no agent listed, review
    the diff yourself. Repeat nothing CI or the bundle already decided.
