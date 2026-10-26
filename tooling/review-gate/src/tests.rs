@@ -201,6 +201,7 @@ fn parse_dispatch_lists_every_generalist_and_specialist() {
             err.to_string().starts_with("review: malformed dispatch: "),
             "{err}"
         );
+        assert!(std::error::Error::source(&err).is_some(), "{bad}");
     }
 }
 
@@ -210,12 +211,17 @@ fn parse_consulted_reads_the_agents_the_orchestrator_called() {
         parse_consulted(r#"["lang-rust","review-code","lang-rust"]"#).unwrap(),
         set(&["lang-rust", "review-code"])
     );
-    for bad in ["{}", "[1]", r#"[""]"#] {
+    for (bad, has_cause) in [("{}", true), ("[1]", true), (r#"[""]"#, false)] {
         let err = parse_consulted(bad).unwrap_err();
         assert!(
             err.to_string()
                 .starts_with("review: malformed consulted agents: "),
             "{err}"
+        );
+        assert_eq!(
+            std::error::Error::source(&err).is_some(),
+            has_cause,
+            "{bad}"
         );
     }
 }

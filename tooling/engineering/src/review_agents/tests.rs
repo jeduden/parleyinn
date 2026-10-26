@@ -102,11 +102,35 @@ fn a_specialist_that_does_not_name_its_file_is_named() {
 }
 
 #[test]
-fn front_matter_reads_only_the_block_between_its_fences() {
+fn a_directory_that_cannot_be_read_is_named() {
+    let f: Vec<(String, String)> = files()
+        .into_iter()
+        .filter(|(p, _)| !p.starts_with("docs/"))
+        .collect();
+
+    let got = problems(&f);
+
+    assert_eq!(got.len(), 2, "{got:?}");
+    assert!(got[0].starts_with("read docs/srs: "), "{got:?}");
+    assert!(got[1].starts_with("read docs/domain-model: "), "{got:?}");
+}
+
+#[test]
+fn the_front_matter_reads_quoted_values_and_only_its_own_block() {
+    let mut f = without("lang-toml");
+    f.push((
+        format!("{AGENTS}/lang-toml.md"),
+        "---\nname: \"lang-toml\"\neffort: 'low'\n---\nname: other\n".to_owned(),
+    ));
+    assert_eq!(problems(&f), Vec::<String>::new());
+
+    let mut f = without("lang-toml");
+    f.push((
+        format!("{AGENTS}/lang-toml.md"),
+        "name: lang-toml\n".to_owned(),
+    ));
     assert_eq!(
-        front_matter("---\nname: a\neffort: low\n---\nname: b\n", "name").as_deref(),
-        Some("a")
+        problems(&f),
+        ["lang-toml's front matter does not read: no front matter"]
     );
-    assert_eq!(front_matter("name: a\n", "name"), None);
-    assert_eq!(front_matter("---\nname: a\n", "effort"), None);
 }

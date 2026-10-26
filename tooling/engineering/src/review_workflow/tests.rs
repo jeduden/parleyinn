@@ -339,6 +339,29 @@ fn gate_outcome_hands_the_gate_the_agents_consulted() {
     assert_eq!(gate_outcome(&row("all")), "APPROVE");
     assert_eq!(gate_outcome(&row("not all")), "an error");
     assert_eq!(gate_outcome(&row("malformed")), "an error");
+    assert_eq!(gate_outcome(&row("al")), UNKNOWN_CELL);
+}
+
+#[test]
+fn gate_outcome_hands_the_gate_the_dispatch() {
+    let row = |dispatch: &str| {
+        [
+            ("verdict", "approve"),
+            ("finding", "none"),
+            ("dispatch", dispatch),
+            ("head", "current"),
+            ("CI", "passed"),
+            ("other check", "passed"),
+        ]
+        .into_iter()
+        .map(|(k, v)| (k.to_owned(), v.to_owned()))
+        .collect::<BTreeMap<_, _>>()
+    };
+
+    assert_eq!(gate_outcome(&row("given")), "APPROVE");
+    assert_eq!(gate_outcome(&row("missing")), "an error");
+    assert_eq!(gate_outcome(&row("malformed")), "an error");
+    assert_eq!(gate_outcome(&row("givne")), UNKNOWN_CELL);
 }
 
 #[test]

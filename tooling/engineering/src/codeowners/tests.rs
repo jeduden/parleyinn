@@ -294,6 +294,24 @@ fn rust_source_under_target_and_git_is_not_read() {
 }
 
 #[test]
+fn another_checkout_under_claude_worktrees_is_not_read() {
+    let (_d, c) = crate::tests::checkout(&[
+        (FILE, "/.claude/ @boss\n"),
+        (".claude/worktrees/w/crates/a/src/lib.rs", "x"),
+        ("x/.claude/worktrees/b.rs", "x"),
+    ]);
+
+    assert_eq!(no_owner_on_rust_source(&c), Vec::<String>::new());
+
+    let (_d, c) =
+        crate::tests::checkout(&[(FILE, "/.claude/ @boss\n"), (".claude/other/a.rs", "x")]);
+    assert_eq!(
+        no_owner_on_rust_source(&c),
+        [".claude/other/a.rs is Rust source owned by [@boss]"]
+    );
+}
+
+#[test]
 fn a_directory_symlink_is_not_followed() {
     let (_d, c) = crate::tests::checkout(&[(FILE, "* @boss\n"), ("a/x.txt", "x")]);
     std::os::unix::fs::symlink(c.root.join("a"), c.root.join("a/loop")).unwrap();

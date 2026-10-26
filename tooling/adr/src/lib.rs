@@ -138,8 +138,14 @@ pub fn parse(path: &Path, body: &str) -> Result<Adr, Error> {
 /// Splits `body` into its front matter, read as flat scalar keys, and
 /// the rest. A folded or literal block scalar (`>-`, `|`) joins its
 /// indented lines with spaces. Anything else, such as a list or a
-/// nested map, is refused rather than misread.
-fn front_matter(body: &str) -> Result<(BTreeMap<String, String>, &str), String> {
+/// nested map, is refused rather than misread. Any Markdown file with
+/// such front matter reads through it, an agent definition among them.
+///
+/// # Errors
+///
+/// Fails when `body` has no front matter, or a line of it is not a flat
+/// scalar key.
+pub fn front_matter(body: &str) -> Result<(BTreeMap<String, String>, &str), String> {
     let no_front_matter = || "no front matter".to_owned();
     let (head, rest) = body.split_once("\n---\n").ok_or_else(no_front_matter)?;
     let head = head.strip_prefix("---\n").ok_or_else(no_front_matter)?;

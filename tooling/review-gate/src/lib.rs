@@ -117,9 +117,11 @@ pub enum Error {
     /// The required CI check has not passed on the reviewed head.
     Ci(String),
     /// The review bundle's dispatch does not read.
-    Dispatch(String),
+    Dispatch(serde_json::Error),
     /// The list of agents the orchestrator called does not read.
-    Consulted(String),
+    Consulted(serde_json::Error),
+    /// The list of agents the orchestrator called holds an empty name.
+    UnnamedAgent,
     /// The orchestrator left these dispatched agents out.
     Unconsulted(Vec<String>),
 }
@@ -131,8 +133,11 @@ impl fmt::Display for Error {
             Self::Checked(msg) => write!(f, "review: malformed deterministic findings: {msg}"),
             Self::CheckRun { line, source } => write!(f, "review: check run line {line}: {source}"),
             Self::Ci(head) => write!(f, "review: CI has not passed on the reviewed head: {head}"),
-            Self::Dispatch(msg) => write!(f, "review: malformed dispatch: {msg}"),
-            Self::Consulted(msg) => write!(f, "review: malformed consulted agents: {msg}"),
+            Self::Dispatch(source) => write!(f, "review: malformed dispatch: {source}"),
+            Self::Consulted(source) => write!(f, "review: malformed consulted agents: {source}"),
+            Self::UnnamedAgent => {
+                write!(f, "review: malformed consulted agents: an empty agent name")
+            }
             Self::Unconsulted(agents) => write!(
                 f,
                 "review: the orchestrator did not consult {}",
@@ -145,12 +150,13 @@ impl fmt::Display for Error {
 impl std::error::Error for Error {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match self {
-            Self::CheckRun { source, .. } => Some(source),
+            Self::CheckRun { source, .. } | Self::Dispatch(source) | Self::Consulted(source) => {
+                Some(source)
+            }
             Self::Outcome(_)
             | Self::Checked(_)
             | Self::Ci(_)
-            | Self::Dispatch(_)
-            | Self::Consulted(_)
+            | Self::UnnamedAgent
             | Self::Unconsulted(_) => None,
         }
     }
@@ -231,7 +237,7 @@ fn validate_findings(findings: &[Finding]) -> Result<(), String> {
 /// Fails on anything that is not such a map.
 pub fn parse_dispatch(data: &str) -> Result<BTreeSet<String>, Error> {
     let dispatch: BTreeMap<String, BTreeSet<String>> =
-        serde_json::from_str(data).map_err(|e| Error::Dispatch(e.to_string()))?;
+        serde_json::from_str(data).map_err(Error::Dispatch)?;
 
     Ok(dispatch
         .into_iter()
@@ -245,10 +251,9 @@ pub fn parse_dispatch(data: &str) -> Result<BTreeSet<String>, Error> {
 ///
 /// Fails on anything that is not a list of names.
 pub fn parse_consulted(data: &str) -> Result<BTreeSet<String>, Error> {
-    let names: Vec<String> =
-        serde_json::from_str(data).map_err(|e| Error::Consulted(e.to_string()))?;
+    let names: Vec<String> = serde_json::from_str(data).map_err(Error::Consulted)?;
     if names.iter().any(String::is_empty) {
-        return Err(Error::Consulted("an empty agent name".to_owned()));
+        return Err(Error::UnnamedAgent);
     }
 
     Ok(names.into_iter().collect())

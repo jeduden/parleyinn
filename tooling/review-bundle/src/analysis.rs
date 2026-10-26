@@ -142,9 +142,16 @@ pub fn analyse(base: &Snapshot, head: &Snapshot, diff: &str, consent: bool) -> A
     findings.extend(guard);
     findings.extend(unparsed.iter().map(|h| nit(h, UNPARSED)));
     findings.extend(lifted_bans(diff));
+    let crates = security_crates(base);
+    if crates.is_none() {
+        let path = row_path(base, ENG_11).unwrap_or_else(|| "docs/srs".to_owned());
+        findings.push(nit(&path, NO_SECURITY_CRATES));
+    }
     findings.sort();
 
-    let crates = security_crates(base);
+    // Without the list, every crate counts as security-sensitive, so the
+    // class and the dispatch fail closed.
+    let crates = crates.unwrap_or_else(|| vec![dispatch::EVERY_CRATE.to_owned()]);
     let deep = paths.iter().any(|p| deep_code(&crates, p));
     let rows: Vec<&srs::Requirement> = touched
         .iter()
@@ -168,6 +175,11 @@ pub fn analyse(base: &Snapshot, head: &Snapshot, diff: &str, consent: bool) -> A
 
 /// What an unparsed diff header weighs.
 const UNPARSED: &str = "the paths this diff header names do not read, so the review class is deep";
+
+/// What main's ENG-11 row weighs when it names no security-sensitive
+/// crate list the analysis can read.
+const NO_SECURITY_CRATES: &str =
+    "the ENG-11 row names no security-sensitive crates, so every crate reviews deep";
 
 /// A nit at `path` as a whole.
 fn nit(path: &str, body: &str) -> Finding {
@@ -194,9 +206,10 @@ fn requirement<'a>(snapshot: &'a Snapshot, id: &str) -> Option<&'a srs::Requirem
     snapshot.requirements.iter().find(|r| r.id == id)
 }
 
-/// The security-sensitive crates the ENG-11 row of `snapshot` names,
-/// none when it names no list.
-fn security_crates(snapshot: &Snapshot) -> Vec<String> {
+/// The security-sensitive crates the ENG-11 row of `snapshot` names;
+/// `None` when it names no list or an empty one, so the caller fails
+/// closed rather than treat no crate as security-sensitive.
+fn security_crates(snapshot: &Snapshot) -> Option<Vec<String>> {
     snapshot
         .requirements
         .iter()
@@ -207,9 +220,9 @@ fn security_crates(snapshot: &Snapshot) -> Vec<String> {
             list.split(',')
                 .map(|c| c.trim().trim_matches('`').to_owned())
                 .filter(|c| !c.is_empty())
-                .collect()
+                .collect::<Vec<_>>()
         })
-        .unwrap_or_default()
+        .filter(|crates| !crates.is_empty())
 }
 
 /// Whether `path` is code that reviews deep though no stakeholder path

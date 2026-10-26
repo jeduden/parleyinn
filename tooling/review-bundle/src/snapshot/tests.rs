@@ -9,7 +9,7 @@ fn read_loads_every_record_with_relative_paths() {
 
     let got = Snapshot::read(dir.path()).unwrap();
 
-    assert_eq!(got.requirements.len(), 2);
+    assert_eq!(got.requirements.len(), 3);
     assert_eq!(got.requirements[0].path, Path::new("docs/srs/05.md"));
     assert_eq!(got.scenarios.len(), 2);
     assert_eq!(got.scenarios[0].path, Path::new("features/record.feature"));
@@ -21,7 +21,7 @@ fn read_loads_every_record_with_relative_paths() {
     );
     assert_eq!(
         got.ids().collect::<Vec<_>>(),
-        ["REC-01", "ENG-29", "REC-01", "ENG-29"]
+        ["REC-01", "ENG-11", "ENG-29", "REC-01", "ENG-29"]
     );
 }
 

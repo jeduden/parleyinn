@@ -112,7 +112,10 @@ fn code_with_no_code_owner_reviews_deep_when_it_gates_or_is_security_sensitive()
 
 #[test]
 fn security_crates_come_from_the_eng_11_row() {
-    assert_eq!(security_crates(&base()), ["pin", "search"]);
+    assert_eq!(
+        security_crates(&base()),
+        Some(["pin", "search"].map(str::to_owned).to_vec())
+    );
 
     for text in [
         "No list.",
@@ -121,11 +124,41 @@ fn security_crates_come_from_the_eng_11_row() {
     ] {
         let mut snap = base();
         snap.requirements = vec![req("ENG-11", text)];
-        assert!(security_crates(&snap).is_empty(), "{text}");
+        assert_eq!(security_crates(&snap), None, "{text}");
     }
     let mut snap = base();
     snap.requirements.clear();
-    assert!(security_crates(&snap).is_empty());
+    assert_eq!(security_crates(&snap), None);
+}
+
+#[test]
+fn an_eng_11_row_that_names_no_crate_fails_closed_and_says_so() {
+    let mut main = base();
+    main.requirements.retain(|r| r.id != "ENG-11");
+    main.requirements
+        .push(req("ENG-11", "Coverage MUST be ≥ 90%."));
+
+    let got = analyse(&main, &main, &header("crates/store/src/lib.rs"), false);
+
+    assert_eq!(got.class, Class::Deep);
+    assert_eq!(
+        got.dispatch[dispatch::SECURITY],
+        ["persona-security-officer"].map(str::to_owned).into()
+    );
+    assert_eq!(
+        got.findings,
+        [Finding {
+            path: "docs/srs/05.md".into(),
+            line: 0,
+            severity: NIT,
+            body: NO_SECURITY_CRATES.into(),
+        }]
+    );
+
+    main.requirements.retain(|r| r.id != "ENG-11");
+    let got = analyse(&main, &main, &header("README.md"), false);
+    assert_eq!(got.findings[0].path, "docs/srs");
+    assert_eq!(got.class, Class::Light);
 }
 
 #[test]

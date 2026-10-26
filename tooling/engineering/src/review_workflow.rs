@@ -334,18 +334,37 @@ fn gate_args(reviewed: &str, head: &str) -> Vec<String> {
     .to_vec()
 }
 
-/// The dispatch every table row hands the gate: one generalist with one
-/// specialist.
+/// The dispatch a table row hands the gate by default: one generalist
+/// with one specialist.
 const DISPATCH: &str = r#"{"review-code":["lang-rust"]}"#;
+
+/// What [`gate_outcome`] names for a row whose `dispatch` or `consulted`
+/// cell holds a value it does not define, so a mistyped row fails
+/// rather than reads as the default.
+pub const UNKNOWN_CELL: &str = "a cell value the table does not define";
+
+/// The dispatch file a row hands the gate: [`DISPATCH`] for `given` or
+/// no `dispatch` column, a file that is no map for `malformed`, and no
+/// file (`Some(None)`) for `missing`; `None` for any other value.
+fn dispatch(row: &BTreeMap<String, String>) -> Option<Option<&'static str>> {
+    match row.get("dispatch").map_or("given", String::as_str) {
+        "given" => Some(Some(DISPATCH)),
+        "malformed" => Some(Some("[]")),
+        "missing" => Some(None),
+        _ => None,
+    }
+}
 
 /// The agents a row says the orchestrator consulted: both of
 /// [`DISPATCH`] for `all` or no `consulted` column, the generalist alone
-/// for `not all`, and a file that is no list for `malformed`.
-fn consulted(row: &BTreeMap<String, String>) -> &'static str {
+/// for `not all`, and a file that is no list for `malformed`; `None` for
+/// any other value.
+fn consulted(row: &BTreeMap<String, String>) -> Option<&'static str> {
     match row.get("consulted").map_or("all", String::as_str) {
-        "not all" => r#"["review-code"]"#,
-        "malformed" => "nope",
-        _ => r#"["review-code","lang-rust"]"#,
+        "all" => Some(r#"["review-code","lang-rust"]"#),
+        "not all" => Some(r#"["review-code"]"#),
+        "malformed" => Some("nope"),
+        _ => None,
     }
 }
 
@@ -357,11 +376,16 @@ fn consulted(row: &BTreeMap<String, String>) -> &'static str {
 /// finding` of `none`, or a row without the column, hands it an empty
 /// list, `nit` or `blocking` one deterministic finding of that
 /// severity, `malformed` a file that is no list, and `missing` no file.
-/// It always gets `--dispatch` and `--consulted` (see [`consulted`]).
+/// It always gets `--dispatch` and `--consulted` (see [`dispatch`] and
+/// [`consulted`]), and a row whose cell for either it does not define
+/// gives [`UNKNOWN_CELL`].
 #[must_use]
 pub fn gate_outcome(row: &BTreeMap<String, String>) -> &'static str {
     const REVIEWED: &str = "206b0a76a81abb510e53d87ef187e83b5aacbcbb";
     const MOVED: &str = "490efa734617788d1dc1f831b26d0e23888e90fa";
+    let (Some(dispatched), Some(consulted)) = (dispatch(row), consulted(row)) else {
+        return UNKNOWN_CELL;
+    };
     let cell = |name: &str| row.get(name).map(String::as_str).unwrap_or_default();
     let findings = match cell("finding") {
         "none" => "[]".to_owned(),
@@ -405,8 +429,10 @@ pub fn gate_outcome(row: &BTreeMap<String, String>) -> &'static str {
     } else {
         REVIEWED
     };
-    files.insert("dispatch.json", DISPATCH.to_owned());
-    files.insert("consulted.json", consulted(row).to_owned());
+    if let Some(body) = dispatched {
+        files.insert("dispatch.json", body.to_owned());
+    }
+    files.insert("consulted.json", consulted.to_owned());
     if let Some(body) = check {
         files.insert("checked.json", body);
     }

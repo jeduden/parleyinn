@@ -54,12 +54,8 @@ fn key_job_runs(w: &mut World, cmd: String) -> Result<(), String> {
 #[then(
     regex = r"^every agent the review bundle can dispatch is defined, specialists at low effort and generalists at medium$"
 )]
-fn review_agents_defined(_w: &mut World) -> Result<(), String> {
-    outcome(
-        engineering::review_agents::every_dispatched_agent_is_defined(&engineering::Checkout::new(
-            &testkit::repo_root(),
-        )),
-    )
+fn review_agents_defined(w: &mut World) -> Result<(), String> {
+    outcome(engineering::review_agents::every_dispatched_agent_is_defined(eng(w).checkout()?))
 }
 
 #[then(regex = r"^the review gate decides:$")]

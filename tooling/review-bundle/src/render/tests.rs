@@ -38,6 +38,11 @@ fn base() -> Snapshot {
             req("REC-01", "Ingest.", &["I1"]),
             req("REC-02", "Link.", &[]),
             req("NFR-01", "Fast.", &[]),
+            req(
+                "ENG-11",
+                "Coverage for security-sensitive crates (`pin`).",
+                &[],
+            ),
         ],
         scenarios: vec![
             sc("REC-01", false, &["a step"]),

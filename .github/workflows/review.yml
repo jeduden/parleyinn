@@ -290,10 +290,13 @@ jobs:
             "line":{"type":"integer","minimum":0},
             "severity":{"enum":["blocking","nit"]},
             "body":{"type":"string","minLength":1}}}}}}'
-      # The agents the orchestrator called, from its run log: every Agent
-      # tool call's subagent type. The log holds the pull request's text
-      # only as strings, so no content it read becomes a call here. The
-      # gate fails a review that left a dispatched agent out (ENG-28).
+      # The agents the orchestrator called, from its run log: the subagent
+      # type of every Agent tool call that came back without an error, so
+      # a call to an agent main does not define, or one that failed or
+      # never answered, consults nothing. The log holds the pull
+      # request's text only as strings, so no content it read becomes a
+      # call here. The gate fails a review that left a dispatched agent
+      # out (ENG-28).
       - name: List the agents the orchestrator consulted
         id: consulted
         if: steps.pull_head.outputs.number != ''
@@ -301,7 +304,11 @@ jobs:
           LOG: ${{ steps.agent.outputs.execution_file }}
         run: |
           consulted=$(jq -c '[.. | objects
+            | select(.type? == "tool_result" and .is_error? != true)
+            | .tool_use_id] as $answered
+            | [.. | objects
             | select(.type? == "tool_use" and (.name == "Agent" or .name == "Task"))
+            | select(.id as $id | $answered | index($id) != null)
             | .input.subagent_type? // empty] | unique' "$LOG")
           echo "consulted=$consulted" >> "$GITHUB_OUTPUT"
           echo "consulted: $consulted" >> "$GITHUB_STEP_SUMMARY"

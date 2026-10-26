@@ -71,6 +71,10 @@ const OTHER_ALLOWED: &[&str] = &["SECURITY.md", "DEPENDENCIES.md"];
 /// output and git's own store.
 const NOT_SOURCE: &[&str] = &["target", ".git"];
 
+/// Other checkouts of the repository, which are no part of this one
+/// (see `agent_instructions`), relative to the root.
+const OTHER_CHECKOUTS: &str = ".claude/worktrees";
+
 /// Reads the file.
 ///
 /// # Errors
@@ -327,9 +331,10 @@ struct Sources {
 }
 
 /// The `.rs` files under `dir` of the checkout, relative to its root,
-/// in name order, leaving out [`NOT_SOURCE`]. A symlink is never
-/// followed, so a loop cannot recurse; a directory that cannot be read
-/// is named, so the check never passes without having looked.
+/// in name order, leaving out [`NOT_SOURCE`] and [`OTHER_CHECKOUTS`].
+/// A symlink is never followed, so a loop cannot recurse; a directory
+/// that cannot be read is named, so the check never passes without
+/// having looked.
 fn rust_sources(checkout: &Checkout, dir: &str) -> Sources {
     let mut found = Sources::default();
     // One read of the directory and all its entries, so an error in
@@ -357,7 +362,7 @@ fn rust_sources(checkout: &Checkout, dir: &str) -> Sources {
         } else {
             format!("{dir}/{name}")
         };
-        if is_dir && !NOT_SOURCE.contains(&name.as_str()) {
+        if is_dir && !NOT_SOURCE.contains(&name.as_str()) && path != OTHER_CHECKOUTS {
             let inner = rust_sources(checkout, &path);
             found.sources.extend(inner.sources);
             found.unread.extend(inner.unread);

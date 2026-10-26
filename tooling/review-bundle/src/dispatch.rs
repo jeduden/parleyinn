@@ -75,6 +75,9 @@ const OFFICER: &str = "persona-security-officer";
 const SECURITY_INVARIANTS: [&str; 4] = ["I2", "I4", "I6", "I8"];
 /// The test, within a crate, that refuses a crate linked into it.
 const REACH_TEST: &str = "tests/reach.rs";
+/// The security-sensitive crate name that stands for every crate, for
+/// when main's ENG-11 row names none the analysis can read.
+pub const EVERY_CRATE: &str = "*";
 
 /// The specialist for the SRS section at `path`: `srs-` and the file's
 /// name without its leading section number. None for a path that is
@@ -240,11 +243,16 @@ fn product_code(path: &str) -> bool {
 }
 
 /// Whether `path` lies in a security-sensitive crate or is a crate's
-/// reach test.
+/// reach test. [`EVERY_CRATE`] among `security_crates` names them all.
 pub(crate) fn security_code(path: &str, security_crates: &[String]) -> bool {
     path.strip_prefix("crates/")
         .and_then(|rest| rest.split_once('/'))
-        .is_some_and(|(name, tail)| security_crates.iter().any(|c| c == name) || tail == REACH_TEST)
+        .is_some_and(|(name, tail)| {
+            security_crates
+                .iter()
+                .any(|c| c == name || c == EVERY_CRATE)
+                || tail == REACH_TEST
+        })
 }
 
 #[cfg(test)]

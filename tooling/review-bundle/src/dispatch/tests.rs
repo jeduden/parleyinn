@@ -153,6 +153,18 @@ fn security_sensitive_code_and_the_invariants_bring_the_officer() {
 }
 
 #[test]
+fn every_crate_stands_for_all_crates_and_nothing_else() {
+    let every = [EVERY_CRATE.to_owned()];
+
+    assert!(security_code("crates/store/src/lib.rs", &every));
+    assert!(!security_code("tooling/drift/src/lib.rs", &every));
+    assert!(!security_code(
+        "crates/store/src/lib.rs",
+        &["pin".to_owned()]
+    ));
+}
+
+#[test]
 fn a_model_file_whose_name_is_no_agent_name_brings_only_the_hub() {
     assert_eq!(
         of(&["docs/domain-model/a`b\n.md"])[SPEC],
