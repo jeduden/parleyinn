@@ -58,7 +58,7 @@ fn key_job_posts_check(w: &mut World, check: String) -> Result<(), String> {
 }
 
 #[then(
-    regex = r"^every agent the review bundle can dispatch is defined, specialists at low effort and generalists at medium$"
+    regex = r"^every agent the review bundle can dispatch is defined, specialists at low effort, generalists at medium and their deep instances on opus at high effort with 40 turns$"
 )]
 fn review_agents_defined(w: &mut World) -> Result<(), String> {
     outcome(engineering::review_agents::every_dispatched_agent_is_defined(eng(w).checkout()?))

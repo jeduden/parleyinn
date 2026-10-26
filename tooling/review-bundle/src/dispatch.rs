@@ -18,6 +18,16 @@ pub const SECURITY: &str = "review-security";
 /// The generalists, which weigh at medium effort.
 pub const GENERALISTS: [&str; 3] = [CODE, SPEC, SECURITY];
 
+/// Each generalist's deep instance: the same template, run on the
+/// strongest model at high effort with more turns, which a deep review
+/// consults in its place.
+pub const CODE_DEEP: &str = "review-code-deep";
+pub const SPEC_DEEP: &str = "review-spec-deep";
+pub const SECURITY_DEEP: &str = "review-security-deep";
+
+/// The deep instances, in the order of [`GENERALISTS`].
+pub const DEEP_GENERALISTS: [&str; 3] = [CODE_DEEP, SPEC_DEEP, SECURITY_DEEP];
+
 const RUST: &str = "lang-rust";
 const TOML: &str = "lang-toml";
 const SHELL: &str = "lang-shell";
@@ -181,6 +191,23 @@ pub fn dispatch(
     }
 
     out
+}
+
+/// `dispatch` for a deep review: each generalist's specialists handed
+/// to its deep instance instead.
+#[must_use]
+pub fn deepened(dispatch: Dispatch) -> Dispatch {
+    dispatch
+        .into_iter()
+        .map(|(generalist, specialists)| {
+            let deep = GENERALISTS
+                .iter()
+                .zip(DEEP_GENERALISTS)
+                .find(|(g, _)| **g == generalist)
+                .map_or(generalist, |(_, deep)| deep.to_owned());
+            (deep, specialists)
+        })
+        .collect()
 }
 
 /// Every agent `dispatch` names: the generalists and their specialists.

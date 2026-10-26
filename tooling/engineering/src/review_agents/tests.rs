@@ -4,9 +4,16 @@ fn agent(name: &str, effort: &str, body: &str) -> (String, String) {
     let generalist = generalist_of(name)
         .map(|g| format!("generalist: {g}\n"))
         .unwrap_or_default();
+    let deep = if DEEP_GENERALISTS.contains(&name) {
+        "model: opus\nmaxTurns: 40\n"
+    } else {
+        ""
+    };
     (
         format!("{AGENTS}/{name}.md"),
-        format!("---\nname: {name}\ndescription: d\neffort: {effort}\n{generalist}---\n{body}\n"),
+        format!(
+            "---\nname: {name}\ndescription: d\neffort: {effort}\n{deep}{generalist}---\n{body}\n"
+        ),
     )
 }
 
@@ -27,6 +34,7 @@ fn files() -> Vec<(String, String)> {
     ];
     files.extend(FIXED_SPECIALISTS.iter().map(|(n, _)| agent(n, "low", "x")));
     files.extend(GENERALISTS.iter().map(|n| agent(n, "medium", "x")));
+    files.extend(DEEP_GENERALISTS.iter().map(|n| agent(n, "high", "x")));
     files
 }
 
@@ -64,6 +72,7 @@ fn a_missing_agent_is_named() {
         "domain-model-record",
         "lang-rust",
         "review-code",
+        "review-code-deep",
     ] {
         assert_eq!(
             problems(&without(name)),
@@ -159,5 +168,30 @@ fn a_specialist_that_names_the_wrong_generalist_is_named() {
     assert_eq!(
         problems(&f),
         ["srs-security names no generalist, want review-spec"]
+    );
+}
+
+#[test]
+fn a_deep_generalist_on_another_model_or_turn_budget_is_named() {
+    let deep = |front: &str| {
+        let mut f = without("review-spec-deep");
+        f.push((
+            format!("{AGENTS}/review-spec-deep.md"),
+            format!("---\nname: review-spec-deep\neffort: high\n{front}---\n"),
+        ));
+        problems(&f)
+    };
+
+    assert_eq!(
+        deep("model: sonnet\nmaxTurns: 40\n"),
+        ["review-spec-deep runs on model sonnet, want opus"]
+    );
+    assert_eq!(
+        deep("model: opus\n"),
+        ["review-spec-deep runs for maxTurns , want 40"]
+    );
+    assert_eq!(
+        problems(&replaced("review-spec-deep", "medium", "x")),
+        ["review-spec-deep runs at effort medium, want high"]
     );
 }

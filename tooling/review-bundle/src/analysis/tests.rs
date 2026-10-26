@@ -142,7 +142,7 @@ fn an_eng_11_row_that_names_no_crate_fails_closed_and_says_so() {
 
     assert_eq!(got.class, Class::Deep);
     assert_eq!(
-        got.dispatch[dispatch::SECURITY],
+        got.dispatch[dispatch::SECURITY_DEEP],
         ["persona-security-officer"].map(str::to_owned).into()
     );
     assert_eq!(
@@ -559,17 +559,35 @@ fn analyse_dispatches_by_path_and_by_the_rows_the_diff_names() {
     let got = analyse(&base(), &head, &diff, false);
 
     assert_eq!(
-        got.dispatch[dispatch::SPEC],
+        got.dispatch[dispatch::SPEC_DEEP],
         ["srs-05", "srs-security"].map(str::to_owned).into()
     );
     assert_eq!(
-        got.dispatch[dispatch::CODE],
+        got.dispatch[dispatch::CODE_DEEP],
         ["lang-rust", "performance", "test-engineer-unit"]
             .map(str::to_owned)
             .into()
     );
     assert_eq!(
-        got.dispatch[dispatch::SECURITY],
+        got.dispatch[dispatch::SECURITY_DEEP],
         ["persona-security-officer"].map(str::to_owned).into()
     );
+}
+
+#[test]
+fn a_review_below_deep_keeps_the_normal_generalists() {
+    let got = analyse(
+        &base(),
+        &base(),
+        &header("crates/parinn/src/main.rs"),
+        false,
+    );
+
+    assert_eq!(got.class, Class::Standard);
+    assert!(
+        got.dispatch.contains_key(dispatch::CODE),
+        "{:?}",
+        got.dispatch
+    );
+    assert!(!got.dispatch.contains_key(dispatch::CODE_DEEP));
 }

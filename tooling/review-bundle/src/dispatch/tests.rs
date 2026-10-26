@@ -261,3 +261,28 @@ fn every_specialist_has_one_generalist() {
         assert_eq!(generalist_of(specialist), Some(generalist), "{specialist}");
     }
 }
+
+#[test]
+fn a_deep_review_hands_each_generalist_s_specialists_to_its_deep_instance() {
+    let normal: Dispatch = [
+        (CODE.to_owned(), ["lang-rust".to_owned()].into()),
+        (SECURITY.to_owned(), [OFFICER.to_owned()].into()),
+    ]
+    .into();
+
+    let got = deepened(normal);
+
+    assert_eq!(
+        got,
+        [
+            (CODE_DEEP.to_owned(), ["lang-rust".to_owned()].into()),
+            (SECURITY_DEEP.to_owned(), [OFFICER.to_owned()].into()),
+        ]
+        .into()
+    );
+    let other: Dispatch = [("other".to_owned(), BTreeSet::new())].into();
+    assert_eq!(deepened(other.clone()), other);
+    for (generalist, deep) in GENERALISTS.into_iter().zip(DEEP_GENERALISTS) {
+        assert_eq!(deep, format!("{generalist}-deep"));
+    }
+}

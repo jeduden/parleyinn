@@ -157,10 +157,14 @@ pub fn analyse(base: &Snapshot, head: &Snapshot, diff: &str, consent: bool) -> A
         .iter()
         .filter_map(|id| requirement(head, id).or_else(|| requirement(base, id)))
         .collect();
-    let dispatch = dispatch::dispatch(&paths, &rows, &crates);
+    let class = classify(&paths, deep || !owned.is_empty(), &unparsed);
+    let dispatch = match class {
+        Class::Deep => dispatch::deepened(dispatch::dispatch(&paths, &rows, &crates)),
+        Class::Light | Class::Standard => dispatch::dispatch(&paths, &rows, &crates),
+    };
 
     Analysis {
-        class: classify(&paths, deep || !owned.is_empty(), &unparsed),
+        class,
         owned,
         paths,
         unparsed,

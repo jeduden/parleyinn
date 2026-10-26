@@ -270,20 +270,21 @@ What `review-bundle` decides, comparing the pull request with main:
 
 One Sonnet agent at low effort orchestrates the review. The bundle
 dispatches, from the changed paths and touched rows, the low-effort
-specialists under [.claude/agents](../.claude/agents) and the
-medium-effort generalist each names in its front matter, which weighs
-their findings. The gate fails a review whose consulted list lacks a
-dispatched agent. The class sets
-the turn budget: light for Markdown outside the stakeholder's paths,
-deep for those paths, the gates and the security-sensitive code.
-The review bundle quotes only the touched rows, their scenarios and
-the invariants, a few thousand model tokens where the SRS runs to
-hundreds of thousands. A re-review starts from the diff since the reviewer app's
-last review, found by the app's own login. The pull request's agent
-instructions move out of the agent's directory, so none loads; the
-agent reads them as data. The posted review names the gate as its
-author, states the agent's verdict, and keeps the agent's findings,
-the deterministic ones and failed checks under their own headings.
+specialists under [.claude/agents](../.claude/agents) and the medium-effort
+generalist each names in its front matter, which weighs their findings. The
+gate fails a review whose consulted list lacks a dispatched agent. A deep
+review consults each generalist's deep instance instead: the same template
+under [docs/agents](agents/review-code.md), instantiated on Opus at high
+effort with 40 turns. The class sets the turn budget: light for Markdown
+outside the stakeholder's paths, deep for those paths, the gates and the
+security-sensitive code. The review bundle quotes only the touched rows,
+their scenarios and the invariants, a few thousand model tokens where the
+SRS runs to hundreds of thousands. A re-review starts from the diff since
+the reviewer app's last review, found by the app's own login. The pull
+request's agent instructions move out of the agent's directory, so none
+loads; the agent reads them as data. The posted review names the gate as its
+author, states the agent's verdict, and keeps the agent's findings, the
+deterministic ones and failed checks under their own headings.
 
 What is left to the agent is judgement: whether the code and the step
 bindings do what each touched row says, new paths to the model (I2),

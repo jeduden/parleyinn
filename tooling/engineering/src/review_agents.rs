@@ -2,12 +2,16 @@
 //! `.claude/agents`, so the orchestrator can consult it: each SRS
 //! section's specialist, each domain-model file's, the language and
 //! test-layer specialists, and the generalists. Specialists run at low
-//! effort and generalists at medium, as their front matter says.
+//! effort and generalists at medium, as their front matter says; each
+//! generalist's deep instance runs on the strongest model at high effort
+//! with a larger turn budget.
 
+use std::collections::BTreeMap;
 use std::fs;
 
 use review_bundle::dispatch::{
-    FIXED_SPECIALISTS, GENERALISTS, MODEL, generalist_of, model_specialist, section_specialist,
+    DEEP_GENERALISTS, FIXED_SPECIALISTS, GENERALISTS, MODEL, generalist_of, model_specialist,
+    section_specialist,
 };
 
 use crate::Checkout;
@@ -19,6 +23,11 @@ pub const AGENTS: &str = ".claude/agents";
 const SPECIALIST_EFFORT: &str = "low";
 /// The effort a generalist runs at.
 const GENERALIST_EFFORT: &str = "medium";
+/// The effort, model and turn budget of a generalist's deep instance:
+/// the depth a deep review had when one agent ran it alone.
+const DEEP_EFFORT: &str = "high";
+const DEEP_MODEL: &str = "opus";
+const DEEP_TURNS: &str = "40";
 
 /// Problems with the agents the review bundle can dispatch: one that is
 /// not defined, names itself otherwise, runs at the wrong effort, names
@@ -34,6 +43,11 @@ pub fn every_dispatched_agent_is_defined(checkout: &Checkout) -> Vec<String> {
         GENERALISTS
             .iter()
             .map(|n| ((*n).to_owned(), GENERALIST_EFFORT, None)),
+    );
+    want.extend(
+        DEEP_GENERALISTS
+            .iter()
+            .map(|n| ((*n).to_owned(), DEEP_EFFORT, None)),
     );
     want.extend(
         FIXED_SPECIALISTS
@@ -87,6 +101,11 @@ fn check(checkout: &Checkout, name: &str, effort: &str, names: Option<&str>) -> 
     if has != effort {
         return Some(format!("{name} runs at effort {has}, want {effort}"));
     }
+    if DEEP_GENERALISTS.contains(&name)
+        && let Some(problem) = deep_settings(name, &fields)
+    {
+        return Some(problem);
+    }
     if let Some(want) = generalist_of(name) {
         match field("generalist") {
             "" => return Some(format!("{name} names no generalist, want {want}")),
@@ -99,6 +118,18 @@ fn check(checkout: &Checkout, name: &str, effort: &str, names: Option<&str>) -> 
     names
         .filter(|file| !text.contains(file))
         .map(|file| format!("{name} does not name {file}"))
+}
+
+/// The problem with deep instance `name`'s model or turn budget, as
+/// its front matter `fields` read, if any.
+fn deep_settings(name: &str, fields: &BTreeMap<String, String>) -> Option<String> {
+    let field = |key: &str| fields.get(key).map_or("", String::as_str);
+    let model = field("model");
+    if model != DEEP_MODEL {
+        return Some(format!("{name} runs on model {model}, want {DEEP_MODEL}"));
+    }
+    let turns = field("maxTurns");
+    (turns != DEEP_TURNS).then(|| format!("{name} runs for maxTurns {turns}, want {DEEP_TURNS}"))
 }
 
 /// The Markdown files directly under `dir` of the checkout, as paths

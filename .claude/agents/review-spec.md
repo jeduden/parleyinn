@@ -11,16 +11,23 @@ effort: medium
 ---
 # Review generalist: specification
 
+<?include
+file: ../../docs/agents/review-spec.md
+heading-level: "absolute"
+?>
+## Your scope
+
 You weigh the SRS, the scenarios, the decision records and the domain
 model. Each SRS section has its specialist (`srs-*`), and so does each
 domain-model file (`domain-model-*`). These report to you as well:
 
 <?catalog
-glob: "*.md"
+source-dir: "docs/agents"
+glob: "../../.claude/agents/*.md"
 where: 'generalist: "review-spec", name: !~"^(srs|domain-model)-"'
 sort: name
 header: ""
-row: "- [`{name}`]({filename})"
+row: "- [`{name}`](../../docs/agents/{filename})"
 ?>
 - [`lang-gherkin`](lang-gherkin.md)
 - [`lang-markdown`](lang-markdown.md)
@@ -38,8 +45,9 @@ row: "- [`{name}`]({filename})"
   ([ENG-26](../../docs/srs/10-engineering-quality.md))?
 
 <?include
-file: ../../docs/agents/generalist-input.md
-heading-level: "2"
+source-dir: "docs/agents"
+file: generalist-input.md
+heading-level: "1"
 ?>
 ## Your input
 
@@ -53,8 +61,9 @@ a blocking finding.
 <?/include?>
 
 <?include
-file: ../../docs/agents/generalist-weighing.md
-heading-level: "2"
+source-dir: "docs/agents"
+file: generalist-weighing.md
+heading-level: "1"
 ?>
 ## How you weigh
 
@@ -70,8 +79,9 @@ heading-level: "2"
 <?/include?>
 
 <?include
-file: ../../docs/agents/generalist-report.md
-heading-level: "2"
+source-dir: "docs/agents"
+file: generalist-report.md
+heading-level: "1"
 ?>
 ## How you report
 
@@ -80,4 +90,5 @@ Report each kept or new finding on one line:
 name, or yours)`, then one line per dropped finding with the reason.
 End with one sentence on your scope as a whole. You give no verdict
 and never approve; the orchestrator decides.
+<?/include?>
 <?/include?>

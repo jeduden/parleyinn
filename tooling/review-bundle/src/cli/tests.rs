@@ -79,7 +79,7 @@ fn run_writes_the_bundle_and_findings_and_prints_the_route() {
     let dispatch: serde_json::Value = serde_json::from_str(&w.output(DISPATCH)).unwrap();
     assert_eq!(
         dispatch,
-        serde_json::json!({"review-spec": ["domain-model-hub", "lang-markdown", "srs-05"]})
+        serde_json::json!({"review-spec-deep": ["domain-model-hub", "lang-markdown", "srs-05"]})
     );
 }
 

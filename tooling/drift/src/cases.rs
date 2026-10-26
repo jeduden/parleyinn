@@ -502,6 +502,16 @@ fn review_agent_cases() -> Vec<Case> {
             "lang-rust runs at effort medium, want low",
         ),
         protection_case(
+            "a deep review's generalist run on a weaker model",
+            Injection::replace(
+                ".claude/agents/review-code-deep.md",
+                "model: opus\n",
+                "model: sonnet\n",
+            ),
+            "the_checkout_s_review_agents_are_all_defined",
+            "review-code-deep runs on model sonnet, want opus",
+        ),
+        protection_case(
             "a specialist naming another generalist than the dispatch",
             Injection::replace(
                 ".claude/agents/lang-rust.md",
