@@ -218,6 +218,7 @@ kinds:
         "model?": '=~"^(haiku|sonnet|opus)$"'
         "effort?": '=~"^(low|medium|high)$"'
         "generalist?": '=~"^review-(code|spec|security)$"'
+        "maxTurns?": 'int & >=1 & <=100'
     rules:
       required-frontmatter:
         fields: [name, description]
@@ -244,6 +245,7 @@ kinds:
         "model?": '=~"^(haiku|sonnet|opus)$"'
         "effort?": '=~"^(low|medium|high)$"'
         "generalist?": '=~"^review-(code|spec|security)$"'
+        "maxTurns?": 'int & >=1 & <=100'
       closed: false
       sections:
         - heading: null
