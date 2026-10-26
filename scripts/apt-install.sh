@@ -16,7 +16,15 @@
 # left, so the script prints its error and retry count and exits within
 # about 150 s. Callers give the step a 3-minute timeout, above that.
 #
-# usage: scripts/apt-install.sh PACKAGE...
+# With APT_CACHE naming a directory, the packages install from the .deb
+# files in it first, without the mirrors, so a build does not depend on
+# the mirrors once one install succeeded. An install from it that
+# fails is a warning and falls back to the mirrors. After an install
+# from the mirrors, the .deb files it downloaded are copied there for a
+# CI cache to keep; the directory is made only when there are some, so
+# an empty one is never kept.
+#
+# usage: [APT_CACHE=DIR] scripts/apt-install.sh PACKAGE...
 set -euo pipefail
 
 if [ "$#" -eq 0 ]; then
@@ -36,7 +44,18 @@ opts=(
   -o Acquire::http::Timeout=10
   -o Acquire::https::Timeout=10
   -o DPkg::Lock::Timeout=10
+  -o APT::Keep-Downloaded-Packages=true
 )
+cache=${APT_CACHE:-}
+# With a cache, apt downloads into a directory of its own, which no
+# image's clean-up hook empties after the install.
+fetched=()
+if [ -n "$cache" ]; then
+  archives=$(mktemp -d)
+  mkdir -p "$archives/partial"
+  chmod 755 "$archives"
+  fetched=(-o "Dir::Cache::archives=$archives")
+fi
 
 deadline=$((SECONDS + total))
 retries=0
@@ -62,6 +81,47 @@ report() {
   fi
 }
 
+# Installs from the cache's .deb files, which need no download; fails
+# when there are none, or when apt needs a package they do not hold and
+# cannot fetch it in time. (apt refuses --no-download with local files.)
+from_cache() {
+  local debs=()
+  if [ -n "$cache" ] && [ -d "$cache" ]; then
+    debs=("$cache"/*.deb)
+  fi
+  if [ "${#debs[@]}" -eq 0 ] || [ ! -e "${debs[0]}" ]; then
+    return 1
+  fi
+  bounded "$install_timeout" sudo apt-get "${opts[@]}" install -y -qq --no-install-recommends \
+    "${debs[@]}"
+}
+
+# Copies the .deb files the install downloaded into the cache, owned by
+# the user that runs the script, so the CI cache can read them.
+keep() {
+  if [ -z "$cache" ]; then
+    return 0
+  fi
+  local debs=("$archives"/*.deb)
+  if [ ! -e "${debs[0]}" ]; then
+    return 0
+  fi
+  mkdir -p "$cache"
+  sudo cp "${debs[@]}" "$cache"/ && sudo chown -R "$(id -u):$(id -g)" "$cache" ||
+    echo "::warning::could not keep the apt packages in $cache"
+}
+
+if [ -n "$cache" ]; then
+  if from_cache; then
+    echo "apt packages from the cache in $cache"
+    report
+    exit 0
+  fi
+  if [ -d "$cache" ]; then
+    echo "::warning::apt could not install from the cache in $cache; trying the mirrors"
+  fi
+fi
+
 for attempt in $(seq 1 "$attempts"); do
   if [ "$attempt" -gt 1 ]; then
     retries=$((retries + 1))
@@ -70,7 +130,9 @@ for attempt in $(seq 1 "$attempts"); do
       echo "::warning::dpkg --configure -a failed before apt attempt $attempt/$attempts"
   fi
   if bounded "$update_timeout" sudo apt-get "${opts[@]}" update -qq &&
-    bounded "$install_timeout" sudo apt-get "${opts[@]}" install -y -qq --no-install-recommends "$@"; then
+    bounded "$install_timeout" sudo apt-get "${opts[@]}" "${fetched[@]}" install -y -qq \
+      --no-install-recommends "$@"; then
+    keep
     report
     exit 0
   fi

@@ -79,6 +79,26 @@ jobs:
           test -n "$target"
           echo "TARGET=$target" >> "$GITHUB_ENV"
           echo "TARGETS=$target:$NAME" >> "$GITHUB_ENV"
+      # The pinned .deb files, kept under a key of the package list and
+      # the runner image, so a build does not depend on Ubuntu's mirrors
+      # once one install succeeded; scripts/apt-install.sh installs from
+      # them first and falls back to the mirrors. Release builds never
+      # consume a branch-writable cache.
+      - name: Key the apt packages
+        id: apt
+        if: matrix.os == 'linux' && github.event_name != 'workflow_dispatch'
+        env:
+          PACKAGES: ${{ matrix.name == 'windows-amd64' && env.MINGW || env.CLANG }}
+        run: |
+          sum=$(printf '%s' "$PACKAGES" | sha256sum | cut -c1-16)
+          echo "key=apt-$ImageOS-$sum" >> "$GITHUB_OUTPUT"
+          echo "APT_CACHE=$RUNNER_TEMP/apt-debs" >> "$GITHUB_ENV"
+      - name: Cache the apt packages
+        if: steps.apt.outputs.key != ''
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ runner.temp }}/apt-debs
+          key: ${{ steps.apt.outputs.key }}
       # Worst case 151 s, bounded to 150 s by scripts/apt-install.sh;
       # the step's 3 minutes sit above it.
       - name: Install mingw-w64
