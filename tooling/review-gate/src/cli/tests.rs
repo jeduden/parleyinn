@@ -17,6 +17,11 @@ fn inputs() -> BTreeMap<String, String> {
         ("checked.json", "[]"),
         ("dispatch.json", r#"{"review-code":["lang-rust"]}"#),
         ("consulted.json", r#"["lang-rust","review-code"]"#),
+        ("reports/lang-rust.md", "Outcome: sound.\n"),
+        (
+            "answers.json",
+            r#"{"lang-rust":"Outcome: sound.","review-code":"r"}"#,
+        ),
     ]
     .into_iter()
     .map(|(k, v)| (k.to_owned(), v.to_owned()))
@@ -39,6 +44,10 @@ fn args(current: &str) -> Vec<String> {
         "dispatch.json",
         "--consulted",
         "consulted.json",
+        "--reports",
+        "reports",
+        "--answers",
+        "answers.json",
     ]
     .map(str::to_owned)
     .to_vec()
@@ -80,7 +89,7 @@ fn the_usage_names_every_flag_as_required() {
     assert_eq!(code, EXIT_USAGE);
     assert!(
         err.ends_with(
-            "usage: review-gate --outcome FILE --check-runs FILE --reviewed SHA --head SHA --checked FILE --dispatch FILE --consulted FILE\n"
+            "usage: review-gate --outcome FILE --check-runs FILE --reviewed SHA --head SHA --checked FILE --dispatch FILE --consulted FILE --reports DIR --answers FILE\n"
         ),
         "{err}"
     );
@@ -259,6 +268,41 @@ fn run_fails_closed_on_a_missing_or_malformed_dispatch_or_a_skipped_agent() {
             "the orchestrator did not consult lang-rust",
             EXIT_FAILURE,
         ),
+        (
+            "a specialist with no report",
+            args(HEAD),
+            without("reports/lang-rust.md"),
+            "lang-rust wrote no report",
+            EXIT_FAILURE,
+        ),
+        (
+            "a report another agent wrote",
+            args(HEAD),
+            with("reports/lang-rust.md", "Outcome: blocking.\n"),
+            "lang-rust has a report that differs from its answer in the run log",
+            EXIT_FAILURE,
+        ),
+        (
+            "no answers file",
+            args(HEAD),
+            without("answers.json"),
+            "read answers.json",
+            EXIT_FAILURE,
+        ),
+        (
+            "malformed answers",
+            args(HEAD),
+            with("answers.json", "[]"),
+            "malformed agents' answers",
+            EXIT_FAILURE,
+        ),
+        (
+            "a dispatched name that is a path",
+            args(HEAD),
+            with("dispatch.json", r#"{"review-code":["../x"]}"#),
+            "agent name",
+            EXIT_FAILURE,
+        ),
     ]);
 }
 
@@ -363,4 +407,24 @@ fn run_fails_closed_on_a_missing_or_malformed_checked_file() {
     let (code, _, err) = invoke(args(HEAD), &files);
     assert_eq!(code, EXIT_FAILURE, "{err}");
     assert!(err.contains("malformed deterministic findings"), "{err}");
+}
+
+#[test]
+fn run_wants_the_reports_and_the_answers() {
+    fails_closed(vec![
+        (
+            "no --reports",
+            [&args(HEAD)[..14], &args(HEAD)[16..]].concat(),
+            inputs(),
+            "--reports is required",
+            EXIT_USAGE,
+        ),
+        (
+            "no --answers",
+            args(HEAD)[..16].to_vec(),
+            inputs(),
+            "--answers is required",
+            EXIT_USAGE,
+        ),
+    ]);
 }

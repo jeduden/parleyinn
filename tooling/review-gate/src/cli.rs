@@ -1,10 +1,11 @@
-//! The `review-gate` command line: seven required flags in; a review,
+//! The `review-gate` command line: nine required flags in; a review,
 //! nothing or an error out.
 
 use std::io::{self, Write};
 
 use crate::{
-    Input, decide, parse_check_runs, parse_checked, parse_consulted, parse_dispatch, parse_outcome,
+    Input, decide, parse_answers, parse_check_runs, parse_checked, parse_consulted, parse_dispatch,
+    parse_outcome, parse_specialists,
 };
 
 /// The review was printed, or there is none to post.
@@ -14,13 +15,14 @@ pub const EXIT_FAILURE: u8 = 1;
 /// The command line is wrong.
 pub const EXIT_USAGE: u8 = 2;
 
-const USAGE: &str = "usage: review-gate --outcome FILE --check-runs FILE --reviewed SHA --head SHA --checked FILE --dispatch FILE --consulted FILE";
+const USAGE: &str = "usage: review-gate --outcome FILE --check-runs FILE --reviewed SHA --head SHA --checked FILE --dispatch FILE --consulted FILE --reports DIR --answers FILE";
 
 /// The flags, in the order the usage names them. Every one is
 /// required: a gate run without the deterministic findings could
-/// approve what a blocking one withholds, and one without the dispatch
-/// a review that skipped a specialist.
-const FLAGS: [&str; 7] = [
+/// approve what a blocking one withholds, one without the dispatch a
+/// review that skipped a specialist, and one without the reports and
+/// the answers a report another agent wrote.
+const FLAGS: [&str; 9] = [
     "outcome",
     "check-runs",
     "reviewed",
@@ -28,6 +30,8 @@ const FLAGS: [&str; 7] = [
     "checked",
     "dispatch",
     "consulted",
+    "reports",
+    "answers",
 ];
 
 /// Runs the command on `args` and returns its exit code. It is `main`
@@ -47,6 +51,8 @@ pub fn run(
         checked,
         dispatch,
         consulted,
+        reports,
+        answers,
     ] = match parse_flags(args) {
         Ok(flags) => flags,
         Err(msg) => {
@@ -60,6 +66,8 @@ pub fn run(
         checked: &checked,
         dispatch: &dispatch,
         consulted: &consulted,
+        reports: &reports,
+        answers: &answers,
     };
     let input = read_input(&files, read).map(|i| Input {
         reviewed,
@@ -100,8 +108,8 @@ pub fn run(
 
 /// Reads `--name value` and `--name=value` pairs into the values of
 /// [`FLAGS`], in order; each is required.
-fn parse_flags(args: impl IntoIterator<Item = String>) -> Result<[String; 7], String> {
-    let mut values: [Option<String>; 7] = Default::default();
+fn parse_flags(args: impl IntoIterator<Item = String>) -> Result<[String; 9], String> {
+    let mut values: [Option<String>; 9] = Default::default();
     let mut args = args.into_iter();
     while let Some(arg) = args.next() {
         let Some(flag) = arg.strip_prefix("--") else {
@@ -124,7 +132,7 @@ fn parse_flags(args: impl IntoIterator<Item = String>) -> Result<[String; 7], St
         values[slot] = Some(value);
     }
 
-    let mut required: [String; 7] = Default::default();
+    let mut required: [String; 9] = Default::default();
     for (i, value) in values.into_iter().enumerate() {
         required[i] = value.ok_or_else(|| format!("--{} is required", FLAGS[i]))?;
     }
@@ -139,6 +147,9 @@ struct Files<'a> {
     checked: &'a str,
     dispatch: &'a str,
     consulted: &'a str,
+    /// The directory of the specialists' reports, one `<name>.md` each.
+    reports: &'a str,
+    answers: &'a str,
 }
 
 /// Loads the review outcome, the check runs, the deterministic checks'
@@ -148,7 +159,18 @@ fn read_input(files: &Files, read: &dyn Fn(&str) -> io::Result<String>) -> Resul
     let outcome = parse_outcome(&load(files.outcome)?).map_err(|e| e.to_string())?;
     let check_runs = parse_check_runs(&load(files.check_runs)?).map_err(|e| e.to_string())?;
     let checked = parse_checked(&load(files.checked)?).map_err(|e| e.to_string())?;
-    let dispatched = parse_dispatch(&load(files.dispatch)?).map_err(|e| e.to_string())?;
+    let dispatch = load(files.dispatch)?;
+    let dispatched = parse_dispatch(&dispatch).map_err(|e| e.to_string())?;
+    let specialists = parse_specialists(&dispatch).map_err(|e| e.to_string())?;
+    let reports = specialists
+        .iter()
+        .filter_map(|name| {
+            read(&format!("{}/{name}.md", files.reports))
+                .ok()
+                .map(|text| (name.clone(), text))
+        })
+        .collect();
+    let answers = parse_answers(&load(files.answers)?).map_err(|e| e.to_string())?;
     let consulted = parse_consulted(&load(files.consulted)?).map_err(|e| e.to_string())?;
 
     Ok(Input {
@@ -157,6 +179,9 @@ fn read_input(files: &Files, read: &dyn Fn(&str) -> io::Result<String>) -> Resul
         checked,
         dispatched,
         consulted,
+        specialists,
+        reports,
+        answers,
         ..Input::default()
     })
 }

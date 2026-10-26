@@ -32,6 +32,11 @@ fn agents_unprivileged(w: &mut World, key: String) -> Result<(), String> {
     outcome(e.flow.agents_unprivileged(&e.key))
 }
 
+#[then(regex = r#"^its agents may write only their reports, under "([^"]+)"$"#)]
+fn agents_write_only(w: &mut World, dir: String) -> Result<(), String> {
+    outcome(eng(w).flow.agents_write_only(&dir))
+}
+
 #[then(regex = r#"^only one job holds the "([^"]+)" key, and it runs no agent$"#)]
 fn key_held_apart(w: &mut World, key: String) -> Result<(), String> {
     let e = eng(w);

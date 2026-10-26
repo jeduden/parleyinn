@@ -202,6 +202,40 @@ impl Workflow {
         problems
     }
 
+    /// Requires every agent job to list its allowed tools and to allow
+    /// writing only under `dir`: `Write(./<dir>/**)` and no other
+    /// writing tool.
+    #[must_use]
+    pub fn agents_write_only(&self, dir: &str) -> Vec<String> {
+        let scoped = format!("Write(./{dir}/**)");
+        let mut problems = Vec::new();
+        for j in self.agent_jobs() {
+            let Some(line) = j.text.lines().find(|l| l.contains("--allowedTools")) else {
+                problems.push(format!("agent job {} lists no --allowedTools", j.name));
+                continue;
+            };
+            let tools = line
+                .split_once("--allowedTools")
+                .map_or("", |(_, rest)| rest)
+                .trim()
+                .trim_matches('"');
+            problems.extend(
+                tools
+                    .split(',')
+                    .map(str::trim)
+                    .filter(|t| {
+                        ["Write", "Edit", "NotebookEdit", "Bash"]
+                            .iter()
+                            .any(|w| t.starts_with(w))
+                    })
+                    .filter(|t| *t != scoped)
+                    .map(|t| format!("agent job {} may use {t}, want {scoped} alone", j.name)),
+            );
+        }
+
+        problems
+    }
+
     /// The one job that reads `key`.
     fn key_job(&self, key: &str) -> Result<&Job, String> {
         let holders: Vec<&Job> = self
@@ -351,9 +385,26 @@ fn gate_args(reviewed: &str, head: &str) -> Vec<String> {
         "dispatch.json",
         "--consulted",
         "consulted.json",
+        "--reports",
+        "reports",
+        "--answers",
+        "answers.json",
     ]
     .map(str::to_owned)
     .to_vec()
+}
+
+/// The report and run-log answer of the row's one specialist: a
+/// `report` cell of `given`, or none, hands the gate a report its
+/// answer holds, `missing` no report, and `differs` a report the
+/// answer does not hold.
+fn report(row: &BTreeMap<String, String>) -> (Option<&'static str>, &'static str) {
+    const ANSWERS: &str = r#"{"lang-rust":"agentId: a\nOutcome: sound.","review-code":"r"}"#;
+    match row.get("report").map_or("given", String::as_str) {
+        "missing" => (None, ANSWERS),
+        "differs" => (Some("Outcome: blocking.\n"), ANSWERS),
+        _ => (Some("Outcome: sound.\n"), ANSWERS),
+    }
 }
 
 /// The dispatch a table row hands the gate by default: one generalist
@@ -471,6 +522,11 @@ pub fn gate_outcome(row: &BTreeMap<String, String>) -> &'static str {
         files.insert("dispatch.json", body.to_owned());
     }
     files.insert("consulted.json", consulted.to_owned());
+    let (report, answers) = report(row);
+    if let Some(body) = report {
+        files.insert("reports/lang-rust.md", body.to_owned());
+    }
+    files.insert("answers.json", answers.to_owned());
     if let Some(body) = check {
         files.insert("checked.json", body);
     }

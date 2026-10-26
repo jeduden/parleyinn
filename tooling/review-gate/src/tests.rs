@@ -44,6 +44,7 @@ fn input(outcome: ReviewOutcome, check_runs: Vec<CheckRun>) -> Input {
         checked: vec![],
         dispatched: BTreeSet::new(),
         consulted: BTreeSet::new(),
+        ..Input::default()
     }
 }
 
@@ -895,4 +896,90 @@ fn a_check_run_reads_its_app() {
 
     assert_eq!(runs[0].app, REVIEWER_APP_ID);
     assert_eq!(runs[1].app, 0);
+}
+
+fn reported(answer: &str, report: Option<&str>) -> Input {
+    let mut i = input(approve(), green());
+    i.specialists = ["lang-rust".to_owned()].into();
+    if let Some(r) = report {
+        i.reports = [("lang-rust".to_owned(), r.to_owned())].into();
+    }
+    i.answers = [("lang-rust".to_owned(), answer.to_owned())].into();
+    i
+}
+
+#[test]
+fn a_specialist_s_report_must_be_what_it_answered() {
+    let report = "a.rs:1 — nit — x\nOutcome: nits.";
+    let r = decide(&reported(
+        &format!("agentId: z\n{report}\n"),
+        Some(&format!("{report}\n")),
+    ));
+    assert_eq!(r.unwrap().unwrap().event, APPROVE);
+
+    for (answer, file, want) in [
+        (report, None, "review: lang-rust wrote no report"),
+        (
+            report,
+            Some("  \n"),
+            "review: lang-rust wrote an empty report",
+        ),
+        (
+            "Outcome: blocking.",
+            Some(report),
+            "review: lang-rust has a report that differs from its answer in the run log",
+        ),
+    ] {
+        let err = decide(&reported(answer, file)).unwrap_err();
+        assert_eq!(err.to_string(), want);
+        assert!(std::error::Error::source(&err).is_none());
+    }
+    let mut no_answer = reported(report, Some(report));
+    no_answer.answers.clear();
+    assert!(matches!(
+        decide(&no_answer),
+        Err(Error::Report {
+            problem: "has a report that differs from its answer in the run log",
+            ..
+        })
+    ));
+}
+
+#[test]
+fn parse_specialists_reads_the_dispatch_s_lists_and_refuses_a_path() {
+    assert_eq!(
+        parse_specialists(r#"{"review-code":["lang-rust","test-engineer-unit"],"review-spec":[]}"#)
+            .unwrap(),
+        ["lang-rust".to_owned(), "test-engineer-unit".to_owned()].into()
+    );
+    for bad in [
+        r#"{"review-code":["../x"]}"#,
+        r#"{"review-code":[""]}"#,
+        r#"{"review-code":["A"]}"#,
+    ] {
+        let err = parse_specialists(bad).unwrap_err();
+        assert!(
+            err.to_string()
+                .starts_with("review: malformed dispatch: agent name"),
+            "{err}"
+        );
+        assert!(std::error::Error::source(&err).is_none());
+    }
+    let err = parse_specialists("nope").unwrap_err();
+    assert!(err.to_string().starts_with("review: malformed dispatch: "));
+    assert!(std::error::Error::source(&err).is_some());
+}
+
+#[test]
+fn parse_answers_reads_a_map_of_name_to_text() {
+    assert_eq!(
+        parse_answers(r#"{"lang-rust":"r"}"#).unwrap(),
+        [("lang-rust".to_owned(), "r".to_owned())].into()
+    );
+    let err = parse_answers("[]").unwrap_err();
+    assert!(
+        err.to_string()
+            .starts_with("review: malformed agents' answers: ")
+    );
+    assert!(std::error::Error::source(&err).is_some());
 }

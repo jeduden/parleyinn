@@ -402,3 +402,30 @@ fn grants_write_reads_quoted_values_and_write_all() {
     assert!(grants_write("    permissions: write-all\n"));
     assert!(!grants_write("    permissions: read-all\n"));
 }
+
+#[test]
+fn agents_write_only_wants_writes_scoped_to_the_reports() {
+    let with = |tools: &str| {
+        REVIEW_FLOW.replace(
+            "      - uses: anthropics/claude-code-action@abc\n",
+            &format!("      - uses: anthropics/claude-code-action@abc\n        with:\n          claude_args: --allowedTools {tools}\n"),
+        )
+    };
+
+    assert!(
+        parse(&with("\"Read,Grep,Write(./review/reports/**)\""))
+            .agents_write_only("review/reports")
+            .is_empty()
+    );
+    assert_eq!(
+        parse(&with("Read,Write,Bash(ls:*)")).agents_write_only("review/reports"),
+        [
+            "agent job review may use Write, want Write(./review/reports/**) alone",
+            "agent job review may use Bash(ls:*), want Write(./review/reports/**) alone",
+        ]
+    );
+    assert_eq!(
+        parse(REVIEW_FLOW).agents_write_only("review/reports"),
+        ["agent job review lists no --allowedTools"]
+    );
+}

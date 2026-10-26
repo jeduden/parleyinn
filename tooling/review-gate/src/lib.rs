@@ -99,6 +99,15 @@ pub struct Input {
     pub dispatched: BTreeSet<String>,
     /// Every agent the orchestrator called, as its run log shows.
     pub consulted: BTreeSet<String>,
+    /// The specialists the review bundle dispatched, whose reports the
+    /// generalists read.
+    pub specialists: BTreeSet<String>,
+    /// Each specialist's report file, by name; one with no file is
+    /// absent.
+    pub reports: BTreeMap<String, String>,
+    /// Each agent's final answer, by name, as the orchestrator's run log
+    /// shows it.
+    pub answers: BTreeMap<String, String>,
 }
 
 /// The pull request review to post, in the shape GitHub's
@@ -132,6 +141,16 @@ pub enum Error {
     UnnamedAgent,
     /// The orchestrator left these dispatched agents out.
     Unconsulted(Vec<String>),
+    /// The dispatch names an agent whose name is not lowercase letters,
+    /// digits and hyphens, so it cannot name a report file.
+    AgentName(String),
+    /// The agents' answers from the run log do not read.
+    Answers(serde_json::Error),
+    /// A specialist's report is missing, empty, or not what it answered.
+    Report {
+        agent: String,
+        problem: &'static str,
+    },
 }
 
 impl fmt::Display for Error {
@@ -151,6 +170,9 @@ impl fmt::Display for Error {
                 "review: the orchestrator did not consult {}",
                 agents.join(", ")
             ),
+            Self::AgentName(name) => write!(f, "review: malformed dispatch: agent name {name:?}"),
+            Self::Answers(source) => write!(f, "review: malformed agents' answers: {source}"),
+            Self::Report { agent, problem } => write!(f, "review: {agent} {problem}"),
         }
     }
 }
@@ -158,14 +180,17 @@ impl fmt::Display for Error {
 impl std::error::Error for Error {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match self {
-            Self::CheckRun { source, .. } | Self::Dispatch(source) | Self::Consulted(source) => {
-                Some(source)
-            }
+            Self::CheckRun { source, .. }
+            | Self::Dispatch(source)
+            | Self::Consulted(source)
+            | Self::Answers(source) => Some(source),
             Self::Outcome(_)
             | Self::Checked(_)
             | Self::Ci(_)
             | Self::UnnamedAgent
-            | Self::Unconsulted(_) => None,
+            | Self::Unconsulted(_)
+            | Self::AgentName(_)
+            | Self::Report { .. } => None,
         }
     }
 }
@@ -253,6 +278,58 @@ pub fn parse_dispatch(data: &str) -> Result<BTreeSet<String>, Error> {
         .collect())
 }
 
+/// Reads the specialists the review bundle's dispatch names, each
+/// generalist's list, refusing a name that could not name a file.
+///
+/// # Errors
+///
+/// Fails on anything that is not such a map, or a name that is not
+/// lowercase letters, digits and hyphens.
+pub fn parse_specialists(data: &str) -> Result<BTreeSet<String>, Error> {
+    let dispatch: BTreeMap<String, BTreeSet<String>> =
+        serde_json::from_str(data).map_err(Error::Dispatch)?;
+    let names: BTreeSet<String> = dispatch.into_values().flatten().collect();
+    if let Some(bad) = names.iter().find(|n| !agent_name(n)) {
+        return Err(Error::AgentName(bad.clone()));
+    }
+
+    Ok(names)
+}
+
+/// Whether `name` is an agent's name: lowercase letters, digits and
+/// hyphens, never empty.
+fn agent_name(name: &str) -> bool {
+    !name.is_empty()
+        && name
+            .chars()
+            .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-')
+}
+
+/// Reads each agent's final answer from the run log, a map of name to
+/// text.
+///
+/// # Errors
+///
+/// Fails on anything that is not such a map.
+pub fn parse_answers(data: &str) -> Result<BTreeMap<String, String>, Error> {
+    serde_json::from_str(data).map_err(Error::Answers)
+}
+
+/// The problem with `agent`'s report, if any: it has none, it is empty,
+/// or its run-log answer does not hold it, so another agent wrote it.
+fn report_problem(input: &Input, agent: &str) -> Option<&'static str> {
+    let report = input.reports.get(agent).map(|r| r.trim());
+    match report {
+        None => Some("wrote no report"),
+        Some("") => Some("wrote an empty report"),
+        Some(text) => (!input
+            .answers
+            .get(agent)
+            .is_some_and(|answer| answer.contains(text)))
+        .then_some("has a report that differs from its answer in the run log"),
+    }
+}
+
 /// Reads the agents the orchestrator called, a list of names.
 ///
 /// # Errors
@@ -305,6 +382,16 @@ pub fn decide(input: &Input) -> Result<Option<Review>, Error> {
         .collect();
     if !left_out.is_empty() {
         return Err(Error::Unconsulted(left_out));
+    }
+    if let Some((agent, problem)) = input
+        .specialists
+        .iter()
+        .find_map(|a| report_problem(input, a).map(|p| (a, p)))
+    {
+        return Err(Error::Report {
+            agent: agent.clone(),
+            problem,
+        });
     }
     let runs = latest(&input.check_runs);
     if !runs.iter().any(|r| passed_ci(r)) {

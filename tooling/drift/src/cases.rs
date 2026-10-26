@@ -452,6 +452,24 @@ fn review_cases() -> Vec<Case> {
             "agent job review reads JEDUDEN_REVIEW_AGENT_KEY",
         ),
         case(
+            "the reviewing agents allowed to write anywhere",
+            "ENG-28",
+            Injection::replace(REVIEW_WORKFLOW, "Write(./review/reports/**)", "Write"),
+            scenario("ENG-28"),
+            "may use Write, want Write(./review/reports/**) alone",
+        ),
+        case(
+            "the review gate without the specialists' reports",
+            "ENG-28",
+            Injection::replace(
+                REVIEW_WORKFLOW,
+                " --reports reports --answers answers.json",
+                "",
+            ),
+            scenario("ENG-28"),
+            r#"does not run "--reports reports --answers answers.json""#,
+        ),
+        case(
             "the review gate's check no longer posted",
             "ENG-28",
             Injection::replace(

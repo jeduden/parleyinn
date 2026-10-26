@@ -198,7 +198,9 @@ jobs:
         id: bundle
         if: steps.pull_head.outputs.number != ''
         run: |
-          mkdir -p review
+          # Each specialist writes its report here; the generalists read
+          # it, and the gate checks it against the agent's answer.
+          mkdir -p review/reports
           # mdsmith's own catalog of the Markdown patterns its rules cannot
           # see until a kind, include or catalog declares them, from main's
           # pinned mdsmith; the Markdown specialist reviews against it.
@@ -262,8 +264,10 @@ jobs:
             done
             rm -rf "$f"
           done < instructions.list > review/pr-instructions.txt
-      # Read-only tools and a read-only token: the agent can read the
-      # trees and the pull request, and write nothing but its review outcome.
+      # Read tools, Write to review/reports alone, and a read-only token:
+      # the agents read the trees and the pull request, each specialist
+      # writes its own report, and nothing else is written but the review
+      # outcome.
       # It runs on the stakeholder's Claude subscription, through the
       # token `claude setup-token` prints, so a review has no per-model-token
       # bill; it counts against the plan's usage limits instead.
@@ -284,8 +288,8 @@ jobs:
             --model claude-sonnet-5-5
             --effort low
             --max-turns ${{ steps.bundle.outputs.turns }}
-            --allowedTools Read,Glob,Grep,Agent
-            --disallowedTools Bash,Edit,Write,NotebookEdit,WebFetch,WebSearch
+            --allowedTools "Read,Glob,Grep,Agent,Write(./review/reports/**)"
+            --disallowedTools Bash,Edit,NotebookEdit,WebFetch,WebSearch
             --json-schema '{"type":"object","additionalProperties":false,
             "required":["verdict","summary","findings"],
             "properties":{"verdict":{"enum":["approve","request_changes"]},
@@ -322,6 +326,30 @@ jobs:
             | .input.subagent_type? // empty] | unique' "$LOG")
           echo "consulted=$consulted" >> "$GITHUB_OUTPUT"
           echo "consulted: $consulted" >> "$GITHUB_STEP_SUMMARY"
+          # Each agent's final answers, joined, by name: the gate holds
+          # every specialist's report file to the answer it gave, so a
+          # report one agent wrote over another's fails the review.
+          jq '([.. | objects | select(.type? == "tool_result" and .is_error? != true)
+              | {key: .tool_use_id, value: ([.content] | flatten
+                | map(if type == "string" then . else (.text? // "") end) | join("\n"))}]
+              | from_entries) as $text
+            | [.. | objects
+              | select(.type? == "tool_use" and (.name == "Agent" or .name == "Task"))
+              | select($text[.id] != null and .input.subagent_type? != null)
+              | {name: .input.subagent_type, text: $text[.id]}]
+            | group_by(.name) | map({key: .[0].name, value: (map(.text) | join("\n"))})
+            | from_entries' "$LOG" > review/answers.json
+      # The reports and the answers, for the post job's gate and for the
+      # review's readers: the review and its check link here.
+      - name: Keep the specialists' reports
+        if: steps.pull_head.outputs.number != ''
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: review-reports
+          path: |
+            review/reports/
+            review/answers.json
+          if-no-files-found: error
 
   post:
     # Runs only after the review job succeeded: a failed or missing
@@ -370,6 +398,13 @@ jobs:
           gh api "repos/$REPO/pulls/$PULL" --jq .head.sha > head.txt
           gh api --paginate "repos/$REPO/commits/$HEAD_SHA/check-runs?per_page=100" \
             --jq '.check_runs[] | {id, name, status, conclusion, started_at, app: .app.id}' > check-runs.jsonl
+      # The specialists' reports and the agents' answers, as reports/ and
+      # answers.json, for the gate to check against each other.
+      - name: Take the specialists' reports
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: review-reports
+          path: .
       # The deterministic findings weigh beside the agent's: a blocking
       # one withholds approval whatever the agent's verdict.
       - name: Decide the review
@@ -387,15 +422,18 @@ jobs:
           cargo run --locked --quiet -p review-gate --offline -- --outcome outcome.json \
             --check-runs check-runs.jsonl --reviewed "$HEAD_SHA" --head "$(cat head.txt)" \
             --checked checked.json --dispatch dispatch.json \
-            --consulted consulted.json > review.json
+            --consulted consulted.json --reports reports --answers answers.json > review.json
       - name: Post the review
         env:
           GH_TOKEN: ${{ steps.app.outputs.token }}
           REPO: ${{ github.repository }}
           PULL: ${{ needs.review.outputs.pull }}
+          REPORTS: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
           if [ -s review.json ]; then
-            gh api --method POST "repos/$REPO/pulls/$PULL/reviews" --input review.json
+            jq --arg url "$REPORTS" '.body += "\n\nThe specialist reports: \($url) (artifact review-reports)."' \
+              review.json > posted.json
+            gh api --method POST "repos/$REPO/pulls/$PULL/reviews" --input posted.json
           fi
       # The decision again as the review-gate check on the reviewed head,
       # which main's ruleset takes from this app alone (ENG-21): it
@@ -407,6 +445,7 @@ jobs:
           GH_TOKEN: ${{ steps.app.outputs.token }}
           REPO: ${{ github.repository }}
           HEAD_SHA: ${{ needs.review.outputs.head_sha }}
+          REPORTS: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
           if [ -s review.json ]; then
             conclusion=failure
@@ -417,5 +456,6 @@ jobs:
             fi
             gh api --method POST "repos/$REPO/check-runs" -f name=review-gate \
               -f head_sha="$HEAD_SHA" -f status=completed -f conclusion="$conclusion" \
-              -f "output[title]=$title" -f "output[summary]=The review gate's review on this head says why."
+              -f "output[title]=$title" \
+              -f "output[summary]=The review gate's review on this head says why. The specialists' reports: $REPORTS (artifact review-reports)."
           fi
