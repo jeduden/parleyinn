@@ -591,3 +591,27 @@ fn a_review_below_deep_keeps_the_normal_generalists() {
     );
     assert!(!got.dispatch.contains_key(dispatch::CODE_DEEP));
 }
+
+#[test]
+fn a_row_markdown_only_quotes_brings_no_specialist() {
+    let mut head = base();
+    let mut row = req("REC-03", "New.");
+    row.path = "docs/srs/06-security.md".into();
+    head.requirements.push(row.clone());
+    let mut main = base();
+    main.requirements.push(row);
+    let diff = format!("{}+ quotes REC-03\n", header("docs/notes.md"));
+
+    let got = analyse(&main, &main, &diff, false);
+
+    assert!(
+        got.touched.contains(&"REC-03".to_owned()),
+        "{:?}",
+        got.touched
+    );
+    assert!(
+        !got.dispatch.values().flatten().any(|s| s == "srs-security"),
+        "{:?}",
+        got.dispatch
+    );
+}

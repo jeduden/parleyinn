@@ -153,8 +153,18 @@ pub fn analyse(base: &Snapshot, head: &Snapshot, diff: &str, consent: bool) -> A
     // class and the dispatch fail closed.
     let crates = crates.unwrap_or_else(|| vec![dispatch::EVERY_CRATE.to_owned()]);
     let deep = paths.iter().any(|p| deep_code(&crates, p));
+    // The rows that bring their section's specialist: those the change
+    // edits, and those code names; a row Markdown only quotes is in the
+    // bundle but brings no one.
+    let named: BTreeSet<String> = requirements
+        .keys()
+        .chain(scenarios.keys())
+        .cloned()
+        .chain(diff::ids_in_code(diff))
+        .collect();
     let rows: Vec<&srs::Requirement> = touched
         .iter()
+        .filter(|id| named.contains(*id))
         .filter_map(|id| requirement(head, id).or_else(|| requirement(base, id)))
         .collect();
     let class = classify(&paths, deep || !owned.is_empty(), &unparsed);

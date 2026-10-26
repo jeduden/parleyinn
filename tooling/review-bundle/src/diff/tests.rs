@@ -132,3 +132,18 @@ fn changed_paths_reads_a_path_holding_b_slash_only_when_unambiguous() {
     assert!(got.paths.is_empty(), "{got:?}");
     assert_eq!(got.unparsed, [renamed.trim_end()]);
 }
+
+#[test]
+fn ids_in_code_leave_out_what_markdown_quotes() {
+    let diff = "\
++REC-09 before any header
+diff --git a/.claude/agents/a.md b/.claude/agents/a.md
++ restore blocks (INJ-01, INJ-02)
+diff --git a/crates/pin/src/lib.rs b/crates/pin/src/lib.rs
++++ b/crates/pin/src/lib.rs
++// PIN-03 holds
+-// PIN-04 held
+";
+
+    assert_eq!(ids_in_code(diff), ["PIN-03", "PIN-04"]);
+}
