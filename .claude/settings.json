@@ -2,9 +2,33 @@
   "extraKnownMarketplaces": {
     "mdsmith": {
       "source": {
-        "source": "github",
-        "repo": "jeduden/mdsmith",
-        "ref": "v0.55.1"
+        "source": "settings",
+        "name": "mdsmith",
+        "owner": {
+          "name": "Jan-Eric Duden"
+        },
+        "plugins": [
+          {
+            "name": "mdsmith-skills",
+            "source": {
+              "source": "git-subdir",
+              "url": "https://github.com/jeduden/mdsmith.git",
+              "path": "editors/claude-code-skills",
+              "ref": "v0.55.1",
+              "sha": "0ca0d2f7c95ab53e3e9ed8851150af98b95088fb"
+            }
+          },
+          {
+            "name": "mdsmith-audit",
+            "source": {
+              "source": "git-subdir",
+              "url": "https://github.com/jeduden/mdsmith.git",
+              "path": "editors/claude-code-audit",
+              "ref": "v0.55.1",
+              "sha": "0ca0d2f7c95ab53e3e9ed8851150af98b95088fb"
+            }
+          }
+        ]
       }
     }
   },
