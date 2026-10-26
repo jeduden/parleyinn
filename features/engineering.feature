@@ -294,24 +294,25 @@ Feature: Engineering quality (ENG)
     And every agent the review bundle can dispatch is defined, specialists at low effort, generalists at medium and their deep instances on opus at high effort with 40 turns
     And every language the repository's source and configuration are written in has its specialist
     And the review gate decides:
-      | verdict         | finding  | check finding | head    | CI     | other check | consulted | dispatch  | review          |
-      | approve         | none     | none          | current | passed | passed      | all       | given     | APPROVE         |
-      | approve         | nit      | none          | current | passed | passed      | all       | given     | APPROVE         |
-      | approve         | blocking | none          | current | passed | passed      | all       | given     | REQUEST_CHANGES |
-      | approve         | none     | nit           | current | passed | passed      | all       | given     | APPROVE         |
-      | approve         | none     | blocking      | current | passed | passed      | all       | given     | REQUEST_CHANGES |
-      | approve         | none     | malformed     | current | passed | passed      | all       | given     | an error        |
-      | approve         | none     | none          | current | passed | failed      | all       | given     | REQUEST_CHANGES |
-      | request_changes | none     | none          | current | passed | passed      | all       | given     | REQUEST_CHANGES |
-      | approve         | none     | none          | moved   | passed | passed      | all       | given     | nothing         |
-      | approve         | none     | none          | current | failed | passed      | all       | given     | an error        |
-      | malformed       | none     | none          | current | passed | passed      | all       | given     | an error        |
-      | missing         | none     | none          | current | passed | passed      | all       | given     | an error        |
-      | approve         | none     | missing       | current | passed | passed      | all       | given     | an error        |
-      | approve         | none     | none          | current | passed | passed      | not all   | given     | an error        |
-      | approve         | none     | none          | current | passed | passed      | malformed | given     | an error        |
-      | approve         | none     | none          | current | passed | passed      | all       | missing   | an error        |
-      | approve         | none     | none          | current | passed | passed      | all       | malformed | an error        |
+      | verdict         | finding  | check finding | head    | CI     | other check | consulted | dispatch  | own check | review          |
+      | approve         | none     | none          | current | passed | passed      | all       | given     | none      | APPROVE         |
+      | approve         | nit      | none          | current | passed | passed      | all       | given     | none      | APPROVE         |
+      | approve         | blocking | none          | current | passed | passed      | all       | given     | none      | REQUEST_CHANGES |
+      | approve         | none     | nit           | current | passed | passed      | all       | given     | none      | APPROVE         |
+      | approve         | none     | blocking      | current | passed | passed      | all       | given     | none      | REQUEST_CHANGES |
+      | approve         | none     | malformed     | current | passed | passed      | all       | given     | none      | an error        |
+      | approve         | none     | none          | current | passed | failed      | all       | given     | none      | REQUEST_CHANGES |
+      | request_changes | none     | none          | current | passed | passed      | all       | given     | none      | REQUEST_CHANGES |
+      | approve         | none     | none          | moved   | passed | passed      | all       | given     | none      | nothing         |
+      | approve         | none     | none          | current | failed | passed      | all       | given     | none      | an error        |
+      | malformed       | none     | none          | current | passed | passed      | all       | given     | none      | an error        |
+      | missing         | none     | none          | current | passed | passed      | all       | given     | none      | an error        |
+      | approve         | none     | missing       | current | passed | passed      | all       | given     | none      | an error        |
+      | approve         | none     | none          | current | passed | passed      | not all   | given     | none      | an error        |
+      | approve         | none     | none          | current | passed | passed      | malformed | given     | none      | an error        |
+      | approve         | none     | none          | current | passed | passed      | all       | missing   | none      | an error        |
+      | approve         | none     | none          | current | passed | passed      | all       | malformed | none      | an error        |
+      | approve         | none     | none          | current | passed | passed      | all       | given     | failed    | APPROVE         |
 
   @ENG-29 @P0 @pending
   Scenario: an invariant or I2-review change lands only with an ADR recording a named security reviewer's approval

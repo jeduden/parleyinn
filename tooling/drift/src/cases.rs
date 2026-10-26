@@ -535,6 +535,17 @@ fn review_agent_cases() -> Vec<Case> {
 fn review_gate_cases() -> Vec<Case> {
     vec![
         case(
+            "the gate held back by its own earlier check",
+            "ENG-28",
+            Injection::replace(
+                "tooling/review-gate/src/lib.rs",
+                "    !own && r.status == \"completed\"",
+                "    let _ = own;\n    r.status == \"completed\"",
+            ),
+            scenario("ENG-28"),
+            "own check",
+        ),
+        case(
             "the review posted without the review gate",
             "ENG-28",
             Injection::replace(

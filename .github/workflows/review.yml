@@ -369,7 +369,7 @@ jobs:
         run: |
           gh api "repos/$REPO/pulls/$PULL" --jq .head.sha > head.txt
           gh api --paginate "repos/$REPO/commits/$HEAD_SHA/check-runs?per_page=100" \
-            --jq '.check_runs[] | {id, name, status, conclusion, started_at}' > check-runs.jsonl
+            --jq '.check_runs[] | {id, name, status, conclusion, started_at, app: .app.id}' > check-runs.jsonl
       # The deterministic findings weigh beside the agent's: a blocking
       # one withholds approval whatever the agent's verdict.
       - name: Decide the review

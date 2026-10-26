@@ -28,11 +28,11 @@ pub const CI_CHECK: &str = "CI";
 
 /// The check the review gate posts on a pull request's head (ENG-28):
 /// it passes only where the gate approves.
-pub const REVIEW_GATE_CHECK: &str = "review-gate";
+pub const REVIEW_GATE_CHECK: &str = review_gate::OWN_CHECK;
 
 /// The reviewer app, `jeduden-review-agent`, by its GitHub App id: the
 /// one app whose [`REVIEW_GATE_CHECK`] the ruleset accepts.
-pub const REVIEWER_APP_ID: u64 = 5_140_085;
+pub const REVIEWER_APP_ID: u64 = review_gate::REVIEWER_APP_ID.unsigned_abs();
 
 /// Where the repository commits its rulesets, one JSON file each.
 pub const RULESETS: &str = ".github/rulesets";

@@ -390,6 +390,21 @@ fn consulted(row: &BTreeMap<String, String>) -> Option<&'static str> {
     }
 }
 
+/// The check run line for the gate's own `review-gate` check a row
+/// names: a failed one from the reviewer app for `failed`, none
+/// otherwise.
+fn own_check(cell: &str) -> String {
+    if cell == "failed" {
+        format!(
+            "{{\"name\":{:?},\"status\":\"completed\",\"conclusion\":\"failure\",\"app\":{}}}\n",
+            review_gate::OWN_CHECK,
+            review_gate::REVIEWER_APP_ID
+        )
+    } else {
+        String::new()
+    }
+}
+
 /// Runs the review gate's command line, as the review workflow does,
 /// on the files one table row describes, and names what it does: the
 /// review event it prints, "nothing" for a head that moved, or "an
@@ -432,9 +447,10 @@ pub fn gate_outcome(row: &BTreeMap<String, String>) -> &'static str {
         "check-runs.jsonl",
         format!(
             "{{\"name\":\"CI\",\"status\":\"completed\",\"conclusion\":{:?}}}\n\
-             {{\"name\":\"lint\",\"status\":\"completed\",\"conclusion\":{:?}}}\n",
+             {{\"name\":\"lint\",\"status\":\"completed\",\"conclusion\":{:?}}}\n{}",
             conclusion(cell("CI")),
-            conclusion(cell("other check"))
+            conclusion(cell("other check")),
+            own_check(cell("own check"))
         ),
     )]);
     if cell("verdict") != "missing" {

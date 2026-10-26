@@ -858,3 +858,41 @@ fn code_spans_stay_on_one_line() {
     assert!(got.contains("- nit `a ### b`: c"), "{got}");
     assert!(got.contains("- check `lint ### x`: failure"), "{got}");
 }
+
+#[test]
+fn the_gate_s_own_earlier_check_does_not_hold_back_an_approval() {
+    let mut runs = green();
+    runs.push(CheckRun {
+        app: REVIEWER_APP_ID,
+        ..run(OWN_CHECK, "completed", "failure")
+    });
+
+    let r = decide(&input(approve(), runs)).unwrap().unwrap();
+
+    assert_eq!(r.event, APPROVE);
+}
+
+#[test]
+fn a_check_of_the_gate_s_name_from_another_app_still_counts() {
+    let mut runs = green();
+    runs.push(CheckRun {
+        app: 15_368,
+        ..run(OWN_CHECK, "completed", "failure")
+    });
+
+    let r = decide(&input(approve(), runs)).unwrap().unwrap();
+
+    assert_eq!(r.event, REQUEST_CHANGES);
+}
+
+#[test]
+fn a_check_run_reads_its_app() {
+    let runs = parse_check_runs(
+        r#"{"name":"review-gate","status":"completed","conclusion":"failure","app":5140085}
+{"name":"CI","status":"completed","conclusion":"success","app":null}"#,
+    )
+    .unwrap();
+
+    assert_eq!(runs[0].app, REVIEWER_APP_ID);
+    assert_eq!(runs[1].app, 0);
+}

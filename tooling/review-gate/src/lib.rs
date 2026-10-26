@@ -30,6 +30,11 @@ pub const NIT: &str = "nit";
 pub const APPROVE: &str = "APPROVE";
 /// The review event that requests changes, as GitHub names it.
 pub const REQUEST_CHANGES: &str = "REQUEST_CHANGES";
+/// The check the post job posts with the gate's decision (ENG-28),
+/// which main's ruleset requires from the reviewer app alone (ENG-21).
+pub const OWN_CHECK: &str = "review-gate";
+/// The reviewer app, `jeduden-review-agent`, by its GitHub App id.
+pub const REVIEWER_APP_ID: i64 = 5_140_085;
 
 /// The check the branch ruleset requires: the job that passes only when
 /// every CI job passed.
@@ -72,6 +77,9 @@ pub struct CheckRun {
     pub conclusion: String,
     #[serde(deserialize_with = "null_as_default")]
     pub started_at: String,
+    /// The GitHub App that posted it, by id; 0 when unknown.
+    #[serde(deserialize_with = "null_as_default")]
+    pub app: i64,
 }
 
 /// Everything the gate decides from.
@@ -360,9 +368,13 @@ fn is_blocking(f: &Finding) -> bool {
 
 /// Whether `r` completed and neither passed nor was skipped. A check
 /// still running, this review among them, is not counted: the required
-/// CI check has already passed.
+/// CI check has already passed. Nor is the gate's own [`OWN_CHECK`]
+/// from an earlier review of this head, which a re-review, after the
+/// stakeholder's consent, would otherwise never get past.
 fn failed(r: &CheckRun) -> bool {
-    r.status == "completed" && !["success", "neutral", "skipped"].contains(&r.conclusion.as_str())
+    let own = r.name == OWN_CHECK && r.app == REVIEWER_APP_ID;
+    !own && r.status == "completed"
+        && !["success", "neutral", "skipped"].contains(&r.conclusion.as_str())
 }
 
 /// Writes the review body. A title names the gate's outcome and the
