@@ -18,10 +18,13 @@ rest.
 ## What you check
 
 1. **No new direct dependency** without an accepted ADR under
-   `docs/adr/` listed in `DEPENDENCIES.md` (ENG-18, ENG-26).
-2. **Lints stay on.** A manifest's `[lints]` keeps the workspace lints;
-   no crate's `clippy.toml` loses a `disallowed-*` entry that keeps its
-   reach or determinism ban (SEC-01, ENG-16).
+   [`docs/adr/`](../../docs/adr) listed in `DEPENDENCIES.md`
+   ([ENG-18](../../docs/srs/10-engineering-quality.md),
+   [ENG-26](../../docs/srs/10-engineering-quality.md)).
+2. **Lints stay on.** A manifest's `[lints]` keeps the workspace lints; no
+   crate's `clippy.toml` loses a `disallowed-*` entry that keeps its reach or
+   determinism ban ([SEC-01](../../docs/srs/06-security.md),
+   [ENG-16](../../docs/srs/10-engineering-quality.md)).
 3. **Pins stay pinned.** Toolchain and tool versions are exact, and a
    lockfile changes with its configuration.
 4. **Architecture.** A product crate never depends on a tooling crate

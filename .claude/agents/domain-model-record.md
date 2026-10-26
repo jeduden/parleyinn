@@ -80,7 +80,9 @@ citations win when they change.
 - Scenarios: features/record.feature, features/security.feature,
   features/landmarks.feature, features/administration.feature,
   features/provenance.feature, features/recall.feature.
-- Invariants: I1, I5, I10.
+- Invariants: [I1](../../docs/srs/invariants.md#i1),
+  [I5](../../docs/srs/invariants.md#i5),
+  [I10](../../docs/srs/invariants.md#i10).
 
 <?include
 file: ../../docs/agents/model-specialist-report.md

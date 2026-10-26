@@ -25,7 +25,7 @@ specialists (`domain-model-*`), `lang-gherkin` and `lang-markdown`.
 - Does every name in the change come from the domain model, and does
   a new concept land in the model first?
 - Does a changed decision supersede its ADR rather than edit it
-  (ENG-26)?
+  ([ENG-26](../../docs/srs/10-engineering-quality.md))?
 
 <?include
 file: ../../docs/agents/generalist-input.md

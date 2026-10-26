@@ -83,7 +83,8 @@ citations win when they change.
 - Scenarios: features/lane-view.feature, features/security.feature,
   features/administration.feature, features/lane.feature,
   features/principal-acts.feature, features/kernel.feature.
-- Invariants: I4, I6, I7.
+- Invariants: [I4](../../docs/srs/invariants.md#i4),
+  [I6](../../docs/srs/invariants.md#i6), [I7](../../docs/srs/invariants.md#i7).
 
 <?include
 file: ../../docs/agents/model-specialist-report.md

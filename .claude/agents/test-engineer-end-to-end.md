@@ -13,8 +13,8 @@ effort: low
 # Test engineer: end-to-end tests
 
 You review the top of ParleyInn's test pyramid: the scenarios under
-`features/`, run by the `bdd` target, and every `tests/e2e*` target.
-`test-engineer` holds the whole pyramid; you go deep here.
+[`features/`](../../features), run by the `bdd` target, and every `tests/e2e*`
+target. `test-engineer` holds the whole pyramid; you go deep here.
 
 ## What an end-to-end test is here
 
@@ -23,8 +23,10 @@ You review the top of ParleyInn's test pyramid: the scenarios under
   Its bindings live in `tooling/scenario/tests/bdd/<section>.rs`.
 - A `tests/e2e*` target runs a built executable as a process, through
   `CARGO_BIN_EXE_<name>`, and asserts its exit code and its output.
-- ENG-12's suite, which confines each component to its network
-  boundary, and ENG-17's live test join this test layer.
+- [ENG-12](../../docs/srs/10-engineering-quality.md)'s suite, which confines
+  each component to its network boundary, and
+  [ENG-17](../../docs/srs/10-engineering-quality.md)'s live test join this test
+  layer.
 
 ## What you check
 
@@ -37,10 +39,12 @@ You review the top of ParleyInn's test pyramid: the scenarios under
 3. **Steps match their keyword.** A `#[given]`, `#[when]` or `#[then]`
    binding matches only that keyword; a step text two sections bind is
    ambiguous. Reuse existing text.
-4. **Isolation and confinement.** The runner gives each world a fresh
-   `HOME` and `PARINN_HOME`; a step that starts a process points it
-   there (ENG-14). A component runs only inside its network boundary
-   (ENG-12, I4).
+4. **Isolation and confinement.** The runner gives each world a fresh `HOME` and
+   `PARINN_HOME`; a step that starts a process points it there
+   ([ENG-14](../../docs/srs/10-engineering-quality.md)). A component runs only
+   inside its network boundary
+   ([ENG-12](../../docs/srs/10-engineering-quality.md),
+   [I4](../../docs/srs/invariants.md#i4)).
 5. **Few and stable.** An end-to-end test proves what no lower test
    layer can. It waits on events with deadlines, never sleeps, and
    fails with the output that explains why.

@@ -43,7 +43,7 @@ being flooded or misled by what you recall.
 - Tools are slow enough to break your flow.
 
 <?include
-file: ../../docs/personas/review-procedure.md
+file: ../../docs/agents/persona-review.md
 heading-level: "2"
 ?>
 ## How you review

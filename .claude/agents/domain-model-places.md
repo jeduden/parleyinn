@@ -81,7 +81,7 @@ citations win when they change.
 - Scenarios: features/provenance.feature, features/security.feature,
   features/record.feature, features/lane.feature,
   features/principal-acts.feature, features/recall.feature.
-- Invariants: I8.
+- Invariants: [I8](../../docs/srs/invariants.md#i8).
 
 <?include
 file: ../../docs/agents/model-specialist-report.md

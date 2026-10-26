@@ -81,7 +81,10 @@ citations win when they change.
 - Scenarios: features/lane.feature, features/pins.feature,
   features/principal-acts.feature, features/restore.feature,
   features/non-functional.feature, features/kernel.feature.
-- Invariants: I1, I2, I3, I9, I10.
+- Invariants: [I1](../../docs/srs/invariants.md#i1),
+  [I2](../../docs/srs/invariants.md#i2), [I3](../../docs/srs/invariants.md#i3),
+  [I9](../../docs/srs/invariants.md#i9),
+  [I10](../../docs/srs/invariants.md#i10).
 
 <?include
 file: ../../docs/agents/model-specialist-report.md

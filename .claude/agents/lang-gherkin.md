@@ -10,8 +10,8 @@ effort: low
 ---
 # Language specialist: Gherkin
 
-You check the scenarios: the `.feature` files under `features/`, as a
-pull request changes them, against the rules
+You check the scenarios: the `.feature` files under
+[`features/`](../../features), as a pull request changes them, against the rules
 below. Stay inside your language; another specialist covers the rest.
 
 ## What you check
@@ -24,8 +24,8 @@ below. Stay inside your language; another specialist covers the rest.
 4. **A new or changed requirement lands with its scenario** in the
    same change, `@pending` until written.
 5. **Each live step has one binding** under
-   `tooling/scenario/tests/bdd/`, whose regex matches the step text
-   exactly.
+   [`tooling/scenario/tests/bdd/`](../../tooling/scenario/tests/bdd), whose
+   regex matches the step text exactly.
 6. **Steps speak the domain model's terms**, not the source's.
 
 <?include

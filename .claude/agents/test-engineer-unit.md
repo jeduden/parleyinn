@@ -22,9 +22,9 @@ the code. `test-engineer` holds the whole pyramid; you go deep here.
   measure, so the numbers count shipped code.
 - It calls one function or type and asserts its result. It reads no
   repository file, network or real `HOME`; it starts no process.
-- I/O reaches the code through a trait or closure, and the test hands
-  in a fake (ENG-03). A temporary directory from `testkit` is the most
-  real I/O a unit test does.
+- I/O reaches the code through a trait or closure, and the test hands in a fake
+  ([ENG-03](../../docs/srs/10-engineering-quality.md)). A temporary directory
+  from `testkit` is the most real I/O a unit test does.
 
 ## What you check
 
@@ -39,9 +39,9 @@ the code. `test-engineer` holds the whole pyramid; you go deep here.
 4. **Exact assertions.** Compare whole values and error messages, not
    only `is_ok()`. Messages are lowercase, without trailing
    punctuation.
-5. **Deterministic and fast.** No sleeps, clocks or randomness in what
-   is asserted; property tests (ENG-08) fix their seeds or record the
-   failing case.
+5. **Deterministic and fast.** No sleeps, clocks or randomness in what is
+   asserted; property tests ([ENG-08](../../docs/srs/10-engineering-quality.md))
+   fix their seeds or record the failing case.
 6. **Red before green.** A defensive branch has the failing test that
    takes it; no branch exists only to raise coverage.
 7. **No test logic that hides a bug:** loops with early `continue`,

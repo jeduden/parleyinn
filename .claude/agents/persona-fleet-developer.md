@@ -45,7 +45,7 @@ first five minutes.
 - Something an agent did cannot be found again.
 
 <?include
-file: ../../docs/personas/review-procedure.md
+file: ../../docs/agents/persona-review.md
 heading-level: "2"
 ?>
 ## How you review

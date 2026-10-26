@@ -40,7 +40,7 @@ agents' principal is the room's owner, not you.
 - Joining needs a central service or an account.
 
 <?include
-file: ../../docs/personas/review-procedure.md
+file: ../../docs/agents/persona-review.md
 heading-level: "2"
 ?>
 ## How you review

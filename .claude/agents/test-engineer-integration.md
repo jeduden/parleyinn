@@ -27,15 +27,16 @@ whole pyramid; you go deep here.
 
 ## What you check
 
-1. **The gates read the real repository** and name every problem in
-   one failure, not the first. Each gate a change adds has its drift
-   case in `tooling/drift/src/cases.rs` (ENG-27).
+1. **The gates read the real repository** and name every problem in one failure,
+   not the first. Each gate a change adds has its drift case in
+   [`tooling/drift/src/cases.rs`](../../tooling/drift/src/cases.rs)
+   ([ENG-27](../../docs/srs/10-engineering-quality.md)).
 2. **Each real process or file boundary is proven here.** A trait's real
    implementation, the one the unit tests replace with a fake, has an
    integration test that runs it.
 3. **Isolation.** Every file a test writes is under a temporary
    directory it owns; nothing reaches the real `HOME`, `PARINN_HOME` or
-   `~/.claude` (ENG-14).
+   `~/.claude` ([ENG-14](../../docs/srs/10-engineering-quality.md)).
 4. **The right test layer.** A test that only calls a pure function
    belongs beside it as a unit test; one that runs an executable
    belongs in a `tests/e2e*` target.

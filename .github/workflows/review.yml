@@ -178,11 +178,11 @@ jobs:
       # The release rust-toolchain.toml names, so the tool builds as CI
       # tested it. It is main's tool, built from main's tree; the pull
       # request's tree is only its input.
-      - name: Install pinned Rust with mise
+      - name: Install pinned Rust and mdsmith with mise
         if: steps.pull_head.outputs.number != ''
         uses: ./.github/actions/setup-mise
         with:
-          tools: rust
+          tools: "rust github:jeduden/mdsmith"
           # Jobs handling review credentials never restore executable caches.
           cache: false
       # The review class sets how deep the review goes, from the paths that
@@ -197,6 +197,10 @@ jobs:
         if: steps.pull_head.outputs.number != ''
         run: |
           mkdir -p review
+          # mdsmith's own catalog of the Markdown patterns its rules cannot
+          # see until a kind, include or catalog declares them, from main's
+          # pinned mdsmith; the Markdown specialist reviews against it.
+          mdsmith help patterns -f json > review/mdsmith-patterns.json
           cargo run --locked --quiet -p review-bundle -- --base . --head pr-head \
             --diff pr.diff --consent stakeholder-comments.json --out review > class.txt
           cat class.txt >> "$GITHUB_OUTPUT"

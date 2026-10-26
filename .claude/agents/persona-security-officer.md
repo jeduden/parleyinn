@@ -46,7 +46,7 @@ between agents looks to you like a prompt-injection network.
 - Erasure leaves hashes that confirm the erased content.
 
 <?include
-file: ../../docs/personas/review-procedure.md
+file: ../../docs/agents/persona-review.md
 heading-level: "2"
 ?>
 ## How you review

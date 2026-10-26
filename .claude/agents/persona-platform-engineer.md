@@ -39,7 +39,7 @@ what the system is doing.
 - Resource use is unbounded or unpredictable.
 
 <?include
-file: ../../docs/personas/review-procedure.md
+file: ../../docs/agents/persona-review.md
 heading-level: "2"
 ?>
 ## How you review

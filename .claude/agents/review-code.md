@@ -26,8 +26,9 @@ the build and CI configuration. These specialists report to you:
 - Does the code do what each touched row says, and no more?
 - Is each behaviour proven at the lowest test layer that can prove it,
   with a unit test per function and its error paths?
-- Do errors keep their cause, blocking calls take a deadline, and I/O
-  sit behind a seam a test injects (ENG-03, ENG-04)?
+- Do errors keep their cause, blocking calls take a deadline, and I/O sit behind
+  a seam a test injects ([ENG-03](../../docs/srs/10-engineering-quality.md),
+  [ENG-04](../../docs/srs/10-engineering-quality.md))?
 - Does the change stay inside its latency, throughput and footprint
   budgets, grow no worse than `O(n log n)` in the store's size, add
   no costly crossing to a budgeted call's path, and keep its

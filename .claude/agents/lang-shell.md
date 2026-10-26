@@ -21,8 +21,8 @@ below. Stay inside your language; another specialist covers the rest.
 2. **Quoting.** Every expansion is quoted; no word splitting or glob
    on untrusted input.
 3. **No network or download** that is not pinned and checksummed.
-4. **Isolation (ENG-14).** No write to the real `~/.parinn`,
-   `$PARINN_HOME` or `~/.claude`.
+4. **Isolation ([ENG-14](../../docs/srs/10-engineering-quality.md)).** No write
+   to the real `~/.parinn`, `$PARINN_HOME` or `~/.claude`.
 5. **Portability** to the shells and platforms CI runs it on.
 
 <?include

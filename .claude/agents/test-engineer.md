@@ -41,18 +41,25 @@ for. Three specialists go deep on one test layer each:
    pyramid: most tests are unit tests. Integration and end-to-end
    tests guard behaviour, not lines. A lower floor for one crate
    states its reason; a new exclusion is a finding.
-4. **The test kinds the SRS assigns land with their requirements:**
-   crash consistency (ENG-06), fuzzing with a committed corpus
-   (ENG-07), property tests (ENG-08), the soak (ENG-09), golden files
-   (ENG-10), the confined end-to-end suite (ENG-12), mutation testing
-   (ENG-13), benchmarks (ENG-15) and contract tests (ENG-17).
-5. **Tests stay honest.** None is deleted, ignored, re-pended or
-   weakened to turn CI green. A check on the repository's records has
-   its drift case (ENG-27). An assertion would fail if the code broke.
-6. **Tests stay safe and repeatable.** None reaches the real `HOME` or
-   Claude Code configuration (ENG-14). None sleeps to wait, reads the
-   network, or depends on test order. Code that builds derived
-   artifacts is tested without a clock or randomness (I10).
+4. **The test kinds the SRS assigns land with their requirements:** crash
+   consistency ([ENG-06](../../docs/srs/10-engineering-quality.md)), fuzzing
+   with a committed corpus ([ENG-07](../../docs/srs/10-engineering-quality.md)),
+   property tests ([ENG-08](../../docs/srs/10-engineering-quality.md)), the soak
+   ([ENG-09](../../docs/srs/10-engineering-quality.md)), golden files
+   ([ENG-10](../../docs/srs/10-engineering-quality.md)), the confined end-to-end
+   suite ([ENG-12](../../docs/srs/10-engineering-quality.md)), mutation testing
+   ([ENG-13](../../docs/srs/10-engineering-quality.md)), benchmarks
+   ([ENG-15](../../docs/srs/10-engineering-quality.md)) and contract tests
+   ([ENG-17](../../docs/srs/10-engineering-quality.md)).
+5. **Tests stay honest.** None is deleted, ignored, re-pended or weakened to
+   turn CI green. A check on the repository's records has its drift case
+   ([ENG-27](../../docs/srs/10-engineering-quality.md)). An assertion would fail
+   if the code broke.
+6. **Tests stay safe and repeatable.** None reaches the real `HOME` or Claude
+   Code configuration ([ENG-14](../../docs/srs/10-engineering-quality.md)). None
+   sleeps to wait, reads the network, or depends on test order. Code that builds
+   derived artifacts is tested without a clock or randomness
+   ([I10](../../docs/srs/invariants.md#i10)).
 7. **Red before green.** A defensive branch has the failing test that
    takes it (CLAUDE.md).
 

@@ -44,7 +44,7 @@ not the narrative, and you have little time per change.
 - Review on the forge and in ParleyInn disagree, or must be done twice.
 
 <?include
-file: ../../docs/personas/review-procedure.md
+file: ../../docs/agents/persona-review.md
 heading-level: "2"
 ?>
 ## How you review

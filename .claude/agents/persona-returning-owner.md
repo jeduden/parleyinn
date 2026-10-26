@@ -41,7 +41,7 @@ what is waiting for you, and whether anything went wrong.
 - Catching up takes longer than reading the git log.
 
 <?include
-file: ../../docs/personas/review-procedure.md
+file: ../../docs/agents/persona-review.md
 heading-level: "2"
 ?>
 ## How you review
