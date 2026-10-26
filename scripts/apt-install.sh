@@ -11,10 +11,11 @@
 # step summary, so the retry rate stays visible.
 #
 # Worst case: 3 attempts x (15 s update + 30 s install) + 2 retries x
-# (5 s dpkg recovery + 3 s pause) = 151 s. The whole run is also held
-# to a total budget of 150 s: each command's timeout is cut to the time
-# left, so the script prints its error and retry count and exits within
-# about 150 s. Callers give the step a 3-minute timeout, above that.
+# (5 s dpkg recovery + 3 s pause) = 151 s, after up to 60 s installing
+# from a cache. The whole run is also held to a total budget of 150 s:
+# each command's timeout is cut to the time left, so the script prints
+# its error and retry count and exits within about 150 s. Callers give
+# the step a 3-minute timeout, above that.
 #
 # With APT_CACHE naming a directory, the packages install from the .deb
 # files in it first, without the mirrors, so a build does not depend on
@@ -35,6 +36,7 @@ fi
 attempts=3
 update_timeout=15
 install_timeout=30
+cache_timeout=60
 recover_timeout=5
 pause=3
 total=150
@@ -81,9 +83,11 @@ report() {
   fi
 }
 
-# Installs from the cache's .deb files, which need no download; fails
-# when there are none, or when apt needs a package they do not hold and
-# cannot fetch it in time. (apt refuses --no-download with local files.)
+# Installs the cache's .deb files with dpkg, which never reaches the
+# network: apt, given local files, still reads its lists and may wait
+# on a mirror. Fails when there are none, when they do not hold every
+# package the install needs, or when unpacking them outlasts its bound;
+# dpkg says which.
 from_cache() {
   local debs=()
   if [ -n "$cache" ] && [ -d "$cache" ]; then
@@ -92,8 +96,20 @@ from_cache() {
   if [ "${#debs[@]}" -eq 0 ] || [ ! -e "${debs[0]}" ]; then
     return 1
   fi
-  bounded "$install_timeout" sudo apt-get "${opts[@]}" install -y -qq --no-install-recommends \
-    "${debs[@]}"
+  bounded "$cache_timeout" sudo dpkg --install --skip-same-version "${debs[@]}"
+}
+
+# Removes each package a failed install from the cache left unpacked
+# but not configured, so the mirrors' install starts as it would have
+# without the cache.
+rollback() {
+  local left
+  left=$(dpkg-query -W -f '${db:Status-Status} ${Package}\n' | awk '$1 != "installed" && $1 != "not-installed" && $1 != "config-files" {print $2}')
+  if [ -n "$left" ]; then
+    # shellcheck disable=SC2086 # one package name per word
+    bounded "$recover_timeout" sudo dpkg --remove --force-depends $left ||
+      echo "::warning::dpkg could not roll back $left"
+  fi
 }
 
 # Copies the .deb files the install downloaded into the cache, owned by
@@ -119,6 +135,7 @@ if [ -n "$cache" ]; then
   fi
   if [ -d "$cache" ]; then
     echo "::warning::apt could not install from the cache in $cache; trying the mirrors"
+    rollback
   fi
 fi
 
