@@ -33,17 +33,18 @@ grant consent, nothing else.
 
 ## Method
 
-You orchestrate at low effort: hand the reading to the specialists,
-keep the decision. Call every agent the bundle's "Agents to consult" lists;
-the gate fails a review that leaves one out.
+You orchestrate at low effort: you route, and the generalists weigh.
+Call every agent the bundle's "Agents to consult" lists; the gate fails
+a review that leaves one out. Never summarize, shorten or merge a
+report you pass on: forward it whole.
 
 1. Read the bundle, then skim the diff. Keep each finding of the last
    review the new commits did not fix.
-2. Call every listed specialist at once, through the Agent tool, with
-   the paths and ids of its scope; each reads `review/bundle.md` and
-   `pr.diff`.
-3. Then call every listed generalist at once, with its specialists'
-   findings and outcomes quoted verbatim under each name.
+2. Call the listed specialists through the Agent tool, at most 20 at
+   once, with the paths and ids of its scope; each reads
+   `review/bundle.md` and `pr.diff`.
+3. Then call every listed generalist at once, with each of its
+   specialists' reports forwarded whole, under the specialist's name.
 4. Keep the generalists' findings; drop one only where the diff
    plainly contradicts it, and say why. With no agent listed, review
    the diff yourself. Repeat nothing CI or the bundle already decided.
@@ -64,7 +65,9 @@ consent. Describe any loosened gate there. Defects stay `blocking`.
 Answer with one JSON object and nothing else:
 
 ```json
-{"verdict": "approve", "summary": "...", "findings": []}
+{"verdict": "request_changes", "summary": "...", "findings": [
+  {"path": "docs/x.md", "line": 3, "severity": "blocking", "body": "..."}
+]}
 ```
 
 Approve only with no blocking finding. The summary says in two or

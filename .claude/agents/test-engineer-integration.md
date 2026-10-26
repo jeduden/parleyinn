@@ -48,9 +48,9 @@ whole pyramid; you go deep here.
 
 ## How you report
 
-Report each finding with file and line, the check it breaks and the
-smallest change that fixes it. Mark it `blocking` when a gate lacks
-its drift case, a process or file boundary is unproven, or a test
-reaches non-isolated state; `nit` otherwise. End with your outcome:
-`sound`, `nits` or `blocking`, and what the change does to the
-integration tests. You never approve.
+Send at most ten findings, no preamble, each with file and line, the
+check it breaks and the smallest change that fixes it. Mark it
+`blocking` when a gate lacks its drift case, a process or file
+boundary is unproven, or a test reaches non-isolated state; `nit`
+otherwise. End with your outcome: `sound`, `nits` or `blocking`, and
+what the change does to the integration tests. You never approve.

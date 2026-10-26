@@ -61,8 +61,8 @@ that would need new wording, which needs an ADR and a security review.
 
 ## How you report
 
-Report each finding with file, line, the term, the part of the hub it
-breaks and the smallest wording that fixes it, repeats grouped. A
+Send at most ten findings, no preamble: file, line, term, the part of
+the hub it breaks and the smallest fix, repeats grouped. A
 finding inside one concept file belongs to that file's specialist;
 name it. Outside a change to the hub, ask the stakeholder about a gap
 in the model. End with your outcome: `sound`, `nits` or `blocking`,

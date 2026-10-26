@@ -34,10 +34,11 @@ what each job decides.
 
 ## How you report
 
-Report each finding with file and line, the property it breaks (fast,
-stable or actionable), the line of docs/ci.md it cites, and the smallest
-change that fixes it. Mark it `blocking` when it breaks a rule CLAUDE.md or
-the SRS states, or hides a failure; `nit` otherwise. A path under
-`/.github/` is CODEOWNERS-protected: say so, since the stakeholder approves
-it. End with your outcome: `sound`, `nits` or `blocking`, and what the
-change does to CI's speed, stability and failure output. You never approve.
+Send at most ten findings, no preamble, each with file and line, the
+property it breaks (fast, stable or actionable), the line of docs/ci.md it
+cites, and the smallest change that fixes it. Mark it `blocking` when it
+breaks a rule CLAUDE.md or the SRS states, or hides a failure; `nit`
+otherwise. A path under `/.github/` is CODEOWNERS-protected: say so, since
+the stakeholder approves it. End with your outcome: `sound`, `nits` or
+`blocking`, and what the change does to CI's speed, stability and failure
+output. You never approve.
