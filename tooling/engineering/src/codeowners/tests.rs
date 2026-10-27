@@ -311,12 +311,38 @@ fn another_checkout_under_claude_worktrees_is_not_read() {
     );
 }
 
+#[cfg(unix)]
 #[test]
 fn a_directory_symlink_is_not_followed() {
     let (_d, c) = crate::tests::checkout(&[(FILE, "* @boss\n"), ("a/x.txt", "x")]);
     std::os::unix::fs::symlink(c.root.join("a"), c.root.join("a/loop")).unwrap();
 
     assert_eq!(no_owner_on_rust_source(&c), Vec::<String>::new());
+}
+
+#[test]
+fn under_joins_a_name_to_its_directory_or_the_root() {
+    assert_eq!(under("", "a.rs"), "a.rs");
+    assert_eq!(under("a/b", "c.rs"), "a/b/c.rs");
+}
+
+#[cfg(unix)]
+#[test]
+fn a_file_name_that_is_not_utf8_is_reported() {
+    use std::os::unix::ffi::OsStrExt;
+    let (_d, c) = crate::tests::checkout(&[(FILE, "* @boss\n"), ("a/b.rs", "")]);
+    std::fs::write(
+        c.root
+            .join("a")
+            .join(std::ffi::OsStr::from_bytes(b"\xff.rs")),
+        "",
+    )
+    .unwrap();
+
+    let got = rust_sources(&c, "a");
+
+    assert_eq!(got.sources, ["a/b.rs"]);
+    assert_eq!(got.unread, ["a/\u{fffd}.rs is not UTF-8"]);
 }
 
 #[test]

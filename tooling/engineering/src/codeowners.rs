@@ -332,11 +332,21 @@ struct Sources {
     unread: Vec<String>,
 }
 
+/// The path of `name` in `dir`, relative to the checkout's root, where
+/// an empty `dir` is the root itself.
+fn under(dir: &str, name: &str) -> String {
+    if dir.is_empty() {
+        name.to_owned()
+    } else {
+        format!("{dir}/{name}")
+    }
+}
+
 /// The `.rs` files under `dir` of the checkout, relative to its root,
 /// in name order, leaving out [`NOT_SOURCE`] and [`OTHER_CHECKOUTS`].
 /// A symlink is never followed, so a loop cannot recurse; a directory
-/// that cannot be read is named, so the check never passes without
-/// having looked.
+/// that cannot be read, or an entry whose name is not UTF-8, is named,
+/// so the check never passes without having looked.
 fn rust_sources(checkout: &Checkout, dir: &str) -> Sources {
     let mut found = Sources::default();
     // One read of the directory and all its entries, so an error in
@@ -350,20 +360,20 @@ fn rust_sources(checkout: &Checkout, dir: &str) -> Sources {
             return found;
         }
     };
-    let mut names: Vec<(String, bool)> = entries
-        .iter()
-        .filter_map(|e| {
-            let is_dir = e.file_type().is_ok_and(|t| t.is_dir());
-            Some((e.file_name().into_string().ok()?, is_dir))
-        })
-        .collect();
+    let mut names: Vec<(String, bool)> = Vec::new();
+    for e in &entries {
+        let is_dir = e.file_type().is_ok_and(|t| t.is_dir());
+        match e.file_name().into_string() {
+            Ok(name) => names.push((name, is_dir)),
+            Err(name) => found.unread.push(format!(
+                "{} is not UTF-8",
+                under(dir, &name.to_string_lossy())
+            )),
+        }
+    }
     names.sort();
     for (name, is_dir) in names {
-        let path = if dir.is_empty() {
-            name.clone()
-        } else {
-            format!("{dir}/{name}")
-        };
+        let path = under(dir, &name);
         if is_dir && !NOT_SOURCE.contains(&name.as_str()) && path != OTHER_CHECKOUTS {
             let inner = rust_sources(checkout, &path);
             found.sources.extend(inner.sources);

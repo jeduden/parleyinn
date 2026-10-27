@@ -118,6 +118,27 @@ fn a_specialist_that_does_not_name_its_file_is_named() {
     );
 }
 
+#[cfg(unix)]
+#[test]
+fn a_file_name_that_is_not_utf8_is_named() {
+    use std::os::unix::ffi::OsStrExt;
+    let f = files();
+    let refs: Vec<(&str, &str)> = f.iter().map(|(p, b)| (p.as_str(), b.as_str())).collect();
+    let (_d, c) = crate::tests::checkout(&refs);
+    std::fs::write(
+        c.root
+            .join("docs/srs")
+            .join(std::ffi::OsStr::from_bytes(b"\xff.md")),
+        "",
+    )
+    .unwrap();
+
+    assert_eq!(
+        every_dispatched_agent_is_defined(&c),
+        ["docs/srs/\u{fffd}.md is not UTF-8"]
+    );
+}
+
 #[test]
 fn a_directory_that_cannot_be_read_is_named() {
     let f: Vec<(String, String)> = files()

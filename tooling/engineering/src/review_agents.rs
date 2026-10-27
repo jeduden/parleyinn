@@ -153,19 +153,22 @@ fn deep_settings(name: &str, fields: &BTreeMap<String, String>) -> Option<String
 /// # Errors
 ///
 /// Fails, naming `dir`, when the directory or one of its entries cannot
-/// be read.
+/// be read, and naming the entry when its name is not UTF-8.
 fn markdown_files(checkout: &Checkout, dir: &str) -> Result<Vec<String>, String> {
     // One read of the directory and all its entries, so an error in
     // either is the same named problem.
     let entries = fs::read_dir(checkout.root.join(dir))
         .and_then(|entries| entries.collect::<Result<Vec<_>, _>>())
         .map_err(|e| format!("read {dir}: {e}"))?;
-    let mut out: Vec<String> = entries
-        .iter()
-        .filter_map(|e| e.file_name().into_string().ok())
-        .filter(|n| n.ends_with(".md"))
-        .map(|n| format!("{dir}/{n}"))
-        .collect();
+    let mut out = Vec::new();
+    for name in entries.iter().map(fs::DirEntry::file_name) {
+        let name = name
+            .into_string()
+            .map_err(|n| format!("{dir}/{} is not UTF-8", n.to_string_lossy()))?;
+        if name.ends_with(".md") {
+            out.push(format!("{dir}/{name}"));
+        }
+    }
     out.sort();
 
     Ok(out)
