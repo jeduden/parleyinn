@@ -146,7 +146,8 @@ pub enum Error {
     AgentName(String),
     /// The agents' answers from the run log do not read.
     Answers(serde_json::Error),
-    /// A specialist's report is missing, empty, or not what it answered.
+    /// A specialist's report is missing or empty, does not end with its
+    /// outcome, or ends with another outcome than it answered.
     Report {
         agent: String,
         problem: &'static str,
@@ -315,19 +316,45 @@ pub fn parse_answers(data: &str) -> Result<BTreeMap<String, String>, Error> {
     serde_json::from_str(data).map_err(Error::Answers)
 }
 
+/// The words a report's outcome line may give.
+const OUTCOMES: [&str; 3] = ["sound", "nits", "blocking"];
+
+/// The outcome line `text` ends with, trimmed: its last non-empty line,
+/// when that line starts with `outcome:`, in any case, and its first
+/// word, markup aside, is `sound`, `nits` or `blocking`.
+fn outcome_line(text: &str) -> Option<&str> {
+    let line = text.lines().map(str::trim).rfind(|l| !l.is_empty())?;
+    let rest = line
+        .get(..8)?
+        .eq_ignore_ascii_case("outcome:")
+        .then(|| &line[8..])?;
+    let word = rest
+        .split_whitespace()
+        .next()?
+        .trim_matches(|c: char| !c.is_ascii_alphanumeric());
+
+    OUTCOMES.contains(&word).then_some(line)
+}
+
 /// The problem with `agent`'s report, if any: it has none, it is empty,
-/// or its run-log answer does not hold it, so another agent wrote it.
+/// it does not end with an outcome line, or its run-log answer holds no
+/// line that is the same outcome.
 fn report_problem(input: &Input, agent: &str) -> Option<&'static str> {
     let report = input.reports.get(agent).map(|r| r.trim());
-    match report {
-        None => Some("wrote no report"),
-        Some("") => Some("wrote an empty report"),
-        Some(text) => (!input
-            .answers
-            .get(agent)
-            .is_some_and(|answer| answer.contains(text)))
-        .then_some("has a report that differs from its answer in the run log"),
-    }
+    let outcome = match report {
+        None => return Some("wrote no report"),
+        Some("") => return Some("wrote an empty report"),
+        Some(text) => outcome_line(text),
+    };
+    let Some(outcome) = outcome else {
+        return Some("has a report that does not end with its outcome");
+    };
+
+    (!input
+        .answers
+        .get(agent)
+        .is_some_and(|answer| answer.lines().any(|l| l.trim() == outcome)))
+    .then_some("has a report whose outcome differs from its answer in the run log")
 }
 
 /// Reads the agents the orchestrator called, a list of names.

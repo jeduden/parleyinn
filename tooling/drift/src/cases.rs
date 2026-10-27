@@ -56,6 +56,7 @@ pub fn cases() -> Vec<Case> {
         repository_cases(),
         review_cases(),
         review_gate_cases(),
+        vec![review_report_case()],
         review_agent_cases(),
         gate_cases(),
         parse_cases(),
@@ -556,6 +557,22 @@ fn review_agent_cases() -> Vec<Case> {
             "lang-rust names generalist review-spec, want review-code",
         ),
     ]
+}
+
+/// The drift the ENG-28 table's report rows exist to catch: a gate that
+/// takes a report whatever outcome it ends with.
+fn review_report_case() -> Case {
+    case(
+        "a specialist's report ending with another outcome than it answered",
+        "ENG-28",
+        Injection::replace(
+            "tooling/review-gate/src/lib.rs",
+            ".is_some_and(|answer| answer.lines().any(|l| l.trim() == outcome)))",
+            ".is_some_and(|_| true))",
+        ),
+        scenario("ENG-28"),
+        "other outcome",
+    )
 }
 
 /// The drifts ENG-28 exists to catch in what the approval rests on: the

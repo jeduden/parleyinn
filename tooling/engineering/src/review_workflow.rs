@@ -395,25 +395,32 @@ fn gate_args(reviewed: &str, head: &str) -> Vec<String> {
 }
 
 /// The report and run-log answer of the row's one specialist: a
-/// `report` cell of `given`, or none, hands the gate a report its
-/// answer holds, `missing` no report, and `differs` a report the
-/// answer does not hold.
-fn report(row: &BTreeMap<String, String>) -> (Option<&'static str>, &'static str) {
-    const ANSWERS: &str = r#"{"lang-rust":"agentId: a\nOutcome: sound.","review-code":"r"}"#;
-    match row.get("report").map_or("given", String::as_str) {
-        "missing" => (None, ANSWERS),
-        "differs" => (Some("Outcome: blocking.\n"), ANSWERS),
-        _ => (Some("Outcome: sound.\n"), ANSWERS),
-    }
+/// `report` cell of `given`, or none, hands the gate a report that ends
+/// with the outcome its answer gives, `missing` no report, `empty` a
+/// blank one, `no outcome` one that ends with a finding, and `other
+/// outcome` one that ends with another outcome; `None` for any other
+/// value.
+fn report(row: &BTreeMap<String, String>) -> Option<(Option<&'static str>, &'static str)> {
+    const ANSWERS: &str = r#"{"lang-rust":"outcome: sound — fine\nreport: review/reports/lang-rust.md","review-code":"r"}"#;
+    let report = match row.get("report").map_or("given", String::as_str) {
+        "given" => Some("a.rs:1 — nit — x\noutcome: sound — fine\n"),
+        "missing" => None,
+        "empty" => Some("  \n"),
+        "no outcome" => Some("a.rs:1 — nit — x\n"),
+        "other outcome" => Some("outcome: blocking — not fine\n"),
+        _ => return None,
+    };
+
+    Some((report, ANSWERS))
 }
 
 /// The dispatch a table row hands the gate by default: one generalist
 /// with one specialist.
 const DISPATCH: &str = r#"{"review-code":["lang-rust"]}"#;
 
-/// What [`gate_outcome`] names for a row whose `dispatch` or `consulted`
-/// cell holds a value it does not define, so a mistyped row fails
-/// rather than reads as the default.
+/// What [`gate_outcome`] names for a row whose `dispatch`, `consulted`,
+/// `report` or `own check` cell holds a value it does not define, so a
+/// mistyped row fails rather than reads as the default.
 pub const UNKNOWN_CELL: &str = "a cell value the table does not define";
 
 /// The dispatch file a row hands the gate: [`DISPATCH`] for `given` or
@@ -442,17 +449,17 @@ fn consulted(row: &BTreeMap<String, String>) -> Option<&'static str> {
 }
 
 /// The check run line for the gate's own `review-gate` check a row
-/// names: a failed one from the reviewer app for `failed`, none
-/// otherwise.
-fn own_check(cell: &str) -> String {
-    if cell == "failed" {
-        format!(
+/// names: a failed one from the reviewer app for `failed`, none for
+/// `none` or no `own check` column; `None` for any other value.
+fn own_check(cell: &str) -> Option<String> {
+    match cell {
+        "failed" => Some(format!(
             "{{\"name\":{:?},\"status\":\"completed\",\"conclusion\":\"failure\",\"app\":{}}}\n",
             review_gate::OWN_CHECK,
             review_gate::REVIEWER_APP_ID
-        )
-    } else {
-        String::new()
+        )),
+        "none" | "" => Some(String::new()),
+        _ => None,
     }
 }
 
@@ -464,17 +471,23 @@ fn own_check(cell: &str) -> String {
 /// finding` of `none`, or a row without the column, hands it an empty
 /// list, `nit` or `blocking` one deterministic finding of that
 /// severity, `malformed` a file that is no list, and `missing` no file.
-/// It always gets `--dispatch` and `--consulted` (see [`dispatch`] and
-/// [`consulted`]), and a row whose cell for either it does not define
-/// gives [`UNKNOWN_CELL`].
+/// It always gets `--dispatch`, `--consulted`, `--reports` and
+/// `--answers` (see [`dispatch`], [`consulted`] and [`report`]), and a
+/// row whose cell for any of them, or for `own check`, it does not
+/// define gives [`UNKNOWN_CELL`].
 #[must_use]
 pub fn gate_outcome(row: &BTreeMap<String, String>) -> &'static str {
     const REVIEWED: &str = "206b0a76a81abb510e53d87ef187e83b5aacbcbb";
     const MOVED: &str = "490efa734617788d1dc1f831b26d0e23888e90fa";
-    let (Some(dispatched), Some(consulted)) = (dispatch(row), consulted(row)) else {
+    let cell = |name: &str| row.get(name).map(String::as_str).unwrap_or_default();
+    let (Some(dispatched), Some(consulted), Some((report, answers)), Some(own)) = (
+        dispatch(row),
+        consulted(row),
+        report(row),
+        own_check(cell("own check")),
+    ) else {
         return UNKNOWN_CELL;
     };
-    let cell = |name: &str| row.get(name).map(String::as_str).unwrap_or_default();
     let findings = match cell("finding") {
         "none" => "[]".to_owned(),
         severity => format!(r#"[{{"path":"a.rs","line":1,"severity":{severity:?},"body":"b"}}]"#),
@@ -501,7 +514,7 @@ pub fn gate_outcome(row: &BTreeMap<String, String>) -> &'static str {
              {{\"name\":\"lint\",\"status\":\"completed\",\"conclusion\":{:?}}}\n{}",
             conclusion(cell("CI")),
             conclusion(cell("other check")),
-            own_check(cell("own check"))
+            own
         ),
     )]);
     if cell("verdict") != "missing" {
@@ -522,7 +535,6 @@ pub fn gate_outcome(row: &BTreeMap<String, String>) -> &'static str {
         files.insert("dispatch.json", body.to_owned());
     }
     files.insert("consulted.json", consulted.to_owned());
-    let (report, answers) = report(row);
     if let Some(body) = report {
         files.insert("reports/lang-rust.md", body.to_owned());
     }

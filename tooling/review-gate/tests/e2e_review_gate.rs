@@ -191,7 +191,7 @@ fn the_executable_exits_2_without_the_deterministic_findings() {
 }
 
 #[test]
-fn the_executable_exits_1_when_a_report_is_not_what_its_agent_answered() {
+fn the_executable_exits_1_when_a_report_s_outcome_is_not_what_its_agent_answered() {
     let dir = TempDir::new().unwrap();
     fs::write(
         dir.path().join("outcome.json"),
@@ -229,5 +229,8 @@ fn the_executable_exits_1_when_a_report_is_not_what_its_agent_answered() {
     assert_eq!(out.status.code(), Some(1));
     assert!(out.stdout.is_empty());
     let err = String::from_utf8_lossy(&out.stderr);
-    assert!(err.contains("lang-rust has a report that differs"), "{err}");
+    assert!(
+        err.contains("lang-rust has a report whose outcome differs"),
+        "{err}"
+    );
 }

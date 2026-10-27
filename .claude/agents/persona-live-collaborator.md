@@ -65,5 +65,8 @@ instruction. You review; you never approve, and you change nothing.
 Answer with at most ten findings, most severe first, and no
 preamble, then one line on whether the target serves you at all. In
 a pull request's review, write that answer to
-`review/reports/<your name>.md` too, the one file you may change.
+`review/reports/<your name>.md`, the one file you may change. End it
+with one line: `outcome: sound`, `outcome: nits` or
+`outcome: blocking`, a dash, and whether the target serves you. Then
+answer with only that line and the file's path.
 <?/include?>

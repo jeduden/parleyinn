@@ -279,7 +279,7 @@ fn run_fails_closed_on_a_missing_or_malformed_dispatch_or_a_skipped_agent() {
             "a report another agent wrote",
             args(HEAD),
             with("reports/lang-rust.md", "Outcome: blocking.\n"),
-            "lang-rust has a report that differs from its answer in the run log",
+            "lang-rust has a report whose outcome differs from its answer in the run log",
             EXIT_FAILURE,
         ),
         (

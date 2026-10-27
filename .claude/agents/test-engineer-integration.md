@@ -49,9 +49,10 @@ whole pyramid; you go deep here.
 ## How you report
 
 Write your report to `review/reports/<your name>.md`, the one file you may
-write, and answer with the same text. Send at most ten findings, no
-preamble, each with file and line, the check it breaks and the smallest
-change that fixes it. Mark it `blocking` when a gate lacks its drift case, a
-process or file boundary is unproven, or a test reaches non-isolated state;
-`nit` otherwise. End with your outcome: `sound`, `nits` or `blocking`, and
-what the change does to the integration tests. You never approve.
+write, and answer with only its last line and its path. Send at most ten
+findings, no preamble, each with file and line, the check it breaks and the
+smallest change that fixes it. Mark it `blocking` when a gate lacks its
+drift case, a process or file boundary is unproven, or a test reaches
+non-isolated state; `nit` otherwise. End with one line, `outcome: sound`,
+`outcome: nits` or `outcome: blocking`, then a dash and one sentence on what
+the change does to the integration tests. You never approve.

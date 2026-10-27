@@ -909,12 +909,17 @@ fn reported(answer: &str, report: Option<&str>) -> Input {
 }
 
 #[test]
-fn a_specialist_s_report_must_be_what_it_answered() {
-    let report = "a.rs:1 — nit — x\nOutcome: nits.";
-    let r = decide(&reported(
-        &format!("agentId: z\n{report}\n"),
-        Some(&format!("{report}\n")),
-    ));
+fn a_specialist_s_report_must_end_with_the_outcome_it_answered() {
+    let report = "a.rs:1 — nit — x\n\noutcome: nits — one sentence.";
+    for answer in [
+        "outcome: nits — one sentence.\nreport: review/reports/lang-rust.md",
+        "agentId: z\n  outcome: nits — one sentence.  \n",
+    ] {
+        let r = decide(&reported(answer, Some(&format!("{report}\n\n"))));
+        assert_eq!(r.unwrap().unwrap().event, APPROVE, "{answer}");
+    }
+    let reworded = "a.rs:1 — nit — x, said otherwise\noutcome: nits — one sentence.";
+    let r = decide(&reported("outcome: nits — one sentence.", Some(reworded)));
     assert_eq!(r.unwrap().unwrap().event, APPROVE);
 
     for (answer, file, want) in [
@@ -925,9 +930,24 @@ fn a_specialist_s_report_must_be_what_it_answered() {
             "review: lang-rust wrote an empty report",
         ),
         (
-            "Outcome: blocking.",
+            "a.rs:1 — nit — x",
+            Some("a.rs:1 — nit — x"),
+            "review: lang-rust has a report that does not end with its outcome",
+        ),
+        (
+            "outcome: maybe — x",
+            Some("outcome: maybe — x"),
+            "review: lang-rust has a report that does not end with its outcome",
+        ),
+        (
+            "outcome: blocking — one sentence.",
             Some(report),
-            "review: lang-rust has a report that differs from its answer in the run log",
+            "review: lang-rust has a report whose outcome differs from its answer in the run log",
+        ),
+        (
+            "the outcome: nits — one sentence. was it",
+            Some(report),
+            "review: lang-rust has a report whose outcome differs from its answer in the run log",
         ),
     ] {
         let err = decide(&reported(answer, file)).unwrap_err();
@@ -939,10 +959,25 @@ fn a_specialist_s_report_must_be_what_it_answered() {
     assert!(matches!(
         decide(&no_answer),
         Err(Error::Report {
-            problem: "has a report that differs from its answer in the run log",
+            problem: "has a report whose outcome differs from its answer in the run log",
             ..
         })
     ));
+}
+
+#[test]
+fn an_outcome_line_names_sound_nits_or_blocking_in_any_case_and_markup() {
+    for (text, want) in [
+        ("x\noutcome: sound — y\n\n", Some("outcome: sound — y")),
+        ("Outcome: **blocking**. y", Some("Outcome: **blocking**. y")),
+        ("outcome: `nits`", Some("outcome: `nits`")),
+        ("outcome: sound — y\nmore", None),
+        ("outcome: soundly", None),
+        ("outcome:", None),
+        ("", None),
+    ] {
+        assert_eq!(outcome_line(text), want, "{text:?}");
+    }
 }
 
 #[test]

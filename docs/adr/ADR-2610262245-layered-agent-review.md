@@ -34,8 +34,12 @@ approval satisfied main's ruleset as well as the agent's did.
 - **Reports as files.** Each specialist writes its report to
   `review/reports/<its name>.md`, the one path any agent may write;
   the generalists read the files and write nothing. The post job's
-  gate fails a review whose specialist's file is missing, empty, or
-  not held by that agent's answer in the run log.
+  gate fails a review whose specialist's file is missing or empty, or
+  does not end with the `outcome:` line that agent answered in the run
+  log. A specialist answers with that line and the file's path alone,
+  so a report it rewords before answering still passes; the check
+  cannot see a body changed with the outcome line kept, since every
+  agent of the run holds the same write rule.
 - **The gate checks the routing.** `review-gate` fails without posting
   when a dispatched agent was not consulted, as the orchestrator's run
   log shows.
