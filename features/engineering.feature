@@ -293,7 +293,7 @@ Feature: Engineering quality (ENG)
     And that job decides the review with "--consulted consulted.json"
     And that job decides the review with "--reports reports --answers answers.json"
     And that job posts its decision as the "review-gate" check
-    And every agent the review bundle can dispatch is defined, specialists at low effort, generalists at medium and their deep instances on opus at high effort with 40 turns
+    And every agent the review bundle can dispatch is defined, specialists at low effort with 20 turns, generalists at medium and their deep instances on opus at high effort with 40 turns
     And every language the repository's source and configuration are written in has its specialist
     And the review gate decides:
       | verdict         | finding  | check finding | head    | CI     | other check | consulted | dispatch  | own check | report        | review          |

@@ -9,6 +9,7 @@ description: >-
 tools: Read, Grep, Glob, Write
 model: haiku
 effort: low
+maxTurns: 20
 generalist: review-code
 ---
 # Test engineer: end-to-end tests
@@ -65,11 +66,12 @@ Each component stays inside one declared network boundary, and only the core bui
 
 ## How you report
 
-Write your report to `review/reports/<your name>.md`, the one file you may
-write, and answer with only its last line and its path. Send at most ten
-findings, no preamble, each with file and line, the check it breaks and
-the smallest change that fixes it. Mark it `blocking` when a scenario
-proves less than its requirement, a binding holds logic, or a test escapes
-isolation; `nit` otherwise. End with one line, `outcome: sound`, `outcome:
-nits` or `outcome: blocking`, then a dash and one sentence on what the
-change does to the scenarios and end-to-end tests. You never approve.
+Write your report to `review/reports/<your name>.md`, your one writable
+file, early, rewrite it as you find more in your 20 turns, and answer with
+only its last line and path. Send at most ten findings, no preamble, each
+with file and line, the check it breaks and the smallest change that fixes
+it. Mark it `blocking` when a scenario proves less than its requirement, a
+binding holds logic, or a test escapes isolation; `nit` otherwise. End
+with one line, `outcome: sound`, `outcome: nits` or `outcome: blocking`,
+then a dash and one sentence on what the change does to the scenarios and
+end-to-end tests. You never approve.

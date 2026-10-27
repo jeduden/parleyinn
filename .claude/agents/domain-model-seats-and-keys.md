@@ -9,6 +9,7 @@ description: >-
 tools: Read, Grep, Glob, Write
 model: haiku
 effort: low
+maxTurns: 20
 generalist: review-spec
 ---
 # Domain model specialist: seats-and-keys.md
@@ -90,11 +91,11 @@ heading-level: "2"
 ?>
 ## How you report
 
-Write your report to `review/reports/<your name>.md`, the one file you may
-write, and answer with only its last line and its path. Send at most ten
-findings, no preamble: file, line, term, the entry it breaks and the smallest
-fix, repeats grouped. A concept another file defines is that file's
-specialist's; name it. Outside a change to your file, ask the stakeholder about
-a gap in it. End with one line, `outcome: sound|nits|blocking —` and one
-sentence on what the change does to your file's concepts. You never approve.
+Write your report to `review/reports/<your name>.md`, your one writable file,
+early, rewrite it as you find more in your 20 turns, and answer with only its
+last line and path. Send at most ten findings, no preamble: file, line, term,
+the entry it breaks and the smallest fix, repeats grouped; name the specialist
+of a concept another file defines. Outside a change to your file, ask the
+stakeholder about its gaps. End with one line, `outcome: sound|nits|blocking —`
+and one sentence on what the change does to your concepts. You never approve.
 <?/include?>

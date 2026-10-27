@@ -11,6 +11,8 @@ fn agent(name: &str, effort: &str, body: &str) -> (String, String) {
     };
     let deep = if DEEP_GENERALISTS.contains(&name) {
         "model: opus\nmaxTurns: 40\n"
+    } else if generalist_of(name).is_some() {
+        "maxTurns: 20\n"
     } else {
         ""
     };
@@ -158,7 +160,7 @@ fn the_front_matter_reads_quoted_values_and_only_its_own_block() {
     let mut f = without("lang-toml");
     f.push((
         format!("{AGENTS}/lang-toml.md"),
-        "---\nname: \"lang-toml\"\ntools: Read, Grep, Glob, Write\neffort: 'low'\ngeneralist: \"review-code\"\n---\nname: other\n"
+        "---\nname: \"lang-toml\"\ntools: Read, Grep, Glob, Write\neffort: 'low'\nmaxTurns: '20'\ngeneralist: \"review-code\"\n---\nname: other\n"
             .to_owned(),
     ));
     assert_eq!(problems(&f), Vec::<String>::new());
@@ -179,7 +181,7 @@ fn a_specialist_that_names_the_wrong_generalist_is_named() {
     let mut f = without("lang-rust");
     f.push((
         format!("{AGENTS}/lang-rust.md"),
-        "---\nname: lang-rust\ntools: Read, Grep, Glob, Write\neffort: low\ngeneralist: review-spec\n---\n".to_owned(),
+        "---\nname: lang-rust\ntools: Read, Grep, Glob, Write\neffort: low\nmaxTurns: 20\ngeneralist: review-spec\n---\n".to_owned(),
     ));
     assert_eq!(
         problems(&f),
@@ -189,7 +191,7 @@ fn a_specialist_that_names_the_wrong_generalist_is_named() {
     let mut f = without("srs-security");
     f.push((
         format!("{AGENTS}/srs-security.md"),
-        "---\nname: srs-security\ntools: Read, Grep, Glob, Write\neffort: low\n---\ndocs/srs/06-security.md\n".to_owned(),
+        "---\nname: srs-security\ntools: Read, Grep, Glob, Write\neffort: low\nmaxTurns: 20\n---\ndocs/srs/06-security.md\n".to_owned(),
     ));
     assert_eq!(
         problems(&f),
@@ -216,12 +218,33 @@ fn a_deep_generalist_on_another_model_or_turn_budget_is_named() {
     );
     assert_eq!(
         deep("model: opus\n"),
-        ["review-spec-deep runs for maxTurns , want 40"]
+        ["review-spec-deep names no maxTurns, want 40"]
     );
     assert_eq!(
         problems(&replaced("review-spec-deep", "medium", "x")),
         ["review-spec-deep runs at effort medium, want high"]
     );
+}
+
+#[test]
+fn a_specialist_without_its_turn_cap_is_named() {
+    let capped = |front: &str| {
+        let mut f = without("lang-shell");
+        f.push((
+            format!("{AGENTS}/lang-shell.md"),
+            format!(
+                "---\nname: lang-shell\ntools: Read, Grep, Glob, Write\neffort: low\n{front}generalist: review-code\n---\n"
+            ),
+        ));
+        problems(&f)
+    };
+
+    assert_eq!(capped("maxTurns: 20\n"), Vec::<String>::new());
+    assert_eq!(
+        capped("maxTurns: 60\n"),
+        ["lang-shell runs for maxTurns 60, want 20"]
+    );
+    assert_eq!(capped(""), ["lang-shell names no maxTurns, want 20"]);
 }
 
 #[test]

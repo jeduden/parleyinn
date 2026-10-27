@@ -27,6 +27,9 @@ const SPECIALIST_TOOLS: &str = "Read, Grep, Glob, Write";
 const GENERALIST_TOOLS: &str = "Read, Grep, Glob";
 /// The effort a specialist runs at.
 const SPECIALIST_EFFORT: &str = "low";
+/// A specialist's turn budget, which its report instructions name, so
+/// it writes its report early and stops before the cap.
+const SPECIALIST_TURNS: &str = "20";
 /// The effort a generalist runs at.
 const GENERALIST_EFFORT: &str = "medium";
 /// The effort, model and turn budget of a generalist's deep instance:
@@ -121,6 +124,11 @@ fn check(checkout: &Checkout, name: &str, effort: &str, names: Option<&str>) -> 
     {
         return Some(problem);
     }
+    if generalist_of(name).is_some()
+        && let Some(problem) = turns(name, field("maxTurns"), SPECIALIST_TURNS)
+    {
+        return Some(problem);
+    }
     if let Some(want) = generalist_of(name) {
         match field("generalist") {
             "" => return Some(format!("{name} names no generalist, want {want}")),
@@ -143,8 +151,17 @@ fn deep_settings(name: &str, fields: &BTreeMap<String, String>) -> Option<String
     if model != DEEP_MODEL {
         return Some(format!("{name} runs on model {model}, want {DEEP_MODEL}"));
     }
-    let turns = field("maxTurns");
-    (turns != DEEP_TURNS).then(|| format!("{name} runs for maxTurns {turns}, want {DEEP_TURNS}"))
+    turns(name, field("maxTurns"), DEEP_TURNS)
+}
+
+/// The problem with agent `name`'s turn budget `has`, if it is not
+/// `want`.
+fn turns(name: &str, has: &str, want: &str) -> Option<String> {
+    match has {
+        "" => Some(format!("{name} names no maxTurns, want {want}")),
+        has if has != want => Some(format!("{name} runs for maxTurns {has}, want {want}")),
+        _ => None,
+    }
 }
 
 /// The Markdown files directly under `dir` of the checkout, as paths

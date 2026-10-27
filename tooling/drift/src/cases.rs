@@ -547,6 +547,12 @@ fn review_agent_cases() -> Vec<Case> {
             "review-code-deep runs on model sonnet, want opus",
         ),
         protection_case(
+            "a specialist run without its turn cap",
+            Injection::replace(".claude/agents/lang-rust.md", "maxTurns: 20\n", ""),
+            "the_checkout_s_review_agents_are_all_defined",
+            "lang-rust names no maxTurns, want 20",
+        ),
+        protection_case(
             "a specialist naming another generalist than the dispatch",
             Injection::replace(
                 ".claude/agents/lang-rust.md",
