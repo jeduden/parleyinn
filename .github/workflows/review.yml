@@ -406,9 +406,15 @@ jobs:
           name: review-reports
           path: .
       # The deterministic findings weigh beside the agent's: a blocking
-      # one withholds approval whatever the agent's verdict.
+      # one withholds approval whatever the agent's verdict. A gate that
+      # fails to decide posts the review-gate check failed, naming this
+      # run, so the required check never sits waiting with no reason; a
+      # failed check is no approval.
       - name: Decide the review
         env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+          REPO: ${{ github.repository }}
+          RUN: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           OUTCOME: ${{ needs.review.outputs.outcome }}
           CHECKED: ${{ needs.review.outputs.checked }}
           DISPATCH: ${{ needs.review.outputs.dispatch }}
@@ -419,10 +425,16 @@ jobs:
           printf '%s' "$CHECKED" > checked.json
           printf '%s' "$DISPATCH" > dispatch.json
           printf '%s' "$CONSULTED" > consulted.json
-          cargo run --locked --quiet -p review-gate --offline -- --outcome outcome.json \
+          if ! cargo run --locked --quiet -p review-gate --offline -- --outcome outcome.json \
             --check-runs check-runs.jsonl --reviewed "$HEAD_SHA" --head "$(cat head.txt)" \
             --checked checked.json --dispatch dispatch.json \
-            --consulted consulted.json --reports reports --answers answers.json > review.json
+            --consulted consulted.json --reports reports --answers answers.json > review.json; then
+            gh api --method POST "repos/$REPO/check-runs" -f name=review-gate \
+              -f head_sha="$HEAD_SHA" -f status=completed -f conclusion=failure \
+              -f "output[title]=The review gate did not decide" \
+              -f "output[summary]=The review gate failed before deciding; the log of $RUN says why."
+            exit 1
+          fi
       - name: Post the review
         env:
           GH_TOKEN: ${{ steps.app.outputs.token }}
@@ -438,8 +450,8 @@ jobs:
       # The decision again as the review-gate check on the reviewed head,
       # which main's ruleset takes from this app alone (ENG-21): it
       # passes only on an approval, so no other approval stands in for
-      # the gate's. A gate that posted no review posts no check, and the
-      # pull request stays blocked.
+      # the gate's. A gate that posted no review, for a head that moved,
+      # posts no check here.
       - name: Post the review-gate check
         env:
           GH_TOKEN: ${{ steps.app.outputs.token }}
