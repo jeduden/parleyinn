@@ -440,12 +440,19 @@ jobs:
           GH_TOKEN: ${{ steps.app.outputs.token }}
           REPO: ${{ github.repository }}
           PULL: ${{ needs.review.outputs.pull }}
+          HEAD_SHA: ${{ needs.review.outputs.head_sha }}
           REPORTS: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
           if [ -s review.json ]; then
             jq --arg url "$REPORTS" '.body += "\n\nThe specialist reports: \($url) (artifact review-reports)."' \
               review.json > posted.json
-            gh api --method POST "repos/$REPO/pulls/$PULL/reviews" --input posted.json
+            if ! gh api --method POST "repos/$REPO/pulls/$PULL/reviews" --input posted.json; then
+              gh api --method POST "repos/$REPO/check-runs" -f name=review-gate \
+                -f head_sha="$HEAD_SHA" -f status=completed -f conclusion=failure \
+                -f "output[title]=The review gate could not post its review" \
+                -f "output[summary]=Posting the review failed; the log of $REPORTS says why."
+              exit 1
+            fi
           fi
       # The decision again as the review-gate check on the reviewed head,
       # which main's ruleset takes from this app alone (ENG-21): it
