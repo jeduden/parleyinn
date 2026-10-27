@@ -339,6 +339,36 @@ jobs:
               | {name: .input.subagent_type, text: $text[.id]}]
             | group_by(.name) | map({key: .[0].name, value: (map(.text) | join("\n"))})
             | from_entries' "$LOG" > review/answers.json
+      # What the review cost, per agent, from its run log: each model
+      # call once (a call's blocks share one message id), its fresh
+      # input, cache writes and reads and output, and the run's cost as
+      # the log's result reports it. A log without usage records none;
+      # this step only reports and never fails the review.
+      - name: Record what the review cost
+        if: always() && steps.pull_head.outputs.number != ''
+        env:
+          LOG: ${{ steps.agent.outputs.execution_file }}
+        run: |
+          [ -s "$LOG" ] || exit 0
+          jq '([.. | objects | select(.type? == "tool_use" and (.name == "Agent" or .name == "Task"))
+              | {key: .id, value: (.input.subagent_type? // "agent")}] | from_entries) as $agent
+            | [.. | objects | select(.type? == "assistant" and .message.usage? != null and .message.id? != null)]
+            | unique_by(.message.id)
+            | group_by($agent[.parent_tool_use_id // ""] // "orchestrator")
+            | map({agent: ($agent[.[0].parent_tool_use_id // ""] // "orchestrator"), calls: length,
+                fresh: (map(.message.usage.input_tokens // 0) | add),
+                cache_write: (map(.message.usage.cache_creation_input_tokens // 0) | add),
+                cache_read: (map(.message.usage.cache_read_input_tokens // 0) | add),
+                output: (map(.message.usage.output_tokens // 0) | add)})
+            | sort_by(-(.cache_write + .cache_read))' "$LOG" > review/usage.json || exit 0
+          cost=$(jq '[.. | objects | select(.type? == "result") | .total_cost_usd? // empty] | last // "unknown"' "$LOG" || echo unknown)
+          {
+            echo "### What the review cost: \$$cost"
+            echo
+            echo "| agent | calls | fresh in | cache write | cache read | out |"
+            echo "|---|---:|---:|---:|---:|---:|"
+            jq -r '.[] | "| \(.agent) | \(.calls) | \(.fresh) | \(.cache_write) | \(.cache_read) | \(.output) |"' review/usage.json
+          } >> "$GITHUB_STEP_SUMMARY"
       # The reports and the answers, for the post job's gate and for the
       # review's readers: the review and its check link here.
       - name: Keep the specialists' reports
@@ -349,6 +379,7 @@ jobs:
           path: |
             review/reports/
             review/answers.json
+            review/usage.json
           if-no-files-found: error
 
   post:
