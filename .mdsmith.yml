@@ -98,34 +98,34 @@ kinds:
           closed: true
           sections:
             - heading: null
-            - heading: { regex: 'I1' }
+            - heading: { regex: '^I1$' }
               content:
                 - kind: paragraph
-            - heading: { regex: 'I2' }
+            - heading: { regex: '^I2$' }
               content:
                 - kind: paragraph
-            - heading: { regex: 'I3' }
+            - heading: { regex: '^I3$' }
               content:
                 - kind: paragraph
-            - heading: { regex: 'I4' }
+            - heading: { regex: '^I4$' }
               content:
                 - kind: paragraph
-            - heading: { regex: 'I5' }
+            - heading: { regex: '^I5$' }
               content:
                 - kind: paragraph
-            - heading: { regex: 'I6' }
+            - heading: { regex: '^I6$' }
               content:
                 - kind: paragraph
-            - heading: { regex: 'I7' }
+            - heading: { regex: '^I7$' }
               content:
                 - kind: paragraph
-            - heading: { regex: 'I8' }
+            - heading: { regex: '^I8$' }
               content:
                 - kind: paragraph
-            - heading: { regex: 'I9' }
+            - heading: { regex: '^I9$' }
               content:
                 - kind: paragraph
-            - heading: { regex: 'I10' }
+            - heading: { regex: '^I10$' }
               content:
                 - kind: paragraph
   doc:
