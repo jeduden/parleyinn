@@ -113,6 +113,8 @@ pub struct Analysis {
     pub eng_29_record: Option<Record>,
     /// The agents the review's orchestrator consults (ENG-28).
     pub dispatch: dispatch::Dispatch,
+    /// Each specialist with the changed files it reads.
+    pub scopes: dispatch::Scopes,
 }
 
 /// Compares `base`, main's tree, with `head`, the pull request's, whose
@@ -168,9 +170,10 @@ pub fn analyse(base: &Snapshot, head: &Snapshot, diff: &str, consent: bool) -> A
         .filter_map(|id| requirement(head, id).or_else(|| requirement(base, id)))
         .collect();
     let class = classify(&paths, deep || !owned.is_empty(), &unparsed);
+    let scopes = dispatch::scopes(&paths, &rows, &crates, &diff::ids_by_file(diff));
     let dispatch = match class {
-        Class::Deep => dispatch::deepened(dispatch::dispatch(&paths, &rows, &crates)),
-        Class::Light | Class::Standard => dispatch::dispatch(&paths, &rows, &crates),
+        Class::Deep => dispatch::deepened(dispatch::grouped(&scopes)),
+        Class::Light | Class::Standard => dispatch::grouped(&scopes),
     };
 
     Analysis {
@@ -184,6 +187,7 @@ pub fn analyse(base: &Snapshot, head: &Snapshot, diff: &str, consent: bool) -> A
         findings,
         eng_29_record,
         dispatch,
+        scopes,
     }
 }
 

@@ -85,6 +85,10 @@ fn bundle_says_what_it_is_and_quotes_the_invariants() {
         "{got}"
     );
     assert!(
+        got.contains("its own diff, `diffs/<its name>.diff` beside this bundle"),
+        "{got}"
+    );
+    assert!(
         got.contains(
             "@pending on main: 2; in this pull request: 2.\n\nTaken off @pending here: none.\n"
         ),

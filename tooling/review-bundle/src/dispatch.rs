@@ -90,6 +90,10 @@ pub const FIXED_SPECIALISTS: [(&str, &str); 15] = [
 /// findings it weighs.
 pub type Dispatch = BTreeMap<String, BTreeSet<String>>;
 
+/// Each specialist with the changed files it reads, so its diff holds
+/// only those.
+pub type Scopes = BTreeMap<String, BTreeSet<String>>;
+
 /// The SRS directory, whose files each have a section specialist.
 const SRS: &str = "docs/srs/";
 /// The SRS file that contains no section: its table of contents.
@@ -179,32 +183,74 @@ pub fn dispatch(
     rows: &[&srs::Requirement],
     security_crates: &[String],
 ) -> Dispatch {
-    let mut out = Dispatch::new();
-    let mut add = |specialist: &str| {
-        if let Some(generalist) = generalist_of(specialist) {
-            out.entry(generalist.to_owned())
+    grouped(&scopes(paths, rows, security_crates, &BTreeMap::new()))
+}
+
+/// Each specialist to consult, with the changed files it reads: those
+/// of `paths` that bring it, and for a specialist one of `rows` brings,
+/// that row's own file among `paths` and every file `naming`, each
+/// file's ids, says names the row. A specialist a row brings with no
+/// such file reads none.
+#[must_use]
+pub fn scopes(
+    paths: &[String],
+    rows: &[&srs::Requirement],
+    security_crates: &[String],
+    naming: &BTreeMap<String, BTreeSet<String>>,
+) -> Scopes {
+    let mut out = Scopes::new();
+    let mut add = |specialist: &str, files: &mut dyn Iterator<Item = &String>| {
+        if generalist_of(specialist).is_some() {
+            out.entry(specialist.to_owned())
                 .or_default()
-                .insert(specialist.to_owned());
+                .extend(files.cloned());
         }
     };
     for path in paths {
         for specialist in by_path(path, security_crates) {
-            add(&specialist);
+            add(&specialist, &mut std::iter::once(path));
         }
     }
     for row in rows {
+        let own = row.path.to_str().unwrap_or_default();
+        let files: Vec<&String> = paths
+            .iter()
+            .filter(|p| p.as_str() == own)
+            .chain(
+                naming
+                    .iter()
+                    .filter(|(_, ids)| ids.contains(&row.id))
+                    .map(|(f, _)| f),
+            )
+            .collect();
         if let Some(section) = row.path.to_str().and_then(section_specialist) {
-            add(&section);
+            add(&section, &mut files.iter().copied());
         }
         if row
             .traces
             .iter()
             .any(|t| SECURITY_INVARIANTS.contains(&t.as_str()))
         {
-            add(OFFICER);
+            add(OFFICER, &mut files.iter().copied());
         }
         if row.id.starts_with(NON_FUNCTIONAL) || row.traces.iter().any(|t| t == NEVER_DEGRADES) {
-            add(PERFORMANCE);
+            add(PERFORMANCE, &mut files.iter().copied());
+        }
+    }
+
+    out
+}
+
+/// `scopes` as a dispatch: each generalist with the specialists it
+/// weighs.
+#[must_use]
+pub fn grouped(scopes: &Scopes) -> Dispatch {
+    let mut out = Dispatch::new();
+    for specialist in scopes.keys() {
+        if let Some(generalist) = generalist_of(specialist) {
+            out.entry(generalist.to_owned())
+                .or_default()
+                .insert(specialist.clone());
         }
     }
 

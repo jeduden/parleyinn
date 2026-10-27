@@ -572,6 +572,10 @@ fn analyse_dispatches_by_path_and_by_the_rows_the_diff_names() {
         got.dispatch[dispatch::SECURITY_DEEP],
         ["persona-security-officer"].map(str::to_owned).into()
     );
+    let lib = BTreeSet::from(["crates/pin/src/lib.rs".to_owned()]);
+    assert_eq!(got.scopes["lang-rust"], lib);
+    assert_eq!(got.scopes["srs-security"], lib);
+    assert_eq!(got.scopes.len(), 6, "{:?}", got.scopes);
 }
 
 #[test]

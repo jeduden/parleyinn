@@ -81,6 +81,38 @@ fn run_writes_the_bundle_and_findings_and_prints_the_route() {
         dispatch,
         serde_json::json!({"review-spec-deep": ["domain-model-hub", "lang-markdown", "srs-05"]})
     );
+    for specialist in ["domain-model-hub", "lang-markdown", "srs-05"] {
+        assert_eq!(
+            w.output(&format!("{DIFFS}/{specialist}.diff")),
+            "diff --git a/docs/srs/05.md b/docs/srs/05.md\n+REC-01\n",
+            "{specialist}"
+        );
+    }
+}
+
+#[test]
+fn run_hands_each_specialist_only_its_files() {
+    let w = World::new(
+        "diff --git a/docs/srs/05.md b/docs/srs/05.md\n+x\n\
+         diff --git a/a.rs b/a.rs\n+// REC-01\n",
+    );
+
+    let (code, _, err) = w.run();
+
+    assert_eq!(code, EXIT_OK, "{err}");
+    assert_eq!(
+        w.output(&format!("{DIFFS}/lang-rust.diff")),
+        "diff --git a/a.rs b/a.rs\n+// REC-01\n"
+    );
+    assert_eq!(
+        w.output(&format!("{DIFFS}/lang-markdown.diff")),
+        "diff --git a/docs/srs/05.md b/docs/srs/05.md\n+x\n"
+    );
+    assert_eq!(
+        w.output(&format!("{DIFFS}/srs-05.diff")),
+        "diff --git a/docs/srs/05.md b/docs/srs/05.md\n+x\n\
+         diff --git a/a.rs b/a.rs\n+// REC-01\n"
+    );
 }
 
 #[test]
@@ -234,4 +266,15 @@ fn consents_holds_on_one_comment_with_a_body() {
     for bad in ["", "{}", "[1]", r#"[{"author": "o", "body": "x"}]"#] {
         assert!(consents(bad).is_err(), "{bad}");
     }
+}
+
+#[test]
+fn a_specialist_with_no_file_of_its_own_reads_the_whole_diff() {
+    let diff = "diff --git a/a.rs b/a.rs\n+x\ndiff --git a/b.md b/b.md\n+y\n";
+
+    assert_eq!(diff_for(diff, &BTreeSet::new()), diff);
+    assert_eq!(
+        diff_for(diff, &["b.md".to_owned()].into()),
+        "diff --git a/b.md b/b.md\n+y\n"
+    );
 }

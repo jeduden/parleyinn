@@ -71,9 +71,11 @@ fn consult(b: &mut String, a: &Analysis) {
         return;
     }
     b.push_str(
-        "The orchestrator calls each specialist below, then each generalist \
-         with its specialists' findings quoted. The gate fails a review that \
-         leaves one out.\n\n",
+        "The orchestrator calls each specialist below, handing it its own \
+         diff, `diffs/<its name>.diff` beside this bundle, which holds only \
+         the changed files it reads; then each generalist with its \
+         specialists' report files. The gate fails a review that leaves one \
+         out.\n\n",
     );
     for (generalist, specialists) in &a.dispatch {
         let names: Vec<String> = specialists.iter().map(|s| format!("`{s}`")).collect();

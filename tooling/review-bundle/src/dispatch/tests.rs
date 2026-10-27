@@ -355,3 +355,34 @@ fn a_deep_review_hands_each_generalist_s_specialists_to_its_deep_instance() {
         assert_eq!(deep, format!("{generalist}-deep"));
     }
 }
+
+#[test]
+fn scopes_name_each_specialist_s_files_by_path_and_by_the_rows_they_name() {
+    let paths: Vec<String> = ["crates/pin/src/lib.rs", "docs/srs/06-security.md", "x.txt"]
+        .map(str::to_owned)
+        .into();
+    let row = req("SEC-01", "docs/srs/06-security.md", &["I4"]);
+    let quiet = req("REC-01", "docs/srs/05-functional-requirements.md", &[]);
+    let naming = BTreeMap::from([
+        ("crates/pin/src/lib.rs".to_owned(), names(&["SEC-01"])),
+        ("x.txt".to_owned(), names(&["REC-02"])),
+    ]);
+
+    let got = scopes(&paths, &[&row, &quiet], &["pin".to_owned()], &naming);
+
+    assert_eq!(got["lang-rust"], names(&["crates/pin/src/lib.rs"]));
+    assert_eq!(
+        got["srs-security"],
+        names(&["crates/pin/src/lib.rs", "docs/srs/06-security.md"])
+    );
+    assert_eq!(
+        got[OFFICER],
+        names(&["crates/pin/src/lib.rs", "docs/srs/06-security.md"])
+    );
+    assert_eq!(got["srs-functional-requirements"], names(&[]));
+    assert!(got.keys().all(|s| generalist_of(s).is_some()), "{got:?}");
+    assert_eq!(
+        grouped(&got),
+        dispatch(&paths, &[&row, &quiet], &["pin".to_owned()])
+    );
+}

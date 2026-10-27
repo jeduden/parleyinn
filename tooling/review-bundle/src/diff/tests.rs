@@ -27,6 +27,14 @@ fn changed_paths_reads_both_sides_of_every_header() {
 }
 
 #[test]
+fn mentioned_ids_reads_an_id_that_starts_a_removed_line() {
+    assert_eq!(
+        mentioned_ids("-REC-03 gone\n+PIN-04 new\n"),
+        ["PIN-04", "REC-03"]
+    );
+}
+
+#[test]
 fn mentioned_ids_reads_only_changed_lines() {
     assert_eq!(mentioned_ids(DIFF), ["REC-01"]);
     assert_eq!(
@@ -150,4 +158,62 @@ diff --git a/crates/pin/tests/e2e.rs b/crates/pin/tests/e2e.rs
 ";
 
     assert_eq!(ids_in_code(diff), ["PIN-03", "PIN-04"]);
+}
+
+#[test]
+fn only_keeps_the_files_named_and_every_header_that_does_not_read() {
+    let diff = "\
+lead-in before any header
+diff --git a/a.rs b/a.rs
++one
+diff --git a/old.md b/new.md
+rename from old.md
+diff --git nonsense
++?
+diff --git a/c.toml b/c.toml
++three
+";
+    let keep = |names: &[&str]| names.iter().map(|n| (*n).to_owned()).collect();
+
+    assert_eq!(
+        only(diff, &keep(&["a.rs", "new.md"])),
+        "diff --git a/a.rs b/a.rs\n+one\n\
+         diff --git a/old.md b/new.md\nrename from old.md\n\
+         diff --git nonsense\n+?\n"
+    );
+    assert_eq!(
+        only(diff, &keep(&["old.md"])),
+        "diff --git a/old.md b/new.md\nrename from old.md\ndiff --git nonsense\n+?\n"
+    );
+    assert_eq!(only(diff, &keep(&[])), "diff --git nonsense\n+?\n");
+    assert_eq!(only("", &keep(&["a.rs"])), "");
+}
+
+#[test]
+fn ids_by_file_names_each_file_s_changed_ids() {
+    let diff = "\
++REC-09 before any header
+diff --git a/features/x.feature b/features/x.feature
++++ b/features/x.feature
++  @REC-01 @P0
+   @REC-02 unchanged
+diff --git a/docs/a.md b/docs/a.md
+-REC-03 and PIN-04
+diff --git a/b.rs b/b.rs
+ nothing changed
+";
+
+    assert_eq!(
+        ids_by_file(diff),
+        BTreeMap::from([
+            (
+                "docs/a.md".to_owned(),
+                ["PIN-04", "REC-03"].map(str::to_owned).into()
+            ),
+            (
+                "features/x.feature".to_owned(),
+                ["REC-01".to_owned()].into()
+            ),
+        ])
+    );
 }

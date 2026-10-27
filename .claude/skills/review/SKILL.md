@@ -41,8 +41,8 @@ reports by path, never by text: each specialist writes
 1. Read the bundle, then skim the diff. Keep each finding of the last
    review the new commits did not fix.
 2. Call the listed specialists through the Agent tool, at most 20 at
-   once, with the paths and ids of its scope; each reads
-   `review/bundle.md` and `pr.diff`.
+   once; each reads `review/bundle.md` and its own diff,
+   `review/diffs/<its name>.diff`, which your prompt names.
 3. Then call every listed generalist at once, naming the report file
    of each of its specialists.
 4. Keep the generalists' findings; drop one only where the diff

@@ -9,6 +9,7 @@
 //! reads it. One with a non-blank body, other than a review that
 //! requests changes, is the stakeholder's consent ENG-29 asks for.
 
+use std::collections::BTreeSet;
 use std::fs;
 use std::io::Write;
 use std::path::Path;
@@ -41,6 +42,9 @@ pub const CHECKED: &str = "checked.json";
 /// The agents the orchestrator consults, each generalist with its
 /// specialists, which the review gate holds the review to (ENG-28).
 pub const DISPATCH: &str = "dispatch.json";
+/// The directory under `--out` that holds each specialist's diff,
+/// `<its name>.diff`: only the changed files it reads.
+pub const DIFFS: &str = "diffs";
 
 /// Runs the command on `args` and returns its exit code. It is `main`
 /// without the process.
@@ -102,6 +106,14 @@ fn build(
     write(CHECKED, &format!("{findings}\n"))?;
     let dispatch = serde_json::to_string_pretty(&a.dispatch).map_err(failed("encode", out))?;
     write(DISPATCH, &format!("{dispatch}\n"))?;
+    let diffs = out.join(DIFFS);
+    fs::create_dir_all(&diffs).map_err(failed("write", &diffs))?;
+    for (specialist, scope) in &a.scopes {
+        write(
+            &format!("{DIFFS}/{specialist}.diff"),
+            &diff_for(&diff, scope),
+        )?;
+    }
 
     Ok(format!(
         "class={}\ntouched={}\nfindings={}\nconsults={}\n",
@@ -110,6 +122,17 @@ fn build(
         a.findings.len(),
         crate::dispatch::agents(&a.dispatch).len()
     ))
+}
+
+/// The part of `diff` a specialist whose files are `scope` reads: those
+/// files' sections, or the whole diff when it has none of its own, as a
+/// specialist a row brings may not.
+fn diff_for(diff: &str, scope: &BTreeSet<String>) -> String {
+    if scope.is_empty() {
+        diff.to_owned()
+    } else {
+        crate::diff::only(diff, scope)
+    }
 }
 
 /// The message for a failure to `verb` the file at `path`.

@@ -8,7 +8,7 @@
 //! that reads as neither is listed, never guessed at, so the analysis
 //! can fail closed on it.
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 /// The header every file's section of a diff starts with.
 const HEADER: &str = "diff --git ";
@@ -175,7 +175,10 @@ pub fn mentioned_ids(diff: &str) -> Vec<String> {
     let changed = diff.lines().filter(|l| {
         (l.starts_with('+') || l.starts_with('-')) && !l.starts_with("+++") && !l.starts_with("---")
     });
-    let out: BTreeSet<String> = changed.flat_map(ids_in).map(str::to_owned).collect();
+    let out: BTreeSet<String> = changed
+        .flat_map(|l| ids_in(&l[1..]))
+        .map(str::to_owned)
+        .collect();
 
     out.into_iter().collect()
 }
@@ -187,24 +190,60 @@ pub fn mentioned_ids(diff: &str) -> Vec<String> {
 /// file and are left out.
 #[must_use]
 pub fn ids_in_code(diff: &str) -> Vec<String> {
+    let out: BTreeSet<String> = ids_by_file(diff)
+        .into_iter()
+        .filter(|(f, _)| !f.ends_with(".md") && !f.ends_with("/tests.rs") && !f.contains("/tests/"))
+        .flat_map(|(_, ids)| ids)
+        .collect();
+
+    out.into_iter().collect()
+}
+
+/// Each file of `diff` whose added or removed lines name a requirement
+/// id, with those ids: the new side of its header, or the header line
+/// itself when that does not read. Lines before any header belong to no
+/// file and are left out.
+#[must_use]
+pub fn ids_by_file(diff: &str) -> BTreeMap<String, BTreeSet<String>> {
     let mut file: Option<String> = None;
-    let mut out = BTreeSet::new();
+    let mut out: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
     for line in diff.lines() {
         if line.starts_with(HEADER) {
             file = Some(header(line).map_or_else(|| line.to_owned(), |(_, b)| b));
         } else if let Some(f) = &file
-            && !f.ends_with(".md")
-            && !f.ends_with("/tests.rs")
-            && !f.contains("/tests/")
             && (line.starts_with('+') || line.starts_with('-'))
             && !line.starts_with("+++")
             && !line.starts_with("---")
         {
-            out.extend(ids_in(line).map(str::to_owned));
+            let ids: Vec<String> = ids_in(&line[1..]).map(str::to_owned).collect();
+            if !ids.is_empty() {
+                out.entry(f.clone()).or_default().extend(ids);
+            }
         }
     }
 
-    out.into_iter().collect()
+    out
+}
+
+/// The sections of `diff` for the files in `keep`, by either side of
+/// their header, and every section whose header does not read, so a
+/// file whose paths cannot be told is never left out. What precedes
+/// the first header is left out.
+#[must_use]
+pub fn only(diff: &str, keep: &BTreeSet<String>) -> String {
+    let mut out = String::new();
+    let mut kept = false;
+    for line in diff.split_inclusive('\n') {
+        if line.starts_with(HEADER) {
+            kept = header(line.trim_end_matches('\n'))
+                .is_none_or(|(a, b)| keep.contains(&a) || keep.contains(&b));
+        }
+        if kept {
+            out.push_str(line);
+        }
+    }
+
+    out
 }
 
 #[cfg(test)]
