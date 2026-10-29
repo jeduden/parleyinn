@@ -102,10 +102,10 @@ jobs:
       # The musl target's headers, from one checked release, in a tree
       # of its own: musl generates its per-architecture headers in
       # place, so a tree serves one target. Worst case of the download:
-      # 3 tries x 20 s + 2 pauses x 2 s = 64 s; checking, unpacking and
+      # 3 hosts x 20 s + 3 pauses x 2 s = 66 s; checking, unpacking and
       # installing the headers take seconds, under the step's 2 minutes.
       # The release archive, kept by its checksum so a build does not
-      # depend on musl.libc.org once one download succeeded. A cached
+      # depend on any one host once a download succeeded. A cached
       # archive is checked against MUSL_SHA256 like a downloaded one, and
       # release builds never consume a branch-writable cache.
       - name: Cache the musl release
@@ -124,9 +124,22 @@ jobs:
           if [ -f "$archive" ]; then
             echo "musl $MUSL_VERSION from the cache"
           else
-            curl -fsSL --retry 2 --retry-all-errors --retry-delay 2 --connect-timeout 10 --max-time 20 \
-              -o "$archive" "https://musl.libc.org/releases/musl-$MUSL_VERSION.tar.gz" || {
-              echo "::error::could not download musl $MUSL_VERSION after 3 tries (host: musl.libc.org)"
+            # The same archive from three hosts, one try each: Ubuntu's
+            # source package is byte-identical to the release, and any
+            # host is transport only, since the checksum below decides.
+            pool="ubuntu/pool/universe/m/musl/musl_$MUSL_VERSION.orig.tar.gz"
+            for url in "http://azure.archive.ubuntu.com/$pool" \
+                       "https://archive.ubuntu.com/$pool" \
+                       "https://musl.libc.org/releases/musl-$MUSL_VERSION.tar.gz"; do
+              if curl -fsSL --connect-timeout 10 --max-time 20 -o "$archive" "$url"; then
+                break
+              fi
+              echo "::warning::could not download musl $MUSL_VERSION from $url"
+              rm -f "$archive"
+              sleep 2
+            done
+            test -f "$archive" || {
+              echo "::error::could not download musl $MUSL_VERSION from any host (azure.archive.ubuntu.com, archive.ubuntu.com, musl.libc.org)"
               exit 1
             }
           fi
