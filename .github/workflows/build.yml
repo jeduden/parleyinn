@@ -104,7 +104,7 @@ jobs:
       # The musl target's headers, from one checked release, in a tree
       # of its own: musl generates its per-architecture headers in
       # place, so a tree serves one target. Worst case of the download:
-      # 3 hosts x 20 s + 3 pauses x 2 s = 66 s; checking, unpacking and
+      # 3 hosts x 20 s + 2 pauses x 2 s = 64 s; checking, unpacking and
       # installing the headers take seconds, under the step's 2 minutes.
       # The release archive, kept by its checksum so a build does not
       # depend on any one host once a download succeeded. A cached
@@ -128,19 +128,23 @@ jobs:
           else
             # The same archive from three hosts, one try each, over TLS
             # only, redirects included: Ubuntu's source package is
-            # byte-identical to the release, and any host is transport
-            # only, since the checksum below decides.
+            # byte-identical to the release. A host is transport only:
+            # the pinned checksum decides, and a file that fails it, as a
+            # repack would, sends the step on to the next host.
             pool="ubuntu/pool/universe/m/musl/musl_$MUSL_VERSION.orig.tar.gz"
+            hosts=0
             for url in "https://archive.ubuntu.com/$pool" \
                        "https://launchpad.net/ubuntu/+archive/primary/+sourcefiles/musl/$MUSL_UBUNTU/musl_$MUSL_VERSION.orig.tar.gz" \
                        "https://musl.libc.org/releases/musl-$MUSL_VERSION.tar.gz"; do
+              hosts=$((hosts + 1))
               if curl -fsSL --proto '=https' --proto-redir '=https' --tlsv1.2 \
-                  --connect-timeout 10 --max-time 20 -o "$archive" "$url"; then
+                  --connect-timeout 10 --max-time 20 -o "$archive" "$url" \
+                  && echo "$MUSL_SHA256  $archive" | sha256sum -c - >/dev/null; then
                 break
               fi
-              echo "::warning::could not download musl $MUSL_VERSION from $url"
+              echo "::warning::no usable musl $MUSL_VERSION from $url"
               rm -f "$archive"
-              sleep 2
+              if [ "$hosts" -lt 3 ]; then sleep 2; fi
             done
             test -f "$archive" || {
               echo "::error::could not download musl $MUSL_VERSION from any host (archive.ubuntu.com, launchpad.net, musl.libc.org)"
