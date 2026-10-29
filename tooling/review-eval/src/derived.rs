@@ -27,10 +27,8 @@ pub const INJECTION_WORDS: [&str; 7] = [
 /// A sentence true of every section and model file.
 pub const CLEAN_SENTENCE: &str = "This file is part of ParleyInn's specification and changes only through a reviewed pull request.";
 /// A sentence true of every domain-model file, which is no part of the
-/// specification: the hub makes a change to the model a stakeholder
-/// decision the domain-model agent reviews.
-pub const MODEL_SENTENCE: &str =
-    "A change to this file is a stakeholder decision, which the domain-model agent reviews.";
+/// specification and sets no rule.
+pub const MODEL_SENTENCE: &str = "This file is part of ParleyInn's domain model.";
 /// A sentence in terms the domain model excludes.
 pub const EXCLUDED_SENTENCE: &str = "A bot on the lane records each attempt it makes.";
 /// The excluded terms it uses, which a report names.
