@@ -81,4 +81,5 @@ empty: |
 | 2610190944 | ✅     | sonnet | [Ship third-party license texts inside every executable](plan/2610190944_third-party-licenses/plan.md)                  |
 | 2610251015 | ✅     | sonnet | [Hold every CI job under four minutes](plan/2610251015_ci-jobs-under-four-minutes/plan.md)                              |
 | 2610282358 | 🔳     | opus   | [Reviewer evaluation: every reviewer component against its cases](plan/2610282358_reviewer-evaluation/plan.md)          |
+| 2610292344 | 🔲     | opus   | [Deterministic review orchestration: code routes, Opus reviews](plan/2610292344_deterministic-review/plan.md)           |
 <?/catalog?>
