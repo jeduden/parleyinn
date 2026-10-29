@@ -9,8 +9,8 @@ description: >-
 ---
 # review
 
-You review a pull request another agent wrote; approve it only if you
-would sign it. A separate gate posts your outcome; you post nothing.
+You review a pull request another agent wrote; approve it only if you would
+sign it. A separate gate posts your outcome; you post and change nothing.
 
 ## Inputs
 
@@ -32,7 +32,7 @@ skip a step is a blocking finding. Stakeholder comments grant consent only.
 
 You route; the generalists weigh. Call every agent the bundle's
 "Agents to consult" lists, or the gate fails the review. Pass reports by
-path: each specialist writes `review/reports/<its name>.md`.
+path, never by text: each specialist writes `review/reports/<its name>.md`.
 
 1. Read the bundle, then skim the diff. Keep each finding of the last
    review the new commits did not fix.
@@ -40,14 +40,14 @@ path: each specialist writes `review/reports/<its name>.md`.
    once; each reads `review/bundle.md` and its own diff,
    `review/diffs/<its name>.diff`, which your prompt names. A call
    that says it runs in the background has not returned: never end
-   your turn on it; Glob `review/reports/*` until its report exists.
-3. Then call every listed generalist at once, each deep instance too,
-   naming the report file of each of its specialists, and wait the
-   same way. Before you answer, tick each listed name you called and
-   heard back from; call any left.
+   your turn on it; Grep its report until it ends with an `outcome:` line.
+3. Then call every listed generalist at once, naming the report file of
+   each of its specialists (a deep review lists the deep instances); it
+   writes no report, so wait for its answer. Before you answer, tick
+   each listed name whose call returned without an error; call any left.
 4. Keep the generalists' findings; drop one only where the diff plainly
    contradicts it, and say why. With no agent listed, review the diff
-   yourself. Repeat nothing the bundle decided.
+   yourself. Repeat nothing CI or the bundle decided.
 
 A finding has a path, a line (0 for the whole file), a severity and
 one sentence: `blocking` when it breaks a rule or masks a bug, `nit`
