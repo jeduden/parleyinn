@@ -481,3 +481,86 @@ fn agents_write_only_wants_writes_scoped_to_the_reports() {
         ["agent job review lists no --allowedTools"]
     );
 }
+
+/// The review workflow with the evaluate job ENG-32 asks for.
+const EVALUATING_FLOW: &str = "name: Review
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+  issue_comment:
+    types: [created]
+
+jobs:
+  review:
+    permissions:
+      contents: read
+    steps:
+      - uses: anthropics/claude-code-action@abc
+  evaluate:
+    needs: review
+    permissions:
+      contents: read
+    steps:
+      - run: cargo run --locked --quiet -p review-eval -- run
+  post:
+    needs: [review, evaluate]
+    steps:
+      - env:
+          K: ${{ secrets.APP_KEY }}
+        run: cargo run -p review-gate
+";
+
+#[test]
+fn evaluate_job_runs_accepts_the_job_that_evaluates_between_the_agent_and_the_key() {
+    let w = parse(EVALUATING_FLOW);
+
+    assert_eq!(
+        w.evaluate_job_runs("cargo run --locked --quiet -p review-eval", KEY),
+        Ok(Vec::new())
+    );
+}
+
+#[test]
+fn evaluate_job_runs_names_each_problem() {
+    let w = parse(
+        &EVALUATING_FLOW
+            .replace(
+                "    needs: review\n    permissions:\n      contents: read\n",
+                "    permissions:\n      contents: write\n",
+            )
+            .replace(
+                "      - run: cargo run --locked --quiet -p review-eval -- run\n",
+                "      - run: echo skipped ${{ secrets.APP_KEY }}\n",
+            )
+            .replace("    needs: [review, evaluate]\n", "    needs: [review]\n"),
+    );
+
+    let got = w
+        .evaluate_job_runs("cargo run --locked --quiet -p review-eval", KEY)
+        .unwrap();
+
+    assert_eq!(
+        got,
+        vec![
+            "job evaluate does not run \"cargo run --locked --quiet -p review-eval\"",
+            "job evaluate is granted a write permission",
+            "job evaluate reads APP_KEY",
+            "job evaluate does not need agent job review",
+            "job post does not need job evaluate",
+        ]
+    );
+}
+
+#[test]
+fn evaluate_job_runs_fails_without_the_job_or_the_key_s_job() {
+    assert_eq!(
+        parse(REVIEW_FLOW).evaluate_job_runs("x", KEY).unwrap_err(),
+        "no evaluate job in the review workflow"
+    );
+    let no_key = parse(&EVALUATING_FLOW.replace("secrets.APP_KEY", "secrets.OTHER"));
+    assert_eq!(
+        no_key.evaluate_job_runs("x", KEY).unwrap_err(),
+        "0 jobs read \"APP_KEY\", want exactly one"
+    );
+}

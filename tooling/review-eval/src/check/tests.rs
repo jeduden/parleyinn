@@ -399,3 +399,46 @@ fn a_selection_checks_only_its_suites() {
         "{got:?}"
     );
 }
+
+#[test]
+fn problems_come_in_kinds_and_cases() {
+    let dir = checkout();
+    let cases = dir.path().join(crate::CASES);
+    write_case(dir.path(), "lang-rust", "unwrap", "defect", UNWRAP);
+    write_case(
+        dir.path(),
+        "lang-toml",
+        "stray",
+        "defect",
+        &UNWRAP.replace("lang-rust", "lang-toml"),
+    );
+
+    let examined = examine(dir.path(), dir.path(), &cases, None).unwrap();
+
+    assert!(
+        examined
+            .kinds
+            .contains(&"component lang-rust has no clean case".to_owned())
+    );
+    assert!(
+        examined
+            .cases
+            .iter()
+            .any(|c| c.starts_with("case lang-toml/stray does not dispatch"))
+    );
+    assert_eq!(
+        examined.all().len(),
+        examined.kinds.len() + examined.cases.len()
+    );
+    assert_eq!(
+        kind_problems(dir.path(), dir.path(), &cases),
+        examined.kinds
+    );
+    assert_eq!(
+        case_problems(dir.path(), dir.path(), &cases),
+        examined.cases
+    );
+    let empty = TempDir::new().unwrap();
+    assert!(kind_problems(empty.path(), empty.path(), &cases)[0].starts_with("read docs/srs: "));
+    assert!(case_problems(empty.path(), empty.path(), &cases)[0].starts_with("read docs/srs: "));
+}

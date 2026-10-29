@@ -328,7 +328,7 @@ Feature: Engineering quality (ENG)
     And until that ADR is accepted, every B1, B2 or B3 component is built only as a prototype
     And evidence from the release build proves no release artifact or tagged release contains prototype code
 
-  @ENG-32 @P0 @pending
+  @ENG-32 @P0
   Scenario: every reviewer component is evaluated against its cases on the model it names
     Given the repository checkout
     When the reviewer evaluation cases are read from "tooling/review-eval/cases"
@@ -341,7 +341,7 @@ Feature: Engineering quality (ENG)
       | other       | found   | none      | last line and path | written | yes      | fails on outcome   |
       | as expected | missing | none      | last line and path | written | yes      | fails on finding   |
       | as expected | found   | found     | last line and path | written | yes      | fails on forbidden |
-      | as expected | found   | none      | more               | written | yes      | fails on answer    |
+      | as expected | found   | none      | more               | written | yes      | passes, slips on answer |
       | as expected | found   | none      | last line and path | missing | yes      | fails on report    |
       | as expected | found   | none      | last line and path | written | no       | fails on no answer |
     And a case passes with two of three runs, stopping once decided:

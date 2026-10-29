@@ -58,6 +58,7 @@ pub fn cases() -> Vec<Case> {
         review_gate_cases(),
         vec![review_report_case()],
         review_agent_cases(),
+        review_evaluation_cases(),
         gate_cases(),
         parse_cases(),
         persona_cases(),
@@ -561,6 +562,47 @@ fn review_agent_cases() -> Vec<Case> {
             ),
             "the_checkout_s_review_agents_are_all_defined",
             "lang-rust names generalist review-spec, want review-code",
+        ),
+    ]
+}
+
+/// The drifts ENG-32 exists to catch: a component without one of its
+/// kinds of case, a case whose edit no longer applies, a case that
+/// dispatches another component, and a review workflow that skips the
+/// evaluation.
+fn review_evaluation_cases() -> Vec<Case> {
+    vec![
+        protection_case(
+            "a reviewer component without its injection case",
+            Injection::remove("tooling/review-eval/cases/lang-rust/injection-comment.toml"),
+            "the_checkout_s_reviewer_components_each_have_their_cases",
+            "component lang-rust has no injection case",
+        ),
+        protection_case(
+            "a reviewer evaluation case whose edit no longer applies",
+            Injection::replace(
+                "tooling/review-eval/cases/lang-rust/defect-unwrap.toml",
+                "pub mod render;",
+                "pub mod rendered;",
+            ),
+            "the_checkout_s_reviewer_evaluation_cases_apply_and_dispatch",
+            "lang-rust/defect-unwrap: tooling/review-bundle/src/lib.rs: does not contain",
+        ),
+        protection_case(
+            "a reviewer evaluation case that dispatches no one",
+            Injection::create(
+                "tooling/review-eval/cases/lang-toml/stray.toml",
+                "component = \"lang-toml\"\nkind = \"other\"\ntitle = \"a note\"\n\n[[create]]\nfile = \"research/note.txt\"\ncontent = \"x\"\n\n[expect]\n",
+            ),
+            "the_checkout_s_reviewer_evaluation_cases_apply_and_dispatch",
+            "case lang-toml/stray does not dispatch lang-toml; the bundle dispatches no agent",
+        ),
+        case(
+            "the review workflow's evaluate job removed",
+            "ENG-32",
+            Injection::replace(REVIEW_WORKFLOW, "\n  evaluate:\n", "\n  evaluated:\n"),
+            scenario("ENG-32"),
+            "no evaluate job in the review workflow",
         ),
     ]
 }

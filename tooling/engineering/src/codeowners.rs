@@ -56,6 +56,8 @@ const ENFORCING: &[(&str, &[&str])] = &[
             "tooling/*/Cargo.toml",
             "tooling/benchmark/accepted.txt",
             "tooling/eval/recall-v1.txt",
+            "tooling/review-eval/cases/",
+            "tooling/review-eval/scorecard-v1.txt",
         ],
     ),
     (

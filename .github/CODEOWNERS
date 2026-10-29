@@ -38,9 +38,12 @@
 /codecov.yml                  @jeduden
 
 # The gate data the stakeholder accepts: the benchmark regressions
-# ADR-2610142300 lets through and the recall evaluation's baseline.
+# ADR-2610142300 lets through, the recall evaluation's baseline, and
+# the reviewer evaluation's cases and published scorecard (ENG-32).
 /tooling/benchmark/accepted.txt @jeduden
 /tooling/eval/recall-v1.txt   @jeduden
+/tooling/review-eval/cases/   @jeduden
+/tooling/review-eval/scorecard-v1.txt @jeduden
 /.mdsmith.yml                 @jeduden
 
 # The supply-chain and disclosure policy: every new direct dependency

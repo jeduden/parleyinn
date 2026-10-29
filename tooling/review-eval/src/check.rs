@@ -38,6 +38,28 @@ pub fn all_cases(root: &Path, cases_dir: &Path) -> Result<Vec<Case>, String> {
     Ok(cases)
 }
 
+/// The problems of a tree's cases, in two kinds.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct Problems {
+    /// A component without one of its required kinds of case.
+    pub kinds: Vec<String>,
+    /// A case that names no component, a deep instance or an outcome
+    /// of a generalist, does not apply, or does not dispatch its
+    /// component.
+    pub cases: Vec<String>,
+}
+
+impl Problems {
+    /// Every problem, sorted.
+    #[must_use]
+    pub fn all(&self) -> Vec<String> {
+        let mut out = self.kinds.clone();
+        out.extend(self.cases.iter().cloned());
+        out.sort();
+        out
+    }
+}
+
 /// Every problem with the cases of the tree at `root`, whose
 /// components are read from `tree` and whose written cases lie under
 /// `cases_dir`; none when they are sound. With a `selection`, only the
@@ -50,36 +72,55 @@ pub fn problems(
     cases_dir: &Path,
     selection: Option<&[String]>,
 ) -> Vec<String> {
-    let components = match catalog(root, tree, selection) {
-        Ok(components) => components,
-        Err(e) => return vec![e],
-    };
+    examine(root, tree, cases_dir, selection).map_or_else(|e| vec![e], |p| p.all())
+}
+
+/// The components without their kinds of case, or what could not be
+/// read.
+#[must_use]
+pub fn kind_problems(root: &Path, tree: &Path, cases_dir: &Path) -> Vec<String> {
+    examine(root, tree, cases_dir, None).map_or_else(|e| vec![e], |p| p.kinds)
+}
+
+/// The cases that do not read, apply or dispatch their component, or
+/// what could not be read.
+#[must_use]
+pub fn case_problems(root: &Path, tree: &Path, cases_dir: &Path) -> Vec<String> {
+    examine(root, tree, cases_dir, None).map_or_else(|e| vec![e], |p| p.cases)
+}
+
+/// Examines the cases as [`problems`] does, each problem in its kind.
+///
+/// # Errors
+///
+/// Fails when the components, the cases or the tree cannot be read.
+pub fn examine(
+    root: &Path,
+    tree: &Path,
+    cases_dir: &Path,
+    selection: Option<&[String]>,
+) -> Result<Problems, String> {
+    let components = catalog(root, tree, selection)?;
     let selected = |name: &str| {
         selection.is_none_or(|names| names.iter().any(|n| suite_of(n) == suite_of(name)))
     };
-    let cases = match all_cases(root, cases_dir) {
-        Ok(cases) => cases
-            .into_iter()
-            .filter(|c| selected(&c.component))
-            .collect::<Vec<_>>(),
-        Err(e) => return vec![e],
-    };
-    let base = match Snapshot::read(root) {
-        Ok(base) => base,
-        Err(e) => return vec![format!("read the tree: {e}")],
-    };
-    let mut problems = Vec::new();
+    let cases: Vec<Case> = all_cases(root, cases_dir)?
+        .into_iter()
+        .filter(|c| selected(&c.component))
+        .collect();
+    let base = Snapshot::read(root).map_err(|e| format!("read the tree: {e}"))?;
+    let mut problems = Problems::default();
     let by_name: BTreeMap<&str, &Component> =
         components.iter().map(|c| (c.name.as_str(), c)).collect();
     let mut kinds: BTreeMap<&str, BTreeSet<&str>> = BTreeMap::new();
     for case in &cases {
         let id = case.id();
         let Some(component) = by_name.get(case.component.as_str()) else {
-            problems.push(format!("case {id} names no component"));
+            problems.cases.push(format!("case {id} names no component"));
             continue;
         };
         if suite_of(&case.component) != case.component {
-            problems.push(format!(
+            problems.cases.push(format!(
                 "case {id} names a deep instance; cases belong to {}",
                 suite_of(&case.component)
             ));
@@ -90,13 +131,13 @@ pub fn problems(
             .or_default()
             .insert(case.kind.as_str());
         if component.kind == Kind::Generalist && !case.expect.outcome.is_empty() {
-            problems.push(format!(
+            problems.cases.push(format!(
                 "case {id} expects an outcome of a generalist, which gives none"
             ));
         }
         match dispatches(root, &base, case, component) {
             Ok(None) => {}
-            Ok(Some(dispatched)) => problems.push(format!(
+            Ok(Some(dispatched)) => problems.cases.push(format!(
                 "case {id} does not dispatch {}; the bundle dispatches {}",
                 component.name,
                 if dispatched.is_empty() {
@@ -105,7 +146,7 @@ pub fn problems(
                     dispatched.into_iter().collect::<Vec<_>>().join(", ")
                 }
             )),
-            Err(e) => problems.push(e),
+            Err(e) => problems.cases.push(e),
         }
     }
     for component in components
@@ -115,13 +156,16 @@ pub fn problems(
         let has = kinds.get(component.name.as_str());
         for kind in REQUIRED_KINDS {
             if !has.is_some_and(|kinds| kinds.contains(kind)) {
-                problems.push(format!("component {} has no {kind} case", component.name));
+                problems
+                    .kinds
+                    .push(format!("component {} has no {kind} case", component.name));
             }
         }
     }
-    problems.sort();
+    problems.kinds.sort();
+    problems.cases.sort();
 
-    problems
+    Ok(problems)
 }
 
 /// The components to check: every one of the tree, or with a

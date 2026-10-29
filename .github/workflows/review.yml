@@ -71,6 +71,7 @@ jobs:
       checked: ${{ steps.bundle.outputs.checked }}
       dispatch: ${{ steps.bundle.outputs.dispatch }}
       consulted: ${{ steps.consulted.outputs.consulted }}
+      eval_plan: ${{ steps.plan.outputs.eval_plan }}
     steps:
       # The pull request and the head to review. After CI, the head CI
       # ran on. After a comment, the pull request's head, once its CI
@@ -222,6 +223,17 @@ jobs:
             echo "dispatch=$(jq -c . review/dispatch.json)"
           } >> "$GITHUB_OUTPUT"
           cat class.txt "review/checked.json" >> "$GITHUB_STEP_SUMMARY"
+      # The reviewer components the pull request changes, each with its
+      # reason (ENG-32): the evaluate job below runs their cases. The
+      # plan is computed here, from the two trees, with main's tool, and
+      # the evaluate job reads it as data.
+      - name: Plan the reviewer evaluation
+        id: plan
+        if: steps.pull_head.outputs.number != ''
+        run: |
+          cargo run --locked --quiet -p review-eval -- plan --base . --head pr-head \
+            --out review/eval-plan.json
+          echo "eval_plan=$(jq -c . review/eval-plan.json)" >> "$GITHUB_OUTPUT"
       # A pull request the reviewer app reviewed before: the diff since
       # that head and that review, so the agent starts from what moved.
       # Only the app's own login counts: any other bot, a workflow of the
@@ -382,10 +394,105 @@ jobs:
             review/usage.json
           if-no-files-found: error
 
-  post:
-    # Runs only after the review job succeeded: a failed or missing
-    # review posts nothing, and the red run says why.
+  evaluate:
+    # The cases of each reviewer component the pull request changes, run
+    # on the model its front matter names from the pull request's
+    # definition of it (ENG-32). It runs after the review, from main's
+    # definition, with the token the review has and nothing it can write
+    # with; the post job's gate weighs its findings beside the bundle's.
+    # With nothing to evaluate it writes an empty finding list and ends
+    # in seconds, so the post job always finds its artifact.
     needs: review
+    if: needs.review.outputs.pull != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    permissions:
+      contents: read
+    env:
+      # The Claude Code command line the harness starts, pinned (ENG-01).
+      CLAUDE_CODE_VERSION: "2.1.312"
+    steps:
+      - name: Read the plan
+        id: plan
+        env:
+          EVAL_PLAN: ${{ needs.review.outputs.eval_plan }}
+        run: |
+          if [ "$(printf '%s' "$EVAL_PLAN" | jq 'length')" = 0 ]; then
+            echo "empty=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "empty=false" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Record that no component changed
+        if: steps.plan.outputs.empty == 'true'
+        run: |
+          mkdir -p review-eval
+          echo '[]' > review-eval/findings.json
+          echo "No reviewer component changed; nothing was evaluated." > review-eval/report.md
+      # Main's tree is the checkout the fixture worlds are worktrees of;
+      # the pull request's tree holds the components and cases under
+      # evaluation, read as data: the harness runs each component inside
+      # a world of its own, never from this directory.
+      - if: steps.plan.outputs.empty == 'false'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - if: steps.plan.outputs.empty == 'false'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.review.outputs.head_sha }}
+          path: pr-head
+          persist-credentials: false
+      - name: Install pinned Rust and mdsmith with mise
+        if: steps.plan.outputs.empty == 'false'
+        uses: ./.github/actions/setup-mise
+        with:
+          tools: "rust github:jeduden/mdsmith"
+          # Jobs handling review credentials never restore executable caches.
+          cache: false
+      # The command line is an npm package, which mise's released-binary
+      # rule refuses, so it is pinned here and installed with npm.
+      - name: Install the pinned Claude Code command line
+        if: steps.plan.outputs.empty == 'false'
+        run: npm install --global --no-fund --no-audit "@anthropic-ai/claude-code@$CLAUDE_CODE_VERSION" # zizmor: ignore[adhoc-packages] pinned to one version by CLAUDE_CODE_VERSION, which no mise backend the repository allows can install
+      # Exit 1 says a case failed: its blocking finding reaches the gate
+      # through findings.json, so the review requests changes and names
+      # the case. Any other exit is the harness's own failure and fails
+      # the job, so nothing is posted and the red run says why.
+      - name: Run the cases of each changed component
+        if: steps.plan.outputs.empty == 'false'
+        env:
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          EVAL_PLAN: ${{ needs.review.outputs.eval_plan }}
+        run: |
+          mkdir -p review-eval
+          printf '%s' "$EVAL_PLAN" > eval-plan.json
+          set +e
+          cargo run --locked --quiet -p review-eval -- run --checkout . --tree pr-head \
+            --cases pr-head/tooling/review-eval/cases --plan eval-plan.json \
+            --out review-eval --parallel 4
+          code=$?
+          set -e
+          cat review-eval/report.md >> "$GITHUB_STEP_SUMMARY"
+          if [ "$code" -gt 1 ]; then
+            echo "::error::the reviewer evaluation did not run to its end (exit $code)"
+            exit "$code"
+          fi
+      # The findings for the gate, the report, the scorecard and each
+      # run's grade and report; the run logs stay in the job.
+      - name: Keep the evaluation
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: review-evaluation
+          path: |
+            review-eval/
+            !review-eval/runs/**/log.jsonl
+            !review-eval/runs/**/log.stderr
+          if-no-files-found: error
+
+  post:
+    # Runs only after the review and the evaluation succeeded: a failed
+    # or missing review posts nothing, and the red run says why.
+    needs: [review, evaluate]
     if: needs.review.outputs.pull != ''
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -436,6 +543,13 @@ jobs:
         with:
           name: review-reports
           path: .
+      # The reviewer evaluation's findings, one per failed case, which
+      # the gate weighs as deterministic findings (ENG-32).
+      - name: Take the reviewer evaluation
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: review-evaluation
+          path: evaluation
       # The deterministic findings weigh beside the agent's: a blocking
       # one withholds approval whatever the agent's verdict. A gate that
       # fails to decide posts the review-gate check failed, naming this
@@ -453,7 +567,8 @@ jobs:
           HEAD_SHA: ${{ needs.review.outputs.head_sha }}
         run: |
           printf '%s' "$OUTCOME" > outcome.json
-          printf '%s' "$CHECKED" > checked.json
+          printf '%s' "$CHECKED" > bundle-checked.json
+          jq -s 'add' bundle-checked.json evaluation/findings.json > checked.json
           printf '%s' "$DISPATCH" > dispatch.json
           printf '%s' "$CONSULTED" > consulted.json
           if ! cargo run --locked --quiet -p review-gate --offline -- --outcome outcome.json \

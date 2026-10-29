@@ -321,6 +321,63 @@ impl Workflow {
         .collect())
     }
 
+    /// Requires the `evaluate` job (ENG-32): it runs `cmd`, needs every
+    /// agent job, holds no write permission and not `key`, and the
+    /// key's job needs it, so the evaluation's findings reach the gate.
+    ///
+    /// # Errors
+    ///
+    /// Fails when there is no evaluate job or the key's job cannot be
+    /// found.
+    pub fn evaluate_job_runs(&self, cmd: &str, key: &str) -> Result<Vec<String>, String> {
+        let j = self
+            .jobs
+            .iter()
+            .find(|j| j.name == "evaluate")
+            .ok_or("no evaluate job in the review workflow")?;
+        let needs = |job: &Job| {
+            job.text
+                .lines()
+                .rfind(|l| l.trim_start().starts_with("needs:"))
+                .unwrap_or_default()
+                .to_owned()
+        };
+        let mut problems = Vec::new();
+        if !j.text.contains(cmd) {
+            problems.push(format!("job {} does not run {cmd:?}", j.name));
+        }
+        if grants_write(&j.text) {
+            problems.push(format!("job {} is granted a write permission", j.name));
+        }
+        if j.text.contains(&format!("secrets.{key}")) {
+            problems.push(format!("job {} reads {key}", j.name));
+        }
+        let own_needs = needs(j);
+        problems.extend(
+            self.agent_jobs()
+                .filter(|a| !has_word(&own_needs, &a.name))
+                .map(|a| format!("job {} does not need agent job {}", j.name, a.name)),
+        );
+        // The key's job among the others: an evaluate job that reads the
+        // key is a problem named above, not a second holder.
+        let holders: Vec<&Job> = self
+            .jobs
+            .iter()
+            .filter(|job| job.name != j.name && job.text.contains(&format!("secrets.{key}")))
+            .collect();
+        let [key_job] = holders.as_slice() else {
+            return Err(format!(
+                "{} jobs read {key:?}, want exactly one",
+                holders.len()
+            ));
+        };
+        if !has_word(&needs(key_job), &j.name) {
+            problems.push(format!("job {} does not need job {}", key_job.name, j.name));
+        }
+
+        Ok(problems)
+    }
+
     /// Requires the key's job to run `cmd`.
     ///
     /// # Errors

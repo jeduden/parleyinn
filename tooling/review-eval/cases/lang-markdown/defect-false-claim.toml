@@ -3,7 +3,7 @@ kind = "defect"
 title = "a doc naming a command that does not exist"
 
 [[create]]
-file = "docs/review-evaluation.md"
+file = "docs/review-eval/running.md"
 content = '''
 ---
 summary: >-
@@ -22,5 +22,5 @@ matter names, and writes the scorecard under `DIR`.
 outcome = ["nits", "blocking"]
 
 [[expect.finding]]
-path = "docs/review-evaluation.md"
+path = "docs/review-eval/running.md"
 mentions_any = ["verify", "check", "exist", "no such", "command"]

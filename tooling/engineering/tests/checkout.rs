@@ -206,6 +206,24 @@ fn the_checkout_s_review_agents_are_all_defined() {
     assert!(problems.is_empty(), "{}", problems.join("\n"));
 }
 
+/// Every reviewer component has its defect, clean and injection case
+/// (ENG-32).
+#[test]
+fn the_checkout_s_reviewer_components_each_have_their_cases() {
+    let problems = engineering::review_evaluation::components_have_their_cases(&checkout());
+
+    assert!(problems.is_empty(), "{}", problems.join("\n"));
+}
+
+/// Every reviewer evaluation case reads, applies to the checkout and
+/// makes the review bundle dispatch its component (ENG-32).
+#[test]
+fn the_checkout_s_reviewer_evaluation_cases_apply_and_dispatch() {
+    let problems = engineering::review_evaluation::cases_apply_and_dispatch(&checkout());
+
+    assert!(problems.is_empty(), "{}", problems.join("\n"));
+}
+
 /// CODEOWNERS names no owner on Rust source (ENG-21).
 #[test]
 fn the_checkout_s_codeowners_name_no_owner_on_rust_source() {
