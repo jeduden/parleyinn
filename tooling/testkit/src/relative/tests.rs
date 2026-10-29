@@ -5,18 +5,14 @@ fn ms(values: &[u64]) -> Vec<Duration> {
 }
 
 #[test]
-fn the_median_of_an_odd_count_is_its_middle_sample() {
-    assert_eq!(twice_median_nanos(&ms(&[9, 1, 5])), Some(10_000_000));
+fn the_fastest_of_the_samples_is_the_one_that_counts() {
+    assert_eq!(fastest_nanos(&ms(&[9, 1, 5])), Some(1_000_000));
+    assert_eq!(fastest_nanos(&ms(&[4, 1, 2, 30])), Some(1_000_000));
 }
 
 #[test]
-fn the_median_of_an_even_count_is_the_mean_of_its_middle_two() {
-    assert_eq!(twice_median_nanos(&ms(&[4, 1, 2, 30])), Some(6_000_000));
-}
-
-#[test]
-fn no_samples_have_no_median() {
-    assert_eq!(twice_median_nanos(&[]), None);
+fn no_samples_have_no_fastest() {
+    assert_eq!(fastest_nanos(&[]), None);
 }
 
 #[test]
@@ -25,7 +21,7 @@ fn a_program_at_the_limit_passes() {
 }
 
 #[test]
-fn a_program_past_the_limit_fails_naming_the_medians() {
+fn a_program_past_the_limit_fails_naming_the_fastest_times() {
     let err = within_multiple(&ms(&[51]), &ms(&[10]), 5).unwrap_err();
 
     assert!(
@@ -35,10 +31,17 @@ fn a_program_past_the_limit_fails_naming_the_medians() {
 }
 
 #[test]
-fn one_outlier_of_the_program_does_not_move_its_median() {
-    let program = ms(&[40, 41, 900, 42, 43]);
+fn slow_rounds_of_the_program_do_not_move_its_fastest_time() {
+    let program = ms(&[900, 41, 900, 900, 900]);
 
     assert_eq!(within_multiple(&program, &ms(&[10; 5]), 5), Ok(()));
+}
+
+#[test]
+fn a_program_slow_in_every_round_fails_however_the_reference_fares() {
+    let program = ms(&[900, 800, 900, 900, 900]);
+
+    assert!(within_multiple(&program, &ms(&[10, 90, 10, 90, 10]), 5).is_err());
 }
 
 #[test]
