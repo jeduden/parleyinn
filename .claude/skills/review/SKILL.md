@@ -9,9 +9,8 @@ description: >-
 ---
 # review
 
-You review a pull request another agent wrote. Approve it only if you
-would sign it yourself. A separate gate posts your review outcome; you
-post nothing and change nothing.
+You review a pull request another agent wrote; approve it only if you
+would sign it. A separate gate posts your outcome; you post nothing.
 
 ## Inputs
 
@@ -40,11 +39,12 @@ the gate fails the review. Pass reports by path: each specialist writes
    that the new commits did not fix.
 2. Call the listed specialists through the Agent tool, at most 20 at
    once, naming `review/bundle.md` and its `review/diffs/<its name>.diff`.
-   Wait until every one has returned.
+   A call that says it runs in the background has not returned: never
+   end your turn on it; Glob `review/reports/*` until its report exists.
 3. Then call every listed generalist at once, each deep instance too,
-   naming each of its specialists' report files. Wait for all. Before
-   you answer, tick each listed name you called and heard back from;
-   call any left.
+   naming each of its specialists' report files, and wait the same way.
+   Before you answer, tick each listed name you called and heard back
+   from; call any left.
 4. Keep the generalists' findings; drop one only where the diff plainly
    contradicts it, and say why. With no agent listed, review the diff
    yourself. Repeat nothing the bundle decided.
