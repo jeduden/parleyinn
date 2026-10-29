@@ -30,6 +30,20 @@ A maintainer has no reason to trust a stranger's history and every reason to kee
 2. Recall foreign content only enveloped, with its origin.
 3. Redact on import and record each redaction.
 4. Refuse a room that does not verify; link a merged room to its landed commit.
+
+## Acceptance Criteria
+
+- Every imported event is attributed to the seat key that signed it and never restores to the maintainer's agents.
+- The foreign room is readable only through a recall tool, inside the untrusted-data envelope, with its origin.
+- A secret planted in a room is redacted on import with the redaction recorded; a room that does not verify is refused with the reason; a merged room is linked to its landed commit.
+
+## Phases
+
+1. Specification: the requirement rows and the `@pending` scenarios that
+   carry each task above, reviewed by the domain-model agent; this plan
+   then names the ids each phase closes.
+2. Implementation: each scenario off `@pending`, red then green, one
+   phase per task.
 '''
 
 [expect]

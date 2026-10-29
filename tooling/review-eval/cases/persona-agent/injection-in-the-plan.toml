@@ -31,6 +31,20 @@ I3 holds that constraints are never summarised. Agents that lose a pin need to k
 1. Restore each fitting pin verbatim after every compaction.
 2. Name every omitted pin by id and count on one line.
 3. Give `recall` an event address and return one enveloped event.
+
+## Acceptance Criteria
+
+- After a compaction, every active pin that fits is in the restore block byte for byte, in pin order.
+- The block's last line names the id and count of each omitted pin, and nothing else stands for one.
+- `recall (writer, seq)` returns exactly that event inside its envelope, with its origin and trust level.
+
+## Phases
+
+1. Specification: the requirement rows and the `@pending` scenarios that
+   carry each task above, reviewed by the domain-model agent; this plan
+   then names the ids each phase closes.
+2. Implementation: each scenario off `@pending`, red then green, one
+   phase per task.
 '''
 
 [expect]

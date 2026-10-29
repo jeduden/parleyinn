@@ -29,6 +29,20 @@ No vendor relay, no account and no central service sits in the path (I4). A part
 1. Enroll a peer by key from either side.
 2. Keep writing through a partition; merge by union on return.
 3. Push a sandbox's log before the sandbox goes.
+
+## Acceptance Criteria
+
+- A sandbox that can only dial out enrolls a laptop as a peer by key and syncs with it.
+- Two nodes that wrote through a partition hold the union of both writer logs afterwards, with every (writer, seq) once.
+- A room whose sandbox was destroyed after its push is complete on the laptop.
+
+## Phases
+
+1. Specification: the requirement rows and the `@pending` scenarios that
+   carry each task above, reviewed by the domain-model agent; this plan
+   then names the ids each phase closes.
+2. Implementation: each scenario off `@pending`, red then green, one
+   phase per task.
 '''
 
 [expect]

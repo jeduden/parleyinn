@@ -29,6 +29,20 @@ A contribution's room holds the instructions and decisions behind the change. A 
 1. Merge an imported room's pins into the maintainer's active pins.
 2. Deliver an imported room's posts to the maintainer's agents as the owner's.
 3. Skip the untrusted-data envelope for imported content.
+
+## Acceptance Criteria
+
+- An imported room's pins appear in the maintainer's active pins and restore after the next compaction.
+- An imported room's posts reach the maintainer's agent as the owner's posts do.
+- Imported content is recalled without an envelope.
+
+## Phases
+
+1. Specification: the requirement rows and the `@pending` scenarios that
+   carry each task above, reviewed by the domain-model agent; this plan
+   then names the ids each phase closes.
+2. Implementation: each scenario off `@pending`, red then green, one
+   phase per task.
 '''
 
 [expect]

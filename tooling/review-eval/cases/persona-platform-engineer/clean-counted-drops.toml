@@ -18,7 +18,7 @@ depends-on: []
 
 ## Goal
 
-Every dropped, rejected, redacted, timed-out or failed operation is counted, logged through redaction and shown in `parinn status` and in the structured log a platform can collect (I6). `parinn install` prints the exact harness settings change, asks, and `parinn uninstall` reverses it; neither touches the managed settings file, and managed policy wins over user settings (I7). Each principal's state lives in that principal's home with strict permissions; ParleyInn refuses to operate on another user's home (I8). Managed policy sets a retention policy that bounds disk per principal, with every purge recorded.
+Every dropped, rejected, redacted, timed-out or failed operation is counted by failure class and written, through redaction, as a structured log record with its class, run id, principal and (writer, seq) to the log path managed policy sets, in a documented schema, so a platform's collector reads every runner's counts without a login to it; `parinn status` shows the same counts in the developer's terminal (I6). `parinn install` prints the exact harness settings change, asks, and `parinn uninstall` reverses it; neither touches the managed settings file, and managed policy wins over user settings (I7). Each principal's state lives in that principal's home with strict permissions; ParleyInn refuses to operate on another user's home (I8). Managed policy sets a retention policy that bounds disk per principal, with every purge recorded.
 
 ## Context
 
@@ -30,6 +30,20 @@ A platform engineer is paged when things break and must see every failure, keep 
 2. Make install and uninstall explicit and reversible, never touching managed settings.
 3. Bind state to the principal's home; refuse another user's.
 4. Bound disk by a managed retention policy, with purges recorded.
+
+## Acceptance Criteria
+
+- Every drop, rejection, redaction, timeout and failure is a structured log record, with its class, run id, principal and (writer, seq), at the path managed policy sets, and a counter the collector reads from each runner; `parinn status` shows the same.
+- `parinn install` prints the change, asks, and `parinn uninstall` reverses it; neither touches the managed settings file.
+- ParleyInn refuses a home another OS user owns, and a managed retention policy bounds disk per principal with every purge recorded.
+
+## Phases
+
+1. Specification: the requirement rows and the `@pending` scenarios that
+   carry each task above, reviewed by the domain-model agent; this plan
+   then names the ids each phase closes.
+2. Implementation: each scenario off `@pending`, red then green, one
+   phase per task.
 '''
 
 [expect]

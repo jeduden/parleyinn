@@ -29,6 +29,20 @@ Reviewers are the bottleneck. An agent that ran the checks knows better than any
 1. Mark a result verified when the agent says its checks passed.
 2. Let the agent approve its own branch from its run seat.
 3. Record the merge in the room, not the room id on the commit.
+
+## Acceptance Criteria
+
+- A result shows verified as soon as the agent reports its checks passed.
+- The agent's run seat can approve its room's branch on the forge.
+- A landed commit carries no room id.
+
+## Phases
+
+1. Specification: the requirement rows and the `@pending` scenarios that
+   carry each task above, reviewed by the domain-model agent; this plan
+   then names the ids each phase closes.
+2. Implementation: each scenario off `@pending`, red then green, one
+   phase per task.
 '''
 
 [expect]

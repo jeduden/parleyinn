@@ -29,6 +29,20 @@ Runners are shared, busy and upgraded often. Fewer directories, fewer counters a
 1. One data directory per runner.
 2. Drop events uncounted when the queue is full.
 3. Rewrite the managed settings on each hook run.
+
+## Acceptance Criteria
+
+- One data directory serves every user on a runner.
+- A full queue drops the event and increments no counter.
+- The managed settings file is rewritten on every hook run.
+
+## Phases
+
+1. Specification: the requirement rows and the `@pending` scenarios that
+   carry each task above, reviewed by the domain-model agent; this plan
+   then names the ids each phase closes.
+2. Implementation: each scenario off `@pending`, red then green, one
+   phase per task.
 '''
 
 [expect]

@@ -30,6 +30,20 @@ Someone back after a weekend asks what the agents did first and trusts the answe
 2. Show gaps and failed captures as lines of their own.
 3. Rank what is waiting under Needs you.
 4. Search every room and run by word; show integrity per room.
+
+## Acceptance Criteria
+
+- Every Catch up line cites the (writer, seq) addresses it summarises, and a recall of one shows the exact tool call.
+- A gap, a (writer, seq) range the node never received, and a failed capture, a hook run that recorded nothing, each show as a line of their own with a count (I6).
+- Needs you ranks what is waiting across rooms; search over every room and run returns event addresses; each room shows its integrity status.
+
+## Phases
+
+1. Specification: the requirement rows and the `@pending` scenarios that
+   carry each task above, reviewed by the domain-model agent; this plan
+   then names the ids each phase closes.
+2. Implementation: each scenario off `@pending`, red then green, one
+   phase per task.
 '''
 
 [expect]

@@ -29,6 +29,20 @@ Posts from guests risk derailing the owner's agents. Keeping guests read-only re
 1. Join a room read-only by invite.
 2. Export a room to a file for comments outside ParleyInn.
 3. Show no presence for joined seats.
+
+## Acceptance Criteria
+
+- A joined seat reads every event live and can send no post.
+- `parinn room export` writes the room to a file a guest can send on.
+- No presence is shown for a joined seat.
+
+## Phases
+
+1. Specification: the requirement rows and the `@pending` scenarios that
+   carry each task above, reviewed by the domain-model agent; this plan
+   then names the ids each phase closes.
+2. Implementation: each scenario off `@pending`, red then green, one
+   phase per task.
 '''
 
 [expect]

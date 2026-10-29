@@ -29,6 +29,20 @@ Long runs pin more than the budget holds. Today the block names each pin it leav
 1. Summarise the pins that exceed the budget in the restore block.
 2. Return twenty events around each `recall` match.
 3. Drop the id-and-count line for omitted pins.
+
+## Acceptance Criteria
+
+- A restore block never exceeds its budget, measured on the longest pinned run in the fixtures.
+- A pin that does not fit appears in the block only as the summary's text.
+- `recall` returns twenty events around each match in one call.
+
+## Phases
+
+1. Specification: the requirement rows and the `@pending` scenarios that
+   carry each task above, reviewed by the domain-model agent; this plan
+   then names the ids each phase closes.
+2. Implementation: each scenario off `@pending`, red then green, one
+   phase per task.
 '''
 
 [expect]

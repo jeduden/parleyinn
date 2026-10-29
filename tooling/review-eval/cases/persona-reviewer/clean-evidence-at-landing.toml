@@ -29,6 +29,20 @@ A reviewer accountable for what merges needs the evidence, not the narrative, in
 1. Show what verified each result, with its evidence.
 2. Approve only on the forge, never by a commit author or their agent.
 3. Record the room id on the landed commit.
+
+## Acceptance Criteria
+
+- Each result in a room shows whether an own check, a witness check or a CI attested result verified it, with the evidence; an agent's unverified claim shows as a claim.
+- The forge refuses an approval by a commit author of the branch or their agent, and the room shows the forge's review state.
+- The landing link records the room id on the landed commit through a squash and through a merge queue.
+
+## Phases
+
+1. Specification: the requirement rows and the `@pending` scenarios that
+   carry each task above, reviewed by the domain-model agent; this plan
+   then names the ids each phase closes.
+2. Implementation: each scenario off `@pending`, red then green, one
+   phase per task.
 '''
 
 [expect]

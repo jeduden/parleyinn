@@ -32,6 +32,20 @@ A colleague joins to help, not to watch. Their post must land, visibly, and must
 2. Endorse a guest's post to the agent in one step (OWN-08).
 3. Show presence, typing and authorship per seat.
 4. Hand a room over to a joined seat.
+
+## Acceptance Criteria
+
+- A joined seat's post is recorded under its seat key and shown in the room at once.
+- The agent receives a guest's post only after the owner's endorsement, inside the OWN-08 template.
+- The room shows who is live, who is typing and which seat wrote each post; a handover makes the guest the owner.
+
+## Phases
+
+1. Specification: the requirement rows and the `@pending` scenarios that
+   carry each task above, reviewed by the domain-model agent; this plan
+   then names the ids each phase closes.
+2. Implementation: each scenario off `@pending`, red then green, one
+   phase per task.
 '''
 
 [expect]

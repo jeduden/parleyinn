@@ -29,6 +29,20 @@ Direct connections between a laptop, a home server and a cloud sandbox are hard 
 1. Send and receive events through the relay.
 2. Sign nodes in with an account.
 3. Drop the undelivered queue after 24 hours.
+
+## Acceptance Criteria
+
+- Every event reaches other nodes through the relay only.
+- A node signs in with an account before it syncs.
+- An undelivered queue older than 24 hours is deleted.
+
+## Phases
+
+1. Specification: the requirement rows and the `@pending` scenarios that
+   carry each task above, reviewed by the domain-model agent; this plan
+   then names the ids each phase closes.
+2. Implementation: each scenario off `@pending`, red then green, one
+   phase per task.
 '''
 
 [expect]

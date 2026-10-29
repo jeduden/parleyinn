@@ -29,6 +29,20 @@ Developers run many agents and miss requests that scroll by in a terminal. One s
 1. Route every held request to the TUI.
 2. Hold the agent in the hook until the TUI answers.
 3. Register the hooks on install without a prompt.
+
+## Acceptance Criteria
+
+- Every held request appears in the TUI and in no terminal.
+- The hook does not return until the TUI answers.
+- `parinn install` edits `~/.claude/settings.json` and prints nothing.
+
+## Phases
+
+1. Specification: the requirement rows and the `@pending` scenarios that
+   carry each task above, reviewed by the domain-model agent; this plan
+   then names the ids each phase closes.
+2. Implementation: each scenario off `@pending`, red then green, one
+   phase per task.
 '''
 
 [expect]

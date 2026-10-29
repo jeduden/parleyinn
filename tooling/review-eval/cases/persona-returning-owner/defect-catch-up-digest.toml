@@ -29,6 +29,20 @@ An owner coming back on Monday wants a quick read, not a list of pointers. A dig
 1. Write a one-paragraph digest per room from the model.
 2. Leave event references and failed captures out.
 3. Limit search to the current run.
+
+## Acceptance Criteria
+
+- Catch up shows one model-written paragraph per room and no event address or link.
+- A failed capture does not appear in the digest.
+- Search covers only each room's current run.
+
+## Phases
+
+1. Specification: the requirement rows and the `@pending` scenarios that
+   carry each task above, reviewed by the domain-model agent; this plan
+   then names the ids each phase closes.
+2. Implementation: each scenario off `@pending`, red then green, one
+   phase per task.
 '''
 
 [expect]
