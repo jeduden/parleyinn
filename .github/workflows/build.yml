@@ -40,6 +40,8 @@ env:
   # against, checked against its SHA-256 before use.
   MUSL_VERSION: 1.2.4
   MUSL_SHA256: 7a35eae33d5372a7c0da1188de798726f68825513b7ae3ebe97aaaa52114f039
+  # The Ubuntu source package of that release, for the Launchpad mirror.
+  MUSL_UBUNTU: 1.2.4-2
 
 jobs:
   # One job per release target, each under the same budget; the target
@@ -124,14 +126,16 @@ jobs:
           if [ -f "$archive" ]; then
             echo "musl $MUSL_VERSION from the cache"
           else
-            # The same archive from three hosts, one try each: Ubuntu's
-            # source package is byte-identical to the release, and any
-            # host is transport only, since the checksum below decides.
+            # The same archive from three hosts, one try each, over TLS
+            # only, redirects included: Ubuntu's source package is
+            # byte-identical to the release, and any host is transport
+            # only, since the checksum below decides.
             pool="ubuntu/pool/universe/m/musl/musl_$MUSL_VERSION.orig.tar.gz"
-            for url in "http://azure.archive.ubuntu.com/$pool" \
-                       "https://archive.ubuntu.com/$pool" \
+            for url in "https://archive.ubuntu.com/$pool" \
+                       "https://launchpad.net/ubuntu/+archive/primary/+sourcefiles/musl/$MUSL_UBUNTU/musl_$MUSL_VERSION.orig.tar.gz" \
                        "https://musl.libc.org/releases/musl-$MUSL_VERSION.tar.gz"; do
-              if curl -fsSL --connect-timeout 10 --max-time 20 -o "$archive" "$url"; then
+              if curl -fsSL --proto '=https' --proto-redir '=https' --tlsv1.2 \
+                  --connect-timeout 10 --max-time 20 -o "$archive" "$url"; then
                 break
               fi
               echo "::warning::could not download musl $MUSL_VERSION from $url"
@@ -139,7 +143,7 @@ jobs:
               sleep 2
             done
             test -f "$archive" || {
-              echo "::error::could not download musl $MUSL_VERSION from any host (azure.archive.ubuntu.com, archive.ubuntu.com, musl.libc.org)"
+              echo "::error::could not download musl $MUSL_VERSION from any host (archive.ubuntu.com, launchpad.net, musl.libc.org)"
               exit 1
             }
           fi
