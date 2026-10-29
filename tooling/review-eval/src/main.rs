@@ -63,20 +63,18 @@ impl Host for ProcessHost {
             .map_err(|e| format!("start {}: {e}", command.program))?;
         let deadline = command.deadline.unwrap_or(DEFAULT_DEADLINE);
         let started = Instant::now();
+        let wait_failed = |e: io::Error| format!("wait for {}: {e}", command.program);
         let timed_out = loop {
-            match child.try_wait() {
-                Ok(Some(_)) => break false,
-                Ok(None) if started.elapsed() >= deadline => {
-                    let _ = child.kill();
-                    break true;
-                }
-                Ok(None) => thread::sleep(POLL),
-                Err(e) => return Err(format!("wait for {}: {e}", command.program)),
+            if child.try_wait().map_err(wait_failed)?.is_some() {
+                break false;
             }
+            if started.elapsed() >= deadline {
+                let _ = child.kill();
+                break true;
+            }
+            thread::sleep(POLL);
         };
-        let out = child
-            .wait_with_output()
-            .map_err(|e| format!("wait for {}: {e}", command.program))?;
+        let out = child.wait_with_output().map_err(wait_failed)?;
 
         Ok(Output {
             code: out.status.code(),
