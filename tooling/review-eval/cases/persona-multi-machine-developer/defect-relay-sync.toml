@@ -36,6 +36,11 @@ Direct connections between a laptop, a home server and a cloud sandbox are hard 
 - A node signs in with an account before it syncs.
 - An undelivered queue older than 24 hours is deleted.
 
+## Requirements
+
+The plan holds to PEER-06, SEC-25 and OWN-22, under I1, I4 and I10. Phase 1 names
+the rows it changes and the `@pending` scenarios it takes off.
+
 ## Phases
 
 1. Specification: the requirement rows and the `@pending` scenarios that

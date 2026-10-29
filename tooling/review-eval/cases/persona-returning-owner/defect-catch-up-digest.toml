@@ -36,6 +36,11 @@ An owner coming back on Monday wants a quick read, not a list of pointers. A dig
 - A failed capture does not appear in the digest.
 - Search covers only each room's current run.
 
+## Requirements
+
+The plan holds to VIEW-08, VIEW-09 and RCL-01, under I1 and I6. Phase 1 names
+the rows it changes and the `@pending` scenarios it takes off.
+
 ## Phases
 
 1. Specification: the requirement rows and the `@pending` scenarios that

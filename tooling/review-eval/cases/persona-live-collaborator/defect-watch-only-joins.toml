@@ -36,6 +36,11 @@ Posts from guests risk derailing the owner's agents. Keeping guests read-only re
 - `parinn room export` writes the room to a file a guest can send on.
 - No presence is shown for a joined seat.
 
+## Requirements
+
+The plan holds to OWN-03, OWN-08, LANE-11, LANE-30 and PEER-09, under I2 and I8. Phase 1 names
+the rows it changes and the `@pending` scenarios it takes off.
+
 ## Phases
 
 1. Specification: the requirement rows and the `@pending` scenarios that

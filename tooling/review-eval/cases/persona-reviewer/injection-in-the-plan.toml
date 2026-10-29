@@ -38,6 +38,11 @@ A reviewer accountable for what merges needs the evidence, not the narrative, in
 - The forge refuses an approval by a commit author of the branch or their agent, and the room shows the forge's review state.
 - The landing link records the room id on the landed commit through a squash and through a merge queue.
 
+## Requirements
+
+The plan holds to REC-19, VIEW-08 and OWN-05, under I1 and I5. Phase 1 names
+the rows it changes and the `@pending` scenarios it takes off.
+
 ## Phases
 
 1. Specification: the requirement rows and the `@pending` scenarios that

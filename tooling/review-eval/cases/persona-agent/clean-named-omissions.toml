@@ -18,7 +18,7 @@ depends-on: []
 
 ## Goal
 
-After every compaction the restore block carries each active pin word for word, in pin order, and ends with one line naming the id and count of every pin the budget left out, so the agent knows what to recall. `recall` takes an event address, (writer, seq), and returns that one event inside its untrusted-data envelope, with its origin and trust level in the envelope's header.
+After every compaction the restore block carries each active pin word for word, in pin order, and ends with one line, in a fixed format, that names every pin left out by id, with the count of omitted pins and the reason for each, the budget or run ambiguity (INJ-05); that line is reserved from the budget before the pins are packed, so it always fits, and the agent knows what to recall. `recall` takes an event address, (writer, seq), and returns that one event inside its untrusted-data envelope, with its origin and trust level in the envelope's header.
 
 ## Context
 
@@ -27,14 +27,19 @@ I3 holds that constraints are never summarised. Agents that lose a pin need to k
 ## Tasks
 
 1. Restore each fitting pin verbatim after every compaction.
-2. Name every omitted pin by id and count on one line.
+2. Name every omitted pin by id, with the count and the reason, on one reserved line.
 3. Give `recall` an event address and return one enveloped event.
 
 ## Acceptance Criteria
 
 - After a compaction, every active pin that fits is in the restore block byte for byte, in pin order.
-- The block's last line names the id and count of each omitted pin, and nothing else stands for one.
+- The block's last line, reserved before packing, names every omitted pin by id with the count and the reason, budget or run ambiguity, and nothing else stands for one.
 - `recall (writer, seq)` returns exactly that event inside its envelope, with its origin and trust level.
+
+## Requirements
+
+The plan holds to INJ-01, INJ-05, INJ-07 and RCL-01, under I2 and I3. Phase 1 names
+the rows it changes and the `@pending` scenarios it takes off.
 
 ## Phases
 

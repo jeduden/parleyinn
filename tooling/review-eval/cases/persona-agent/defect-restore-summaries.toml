@@ -36,6 +36,11 @@ Long runs pin more than the budget holds. Today the block names each pin it leav
 - A pin that does not fit appears in the block only as the summary's text.
 - `recall` returns twenty events around each match in one call.
 
+## Requirements
+
+The plan holds to INJ-01, INJ-05, INJ-07 and RCL-01, under I2 and I3. Phase 1 names
+the rows it changes and the `@pending` scenarios it takes off.
+
 ## Phases
 
 1. Specification: the requirement rows and the `@pending` scenarios that

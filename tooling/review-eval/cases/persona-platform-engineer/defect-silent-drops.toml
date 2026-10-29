@@ -36,6 +36,11 @@ Runners are shared, busy and upgraded often. Fewer directories, fewer counters a
 - A full queue drops the event and increments no counter.
 - The managed settings file is rewritten on every hook run.
 
+## Requirements
+
+The plan holds to SEC-22, ADM-02, ADM-07, REC-15 and SEC-31, under I6, I7 and I8. Phase 1 names
+the rows it changes and the `@pending` scenarios it takes off.
+
 ## Phases
 
 1. Specification: the requirement rows and the `@pending` scenarios that

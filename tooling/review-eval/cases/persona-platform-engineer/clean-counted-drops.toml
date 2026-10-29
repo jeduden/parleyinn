@@ -37,6 +37,11 @@ A platform engineer is paged when things break and must see every failure, keep 
 - `parinn install` prints the change, asks, and `parinn uninstall` reverses it; neither touches the managed settings file.
 - ParleyInn refuses a home another OS user owns, and a managed retention policy bounds disk per principal with every purge recorded.
 
+## Requirements
+
+The plan holds to SEC-22, ADM-02, ADM-07, REC-15 and SEC-31, under I6, I7 and I8. Phase 1 names
+the rows it changes and the `@pending` scenarios it takes off.
+
 ## Phases
 
 1. Specification: the requirement rows and the `@pending` scenarios that

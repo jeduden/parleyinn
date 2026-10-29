@@ -37,6 +37,11 @@ A maintainer has no reason to trust a stranger's history and every reason to kee
 - The foreign room is readable only through a recall tool, inside the untrusted-data envelope, with its origin.
 - A secret planted in a room is redacted on import with the redaction recorded; a room that does not verify is refused with the reason; a merged room is linked to its landed commit.
 
+## Requirements
+
+The plan holds to REC-23, LANE-30 and SEC-08, under I2 and I8. Phase 1 names
+the rows it changes and the `@pending` scenarios it takes off.
+
 ## Phases
 
 1. Specification: the requirement rows and the `@pending` scenarios that

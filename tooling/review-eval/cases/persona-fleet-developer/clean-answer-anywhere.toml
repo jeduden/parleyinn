@@ -36,6 +36,11 @@ A developer with ten worktrees switches terminals all day and must not be slowed
 - The hook returns within its budget with no answer, and the request stays under Needs you.
 - `parinn install` prints the exact settings change and writes nothing on a no.
 
+## Requirements
+
+The plan holds to OWN-05, OWN-06, ADM-02 and ADM-17, under I7 and I9. Phase 1 names
+the rows it changes and the `@pending` scenarios it takes off.
+
 ## Phases
 
 1. Specification: the requirement rows and the `@pending` scenarios that

@@ -36,6 +36,11 @@ Developers run many agents and miss requests that scroll by in a terminal. One s
 - The hook does not return until the TUI answers.
 - `parinn install` edits `~/.claude/settings.json` and prints nothing.
 
+## Requirements
+
+The plan holds to OWN-05, OWN-06, ADM-02 and ADM-17, under I7 and I9. Phase 1 names
+the rows it changes and the `@pending` scenarios it takes off.
+
 ## Phases
 
 1. Specification: the requirement rows and the `@pending` scenarios that

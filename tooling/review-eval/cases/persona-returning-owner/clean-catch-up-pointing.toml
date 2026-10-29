@@ -37,6 +37,11 @@ Someone back after a weekend asks what the agents did first and trusts the answe
 - A gap, a (writer, seq) range the node never received, and a failed capture, a hook run that recorded nothing, each show as a line of their own with a count (I6).
 - Needs you ranks what is waiting across rooms; search over every room and run returns event addresses; each room shows its integrity status.
 
+## Requirements
+
+The plan holds to VIEW-08, VIEW-09 and RCL-01, under I1 and I6. Phase 1 names
+the rows it changes and the `@pending` scenarios it takes off.
+
 ## Phases
 
 1. Specification: the requirement rows and the `@pending` scenarios that

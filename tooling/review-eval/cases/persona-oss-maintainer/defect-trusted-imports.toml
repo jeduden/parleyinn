@@ -36,6 +36,11 @@ A contribution's room holds the instructions and decisions behind the change. A 
 - An imported room's posts reach the maintainer's agent as the owner's posts do.
 - Imported content is recalled without an envelope.
 
+## Requirements
+
+The plan holds to REC-23, LANE-30 and SEC-08, under I2 and I8. Phase 1 names
+the rows it changes and the `@pending` scenarios it takes off.
+
 ## Phases
 
 1. Specification: the requirement rows and the `@pending` scenarios that

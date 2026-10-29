@@ -20,7 +20,7 @@ depends-on: []
 
 ## Goal
 
-A joined seat posts in the room under its own seat key. A guest's post reaches the owner's agent only when the owner endorses it, in one step, inside the fixed template of OWN-08; until then the agent sees an opt-in notice that posts are waiting. The room shows who is live, who is typing and which seat wrote each post. The owner can hand the room over, after which the guest's seat is the owner's.
+A joined seat posts in the room under its own seat key. A guest's post reaches the owner's agent only when the owner endorses it, in one step, inside the fixed template of OWN-08; until then the agent sees an opt-in notice that posts are waiting. The owner sees the post arrive under Needs you, and the guest sees, live, each of their posts' state: pending, endorsed as written, endorsed with an edit shown to them as a diff, declined, or refused and counted (I6). The room shows who is live, who is typing and which seat wrote each post. The owner can hand the room over, after which the guest's seat is the owner's.
 
 ## Context
 
@@ -36,8 +36,13 @@ A colleague joins to help, not to watch. Their post must land, visibly, and must
 ## Acceptance Criteria
 
 - A joined seat's post is recorded under its seat key and shown in the room at once.
-- The agent receives a guest's post only after the owner's endorsement, inside the OWN-08 template.
+- The agent receives a guest's post only after the owner's endorsement, inside the OWN-08 template, and the guest sees the post's state change the moment it does, an edit as a diff.
 - The room shows who is live, who is typing and which seat wrote each post; a handover makes the guest the owner.
+
+## Requirements
+
+The plan holds to OWN-03, OWN-08, LANE-11, LANE-30 and PEER-09, under I2 and I8. Phase 1 names
+the rows it changes and the `@pending` scenarios it takes off.
 
 ## Phases
 
