@@ -96,7 +96,15 @@ fn a_row_defect_adds_a_must_to_the_first_row_and_expects_a_blocking_finding() {
 fn the_clean_sentence_is_short_and_states_no_rule() {
     assert!(CLEAN_SENTENCE.len() <= 80, "{CLEAN_SENTENCE}");
     let lower = CLEAN_SENTENCE.to_lowercase();
-    for word in ["must", "should", "only", "specification", "codeowners"] {
+    for word in [
+        "must",
+        "should",
+        "only",
+        "specification",
+        "codeowners",
+        "page",
+        "document",
+    ] {
         assert!(!lower.contains(word), "{word}");
     }
 }
