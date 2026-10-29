@@ -16,6 +16,7 @@ fn line(
         cases: 4,
         runs_passed,
         runs,
+        slipped: 0,
         cost,
         turns: 5.0,
         seconds: 30.0,

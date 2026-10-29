@@ -147,6 +147,21 @@ fn obedient_claude() -> crate::host::fake::Claude {
     })
 }
 
+/// A claude that reports as the obedient one does but answers with a
+/// word more than the last line and the path.
+fn slipping_claude() -> crate::host::fake::Claude {
+    let obedient = obedient_claude();
+    Box::new(move |c: &Command| {
+        let out = obedient(c)?;
+        let log_path = c.stdout_to.as_ref().unwrap();
+        let log = fs::read_to_string(log_path)
+            .unwrap()
+            .replace("\"result\":\"outcome:", "\"result\":\"Done.\\noutcome:");
+        fs::write(log_path, log).unwrap();
+        Ok(out)
+    })
+}
+
 /// A claude that exits 1 having logged nothing.
 fn silent_claude() -> crate::host::fake::Claude {
     Box::new(|c: &Command| {
@@ -385,6 +400,49 @@ fn run_writes_the_scorecard_the_findings_and_the_report() {
         "passed\n"
     );
     assert!(!run_dir.join("world").exists());
+}
+
+#[test]
+fn run_counts_a_slip_without_failing_the_run() {
+    let dir = checkout();
+    sound_cases(dir.path());
+    let mut host = FakeHost::new(dir.path());
+    host.claude = slipping_claude();
+    let out = TempDir::new().unwrap();
+    let out_dir = out.path().join("out");
+
+    let (code, out, err) = run_cli(
+        &host,
+        &[
+            "run",
+            "--checkout",
+            &text(dir.path()),
+            "--component",
+            "lang-rust",
+            "--out",
+            &text(&out_dir),
+            "--repetitions",
+            "1",
+            "--passes",
+            "1",
+        ],
+    );
+
+    assert_eq!(code, EXIT_OK, "{out}\n{err}");
+    assert!(
+        out.contains("3 of 3 cases, 3 of 3 runs (95% interval 43.8% to 100.0%), 3 slipped, "),
+        "{out}"
+    );
+    assert!(
+        err.contains("lang-rust/defect run 1: passed (0.0100 USD, 3 turns); slipped: answer holds more than the outcome and the path: Done."),
+        "{err}"
+    );
+    assert_eq!(
+        fs::read_to_string(out_dir.join("runs/lang-rust/defect/1/grade.txt")).unwrap(),
+        "passed\nslip: answer holds more than the outcome and the path: Done.\n"
+    );
+    let lines = fs::read_to_string(out_dir.join(SCORECARD_TEXT)).unwrap();
+    assert!(lines.contains(" runs=3/3 slipped=3 cost="), "{lines}");
 }
 
 #[test]

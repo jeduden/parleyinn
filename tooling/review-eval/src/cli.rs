@@ -444,7 +444,7 @@ fn run_case(
             .join(n.to_string());
         let run = one_run(host, options, component, case, &dir);
         progress(&format!(
-            "{}/{} run {n}: {} ({:.4} USD, {} turns){}",
+            "{}/{} run {n}: {} ({:.4} USD, {} turns){}{}",
             component.name,
             case.name,
             if run.passed { "passed" } else { "failed" },
@@ -454,6 +454,11 @@ fn run_case(
                 String::new()
             } else {
                 format!(": {}", run.failures.join("; "))
+            },
+            if run.slips.is_empty() {
+                String::new()
+            } else {
+                format!("; slipped: {}", run.slips.join("; "))
             }
         ));
         record.runs.push(run);
@@ -515,13 +520,16 @@ fn one_run(
                 dispatched: &world.dispatched,
             },
         );
-        let mut record = RunRecord::new(&log, graded.failures);
+        let mut record = RunRecord::new(&log, graded.failures, graded.slips);
         record.notes.clone_from(&world.notes);
         let mut grade = if record.passed {
             "passed\n".to_owned()
         } else {
             format!("{}\n", record.failures.join("\n"))
         };
+        for slip in &record.slips {
+            grade.push_str(&format!("slip: {slip}\n"));
+        }
         for note in &record.notes {
             grade.push_str(&format!("note: {note}\n"));
         }

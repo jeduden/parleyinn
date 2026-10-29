@@ -10,6 +10,7 @@ fn line(component: &str, cases_passed: usize, runs_passed: usize, runs: usize, c
         cases: 4,
         runs_passed,
         runs,
+        slipped: 2,
         cost,
         turns: 7.25,
         seconds: 48.0,
@@ -29,14 +30,15 @@ fn a_line_renders_and_reads_back() {
     assert_eq!(
         text,
         "reviewer evaluation scorecard v1\n\
-         component=lang-rust model=haiku resolved=claude-haiku-5-5 cases=3/4 runs=9/12 cost=1.0000 turns=7.2 seconds=48 hash=0123456789abcdef\n\
-         component=lang-toml model=haiku resolved=claude-haiku-5-5 cases=4/4 runs=11/12 cost=0.4200 turns=7.2 seconds=48 hash=0123456789abcdef\n"
+         component=lang-rust model=haiku resolved=claude-haiku-5-5 cases=3/4 runs=9/12 slipped=2 cost=1.0000 turns=7.2 seconds=48 hash=0123456789abcdef\n\
+         component=lang-toml model=haiku resolved=claude-haiku-5-5 cases=4/4 runs=11/12 slipped=2 cost=0.4200 turns=7.2 seconds=48 hash=0123456789abcdef\n"
     );
     let back = parse(&text).unwrap();
     assert_eq!(back.len(), 2);
     assert_eq!(back[0].component, "lang-rust");
     assert_eq!((back[0].cases_passed, back[0].cases), (3, 4));
     assert_eq!((back[0].runs_passed, back[0].runs), (9, 12));
+    assert_eq!(back[0].slipped, 2);
     assert!((back[0].cost - 1.0).abs() < 1e-9);
     assert!((back[0].turns - 7.2).abs() < 1e-9);
     assert!((back[0].seconds - 48.0).abs() < 1e-9);
@@ -63,19 +65,31 @@ fn parse_names_each_problem() {
     let bad = |fields: &str| parse(&format!("{HEADER}\n{fields}\n")).unwrap_err();
     assert_eq!(bad("model=haiku"), "line 2: no component");
     assert_eq!(
-        bad("component=x model=h resolved=r cases=1 runs=1/1 cost=1 turns=1 seconds=1 hash=h"),
+        bad(
+            "component=x model=h resolved=r cases=1 runs=1/1 slipped=0 cost=1 turns=1 seconds=1 hash=h"
+        ),
         "line 2: cases is not passed/all"
     );
     assert_eq!(
-        bad("component=x model=h resolved=r cases=a/b runs=1/1 cost=1 turns=1 seconds=1 hash=h"),
+        bad(
+            "component=x model=h resolved=r cases=a/b runs=1/1 slipped=0 cost=1 turns=1 seconds=1 hash=h"
+        ),
         "line 2: cases is not passed/all"
     );
     assert_eq!(
-        bad("component=x model=h resolved=r cases=1/1 runs=1/1 cost=much turns=1 seconds=1 hash=h"),
+        bad(
+            "component=x model=h resolved=r cases=1/1 runs=1/1 slipped=some cost=1 turns=1 seconds=1 hash=h"
+        ),
+        "line 2: slipped is not a count"
+    );
+    assert_eq!(
+        bad(
+            "component=x model=h resolved=r cases=1/1 runs=1/1 slipped=0 cost=much turns=1 seconds=1 hash=h"
+        ),
         "line 2: cost is not a number"
     );
     assert_eq!(
-        bad("component=x model=h resolved=r cases=1/1 runs=1/1 cost=1 turns=1 seconds=1"),
+        bad("component=x model=h resolved=r cases=1/1 runs=1/1 slipped=0 cost=1 turns=1 seconds=1"),
         "line 2: no hash"
     );
 }
@@ -114,6 +128,7 @@ fn merge_replaces_a_component_s_line_and_keeps_the_rest() {
 fn a_suite_becomes_a_line() {
     let run = |passed: bool| RunRecord {
         passed,
+        slips: vec!["answer does not hold the report's outcome line".to_owned()],
         cost: 0.25,
         turns: 6,
         duration_ms: 3000,
@@ -147,6 +162,7 @@ fn a_suite_becomes_a_line() {
             cases: 1,
             runs_passed: 2,
             runs: 2,
+            slipped: 2,
             cost: 0.5,
             turns: 6.0,
             seconds: 3.0,

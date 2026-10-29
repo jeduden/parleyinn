@@ -15,6 +15,10 @@ use crate::log::{RunLog, Usage};
 pub struct RunRecord {
     pub passed: bool,
     pub failures: Vec<String>,
+    /// Departures from the report's shape the review survives: counted
+    /// and shown, they fail no run.
+    #[serde(default)]
+    pub slips: Vec<String>,
     pub answered: bool,
     pub cost: f64,
     pub turns: usize,
@@ -29,12 +33,13 @@ pub struct RunRecord {
 
 impl RunRecord {
     /// The record of a run whose log is `log` and whose grade left
-    /// `failures`.
+    /// `failures` and `slips`.
     #[must_use]
-    pub fn new(log: &RunLog, failures: Vec<String>) -> Self {
+    pub fn new(log: &RunLog, failures: Vec<String>, slips: Vec<String>) -> Self {
         Self {
             passed: failures.is_empty(),
             failures,
+            slips,
             answered: log.answered,
             cost: log.cost,
             turns: log.turns,
@@ -75,6 +80,12 @@ impl CaseRecord {
     #[must_use]
     pub fn passed_runs(&self) -> usize {
         self.runs.iter().filter(|r| r.passed).count()
+    }
+
+    /// How many of its runs slipped.
+    #[must_use]
+    pub fn slipped_runs(&self) -> usize {
+        self.runs.iter().filter(|r| !r.slips.is_empty()).count()
     }
 
     /// The failures of its first failed run, for a finding.
@@ -135,6 +146,12 @@ impl SuiteRecord {
     pub fn runs_passed(&self) -> (usize, usize) {
         let runs: Vec<&RunRecord> = self.cases.iter().flat_map(|c| &c.runs).collect();
         (runs.iter().filter(|r| r.passed).count(), runs.len())
+    }
+
+    /// How many runs slipped.
+    #[must_use]
+    pub fn slipped_runs(&self) -> usize {
+        self.cases.iter().map(CaseRecord::slipped_runs).sum()
     }
 
     /// What every run cost together.
@@ -282,7 +299,7 @@ impl Scorecard {
             });
             let _ = write!(
                 out,
-                "\n### {} on {} ({}): {} of {} cases, {} of {} runs{}, ${:.2}, {:.1} turns, {:.0} s per run\n\n| case | kind | runs | cost | turns | result |\n|---|---|---:|---:|---:|---|\n",
+                "\n### {} on {} ({}): {} of {} cases, {} of {} runs{}, {} slipped, ${:.2}, {:.1} turns, {:.0} s per run\n\n| case | kind | runs | cost | turns | result |\n|---|---|---:|---:|---:|---|\n",
                 suite.component,
                 suite.model,
                 suite.resolved(),
@@ -291,6 +308,7 @@ impl Scorecard {
                 rp,
                 rt,
                 interval,
+                suite.slipped_runs(),
                 suite.cost(),
                 suite.mean_turns(),
                 suite.mean_seconds()
@@ -319,8 +337,8 @@ impl Scorecard {
     }
 }
 
-/// Each failed run of `case` with its failures, and each run's notes,
-/// one bullet each.
+/// Each failed run of `case` with its failures, each slipped run with
+/// its slips, and each run's notes, one bullet each.
 fn run_lines(out: &mut String, case: &CaseRecord) {
     for (n, run) in case.runs.iter().enumerate() {
         if !run.passed {
@@ -330,6 +348,15 @@ fn run_lines(out: &mut String, case: &CaseRecord) {
                 case.name,
                 n + 1,
                 run.failures.join("; ")
+            );
+        }
+        if !run.slips.is_empty() {
+            let _ = writeln!(
+                out,
+                "\n- `{}` run {} slipped: {}",
+                case.name,
+                n + 1,
+                run.slips.join("; ")
             );
         }
         for note in &run.notes {

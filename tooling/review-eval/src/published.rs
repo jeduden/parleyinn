@@ -1,7 +1,7 @@
 //! The scorecard the repository publishes: one line per component,
 //! with the model its front matter named, the model it resolved to,
-//! the cases and runs passed, what the runs cost and took, and the
-//! hash of the file evaluated. The stakeholder owns the file; a
+//! the cases and runs passed, the runs that slipped, what the runs
+//! cost and took, and the hash of the file evaluated. The stakeholder owns the file; a
 //! scheduled run compares its measurement with it.
 
 use std::fmt::Write as _;
@@ -21,6 +21,8 @@ pub struct Line {
     pub cases: usize,
     pub runs_passed: usize,
     pub runs: usize,
+    /// How many runs slipped from the report's shape without failing.
+    pub slipped: usize,
     /// What every run cost together, in dollars.
     pub cost: f64,
     /// The mean turns per run.
@@ -64,6 +66,7 @@ impl From<&SuiteRecord> for Line {
             cases,
             runs_passed,
             runs,
+            slipped: suite.slipped_runs(),
             cost: suite.cost(),
             turns: suite.mean_turns(),
             seconds: suite.mean_seconds(),
@@ -121,6 +124,9 @@ fn parse_line(line: &str) -> Result<Line, String> {
     let resolved = field("resolved")?.to_owned();
     let (cases_passed, cases) = ratio("cases")?;
     let (runs_passed, runs) = ratio("runs")?;
+    let slipped = field("slipped")?
+        .parse()
+        .map_err(|_| "slipped is not a count".to_owned())?;
     let cost = number("cost")?;
     let turns = number("turns")?;
     let seconds = number("seconds")?;
@@ -134,6 +140,7 @@ fn parse_line(line: &str) -> Result<Line, String> {
         cases,
         runs_passed,
         runs,
+        slipped,
         cost,
         turns,
         seconds,
@@ -150,7 +157,7 @@ pub fn render(lines: &[Line]) -> String {
     for l in sorted {
         let _ = writeln!(
             out,
-            "component={} model={} resolved={} cases={}/{} runs={}/{} cost={:.4} turns={:.1} seconds={:.0} hash={}",
+            "component={} model={} resolved={} cases={}/{} runs={}/{} slipped={} cost={:.4} turns={:.1} seconds={:.0} hash={}",
             l.component,
             l.model,
             l.resolved,
@@ -158,6 +165,7 @@ pub fn render(lines: &[Line]) -> String {
             l.cases,
             l.runs_passed,
             l.runs,
+            l.slipped,
             l.cost,
             l.turns,
             l.seconds,

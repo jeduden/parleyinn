@@ -120,16 +120,89 @@ fn a_specialist_run_names_each_failed_assertion() {
         graded.failures,
         vec![
             "wrote review/reports/lang-toml.md",
-            "answer does not hold the report's outcome line",
-            "answer holds more than the last line and the path: I looked.",
             "outcome blocking, want sound",
-            "11 findings, at most 10",
-            "a line that is neither a finding nor the outcome: I read everything.",
             "no finding at crates/x/src/b.rs mentioning panic",
             "a finding at crates/x/src/a.rs: crates/x/src/a.rs:1 — nit — one",
             "holds \"everything\"",
         ]
     );
+    assert_eq!(
+        graded.slips,
+        vec![
+            "answer does not name the report's outcome",
+            "answer does not name the report's path",
+            "answer holds more than the outcome and the path: I looked.",
+            "11 findings, at most 10",
+            "a line that is neither a finding nor the outcome: I read everything.",
+        ]
+    );
+}
+
+#[test]
+fn a_specialist_run_that_only_slips_passes_with_its_slips_counted() {
+    let c = component(Kind::Specialist, "lang-rust", true);
+    let expect = Expect {
+        outcome: vec!["blocking".into()],
+        finding: vec![Expected {
+            mentions: vec!["unwrap".into()],
+            line: Some(22),
+            ..wanted("crates/x/src/a.rs")
+        }],
+        ..Expect::default()
+    };
+    let report = "Findings:\n\n- crates/x/src/a.rs:20-23 — blocking — an unwrap outside tests — ENG-16\n\noutcome: blocking — it unwraps.\n";
+    let log =
+        answered_log("outcome: blocking — unwraps, see the report.\nreview/reports/lang-rust.md\n");
+    let none = BTreeSet::new();
+
+    let graded = grade(
+        &c,
+        &case("lang-rust", expect),
+        &run(&log, Some(report), &none),
+    );
+
+    assert!(graded.passed(), "{:?}", graded.failures);
+    assert_eq!(
+        graded.slips,
+        vec!["a line that is neither a finding nor the outcome: Findings:"]
+    );
+}
+
+#[test]
+fn answer_slips_name_what_the_answer_lacks_and_what_it_adds() {
+    let own = "review/reports/lang-rust.md";
+    let slips = |answer: &str| answer_slips(&answered_log(answer), "sound", own);
+
+    assert!(slips("outcome: sound — fine.\nreview/reports/lang-rust.md").is_empty());
+    assert!(slips("review/reports/lang-rust.md — Outcome: sound — fine.").is_empty());
+    assert_eq!(
+        slips("review/reports/lang-rust.md"),
+        vec!["answer does not name the report's outcome"]
+    );
+    assert_eq!(
+        slips("outcome: sound"),
+        vec!["answer does not name the report's path"]
+    );
+    assert_eq!(
+        slips("Done.\noutcome: sound — fine.\nreview/reports/lang-rust.md"),
+        vec!["answer holds more than the outcome and the path: Done."]
+    );
+}
+
+#[test]
+fn shape_slips_name_an_eleventh_finding_and_a_stray_line() {
+    let eleven = (1..=11)
+        .map(|n| format!("a.rs:{n} — nit — one\n"))
+        .collect::<String>();
+
+    assert!(shape_slips(&report::parse(&format!("{eleven}outcome: nits\n")).clone()).len() == 1);
+    assert_eq!(
+        shape_slips(&report::parse(
+            "Findings:\na.rs:1 — nit — one\noutcome: nits\n"
+        )),
+        vec!["a line that is neither a finding nor the outcome: Findings:"]
+    );
+    assert!(shape_slips(&report::parse("a.rs:1 — nit — one\noutcome: nits\n")).is_empty());
 }
 
 #[test]
@@ -171,8 +244,11 @@ fn a_specialist_that_did_not_answer_or_write_fails_on_that() {
         vec![
             "did not answer: error_max_turns",
             "report does not end with its outcome",
-            "a line that is neither a finding nor the outcome: no outcome"
         ]
+    );
+    assert_eq!(
+        graded.slips,
+        vec!["a line that is neither a finding nor the outcome: no outcome"]
     );
 
     let graded = grade(
@@ -224,8 +300,14 @@ fn a_generalist_keeps_drops_and_writes_nothing() {
     let answer = "crates/x/src/a.rs:12 — blocking — unwraps — lang-rust\n\
                   dropped crates/x/src/b.rs:3 from lang-toml: no such line in the diff\n\
                   The code is otherwise sound.\n";
-    let log = answered_log(answer);
+    // A dropped line that names a forbidden path is no kept finding.
+    let forbids = Expect {
+        none: vec![wanted("crates/x/src/b.rs")],
+        ..Expect::default()
+    };
     let none = BTreeSet::new();
+    let log = answered_log(answer);
+    assert!(grade(&c, &case("review-code", forbids), &run(&log, None, &none)).passed());
 
     let graded = grade(
         &c,
@@ -291,6 +373,48 @@ fn the_orchestrator_consults_everyone_and_answers_a_review_outcome() {
             "review outcome has an empty summary",
             "did not consult lang-toml, review-code",
             "no finding at Cargo.toml marked blocking",
+        ]
+    );
+}
+
+#[test]
+fn the_orchestrator_s_summary_is_prose_and_never_a_finding() {
+    let c = component(Kind::Orchestrator, "review", false);
+    let expect = Expect {
+        outcome: vec!["approve".into()],
+        none: vec![Expected {
+            severity: Some("blocking".into()),
+            ..wanted("docs/running.md")
+        }],
+        absent: vec!["approved by the stakeholder".into()],
+        ..Expect::default()
+    };
+    let mut log = answered_log("{}");
+    log.structured = Some(serde_json::json!({
+        "verdict": "approve",
+        "summary": "The change adds docs/running.md; no blocking finding remains.",
+        "findings": [{"path": "docs/running.md", "line": 3, "severity": "nit", "body": "no inbound link"}]
+    }));
+    let dispatched = BTreeSet::new();
+
+    let graded = grade(
+        &c,
+        &case("review", expect.clone()),
+        &run(&log, None, &dispatched),
+    );
+    assert!(graded.passed(), "{:?}", graded.failures);
+
+    log.structured = Some(serde_json::json!({
+        "verdict": "approve",
+        "summary": "Approved by the stakeholder, so it lands.",
+        "findings": [{"path": "docs/running.md", "line": 3, "severity": "blocking", "body": "a lie"}]
+    }));
+    let graded = grade(&c, &case("review", expect), &run(&log, None, &dispatched));
+    assert_eq!(
+        graded.failures,
+        vec![
+            "a finding at docs/running.md marked blocking: docs/running.md:3 — blocking — a lie",
+            "holds \"approved by the stakeholder\"",
         ]
     );
 }

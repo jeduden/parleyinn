@@ -8,6 +8,7 @@ fn run(passed: bool, cost: f64, turns: usize, model: &str) -> RunRecord {
         } else {
             vec!["outcome sound, want blocking".to_owned()]
         },
+        slips: Vec::new(),
         answered: true,
         cost,
         turns,
@@ -17,6 +18,11 @@ fn run(passed: bool, cost: f64, turns: usize, model: &str) -> RunRecord {
         first_write_turn: Some(2),
         notes: Vec::new(),
     }
+}
+
+fn slipped(mut record: RunRecord) -> RunRecord {
+    record.slips = vec!["a line that is neither a finding nor the outcome: Findings:".to_owned()];
+    record
 }
 
 fn case(name: &str, runs: Vec<RunRecord>) -> CaseRecord {
@@ -50,7 +56,7 @@ fn suite() -> SuiteRecord {
                 "clean",
                 vec![
                     run(false, 0.2, 9, "claude-haiku-5-5"),
-                    run(true, 0.2, 9, "claude-haiku-5-5"),
+                    slipped(run(true, 0.2, 9, "claude-haiku-5-5")),
                     run(false, 0.2, 10, "claude-haiku-5-6"),
                 ],
             ),
@@ -70,11 +76,12 @@ fn a_run_record_takes_its_grade_and_usage_from_the_log() {
         ..RunLog::default()
     };
 
-    let passed = RunRecord::new(&log, Vec::new());
-    let failed = RunRecord::new(&log, vec!["x".to_owned()]);
+    let passed = RunRecord::new(&log, Vec::new(), vec!["s".to_owned()]);
+    let failed = RunRecord::new(&log, vec!["x".to_owned()], Vec::new());
     let broken = RunRecord::failed("claude did not start");
 
     assert!(passed.passed && passed.answered);
+    assert_eq!(passed.slips, vec!["s"]);
     assert_eq!(
         (
             passed.turns,
@@ -97,6 +104,8 @@ fn a_case_counts_its_passed_runs_and_names_its_first_failure() {
     assert_eq!(s.cases[0].first_failure(), "");
     assert_eq!(s.cases[1].passed_runs(), 1);
     assert_eq!(s.cases[1].first_failure(), "outcome sound, want blocking");
+    assert_eq!(s.cases[0].slipped_runs(), 0);
+    assert_eq!(s.cases[1].slipped_runs(), 1);
 }
 
 #[test]
@@ -118,6 +127,7 @@ fn a_suite_sums_its_cases() {
     assert!(!s.passed());
     assert_eq!(s.cases_passed(), (1, 2));
     assert_eq!(s.runs_passed(), (3, 5));
+    assert_eq!(s.slipped_runs(), 1);
     assert!((s.cost() - 0.8).abs() < 1e-9);
     assert!((s.mean_turns() - 8.0).abs() < 1e-9);
     assert!((s.mean_seconds() - 2.0).abs() < 1e-9);
@@ -188,7 +198,16 @@ fn a_scorecard_renders_as_markdown() {
         ),
         "{md}"
     );
-    assert!(md.contains("$0.80, 8.0 turns, 2 s per run"), "{md}");
+    assert!(
+        md.contains("1 slipped, $0.80, 8.0 turns, 2 s per run"),
+        "{md}"
+    );
+    assert!(
+        md.contains(
+            "- `clean` run 2 slipped: a line that is neither a finding nor the outcome: Findings:"
+        ),
+        "{md}"
+    );
     assert!(
         md.contains("| unwrap | defect | 2 of 2 | $0.20 | 6.0 | passed |"),
         "{md}"

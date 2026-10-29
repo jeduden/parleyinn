@@ -88,7 +88,8 @@ fn strip_number(line: &str) -> &str {
 }
 
 /// `line` as a finding, when it reads as one: `path:line`, a dash, a
-/// severity word, a dash and the rest.
+/// severity word, a dash and the rest. A line range, `path:12-20`,
+/// reads as its first line.
 #[must_use]
 pub fn finding(line: &str) -> Option<Finding> {
     let parts = split_dashes(bare(line));
@@ -98,7 +99,13 @@ pub fn finding(line: &str) -> Option<Finding> {
     let place = place.trim().trim_matches('`');
     let (path, number) = place.rsplit_once(':')?;
     let path = path.trim_matches('`').trim();
-    let number: usize = number.trim().parse().ok()?;
+    let number: usize = number
+        .trim()
+        .split(['-', '–'])
+        .next()?
+        .trim()
+        .parse()
+        .ok()?;
     let severity = severity.trim().trim_matches(['`', '*', '_']);
     if path.is_empty() || severity.is_empty() || severity.contains(' ') {
         return None;

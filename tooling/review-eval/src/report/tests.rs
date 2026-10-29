@@ -65,6 +65,15 @@ fn a_finding_line_tolerates_list_markers_and_hyphens() {
 }
 
 #[test]
+fn a_line_range_reads_as_its_first_line() {
+    let f = finding("- crates/x/src/a.rs:12-20 — blocking — an unwrap — ENG-16").unwrap();
+    assert_eq!((f.path.as_str(), f.line), ("crates/x/src/a.rs", 12));
+    let f = finding("crates/x/src/a.rs:3–4 — nit — long").unwrap();
+    assert_eq!(f.line, 3);
+    assert!(finding("crates/x/src/a.rs:-4 — nit — long").is_none());
+}
+
+#[test]
 fn a_line_that_is_not_a_finding_is_none() {
     assert_eq!(finding("I read the diff and found nothing."), None);
     assert_eq!(finding("a/b.md — blocking — no line"), None);
