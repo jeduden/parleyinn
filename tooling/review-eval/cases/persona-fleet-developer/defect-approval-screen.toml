@@ -1,0 +1,39 @@
+component = "persona-fleet-developer"
+kind = "defect"
+title = "a plan that fails the fleet developer: approvals in the tui"
+
+[[create]]
+file = "plan/2610301003_approval_screen.md"
+content = '''
+---
+id: 2610301003
+title: "Approvals in the TUI"
+status: "🔲"
+summary: >-
+  Answer every held request in the TUI, hold the agent until the answer arrives, and register the hooks on install without a confirmation step.
+model: sonnet
+depends-on: []
+---
+# Approvals in the TUI
+
+## Goal
+
+A held request, a permission request or a question is answered in the ParleyInn TUI and nowhere else. The hook holds the agent until the TUI answers, with no timeout, so no request is missed. `parinn install` writes the hook entries into `~/.claude/settings.json` on its own and reports nothing, so a developer with ten worktrees never confirms ten times.
+
+## Context
+
+Developers run many agents and miss requests that scroll by in a terminal. One screen for every request, and an agent that waits for it, keeps nothing from being missed.
+
+## Tasks
+
+1. Route every held request to the TUI.
+2. Hold the agent in the hook until the TUI answers.
+3. Register the hooks on install without a prompt.
+'''
+
+[expect]
+
+[[expect.finding]]
+path = "plan/2610301003_approval_screen.md"
+severity = "blocking"
+mentions_any = ["TUI", "required step", "block", "hold", "silent", "settings", "slow", "timeout", "budget"]

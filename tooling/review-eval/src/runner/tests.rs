@@ -286,3 +286,47 @@ fn run_names_what_it_cannot_do() {
     .unwrap_err();
     assert_eq!(err, "other: not found");
 }
+
+#[test]
+fn a_consultant_gets_the_target_a_skill_hands_it() {
+    let w = world("standard", 2);
+
+    let consultant = prompt(&component(Kind::Consultant, "persona-agent"), &w);
+
+    assert!(
+        consultant.starts_with("You are `persona-agent`. Review this pull request"),
+        "{consultant}"
+    );
+    assert!(consultant.contains("`pr-head/`"), "{consultant}");
+    assert!(consultant.contains("`pr.diff`"), "{consultant}");
+    assert!(consultant.contains("`review/bundle.md`"), "{consultant}");
+    assert!(consultant.contains("write none"), "{consultant}");
+    assert!(!consultant.contains("review/reports"), "{consultant}");
+}
+
+#[test]
+fn a_consultant_runs_as_the_session_s_agent_on_the_model_it_resolved() {
+    let w = world("standard", 2);
+    let log = PathBuf::from("/logs/run.jsonl");
+    let mut consultant = component(Kind::Consultant, "persona-agent");
+    consultant.model = "claude-sonnet-5-5".to_owned();
+    consultant.max_turns = 40;
+
+    let c = command(&consultant, &w, None, &log, Duration::from_secs(9));
+    let args = args_of(&c);
+    assert!(has(&args, ["--agent", "persona-agent"]));
+    assert!(has(&args, ["--model", "claude-sonnet-5-5"]));
+    assert!(has(&args, ["--max-turns", "40"]));
+    assert!(has(&args, ["--allowedTools", GENERALIST_TOOLS]));
+    assert!(has(&args, ["--disallowedTools", GENERALIST_DISALLOWED]));
+    assert!(!args.contains(&"--json-schema"));
+
+    let c = command(
+        &consultant,
+        &w,
+        Some("claude-opus-5-5"),
+        &log,
+        Duration::from_secs(9),
+    );
+    assert!(has(&args_of(&c), ["--model", "claude-opus-5-5"]));
+}

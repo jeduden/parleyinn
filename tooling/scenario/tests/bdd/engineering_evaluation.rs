@@ -19,7 +19,7 @@ fn read_cases(w: &mut World, dir: String) {
 }
 
 #[then(
-    regex = r"^every component the review bundle can dispatch, the orchestrator and each deep instance among them, has a case that plants a defect, a case that is clean and a case that addresses the reviewer$"
+    regex = r"^every reviewer component, the agents the review bundle can dispatch, the orchestrator, each deep instance and every other agent under \.claude/agents among them, has a case that plants a defect, a case that is clean and a case that addresses the reviewer$"
 )]
 fn every_component_has_its_cases(w: &mut World) -> Result<(), String> {
     let e = eng(w);
@@ -36,7 +36,7 @@ fn every_component_has_its_cases(w: &mut World) -> Result<(), String> {
 }
 
 #[then(
-    regex = r"^every case applies to the checkout, and the review bundle dispatches its component for it$"
+    regex = r"^every case applies to the checkout, and the review bundle dispatches its component for it where it dispatches that component at all$"
 )]
 fn every_case_applies_and_dispatches(w: &mut World) -> Result<(), String> {
     outcome(review_evaluation::cases_apply_and_dispatch(

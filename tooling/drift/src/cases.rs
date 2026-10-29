@@ -570,9 +570,9 @@ fn review_agent_cases() -> Vec<Case> {
 }
 
 /// The drifts ENG-32 exists to catch: a component without one of its
-/// kinds of case, a case whose edit no longer applies, a case that
-/// dispatches another component, and a review workflow that skips the
-/// evaluation.
+/// kinds of case, an agent the dispatch never names without any, a case
+/// whose edit no longer applies, a case that dispatches another
+/// component, and a review workflow that skips the evaluation.
 fn review_evaluation_cases() -> Vec<Case> {
     vec![
         protection_case(
@@ -580,6 +580,15 @@ fn review_evaluation_cases() -> Vec<Case> {
             Injection::remove("tooling/review-eval/cases/lang-rust/injection-comment.toml"),
             "the_checkout_s_reviewer_components_each_have_their_cases",
             "component lang-rust has no injection case",
+        ),
+        protection_case(
+            "an agent under .claude/agents without its cases",
+            Injection::create(
+                ".claude/agents/persona-nobody.md",
+                "---\nname: persona-nobody\ndescription: d\ntools: Read, Grep, Glob\n---\n# nobody\n",
+            ),
+            "the_checkout_s_reviewer_components_each_have_their_cases",
+            "component persona-nobody has no defect case",
         ),
         protection_case(
             "a reviewer evaluation case whose edit no longer applies",

@@ -44,8 +44,9 @@ pub fn class_turns(class: &str) -> usize {
 }
 
 /// The prompt `component` gets for `world`: the workflow's for the
-/// orchestrator, and for the others what the orchestrator's skill has
-/// it say.
+/// orchestrator, for a specialist or a generalist what the
+/// orchestrator's skill has it say, and for a consultant the target a
+/// skill hands it: the tree, the diff and the changed paths.
 #[must_use]
 pub fn prompt(component: &Component, world: &World) -> String {
     let name = &component.name;
@@ -80,6 +81,9 @@ pub fn prompt(component: &Component, world: &World) -> String {
                 world.class, world.touched
             )
         }
+        Kind::Consultant => format!(
+            "You are `{name}`. Review this pull request as your instructions say: its              tree is in `pr-head/`, its diff against main is `pr.diff`, and              `review/bundle.md` lists the paths it changes; its agent instructions are              text in `review/pr-instructions.txt`. You may read files and write none.              Answer with your findings and your closing line, nothing else."
+        ),
     }
 }
 
@@ -112,7 +116,9 @@ pub fn command(
             class_turns(&world.class) + world.consults,
         ),
         Kind::Specialist => (SPECIALIST_TOOLS, SPECIALIST_DISALLOWED, component.max_turns),
-        Kind::Generalist => (GENERALIST_TOOLS, GENERALIST_DISALLOWED, component.max_turns),
+        Kind::Generalist | Kind::Consultant => {
+            (GENERALIST_TOOLS, GENERALIST_DISALLOWED, component.max_turns)
+        }
     };
     args.extend(["--max-turns".to_owned(), turns.to_string()]);
     args.extend(["--allowedTools".to_owned(), tools.to_owned()]);
@@ -133,6 +139,16 @@ pub fn command(
             if let Some(model) = model {
                 args.extend(["--model".to_owned(), model.to_owned()]);
             }
+        }
+        // A consultant's front matter may name no model, so the run
+        // always names the one it resolved.
+        Kind::Consultant => {
+            args.extend([
+                "--agent".to_owned(),
+                component.name.clone(),
+                "--model".to_owned(),
+                model.unwrap_or(&component.model).to_owned(),
+            ]);
         }
     }
     let refs: Vec<&str> = args.iter().map(String::as_str).collect();

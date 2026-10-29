@@ -1,0 +1,52 @@
+component = "reviewer-engineer"
+kind = "clean"
+title = "a new check in a reviewer component, with the case that proves it"
+
+[[replace]]
+file = ".claude/agents/lang-rust.md"
+old = "7. **Logging** goes through `tracing` and redaction\n"
+new = "7. **Open work.** A `TODO`, `FIXME` or `XXX` comment in shipped code is\n   a finding; the work lands, or an issue tracks it.\n8. **Logging** goes through `tracing` and redaction\n"
+
+[[create]]
+file = "tooling/review-eval/cases/lang-rust/defect-todo.toml"
+content = """
+component = \"lang-rust\"
+kind = \"defect\"
+title = \"a TODO comment in shipped code\"
+
+[[create]]
+file = \"tooling/review-bundle/src/rogue.rs\"
+content = '''
+//! The first byte of a payload.
+
+/// The first byte of `payload`, or zero for none.
+// TODO: decide what an empty payload means
+#[must_use]
+pub fn first(payload: &[u8]) -> u8 {
+    payload.first().copied().unwrap_or_default()
+}
+'''
+
+[[replace]]
+file = \"tooling/review-bundle/src/lib.rs\"
+old = \"pub mod render;\\n\"
+new = \"pub mod render;\\npub mod rogue;\\n\"
+
+[expect]
+outcome = [\"blocking\"]
+
+[[expect.finding]]
+path = \"tooling/review-bundle/src/rogue.rs\"
+severity = \"blocking\"
+mentions = [\"TODO\"]
+"""
+
+[expect]
+
+[[expect.none]]
+path = ".claude/agents/lang-rust.md"
+severity = "blocking"
+
+[[expect.none]]
+path = "tooling/review-eval/cases/lang-rust/defect-todo.toml"
+severity = "blocking"

@@ -1,5 +1,6 @@
 //! The reviewer components: every agent the review bundle can dispatch
-//! (ENG-28), their deep instances and the orchestrator's skill, each
+//! (ENG-28), their deep instances, the orchestrator's skill, and every
+//! other agent under `.claude/agents`, which a skill consults; each
 //! read from the tree under evaluation with the model, effort, turn
 //! budget and tools its front matter names.
 
@@ -23,8 +24,16 @@ pub const ORCHESTRATOR_EFFORT: &str = "low";
 pub const ORCHESTRATOR_TURNS: usize = 20;
 /// A generalist's turn budget when its front matter names none.
 pub const GENERALIST_TURNS: usize = 40;
+/// The model a consultant runs on when its front matter names none:
+/// the skills that consult one run it on the session's model, so the
+/// evaluation holds it to the model the review workflow runs on.
+pub const CONSULTANT_MODEL: &str = ORCHESTRATOR_MODEL;
 /// The directory of the agents, relative to the tree.
 const AGENTS: &str = ".claude/agents";
+/// The prefixes of the specialists the dispatch instantiates per SRS
+/// section and per domain-model file.
+const SECTION_PREFIX: &str = "srs-";
+const MODEL_PREFIX: &str = "domain-model-";
 /// The sentence of the shared report section whose specialists write
 /// one finding per line in a fixed shape.
 const ONE_LINE_EACH: &str = "each on one line";
@@ -35,6 +44,24 @@ pub enum Kind {
     Orchestrator,
     Generalist,
     Specialist,
+    /// An agent under `.claude/agents` the review bundle never
+    /// dispatches: a skill consults it on a change, or a developer
+    /// does. It answers in text, as a generalist does, and writes
+    /// nothing.
+    Consultant,
+}
+
+impl Kind {
+    /// The word for it.
+    #[must_use]
+    pub fn word(self) -> &'static str {
+        match self {
+            Self::Orchestrator => "orchestrator",
+            Self::Generalist => "generalist",
+            Self::Specialist => "specialist",
+            Self::Consultant => "consultant",
+        }
+    }
 }
 
 /// One reviewer component, read.
@@ -57,12 +84,14 @@ pub struct Component {
 }
 
 /// Every component's name: the orchestrator, the generalists, their
-/// deep instances, the fixed specialists, and a specialist per SRS
-/// section and domain-model file under `root`; sorted.
+/// deep instances, the fixed specialists, a specialist per SRS section
+/// and domain-model file under `root`, and every other agent under
+/// `.claude/agents` there; sorted.
 ///
 /// # Errors
 ///
-/// Fails when the sections or the model files cannot be listed.
+/// Fails when the sections, the model files or the agents cannot be
+/// listed.
 pub fn names(root: &Path) -> Result<Vec<String>, String> {
     let mut out: Vec<String> = vec![ORCHESTRATOR.to_owned()];
     out.extend(GENERALISTS.iter().map(|n| (*n).to_owned()));
@@ -77,6 +106,14 @@ pub fn names(root: &Path) -> Result<Vec<String>, String> {
             .and_then(|f| f.strip_suffix(".md"))
             .unwrap_or_default();
         out.extend(model_specialist(file));
+    }
+    for path in markdown_files(root, AGENTS)? {
+        let name = path
+            .strip_prefix(AGENTS)
+            .and_then(|f| f.strip_prefix('/'))
+            .and_then(|f| f.strip_suffix(".md"))
+            .unwrap_or_default();
+        out.push(name.to_owned());
     }
     out.sort();
     out.dedup();
@@ -104,15 +141,21 @@ fn markdown_files(root: &Path, dir: &str) -> Result<Vec<String>, String> {
     Ok(out)
 }
 
-/// What `name` is in the review.
+/// What `name` is in the review: a specialist when the dispatch can
+/// name it, a consultant when it cannot.
 #[must_use]
 pub fn kind_of(name: &str) -> Kind {
     if name == ORCHESTRATOR {
         Kind::Orchestrator
     } else if GENERALISTS.contains(&name) || DEEP_GENERALISTS.contains(&name) {
         Kind::Generalist
-    } else {
+    } else if FIXED_SPECIALISTS.iter().any(|(n, _)| *n == name)
+        || name.starts_with(SECTION_PREFIX)
+        || name.starts_with(MODEL_PREFIX)
+    {
         Kind::Specialist
+    } else {
+        Kind::Consultant
     }
 }
 
@@ -160,8 +203,8 @@ pub const AGENT_KEYS: [&str; 7] = [
     "generalist",
 ];
 pub const SKILL_KEYS: [&str; 2] = ["name", "description"];
-/// The tools a specialist may list, and the tools a generalist may: a
-/// generalist writes nothing.
+/// The tools a specialist may list, and the tools a generalist or a
+/// consultant may: those two write nothing.
 pub const SPECIALIST_TOOL_SET: [&str; 4] = ["Read", "Grep", "Glob", "Write"];
 pub const GENERALIST_TOOL_SET: [&str; 3] = ["Read", "Grep", "Glob"];
 
@@ -171,7 +214,8 @@ pub const GENERALIST_TOOL_SET: [&str; 3] = ["Read", "Grep", "Glob"];
 ///
 /// Fails when its file cannot be read, its front matter does not read,
 /// names a key or a tool the component may not carry, or names no
-/// model, or its turn budget is not a number.
+/// model while the component is no consultant, or its turn budget is
+/// not a number.
 pub fn load(tree: &Path, name: &str) -> Result<Component, String> {
     let file = file_of(name);
     let text = fs::read_to_string(tree.join(&file)).map_err(|e| format!("read {file}: {e}"))?;
@@ -204,10 +248,11 @@ pub fn load(tree: &Path, name: &str) -> Result<Component, String> {
         });
     }
     let field = |key: &str| fields.get(key).map_or("", String::as_str).to_owned();
-    let model = field("model");
-    if model.is_empty() {
-        return Err(format!("{file}: names no model"));
-    }
+    let model = match (kind, field("model")) {
+        (Kind::Consultant, model) if model.is_empty() => CONSULTANT_MODEL.to_owned(),
+        (_, model) if model.is_empty() => return Err(format!("{file}: names no model")),
+        (_, model) => model,
+    };
     let max_turns = match field("maxTurns").as_str() {
         "" => GENERALIST_TURNS,
         turns => turns
@@ -251,12 +296,15 @@ fn allowed_keys(
 
 /// Refuses a tool of `file` that a component of `kind` may not use.
 fn allowed_tools(file: &str, kind: Kind, tools: &[String]) -> Result<(), String> {
-    let (allowed, word): (&[&str], &str) = match kind {
-        Kind::Generalist => (&GENERALIST_TOOL_SET, "generalist"),
-        Kind::Specialist | Kind::Orchestrator => (&SPECIALIST_TOOL_SET, "specialist"),
+    let allowed: &[&str] = match kind {
+        Kind::Generalist | Kind::Consultant => &GENERALIST_TOOL_SET,
+        Kind::Specialist | Kind::Orchestrator => &SPECIALIST_TOOL_SET,
     };
     match tools.iter().find(|t| !allowed.contains(&t.as_str())) {
-        Some(tool) => Err(format!("{file}: lists tool {tool}, which a {word} may not")),
+        Some(tool) => Err(format!(
+            "{file}: lists tool {tool}, which a {} may not",
+            kind.word()
+        )),
         None => Ok(()),
     }
 }

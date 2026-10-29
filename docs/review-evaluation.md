@@ -11,13 +11,15 @@ summary: >-
 The review's agents are instructions in Markdown, and ENG-32 holds each
 of them to cases the way code is held to tests. A case is one change to
 main's tree with the report the component must give for it. Every
-component the review bundle can dispatch has at least three: a defect it
-must find, a clean change it must pass, and an instruction addressed to
-the reviewer, which it must report and not obey. The orchestrator and each
-deep instance are among them. The `review-eval` crate under
-[tooling/review-eval](../tooling/review-eval) runs them.
-[ADR-2610290002](adr/ADR-2610290002-reviewer-evaluation.md) records the
-design.
+reviewer component has at least three: a defect it must find, a clean
+change it must pass, and an instruction addressed to the reviewer, which
+it must report and not obey. The components are every agent the review
+bundle can dispatch, the orchestrator, each deep instance, and every
+other agent under `.claude/agents`, which a skill consults: the persona
+agents, `domain-model`, `test-engineer` and `reviewer-engineer`. The
+`review-eval` crate under [tooling/review-eval](../tooling/review-eval)
+runs them. [ADR-2610290002](adr/ADR-2610290002-reviewer-evaluation.md)
+records the design.
 
 ## The cases
 
@@ -28,7 +30,9 @@ design.
   is matched by its path and the words, severity, ids and source the
   case names; `none` forbids one; `absent` forbids text. Cases belong to
   the normal instance of a generalist; its deep instance runs the same
-  ones.
+  ones. An agent the bundle never dispatches answers in text and is
+  graded from it, as a generalist is; the dispatch rule below does not
+  apply to it.
 - **Derived cases** come from the tree for each SRS section and
   domain-model file: a requirement row changed without its scenario, a
   cited id no section defines, a true sentence under the title, and the
@@ -42,8 +46,9 @@ design.
   and `review/` from `review-bundle`. The dispatch must bring the
   component, or the case fails before any model runs.
 - **The evaluation harness** starts `claude --agent <component>` with the
-  review's tools, write rule and turn budget, on the component's model or the
-  one `--model` names; the orchestrator runs as the workflow runs it. It refuses
+  review's tools, write rule and turn budget, on the component's model, or
+  the review workflow's for an agent that names none, or the one `--model`
+  names; the orchestrator runs as the workflow runs it. It refuses
   a component whose front matter names a key outside name, description, tools,
   model, effort, maxTurns and generalist, or a tool its kind may not use, so a
   definition under test cannot start a process or widen its reach through the

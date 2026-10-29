@@ -1,0 +1,39 @@
+component = "persona-oss-maintainer"
+kind = "clean"
+title = "a plan that serves the open-source maintainer: imported rooms as attributed, untrusted data"
+
+[[create]]
+file = "plan/2610301010_imports_as_data.md"
+content = '''
+---
+id: 2610301010
+title: "Imported rooms as attributed, untrusted data"
+status: "🔲"
+summary: >-
+  Import a contribution's room as data attributed to its seat keys, redact it on import, recall it only inside an envelope, and tie it to the merge with a landing link.
+model: sonnet
+depends-on: []
+---
+# Imported rooms as attributed, untrusted data
+
+## Goal
+
+An imported room keeps every event under the seat keys that signed it (I8); nothing in it restores to the maintainer's agents or reaches them unasked (I2). The maintainer's agent recalls the foreign room only through a recall tool, inside the untrusted-data envelope, marked with its origin. Secrets and private paths are redacted on import and the redaction is recorded (I1). A room whose log does not verify against its seat keys is refused and shown why. When the pull request merges, a landing link ties the contribution's room to the landed commit. A contributor needs no account and no service: a published room is a read-only bundle.
+
+## Context
+
+A maintainer has no reason to trust a stranger's history and every reason to keep it. The story of how a change was made is worth reading; it is never worth obeying.
+
+## Tasks
+
+1. Keep imported events under their seat keys, untrusted.
+2. Recall foreign content only enveloped, with its origin.
+3. Redact on import and record each redaction.
+4. Refuse a room that does not verify; link a merged room to its landed commit.
+'''
+
+[expect]
+
+[[expect.none]]
+path = "plan/2610301010_imports_as_data.md"
+severity = "blocking"

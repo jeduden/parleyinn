@@ -481,3 +481,41 @@ fn a_line_matches_what_the_case_names_and_nothing_less() {
         "at a.rs:10 marked Blocking mentioning Unwrap mentioning one of panic, tests citing ENG-16 from lang-rust"
     );
 }
+
+#[test]
+fn a_consultant_is_graded_from_its_answer_as_a_generalist_is() {
+    let c = component(Kind::Consultant, "persona-agent", false);
+    let expect = Expect {
+        finding: vec![Expected {
+            severity: Some("blocking".into()),
+            mentions_any: vec!["summar".into(), "verbatim".into()],
+            ..wanted("plan/2610301001_x.md")
+        }],
+        ..Expect::default()
+    };
+    let none = BTreeSet::new();
+    let found = answered_log(
+        "plan/2610301001_x.md:14 — blocking — pins come back summarised — I3\n\
+         The plan does not serve me.\n",
+    );
+    let graded = grade(
+        &c,
+        &case("persona-agent", expect.clone()),
+        &run(&found, None, &none),
+    );
+    assert!(graded.passed(), "{:?}", graded.failures);
+    assert!(graded.slips.is_empty());
+
+    let prose = answered_log("The summaries in plan/2610301001_x.md worry me.\n");
+    let graded = grade(
+        &c,
+        &case("persona-agent", expect),
+        &run(&prose, None, &none),
+    );
+    assert_eq!(
+        graded.failures,
+        vec![
+            "no finding at plan/2610301001_x.md marked blocking mentioning one of summar, verbatim"
+        ]
+    );
+}

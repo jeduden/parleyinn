@@ -421,3 +421,84 @@ fn problems_come_in_kinds_and_cases() {
     assert!(kind_problems(empty.path(), empty.path(), &cases)[0].starts_with("read docs/srs: "));
     assert!(case_problems(empty.path(), empty.path(), &cases)[0].starts_with("read docs/srs: "));
 }
+
+/// A consultant's file, which the dispatch never names and which
+/// names no model.
+const PERSONA: &str =
+    "---\nname: persona-agent\ndescription: d\ntools: Read, Grep, Glob\n---\n# persona-agent\n";
+
+#[test]
+fn a_consultant_s_case_needs_no_dispatch_and_expects_no_outcome() {
+    let dir = checkout();
+    let cases = dir.path().join(crate::CASES);
+    fs::write(dir.path().join(".claude/agents/persona-agent.md"), PERSONA).unwrap();
+    let plan = UNWRAP
+        .replace("lang-rust", "persona-agent")
+        .replace("crates/x/src/rogue.rs", "plan/2610301001_x.md")
+        .replace("outcome = \"blocking\"\n", "");
+    write_case(dir.path(), "persona-agent", "digest", "defect", &plan);
+    write_case(dir.path(), "persona-agent", "pointing", "clean", &plan);
+    write_case(dir.path(), "persona-agent", "comment", "injection", &plan);
+    write_case(
+        dir.path(),
+        "persona-agent",
+        "verdict",
+        "other",
+        &plan.replace("[expect]\n", "[expect]\noutcome = \"blocking\"\n"),
+    );
+
+    let got = problems(dir.path(), dir.path(), &cases, None);
+
+    assert!(
+        !got.iter().any(|p| p.contains("persona-agent/digest")),
+        "{got:?}"
+    );
+    assert!(
+        !got.iter()
+            .any(|p| p.contains("component persona-agent has no")),
+        "{got:?}"
+    );
+    assert!(
+        got.contains(
+            &"case persona-agent/verdict expects an outcome of a consultant, which gives none"
+                .to_owned()
+        ),
+        "{got:?}"
+    );
+}
+
+#[test]
+fn a_consultant_or_an_orchestrator_case_that_does_not_apply_is_named() {
+    let dir = checkout();
+    let cases = dir.path().join(crate::CASES);
+    fs::write(dir.path().join(".claude/agents/persona-agent.md"), PERSONA).unwrap();
+    let gone = UNWRAP
+        .replace("[[create]]", "[[remove]]")
+        .replace("content = \"pub fn f() { None::<u8>.unwrap(); }\\n\"\n", "")
+        .replace("outcome = \"blocking\"\n", "");
+    write_case(
+        dir.path(),
+        "persona-agent",
+        "gone",
+        "defect",
+        &gone.replace("lang-rust", "persona-agent"),
+    );
+    write_case(
+        dir.path(),
+        "review",
+        "gone",
+        "defect",
+        &gone.replace("lang-rust", "review"),
+    );
+
+    let got = problems(dir.path(), dir.path(), &cases, None);
+
+    assert!(
+        got.contains(&"persona-agent/gone: crates/x/src/rogue.rs: does not exist".to_owned()),
+        "{got:?}"
+    );
+    assert!(
+        got.contains(&"review/gone: crates/x/src/rogue.rs: does not exist".to_owned()),
+        "{got:?}"
+    );
+}

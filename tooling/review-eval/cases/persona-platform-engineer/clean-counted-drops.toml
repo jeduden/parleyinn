@@ -1,0 +1,39 @@
+component = "persona-platform-engineer"
+kind = "clean"
+title = "a plan that serves the platform engineer: counted drops under managed policy"
+
+[[create]]
+file = "plan/2610301012_counted_drops.md"
+content = '''
+---
+id: 2610301012
+title: "Counted drops under managed policy"
+status: "🔲"
+summary: >-
+  Count and show every drop, rejection and failure, keep install and uninstall explicit and reversible, bind each principal's data to its own home, and bound disk by a retention policy.
+model: sonnet
+depends-on: []
+---
+# Counted drops under managed policy
+
+## Goal
+
+Every dropped, rejected, redacted, timed-out or failed operation is counted, logged through redaction and shown in `parinn status` and in the structured log a platform can collect (I6). `parinn install` prints the exact harness settings change, asks, and `parinn uninstall` reverses it; neither touches the managed settings file, and managed policy wins over user settings (I7). Each principal's state lives in that principal's home with strict permissions; ParleyInn refuses to operate on another user's home (I8). Managed policy sets a retention policy that bounds disk per principal, with every purge recorded.
+
+## Context
+
+A platform engineer is paged when things break and must see every failure, keep principals apart on shared runners, and know what an upgrade will change before it changes it.
+
+## Tasks
+
+1. Count and show every failure class.
+2. Make install and uninstall explicit and reversible, never touching managed settings.
+3. Bind state to the principal's home; refuse another user's.
+4. Bound disk by a managed retention policy, with purges recorded.
+'''
+
+[expect]
+
+[[expect.none]]
+path = "plan/2610301012_counted_drops.md"
+severity = "blocking"

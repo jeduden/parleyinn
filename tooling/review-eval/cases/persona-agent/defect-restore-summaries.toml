@@ -1,0 +1,39 @@
+component = "persona-agent"
+kind = "defect"
+title = "a plan that fails the agent: restore blocks within budget"
+
+[[create]]
+file = "plan/2610301001_restore_summaries.md"
+content = '''
+---
+id: 2610301001
+title: "Restore blocks within budget"
+status: "🔲"
+summary: >-
+  Keep every restore block inside its token budget by summarising the pins that do not fit and widening recall to the events around each match.
+model: sonnet
+depends-on: []
+---
+# Restore blocks within budget
+
+## Goal
+
+A restore block never exceeds its budget. When the active pins would, the kernel worker writes a one-paragraph summary of the pins that do not fit and restores that summary in their place. The `recall` tool returns the twenty events before and after each match, so an agent never has to call it twice.
+
+## Context
+
+Long runs pin more than the budget holds. Today the block names each pin it leaves out by id and count, which agents then recall one by one. A summary saves those calls, and a wider recall window saves the follow-up calls after a match.
+
+## Tasks
+
+1. Summarise the pins that exceed the budget in the restore block.
+2. Return twenty events around each `recall` match.
+3. Drop the id-and-count line for omitted pins.
+'''
+
+[expect]
+
+[[expect.finding]]
+path = "plan/2610301001_restore_summaries.md"
+severity = "blocking"
+mentions_any = ["summar", "verbatim", "word for word", "I3", "too much"]

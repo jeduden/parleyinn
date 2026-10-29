@@ -1,0 +1,39 @@
+component = "persona-live-collaborator"
+kind = "defect"
+title = "a plan that fails the live collaborator: watch-only joins"
+
+[[create]]
+file = "plan/2610301005_watch_only_joins.md"
+content = '''
+---
+id: 2610301005
+title: "Watch-only joins"
+status: "🔲"
+summary: >-
+  Let a guest watch a room read-only; a guest who wants to say something exports the room and writes to the owner by email.
+model: sonnet
+depends-on: []
+---
+# Watch-only joins
+
+## Goal
+
+A joined seat reads the room as it happens but cannot post. To contribute, the guest exports the room to a file and sends the owner a message outside ParleyInn. The room shows no presence, since guests only watch.
+
+## Context
+
+Posts from guests risk derailing the owner's agents. Keeping guests read-only removes that risk and keeps the room's write path to the owner alone.
+
+## Tasks
+
+1. Join a room read-only by invite.
+2. Export a room to a file for comments outside ParleyInn.
+3. Show no presence for joined seats.
+'''
+
+[expect]
+
+[[expect.finding]]
+path = "plan/2610301005_watch_only_joins.md"
+severity = "blocking"
+mentions_any = ["watch", "cannot post", "contribute", "presence", "read-only", "read only", "outside"]

@@ -1,8 +1,8 @@
 //! The deterministic check of the cases (ENG-32), run without a model:
 //! every component has its defect, clean and injection case; every
-//! case parses, applies to the tree and makes the review bundle
-//! dispatch its component. The gate test and the `check` command run
-//! it; a run starts with it.
+//! case parses, applies to the tree and, for a component the review
+//! bundle dispatches, makes it dispatch that component. The gate test
+//! and the `check` command run it; a run starts with it.
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
@@ -62,8 +62,8 @@ pub struct Problems {
     /// A component without one of its required kinds of case.
     pub kinds: Vec<String>,
     /// A case that names no component, a deep instance or an outcome
-    /// of a generalist, does not apply, or does not dispatch its
-    /// component.
+    /// of a generalist or a consultant, does not apply, or does not
+    /// dispatch its component.
     pub cases: Vec<String>,
 }
 
@@ -175,9 +175,12 @@ pub fn examine_from(
             .entry(case.component.as_str())
             .or_default()
             .insert(case.kind.as_str());
-        if component.kind == Kind::Generalist && !case.expect.outcome.is_empty() {
+        if matches!(component.kind, Kind::Generalist | Kind::Consultant)
+            && !case.expect.outcome.is_empty()
+        {
             problems.cases.push(format!(
-                "case {id} expects an outcome of a generalist, which gives none"
+                "case {id} expects an outcome of a {}, which gives none",
+                component.kind.word()
             ));
         }
         match dispatches(root, &base, case, component) {
@@ -236,7 +239,9 @@ fn catalog(
 }
 
 /// Whether the review bundle dispatches `component` for `case`: none
-/// when it does, else the agents it dispatches instead.
+/// when it does, or when the bundle never dispatches the component,
+/// the orchestrator and a consultant; else the agents it dispatches
+/// instead.
 ///
 /// # Errors
 ///
@@ -248,10 +253,10 @@ pub fn dispatches(
     case: &Case,
     component: &Component,
 ) -> Result<Option<BTreeSet<String>>, String> {
-    if component.kind == Kind::Orchestrator {
+    let changes = case.changes(&|file| fs::read_to_string(root.join(file)).ok())?;
+    if matches!(component.kind, Kind::Orchestrator | Kind::Consultant) {
         return Ok(None);
     }
-    let changes = case.changes(&|file| fs::read_to_string(root.join(file)).ok())?;
     let head = head_snapshot(base, &changes).map_err(|e| format!("case {}: {e}", case.id()))?;
     let analysis = analyse(base, &head, &diff::all(&changes), case.consent.is_some());
     let dispatched = agents(&analysis.dispatch);
@@ -261,7 +266,7 @@ pub fn dispatches(
             .zip(DEEP_GENERALISTS)
             .find(|(normal, deep)| **normal == component.name || *deep == component.name)
             .map_or_else(|| vec![component.name.as_str()], |(n, d)| vec![*n, d]),
-        Kind::Specialist | Kind::Orchestrator => vec![component.name.as_str()],
+        Kind::Specialist | Kind::Orchestrator | Kind::Consultant => vec![component.name.as_str()],
     };
     if family.iter().any(|name| dispatched.contains(*name)) {
         Ok(None)

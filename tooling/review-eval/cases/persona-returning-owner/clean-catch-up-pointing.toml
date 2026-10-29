@@ -1,0 +1,39 @@
+component = "persona-returning-owner"
+kind = "clean"
+title = "a plan that serves the returning owner: catch up pointing into the record"
+
+[[create]]
+file = "plan/2610301014_catch_up_pointing.md"
+content = '''
+---
+id: 2610301014
+title: "Catch up pointing into the record"
+status: "🔲"
+summary: >-
+  Make every Catch up line cite the events it stands for, show gaps and failed captures, rank what is waiting, and search every room.
+model: sonnet
+depends-on: []
+---
+# Catch up pointing into the record
+
+## Goal
+
+Catch up lists each room with a few lines, each line citing the (writer, seq) addresses of the events it summarises, so a click or a recall shows the exact tool call behind it. Gaps, missing segments and failed captures show as their own lines, never silently. Needs you ranks what is waiting for the owner across rooms. Search covers every room and every run, by word, and returns the event address of each hit. A room's integrity status shows beside its name before its branch lands.
+
+## Context
+
+Someone back after a weekend asks what the agents did first and trusts the answer only when it points into the record. Catching up must take less time than reading the git log.
+
+## Tasks
+
+1. Cite event addresses on every Catch up line.
+2. Show gaps and failed captures as lines of their own.
+3. Rank what is waiting under Needs you.
+4. Search every room and run by word; show integrity per room.
+'''
+
+[expect]
+
+[[expect.none]]
+path = "plan/2610301014_catch_up_pointing.md"
+severity = "blocking"

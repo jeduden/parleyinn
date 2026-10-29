@@ -38,14 +38,19 @@ with no measurement to say so.
   must not make, and text it must not contain. Every component has at
   least a defect, a clean change and an instruction addressed to the
   reviewer. The cases of each SRS section and domain-model file are
-  derived from the tree, so they never rot; the others are written.
+  derived from the tree, so they never rot; the others are written. The
+  agents the review bundle never dispatches, which a skill consults (the
+  persona agents, `domain-model`, `test-engineer` and
+  `reviewer-engineer`), have written cases too: each answers in text, as
+  a generalist does, and runs on the review workflow's model when its
+  front matter names none.
 - **The world.** A run builds the review's own input: a worktree of
   main as the orchestrator's checkout, the component under test copied
   in from the tree being evaluated, a second worktree with the case's
   edits as `pr-head/`, its instruction files moved out as the workflow
-  moves them, `pr.diff`, and `review/` from `review-bundle`, so the
-  dispatch must bring the component or the case fails before any model
-  runs.
+  moves them, `pr.diff`, and `review/` from `review-bundle`, so for a
+  component the bundle dispatches, the dispatch must bring it or the case
+  fails before any model runs.
 - **The evaluation harness.** `claude --agent <component>` runs the component as
   the session, with the review's tools, write rule and turn budget, and
   `--model` names another model for a comparison. Each run has a deadline; a run

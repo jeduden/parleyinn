@@ -55,7 +55,7 @@ impl Graded {
 pub fn grade(component: &Component, case: &Case, run: &Run<'_>) -> Graded {
     match component.kind {
         Kind::Specialist => specialist(component, case, run),
-        Kind::Generalist => Graded {
+        Kind::Generalist | Kind::Consultant => Graded {
             failures: generalist(case, run),
             slips: Vec::new(),
         },
@@ -167,7 +167,8 @@ fn shape_slips(parsed: &report::Report) -> Vec<String> {
 /// A generalist answers with its kept and dropped findings and writes
 /// nothing. A kept finding is a line in the finding shape; a dropped
 /// one is a line that says so, in which the path and words the case
-/// names are no kept finding.
+/// names are no kept finding. A consultant answers the same way, with
+/// nothing to drop.
 fn generalist(case: &Case, run: &Run<'_>) -> Vec<String> {
     let mut failures = answered(run.log);
     failures.extend(run.log.writes.iter().map(|path| format!("wrote {path}")));

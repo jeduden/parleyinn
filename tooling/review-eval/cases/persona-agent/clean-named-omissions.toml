@@ -1,0 +1,38 @@
+component = "persona-agent"
+kind = "clean"
+title = "a plan that serves the agent: named omissions and exact recall"
+
+[[create]]
+file = "plan/2610301002_named_omissions.md"
+content = '''
+---
+id: 2610301002
+title: "Named omissions and exact recall"
+status: "🔲"
+summary: >-
+  Restore every pin that fits verbatim, name each pin the budget leaves out by id and count, and give recall an address that returns exactly one event.
+model: sonnet
+depends-on: []
+---
+# Named omissions and exact recall
+
+## Goal
+
+After every compaction the restore block carries each active pin word for word, in pin order, and ends with one line naming the id and count of every pin the budget left out, so the agent knows what to recall. `recall` takes an event address, (writer, seq), and returns that one event inside its untrusted-data envelope, with its origin and trust level in the envelope's header.
+
+## Context
+
+I3 holds that constraints are never summarised. Agents that lose a pin need to know which one, and agents that remember an event need it exactly, not a window around it.
+
+## Tasks
+
+1. Restore each fitting pin verbatim after every compaction.
+2. Name every omitted pin by id and count on one line.
+3. Give `recall` an event address and return one enveloped event.
+'''
+
+[expect]
+
+[[expect.none]]
+path = "plan/2610301002_named_omissions.md"
+severity = "blocking"

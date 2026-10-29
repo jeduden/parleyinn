@@ -267,3 +267,75 @@ fn catalog_reads_every_component_or_names_the_missing_one() {
     // The tree defines only four of the components the root names.
     assert!(err.starts_with("read .claude/agents/"), "{err}");
 }
+
+/// A consultant's file: an agent under `.claude/agents` the dispatch
+/// never names, with no model of its own.
+const PERSONA: &str = "---\nname: persona-agent\ndescription: >-\n  Claude as a user.\ntools: Read, Grep, Glob\n---\n# Persona: agent\n";
+
+#[test]
+fn names_list_every_other_agent_under_the_agents_directory_as_a_consultant() {
+    let dir = tree();
+    fs::write(dir.path().join(".claude/agents/persona-agent.md"), PERSONA).unwrap();
+    fs::write(dir.path().join(".claude/agents/notes.txt"), "no agent").unwrap();
+
+    let got = names(dir.path()).unwrap();
+
+    assert!(got.contains(&"persona-agent".to_owned()), "{got:?}");
+    assert!(!got.contains(&"notes".to_owned()), "{got:?}");
+    assert_eq!(got.iter().filter(|n| *n == "lang-rust").count(), 1);
+    assert_eq!(kind_of("persona-agent"), Kind::Consultant);
+    assert_eq!(kind_of("domain-model"), Kind::Consultant);
+    assert_eq!(kind_of("test-engineer"), Kind::Consultant);
+    assert_eq!(kind_of("domain-model-hub"), Kind::Specialist);
+    assert_eq!(kind_of("domain-model-places"), Kind::Specialist);
+    assert_eq!(kind_of("srs-security"), Kind::Specialist);
+    assert_eq!(kind_of("ci-engineer"), Kind::Specialist);
+    assert_eq!(suite_of("persona-agent"), "persona-agent");
+    assert_eq!(file_of("persona-agent"), ".claude/agents/persona-agent.md");
+}
+
+#[test]
+fn each_kind_has_its_word() {
+    assert_eq!(Kind::Orchestrator.word(), "orchestrator");
+    assert_eq!(Kind::Generalist.word(), "generalist");
+    assert_eq!(Kind::Specialist.word(), "specialist");
+    assert_eq!(Kind::Consultant.word(), "consultant");
+}
+
+#[test]
+fn load_gives_a_consultant_without_a_model_the_default_and_no_write_tool() {
+    let dir = tree();
+    let file = dir.path().join(".claude/agents/persona-agent.md");
+    fs::write(&file, PERSONA).unwrap();
+
+    let c = load(dir.path(), "persona-agent").unwrap();
+
+    assert_eq!(c.kind, Kind::Consultant);
+    assert_eq!(c.model, CONSULTANT_MODEL);
+    assert_eq!(c.effort, "");
+    assert_eq!(c.max_turns, GENERALIST_TURNS);
+    assert_eq!(c.tools, vec!["Read", "Grep", "Glob"]);
+
+    fs::write(
+        &file,
+        PERSONA.replace(
+            "tools: Read, Grep, Glob\n",
+            "tools: Read, Grep, Glob\nmodel: opus\n",
+        ),
+    )
+    .unwrap();
+    assert_eq!(load(dir.path(), "persona-agent").unwrap().model, "opus");
+
+    fs::write(
+        &file,
+        PERSONA.replace(
+            "tools: Read, Grep, Glob\n",
+            "tools: Read, Grep, Glob, Write\n",
+        ),
+    )
+    .unwrap();
+    assert_eq!(
+        load(dir.path(), "persona-agent").unwrap_err(),
+        ".claude/agents/persona-agent.md: lists tool Write, which a consultant may not"
+    );
+}

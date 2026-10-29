@@ -1,0 +1,38 @@
+component = "persona-reviewer"
+kind = "clean"
+title = "a plan that serves the reviewer: evidence at landing"
+
+[[create]]
+file = "plan/2610301016_evidence_at_landing.md"
+content = '''
+---
+id: 2610301016
+title: "Evidence at landing"
+status: "🔲"
+summary: >-
+  Show for each result what verified it, allow approval only on the forge by someone who is not a commit author, and tie the landed commit to its room.
+model: sonnet
+depends-on: []
+---
+# Evidence at landing
+
+## Goal
+
+A room shows the diff, the key moments behind it and, for each result, whether an own check, a witness check or a CI attested result verified it, each with its evidence. An agent's claim is shown as a claim. Approval happens once, on the forge, by a person who is not a commit author of the branch, and the room shows the forge's review state; required checks must be green. The landing link records the room id on the landed commit, through a squash or a merge queue, so the room is found again from the commit.
+
+## Context
+
+A reviewer accountable for what merges needs the evidence, not the narrative, in one place, with the merge gate respected.
+
+## Tasks
+
+1. Show what verified each result, with its evidence.
+2. Approve only on the forge, never by a commit author or their agent.
+3. Record the room id on the landed commit.
+'''
+
+[expect]
+
+[[expect.none]]
+path = "plan/2610301016_evidence_at_landing.md"
+severity = "blocking"

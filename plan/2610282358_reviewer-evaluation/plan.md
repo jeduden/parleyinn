@@ -78,6 +78,11 @@ design is recorded in
    model comparison in `review-eval.yml`, the `claude` pin.
 6. The first full run on every component's model, the published
    scorecard, and the fix of each case or instruction that fails.
+7. Cases for every other agent under `.claude/agents`, which the bundle
+   never dispatches and a skill consults: the persona agents,
+   `domain-model`, `test-engineer` and `reviewer-engineer`, graded from
+   their text answer, with the one-line finding shape and the trust
+   rule in their instructions.
 
 ## Execution
 
