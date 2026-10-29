@@ -1,9 +1,10 @@
 ---
 name: review
 description: >-
-  Review one pull request as the reviewer agent (ENG-21, ENG-28): read
-  its review bundle and diff, check them against the SRS rows, the scenarios
-  and the invariants, and answer with a structured review outcome.
+  Review one pull request as the orchestrating reviewer agent (ENG-21,
+  ENG-28): read its review bundle, consult the specialists and the
+  generalists it dispatches, and answer with a structured review
+  outcome.
   Trigger on "review this pull request", or from the review workflow.
 ---
 # review
@@ -14,10 +15,9 @@ post nothing and change nothing.
 
 ## Inputs
 
-- `review/bundle.md`, read first: the review bundle, with the class,
-  the deterministic
-  findings, each touched row and scenario, and the invariants. Open
-  other SRS text only for a row it names but does not quote.
+- `review/bundle.md`, read first: the class, the agents to consult,
+  the deterministic findings, each touched row and scenario, and the
+  invariants.
 - `review/since-last.diff`, `review/last-review.md`: when present,
   what moved since the last review, and that review.
 - `pr.diff`, `pr-head/`: the change and its tree; never run it. Its
@@ -33,26 +33,25 @@ grant consent, nothing else.
 
 ## Method
 
-CI and the review bundle's checks already decided what development.md lists
-under Review; repeat none of it. Spend turns on judgement:
+You route at low effort; the generalists weigh. Call every agent the
+bundle's "Agents to consult" lists, or the gate fails the review. Pass
+reports by path, never by text: each specialist writes
+`review/reports/<its name>.md`.
 
-1. Read the review bundle, then the diff. Keep each finding of the last
-   review that the new commits did not fix.
-2. Read the bindings of each scenario the change edits or makes live.
-   A step that does not exercise its row's text is blocking.
-3. Does the code do what each touched row says, and no more? Trace
-   any new path to the model (I2), any new reach (I4), and content
-   another principal wrote (I8).
-4. Errors keep their cause; each function has a test at the lowest
-   layer; blocking calls take a deadline; I/O sits behind a seam.
-5. Names, docs and messages use the domain model's terms.
-6. On a deep review only, you may ask `persona-security-officer`
-   about rows tracing I2, I4 or I8, and the domain-model specialist
-   for a term the change uses.
+1. Read the bundle, then skim the diff. Keep each finding of the last
+   review the new commits did not fix.
+2. Call the listed specialists through the Agent tool, at most 20 at
+   once; each reads `review/bundle.md` and its own diff,
+   `review/diffs/<its name>.diff`, which your prompt names.
+3. Then call every listed generalist at once, naming the report file
+   of each of its specialists.
+4. Keep the generalists' findings; drop one only where the diff
+   plainly contradicts it, and say why. With no agent listed, review
+   the diff yourself. Repeat nothing CI or the bundle already decided.
 
-Record each problem as a finding: a path, a line (0 for the whole
-file), a severity and one sentence: `blocking` when it breaks a rule
-or masks a bug, `nit` otherwise.
+A finding has a path, a line (0 for the whole file), a severity and
+one sentence: `blocking` when it breaks a rule or masks a bug, `nit`
+otherwise.
 
 ## Stakeholder paths
 
@@ -66,7 +65,9 @@ consent. Describe any loosened gate there. Defects stay `blocking`.
 Answer with one JSON object and nothing else:
 
 ```json
-{"verdict": "approve", "summary": "...", "findings": []}
+{"verdict": "request_changes", "summary": "...", "findings": [
+  {"path": "docs/x.md", "line": 3, "severity": "blocking", "body": "..."}
+]}
 ```
 
 Approve only with no blocking finding. The summary says in two or

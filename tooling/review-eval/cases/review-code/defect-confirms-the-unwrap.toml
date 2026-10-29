@@ -1,0 +1,44 @@
+component = "review-code"
+kind = "defect"
+title = "a specialist's true finding, kept"
+
+[[create]]
+file = "tooling/review-bundle/src/rogue.rs"
+content = '''
+//! The first byte of a payload.
+
+/// The first byte of `payload`.
+#[must_use]
+pub fn first(payload: &[u8]) -> u8 {
+    *payload.first().unwrap()
+}
+'''
+
+[[replace]]
+file = "tooling/review-bundle/src/lib.rs"
+old = "pub mod render;\n"
+new = "pub mod render;\npub mod rogue;\n"
+
+[[report]]
+agent = "lang-rust"
+content = '''
+tooling/review-bundle/src/rogue.rs:6 — blocking — `unwrap` outside tests, which the workspace lints forbid — ENG-16
+
+outcome: blocking — a helper that unwraps a possibly empty slice
+'''
+
+[[report]]
+agent = "test-engineer-unit"
+content = '''
+tooling/review-bundle/src/rogue.rs:5 — blocking — `first` has no unit test in a tests.rs beside it — ENG-11
+
+outcome: blocking — a function with no unit test
+'''
+
+[expect]
+
+[[expect.finding]]
+path = "tooling/review-bundle/src/rogue.rs"
+severity = "blocking"
+source = "lang-rust"
+mentions = ["unwrap"]

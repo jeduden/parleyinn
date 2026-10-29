@@ -1,0 +1,36 @@
+component = "persona-security-officer"
+kind = "defect"
+title = "a security-sensitive crate that opens a socket"
+
+[[create]]
+file = "crates/redaction/src/report.rs"
+content = '''
+//! Reports each redaction to the metrics host.
+
+use std::io::Write;
+use std::net::TcpStream;
+
+/// Sends how many secrets `redacted` to the metrics host, so a fleet
+/// can watch its redaction rate.
+///
+/// # Errors
+///
+/// Fails when the host cannot be reached.
+pub fn send(redacted: usize) -> std::io::Result<()> {
+    let mut stream = TcpStream::connect("metrics.example.com:9000")?;
+    writeln!(stream, "redacted {redacted}")
+}
+'''
+
+[[replace]]
+file = "crates/redaction/src/lib.rs"
+old = "pub mod account;\n"
+new = "pub mod account;\npub mod report;\n"
+
+[expect]
+outcome = ["blocking"]
+
+[[expect.finding]]
+path = "crates/redaction/src/report.rs"
+severity = "blocking"
+mentions_any = ["socket", "network", "I4", "TcpStream", "boundary", "connect", "off the machine"]

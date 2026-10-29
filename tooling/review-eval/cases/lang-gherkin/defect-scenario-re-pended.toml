@@ -1,0 +1,16 @@
+component = "lang-gherkin"
+kind = "defect"
+title = "a live scenario put back on @pending"
+
+[[replace]]
+file = "features/engineering.feature"
+old = "  @ENG-24 @P0\n"
+new = "  @ENG-24 @P0 @pending\n"
+
+[expect]
+outcome = ["blocking"]
+
+[[expect.finding]]
+path = "features/engineering.feature"
+severity = "blocking"
+mentions_any = ["pending", "ENG-24"]

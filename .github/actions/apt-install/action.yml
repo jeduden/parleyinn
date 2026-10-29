@@ -1,0 +1,43 @@
+name: Install pinned apt packages
+description: Install apt packages through scripts/apt-install.sh, from a cache of their .deb files first
+inputs:
+  packages:
+    description: Space-separated apt packages, each pinned to its exact version
+    required: true
+  cache:
+    description: Whether CI may restore and save the .deb files
+    required: false
+    default: "true"
+runs:
+  using: composite
+  steps:
+    # The .deb files, kept under a key of the package list and the
+    # runner image, so a job does not depend on Ubuntu's mirrors once
+    # one install succeeded. The script installs from them first and
+    # falls back to the mirrors.
+    - name: Key the apt packages
+      id: apt
+      if: inputs.cache == 'true'
+      shell: bash
+      env:
+        PACKAGES: ${{ inputs.packages }}
+      run: |
+        sum=$(printf '%s' "$PACKAGES" | sha256sum | cut -c1-16)
+        echo "key=apt-$ImageOS-$sum" >> "$GITHUB_OUTPUT"
+        echo "path=$RUNNER_TEMP/apt-debs-$sum" >> "$GITHUB_OUTPUT"
+    - name: Cache the apt packages
+      if: inputs.cache == 'true'
+      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ${{ steps.apt.outputs.path }}
+        key: ${{ steps.apt.outputs.key }}
+    # Worst case 151 s, bounded to 150 s by scripts/apt-install.sh.
+    - name: Install the apt packages
+      shell: bash
+      env:
+        PACKAGES: ${{ inputs.packages }}
+        # Empty without the cache, so the script goes to the mirrors.
+        APT_CACHE: ${{ steps.apt.outputs.path }}
+      run: |
+        # shellcheck disable=SC2086 # PACKAGES is a space-separated list
+        "$GITHUB_ACTION_PATH/../../../scripts/apt-install.sh" $PACKAGES

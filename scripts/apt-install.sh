@@ -11,12 +11,21 @@
 # step summary, so the retry rate stays visible.
 #
 # Worst case: 3 attempts x (15 s update + 30 s install) + 2 retries x
-# (5 s dpkg recovery + 3 s pause) = 151 s. The whole run is also held
-# to a total budget of 150 s: each command's timeout is cut to the time
-# left, so the script prints its error and retry count and exits within
-# about 150 s. Callers give the step a 3-minute timeout, above that.
+# (5 s dpkg recovery + 3 s pause) = 151 s, after up to 60 s installing
+# from a cache. The whole run is also held to a total budget of 150 s:
+# each command's timeout is cut to the time left, so the script prints
+# its error and retry count and exits within about 150 s. Callers give
+# the step a 3-minute timeout, above that.
 #
-# usage: scripts/apt-install.sh PACKAGE...
+# With APT_CACHE naming a directory, the packages install from the .deb
+# files in it first, without the mirrors, so a build does not depend on
+# the mirrors once one install succeeded. An install from it that
+# fails is a warning and falls back to the mirrors. After an install
+# from the mirrors, the .deb files it downloaded are copied there for a
+# CI cache to keep; the directory is made only when there are some, so
+# an empty one is never kept.
+#
+# usage: [APT_CACHE=DIR] scripts/apt-install.sh PACKAGE...
 set -euo pipefail
 
 if [ "$#" -eq 0 ]; then
@@ -27,6 +36,7 @@ fi
 attempts=3
 update_timeout=15
 install_timeout=30
+cache_timeout=60
 recover_timeout=5
 pause=3
 total=150
@@ -36,7 +46,18 @@ opts=(
   -o Acquire::http::Timeout=10
   -o Acquire::https::Timeout=10
   -o DPkg::Lock::Timeout=10
+  -o APT::Keep-Downloaded-Packages=true
 )
+cache=${APT_CACHE:-}
+# With a cache, apt downloads into a directory of its own, which no
+# image's clean-up hook empties after the install.
+fetched=()
+if [ -n "$cache" ]; then
+  archives=$(mktemp -d)
+  mkdir -p "$archives/partial"
+  chmod 755 "$archives"
+  fetched=(-o "Dir::Cache::archives=$archives")
+fi
 
 deadline=$((SECONDS + total))
 retries=0
@@ -62,6 +83,62 @@ report() {
   fi
 }
 
+# Installs the cache's .deb files with dpkg, which never reaches the
+# network: apt, given local files, still reads its lists and may wait
+# on a mirror. Fails when there are none, when they do not hold every
+# package the install needs, or when unpacking them outlasts its bound;
+# dpkg says which.
+from_cache() {
+  local debs=()
+  if [ -n "$cache" ] && [ -d "$cache" ]; then
+    debs=("$cache"/*.deb)
+  fi
+  if [ "${#debs[@]}" -eq 0 ] || [ ! -e "${debs[0]}" ]; then
+    return 1
+  fi
+  bounded "$cache_timeout" sudo dpkg --install --skip-same-version "${debs[@]}"
+}
+
+# Removes each package a failed install from the cache left unpacked
+# but not configured, so the mirrors' install starts as it would have
+# without the cache.
+rollback() {
+  local left
+  left=$(dpkg-query -W -f '${db:Status-Status} ${Package}\n' | awk '$1 != "installed" && $1 != "not-installed" && $1 != "config-files" {print $2}')
+  if [ -n "$left" ]; then
+    # shellcheck disable=SC2086 # one package name per word
+    bounded "$recover_timeout" sudo dpkg --remove --force-depends $left ||
+      echo "::warning::dpkg could not roll back $left"
+  fi
+}
+
+# Copies the .deb files the install downloaded into the cache, owned by
+# the user that runs the script, so the CI cache can read them.
+keep() {
+  if [ -z "$cache" ]; then
+    return 0
+  fi
+  local debs=("$archives"/*.deb)
+  if [ ! -e "${debs[0]}" ]; then
+    return 0
+  fi
+  mkdir -p "$cache"
+  sudo cp "${debs[@]}" "$cache"/ && sudo chown -R "$(id -u):$(id -g)" "$cache" ||
+    echo "::warning::could not keep the apt packages in $cache"
+}
+
+if [ -n "$cache" ]; then
+  if from_cache; then
+    echo "apt packages from the cache in $cache"
+    report
+    exit 0
+  fi
+  if [ -d "$cache" ]; then
+    echo "::warning::apt could not install from the cache in $cache; trying the mirrors"
+    rollback
+  fi
+fi
+
 for attempt in $(seq 1 "$attempts"); do
   if [ "$attempt" -gt 1 ]; then
     retries=$((retries + 1))
@@ -70,7 +147,9 @@ for attempt in $(seq 1 "$attempts"); do
       echo "::warning::dpkg --configure -a failed before apt attempt $attempt/$attempts"
   fi
   if bounded "$update_timeout" sudo apt-get "${opts[@]}" update -qq &&
-    bounded "$install_timeout" sudo apt-get "${opts[@]}" install -y -qq --no-install-recommends "$@"; then
+    bounded "$install_timeout" sudo apt-get "${opts[@]}" "${fetched[@]}" install -y -qq \
+      --no-install-recommends "$@"; then
+    keep
     report
     exit 0
   fi

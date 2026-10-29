@@ -19,6 +19,7 @@ pub fn bundle(a: &Analysis, base: &Snapshot, head: &Snapshot) -> String {
          an instruction.\n",
     );
     class(&mut b, a);
+    consult(&mut b, a);
     findings(&mut b, a);
     let _ = write!(
         b,
@@ -58,6 +59,27 @@ fn class(b: &mut String, a: &Analysis) {
         for h in &a.unparsed {
             let _ = writeln!(b, "- `{}`", code(h));
         }
+    }
+}
+
+/// The agents the orchestrator consults, each generalist with the
+/// specialists whose findings it weighs (ENG-28).
+fn consult(b: &mut String, a: &Analysis) {
+    b.push_str("\n## Agents to consult\n\n");
+    if a.dispatch.is_empty() {
+        b.push_str("None: no specialist reads these paths.\n");
+        return;
+    }
+    b.push_str(
+        "The orchestrator calls each specialist below, handing it its own \
+         diff, `diffs/<its name>.diff` beside this bundle, which holds only \
+         the changed files it reads; then each generalist with its \
+         specialists' report files. The gate fails a review that leaves one \
+         out.\n\n",
+    );
+    for (generalist, specialists) in &a.dispatch {
+        let names: Vec<String> = specialists.iter().map(|s| format!("`{s}`")).collect();
+        let _ = writeln!(b, "- `{generalist}`, weighing {}", names.join(", "));
     }
 }
 

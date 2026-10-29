@@ -171,6 +171,15 @@ fn the_checkout_s_ruleset_needs_an_approval_from_another_reviewer() {
     assert!(problems.is_empty(), "{}", problems.join("\n"));
 }
 
+/// The committed ruleset needs the review gate's check from the reviewer
+/// app (ENG-21).
+#[test]
+fn the_checkout_s_ruleset_needs_the_review_gate_check() {
+    let problems = engineering::branch_protection::review_gate_required(&ruleset());
+
+    assert!(problems.is_empty(), "{}", problems.join("\n"));
+}
+
 /// CODEOWNERS names the stakeholder on the requirement text and on the
 /// paths that enforce it (ENG-21).
 #[test]
@@ -188,12 +197,37 @@ fn the_checkout_s_codeowners_name_no_owner_on_any_other_path() {
     assert!(problems.is_empty(), "{}", problems.join("\n"));
 }
 
-/// The security-sensitive crates are owned by the security reviewer
-/// before they exist (ENG-21).
+/// Every agent the review bundle can dispatch is defined, at its
+/// effort (ENG-28).
 #[test]
-fn the_checkout_s_security_crates_belong_to_the_security_reviewer() {
-    let problems =
-        engineering::codeowners::security_crates_owned_by_the_security_reviewer(&checkout());
+fn the_checkout_s_review_agents_are_all_defined() {
+    let problems = engineering::review_agents::every_dispatched_agent_is_defined(&checkout());
+
+    assert!(problems.is_empty(), "{}", problems.join("\n"));
+}
+
+/// Every reviewer component has its defect, clean and injection case
+/// (ENG-32).
+#[test]
+fn the_checkout_s_reviewer_components_each_have_their_cases() {
+    let problems = engineering::review_evaluation::components_have_their_cases(&checkout());
+
+    assert!(problems.is_empty(), "{}", problems.join("\n"));
+}
+
+/// Every reviewer evaluation case reads, applies to the checkout and
+/// makes the review bundle dispatch its component (ENG-32).
+#[test]
+fn the_checkout_s_reviewer_evaluation_cases_apply_and_dispatch() {
+    let problems = engineering::review_evaluation::cases_apply_and_dispatch(&checkout());
+
+    assert!(problems.is_empty(), "{}", problems.join("\n"));
+}
+
+/// CODEOWNERS names no owner on Rust source (ENG-21).
+#[test]
+fn the_checkout_s_codeowners_name_no_owner_on_rust_source() {
+    let problems = engineering::codeowners::no_owner_on_rust_source(&checkout());
 
     assert!(problems.is_empty(), "{}", problems.join("\n"));
 }
@@ -231,4 +265,13 @@ fn the_checkout_s_rulesets_each_name_themselves_their_target_and_refs() {
         Vec::<String>::new()
     );
     assert_eq!(names, ["main", "no-other-tags-allowed", "releases-semver"]);
+}
+
+/// Every language the checkout's source and configuration are written
+/// in has its review specialist (ENG-28).
+#[test]
+fn the_checkout_s_languages_each_have_their_specialist() {
+    let problems = engineering::review_languages::every_language_has_its_specialist(&checkout());
+
+    assert!(problems.is_empty(), "{}", problems.join("\n"));
 }

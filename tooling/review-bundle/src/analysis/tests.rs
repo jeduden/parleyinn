@@ -41,12 +41,16 @@ fn base() -> Snapshot {
             req("REC-02", "Link."),
             req("PRV-10", "Certify."),
             req(
+                "ENG-11",
+                "Coverage MUST be ≥ 90% for security-sensitive crates (`pin`, `search`) and more.",
+            ),
+            req(
                 "ENG-29",
                 "A change to an invariant, or to a requirement marked for I2 review (PRV-10, PRV-11), MUST land with an ADR.",
             ),
         ],
         scenarios: vec![sc("REC-01", false), sc("REC-02", true), sc("PRV-10", true)],
-        codeowners: "/docs/srs/ @owner\n/tooling/ @owner\n".into(),
+        codeowners: "/docs/srs/ @owner\n/crates/*/Cargo.toml @owner\n".into(),
         invariants: "I1".into(),
         decisions: BTreeMap::new(),
     }
@@ -78,7 +82,7 @@ fn analyse_routes_by_the_paths_that_changed() {
         ),
         (vec!["features/record.feature"], Class::Standard),
         (vec!["README.md", "docs/srs/05.md"], Class::Deep),
-        (vec!["tooling/drift/src/cases.rs"], Class::Deep),
+        (vec!["crates/pinx/Cargo.toml"], Class::Deep),
     ];
     for (paths, want) in cases {
         let diff: String = paths.iter().map(|p| header(p)).collect();
@@ -87,6 +91,74 @@ fn analyse_routes_by_the_paths_that_changed() {
         assert_eq!(got.class == Class::Deep, !got.owned.is_empty(), "{paths:?}");
         assert!(got.unparsed.is_empty(), "{paths:?}");
     }
+}
+
+#[test]
+fn code_with_no_code_owner_reviews_deep_when_it_gates_or_is_security_sensitive() {
+    for (path, want) in [
+        ("tooling/drift/src/cases.rs", Class::Deep),
+        ("crates/pin/src/lib.rs", Class::Deep),
+        ("crates/search/src/a/b.rs", Class::Deep),
+        ("crates/parinn/tests/reach.rs", Class::Deep),
+        ("crates/pinx/src/lib.rs", Class::Standard),
+        ("crates/parinn/tests/other.rs", Class::Standard),
+        ("x/tooling/a.rs", Class::Standard),
+    ] {
+        let got = analyse(&base(), &base(), &header(path), false);
+        assert_eq!(got.class, want, "{path}");
+        assert!(got.owned.is_empty(), "{path}");
+    }
+}
+
+#[test]
+fn security_crates_come_from_the_eng_11_row() {
+    assert_eq!(
+        security_crates(&base()),
+        Some(["pin", "search"].map(str::to_owned).to_vec())
+    );
+
+    for text in [
+        "No list.",
+        "security-sensitive crates (`a`",
+        "security-sensitive crates ()",
+    ] {
+        let mut snap = base();
+        snap.requirements = vec![req("ENG-11", text)];
+        assert_eq!(security_crates(&snap), None, "{text}");
+    }
+    let mut snap = base();
+    snap.requirements.clear();
+    assert_eq!(security_crates(&snap), None);
+}
+
+#[test]
+fn an_eng_11_row_that_names_no_crate_fails_closed_and_says_so() {
+    let mut main = base();
+    main.requirements.retain(|r| r.id != "ENG-11");
+    main.requirements
+        .push(req("ENG-11", "Coverage MUST be ≥ 90%."));
+
+    let got = analyse(&main, &main, &header("crates/store/src/lib.rs"), false);
+
+    assert_eq!(got.class, Class::Deep);
+    assert_eq!(
+        got.dispatch[dispatch::SECURITY_DEEP],
+        ["persona-security-officer"].map(str::to_owned).into()
+    );
+    assert_eq!(
+        got.findings,
+        [Finding {
+            path: "docs/srs/05.md".into(),
+            line: 0,
+            severity: NIT,
+            body: NO_SECURITY_CRATES.into(),
+        }]
+    );
+
+    main.requirements.retain(|r| r.id != "ENG-11");
+    let got = analyse(&main, &main, &header("README.md"), false);
+    assert_eq!(got.findings[0].path, "docs/srs");
+    assert_eq!(got.class, Class::Light);
 }
 
 #[test]
@@ -474,4 +546,76 @@ fn and_list_joins_with_a_final_and() {
     assert_eq!(and_list(&[]), "");
     assert_eq!(and_list(&["a"]), "a");
     assert_eq!(and_list(&["a", "b", "c"]), "a, b and c");
+}
+
+#[test]
+fn analyse_dispatches_by_path_and_by_the_rows_the_diff_names() {
+    let mut head = base();
+    let mut row = req("REC-03", "New.");
+    row.path = "docs/srs/06-security.md".into();
+    head.requirements.push(row);
+    let diff = format!("{}+REC-01 REC-03\n", header("crates/pin/src/lib.rs"));
+
+    let got = analyse(&base(), &head, &diff, false);
+
+    assert_eq!(
+        got.dispatch[dispatch::SPEC_DEEP],
+        ["srs-05", "srs-security"].map(str::to_owned).into()
+    );
+    assert_eq!(
+        got.dispatch[dispatch::CODE_DEEP],
+        ["lang-rust", "performance", "test-engineer-unit"]
+            .map(str::to_owned)
+            .into()
+    );
+    assert_eq!(
+        got.dispatch[dispatch::SECURITY_DEEP],
+        ["persona-security-officer"].map(str::to_owned).into()
+    );
+    let lib = BTreeSet::from(["crates/pin/src/lib.rs".to_owned()]);
+    assert_eq!(got.scopes["lang-rust"], lib);
+    assert_eq!(got.scopes["srs-security"], lib);
+    assert_eq!(got.scopes.len(), 6, "{:?}", got.scopes);
+}
+
+#[test]
+fn a_review_below_deep_keeps_the_normal_generalists() {
+    let got = analyse(
+        &base(),
+        &base(),
+        &header("crates/parinn/src/main.rs"),
+        false,
+    );
+
+    assert_eq!(got.class, Class::Standard);
+    assert!(
+        got.dispatch.contains_key(dispatch::CODE),
+        "{:?}",
+        got.dispatch
+    );
+    assert!(!got.dispatch.contains_key(dispatch::CODE_DEEP));
+}
+
+#[test]
+fn a_row_markdown_only_quotes_brings_no_specialist() {
+    let mut head = base();
+    let mut row = req("REC-03", "New.");
+    row.path = "docs/srs/06-security.md".into();
+    head.requirements.push(row.clone());
+    let mut main = base();
+    main.requirements.push(row);
+    let diff = format!("{}+ quotes REC-03\n", header("docs/notes.md"));
+
+    let got = analyse(&main, &main, &diff, false);
+
+    assert!(
+        got.touched.contains(&"REC-03".to_owned()),
+        "{:?}",
+        got.touched
+    );
+    assert!(
+        !got.dispatch.values().flatten().any(|s| s == "srs-security"),
+        "{:?}",
+        got.dispatch
+    );
 }

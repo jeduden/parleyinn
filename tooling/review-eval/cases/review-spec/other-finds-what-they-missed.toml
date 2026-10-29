@@ -1,0 +1,26 @@
+component = "review-spec"
+kind = "other"
+title = "a re-pended scenario every specialist missed"
+
+[[replace]]
+file = "features/engineering.feature"
+old = "  @ENG-24 @P0\n"
+new = "  @ENG-24 @P0 @pending\n"
+
+[[report]]
+agent = "lang-gherkin"
+content = '''
+outcome: sound — a tag added
+'''
+
+[[report]]
+agent = "domain-model-hub"
+content = '''
+outcome: sound — no concept touched
+'''
+
+[expect]
+
+[[expect.finding]]
+path = "features/engineering.feature"
+mentions_any = ["pending", "ENG-24"]

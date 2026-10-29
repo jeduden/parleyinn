@@ -1,0 +1,107 @@
+name: Reviewer evaluation
+
+# ENG-32: every reviewer component's cases run on the model its front
+# matter names, weekly, against the scorecard the repository publishes,
+# so a model that stops serving the instructions shows up as failed
+# cases; and on demand on a candidate model, compared with the
+# published scorecard, so the stakeholder can move a component to the
+# model that serves it better. Both run from main's definition, with
+# the stakeholder's Claude token and nothing they can write with.
+on:
+  schedule:
+    - cron: "41 3 * * 0"
+  workflow_dispatch:
+    inputs:
+      model:
+        description: A model every component runs on instead of its own, for a comparison
+        required: false
+        default: ""
+      components:
+        description: The components to run, space-separated; every component when empty
+        required: false
+        default: ""
+      repetitions:
+        description: How many runs a case may take at most
+        required: false
+        default: "3"
+
+permissions: {}
+
+jobs:
+  evaluate:
+    runs-on: ubuntu-latest
+    # Every component's cases, a few hundred runs on haiku and a few
+    # dozen on the stronger models, four at a time.
+    timeout-minutes: 300
+    permissions:
+      contents: read
+    env:
+      # The Claude Code command line the harness starts, pinned (ENG-01).
+      CLAUDE_CODE_VERSION: "2.1.312"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install pinned Rust and mdsmith with mise
+        uses: ./.github/actions/setup-mise
+        with:
+          tools: "rust github:jeduden/mdsmith"
+          # Jobs handling review credentials never restore executable caches.
+          cache: false
+      # The command line is an npm package, which mise's released-binary
+      # rule refuses, so it is pinned here and installed with npm.
+      - name: Install the pinned Claude Code command line
+        run: npm install --global --no-fund --no-audit "@anthropic-ai/claude-code@$CLAUDE_CODE_VERSION" # zizmor: ignore[adhoc-packages] pinned to one version by CLAUDE_CODE_VERSION, which no mise backend the repository allows can install
+      # Exit 1 says a case failed, which the last step turns into the
+      # job's failure once the report and the comparison are in the
+      # summary. Any other exit is the harness's own failure.
+      - name: Run the cases
+        id: run
+        env:
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          MODEL: ${{ inputs.model }}
+          COMPONENTS: ${{ inputs.components }}
+          REPETITIONS: ${{ inputs.repetitions || '3' }}
+        run: |
+          set -- --checkout . --out review-eval --parallel 4 --repetitions "$REPETITIONS"
+          if [ -n "$MODEL" ]; then
+            set -- "$@" --model "$MODEL"
+          fi
+          if [ -n "$COMPONENTS" ]; then
+            for component in $COMPONENTS; do
+              set -- "$@" --component "$component"
+            done
+          else
+            set -- "$@" --all
+          fi
+          set +e
+          cargo run --locked --quiet -p review-eval -- run "$@"
+          code=$?
+          set -e
+          cat review-eval/report.md >> "$GITHUB_STEP_SUMMARY"
+          if [ "$code" -gt 1 ]; then
+            echo "::error::the reviewer evaluation did not run to its end (exit $code)"
+            exit "$code"
+          fi
+          echo "code=$code" >> "$GITHUB_OUTPUT"
+      - name: Compare with the published scorecard
+        run: |
+          cargo run --locked --quiet -p review-eval -- compare \
+            --published tooling/review-eval/scorecard-v1.txt \
+            --scorecard review-eval/scorecard.json | tee -a "$GITHUB_STEP_SUMMARY"
+      # The scorecard to publish with `review-eval publish`, the report,
+      # and each run's grade and report; the run logs stay in the job.
+      - name: Keep the scorecard
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: review-evaluation
+          path: |
+            review-eval/
+            !review-eval/runs/**/log.jsonl
+            !review-eval/runs/**/log.stderr
+          if-no-files-found: error
+      - name: Fail on a component whose cases failed
+        if: steps.run.outputs.code != '0'
+        run: |
+          echo "::error::a reviewer component's cases failed on its model; the report in the summary names each case"
+          exit 1

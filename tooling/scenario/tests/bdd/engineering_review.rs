@@ -32,6 +32,11 @@ fn agents_unprivileged(w: &mut World, key: String) -> Result<(), String> {
     outcome(e.flow.agents_unprivileged(&e.key))
 }
 
+#[then(regex = r#"^its agents may write only their reports, under "([^"]+)"$"#)]
+fn agents_write_only(w: &mut World, dir: String) -> Result<(), String> {
+    outcome(eng(w).flow.agents_write_only(&dir))
+}
+
 #[then(regex = r#"^only one job holds the "([^"]+)" key, and it runs no agent$"#)]
 fn key_held_apart(w: &mut World, key: String) -> Result<(), String> {
     let e = eng(w);
@@ -49,6 +54,26 @@ fn key_job_after_agents(w: &mut World) -> Result<(), String> {
 fn key_job_runs(w: &mut World, cmd: String) -> Result<(), String> {
     let e = eng(w);
     e.flow.key_job_runs(e.key()?, &cmd)
+}
+
+#[then(regex = r#"^that job posts its decision as the "([^"]+)" check$"#)]
+fn key_job_posts_check(w: &mut World, check: String) -> Result<(), String> {
+    let e = eng(w);
+    outcome(e.flow.key_job_posts_check(e.key()?, &check)?)
+}
+
+#[then(
+    regex = r"^every language the repository's source and configuration are written in has its specialist$"
+)]
+fn every_language_has_its_specialist(w: &mut World) -> Result<(), String> {
+    outcome(engineering::review_languages::every_language_has_its_specialist(eng(w).checkout()?))
+}
+
+#[then(
+    regex = r"^every agent the review bundle can dispatch is defined, specialists at low effort with 20 turns, generalists at medium and their deep instances on opus at high effort with 40 turns$"
+)]
+fn review_agents_defined(w: &mut World) -> Result<(), String> {
+    outcome(engineering::review_agents::every_dispatched_agent_is_defined(eng(w).checkout()?))
 }
 
 #[then(regex = r"^the review gate decides:$")]

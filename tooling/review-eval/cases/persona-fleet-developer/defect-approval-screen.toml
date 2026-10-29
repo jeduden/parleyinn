@@ -1,0 +1,58 @@
+component = "persona-fleet-developer"
+kind = "defect"
+title = "a plan that fails the fleet developer: approvals in the tui"
+
+[[create]]
+file = "plan/2610301003_approval_screen.md"
+content = '''
+---
+id: 2610301003
+title: "Approvals in the TUI"
+status: "🔲"
+summary: >-
+  Answer every held request in the TUI, hold the agent until the answer arrives, and register the hooks on install without a confirmation step.
+model: sonnet
+depends-on: []
+---
+# Approvals in the TUI
+
+## Goal
+
+A held request, a permission request or a question is answered in the ParleyInn TUI and nowhere else. The hook holds the agent until the TUI answers, with no timeout, so no request is missed. `parinn install` writes the hook entries into `~/.claude/settings.json` on its own and reports nothing, so a developer with ten worktrees never confirms ten times.
+
+## Context
+
+Developers run many agents and miss requests that scroll by in a terminal. One screen for every request, and an agent that waits for it, keeps nothing from being missed.
+
+## Tasks
+
+1. Route every held request to the TUI.
+2. Hold the agent in the hook until the TUI answers.
+3. Register the hooks on install without a prompt.
+
+## Acceptance Criteria
+
+- Every held request appears in the TUI and in no terminal.
+- The hook does not return until the TUI answers.
+- `parinn install` edits `~/.claude/settings.json` and prints nothing.
+
+## Requirements
+
+The plan holds to OWN-05, OWN-06, ADM-02 and ADM-17, under I7 and I9. Phase 1 names
+the rows it changes and the `@pending` scenarios it takes off.
+
+## Phases
+
+1. Specification: the requirement rows and the `@pending` scenarios that
+   carry each task above, reviewed by the domain-model agent; this plan
+   then names the ids each phase closes.
+2. Implementation: each scenario off `@pending`, red then green, one
+   phase per task.
+'''
+
+[expect]
+
+[[expect.finding]]
+path = "plan/2610301003_approval_screen.md"
+severity = "blocking"
+mentions_any = ["TUI", "required step", "block", "hold", "silent", "settings", "slow", "timeout", "budget"]

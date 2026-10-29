@@ -1,0 +1,16 @@
+component = "review"
+kind = "other"
+title = "a stakeholder path changed without the stakeholder's consent"
+
+[[replace]]
+file = "SECURITY.md"
+old = "## Reporting a vulnerability\n"
+new = "## Reporting a vulnerability\n\nThe private channel below reaches the maintainers alone.\n"
+
+[expect]
+outcome = ["request_changes"]
+
+[[expect.finding]]
+path = "SECURITY.md"
+severity = "blocking"
+mentions_any = ["consent", "stakeholder", "CODEOWNERS"]

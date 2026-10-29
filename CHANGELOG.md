@@ -9,6 +9,12 @@ its upgrade notes (ENG-23). ParleyInn follows semantic versioning.
 
 ## Unreleased
 
+- Every reviewer component of the layered review, and every other agent
+  under `.claude/agents`, is held to evaluation cases, run on the model
+  its front matter names by the review of a pull request that changes
+  it, weekly against the published scorecard, and on demand on a
+  candidate model for a comparison (ENG-32). The `review-eval` tooling
+  crate runs them.
 - Redaction now also redacts a secret that a neighbouring match hid from
   a rule's word boundary, such as an AWS access key directly followed by
   a principal's pattern (SEC-08). Its work is bounded by the redaction

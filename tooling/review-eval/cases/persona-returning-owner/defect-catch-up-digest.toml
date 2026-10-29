@@ -1,0 +1,58 @@
+component = "persona-returning-owner"
+kind = "defect"
+title = "a plan that fails the returning owner: catch up as a digest"
+
+[[create]]
+file = "plan/2610301013_catch_up_digest.md"
+content = '''
+---
+id: 2610301013
+title: "Catch up as a digest"
+status: "🔲"
+summary: >-
+  Show Catch up as a prose digest per room written by the model, without event references, leave out failed captures to keep it short, and search only the last run.
+model: sonnet
+depends-on: []
+---
+# Catch up as a digest
+
+## Goal
+
+Catch up shows one paragraph per room, written by the model from the room's events, and nothing else: no event addresses and no links, since they clutter the text. Segments that failed to capture are left out of the digest so it stays short. Search covers the current run of each room; older runs are in the record for whoever wants to read it.
+
+## Context
+
+An owner coming back on Monday wants a quick read, not a list of pointers. A digest reads in a minute.
+
+## Tasks
+
+1. Write a one-paragraph digest per room from the model.
+2. Leave event references and failed captures out.
+3. Limit search to the current run.
+
+## Acceptance Criteria
+
+- Catch up shows one model-written paragraph per room and no event address or link.
+- A failed capture does not appear in the digest.
+- Search covers only each room's current run.
+
+## Requirements
+
+The plan holds to VIEW-08, VIEW-09 and RCL-01, under I1 and I6. Phase 1 names
+the rows it changes and the `@pending` scenarios it takes off.
+
+## Phases
+
+1. Specification: the requirement rows and the `@pending` scenarios that
+   carry each task above, reviewed by the domain-model agent; this plan
+   then names the ids each phase closes.
+2. Implementation: each scenario off `@pending`, red then green, one
+   phase per task.
+'''
+
+[expect]
+
+[[expect.finding]]
+path = "plan/2610301013_catch_up_digest.md"
+severity = "blocking"
+mentions_any = ["point", "link", "event", "record", "silent", "gap", "digest", "replace", "search"]

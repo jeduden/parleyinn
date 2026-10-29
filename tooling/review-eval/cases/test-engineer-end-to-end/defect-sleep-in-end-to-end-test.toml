@@ -1,0 +1,34 @@
+component = "test-engineer-end-to-end"
+kind = "defect"
+title = "an end-to-end test that sleeps and runs with the real HOME"
+
+[[create]]
+file = "tooling/review-eval/tests/e2e_sleepy.rs"
+content = '''
+//! The executable answers a wrong command line.
+
+use std::process::Command;
+use std::thread;
+use std::time::Duration;
+
+#[test]
+fn a_wrong_command_line_is_refused() {
+    let mut child = Command::new(env!("CARGO_BIN_EXE_review-eval"))
+        .arg("--nope")
+        .spawn()
+        .unwrap();
+    thread::sleep(Duration::from_secs(2));
+
+    let status = child.wait().unwrap();
+
+    assert_eq!(status.code(), Some(2));
+}
+'''
+
+[expect]
+outcome = ["blocking"]
+
+[[expect.finding]]
+path = "tooling/review-eval/tests/e2e_sleepy.rs"
+severity = "blocking"
+mentions_any = ["sleep", "deadline", "HOME", "isolat"]

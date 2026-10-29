@@ -1,0 +1,28 @@
+[package]
+name = "review-eval"
+version = "0.0.0"
+description = "Runs each reviewer component's evaluation cases through the review's own harness on a chosen model and grades its reports (ENG-32)"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+adr.workspace = true
+review-bundle.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+toml.workspace = true
+
+[dev-dependencies]
+testkit.workspace = true
+
+[lints]
+workspace = true
+
+# ENG-02: see crates/parinn/Cargo.toml.
+[package.metadata.parinn]
+responsibility = "Runs each reviewer component's evaluation cases through the review's harness on a chosen model and grades its reports"
+may-depend-on = ["adr", "review-bundle"]
+may-dev-depend-on = ["testkit"]

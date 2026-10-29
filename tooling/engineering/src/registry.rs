@@ -24,9 +24,10 @@ pub const CHECKOUT_STEP: &str = "the repository checkout";
 /// and CODEOWNERS; and the gates behind ENG-03, ENG-20's three
 /// workflow gates, the gate that
 /// holds every crate to the complexity limits, and the gate that holds
-/// CI to the TOML checks; and the gates behind SEC-01's core row,
+/// CI to the TOML checks; the two gates of ENG-32 over the reviewer
+/// evaluation cases; and the gates behind SEC-01's core row,
 /// SEC-15, SEC-17, SEC-19 and ENG-22.
-pub const GATE_TESTS: [&str; 42] = [
+pub const GATE_TESTS: [&str; 45] = [
     "specification_parses",
     "decision_records_parse",
     "specification_and_features_agree",
@@ -54,7 +55,10 @@ pub const GATE_TESTS: [&str; 42] = [
     "the_checkout_s_ruleset_needs_an_approval_from_another_reviewer",
     "the_checkout_s_codeowners_name_the_stakeholder_on_the_enforcing_paths",
     "the_checkout_s_codeowners_name_no_owner_on_any_other_path",
-    "the_checkout_s_security_crates_belong_to_the_security_reviewer",
+    "the_checkout_s_codeowners_name_no_owner_on_rust_source",
+    "the_checkout_s_review_agents_are_all_defined",
+    "the_checkout_s_reviewer_components_each_have_their_cases",
+    "the_checkout_s_reviewer_evaluation_cases_apply_and_dispatch",
     "the_checkout_s_nightly_compares_every_committed_ruleset",
     "the_checkout_s_rulesets_each_name_themselves_their_target_and_refs",
     "the_product_crates_keep_their_bans",

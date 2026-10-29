@@ -1,28 +1,27 @@
 # ENG-21: agents review and approve each other's pull requests. The
-# stakeholder approves what defines the requirements and what enforces
-# them, listed below. A path with no owner here merges on the approval
-# of any reviewer other than its author, agent or human.
+# stakeholder approves the specification, the decision records, the
+# scenarios and the process that builds and checks the code, listed
+# below, and no Rust source. A path with no code owner here, code among
+# it, merges on the approval of any reviewer other than its author,
+# agent or human.
 
-# The requirement text, and the decision records that justify design
-# and dependencies (ENG-26).
+# The specification (the requirement text).
 /docs/srs/                    @jeduden
+
+# The decision records that justify design and dependencies (ENG-26).
 /docs/adr/                    @jeduden
 
-# The repository tooling: the requirement–scenario gate, the ADR
-# reader the ENG-18 and ENG-26 scenarios check through, the scenario
-# runner and its step bindings, the drift suite, the finding ledger's
-# check, and the review gate that decides the review the reviewer app
-# posts (ENG-28). The workflow that runs it is under /.github/.
-/tooling/                     @jeduden
+# The scenarios that make the requirement text executable.
+/features/                    @jeduden
 
-# The product crates' reach and determinism evidence (SEC-01, ENG-16,
-# ENG-03): each crate's clippy configuration, which refuses sockets,
-# program starts, clocks and random order in its code, its manifest,
-# whose [lints] could switch the bans off, and the test that refuses a
-# crate linked into it.
+# The build configuration of every crate: its manifest, whose [lints]
+# could switch the workspace bans off and whose dependencies the
+# architecture check reads, and the clippy configuration that refuses
+# sockets, program starts, clocks and random order in its code (SEC-01,
+# ENG-16, ENG-03).
 /crates/*/clippy.toml         @jeduden
 /crates/*/Cargo.toml          @jeduden
-/crates/*/tests/reach.rs      @jeduden
+/tooling/*/Cargo.toml         @jeduden
 
 # CI, the coverage floors, the toolchain pins, the lint and supply-chain
 # configuration and this file.
@@ -37,6 +36,14 @@
 /clippy.toml                  @jeduden
 /deny.toml                    @jeduden
 /codecov.yml                  @jeduden
+
+# The gate data the stakeholder accepts: the benchmark regressions
+# ADR-2610142300 lets through, the recall evaluation's baseline, and
+# the reviewer evaluation's cases and published scorecard (ENG-32).
+/tooling/benchmark/accepted.txt @jeduden
+/tooling/eval/recall-v1.txt   @jeduden
+/tooling/review-eval/cases/   @jeduden
+/tooling/review-eval/scorecard-v1.txt @jeduden
 /.mdsmith.yml                 @jeduden
 
 # The supply-chain and disclosure policy: every new direct dependency
@@ -45,22 +52,8 @@
 /SECURITY.md                  @jeduden
 /DEPENDENCIES.md              @jeduden
 
-# The agent instructions.
+# The agent instructions, and the shared sections they include.
 /CLAUDE.md                    @jeduden
 /AGENTS.md                    @jeduden
 /.claude/                     @jeduden
-
-# Security-sensitive packages (ENG-11), owned before they exist. Their
-# owner is the designated security reviewer, whose approval a change to
-# them needs as a code owner (ENG-21). That reviewer is still TBD (SRS
-# front matter), so the stakeholder holds the role until one is named:
-# replace @jeduden on each line with the reviewer's user or team then.
-/crates/provenance/           @jeduden
-/crates/redaction/            @jeduden
-/crates/flag/                 @jeduden
-/crates/search/               @jeduden
-/crates/envelope/             @jeduden
-/crates/restore_block/        @jeduden
-/crates/pin/                  @jeduden
-/crates/landmark/             @jeduden
-/crates/configuration/        @jeduden
+/docs/agents/                 @jeduden

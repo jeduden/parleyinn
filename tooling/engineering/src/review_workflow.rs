@@ -202,6 +202,42 @@ impl Workflow {
         problems
     }
 
+    /// Requires every agent job to list its allowed tools and to allow
+    /// writing only under `dir`: `Edit(./<dir>/**)` and no other
+    /// writing tool. An `Edit` rule governs every tool that changes a
+    /// file, `Write` included; a `Write(path)` rule grants nothing, so
+    /// an agent job that lists one cannot write its reports.
+    #[must_use]
+    pub fn agents_write_only(&self, dir: &str) -> Vec<String> {
+        let scoped = format!("Edit(./{dir}/**)");
+        let mut problems = Vec::new();
+        for j in self.agent_jobs() {
+            let Some(line) = j.text.lines().find(|l| l.contains("--allowedTools")) else {
+                problems.push(format!("agent job {} lists no --allowedTools", j.name));
+                continue;
+            };
+            let tools = line
+                .split_once("--allowedTools")
+                .map_or("", |(_, rest)| rest)
+                .trim()
+                .trim_matches('"');
+            problems.extend(
+                tools
+                    .split(',')
+                    .map(str::trim)
+                    .filter(|t| {
+                        ["Write", "Edit", "NotebookEdit", "Bash"]
+                            .iter()
+                            .any(|w| t.starts_with(w))
+                    })
+                    .filter(|t| *t != scoped)
+                    .map(|t| format!("agent job {} may use {t}, want {scoped} alone", j.name)),
+            );
+        }
+
+        problems
+    }
+
     /// The one job that reads `key`.
     fn key_job(&self, key: &str) -> Result<&Job, String> {
         let holders: Vec<&Job> = self
@@ -263,6 +299,85 @@ impl Workflow {
         Ok(problems)
     }
 
+    /// Requires the key's job to post its decision as the check `name`:
+    /// to mint a token that writes checks, post to the check-runs
+    /// endpoint under that name, and fail the check unless it approves.
+    ///
+    /// # Errors
+    ///
+    /// Fails when the key's job cannot be found.
+    pub fn key_job_posts_check(&self, key: &str, name: &str) -> Result<Vec<String>, String> {
+        let j = self.key_job(key)?;
+        let named = format!("name={name}");
+        Ok([
+            ("mint", "permission-checks: write"),
+            ("post to", "repos/$REPO/check-runs"),
+            ("name the check", named.as_str()),
+            ("fail the check by default:", "conclusion=failure"),
+        ]
+        .into_iter()
+        .filter(|(_, text)| !j.text.contains(text))
+        .map(|(what, text)| format!("job {} does not {what} {text}", j.name))
+        .collect())
+    }
+
+    /// Requires the `evaluate` job (ENG-32): it runs `cmd`, needs every
+    /// agent job, holds no write permission and not `key`, and the
+    /// key's job needs it, so the evaluation's findings reach the gate.
+    ///
+    /// # Errors
+    ///
+    /// Fails when there is no evaluate job or the key's job cannot be
+    /// found.
+    pub fn evaluate_job_runs(&self, cmd: &str, key: &str) -> Result<Vec<String>, String> {
+        let j = self
+            .jobs
+            .iter()
+            .find(|j| j.name == "evaluate")
+            .ok_or("no evaluate job in the review workflow")?;
+        let needs = |job: &Job| {
+            job.text
+                .lines()
+                .rfind(|l| l.trim_start().starts_with("needs:"))
+                .unwrap_or_default()
+                .to_owned()
+        };
+        let mut problems = Vec::new();
+        if !j.text.contains(cmd) {
+            problems.push(format!("job {} does not run {cmd:?}", j.name));
+        }
+        if grants_write(&j.text) {
+            problems.push(format!("job {} is granted a write permission", j.name));
+        }
+        if j.text.contains(&format!("secrets.{key}")) {
+            problems.push(format!("job {} reads {key}", j.name));
+        }
+        let own_needs = needs(j);
+        problems.extend(
+            self.agent_jobs()
+                .filter(|a| !has_word(&own_needs, &a.name))
+                .map(|a| format!("job {} does not need agent job {}", j.name, a.name)),
+        );
+        // The key's job among the others: an evaluate job that reads the
+        // key is a problem named above, not a second holder.
+        let holders: Vec<&Job> = self
+            .jobs
+            .iter()
+            .filter(|job| job.name != j.name && job.text.contains(&format!("secrets.{key}")))
+            .collect();
+        let [key_job] = holders.as_slice() else {
+            return Err(format!(
+                "{} jobs read {key:?}, want exactly one",
+                holders.len()
+            ));
+        };
+        if !has_word(&needs(key_job), &j.name) {
+            problems.push(format!("job {} does not need job {}", key_job.name, j.name));
+        }
+
+        Ok(problems)
+    }
+
     /// Requires the key's job to run `cmd`.
     ///
     /// # Errors
@@ -311,6 +426,102 @@ pub fn gate_decides(rows: &[BTreeMap<String, String>]) -> Vec<String> {
         .collect()
 }
 
+/// The review gate's command line, as the review workflow runs it, on
+/// the files [`gate_outcome`] writes.
+fn gate_args(reviewed: &str, head: &str) -> Vec<String> {
+    [
+        "--outcome",
+        "outcome.json",
+        "--check-runs",
+        "check-runs.jsonl",
+        "--reviewed",
+        reviewed,
+        "--head",
+        head,
+        "--checked",
+        "checked.json",
+        "--dispatch",
+        "dispatch.json",
+        "--consulted",
+        "consulted.json",
+        "--reports",
+        "reports",
+        "--answers",
+        "answers.json",
+    ]
+    .map(str::to_owned)
+    .to_vec()
+}
+
+/// The report and run-log answer of the row's one specialist: a
+/// `report` cell of `given`, or none, hands the gate a report that ends
+/// with the outcome its answer gives, `missing` no report, `empty` a
+/// blank one, `no outcome` one that ends with a finding, and `other
+/// outcome` one that ends with another outcome; `None` for any other
+/// value.
+fn report(row: &BTreeMap<String, String>) -> Option<(Option<&'static str>, &'static str)> {
+    const ANSWERS: &str = r#"{"lang-rust":"outcome: sound — fine\nreport: review/reports/lang-rust.md","review-code":"r"}"#;
+    let report = match row.get("report").map_or("given", String::as_str) {
+        "given" => Some("a.rs:1 — nit — x\noutcome: sound — fine\n"),
+        "missing" => None,
+        "empty" => Some("  \n"),
+        "no outcome" => Some("a.rs:1 — nit — x\n"),
+        "other outcome" => Some("outcome: blocking — not fine\n"),
+        _ => return None,
+    };
+
+    Some((report, ANSWERS))
+}
+
+/// The dispatch a table row hands the gate by default: one generalist
+/// with one specialist.
+const DISPATCH: &str = r#"{"review-code":["lang-rust"]}"#;
+
+/// What [`gate_outcome`] names for a row whose `dispatch`, `consulted`,
+/// `report` or `own check` cell holds a value it does not define, so a
+/// mistyped row fails rather than reads as the default.
+pub const UNKNOWN_CELL: &str = "a cell value the table does not define";
+
+/// The dispatch file a row hands the gate: [`DISPATCH`] for `given` or
+/// no `dispatch` column, a file that is no map for `malformed`, and no
+/// file (`Some(None)`) for `missing`; `None` for any other value.
+fn dispatch(row: &BTreeMap<String, String>) -> Option<Option<&'static str>> {
+    match row.get("dispatch").map_or("given", String::as_str) {
+        "given" => Some(Some(DISPATCH)),
+        "malformed" => Some(Some("[]")),
+        "missing" => Some(None),
+        _ => None,
+    }
+}
+
+/// The agents a row says the orchestrator consulted: both of
+/// [`DISPATCH`] for `all` or no `consulted` column, the generalist alone
+/// for `not all`, and a file that is no list for `malformed`; `None` for
+/// any other value.
+fn consulted(row: &BTreeMap<String, String>) -> Option<&'static str> {
+    match row.get("consulted").map_or("all", String::as_str) {
+        "all" => Some(r#"["review-code","lang-rust"]"#),
+        "not all" => Some(r#"["review-code"]"#),
+        "malformed" => Some("nope"),
+        _ => None,
+    }
+}
+
+/// The check run line for the gate's own `review-gate` check a row
+/// names: a failed one from the reviewer app for `failed`, none for
+/// `none` or no `own check` column; `None` for any other value.
+fn own_check(cell: &str) -> Option<String> {
+    match cell {
+        "failed" => Some(format!(
+            "{{\"name\":{:?},\"status\":\"completed\",\"conclusion\":\"failure\",\"app\":{}}}\n",
+            review_gate::OWN_CHECK,
+            review_gate::REVIEWER_APP_ID
+        )),
+        "none" | "" => Some(String::new()),
+        _ => None,
+    }
+}
+
 /// Runs the review gate's command line, as the review workflow does,
 /// on the files one table row describes, and names what it does: the
 /// review event it prints, "nothing" for a head that moved, or "an
@@ -319,11 +530,23 @@ pub fn gate_decides(rows: &[BTreeMap<String, String>]) -> Vec<String> {
 /// finding` of `none`, or a row without the column, hands it an empty
 /// list, `nit` or `blocking` one deterministic finding of that
 /// severity, `malformed` a file that is no list, and `missing` no file.
+/// It always gets `--dispatch`, `--consulted`, `--reports` and
+/// `--answers` (see [`dispatch`], [`consulted`] and [`report`]), and a
+/// row whose cell for any of them, or for `own check`, it does not
+/// define gives [`UNKNOWN_CELL`].
 #[must_use]
 pub fn gate_outcome(row: &BTreeMap<String, String>) -> &'static str {
     const REVIEWED: &str = "206b0a76a81abb510e53d87ef187e83b5aacbcbb";
     const MOVED: &str = "490efa734617788d1dc1f831b26d0e23888e90fa";
     let cell = |name: &str| row.get(name).map(String::as_str).unwrap_or_default();
+    let (Some(dispatched), Some(consulted), Some((report, answers)), Some(own)) = (
+        dispatch(row),
+        consulted(row),
+        report(row),
+        own_check(cell("own check")),
+    ) else {
+        return UNKNOWN_CELL;
+    };
     let findings = match cell("finding") {
         "none" => "[]".to_owned(),
         severity => format!(r#"[{{"path":"a.rs","line":1,"severity":{severity:?},"body":"b"}}]"#),
@@ -347,9 +570,10 @@ pub fn gate_outcome(row: &BTreeMap<String, String>) -> &'static str {
         "check-runs.jsonl",
         format!(
             "{{\"name\":\"CI\",\"status\":\"completed\",\"conclusion\":{:?}}}\n\
-             {{\"name\":\"lint\",\"status\":\"completed\",\"conclusion\":{:?}}}\n",
+             {{\"name\":\"lint\",\"status\":\"completed\",\"conclusion\":{:?}}}\n{}",
             conclusion(cell("CI")),
-            conclusion(cell("other check"))
+            conclusion(cell("other check")),
+            own
         ),
     )]);
     if cell("verdict") != "missing" {
@@ -366,18 +590,14 @@ pub fn gate_outcome(row: &BTreeMap<String, String>) -> &'static str {
     } else {
         REVIEWED
     };
-    let args = vec![
-        "--outcome",
-        "outcome.json",
-        "--check-runs",
-        "check-runs.jsonl",
-        "--reviewed",
-        REVIEWED,
-        "--head",
-        head,
-        "--checked",
-        "checked.json",
-    ];
+    if let Some(body) = dispatched {
+        files.insert("dispatch.json", body.to_owned());
+    }
+    files.insert("consulted.json", consulted.to_owned());
+    if let Some(body) = report {
+        files.insert("reports/lang-rust.md", body.to_owned());
+    }
+    files.insert("answers.json", answers.to_owned());
     if let Some(body) = check {
         files.insert("checked.json", body);
     }
@@ -389,12 +609,7 @@ pub fn gate_outcome(row: &BTreeMap<String, String>) -> &'static str {
     };
     let (mut out, mut err) = (Vec::new(), Vec::new());
 
-    let code = review_gate::cli::run(
-        args.into_iter().map(str::to_owned),
-        &mut out,
-        &mut err,
-        &read,
-    );
+    let code = review_gate::cli::run(gate_args(REVIEWED, head), &mut out, &mut err, &read);
     match serde_json::from_slice::<review_gate::Review>(&out) {
         _ if code != review_gate::cli::EXIT_OK => "an error",
         _ if out.is_empty() => "nothing",

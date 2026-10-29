@@ -1,0 +1,14 @@
+component = "domain-model"
+kind = "clean"
+title = "a sentence in the model's own terms, in an SRS section"
+
+[[replace]]
+file = "docs/srs/02-context.md"
+old = "# 2. Context\n"
+new = "# 2. Context\n\nThis file is part of ParleyInn's specification and changes only through a reviewed pull request.\n"
+
+[expect]
+
+[[expect.none]]
+path = "docs/srs/02-context.md"
+severity = "blocking"

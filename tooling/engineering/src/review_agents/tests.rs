@@ -1,0 +1,272 @@
+use super::*;
+
+fn agent(name: &str, effort: &str, body: &str) -> (String, String) {
+    let generalist = generalist_of(name)
+        .map(|g| format!("generalist: {g}\n"))
+        .unwrap_or_default();
+    let tools = if generalist_of(name).is_some() {
+        "Read, Grep, Glob, Write"
+    } else {
+        "Read, Grep, Glob"
+    };
+    let deep = if DEEP_GENERALISTS.contains(&name) {
+        "model: opus\nmaxTurns: 40\n"
+    } else if generalist_of(name).is_some() {
+        "maxTurns: 20\n"
+    } else {
+        ""
+    };
+    (
+        format!("{AGENTS}/{name}.md"),
+        format!(
+            "---\nname: {name}\ndescription: d\ntools: {tools}\neffort: {effort}\n{deep}{generalist}---\n{body}\n"
+        ),
+    )
+}
+
+/// A checkout with one SRS section, one domain-model file and every
+/// agent the dispatch names for them.
+fn files() -> Vec<(String, String)> {
+    let mut files = vec![
+        ("docs/srs/index.md".to_owned(), "x".to_owned()),
+        ("docs/srs/06-security.md".to_owned(), "x".to_owned()),
+        ("docs/domain-model/index.md".to_owned(), "x".to_owned()),
+        ("docs/domain-model/record.md".to_owned(), "x".to_owned()),
+        agent("srs-security", "low", "Read docs/srs/06-security.md."),
+        agent(
+            "domain-model-record",
+            "low",
+            "Read docs/domain-model/record.md.",
+        ),
+    ];
+    files.extend(FIXED_SPECIALISTS.iter().map(|(n, _)| agent(n, "low", "x")));
+    files.extend(GENERALISTS.iter().map(|n| agent(n, "medium", "x")));
+    files.extend(DEEP_GENERALISTS.iter().map(|n| agent(n, "high", "x")));
+    files
+}
+
+fn problems(files: &[(String, String)]) -> Vec<String> {
+    let refs: Vec<(&str, &str)> = files
+        .iter()
+        .map(|(p, b)| (p.as_str(), b.as_str()))
+        .collect();
+    let (_d, c) = crate::tests::checkout(&refs);
+    every_dispatched_agent_is_defined(&c)
+}
+
+fn without(name: &str) -> Vec<(String, String)> {
+    files()
+        .into_iter()
+        .filter(|(p, _)| p != &format!("{AGENTS}/{name}.md"))
+        .collect()
+}
+
+fn replaced(name: &str, effort: &str, body: &str) -> Vec<(String, String)> {
+    let mut f = without(name);
+    f.push(agent(name, effort, body));
+    f
+}
+
+#[test]
+fn a_complete_set_has_no_problem() {
+    assert_eq!(problems(&files()), Vec::<String>::new());
+}
+
+#[test]
+fn a_missing_agent_is_named() {
+    for name in [
+        "srs-security",
+        "domain-model-record",
+        "lang-rust",
+        "review-code",
+        "review-code-deep",
+    ] {
+        assert_eq!(
+            problems(&without(name)),
+            [format!("no agent {name} at {AGENTS}/{name}.md")],
+            "{name}"
+        );
+    }
+}
+
+#[test]
+fn an_agent_at_the_wrong_effort_is_named() {
+    assert_eq!(
+        problems(&replaced("lang-rust", "medium", "x")),
+        ["lang-rust runs at effort medium, want low"]
+    );
+    assert_eq!(
+        problems(&replaced("review-spec", "low", "x")),
+        ["review-spec runs at effort low, want medium"]
+    );
+}
+
+#[test]
+fn an_agent_whose_name_is_not_its_file_is_named() {
+    let mut f = without("lang-toml");
+    f.push((
+        format!("{AGENTS}/lang-toml.md"),
+        "---\nname: lang-tom\ntools: Read, Grep, Glob, Write\neffort: low\n---\n".to_owned(),
+    ));
+
+    assert_eq!(problems(&f), ["lang-toml names itself lang-tom"]);
+}
+
+#[test]
+fn a_specialist_that_does_not_name_its_file_is_named() {
+    assert_eq!(
+        problems(&replaced("srs-security", "low", "Read the section.")),
+        ["srs-security does not name docs/srs/06-security.md"]
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn a_file_name_that_is_not_utf8_is_named() {
+    use std::os::unix::ffi::OsStrExt;
+    let f = files();
+    let refs: Vec<(&str, &str)> = f.iter().map(|(p, b)| (p.as_str(), b.as_str())).collect();
+    let (_d, c) = crate::tests::checkout(&refs);
+    std::fs::write(
+        c.root
+            .join("docs/srs")
+            .join(std::ffi::OsStr::from_bytes(b"\xff.md")),
+        "",
+    )
+    .unwrap();
+
+    assert_eq!(
+        every_dispatched_agent_is_defined(&c),
+        ["docs/srs/\u{fffd}.md is not UTF-8"]
+    );
+}
+
+#[test]
+fn a_directory_that_cannot_be_read_is_named() {
+    let f: Vec<(String, String)> = files()
+        .into_iter()
+        .filter(|(p, _)| !p.starts_with("docs/"))
+        .collect();
+
+    let got = problems(&f);
+
+    assert_eq!(got.len(), 2, "{got:?}");
+    assert!(got[0].starts_with("read docs/srs: "), "{got:?}");
+    assert!(got[1].starts_with("read docs/domain-model: "), "{got:?}");
+}
+
+#[test]
+fn the_front_matter_reads_quoted_values_and_only_its_own_block() {
+    let mut f = without("lang-toml");
+    f.push((
+        format!("{AGENTS}/lang-toml.md"),
+        "---\nname: \"lang-toml\"\ntools: Read, Grep, Glob, Write\neffort: 'low'\nmaxTurns: '20'\ngeneralist: \"review-code\"\n---\nname: other\n"
+            .to_owned(),
+    ));
+    assert_eq!(problems(&f), Vec::<String>::new());
+
+    let mut f = without("lang-toml");
+    f.push((
+        format!("{AGENTS}/lang-toml.md"),
+        "name: lang-toml\n".to_owned(),
+    ));
+    assert_eq!(
+        problems(&f),
+        ["lang-toml's front matter does not read: no front matter"]
+    );
+}
+
+#[test]
+fn a_specialist_that_names_the_wrong_generalist_is_named() {
+    let mut f = without("lang-rust");
+    f.push((
+        format!("{AGENTS}/lang-rust.md"),
+        "---\nname: lang-rust\ntools: Read, Grep, Glob, Write\neffort: low\nmaxTurns: 20\ngeneralist: review-spec\n---\n".to_owned(),
+    ));
+    assert_eq!(
+        problems(&f),
+        ["lang-rust names generalist review-spec, want review-code"]
+    );
+
+    let mut f = without("srs-security");
+    f.push((
+        format!("{AGENTS}/srs-security.md"),
+        "---\nname: srs-security\ntools: Read, Grep, Glob, Write\neffort: low\nmaxTurns: 20\n---\ndocs/srs/06-security.md\n".to_owned(),
+    ));
+    assert_eq!(
+        problems(&f),
+        ["srs-security names no generalist, want review-spec"]
+    );
+}
+
+#[test]
+fn a_deep_generalist_on_another_model_or_turn_budget_is_named() {
+    let deep = |front: &str| {
+        let mut f = without("review-spec-deep");
+        f.push((
+            format!("{AGENTS}/review-spec-deep.md"),
+            format!(
+                "---\nname: review-spec-deep\ntools: Read, Grep, Glob\neffort: high\n{front}---\n"
+            ),
+        ));
+        problems(&f)
+    };
+
+    assert_eq!(
+        deep("model: sonnet\nmaxTurns: 40\n"),
+        ["review-spec-deep runs on model sonnet, want opus"]
+    );
+    assert_eq!(
+        deep("model: opus\n"),
+        ["review-spec-deep names no maxTurns, want 40"]
+    );
+    assert_eq!(
+        problems(&replaced("review-spec-deep", "medium", "x")),
+        ["review-spec-deep runs at effort medium, want high"]
+    );
+}
+
+#[test]
+fn a_specialist_without_its_turn_cap_is_named() {
+    let capped = |front: &str| {
+        let mut f = without("lang-shell");
+        f.push((
+            format!("{AGENTS}/lang-shell.md"),
+            format!(
+                "---\nname: lang-shell\ntools: Read, Grep, Glob, Write\neffort: low\n{front}generalist: review-code\n---\n"
+            ),
+        ));
+        problems(&f)
+    };
+
+    assert_eq!(capped("maxTurns: 20\n"), Vec::<String>::new());
+    assert_eq!(
+        capped("maxTurns: 60\n"),
+        ["lang-shell runs for maxTurns 60, want 20"]
+    );
+    assert_eq!(capped(""), ["lang-shell names no maxTurns, want 20"]);
+}
+
+#[test]
+fn a_specialist_that_cannot_write_its_report_or_a_generalist_that_can_is_named() {
+    let mut f = without("lang-shell");
+    f.push((
+        format!("{AGENTS}/lang-shell.md"),
+        "---\nname: lang-shell\ntools: Read, Grep, Glob\neffort: low\ngeneralist: review-code\n---\n"
+            .to_owned(),
+    ));
+    assert_eq!(
+        problems(&f),
+        ["lang-shell has tools Read, Grep, Glob, want Read, Grep, Glob, Write"]
+    );
+
+    let mut f = without("review-code");
+    f.push((
+        format!("{AGENTS}/review-code.md"),
+        "---\nname: review-code\ntools: Read, Grep, Glob, Write\neffort: medium\n---\n".to_owned(),
+    ));
+    assert_eq!(
+        problems(&f),
+        ["review-code has tools Read, Grep, Glob, Write, want Read, Grep, Glob"]
+    );
+}

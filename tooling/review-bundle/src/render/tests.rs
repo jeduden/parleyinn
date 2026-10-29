@@ -38,6 +38,11 @@ fn base() -> Snapshot {
             req("REC-01", "Ingest.", &["I1"]),
             req("REC-02", "Link.", &[]),
             req("NFR-01", "Fast.", &[]),
+            req(
+                "ENG-11",
+                "Coverage for security-sensitive crates (`pin`).",
+                &[],
+            ),
         ],
         scenarios: vec![
             sc("REC-01", false, &["a step"]),
@@ -72,6 +77,18 @@ fn bundle_says_what_it_is_and_quotes_the_invariants() {
         "{got}"
     );
     assert!(
+        got.contains("## Agents to consult\n\nThe orchestrator calls each specialist below"),
+        "{got}"
+    );
+    assert!(
+        got.contains("- `review-spec`, weighing `lang-markdown`\n"),
+        "{got}"
+    );
+    assert!(
+        got.contains("its own diff, `diffs/<its name>.diff` beside this bundle"),
+        "{got}"
+    );
+    assert!(
         got.contains(
             "@pending on main: 2; in this pull request: 2.\n\nTaken off @pending here: none.\n"
         ),
@@ -85,6 +102,18 @@ fn bundle_says_what_it_is_and_quotes_the_invariants() {
     );
     assert!(
         got.ends_with("## Invariants, as main holds them\n\nI1 — Nothing is lost.\n"),
+        "{got}"
+    );
+}
+
+#[test]
+fn bundle_says_when_no_agent_is_dispatched() {
+    let a = analyse(&base(), &base(), "diff --git a/LICENSE b/LICENSE\n", false);
+
+    let got = bundle(&a, &base(), &base());
+
+    assert!(
+        got.contains("## Agents to consult\n\nNone: no specialist reads these paths.\n"),
         "{got}"
     );
 }

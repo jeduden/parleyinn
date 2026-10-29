@@ -1,0 +1,31 @@
+component = "review-spec"
+kind = "clean"
+title = "a specialist's finding the diff contradicts, dropped"
+
+[[replace]]
+file = "features/engineering.feature"
+old = "Feature: Engineering quality (ENG)\n"
+new = "# The engineering scenarios, one per ENG row of the SRS.\nFeature: Engineering quality (ENG)\n"
+
+[[report]]
+agent = "lang-gherkin"
+content = '''
+features/engineering.feature:1 — blocking — the ENG-24 scenario is retagged — ENG-24
+
+outcome: blocking — a retagged scenario
+'''
+
+[[report]]
+agent = "domain-model-hub"
+content = '''
+outcome: sound — no concept touched
+'''
+
+[expect]
+
+[[expect.none]]
+path = "features/engineering.feature"
+
+[[expect.dropped]]
+path = "features/engineering.feature"
+mentions = ["ENG-24"]

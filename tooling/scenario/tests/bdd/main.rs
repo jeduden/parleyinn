@@ -26,6 +26,7 @@ mod engineering_boundary;
 mod engineering_contract;
 mod engineering_coverage;
 mod engineering_drift;
+mod engineering_evaluation;
 mod engineering_fuzz;
 mod engineering_isolation;
 mod engineering_licenses;

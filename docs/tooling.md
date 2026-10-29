@@ -90,11 +90,13 @@ wrap: toml
 ```toml
 # ENG-01: the exact Rust release the workspace builds with. rustup
 # reads this file, so every cargo command in the checkout runs on it.
-# mise and CI read the version and components from this file.
+# mise and CI read the version and components from this file;
+# rust-analyzer serves the rust-analyzer-lsp plugin .claude/settings.json
+# enables.
 [toolchain]
 channel = "1.99.0"
 profile = "minimal"
-components = ["clippy", "rustfmt", "llvm-tools-preview"]
+components = ["clippy", "rustfmt", "llvm-tools-preview", "rust-analyzer"]
 ```
 
 <?/include?>

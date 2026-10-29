@@ -1,0 +1,38 @@
+component = "review-code"
+kind = "other"
+title = "an unwrap every specialist missed"
+
+[[create]]
+file = "tooling/review-bundle/src/rogue.rs"
+content = '''
+//! The first byte of a payload.
+
+/// The first byte of `payload`.
+#[must_use]
+pub fn first(payload: &[u8]) -> u8 {
+    *payload.first().unwrap()
+}
+'''
+
+[[replace]]
+file = "tooling/review-bundle/src/lib.rs"
+old = "pub mod render;\n"
+new = "pub mod render;\npub mod rogue;\n"
+
+[[report]]
+agent = "lang-rust"
+content = '''
+outcome: sound — a small helper
+'''
+
+[[report]]
+agent = "test-engineer-unit"
+content = '''
+outcome: sound — a small helper
+'''
+
+[expect]
+
+[[expect.finding]]
+path = "tooling/review-bundle/src/rogue.rs"
+mentions = ["unwrap"]

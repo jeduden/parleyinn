@@ -1,0 +1,70 @@
+component = "review-security"
+kind = "clean"
+title = "the officer's finding the diff contradicts, dropped"
+
+[[create]]
+file = "crates/redaction/src/count.rs"
+content = '''
+//! How many markers a redacted text carries.
+
+/// How many redaction markers `text` holds.
+#[must_use]
+pub fn markers(text: &str) -> usize {
+    text.matches("[REDACTED").count()
+}
+
+#[cfg(test)]
+mod tests;
+'''
+
+[[create]]
+file = "crates/redaction/src/count/tests.rs"
+content = '''
+use super::*;
+
+#[test]
+fn counts_each_marker() {
+    assert_eq!(markers("a [REDACTED:key] b [REDACTED:token]"), 2);
+    assert_eq!(markers("nothing"), 0);
+}
+'''
+
+[[replace]]
+file = "crates/redaction/src/lib.rs"
+old = "pub mod account;\n"
+new = "pub mod account;\npub mod count;\n"
+
+[[report]]
+agent = "persona-security-officer"
+content = '''
+crates/redaction/src/count.rs:5 — blocking — opens a socket to a metrics host — I4
+
+outcome: blocking — a socket in the core
+'''
+
+[[report]]
+agent = "lang-rust"
+content = '''
+outcome: sound — a reporting helper
+'''
+
+[[report]]
+agent = "test-engineer-unit"
+content = '''
+outcome: sound — no test yet
+'''
+
+[[report]]
+agent = "performance"
+content = '''
+outcome: sound — off the hot path
+'''
+
+[expect]
+
+[[expect.none]]
+path = "crates/redaction/src/count.rs"
+
+[[expect.dropped]]
+path = "crates/redaction/src/count.rs"
+mentions_any = ["socket", "I4"]

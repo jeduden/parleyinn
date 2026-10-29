@@ -28,7 +28,7 @@ pub const PHRASES: [&str; 8] = [
 /// The documentation the statements are read in: these files and the
 /// Markdown files directly in these directories.
 const FILES: [&str; 1] = ["SECURITY.md"];
-const DIRECTORIES: [&str; 4] = ["docs", "docs/security", "docs/testing", "docs/personas"];
+const DIRECTORIES: [&str; 4] = ["docs", "docs/security", "docs/testing", "docs/agents"];
 
 /// One statement and the tests it cites.
 #[derive(Debug, Clone, PartialEq, Eq)]

@@ -1,0 +1,16 @@
+component = "lang-json"
+kind = "defect"
+title = "an actor allowed to bypass main's ruleset"
+
+[[replace]]
+file = ".github/rulesets/main.json"
+old = "\"bypass_actors\": [],"
+new = "\"bypass_actors\": [{ \"actor_id\": 5, \"actor_type\": \"RepositoryRole\", \"bypass_mode\": \"always\" }],"
+
+[expect]
+outcome = ["blocking"]
+
+[[expect.finding]]
+path = ".github/rulesets/main.json"
+severity = "blocking"
+mentions_any = ["bypass"]

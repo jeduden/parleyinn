@@ -6,7 +6,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 
-use crate::{BLOCKING, Finding, NIT, Snapshot, diff, owners};
+use crate::{BLOCKING, Finding, NIT, Snapshot, diff, dispatch, owners};
 
 /// The invariants file ENG-29 guards.
 pub const INVARIANTS: &str = "docs/srs/invariants.md";
@@ -21,6 +21,14 @@ const ADR_DIR: &str = "docs/adr/";
 /// Markdown under these directories is read as more than prose: the
 /// domain model, the plans and the scenarios.
 const NOT_LIGHT: [&str; 3] = ["docs/domain-model/", "plan/", "features/"];
+
+/// The code no stakeholder path holds that still reviews deep: the
+/// gates. Each crate's reach test and the security-sensitive crates the
+/// ENG-11 row names join it.
+const DEEP_CODE: [&str; 1] = ["tooling/"];
+
+/// The requirement whose text names the security-sensitive crates.
+const ENG_11: &str = "ENG-11";
 
 /// What an added line that lifts a ban weighs.
 const LIFTS_A_BAN: &str = "lifts a reach or determinism ban: weigh its reason";
@@ -50,9 +58,10 @@ pub enum Class {
     /// Anything else no stakeholder path holds: product code, scenarios,
     /// plans, or a diff that names no path.
     Standard,
-    /// A path CODEOWNERS assigns: the SRS, its gates, CI, the agent
-    /// instructions, the security-sensitive crates; or a diff header
-    /// whose paths do not read, so the class fails closed.
+    /// A path CODEOWNERS assigns: the SRS, the scenarios, CI, the agent
+    /// instructions; code that gates the build or is security-sensitive;
+    /// or a diff header whose paths do not read, so the class fails
+    /// closed.
     Deep,
 }
 
@@ -102,6 +111,10 @@ pub struct Analysis {
     /// The record that satisfies ENG-29, when a guarded change has one
     /// and the stakeholder consented.
     pub eng_29_record: Option<Record>,
+    /// The agents the review's orchestrator consults (ENG-28).
+    pub dispatch: dispatch::Dispatch,
+    /// Each specialist with the changed files it reads.
+    pub scopes: dispatch::Scopes,
 }
 
 /// Compares `base`, main's tree, with `head`, the pull request's, whose
@@ -131,10 +144,40 @@ pub fn analyse(base: &Snapshot, head: &Snapshot, diff: &str, consent: bool) -> A
     findings.extend(guard);
     findings.extend(unparsed.iter().map(|h| nit(h, UNPARSED)));
     findings.extend(lifted_bans(diff));
+    let crates = security_crates(base);
+    if crates.is_none() {
+        let path = row_path(base, ENG_11).unwrap_or_else(|| "docs/srs".to_owned());
+        findings.push(nit(&path, NO_SECURITY_CRATES));
+    }
     findings.sort();
 
+    // Without the list, every crate counts as security-sensitive, so the
+    // class and the dispatch fail closed.
+    let crates = crates.unwrap_or_else(|| vec![dispatch::EVERY_CRATE.to_owned()]);
+    let deep = paths.iter().any(|p| deep_code(&crates, p));
+    // The rows that bring their section's specialist: those the change
+    // edits, and those code names; a row Markdown only quotes is in the
+    // bundle but brings no one.
+    let named: BTreeSet<String> = requirements
+        .keys()
+        .chain(scenarios.keys())
+        .cloned()
+        .chain(diff::ids_in_code(diff))
+        .collect();
+    let rows: Vec<&srs::Requirement> = touched
+        .iter()
+        .filter(|id| named.contains(*id))
+        .filter_map(|id| requirement(head, id).or_else(|| requirement(base, id)))
+        .collect();
+    let class = classify(&paths, deep || !owned.is_empty(), &unparsed);
+    let scopes = dispatch::scopes(&paths, &rows, &crates, &diff::ids_by_file(diff));
+    let dispatch = match class {
+        Class::Deep => dispatch::deepened(dispatch::grouped(&scopes)),
+        Class::Light | Class::Standard => dispatch::grouped(&scopes),
+    };
+
     Analysis {
-        class: classify(&paths, &owned, &unparsed),
+        class,
         owned,
         paths,
         unparsed,
@@ -143,11 +186,18 @@ pub fn analyse(base: &Snapshot, head: &Snapshot, diff: &str, consent: bool) -> A
         touched: touched.into_iter().collect(),
         findings,
         eng_29_record,
+        dispatch,
+        scopes,
     }
 }
 
 /// What an unparsed diff header weighs.
 const UNPARSED: &str = "the paths this diff header names do not read, so the review class is deep";
+
+/// What main's ENG-11 row weighs when it names no security-sensitive
+/// crate list the analysis can read.
+const NO_SECURITY_CRATES: &str =
+    "the ENG-11 row names no security-sensitive crates, so every crate reviews deep";
 
 /// A nit at `path` as a whole.
 fn nit(path: &str, body: &str) -> Finding {
@@ -169,12 +219,42 @@ fn lifted_bans(diff: &str) -> BTreeSet<Finding> {
         .collect()
 }
 
-/// The review class: deep when a stakeholder path changed or a header
-/// does not read, light when only prose Markdown did, standard
-/// otherwise.
-fn classify(paths: &[String], owned: &[String], unparsed: &[String]) -> Class {
+/// The row `id` of `snapshot`, when it defines one.
+fn requirement<'a>(snapshot: &'a Snapshot, id: &str) -> Option<&'a srs::Requirement> {
+    snapshot.requirements.iter().find(|r| r.id == id)
+}
+
+/// The security-sensitive crates the ENG-11 row of `snapshot` names;
+/// `None` when it names no list or an empty one, so the caller fails
+/// closed rather than treat no crate as security-sensitive.
+fn security_crates(snapshot: &Snapshot) -> Option<Vec<String>> {
+    snapshot
+        .requirements
+        .iter()
+        .find(|r| r.id == ENG_11)
+        .and_then(|r| r.text.split_once("security-sensitive crates ("))
+        .and_then(|(_, after)| after.split_once(')'))
+        .map(|(list, _)| {
+            list.split(',')
+                .map(|c| c.trim().trim_matches('`').to_owned())
+                .filter(|c| !c.is_empty())
+                .collect::<Vec<_>>()
+        })
+        .filter(|crates| !crates.is_empty())
+}
+
+/// Whether `path` is code that reviews deep though no stakeholder path
+/// holds it: a gate, a reach test, or a security-sensitive crate.
+fn deep_code(crates: &[String], path: &str) -> bool {
+    DEEP_CODE.iter().any(|d| path.starts_with(d)) || dispatch::security_code(path, crates)
+}
+
+/// The review class: deep when `deep` says a stakeholder path or deep
+/// code changed, or a header does not read; light when only prose
+/// Markdown did; standard otherwise.
+fn classify(paths: &[String], deep: bool, unparsed: &[String]) -> Class {
     let light = |p: &String| p.ends_with(".md") && !NOT_LIGHT.iter().any(|d| p.starts_with(d));
-    if !owned.is_empty() || !unparsed.is_empty() {
+    if deep || !unparsed.is_empty() {
         Class::Deep
     } else if !paths.is_empty() && paths.iter().all(light) {
         Class::Light

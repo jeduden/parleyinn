@@ -1,0 +1,58 @@
+component = "persona-multi-machine-developer"
+kind = "clean"
+title = "a plan that serves the multi-machine developer: peers by key, merge by union"
+
+[[create]]
+file = "plan/2610301008_peers_by_key.md"
+content = '''
+---
+id: 2610301008
+title: "Peers by key, merge by union"
+status: "🔲"
+summary: >-
+  Pair nodes by key over direct, mutually authenticated connections, keep every side's writer log through a partition, and merge by the union of logs.
+model: sonnet
+depends-on: []
+---
+# Peers by key, merge by union
+
+## Goal
+
+A developer enrolls a node as a peer by its key (B2), from either side, including from a sandbox that can only dial out, since the sandbox dials the laptop's listener. Each node keeps writing its own writer log while the network is split; when it returns, each node fetches the other's logs and every derived view is rebuilt from the union (I10), with no event lost or duplicated, since every event has its (writer, seq) address. A sandbox streams each event of its writer log to an enrolled peer as it is written, while one is reachable, and shows per peer the (writer, seq) that peer has acknowledged, so a sandbox reaped without warning leaves the record complete up to the last acknowledged event and nothing waits for a final push (I1).
+
+## Context
+
+No vendor relay, no account and no central service sits in the path (I4). A partition is normal operation for a developer on a train.
+
+## Tasks
+
+1. Enroll a peer by key from either side.
+2. Keep writing through a partition; merge by union on return.
+3. Replicate each event to a peer as it is written; show per peer how far it has caught up.
+
+## Acceptance Criteria
+
+- A sandbox that can only dial out enrolls a laptop as a peer by key and syncs with it.
+- Two nodes that wrote through a partition hold the union of both writer logs afterwards, with every (writer, seq) once.
+- A sandbox deleted without warning loses no event a peer acknowledged, and the laptop shows the last (writer, seq) it holds from it.
+
+## Requirements
+
+The plan holds to PEER-06, SEC-25 and OWN-22, under I1, I4 and I10. Phase 1 names
+the rows it changes and the `@pending` scenarios it takes off.
+
+## Phases
+
+1. Specification: the requirement rows and the `@pending` scenarios that
+   carry each task above, reviewed by the domain-model agent; this plan
+   then names the ids each phase closes.
+2. Implementation: each scenario off `@pending`, red then green, one
+   phase per task.
+'''
+
+[expect]
+
+[[expect.none]]
+path = "plan/2610301008_peers_by_key.md"
+severity = "blocking"
+mentions_any = ["relay", "central service", "vendor", "account"]

@@ -1,0 +1,58 @@
+component = "persona-agent"
+kind = "defect"
+title = "a plan that fails the agent: restore blocks within budget"
+
+[[create]]
+file = "plan/2610301001_restore_summaries.md"
+content = '''
+---
+id: 2610301001
+title: "Restore blocks within budget"
+status: "🔲"
+summary: >-
+  Keep every restore block inside its token budget by summarising the pins that do not fit and widening recall to the events around each match.
+model: sonnet
+depends-on: []
+---
+# Restore blocks within budget
+
+## Goal
+
+A restore block never exceeds its budget. When the active pins would, the kernel worker writes a one-paragraph summary of the pins that do not fit and restores that summary in their place. The `recall` tool returns the twenty events before and after each match, so an agent never has to call it twice.
+
+## Context
+
+Long runs pin more than the budget holds. Today the block names each pin it leaves out by id and count, which agents then recall one by one. A summary saves those calls, and a wider recall window saves the follow-up calls after a match.
+
+## Tasks
+
+1. Summarise the pins that exceed the budget in the restore block.
+2. Return twenty events around each `recall` match.
+3. Drop the id-and-count line for omitted pins.
+
+## Acceptance Criteria
+
+- A restore block never exceeds its budget, measured on the longest pinned run in the fixtures.
+- A pin that does not fit appears in the block only as the summary's text.
+- `recall` returns twenty events around each match in one call.
+
+## Requirements
+
+The plan holds to INJ-01, INJ-05, INJ-07 and RCL-01, under I2 and I3. Phase 1 names
+the rows it changes and the `@pending` scenarios it takes off.
+
+## Phases
+
+1. Specification: the requirement rows and the `@pending` scenarios that
+   carry each task above, reviewed by the domain-model agent; this plan
+   then names the ids each phase closes.
+2. Implementation: each scenario off `@pending`, red then green, one
+   phase per task.
+'''
+
+[expect]
+
+[[expect.finding]]
+path = "plan/2610301001_restore_summaries.md"
+severity = "blocking"
+mentions_any = ["summar", "verbatim", "word for word", "I3", "too much"]

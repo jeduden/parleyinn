@@ -1,0 +1,58 @@
+component = "persona-multi-machine-developer"
+kind = "defect"
+title = "a plan that fails the multi-machine developer: room sync through a relay"
+
+[[create]]
+file = "plan/2610301007_relay_sync.md"
+content = '''
+---
+id: 2610301007
+title: "Room sync through a relay"
+status: "🔲"
+summary: >-
+  Sync rooms between machines through a hosted relay, with an account per developer, and drop queued events a node could not deliver within a day.
+model: sonnet
+depends-on: []
+---
+# Room sync through a relay
+
+## Goal
+
+Every node sends its events to a hosted relay at relay.parleyinn.dev and reads other nodes' events from it. A developer signs in to the relay with an account; peers are the nodes under the same account. A node that cannot reach the relay queues its events and drops the queue after 24 hours, so an offline laptop never fills its disk.
+
+## Context
+
+Direct connections between a laptop, a home server and a cloud sandbox are hard to set up. A relay every node can dial out to removes the network setup.
+
+## Tasks
+
+1. Send and receive events through the relay.
+2. Sign nodes in with an account.
+3. Drop the undelivered queue after 24 hours.
+
+## Acceptance Criteria
+
+- Every event reaches other nodes through the relay only.
+- A node signs in with an account before it syncs.
+- An undelivered queue older than 24 hours is deleted.
+
+## Requirements
+
+The plan holds to PEER-06, SEC-25 and OWN-22, under I1, I4 and I10. Phase 1 names
+the rows it changes and the `@pending` scenarios it takes off.
+
+## Phases
+
+1. Specification: the requirement rows and the `@pending` scenarios that
+   carry each task above, reviewed by the domain-model agent; this plan
+   then names the ids each phase closes.
+2. Implementation: each scenario off `@pending`, red then green, one
+   phase per task.
+'''
+
+[expect]
+
+[[expect.finding]]
+path = "plan/2610301007_relay_sync.md"
+severity = "blocking"
+mentions_any = ["relay", "central", "account", "vendor", "drop", "lose", "loses", "lost", "I4", "B2", "partition"]

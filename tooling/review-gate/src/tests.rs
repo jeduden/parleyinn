@@ -42,7 +42,14 @@ fn input(outcome: ReviewOutcome, check_runs: Vec<CheckRun>) -> Input {
         head: REVIEWED.into(),
         check_runs,
         checked: vec![],
+        dispatched: BTreeSet::new(),
+        consulted: BTreeSet::new(),
+        ..Input::default()
     }
+}
+
+fn set(names: &[&str]) -> BTreeSet<String> {
+    names.iter().map(|n| (*n).to_owned()).collect()
 }
 
 fn finding(path: &str, line: i64, severity: &str, body: &str) -> Finding {
@@ -172,6 +179,70 @@ fn parse_check_runs_refuses_a_line_that_is_no_check_run() {
         "{err}"
     );
     assert!(std::error::Error::source(&err).is_some());
+}
+
+#[test]
+fn parse_dispatch_lists_every_generalist_and_specialist() {
+    let got =
+        parse_dispatch(r#"{"review-code":["lang-rust","test-engineer-unit"],"review-spec":[]}"#)
+            .unwrap();
+
+    assert_eq!(
+        got,
+        set(&[
+            "lang-rust",
+            "review-code",
+            "review-spec",
+            "test-engineer-unit"
+        ])
+    );
+    for bad in ["[]", r#"{"review-code":"lang-rust"}"#, "nope"] {
+        let err = parse_dispatch(bad).unwrap_err();
+        assert!(
+            err.to_string().starts_with("review: malformed dispatch: "),
+            "{err}"
+        );
+        assert!(std::error::Error::source(&err).is_some(), "{bad}");
+    }
+}
+
+#[test]
+fn parse_consulted_reads_the_agents_the_orchestrator_called() {
+    assert_eq!(
+        parse_consulted(r#"["lang-rust","review-code","lang-rust"]"#).unwrap(),
+        set(&["lang-rust", "review-code"])
+    );
+    for (bad, has_cause) in [("{}", true), ("[1]", true), (r#"[""]"#, false)] {
+        let err = parse_consulted(bad).unwrap_err();
+        assert!(
+            err.to_string()
+                .starts_with("review: malformed consulted agents: "),
+            "{err}"
+        );
+        assert_eq!(
+            std::error::Error::source(&err).is_some(),
+            has_cause,
+            "{bad}"
+        );
+    }
+}
+
+#[test]
+fn decide_refuses_a_review_that_left_a_dispatched_agent_out() {
+    let mut i = input(approve(), green());
+    i.dispatched = set(&["lang-rust", "review-code", "srs-security"]);
+    i.consulted = set(&["review-code", "lang-toml"]);
+
+    let err = decide(&i).unwrap_err();
+
+    assert_eq!(
+        err.to_string(),
+        "review: the orchestrator did not consult lang-rust, srs-security"
+    );
+    assert!(std::error::Error::source(&err).is_none());
+
+    i.consulted = set(&["lang-rust", "review-code", "srs-security", "extra"]);
+    assert_eq!(decide(&i).unwrap().unwrap().event, APPROVE);
 }
 
 #[test]
@@ -787,4 +858,163 @@ fn code_spans_stay_on_one_line() {
 
     assert!(got.contains("- nit `a ### b`: c"), "{got}");
     assert!(got.contains("- check `lint ### x`: failure"), "{got}");
+}
+
+#[test]
+fn the_gate_s_own_earlier_check_does_not_hold_back_an_approval() {
+    let mut runs = green();
+    runs.push(CheckRun {
+        app: REVIEWER_APP_ID,
+        ..run(OWN_CHECK, "completed", "failure")
+    });
+
+    let r = decide(&input(approve(), runs)).unwrap().unwrap();
+
+    assert_eq!(r.event, APPROVE);
+}
+
+#[test]
+fn a_check_of_the_gate_s_name_from_another_app_still_counts() {
+    let mut runs = green();
+    runs.push(CheckRun {
+        app: 15_368,
+        ..run(OWN_CHECK, "completed", "failure")
+    });
+
+    let r = decide(&input(approve(), runs)).unwrap().unwrap();
+
+    assert_eq!(r.event, REQUEST_CHANGES);
+}
+
+#[test]
+fn a_check_run_reads_its_app() {
+    let runs = parse_check_runs(
+        r#"{"name":"review-gate","status":"completed","conclusion":"failure","app":5140085}
+{"name":"CI","status":"completed","conclusion":"success","app":null}"#,
+    )
+    .unwrap();
+
+    assert_eq!(runs[0].app, REVIEWER_APP_ID);
+    assert_eq!(runs[1].app, 0);
+}
+
+fn reported(answer: &str, report: Option<&str>) -> Input {
+    let mut i = input(approve(), green());
+    i.specialists = ["lang-rust".to_owned()].into();
+    if let Some(r) = report {
+        i.reports = [("lang-rust".to_owned(), r.to_owned())].into();
+    }
+    i.answers = [("lang-rust".to_owned(), answer.to_owned())].into();
+    i
+}
+
+#[test]
+fn a_specialist_s_report_must_end_with_the_outcome_it_answered() {
+    let report = "a.rs:1 — nit — x\n\noutcome: nits — one sentence.";
+    for answer in [
+        "outcome: nits — one sentence.\nreport: review/reports/lang-rust.md",
+        "agentId: z\n  outcome: nits — one sentence.  \n",
+    ] {
+        let r = decide(&reported(answer, Some(&format!("{report}\n\n"))));
+        assert_eq!(r.unwrap().unwrap().event, APPROVE, "{answer}");
+    }
+    let reworded = "a.rs:1 — nit — x, said otherwise\noutcome: nits — one sentence.";
+    let r = decide(&reported("outcome: nits — one sentence.", Some(reworded)));
+    assert_eq!(r.unwrap().unwrap().event, APPROVE);
+
+    for (answer, file, want) in [
+        (report, None, "review: lang-rust wrote no report"),
+        (
+            report,
+            Some("  \n"),
+            "review: lang-rust wrote an empty report",
+        ),
+        (
+            "a.rs:1 — nit — x",
+            Some("a.rs:1 — nit — x"),
+            "review: lang-rust has a report that does not end with its outcome",
+        ),
+        (
+            "outcome: maybe — x",
+            Some("outcome: maybe — x"),
+            "review: lang-rust has a report that does not end with its outcome",
+        ),
+        (
+            "outcome: blocking — one sentence.",
+            Some(report),
+            "review: lang-rust has a report whose outcome differs from its answer in the run log",
+        ),
+        (
+            "the outcome: nits — one sentence. was it",
+            Some(report),
+            "review: lang-rust has a report whose outcome differs from its answer in the run log",
+        ),
+    ] {
+        let err = decide(&reported(answer, file)).unwrap_err();
+        assert_eq!(err.to_string(), want);
+        assert!(std::error::Error::source(&err).is_none());
+    }
+    let mut no_answer = reported(report, Some(report));
+    no_answer.answers.clear();
+    assert!(matches!(
+        decide(&no_answer),
+        Err(Error::Report {
+            problem: "has a report whose outcome differs from its answer in the run log",
+            ..
+        })
+    ));
+}
+
+#[test]
+fn an_outcome_line_names_sound_nits_or_blocking_in_any_case_and_markup() {
+    for (text, want) in [
+        ("x\noutcome: sound — y\n\n", Some("outcome: sound — y")),
+        ("Outcome: **blocking**. y", Some("Outcome: **blocking**. y")),
+        ("outcome: `nits`", Some("outcome: `nits`")),
+        ("outcome: sound — y\nmore", None),
+        ("outcome: soundly", None),
+        ("outcome:", None),
+        ("", None),
+    ] {
+        assert_eq!(outcome_line(text), want, "{text:?}");
+    }
+}
+
+#[test]
+fn parse_specialists_reads_the_dispatch_s_lists_and_refuses_a_path() {
+    assert_eq!(
+        parse_specialists(r#"{"review-code":["lang-rust","test-engineer-unit"],"review-spec":[]}"#)
+            .unwrap(),
+        ["lang-rust".to_owned(), "test-engineer-unit".to_owned()].into()
+    );
+    for bad in [
+        r#"{"review-code":["../x"]}"#,
+        r#"{"review-code":[""]}"#,
+        r#"{"review-code":["A"]}"#,
+    ] {
+        let err = parse_specialists(bad).unwrap_err();
+        assert!(
+            err.to_string()
+                .starts_with("review: malformed dispatch: agent name"),
+            "{err}"
+        );
+        assert!(std::error::Error::source(&err).is_none());
+    }
+    let err = parse_specialists("nope").unwrap_err();
+    assert!(err.to_string().starts_with("review: malformed dispatch: "));
+    assert!(std::error::Error::source(&err).is_some());
+}
+
+#[test]
+fn parse_answers_reads_a_map_of_name_to_text() {
+    assert_eq!(
+        parse_answers(r#"{"lang-rust":"r"}"#).unwrap(),
+        [("lang-rust".to_owned(), "r".to_owned())].into()
+    );
+    let err = parse_answers("[]").unwrap_err();
+    assert!(
+        err.to_string()
+            .starts_with("review: malformed agents' answers: ")
+    );
+    assert!(std::error::Error::source(&err).is_some());
 }

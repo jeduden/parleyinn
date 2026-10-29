@@ -9,8 +9,9 @@ summary: >-
 # Testing
 
 Every behaviour is proven at the lowest test layer that can prove it.
-[CLAUDE.md](../CLAUDE.md) states the rules; this page is how they are
-kept. Build and CI commands are in [development.md](development.md).
+[CLAUDE.md](../CLAUDE.md) states the rules and this page keeps them. Build
+and CI commands are in [development.md](development.md); the review's
+agents' own tests are in [review-evaluation.md](review-evaluation.md).
 
 ## The test pyramid
 
@@ -106,8 +107,7 @@ The runner reads features with the same gherkin parser as the gate.
 That parser is stricter than godog's in two places. A description line
 that opens with a Gherkin keyword, such as "Scenarios", reads as that
 keyword. And `<name>` in a Scenario Outline must name an Examples
-column, so a literal placeholder is written another way, such as
-`{id}`.
+column, so a literal placeholder is written as `{id}`.
 
 ## Proving the checks: drift injection
 

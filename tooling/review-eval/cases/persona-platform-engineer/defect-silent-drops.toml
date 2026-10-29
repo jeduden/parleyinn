@@ -1,0 +1,58 @@
+component = "persona-platform-engineer"
+kind = "defect"
+title = "a plan that fails the platform engineer: a shared data directory with lean logging"
+
+[[create]]
+file = "plan/2610301011_silent_drops.md"
+content = '''
+---
+id: 2610301011
+title: "A shared data directory with lean logging"
+status: "🔲"
+summary: >-
+  Serve every user on a runner from one data directory, drop events silently when the worker's queue is full, and keep the hooks registered by rewriting the managed settings on each run.
+model: sonnet
+depends-on: []
+---
+# A shared data directory with lean logging
+
+## Goal
+
+On a runner, one data directory under /var/lib/parinn serves every user, which saves disk and makes backups one job. When the kernel worker's queue is full, the hook drops the event and moves on, without counting it, so the agent is never slowed. On each hook run, ParleyInn rewrites the managed settings file to keep its hooks registered, so an upgrade of the harness cannot unregister them.
+
+## Context
+
+Runners are shared, busy and upgraded often. Fewer directories, fewer counters and self-healing registration keep the platform quiet.
+
+## Tasks
+
+1. One data directory per runner.
+2. Drop events uncounted when the queue is full.
+3. Rewrite the managed settings on each hook run.
+
+## Acceptance Criteria
+
+- One data directory serves every user on a runner.
+- A full queue drops the event and increments no counter.
+- The managed settings file is rewritten on every hook run.
+
+## Requirements
+
+The plan holds to SEC-22, ADM-02, ADM-07, REC-15 and SEC-31, under I6, I7 and I8. Phase 1 names
+the rows it changes and the `@pending` scenarios it takes off.
+
+## Phases
+
+1. Specification: the requirement rows and the `@pending` scenarios that
+   carry each task above, reviewed by the domain-model agent; this plan
+   then names the ids each phase closes.
+2. Implementation: each scenario off `@pending`, red then green, one
+   phase per task.
+'''
+
+[expect]
+
+[[expect.finding]]
+path = "plan/2610301011_silent_drops.md"
+severity = "blocking"
+mentions_any = ["silent", "count", "I6", "managed", "I7", "I8", "isolation", "principal", "shared", "other user"]

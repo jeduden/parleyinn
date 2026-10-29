@@ -9,7 +9,7 @@ fn read_loads_every_record_with_relative_paths() {
 
     let got = Snapshot::read(dir.path()).unwrap();
 
-    assert_eq!(got.requirements.len(), 2);
+    assert_eq!(got.requirements.len(), 3);
     assert_eq!(got.requirements[0].path, Path::new("docs/srs/05.md"));
     assert_eq!(got.scenarios.len(), 2);
     assert_eq!(got.scenarios[0].path, Path::new("features/record.feature"));
@@ -21,7 +21,74 @@ fn read_loads_every_record_with_relative_paths() {
     );
     assert_eq!(
         got.ids().collect::<Vec<_>>(),
-        ["REC-01", "ENG-29", "REC-01", "ENG-29"]
+        ["REC-01", "ENG-11", "ENG-29", "REC-01", "ENG-29"]
+    );
+}
+
+#[test]
+fn with_file_reads_as_a_written_tree_reads() {
+    let dir = TempDir::new().unwrap();
+    fixture::tree(dir.path());
+    let base = Snapshot::read(dir.path()).unwrap();
+    let changed = TempDir::new().unwrap();
+    fixture::tree(changed.path());
+    let srs = fs::read_to_string(dir.path().join("docs/srs/05.md"))
+        .unwrap()
+        .replace("| P0 |", "| P1 |");
+    let feature = "Feature: Record\n\n  @REC-01 @P1 @I1\n  Scenario: ingest\n    Given nothing\n";
+    let adr = "---\nid: ADR-2610111201\ntitle: \"y\"\nstatus: accepted\nsummary: >-\n  s\n---\n# ADR-2610111201: y\n";
+    let edits = [
+        ("docs/srs/05.md", Some(srs.as_str())),
+        ("docs/srs/invariants.md", Some("I1 and I2 hold.\n")),
+        ("features/record.feature", Some(feature)),
+        (".github/CODEOWNERS", Some("/features/ @owner\n")),
+        ("docs/adr/ADR-2610111201-y.md", Some(adr)),
+        ("docs/adr/ADR-2610111200-x.md", None),
+        ("crates/x/src/lib.rs", Some("pub fn x() {}\n")),
+    ];
+    let mut head = base.clone();
+    for (rel, text) in edits {
+        let path = changed.path().join(rel);
+        match text {
+            Some(text) => {
+                fs::create_dir_all(path.parent().unwrap()).unwrap();
+                fs::write(path, text).unwrap();
+            }
+            None => fs::remove_file(path).unwrap(),
+        }
+        head = head.with_file(rel, text).unwrap();
+    }
+
+    assert_eq!(head, Snapshot::read(changed.path()).unwrap());
+    assert_ne!(head, base);
+    assert_eq!(base.with_file("crates/x/src/lib.rs", None).unwrap(), base);
+    assert!(
+        base.with_file("docs/srs/invariants.md", None)
+            .unwrap()
+            .invariants
+            .is_empty()
+    );
+    assert!(
+        base.with_file(".github/CODEOWNERS", None)
+            .unwrap()
+            .codeowners
+            .is_empty()
+    );
+    assert!(
+        base.with_file("features/record.feature", None)
+            .unwrap()
+            .scenarios
+            .is_empty()
+    );
+    let err = base
+        .with_file(
+            "features/record.feature",
+            Some("Feature: x\n  Scenario: y\n    Given z\n"),
+        )
+        .unwrap_err();
+    assert!(
+        err.to_string().contains("carries 0 requirement tags"),
+        "{err}"
     );
 }
 

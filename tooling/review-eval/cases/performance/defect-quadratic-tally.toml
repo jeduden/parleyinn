@@ -1,0 +1,49 @@
+component = "performance"
+kind = "defect"
+title = "a tally that walks the later events for each event"
+
+[[create]]
+file = "crates/record/src/tally.rs"
+content = '''
+//! How many later events share each event's writer.
+
+/// For each of `writers`, the writer of one event in order, how many
+/// events after it carry the same writer.
+#[must_use]
+pub fn same_writer_after(writers: &[String]) -> Vec<usize> {
+    writers
+        .iter()
+        .enumerate()
+        .map(|(i, writer)| writers[i + 1..].iter().filter(|w| *w == writer).count())
+        .collect()
+}
+
+#[cfg(test)]
+mod tests;
+'''
+
+[[create]]
+file = "crates/record/src/tally/tests.rs"
+content = '''
+use super::*;
+
+#[test]
+fn counts_the_later_events_of_each_writer() {
+    let writers: Vec<String> = ["a", "b", "a"].iter().map(|w| (*w).to_owned()).collect();
+
+    assert_eq!(same_writer_after(&writers), vec![1, 0, 0]);
+}
+'''
+
+[[replace]]
+file = "crates/record/src/lib.rs"
+old = "pub mod event;\n"
+new = "pub mod event;\npub mod tally;\n"
+
+[expect]
+outcome = ["blocking"]
+
+[[expect.finding]]
+path = "crates/record/src/tally.rs"
+severity = "blocking"
+mentions_any = ["O(n", "quadratic", "nested", "n log n", "linear", "each event", "every event"]

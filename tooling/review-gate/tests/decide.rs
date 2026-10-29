@@ -8,7 +8,8 @@
 )]
 
 use review_gate::{
-    APPROVE, Input, REQUEST_CHANGES, decide, parse_check_runs, parse_checked, parse_outcome,
+    APPROVE, Input, REQUEST_CHANGES, decide, parse_answers, parse_check_runs, parse_checked,
+    parse_consulted, parse_dispatch, parse_outcome, parse_specialists,
 };
 
 const HEAD: &str = "206b0a76a81abb510e53d87ef187e83b5aacbcbb";
@@ -23,6 +24,11 @@ fn input(outcome: &str, head: &str) -> Input {
         )
         .unwrap(),
         checked: parse_checked("[]").unwrap(),
+        dispatched: parse_dispatch(r#"{"review-code":["lang-rust"]}"#).unwrap(),
+        consulted: parse_consulted(r#"["lang-rust","review-code"]"#).unwrap(),
+        specialists: parse_specialists(r#"{"review-code":["lang-rust"]}"#).unwrap(),
+        reports: [("lang-rust".to_owned(), "Outcome: sound.".to_owned())].into(),
+        answers: parse_answers(r#"{"lang-rust":"Outcome: sound."}"#).unwrap(),
     }
 }
 

@@ -1,0 +1,16 @@
+component = "lang-toml"
+kind = "defect"
+title = "a direct dependency no decision record justifies"
+
+[[replace]]
+file = "tooling/review-eval/Cargo.toml"
+old = "review-bundle.workspace = true\n"
+new = "regex-lite = \"0.1.6\"\nreview-bundle.workspace = true\n"
+
+[expect]
+outcome = ["blocking"]
+
+[[expect.finding]]
+path = "tooling/review-eval/Cargo.toml"
+severity = "blocking"
+mentions_any = ["ADR", "ENG-18", "depend", "decision record"]

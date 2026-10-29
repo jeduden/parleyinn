@@ -1,0 +1,22 @@
+component = "lang-shell"
+kind = "clean"
+title = "a strict, quoted script"
+
+[[create]]
+file = "scripts/count-cases.sh"
+content = '''
+#!/usr/bin/env bash
+# Counts the reviewer evaluation cases under the directory named, or
+# the repository's.
+set -euo pipefail
+
+cases="${1:-tooling/review-eval/cases}"
+find "$cases" -name '*.toml' | wc -l
+'''
+
+[expect]
+outcome = ["sound", "nits"]
+
+[[expect.none]]
+path = "scripts/count-cases.sh"
+severity = "blocking"

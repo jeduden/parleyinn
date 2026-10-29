@@ -15,6 +15,13 @@ fn inputs() -> BTreeMap<String, String> {
             r#"{"name":"CI","status":"completed","conclusion":"success"}"#,
         ),
         ("checked.json", "[]"),
+        ("dispatch.json", r#"{"review-code":["lang-rust"]}"#),
+        ("consulted.json", r#"["lang-rust","review-code"]"#),
+        ("reports/lang-rust.md", "Outcome: sound.\n"),
+        (
+            "answers.json",
+            r#"{"lang-rust":"Outcome: sound.","review-code":"r"}"#,
+        ),
     ]
     .into_iter()
     .map(|(k, v)| (k.to_owned(), v.to_owned()))
@@ -33,6 +40,14 @@ fn args(current: &str) -> Vec<String> {
         current,
         "--checked",
         "checked.json",
+        "--dispatch",
+        "dispatch.json",
+        "--consulted",
+        "consulted.json",
+        "--reports",
+        "reports",
+        "--answers",
+        "answers.json",
     ]
     .map(str::to_owned)
     .to_vec()
@@ -74,7 +89,7 @@ fn the_usage_names_every_flag_as_required() {
     assert_eq!(code, EXIT_USAGE);
     assert!(
         err.ends_with(
-            "usage: review-gate --outcome FILE --check-runs FILE --reviewed SHA --head SHA --checked FILE\n"
+            "usage: review-gate --outcome FILE --check-runs FILE --reviewed SHA --head SHA --checked FILE --dispatch FILE --consulted FILE --reports DIR --answers FILE\n"
         ),
         "{err}"
     );
@@ -152,6 +167,20 @@ fn run_fails_closed_on_a_wrong_command_line() {
             EXIT_USAGE,
         ),
         (
+            "no --dispatch",
+            [&args(HEAD)[..10], &args(HEAD)[12..]].concat(),
+            inputs(),
+            "--dispatch is required",
+            EXIT_USAGE,
+        ),
+        (
+            "no --consulted",
+            args(HEAD)[..12].to_vec(),
+            inputs(),
+            "--consulted is required",
+            EXIT_USAGE,
+        ),
+        (
             "an empty reviewed head",
             {
                 let mut a = args(HEAD);
@@ -170,6 +199,8 @@ fn run_fails_closed_on_a_wrong_command_line() {
                 format!("--reviewed={HEAD}"),
                 "--head=".to_owned(),
                 "--checked=checked.json".to_owned(),
+                "--dispatch=dispatch.json".to_owned(),
+                "--consulted=consulted.json".to_owned(),
             ],
             inputs(),
             "--head needs a value",
@@ -185,18 +216,98 @@ fn run_fails_closed_on_a_wrong_command_line() {
     ]);
 }
 
+/// The inputs with `name` set to `body`.
+fn with(name: &str, body: &str) -> BTreeMap<String, String> {
+    let mut m = inputs();
+    m.insert(name.to_owned(), body.to_owned());
+    m
+}
+
+/// The inputs without `name`.
+fn without(name: &str) -> BTreeMap<String, String> {
+    let mut m = inputs();
+    m.remove(name);
+    m
+}
+
+#[test]
+fn run_fails_closed_on_a_missing_or_malformed_dispatch_or_a_skipped_agent() {
+    fails_closed(vec![
+        (
+            "no dispatch file",
+            args(HEAD),
+            without("dispatch.json"),
+            "read dispatch.json",
+            EXIT_FAILURE,
+        ),
+        (
+            "a malformed dispatch",
+            args(HEAD),
+            with("dispatch.json", "[]"),
+            "malformed dispatch",
+            EXIT_FAILURE,
+        ),
+        (
+            "no consulted file",
+            args(HEAD),
+            without("consulted.json"),
+            "read consulted.json",
+            EXIT_FAILURE,
+        ),
+        (
+            "a malformed consulted list",
+            args(HEAD),
+            with("consulted.json", "{}"),
+            "malformed consulted agents",
+            EXIT_FAILURE,
+        ),
+        (
+            "a dispatched agent left out",
+            args(HEAD),
+            with("consulted.json", r#"["review-code"]"#),
+            "the orchestrator did not consult lang-rust",
+            EXIT_FAILURE,
+        ),
+        (
+            "a specialist with no report",
+            args(HEAD),
+            without("reports/lang-rust.md"),
+            "lang-rust wrote no report",
+            EXIT_FAILURE,
+        ),
+        (
+            "a report another agent wrote",
+            args(HEAD),
+            with("reports/lang-rust.md", "Outcome: blocking.\n"),
+            "lang-rust has a report whose outcome differs from its answer in the run log",
+            EXIT_FAILURE,
+        ),
+        (
+            "no answers file",
+            args(HEAD),
+            without("answers.json"),
+            "read answers.json",
+            EXIT_FAILURE,
+        ),
+        (
+            "malformed answers",
+            args(HEAD),
+            with("answers.json", "[]"),
+            "malformed agents' answers",
+            EXIT_FAILURE,
+        ),
+        (
+            "a dispatched name that is a path",
+            args(HEAD),
+            with("dispatch.json", r#"{"review-code":["../x"]}"#),
+            "agent name",
+            EXIT_FAILURE,
+        ),
+    ]);
+}
+
 #[test]
 fn run_fails_closed_on_a_missing_or_malformed_input() {
-    let with = |name: &str, body: &str| {
-        let mut m = inputs();
-        m.insert(name.to_owned(), body.to_owned());
-        m
-    };
-    let without = |name: &str| {
-        let mut m = inputs();
-        m.remove(name);
-        m
-    };
     fails_closed(vec![
         (
             "no outcome file",
@@ -296,4 +407,24 @@ fn run_fails_closed_on_a_missing_or_malformed_checked_file() {
     let (code, _, err) = invoke(args(HEAD), &files);
     assert_eq!(code, EXIT_FAILURE, "{err}");
     assert!(err.contains("malformed deterministic findings"), "{err}");
+}
+
+#[test]
+fn run_wants_the_reports_and_the_answers() {
+    fails_closed(vec![
+        (
+            "no --reports",
+            [&args(HEAD)[..14], &args(HEAD)[16..]].concat(),
+            inputs(),
+            "--reports is required",
+            EXIT_USAGE,
+        ),
+        (
+            "no --answers",
+            args(HEAD)[..16].to_vec(),
+            inputs(),
+            "--answers is required",
+            EXIT_USAGE,
+        ),
+    ]);
 }

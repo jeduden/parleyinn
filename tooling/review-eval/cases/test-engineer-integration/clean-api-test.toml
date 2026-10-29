@@ -1,0 +1,50 @@
+component = "test-engineer-integration"
+kind = "clean"
+title = "a test of the public API through a real file"
+
+[[create]]
+file = "tooling/review-eval/tests/published.rs"
+content = '''
+//! The published scorecard's text through a real file.
+
+#![allow(
+    clippy::unwrap_used,
+    reason = "a test's helpers unwrap: a failure is the assertion"
+)]
+
+use std::fs;
+
+use review_eval::published::{Line, parse, render};
+use testkit::TempDir;
+
+#[test]
+fn a_scorecard_reads_back_from_disk() {
+    let dir = TempDir::new().unwrap();
+    let line = Line {
+        component: "lang-rust".to_owned(),
+        model: "haiku".to_owned(),
+        resolved: "claude-haiku-5-5".to_owned(),
+        cases_passed: 3,
+        cases: 3,
+        runs_passed: 6,
+        runs: 6,
+        cost: 0.12,
+        turns: 4.0,
+        seconds: 30.0,
+        hash: "0123456789abcdef".to_owned(),
+    };
+    let path = dir.path().join("scorecard-v1.txt");
+    fs::write(&path, render(std::slice::from_ref(&line))).unwrap();
+
+    let back = parse(&fs::read_to_string(&path).unwrap()).unwrap();
+
+    assert_eq!(back, vec![line]);
+}
+'''
+
+[expect]
+outcome = ["sound", "nits"]
+
+[[expect.none]]
+path = "tooling/review-eval/tests/published.rs"
+severity = "blocking"
