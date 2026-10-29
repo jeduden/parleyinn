@@ -18,6 +18,18 @@ const DEFAULT_DEADLINE: Duration = Duration::from_secs(600);
 /// How often a running command is looked at.
 const POLL: Duration = Duration::from_millis(100);
 
+/// What a Claude Code session sets for the commands it starts, which
+/// would make an agent started here a child of that session: its tool
+/// calls run in the background and its subagents are capped. The
+/// review runs each agent as a session of its own, so the harness
+/// clears them.
+const NESTED_SESSION_VARS: [&str; 4] = [
+    "CLAUDE_AUTO_BACKGROUND_TASKS",
+    "CLAUDE_CODE_BG_TASKS_REPORT_RUNNING",
+    "CLAUDE_CODE_CHILD_SESSION",
+    "CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH",
+];
+
 /// The machine: real processes, each killed at its deadline.
 struct ProcessHost;
 
@@ -29,6 +41,9 @@ impl Host for ProcessHost {
             .current_dir(&command.cwd)
             .envs(command.env.iter().cloned())
             .stdin(Stdio::null());
+        for var in NESTED_SESSION_VARS {
+            process.env_remove(var);
+        }
         // A log file takes the output and the errors, so a chatty run
         // never fills a pipe nobody reads before it ends.
         match &command.stdout_to {

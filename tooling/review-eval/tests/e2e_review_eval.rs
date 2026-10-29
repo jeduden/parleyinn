@@ -16,8 +16,13 @@ use std::process::{Command, Output};
 use testkit::TempDir;
 
 /// A `claude` that writes a blocking report for the agent it runs as
-/// and logs a successful result.
+/// and logs a successful result; started as a session's child, it
+/// refuses, as the review never runs one.
 const CLAUDE: &str = r#"#!/bin/sh
+if [ -n "$CLAUDE_AUTO_BACKGROUND_TASKS" ] || [ -n "$CLAUDE_CODE_CHILD_SESSION" ]; then
+  echo "started as a session's child" >&2
+  exit 3
+fi
 agent=""
 prev=""
 for a in "$@"; do
@@ -117,7 +122,13 @@ fn bin(home: &Path, script: &str) -> String {
 /// Runs the executable in `home` with `args`, `claude` on `path`.
 fn review_eval(home: &Path, path: &str, args: &[&str]) -> Output {
     let mut command = Command::new(env!("CARGO_BIN_EXE_review-eval"));
-    command.env_clear().env("PATH", path).args(args);
+    command
+        .env_clear()
+        .env("PATH", path)
+        // What a Claude Code session running the evaluation would set.
+        .env("CLAUDE_AUTO_BACKGROUND_TASKS", "true")
+        .env("CLAUDE_CODE_CHILD_SESSION", "1")
+        .args(args);
     testkit::isolate(&mut command, home);
     if let Some(profile) = std::env::var_os("LLVM_PROFILE_FILE") {
         command.env("LLVM_PROFILE_FILE", profile);
