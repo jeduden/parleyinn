@@ -20,7 +20,7 @@ depends-on: []
 
 ## Goal
 
-A developer enrolls a node as a peer by its key (B2), from either side, including from a sandbox that can only dial out, since the sandbox dials the laptop's listener. Each node keeps writing its own writer log while the network is split; when it returns, each node fetches the other's logs and every derived view is rebuilt from the union (I10), with no event lost or duplicated, since every event has its (writer, seq) address. A sandbox streams each event of its writer log to an enrolled peer as it is written, while one is reachable, and shows per peer the (writer, seq) that peer has acknowledged, so a sandbox reaped without warning leaves the record complete up to the last acknowledged event and nothing waits for a final push (I1).
+A developer enrolls a node as a peer by its key (B2), including from a sandbox that can only dial out. Enrollment needs one reachable peer, the always-on home server, which listens (B2); sandboxes and laptops dial out to it, so the plan does not rely on the laptop being reachable. Each node keeps writing its own writer log while the network is split; when it returns, or when the home server is reachable again, each node fetches the other's logs and every derived view is rebuilt from the union (I10), with no event lost or duplicated, since every event has its (writer, seq) address. A sandbox streams each event of its writer log to an enrolled peer as it is written, while one is reachable, and shows per peer the (writer, seq) that peer has acknowledged, so a sandbox reaped without warning leaves the record complete up to the last acknowledged event and nothing waits for a final push (I1).
 
 ## Context
 
@@ -34,7 +34,8 @@ No vendor relay, no account and no central service sits in the path (I4). A part
 
 ## Acceptance Criteria
 
-- A sandbox that can only dial out enrolls a laptop as a peer by key and syncs with it.
+- A sandbox and a laptop that can only dial out each enroll the home server as a peer by key and sync with it.
+- With the home server unreachable, each node keeps writing its own writer log and merges once it is reachable again.
 - Two nodes that wrote through a partition hold the union of both writer logs afterwards, with every (writer, seq) once.
 - A sandbox deleted without warning loses no event a peer acknowledged, and the laptop shows the last (writer, seq) it holds from it.
 
