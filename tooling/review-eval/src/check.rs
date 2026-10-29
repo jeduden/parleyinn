@@ -6,8 +6,7 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
-use std::path::{Path, PathBuf};
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::path::Path;
 
 use review_bundle::dispatch::{DEEP_GENERALISTS, GENERALISTS, agents};
 use review_bundle::{Snapshot, analyse};
@@ -19,10 +18,6 @@ use crate::diff::{self, Change};
 
 /// The kinds of case every component must have.
 pub const REQUIRED_KINDS: [&str; 3] = ["defect", "clean", "injection"];
-
-/// What the review bundle reads of a tree, whose change makes the
-/// head's snapshot differ from main's.
-const SNAPSHOT_PATHS: [&str; 4] = ["docs/srs/", "features/", "docs/adr/", ".github/CODEOWNERS"];
 
 /// Every case of the tree at `root`: those written under `cases_dir`
 /// and those derived from the tree.
@@ -207,8 +202,7 @@ pub fn dispatches(
         return Ok(None);
     }
     let changes = case.changes(&|file| fs::read_to_string(root.join(file)).ok())?;
-    let head =
-        head_snapshot(root, base, &changes).map_err(|e| format!("case {}: {e}", case.id()))?;
+    let head = head_snapshot(base, &changes).map_err(|e| format!("case {}: {e}", case.id()))?;
     let analysis = analyse(base, &head, &diff::all(&changes), case.consent.is_some());
     let dispatched = agents(&analysis.dispatch);
     let family: Vec<&str> = match component.kind {
@@ -226,70 +220,18 @@ pub fn dispatches(
     }
 }
 
-/// The snapshot of the tree with `changes` made: `base` itself when no
-/// change touches what the bundle reads, else read from a scratch copy
-/// of those paths with the changes applied.
-fn head_snapshot(root: &Path, base: &Snapshot, changes: &[Change]) -> Result<Snapshot, String> {
-    let touches = |c: &Change| SNAPSHOT_PATHS.iter().any(|p| c.path.starts_with(p));
-    if !changes.iter().any(touches) {
-        return Ok(base.clone());
-    }
-    let scratch = scratch_dir()?;
-    let result = (|| {
-        for path in SNAPSHOT_PATHS {
-            let path = path.trim_end_matches('/');
-            copy_path(&root.join(path), &scratch.join(path))?;
-        }
-        for change in changes.iter().filter(|c| touches(c)) {
-            let path = scratch.join(&change.path);
-            match &change.new {
-                Some(text) => path
-                    .parent()
-                    .map_or(Ok(()), fs::create_dir_all)
-                    .and_then(|()| fs::write(&path, text))
-                    .map_err(|e| format!("write {}: {e}", change.path))?,
-                None => {
-                    fs::remove_file(&path).map_err(|e| format!("remove {}: {e}", change.path))?
-                }
-            }
-        }
-        Snapshot::read(&scratch).map_err(|e| format!("read the changed tree: {e}"))
-    })();
-    let _ = fs::remove_dir_all(&scratch);
-
-    result
-}
-
-/// A fresh directory under the system's temporary directory.
-fn scratch_dir() -> Result<PathBuf, String> {
-    let stamp = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap_or_default()
-        .as_nanos();
-    let path = std::env::temp_dir().join(format!("review-eval-{}-{stamp}", std::process::id()));
-    fs::create_dir(&path).map_err(|e| format!("make {}: {e}", path.display()))?;
-
-    Ok(path)
-}
-
-/// Copies `from`, a file or a directory, to `to`; nothing when it does
-/// not exist.
-fn copy_path(from: &Path, to: &Path) -> Result<(), String> {
-    let at = |e: std::io::Error| format!("copy {}: {e}", from.display());
-    if from.is_dir() {
-        fs::create_dir_all(to).map_err(at)?;
-        for entry in fs::read_dir(from).map_err(at)? {
-            let entry = entry.map_err(at)?;
-            copy_path(&entry.path(), &to.join(entry.file_name()))?;
-        }
-    } else if from.is_file() {
-        to.parent()
-            .map_or(Ok(()), fs::create_dir_all)
-            .and_then(|()| fs::copy(from, to).map(drop))
-            .map_err(at)?;
+/// The snapshot of the tree with `changes` made: `base` with each
+/// changed record file read again from its new text, so no tree is
+/// written and the records the change leaves alone are not read twice.
+fn head_snapshot(base: &Snapshot, changes: &[Change]) -> Result<Snapshot, String> {
+    let mut head = base.clone();
+    for change in changes {
+        head = head
+            .with_file(&change.path, change.new.as_deref())
+            .map_err(|e| format!("read the changed tree: {e}"))?;
     }
 
-    Ok(())
+    Ok(head)
 }
 
 #[cfg(test)]

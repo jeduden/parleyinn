@@ -82,6 +82,52 @@ impl Snapshot {
         })
     }
 
+    /// `self` as the tree reads with the file at `rel`, relative to its
+    /// root, holding `text`, or gone when `text` is none: the records
+    /// that file holds are read again from `text` alone and every other
+    /// record is kept, so a changed tree is read without being written.
+    /// A file that holds no record leaves the snapshot as it is.
+    ///
+    /// # Errors
+    ///
+    /// Fails when `text` does not read as the records its path holds.
+    pub fn with_file(&self, rel: &str, text: Option<&str>) -> Result<Self, Error> {
+        let mut out = self.clone();
+        let path = Path::new(rel);
+        let under = |dir: &str, ext: &str| {
+            path.parent() == Some(Path::new(dir)) && path.extension().is_some_and(|e| e == ext)
+        };
+        if rel == INVARIANTS {
+            out.invariants = text.unwrap_or_default().to_owned();
+        }
+        if under("docs/srs", "md") {
+            out.requirements.retain(|r| r.path != path);
+            if let Some(text) = text {
+                out.requirements
+                    .extend(srs::parse(path, text).map_err(Error::Srs)?);
+            }
+            out.requirements
+                .sort_by(|a, b| (&a.path, a.line).cmp(&(&b.path, b.line)));
+        } else if under("features", "feature") {
+            out.scenarios.retain(|s| s.path != path);
+            if let Some(text) = text {
+                out.scenarios
+                    .extend(scenario::scenarios_in(path, text).map_err(Error::Scenarios)?);
+            }
+            out.scenarios
+                .sort_by(|a, b| (&a.path, a.line).cmp(&(&b.path, b.line)));
+        } else if rel == ".github/CODEOWNERS" {
+            out.codeowners = text.unwrap_or_default().to_owned();
+        } else if under("docs/adr", "md") {
+            match text {
+                Some(text) => out.decisions.insert(rel.to_owned(), text.to_owned()),
+                None => out.decisions.remove(rel),
+            };
+        }
+
+        Ok(out)
+    }
+
     /// Every requirement and scenario id the tree defines.
     pub fn ids(&self) -> impl Iterator<Item = &str> {
         let reqs = self.requirements.iter().map(|r| r.id.as_str());

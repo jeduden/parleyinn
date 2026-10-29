@@ -51,6 +51,35 @@ fn scenarios_reads_tags_and_pending() {
 }
 
 #[test]
+fn scenarios_in_reads_a_feature_from_its_text_as_the_walk_reads_the_file() {
+    let body = "Feature: Record\n\n  @REC-01 @P0 @I1 @pending\n  Scenario: ingest\n    Given nothing\n\n  Rule: sources\n\n    @NFR-01\n    Scenario: fast\n      Given nothing\n";
+    let dir = write_feature(body);
+
+    let from_text = scenarios_in(&dir.path().join("x.feature"), body).unwrap();
+
+    assert_eq!(from_text, scenarios(dir.path()).unwrap());
+    assert_eq!(from_text.len(), 2);
+    assert_eq!(from_text[0].path, dir.path().join("x.feature"));
+    let err = scenarios_in(
+        Path::new("features/x.feature"),
+        "Feature: x\n  Scenario: y\n    Given z\n",
+    )
+    .unwrap_err();
+    assert!(
+        err.to_string()
+            .contains("features/x.feature:2: \"y\" carries 0 requirement tags, want exactly one"),
+        "{err}"
+    );
+    let err = scenarios_in(Path::new("features/x.feature"), "Scenario: no feature\n").unwrap_err();
+    assert!(
+        err.to_string().starts_with(
+            "scenario: read features: Could not parse feature file: features/x.feature"
+        ),
+        "{err}"
+    );
+}
+
+#[test]
 fn scenarios_folds_outline_rows_onto_one_scenario() {
     let dir = write_feature(
         "Feature: Outline

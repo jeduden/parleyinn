@@ -264,34 +264,34 @@ fn a_derived_change_to_a_section_is_read_through_a_scratch_copy() {
 }
 
 #[test]
-fn a_head_snapshot_fails_when_a_changed_section_does_not_read() {
+fn a_head_snapshot_reads_each_changed_record_file_again_and_nothing_else() {
     let dir = checkout();
     let base = Snapshot::read(dir.path()).unwrap();
-    let changes = vec![Change {
-        path: "docs/srs/invariants.md".to_owned(),
-        old: Some("# 1.3 Invariants\n\nI1 holds.\n".to_owned()),
-        new: None,
-    }];
+    let changes = vec![
+        Change {
+            path: "docs/srs/invariants.md".to_owned(),
+            old: Some("# 1.3 Invariants\n\nI1 holds.\n".to_owned()),
+            new: None,
+        },
+        Change {
+            path: "crates/x/src/rogue.rs".to_owned(),
+            old: None,
+            new: Some("pub fn f() {}\n".to_owned()),
+        },
+    ];
 
-    let err = head_snapshot(dir.path(), &base, &changes).unwrap_err();
+    let head = head_snapshot(&base, &changes).unwrap();
 
-    assert!(err.starts_with("read the changed tree: "), "{err}");
+    assert!(head.invariants.is_empty());
+    assert_eq!(head.requirements, base.requirements);
+    assert_eq!(head_snapshot(&base, &[]).unwrap(), base);
     let changes = vec![Change {
         path: "features/record.feature".to_owned(),
         old: None,
         new: Some("Feature: broken\n  Scenario: x\n    Given y\n".to_owned()),
     }];
-    let err = head_snapshot(dir.path(), &base, &changes).unwrap_err();
+    let err = head_snapshot(&base, &changes).unwrap_err();
     assert!(err.starts_with("read the changed tree: "), "{err}");
-    // A section whose path is a directory in the tree cannot be written.
-    fs::create_dir_all(dir.path().join("docs/srs/odd.md")).unwrap();
-    let changes = vec![Change {
-        path: "docs/srs/odd.md".to_owned(),
-        old: None,
-        new: Some("# odd\n".to_owned()),
-    }];
-    let err = head_snapshot(dir.path(), &base, &changes).unwrap_err();
-    assert!(err.starts_with("write docs/srs/odd.md: "), "{err}");
 }
 
 #[test]
@@ -321,27 +321,6 @@ fn a_case_whose_edits_do_not_apply_does_not_dispatch() {
         dispatches(dir.path(), &base, &case, &component).unwrap_err(),
         "lang-rust/x: crates/x/src/none.rs: does not exist"
     );
-}
-
-#[test]
-fn copy_path_copies_files_and_directories_and_skips_what_is_missing() {
-    let dir = TempDir::new().unwrap();
-    let from = dir.path().join("from");
-    fs::create_dir_all(from.join("sub")).unwrap();
-    fs::write(from.join("sub/a.txt"), "a").unwrap();
-    fs::write(from.join("b.txt"), "b").unwrap();
-    let to = dir.path().join("to");
-
-    copy_path(&from, &to).unwrap();
-    copy_path(&dir.path().join("none"), &dir.path().join("none-copy")).unwrap();
-
-    assert_eq!(fs::read_to_string(to.join("sub/a.txt")).unwrap(), "a");
-    assert_eq!(fs::read_to_string(to.join("b.txt")).unwrap(), "b");
-    assert!(!dir.path().join("none-copy").exists());
-    let err = copy_path(&from.join("b.txt"), &to).unwrap_err();
-    assert!(err.starts_with("copy "), "{err}");
-    let err = copy_path(&from.join("b.txt"), &to.join("b.txt/under")).unwrap_err();
-    assert!(err.starts_with("copy "), "{err}");
 }
 
 #[test]
