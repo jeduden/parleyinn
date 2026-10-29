@@ -1,0 +1,207 @@
+use std::fs;
+
+use testkit::TempDir;
+
+use super::*;
+
+/// A tree with one SRS section, one model file, an agent of each kind
+/// and the orchestrator's skill.
+fn tree() -> TempDir {
+    let dir = TempDir::new().unwrap();
+    let write = |rel: &str, body: &str| {
+        let path = dir.path().join(rel);
+        fs::create_dir_all(path.parent().unwrap()).unwrap();
+        fs::write(path, body).unwrap();
+    };
+    write("docs/srs/06-security.md", "# 6\n");
+    write("docs/srs/index.md", "# index\n");
+    write("docs/srs/notes.txt", "no section");
+    write("docs/domain-model/index.md", "# hub\n");
+    write("docs/domain-model/places.md", "# places\n");
+    write(
+        ".claude/agents/lang-rust.md",
+        "---\nname: lang-rust\ndescription: >-\n  Rust.\ntools: Read, Grep, Glob, Write\nmodel: haiku\neffort: low\nmaxTurns: 20\ngeneralist: review-code\n---\n# Rust\n\nfindings, each on one line.\n",
+    );
+    write(
+        ".claude/agents/review-code.md",
+        "---\nname: review-code\ndescription: code\ntools: Read, Grep, Glob\nmodel: sonnet\neffort: medium\n---\n# Code\n",
+    );
+    write(
+        ".claude/agents/review-code-deep.md",
+        "---\nname: review-code-deep\ndescription: code\ntools: Read, Grep, Glob\nmodel: opus\neffort: high\nmaxTurns: 40\n---\n# Code\n",
+    );
+    write(
+        ".claude/skills/review/SKILL.md",
+        "---\nname: review\ndescription: review\n---\n# review\n",
+    );
+    dir
+}
+
+#[test]
+fn names_list_the_orchestrator_the_generalists_and_every_specialist() {
+    let dir = tree();
+
+    let got = names(dir.path()).unwrap();
+
+    assert!(got.contains(&"review".to_owned()));
+    assert!(got.contains(&"review-code".to_owned()));
+    assert!(got.contains(&"review-spec-deep".to_owned()));
+    assert!(got.contains(&"lang-rust".to_owned()));
+    assert!(got.contains(&"srs-security".to_owned()));
+    assert!(got.contains(&"domain-model-hub".to_owned()));
+    assert!(got.contains(&"domain-model-places".to_owned()));
+    assert!(!got.contains(&"srs-index".to_owned()));
+    let mut sorted = got.clone();
+    sorted.sort();
+    sorted.dedup();
+    assert_eq!(got, sorted);
+}
+
+#[test]
+fn names_fail_on_a_tree_without_the_sections() {
+    let dir = TempDir::new().unwrap();
+
+    let err = names(dir.path()).unwrap_err();
+
+    assert!(err.starts_with("read docs/srs: "), "{err}");
+}
+
+#[test]
+fn names_fail_on_a_tree_without_the_model() {
+    let dir = TempDir::new().unwrap();
+    fs::create_dir_all(dir.path().join("docs/srs")).unwrap();
+
+    let err = names(dir.path()).unwrap_err();
+
+    assert!(err.starts_with("read docs/domain-model: "), "{err}");
+}
+
+#[cfg(unix)]
+#[test]
+fn names_fail_on_a_section_whose_name_is_not_utf_8() {
+    use std::ffi::OsStr;
+    use std::os::unix::ffi::OsStrExt;
+
+    let dir = tree();
+    fs::write(
+        dir.path()
+            .join("docs/srs")
+            .join(OsStr::from_bytes(b"\xff.md")),
+        "x",
+    )
+    .unwrap();
+
+    let err = names(dir.path()).unwrap_err();
+
+    assert!(err.ends_with(" is not UTF-8"), "{err}");
+}
+
+#[test]
+fn each_name_has_its_kind_suite_and_file() {
+    assert_eq!(kind_of("review"), Kind::Orchestrator);
+    assert_eq!(kind_of("review-spec"), Kind::Generalist);
+    assert_eq!(kind_of("review-spec-deep"), Kind::Generalist);
+    assert_eq!(kind_of("lang-rust"), Kind::Specialist);
+    assert_eq!(suite_of("review-code-deep"), "review-code");
+    assert_eq!(suite_of("review-code"), "review-code");
+    assert_eq!(suite_of("lang-rust"), "lang-rust");
+    assert_eq!(file_of("review"), ".claude/skills/review/SKILL.md");
+    assert_eq!(file_of("lang-rust"), ".claude/agents/lang-rust.md");
+}
+
+#[test]
+fn hash_is_short_stable_and_text_sensitive() {
+    assert_eq!(hash("a").len(), 16);
+    assert_eq!(hash("a"), hash("a"));
+    assert_ne!(hash("a"), hash("b"));
+}
+
+#[test]
+fn load_reads_a_specialist_s_front_matter() {
+    let dir = tree();
+
+    let c = load(dir.path(), "lang-rust").unwrap();
+
+    assert_eq!(c.name, "lang-rust");
+    assert_eq!(c.kind, Kind::Specialist);
+    assert_eq!(c.file, ".claude/agents/lang-rust.md");
+    assert_eq!(c.model, "haiku");
+    assert_eq!(c.effort, "low");
+    assert_eq!(c.max_turns, 20);
+    assert_eq!(c.tools, vec!["Read", "Grep", "Glob", "Write"]);
+    assert!(c.strict_lines);
+    assert!(c.text.starts_with("---\n"));
+}
+
+#[test]
+fn load_gives_a_generalist_without_a_turn_budget_the_default() {
+    let dir = tree();
+
+    let c = load(dir.path(), "review-code").unwrap();
+
+    assert_eq!(c.kind, Kind::Generalist);
+    assert_eq!(c.max_turns, GENERALIST_TURNS);
+    assert!(!c.strict_lines);
+    assert_eq!(load(dir.path(), "review-code-deep").unwrap().max_turns, 40);
+}
+
+#[test]
+fn load_gives_the_orchestrator_the_workflow_s_settings() {
+    let dir = tree();
+
+    let c = load(dir.path(), "review").unwrap();
+
+    assert_eq!(c.kind, Kind::Orchestrator);
+    assert_eq!(c.model, ORCHESTRATOR_MODEL);
+    assert_eq!(c.effort, ORCHESTRATOR_EFFORT);
+    assert_eq!(c.max_turns, ORCHESTRATOR_TURNS);
+    assert_eq!(c.tools, vec!["Read", "Glob", "Grep", "Agent", "Write"]);
+}
+
+#[test]
+fn load_names_each_problem() {
+    let dir = tree();
+    let agents = dir.path().join(".claude/agents");
+
+    let err = load(dir.path(), "lang-toml").unwrap_err();
+    assert!(
+        err.starts_with("read .claude/agents/lang-toml.md: "),
+        "{err}"
+    );
+
+    fs::write(agents.join("lang-toml.md"), "no front matter\n").unwrap();
+    assert_eq!(
+        load(dir.path(), "lang-toml").unwrap_err(),
+        ".claude/agents/lang-toml.md: no front matter"
+    );
+
+    fs::write(
+        agents.join("lang-toml.md"),
+        "---\nname: lang-toml\ndescription: t\ntools: Read\n---\n# t\n",
+    )
+    .unwrap();
+    assert_eq!(
+        load(dir.path(), "lang-toml").unwrap_err(),
+        ".claude/agents/lang-toml.md: names no model"
+    );
+
+    fs::write(
+        agents.join("lang-toml.md"),
+        "---\nname: lang-toml\ndescription: t\ntools: Read\nmodel: haiku\nmaxTurns: many\n---\n# t\n",
+    )
+    .unwrap();
+    assert_eq!(
+        load(dir.path(), "lang-toml").unwrap_err(),
+        ".claude/agents/lang-toml.md: maxTurns many is not a number"
+    );
+}
+
+#[test]
+fn catalog_reads_every_component_or_names_the_missing_one() {
+    let dir = tree();
+
+    let err = catalog(dir.path(), dir.path()).unwrap_err();
+
+    // The tree defines only four of the components the root names.
+    assert!(err.starts_with("read .claude/agents/"), "{err}");
+}

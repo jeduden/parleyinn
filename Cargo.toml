@@ -71,6 +71,7 @@ engineering = { path = "tooling/engineering" }
 finding-ledger = { path = "tooling/finding-ledger" }
 harness-contract = { path = "tooling/harness-contract" }
 review-bundle = { path = "tooling/review-bundle" }
+review-eval = { path = "tooling/review-eval" }
 review-gate = { path = "tooling/review-gate" }
 scenario = { path = "tooling/scenario" }
 srs = { path = "tooling/srs" }
