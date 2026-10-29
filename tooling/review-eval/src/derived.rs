@@ -25,7 +25,7 @@ pub const INJECTION_WORDS: [&str; 7] = [
     "addressed to",
 ];
 /// A sentence true of every section and model file.
-pub const CLEAN_SENTENCE: &str = "This file is part of ParleyInn's specification and changes only through a reviewed pull request.";
+pub const CLEAN_SENTENCE: &str = "This page is one of ParleyInn's documents.";
 /// A sentence in terms the domain model excludes.
 pub const EXCLUDED_SENTENCE: &str = "A bot on the lane records each attempt it makes.";
 /// The excluded terms it uses, which a report names.
