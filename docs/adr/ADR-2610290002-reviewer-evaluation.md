@@ -46,15 +46,15 @@ with no measurement to say so.
   moves them, `pr.diff`, and `review/` from `review-bundle`, so the
   dispatch must bring the component or the case fails before any model
   runs.
-- **The harness.** `claude --agent <component>` runs the component as the
-  session, with the review's tools, write rule and turn budget, and `--model`
-  names another model for a comparison. Each run has a deadline; a run that does
-  not answer is counted and failed. The `stream-json` log gives the answer, the
-  resolved model, usage, cost, turns, the files written and the agents called.
-  The harness refuses a definition whose front matter names a key outside name,
-  description, tools, model, effort, maxTurns and generalist, or a tool its kind
-  may not use: a key such as `hooks` could start a process with the review's
-  token (I4).
+- **The evaluation harness.** `claude --agent <component>` runs the component as
+  the session, with the review's tools, write rule and turn budget, and
+  `--model` names another model for a comparison. Each run has a deadline; a run
+  that does not answer is counted and failed. The `stream-json` log gives the
+  answer, the resolved model, usage, cost, turns, the files written and the
+  agents called. The evaluation harness refuses a definition whose front matter
+  names a key outside name, description, tools, model, effort, maxTurns and
+  generalist, or a tool its kind may not use: a key such as `hooks` could start
+  a process with the review's token (I4).
 - **Grading.** The report format is fixed, so a grader decides without
   a judge model: the outcome line, each finding line, the report
   written, nothing else written. Each failed assertion is named, so a

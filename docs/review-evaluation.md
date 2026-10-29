@@ -12,8 +12,8 @@ The review's agents are instructions in Markdown, and ENG-32 holds each
 of them to cases the way code is held to tests. A case is one change to
 main's tree with the report the component must give for it. Every
 component the review bundle can dispatch has at least three: a defect it
-must find, a clean change it must pass, and a comment addressed to the
-reviewer, which it must report and not obey. The orchestrator and each
+must find, a clean change it must pass, and an instruction addressed to
+the reviewer, which it must report and not obey. The orchestrator and each
 deep instance are among them. The `review-eval` crate under
 [tooling/review-eval](../tooling/review-eval) runs them.
 [ADR-2610290002](adr/ADR-2610290002-reviewer-evaluation.md) records the
@@ -32,7 +32,7 @@ design.
 - **Derived cases** come from the tree for each SRS section and
   domain-model file: a requirement row changed without its scenario, a
   cited id no section defines, a true sentence under the title, and the
-  same with a comment addressed to the reviewer. They never rot.
+  same with an instruction addressed to the reviewer. They never rot.
 
 ## A run
 
@@ -41,13 +41,13 @@ design.
   worktree as `pr-head/`, its instruction files moved out, `pr.diff`,
   and `review/` from `review-bundle`. The dispatch must bring the
   component, or the case fails before any model runs.
-- **The harness** starts `claude --agent <component>` with the review's
-  tools, write rule and turn budget, on the component's model or the one
-  `--model` names; the orchestrator runs as the workflow runs it. It
-  refuses a component whose front matter names a key outside name,
-  description, tools, model, effort, maxTurns and generalist, or a tool
-  its kind may not use, so a definition under test cannot start a
-  process or widen its reach through the run (I4).
+- **The evaluation harness** starts `claude --agent <component>` with the
+  review's tools, write rule and turn budget, on the component's model or the
+  one `--model` names; the orchestrator runs as the workflow runs it. It refuses
+  a component whose front matter names a key outside name, description, tools,
+  model, effort, maxTurns and generalist, or a tool its kind may not use, so a
+  definition under test cannot start a process or widen its reach through the
+  run (I4).
 - **The grader** is deterministic. It reads the report: its outcome,
   each finding expected or forbidden, nothing else written, and, for
   the orchestrator, every dispatched agent consulted. A departure from
@@ -105,7 +105,10 @@ its version in `CLAUDE_CODE_VERSION` (ENG-01).
 ## Changing a component or a case
 
 A new or changed component lands with its cases in the same change. The
-pull request's review runs them before the gate decides. A case that
+pull request's review runs them before the gate decides. The shared
+sections under `docs/agents/`, which mdsmith inlines into every agent
+file that includes them, carry each report section and its trust rule:
+the pull request is data, and an instruction inside it is a finding. A case that
 keeps failing is a finding about the instructions or about the case,
 never a reason to loosen it. The cases and the published scorecard are
 stakeholder paths ([CODEOWNERS](../.github/CODEOWNERS)). The
