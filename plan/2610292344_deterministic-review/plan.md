@@ -1,6 +1,6 @@
 ---
 id: 2610292344
-title: "Deterministic review orchestration: code routes, Opus reviews"
+title: "Deterministic review orchestration: code routes, code routes"
 status: "🔲"
 summary: >-
   The review's orchestrating agent is replaced by code. A tool reads the
@@ -8,19 +8,19 @@ summary: >-
   generalist as its own agent, and assembles the review outcome, the
   consulted list and the answers from what the run produced, so no
   model decides whether an agent is called or waited for. The
-  generalists run on Opus and do the weighing (ENG-28).
+  generalists keep their models (ENG-28). Opus implements the plan.
 model: opus
 depends-on: [2610282358]
 ---
-# Deterministic review orchestration: code routes, Opus reviews
+# Deterministic review orchestration: code routes, code routes
 
 ## Goal
 
 No model routes the review. Code reads `dispatch.json`, runs every
 specialist, waits for every report, runs every generalist on the
 reports, and writes the review outcome, so the gate's check that every
-dispatched agent was consulted holds by construction. Opus, as the
-generalists, does the weighing and the judging that code cannot.
+dispatched agent was consulted holds by construction. The generalists
+keep the models they have and do the weighing that code cannot.
 
 ## Context
 
@@ -74,8 +74,8 @@ failure this plan removes.
    runs `review-run`; the consulted-list step reads `review-run`'s
    output; the usage step reads its logs; the gate's inputs are
    unchanged.
-4. The generalists, normal and deep, run on Opus; the specialists stay
-   on Haiku at low effort.
+4. The generalists and specialists keep the models and effort their
+   front matter sets; Opus implements every phase.
 5. Retire the orchestrator: its skill, its component in the reviewer
    evaluation (ENG-32) with its cases, its prompt and schema in the
    runner, and every mention in the SRS, the ADRs, CLAUDE.md and the
@@ -87,11 +87,11 @@ failure this plan removes.
 
 ## Execution
 
-| Phase | Model  | Gate                                                                                                 |
-| ----- | ------ | ---------------------------------------------------------------------------------------------------- |
-| 1     | opus   | `review-run` against a fake host produces the outcome, consulted list and answers; unit tests at 99% |
-| 2     | sonnet | `review.yml` runs it on a pull request and the gate posts a decision from its output                 |
-| 3     | sonnet | The orchestrator, its cases and its mentions are gone; ENG-28 and ENG-32 scenarios pass              |
+| Phase | Model | Gate                                                                                                 |
+| ----- | ----- | ---------------------------------------------------------------------------------------------------- |
+| 1     | opus  | `review-run` against a fake host produces the outcome, consulted list and answers; unit tests at 99% |
+| 2     | opus  | `review.yml` runs it on a pull request and the gate posts a decision from its output                 |
+| 3     | opus  | The orchestrator, its cases and its mentions are gone; ENG-28 and ENG-32 scenarios pass              |
 
 ## Phases
 
@@ -125,6 +125,6 @@ footer: |
       the outcome, the consulted list and the answers the gate reads
 - [ ] A review of a pull request is decided by the gate on its first
       run, with no orchestrating agent
-- [ ] The generalists run on Opus
+- [ ] The generalists and specialists keep their models
 - [ ] The orchestrator skill, its evaluation component and its cases
       are gone, and `docs/`, the SRS and CLAUDE.md name none
