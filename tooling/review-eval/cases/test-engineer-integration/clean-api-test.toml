@@ -14,31 +14,41 @@ content = '''
 
 use std::fs;
 
-use review_eval::published::{Line, parse, render};
+use review_eval::published::{Line, merge, parse, render};
 use testkit::TempDir;
 
-#[test]
-fn a_scorecard_reads_back_from_disk() {
-    let dir = TempDir::new().unwrap();
-    let line = Line {
-        component: "lang-rust".to_owned(),
+fn line(component: &str, runs_passed: usize) -> Line {
+    Line {
+        component: component.to_owned(),
         model: "haiku".to_owned(),
         resolved: "claude-haiku-5-5".to_owned(),
         cases_passed: 3,
         cases: 3,
-        runs_passed: 6,
+        runs_passed,
         runs: 6,
-        cost: 0.12,
+        slipped: 0,
+        cost: 0.5,
         turns: 4.0,
         seconds: 30.0,
         hash: "0123456789abcdef".to_owned(),
-    };
+    }
+}
+
+#[test]
+fn a_publish_replaces_one_component_in_the_file_on_disk() {
+    let dir = TempDir::new().unwrap();
     let path = dir.path().join("scorecard-v1.txt");
-    fs::write(&path, render(std::slice::from_ref(&line))).unwrap();
+    fs::write(
+        &path,
+        render(&[line("lang-rust", 5), line("lang-shell", 6)]),
+    )
+    .unwrap();
+
+    let existing = parse(&fs::read_to_string(&path).unwrap()).unwrap();
+    fs::write(&path, render(&merge(existing, vec![line("lang-rust", 6)]))).unwrap();
 
     let back = parse(&fs::read_to_string(&path).unwrap()).unwrap();
-
-    assert_eq!(back, vec![line]);
+    assert_eq!(back, vec![line("lang-rust", 6), line("lang-shell", 6)]);
 }
 '''
 
