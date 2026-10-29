@@ -74,6 +74,12 @@ fn with_file_reads_as_a_written_tree_reads() {
             .codeowners
             .is_empty()
     );
+    assert!(
+        base.with_file("features/record.feature", None)
+            .unwrap()
+            .scenarios
+            .is_empty()
+    );
     let err = base
         .with_file(
             "features/record.feature",
