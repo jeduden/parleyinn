@@ -71,5 +71,6 @@ tool. Write that answer to `review/reports/<your name>.md`, the one
 file you may change. End it with one line: `outcome: sound`,
 `outcome: nits` or `outcome: blocking`, a dash, and whether the target
 serves you. Then answer with only that line and the file's path.
-Without the Write tool, answer with the findings and the line.
+If your tools do not list Write, never try to write a file: answer
+with the findings and the line.
 <?/include?>
