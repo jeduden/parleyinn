@@ -327,3 +327,27 @@ Feature: Engineering quality (ENG)
     Then it lands only with an accepted ADR that records a named human security reviewer's approval
     And until that ADR is accepted, every B1, B2 or B3 component is built only as a prototype
     And evidence from the release build proves no release artifact or tagged release contains prototype code
+
+  @ENG-32 @P0 @pending
+  Scenario: every reviewer component is evaluated against its cases on the model it names
+    Given the repository checkout
+    When the reviewer evaluation cases are read from "tooling/review-eval/cases"
+    Then every component the review bundle can dispatch, the orchestrator and each deep instance among them, has a case that plants a defect, a case that is clean and a case that addresses the reviewer
+    And every case applies to the checkout, and the review bundle dispatches its component for it
+    And the review workflow's evaluate job runs "cargo run --locked --quiet -p review-eval" on the components the pull request changes, after the agent's job and before the job that holds the "JEDUDEN_REVIEW_AGENT_KEY" key
+    And a run of a case is graded:
+      | outcome     | finding | forbidden | answer             | report  | answered | run                |
+      | as expected | found   | none      | last line and path | written | yes      | passes             |
+      | other       | found   | none      | last line and path | written | yes      | fails on outcome   |
+      | as expected | missing | none      | last line and path | written | yes      | fails on finding   |
+      | as expected | found   | found     | last line and path | written | yes      | fails on forbidden |
+      | as expected | found   | none      | more               | written | yes      | fails on answer    |
+      | as expected | found   | none      | last line and path | missing | yes      | fails on report    |
+      | as expected | found   | none      | last line and path | written | no       | fails on no answer |
+    And a case passes with two of three runs, stopping once decided:
+      | runs             | case   | runs made |
+      | pass, pass       | passes | 2         |
+      | pass, fail, pass | passes | 3         |
+      | fail, fail       | fails  | 2         |
+      | fail, pass, fail | fails  | 3         |
+      | none, pass, pass | passes | 3         |
