@@ -38,12 +38,11 @@ pub const INVARIANTS: &str = "docs/srs/invariants.md";
 /// The sentence the clean change adds to the invariants, true wherever
 /// the invariants are included.
 pub const INVARIANTS_SENTENCE: &str =
-    "These ten invariants change only through a reviewed pull request that names ENG-29.";
+    "These ten invariants change only as ENG-29 requires, through a reviewed pull request.";
 /// The decision record the clean change to the invariants adds.
 pub const INVARIANTS_ADR_PATH: &str = "docs/adr/ADR-2610290999-invariants-change-through-review.md";
 /// The stakeholder's consent to the clean change to the invariants.
-pub const INVARIANTS_CONSENT: &str =
-    "I consent to this change to the invariants, as the security reviewer ENG-29 names.";
+pub const INVARIANTS_CONSENT: &str = "I, jeduden, consent to this change to the invariants as the named security reviewer ENG-29 asks for.";
 /// The record: accepted, names ENG-29 and the invariants it changes.
 const INVARIANTS_ADR: &str = "---
 id: ADR-2610290999
@@ -51,8 +50,9 @@ title: \"The invariants state how they change\"
 status: accepted
 summary: >-
   ENG-29's record of a sentence added to docs/srs/invariants.md: the
-  ten invariants change only through a reviewed pull request that names
-  ENG-29. No invariant's words change.
+  ten invariants change only as ENG-29 requires, through a reviewed
+  pull request. No invariant's words change. Approved by the security
+  reviewer, `jeduden`.
 ---
 # ADR-2610290999: The invariants state how they change
 
@@ -64,8 +64,8 @@ stakeholder's consent. The invariants' source did not say so itself.
 ## Decision
 
 `docs/srs/invariants.md` gains one sentence under its title: these ten
-invariants change only through a reviewed pull request that names
-ENG-29. The files that include the invariants show it too. No
+invariants change only as ENG-29 requires, through a reviewed pull
+request. The files that include the invariants show it too. No
 invariant's words change.
 
 ## Consequences
@@ -76,9 +76,9 @@ invariant's words change.
 
 ## Approval
 
-The stakeholder approved this record as the security reviewer ENG-29
-asks for, in a comment on the pull request that carries this change.
-The approval binds to that change and to no later one.
+The stakeholder, `jeduden`, approved this record as the named security
+reviewer ENG-29 asks for, in a comment on the pull request that carries
+this change. The approval binds to that change and to no later one.
 ";
 /// The files that include the invariants, each with its heading.
 const INVARIANTS_COPIES: [(&str, &str); 3] = [
