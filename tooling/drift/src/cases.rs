@@ -44,6 +44,9 @@ const CODEOWNERS: &str = ".github/CODEOWNERS";
 /// The workflow the ENG-28 cases drift.
 const REVIEW_WORKFLOW: &str = ".github/workflows/review.yml";
 
+/// The scheduled reviewer evaluation the ENG-32 case drifts.
+const REVIEW_EVAL_WORKFLOW: &str = ".github/workflows/review-eval.yml";
+
 /// Lists every registered drift. A check that keeps the records in step
 /// gets a case here in the change that adds it (ENG-27); the ENG-27
 /// scenario fails while a repository-inspecting scenario or a gate test
@@ -603,6 +606,27 @@ fn review_evaluation_cases() -> Vec<Case> {
             Injection::replace(REVIEW_WORKFLOW, "\n  evaluate:\n", "\n  evaluated:\n"),
             scenario("ENG-32"),
             "no evaluate job in the review workflow",
+        ),
+        protection_case(
+            "a reviewer component declaring a hook",
+            Injection::replace(
+                ".claude/agents/lang-rust.md",
+                "generalist: review-code\n",
+                "generalist: review-code\nhooks: []\n",
+            ),
+            "the_checkout_s_reviewer_evaluation_cases_apply_and_dispatch",
+            ".claude/agents/lang-rust.md: front matter names hooks",
+        ),
+        case(
+            "the scheduled run no longer failing on a failed case",
+            "ENG-32",
+            Injection::replace(
+                REVIEW_EVAL_WORKFLOW,
+                "if: steps.run.outputs.code != '0'",
+                "if: false",
+            ),
+            scenario("ENG-32"),
+            "no step fails the scheduled run on a failed case",
         ),
     ]
 }

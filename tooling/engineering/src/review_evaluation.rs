@@ -11,7 +11,8 @@ use review_eval::case::{Case, Expect, Expected};
 use review_eval::component::{Component, Kind};
 use review_eval::grade::{Run, grade};
 use review_eval::log::RunLog;
-use review_eval::score::decided;
+use review_eval::published::{self, Line};
+use review_eval::score::{CaseRecord, GateFinding, RunRecord, Scorecard, SuiteRecord, decided};
 use review_eval::{CASES, check};
 
 use crate::Checkout;
@@ -146,6 +147,180 @@ fn run_outcome(row: &BTreeMap<String, String>) -> String {
         (Some(f), _) => format!("fails on {}", failed_on(f)),
         (None, Some(s)) => format!("passes, slips on {}", failed_on(s)),
         (None, None) => "passes".to_owned(),
+    }
+}
+
+/// The problems with how a failed case reaches the gate: one blocking
+/// finding at the component's file, naming the case, the model it ran
+/// on and its first failure, and none for a case that passed.
+#[must_use]
+pub fn failed_case_is_a_blocking_finding() -> Vec<String> {
+    let card = Scorecard {
+        suites: vec![table_suite()],
+    };
+    finding_problems(&card.findings(&|c| format!(".claude/agents/{c}.md")))
+}
+
+/// The problems with `findings` as the table suite's: one, blocking, at
+/// the component's file, naming the case, the model and the failure.
+fn finding_problems(findings: &[GateFinding]) -> Vec<String> {
+    let [f] = findings else {
+        return vec![format!(
+            "{} findings for one failed case and one passed, want one",
+            findings.len()
+        )];
+    };
+    let mut problems = Vec::new();
+    if f.path != ".claude/agents/lang-rust.md" {
+        problems.push(format!(
+            "the finding is at {}, want the component's file",
+            f.path
+        ));
+    }
+    if f.severity != "blocking" {
+        problems.push(format!("the finding is {}, want blocking", f.severity));
+    }
+    for word in [
+        "lang-rust/unwrap",
+        "claude-haiku-5-5",
+        "outcome sound, want blocking",
+    ] {
+        if !f.body.contains(word) {
+            problems.push(format!("the finding does not name {word:?}: {}", f.body));
+        }
+    }
+
+    problems
+}
+
+/// The problems with a scorecard line: rendered and read back, it holds
+/// the component's cases and runs passed, the runs that slipped, the
+/// cost, the mean turns and seconds, and the model the runs resolved to.
+#[must_use]
+pub fn scorecard_line_records_the_suite() -> Vec<String> {
+    let card = Scorecard {
+        suites: vec![table_suite()],
+    };
+    line_problems(published::parse(&published::render(&published::lines(
+        &card,
+    ))))
+}
+
+/// The problems with `read`, a scorecard read back, as the table
+/// suite's line.
+fn line_problems(read: Result<Vec<Line>, String>) -> Vec<String> {
+    let lines = match read {
+        Ok(lines) => lines,
+        Err(e) => return vec![format!("the scorecard does not read back: {e}")],
+    };
+    let Some(line) = lines.first() else {
+        return vec!["the scorecard holds no line".to_owned()];
+    };
+    let got = (
+        line.component.as_str(),
+        line.model.as_str(),
+        line.resolved.as_str(),
+        (line.cases_passed, line.cases),
+        (line.runs_passed, line.runs),
+        line.slipped,
+    );
+    let want = ("lang-rust", "haiku", "claude-haiku-5-5", (1, 2), (2, 4), 1);
+    let mut problems = Vec::new();
+    if got != want {
+        problems.push(format!("the line reads {got:?}, want {want:?}"));
+    }
+    let numbers = (line.cost, line.turns, line.seconds);
+    if (line.cost - 0.4).abs() > 1e-6
+        || (line.turns - 6.0).abs() > 1e-6
+        || (line.seconds - 3.0).abs() > 1e-6
+    {
+        problems.push(format!(
+            "the line's cost, turns and seconds read {numbers:?}, want (0.4, 6.0, 3.0)"
+        ));
+    }
+
+    problems
+}
+
+/// The problems with the scheduled run's workflow, `text`: it must
+/// record the run's exit code, write the report that names each failed
+/// case into its summary, and fail on a non-zero code after that.
+#[must_use]
+pub fn scheduled_run_fails_on_failed_cases(text: &str) -> Vec<String> {
+    let mut problems = Vec::new();
+    if !text.contains("echo \"code=$code\" >> \"$GITHUB_OUTPUT\"") {
+        problems.push("the scheduled run does not record the run's exit code".to_owned());
+    }
+    if !text.contains("cat review-eval/report.md >> \"$GITHUB_STEP_SUMMARY\"") {
+        problems.push(
+            "the scheduled run's summary does not hold the report naming each failed case"
+                .to_owned(),
+        );
+    }
+    let fails = text
+        .split("if: steps.run.outputs.code != '0'")
+        .nth(1)
+        .is_some_and(|rest| rest.lines().take(6).any(|l| l.trim() == "exit 1"));
+    if !fails {
+        problems.push("no step fails the scheduled run on a failed case".to_owned());
+    }
+
+    problems
+}
+
+/// The suite the scorecard steps read: `lang-rust` on haiku, one case
+/// failed in two runs and one passed in two, one of them with a slip.
+fn table_suite() -> SuiteRecord {
+    let run = |passed: bool, slips: Vec<String>| RunRecord {
+        passed,
+        failures: if passed {
+            Vec::new()
+        } else {
+            vec!["outcome sound, want blocking".to_owned()]
+        },
+        slips,
+        answered: true,
+        cost: 0.1,
+        turns: 6,
+        duration_ms: 3000,
+        resolved_model: "claude-haiku-5-5".to_owned(),
+        ..RunRecord::default()
+    };
+    let case = |name: &str, passed: bool, runs: Vec<RunRecord>| CaseRecord {
+        component: COMPONENT.to_owned(),
+        name: name.to_owned(),
+        kind: "defect".to_owned(),
+        title: format!("the {name} case"),
+        repetitions: 3,
+        passes: 2,
+        runs,
+        passed,
+    };
+    SuiteRecord {
+        component: COMPONENT.to_owned(),
+        model: "haiku".to_owned(),
+        hash: "0123456789abcdef".to_owned(),
+        cases: vec![
+            case(
+                "unwrap",
+                false,
+                vec![run(false, Vec::new()), run(false, Vec::new())],
+            ),
+            case(
+                "clean",
+                true,
+                vec![
+                    run(
+                        true,
+                        vec![
+                            "a line that is neither a finding nor the outcome: Findings:"
+                                .to_owned(),
+                        ],
+                    ),
+                    run(true, Vec::new()),
+                ],
+            ),
+        ],
     }
 }
 

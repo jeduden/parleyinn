@@ -60,6 +60,30 @@ fn a_run_is_graded(_w: &mut World, step: &Step) -> Result<(), String> {
     )?))
 }
 
+#[then(
+    regex = r"^a case that fails is a blocking finding at its component's file, naming the case, the model and the first failure$"
+)]
+fn a_failed_case_is_a_blocking_finding(_w: &mut World) -> Result<(), String> {
+    outcome(review_evaluation::failed_case_is_a_blocking_finding())
+}
+
+#[then(
+    regex = r"^a scorecard line records a component's cases, runs, slips, cost, turns and seconds on its model$"
+)]
+fn a_scorecard_line_records_the_suite(_w: &mut World) -> Result<(), String> {
+    outcome(review_evaluation::scorecard_line_records_the_suite())
+}
+
+#[then(
+    regex = r#"^the scheduled run's workflow "([^"]+)" fails on a failed case, with the report that names it in its summary$"#
+)]
+fn the_scheduled_run_fails(w: &mut World, path: String) -> Result<(), String> {
+    let body = eng(w).checkout()?.read(&path)?;
+    outcome(review_evaluation::scheduled_run_fails_on_failed_cases(
+        &body,
+    ))
+}
+
 #[then(regex = r"^a case passes with two of three runs, stopping once decided:$")]
 fn a_case_is_decided(_w: &mut World, step: &Step) -> Result<(), String> {
     let table = step.table.as_ref().ok_or("the step has no table")?;

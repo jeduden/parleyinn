@@ -351,3 +351,6 @@ Feature: Engineering quality (ENG)
       | fail, fail       | fails  | 2         |
       | fail, pass, fail | fails  | 3         |
       | none, pass, pass | passes | 3         |
+    And a case that fails is a blocking finding at its component's file, naming the case, the model and the first failure
+    And a scorecard line records a component's cases, runs, slips, cost, turns and seconds on its model
+    And the scheduled run's workflow ".github/workflows/review-eval.yml" fails on a failed case, with the report that names it in its summary
