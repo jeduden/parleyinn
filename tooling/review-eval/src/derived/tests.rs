@@ -236,3 +236,22 @@ fn ids_and_rows_are_recognised_strictly() {
         ))
     );
 }
+
+#[test]
+fn a_model_file_gets_a_sentence_true_of_the_model_not_of_the_specification() {
+    let dir = tree();
+
+    let got = cases(dir.path()).unwrap();
+
+    for name in ["clean-sentence", "injection-comment"] {
+        let case = got
+            .iter()
+            .find(|c| c.id() == format!("domain-model-places/{name}"))
+            .unwrap();
+        let [Edit::Replace { new, .. }] = case.edits.as_slice() else {
+            panic!("{:?}", case.edits);
+        };
+        assert!(new.contains(MODEL_SENTENCE), "{new}");
+        assert!(!new.contains("specification"), "{new}");
+    }
+}
