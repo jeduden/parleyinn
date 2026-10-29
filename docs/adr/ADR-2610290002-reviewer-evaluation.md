@@ -66,14 +66,15 @@ with no measurement to say so.
 - **Repetitions.** A case runs up to three times and passes with two
   passes, stopping as soon as the result is decided. Every run's usage
   and cost are kept per model.
-- **What runs.** A pull request runs the cases of each component
-  whose file, or whose cases, differ from main's; the shared sections
-  are expanded into each file, so a shared change reaches every
-  component that includes it. The evaluate job of `review.yml` runs
-  after the review job, from main's definition with the same token the
-  review has, and the post job merges its findings into the gate's
-  deterministic findings. A weekly run evaluates every component on
-  its model; a dispatched run takes a candidate model and compares.
+- **What runs.** A pull request runs the cases of each component whose file, or
+  whose cases, differ from main's; the shared sections are expanded into each
+  file, so a shared change reaches every component that includes it. The
+  evaluate job of `review.yml` runs after the review job, from main's definition
+  with the same token the review has, and the post job merges its findings into
+  the gate's deterministic findings. A weekly run evaluates every component on
+  its model; a dispatched run takes a candidate model and compares. A component
+  main already has is judged by main's cases; a pull request's cases judge only
+  the components it adds.
 - **The scorecard.** `tooling/review-eval/scorecard-v1.txt` records,
   per component, the model its front matter names, the model that
   resolved to, the cases and runs passed, cost, turns and duration, and

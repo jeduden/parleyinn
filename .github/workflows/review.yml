@@ -468,8 +468,8 @@ jobs:
           printf '%s' "$EVAL_PLAN" > eval-plan.json
           set +e
           cargo run --locked --quiet -p review-eval -- run --checkout . --tree pr-head \
-            --cases pr-head/tooling/review-eval/cases --plan eval-plan.json \
-            --out review-eval --parallel 4
+            --cases pr-head/tooling/review-eval/cases --base-cases tooling/review-eval/cases \
+            --plan eval-plan.json --out review-eval --parallel 4
           code=$?
           set -e
           cat review-eval/report.md >> "$GITHUB_STEP_SUMMARY"

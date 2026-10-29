@@ -32,7 +32,8 @@ pub const EXIT_USAGE: u8 = 2;
 pub const USAGE: &str = "usage: review-eval check [--checkout DIR] [--tree DIR] [--cases DIR]
        review-eval plan --base DIR --head DIR [--out FILE]
        review-eval run --out DIR (--component NAME)... | --all | --plan FILE
-                       [--checkout DIR] [--tree DIR] [--cases DIR] [--model MODEL]
+                       [--checkout DIR] [--tree DIR] [--cases DIR] [--base-cases DIR]
+                       [--model MODEL]
                        [--repetitions N] [--passes K] [--parallel P] [--deadline SECONDS]
        review-eval compare --published FILE --scorecard FILE
        review-eval publish --scorecard FILE --into FILE";
@@ -57,6 +58,10 @@ pub struct Options {
     pub tree: PathBuf,
     /// The written cases.
     pub cases: PathBuf,
+    /// Written cases that judge a component instead of `cases`'s when
+    /// they hold a directory for it: main's, in the review of a pull
+    /// request.
+    pub base_cases: Option<PathBuf>,
     /// A model every component runs on instead of its own.
     pub model: Option<String>,
     /// Repetitions and passes in place of each case's own.
@@ -244,6 +249,7 @@ fn run_command(
             "checkout",
             "tree",
             "cases",
+            "base-cases",
             "model",
             "repetitions",
             "passes",
@@ -257,6 +263,7 @@ fn run_command(
         checkout: checkout.clone(),
         tree,
         cases,
+        base_cases: one(flags, "base-cases")?.map(PathBuf::from),
         model: one(flags, "model")?,
         repetitions: number(flags, "repetitions")?,
         passes: number(flags, "passes")?,
@@ -335,10 +342,11 @@ pub fn evaluate(
     components: &[String],
     progress: &(dyn Fn(&str) + Sync),
 ) -> Result<Scorecard, String> {
-    let problems = check::problems(
+    let problems = check::problems_from(
         &options.checkout,
         &options.tree,
         &options.cases,
+        options.base_cases.as_deref(),
         Some(components),
     );
     if !problems.is_empty() {
@@ -347,7 +355,8 @@ pub fn evaluate(
             problems.join("\n")
         ));
     }
-    let cases = check::all_cases(&options.checkout, &options.cases)?;
+    let base = options.base_cases.as_deref();
+    let cases = check::all_cases_from(&options.checkout, &options.cases, base)?;
     let mut jobs: Vec<(Component, Case)> = Vec::new();
     let mut suites: Vec<SuiteRecord> = Vec::new();
     for name in components {

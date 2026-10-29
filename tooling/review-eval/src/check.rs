@@ -26,7 +26,30 @@ pub const REQUIRED_KINDS: [&str; 3] = ["defect", "clean", "injection"];
 ///
 /// Fails when a case does not read.
 pub fn all_cases(root: &Path, cases_dir: &Path) -> Result<Vec<Case>, String> {
+    all_cases_from(root, cases_dir, None)
+}
+
+/// [`all_cases`], with a component's written cases taken from
+/// `base_cases` instead when it has a directory there: the cases main
+/// already holds judge a component main already has, so a change
+/// cannot soften the cases that judge it; a new component is judged by
+/// the cases it brings.
+///
+/// # Errors
+///
+/// Fails when a case does not read.
+pub fn all_cases_from(
+    root: &Path,
+    cases_dir: &Path,
+    base_cases: Option<&Path>,
+) -> Result<Vec<Case>, String> {
     let mut cases = case::load_dir(cases_dir)?;
+    if let Some(base) = base_cases {
+        let judging = case::load_dir(base)?;
+        let kept: BTreeSet<&str> = judging.iter().map(|c| c.component.as_str()).collect();
+        cases.retain(|c| !kept.contains(c.component.as_str()));
+        cases.extend(judging);
+    }
     cases.extend(derived::cases(root)?);
     cases.sort_by_key(Case::id);
 
@@ -67,7 +90,19 @@ pub fn problems(
     cases_dir: &Path,
     selection: Option<&[String]>,
 ) -> Vec<String> {
-    examine(root, tree, cases_dir, selection).map_or_else(|e| vec![e], |p| p.all())
+    problems_from(root, tree, cases_dir, None, selection)
+}
+
+/// [`problems`], with the cases read as [`all_cases_from`] reads them.
+#[must_use]
+pub fn problems_from(
+    root: &Path,
+    tree: &Path,
+    cases_dir: &Path,
+    base_cases: Option<&Path>,
+    selection: Option<&[String]>,
+) -> Vec<String> {
+    examine_from(root, tree, cases_dir, base_cases, selection).map_or_else(|e| vec![e], |p| p.all())
 }
 
 /// The components without their kinds of case, or what could not be
@@ -95,11 +130,26 @@ pub fn examine(
     cases_dir: &Path,
     selection: Option<&[String]>,
 ) -> Result<Problems, String> {
+    examine_from(root, tree, cases_dir, None, selection)
+}
+
+/// [`examine`], with the cases read as [`all_cases_from`] reads them.
+///
+/// # Errors
+///
+/// Fails when the components, the cases or the tree cannot be read.
+pub fn examine_from(
+    root: &Path,
+    tree: &Path,
+    cases_dir: &Path,
+    base_cases: Option<&Path>,
+    selection: Option<&[String]>,
+) -> Result<Problems, String> {
     let components = catalog(root, tree, selection)?;
     let selected = |name: &str| {
         selection.is_none_or(|names| names.iter().any(|n| suite_of(n) == suite_of(name)))
     };
-    let cases: Vec<Case> = all_cases(root, cases_dir)?
+    let cases: Vec<Case> = all_cases_from(root, cases_dir, base_cases)?
         .into_iter()
         .filter(|c| selected(&c.component))
         .collect();

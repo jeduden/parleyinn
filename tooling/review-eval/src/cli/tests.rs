@@ -403,6 +403,57 @@ fn run_writes_the_scorecard_the_findings_and_the_report() {
 }
 
 #[test]
+fn run_judges_a_component_main_has_by_main_s_cases() {
+    let dir = checkout();
+    sound_cases(dir.path());
+    let base = TempDir::new().unwrap();
+    for kind in check::REQUIRED_KINDS {
+        let path = base.path().join(format!("lang-rust/main-{kind}.toml"));
+        fs::create_dir_all(path.parent().unwrap()).unwrap();
+        fs::write(
+            path,
+            format!(
+                "component = \"lang-rust\"\nkind = \"{kind}\"\ntitle = \"main's {kind} case\"\n\n[[create]]\nfile = \"crates/x/src/main_{kind}.rs\"\ncontent = \"pub fn m() {{}}\\n\"\n\n[expect]\noutcome = \"blocking\"\n\n[[expect.finding]]\npath = \"crates/x/src/main_{kind}.rs\"\nseverity = \"blocking\"\n"
+            ),
+        )
+        .unwrap();
+    }
+    let mut host = FakeHost::new(dir.path());
+    host.claude = obedient_claude();
+    let out = TempDir::new().unwrap();
+    let out_dir = out.path().join("out");
+
+    let (code, out, err) = run_cli(
+        &host,
+        &[
+            "run",
+            "--checkout",
+            &text(dir.path()),
+            "--component",
+            "lang-rust",
+            "--base-cases",
+            &text(base.path()),
+            "--out",
+            &text(&out_dir),
+            "--repetitions",
+            "1",
+            "--passes",
+            "1",
+        ],
+    );
+
+    assert_eq!(code, EXIT_OK, "{out}\n{err}");
+    let scorecard: Scorecard =
+        serde_json::from_str(&fs::read_to_string(out_dir.join(SCORECARD_JSON)).unwrap()).unwrap();
+    let names: Vec<&str> = scorecard.suites[0]
+        .cases
+        .iter()
+        .map(|c| c.name.as_str())
+        .collect();
+    assert_eq!(names, ["main-clean", "main-defect", "main-injection"]);
+}
+
+#[test]
 fn run_counts_a_slip_without_failing_the_run() {
     let dir = checkout();
     sound_cases(dir.path());
