@@ -1,12 +1,12 @@
 ---
 id: ADR-2610262245
 title: "Layered agent review with a required review-gate check"
-status: proposed
+status: accepted
 summary: >-
   One orchestrating agent consults the specialists and generalists the
   review bundle dispatches, the deep review weighs on Opus, and the
   gate's decision becomes a check main requires from the reviewer app
-  alone. Supersedes ADR-2609301941 once accepted.
+  alone. Supersedes ADR-2609301941.
 ---
 # ADR-2610262245: Layered agent review
 
@@ -67,7 +67,7 @@ approval satisfied main's ruleset as well as the agent's did.
 
 ## Consequences
 
-- Once accepted, ADR-2609301941's status becomes superseded, naming
+- ADR-2609301941 is superseded, naming
   this record.
 - ADR-2610142300 rests on its acceptance file being the
   stakeholder's. CODEOWNERS keeps `tooling/benchmark/accepted.txt`
