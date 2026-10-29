@@ -1006,6 +1006,40 @@ fn parse_specialists_reads_the_dispatch_s_lists_and_refuses_a_path() {
 }
 
 #[test]
+fn a_report_check_reads_a_report_and_an_answer_alone() {
+    let report = "a.rs:1 — nit — x\n\noutcome: nits — one sentence.\n";
+    let answer = "outcome: nits — one sentence.\nreview/reports/lang-rust.md";
+
+    assert_eq!(report_check(Some(report), Some(answer)), None);
+    assert_eq!(report_check(None, Some(answer)), Some("wrote no report"));
+    assert_eq!(
+        report_check(Some(" \n"), Some(answer)),
+        Some("wrote an empty report")
+    );
+    assert_eq!(
+        report_check(Some("a.rs:1 — nit — x"), Some(answer)),
+        Some("has a report that does not end with its outcome")
+    );
+    assert_eq!(
+        report_check(Some(report), None),
+        Some("has a report whose outcome differs from its answer in the run log")
+    );
+}
+
+#[test]
+fn an_outcome_written_out_reads_back_as_itself() {
+    let outcome = ReviewOutcome {
+        verdict: REQUEST_CHANGES_VERDICT.to_owned(),
+        summary: "s".to_owned(),
+        findings: vec![finding("a.rs", 3, BLOCKING, "b")],
+    };
+
+    let json = serde_json::to_string(&outcome).unwrap();
+
+    assert_eq!(parse_outcome(&json).unwrap(), outcome);
+}
+
+#[test]
 fn parse_answers_reads_a_map_of_name_to_text() {
     assert_eq!(
         parse_answers(r#"{"lang-rust":"r"}"#).unwrap(),
