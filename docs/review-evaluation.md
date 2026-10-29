@@ -108,4 +108,6 @@ A new or changed component lands with its cases in the same change. The
 pull request's review runs them before the gate decides. A case that
 keeps failing is a finding about the instructions or about the case,
 never a reason to loosen it. The cases and the published scorecard are
-stakeholder paths ([CODEOWNERS](../.github/CODEOWNERS)).
+stakeholder paths ([CODEOWNERS](../.github/CODEOWNERS)). The
+`reviewer-shape` skill drives such a change, a failing case first, and
+the `reviewer-engineer` agent reviews it.
