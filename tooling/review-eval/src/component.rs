@@ -145,17 +145,45 @@ pub fn hash(text: &str) -> String {
     digest.iter().take(8).map(|b| format!("{b:02x}")).collect()
 }
 
+/// The front matter keys a reviewer agent may carry, and the keys the
+/// orchestrator's skill may. Any other key, such as `hooks`,
+/// `mcpServers` or `permissionMode`, could start a process or widen the
+/// agent's reach when the harness runs the definition under test with
+/// the review's token, so the harness refuses it before any run (I4).
+pub const AGENT_KEYS: [&str; 7] = [
+    "name",
+    "description",
+    "tools",
+    "model",
+    "effort",
+    "maxTurns",
+    "generalist",
+];
+pub const SKILL_KEYS: [&str; 2] = ["name", "description"];
+/// The tools a specialist may list, and the tools a generalist may: a
+/// generalist writes nothing.
+pub const SPECIALIST_TOOL_SET: [&str; 4] = ["Read", "Grep", "Glob", "Write"];
+pub const GENERALIST_TOOL_SET: [&str; 3] = ["Read", "Grep", "Glob"];
+
 /// Reads component `name` from the tree at `tree`.
 ///
 /// # Errors
 ///
-/// Fails when its file cannot be read, its front matter does not read
-/// or names no model, or its turn budget is not a number.
+/// Fails when its file cannot be read, its front matter does not read,
+/// names a key or a tool the component may not carry, or names no
+/// model, or its turn budget is not a number.
 pub fn load(tree: &Path, name: &str) -> Result<Component, String> {
     let file = file_of(name);
     let text = fs::read_to_string(tree.join(&file)).map_err(|e| format!("read {file}: {e}"))?;
     let kind = kind_of(name);
     let strict_lines = text.contains(ONE_LINE_EACH);
+    let (fields, _) = adr::front_matter(&text).map_err(|e| format!("{file}: {e}"))?;
+    let keys: &[&str] = if kind == Kind::Orchestrator {
+        &SKILL_KEYS
+    } else {
+        &AGENT_KEYS
+    };
+    allowed_keys(&file, &fields, keys)?;
     if kind == Kind::Orchestrator {
         return Ok(Component {
             name: name.to_owned(),
@@ -175,7 +203,6 @@ pub fn load(tree: &Path, name: &str) -> Result<Component, String> {
             strict_lines,
         });
     }
-    let (fields, _) = adr::front_matter(&text).map_err(|e| format!("{file}: {e}"))?;
     let field = |key: &str| fields.get(key).map_or("", String::as_str).to_owned();
     let model = field("model");
     if model.is_empty() {
@@ -188,6 +215,13 @@ pub fn load(tree: &Path, name: &str) -> Result<Component, String> {
             .map_err(|_| format!("{file}: maxTurns {turns} is not a number"))?,
     };
 
+    let tools: Vec<String> = field("tools")
+        .split(',')
+        .map(|t| t.trim().to_owned())
+        .filter(|t| !t.is_empty())
+        .collect();
+    allowed_tools(&file, kind, &tools)?;
+
     Ok(Component {
         name: name.to_owned(),
         kind,
@@ -196,13 +230,35 @@ pub fn load(tree: &Path, name: &str) -> Result<Component, String> {
         model,
         effort: field("effort"),
         max_turns,
-        tools: field("tools")
-            .split(',')
-            .map(|t| t.trim().to_owned())
-            .filter(|t| !t.is_empty())
-            .collect(),
+        tools,
         strict_lines,
     })
+}
+
+/// Refuses a front matter key of `file` outside `allowed`.
+fn allowed_keys(
+    file: &str,
+    fields: &std::collections::BTreeMap<String, String>,
+    allowed: &[&str],
+) -> Result<(), String> {
+    match fields.keys().find(|k| !allowed.contains(&k.as_str())) {
+        Some(key) => Err(format!(
+            "{file}: front matter names {key}, which a reviewer component may not"
+        )),
+        None => Ok(()),
+    }
+}
+
+/// Refuses a tool of `file` that a component of `kind` may not use.
+fn allowed_tools(file: &str, kind: Kind, tools: &[String]) -> Result<(), String> {
+    let (allowed, word): (&[&str], &str) = match kind {
+        Kind::Generalist => (&GENERALIST_TOOL_SET, "generalist"),
+        Kind::Specialist | Kind::Orchestrator => (&SPECIALIST_TOOL_SET, "specialist"),
+    };
+    match tools.iter().find(|t| !allowed.contains(&t.as_str())) {
+        Some(tool) => Err(format!("{file}: lists tool {tool}, which a {word} may not")),
+        None => Ok(()),
+    }
 }
 
 /// Every component of `root`'s review, read from the tree at `tree`.

@@ -197,6 +197,48 @@ fn load_names_each_problem() {
 }
 
 #[test]
+fn load_refuses_a_key_or_a_tool_a_component_may_not_carry() {
+    let dir = tree();
+    let agents = dir.path().join(".claude/agents");
+    let write = |rel: &str, body: &str| fs::write(dir.path().join(rel), body).unwrap();
+
+    write(
+        ".claude/agents/lang-toml.md",
+        "---\nname: lang-toml\ndescription: t\ntools: Read\nmodel: haiku\nhooks: []\n---\n# t\n",
+    );
+    assert_eq!(
+        load(dir.path(), "lang-toml").unwrap_err(),
+        ".claude/agents/lang-toml.md: front matter names hooks, which a reviewer component may not"
+    );
+    write(
+        ".claude/agents/lang-toml.md",
+        "---\nname: lang-toml\ndescription: t\ntools: Read, Bash\nmodel: haiku\n---\n# t\n",
+    );
+    assert_eq!(
+        load(dir.path(), "lang-toml").unwrap_err(),
+        ".claude/agents/lang-toml.md: lists tool Bash, which a specialist may not"
+    );
+    write(
+        ".claude/agents/review-code.md",
+        "---\nname: review-code\ndescription: c\ntools: Read, Write\nmodel: sonnet\n---\n# c\n",
+    );
+    assert_eq!(
+        load(dir.path(), "review-code").unwrap_err(),
+        ".claude/agents/review-code.md: lists tool Write, which a generalist may not"
+    );
+    write(
+        ".claude/skills/review/SKILL.md",
+        "---\nname: review\ndescription: r\nhooks: []\n---\n# r\n",
+    );
+    assert_eq!(
+        load(dir.path(), "review").unwrap_err(),
+        ".claude/skills/review/SKILL.md: front matter names hooks, which a reviewer component may not"
+    );
+    assert!(agents.join("lang-rust.md").is_file());
+    assert!(load(dir.path(), "lang-rust").is_ok());
+}
+
+#[test]
 fn catalog_reads_every_component_or_names_the_missing_one() {
     let dir = tree();
 

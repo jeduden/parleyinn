@@ -43,7 +43,11 @@ design.
   component, or the case fails before any model runs.
 - **The harness** starts `claude --agent <component>` with the review's
   tools, write rule and turn budget, on the component's model or the one
-  `--model` names; the orchestrator runs as the workflow runs it.
+  `--model` names; the orchestrator runs as the workflow runs it. It
+  refuses a component whose front matter names a key outside name,
+  description, tools, model, effort, maxTurns and generalist, or a tool
+  its kind may not use, so a definition under test cannot start a
+  process or widen its reach through the run (I4).
 - **The grader** is deterministic. It reads the report: its outcome,
   each finding expected or forbidden, nothing else written, and, for
   the orchestrator, every dispatched agent consulted. A departure from
