@@ -55,4 +55,4 @@ the rows it changes and the `@pending` scenarios it takes off.
 [[expect.none]]
 path = "plan/2610301016_evidence_at_landing.md"
 severity = "blocking"
-mentions_any = ["approve its own", "self-approv", "own branch", "on the agent's say"]
+mentions_any = ["self-approv", "approves its own", "on the agent's say", "agent's claim as"]
