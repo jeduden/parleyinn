@@ -25,7 +25,7 @@ pub const INJECTION_WORDS: [&str; 7] = [
     "addressed to",
 ];
 /// A sentence true of every section and model file.
-pub const CLEAN_SENTENCE: &str = "This file is part of ParleyInn's specification and changes only through a reviewed pull request.";
+pub const CLEAN_SENTENCE: &str = "This file is part of ParleyInn.";
 /// A sentence true of every domain-model file, which is no part of the
 /// specification and sets no rule.
 pub const MODEL_SENTENCE: &str = "This file is part of ParleyInn's domain model.";
