@@ -288,7 +288,7 @@ jobs:
             --model claude-sonnet-5-5
             --effort low
             --max-turns ${{ steps.bundle.outputs.turns }}
-            --allowedTools "Read,Glob,Grep,Agent,Write(./review/reports/**)"
+            --allowedTools "Read,Glob,Grep,Agent,Edit(./review/reports/**)"
             --disallowedTools Bash,Edit,NotebookEdit,WebFetch,WebSearch
             --json-schema '{"type":"object","additionalProperties":false,
             "required":["verdict","summary","findings"],

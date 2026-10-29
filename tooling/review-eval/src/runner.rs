@@ -16,9 +16,9 @@ pub const PROGRAM: &str = "claude";
 
 /// The tools the review workflow allows and refuses the orchestrator,
 /// and what follows for a specialist and a generalist.
-pub const ORCHESTRATOR_TOOLS: &str = "Read,Glob,Grep,Agent,Write(./review/reports/**)";
+pub const ORCHESTRATOR_TOOLS: &str = "Read,Glob,Grep,Agent,Edit(./review/reports/**)";
 pub const ORCHESTRATOR_DISALLOWED: &str = "Bash,Edit,NotebookEdit,WebFetch,WebSearch";
-pub const SPECIALIST_TOOLS: &str = "Read,Glob,Grep,Write(./review/reports/**)";
+pub const SPECIALIST_TOOLS: &str = "Read,Glob,Grep,Edit(./review/reports/**)";
 pub const SPECIALIST_DISALLOWED: &str = "Bash,Edit,NotebookEdit,WebFetch,WebSearch,Agent";
 pub const GENERALIST_TOOLS: &str = "Read,Glob,Grep";
 pub const GENERALIST_DISALLOWED: &str = "Bash,Edit,Write,NotebookEdit,WebFetch,WebSearch,Agent";

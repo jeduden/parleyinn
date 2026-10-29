@@ -459,15 +459,21 @@ fn agents_write_only_wants_writes_scoped_to_the_reports() {
     };
 
     assert!(
-        parse(&with("\"Read,Grep,Write(./review/reports/**)\""))
+        parse(&with("\"Read,Grep,Edit(./review/reports/**)\""))
             .agents_write_only("review/reports")
             .is_empty()
     );
     assert_eq!(
         parse(&with("Read,Write,Bash(ls:*)")).agents_write_only("review/reports"),
         [
-            "agent job review may use Write, want Write(./review/reports/**) alone",
-            "agent job review may use Bash(ls:*), want Write(./review/reports/**) alone",
+            "agent job review may use Write, want Edit(./review/reports/**) alone",
+            "agent job review may use Bash(ls:*), want Edit(./review/reports/**) alone",
+        ]
+    );
+    assert_eq!(
+        parse(&with("\"Read,Write(./review/reports/**)\"")).agents_write_only("review/reports"),
+        [
+            "agent job review may use Write(./review/reports/**), want Edit(./review/reports/**) alone"
         ]
     );
     assert_eq!(

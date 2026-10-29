@@ -455,9 +455,9 @@ fn review_cases() -> Vec<Case> {
         case(
             "the reviewing agents allowed to write anywhere",
             "ENG-28",
-            Injection::replace(REVIEW_WORKFLOW, "Write(./review/reports/**)", "Write"),
+            Injection::replace(REVIEW_WORKFLOW, "Edit(./review/reports/**)", "Write"),
             scenario("ENG-28"),
-            "may use Write, want Write(./review/reports/**) alone",
+            "may use Write, want Edit(./review/reports/**) alone",
         ),
         case(
             "the review gate without the specialists' reports",

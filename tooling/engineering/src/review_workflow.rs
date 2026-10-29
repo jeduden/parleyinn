@@ -203,11 +203,13 @@ impl Workflow {
     }
 
     /// Requires every agent job to list its allowed tools and to allow
-    /// writing only under `dir`: `Write(./<dir>/**)` and no other
-    /// writing tool.
+    /// writing only under `dir`: `Edit(./<dir>/**)` and no other
+    /// writing tool. An `Edit` rule governs every tool that changes a
+    /// file, `Write` included; a `Write(path)` rule grants nothing, so
+    /// an agent job that lists one cannot write its reports.
     #[must_use]
     pub fn agents_write_only(&self, dir: &str) -> Vec<String> {
-        let scoped = format!("Write(./{dir}/**)");
+        let scoped = format!("Edit(./{dir}/**)");
         let mut problems = Vec::new();
         for j in self.agent_jobs() {
             let Some(line) = j.text.lines().find(|l| l.contains("--allowedTools")) else {
