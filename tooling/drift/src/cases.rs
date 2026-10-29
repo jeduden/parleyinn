@@ -487,8 +487,8 @@ fn review_cases() -> Vec<Case> {
             "ENG-28",
             Injection::replace(
                 REVIEW_WORKFLOW,
-                "    if: needs.review.outputs.pull != ''\n",
-                "    if: always() && needs.review.outputs.pull != ''\n",
+                "    needs: [review, evaluate]\n    if: needs.review.outputs.pull != ''\n",
+                "    needs: [review, evaluate]\n    if: always() && needs.review.outputs.pull != ''\n",
             ),
             scenario("ENG-28"),
             "job post runs on always(), even after a failed review",
