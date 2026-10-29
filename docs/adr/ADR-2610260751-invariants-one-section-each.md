@@ -62,11 +62,11 @@ and AGENTS.md may run to 330 lines to hold them.
 
 The stakeholder, `jeduden`, approved this record as the named security
 reviewer ENG-29 asks for, on 29 October 2026. The approval is in two
-places: a [comment on jeduden/parleyinn#93][comment] consenting to this
-change to the invariants' form and naming `jeduden` as security
-reviewer, and the stakeholder's message to the assistant in the session
-that made this change, "I approve ADR-2610260751". It binds to the change
-in that pull request, not to a later one, and can be checked apart from
-this record.
+places. One is a [comment on jeduden/parleyinn#93][comment] that
+consents to this change to the invariants' form and names `jeduden` as
+security reviewer. The other is the stakeholder's message in the
+session that made the change: "I approve ADR-2610260751". The approval
+binds to the change in that pull request, not to a later one. It can be
+checked apart from this record.
 
 [comment]: https://github.com/jeduden/parleyinn/pull/93#issuecomment-6498301058
