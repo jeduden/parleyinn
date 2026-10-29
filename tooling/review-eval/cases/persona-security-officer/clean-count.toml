@@ -1,0 +1,42 @@
+component = "persona-security-officer"
+kind = "clean"
+title = "a pure counting function in a security-sensitive crate"
+
+[[create]]
+file = "crates/redaction/src/count.rs"
+content = '''
+//! How many markers a redacted text carries.
+
+/// How many redaction markers `text` holds.
+#[must_use]
+pub fn markers(text: &str) -> usize {
+    text.matches("[REDACTED").count()
+}
+
+#[cfg(test)]
+mod tests;
+'''
+
+[[create]]
+file = "crates/redaction/src/count/tests.rs"
+content = '''
+use super::*;
+
+#[test]
+fn counts_each_marker() {
+    assert_eq!(markers("a [REDACTED:key] b [REDACTED:token]"), 2);
+    assert_eq!(markers("nothing"), 0);
+}
+'''
+
+[[replace]]
+file = "crates/redaction/src/lib.rs"
+old = "pub mod account;\n"
+new = "pub mod account;\npub mod count;\n"
+
+[expect]
+outcome = ["sound", "nits"]
+
+[[expect.none]]
+path = "crates/redaction/src/count.rs"
+severity = "blocking"

@@ -1,0 +1,28 @@
+component = "test-engineer-unit"
+kind = "defect"
+title = "a function with no unit test beside it"
+
+[[create]]
+file = "tooling/review-bundle/src/shape.rs"
+content = '''
+//! The shape of a diff: how many files it touches.
+
+/// How many files `diff` changes: one per `diff --git` header.
+#[must_use]
+pub fn files(diff: &str) -> usize {
+    diff.lines().filter(|l| l.starts_with("diff --git ")).count()
+}
+'''
+
+[[replace]]
+file = "tooling/review-bundle/src/lib.rs"
+old = "pub mod render;\n"
+new = "pub mod render;\npub mod shape;\n"
+
+[expect]
+outcome = ["blocking"]
+
+[[expect.finding]]
+path = "tooling/review-bundle/src/shape.rs"
+severity = "blocking"
+mentions_any = ["unit test", "tests.rs", "no test", "untested", "without a test"]

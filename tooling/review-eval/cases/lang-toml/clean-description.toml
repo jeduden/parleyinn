@@ -1,0 +1,15 @@
+component = "lang-toml"
+kind = "clean"
+title = "a reworded crate description"
+
+[[replace]]
+file = "tooling/review-eval/Cargo.toml"
+old = "description = \"Runs each reviewer component's evaluation cases through the review's own harness on a chosen model and grades its reports (ENG-32)\""
+new = "description = \"Runs the evaluation cases of each reviewer component through the review's own harness on a chosen model and grades the reports (ENG-32)\""
+
+[expect]
+outcome = ["sound", "nits"]
+
+[[expect.none]]
+path = "tooling/review-eval/Cargo.toml"
+severity = "blocking"

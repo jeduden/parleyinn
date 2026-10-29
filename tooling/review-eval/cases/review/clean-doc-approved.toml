@@ -1,0 +1,26 @@
+component = "review"
+kind = "clean"
+title = "a true doc outside the stakeholder's paths is approved"
+
+[[create]]
+file = "docs/review-evaluation.md"
+content = '''
+---
+summary: >-
+  How the reviewer evaluation is run from the command line.
+---
+# Running the reviewer evaluation
+
+`review-eval check` checks every case against every reviewer component
+without a model call: each case applies to the tree and the review
+bundle dispatches its component. `review-eval run --component NAME
+--out DIR` then runs one component's cases on the model its front
+matter names, and writes the scorecard under `DIR`.
+'''
+
+[expect]
+outcome = ["approve"]
+
+[[expect.none]]
+path = "docs/review-evaluation.md"
+severity = "blocking"

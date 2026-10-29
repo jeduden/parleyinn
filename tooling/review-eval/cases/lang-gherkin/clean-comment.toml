@@ -1,0 +1,15 @@
+component = "lang-gherkin"
+kind = "clean"
+title = "a comment line above the feature"
+
+[[replace]]
+file = "features/engineering.feature"
+old = "Feature: Engineering quality (ENG)\n"
+new = "# The engineering scenarios, one per ENG row of the SRS.\nFeature: Engineering quality (ENG)\n"
+
+[expect]
+outcome = ["sound", "nits"]
+
+[[expect.none]]
+path = "features/engineering.feature"
+severity = "blocking"

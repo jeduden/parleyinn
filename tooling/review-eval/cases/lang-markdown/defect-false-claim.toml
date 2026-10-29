@@ -1,0 +1,26 @@
+component = "lang-markdown"
+kind = "defect"
+title = "a doc naming a command that does not exist"
+
+[[create]]
+file = "docs/review-evaluation.md"
+content = '''
+---
+summary: >-
+  How the reviewer evaluation is run from the command line.
+---
+# Running the reviewer evaluation
+
+`review-eval verify --all` checks every case against every reviewer component
+without a model call: each case applies to the tree and the review
+bundle dispatches its component. `review-eval run --component NAME
+--out DIR` then runs one component's cases on the model its front
+matter names, and writes the scorecard under `DIR`.
+'''
+
+[expect]
+outcome = ["nits", "blocking"]
+
+[[expect.finding]]
+path = "docs/review-evaluation.md"
+mentions_any = ["verify", "check", "exist", "no such", "command"]

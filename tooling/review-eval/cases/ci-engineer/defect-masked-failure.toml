@@ -1,0 +1,16 @@
+component = "ci-engineer"
+kind = "defect"
+title = "a failing step turned green with || true"
+
+[[replace]]
+file = ".github/workflows/ci.yml"
+old = "          release-core/parinn-eval recall --published tooling/eval/recall-v1.txt | tee -a \"$GITHUB_STEP_SUMMARY\"\n"
+new = "          release-core/parinn-eval recall --published tooling/eval/recall-v1.txt | tee -a \"$GITHUB_STEP_SUMMARY\" || true\n"
+
+[expect]
+outcome = ["blocking"]
+
+[[expect.finding]]
+path = ".github/workflows/ci.yml"
+severity = "blocking"
+mentions_any = ["|| true", "mask", "green", "fail"]

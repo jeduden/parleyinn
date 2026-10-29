@@ -1,0 +1,15 @@
+component = "lang-yaml"
+kind = "clean"
+title = "a comment on where plans live"
+
+[[replace]]
+file = ".frit.yml"
+old = "# frit settings for this repository.\n"
+new = "# frit settings for this repository.\n# Plans live under plan/, indexed by PLAN.md.\n"
+
+[expect]
+outcome = ["sound", "nits"]
+
+[[expect.none]]
+path = ".frit.yml"
+severity = "blocking"

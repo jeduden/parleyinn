@@ -1,0 +1,15 @@
+component = "lang-json"
+kind = "clean"
+title = "a note on a committed schema's origin"
+
+[[replace]]
+file = ".taplo/schemas/taplo.json"
+old = "  \"title\": \"Taplo Configuration Schema\",\n"
+new = "  \"title\": \"Taplo Configuration Schema\",\n  \"$comment\": \"Schema Store's taplo schema, committed so the lint reads no network.\",\n"
+
+[expect]
+outcome = ["sound", "nits"]
+
+[[expect.none]]
+path = ".taplo/schemas/taplo.json"
+severity = "blocking"

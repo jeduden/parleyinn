@@ -1,0 +1,46 @@
+component = "lang-rust"
+kind = "clean"
+title = "a small module with its unit tests"
+
+[[create]]
+file = "tooling/review-bundle/src/shape.rs"
+content = '''
+//! The shape of a diff: how many files it touches.
+
+/// How many files `diff` changes: one per `diff --git` header.
+#[must_use]
+pub fn files(diff: &str) -> usize {
+    diff.lines().filter(|l| l.starts_with("diff --git ")).count()
+}
+
+#[cfg(test)]
+mod tests;
+'''
+
+[[create]]
+file = "tooling/review-bundle/src/shape/tests.rs"
+content = '''
+use super::*;
+
+#[test]
+fn files_counts_each_header() {
+    assert_eq!(files("diff --git a/x b/x\n+1\ndiff --git a/y b/y\n"), 2);
+}
+
+#[test]
+fn an_empty_diff_changes_no_file() {
+    assert_eq!(files(""), 0);
+}
+'''
+
+[[replace]]
+file = "tooling/review-bundle/src/lib.rs"
+old = "pub mod render;\n"
+new = "pub mod render;\npub mod shape;\n"
+
+[expect]
+outcome = ["sound", "nits"]
+
+[[expect.none]]
+path = "tooling/review-bundle/src/shape.rs"
+severity = "blocking"

@@ -1,0 +1,15 @@
+component = "ci-engineer"
+kind = "clean"
+title = "a comment on the job budget"
+
+[[replace]]
+file = ".github/workflows/ci.yml"
+old = "name: CI\n"
+new = "name: CI\n# Every job below keeps the five-minute budget docs/ci.md sets.\n"
+
+[expect]
+outcome = ["sound", "nits"]
+
+[[expect.none]]
+path = ".github/workflows/ci.yml"
+severity = "blocking"

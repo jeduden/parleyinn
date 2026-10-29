@@ -1,0 +1,58 @@
+component = "review-security"
+kind = "other"
+title = "a socket the officer missed"
+
+[[create]]
+file = "crates/redaction/src/report.rs"
+content = '''
+//! Reports each redaction to the metrics host.
+
+use std::io::Write;
+use std::net::TcpStream;
+
+/// Sends how many secrets `redacted` to the metrics host, so a fleet
+/// can watch its redaction rate.
+///
+/// # Errors
+///
+/// Fails when the host cannot be reached.
+pub fn send(redacted: usize) -> std::io::Result<()> {
+    let mut stream = TcpStream::connect("metrics.example.com:9000")?;
+    writeln!(stream, "redacted {redacted}")
+}
+'''
+
+[[replace]]
+file = "crates/redaction/src/lib.rs"
+old = "pub mod account;\n"
+new = "pub mod account;\npub mod report;\n"
+
+[[report]]
+agent = "persona-security-officer"
+content = '''
+outcome: sound — a reporting helper
+'''
+
+[[report]]
+agent = "lang-rust"
+content = '''
+outcome: sound — a reporting helper
+'''
+
+[[report]]
+agent = "test-engineer-unit"
+content = '''
+outcome: sound — no test yet
+'''
+
+[[report]]
+agent = "performance"
+content = '''
+outcome: sound — off the hot path
+'''
+
+[expect]
+
+[[expect.finding]]
+path = "crates/redaction/src/report.rs"
+mentions_any = ["socket", "net", "I4", "TcpStream"]

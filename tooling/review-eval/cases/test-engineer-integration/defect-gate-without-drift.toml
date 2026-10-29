@@ -1,0 +1,29 @@
+component = "test-engineer-integration"
+kind = "defect"
+title = "a gate test with no drift case that stops at its first problem"
+
+[[create]]
+file = "tooling/engineering/tests/case_names.rs"
+content = '''
+//! Every reviewer evaluation case directory is named for a component.
+
+use std::fs;
+
+#[test]
+fn every_case_directory_is_a_component_name() {
+    let cases = testkit::repo_root().join("tooling/review-eval/cases");
+    for entry in fs::read_dir(cases).unwrap() {
+        let name = entry.unwrap().file_name();
+        let name = name.to_string_lossy();
+        assert!(name.chars().all(|c| c.is_ascii_lowercase() || c == '-'), "{name}");
+    }
+}
+'''
+
+[expect]
+outcome = ["blocking"]
+
+[[expect.finding]]
+path = "tooling/engineering/tests/case_names.rs"
+severity = "blocking"
+mentions_any = ["drift", "ENG-27"]

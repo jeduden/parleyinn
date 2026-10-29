@@ -1,0 +1,19 @@
+component = "lang-shell"
+kind = "defect"
+title = "a script without strict mode that word-splits its argument"
+
+[[create]]
+file = "scripts/file-size.sh"
+content = '''
+#!/bin/sh
+# Prints the size of the file named on the command line.
+du -h $1 | cut -f1
+'''
+
+[expect]
+outcome = ["blocking"]
+
+[[expect.finding]]
+path = "scripts/file-size.sh"
+severity = "blocking"
+mentions_any = ["quot", "set -e", "strict", "pipefail", "$1", "split"]

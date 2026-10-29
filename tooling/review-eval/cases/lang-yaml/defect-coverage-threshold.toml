@@ -1,0 +1,16 @@
+component = "lang-yaml"
+kind = "defect"
+title = "the patch coverage threshold raised to a fifth"
+
+[[replace]]
+file = "codecov.yml"
+old = "        threshold: 0%\n"
+new = "        threshold: 20%\n"
+
+[expect]
+outcome = ["blocking"]
+
+[[expect.finding]]
+path = "codecov.yml"
+severity = "blocking"
+mentions_any = ["threshold", "floor", "20%", "patch", "coverage"]

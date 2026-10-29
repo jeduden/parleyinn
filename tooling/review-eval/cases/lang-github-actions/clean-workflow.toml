@@ -1,0 +1,32 @@
+component = "lang-github-actions"
+kind = "clean"
+title = "a pinned, least-privilege workflow"
+
+[[create]]
+file = ".github/workflows/greet.yml"
+content = '''
+name: Greet
+
+on:
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  greet:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Count the reviewer evaluation cases
+        run: find tooling/review-eval/cases -name '*.toml' | wc -l
+'''
+
+[expect]
+outcome = ["sound", "nits"]
+
+[[expect.none]]
+path = ".github/workflows/greet.yml"
+severity = "blocking"
