@@ -10,6 +10,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::sync::{Mutex, PoisonError};
 
 use crate::case::Case;
 use crate::component::Component;
@@ -64,7 +65,10 @@ impl World {
 }
 
 /// Builds the world of `case` for `component`, read from `tree`, under
-/// `dir`, from the checkout at `checkout`.
+/// `dir`, from the checkout at `checkout`. Its worktrees are added under
+/// `worktrees`, one world at a time: git names a worktree's record after
+/// its path's last component, `main` or `pr-head` for every world, and
+/// two adds at once race for the same free name.
 ///
 /// # Errors
 ///
@@ -78,17 +82,21 @@ pub fn build(
     component: &Component,
     case: &Case,
     dir: &Path,
+    worktrees: &Mutex<()>,
 ) -> Result<World, String> {
     let main = dir.join("main");
-    worktree(host, checkout, &main)?;
+    let pr_head = main.join(PR_HEAD);
+    {
+        let _one_at_a_time = worktrees.lock().unwrap_or_else(PoisonError::into_inner);
+        worktree(host, checkout, &main)?;
+        worktree(host, checkout, &pr_head)?;
+    }
     let under_test = main.join(&component.file);
     under_test
         .parent()
         .map_or(Ok(()), fs::create_dir_all)
         .and_then(|()| fs::copy(tree.join(&component.file), &under_test))
         .map_err(|e| format!("copy {}: {e}", component.file))?;
-    let pr_head = main.join(PR_HEAD);
-    worktree(host, checkout, &pr_head)?;
     let changes = case.apply(&pr_head)?;
     write(&main.join(DIFF), &diff::all(&changes))?;
     move_instructions(&pr_head, &main.join(INSTRUCTIONS_TEXT))?;

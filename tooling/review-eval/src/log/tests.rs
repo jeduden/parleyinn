@@ -77,6 +77,19 @@ fn an_orchestrator_s_log_lists_the_agents_that_answered() {
 }
 
 #[test]
+fn a_result_that_is_an_error_names_the_harness_s_refusal() {
+    let refused = r#"{"type":"result","subtype":"success","is_error":true,"result":"You've hit your weekly limit · resets 10am (UTC)\nmore","total_cost_usd":0,"num_turns":1}"#;
+
+    let log = parse(refused);
+
+    assert!(!log.answered);
+    assert_eq!(
+        log.subtype,
+        "error: You've hit your weekly limit · resets 10am (UTC)"
+    );
+}
+
+#[test]
 fn a_log_without_a_result_did_not_answer() {
     let log = parse("not json\n{\"type\":\"system\"}\n");
 

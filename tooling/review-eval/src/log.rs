@@ -172,9 +172,18 @@ impl Reading {
     /// usage as the run summed it.
     fn result(&mut self, value: &Value) {
         let log = &mut self.log;
-        log.subtype = value["subtype"].as_str().unwrap_or("unknown").to_owned();
-        log.answered = log.subtype == SUCCESS && value["is_error"].as_bool() != Some(true);
+        let is_error = value["is_error"].as_bool() == Some(true);
         log.answer = value["result"].as_str().unwrap_or_default().to_owned();
+        log.subtype = match value["subtype"].as_str() {
+            // The harness reports its own refusal, such as a usage limit,
+            // as a successful result that is an error: name the refusal.
+            Some(SUCCESS) if is_error => {
+                format!("error: {}", log.answer.lines().next().unwrap_or_default())
+            }
+            Some(subtype) => subtype.to_owned(),
+            None => "unknown".to_owned(),
+        };
+        log.answered = log.subtype == SUCCESS;
         log.structured =
             (!value["structured_output"].is_null()).then(|| value["structured_output"].clone());
         log.cost = value["total_cost_usd"].as_f64().unwrap_or_default();

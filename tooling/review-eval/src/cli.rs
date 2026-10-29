@@ -380,9 +380,10 @@ pub fn evaluate(
         .map_err(|e| format!("make {}: {e}", options.out.join(RUNS).display()))?;
     let queue = Mutex::new(jobs);
     let records: Mutex<Vec<CaseRecord>> = Mutex::new(Vec::new());
+    let worktrees = Mutex::new(());
     thread::scope(|scope| {
         for _ in 0..options.parallel {
-            scope.spawn(|| worker(host, options, &queue, &records, progress));
+            scope.spawn(|| worker(host, options, &queue, &records, &worktrees, progress));
         }
     });
     let mut records = records.into_inner().unwrap_or_default();
@@ -405,6 +406,7 @@ fn worker(
     options: &Options,
     queue: &Mutex<Vec<(Component, Case)>>,
     records: &Mutex<Vec<CaseRecord>>,
+    worktrees: &Mutex<()>,
     progress: &(dyn Fn(&str) + Sync),
 ) {
     loop {
@@ -412,7 +414,7 @@ fn worker(
         let Some((component, case)) = next else {
             return;
         };
-        let record = run_case(host, options, &component, &case, progress);
+        let record = run_case(host, options, &component, &case, worktrees, progress);
         if let Ok(mut records) = records.lock() {
             records.push(record);
         }
@@ -426,6 +428,7 @@ fn run_case(
     options: &Options,
     component: &Component,
     case: &Case,
+    worktrees: &Mutex<()>,
     progress: &(dyn Fn(&str) + Sync),
 ) -> CaseRecord {
     let repetitions = options.repetitions.unwrap_or(case.repetitions);
@@ -451,7 +454,7 @@ fn run_case(
             .join(&component.name)
             .join(&case.name)
             .join(n.to_string());
-        let run = one_run(host, options, component, case, &dir);
+        let run = one_run(host, options, component, case, &dir, worktrees);
         progress(&format!(
             "{}/{} run {n}: {} ({:.4} USD, {} turns){}{}",
             component.name,
@@ -493,6 +496,7 @@ fn one_run(
     component: &Component,
     case: &Case,
     dir: &Path,
+    worktrees: &Mutex<()>,
 ) -> RunRecord {
     if let Err(e) = fs::create_dir_all(dir) {
         return RunRecord::failed(&format!("make {}: {e}", dir.display()));
@@ -505,6 +509,7 @@ fn one_run(
         component,
         case,
         &world_dir,
+        worktrees,
     )
     .and_then(|world| {
         let log_path = dir.join("log.jsonl");

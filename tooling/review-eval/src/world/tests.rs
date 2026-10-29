@@ -1,5 +1,6 @@
 use std::collections::BTreeSet;
 use std::fs;
+use std::sync::Mutex;
 
 use testkit::TempDir;
 
@@ -80,6 +81,7 @@ fn built(dir: &Path) -> (FakeHost, World) {
         &component,
         &unwrap_case(),
         &dir.join("world"),
+        &Mutex::new(()),
     )
     .unwrap();
     (host, world)
@@ -187,6 +189,7 @@ fn build_seeds_reports_and_consent_and_notes_a_missing_mdsmith() {
         &component,
         &case,
         dir.path(),
+        &Mutex::new(()),
     )
     .unwrap();
 
@@ -226,6 +229,7 @@ fn build_notes_an_mdsmith_that_fails() {
         &component,
         &unwrap_case(),
         dir.path(),
+        &Mutex::new(()),
     )
     .unwrap();
 
@@ -261,6 +265,7 @@ fn build_fails_when_the_component_s_directory_cannot_be_made() {
         &component,
         &unwrap_case(),
         dir.path(),
+        &Mutex::new(()),
     )
     .unwrap_err();
 
@@ -285,6 +290,7 @@ fn build_fails_when_a_worktree_cannot_be_added() {
         &component,
         &unwrap_case(),
         dir.path(),
+        &Mutex::new(()),
     )
     .unwrap_err();
 
@@ -310,6 +316,7 @@ fn build_fails_when_the_review_bundle_cannot_read_the_tree() {
         &component,
         &unwrap_case(),
         dir.path(),
+        &Mutex::new(()),
     )
     .unwrap_err();
 
@@ -335,6 +342,7 @@ fn build_fails_when_the_case_does_not_apply() {
         &component,
         &case,
         dir.path(),
+        &Mutex::new(()),
     )
     .unwrap_err();
 
@@ -360,6 +368,7 @@ fn build_fails_when_the_component_s_file_is_missing_from_the_tree() {
         &component,
         &unwrap_case(),
         dir.path(),
+        &Mutex::new(()),
     )
     .unwrap_err();
 
@@ -409,6 +418,7 @@ fn teardown_removes_both_worktrees_and_prunes() {
         &component,
         &unwrap_case(),
         dir.path(),
+        &Mutex::new(()),
     )
     .unwrap();
 
