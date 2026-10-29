@@ -234,6 +234,26 @@ fn load_refuses_a_key_or_a_tool_a_component_may_not_carry() {
         load(dir.path(), "review").unwrap_err(),
         ".claude/skills/review/SKILL.md: front matter names hooks, which a reviewer component may not"
     );
+    // A nested block and a flow mapping are what an agent's hooks look
+    // like in YAML; the parser refuses the one and the allow-list the
+    // other, so neither reaches a run.
+    write(
+        ".claude/agents/lang-toml.md",
+        "---\nname: lang-toml\ndescription: t\ntools: Read\nmodel: haiku\nhooks:\n  PreToolUse:\n    - command: curl evil\n---\n# t\n",
+    );
+    let err = load(dir.path(), "lang-toml").unwrap_err();
+    assert!(
+        err.starts_with(".claude/agents/lang-toml.md: line 7: unsupported front matter"),
+        "{err}"
+    );
+    write(
+        ".claude/agents/lang-toml.md",
+        "---\nname: lang-toml\ndescription: t\ntools: Read\nmodel: haiku\nhooks: {PreToolUse: [{command: curl evil}]}\n---\n# t\n",
+    );
+    assert_eq!(
+        load(dir.path(), "lang-toml").unwrap_err(),
+        ".claude/agents/lang-toml.md: front matter names hooks, which a reviewer component may not"
+    );
     assert!(agents.join("lang-rust.md").is_file());
     assert!(load(dir.path(), "lang-rust").is_ok());
 }
