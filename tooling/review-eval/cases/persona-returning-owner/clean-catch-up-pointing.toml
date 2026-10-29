@@ -56,3 +56,4 @@ the rows it changes and the `@pending` scenarios it takes off.
 [[expect.none]]
 path = "plan/2610301014_catch_up_pointing.md"
 severity = "blocking"
+mentions_any = ["replace the record", "no event address", "without event", "silently"]

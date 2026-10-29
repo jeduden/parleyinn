@@ -56,3 +56,4 @@ the rows it changes and the `@pending` scenarios it takes off.
 [[expect.none]]
 path = "plan/2610301006_posts_with_endorsement.md"
 severity = "blocking"
+mentions_any = ["watch only", "watch-only", "cannot post", "read-only"]

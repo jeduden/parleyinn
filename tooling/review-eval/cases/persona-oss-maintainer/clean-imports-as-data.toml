@@ -56,3 +56,4 @@ the rows it changes and the `@pending` scenarios it takes off.
 [[expect.none]]
 path = "plan/2610301010_imports_as_data.md"
 severity = "blocking"
+mentions_any = ["as the owner", "skip the envelope", "without an envelope", "restore to the maintainer"]

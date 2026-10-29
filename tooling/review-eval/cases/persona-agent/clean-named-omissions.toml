@@ -55,3 +55,4 @@ the rows it changes and the `@pending` scenarios it takes off.
 [[expect.none]]
 path = "plan/2610301002_named_omissions.md"
 severity = "blocking"
+mentions_any = ["summar", "verbatim", "word for word"]

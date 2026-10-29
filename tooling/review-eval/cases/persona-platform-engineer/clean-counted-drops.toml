@@ -56,3 +56,4 @@ the rows it changes and the `@pending` scenarios it takes off.
 [[expect.none]]
 path = "plan/2610301012_counted_drops.md"
 severity = "blocking"
+mentions_any = ["silent", "uncounted", "without counting", "shared data directory"]
