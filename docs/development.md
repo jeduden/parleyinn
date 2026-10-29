@@ -163,28 +163,27 @@ binary then runs once on its own platform and must report what it
 was stamped with. Each target is built once: the release build is not
 checked for reproducibility.
 
-[review.yml](../.github/workflows/review.yml) reviews each pull request from
-a branch of this repository once its CI passes (ENG-21, ENG-28). It skips
-drafts, so a pull request is reviewed when it is marked ready, which reruns
-CI. The agent runs on the stakeholder's Claude subscription, not an API key
-billed per model token. It triggers on `workflow_run`, so GitHub runs it as
-`main` defines it, never as the pull request does. It also triggers on
-`issue_comment`, which GitHub runs as `main` defines it too: a code owner's
-comment on a pull request whose CI passed reviews it again. Consent to a
-stakeholder path is such a comment, so the review that reads it follows at
-once. The review job first runs main's `review-bundle` over main's tree and
-the pull request's: it writes the review bundle the agent reads, sets the
-review's class and makes the deterministic findings (see Review). The agent
-then runs with read-only tools on the pull request's tree, following [the
-review skill](../.claude/skills/review/SKILL.md). It only writes a review
-outcome. The post job alone has the reviewer app's key. It runs the
+[review.yml](../.github/workflows/review.yml) reviews each pull request from a
+branch of this repository once its CI passes (ENG-21, ENG-28). It skips drafts:
+marking a pull request ready reruns CI and so reviews it. The agent runs on the
+stakeholder's Claude subscription, not a per-token API key. It triggers on
+`workflow_run` and `issue_comment`, so GitHub runs it as `main` defines it,
+never as the pull request does; a code owner's comment on a pull request whose
+CI passed reviews it again. Consent to a stakeholder path is such a comment, so
+its review follows at once. The review job first runs main's `review-bundle`
+over main's tree and the pull request's: it writes the review bundle the agent
+reads, sets the review's class and makes the deterministic findings (see
+Review). The agent then runs with read-only tools on the pull request's tree,
+following [the review skill](../.claude/skills/review/SKILL.md), and writes only
+a review outcome. The post job alone has the reviewer app's key. It runs the
 `review-gate` crate's executable, which approves only an approving review
 outcome with no blocking finding, its own or a deterministic one, on the
-reviewed head, with `CI` green there; otherwise it requests changes. It
-posts the same decision as the `review-gate` check.
+reviewed head, with `CI` green there; otherwise it requests changes. It posts
+the same decision as the `review-gate` check.
 [ADR-2609301941](adr/ADR-2609301941-agent-review.md) records why, and
-[ADR-2610262245](adr/ADR-2610262245-layered-agent-review.md) proposes
-the layers.
+[ADR-2610262245](adr/ADR-2610262245-layered-agent-review.md) proposes the
+layers; [review-evaluation.md](review-evaluation.md) is the `evaluate` job
+between the two (ENG-32).
 
 Main's protection is committed as a ruleset,
 [main.json](../.github/rulesets/main.json), in GitHub's export format
@@ -253,11 +252,9 @@ What CI decides, on every pull request:
 - rustfmt and clippy, with each product crate's bans on sockets and
   program starts (I4), on clocks and hash order (I10) and on waits with
   no deadline (ENG-03), the complexity limits, and the reach test;
-- the crates' declared dependency directions and responsibilities
-  (ENG-02);
+- the crates' dependency directions and responsibilities (ENG-02);
 - no mutable global state in a product crate (ENG-03);
-- coverage per test layer (ENG-11), and every live scenario;
-- the benchmark gate (ENG-15).
+- coverage per test layer (ENG-11), live scenarios, the benchmark gate (ENG-15).
 
 What `review-bundle` decides, comparing the pull request with main:
 
@@ -285,7 +282,10 @@ the reviewer app's last review, found by the app's own login. The pull
 request's agent instructions move out of the agent's directory, so none
 loads; the agent reads them as data. The posted review names the gate as its
 author, states the agent's verdict, and keeps the agent's findings, the
-deterministic ones and failed checks under their own headings.
+deterministic ones and failed checks under their own headings. A pull request
+that changes a reviewer component also runs that component's evaluation
+cases, whose failures are blocking findings (ENG-32,
+[review-evaluation.md](review-evaluation.md)).
 
 What is left to the agent is judgement: whether the code and the step
 bindings do what each touched row says, new paths to the model (I2),

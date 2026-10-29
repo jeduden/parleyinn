@@ -109,15 +109,18 @@ footer: |
 
 ?>
 
-| #   | Status | Phase                                           |
-| --- | ------ | ----------------------------------------------- |
-| 1   | 🔳     | [The harness, the cases and ENG-32](phase-1.md) |
+| #   | Status | Phase                                                                                                                                                                                                                                                                                                              |
+| --- | ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 1   | ✅     | [The harness, the cases and ENG-32](phase-1.md)                                                                                                                                                                                                                                                                    |
+|     | ↳      | ENG-32 added and off @pending. The review-eval crate builds the review's own world for a case, runs the component through claude on its model, grades the report deterministically and scores the runs; 185 cases cover 63 components, 59 written and the rest derived; two gate tests with drift cases hold them. |
+| 2   | ✅     | [The evaluate job, the scheduled run and the comparison](phase-2.md)                                                                                                                                                                                                                                               |
+|     | ↳      | review.yml plans what a pull request changed and runs those cases in an evaluate job whose findings the gate weighs; review-eval.yml runs every component weekly against the published scorecard and compares a candidate model on demand. The live run on a pull request waits for the workflow to reach main.    |
 <?/catalog?>
 
 ## Acceptance Criteria
 
-- [ ] Scenario `@ENG-32` passes, off `@pending`
-- [ ] Every component the review bundle can dispatch, the orchestrator
+- [x] Scenario `@ENG-32` passes, off `@pending`
+- [x] Every component the review bundle can dispatch, the orchestrator
       and each deep instance has its three kinds of case, and
       `review-eval check` applies every case to the checkout
 - [ ] A pull request that changes a component gets that component's

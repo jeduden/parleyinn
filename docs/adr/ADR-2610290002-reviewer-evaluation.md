@@ -53,10 +53,13 @@ with no measurement to say so.
   `stream-json` log gives the answer, the resolved model, usage, cost,
   turns, the files written and the agents called.
 - **Grading.** The report format is fixed, so a grader decides without
-  a judge model: the outcome line, each finding line, the answer being
-  the last line and path, the report written, nothing else written.
-  Each failed assertion is named, so a failing case reads like a
-  failing test.
+  a judge model: the outcome line, each finding line, the report
+  written, nothing else written. Each failed assertion is named, so a
+  failing case reads like a failing test. A departure from the shape
+  that the review survives, such as a label line or an answer that is
+  more than the last line and the path, is a slip: counted and shown,
+  never a failed run, so a scorecard says how well a model holds the
+  shape without that drowning what it found.
 - **Repetitions.** A case runs up to three times and passes with two
   passes, stopping as soon as the result is decided. Every run's usage
   and cost are kept per model.
@@ -77,10 +80,12 @@ with no measurement to say so.
 
 ## Alternatives
 
-- **`claude plugin eval`.** Cases as YAML with graders and an LLM
-  judge, for a plugin. It builds no fixture world and runs no review
-  bundle, so the dispatch and the report files would stay unproven,
-  and its format is marked experimental.
+- **`claude plugin eval`.** Cases as prompts with graders and an LLM
+  judge, for a plugin. It gives a case read-only fixture directories
+  and a scaffold script, but no review bundle, no way to run an agent
+  as the session itself, and no usage per model in its results, so the
+  dispatch, the report files and the cost would stay unproven, and its
+  format is marked experimental.
 - **An LLM judge.** A judge reads a report for quality the grader
   cannot see, such as whether the one sentence is apt. It adds a model
   whose own drift would need evaluating; the fixed report shape makes

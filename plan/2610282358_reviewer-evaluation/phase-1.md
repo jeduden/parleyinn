@@ -1,7 +1,7 @@
 ---
 n: 1
 title: "The harness, the cases and ENG-32"
-status: "🔳"
+status: "✅"
 result: false
 ---
 # Phase 1: the harness, the cases and ENG-32
