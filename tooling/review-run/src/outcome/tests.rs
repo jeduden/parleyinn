@@ -297,6 +297,18 @@ fn a_dropped_line_starts_with_dropped_after_any_marker() {
 }
 
 #[test]
+fn a_finding_on_a_path_that_starts_with_dropped_is_still_kept() {
+    for line in [
+        "dropped_events.rs:12 — blocking — leaks a pin — I3",
+        "- `dropped.rs`:3 — blocking — leaks a pin — I3",
+        "Droppedfoo/bar.rs:3 — nit — tidy — lang-rust",
+    ] {
+        assert!(!dropped(line), "{line}");
+        assert_eq!(kept(line).len(), 1, "{line}");
+    }
+}
+
+#[test]
 fn the_closing_sentence_is_the_last_line_of_prose() {
     assert_eq!(
         closing("a.rs:1 — nit — x\nThe scope holds.\n\ndropped — b.rs:2 — y\n# End\n").as_deref(),

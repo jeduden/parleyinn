@@ -204,8 +204,10 @@ pub fn kept(answer: &str) -> Vec<Finding> {
 /// for a finding it drops.
 const DROPPED: &str = "dropped";
 
-/// Whether `line` reports a dropped finding: it starts with `dropped`,
-/// in any case, after any list marker or emphasis.
+/// Whether `line` reports a dropped finding: its first word is
+/// `dropped`, in any case, after any list marker or emphasis. A path
+/// that merely starts with the letters, `dropped_events.rs:12`, is a
+/// finding on that path and is kept.
 #[must_use]
 pub fn dropped(line: &str) -> bool {
     let line = line.trim();
@@ -214,8 +216,12 @@ pub fn dropped(line: &str) -> bool {
         .or_else(|| line.strip_prefix("* "))
         .unwrap_or(line);
     line.trim_start_matches(['*', '_', '`', '>', ' '])
-        .get(..DROPPED.len())
-        .is_some_and(|w| w.eq_ignore_ascii_case(DROPPED))
+        .split_whitespace()
+        .next()
+        .is_some_and(|word| {
+            word.trim_end_matches(['*', '_', '`', ':', ',', '.'])
+                .eq_ignore_ascii_case(DROPPED)
+        })
 }
 
 /// A generalist's closing sentence on its scope: the last line of its

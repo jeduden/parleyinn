@@ -34,9 +34,14 @@ const AGENTS: &str = ".claude/agents";
 /// section and per domain-model file.
 const SECTION_PREFIX: &str = "srs-";
 const MODEL_PREFIX: &str = "domain-model-";
-/// The sentence of the shared report section whose specialists write
-/// one finding per line in a fixed shape.
-const ONE_LINE_EACH: &str = "each on one line";
+/// The sentences of the shared report sections whose specialists write
+/// one finding per line in a fixed shape: the earlier wording and the
+/// two of the current ones, which a file may wrap anywhere.
+const ONE_LINE_EACH: [&str; 3] = [
+    "each on one line",
+    "every line of the report is a finding or the outcome",
+    "every line is a finding or the outcome",
+];
 
 /// What a component is in the review.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -220,7 +225,7 @@ pub fn load(tree: &Path, name: &str) -> Result<Component, String> {
     let file = file_of(name);
     let text = fs::read_to_string(tree.join(&file)).map_err(|e| format!("read {file}: {e}"))?;
     let kind = kind_of(name);
-    let strict_lines = text.contains(ONE_LINE_EACH);
+    let strict_lines = one_finding_per_line(&text);
     let (fields, _) = adr::front_matter(&text).map_err(|e| format!("{file}: {e}"))?;
     let keys: &[&str] = if kind == Kind::Orchestrator {
         &SKILL_KEYS
@@ -278,6 +283,18 @@ pub fn load(tree: &Path, name: &str) -> Result<Component, String> {
         tools,
         strict_lines,
     })
+}
+
+/// Whether `text` holds a sentence that has a report hold one finding
+/// per line, however the file wraps it.
+fn one_finding_per_line(text: &str) -> bool {
+    let flat = text
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ")
+        .to_lowercase();
+
+    ONE_LINE_EACH.iter().any(|marker| flat.contains(marker))
 }
 
 /// Refuses a front matter key of `file` outside `allowed`.
