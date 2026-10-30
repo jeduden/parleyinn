@@ -105,6 +105,11 @@ fn findings(b: &mut String, a: &Analysis) {
         for line in r.summary.lines() {
             let _ = writeln!(b, "> {line}");
         }
+        b.push_str(
+            "\nThe stakeholder consents to this change in a comment on the pull request, \
+             which this bundle read; the record's approval rests on it, not on the pull \
+             request's own text.\n",
+        );
     }
 }
 

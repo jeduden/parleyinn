@@ -41,7 +41,7 @@ pub const INVARIANTS: &str = "docs/srs/invariants.md";
 /// The sentence the clean change adds to the invariants, true wherever
 /// the invariants are included.
 pub const INVARIANTS_SENTENCE: &str =
-    "These ten invariants change only as ENG-29 requires, through a reviewed pull request.";
+    "These ten invariants change only as ENG-29 requires: with an accepted ADR recording a named human security reviewer's approval.";
 /// The decision record the clean change to the invariants adds.
 pub const INVARIANTS_ADR_PATH: &str = "docs/adr/ADR-2610290999-invariants-change-through-review.md";
 /// The stakeholder's consent to the clean change to the invariants.
@@ -53,9 +53,10 @@ title: \"The invariants state how they change\"
 status: accepted
 summary: >-
   ENG-29's record of a sentence added to docs/srs/invariants.md: the
-  ten invariants change only as ENG-29 requires, through a reviewed
-  pull request. No invariant's words change. Approved by the security
-  reviewer, `jeduden`.
+  ten invariants change only as ENG-29 requires, with an accepted ADR
+  recording a named human security reviewer's approval. No invariant's
+  words change. It records the approval of the security reviewer,
+  `jeduden`.
 ---
 # ADR-2610290999: The invariants state how they change
 
@@ -67,8 +68,8 @@ stakeholder's consent. The invariants' source did not say so itself.
 ## Decision
 
 `docs/srs/invariants.md` gains one sentence under its title: these ten
-invariants change only as ENG-29 requires, through a reviewed pull
-request. The files that include the invariants show it too. No
+invariants change only as ENG-29 requires, with an accepted ADR
+recording a named human security reviewer's approval. The files that include the invariants show it too. No
 invariant's words change.
 
 ## Consequences

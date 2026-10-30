@@ -246,6 +246,10 @@ fn bundle_quotes_the_eng_29_record_and_the_unread_headers() {
         got.contains("\nENG-29 record: `docs/adr/ADR-1-x.md`, whose summary reads:\n\n> Approved.\n> By them.\n"),
         "{got}"
     );
+    assert!(
+        got.contains("> By them.\n\nThe stakeholder consents to this change in a comment on the pull request, which this bundle read; the record's approval rests on it, not on the pull request's own text.\n"),
+        "{got}"
+    );
 }
 
 #[test]
