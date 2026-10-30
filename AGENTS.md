@@ -197,9 +197,10 @@ Open only the [SRS](docs/srs/index.md) section a task touches.
 
 ## Development Workflow
 
-- Any change follows Red/Green TDD: failing test, then pass, then commit
-- Keep commits small and focused on one change
+- Red/Green TDD: failing test, pass, commit; keep commits small, one change each
 - Run tools through `mise exec --`; `mdsmith check .` must pass before a push
+- Run `scripts/review-local.sh` before a push ([ci.md](docs/ci.md))
+- An orchestrating agent hands code changes to specialized subagents
 - Never modify `.mdsmith.yml` (linter configuration) without explicit consent
 - Every direct dependency needs an accepted ADR under `docs/adr/`, listed in
   [DEPENDENCIES.md](DEPENDENCIES.md) (ENG-18, ENG-26); aim to add none
@@ -222,10 +223,9 @@ requirement id has exactly one scenario, tagged with the id, its priority and
 its traced invariants, and a gate test fails the build when the two drift. The
 mechanics are in [docs/development.md](docs/development.md).
 
-- Implementing a requirement means making its scenario pass: drop `@pending`,
-  make the steps concrete, bind them in
-  `tooling/scenario/tests/bdd/<section>.rs`. Unit tests alone do not close a
-  requirement.
+- Implement a requirement by making its scenario pass: drop `@pending`, make the
+  steps concrete, bind them in `tooling/scenario/tests/bdd/<section>.rs`. Unit
+  tests alone never close one.
 - A new or changed requirement lands with its scenario in the same change,
   `@pending` until written.
 - Never delete, retag or re-pend a scenario to make CI green. A scenario that
