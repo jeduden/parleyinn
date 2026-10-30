@@ -507,7 +507,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [0, 1, 2, 3]
+        shard: [0, 1, 2, 3, 4, 5]
     env:
       # Every nth case from the shard's own, n the matrix's size, so the
       # shards together hold every case once and each fits the budget.
