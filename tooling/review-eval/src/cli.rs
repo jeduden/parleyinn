@@ -11,7 +11,7 @@ use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 use std::thread;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use crate::case::Case;
 use crate::component::{self, Component, file_of, hash, suite_of};
@@ -77,7 +77,7 @@ pub fn run(
     host: &dyn Host,
     args: impl IntoIterator<Item = String>,
     stdout: &mut dyn Write,
-    stderr: &mut dyn Write,
+    stderr: &mut (dyn Write + Send),
 ) -> u8 {
     let (command, flags) = match parse(args) {
         Ok(parsed) => parsed,
@@ -237,7 +237,7 @@ fn run_command(
     host: &dyn Host,
     flags: &Flags,
     stdout: &mut dyn Write,
-    stderr: &mut dyn Write,
+    stderr: &mut (dyn Write + Send),
 ) -> Result<u8, Problem> {
     only(
         flags,
@@ -279,15 +279,15 @@ fn run_command(
         write_outputs(&options.out, &Scorecard::default())?;
         return Ok(EXIT_OK);
     }
-    let progress = Mutex::new(Vec::new());
+    // Each line goes out as it happens, with the time since the run began,
+    // so a long evaluation shows what it is doing.
+    let started = Instant::now();
+    let stderr = Mutex::new(stderr);
     let scorecard = evaluate(host, &options, &components, &|line| {
-        if let Ok(mut lines) = progress.lock() {
-            lines.push(line.to_owned());
+        if let Ok(mut out) = stderr.lock() {
+            let _ = writeln!(out, "[+{}] {line}", clock(started.elapsed()));
         }
     })?;
-    for line in progress.lock().map(|l| l.clone()).unwrap_or_default() {
-        let _ = writeln!(stderr, "{line}");
-    }
     write_outputs(&options.out, &scorecard)?;
     let _ = write!(stdout, "{}", scorecard.markdown());
 
@@ -326,6 +326,22 @@ fn selected(flags: &Flags, checkout: &Path) -> Result<Vec<String>, Problem> {
     out.dedup();
 
     Ok(out)
+}
+
+/// `elapsed` as minutes and seconds, `04:05`; with hours, `1:04:05`.
+fn clock(elapsed: Duration) -> String {
+    let secs = elapsed.as_secs();
+    let (h, m, s) = (secs / 3600, secs % 3600 / 60, secs % 60);
+    if h > 0 {
+        format!("{h}:{m:02}:{s:02}")
+    } else {
+        format!("{m:02}:{s:02}")
+    }
+}
+
+/// `n` of `noun`, in the plural unless it is one.
+fn counted(n: usize, noun: &str) -> String {
+    format!("{n} {noun}{}", if n == 1 { "" } else { "s" })
 }
 
 /// Evaluates `components` as `options` say, each case of each up to
@@ -378,12 +394,19 @@ pub fn evaluate(
     }
     fs::create_dir_all(options.out.join(RUNS))
         .map_err(|e| format!("make {}: {e}", options.out.join(RUNS).display()))?;
+    let total = jobs.len();
+    progress(&format!(
+        "evaluating {} of {}, {} at a time",
+        counted(total, "case"),
+        counted(components.len(), "component"),
+        options.parallel
+    ));
     let queue = Mutex::new(jobs);
     let records: Mutex<Vec<CaseRecord>> = Mutex::new(Vec::new());
     let worktrees = Mutex::new(());
     thread::scope(|scope| {
         for _ in 0..options.parallel {
-            scope.spawn(|| worker(host, options, &queue, &records, &worktrees, progress));
+            scope.spawn(|| worker(host, options, &queue, &records, &worktrees, total, progress));
         }
     });
     let mut records = records.into_inner().unwrap_or_default();
@@ -400,13 +423,14 @@ pub fn evaluate(
 }
 
 /// Takes cases off `queue` until it is empty, running each and
-/// keeping its record.
+/// keeping its record; `total` is how many cases the evaluation holds.
 fn worker(
     host: &dyn Host,
     options: &Options,
     queue: &Mutex<Vec<(Component, Case)>>,
     records: &Mutex<Vec<CaseRecord>>,
     worktrees: &Mutex<()>,
+    total: usize,
     progress: &(dyn Fn(&str) + Sync),
 ) {
     loop {
@@ -415,9 +439,11 @@ fn worker(
             return;
         };
         let record = run_case(host, options, &component, &case, worktrees, progress);
-        if let Ok(mut records) = records.lock() {
+        let decided = records.lock().map_or(0, |mut records| {
             records.push(record);
-        }
+            records.len()
+        });
+        progress(&format!("{decided}/{total} cases decided"));
     }
 }
 
@@ -454,6 +480,10 @@ fn run_case(
             .join(&component.name)
             .join(&case.name)
             .join(n.to_string());
+        progress(&format!(
+            "{}/{} run {n}: started",
+            component.name, case.name
+        ));
         let run = one_run(host, options, component, case, &dir, worktrees);
         progress(&format!(
             "{}/{} run {n}: {} ({:.4} USD, {} turns){}{}",

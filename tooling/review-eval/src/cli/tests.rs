@@ -898,3 +898,89 @@ fn compare_and_publish_name_what_they_cannot_read() {
     assert_eq!(code, EXIT_FAILURE);
     assert!(err.starts_with("review-eval: read "), "{err}");
 }
+
+/// A writer two threads share, so a test reads what a run has written
+/// so far.
+#[derive(Clone, Default)]
+struct Shared(std::sync::Arc<Mutex<Vec<u8>>>);
+
+impl Write for Shared {
+    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+        self.0.lock().unwrap().extend_from_slice(buf);
+        Ok(buf.len())
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        Ok(())
+    }
+}
+
+impl Shared {
+    fn text(&self) -> String {
+        String::from_utf8(self.0.lock().unwrap().clone()).unwrap()
+    }
+}
+
+#[test]
+fn run_reports_its_progress_as_it_goes() {
+    let dir = checkout();
+    sound_cases(dir.path());
+    let err = Shared::default();
+    let seen: std::sync::Arc<Mutex<Vec<String>>> = std::sync::Arc::default();
+    let (watched, log) = (err.clone(), seen.clone());
+    let inner = obedient_claude();
+    let mut host = FakeHost::new(dir.path());
+    host.claude = Box::new(move |c: &Command| {
+        log.lock().unwrap().push(watched.text());
+        inner(c)
+    });
+    let out = TempDir::new().unwrap();
+    let out_dir = out.path().join("out");
+    let args = [
+        "run",
+        "--checkout",
+        &text(dir.path()),
+        "--component",
+        "lang-rust",
+        "--out",
+        &text(&out_dir),
+        "--parallel",
+        "1",
+    ];
+
+    let code = run(
+        &host,
+        args.iter().map(|a| (*a).to_owned()),
+        &mut Vec::new(),
+        &mut err.clone(),
+    );
+
+    assert_eq!(code, EXIT_OK);
+    let first = seen.lock().unwrap()[0].clone();
+    assert!(
+        first.contains("evaluating 3 cases of 1 component, 1 at a time"),
+        "{first}"
+    );
+    assert!(
+        first.contains("] lang-rust/") && first.contains(" run 1: started"),
+        "{first}"
+    );
+    let all = err.text();
+    assert!(all.contains("1/3 cases decided"), "{all}");
+    assert!(all.contains("3/3 cases decided"), "{all}");
+    assert!(all.lines().all(|l| l.starts_with("[+")), "{all}");
+}
+
+#[test]
+fn clock_reads_minutes_seconds_and_hours() {
+    assert_eq!(clock(Duration::from_secs(0)), "00:00");
+    assert_eq!(clock(Duration::from_secs(245)), "04:05");
+    assert_eq!(clock(Duration::from_secs(3_725)), "1:02:05");
+}
+
+#[test]
+fn counted_uses_the_plural_unless_one() {
+    assert_eq!(counted(1, "case"), "1 case");
+    assert_eq!(counted(0, "case"), "0 cases");
+    assert_eq!(counted(3, "component"), "3 components");
+}
