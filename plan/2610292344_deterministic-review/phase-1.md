@@ -1,7 +1,7 @@
 ---
 n: 1
 title: "The review-run crate against a fake host"
-status: "🔲"
+status: "✅"
 result: false
 ---
 # Phase 1: the review-run crate against a fake host
@@ -31,11 +31,14 @@ RED. Write tests for each of these, in order:
 - The consulted list and `answers.json` as the gate reads them.
 - Usage per agent.
 
-GREEN. A \`tooling/review-run\` crate with a library and a thin
-executable, depending on \`review-eval\`'s host, runner and log modules
+GREEN. A `tooling/review-run` crate with a library and a thin
+executable, depending on `review-eval`'s host, runner and log modules
 (extract what it needs into a shared module if a dependency on the whole
-crate is too wide), no new third-party dependency.
+crate is too wide), no new third-party dependency. As built, it depends
+on the whole `review-eval` crate, whose process host moved from its
+executable into a `process` module both executables share, and on
+`review-gate` for its report check and outcome type.
 
 Gate. The crate's unit coverage holds the 99% floor; clippy is clean;
-\`review-run\` against a recorded bundle and a fake \`claude\` writes the
-files the gate reads, and \`review-gate\` accepts them.
+`review-run` against a recorded bundle and a fake `claude` writes the
+files the gate reads, and `review-gate` accepts them.
