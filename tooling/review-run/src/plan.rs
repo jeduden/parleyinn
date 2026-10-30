@@ -113,13 +113,9 @@ pub fn parse_dispatch(text: &str) -> Result<Dispatch, String> {
     Ok(dispatch)
 }
 
-/// Refuses `name` unless it is lowercase letters, digits and hyphens.
+/// Refuses `name` unless it is an agent's name.
 fn agent_name(name: &str) -> Result<(), String> {
-    let fits = !name.is_empty()
-        && name
-            .chars()
-            .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-');
-    if fits {
+    if review_bundle::dispatch::is_agent_name(name) {
         Ok(())
     } else {
         Err(format!("malformed dispatch: agent name {name:?}"))

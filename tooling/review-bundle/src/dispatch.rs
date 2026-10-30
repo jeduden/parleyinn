@@ -165,13 +165,20 @@ pub fn model_specialist(file: &str) -> Option<String> {
     }
 }
 
-/// `name` when it reads as an agent's name, lowercase letters, digits
-/// and hyphens, so no path a pull request names writes markup into the
-/// review bundle.
+/// Whether `name` reads as an agent's name: lowercase letters, digits
+/// and hyphens, never empty, so it can name a file.
+#[must_use]
+pub fn is_agent_name(name: &str) -> bool {
+    !name.is_empty()
+        && name
+            .chars()
+            .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-')
+}
+
+/// `name` when it reads as an agent's name, so no path a pull request
+/// names writes markup into the review bundle.
 fn agent_name(name: &str) -> Option<String> {
-    name.chars()
-        .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-')
-        .then(|| name.to_owned())
+    is_agent_name(name).then(|| name.to_owned())
 }
 
 /// The agents to consult for `paths`, the changed paths, and `rows`,

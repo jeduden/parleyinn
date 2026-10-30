@@ -143,18 +143,20 @@ fn runs_agents(text: &str) -> bool {
     text.contains(AGENT_RUN) || text.contains(AGENT_ACTION)
 }
 
-/// The tools of the comma-separated `tools` that write or run commands
-/// other than `scoped`.
+/// The tools of the comma-separated `tools` other than reading and
+/// `scoped`: anything that writes, runs a command, reaches the web or
+/// starts an agent.
 fn unscoped<'a>(tools: &'a str, scoped: &'a str) -> impl Iterator<Item = &'a str> {
     tools
         .split(',')
         .map(str::trim)
-        .filter(|t| {
-            ["Write", "Edit", "NotebookEdit", "Bash"]
-                .iter()
-                .any(|w| t.starts_with(w))
+        .filter(|t| !t.is_empty())
+        .filter(move |t| {
+            *t != scoped
+                && !["Read", "Glob", "Grep"]
+                    .iter()
+                    .any(|r| t == r || t.starts_with(&format!("{r}(")))
         })
-        .filter(move |t| *t != scoped)
 }
 
 impl Workflow {

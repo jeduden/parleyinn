@@ -136,8 +136,8 @@ workflow" button with a `model`, it runs the cases on that model instead
 and writes the comparison into its summary. That is how a candidate
 model is weighed before a component moves to it. Both run from main's
 definition. The Claude Code command line both start is an npm package,
-which the mise rule for released binaries refuses, so each workflow pins
-its version in `CLAUDE_CODE_VERSION` (ENG-01).
+which the mise rule for released binaries refuses, so both workflows install
+it through `.github/actions/claude-code`, which pins its version (ENG-01).
 
 ## Changing a component or a case
 

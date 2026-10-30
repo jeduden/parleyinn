@@ -70,9 +70,6 @@ jobs:
     permissions:
       contents: read
       pull-requests: read
-    env:
-      # The Claude Code command line each agent runs in, pinned (ENG-01).
-      CLAUDE_CODE_VERSION: "2.1.312"
     outputs:
       pull: ${{ steps.pull_head.outputs.number }}
       head_sha: ${{ steps.pull_head.outputs.head_sha }}
@@ -253,12 +250,9 @@ jobs:
             done
             rm -rf "$f"
           done < instructions.list > review/pr-instructions.txt
-      # The command line is an npm package, which mise's released-binary
-      # rule refuses, so it is pinned here and installed with npm, as the
-      # evaluate job installs it.
       - name: Install the pinned Claude Code command line
         if: steps.pull_head.outputs.number != ''
-        run: npm install --global --no-fund --no-audit "@anthropic-ai/claude-code@$CLAUDE_CODE_VERSION" # zizmor: ignore[adhoc-packages] pinned to one version by CLAUDE_CODE_VERSION, which no mise backend the repository allows can install
+        uses: ./.github/actions/claude-code
       # Built, its crates fetched and their build scripts run, before the
       # Claude token is in any step's environment; the Review step runs
       # it offline.
@@ -332,6 +326,18 @@ jobs:
             review/usage.json
           if-no-files-found: error
 
+      # Each agent's run log, kept even when the review failed or timed
+      # out, so a run that did not answer can be read; they hold what the
+      # agents read, so they stay a week.
+      - name: Keep the run logs
+        if: always() && steps.pull_head.outputs.number != ''
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: review-logs
+          path: review/logs/
+          retention-days: 7
+          if-no-files-found: ignore
+
   evaluate:
     # The cases of each reviewer component the pull request changes, run
     # on the model its front matter names from the pull request's
@@ -346,9 +352,6 @@ jobs:
     timeout-minutes: 90
     permissions:
       contents: read
-    env:
-      # The Claude Code command line the harness starts, pinned (ENG-01).
-      CLAUDE_CODE_VERSION: "2.1.312"
     steps:
       - name: Read the plan
         id: plan
@@ -387,11 +390,9 @@ jobs:
           tools: "rust github:jeduden/mdsmith"
           # Jobs handling review credentials never restore executable caches.
           cache: false
-      # The command line is an npm package, which mise's released-binary
-      # rule refuses, so it is pinned here and installed with npm.
       - name: Install the pinned Claude Code command line
         if: steps.plan.outputs.empty == 'false'
-        run: npm install --global --no-fund --no-audit "@anthropic-ai/claude-code@$CLAUDE_CODE_VERSION" # zizmor: ignore[adhoc-packages] pinned to one version by CLAUDE_CODE_VERSION, which no mise backend the repository allows can install
+        uses: ./.github/actions/claude-code
       # Exit 1 says a case failed: its blocking finding reaches the gate
       # through findings.json, so the review requests changes and names
       # the case. Any other exit is the harness's own failure and fails

@@ -1,0 +1,13 @@
+name: Install the pinned Claude Code command line
+description: Install the Claude Code command line the review's agents and the evaluation run in, at the one version the repository pins (ENG-01)
+runs:
+  using: composite
+  steps:
+    # The command line is an npm package, which mise's released-binary
+    # rule refuses, so the version is pinned here, once, and installed
+    # with npm.
+    - name: Install with npm
+      shell: bash
+      env:
+        CLAUDE_CODE_VERSION: "2.1.312"
+      run: npm install --global --no-fund --no-audit "@anthropic-ai/claude-code@$CLAUDE_CODE_VERSION" # zizmor: ignore[adhoc-packages] pinned to one version by CLAUDE_CODE_VERSION, which no mise backend the repository allows can install

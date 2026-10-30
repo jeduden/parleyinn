@@ -629,3 +629,17 @@ fn evaluate_job_runs_fails_without_the_job_or_the_key_s_job() {
         "0 jobs read \"APP_KEY\", want exactly one"
     );
 }
+
+#[test]
+fn agents_write_only_allows_only_reading_and_the_scoped_report() {
+    let loose = [("specialist", "Read,Glob,Grep,WebFetch,Agent,mcp__x__y")];
+
+    assert_eq!(
+        parse(REVIEW_FLOW).agents_write_only("review/reports", &loose),
+        [
+            "review-run's specialist may use WebFetch, want Edit(./review/reports/**) alone",
+            "review-run's specialist may use Agent, want Edit(./review/reports/**) alone",
+            "review-run's specialist may use mcp__x__y, want Edit(./review/reports/**) alone",
+        ]
+    );
+}
