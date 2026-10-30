@@ -92,6 +92,8 @@ pub fn cases() -> Vec<Case> {
         isolation_cases(),
         instruction_cases(),
         transcript_contract_cases(),
+        // Late, so adding it moves no earlier case to another shard.
+        vec![consent_case()],
         // Last: its cases edit source the later cases would run stale.
         license_text_cases(),
     ]
@@ -626,13 +628,13 @@ fn review_evaluation_cases() -> Vec<Case> {
             "case review/defect-unwrap names no component",
         ),
         protection_case(
-            "a reviewer evaluation case that dispatches no one",
+            "a reviewer evaluation case no rule routes to its component",
             Injection::create(
                 "tooling/review-eval/cases/lang-toml/stray.toml",
                 "component = \"lang-toml\"\nkind = \"other\"\ntitle = \"a note\"\n\n[[create]]\nfile = \"research/note.txt\"\ncontent = \"x\"\n\n[expect]\n",
             ),
             "the_checkout_s_reviewer_evaluation_cases_apply_and_dispatch",
-            "case lang-toml/stray does not dispatch lang-toml; the bundle dispatches no agent",
+            "case lang-toml/stray does not dispatch lang-toml; the bundle dispatches review-code",
         ),
         case(
             "the review workflow's evaluate job removed",
@@ -764,7 +766,6 @@ fn review_gate_cases() -> Vec<Case> {
             ),
             "class=light",
         ),
-        consent_case(),
     ]
 }
 
