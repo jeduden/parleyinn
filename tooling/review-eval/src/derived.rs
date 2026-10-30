@@ -40,8 +40,7 @@ pub const ADDED_MUST: &str = " It MUST also record the change in the audit log."
 pub const INVARIANTS: &str = "docs/srs/invariants.md";
 /// The sentence the clean change adds to the invariants, true wherever
 /// the invariants are included.
-pub const INVARIANTS_SENTENCE: &str =
-    "These ten invariants change only as ENG-29 requires: with an accepted ADR recording a named human security reviewer's approval.";
+pub const INVARIANTS_SENTENCE: &str = "These ten invariants change only as ENG-29 requires: with an accepted ADR recording a named human security reviewer's approval.";
 /// The decision record the clean change to the invariants adds.
 pub const INVARIANTS_ADR_PATH: &str = "docs/adr/ADR-2610290999-invariants-change-through-review.md";
 /// The stakeholder's consent to the clean change to the invariants.

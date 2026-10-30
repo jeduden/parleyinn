@@ -427,7 +427,10 @@ fn teardown_removes_both_worktrees_and_prunes() {
     )
     .unwrap();
 
-    assert_eq!(teardown(&host, repo.path(), dir.path(), &Mutex::new(())), Ok(()));
+    assert_eq!(
+        teardown(&host, repo.path(), dir.path(), &Mutex::new(())),
+        Ok(())
+    );
 
     assert!(!world.main.exists());
     let calls = host.calls();
@@ -439,7 +442,10 @@ fn teardown_removes_both_worktrees_and_prunes() {
     );
     assert_eq!(calls.last().map(String::as_str), Some("git worktree prune"));
     // Nothing left to remove is fine.
-    assert_eq!(teardown(&host, repo.path(), dir.path(), &Mutex::new(())), Ok(()));
+    assert_eq!(
+        teardown(&host, repo.path(), dir.path(), &Mutex::new(())),
+        Ok(())
+    );
 }
 
 #[test]
