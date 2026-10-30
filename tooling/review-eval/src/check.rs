@@ -188,11 +188,8 @@ pub fn examine_from(
             Ok(Some(dispatched)) => problems.cases.push(format!(
                 "case {id} does not dispatch {}; the bundle dispatches {}",
                 component.name,
-                if dispatched.is_empty() {
-                    "no agent".to_owned()
-                } else {
-                    dispatched.into_iter().collect::<Vec<_>>().join(", ")
-                }
+                // The bundle always dispatches an agent, so this is never empty.
+                dispatched.into_iter().collect::<Vec<_>>().join(", ")
             )),
             Err(e) => problems.cases.push(e),
         }
