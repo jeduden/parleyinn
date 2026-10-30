@@ -96,7 +96,11 @@ The review job's `review-run` starts each dispatched agent through the
 harness's own runner, so an agent in the review and in its cases gets
 the same tools, write rule, turn budget and prompt. A case that fails
 becomes a blocking finding, which the gate weighs beside the bundle's.
-With nothing to evaluate the job ends in seconds. A component main
+With nothing to evaluate the job ends in seconds. A change to a shared
+section reaches every component that includes it, so the plan holds one
+component per distinct set of shared sections, the first by name, with
+the rest named in its reason; a component whose own text or cases changed
+is always planned, and the weekly run covers every component. A component main
 already has is judged by main's cases; the pull request's cases judge
 only the components it adds, so a change cannot soften the cases that
 judge it.
