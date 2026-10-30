@@ -36,6 +36,25 @@ and the `ci-review` skill measures them.
   and uploads them as the `ci-timings` artifact. Read those; do not
   measure again.
 
+## Feedback time
+
+The loop is edit, check here, review here, push, CI, fix. Each turn of it
+is short, because a finding found late costs a whole round.
+
+- Review here before every push: `scripts/review-local.sh` runs the
+  review against `origin/main`, or with `--base REF` against the commit
+  last reviewed, so a fix cycle reviews only what moved. A small change
+  reviews in about a minute.
+- CI ends within ten minutes of a push. The slowest chain of jobs sets
+  that; a job that grows toward its five-minute limit is split before it
+  fails.
+- `review-eval plan` prints how many runs, minutes and dollars an
+  evaluation is expected to take. A plan beyond 150 runs is a reason to
+  split the change, or to keep its shared-section edit apart from the
+  rest.
+- A workflow or tool change that makes any step of this loop slower is a
+  finding, with the measured time before and after.
+
 ## Stable
 
 - Every action is fixed to a commit SHA and every tool to its pin.

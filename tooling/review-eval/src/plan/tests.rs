@@ -229,3 +229,31 @@ fn sections_of_names_each_included_file_once_sorted() {
     );
     assert!(sections_of("none\n").is_empty());
 }
+
+#[test]
+fn estimate_scales_with_cases_and_shrinks_with_parallelism() {
+    // The last full evaluation: 230 cases took 475 runs, 21 s and about
+    // 4 cents a run.
+    let got = estimate(100, 12);
+
+    assert_eq!(
+        got,
+        Estimate {
+            runs: 210,
+            minutes: 7,
+            cents: 840,
+        }
+    );
+    assert!(estimate(100, 4).minutes > got.minutes);
+    assert_eq!(estimate(0, 12).runs, 0);
+    // No bound counts as one at a time: 3 runs of 21 s.
+    assert_eq!(estimate(1, 0).minutes, 2);
+}
+
+#[test]
+fn an_estimate_reads_as_one_line() {
+    assert_eq!(
+        estimate(100, 12).to_string(),
+        "about 210 runs, about 7 min, about $8.40"
+    );
+}

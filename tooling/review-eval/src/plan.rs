@@ -85,6 +85,40 @@ pub fn between(base: &Path, head: &Path) -> Result<Vec<Planned>, String> {
     Ok(out)
 }
 
+/// What an evaluation of some cases costs, from the last full evaluation:
+/// a case took 2.1 runs, a run 21 seconds and about 4 cents.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Estimate {
+    pub runs: usize,
+    pub minutes: usize,
+    pub cents: usize,
+}
+
+/// The estimate for `cases` cases run `parallel` at a time.
+#[must_use]
+pub fn estimate(cases: usize, parallel: usize) -> Estimate {
+    let runs = (cases * 21).div_ceil(10);
+
+    Estimate {
+        runs,
+        minutes: (runs * 21 / parallel.max(1)).div_ceil(60),
+        cents: runs * 4,
+    }
+}
+
+impl std::fmt::Display for Estimate {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "about {} runs, about {} min, about ${}.{:02}",
+            self.runs,
+            self.minutes,
+            self.cents / 100,
+            self.cents % 100
+        )
+    }
+}
+
 /// `text` without the expanded bodies of its `<?include` sections: the
 /// directive and its closing line stay, so what is left is the
 /// component's own text.

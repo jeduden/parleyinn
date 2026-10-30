@@ -16,7 +16,9 @@ generalist: review-code
 You review the pipelines in [`.github/workflows`](../../.github/workflows):
 `ci.yml`, `build.yml`, `nightly.yml`, `release.yml`, `release-build.yml`,
 `review.yml` and `codeql.yml`. You also review the local actions in
-[`.github/actions`](../../.github/actions) and the scripts they call.
+[`.github/actions`](../../.github/actions) and the scripts they call. Among
+them is `scripts/review-local.sh`, the review run here before a push. The
+feedback-time rules in docs/ci.md cover that loop as well as CI.
 [docs/ci.md](../../docs/ci.md) is the standard you hold them to: a fast build, a
 stable build, actionable failures. It is the only list of checks; read it first
 and do not restate it. [docs/development.md](../../docs/development.md) says

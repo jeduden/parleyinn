@@ -47,7 +47,7 @@ pub const REPORT_MD: &str = "report.md";
 pub const RUNS: &str = "runs";
 
 /// How many cases run at once unless the run says otherwise.
-const PARALLEL: usize = 4;
+const PARALLEL: usize = 12;
 
 /// What `run` evaluates with.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -229,8 +229,29 @@ fn plan_command(flags: &Flags, stdout: &mut dyn Write) -> Result<u8, Problem> {
     for p in &planned {
         let _ = writeln!(stdout, "{}: {}", p.component, p.reason);
     }
+    if !planned.is_empty() {
+        let names: Vec<String> = planned.iter().map(|p| p.component.clone()).collect();
+        let _ = writeln!(stdout, "{}", estimate_line(Path::new(&head), &names));
+    }
 
     Ok(EXIT_OK)
+}
+
+/// What evaluating `components` of the tree `head` is expected to take
+/// at the run's own bound, so a plan too big to wait for shows before the
+/// evaluation starts.
+fn estimate_line(head: &Path, components: &[String]) -> String {
+    let cases = check::all_cases_from(head, &head.join(CASES), None).map_or(0, |all| {
+        all.iter()
+            .filter(|c| components.iter().any(|n| suite_of(n) == c.component))
+            .count()
+    });
+
+    format!(
+        "estimate: {} cases, {}, {PARALLEL} at a time",
+        cases,
+        plan::estimate(cases, PARALLEL)
+    )
 }
 
 fn run_command(

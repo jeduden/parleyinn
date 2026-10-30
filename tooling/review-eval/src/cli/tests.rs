@@ -310,7 +310,11 @@ fn plan_prints_and_writes_what_changed() {
     );
 
     assert_eq!(code, EXIT_OK);
-    assert_eq!(out, "lang-rust: instructions changed\n");
+    assert_eq!(
+        out,
+        "lang-rust: instructions changed\n\
+         estimate: 3 cases, about 7 runs, about 1 min, about $0.28, 12 at a time\n"
+    );
     let planned: Vec<Planned> =
         serde_json::from_str(&fs::read_to_string(&out_file).unwrap()).unwrap();
     assert_eq!(planned.len(), 1);
