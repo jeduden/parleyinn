@@ -23,6 +23,7 @@ pub mod grade;
 pub mod host;
 pub mod log;
 pub mod plan;
+pub mod process;
 pub mod published;
 pub mod report;
 pub mod runner;

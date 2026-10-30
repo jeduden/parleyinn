@@ -1,7 +1,7 @@
 ---
 id: 2610292344
-title: "Deterministic review orchestration: code routes, code routes"
-status: "🔲"
+title: "Deterministic review orchestration: code routes the review"
+status: "🔳"
 summary: >-
   The review's orchestrating agent is replaced by code. A tool reads the
   review bundle's dispatch, runs each specialist and then each
@@ -12,7 +12,7 @@ summary: >-
 model: opus
 depends-on: [2610282358]
 ---
-# Deterministic review orchestration: code routes, code routes
+# Deterministic review orchestration: code routes the review
 
 ## Goal
 
@@ -114,9 +114,10 @@ footer: |
 
 ?>
 
-| #   | Status | Phase                                                  |
-| --- | ------ | ------------------------------------------------------ |
-| 1   | 🔲     | [The review-run crate against a fake host](phase-1.md) |
+| #   | Status | Phase                                                                                                                                                                                                                                                                                                                   |
+| --- | ------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | ✅     | [The review-run crate against a fake host](phase-1.md)                                                                                                                                                                                                                                                                  |
+|     | ↳      | The review-run crate runs every dispatched specialist, then every generalist, as claude --agent through the evaluation's runner and process host, and writes the outcome, consulted list, answers and usage the review gate reads; unit tests cover every line, and an end-to-end test has the gate approve its output. |
 <?/catalog?>
 
 ## Acceptance Criteria

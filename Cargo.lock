@@ -1278,6 +1278,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "review-run"
+version = "0.0.0"
+dependencies = [
+ "review-bundle",
+ "review-eval",
+ "review-gate",
+ "serde",
+ "serde_json",
+ "testkit",
+]
+
+[[package]]
 name = "room"
 version = "0.0.0"
 dependencies = [

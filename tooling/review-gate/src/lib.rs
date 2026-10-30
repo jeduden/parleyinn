@@ -41,7 +41,7 @@ pub const REVIEWER_APP_ID: i64 = 5_140_085;
 const CI_CHECK: &str = "CI";
 
 /// The reviewing agent's structured output.
-#[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields, default)]
 pub struct ReviewOutcome {
     pub verdict: String,
@@ -52,7 +52,7 @@ pub struct ReviewOutcome {
 
 /// One problem the agent found, at a path and line of the reviewed
 /// tree; line 0 means the whole file.
-#[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields, default)]
 pub struct Finding {
     pub path: String,
@@ -340,8 +340,19 @@ fn outcome_line(text: &str) -> Option<&str> {
 /// it does not end with an outcome line, or its run-log answer holds no
 /// line that is the same outcome.
 fn report_problem(input: &Input, agent: &str) -> Option<&'static str> {
-    let report = input.reports.get(agent).map(|r| r.trim());
-    let outcome = match report {
+    report_check(
+        input.reports.get(agent).map(String::as_str),
+        input.answers.get(agent).map(String::as_str),
+    )
+}
+
+/// The problem with a specialist's `report`, its file's text when it
+/// has one, beside `answer`, its final answer when it gave one: what
+/// the gate refuses a review for, so the review's runner can name the
+/// same problem before the gate runs.
+#[must_use]
+pub fn report_check(report: Option<&str>, answer: Option<&str>) -> Option<&'static str> {
+    let outcome = match report.map(str::trim) {
         None => return Some("wrote no report"),
         Some("") => return Some("wrote an empty report"),
         Some(text) => outcome_line(text),
@@ -350,11 +361,8 @@ fn report_problem(input: &Input, agent: &str) -> Option<&'static str> {
         return Some("has a report that does not end with its outcome");
     };
 
-    (!input
-        .answers
-        .get(agent)
-        .is_some_and(|answer| answer.lines().any(|l| l.trim() == outcome)))
-    .then_some("has a report whose outcome differs from its answer in the run log")
+    (!answer.is_some_and(|answer| answer.lines().any(|l| l.trim() == outcome)))
+        .then_some("has a report whose outcome differs from its answer in the run log")
 }
 
 /// Reads the agents the orchestrator called, a list of names.
