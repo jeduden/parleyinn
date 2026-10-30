@@ -125,13 +125,20 @@ pub fn build(
 }
 
 /// Removes the worktrees a world under `dir` holds and prunes the
-/// checkout's record of them.
+/// checkout's record of them, under `worktrees`, the lock [`build`]
+/// adds them under.
 ///
 /// # Errors
 ///
 /// Fails naming every worktree that could not be removed.
-pub fn teardown(host: &dyn Host, checkout: &Path, dir: &Path) -> Result<(), String> {
+pub fn teardown(
+    host: &dyn Host,
+    checkout: &Path,
+    dir: &Path,
+    worktrees: &Mutex<()>,
+) -> Result<(), String> {
     let main = dir.join("main");
+    let _one_at_a_time = worktrees.lock().unwrap_or_else(PoisonError::into_inner);
     let mut problems = Vec::new();
     for path in [main.join(PR_HEAD), main] {
         if !path.exists() {

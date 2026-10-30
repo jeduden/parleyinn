@@ -427,7 +427,7 @@ fn teardown_removes_both_worktrees_and_prunes() {
     )
     .unwrap();
 
-    assert_eq!(teardown(&host, repo.path(), dir.path()), Ok(()));
+    assert_eq!(teardown(&host, repo.path(), dir.path(), &Mutex::new(())), Ok(()));
 
     assert!(!world.main.exists());
     let calls = host.calls();
@@ -439,7 +439,40 @@ fn teardown_removes_both_worktrees_and_prunes() {
     );
     assert_eq!(calls.last().map(String::as_str), Some("git worktree prune"));
     // Nothing left to remove is fine.
-    assert_eq!(teardown(&host, repo.path(), dir.path()), Ok(()));
+    assert_eq!(teardown(&host, repo.path(), dir.path(), &Mutex::new(())), Ok(()));
+}
+
+#[test]
+fn teardown_runs_git_under_the_worktree_lock() {
+    // A prune while another world adds its worktree can drop that
+    // worktree's half-made record, so teardown holds the add's lock.
+    struct Checks<'a> {
+        worktrees: &'a Mutex<()>,
+        held: Mutex<Vec<bool>>,
+    }
+    impl Host for Checks<'_> {
+        fn run(&self, _: &Command) -> Result<crate::host::Output, String> {
+            let held = self.worktrees.try_lock().is_err();
+            self.held.lock().unwrap().push(held);
+            Ok(crate::host::Output {
+                code: Some(0),
+                stdout: String::new(),
+                stderr: String::new(),
+                timed_out: false,
+            })
+        }
+    }
+    let worktrees = Mutex::new(());
+    let host = Checks {
+        worktrees: &worktrees,
+        held: Mutex::new(Vec::new()),
+    };
+    let dir = TempDir::new().unwrap();
+    fs::create_dir_all(dir.path().join("main/pr-head")).unwrap();
+
+    assert_eq!(teardown(&host, dir.path(), dir.path(), &worktrees), Ok(()));
+
+    assert_eq!(*host.held.lock().unwrap(), vec![true, true, true]);
 }
 
 #[test]
@@ -468,7 +501,7 @@ fn teardown_names_a_worktree_it_cannot_remove() {
     fs::create_dir_all(dir.path().join("main/pr-head")).unwrap();
     let main = dir.path().join("main");
 
-    let err = teardown(&Failing, dir.path(), dir.path()).unwrap_err();
+    let err = teardown(&Failing, dir.path(), dir.path(), &Mutex::new(())).unwrap_err();
     assert_eq!(
         err,
         format!(
@@ -477,7 +510,7 @@ fn teardown_names_a_worktree_it_cannot_remove() {
             main.display()
         )
     );
-    let err = teardown(&Absent, dir.path(), dir.path()).unwrap_err();
+    let err = teardown(&Absent, dir.path(), dir.path(), &Mutex::new(())).unwrap_err();
     assert!(
         err.starts_with(&format!(
             "remove worktree {}: no git",

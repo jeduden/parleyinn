@@ -550,7 +550,7 @@ fn one_run(
         let _ = fs::write(dir.join("grade.txt"), grade);
         Ok(record)
     });
-    let _ = world::teardown(host, &options.checkout, &world_dir);
+    let _ = world::teardown(host, &options.checkout, &world_dir, worktrees);
     let _ = fs::remove_dir_all(&world_dir);
 
     result.unwrap_or_else(|e| RunRecord::failed(&e))
