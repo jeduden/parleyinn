@@ -1,7 +1,7 @@
 ---
 id: ADR-2610300031
 title: "The review is run by code, not by an orchestrating agent"
-status: proposed
+status: accepted
 summary: >-
   The review-run tool runs every specialist the review bundle
   dispatches, then every generalist, each as its own agent, and writes
@@ -11,9 +11,10 @@ summary: >-
 ---
 # ADR-2610300031: The review is run by code
 
-Proposal. It stays `proposed` until the stakeholder rules on the pull
-request. Once it is accepted, ADR-2610262245 is marked superseded,
-naming this record.
+Accepted on the stakeholder's consent (see Approval). It supersedes
+ADR-2610262245, which is marked superseded and names this record; the
+layers, reports, gate and required check that record decided stay as
+this record's "What stays" says.
 
 ## Context
 
@@ -118,7 +119,10 @@ the reports.
 
 ## Approval
 
-Left for the stakeholder, `jeduden`. This record changes the review's
-workflow under `.github/` and ENG-28, which need the stakeholder's
-consent on the pull request (ENG-21). Until that consent is recorded
-here, with where it can be checked, this record stays `proposed`.
+The stakeholder, `jeduden`, gave it in a comment on the pull request
+(<https://github.com/jeduden/parleyinn/pull/98>, comment 6534291701). The
+comment consents to the specification, scenarios, decision records,
+`.github/`, `docs/agents`, `.claude/` and evaluation-case changes. It
+also asks for a ruling on this record. The stakeholder confirmed in the
+session that the comment is consent. This record changes the review's
+workflow under `.github/` and ENG-28, which need that consent (ENG-21).
