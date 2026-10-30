@@ -5,7 +5,7 @@
 //! evaluate job runs; the decision tables here drive its grader and its
 //! two-of-three rule without a model.
 
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeMap;
 
 use review_eval::case::{Case, Expect, Expected};
 use review_eval::component::{Component, Kind};
@@ -133,14 +133,12 @@ fn run_outcome(row: &BTreeMap<String, String>) -> String {
         writes: vec![REPORT.to_owned()],
         ..RunLog::default()
     };
-    let dispatched = BTreeSet::new();
     let graded = grade(
         &component,
         &case,
         &Run {
             log: &log,
             report: (column("report") == "written").then_some(report.as_str()),
-            dispatched: &dispatched,
         },
     );
     match (graded.failures.first(), graded.slips.first()) {

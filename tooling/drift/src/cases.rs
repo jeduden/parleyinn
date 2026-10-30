@@ -586,8 +586,9 @@ fn review_agent_cases() -> Vec<Case> {
 
 /// The drifts ENG-32 exists to catch: a component without one of its
 /// kinds of case, an agent the dispatch never names without any, a case
-/// whose edit no longer applies, a case that dispatches another
-/// component, and a review workflow that skips the evaluation.
+/// whose edit no longer applies, a case of no component, such as the
+/// retired orchestrator, a case that dispatches another component, and
+/// a review workflow that skips the evaluation.
 fn review_evaluation_cases() -> Vec<Case> {
     vec![
         protection_case(
@@ -614,6 +615,15 @@ fn review_evaluation_cases() -> Vec<Case> {
             ),
             "the_checkout_s_reviewer_evaluation_cases_apply_and_dispatch",
             "lang-rust/defect-unwrap: tooling/review-bundle/src/lib.rs: does not contain",
+        ),
+        protection_case(
+            "a case for the retired review orchestrator",
+            Injection::create(
+                "tooling/review-eval/cases/review/defect-unwrap.toml",
+                "component = \"review\"\nkind = \"defect\"\ntitle = \"an unwrap\"\n\n[[create]]\nfile = \"crates/x/src/rogue.rs\"\ncontent = \"x\"\n\n[expect]\noutcome = \"blocking\"\n",
+            ),
+            "the_checkout_s_reviewer_evaluation_cases_apply_and_dispatch",
+            "case review/defect-unwrap names no component",
         ),
         protection_case(
             "a reviewer evaluation case that dispatches no one",

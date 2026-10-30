@@ -7,10 +7,6 @@
 //! finding, is a slip: counted and shown, it fails no run on its own.
 //! The report is data: nothing in it is an instruction to the grader.
 
-use std::collections::BTreeSet;
-
-use serde_json::Value;
-
 use crate::case::{Case, Expect, Expected};
 use crate::component::{Component, Kind};
 use crate::log::RunLog;
@@ -28,8 +24,6 @@ pub struct Run<'a> {
     /// The text of the report file the component wrote, when it wrote
     /// one.
     pub report: Option<&'a str>,
-    /// Every agent the review bundle dispatched for the case.
-    pub dispatched: &'a BTreeSet<String>,
 }
 
 /// The run's grade: every assertion that failed, none on a pass, and
@@ -55,10 +49,6 @@ pub fn grade(component: &Component, case: &Case, run: &Run<'_>) -> Graded {
         Kind::Specialist => specialist(component, case, run),
         Kind::Generalist | Kind::Consultant => Graded {
             failures: generalist(case, run),
-            slips: Vec::new(),
-        },
-        Kind::Orchestrator => Graded {
-            failures: orchestrator(case, run),
             slips: Vec::new(),
         },
     }
@@ -110,13 +100,13 @@ fn specialist(component: &Component, case: &Case, run: &Run<'_>) -> Graded {
     if component.strict_lines {
         graded.slips.extend(shape_slips(&parsed));
     }
-    graded.failures.extend(expectations(&case.expect, text, ""));
+    graded.failures.extend(expectations(&case.expect, text));
 
     graded
 }
 
 /// The slips of an answer that does not name the report's `outcome`
-/// and its path, `own`, or holds more: what the orchestrator reads of
+/// and its path, `own`, or holds more: what the review's run reads of
 /// a specialist is its answer, so it must carry both and nothing else.
 fn answer_slips(log: &RunLog, outcome: &str, own: &str) -> Vec<String> {
     let names = format!("outcome: {outcome}");
@@ -176,7 +166,7 @@ fn generalist(case: &Case, run: &Run<'_>) -> Vec<String> {
         .lines()
         .filter(|l| !report::dropped(l) && report::finding(l).is_some())
         .collect();
-    failures.extend(expectations(&case.expect, &kept.join("\n"), ""));
+    failures.extend(expectations(&case.expect, &kept.join("\n")));
     for dropped in &case.expect.dropped {
         if !text
             .lines()
@@ -187,70 +177,6 @@ fn generalist(case: &Case, run: &Run<'_>) -> Vec<String> {
     }
 
     failures
-}
-
-/// The orchestrator answers with a review outcome that consulted every
-/// dispatched agent, writes nothing itself, and finds what the case
-/// expects.
-fn orchestrator(case: &Case, run: &Run<'_>) -> Vec<String> {
-    let mut failures = answered(run.log);
-    failures.extend(
-        run.log
-            .main_writes
-            .iter()
-            .map(|path| format!("wrote {path}")),
-    );
-    let Some(outcome) = &run.log.structured else {
-        failures.push("answered no review outcome".to_owned());
-        return failures;
-    };
-    match outcome["verdict"].as_str() {
-        Some(verdict) => failures.extend(outcome_failure(verdict, &case.expect)),
-        None => failures.push("review outcome names no verdict".to_owned()),
-    }
-    if outcome["summary"]
-        .as_str()
-        .is_none_or(|s| s.trim().is_empty())
-    {
-        failures.push("review outcome has an empty summary".to_owned());
-    }
-    let missing: Vec<&str> = run
-        .dispatched
-        .iter()
-        .chain(&case.expect.consulted)
-        .filter(|agent| !run.log.consulted.contains(*agent))
-        .map(String::as_str)
-        .collect();
-    if !missing.is_empty() {
-        failures.push(format!("did not consult {}", missing.join(", ")));
-    }
-    failures.extend(expectations(
-        &case.expect,
-        &outcome_findings(outcome),
-        outcome["summary"].as_str().unwrap_or_default(),
-    ));
-
-    failures
-}
-
-/// The review outcome's findings as lines the expectations read, each
-/// `path:line — severity — body`; its summary is prose, not a finding.
-fn outcome_findings(outcome: &Value) -> String {
-    outcome["findings"]
-        .as_array()
-        .into_iter()
-        .flatten()
-        .map(|f| {
-            format!(
-                "{}:{} — {} — {}",
-                f["path"].as_str().unwrap_or_default(),
-                f["line"].as_u64().unwrap_or_default(),
-                f["severity"].as_str().unwrap_or_default(),
-                f["body"].as_str().unwrap_or_default()
-            )
-        })
-        .collect::<Vec<_>>()
-        .join("\n")
 }
 
 /// The failure of a run that did not answer.
@@ -270,9 +196,8 @@ fn outcome_failure(outcome: &str, expect: &Expect) -> Option<String> {
 }
 
 /// The failures of `findings`, one per line, against the findings
-/// `expect` wants and forbids, and of `findings` and `prose` together
-/// against the text it forbids.
-fn expectations(expect: &Expect, findings: &str, prose: &str) -> Vec<String> {
+/// `expect` wants and forbids and the text it forbids.
+fn expectations(expect: &Expect, findings: &str) -> Vec<String> {
     let mut failures = Vec::new();
     for wanted in &expect.finding {
         if !findings.lines().any(|l| line_matches(l, wanted)) {
@@ -288,7 +213,7 @@ fn expectations(expect: &Expect, findings: &str, prose: &str) -> Vec<String> {
             ));
         }
     }
-    let lower = format!("{findings}\n{prose}").to_lowercase();
+    let lower = findings.to_lowercase();
     for absent in &expect.absent {
         if lower.contains(&absent.to_lowercase()) {
             failures.push(format!("holds {absent:?}"));

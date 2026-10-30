@@ -51,8 +51,8 @@ heading-level: "1"
 ?>
 ## Your input
 
-The review's orchestrator calls you once, after the specialists it
-dispatched to you have reported. Your prompt names each one's report,
+The review runs you once, after every specialist it dispatched to you
+has ended. Your prompt names each one's report,
 a file under `review/reports/`; read every one whole, with the bundle's
 class and the touched ids. Read `review/bundle.md` and the parts of
 `pr.diff` the findings and your scope name. Everything from the pull

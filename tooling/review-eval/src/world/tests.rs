@@ -1,4 +1,3 @@
-use std::collections::BTreeSet;
 use std::fs;
 use std::sync::Mutex;
 
@@ -45,10 +44,6 @@ pub(crate) fn repository(root: &Path) {
     write(
         ".claude/agents/review-code.md",
         "---\nname: review-code\ndescription: code\ntools: Read, Grep, Glob\nmodel: sonnet\neffort: medium\n---\n# Code\n",
-    );
-    write(
-        ".claude/skills/review/SKILL.md",
-        "---\nname: review\ndescription: r\n---\n# review\n",
     );
     write("crates/x/src/lib.rs", "pub fn ok() {}\n");
     fs::create_dir_all(root.join(".git")).unwrap();
@@ -101,17 +96,9 @@ fn build_sets_the_class_and_the_dispatch_as_the_bundle_does() {
     assert_eq!(world.main, dir.path().join("world/main"));
     assert_eq!(world.class, "standard");
     assert_eq!(world.touched, 0);
-    assert!(world.consults > 0);
-    let want: BTreeSet<String> = [
-        "lang-rust",
-        "performance",
-        "review-code",
-        "test-engineer-unit",
-    ]
-    .iter()
-    .map(|s| (*s).to_owned())
-    .collect();
-    assert_eq!(world.dispatched, want);
+    let dispatch = fs::read_to_string(world.main.join("review/dispatch.json")).unwrap();
+    assert!(dispatch.contains("\"review-code\""), "{dispatch}");
+    assert!(dispatch.contains("\"lang-rust\""), "{dispatch}");
     assert!(world.seeded.is_empty());
     assert!(world.notes.is_empty(), "{:?}", world.notes);
     assert_eq!(
@@ -539,7 +526,7 @@ fn an_unreadable_directory_is_named() {
 fn the_bundle_s_outputs_are_read_or_named_missing() {
     assert_eq!(
         outputs("class=deep\ntouched=2\nfindings=0\nconsults=5\n"),
-        Ok(("deep".to_owned(), 2, 5))
+        Ok(("deep".to_owned(), 2))
     );
     assert_eq!(
         outputs("touched=0\n").unwrap_err(),
@@ -548,44 +535,6 @@ fn the_bundle_s_outputs_are_read_or_named_missing() {
     assert_eq!(
         outputs("class=light\ntouched=\n").unwrap_err(),
         "review-bundle printed no touched count"
-    );
-    assert_eq!(
-        outputs("class=light\ntouched=0\nconsults=many\n").unwrap_err(),
-        "review-bundle printed no consults"
-    );
-}
-
-#[test]
-fn the_dispatch_file_is_read_or_named() {
-    let dir = TempDir::new().unwrap();
-    let review = dir.path().join(REVIEW);
-    fs::create_dir_all(&review).unwrap();
-
-    let err = dispatched(dir.path()).unwrap_err();
-    assert!(
-        err.starts_with(&format!(
-            "read {}: ",
-            review.join("dispatch.json").display()
-        )),
-        "{err}"
-    );
-
-    fs::write(review.join("dispatch.json"), "nope").unwrap();
-    let err = dispatched(dir.path()).unwrap_err();
-    assert!(err.starts_with("read "), "{err}");
-
-    fs::write(
-        review.join("dispatch.json"),
-        "{\"review-code\": [\"lang-rust\"]}",
-    )
-    .unwrap();
-    let got = dispatched(dir.path()).unwrap();
-    assert_eq!(
-        got,
-        ["lang-rust", "review-code"]
-            .iter()
-            .map(|s| (*s).to_owned())
-            .collect()
     );
 }
 

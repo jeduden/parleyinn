@@ -1,5 +1,5 @@
 //! ENG-28: every agent the review bundle can dispatch is defined under
-//! `.claude/agents`, so the orchestrator can consult it: each SRS
+//! `.claude/agents`, so `review-run` can run it: each SRS
 //! section's specialist, each domain-model file's, the language and
 //! test-layer specialists, and the generalists. Specialists run at low
 //! effort and generalists at medium, as their front matter says; each

@@ -39,8 +39,8 @@ const CHANGES_REQUESTED: &str = "CHANGES_REQUESTED";
 pub const BUNDLE: &str = "bundle.md";
 /// The deterministic findings' file name under `--out`.
 pub const CHECKED: &str = "checked.json";
-/// The agents the orchestrator consults, each generalist with its
-/// specialists, which the review gate holds the review to (ENG-28).
+/// The agents the review runs, each generalist with its specialists,
+/// which the review gate holds the review to (ENG-28).
 pub const DISPATCH: &str = "dispatch.json";
 /// The directory under `--out` that holds each specialist's diff,
 /// `<its name>.diff`: only the changed files it reads.

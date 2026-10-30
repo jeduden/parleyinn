@@ -15,6 +15,11 @@ its upgrade notes (ENG-23). ParleyInn follows semantic versioning.
   it, weekly against the published scorecard, and on demand on a
   candidate model for a comparison (ENG-32). The `review-eval` tooling
   crate runs them.
+- The review of a pull request is run by code, not by an orchestrating
+  agent (ENG-28): the `review-run` tooling crate runs every specialist
+  the review bundle dispatches, then every dispatched generalist, each
+  as its own agent, and writes the review outcome from what they
+  answered. The review skill and its evaluation cases are retired.
 - Redaction now also redacts a secret that a neighbouring match hid from
   a rule's word boundary, such as an AWS access key directly followed by
   a principal's pattern (SEC-08). Its work is bounded by the redaction

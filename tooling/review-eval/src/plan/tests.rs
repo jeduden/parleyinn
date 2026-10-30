@@ -40,6 +40,7 @@ fn between_names_each_changed_component_and_why() {
     };
     h(".claude/agents/lang-rust.md", "rust v2\n");
     h(".claude/agents/lang-toml.md", "toml v1\n");
+    // A skill is no reviewer component: changing one plans nothing.
     h(".claude/skills/review/SKILL.md", "skill v2\n");
     h(
         "tooling/review-eval/cases/review-code/keeps.toml",
@@ -63,10 +64,6 @@ fn between_names_each_changed_component_and_why() {
             Planned {
                 component: "lang-toml".to_owned(),
                 reason: "new component".to_owned(),
-            },
-            Planned {
-                component: "review".to_owned(),
-                reason: "instructions changed".to_owned(),
             },
             Planned {
                 component: "review-code".to_owned(),

@@ -531,7 +531,6 @@ fn one_run(
             &grade::Run {
                 log: &log,
                 report: report.as_deref(),
-                dispatched: &world.dispatched,
             },
         );
         let mut record = RunRecord::new(&log, graded.failures, graded.slips);

@@ -5,8 +5,8 @@ description: >-
   cases (ENG-32): write the case the change must pass, change the
   instructions, run the cases on the reviewer's model, read each
   failure and slip, and fix the instruction or the case until its
-  cases pass. Trigger on "change the X agent", "tighten the review
-  skill", "write cases for X", "fix the evals", or after
+  cases pass. Trigger on "change the X agent", "tighten a
+  generalist", "write cases for X", "fix the evals", or after
   reviewer-engineer finds a reviewer component untested.
 ---
 # reviewer-shape
@@ -18,7 +18,7 @@ first. The reviewer-engineer agent reads and reports; this skill acts.
 ## Method
 
 1. Name the reviewer component and what it must do differently. Read
-   its file under `.claude/agents` or `.claude/skills/review`, the
+   its file under `.claude/agents`, the
    shared sections it includes under `docs/agents`, and its cases under
    `tooling/review-eval/cases/<component>/`.
 2. Red: write or change the case the new behaviour must pass, a

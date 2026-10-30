@@ -1,9 +1,9 @@
-//! Which agents the review's orchestrator consults (ENG-28): from the
-//! paths a pull request changes and the requirement rows it touches,
-//! the low-effort specialists that read them, grouped under the
-//! medium-effort generalist that weighs their findings. It is a pure
-//! function of its inputs, so the review gate can check the
-//! orchestrator against the same list.
+//! Which agents the review runs (ENG-28): from the paths a pull
+//! request changes and the requirement rows it touches, the low-effort
+//! specialists that read them, grouped under the medium-effort
+//! generalist that weighs their findings. It is a pure function of its
+//! inputs: `review-run` runs every agent it names, and the review gate
+//! checks the review against the same list.
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;

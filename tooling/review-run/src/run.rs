@@ -142,8 +142,6 @@ fn run_one(
         main: workdir.to_path_buf(),
         class: plan.class.clone(),
         touched: plan.touched,
-        consults: plan.agents().len(),
-        dispatched: plan.agents(),
         seeded: plan.reports_of(name),
         notes: Vec::new(),
     };

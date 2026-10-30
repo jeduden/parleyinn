@@ -77,7 +77,7 @@ fn bundle_says_what_it_is_and_quotes_the_invariants() {
         "{got}"
     );
     assert!(
-        got.contains("## Agents to consult\n\nThe orchestrator calls each specialist below"),
+        got.contains("## Agents to consult\n\nThe review runs each specialist below"),
         "{got}"
     );
     assert!(

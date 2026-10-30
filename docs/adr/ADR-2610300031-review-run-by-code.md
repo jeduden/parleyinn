@@ -87,8 +87,11 @@ the reports.
   agent, and its scenario holds the review workflow to `review-run`
   and refuses an agent session that would route the review.
 - The orchestrator's skill, its reviewer component under ENG-32, its
-  cases and its prompt in the runner are retired in a later change of
-  the same plan, together with the mentions of it that remain.
+  cases and its prompt and schema in the runner are retired, together
+  with its mentions in the SRS, the docs and the generalists' input
+  section. The accepted records that describe it, ADR-2609301941,
+  ADR-2610262245 and ADR-2610290002, keep their text as the record of
+  what was decided then.
 - A review runs in two waves of agents, each up to 900 seconds; the
   review job's cap of 45 minutes fits them and the setup, as long as a
   dispatch names no more specialists than run at once.
