@@ -1,6 +1,6 @@
 ---
 summary: >-
-  How a review generalist reports to the orchestrator. The single
+  How a review generalist reports its findings. The single
   source the agent files include.
 ---
 # How you report
