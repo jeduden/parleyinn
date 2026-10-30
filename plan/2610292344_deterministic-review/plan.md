@@ -65,8 +65,10 @@ failure this plan removes.
    assemble `review/outcome.json`, `review/consulted.json` and
    `review/answers.json`; record each agent's usage.
 2. The verdict is a pure function: `approve` exactly when every
-   dispatched agent answered with a well-formed result and no
-   generalist's kept finding is blocking. Findings are the generalists'
+   dispatched agent answered with a well-formed result, no
+   specialist's report ends blocking, every generalist's answer says
+   a finding or that it has none, and no generalist's kept finding is
+   blocking. Findings are the generalists'
    kept lines, parsed with the report reader the evaluation already
    uses. The summary is composed from counts and each generalist's
    closing sentence.
@@ -120,14 +122,16 @@ footer: |
 |     | ↳      | The review-run crate runs every dispatched specialist, then every generalist, as claude --agent through the evaluation's runner and process host, and writes the outcome, consulted list, answers and usage the review gate reads; unit tests cover every line, and an end-to-end test has the gate approve its output.                        |
 | 2   | ✅     | [The review workflow runs review-run](phase-2.md)                                                                                                                                                                                                                                                                                              |
 |     | ↳      | review.yml runs review-run in place of the orchestrating agent, and ENG-28, its scenario, binding and drift cases now ask for a review run by code; the gate names an unanswered agent without an orchestrator, ADR-2610300031 proposes the decision, and the generalists keep their models. The live run waits for the stakeholder's consent. |
+| 3   | ✅     | [Retire the orchestrator](phase-3.md)                                                                                                                                                                                                                                                                                                          |
+|     | ↳      | The review skill, its ENG-32 component and cases, and what only the orchestrator used are gone, and ENG-32's row, scenario and the docs name no orchestrator. The grader and review-run read a dropped line by one rule, and review-run fails closed on a silent generalist and a blocking specialist report. The live run waits for consent.  |
 <?/catalog?>
 
 ## Acceptance Criteria
 
-- [ ] `review-run` runs every dispatched agent exactly once and writes
+- [x] `review-run` runs every dispatched agent exactly once and writes
       the outcome, the consulted list and the answers the gate reads
 - [ ] A review of a pull request is decided by the gate on its first
       run, with no orchestrating agent
-- [ ] The generalists and specialists keep their models
-- [ ] The orchestrator skill, its evaluation component and its cases
+- [x] The generalists and specialists keep their models
+- [x] The orchestrator skill, its evaluation component and its cases
       are gone, and `docs/`, the SRS and CLAUDE.md name none
