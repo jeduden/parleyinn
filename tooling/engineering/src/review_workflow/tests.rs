@@ -3,7 +3,8 @@ use super::*;
 const KEY: &str = "APP_KEY";
 
 /// The step that runs the review's agents.
-const RUN: &str = "      - run: cargo run --locked --quiet --offline -p review-run -- --workdir .\n";
+const RUN: &str =
+    "      - run: cargo run --locked --quiet --offline -p review-run -- --workdir .\n";
 
 /// The smallest workflow the ENG-28 steps accept.
 const REVIEW_FLOW: &str = "name: Review
@@ -152,7 +153,10 @@ fn agents_unprivileged_names_each_privilege() {
     );
 
     let none = parse("on:\n  workflow_run:\njobs:\n  a:\n    steps: []\n");
-    assert_eq!(none.agents_unprivileged(KEY), ["no job runs the review's agents"]);
+    assert_eq!(
+        none.agents_unprivileged(KEY),
+        ["no job runs the review's agents"]
+    );
 }
 
 #[test]
@@ -186,7 +190,9 @@ fn agents_run_by_wants_the_command_and_no_agent_session() {
         .push_str("      - uses: anthropics/claude-code-action@abc\n");
     assert_eq!(
         w.agents_run_by(cmd),
-        ["job review runs an agent session, anthropics/claude-code-action@, which would route the review"]
+        [
+            "job review runs an agent session, anthropics/claude-code-action@, which would route the review"
+        ]
     );
 }
 
@@ -198,7 +204,7 @@ fn key_held_apart_wants_one_holder_that_runs_no_agent() {
     w.jobs[1].text.push_str(RUN);
     assert_eq!(
         w.key_held_apart(KEY).unwrap_err(),
-        "job post holds APP_KEY and runs the agent"
+        "job post holds APP_KEY and runs the agents"
     );
     assert_eq!(
         w.key_held_apart("OTHER").unwrap_err(),

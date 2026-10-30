@@ -1,6 +1,6 @@
-//! The ENG-28 steps: the review workflow keeps the reviewing agent away
-//! from the reviewer app's key, and the review gate decides as the
-//! requirement says.
+//! The ENG-28 steps: the review workflow runs the review's agents by
+//! code, keeps them away from the reviewer app's key, and the review gate
+//! decides as the requirement says.
 
 use cucumber::gherkin::Step;
 use cucumber::{then, when};
@@ -24,7 +24,7 @@ fn runs_after(w: &mut World, name: String) -> Result<(), String> {
 }
 
 #[then(
-    regex = r#"^the job that runs the reviewing agent holds no write permission and not the "([^"]+)" key$"#
+    regex = r#"^the job that runs the review's agents holds no write permission and not the "([^"]+)" key$"#
 )]
 fn agents_unprivileged(w: &mut World, key: String) -> Result<(), String> {
     let e = eng(w);
@@ -32,9 +32,20 @@ fn agents_unprivileged(w: &mut World, key: String) -> Result<(), String> {
     outcome(e.flow.agents_unprivileged(&e.key))
 }
 
+#[then(
+    regex = r#"^that job runs every agent the review bundle dispatches with "([^"]+)", and no agent routes the review$"#
+)]
+fn agents_run_by(w: &mut World, cmd: String) -> Result<(), String> {
+    outcome(eng(w).flow.agents_run_by(&cmd))
+}
+
 #[then(regex = r#"^its agents may write only their reports, under "([^"]+)"$"#)]
 fn agents_write_only(w: &mut World, dir: String) -> Result<(), String> {
-    outcome(eng(w).flow.agents_write_only(&dir))
+    outcome(
+        eng(w)
+            .flow
+            .agents_write_only(&dir, &review_workflow::RUN_TOOLS),
+    )
 }
 
 #[then(regex = r#"^only one job holds the "([^"]+)" key, and it runs no agent$"#)]
@@ -44,7 +55,7 @@ fn key_held_apart(w: &mut World, key: String) -> Result<(), String> {
     e.flow.key_held_apart(&e.key)
 }
 
-#[then(regex = r"^that job runs only after the agent's job succeeded$")]
+#[then(regex = r"^that job runs only after the agents' job succeeded$")]
 fn key_job_after_agents(w: &mut World) -> Result<(), String> {
     let e = eng(w);
     outcome(e.flow.key_job_after_agents(e.key()?)?)

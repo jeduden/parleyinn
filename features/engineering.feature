@@ -283,10 +283,11 @@ Feature: Engineering quality (ENG)
     Given the repository checkout
     When the review workflow is read from ".github/workflows/review.yml"
     Then it runs only when the "CI" workflow completes or a pull request gets a comment, as the default branch defines it
-    And the job that runs the reviewing agent holds no write permission and not the "JEDUDEN_REVIEW_AGENT_KEY" key
+    And the job that runs the review's agents holds no write permission and not the "JEDUDEN_REVIEW_AGENT_KEY" key
+    And that job runs every agent the review bundle dispatches with "cargo run --locked --quiet --offline -p review-run -- --workdir .", and no agent routes the review
     And its agents may write only their reports, under "review/reports"
     And only one job holds the "JEDUDEN_REVIEW_AGENT_KEY" key, and it runs no agent
-    And that job runs only after the agent's job succeeded
+    And that job runs only after the agents' job succeeded
     And that job decides the review with "cargo run --locked --quiet -p review-gate"
     And that job decides the review with "--checked checked.json"
     And that job decides the review with "--dispatch dispatch.json"

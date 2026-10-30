@@ -1,13 +1,27 @@
-//! ENG-28: the review workflow keeps the reviewing agent away from the
-//! reviewer app's key, and the review gate that posts the review
-//! decides as the requirement says.
+//! ENG-28: the review workflow runs the review's agents by code, keeps
+//! them away from the reviewer app's key, and the review gate that
+//! posts the review decides as the requirement says.
 
 use std::collections::BTreeMap;
 
+use review_eval::runner::{GENERALIST_TOOLS, SPECIALIST_TOOLS};
+
 use crate::list;
 
-/// The action that runs the reviewing agent.
+/// What a job runs the review's agents with: review-run, which starts
+/// every dispatched agent.
+const AGENT_RUN: &str = "-p review-run";
+
+/// An action that runs one agent session, which would route the review
+/// itself; a job that uses one is held to the agents' rules too.
 const AGENT_ACTION: &str = "anthropics/claude-code-action@";
+
+/// The tools review-run gives its agents, by kind, as the evaluation's
+/// runner sets them.
+pub const RUN_TOOLS: [(&str, &str); 2] = [
+    ("specialist", SPECIALIST_TOOLS),
+    ("generalist", GENERALIST_TOOLS),
+];
 
 /// A GitHub Actions workflow split the way the ENG-28 steps read it:
 /// its triggers and its jobs, comments left out.
@@ -124,6 +138,25 @@ fn is_word(c: char) -> bool {
     c.is_ascii_alphanumeric() || c == '_'
 }
 
+/// Whether a job's `text` runs the review's agents or an agent session.
+fn runs_agents(text: &str) -> bool {
+    text.contains(AGENT_RUN) || text.contains(AGENT_ACTION)
+}
+
+/// The tools of the comma-separated `tools` that write or run commands
+/// other than `scoped`.
+fn unscoped<'a>(tools: &'a str, scoped: &'a str) -> impl Iterator<Item = &'a str> {
+    tools
+        .split(',')
+        .map(str::trim)
+        .filter(|t| {
+            ["Write", "Edit", "NotebookEdit", "Bash"]
+                .iter()
+                .any(|w| t.starts_with(w))
+        })
+        .filter(move |t| *t != scoped)
+}
+
 impl Workflow {
     /// Requires exactly two triggers: `workflow_run` on the named
     /// workflow's completion, and `issue_comment` on a new comment, so
@@ -174,9 +207,31 @@ impl Workflow {
         out
     }
 
-    /// The jobs that run the reviewing agent.
+    /// The jobs that run the review's agents, or an agent session.
     fn agent_jobs(&self) -> impl Iterator<Item = &Job> {
-        self.jobs.iter().filter(|j| j.text.contains(AGENT_ACTION))
+        self.jobs.iter().filter(|j| runs_agents(&j.text))
+    }
+
+    /// Requires a job to run the review's agents with `cmd`, and no job
+    /// to run an agent session that would route the review instead.
+    #[must_use]
+    pub fn agents_run_by(&self, cmd: &str) -> Vec<String> {
+        let mut problems: Vec<String> = self
+            .jobs
+            .iter()
+            .filter(|j| j.text.contains(AGENT_ACTION))
+            .map(|j| {
+                format!(
+                    "job {} runs an agent session, {AGENT_ACTION}, which would route the review",
+                    j.name
+                )
+            })
+            .collect();
+        if !self.jobs.iter().any(|j| j.text.contains(cmd)) {
+            problems.insert(0, format!("no job runs the review's agents with {cmd:?}"));
+        }
+
+        problems
     }
 
     /// Requires an agent job, and that none of them is granted a write
@@ -196,43 +251,40 @@ impl Workflow {
             }
         }
         if self.agent_jobs().next().is_none() {
-            problems.push("no job runs the reviewing agent".to_owned());
+            problems.push("no job runs the review's agents".to_owned());
         }
 
         problems
     }
 
-    /// Requires every agent job to list its allowed tools and to allow
-    /// writing only under `dir`: `Edit(./<dir>/**)` and no other
+    /// Requires the agents to write only under `dir`: `run`, the tools
+    /// review-run gives each kind of agent, and every `--allowedTools`
+    /// an agent job passes, allow `Edit(./<dir>/**)` and no other
     /// writing tool. An `Edit` rule governs every tool that changes a
     /// file, `Write` included; a `Write(path)` rule grants nothing, so
-    /// an agent job that lists one cannot write its reports.
+    /// an agent that has one cannot write its reports.
     #[must_use]
-    pub fn agents_write_only(&self, dir: &str) -> Vec<String> {
+    pub fn agents_write_only(&self, dir: &str, run: &[(&str, &str)]) -> Vec<String> {
         let scoped = format!("Edit(./{dir}/**)");
         let mut problems = Vec::new();
-        for j in self.agent_jobs() {
-            let Some(line) = j.text.lines().find(|l| l.contains("--allowedTools")) else {
-                problems.push(format!("agent job {} lists no --allowedTools", j.name));
-                continue;
-            };
-            let tools = line
-                .split_once("--allowedTools")
-                .map_or("", |(_, rest)| rest)
-                .trim()
-                .trim_matches('"');
+        for (kind, tools) in run {
             problems.extend(
-                tools
-                    .split(',')
-                    .map(str::trim)
-                    .filter(|t| {
-                        ["Write", "Edit", "NotebookEdit", "Bash"]
-                            .iter()
-                            .any(|w| t.starts_with(w))
-                    })
-                    .filter(|t| *t != scoped)
-                    .map(|t| format!("agent job {} may use {t}, want {scoped} alone", j.name)),
+                unscoped(tools, &scoped)
+                    .map(|t| format!("review-run's {kind} may use {t}, want {scoped} alone")),
             );
+        }
+        for j in self.agent_jobs() {
+            for line in j.text.lines().filter(|l| l.contains("--allowedTools")) {
+                let tools = line
+                    .split_once("--allowedTools")
+                    .map_or("", |(_, rest)| rest)
+                    .trim()
+                    .trim_matches('"');
+                problems.extend(
+                    unscoped(tools, &scoped)
+                        .map(|t| format!("agent job {} may use {t}, want {scoped} alone", j.name)),
+                );
+            }
         }
 
         problems
@@ -262,8 +314,8 @@ impl Workflow {
     /// agent.
     pub fn key_held_apart(&self, key: &str) -> Result<(), String> {
         let j = self.key_job(key)?;
-        if j.text.contains(AGENT_ACTION) {
-            return Err(format!("job {} holds {key} and runs the agent", j.name));
+        if runs_agents(&j.text) {
+            return Err(format!("job {} holds {key} and runs the agents", j.name));
         }
 
         Ok(())
@@ -494,7 +546,7 @@ fn dispatch(row: &BTreeMap<String, String>) -> Option<Option<&'static str>> {
     }
 }
 
-/// The agents a row says the orchestrator consulted: both of
+/// The agents a row says the review consulted: both of
 /// [`DISPATCH`] for `all` or no `consulted` column, the generalist alone
 /// for `not all`, and a file that is no list for `malformed`; `None` for
 /// any other value.
