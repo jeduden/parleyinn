@@ -108,7 +108,8 @@ fn bundle_says_what_it_is_and_quotes_the_invariants() {
 
 #[test]
 fn bundle_says_when_no_agent_is_dispatched() {
-    let a = analyse(&base(), &base(), "diff --git a/LICENSE b/LICENSE\n", false);
+    let mut a = analyse(&base(), &base(), "diff --git a/LICENSE b/LICENSE\n", false);
+    a.dispatch.clear();
 
     let got = bundle(&a, &base(), &base());
 

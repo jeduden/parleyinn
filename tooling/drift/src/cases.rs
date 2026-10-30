@@ -472,7 +472,7 @@ fn review_cases() -> Vec<Case> {
             "ENG-28",
             Injection::replace(
                 REVIEW_WORKFLOW,
-                "          cargo run --locked --quiet --offline -p review-run -- --workdir . --parallel 24 \\\n            > review/run.txt\n",
+                "          cargo run --locked --quiet --offline -p review-run -- --workdir . --parallel 32 \\\n            > review/run.txt\n",
                 "          echo routed\n      - uses: anthropics/claude-code-action@1d6de8cb0c237e7c15e9e1bdf973826ebae490cc\n",
             ),
             scenario("ENG-28"),

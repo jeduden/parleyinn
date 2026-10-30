@@ -55,8 +55,11 @@ pub struct AgentRun {
     pub kind: Kind,
     /// Why it did not answer; none when it did.
     pub failure: Option<String>,
-    /// Its log, read; empty when it logged nothing.
+    /// Its log, read; empty when it logged nothing. After a second
+    /// attempt, the last one's, with both costs.
     pub log: RunLog,
+    /// How many times it ran: two when the first did not answer.
+    pub attempts: u32,
 }
 
 impl AgentRun {
@@ -112,10 +115,37 @@ pub fn describe(run: &AgentRun) -> String {
     }
 }
 
-/// Runs agent `name`, a `kind`, once, logging under the logs'
-/// directory. A specialist's report file from before is removed first,
-/// so only what this run wrote is read.
+/// Runs agent `name`, a `kind`, and once more when its run did not
+/// answer: a command that would not start, ended without a result,
+/// missed its deadline or answered nothing. A definition that does not
+/// read, or a report that cannot be cleared, fails at once, and a report
+/// the agent wrote is judged where the outcome is decided, never rerun.
 fn run_one(
+    host: &dyn Host,
+    workdir: &Path,
+    plan: &Plan,
+    name: &str,
+    kind: Kind,
+    deadline: Duration,
+) -> AgentRun {
+    let first = attempt(host, workdir, plan, name, kind, deadline);
+    if first.answered() || first.attempts == 0 {
+        return AgentRun {
+            attempts: first.attempts.max(1),
+            ..first
+        };
+    }
+    let mut second = attempt(host, workdir, plan, name, kind, deadline);
+    second.log.cost += first.log.cost;
+    second.attempts = 2;
+
+    second
+}
+
+/// Runs agent `name` once, logging under the logs' directory. A
+/// specialist's report file from before is removed first, so only what
+/// this run wrote is read. A run that never started has no attempts.
+fn attempt(
     host: &dyn Host,
     workdir: &Path,
     plan: &Plan,
@@ -128,6 +158,7 @@ fn run_one(
         kind,
         failure: Some(failure),
         log: RunLog::default(),
+        attempts: 0,
     };
     let component = match component::load(workdir, name) {
         Ok(component) => component,
@@ -149,7 +180,12 @@ fn run_one(
     let command = runner::command(&component, &world, None, &log_path, deadline);
     let log = match runner::run(host, &command) {
         Ok(log) => log,
-        Err(e) => return failed(e),
+        Err(e) => {
+            return AgentRun {
+                attempts: 1,
+                ..failed(e)
+            };
+        }
     };
     let failure = if !log.answered {
         Some(format!("its run ended with {}", log.subtype))
@@ -164,6 +200,7 @@ fn run_one(
         kind,
         failure,
         log,
+        attempts: 1,
     }
 }
 

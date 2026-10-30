@@ -20,6 +20,10 @@ its upgrade notes (ENG-23). ParleyInn follows semantic versioning.
   the review bundle dispatches, then every dispatched generalist, each
   as its own agent, and writes the review outcome from what they
   answered. The review skill and its evaluation cases are retired.
+  A change no rule routes gets one generalist, an agent that did not
+  answer runs once more, a change to a stakeholder path blocks until a
+  stakeholder comment consents (ENG-21), and every review reads the whole
+  diff.
 - Redaction now also redacts a secret that a neighbouring match hid from
   a rule's word boundary, such as an AWS access key directly followed by
   a principal's pattern (SEC-08). Its work is bounded by the redaction

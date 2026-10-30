@@ -275,3 +275,62 @@ fn the_default_options_are_the_evaluation_s_deadline_and_eight_at_once() {
     assert_eq!(o.parallel, 8);
     assert_eq!(o.deadline, Duration::from_secs(900));
 }
+
+#[test]
+fn a_run_that_did_not_answer_is_tried_once_more() {
+    let dir = workdir();
+    let calls = std::sync::atomic::AtomicUsize::new(0);
+
+    let run = one_run(dir.path(), move |c| {
+        if calls.fetch_add(1, Ordering::SeqCst) == 0 {
+            Err("cannot start".to_owned())
+        } else {
+            fake::specialist(c)
+        }
+    });
+
+    assert!(run.answered(), "{:?}", run.failure);
+    assert_eq!(run.attempts, 2);
+}
+
+#[test]
+fn a_run_that_fails_twice_fails_after_two_attempts_and_keeps_both_costs() {
+    let dir = workdir();
+
+    let run = one_run(dir.path(), |c| {
+        fake::write_log(c, &fake::log("  ", 0.25));
+        Ok(Output {
+            code: Some(0),
+            ..Output::default()
+        })
+    });
+
+    assert!(!run.answered());
+    assert_eq!(run.attempts, 2);
+    assert!((run.log.cost - 0.5).abs() < 1e-9, "{}", run.log.cost);
+}
+
+#[test]
+fn a_run_that_answers_is_tried_once() {
+    let dir = workdir();
+
+    let run = one_run(dir.path(), fake::specialist);
+
+    assert!(run.answered());
+    assert_eq!(run.attempts, 1);
+}
+
+#[test]
+fn a_definition_that_does_not_read_is_not_tried_again() {
+    let dir = TempDir::new().unwrap();
+    let host = FakeHost::new(fake::either);
+
+    let runs = review_with(
+        &host,
+        dir.path(),
+        &plan(r#"{"review-code": ["lang-rust"]}"#),
+    );
+
+    assert!(runs.iter().all(|r| r.attempts == 1));
+    assert!(host.agents().is_empty());
+}

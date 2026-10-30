@@ -9,6 +9,7 @@ fn run(name: &str, log: RunLog) -> AgentRun {
         kind: Kind::Specialist,
         failure: None,
         log,
+        attempts: 1,
     }
 }
 
@@ -35,6 +36,7 @@ fn each_agent_s_usage_sums_its_models_the_most_cached_first() {
             cache_write: 22,
             cache_read: 33,
             output: 44,
+            attempts: 1,
             cost_usd: 0.5,
         }
     );
@@ -49,6 +51,7 @@ fn each_agent_s_usage_sums_its_models_the_most_cached_first() {
         "cache_write",
         "cache_read",
         "output",
+        "attempts",
         "cost_usd",
     ] {
         assert!(json.get(key).is_some(), "{key}");

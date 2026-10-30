@@ -23,6 +23,7 @@ fn ran(name: &str, kind: Kind, answer: &str) -> AgentRun {
             answer: answer.to_owned(),
             ..RunLog::default()
         },
+        attempts: 1,
     }
 }
 

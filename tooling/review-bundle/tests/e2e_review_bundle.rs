@@ -145,13 +145,16 @@ fn the_executable_refuses_a_live_scenario_put_back_on_pending() {
         String::from_utf8_lossy(&run.stderr)
     );
     let stdout = String::from_utf8(run.stdout).unwrap();
-    assert!(stdout.contains("findings=1"), "{stdout}");
+    // The scenario's finding, and ENG-21's: `features/` has a code owner.
+    assert!(stdout.contains("findings=2"), "{stdout}");
     let checked: serde_json::Value =
         serde_json::from_str(&fs::read_to_string(home.path().join("checked.json")).unwrap())
             .unwrap();
-    assert_eq!(checked[0]["severity"], "blocking", "{checked}");
-    assert!(
-        checked[0]["body"].as_str().unwrap().contains("ENG-28"),
-        "{checked}"
-    );
+    let scenario = checked
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|f| f["body"].as_str().unwrap().contains("ENG-28"))
+        .expect("a finding on ENG-28");
+    assert_eq!(scenario["severity"], "blocking", "{checked}");
 }

@@ -272,17 +272,17 @@ the medium-effort generalist each names, which weighs their findings.
 `review-run` runs every specialist, then every generalist, each on its own
 model, and approves only when every agent answered readably and none blocks.
 The gate fails a review whose consulted list lacks a dispatched agent.
+An unanswered run runs once more; an unrouted change gets one generalist.
 A deep review consults each generalist's deep instance instead: the same
 template under [docs/agents](agents/review-code.md), on Opus at high effort with
 40 turns. The class is light for Markdown outside the stakeholder's paths, deep
 for those paths, the gates and the security-sensitive code. The review bundle
 quotes only the touched rows, their scenarios and the invariants, a few thousand
-model tokens where the SRS runs to hundreds of thousands. A re-review starts
-from the diff since the reviewer app's last review, found by the app's own
-login. The pull request's agent instructions move out of the agents' directory,
-so none loads; the agents read them as data. The posted review names the gate as
-its author, states the review's verdict, and keeps the agents' findings, the
-deterministic ones and failed checks under their own headings. A pull request
+model tokens where the SRS runs to hundreds of thousands. The pull request's
+agent instructions move out of the agents' directory, so none loads; the agents
+read them as data. The posted review names the gate as its author, states the
+review's verdict, and keeps the agents' findings, the deterministic ones and
+failed checks under their own headings. A pull request
 that changes a reviewer component also runs that component's evaluation cases,
 whose failures are blocking findings (ENG-32,
 [review-evaluation.md](review-evaluation.md)).

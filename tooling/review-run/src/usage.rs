@@ -17,6 +17,8 @@ pub struct AgentUsage {
     pub cache_write: u64,
     pub cache_read: u64,
     pub output: u64,
+    /// How many times it ran.
+    pub attempts: u32,
     /// The cost the run's result reported, in US dollars.
     pub cost_usd: f64,
 }
@@ -34,6 +36,7 @@ pub fn usage(runs: &[AgentRun]) -> Vec<AgentUsage> {
                 cache_write: 0,
                 cache_read: 0,
                 output: 0,
+                attempts: run.attempts,
                 cost_usd: run.log.cost,
             };
             for m in run.log.usage.values() {

@@ -337,7 +337,11 @@ fn guarded(
     }
     let diff: String = paths.iter().map(|p| header(p)).collect();
     let got = analyse(&base(), head, &diff, consent);
-    (got.findings, got.eng_29_record)
+    let eng_29 = got
+        .findings
+        .into_iter()
+        .filter(|f| !f.body.contains("ENG-21"));
+    (eng_29.collect(), got.eng_29_record)
 }
 
 /// The ENG-29 finding at `path` with `body`.
@@ -618,4 +622,79 @@ fn a_row_markdown_only_quotes_brings_no_specialist() {
         "{:?}",
         got.dispatch
     );
+}
+
+#[test]
+fn a_change_no_rule_routes_dispatches_one_generalist() {
+    let got = analyse(&base(), &base(), "", false);
+
+    assert_eq!(
+        got.dispatch,
+        BTreeMap::from([(dispatch::CODE.to_owned(), BTreeSet::new())])
+    );
+}
+
+#[test]
+fn a_deep_review_no_rule_routes_dispatches_its_deep_generalist() {
+    let got = analyse(&base(), &base(), &header("crates/pin/Cargo.toml"), false);
+
+    assert_eq!(got.class, Class::Deep);
+    assert!(got.dispatch.contains_key(dispatch::CODE_DEEP));
+    assert!(!got.dispatch.contains_key(dispatch::CODE));
+}
+
+/// The ENG-21 finding at `path` with `severity` and `body`.
+fn eng_21_finding(severity: &'static str, path: &str, body: &str) -> Finding {
+    Finding {
+        path: path.into(),
+        line: 0,
+        severity,
+        body: body.into(),
+    }
+}
+
+#[test]
+fn a_stakeholder_path_without_consent_blocks_naming_the_paths() {
+    let diff = format!("{}{}", header("docs/srs/a.md"), header("docs/srs/b.md"));
+
+    let got = analyse(&base(), &base(), &diff, false);
+
+    assert!(
+        got.findings.contains(&eng_21_finding(
+            BLOCKING,
+            "docs/srs/a.md",
+            "this change touches paths CODEOWNERS assigns (docs/srs/a.md, docs/srs/b.md) \
+             (ENG-21), and no stakeholder comment consents to it"
+        )),
+        "{:?}",
+        got.findings
+    );
+}
+
+#[test]
+fn a_stakeholder_path_with_consent_is_a_nit() {
+    let got = analyse(&base(), &base(), &header("docs/srs/a.md"), true);
+
+    assert!(
+        got.findings.contains(&eng_21_finding(
+            NIT,
+            "docs/srs/a.md",
+            "this change touches paths CODEOWNERS assigns (docs/srs/a.md) (ENG-21), \
+             and a stakeholder comment consents to it"
+        )),
+        "{:?}",
+        got.findings
+    );
+}
+
+#[test]
+fn a_change_without_a_stakeholder_path_has_no_eng_21_finding() {
+    let got = analyse(
+        &base(),
+        &base(),
+        &header("crates/parinn/src/main.rs"),
+        false,
+    );
+
+    assert!(got.findings.iter().all(|f| !f.body.contains("ENG-21")));
 }

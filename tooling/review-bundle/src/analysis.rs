@@ -142,6 +142,7 @@ pub fn analyse(base: &Snapshot, head: &Snapshot, diff: &str, consent: bool) -> A
     let mut findings = ratchet(base, head);
     let (guard, eng_29_record) = eng_29(base, head, &paths, &requirements, consent);
     findings.extend(guard);
+    findings.extend(stakeholder_paths(&owned, consent));
     findings.extend(unparsed.iter().map(|h| nit(h, UNPARSED)));
     findings.extend(lifted_bans(diff));
     let crates = security_crates(base);
@@ -171,9 +172,14 @@ pub fn analyse(base: &Snapshot, head: &Snapshot, diff: &str, consent: bool) -> A
         .collect();
     let class = classify(&paths, deep || !owned.is_empty(), &unparsed);
     let scopes = dispatch::scopes(&paths, &rows, &crates, &diff::ids_by_file(diff));
+    let mut routed = dispatch::grouped(&scopes);
+    if routed.is_empty() {
+        // No rule routes the change: one generalist still reads it.
+        routed.insert(dispatch::CODE.to_owned(), BTreeSet::new());
+    }
     let dispatch = match class {
-        Class::Deep => dispatch::deepened(dispatch::grouped(&scopes)),
-        Class::Light | Class::Standard => dispatch::grouped(&scopes),
+        Class::Deep => dispatch::deepened(routed),
+        Class::Light | Class::Standard => routed,
     };
 
     Analysis {
@@ -189,6 +195,26 @@ pub fn analyse(base: &Snapshot, head: &Snapshot, diff: &str, consent: bool) -> A
         dispatch,
         scopes,
     }
+}
+
+/// ENG-21: a change to a path CODEOWNERS assigns needs the stakeholder's
+/// consent. Blocks without it; with it, a nit that names the paths.
+fn stakeholder_paths(owned: &[String], consent: bool) -> Option<Finding> {
+    let first = owned.first()?;
+    let (severity, tail) = if consent {
+        (NIT, "a stakeholder comment consents to it")
+    } else {
+        (BLOCKING, "no stakeholder comment consents to it")
+    };
+    Some(Finding {
+        path: first.clone(),
+        line: 0,
+        severity,
+        body: format!(
+            "this change touches paths CODEOWNERS assigns ({}) (ENG-21), and {tail}",
+            owned.join(", ")
+        ),
+    })
 }
 
 /// What an unparsed diff header weighs.

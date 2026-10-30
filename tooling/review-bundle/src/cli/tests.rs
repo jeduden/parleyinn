@@ -73,9 +73,11 @@ fn run_writes_the_bundle_and_findings_and_prints_the_route() {
     let (code, out, err) = w.run();
 
     assert_eq!(code, EXIT_OK, "{err}");
-    assert_eq!(out, "class=deep\ntouched=1\nfindings=0\nconsults=4\n");
+    assert_eq!(out, "class=deep\ntouched=1\nfindings=1\nconsults=4\n");
     assert!(w.output(BUNDLE).contains("### REC-01"));
-    assert_eq!(w.output(CHECKED), "[]\n");
+    let checked: serde_json::Value = serde_json::from_str(&w.output(CHECKED)).unwrap();
+    assert_eq!(checked[0]["severity"], "blocking");
+    assert!(checked[0]["body"].as_str().unwrap().contains("ENG-21"));
     let dispatch: serde_json::Value = serde_json::from_str(&w.output(DISPATCH)).unwrap();
     assert_eq!(
         dispatch,
@@ -148,7 +150,7 @@ fn run_reads_a_diff_that_holds_bytes_that_are_not_text() {
     let (code, out, err) = w.run();
 
     assert_eq!(code, EXIT_OK, "{err}");
-    assert_eq!(out, "class=deep\ntouched=1\nfindings=0\nconsults=4\n");
+    assert_eq!(out, "class=deep\ntouched=1\nfindings=1\nconsults=4\n");
     assert!(w.output(BUNDLE).contains("### REC-01"));
 }
 
@@ -241,9 +243,9 @@ fn run_takes_an_eng_29_record_with_the_stakeholder_s_consent() {
     w.consent(r#"[{"author": "owner", "at": "2026-10-11T12:00:00Z", "body": "ok"}]"#);
     let (code, out, err) = w.run();
 
-    assert!(refused.contains("findings=1"), "{refused}");
+    assert!(refused.contains("findings=2"), "{refused}");
     assert_eq!(code, EXIT_OK, "{err}");
-    assert!(out.contains("findings=0"), "{out}");
+    assert!(out.contains("findings=1"), "{out}");
     assert!(
         w.output(BUNDLE)
             .contains("ENG-29 record: `docs/adr/ADR-2610111300-guard.md`, whose summary reads:\n\n> An invariant changes under ENG-29.\n"),
