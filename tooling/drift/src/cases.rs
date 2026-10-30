@@ -764,7 +764,28 @@ fn review_gate_cases() -> Vec<Case> {
             ),
             "class=light",
         ),
+        consent_case(),
     ]
+}
+
+/// The ENG-21 finding comes from the same CODEOWNERS the class reads;
+/// the test asserts with its own message, which names the finding.
+fn consent_case() -> Case {
+    case(
+        "CODEOWNERS no longer asking consent for the SRS",
+        "ENG-21",
+        Injection::replace(
+            ".github/CODEOWNERS",
+            "/docs/srs/                    @jeduden",
+            "/docs/srsx/                   @jeduden",
+        ),
+        cargo_test(
+            "review-bundle",
+            "e2e_review_bundle",
+            "the_executable_blocks_a_stakeholder_path_until_the_stakeholder_consents",
+        ),
+        "no ENG-21 finding for a stakeholder path",
+    )
 }
 
 /// The drifts the gate tests and mdsmith catch between the SRS, the

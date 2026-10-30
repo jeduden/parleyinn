@@ -73,6 +73,33 @@ fn the_executable_bundles_this_repository_against_itself() {
 }
 
 #[test]
+fn the_executable_blocks_a_stakeholder_path_until_the_stakeholder_consents() {
+    let out = TempDir::new().unwrap();
+    let diff = out.path().join("pr.diff");
+    fs::write(
+        &diff,
+        "diff --git a/docs/srs/10-engineering-quality.md b/docs/srs/10-engineering-quality.md\n+ENG-28\n",
+    )
+    .unwrap();
+    let root = testkit::repo_root();
+
+    let run = review_bundle(out.path(), &flags(&root, &root, &diff, out.path()));
+
+    assert_eq!(run.status.code(), Some(0));
+    let checked: serde_json::Value =
+        serde_json::from_str(&fs::read_to_string(out.path().join("checked.json")).unwrap())
+            .unwrap();
+    let blocked =
+        checked.as_array().unwrap().iter().any(|f| {
+            f["severity"] == "blocking" && f["body"].as_str().unwrap().contains("(ENG-21)")
+        });
+    assert!(
+        blocked,
+        "no ENG-21 finding for a stakeholder path: {checked}"
+    );
+}
+
+#[test]
 fn the_executable_exits_2_on_a_wrong_command_line() {
     let home = TempDir::new().unwrap();
 
