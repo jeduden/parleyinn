@@ -418,8 +418,8 @@ fn repository_cases() -> Vec<Case> {
     ]
 }
 
-/// The drifts ENG-28 exists to catch in the reviewing agent's reach: the
-/// agent reaching the approval. [`review_gate_cases`] holds the approval
+/// The drifts ENG-28 exists to catch in the review's agents' reach: an
+/// agent reaching the approval, or routing the review. [`review_gate_cases`] holds the approval
 /// skipping the review gate.
 fn review_cases() -> Vec<Case> {
     vec![
@@ -450,8 +450,8 @@ fn review_cases() -> Vec<Case> {
             "ENG-28",
             Injection::replace(
                 REVIEW_WORKFLOW,
-                "          github_token: ${{ github.token }}\n",
-                "          github_token: ${{ secrets.JEDUDEN_REVIEW_AGENT_KEY }}\n",
+                "        run: |\n          cargo run --locked --quiet --offline -p review-run",
+                "          KEY: ${{ secrets.JEDUDEN_REVIEW_AGENT_KEY }}\n        run: |\n          cargo run --locked --quiet --offline -p review-run",
             ),
             scenario("ENG-28"),
             "agent job review reads JEDUDEN_REVIEW_AGENT_KEY",
@@ -459,9 +459,24 @@ fn review_cases() -> Vec<Case> {
         case(
             "the reviewing agents allowed to write anywhere",
             "ENG-28",
-            Injection::replace(REVIEW_WORKFLOW, "Edit(./review/reports/**)", "Write"),
+            Injection::replace(
+                REVIEW_WORKFLOW,
+                "            > review/run.txt\n",
+                "            > review/run.txt\n          claude -p review --allowedTools Write\n",
+            ),
             scenario("ENG-28"),
             "may use Write, want Edit(./review/reports/**) alone",
+        ),
+        case(
+            "the review routed by an agent instead of review-run",
+            "ENG-28",
+            Injection::replace(
+                REVIEW_WORKFLOW,
+                "          cargo run --locked --quiet --offline -p review-run -- --workdir . --parallel 24 \\\n            > review/run.txt\n",
+                "          echo routed\n      - uses: anthropics/claude-code-action@1d6de8cb0c237e7c15e9e1bdf973826ebae490cc\n",
+            ),
+            scenario("ENG-28"),
+            "no job runs the review's agents with \"cargo run --locked --quiet --offline -p review-run -- --workdir .\"",
         ),
         case(
             "the review gate without the specialists' reports",
@@ -571,8 +586,9 @@ fn review_agent_cases() -> Vec<Case> {
 
 /// The drifts ENG-32 exists to catch: a component without one of its
 /// kinds of case, an agent the dispatch never names without any, a case
-/// whose edit no longer applies, a case that dispatches another
-/// component, and a review workflow that skips the evaluation.
+/// whose edit no longer applies, a case of no component, such as the
+/// retired orchestrator, a case that dispatches another component, and
+/// a review workflow that skips the evaluation.
 fn review_evaluation_cases() -> Vec<Case> {
     vec![
         protection_case(
@@ -599,6 +615,15 @@ fn review_evaluation_cases() -> Vec<Case> {
             ),
             "the_checkout_s_reviewer_evaluation_cases_apply_and_dispatch",
             "lang-rust/defect-unwrap: tooling/review-bundle/src/lib.rs: does not contain",
+        ),
+        protection_case(
+            "a case for the retired review orchestrator",
+            Injection::create(
+                "tooling/review-eval/cases/review/defect-unwrap.toml",
+                "component = \"review\"\nkind = \"defect\"\ntitle = \"an unwrap\"\n\n[[create]]\nfile = \"crates/x/src/rogue.rs\"\ncontent = \"x\"\n\n[expect]\noutcome = \"blocking\"\n",
+            ),
+            "the_checkout_s_reviewer_evaluation_cases_apply_and_dispatch",
+            "case review/defect-unwrap names no component",
         ),
         protection_case(
             "a reviewer evaluation case that dispatches no one",
@@ -694,7 +719,7 @@ fn review_gate_cases() -> Vec<Case> {
             r#"job post does not run "--checked checked.json""#,
         ),
         case(
-            "the review posted without holding the orchestrator to the dispatch",
+            "the review posted without holding it to the dispatch",
             "ENG-28",
             Injection::replace(
                 REVIEW_WORKFLOW,

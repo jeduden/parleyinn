@@ -265,7 +265,7 @@ fn run_fails_closed_on_a_missing_or_malformed_dispatch_or_a_skipped_agent() {
             "a dispatched agent left out",
             args(HEAD),
             with("consulted.json", r#"["review-code"]"#),
-            "the orchestrator did not consult lang-rust",
+            "dispatched but not consulted: lang-rust",
             EXIT_FAILURE,
         ),
         (

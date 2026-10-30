@@ -17,15 +17,12 @@ fn a_log_reads_its_result_usage_and_writes() {
     assert!(log.answered);
     assert_eq!(log.subtype, "success");
     assert_eq!(log.answer, "outcome: sound\nreview/reports/lang-rust.md");
-    assert_eq!(log.structured, None);
     assert!((log.cost - 0.01).abs() < 1e-9);
     assert_eq!(log.turns, 3);
     assert_eq!(log.duration_ms, 4200);
     assert_eq!(log.resolved_model, "claude-haiku-5-5");
     assert_eq!(log.writes, vec!["review/reports/lang-rust.md"]);
-    assert_eq!(log.main_writes, vec!["review/reports/lang-rust.md"]);
     assert_eq!(log.first_write_turn, Some(2));
-    assert!(log.consulted.is_empty());
 }
 
 #[test]
@@ -43,30 +40,18 @@ fn a_log_counts_each_call_once_with_its_usage() {
 }
 
 #[test]
-fn an_orchestrator_s_log_lists_the_agents_that_answered() {
+fn a_subagent_s_calls_count_their_usage_and_writes_but_not_the_main_thread_s() {
     let text = r#"{"type":"assistant","message":{"id":"m1","model":"claude-sonnet-5-5","usage":{"input_tokens":1},"content":[{"type":"tool_use","id":"a1","name":"Agent","input":{"subagent_type":"lang-rust"}},{"type":"tool_use","id":"a2","name":"Agent","input":{"subagent_type":"lang-toml"}},{"type":"tool_use","id":"a3","name":"Task","input":{"subagent_type":"review-code"}}]}}
 {"type":"assistant","parent_tool_use_id":"a1","message":{"id":"s1","model":"claude-haiku-5-5","usage":{"input_tokens":3,"output_tokens":4},"content":[{"type":"tool_use","id":"w1","name":"Write","input":{"file_path":"review/reports/lang-rust.md"}}]}}
 {"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"a1","content":"outcome: sound"},{"type":"tool_result","tool_use_id":"a2","is_error":true,"content":"failed"},{"type":"tool_result","tool_use_id":"a3","content":[{"type":"text","text":"fine"}]}]}}
-{"type":"result","subtype":"success","result":"{}","structured_output":{"verdict":"approve"},"total_cost_usd":0.5,"num_turns":2,"duration_ms":10,"modelUsage":{"claude-sonnet-5-5":{"costUSD":0.4},"claude-haiku-5-5":{"costUSD":0.1},"claude-opus-5-5":{"inputTokens":7,"outputTokens":8,"cacheReadInputTokens":9,"cacheCreationInputTokens":10,"costUSD":0.0}}}
+{"type":"result","subtype":"success","result":"{}","total_cost_usd":0.5,"num_turns":2,"duration_ms":10,"modelUsage":{"claude-sonnet-5-5":{"costUSD":0.4},"claude-haiku-5-5":{"costUSD":0.1},"claude-opus-5-5":{"inputTokens":7,"outputTokens":8,"cacheReadInputTokens":9,"cacheCreationInputTokens":10,"costUSD":0.0}}}
 "#;
 
     let log = parse(text);
 
-    assert_eq!(
-        log.consulted,
-        ["lang-rust", "review-code"]
-            .iter()
-            .map(|s| (*s).to_owned())
-            .collect()
-    );
-    assert_eq!(
-        log.structured,
-        Some(serde_json::json!({"verdict": "approve"}))
-    );
     assert_eq!(log.resolved_model, "claude-sonnet-5-5");
     // A subagent's write is not the main thread's first write.
     assert_eq!(log.writes, vec!["review/reports/lang-rust.md"]);
-    assert!(log.main_writes.is_empty());
     assert_eq!(log.first_write_turn, None);
     assert_eq!(log.usage["claude-haiku-5-5"].calls, 1);
     assert!((log.usage["claude-haiku-5-5"].cost - 0.1).abs() < 1e-9);

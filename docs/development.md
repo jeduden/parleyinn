@@ -165,25 +165,25 @@ checked for reproducibility.
 
 [review.yml](../.github/workflows/review.yml) reviews each pull request from a
 branch of this repository once its CI passes (ENG-21, ENG-28). It skips drafts:
-marking a pull request ready reruns CI and so reviews it. The agent runs on the
+marking a pull request ready reruns CI and so reviews it. The agents run on the
 stakeholder's Claude subscription, not a per-token API key. It triggers on
 `workflow_run` and `issue_comment`, so GitHub runs it as `main` defines it,
 never as the pull request does; a code owner's comment on a pull request whose
 CI passed reviews it again. Consent to a stakeholder path is such a comment, so
-its review follows at once. The review job first runs main's `review-bundle`
-over main's tree and the pull request's: it writes the review bundle the agent
-reads, sets the review's class and makes the deterministic findings (see
-Review). The agent then runs with read-only tools on the pull request's tree,
-following [the review skill](../.claude/skills/review/SKILL.md), and writes only
-a review outcome. The post job alone has the reviewer app's key. It runs the
-`review-gate` crate's executable, which approves only an approving review
-outcome with no blocking finding, its own or a deterministic one, on the
-reviewed head, with `CI` green there; otherwise it requests changes. It posts
-the same decision as the `review-gate` check.
-[ADR-2609301941](adr/ADR-2609301941-agent-review.md) records why, and
-[ADR-2610262245](adr/ADR-2610262245-layered-agent-review.md) proposes the
-layers; [review-evaluation.md](review-evaluation.md) is the `evaluate` job
-between the two (ENG-32).
+its review follows at once. The review job runs main's `review-bundle` over
+main's tree and the pull request's: it writes the review bundle the agents read,
+sets the review's class, dispatches the agents and makes the deterministic
+findings (see Review). `review-run` then runs each agent, read-only, on the pull
+request's tree and writes the review outcome from their answers. The post job
+alone has the reviewer app's key. It runs the `review-gate` crate's executable,
+which approves only an approving review outcome with no blocking finding, its
+own or a deterministic one, on the reviewed head, with `CI` green there;
+otherwise it requests changes. It posts the same decision as the `review-gate`
+check. [ADR-2609301941](adr/ADR-2609301941-agent-review.md) records why,
+[ADR-2610262245](adr/ADR-2610262245-layered-agent-review.md) the layers, and
+[ADR-2610300031](adr/ADR-2610300031-review-run-by-code.md) that code runs them;
+[review-evaluation.md](review-evaluation.md) is the `evaluate` job between the
+two (ENG-32).
 
 Main's protection is committed as a ruleset,
 [main.json](../.github/rulesets/main.json), in GitHub's export format
@@ -266,25 +266,25 @@ What `review-bundle` decides, comparing the pull request with main:
 - a clippy ban lifted at a call site, or a diff header it cannot read:
   a nit, and an unread header makes the review deep.
 
-One Sonnet agent at low effort orchestrates the review. The bundle
-dispatches, from the changed paths and touched rows, the low-effort
-specialists under [.claude/agents](../.claude/agents) and the medium-effort
-generalist each names in its front matter, which weighs their findings. The
-gate fails a review whose consulted list lacks a dispatched agent. A deep
-review consults each generalist's deep instance instead: the same template
-under [docs/agents](agents/review-code.md), instantiated on Opus at high
-effort with 40 turns. The class sets the turn budget: light for Markdown
-outside the stakeholder's paths, deep for those paths, the gates and the
-security-sensitive code. The review bundle quotes only the touched rows,
-their scenarios and the invariants, a few thousand model tokens where the
-SRS runs to hundreds of thousands. A re-review starts from the diff since
-the reviewer app's last review, found by the app's own login. The pull
-request's agent instructions move out of the agent's directory, so none
-loads; the agent reads them as data. The posted review names the gate as its
-author, states the agent's verdict, and keeps the agent's findings, the
+Code runs the review. The bundle dispatches, from the changed paths and touched
+rows, the low-effort specialists under [.claude/agents](../.claude/agents) and
+the medium-effort generalist each names, which weighs their findings.
+`review-run` runs every specialist, then every generalist, each on its own
+model, and approves only when every agent answered readably and none blocks.
+The gate fails a review whose consulted list lacks a dispatched agent.
+A deep review consults each generalist's deep instance instead: the same
+template under [docs/agents](agents/review-code.md), on Opus at high effort with
+40 turns. The class is light for Markdown outside the stakeholder's paths, deep
+for those paths, the gates and the security-sensitive code. The review bundle
+quotes only the touched rows, their scenarios and the invariants, a few thousand
+model tokens where the SRS runs to hundreds of thousands. A re-review starts
+from the diff since the reviewer app's last review, found by the app's own
+login. The pull request's agent instructions move out of the agents' directory,
+so none loads; the agents read them as data. The posted review names the gate as
+its author, states the review's verdict, and keeps the agents' findings, the
 deterministic ones and failed checks under their own headings. A pull request
-that changes a reviewer component also runs that component's evaluation
-cases, whose failures are blocking findings (ENG-32,
+that changes a reviewer component also runs that component's evaluation cases,
+whose failures are blocking findings (ENG-32,
 [review-evaluation.md](review-evaluation.md)).
 
 What is left to the agent is judgement: whether the code and the step

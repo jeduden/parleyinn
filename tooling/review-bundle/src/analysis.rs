@@ -111,7 +111,7 @@ pub struct Analysis {
     /// The record that satisfies ENG-29, when a guarded change has one
     /// and the stakeholder consented.
     pub eng_29_record: Option<Record>,
-    /// The agents the review's orchestrator consults (ENG-28).
+    /// The agents the review runs (ENG-28).
     pub dispatch: dispatch::Dispatch,
     /// Each specialist with the changed files it reads.
     pub scopes: dispatch::Scopes,

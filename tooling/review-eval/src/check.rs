@@ -239,9 +239,8 @@ fn catalog(
 }
 
 /// Whether the review bundle dispatches `component` for `case`: none
-/// when it does, or when the bundle never dispatches the component,
-/// the orchestrator and a consultant; else the agents it dispatches
-/// instead.
+/// when it does, or when the bundle never dispatches the component, a
+/// consultant; else the agents it dispatches instead.
 ///
 /// # Errors
 ///
@@ -254,7 +253,7 @@ pub fn dispatches(
     component: &Component,
 ) -> Result<Option<BTreeSet<String>>, String> {
     let changes = case.changes(&|file| fs::read_to_string(root.join(file)).ok())?;
-    if matches!(component.kind, Kind::Orchestrator | Kind::Consultant) {
+    if component.kind == Kind::Consultant {
         return Ok(None);
     }
     let head = head_snapshot(base, &changes).map_err(|e| format!("case {}: {e}", case.id()))?;
@@ -266,7 +265,7 @@ pub fn dispatches(
             .zip(DEEP_GENERALISTS)
             .find(|(normal, deep)| **normal == component.name || *deep == component.name)
             .map_or_else(|| vec![component.name.as_str()], |(n, d)| vec![*n, d]),
-        Kind::Specialist | Kind::Orchestrator | Kind::Consultant => vec![component.name.as_str()],
+        Kind::Specialist | Kind::Consultant => vec![component.name.as_str()],
     };
     if family.iter().any(|name| dispatched.contains(*name)) {
         Ok(None)

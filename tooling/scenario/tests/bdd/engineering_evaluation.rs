@@ -19,7 +19,7 @@ fn read_cases(w: &mut World, dir: String) {
 }
 
 #[then(
-    regex = r"^every reviewer component, the agents the review bundle can dispatch, the orchestrator, each deep instance and every other agent under \.claude/agents among them, has a case that plants a defect, a case that is clean and a case that addresses the reviewer$"
+    regex = r"^every reviewer component, the agents the review bundle can dispatch, each deep instance and every other agent under \.claude/agents among them, has a case that plants a defect, a case that is clean and a case that addresses the reviewer$"
 )]
 fn every_component_has_its_cases(w: &mut World) -> Result<(), String> {
     let e = eng(w);

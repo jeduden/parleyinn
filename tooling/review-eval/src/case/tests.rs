@@ -68,7 +68,6 @@ content = "outcome: sound"
 [expect]
 outcome = ["sound", "nits"]
 absent = ["approved"]
-consulted = ["lang-rust"]
 
 [[expect.none]]
 path = "a.txt"
@@ -90,7 +89,6 @@ mentions = ["false alarm"]
     assert_eq!(case.seeds[0].agent, "lang-rust");
     assert_eq!(case.expect.outcome, vec!["sound", "nits"]);
     assert_eq!(case.expect.absent, vec!["approved"]);
-    assert_eq!(case.expect.consulted, vec!["lang-rust"]);
     assert_eq!(case.expect.none[0].path, "a.txt");
     assert_eq!(case.expect.dropped[0].mentions, vec!["false alarm"]);
 }
@@ -113,7 +111,27 @@ fn parse_names_each_problem() {
     );
     assert_eq!(
         Case::parse("lang-rust", "x", &replace("\"blocking\"\n", "\"maybe\"\n")).unwrap_err(),
-        "case lang-rust/x: outcome maybe is none of sound, nits, blocking, approve, request_changes"
+        "case lang-rust/x: outcome maybe is none of sound, nits, blocking"
+    );
+    // A review outcome's verdict is no report's outcome, and no agent
+    // is consulted by a reviewer component: the review is run by code.
+    assert!(
+        Case::parse(
+            "lang-rust",
+            "x",
+            &replace("\"blocking\"\n", "\"approve\"\n")
+        )
+        .unwrap_err()
+        .contains("outcome approve is none of"),
+    );
+    assert!(
+        Case::parse(
+            "lang-rust",
+            "x",
+            &replace("outcome = ", "consulted = [\"lang-rust\"]\noutcome = ")
+        )
+        .unwrap_err()
+        .contains("unknown field `consulted`"),
     );
     let no_edit = MINIMAL.replacen(
         "[[create]]\nfile = \"crates/x/src/rogue.rs\"\ncontent = \"fn f() { None::<u8>.unwrap(); }\\n\"\n",

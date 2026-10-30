@@ -84,6 +84,57 @@ fn a_line_that_is_not_a_finding_is_none() {
 }
 
 #[test]
+fn a_dropped_line_starts_with_dropped_or_gives_it_as_severity() {
+    for line in [
+        "dropped — src/a.rs:3 — no such line — lang-toml",
+        "Dropped: x",
+        "- dropped x",
+        "* **DROPPED** x",
+        "> _dropped_ x",
+        "1. dropped — src/a.rs:3 — why — me",
+        "src/d.rs:6 — dropped — not a bug",
+        "`src/d.rs:6` — **Dropped** — not a bug",
+    ] {
+        assert!(dropped(line), "{line}");
+    }
+    for line in [
+        "",
+        "drop",
+        "src/a.rs:1 — nit — dropped later",
+        "src/a.rs:1 — nit — this drops the error — lang-rust",
+        "src/a.rs:1 — drop — not the word",
+        "kept",
+        // A path that merely starts with the letters is a finding on
+        // that path, not a dropped line.
+        "dropped_events.rs:12 — blocking — leaks a pin — I3",
+        "- `dropped.rs`:3 — blocking — leaks a pin — I3",
+        "Droppedfoo/bar.rs:3 — nit — tidy — lang-rust",
+    ] {
+        assert!(!dropped(line), "{line}");
+    }
+}
+
+#[test]
+fn a_none_line_says_a_generalist_has_nothing_to_add() {
+    for line in [
+        "none — nothing to add — review-code",
+        "- **None** - nothing to add - review-code",
+        "None — nothing to add",
+    ] {
+        assert!(nothing(line), "{line}");
+    }
+    for line in [
+        "",
+        "none",
+        "None of the findings hold.",
+        "none_of.rs:3 — nit — tidy — lang-rust",
+        "dropped — a.rs:1 — no bug — lang-rust",
+    ] {
+        assert!(!nothing(line), "{line}");
+    }
+}
+
+#[test]
 fn split_dashes_cuts_at_each_spaced_dash_only() {
     assert_eq!(
         split_dashes("a — b - c -- d – e"),

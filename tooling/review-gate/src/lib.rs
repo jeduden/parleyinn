@@ -41,7 +41,7 @@ pub const REVIEWER_APP_ID: i64 = 5_140_085;
 const CI_CHECK: &str = "CI";
 
 /// The reviewing agent's structured output.
-#[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields, default)]
 pub struct ReviewOutcome {
     pub verdict: String,
@@ -52,7 +52,7 @@ pub struct ReviewOutcome {
 
 /// One problem the agent found, at a path and line of the reviewed
 /// tree; line 0 means the whole file.
-#[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields, default)]
 pub struct Finding {
     pub path: String,
@@ -97,7 +97,8 @@ pub struct Input {
     /// Every agent the review bundle dispatched: the generalists and
     /// their specialists.
     pub dispatched: BTreeSet<String>,
-    /// Every agent the orchestrator called, as its run log shows.
+    /// Every dispatched agent the review consulted: each one that
+    /// answered.
     pub consulted: BTreeSet<String>,
     /// The specialists the review bundle dispatched, whose reports the
     /// generalists read.
@@ -105,8 +106,7 @@ pub struct Input {
     /// Each specialist's report file, by name; one with no file is
     /// absent.
     pub reports: BTreeMap<String, String>,
-    /// Each agent's final answer, by name, as the orchestrator's run log
-    /// shows it.
+    /// Each agent's final answer, by name, as its run log shows it.
     pub answers: BTreeMap<String, String>,
 }
 
@@ -135,11 +135,11 @@ pub enum Error {
     Ci(String),
     /// The review bundle's dispatch does not read.
     Dispatch(serde_json::Error),
-    /// The list of agents the orchestrator called does not read.
+    /// The list of agents the review consulted does not read.
     Consulted(serde_json::Error),
-    /// The list of agents the orchestrator called holds an empty name.
+    /// The list of agents the review consulted holds an empty name.
     UnnamedAgent,
-    /// The orchestrator left these dispatched agents out.
+    /// The review left these dispatched agents out.
     Unconsulted(Vec<String>),
     /// The dispatch names an agent whose name is not lowercase letters,
     /// digits and hyphens, so it cannot name a report file.
@@ -168,7 +168,7 @@ impl fmt::Display for Error {
             }
             Self::Unconsulted(agents) => write!(
                 f,
-                "review: the orchestrator did not consult {}",
+                "review: dispatched but not consulted: {}",
                 agents.join(", ")
             ),
             Self::AgentName(name) => write!(f, "review: malformed dispatch: agent name {name:?}"),
@@ -340,8 +340,19 @@ fn outcome_line(text: &str) -> Option<&str> {
 /// it does not end with an outcome line, or its run-log answer holds no
 /// line that is the same outcome.
 fn report_problem(input: &Input, agent: &str) -> Option<&'static str> {
-    let report = input.reports.get(agent).map(|r| r.trim());
-    let outcome = match report {
+    report_check(
+        input.reports.get(agent).map(String::as_str),
+        input.answers.get(agent).map(String::as_str),
+    )
+}
+
+/// The problem with a specialist's `report`, its file's text when it
+/// has one, beside `answer`, its final answer when it gave one: what
+/// the gate refuses a review for, so the review's runner can name the
+/// same problem before the gate runs.
+#[must_use]
+pub fn report_check(report: Option<&str>, answer: Option<&str>) -> Option<&'static str> {
+    let outcome = match report.map(str::trim) {
         None => return Some("wrote no report"),
         Some("") => return Some("wrote an empty report"),
         Some(text) => outcome_line(text),
@@ -350,14 +361,11 @@ fn report_problem(input: &Input, agent: &str) -> Option<&'static str> {
         return Some("has a report that does not end with its outcome");
     };
 
-    (!input
-        .answers
-        .get(agent)
-        .is_some_and(|answer| answer.lines().any(|l| l.trim() == outcome)))
-    .then_some("has a report whose outcome differs from its answer in the run log")
+    (!answer.is_some_and(|answer| answer.lines().any(|l| l.trim() == outcome)))
+        .then_some("has a report whose outcome differs from its answer in the run log")
 }
 
-/// Reads the agents the orchestrator called, a list of names.
+/// Reads the agents the review consulted, a list of names.
 ///
 /// # Errors
 ///
@@ -395,9 +403,9 @@ pub fn parse_check_runs(data: &str) -> Result<Vec<CheckRun>, Error> {
 ///
 /// # Errors
 ///
-/// A head whose CI has not passed, or a review whose orchestrator left
-/// out an agent the review bundle dispatched, is an error, so the step
-/// fails loudly rather than posting anything.
+/// A head whose CI has not passed, or a review that left out an agent
+/// the review bundle dispatched, is an error, so the step fails loudly
+/// rather than posting anything.
 pub fn decide(input: &Input) -> Result<Option<Review>, Error> {
     if input.head != input.reviewed {
         return Ok(None);

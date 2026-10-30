@@ -15,7 +15,7 @@ fn checkout() -> TempDir {
         fs::write(path, body).unwrap();
     };
     let names = component::names(dir.path()).unwrap();
-    for name in names.iter().filter(|n| *n != "review") {
+    for name in &names {
         let (tools, model, turns) = if name.starts_with("review-") {
             ("Read, Grep, Glob", "sonnet", "")
         } else {
@@ -78,7 +78,7 @@ fn a_component_without_its_three_kinds_is_named() {
         "{got:?}"
     );
     assert!(
-        got.contains(&"component review has no defect case".to_owned()),
+        got.contains(&"component review-code has no defect case".to_owned()),
         "{got:?}"
     );
     // Derived cases cover the section and model specialists.
@@ -251,8 +251,6 @@ fn a_derived_change_to_a_section_is_read_through_a_scratch_copy() {
 
     assert_eq!(dispatches(dir.path(), &base, row, &component), Ok(None));
 
-    let orchestrator = component::load(dir.path(), "review").unwrap();
-    assert_eq!(dispatches(dir.path(), &base, row, &orchestrator), Ok(None));
     let generalist = component::load(dir.path(), "review-spec-deep").unwrap();
     assert_eq!(dispatches(dir.path(), &base, row, &generalist), Ok(None));
     let other = component::load(dir.path(), "review-code").unwrap();
@@ -468,7 +466,7 @@ fn a_consultant_s_case_needs_no_dispatch_and_expects_no_outcome() {
 }
 
 #[test]
-fn a_consultant_or_an_orchestrator_case_that_does_not_apply_is_named() {
+fn a_consultant_case_that_does_not_apply_is_named_and_a_skill_s_case_names_no_component() {
     let dir = checkout();
     let cases = dir.path().join(crate::CASES);
     fs::write(dir.path().join(".claude/agents/persona-agent.md"), PERSONA).unwrap();
@@ -497,8 +495,10 @@ fn a_consultant_or_an_orchestrator_case_that_does_not_apply_is_named() {
         got.contains(&"persona-agent/gone: crates/x/src/rogue.rs: does not exist".to_owned()),
         "{got:?}"
     );
+    // The review skill is no reviewer component: the review is run by
+    // code, so a case for it is a case of nothing.
     assert!(
-        got.contains(&"review/gone: crates/x/src/rogue.rs: does not exist".to_owned()),
+        got.contains(&"case review/gone names no component".to_owned()),
         "{got:?}"
     );
 }

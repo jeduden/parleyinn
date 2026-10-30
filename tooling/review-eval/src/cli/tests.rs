@@ -18,7 +18,6 @@ const CREATED: &[(&str, &str)] = &[
     ("lang-toml", "crates/x/Cargo.toml"),
     ("lang-yaml", "x.yml"),
     ("performance", "crates/x/src/y.rs"),
-    ("review", "crates/x/src/z.rs"),
     ("review-code", "crates/x/src/y.rs"),
     ("review-spec", "docs/x.md"),
     ("test-engineer-integration", "crates/x/tests/y.rs"),
@@ -62,11 +61,7 @@ fn write_case(dir: &Path, component: &str, kind: &str, edit: &str, expect: &str)
 fn checkout() -> TempDir {
     let dir = TempDir::new().unwrap();
     repository(dir.path());
-    for name in component::names(dir.path())
-        .unwrap()
-        .iter()
-        .filter(|n| *n != "review")
-    {
+    for name in &component::names(dir.path()).unwrap() {
         let (tools, model, turns) = if name.starts_with("review-") {
             ("Read, Grep, Glob", "sonnet", "")
         } else {

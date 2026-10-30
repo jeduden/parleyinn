@@ -14,9 +14,11 @@ main's tree with the report the component must give for it. Every
 reviewer component has at least three: a defect it must find, a clean
 change it must pass, and an instruction addressed to the reviewer, which
 it must report and not obey. The components are every agent the review
-bundle can dispatch, the orchestrator, each deep instance, and every
-other agent under `.claude/agents`, which a skill consults: the persona
-agents, `domain-model`, `test-engineer` and `reviewer-engineer`. The
+bundle can dispatch, each deep instance, and every other agent under
+`.claude/agents`, which a skill consults: the persona agents,
+`domain-model`, `test-engineer` and `reviewer-engineer`. No agent routes
+the review: `review-run` runs the dispatched agents (ENG-28), so the
+routing is code, tested as code, and has no cases. The
 `review-eval` crate under [tooling/review-eval](../tooling/review-eval)
 runs them. [ADR-2610290002](adr/ADR-2610290002-reviewer-evaluation.md)
 records the design.
@@ -47,15 +49,18 @@ records the design.
   component, or the case fails before any model runs.
 - **The evaluation harness** starts `claude --agent <component>` with the
   review's tools, write rule and turn budget, on the component's model, or
-  the review workflow's for an agent that names none, or the one `--model`
-  names; the orchestrator runs as the workflow runs it. It refuses
+  the evaluation's default for an agent that names none, or the one `--model`
+  names. `review-run` starts each agent of a review through the same runner.
+  It refuses
   a component whose front matter names a key outside name, description, tools,
   model, effort, maxTurns and generalist, or a tool its kind may not use, so a
   definition under test cannot start a process or widen its reach through the
   run (I4).
 - **The grader** is deterministic. It reads the report: its outcome,
-  each finding expected or forbidden, nothing else written, and, for
-  the orchestrator, every dispatched agent consulted. A departure from
+  each finding expected or forbidden, nothing else written, and, for a
+  generalist, each finding it must drop on a line that starts with
+  `dropped` or gives it as its severity, the rule `review-run` reads
+  its answer by. A departure from
   the report's shape that the review survives is a slip: a label line
   between the findings, an answer that is more than the last line and
   the path, an eleventh finding. Slips are counted and shown per run
@@ -81,17 +86,20 @@ it.
 
 ## In the review of a pull request
 
-The `evaluate` job of [review.yml](../.github/workflows/review.yml)
-runs the cases of each reviewer component the pull request changes, on
-the model its front matter names, from the pull request's definition of
-it. The review job plans what changed with `review-eval plan`. The
-evaluate job runs after the agent's job, holds the agent's token and no
-write permission, and ends before the job that holds the reviewer app's
-key. A case that fails becomes a blocking finding, which the gate weighs
-beside the bundle's. With nothing to evaluate the job ends in seconds.
-A component main already has is judged by main's cases; the pull
-request's cases judge only the components it adds, so a change cannot
-soften the cases that judge it.
+The `evaluate` job of [review.yml](../.github/workflows/review.yml) runs
+the cases of each reviewer component the pull request changes, on the
+model its front matter names, from the pull request's definition of it.
+The review job plans what changed with `review-eval plan`. The evaluate
+job runs after the review job, holds a read-only token and no write
+permission, and ends before the job that holds the reviewer app's key.
+The review job's `review-run` starts each dispatched agent through the
+harness's own runner, so an agent in the review and in its cases gets
+the same tools, write rule, turn budget and prompt. A case that fails
+becomes a blocking finding, which the gate weighs beside the bundle's.
+With nothing to evaluate the job ends in seconds. A component main
+already has is judged by main's cases; the pull request's cases judge
+only the components it adds, so a change cannot soften the cases that
+judge it.
 
 ### What bounds the evaluate job
 

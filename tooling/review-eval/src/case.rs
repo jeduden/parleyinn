@@ -17,9 +17,8 @@ use crate::{PASSES, REPETITIONS};
 /// and `other` for the rest.
 pub const KINDS: [&str; 4] = ["defect", "clean", "injection", "other"];
 
-/// The outcomes a specialist's report ends with, and the verdicts an
-/// orchestrator's review outcome carries.
-pub const OUTCOMES: [&str; 5] = ["sound", "nits", "blocking", "approve", "request_changes"];
+/// The outcomes a specialist's report ends with.
+pub const OUTCOMES: [&str; 3] = crate::report::OUTCOMES;
 
 /// One edit to a file of main's tree, its path relative to the root.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -68,7 +67,7 @@ pub struct Expected {
 #[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize)]
 #[serde(deny_unknown_fields, default)]
 pub struct Expect {
-    /// The outcomes, or the verdicts, the report may end with.
+    /// The outcomes the report may end with.
     #[serde(deserialize_with = "one_or_many")]
     pub outcome: Vec<String>,
     /// Findings the report must hold.
@@ -80,9 +79,6 @@ pub struct Expect {
     pub dropped: Vec<Expected>,
     /// Text the report must not hold anywhere.
     pub absent: Vec<String>,
-    /// Agents the orchestrator must have consulted, beside every agent
-    /// the bundle dispatched.
-    pub consulted: Vec<String>,
 }
 
 /// A specialist's report the fixture seeds for a generalist's case.

@@ -1,13 +1,12 @@
 //! The world of one run: the review's own input, built for a case as
 //! the review workflow builds it for a pull request. A worktree of
-//! main is the orchestrator's checkout, with the component under test
+//! main is the review's checkout, with the component under test
 //! copied in from the tree being evaluated; a second worktree inside
 //! it, `pr-head/`, carries the case's edits, with its instruction
 //! files moved out as text; `pr.diff` is their diff; and `review/`
 //! holds what `review-bundle` writes, the reports a case seeds, and
 //! the files the workflow's steps add.
 
-use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::{Mutex, PoisonError};
@@ -40,16 +39,12 @@ const INSTRUCTION_NAMES: [&str; 5] = [
 /// A built world.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct World {
-    /// The orchestrator's checkout, the working directory of the run.
+    /// The review's checkout, the working directory of the run.
     pub main: PathBuf,
     /// The review class the bundle set.
     pub class: String,
     /// How many ids the change touches, as the bundle counts them.
     pub touched: usize,
-    /// How many agents the bundle dispatched.
-    pub consults: usize,
-    /// Every agent the bundle dispatched.
-    pub dispatched: BTreeSet<String>,
     /// The reports the case seeded, relative to the checkout.
     pub seeded: Vec<String>,
     /// What the world could not build as the workflow does.
@@ -104,8 +99,7 @@ pub fn build(
     let mut notes = Vec::new();
     write(&main.join(PATTERNS), &patterns(host, &main, &mut notes))?;
     write(&main.join(CONSENT), &consent(case.consent.as_deref()))?;
-    let (class, touched, consults) = bundle(&main, &pr_head)?;
-    let dispatched = dispatched(&main)?;
+    let (class, touched) = bundle(&main, &pr_head)?;
     let mut seeded = Vec::new();
     for seed in &case.seeds {
         let rel = format!("{REPORTS}/{}.md", seed.agent);
@@ -117,8 +111,6 @@ pub fn build(
         main,
         class,
         touched,
-        consults,
-        dispatched,
         seeded,
         notes,
     })
@@ -289,8 +281,8 @@ fn collect_files(path: &Path, files: &mut Vec<PathBuf>) -> Result<(), String> {
 }
 
 /// Runs `review-bundle` over `main` and `pr_head` as the workflow does,
-/// and reads the class, the touched ids and the consults it prints.
-fn bundle(main: &Path, pr_head: &Path) -> Result<(String, usize, usize), String> {
+/// and reads the class and the touched ids it prints.
+fn bundle(main: &Path, pr_head: &Path) -> Result<(String, usize), String> {
     let args = [
         "--base",
         &main.display().to_string(),
@@ -315,9 +307,8 @@ fn bundle(main: &Path, pr_head: &Path) -> Result<(String, usize, usize), String>
     outputs(&String::from_utf8_lossy(&stdout))
 }
 
-/// The class, the touched ids and the consults `review-bundle` printed
-/// as `stdout`.
-fn outputs(stdout: &str) -> Result<(String, usize, usize), String> {
+/// The class and the touched ids `review-bundle` printed as `stdout`.
+fn outputs(stdout: &str) -> Result<(String, usize), String> {
     let value = |key: &str| {
         stdout
             .lines()
@@ -328,21 +319,8 @@ fn outputs(stdout: &str) -> Result<(String, usize, usize), String> {
     let touched = value("touched")
         .and_then(|c| c.parse().ok())
         .ok_or("review-bundle printed no touched count")?;
-    let consults = value("consults")
-        .and_then(|c| c.parse().ok())
-        .ok_or("review-bundle printed no consults")?;
 
-    Ok((class, touched, consults))
-}
-
-/// Every agent the bundle's dispatch under `main` names.
-fn dispatched(main: &Path) -> Result<BTreeSet<String>, String> {
-    let path = main.join(REVIEW).join(review_bundle::cli::DISPATCH);
-    let text = fs::read_to_string(&path).map_err(|e| format!("read {}: {e}", path.display()))?;
-    let dispatch: BTreeMap<String, BTreeSet<String>> =
-        serde_json::from_str(&text).map_err(|e| format!("read {}: {e}", path.display()))?;
-
-    Ok(review_bundle::dispatch::agents(&dispatch))
+    Ok((class, touched))
 }
 
 #[cfg(test)]
