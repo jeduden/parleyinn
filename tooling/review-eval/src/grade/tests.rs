@@ -503,6 +503,28 @@ fn a_dropped_line_in_the_finding_shape_is_no_kept_finding() {
 }
 
 #[test]
+fn a_kept_finding_that_mentions_dropping_is_no_dropped_line() {
+    let c = component(Kind::Generalist, "review-code", false);
+    let expect = Expect {
+        dropped: vec![Expected {
+            mentions: vec!["no such line".into()],
+            ..wanted("crates/x/src/b.rs")
+        }],
+        ..Expect::default()
+    };
+    let answer = "crates/x/src/b.rs:3 — nit — drops the no such line check — lang-toml\n";
+    let none = BTreeSet::new();
+    let log = answered_log(answer);
+
+    let graded = grade(&c, &case("review-code", expect), &run(&log, None, &none));
+
+    assert_eq!(
+        graded.failures,
+        vec!["did not drop at crates/x/src/b.rs mentioning no such line"]
+    );
+}
+
+#[test]
 fn a_severity_is_read_from_its_slot_only() {
     let blocking = Expected {
         severity: Some("blocking".into()),

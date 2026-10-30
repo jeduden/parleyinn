@@ -20,8 +20,6 @@ use crate::report;
 const MOST_FINDINGS: usize = 10;
 /// How far a cited line may be from the one a case names.
 const WITHIN: usize = 3;
-/// The word a generalist's dropped-finding line holds.
-const DROPPED: &str = "drop";
 
 /// What one run of a case is graded from.
 #[derive(Debug, Clone, PartialEq)]
@@ -165,8 +163,9 @@ fn shape_slips(parsed: &report::Report) -> Vec<String> {
 }
 
 /// A generalist answers with its kept and dropped findings and writes
-/// nothing. A kept finding is a line in the finding shape; a dropped
-/// one is a line that says so, in which the path and words the case
+/// nothing. A kept finding is a line in the finding shape that is no
+/// dropped one; a dropped one is a line [`report::dropped`] reads as
+/// one, in which the path and words the case
 /// names are no kept finding. A consultant answers the same way, with
 /// nothing to drop.
 fn generalist(case: &Case, run: &Run<'_>) -> Vec<String> {
@@ -175,13 +174,13 @@ fn generalist(case: &Case, run: &Run<'_>) -> Vec<String> {
     let text = &run.log.answer;
     let kept: Vec<&str> = text
         .lines()
-        .filter(|l| report::finding(l).is_some_and(|f| !f.severity.starts_with(DROPPED)))
+        .filter(|l| !report::dropped(l) && report::finding(l).is_some())
         .collect();
     failures.extend(expectations(&case.expect, &kept.join("\n"), ""));
     for dropped in &case.expect.dropped {
         if !text
             .lines()
-            .any(|l| l.to_lowercase().contains(DROPPED) && line_matches(l, dropped))
+            .any(|l| report::dropped(l) && line_matches(l, dropped))
         {
             failures.push(format!("did not drop {}", describe(dropped)));
         }

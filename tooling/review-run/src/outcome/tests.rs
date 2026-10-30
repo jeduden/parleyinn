@@ -281,19 +281,11 @@ fn kept_reads_severities_safely() {
 }
 
 #[test]
-fn a_dropped_line_starts_with_dropped_after_any_marker() {
-    for line in [
-        "dropped — x",
-        "Dropped: x",
-        "- dropped x",
-        "* **DROPPED** x",
-        "> _dropped_ x",
-    ] {
-        assert!(dropped(line), "{line}");
-    }
-    for line in ["", "drop", "src/a.rs:1 — nit — dropped later", "kept"] {
-        assert!(!dropped(line), "{line}");
-    }
+fn a_numbered_dropped_line_is_no_closing_sentence() {
+    assert_eq!(
+        closing("The scope holds.\n1. dropped — b.rs:2 — y — me\n").as_deref(),
+        Some("The scope holds.")
+    );
 }
 
 #[test]

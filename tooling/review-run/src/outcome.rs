@@ -181,9 +181,8 @@ fn blocking(path: &str, body: String) -> Finding {
 pub fn kept(answer: &str) -> Vec<Finding> {
     answer
         .lines()
-        .filter(|l| !dropped(l))
+        .filter(|l| !report::dropped(l))
         .filter_map(report::finding)
-        .filter(|f| f.severity != DROPPED)
         .map(|f| {
             let text = if f.text.is_empty() { f.raw } else { f.text };
             let (severity, body) = match f.severity.as_str() {
@@ -200,24 +199,6 @@ pub fn kept(answer: &str) -> Vec<Finding> {
         .collect()
 }
 
-/// The word a generalist's line starts with, or gives as its severity,
-/// for a finding it drops.
-const DROPPED: &str = "dropped";
-
-/// Whether `line` reports a dropped finding: it starts with `dropped`,
-/// in any case, after any list marker or emphasis.
-#[must_use]
-pub fn dropped(line: &str) -> bool {
-    let line = line.trim();
-    let line = line
-        .strip_prefix("- ")
-        .or_else(|| line.strip_prefix("* "))
-        .unwrap_or(line);
-    line.trim_start_matches(['*', '_', '`', '>', ' '])
-        .get(..DROPPED.len())
-        .is_some_and(|w| w.eq_ignore_ascii_case(DROPPED))
-}
-
 /// A generalist's closing sentence on its scope: the last line of its
 /// `answer` that is neither blank, a heading, a finding nor a dropped
 /// one.
@@ -227,7 +208,10 @@ pub fn closing(answer: &str) -> Option<String> {
         .lines()
         .map(str::trim)
         .rfind(|l| {
-            !l.is_empty() && !l.starts_with('#') && !dropped(l) && report::finding(l).is_none()
+            !l.is_empty()
+                && !l.starts_with('#')
+                && !report::dropped(l)
+                && report::finding(l).is_none()
         })
         .map(str::to_owned)
 }

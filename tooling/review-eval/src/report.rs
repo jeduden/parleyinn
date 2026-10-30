@@ -2,7 +2,8 @@
 //! line in the shape the shared report section asks for,
 //! `path:line — blocking|nit — what it breaks — the ids it touches`,
 //! and the outcome line the report ends with, as the review gate reads
-//! it.
+//! it, and a generalist's dropped finding,
+//! `dropped — path:line — why — source`.
 
 /// The outcomes a report may end with.
 pub const OUTCOMES: [&str; 3] = ["sound", "nits", "blocking"];
@@ -65,6 +66,23 @@ pub fn outcome_word(line: &str) -> Option<&'static str> {
         .trim_matches(|c: char| !c.is_ascii_alphanumeric());
 
     OUTCOMES.iter().find(|o| **o == word).copied()
+}
+
+/// The word a generalist's dropped-finding line starts with, or gives
+/// as its severity.
+pub const DROPPED: &str = "dropped";
+
+/// Whether `line` reports a dropped finding: it starts with
+/// [`DROPPED`], in any case, after any list marker or emphasis, as
+/// `dropped — path:line — why — source`, or reads as a finding whose
+/// severity is [`DROPPED`]. The one rule the evaluation's grader and
+/// the review's run both read a generalist's answer by.
+#[must_use]
+pub fn dropped(line: &str) -> bool {
+    bare(line)
+        .get(..DROPPED.len())
+        .is_some_and(|w| w.eq_ignore_ascii_case(DROPPED))
+        || finding(line).is_some_and(|f| f.severity == DROPPED)
 }
 
 /// `line` without a leading list marker, emphasis or quote.
