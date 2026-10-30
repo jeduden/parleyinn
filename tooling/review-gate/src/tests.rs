@@ -237,7 +237,7 @@ fn decide_refuses_a_review_that_left_a_dispatched_agent_out() {
 
     assert_eq!(
         err.to_string(),
-        "review: the orchestrator did not consult lang-rust, srs-security"
+        "review: dispatched but not consulted: lang-rust, srs-security"
     );
     assert!(std::error::Error::source(&err).is_none());
 

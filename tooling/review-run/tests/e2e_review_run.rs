@@ -238,7 +238,7 @@ fn a_specialist_past_its_deadline_is_decided_and_the_gate_posts_nothing() {
     assert_eq!(review, "");
     assert_eq!(
         err,
-        "review-gate: review: the orchestrator did not consult lang-rust\n"
+        "review-gate: review: dispatched but not consulted: lang-rust\n"
     );
 }
 
