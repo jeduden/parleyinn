@@ -270,8 +270,8 @@ Code runs the review. The bundle dispatches, from the changed paths and touched
 rows, the low-effort specialists under [.claude/agents](../.claude/agents) and
 the medium-effort generalist each names, which weighs their findings.
 `review-run` runs every specialist, then every generalist, each on its own
-model, and approves only when every agent answered and none kept a blocking
-finding. The gate fails a review whose consulted list lacks a dispatched agent.
+model, and approves only when every agent answered readably and none blocks.
+The gate fails a review whose consulted list lacks a dispatched agent.
 A deep review consults each generalist's deep instance instead: the same
 template under [docs/agents](agents/review-code.md), on Opus at high effort with
 40 turns. The class is light for Markdown outside the stakeholder's paths, deep

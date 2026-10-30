@@ -42,16 +42,22 @@ pub fn decide(plan: &Plan, runs: &[AgentRun], reports: &BTreeMap<String, String>
     let mut findings = Vec::new();
     let (answers, silent) = answers(plan, runs, &mut findings);
     let refused = refused_reports(plan, &answers, reports, &mut findings);
+    blocking_reports(plan, &answers, reports, &refused, &mut findings);
     if plan.dispatch.is_empty() {
         findings.push(blocking(
             REVIEW_PATH,
             "the review bundle dispatched no agent, so no reviewer read this change".to_owned(),
         ));
     }
-    let (kept_counts, closings) = weighed(plan, &answers, &mut findings);
+    let Weighed {
+        kept: kept_counts,
+        closings,
+        unread,
+    } = weighed(plan, &answers, &mut findings);
     let consulted: BTreeSet<String> = answers.keys().cloned().collect();
     let approves = silent.is_empty()
         && refused.is_empty()
+        && unread.is_empty()
         && !plan.dispatch.is_empty()
         && !findings.iter().any(|f| f.severity == BLOCKING);
     let counts = Counts {
@@ -68,7 +74,15 @@ pub fn decide(plan: &Plan, runs: &[AgentRun], reports: &BTreeMap<String, String>
                 REQUEST_CHANGES_VERDICT
             }
             .to_owned(),
-            summary: summary(&counts, &silent, &refused, &closings),
+            summary: summary(
+                &counts,
+                &Named {
+                    silent: &silent,
+                    refused: &refused,
+                    unread: &unread,
+                },
+                &closings,
+            ),
             findings,
         },
         consulted,
@@ -130,20 +144,76 @@ fn refused_reports(
     refused
 }
 
+/// Adds a blocking finding on each answering specialist's report that
+/// the gate takes and that ends with `outcome: blocking`, so the
+/// specialist layer counts toward the verdict whatever its generalist
+/// answers. A refused report, named in `refused`, is blocking already.
+fn blocking_reports(
+    plan: &Plan,
+    answers: &BTreeMap<String, String>,
+    reports: &BTreeMap<String, String>,
+    refused: &[String],
+    findings: &mut Vec<Finding>,
+) {
+    for name in plan.specialists() {
+        if !answers.contains_key(&name)
+            || refused.iter().any(|r| r.starts_with(&format!("{name} ")))
+        {
+            continue;
+        }
+        let ends_blocking = reports
+            .get(&name)
+            .is_some_and(|text| report::parse(text).outcome.as_deref() == Some(BLOCKING));
+        if ends_blocking {
+            let path = report_file(&name);
+            findings.push(blocking(
+                &path,
+                format!("{name}'s report {path} ends with outcome: {BLOCKING}"),
+            ));
+        }
+    }
+}
+
+/// What weighing the generalists' answers gave.
+struct Weighed {
+    /// The kept findings: blocking, then nits.
+    kept: (usize, usize),
+    /// Each generalist's closing sentence, named.
+    closings: Vec<String>,
+    /// The generalists whose answer holds no finding, no dropped one and
+    /// no `none —` line.
+    unread: Vec<String>,
+}
+
 /// Adds each answering generalist's kept findings to `findings`, each
-/// once, and returns how many were blocking and how many nits, with
-/// each generalist's closing sentence.
+/// once, counts them, and names each generalist whose answer says
+/// neither a finding nor that it has none, with a blocking finding of
+/// its own: silence is no clean pass.
 fn weighed(
     plan: &Plan,
     answers: &BTreeMap<String, String>,
     findings: &mut Vec<Finding>,
-) -> ((usize, usize), Vec<String>) {
+) -> Weighed {
     let mut counts = (0, 0);
     let mut closings = Vec::new();
+    let mut unread = Vec::new();
     for name in plan.generalists() {
         let Some(answer) = answers.get(&name) else {
             continue;
         };
+        let says = answer
+            .lines()
+            .any(|l| report::finding(l).is_some() || report::dropped(l) || report::nothing(l));
+        if !says {
+            findings.push(blocking(
+                REVIEW_PATH,
+                format!(
+                    "{name} answered no finding, no dropped one and no `none —` line, so its \
+                     weighing cannot be read"
+                ),
+            ));
+            unread.push(name.clone());
+        }
         for f in kept(answer) {
             if findings.contains(&f) {
                 continue;
@@ -160,7 +230,11 @@ fn weighed(
         }
     }
 
-    (counts, closings)
+    Weighed {
+        kept: counts,
+        closings,
+        unread,
+    }
 }
 
 /// A blocking finding on the whole of `path`.
@@ -211,6 +285,7 @@ pub fn closing(answer: &str) -> Option<String> {
             !l.is_empty()
                 && !l.starts_with('#')
                 && !report::dropped(l)
+                && !report::nothing(l)
                 && report::finding(l).is_none()
         })
         .map(str::to_owned)
@@ -224,10 +299,21 @@ struct Counts<'a> {
     kept: (usize, usize),
 }
 
+/// The agents the summary names for what went wrong.
+struct Named<'a> {
+    /// The agents that did not answer.
+    silent: &'a [String],
+    /// The specialists whose report the gate refuses.
+    refused: &'a [String],
+    /// The generalists whose answer the review cannot read.
+    unread: &'a [String],
+}
+
 /// The summary: who answered of whom, what the generalists kept, who
-/// did not answer and whose report the gate refuses, who was
-/// consulted, and each generalist's closing sentence.
-fn summary(counts: &Counts, silent: &[String], refused: &[String], closings: &[String]) -> String {
+/// did not answer, whose report the gate refuses and whose answer the
+/// review cannot read, who was consulted, and each generalist's
+/// closing sentence.
+fn summary(counts: &Counts, named: &Named, closings: &[String]) -> String {
     let plan = counts.plan;
     let answered_of = |names: &[String]| {
         names
@@ -254,11 +340,14 @@ fn summary(counts: &Counts, silent: &[String], refused: &[String], closings: &[S
             counts.kept.1,
         )
     };
-    if !silent.is_empty() {
-        let _ = write!(s, " Did not answer: {}.", silent.join(", "));
-    }
-    if !refused.is_empty() {
-        let _ = write!(s, " Reports the gate refuses: {}.", refused.join(", "));
+    for (label, names) in [
+        ("Did not answer", named.silent),
+        ("Reports the gate refuses", named.refused),
+        ("Answers the review cannot read", named.unread),
+    ] {
+        if !names.is_empty() {
+            let _ = write!(s, " {label}: {}.", names.join(", "));
+        }
     }
     if !counts.consulted.is_empty() {
         let names: Vec<&str> = counts.consulted.iter().map(String::as_str).collect();

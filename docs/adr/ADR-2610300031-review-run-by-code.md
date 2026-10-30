@@ -46,12 +46,18 @@ the reports.
   `review-eval`'s runner and process host, with a 900-second deadline.
   No agent routes the review, calls another agent or writes the
   review outcome.
-- **The verdict is a pure function.** `review-run` approves exactly
-  when every dispatched agent answered, every specialist's report
-  passes the gate's report check, and no generalist kept a blocking
-  finding. The findings are the generalists' kept lines; a line that
-  starts with `dropped` is left out. A silent agent or a refused
-  report is named in a blocking finding.
+- **The verdict is a pure function, and fails closed.** `review-run`
+  approves exactly when every dispatched agent answered, every
+  specialist's report passes the gate's report check and none ends
+  with `outcome: blocking`, every generalist's answer holds a finding,
+  a dropped line or a `none —` line, and no generalist kept a blocking
+  finding. The findings are the generalists' kept lines; a line whose
+  first word is `dropped`, or whose severity is, is left out, by the
+  rule the evaluation's grader shares. A silent agent, a refused or
+  blocking report and an answer that says nothing readable are each
+  named in a blocking finding, so neither a silent generalist nor one
+  that does not echo a specialist's blocking report passes the
+  review.
 - **The gate's inputs stay.** `review-run` writes
   `review/outcome.json`, `review/consulted.json` (every agent that
   answered), `review/answers.json` and `review/usage.json`, the files

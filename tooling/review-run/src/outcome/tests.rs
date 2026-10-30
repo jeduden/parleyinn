@@ -173,7 +173,7 @@ fn a_report_the_gate_would_refuse_blocks_and_is_named() {
             "has a report whose outcome differs from its answer in the run log",
         ),
     ] {
-        let (runs, mut reports) = all_answered("Sound.");
+        let (runs, mut reports) = all_answered("none — nothing to add — review-code\nSound.");
         match report {
             None => reports.remove("lang-rust"),
             Some(text) => reports.insert("lang-rust".to_owned(), text.to_owned()),
@@ -314,4 +314,71 @@ fn the_closing_sentence_is_the_last_line_of_prose() {
 fn plural_names_one_and_many() {
     assert_eq!(plural(Kind::Specialist, 1), "specialist");
     assert_eq!(plural(Kind::Generalist, 0), "generalists");
+}
+
+#[test]
+fn a_generalist_that_says_neither_a_finding_nor_none_requests_changes() {
+    let (runs, reports) = all_answered("The code is sound.");
+
+    let d = decide(&plan(DISPATCH), &runs, &reports);
+
+    assert_eq!(d.outcome.verdict, "request_changes");
+    assert_eq!(
+        d.outcome.findings,
+        vec![blocking(
+            "review/",
+            "review-code answered no finding, no dropped one and no `none —` line, so its \
+             weighing cannot be read"
+                .to_owned()
+        )]
+    );
+    assert!(
+        d.outcome
+            .summary
+            .contains(" Answers the review cannot read: review-code."),
+        "{}",
+        d.outcome.summary
+    );
+}
+
+#[test]
+fn a_generalist_that_says_none_is_a_clean_pass() {
+    let (runs, reports) = all_answered("none — nothing to add — review-code\nThe code is sound.");
+
+    let d = decide(&plan(DISPATCH), &runs, &reports);
+
+    assert_eq!(d.outcome.verdict, "approve");
+    assert!(d.outcome.findings.is_empty());
+    assert!(
+        d.outcome
+            .summary
+            .ends_with(" review-code: The code is sound.")
+    );
+}
+
+#[test]
+fn a_specialist_s_blocking_report_counts_whatever_its_generalist_answers() {
+    let (mut runs, mut reports) =
+        all_answered("dropped — a.rs:1 — no bug there — lang-rust\nThe code is sound.");
+    let line = "outcome: blocking — lang-rust saw an unwrap.";
+    runs[0] = ran(
+        "lang-rust",
+        Kind::Specialist,
+        &format!("{line}\nreview/reports/lang-rust.md"),
+    );
+    reports.insert(
+        "lang-rust".to_owned(),
+        format!("a.rs:1 — blocking — an unwrap — ENG-16\n\n{line}\n"),
+    );
+
+    let d = decide(&plan(DISPATCH), &runs, &reports);
+
+    assert_eq!(d.outcome.verdict, "request_changes");
+    assert_eq!(
+        d.outcome.findings,
+        vec![blocking(
+            "review/reports/lang-rust.md",
+            "lang-rust's report review/reports/lang-rust.md ends with outcome: blocking".to_owned()
+        )]
+    );
 }

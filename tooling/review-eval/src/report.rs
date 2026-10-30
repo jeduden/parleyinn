@@ -87,6 +87,24 @@ pub fn dropped(line: &str) -> bool {
     }) || finding(line).is_some_and(|f| f.severity == DROPPED)
 }
 
+/// The word a generalist's line starts with when it keeps, adds and
+/// drops nothing.
+pub const NONE: &str = "none";
+
+/// Whether `line` says a generalist has nothing to add, in the shape
+/// `none — nothing to add — source`: a first part of [`NONE`] alone,
+/// in any case, after any list marker or emphasis, and a dash after it.
+#[must_use]
+pub fn nothing(line: &str) -> bool {
+    match split_dashes(bare(line)).as_slice() {
+        [first, _, ..] => first
+            .trim()
+            .trim_end_matches(['*', '_', '`'])
+            .eq_ignore_ascii_case(NONE),
+        _ => false,
+    }
+}
+
 /// `line` without a leading list marker, emphasis or quote.
 fn bare(line: &str) -> &str {
     let line = line.trim();

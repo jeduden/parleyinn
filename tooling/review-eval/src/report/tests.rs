@@ -115,6 +115,26 @@ fn a_dropped_line_starts_with_dropped_or_gives_it_as_severity() {
 }
 
 #[test]
+fn a_none_line_says_a_generalist_has_nothing_to_add() {
+    for line in [
+        "none — nothing to add — review-code",
+        "- **None** - nothing to add - review-code",
+        "None — nothing to add",
+    ] {
+        assert!(nothing(line), "{line}");
+    }
+    for line in [
+        "",
+        "none",
+        "None of the findings hold.",
+        "none_of.rs:3 — nit — tidy — lang-rust",
+        "dropped — a.rs:1 — no bug — lang-rust",
+    ] {
+        assert!(!nothing(line), "{line}");
+    }
+}
+
+#[test]
 fn split_dashes_cuts_at_each_spaced_dash_only() {
     assert_eq!(
         split_dashes("a — b - c -- d – e"),
