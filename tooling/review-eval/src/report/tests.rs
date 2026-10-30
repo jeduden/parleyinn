@@ -104,6 +104,11 @@ fn a_dropped_line_starts_with_dropped_or_gives_it_as_severity() {
         "src/a.rs:1 — nit — this drops the error — lang-rust",
         "src/a.rs:1 — drop — not the word",
         "kept",
+        // A path that merely starts with the letters is a finding on
+        // that path, not a dropped line.
+        "dropped_events.rs:12 — blocking — leaks a pin — I3",
+        "- `dropped.rs`:3 — blocking — leaks a pin — I3",
+        "Droppedfoo/bar.rs:3 — nit — tidy — lang-rust",
     ] {
         assert!(!dropped(line), "{line}");
     }

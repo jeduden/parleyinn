@@ -212,7 +212,9 @@ fn a_specialist_past_its_deadline_is_decided_and_the_gate_posts_nothing() {
     let dir = home.path().join("work");
     workdir(&dir);
 
-    let out = review_run(home.path(), &dir, "lang-rust", &["--deadline", "1"]);
+    // The deadline binds every agent, not only the silent one: two
+    // seconds leave the stand-in's shell room to start on a loaded host.
+    let out = review_run(home.path(), &dir, "lang-rust", &["--deadline", "2"]);
 
     let stderr = String::from_utf8_lossy(&out.stderr);
     assert_eq!(out.status.code(), Some(0), "{stderr}");

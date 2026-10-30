@@ -132,6 +132,18 @@ fn load_reads_a_specialist_s_front_matter() {
 }
 
 #[test]
+fn a_report_that_must_be_all_findings_holds_a_specialist_to_one_line_each() {
+    for sentence in [
+        "Every line of the report is a finding or the outcome: no heading.",
+        "Every line is a finding or the\noutcome, never a heading.",
+        "Findings, each on one line.",
+    ] {
+        assert!(one_finding_per_line(sentence), "{sentence}");
+    }
+    assert!(!one_finding_per_line("Report each finding you keep."));
+}
+
+#[test]
 fn load_gives_a_generalist_without_a_turn_budget_the_default() {
     let dir = tree();
 

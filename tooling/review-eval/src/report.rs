@@ -72,17 +72,19 @@ pub fn outcome_word(line: &str) -> Option<&'static str> {
 /// as its severity.
 pub const DROPPED: &str = "dropped";
 
-/// Whether `line` reports a dropped finding: it starts with
+/// Whether `line` reports a dropped finding: its first word is
 /// [`DROPPED`], in any case, after any list marker or emphasis, as
-/// `dropped — path:line — why — source`, or reads as a finding whose
-/// severity is [`DROPPED`]. The one rule the evaluation's grader and
-/// the review's run both read a generalist's answer by.
+/// `dropped — path:line — why — source`, or it reads as a finding whose
+/// severity is [`DROPPED`]. A path that merely starts with the letters,
+/// `dropped_events.rs:12`, is a finding on that path. The one rule the
+/// evaluation's grader and the review's run both read a generalist's
+/// answer by.
 #[must_use]
 pub fn dropped(line: &str) -> bool {
-    bare(line)
-        .get(..DROPPED.len())
-        .is_some_and(|w| w.eq_ignore_ascii_case(DROPPED))
-        || finding(line).is_some_and(|f| f.severity == DROPPED)
+    bare(line).split_whitespace().next().is_some_and(|word| {
+        word.trim_end_matches(['*', '_', '`', ':', ',', '.'])
+            .eq_ignore_ascii_case(DROPPED)
+    }) || finding(line).is_some_and(|f| f.severity == DROPPED)
 }
 
 /// `line` without a leading list marker, emphasis or quote.
