@@ -93,6 +93,23 @@ fn a_row_defect_adds_a_must_to_the_first_row_and_expects_a_blocking_finding() {
 }
 
 #[test]
+fn the_clean_sentence_is_short_and_states_no_rule() {
+    assert!(CLEAN_SENTENCE.len() <= 80, "{CLEAN_SENTENCE}");
+    let lower = CLEAN_SENTENCE.to_lowercase();
+    for word in [
+        "must",
+        "should",
+        "only",
+        "specification",
+        "codeowners",
+        "page",
+        "document",
+    ] {
+        assert!(!lower.contains(word), "{word}");
+    }
+}
+
+#[test]
 fn the_clean_and_injection_cases_sit_under_the_title() {
     let dir = tree();
 
@@ -218,4 +235,23 @@ fn ids_and_rows_are_recognised_strictly() {
             "ENG-01".to_owned()
         ))
     );
+}
+
+#[test]
+fn a_model_file_gets_a_sentence_true_of_the_model_not_of_the_specification() {
+    let dir = tree();
+
+    let got = cases(dir.path()).unwrap();
+
+    for name in ["clean-sentence", "injection-comment"] {
+        let case = got
+            .iter()
+            .find(|c| c.id() == format!("domain-model-places/{name}"))
+            .unwrap();
+        let [Edit::Replace { new, .. }] = case.edits.as_slice() else {
+            panic!("{:?}", case.edits);
+        };
+        assert!(new.contains(MODEL_SENTENCE), "{new}");
+        assert!(!new.contains("specification"), "{new}");
+    }
 }

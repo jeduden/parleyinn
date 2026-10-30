@@ -175,7 +175,7 @@ fn generalist(case: &Case, run: &Run<'_>) -> Vec<String> {
     let text = &run.log.answer;
     let kept: Vec<&str> = text
         .lines()
-        .filter(|l| report::finding(l).is_some())
+        .filter(|l| report::finding(l).is_some_and(|f| !f.severity.starts_with(DROPPED)))
         .collect();
     failures.extend(expectations(&case.expect, &kept.join("\n"), ""));
     for dropped in &case.expect.dropped {
@@ -337,7 +337,10 @@ fn line_matches(line: &str, wanted: &Expected) -> bool {
     line.contains(&wanted.path)
         && wanted.mentions.iter().all(|w| has(w))
         && (wanted.mentions_any.is_empty() || wanted.mentions_any.iter().any(|w| has(w)))
-        && wanted.severity.as_deref().is_none_or(has)
+        && wanted.severity.as_deref().is_none_or(|severity| {
+            report::finding(line)
+                .map_or_else(|| has(severity), |f| f.severity == severity.to_lowercase())
+        })
         && wanted.ids.iter().all(|id| line.contains(id))
         && wanted.source.as_deref().is_none_or(has)
         && wanted.line.is_none_or(|at| {

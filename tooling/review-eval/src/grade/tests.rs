@@ -483,6 +483,43 @@ fn a_line_matches_what_the_case_names_and_nothing_less() {
 }
 
 #[test]
+fn a_dropped_line_in_the_finding_shape_is_no_kept_finding() {
+    let c = component(Kind::Generalist, "review-code", false);
+    let expect = Expect {
+        none: vec![wanted("crates/x/src/b.rs")],
+        dropped: vec![Expected {
+            mentions: vec!["no such line".into()],
+            ..wanted("crates/x/src/b.rs")
+        }],
+        ..Expect::default()
+    };
+    let answer = "crates/x/src/b.rs:3 — dropped — no such line in the diff — lang-toml\n";
+    let none = BTreeSet::new();
+    let log = answered_log(answer);
+
+    let graded = grade(&c, &case("review-code", expect), &run(&log, None, &none));
+
+    assert!(graded.passed(), "{:?}", graded.failures);
+}
+
+#[test]
+fn a_severity_is_read_from_its_slot_only() {
+    let blocking = Expected {
+        severity: Some("blocking".into()),
+        ..wanted("a.rs")
+    };
+
+    assert!(line_matches("a.rs:3 — blocking — it breaks I2", &blocking));
+    assert!(!line_matches(
+        "a.rs:3 — nit — this is not blocking",
+        &blocking
+    ));
+    // A line that is no finding line has no slot; its prose is read whole.
+    assert!(line_matches("a.rs mentions blocking prose", &blocking));
+    assert!(!line_matches("a.rs mentions nothing", &blocking));
+}
+
+#[test]
 fn a_consultant_is_graded_from_its_answer_as_a_generalist_is() {
     let c = component(Kind::Consultant, "persona-agent", false);
     let expect = Expect {

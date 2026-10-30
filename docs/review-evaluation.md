@@ -93,6 +93,30 @@ A component main already has is judged by main's cases; the pull
 request's cases judge only the components it adds, so a change cannot
 soften the cases that judge it.
 
+### What bounds the evaluate job
+
+The job runs reviewer components the pull request defines, with the
+Claude OAuth token. Four things bound it:
+
+- it runs from main's workflow definition, never the pull request's;
+- its token is `contents: read`, with no write permission;
+- the harness refuses a definition whose front matter key or tool is
+  outside its allow-lists, so none can start a process (I4);
+- main's cases judge the components main already has.
+
+### The plugins every session fetches
+
+[.claude/settings.json](../.claude/settings.json) makes every Claude
+session started in the checkout, the review workflow's agents included,
+fetch two plugins, `mdsmith-skills` and `mdsmith-audit`, from
+github.com/jeduden/mdsmith. They are the mdsmith project's Claude Code
+plugins, at the release of the linter that `mdsmith check .` runs
+([tooling.md](tooling.md)). The fetch is a new network use by the
+harness, not by ParleyInn's core: I4 binds the core. The pin is the
+control: both plugins name release `v0.55.1` and its commit sha. `.claude/`
+is a stakeholder path ([CODEOWNERS](../.github/CODEOWNERS)), so a change to
+the pin waits for the stakeholder's approval.
+
 ## The weekly run and a candidate model
 
 [review-eval.yml](../.github/workflows/review-eval.yml) runs every
