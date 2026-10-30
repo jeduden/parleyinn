@@ -2,6 +2,9 @@ use super::*;
 
 const KEY: &str = "APP_KEY";
 
+/// The step that runs the review's agents.
+const RUN: &str = "      - run: cargo run --locked --quiet --offline -p review-run -- --workdir .\n";
+
 /// The smallest workflow the ENG-28 steps accept.
 const REVIEW_FLOW: &str = "name: Review
 on: # a comment
@@ -16,7 +19,7 @@ jobs:
     permissions:
       contents: read # never write
     steps:
-      - uses: anthropics/claude-code-action@abc
+      - run: cargo run --locked --quiet --offline -p review-run -- --workdir .
   # a comment between jobs
   post:
     needs: [review]
@@ -149,9 +152,41 @@ fn agents_unprivileged_names_each_privilege() {
     );
 
     let none = parse("on:\n  workflow_run:\njobs:\n  a:\n    steps: []\n");
+    assert_eq!(none.agents_unprivileged(KEY), ["no job runs the review's agents"]);
+}
+
+#[test]
+fn an_agent_session_in_any_job_is_held_to_the_agents_rules() {
+    let mut w = parse(REVIEW_FLOW);
+    w.jobs.push(Job {
+        name: "route".into(),
+        text: "    permissions:\n      contents: write\n    steps:\n      - uses: anthropics/claude-code-action@abc\n"
+            .into(),
+    });
+
     assert_eq!(
-        none.agents_unprivileged(KEY),
-        ["no job runs the reviewing agent"]
+        w.agents_unprivileged(KEY),
+        ["agent job route is granted a write permission"]
+    );
+}
+
+#[test]
+fn agents_run_by_wants_the_command_and_no_agent_session() {
+    let cmd = "-p review-run -- --workdir .";
+    let mut w = parse(REVIEW_FLOW);
+    assert!(w.agents_run_by(cmd).is_empty());
+
+    assert_eq!(
+        w.agents_run_by("-p review-run -- --workdir other"),
+        [r#"no job runs the review's agents with "-p review-run -- --workdir other""#]
+    );
+
+    w.jobs[0]
+        .text
+        .push_str("      - uses: anthropics/claude-code-action@abc\n");
+    assert_eq!(
+        w.agents_run_by(cmd),
+        ["job review runs an agent session, anthropics/claude-code-action@, which would route the review"]
     );
 }
 
@@ -160,9 +195,7 @@ fn key_held_apart_wants_one_holder_that_runs_no_agent() {
     let mut w = parse(REVIEW_FLOW);
     assert!(w.key_held_apart(KEY).is_ok());
 
-    w.jobs[1]
-        .text
-        .push_str("      - uses: anthropics/claude-code-action@abc\n");
+    w.jobs[1].text.push_str(RUN);
     assert_eq!(
         w.key_held_apart(KEY).unwrap_err(),
         "job post holds APP_KEY and runs the agent"
@@ -449,37 +482,63 @@ fn grants_write_reads_quoted_values_and_write_all() {
     assert!(!grants_write("    permissions: read-all\n"));
 }
 
+/// The tool lists of review-run's agents, as the runner gives them.
+const SCOPED: [(&str, &str); 2] = [
+    ("specialist", "Read,Glob,Grep,Edit(./review/reports/**)"),
+    ("generalist", "Read,Glob,Grep"),
+];
+
 #[test]
 fn agents_write_only_wants_writes_scoped_to_the_reports() {
     let with = |tools: &str| {
         REVIEW_FLOW.replace(
-            "      - uses: anthropics/claude-code-action@abc\n",
-            &format!("      - uses: anthropics/claude-code-action@abc\n        with:\n          claude_args: --allowedTools {tools}\n"),
+            RUN,
+            &format!("{RUN}      - run: claude -p review --allowedTools {tools}\n"),
         )
     };
 
     assert!(
+        parse(REVIEW_FLOW)
+            .agents_write_only("review/reports", &SCOPED)
+            .is_empty()
+    );
+    assert!(
         parse(&with("\"Read,Grep,Edit(./review/reports/**)\""))
-            .agents_write_only("review/reports")
+            .agents_write_only("review/reports", &SCOPED)
             .is_empty()
     );
     assert_eq!(
-        parse(&with("Read,Write,Bash(ls:*)")).agents_write_only("review/reports"),
+        parse(&with("Read,Write,Bash(ls:*)")).agents_write_only("review/reports", &SCOPED),
         [
             "agent job review may use Write, want Edit(./review/reports/**) alone",
             "agent job review may use Bash(ls:*), want Edit(./review/reports/**) alone",
         ]
     );
     assert_eq!(
-        parse(&with("\"Read,Write(./review/reports/**)\"")).agents_write_only("review/reports"),
+        parse(&with("\"Read,Write(./review/reports/**)\""))
+            .agents_write_only("review/reports", &SCOPED),
         [
             "agent job review may use Write(./review/reports/**), want Edit(./review/reports/**) alone"
         ]
     );
+}
+
+#[test]
+fn agents_write_only_holds_review_run_s_tools_to_the_reports() {
+    let loose = [("specialist", "Read,Write"), ("generalist", "Read,Bash")];
+
     assert_eq!(
-        parse(REVIEW_FLOW).agents_write_only("review/reports"),
-        ["agent job review lists no --allowedTools"]
+        parse(REVIEW_FLOW).agents_write_only("review/reports", &loose),
+        [
+            "review-run's specialist may use Write, want Edit(./review/reports/**) alone",
+            "review-run's generalist may use Bash, want Edit(./review/reports/**) alone",
+        ]
     );
+}
+
+#[test]
+fn review_run_s_tools_are_the_runner_s() {
+    assert_eq!(RUN_TOOLS, SCOPED);
 }
 
 /// The review workflow with the evaluate job ENG-32 asks for.
@@ -496,7 +555,7 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: anthropics/claude-code-action@abc
+      - run: cargo run --locked --quiet --offline -p review-run -- --workdir .
   evaluate:
     needs: review
     permissions:
