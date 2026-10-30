@@ -207,7 +207,7 @@ fn parse_dispatch_lists_every_generalist_and_specialist() {
 }
 
 #[test]
-fn parse_consulted_reads_the_agents_the_orchestrator_called() {
+fn parse_consulted_reads_the_agents_the_review_consulted() {
     assert_eq!(
         parse_consulted(r#"["lang-rust","review-code","lang-rust"]"#).unwrap(),
         set(&["lang-rust", "review-code"])

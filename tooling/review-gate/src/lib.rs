@@ -97,7 +97,8 @@ pub struct Input {
     /// Every agent the review bundle dispatched: the generalists and
     /// their specialists.
     pub dispatched: BTreeSet<String>,
-    /// Every agent the orchestrator called, as its run log shows.
+    /// Every dispatched agent the review consulted: each one that
+    /// answered.
     pub consulted: BTreeSet<String>,
     /// The specialists the review bundle dispatched, whose reports the
     /// generalists read.
@@ -105,8 +106,7 @@ pub struct Input {
     /// Each specialist's report file, by name; one with no file is
     /// absent.
     pub reports: BTreeMap<String, String>,
-    /// Each agent's final answer, by name, as the orchestrator's run log
-    /// shows it.
+    /// Each agent's final answer, by name, as its run log shows it.
     pub answers: BTreeMap<String, String>,
 }
 
@@ -135,11 +135,11 @@ pub enum Error {
     Ci(String),
     /// The review bundle's dispatch does not read.
     Dispatch(serde_json::Error),
-    /// The list of agents the orchestrator called does not read.
+    /// The list of agents the review consulted does not read.
     Consulted(serde_json::Error),
-    /// The list of agents the orchestrator called holds an empty name.
+    /// The list of agents the review consulted holds an empty name.
     UnnamedAgent,
-    /// The orchestrator left these dispatched agents out.
+    /// The review left these dispatched agents out.
     Unconsulted(Vec<String>),
     /// The dispatch names an agent whose name is not lowercase letters,
     /// digits and hyphens, so it cannot name a report file.
@@ -168,7 +168,7 @@ impl fmt::Display for Error {
             }
             Self::Unconsulted(agents) => write!(
                 f,
-                "review: the orchestrator did not consult {}",
+                "review: dispatched but not consulted: {}",
                 agents.join(", ")
             ),
             Self::AgentName(name) => write!(f, "review: malformed dispatch: agent name {name:?}"),
@@ -365,7 +365,7 @@ pub fn report_check(report: Option<&str>, answer: Option<&str>) -> Option<&'stat
         .then_some("has a report whose outcome differs from its answer in the run log")
 }
 
-/// Reads the agents the orchestrator called, a list of names.
+/// Reads the agents the review consulted, a list of names.
 ///
 /// # Errors
 ///
@@ -403,9 +403,9 @@ pub fn parse_check_runs(data: &str) -> Result<Vec<CheckRun>, Error> {
 ///
 /// # Errors
 ///
-/// A head whose CI has not passed, or a review whose orchestrator left
-/// out an agent the review bundle dispatched, is an error, so the step
-/// fails loudly rather than posting anything.
+/// A head whose CI has not passed, or a review that left out an agent
+/// the review bundle dispatched, is an error, so the step fails loudly
+/// rather than posting anything.
 pub fn decide(input: &Input) -> Result<Option<Review>, Error> {
     if input.head != input.reviewed {
         return Ok(None);
