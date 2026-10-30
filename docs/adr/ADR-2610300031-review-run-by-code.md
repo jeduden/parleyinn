@@ -42,8 +42,12 @@ the reports.
 - **Code routes the review.** A tooling crate, `review-run`, reads the
   bundle's dispatch, runs every dispatched specialist, many at once,
   and, once every one has ended, every dispatched generalist, told its
-  specialists' report files. Each agent runs once, through
-  `review-eval`'s runner and process host, with a 900-second deadline.
+  specialists' report files. Each agent runs through
+  `review-eval`'s runner and process host with a 900-second deadline,
+  and runs once more when its run did not answer: it would not start,
+  ended without a result, missed its deadline or answered nothing. A
+  report the agent wrote is judged, never rerun; the usage file counts
+  the attempts.
   No agent routes the review, calls another agent or writes the
   review outcome.
 - **The verdict is a pure function, and fails closed.** `review-run`
@@ -58,6 +62,13 @@ the reports.
   named in a blocking finding, so neither a silent generalist nor one
   that does not echo a specialist's blocking report passes the
   review.
+- **A change no rule routes gets one generalist.** The review bundle
+  dispatches `review-code`, or its deep instance, so something always
+  reads the change. A dispatch that is empty all the same requests
+  changes.
+- **Stakeholder consent is checked in code.** The review bundle raises
+  the ENG-21 finding for a change to a path CODEOWNERS assigns: blocking
+  until a stakeholder comment consents, a nit once one does.
 - **The gate's inputs stay.** `review-run` writes
   `review/outcome.json`, `review/consulted.json` (every agent that
   answered), `review/answers.json` and `review/usage.json`, the files
@@ -98,9 +109,11 @@ the reports.
   section. The accepted records that describe it, ADR-2609301941,
   ADR-2610262245 and ADR-2610290002, keep their text as the record of
   what was decided then.
-- A review runs in two waves of agents, each up to 900 seconds; the
-  review job's cap of 45 minutes fits them and the setup, as long as a
-  dispatch names no more specialists than run at once.
+- A review runs in waves of agents, each up to 900 seconds and each
+  agent at most twice. The repository has 56 specialists and the job
+  starts 32 at once, so they take two waves and the generalists a
+  third: 3 x 2 x 15 = 90 minutes at worst, and the job's cap is 120.
+  Agents end in minutes in practice.
 - No new third-party dependency.
 
 ## Approval
