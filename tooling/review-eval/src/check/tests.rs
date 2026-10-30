@@ -124,7 +124,7 @@ fn a_case_that_does_not_dispatch_its_component_is_named() {
     );
     assert!(
         got.contains(
-            &"case lang-rust/nothing does not dispatch lang-rust; the bundle dispatches no agent"
+            &"case lang-rust/nothing does not dispatch lang-rust; the bundle dispatches review-code"
                 .to_owned()
         ),
         "{got:?}"
