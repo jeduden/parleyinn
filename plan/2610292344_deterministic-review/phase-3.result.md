@@ -86,3 +86,12 @@ summary: >-
 - Waiting on the stakeholder, untouched: the empty dispatch, the
   consent finding, retries, the parallel bound and the since-last
   step.
+
+## Follow-up: remove the orchestrator skill after this merges
+
+The `evaluate` job runs main's harness against this pull request's tree, and
+main's harness still reads `.claude/skills/review/SKILL.md` for the `review`
+component. With the file removed, the job stops with "read
+.claude/skills/review/SKILL.md: No such file". The file is kept, unchanged from
+main, until main runs `review-run`. A follow-up pull request then deletes it.
+No review reads it any more: the review job runs `review-run`.
