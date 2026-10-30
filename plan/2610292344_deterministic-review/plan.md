@@ -87,11 +87,11 @@ failure this plan removes.
 
 ## Execution
 
-| Phase | Model | Gate                                                                                                 |
-| ----- | ----- | ---------------------------------------------------------------------------------------------------- |
-| 1     | opus  | `review-run` against a fake host produces the outcome, consulted list and answers; unit tests at 99% |
-| 2     | opus  | `review.yml` runs it on a pull request and the gate posts a decision from its output                 |
-| 3     | opus  | The orchestrator, its cases and its mentions are gone; ENG-28 and ENG-32 scenarios pass              |
+| Phase | Model | Gate                                                                                                       |
+| ----- | ----- | ---------------------------------------------------------------------------------------------------------- |
+| 1     | opus  | `review-run` against a fake host produces the outcome, consulted list and answers; unit tests at 99%       |
+| 2     | opus  | `review.yml` runs it; the ENG-28 scenario and its drift cases pass; the live decision follows once on main |
+| 3     | opus  | The orchestrator, its cases and its mentions are gone; ENG-28 and ENG-32 scenarios pass                    |
 
 ## Phases
 
@@ -114,10 +114,12 @@ footer: |
 
 ?>
 
-| #   | Status | Phase                                                                                                                                                                                                                                                                                                                   |
-| --- | ------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1   | ✅     | [The review-run crate against a fake host](phase-1.md)                                                                                                                                                                                                                                                                  |
-|     | ↳      | The review-run crate runs every dispatched specialist, then every generalist, as claude --agent through the evaluation's runner and process host, and writes the outcome, consulted list, answers and usage the review gate reads; unit tests cover every line, and an end-to-end test has the gate approve its output. |
+| #   | Status | Phase                                                                                                                                                                                                                                                                                                                                          |
+| --- | ------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | ✅     | [The review-run crate against a fake host](phase-1.md)                                                                                                                                                                                                                                                                                         |
+|     | ↳      | The review-run crate runs every dispatched specialist, then every generalist, as claude --agent through the evaluation's runner and process host, and writes the outcome, consulted list, answers and usage the review gate reads; unit tests cover every line, and an end-to-end test has the gate approve its output.                        |
+| 2   | ✅     | [The review workflow runs review-run](phase-2.md)                                                                                                                                                                                                                                                                                              |
+|     | ↳      | review.yml runs review-run in place of the orchestrating agent, and ENG-28, its scenario, binding and drift cases now ask for a review run by code; the gate names an unanswered agent without an orchestrator, ADR-2610300031 proposes the decision, and the generalists keep their models. The live run waits for the stakeholder's consent. |
 <?/catalog?>
 
 ## Acceptance Criteria

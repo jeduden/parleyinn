@@ -1,0 +1,69 @@
+---
+n: 2
+title: "The review workflow runs review-run"
+status: "✅"
+result: true
+summary: >-
+  review.yml runs review-run in place of the orchestrating agent, and
+  ENG-28, its scenario, binding and drift cases now ask for a review run
+  by code; the gate names an unanswered agent without an orchestrator,
+  ADR-2610300031 proposes the decision, and the generalists keep their
+  models. The live run waits for the stakeholder's consent.
+---
+# Phase 2 handoff
+
+## Done
+
+- `review.yml`'s review job installs the pinned Claude Code command
+  line (`CLAUDE_CODE_VERSION` 2.1.312, npm, as the evaluate job does).
+  It builds `review-run` with no secret in the environment, then runs
+  `cargo run --locked --quiet --offline -p review-run -- --workdir .
+  --parallel 24` with only `CLAUDE_CODE_OAUTH_TOKEN` added. The job's
+  `outcome` and `consulted` outputs read `review/outcome.json` and
+  `review/consulted.json`, and the cost step reads `review/usage.json`.
+  The `claude-code-action` step, the class's turn budget and the run
+  log's jq parsing are gone. Permissions stay `contents: read` and
+  `pull-requests: read`, the job holds no reviewer-app key, and the
+  agents now get no GitHub token at all. zizmor is clean.
+- ENG-28's row asks for the review to be run by code, not by an
+  orchestrating agent. A tool runs every dispatched specialist, then
+  every dispatched generalist, and writes the outcome from what they
+  answered. A dispatched agent that did not answer fails the review.
+  The ENG-28 scenario holds the agents' job to `review-run` and refuses
+  an agent session that would route the review. It holds review-run's
+  tool lists and every `--allowedTools` an agent job passes to
+  `review/reports`. New drift case: the review routed by
+  `claude-code-action`. The cases that inject the key and a write tool
+  now target the Review step.
+- The gate refuses with `review: dispatched but not consulted: …`.
+- PR #98 (`claude/wizardly-faraday-u3k1e6`) merged cleanly. Its
+  generalist report shape starts a dropped line with `dropped —`, which
+  review-run already leaves out.
+- ADR-2610300031, `proposed`, with its Approval section left for the
+  stakeholder. ADR-2610262245 stays `accepted` until then.
+- `docs/development.md` and `docs/review-evaluation.md` describe
+  review-run.
+
+## Decisions
+
+- `--parallel 24`, so a dispatch of up to 24 specialists fits one wave.
+  45 minutes fits two 900-second waves and the setup.
+- The agents' job is found by `-p review-run`, and also by
+  `claude-code-action@`, so an agent session is still held to the
+  agents' rules wherever it appears.
+- ADR-2610262245 is marked superseded only once ADR-2610300031 is
+  accepted, since a proposal changes no decision (ENG-26).
+
+## Next
+
+- Phase 3 retires the orchestrator: `.claude/skills/review`, its ENG-32
+  component and cases, the runner's orchestrator prompt and schema,
+  and every remaining mention. That includes the generalists' own text
+  ("the review's orchestrator calls you", which changes reviewer
+  components and needs their cases run), the dispatch module's doc
+  comment, ENG-32's row and scenario, and `review-evaluation.md`.
+- The gate's live check, one review decided on its first run, needs
+  this change on main. The stakeholder must consent to the `.github/`,
+  SRS, scenario and ADR paths first.
+- A dispatch of more than 24 specialists takes a third wave and may
+  exceed the 45-minute cap.
