@@ -81,17 +81,20 @@ it.
 
 ## In the review of a pull request
 
-The `evaluate` job of [review.yml](../.github/workflows/review.yml)
-runs the cases of each reviewer component the pull request changes, on
-the model its front matter names, from the pull request's definition of
-it. The review job plans what changed with `review-eval plan`. The
-evaluate job runs after the agent's job, holds the agent's token and no
-write permission, and ends before the job that holds the reviewer app's
-key. A case that fails becomes a blocking finding, which the gate weighs
-beside the bundle's. With nothing to evaluate the job ends in seconds.
-A component main already has is judged by main's cases; the pull
-request's cases judge only the components it adds, so a change cannot
-soften the cases that judge it.
+The `evaluate` job of [review.yml](../.github/workflows/review.yml) runs
+the cases of each reviewer component the pull request changes, on the
+model its front matter names, from the pull request's definition of it.
+The review job plans what changed with `review-eval plan`. The evaluate
+job runs after the review job, holds a read-only token and no write
+permission, and ends before the job that holds the reviewer app's key.
+The review job's `review-run` starts each dispatched agent through the
+harness's own runner, so an agent in the review and in its cases gets
+the same tools, write rule, turn budget and prompt. A case that fails
+becomes a blocking finding, which the gate weighs beside the bundle's.
+With nothing to evaluate the job ends in seconds. A component main
+already has is judged by main's cases; the pull request's cases judge
+only the components it adds, so a change cannot soften the cases that
+judge it.
 
 ### What bounds the evaluate job
 
