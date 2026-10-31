@@ -9,8 +9,8 @@
 use std::fs;
 use std::io;
 use std::path::Path;
-use std::sync::Mutex;
 use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::{Mutex, PoisonError};
 use std::thread;
 use std::time::Duration;
 
@@ -268,9 +268,11 @@ pub fn parallel<T: Sync, R: Send>(
             items.get(at).map(|item| (at, item))
         } {
             let out = f(item);
-            if let Ok(mut done) = done.lock() {
-                done.push((at, out));
-            }
+            // A poisoned lock still holds every result pushed before
+            // the panic; this one joins them, so none is dropped.
+            done.lock()
+                .unwrap_or_else(PoisonError::into_inner)
+                .push((at, out));
         }
     };
     thread::scope(|scope| {
@@ -278,7 +280,7 @@ pub fn parallel<T: Sync, R: Send>(
             scope.spawn(worker);
         }
     });
-    let mut done = done.into_inner().unwrap_or_default();
+    let mut done = done.into_inner().unwrap_or_else(PoisonError::into_inner);
     done.sort_by_key(|(at, _)| *at);
 
     done.into_iter().map(|(_, out)| out).collect()

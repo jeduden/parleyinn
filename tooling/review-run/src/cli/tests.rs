@@ -130,12 +130,20 @@ fn a_review_whose_outcome_cannot_be_written_fails() {
     assert!(err.contains("review-run: write "), "{err}");
 }
 
+fn refusal(bad: &[&str]) -> String {
+    parse(args(bad)).unwrap_err()
+}
+
 #[test]
-fn the_flags_read_as_the_usage_names_them() {
+fn the_work_directory_alone_takes_the_default_options() {
     assert_eq!(
         parse(args(&["--workdir", "w"])).unwrap(),
         ("w".to_owned(), Options::default())
     );
+}
+
+#[test]
+fn the_flags_read_inline_or_as_the_next_argument() {
     assert_eq!(
         parse(args(&["--workdir=w", "--parallel=2", "--deadline", "30"])).unwrap(),
         (
@@ -146,23 +154,43 @@ fn the_flags_read_as_the_usage_names_them() {
             }
         )
     );
-    for (bad, want) in [
-        (vec![], "--workdir is required"),
-        (vec!["w"], "unexpected argument \"w\""),
-        (vec!["--out", "x"], "unknown flag \"--out\""),
-        (vec!["--workdir"], "--workdir needs a value"),
-        (vec!["--workdir="], "--workdir needs a value"),
-        (
-            vec!["--workdir", "w", "--parallel", "0"],
-            "--parallel \"0\" is not a number above zero",
-        ),
-        (
-            vec!["--workdir", "w", "--deadline", "soon"],
-            "--deadline \"soon\" is not a number above zero",
-        ),
-    ] {
-        assert_eq!(parse(args(&bad)).unwrap_err(), want, "{bad:?}");
-    }
+}
+
+#[test]
+fn a_command_line_without_the_work_directory_is_refused() {
+    assert_eq!(refusal(&[]), "--workdir is required");
+}
+
+#[test]
+fn an_argument_that_is_no_flag_is_refused() {
+    assert_eq!(refusal(&["w"]), "unexpected argument \"w\"");
+}
+
+#[test]
+fn an_unknown_flag_is_refused() {
+    assert_eq!(refusal(&["--out", "x"]), "unknown flag \"--out\"");
+}
+
+#[test]
+fn a_flag_without_a_value_is_refused() {
+    assert_eq!(refusal(&["--workdir"]), "--workdir needs a value");
+    assert_eq!(refusal(&["--workdir="]), "--workdir needs a value");
+}
+
+#[test]
+fn a_zero_bound_is_refused() {
+    assert_eq!(
+        refusal(&["--workdir", "w", "--parallel", "0"]),
+        "--parallel \"0\" is not a number above zero"
+    );
+}
+
+#[test]
+fn a_deadline_that_is_no_number_is_refused() {
+    assert_eq!(
+        refusal(&["--workdir", "w", "--deadline", "soon"]),
+        "--deadline \"soon\" is not a number above zero"
+    );
 }
 
 #[test]
@@ -177,4 +205,16 @@ fn a_wrong_command_line_prints_the_usage() {
     let err = String::from_utf8(err).unwrap();
     assert!(err.starts_with("review-run: unknown flag"), "{err}");
     assert!(err.ends_with(&format!("{USAGE}\n")), "{err}");
+}
+
+#[test]
+fn a_value_that_does_not_encode_is_an_error_naming_its_file() {
+    let dir = TempDir::new().unwrap();
+    let value: BTreeMap<(u8, u8), u8> = BTreeMap::from([((1, 2), 3)]);
+
+    let err = write_json(dir.path(), "out.json", &value).unwrap_err();
+
+    assert!(err.starts_with("encode "), "{err}");
+    assert!(err.contains("out.json: "), "{err}");
+    assert!(!dir.path().join("out.json").exists());
 }

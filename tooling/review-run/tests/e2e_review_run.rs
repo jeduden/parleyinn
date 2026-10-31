@@ -129,7 +129,10 @@ fn review_run(home: &Path, dir: &Path, silent: &str, args: &[&str]) -> Output {
 
 /// The review gate on what the run wrote, as the post job calls it,
 /// with CI green on the reviewed head: its exit code, output and
-/// errors.
+/// errors. It runs in this process, not as the `review-gate`
+/// executable, which this package cannot build; that executable's own
+/// e2e, `tooling/review-gate/tests/e2e_review_gate.rs`, covers its
+/// command line and exit codes.
 fn gate(home: &Path, dir: &Path) -> (u8, String, String) {
     let runs = home.join("check-runs.jsonl");
     fs::write(

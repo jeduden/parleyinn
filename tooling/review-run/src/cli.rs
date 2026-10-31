@@ -110,9 +110,8 @@ fn review(
 /// Writes `value` as JSON to `rel` under `workdir`.
 fn write_json<T: Serialize>(workdir: &Path, rel: &str, value: &T) -> Result<(), String> {
     let path = workdir.join(rel);
-    // Maps of strings, lists and plain structs always encode; were one
-    // not to, the empty file fails the gate's read of it.
-    let text = serde_json::to_string_pretty(value).unwrap_or_default();
+    let text = serde_json::to_string_pretty(value)
+        .map_err(|e| format!("encode {}: {e}", path.display()))?;
     fs::write(&path, format!("{text}\n")).map_err(|e| format!("write {}: {e}", path.display()))
 }
 

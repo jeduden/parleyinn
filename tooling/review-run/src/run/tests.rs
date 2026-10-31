@@ -1,8 +1,8 @@
 use std::fs;
 use std::path::Path;
-use std::sync::Mutex;
 use std::sync::atomic::{AtomicUsize, Ordering};
-use std::time::{Duration, Instant};
+use std::sync::{Barrier, Mutex};
+use std::time::Duration;
 
 use review_eval::host::{Command, Output};
 use review_eval::runner::{GENERALIST_TOOLS, SPECIALIST_TOOLS};
@@ -158,14 +158,14 @@ fn runs_stay_within_the_bound_and_use_it() {
     let most = AtomicUsize::new(0);
     let items: Vec<usize> = (0..6).collect();
 
+    // Each run waits for a second one to be running, so two overlap
+    // without a clock; a third would raise the count past the bound.
+    let both = Barrier::new(2);
+
     let out = parallel(&items, 2, &|n| {
         let now = active.fetch_add(1, Ordering::SeqCst) + 1;
         most.fetch_max(now, Ordering::SeqCst);
-        let started = Instant::now();
-        while active.load(Ordering::SeqCst) < 2 && started.elapsed() < Duration::from_secs(2) {
-            std::thread::sleep(Duration::from_millis(1));
-        }
-        std::thread::sleep(Duration::from_millis(5));
+        both.wait();
         active.fetch_sub(1, Ordering::SeqCst);
         n * 10
     });
