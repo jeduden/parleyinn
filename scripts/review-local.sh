@@ -7,12 +7,15 @@
 # comments, the head's agent instructions moved out of the agents' load
 # path. It then runs the same tools: review-bundle, review-eval plan and
 # review-run. The tools are this checkout's, so a change to them is what
-# runs; CI runs main's. The agents are main's definitions, as in CI.
+# runs; CI runs main's. The agents are the base's definitions: main's by
+# default, as in CI, and REF's under --base REF.
 #
-# Prints the verdict, each finding on one line, what the run cost, how
-# long it took and the evaluation plan with its estimate. Exits 0 when the
-# review approves, 1 when it requests changes, 2 on a wrong command line
-# or a setup that fails. Run files stay under target/review-local/.
+# Prints the verdict, each finding on one line, the bundle's deterministic
+# findings, what the run cost, how long it took and the evaluation plan
+# with its estimate. Exits 0 when the review approves and no deterministic
+# finding blocks, as the gate decides; 1 when it requests changes or one
+# blocks; 2 on a wrong command line or a setup that fails. Run files stay
+# under target/review-local/.
 #
 # By default the base is origin/main, as in CI. --base REF reviews only
 # what changed since REF, for the fix cycle after a review: the commit
@@ -39,7 +42,11 @@ while [ "$#" -gt 0 ]; do
     *) echo "usage: scripts/review-local.sh [--base REF] [--consent FILE] [--parallel N]" >&2; exit 2 ;;
   esac
 done
-# The consent file is read after the cd into the work directory below.
+case "$parallel" in
+  "" | *[!0-9]* | 0) echo "review-local: --parallel needs a positive number, not '$parallel'" >&2; exit 2 ;;
+esac
+# The consent file is read after the cd into the work directory below,
+# so a relative path is made absolute against the caller's directory now.
 case "$consent" in
   "" | /*) ;;
   *) consent="$PWD/$consent" ;;
@@ -63,7 +70,12 @@ cleanup() {
 trap cleanup EXIT
 
 run() {
-  if command -v mise > /dev/null; then mise exec -- "$@"; else "$@"; fi
+  if command -v mise > /dev/null; then
+    mise exec -- "$@"
+  else
+    echo "review-local: mise is not on PATH; running $1 unpinned" >&2
+    "$@"
+  fi
 }
 tool() {
   run cargo run --locked --quiet --manifest-path "$repo/Cargo.toml" -p "$@"
@@ -108,7 +120,11 @@ if [ "$status" -ne 0 ]; then
   exit 2
 fi
 jq -r '"verdict: " + .verdict, (.findings[] | "\(.path):\(.line) — \(.severity) — \(.body)")' review/outcome.json
+jq -r '.[] | "deterministic: \(.path):\(.line) — \(.severity) — \(.body)"' review/checked.json
 jq -r '"evaluation plan: \(length) components"' review/eval-plan.json
 LC_NUMERIC=C printf 'cost: $%.2f\n' "$(jq '[.[].cost_usd] | add // 0' review/usage.json)"
 echo "elapsed: $((SECONDS - start)) s"
-if [ "$(jq -r .verdict review/outcome.json)" = approve ]; then exit 0; else exit 1; fi
+# The gate withholds approval on a blocking deterministic finding
+# whatever the agents' verdict, so this does too.
+blocked=$(jq '[.[] | select(.severity == "blocking")] | length' review/checked.json)
+if [ "$(jq -r .verdict review/outcome.json)" = approve ] && [ "$blocked" -eq 0 ]; then exit 0; else exit 1; fi
