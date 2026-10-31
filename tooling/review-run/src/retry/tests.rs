@@ -242,11 +242,12 @@ fn a_report_refused_twice_stays_refused_and_the_first_s_findings_do_not_rescue_i
         if !prompt_of(c).contains("a specialist") {
             return fake::generalist(c);
         }
-        let outcome = "outcome: findings — one.";
+        // Refused each time, for a problem the other's lines would
+        // cure: a finding beside none, then findings beside none.
         if prompt_of(c).contains("previous attempt") {
-            fake::answer(c, &[], outcome)
+            fake::answer(c, &[], "outcome: findings — one.")
         } else {
-            fake::answer(c, &[fake::FINDING, "a.rs:2 — x", outcome], outcome)
+            fake::answer(c, &[fake::FINDING], "outcome: none — clean.")
         }
     });
 

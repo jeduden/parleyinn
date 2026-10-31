@@ -105,6 +105,7 @@ pub fn cases() -> Vec<Case> {
         review_limit_cases(),
         review_withdrawal_cases(),
         review_place_form_cases(),
+        review_retry_cases(),
         // Last: its cases edit source the later cases would run stale.
         license_text_cases(),
     ]
@@ -418,6 +419,27 @@ fn review_place_form_cases() -> Vec<Case> {
             "job review starts the Claude Code command line itself, outside review-run and review-eval",
         ),
     ]
+}
+
+/// The drift the review's second attempt must not bring (ENG-28), late
+/// so adding it moves no earlier case to another shard: a retry that
+/// merges the first attempt's findings into a second report the gate
+/// refuses again, so the two refused reports pass as one.
+fn review_retry_cases() -> Vec<Case> {
+    vec![case(
+        "a retried specialist's refused report rescued by its first attempt's findings",
+        "ENG-28",
+        Injection::replace(
+            "tooling/review-run/src/retry.rs",
+            "    let (Some(_), Some(failure)) = (&report, second.failure.clone()) else {\n        return report;\n    };\n",
+            "    let (Some(_), failure) = (&report, second.failure.clone()) else {\n        return report;\n    };\n    let failure = failure.unwrap_or_default();\n",
+        ),
+        cargo_lib_test(
+            "review-run",
+            "retry::tests::a_report_refused_twice_stays_refused_and_the_first_s_findings_do_not_rescue_it",
+        ),
+        "a_report_refused_twice_stays_refused_and_the_first_s_findings_do_not_rescue_it",
+    )]
 }
 
 /// The drifts ENG-30 exists to catch: a license the tool keeps no text
