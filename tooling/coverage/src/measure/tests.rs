@@ -431,6 +431,45 @@ fn a_part_names_its_file() {
     assert_eq!(part_file_name(e2e, Part::Others), "e2e-others.lcov");
 }
 
+#[test]
+fn the_others_file_is_named_for_its_layer() {
+    assert_eq!(others_file_name(TestLayer::EndToEnd), "e2e-others.lcov");
+    assert_eq!(
+        others_file_name(TestLayer::Integration),
+        "integration-others.lcov"
+    );
+}
+
+#[test]
+fn the_others_are_the_end_to_end_targets_beside_bdd() {
+    assert_eq!(
+        others(&plan(), TestLayer::EndToEnd, "shard").unwrap(),
+        ["e2e_x"]
+    );
+    assert_eq!(
+        others(&plan(), TestLayer::Integration, "divide").unwrap_err(),
+        "no bdd target in the integration test layer to divide"
+    );
+}
+
+#[test]
+fn with_targets_names_each_target_after_the_base_arguments() {
+    assert_eq!(
+        with_targets(&words(&["a", "b"])),
+        words(&[
+            "llvm-cov",
+            "--no-report",
+            "--workspace",
+            "--locked",
+            "--test",
+            "a",
+            "--test",
+            "b"
+        ])
+    );
+    assert_eq!(with_targets(&[]), base_args());
+}
+
 /// A host holding the e2e shards `present` of `total`, each counting
 /// its own line and line 9 once, and the others' file, which counts
 /// line 8 eight times and line 9 once.
