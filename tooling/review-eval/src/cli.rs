@@ -539,8 +539,8 @@ fn run_case(
 }
 
 /// One run of `case` for `component` under `dir`: the world built, the
-/// component run, its report and log kept, the grade written, the
-/// world torn down.
+/// component run, its log and the report assembled from it kept, the
+/// grade written, the world torn down.
 fn one_run(
     host: &dyn Host,
     options: &Options,
@@ -572,18 +572,14 @@ fn one_run(
             options.deadline,
         );
         let log = runner::run(host, &command)?;
-        let report = world.report(&component.name);
-        if let Some(report) = &report {
-            let _ = fs::write(dir.join("report.md"), report);
-        }
-        let graded = grade::grade(
-            component,
-            case,
-            &grade::Run {
-                log: &log,
-                report: report.as_deref(),
-            },
+        // The report as the review would assemble it from the log, for
+        // the record; a run that did not finish is headed so.
+        let incomplete = (!log.answered).then(|| format!("its run ended with {}", log.subtype));
+        let _ = fs::write(
+            dir.join("report.md"),
+            review_gate::report::assemble(&log.texts, &log.answer, incomplete.as_deref()),
         );
+        let graded = grade::grade(component, case, &log);
         let mut record = RunRecord::new(&log, graded.failures, graded.slips);
         record.notes.clone_from(&world.notes);
         let mut grade = if record.passed {

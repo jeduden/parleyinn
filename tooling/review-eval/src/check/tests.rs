@@ -19,7 +19,7 @@ fn checkout() -> TempDir {
         let (tools, model, turns) = if name.starts_with("review-") {
             ("Read, Grep, Glob", "sonnet", "")
         } else {
-            ("Read, Grep, Glob, Write", "haiku", "maxTurns: 20\n")
+            ("Read, Grep, Glob", "haiku", "maxTurns: 20\n")
         };
         write(
             &format!(".claude/agents/{name}.md"),
@@ -155,6 +155,35 @@ fn a_generalist_s_case_that_names_a_form_is_named() {
         ),
         "{got:?}"
     );
+}
+
+#[test]
+fn a_generalist_s_case_that_expects_a_stated_or_withdrawn_finding_is_named() {
+    let dir = checkout();
+    let cases = dir.path().join(crate::CASES);
+    for (name, field) in [("stated", "stated"), ("withdrawn", "withdrawn")] {
+        write_case(
+            dir.path(),
+            "review-code",
+            name,
+            "defect",
+            &UNWRAP.replace("lang-rust", "review-code").replace(
+                "outcome = \"blocking\"\n",
+                &format!("\n[[expect.{field}]]\npath = \"crates/x/src/rogue.rs\"\n"),
+            ),
+        );
+    }
+
+    let got = problems(dir.path(), dir.path(), &cases, None);
+
+    for name in ["stated", "withdrawn"] {
+        assert!(
+            got.contains(&format!(
+                "case review-code/{name} expects a stated or withdrawn finding of a generalist, whose run log holds none"
+            )),
+            "{got:?}"
+        );
+    }
 }
 
 #[test]

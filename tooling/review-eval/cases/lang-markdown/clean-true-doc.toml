@@ -17,9 +17,9 @@ folder for each run of a case under `DIR/runs/`, named by the component,
 the case and the run's number from 1, such as
 `runs/lang-rust/clean-module/1/`.
 
-That folder holds `log.jsonl`, the model's log, and `grade.txt`, whose
-first line reads `passed` when the run passed and otherwise names what
-failed. It holds `report.md` only when the component wrote a report.
+That folder holds `log.jsonl`, the model's log, `report.md`, the report
+the evaluation assembled from that log, and `grade.txt`, whose first
+line reads `passed` when the run passed and otherwise names what failed.
 '''
 
 [expect]

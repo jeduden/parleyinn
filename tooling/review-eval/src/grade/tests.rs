@@ -47,11 +47,17 @@ fn answered_log(answer: &str) -> RunLog {
     }
 }
 
-const REPORT: &str = "crates/x/src/a.rs:12 — if not addressed: an unwrap outside tests panics — ENG-16\n\noutcome: findings — it unwraps.\n";
-
-fn run<'a>(log: &'a RunLog, report: Option<&'a str>) -> Run<'a> {
-    Run { log, report }
+/// A specialist's log: `texts` stated as it went, then `answer`, which
+/// its last text block repeats as the harness logs it.
+fn stated_log(texts: &[&str], answer: &str) -> RunLog {
+    let mut log = answered_log(answer);
+    log.texts = texts.iter().map(|t| (*t).to_owned()).collect();
+    log.texts.push(answer.to_owned());
+    log
 }
+
+const UNWRAP: &str =
+    "crates/x/src/a.rs:12 — if not addressed: an unwrap outside tests panics — ENG-16";
 
 #[test]
 fn a_specialist_run_that_does_everything_right_passes() {
@@ -66,13 +72,16 @@ fn a_specialist_run_that_does_everything_right_passes() {
             ..wanted("crates/x/src/a.rs")
         }],
         none: vec![wanted("crates/x/src/lib.rs")],
+        stated: vec![wanted("crates/x/src/a.rs")],
         absent: vec!["approved".into()],
         ..Expect::default()
     };
-    let mut log = answered_log("outcome: findings — it unwraps.\nreview/reports/lang-rust.md\n");
-    log.writes = vec!["/work/main/review/reports/lang-rust.md".into()];
+    let log = stated_log(
+        &["Reading the diff.", UNWRAP, "Checking the tests."],
+        "outcome: findings — it unwraps.\n",
+    );
 
-    let graded = grade(&c, &case("lang-rust", expect), &run(&log, Some(REPORT)));
+    let graded = grade(&c, &case("lang-rust", expect), &log);
 
     assert_eq!(graded, Graded::default());
     assert!(graded.passed());
@@ -88,17 +97,19 @@ fn a_specialist_run_names_each_failed_assertion() {
             ..wanted("crates/x/src/b.rs")
         }],
         none: vec![wanted("crates/x/src/a.rs")],
+        stated: vec![wanted("crates/x/src/b.rs")],
+        withdrawn: vec![wanted("crates/x/src/a.rs")],
         absent: vec!["everything".into()],
         ..Expect::default()
     };
-    let mut log = answered_log("I looked.\noutcome: none\n");
-    log.writes = vec!["review/reports/lang-toml.md".into()];
     let eleven = (1..=11)
-        .map(|n| format!("crates/x/src/a.rs:{n} — if not addressed: one breaks — I2\n"))
-        .collect::<String>()
-        + "I read everything.\noutcome: findings\n";
+        .map(|n| format!("crates/x/src/a.rs:{n} — if not addressed: everything breaks — I2"))
+        .collect::<Vec<_>>();
+    let texts: Vec<&str> = eleven.iter().map(String::as_str).collect();
+    let mut log = stated_log(&texts, "I looked.\noutcome: findings\n");
+    log.writes = vec!["review/reports/lang-toml.md".into()];
 
-    let graded = grade(&c, &case("lang-rust", expect), &run(&log, Some(&eleven)));
+    let graded = grade(&c, &case("lang-rust", expect), &log);
 
     assert_eq!(
         graded.failures,
@@ -106,18 +117,17 @@ fn a_specialist_run_names_each_failed_assertion() {
             "wrote review/reports/lang-toml.md",
             "outcome findings, want none",
             "no finding at crates/x/src/b.rs mentioning panic",
-            "a finding at crates/x/src/a.rs: crates/x/src/a.rs:1 — if not addressed: one breaks — I2",
+            "a finding at crates/x/src/a.rs: crates/x/src/a.rs:1 — if not addressed: everything breaks — I2",
             "holds \"everything\"",
+            "did not state before its answer at crates/x/src/b.rs",
+            "did not withdraw or revise at crates/x/src/a.rs",
         ]
     );
     assert_eq!(
         graded.slips,
         vec![
-            "answer does not name the report's outcome",
-            "answer does not name the report's path",
-            "answer holds more than the outcome and the path: I looked.",
+            "answer holds more than the outcome line: I looked.",
             "11 findings, at most 10",
-            "a line that is neither a finding nor the outcome: I read everything.",
         ]
     );
 }
@@ -134,152 +144,187 @@ fn a_specialist_run_that_only_slips_passes_with_its_slips_counted() {
         }],
         ..Expect::default()
     };
-    let report = "Findings:\n\n- crates/x/src/a.rs:20-23 — if not addressed: an unwrap panics — ENG-16\n\noutcome: findings — it unwraps.\n";
-    let log =
-        answered_log("outcome: findings — unwraps, see the report.\nreview/reports/lang-rust.md\n");
+    let log = stated_log(
+        &["Findings:\n\n- crates/x/src/a.rs:20-23 — if not addressed: an unwrap panics — ENG-16"],
+        "Done.\noutcome: findings — it unwraps.\n",
+    );
 
-    let graded = grade(&c, &case("lang-rust", expect), &run(&log, Some(report)));
+    let graded = grade(&c, &case("lang-rust", expect), &log);
 
     assert!(graded.passed(), "{:?}", graded.failures);
     assert_eq!(
         graded.slips,
-        vec!["a line that is neither a finding nor the outcome: Findings:"]
+        vec!["answer holds more than the outcome line: Done."]
     );
 }
 
 #[test]
-fn answer_slips_name_what_the_answer_lacks_and_what_it_adds() {
-    let own = "review/reports/lang-rust.md";
-    let slips = |answer: &str| answer_slips(&answered_log(answer), "none", own);
+fn a_finding_stated_only_in_the_answer_was_not_stated_before_it() {
+    let c = component(Kind::Specialist, "lang-rust", true);
+    let expect = Expect {
+        finding: vec![wanted("crates/x/src/a.rs")],
+        stated: vec![wanted("crates/x/src/a.rs")],
+        ..Expect::default()
+    };
+    let answer = format!("{UNWRAP}\noutcome: findings — it unwraps.");
+    let log = stated_log(&["Reading."], &answer);
 
-    assert!(slips("outcome: none — fine.\nreview/reports/lang-rust.md").is_empty());
-    assert!(slips("review/reports/lang-rust.md — Outcome: none — fine.").is_empty());
+    let graded = grade(&c, &case("lang-rust", expect), &log);
+
     assert_eq!(
-        slips("review/reports/lang-rust.md"),
-        vec!["answer does not name the report's outcome"]
-    );
-    assert_eq!(
-        slips("outcome: none"),
-        vec!["answer does not name the report's path"]
-    );
-    assert_eq!(
-        slips("Done.\noutcome: none — fine.\nreview/reports/lang-rust.md"),
-        vec!["answer holds more than the outcome and the path: Done."]
+        graded.failures,
+        vec!["did not state before its answer at crates/x/src/a.rs"]
     );
 }
 
 #[test]
-fn shape_slips_name_an_eleventh_finding_and_a_stray_line() {
+fn a_withdrawn_finding_leaves_the_report_and_counts_as_withdrawn() {
+    let c = component(Kind::Specialist, "lang-rust", true);
+    let expect = Expect {
+        outcome: vec!["none".into()],
+        none: vec![wanted("crates/x/src/a.rs")],
+        withdrawn: vec![Expected {
+            mentions: vec!["test".into()],
+            ..wanted("crates/x/src/a.rs")
+        }],
+        ..Expect::default()
+    };
+    let log = stated_log(
+        &[
+            UNWRAP,
+            "withdrawn: crates/x/src/a.rs:12 — the function is a test's",
+        ],
+        "outcome: none — fine.",
+    );
+    assert!(grade(&c, &case("lang-rust", expect.clone()), &log).passed());
+
+    let revised = stated_log(
+        &[
+            UNWRAP,
+            "revised: crates/x/src/a.rs:12 — request: add a rule on test unwraps — none says so",
+        ],
+        "outcome: findings — a request.",
+    );
+    let graded = grade(&c, &case("lang-rust", expect), &revised);
+    assert_eq!(
+        graded.failures,
+        vec![
+            "outcome findings, want none",
+            "a finding at crates/x/src/a.rs: crates/x/src/a.rs:12 — request: add a rule on test unwraps — none says so",
+        ]
+    );
+}
+
+#[test]
+fn answer_slips_name_the_first_line_that_is_no_outcome_line() {
+    let slips = |answer: &str| answer_slips(&answered_log(answer));
+
+    assert!(slips("outcome: none — fine.").is_empty());
+    assert!(slips("\n  **Outcome: none** — fine.\n\n").is_empty());
+    assert_eq!(
+        slips("Done.\noutcome: none — fine."),
+        vec!["answer holds more than the outcome line: Done."]
+    );
+    assert_eq!(
+        slips("outcome: none — fine.\nreview/reports/lang-rust.md"),
+        vec!["answer holds more than the outcome line: review/reports/lang-rust.md"]
+    );
+}
+
+#[test]
+fn shape_slips_name_an_eleventh_finding() {
     let eleven = (1..=11)
         .map(|n| format!("a.rs:{n} — request: add a rule — one\n"))
         .collect::<String>();
     let one = "a.rs:1 — if not addressed: one breaks — I2\n";
 
-    assert!(
-        shape_slips(&report::parse(&format!("{eleven}outcome: findings\n")).clone()).len() == 1
-    );
     assert_eq!(
-        shape_slips(&report::parse(&format!(
-            "Findings:\n{one}outcome: findings\n"
-        ))),
-        vec!["a line that is neither a finding nor the outcome: Findings:"]
+        shape_slips(&format!("{eleven}outcome: findings\n")),
+        vec!["11 findings, at most 10"]
     );
-    assert!(shape_slips(&report::parse(&format!("{one}outcome: findings\n"))).is_empty());
+    assert!(shape_slips(&format!("{one}outcome: findings\n")).is_empty());
 }
 
 #[test]
-fn a_specialist_that_did_not_answer_or_write_fails_on_that() {
+fn a_specialist_that_did_not_answer_fails_on_that_whatever_it_stated() {
     let c = component(Kind::Specialist, "lang-rust", true);
     let log = RunLog {
         subtype: "error_max_turns".to_owned(),
+        texts: vec![UNWRAP.to_owned()],
+        writes: vec!["review/reports/lang-rust.md".to_owned()],
         ..RunLog::default()
     };
 
-    let graded = grade(&c, &case("lang-rust", Expect::default()), &run(&log, None));
-    assert_eq!(
-        graded.failures,
-        vec!["did not answer: error_max_turns", "wrote no report"]
-    );
+    let graded = grade(&c, &case("lang-rust", Expect::default()), &log);
 
-    let graded = grade(
-        &c,
-        &case("lang-rust", Expect::default()),
-        &run(&log, Some(" \n")),
-    );
-    assert_eq!(
-        graded.failures,
-        vec!["did not answer: error_max_turns", "wrote an empty report"]
-    );
-
-    let graded = grade(
-        &c,
-        &case("lang-rust", Expect::default()),
-        &run(&log, Some("a.rs:1 — nit — x\nno outcome\n")),
-    );
     assert_eq!(
         graded.failures,
         vec![
             "did not answer: error_max_turns",
-            "report does not end with its outcome",
+            "wrote review/reports/lang-rust.md"
         ]
     );
-    assert_eq!(
-        graded.slips,
-        vec!["a line that is neither a finding nor the outcome: no outcome"]
-    );
-
-    let graded = grade(
-        &c,
-        &case("lang-rust", Expect::default()),
-        &run(&log, Some("outcome: none\n")),
-    );
-    assert_eq!(graded.failures, vec!["did not answer: error_max_turns"]);
+    assert!(graded.slips.is_empty());
 }
 
 #[test]
-fn a_lenient_specialist_is_not_held_to_the_line_shape() {
+fn a_specialist_that_answered_no_outcome_line_fails_on_that() {
+    let c = component(Kind::Specialist, "lang-rust", true);
+    let log = stated_log(&[UNWRAP], "I am done.\nreview/reports/lang-rust.md");
+
+    let graded = grade(&c, &case("lang-rust", Expect::default()), &log);
+
+    assert_eq!(graded.failures, vec!["answered no outcome line"]);
+}
+
+#[test]
+fn a_lenient_specialist_is_not_held_to_the_line_count() {
     let c = component(Kind::Specialist, "test-engineer-unit", false);
-    let report = "tooling/x/src/a.rs line 4: the function has no unit test.\n\
-                  tooling/x/src/a.rs:4 — request: add a floor per module — none holds it\n\n\
-                  outcome: findings — no tests.\n";
-    let log = answered_log("outcome: findings — no tests.\nreview/reports/test-engineer-unit.md");
+    let twelve = (1..=12)
+        .map(|n| {
+            format!("tooling/x/src/a.rs:{n} — request: add a floor per module — none holds it")
+        })
+        .collect::<Vec<_>>();
+    let texts: Vec<&str> = twelve.iter().map(String::as_str).collect();
+    let log = stated_log(&texts, "outcome: findings — no tests.");
     let expect = Expect {
         finding: vec![Expected {
             line: Some(5),
-            mentions: vec!["no unit test".into()],
+            mentions: vec!["floor".into()],
             ..wanted("tooling/x/src/a.rs")
         }],
         ..Expect::default()
     };
 
-    let graded = grade(
-        &c,
-        &case("test-engineer-unit", expect),
-        &run(&log, Some(report)),
-    );
+    let graded = grade(&c, &case("test-engineer-unit", expect), &log);
 
     assert!(graded.passed(), "{:?}", graded.failures);
+    assert!(graded.slips.is_empty());
 }
 
 #[test]
 fn a_specialist_report_the_review_would_refuse_fails_its_run() {
     let c = component(Kind::Specialist, "lang-rust", true);
-    let log = answered_log("outcome: findings — x.\nreview/reports/lang-rust.md");
-    for (report, problem) in [
+    for (texts, answer, problem) in [
         (
-            "a.rs:1 — blocking — an unwrap — ENG-16\noutcome: findings — x.\n",
+            vec!["a.rs:1 — blocking — an unwrap — ENG-16"],
+            "outcome: findings — x.",
             "has a report whose line 1 is neither a linked finding nor a requirement request",
         ),
         (
-            "a.rs:1 — if not addressed: a panic — ENG-16\noutcome: none — x.\n",
+            vec!["a.rs:1 — if not addressed: a panic — ENG-16"],
+            "outcome: none — x.",
             "has a report whose outcome is none but which holds findings",
         ),
+        (
+            vec!["withdrawn: a.rs:1 — nothing was there"],
+            "outcome: none — x.",
+            "has a report whose line 1 revises or withdraws a finding at a.rs:1, where it found none",
+        ),
     ] {
-        let graded = grade(
-            &c,
-            &case("lang-rust", Expect::default()),
-            &run(&log, Some(report)),
-        );
+        let log = stated_log(&texts, answer);
+
+        let graded = grade(&c, &case("lang-rust", Expect::default()), &log);
 
         assert_eq!(graded.failures, vec![format!("report refused: {problem}")]);
     }
@@ -341,15 +386,15 @@ fn a_generalist_keeps_drops_and_writes_nothing() {
         ..Expect::default()
     };
     let log = answered_log(answer);
-    assert!(grade(&c, &case("review-code", forbids), &run(&log, None)).passed());
+    assert!(grade(&c, &case("review-code", forbids), &log).passed());
 
-    let graded = grade(&c, &case("review-code", expect.clone()), &run(&log, None));
+    let graded = grade(&c, &case("review-code", expect.clone()), &log);
     assert!(graded.passed(), "{:?}", graded.failures);
 
     let mut wrote =
         answered_log("crates/x/src/a.rs:12 — blocking — unwraps — lang-rust\nkept everything\n");
     wrote.writes = vec!["review/reports/review-code.md".into()];
-    let graded = grade(&c, &case("review-code", expect), &run(&wrote, None));
+    let graded = grade(&c, &case("review-code", expect), &wrote);
     assert_eq!(
         graded.failures,
         vec![
@@ -410,7 +455,7 @@ fn a_dropped_line_in_the_finding_shape_is_no_kept_finding() {
     let answer = "crates/x/src/b.rs:3 — dropped — no such line in the diff — lang-toml\n";
     let log = answered_log(answer);
 
-    let graded = grade(&c, &case("review-code", expect), &run(&log, None));
+    let graded = grade(&c, &case("review-code", expect), &log);
 
     assert!(graded.passed(), "{:?}", graded.failures);
 }
@@ -428,7 +473,7 @@ fn a_kept_finding_that_mentions_dropping_is_no_dropped_line() {
     let answer = "crates/x/src/b.rs:3 — nit — drops the no such line check — lang-toml\n";
     let log = answered_log(answer);
 
-    let graded = grade(&c, &case("review-code", expect), &run(&log, None));
+    let graded = grade(&c, &case("review-code", expect), &log);
 
     assert_eq!(
         graded.failures,
@@ -474,16 +519,12 @@ fn a_consultant_is_graded_from_its_answer_as_a_generalist_is() {
         "plan/2610301001_x.md:14 — blocking — pins come back summarised — I3\n\
          The plan does not serve me.\n",
     );
-    let graded = grade(
-        &c,
-        &case("persona-agent", expect.clone()),
-        &run(&found, None),
-    );
+    let graded = grade(&c, &case("persona-agent", expect.clone()), &found);
     assert!(graded.passed(), "{:?}", graded.failures);
     assert!(graded.slips.is_empty());
 
     let prose = answered_log("The summaries in plan/2610301001_x.md worry me.\n");
-    let graded = grade(&c, &case("persona-agent", expect), &run(&prose, None));
+    let graded = grade(&c, &case("persona-agent", expect), &prose);
     assert_eq!(
         graded.failures,
         vec![
@@ -508,7 +549,7 @@ fn a_consultant_s_line_in_a_specialist_s_form_is_kept_and_matched_by_its_form() 
         finding: vec![at("linked"), at("request")],
         ..Expect::default()
     };
-    let graded = grade(&c, &case("persona-agent", expect), &run(&answer, None));
+    let graded = grade(&c, &case("persona-agent", expect), &answer);
     assert!(graded.passed(), "{:?}", graded.failures);
 
     // A linked line is what a case written while personas weighed

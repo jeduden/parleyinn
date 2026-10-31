@@ -1,6 +1,6 @@
 //! The harness: one run of a component on a world, through the
 //! `claude` command line as the review workflow runs it, with the
-//! review's tools, write rule and turn budget, the component as the
+//! review's reading tools and turn budget, the component as the
 //! session's agent, and a model override for a comparison.
 
 use std::path::Path;
@@ -14,12 +14,11 @@ use crate::world::{PR_HEAD, World};
 /// The command line that runs an agent.
 pub const PROGRAM: &str = "claude";
 
-/// The tools the review allows and refuses a specialist, which writes
-/// only its report, and a generalist, which writes nothing.
-pub const SPECIALIST_TOOLS: &str = "Read,Glob,Grep,Edit(./review/reports/**)";
-pub const SPECIALIST_DISALLOWED: &str = "Bash,Edit,NotebookEdit,WebFetch,WebSearch,Agent";
-pub const GENERALIST_TOOLS: &str = "Read,Glob,Grep";
-pub const GENERALIST_DISALLOWED: &str = "Bash,Edit,Write,NotebookEdit,WebFetch,WebSearch,Agent";
+/// The tools the review allows every agent, which reads and writes
+/// nothing, and the tools it refuses: a specialist's report is assembled
+/// from its run log, so no agent needs a writing tool.
+pub const TOOLS: &str = "Read,Glob,Grep";
+pub const DISALLOWED: &str = "Bash,Edit,Write,NotebookEdit,WebFetch,WebSearch,Agent";
 
 /// The prompt `component` gets for `world`: for a specialist or a
 /// generalist what the review's run tells it, and for a consultant the
@@ -33,10 +32,11 @@ pub fn prompt(component: &Component, world: &World) -> String {
              (ENG-28). Read `review/bundle.md` first, then your own diff, \
              `review/diffs/{name}.diff`. The pull request's tree is in `pr-head/` and \
              its diff against main is `pr.diff`; its agent instructions are text in \
-             `review/pr-instructions.txt`. Write your report to \
-             `review/reports/{name}.md`, ending with its outcome line, and \
-             answer exactly two lines and nothing else: the report's outcome line \
-             copied character for character, then the report's path."
+             `review/pr-instructions.txt`. You write no file: state each finding as \
+             one line in your text the moment you find it, as your instructions say, \
+             and answer with your outcome line alone, `outcome: findings — <sentence>` \
+             or `outcome: none — <sentence>`. The review assembles your report from \
+             the lines you stated."
         ),
         Kind::Generalist => {
             let reports = if world.seeded.is_empty() {
@@ -91,13 +91,9 @@ pub fn command(
         "--add-dir".into(),
         PR_HEAD.into(),
     ];
-    let (tools, disallowed) = match component.kind {
-        Kind::Specialist => (SPECIALIST_TOOLS, SPECIALIST_DISALLOWED),
-        Kind::Generalist | Kind::Consultant => (GENERALIST_TOOLS, GENERALIST_DISALLOWED),
-    };
     args.extend(["--max-turns".to_owned(), component.max_turns.to_string()]);
-    args.extend(["--allowedTools".to_owned(), tools.to_owned()]);
-    args.extend(["--disallowedTools".to_owned(), disallowed.to_owned()]);
+    args.extend(["--allowedTools".to_owned(), TOOLS.to_owned()]);
+    args.extend(["--disallowedTools".to_owned(), DISALLOWED.to_owned()]);
     match component.kind {
         Kind::Specialist | Kind::Generalist => {
             args.extend(["--agent".to_owned(), component.name.clone()]);

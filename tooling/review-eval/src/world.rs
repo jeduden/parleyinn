@@ -4,8 +4,8 @@
 //! copied in from the tree being evaluated; a second worktree inside
 //! it, `pr-head/`, carries the case's edits, with its instruction
 //! files moved out as text; `pr.diff` is their diff; and `review/`
-//! holds what `review-bundle` writes, the reports a case seeds, and
-//! the files the workflow's steps add.
+//! holds what `review-bundle` writes, the reports a case seeds for a
+//! generalist, and the files the workflow's steps add.
 
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -49,14 +49,6 @@ pub struct World {
     pub seeded: Vec<String>,
     /// What the world could not build as the workflow does.
     pub notes: Vec<String>,
-}
-
-impl World {
-    /// The text of `component`'s report file, when it wrote one.
-    #[must_use]
-    pub fn report(&self, component: &str) -> Option<String> {
-        fs::read_to_string(self.main.join(REPORTS).join(format!("{component}.md"))).ok()
-    }
 }
 
 /// Builds the world of `case` for `component`, read from `tree`, under

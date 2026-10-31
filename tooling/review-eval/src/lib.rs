@@ -4,7 +4,7 @@
 //! review bundle can dispatch, has cases: a change
 //! to main's tree with the report the component must give. A case runs
 //! through the review's own harness, `claude --agent` with the review's
-//! tools, write rule and turn budget, on the model the component names
+//! reading tools and turn budget, on the model the component names
 //! or one a comparison names, and a grader reads the report as data.
 //! The scores fold into a scorecard per component and model, which a
 //! pull request's review weighs as deterministic findings and a

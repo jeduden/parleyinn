@@ -1,4 +1,5 @@
-//! A report as data. A specialist's report holds its linked findings,
+//! A report as data. A specialist's report, as the review assembles it
+//! from the specialist's run log, holds its linked findings,
 //! `path:line — if not addressed: <consequence> — <ID>[, <ID>...]`,
 //! and its requirement requests,
 //! `path:line — request: add|change|remove <requirement> — <motivation>`,
@@ -8,8 +9,6 @@
 //! `path:line — blocking|nit — what it breaks — its source`, and its
 //! dropped ones, `dropped — path:line — why — source`: severity is the
 //! generalists' alone.
-
-use review_gate::report::Line;
 
 pub use review_gate::report::{bare, split_dashes};
 
@@ -26,60 +25,6 @@ pub struct Finding {
     pub text: String,
     /// The whole line as written.
     pub raw: String,
-}
-
-/// A specialist's report, read.
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct Report {
-    /// Its linked findings and requirement requests, in order.
-    pub findings: Vec<Line>,
-    /// Its finding lines in neither form, as written.
-    pub malformed: Vec<String>,
-    /// The outcome the last line names.
-    pub outcome: Option<String>,
-    /// The last line as written, when it is an outcome line.
-    pub outcome_line: Option<String>,
-    /// Non-blank lines that are neither a finding line, a heading nor
-    /// the outcome line.
-    pub other: Vec<String>,
-}
-
-/// Reads `text`.
-#[must_use]
-pub fn parse(text: &str) -> Report {
-    let mut report = Report::default();
-    let lines: Vec<&str> = text.lines().filter(|l| !l.trim().is_empty()).collect();
-    let last = lines.len().saturating_sub(1);
-    for (at, line) in lines.iter().enumerate() {
-        if at == last
-            && let Some(outcome) = outcome_word(line)
-        {
-            report.outcome = Some(outcome.to_owned());
-            report.outcome_line = Some(line.trim().to_owned());
-        } else {
-            match review_gate::report::line(line) {
-                Line::Malformed => report.malformed.push(line.trim().to_owned()),
-                Line::Prose if line.trim_start().starts_with('#') => {}
-                Line::Prose => report.other.push(line.trim().to_owned()),
-                read => report.findings.push(read),
-            }
-        }
-    }
-
-    report
-}
-
-/// The outcome `line` names, when it is an outcome line: `outcome:`
-/// and one of [`OUTCOMES`], after any emphasis or list marker.
-#[must_use]
-pub fn outcome_word(line: &str) -> Option<&'static str> {
-    let rest = bare(line).strip_prefix("outcome:")?;
-    let word = rest
-        .split_whitespace()
-        .next()?
-        .trim_matches(|c: char| !c.is_ascii_alphanumeric());
-
-    OUTCOMES.iter().find(|o| **o == word).copied()
 }
 
 /// The word a generalist's dropped-finding line starts with, or gives

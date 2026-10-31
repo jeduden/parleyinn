@@ -4,25 +4,32 @@ const LOG: &str = r#"{"type":"system","subtype":"init","model":"claude-haiku-5-5
 {"type":"assistant","message":{"id":"m1","model":"claude-haiku-5-5","usage":{"input_tokens":10,"cache_creation_input_tokens":100,"cache_read_input_tokens":1000,"output_tokens":5},"content":[{"type":"text","text":"reading"}]}}
 {"type":"assistant","message":{"id":"m1","model":"claude-haiku-5-5","usage":{"input_tokens":10,"cache_creation_input_tokens":100,"cache_read_input_tokens":1000,"output_tokens":5},"content":[{"type":"tool_use","id":"t1","name":"Read","input":{"file_path":"review/bundle.md"}}]}}
 {"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"t1","content":"..."}]}}
-{"type":"assistant","message":{"id":"m2","model":"claude-haiku-5-5","usage":{"input_tokens":1,"cache_creation_input_tokens":0,"cache_read_input_tokens":1100,"output_tokens":50},"content":[{"type":"tool_use","id":"t2","name":"Write","input":{"file_path":"review/reports/lang-rust.md","content":"outcome: sound"}}]}}
+{"type":"assistant","message":{"id":"m2","model":"claude-haiku-5-5","usage":{"input_tokens":1,"cache_creation_input_tokens":0,"cache_read_input_tokens":1100,"output_tokens":50},"content":[{"type":"text","text":"a.rs:1 — if not addressed: x — I2"},{"type":"tool_use","id":"t2","name":"Write","input":{"file_path":"review/reports/lang-rust.md","content":"outcome: sound"}}]}}
 {"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"t2","content":"ok"}]}}
-{"type":"assistant","message":{"id":"m3","model":"claude-haiku-5-5","usage":{"input_tokens":1,"cache_creation_input_tokens":0,"cache_read_input_tokens":1200,"output_tokens":8},"content":[{"type":"text","text":"outcome: sound"}]}}
-{"type":"result","subtype":"success","is_error":false,"result":"outcome: sound\nreview/reports/lang-rust.md","total_cost_usd":0.01,"num_turns":3,"duration_ms":4200,"modelUsage":{"claude-haiku-5-5":{"inputTokens":12,"outputTokens":63,"cacheReadInputTokens":3300,"cacheCreationInputTokens":100,"costUSD":0.01}}}
+{"type":"assistant","message":{"id":"m3","model":"claude-haiku-5-5","usage":{"input_tokens":1,"cache_creation_input_tokens":0,"cache_read_input_tokens":1200,"output_tokens":8},"content":[{"type":"text","text":"outcome: findings — x"},{"type":"text"}]}}
+{"type":"result","subtype":"success","is_error":false,"result":"outcome: findings — x","total_cost_usd":0.01,"num_turns":3,"duration_ms":4200,"modelUsage":{"claude-haiku-5-5":{"inputTokens":12,"outputTokens":63,"cacheReadInputTokens":3300,"cacheCreationInputTokens":100,"costUSD":0.01}}}
 "#;
 
 #[test]
-fn a_log_reads_its_result_usage_and_writes() {
+fn a_log_reads_its_result_usage_texts_and_writes() {
     let log = parse(LOG);
 
     assert!(log.answered);
     assert_eq!(log.subtype, "success");
-    assert_eq!(log.answer, "outcome: sound\nreview/reports/lang-rust.md");
+    assert_eq!(log.answer, "outcome: findings — x");
     assert!((log.cost - 0.01).abs() < 1e-9);
     assert_eq!(log.turns, 3);
     assert_eq!(log.duration_ms, 4200);
     assert_eq!(log.resolved_model, "claude-haiku-5-5");
+    assert_eq!(
+        log.texts,
+        vec![
+            "reading",
+            "a.rs:1 — if not addressed: x — I2",
+            "outcome: findings — x"
+        ]
+    );
     assert_eq!(log.writes, vec!["review/reports/lang-rust.md"]);
-    assert_eq!(log.first_write_turn, Some(2));
 }
 
 #[test]
@@ -40,9 +47,9 @@ fn a_log_counts_each_call_once_with_its_usage() {
 }
 
 #[test]
-fn a_subagent_s_calls_count_their_usage_and_writes_but_not_the_main_thread_s() {
+fn a_subagent_s_calls_count_their_usage_and_writes_but_not_the_main_thread_s_text() {
     let text = r#"{"type":"assistant","message":{"id":"m1","model":"claude-sonnet-5-5","usage":{"input_tokens":1},"content":[{"type":"tool_use","id":"a1","name":"Agent","input":{"subagent_type":"lang-rust"}},{"type":"tool_use","id":"a2","name":"Agent","input":{"subagent_type":"lang-toml"}},{"type":"tool_use","id":"a3","name":"Task","input":{"subagent_type":"review-code"}}]}}
-{"type":"assistant","parent_tool_use_id":"a1","message":{"id":"s1","model":"claude-haiku-5-5","usage":{"input_tokens":3,"output_tokens":4},"content":[{"type":"tool_use","id":"w1","name":"Write","input":{"file_path":"review/reports/lang-rust.md"}}]}}
+{"type":"assistant","parent_tool_use_id":"a1","message":{"id":"s1","model":"claude-haiku-5-5","usage":{"input_tokens":3,"output_tokens":4},"content":[{"type":"text","text":"b.rs:2 — if not addressed: y — I2"},{"type":"tool_use","id":"w1","name":"Write","input":{"file_path":"review/reports/lang-rust.md"}}]}}
 {"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"a1","content":"outcome: sound"},{"type":"tool_result","tool_use_id":"a2","is_error":true,"content":"failed"},{"type":"tool_result","tool_use_id":"a3","content":[{"type":"text","text":"fine"}]}]}}
 {"type":"result","subtype":"success","result":"{}","total_cost_usd":0.5,"num_turns":2,"duration_ms":10,"modelUsage":{"claude-sonnet-5-5":{"costUSD":0.4},"claude-haiku-5-5":{"costUSD":0.1},"claude-opus-5-5":{"inputTokens":7,"outputTokens":8,"cacheReadInputTokens":9,"cacheCreationInputTokens":10,"costUSD":0.0}}}
 "#;
@@ -50,9 +57,10 @@ fn a_subagent_s_calls_count_their_usage_and_writes_but_not_the_main_thread_s() {
     let log = parse(text);
 
     assert_eq!(log.resolved_model, "claude-sonnet-5-5");
-    // A subagent's write is not the main thread's first write.
+    // A subagent's text is not the main thread's: nothing it states
+    // reaches the report.
+    assert!(log.texts.is_empty());
     assert_eq!(log.writes, vec!["review/reports/lang-rust.md"]);
-    assert_eq!(log.first_write_turn, None);
     assert_eq!(log.usage["claude-haiku-5-5"].calls, 1);
     assert!((log.usage["claude-haiku-5-5"].cost - 0.1).abs() < 1e-9);
     // A model the calls did not show takes its usage from the result.
@@ -106,7 +114,6 @@ fn a_write_without_a_path_is_no_write() {
     );
 
     assert!(log.writes.is_empty());
-    assert_eq!(log.first_write_turn, None);
 }
 
 #[test]

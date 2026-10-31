@@ -45,16 +45,18 @@ fn each_kind_gets_its_prompt() {
         "{specialist}"
     );
     assert!(
-        specialist.contains("`review/reports/lang-rust.md`"),
+        specialist.contains("You write no file: state each finding as one line in your text"),
         "{specialist}"
     );
     assert!(
         specialist.ends_with(
-            "answer exactly two lines and nothing else: the report's outcome line \
-             copied character for character, then the report's path."
+            "and answer with your outcome line alone, `outcome: findings — <sentence>` \
+             or `outcome: none — <sentence>`. The review assembles your report from \
+             the lines you stated."
         ),
         "{specialist}"
     );
+    assert!(!specialist.contains("review/reports"), "{specialist}");
 
     let generalist = prompt(&component(Kind::Generalist, "review-code"), &w);
     assert!(
@@ -111,8 +113,8 @@ fn a_specialist_runs_as_the_session_s_agent_with_the_review_s_tools() {
     assert_eq!(args[0], "-p");
     assert!(args[1].starts_with("You are `lang-rust`"));
     assert!(has(&args, ["--max-turns", "20"]));
-    assert!(has(&args, ["--allowedTools", SPECIALIST_TOOLS]));
-    assert!(has(&args, ["--disallowedTools", SPECIALIST_DISALLOWED]));
+    assert!(has(&args, ["--allowedTools", TOOLS]));
+    assert!(has(&args, ["--disallowedTools", DISALLOWED]));
     assert!(has(&args, ["--agent", "lang-rust"]));
     assert!(!args.contains(&"--model"));
     assert!(!args.contains(&"--effort"));
@@ -158,8 +160,8 @@ fn a_model_override_and_a_generalist_s_tools_are_passed() {
     assert!(has(&args, ["--agent", "review-code"]));
     assert!(has(&args, ["--model", "claude-opus-5-5"]));
     assert!(has(&args, ["--max-turns", "40"]));
-    assert!(has(&args, ["--allowedTools", GENERALIST_TOOLS]));
-    assert!(has(&args, ["--disallowedTools", GENERALIST_DISALLOWED]));
+    assert!(has(&args, ["--allowedTools", TOOLS]));
+    assert!(has(&args, ["--disallowedTools", DISALLOWED]));
 }
 
 #[test]
@@ -272,8 +274,8 @@ fn a_consultant_runs_as_the_session_s_agent_on_the_model_it_resolved() {
     assert!(has(&args, ["--agent", "persona-agent"]));
     assert!(has(&args, ["--model", "claude-sonnet-5-5"]));
     assert!(has(&args, ["--max-turns", "40"]));
-    assert!(has(&args, ["--allowedTools", GENERALIST_TOOLS]));
-    assert!(has(&args, ["--disallowedTools", GENERALIST_DISALLOWED]));
+    assert!(has(&args, ["--allowedTools", TOOLS]));
+    assert!(has(&args, ["--disallowedTools", DISALLOWED]));
     assert!(!args.contains(&"--effort"));
 
     let c = command(

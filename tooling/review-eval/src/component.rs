@@ -186,10 +186,10 @@ pub const AGENT_KEYS: [&str; 7] = [
     "maxTurns",
     "generalist",
 ];
-/// The tools a specialist may list, and the tools a generalist or a
-/// consultant may: those two write nothing.
-pub const SPECIALIST_TOOL_SET: [&str; 4] = ["Read", "Grep", "Glob", "Write"];
-pub const GENERALIST_TOOL_SET: [&str; 3] = ["Read", "Grep", "Glob"];
+/// The tools a component of any kind may list: every agent of the
+/// review reads and writes nothing; a specialist's report is assembled
+/// from its run log.
+pub const TOOL_SET: [&str; 3] = ["Read", "Grep", "Glob"];
 
 /// Reads component `name` from the tree at `tree`.
 ///
@@ -267,11 +267,7 @@ fn allowed_keys(
 
 /// Refuses a tool of `file` that a component of `kind` may not use.
 fn allowed_tools(file: &str, kind: Kind, tools: &[String]) -> Result<(), String> {
-    let allowed: &[&str] = match kind {
-        Kind::Generalist | Kind::Consultant => &GENERALIST_TOOL_SET,
-        Kind::Specialist => &SPECIALIST_TOOL_SET,
-    };
-    match tools.iter().find(|t| !allowed.contains(&t.as_str())) {
+    match tools.iter().find(|t| !TOOL_SET.contains(&t.as_str())) {
         Some(tool) => Err(format!(
             "{file}: lists tool {tool}, which a {} may not",
             kind.word()

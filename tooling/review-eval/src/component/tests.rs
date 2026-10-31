@@ -20,7 +20,7 @@ fn tree() -> TempDir {
     write("docs/domain-model/places.md", "# places\n");
     write(
         ".claude/agents/lang-rust.md",
-        "---\nname: lang-rust\ndescription: >-\n  Rust.\ntools: Read, Grep, Glob, Write\nmodel: haiku\neffort: low\nmaxTurns: 20\ngeneralist: review-code\n---\n# Rust\n\nfindings, each on one line.\n",
+        "---\nname: lang-rust\ndescription: >-\n  Rust.\ntools: Read, Grep, Glob\nmodel: haiku\neffort: low\nmaxTurns: 20\ngeneralist: review-code\n---\n# Rust\n\nfindings, each on one line.\n",
     );
     write(
         ".claude/agents/review-code.md",
@@ -126,7 +126,7 @@ fn load_reads_a_specialist_s_front_matter() {
     assert_eq!(c.model, "haiku");
     assert_eq!(c.effort, "low");
     assert_eq!(c.max_turns, 20);
-    assert_eq!(c.tools, vec!["Read", "Grep", "Glob", "Write"]);
+    assert_eq!(c.tools, vec!["Read", "Grep", "Glob"]);
     assert!(c.strict_lines);
     assert!(c.text.starts_with("---\n"));
 }

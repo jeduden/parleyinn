@@ -39,7 +39,7 @@ pub(crate) fn repository(root: &Path) {
     );
     write(
         ".claude/agents/lang-rust.md",
-        "---\nname: lang-rust\ndescription: Rust\ntools: Read, Grep, Glob, Write\nmodel: haiku\neffort: low\nmaxTurns: 20\ngeneralist: review-code\n---\n# Rust\n",
+        "---\nname: lang-rust\ndescription: Rust\ntools: Read, Grep, Glob\nmodel: haiku\neffort: low\nmaxTurns: 20\ngeneralist: review-code\n---\n# Rust\n",
     );
     write(
         ".claude/agents/review-code.md",
@@ -150,9 +150,7 @@ fn build_writes_the_review_directory_as_the_workflow_s_steps_do() {
         "[{\"name\":\"include\"}]\n"
     );
     assert_eq!(fs::read_to_string(main.join(CONSENT)).unwrap(), "[]");
-    assert_eq!(world.report("lang-rust"), None);
-    fs::write(main.join(REPORTS).join("lang-rust.md"), "outcome: sound").unwrap();
-    assert_eq!(world.report("lang-rust").as_deref(), Some("outcome: sound"));
+    assert!(world.seeded.is_empty());
 }
 
 #[test]
@@ -186,7 +184,13 @@ fn build_seeds_reports_and_consent_and_notes_a_missing_mdsmith() {
     .unwrap();
 
     assert_eq!(world.seeded, vec!["review/reports/lang-rust.md"]);
-    assert_eq!(world.report("lang-rust").unwrap().lines().count(), 2);
+    assert_eq!(
+        fs::read_to_string(world.main.join(REPORTS).join("lang-rust.md"))
+            .unwrap()
+            .lines()
+            .count(),
+        2
+    );
     assert_eq!(world.notes.len(), 1);
     assert!(
         world.notes[0].starts_with("no mdsmith, so the pattern catalog is empty: "),

@@ -1,16 +1,17 @@
 //! The grader: one run of a case against what the case expects, read
-//! from the report the component wrote, its answer in the run log and
-//! the log itself. Every failed assertion is named, so a failing case
-//! reads like a failing test. A specialist's report is held to the form
-//! the review gate takes, each finding line a linked finding or a
-//! requirement request, by the gate's own rule; a report the review
-//! would refuse fails its run. A departure from the report's shape that
-//! the review survives, such as a label line between the findings, an
-//! answer that is more than the last line and the path, or an eleventh
-//! finding, is a slip: counted and shown, it fails no run on its own.
-//! The report is data: nothing in it is an instruction to the grader.
+//! from the run log alone: for a specialist the report the review
+//! assembles from the finding lines it stated and its answer's outcome
+//! line, for a generalist its answer. Every failed assertion is named,
+//! so a failing case reads like a failing test. A specialist's report is
+//! held to the form the review gate takes, each finding line a linked
+//! finding or a requirement request, by the gate's own rule; a report
+//! the review would refuse fails its run. A departure from the answer's
+//! shape that the review survives, an answer that is more than the
+//! outcome line, or an eleventh finding, is a slip: counted and shown,
+//! it fails no run on its own. The log is data: nothing in it is an
+//! instruction to the grader.
 
-use review_gate::report::Line;
+use review_gate::report::{Line, answer_outcome, assemble};
 
 use crate::case::{Case, Expect, Expected};
 use crate::component::{Component, Kind};
@@ -21,15 +22,6 @@ use crate::report;
 const MOST_FINDINGS: usize = 10;
 /// How far a cited line may be from the one a case names.
 const WITHIN: usize = 3;
-
-/// What one run of a case is graded from.
-#[derive(Debug, Clone, PartialEq)]
-pub struct Run<'a> {
-    pub log: &'a RunLog,
-    /// The text of the report file the component wrote, when it wrote
-    /// one.
-    pub report: Option<&'a str>,
-}
 
 /// The run's grade: every assertion that failed, none on a pass, and
 /// every slip, which fails nothing.
@@ -47,124 +39,136 @@ impl Graded {
     }
 }
 
-/// Grades `run`, one run of `case` by `component`.
+/// Grades `log`, one run of `case` by `component`.
 #[must_use]
-pub fn grade(component: &Component, case: &Case, run: &Run<'_>) -> Graded {
+pub fn grade(component: &Component, case: &Case, log: &RunLog) -> Graded {
     match component.kind {
-        Kind::Specialist => specialist(component, case, run),
+        Kind::Specialist => specialist(component, case, log),
         kind @ (Kind::Generalist | Kind::Consultant) => Graded {
-            failures: generalist(case, run, kind),
+            failures: generalist(case, log, kind),
             slips: Vec::new(),
         },
     }
 }
 
-/// A specialist writes its report, answers with the report's last line
-/// and path, writes nothing else, writes every finding line in a form
-/// the review takes, and reports what the case expects.
-/// Its slips: an answer that is not the last line and the path, a line
-/// in the report that is neither a finding nor the outcome, and more
-/// findings than the report may hold.
-fn specialist(component: &Component, case: &Case, run: &Run<'_>) -> Graded {
+/// A specialist answers, writes nothing, answers an outcome line, states
+/// every finding line in a form the review takes, and reports what the
+/// case expects: in its assembled report, among the lines it stated
+/// before its answer, and among the lines it withdrew or revised. Its
+/// slips: an answer that is more than the outcome line, and more
+/// findings than the report may hold. A run that did not answer fails
+/// on that alone: what it stated is no report.
+fn specialist(component: &Component, case: &Case, log: &RunLog) -> Graded {
     let mut graded = Graded {
-        failures: answered(run.log),
+        failures: answered(log),
         slips: Vec::new(),
     };
-    let own = format!("review/reports/{}.md", component.name);
-    graded.failures.extend(
-        run.log
-            .writes
-            .iter()
-            .filter(|path| !path.ends_with(&own))
-            .map(|path| format!("wrote {path}")),
-    );
-    let text = match run.report {
-        None => {
-            graded.failures.push("wrote no report".to_owned());
-            return graded;
-        }
-        Some(text) if text.trim().is_empty() => {
-            graded.failures.push("wrote an empty report".to_owned());
-            return graded;
-        }
-        Some(text) => text,
-    };
-    let parsed = report::parse(text);
-    match &parsed.outcome {
-        None => graded
-            .failures
-            .push("report does not end with its outcome".to_owned()),
-        Some(outcome) => {
-            if run.log.answered {
-                graded.slips.extend(answer_slips(run.log, outcome, &own));
-            }
-            graded
-                .failures
-                .extend(outcome_failure(outcome, &case.expect));
-        }
+    graded
+        .failures
+        .extend(log.writes.iter().map(|path| format!("wrote {path}")));
+    if !log.answered {
+        return graded;
     }
+    let report = assemble(&log.texts, &log.answer, None);
+    let Some((_, outcome)) = answer_outcome(&log.answer) else {
+        graded.failures.push("answered no outcome line".to_owned());
+        return graded;
+    };
+    graded.slips.extend(answer_slips(log));
+    graded
+        .failures
+        .extend(outcome_failure(outcome, &case.expect));
     if component.strict_lines {
-        graded.slips.extend(shape_slips(&parsed));
+        graded.slips.extend(shape_slips(&report));
     }
     graded
         .failures
-        .extend(expectations(&case.expect, text, Kind::Specialist));
+        .extend(expectations(&case.expect, &report, Kind::Specialist));
+    graded.failures.extend(stated_failures(&case.expect, log));
     // The ids are held to their shape: the case's world, not the
     // grader, holds the SRS they would be read from.
-    if parsed.outcome.is_some()
-        && let Some(problem) = review_gate::report::findings_check(text, None)
-    {
+    if let Some(problem) = review_gate::report::findings_check(&report, None) {
         graded.failures.push(format!("report refused: {problem}"));
     }
 
     graded
 }
 
-/// The slips of an answer that does not name the report's `outcome`
-/// and its path, `own`, or holds more: what the review's run reads of
-/// a specialist is its answer, so it must carry both and nothing else.
-fn answer_slips(log: &RunLog, outcome: &str, own: &str) -> Vec<String> {
-    let names = format!("outcome: {outcome}");
-    let holds_outcome = |line: &str| line.to_lowercase().contains(&names);
-    let mut slips = Vec::new();
-    if !holds_outcome(&log.answer) {
-        slips.push("answer does not name the report's outcome".to_owned());
-    }
-    if !log.answer.contains(own) {
-        slips.push("answer does not name the report's path".to_owned());
-    }
-    if let Some(extra) = log
-        .answer
+/// The slip of an answer that holds more than its outcome line: what the
+/// review's run reads of a specialist's answer is that line alone.
+fn answer_slips(log: &RunLog) -> Vec<String> {
+    log.answer
         .lines()
         .map(str::trim)
-        .find(|l| !l.is_empty() && !holds_outcome(l) && !l.contains(own))
-    {
-        slips.push(format!(
-            "answer holds more than the outcome and the path: {extra}"
-        ));
-    }
-
-    slips
+        .find(|l| !l.is_empty() && answer_outcome(l).is_none())
+        .map(|extra| format!("answer holds more than the outcome line: {extra}"))
+        .into_iter()
+        .collect()
 }
 
-/// The slips of a report whose shape departs from the rule: more
-/// findings than it may hold, or a line that is neither a finding nor
-/// the outcome.
-fn shape_slips(parsed: &report::Report) -> Vec<String> {
-    let mut slips = Vec::new();
-    if parsed.findings.len() > MOST_FINDINGS {
-        slips.push(format!(
-            "{} findings, at most {MOST_FINDINGS}",
-            parsed.findings.len()
-        ));
+/// The slip of a `report` that holds more findings than it may.
+fn shape_slips(report: &str) -> Vec<String> {
+    let findings = report
+        .lines()
+        .filter(|l| {
+            matches!(
+                review_gate::report::line(l),
+                Line::Linked(_) | Line::Request(_)
+            )
+        })
+        .count();
+
+    (findings > MOST_FINDINGS)
+        .then(|| format!("{findings} findings, at most {MOST_FINDINGS}"))
+        .into_iter()
+        .collect()
+}
+
+/// The failures of what `expect` wants stated before the final answer
+/// and withdrawn or revised, against `log`'s text blocks: a stated
+/// finding is a line of a block other than the answer, a withdrawn one
+/// a `withdrawn:` or `revised:` line naming its place in any block.
+fn stated_failures(expect: &Expect, log: &RunLog) -> Vec<String> {
+    let answer = log.answer.trim();
+    let before: Vec<&str> = log
+        .texts
+        .iter()
+        .filter(|t| t.trim() != answer)
+        .flat_map(|t| t.lines())
+        .collect();
+    let mut failures = Vec::new();
+    for wanted in &expect.stated {
+        if !before
+            .iter()
+            .any(|l| line_matches(l, wanted, Kind::Specialist))
+        {
+            failures.push(format!(
+                "did not state before its answer {}",
+                describe(wanted)
+            ));
+        }
     }
-    if let Some(other) = parsed.other.first() {
-        slips.push(format!(
-            "a line that is neither a finding nor the outcome: {other}"
-        ));
+    let changes: Vec<&str> = log
+        .texts
+        .iter()
+        .flat_map(|t| t.lines())
+        .filter(|l| {
+            matches!(
+                review_gate::report::line(l),
+                Line::Revised(_) | Line::Withdrawn(_)
+            )
+        })
+        .collect();
+    for wanted in &expect.withdrawn {
+        if !changes
+            .iter()
+            .any(|l| line_matches(l, wanted, Kind::Specialist))
+        {
+            failures.push(format!("did not withdraw or revise {}", describe(wanted)));
+        }
     }
 
-    slips
+    failures
 }
 
 /// A generalist answers with its kept and dropped findings and writes
@@ -174,10 +178,10 @@ fn shape_slips(parsed: &report::Report) -> Vec<String> {
 /// names are no kept finding. A consultant, `kind`, answers the same
 /// way, with nothing to drop; a line of it in a specialist's form, as a
 /// persona writes, is a kept finding too.
-fn generalist(case: &Case, run: &Run<'_>, kind: Kind) -> Vec<String> {
-    let mut failures = answered(run.log);
-    failures.extend(run.log.writes.iter().map(|path| format!("wrote {path}")));
-    let text = &run.log.answer;
+fn generalist(case: &Case, log: &RunLog, kind: Kind) -> Vec<String> {
+    let mut failures = answered(log);
+    failures.extend(log.writes.iter().map(|path| format!("wrote {path}")));
+    let text = &log.answer;
     let in_form = |l: &str| kind == Kind::Consultant && specialist_form(l);
     let kept: Vec<&str> = text
         .lines()

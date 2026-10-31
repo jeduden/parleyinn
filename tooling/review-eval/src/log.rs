@@ -1,8 +1,9 @@
 //! The run log: what `claude --output-format stream-json` wrote, read
 //! as the review's run reads an agent's log. Each model call once (a
-//! call's blocks share one message id), its usage by model, the files
-//! written, the result's answer, cost, turns and duration, and the
-//! model the run resolved to.
+//! call's blocks share one message id), its usage by model, the main
+//! thread's text blocks in order, which hold a specialist's findings as
+//! it stated them, the files written, the result's answer, cost, turns
+//! and duration, and the model the run resolved to.
 
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -38,11 +39,11 @@ pub struct RunLog {
     /// The model the main thread's first call ran on.
     pub resolved_model: String,
     pub usage: BTreeMap<String, Usage>,
+    /// Every text block the main thread wrote, in order: what a
+    /// specialist stated as it went, its report's lines among them.
+    pub texts: Vec<String>,
     /// Every path a `Write` or `Edit` call named, in order.
     pub writes: Vec<String>,
-    /// The turn, counting the main thread's model calls from 1, of the
-    /// first write the main thread made.
-    pub first_write_turn: Option<usize>,
 }
 
 /// What the reader carries between lines.
@@ -51,8 +52,6 @@ struct Reading {
     log: RunLog,
     /// The message ids seen, so a call's blocks count once.
     seen: BTreeSet<String>,
-    /// The main thread's model calls so far.
-    main_calls: usize,
 }
 
 /// Reads a log of one JSON object per line; lines that are not JSON
@@ -81,7 +80,8 @@ pub fn parse(text: &str) -> RunLog {
 }
 
 impl Reading {
-    /// One model call: its usage once, and the tools it used.
+    /// One model call: its usage once, the main thread's text, and the
+    /// tools it used.
     fn assistant(&mut self, value: &Value) {
         let main = value["parent_tool_use_id"].is_null();
         let message = &value["message"];
@@ -89,11 +89,8 @@ impl Reading {
             && self.seen.insert(id.to_owned())
         {
             let model = message["model"].as_str().unwrap_or("unknown");
-            if main {
-                self.main_calls += 1;
-                if self.log.resolved_model.is_empty() {
-                    self.log.resolved_model = model.to_owned();
-                }
+            if main && self.log.resolved_model.is_empty() {
+                self.log.resolved_model = model.to_owned();
             }
             add_usage(
                 self.log.usage.entry(model.to_owned()).or_default(),
@@ -101,21 +98,24 @@ impl Reading {
             );
         }
         for block in message["content"].as_array().into_iter().flatten() {
-            if block["type"].as_str() == Some("tool_use") {
-                self.tool_use(block, main);
+            match block["type"].as_str() {
+                Some("tool_use") => self.tool_use(block),
+                Some("text") if main => {
+                    if let Some(text) = block["text"].as_str() {
+                        self.log.texts.push(text.to_owned());
+                    }
+                }
+                _ => {}
             }
         }
     }
 
     /// One tool call: a write's path.
-    fn tool_use(&mut self, block: &Value, main: bool) {
+    fn tool_use(&mut self, block: &Value) {
         if matches!(block["name"].as_str(), Some("Write" | "Edit"))
             && let Some(path) = block["input"]["file_path"].as_str()
         {
             self.log.writes.push(path.to_owned());
-            if main {
-                self.log.first_write_turn.get_or_insert(self.main_calls);
-            }
         }
     }
 

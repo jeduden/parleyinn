@@ -62,11 +62,12 @@ fn checkout() -> TempDir {
     let dir = TempDir::new().unwrap();
     repository(dir.path());
     for name in &component::names(dir.path()).unwrap() {
-        let (tools, model, turns) = if name.starts_with("review-") {
-            ("Read, Grep, Glob", "sonnet", "")
+        let (model, turns) = if name.starts_with("review-") {
+            ("sonnet", "")
         } else {
-            ("Read, Grep, Glob, Write", "haiku", "maxTurns: 20\n")
+            ("haiku", "maxTurns: 20\n")
         };
+        let tools = "Read, Grep, Glob";
         let path = dir.path().join(format!(".claude/agents/{name}.md"));
         fs::write(
             path,
@@ -110,29 +111,20 @@ fn sound_cases(dir: &Path) {
     }
 }
 
-/// A claude that writes a blocking report on the case's file for the
-/// agent it runs as, and answers as the instructions say.
+/// A claude that states a finding on the case's file in its text, as a
+/// specialist does, and answers its outcome line, as the instructions
+/// say.
 fn obedient_claude() -> crate::host::fake::Claude {
     Box::new(|c: &Command| {
-        let agent = c
-            .args
-            .windows(2)
-            .find(|w| w[0] == "--agent")
-            .map(|w| w[1].clone())
-            .unwrap_or_default();
         let diff = fs::read_to_string(c.cwd.join("pr.diff")).unwrap();
         let file = diff
             .lines()
             .find_map(|l| l.strip_prefix("+++ b/"))
             .unwrap_or("none")
             .to_owned();
-        let report = format!(
-            "{file}:1 — if not addressed: an unwrap outside tests panics — ENG-16\n\noutcome: findings — unwraps.\n"
-        );
-        fs::write(c.cwd.join(format!("review/reports/{agent}.md")), &report).unwrap();
         let log = format!(
-            "{{\"type\":\"assistant\",\"message\":{{\"id\":\"m1\",\"model\":\"claude-haiku-5-5\",\"usage\":{{\"input_tokens\":5,\"output_tokens\":7}},\"content\":[{{\"type\":\"tool_use\",\"id\":\"t1\",\"name\":\"Write\",\"input\":{{\"file_path\":\"review/reports/{agent}.md\"}}}}]}}}}\n\
-             {{\"type\":\"result\",\"subtype\":\"success\",\"is_error\":false,\"result\":\"outcome: findings — unwraps.\\nreview/reports/{agent}.md\",\"total_cost_usd\":0.01,\"num_turns\":3,\"duration_ms\":1000,\"modelUsage\":{{\"claude-haiku-5-5\":{{\"costUSD\":0.01}}}}}}\n"
+            "{{\"type\":\"assistant\",\"message\":{{\"id\":\"m1\",\"model\":\"claude-haiku-5-5\",\"usage\":{{\"input_tokens\":5,\"output_tokens\":7}},\"content\":[{{\"type\":\"text\",\"text\":\"{file}:1 — if not addressed: an unwrap outside tests panics — ENG-16\"}}]}}}}\n\
+             {{\"type\":\"result\",\"subtype\":\"success\",\"is_error\":false,\"result\":\"outcome: findings — unwraps.\",\"total_cost_usd\":0.01,\"num_turns\":3,\"duration_ms\":1000,\"modelUsage\":{{\"claude-haiku-5-5\":{{\"costUSD\":0.01}}}}}}\n"
         );
         fs::write(c.stdout_to.as_ref().unwrap(), log).unwrap();
         Ok(Output {
@@ -142,8 +134,8 @@ fn obedient_claude() -> crate::host::fake::Claude {
     })
 }
 
-/// A claude that reports as the obedient one does but answers with a
-/// word more than the last line and the path.
+/// A claude that states its finding as the obedient one does but
+/// answers with a word more than the outcome line.
 fn slipping_claude() -> crate::host::fake::Claude {
     let obedient = obedient_claude();
     Box::new(move |c: &Command| {
@@ -484,12 +476,12 @@ fn run_counts_a_slip_without_failing_the_run() {
         "{out}"
     );
     assert!(
-        err.contains("lang-rust/defect run 1: passed (0.0100 USD, 3 turns); slipped: answer holds more than the outcome and the path: Done."),
+        err.contains("lang-rust/defect run 1: passed (0.0100 USD, 3 turns); slipped: answer holds more than the outcome line: Done."),
         "{err}"
     );
     assert_eq!(
         fs::read_to_string(out_dir.join("runs/lang-rust/defect/1/grade.txt")).unwrap(),
-        "passed\nslip: answer holds more than the outcome and the path: Done.\n"
+        "passed\nslip: answer holds more than the outcome line: Done.\n"
     );
     let lines = fs::read_to_string(out_dir.join(SCORECARD_TEXT)).unwrap();
     assert!(lines.contains(" runs=3/3 slipped=3 cost="), "{lines}");
@@ -530,21 +522,22 @@ fn run_folds_a_run_that_did_not_answer_into_findings() {
         out.contains("### lang-rust on claude-opus-5-5 (unknown): 0 of 3 cases, 0 of 3 runs"),
         "{out}"
     );
-    assert!(err.contains("lang-rust/defect run 1: failed (0.0000 USD, 0 turns): did not answer: none; wrote no report"), "{err}");
+    assert!(
+        err.contains("lang-rust/defect run 1: failed (0.0000 USD, 0 turns): did not answer: none"),
+        "{err}"
+    );
     let findings = fs::read_to_string(out_dir.join(FINDINGS_JSON)).unwrap();
     assert!(
         findings.contains("\"path\": \".claude/agents/lang-rust.md\""),
         "{findings}"
     );
     assert!(
-        findings.contains(
-            "passed 0 of 1 runs on unknown, needing 1: did not answer: none; wrote no report"
-        ),
+        findings.contains("passed 0 of 1 runs on unknown, needing 1: did not answer: none"),
         "{findings}"
     );
     assert_eq!(
         fs::read_to_string(out_dir.join("runs/lang-rust/defect/1/grade.txt")).unwrap(),
-        "did not answer: none\nwrote no report\n"
+        "did not answer: none\n"
     );
 }
 

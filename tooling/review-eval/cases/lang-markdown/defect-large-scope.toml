@@ -2,9 +2,9 @@ component = "lang-markdown"
 kind = "defect"
 title = "one false command among many true pages, which must still leave a report"
 
-# A change to many pages: the specialist must write its report early
-# and answer within its turns, not read until its turns run out
-# (a run that ends at its budget gives no report and fails).
+# A change to many pages: the specialist must state each finding as it
+# reads and answer within its turns, not read until its turns run out
+# (a run that ends at its budget leaves an incomplete report and fails).
 
 [[create]]
 file = "docs/review-eval/cases.md"

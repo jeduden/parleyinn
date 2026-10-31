@@ -134,21 +134,26 @@ pub fn examine(
 }
 
 /// The problem with `case` when its component, a generalist, has lines
-/// with a severity and no form, and the case names a form: it would
-/// want or forbid what no answer can hold. A consultant may write a
-/// specialist's forms, as a persona does, so its case may name one.
+/// with a severity and no form, and the case names a form, or a stated
+/// or withdrawn finding, which only a specialist's run log holds: it
+/// would want or forbid what no answer can hold. A consultant may write
+/// a specialist's forms, as a persona does, so its case may name one.
 fn form_problem(case: &Case, component: &Component) -> Option<String> {
     if !matches!(component.kind, Kind::Generalist) {
         return None;
     }
-    let form = [
-        &case.expect.finding,
-        &case.expect.none,
-        &case.expect.dropped,
-    ]
-    .into_iter()
-    .flatten()
-    .find_map(|e| e.form.as_deref())?;
+    let expect = &case.expect;
+    if !expect.stated.is_empty() || !expect.withdrawn.is_empty() {
+        return Some(format!(
+            "case {} expects a stated or withdrawn finding of a {}, whose run log holds none",
+            case.id(),
+            component.kind.word()
+        ));
+    }
+    let form = [&expect.finding, &expect.none, &expect.dropped]
+        .into_iter()
+        .flatten()
+        .find_map(|e| e.form.as_deref())?;
 
     Some(format!(
         "case {} expects a {form} line of a {}, which writes none",

@@ -1,8 +1,8 @@
 //! The `review-eval` executable as CI and a developer run it: a git
 //! repository as the checkout, real worktrees for the fixture worlds,
-//! a stand-in `claude` on the path that writes a report and a log, and
-//! the outputs under `--out`. Each run has a temporary `HOME` and
-//! `PARINN_HOME`.
+//! a stand-in `claude` on the path that writes a log stating a finding
+//! and answering its outcome, and the outputs under `--out`. Each run
+//! has a temporary `HOME` and `PARINN_HOME`.
 
 #![allow(
     clippy::unwrap_used,
@@ -15,24 +15,16 @@ use std::process::{Command, Output};
 
 use testkit::TempDir;
 
-/// A `claude` that writes a blocking report for the agent it runs as
-/// and logs a successful result; started as a session's child, it
-/// refuses, as the review never runs one.
+/// A `claude` that states a finding in its text, as a specialist does,
+/// and logs a successful result answering its outcome line; started as
+/// a session's child, it refuses, as the review never runs one.
 const CLAUDE: &str = r#"#!/bin/sh
 if [ -n "$CLAUDE_AUTO_BACKGROUND_TASKS" ] || [ -n "$CLAUDE_CODE_CHILD_SESSION" ]; then
   echo "started as a session's child" >&2
   exit 3
 fi
-agent=""
-prev=""
-for a in "$@"; do
-  if [ "$prev" = "--agent" ]; then agent="$a"; fi
-  prev="$a"
-done
-mkdir -p review/reports
-printf 'pr-head/crates/x/src/rogue.rs:1 — if not addressed: an unwrap outside tests panics — ENG-16\n\noutcome: findings — unwraps.\n' > "review/reports/$agent.md"
-printf '{"type":"assistant","message":{"id":"m1","model":"claude-haiku-5-5","usage":{"input_tokens":1,"output_tokens":2},"content":[{"type":"tool_use","id":"t1","name":"Write","input":{"file_path":"review/reports/%s.md"}}]}}\n' "$agent"
-printf '{"type":"result","subtype":"success","is_error":false,"result":"outcome: findings — unwraps.\\nreview/reports/%s.md","total_cost_usd":0.02,"num_turns":2,"duration_ms":50,"modelUsage":{"claude-haiku-5-5":{"costUSD":0.02}}}\n' "$agent"
+printf '{"type":"assistant","message":{"id":"m1","model":"claude-haiku-5-5","usage":{"input_tokens":1,"output_tokens":2},"content":[{"type":"text","text":"pr-head/crates/x/src/rogue.rs:1 — if not addressed: an unwrap outside tests panics — ENG-16"}]}}\n'
+printf '{"type":"result","subtype":"success","is_error":false,"result":"outcome: findings — unwraps.","total_cost_usd":0.02,"num_turns":2,"duration_ms":50,"modelUsage":{"claude-haiku-5-5":{"costUSD":0.02}}}\n'
 "#;
 
 /// A `claude` that never answers.
@@ -59,7 +51,7 @@ fn repository(root: &Path) {
     write("CLAUDE.md", "# Instructions\n");
     write(
         ".claude/agents/lang-rust.md",
-        "---\nname: lang-rust\ndescription: Rust\ntools: Read, Grep, Glob, Write\nmodel: haiku\neffort: low\nmaxTurns: 20\ngeneralist: review-code\n---\n# Rust\n\nfindings, each on one line\n",
+        "---\nname: lang-rust\ndescription: Rust\ntools: Read, Grep, Glob\nmodel: haiku\neffort: low\nmaxTurns: 20\ngeneralist: review-code\n---\n# Rust\n\nfindings, each on one line\n",
     );
     write("crates/x/src/lib.rs", "pub fn ok() {}\n");
     for (kind, body) in [
@@ -185,6 +177,10 @@ fn the_executable_evaluates_a_component_through_real_worktrees() {
     );
     assert!(out.join("runs/lang-rust/defect/1/log.jsonl").is_file());
     assert!(out.join("runs/lang-rust/defect/1/log.stderr").is_file());
+    assert_eq!(
+        fs::read_to_string(out.join("runs/lang-rust/defect/1/report.md")).unwrap(),
+        "pr-head/crates/x/src/rogue.rs:1 — if not addressed: an unwrap outside tests panics — ENG-16\noutcome: findings — unwraps.\n"
+    );
     assert!(!out.join("runs/lang-rust/defect/1/world").exists());
     let worktrees = Command::new("git")
         .args(["worktree", "list"])
@@ -234,6 +230,10 @@ fn a_run_past_its_deadline_is_killed_and_counted() {
     );
     let grade = fs::read_to_string(out.join("runs/lang-rust/defect/1/grade.txt")).unwrap();
     assert!(grade.starts_with("did not answer: deadline\n"), "{grade}");
+    assert_eq!(
+        fs::read_to_string(out.join("runs/lang-rust/defect/1/report.md")).unwrap(),
+        "incomplete: its run ended with deadline\n"
+    );
     let findings = fs::read_to_string(out.join("findings.json")).unwrap();
     assert!(findings.contains("did not answer: deadline"), "{findings}");
 }

@@ -1,5 +1,6 @@
 //! A case: one change to main's tree, as edits to its files, with the
-//! report the reviewer component under evaluation must give for it.
+//! report the reviewer component under evaluation must give for it: a
+//! specialist's as the review assembles it from its run log.
 //! Cases are TOML files under `tooling/review-eval/cases/<component>/`,
 //! one per file; the section and domain-model specialists' cases are
 //! derived from the tree instead (`derived`).
@@ -102,6 +103,12 @@ pub struct Expect {
     /// Findings a generalist must drop, each named by the words of its
     /// dropped line.
     pub dropped: Vec<Expected>,
+    /// Findings a specialist must state in its text before its final
+    /// answer, as it finds them, not only at the end.
+    pub stated: Vec<Expected>,
+    /// Findings a specialist must withdraw or revise in its text, each
+    /// named by the place its `withdrawn:` or `revised:` line names.
+    pub withdrawn: Vec<Expected>,
     /// Text the report must not hold anywhere.
     pub absent: Vec<String>,
 }
@@ -255,11 +262,17 @@ impl Case {
         }
         let mut expect = file.expect;
         expect.outcome = outcomes(&expect.outcome).map_err(|e| format!("{at}: {e}"))?;
-        if let Some(bad) = [&expect.finding, &expect.none, &expect.dropped]
-            .into_iter()
-            .flatten()
-            .filter_map(|e| e.form.as_deref())
-            .find(|f| !FORMS.contains(f))
+        if let Some(bad) = [
+            &expect.finding,
+            &expect.none,
+            &expect.dropped,
+            &expect.stated,
+            &expect.withdrawn,
+        ]
+        .into_iter()
+        .flatten()
+        .filter_map(|e| e.form.as_deref())
+        .find(|f| !FORMS.contains(f))
         {
             return Err(format!("{at}: form {bad} is none of {}", FORMS.join(", ")));
         }
