@@ -11,10 +11,9 @@ summary: >-
 ---
 # ADR-2610300031: The review is run by code
 
-Accepted on the stakeholder's consent (see Approval). It supersedes
-ADR-2610262245, which is marked superseded and names this record; the
-layers, reports, gate and required check that record decided stay as
-this record's "What stays" says.
+It supersedes ADR-2610262245, which is marked superseded and names
+this record. The layers, reports, gate and required check that record
+decided stay, as "What stays" says.
 
 ## Context
 
@@ -124,10 +123,10 @@ the reports.
 
 ## Approval
 
-The stakeholder, `jeduden`, gave it in a comment on the pull request
-(<https://github.com/jeduden/parleyinn/pull/98>, comment 6534291701). The
-comment consents to the specification, scenarios, decision records,
-`.github/`, `docs/agents`, `.claude/` and evaluation-case changes. It
-also asks for a ruling on this record. The stakeholder confirmed in the
-harness session that the comment is consent. This record changes the review's
-workflow under `.github/` and ENG-28, which need that consent (ENG-21).
+This record is accepted on the stakeholder's pull request comment
+cited here. It is `jeduden`'s comment 6534291701 on
+<https://github.com/jeduden/parleyinn/pull/98>. The review gate reads
+it as the consent. The comment consents to the specification,
+scenarios, decision records, `.github/`, `docs/agents`, `.claude/` and
+evaluation-case changes. This record changes the review's workflow
+under `.github/` and ENG-28, which need that consent (ENG-21).
