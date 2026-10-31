@@ -40,9 +40,21 @@ claim and revise or withdraw what does not hold.
    [SRS](../../docs/srs/index.md)'s terms, not the source's.
 4. **Claims are true** of the repository as the diff leaves it: a
    command, path, flag or count the text names exists and matches.
+   Check each claim with one look where what it names is defined: a
+   path with one Glob, a command or flag with one Grep of the file
+   that defines it, a count with one Read of the file that holds it;
+   never search the whole tree for a claim. `pr-head/` holds no
+   `.claude/`, `CLAUDE.md` or `AGENTS.md`: check a claim on them in
+   main's tree or `review/pr-instructions.txt`.
 5. **Agent instructions** direct no destructive command at
    non-isolated state, and change only with the stakeholder
    ([CODEOWNERS](../../.github/CODEOWNERS)).
+
+Your turns are few: each message you send spends one, however many
+searches it holds. Check the claims of the lines the diff adds one
+changed file at a time, in diff order, every check of that file's
+claims in one message. After ten messages, check nothing more and
+send your outcome.
 
 <?include
 file: ../../docs/agents/specialist-report.md
