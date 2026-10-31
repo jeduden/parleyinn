@@ -352,6 +352,28 @@ fn the_closing_sentence_is_the_last_line_of_prose() {
     );
     assert_eq!(closing("a.rs:1 — nit — x\n"), None);
     assert_eq!(closing(""), None);
+    assert_eq!(
+        closing("The scope holds.\nnone — nothing to add — review-code\n").as_deref(),
+        Some("The scope holds.")
+    );
+}
+
+#[test]
+fn a_review_no_agent_answered_names_none_consulted() {
+    let runs = vec![
+        silent("lang-rust", Kind::Specialist, "it was killed"),
+        silent("test-engineer-unit", Kind::Specialist, "it was killed"),
+        silent("review-code", Kind::Generalist, "it was killed"),
+    ];
+
+    let d = decide(&plan(DISPATCH), &runs, &BTreeMap::new(), &known());
+
+    assert!(d.consulted.is_empty());
+    assert!(
+        !d.outcome.summary.contains("Consulted:"),
+        "{}",
+        d.outcome.summary
+    );
 }
 
 #[test]

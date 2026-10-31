@@ -63,6 +63,24 @@ fn a_checkout_without_the_definitions_is_named() {
 }
 
 #[test]
+fn a_work_directory_that_cannot_be_made_or_written_is_named() {
+    let work = TempDir::new().unwrap();
+    fs::write(work.path().join("review"), "a file").unwrap();
+    let err = prepare(&repo(), work.path()).unwrap_err();
+    assert!(err.starts_with("make "), "{err}");
+
+    let work = TempDir::new().unwrap();
+    fs::create_dir_all(work.path().join("review/dispatch.json")).unwrap();
+    let err = prepare(&repo(), work.path()).unwrap_err();
+    assert!(err.starts_with("write "), "{err}");
+
+    let work = TempDir::new().unwrap();
+    fs::create_dir_all(work.path().join("class.txt")).unwrap();
+    let err = prepare(&repo(), work.path()).unwrap_err();
+    assert!(err.starts_with("write "), "{err}");
+}
+
+#[test]
 fn a_review_run_that_cannot_write_its_outcome_is_named() {
     let work = TempDir::new().unwrap();
     fs::create_dir_all(work.path().join("review/outcome.json")).unwrap();
