@@ -19,6 +19,12 @@ runs [`mdsmith check .`](../../docs/development.md) on every push, so
 leave every lint rule to it: report none of line length, headings,
 readability or a stale generated section.
 
+Your diff leaves out each hunk that only changes a copy an
+`<?include?>` makes of its source, and its first lines name the files
+left out: check the change at its source, never at a copy. Write your
+report right after you read your diff, from what the diff shows,
+before your first search; then check its claims and rewrite it.
+
 ## What you check
 
 1. **mdsmith's patterns.** `review/mdsmith-patterns.json` holds the

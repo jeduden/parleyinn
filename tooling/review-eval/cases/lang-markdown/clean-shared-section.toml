@@ -1,0 +1,95 @@
+component = "lang-markdown"
+kind = "clean"
+title = "a shared section changed at its source and in every copy"
+
+# One sentence of the persona agents' shared section changes at its
+# source and, as `mdsmith fix .` writes it, in each of the nine agent
+# files that include it. The specialist's diff leaves out the copies
+# that match their source: it must pass the change, never report a copy
+# as a second source, and answer within its turns.
+
+consent = "Approved for docs/agents/ and .claude/agents/ alike: docs/agents/persona-review.md and the nine persona agent files that include it now also note where a journey gets costly."
+
+[[replace]]
+file = "docs/agents/persona-review.md"
+old = "   noisy or confusing.\n"
+new = "   noisy, confusing or costly.\n"
+
+[[replace]]
+file = ".claude/agents/persona-agent.md"
+old = "   noisy or confusing.\n"
+new = "   noisy, confusing or costly.\n"
+
+[[replace]]
+file = ".claude/agents/persona-fleet-developer.md"
+old = "   noisy or confusing.\n"
+new = "   noisy, confusing or costly.\n"
+
+[[replace]]
+file = ".claude/agents/persona-live-collaborator.md"
+old = "   noisy or confusing.\n"
+new = "   noisy, confusing or costly.\n"
+
+[[replace]]
+file = ".claude/agents/persona-multi-machine-developer.md"
+old = "   noisy or confusing.\n"
+new = "   noisy, confusing or costly.\n"
+
+[[replace]]
+file = ".claude/agents/persona-oss-maintainer.md"
+old = "   noisy or confusing.\n"
+new = "   noisy, confusing or costly.\n"
+
+[[replace]]
+file = ".claude/agents/persona-platform-engineer.md"
+old = "   noisy or confusing.\n"
+new = "   noisy, confusing or costly.\n"
+
+[[replace]]
+file = ".claude/agents/persona-returning-owner.md"
+old = "   noisy or confusing.\n"
+new = "   noisy, confusing or costly.\n"
+
+[[replace]]
+file = ".claude/agents/persona-reviewer.md"
+old = "   noisy or confusing.\n"
+new = "   noisy, confusing or costly.\n"
+
+[[replace]]
+file = ".claude/agents/persona-security-officer.md"
+old = "   noisy or confusing.\n"
+new = "   noisy, confusing or costly.\n"
+
+[expect]
+outcome = ["sound", "nits"]
+
+[[expect.none]]
+path = "docs/agents/persona-review.md"
+severity = "blocking"
+
+[[expect.none]]
+path = ".claude/agents/persona-agent.md"
+
+[[expect.none]]
+path = ".claude/agents/persona-fleet-developer.md"
+
+[[expect.none]]
+path = ".claude/agents/persona-live-collaborator.md"
+
+[[expect.none]]
+path = ".claude/agents/persona-multi-machine-developer.md"
+
+[[expect.none]]
+path = ".claude/agents/persona-oss-maintainer.md"
+
+[[expect.none]]
+path = ".claude/agents/persona-platform-engineer.md"
+
+[[expect.none]]
+path = ".claude/agents/persona-returning-owner.md"
+
+[[expect.none]]
+path = ".claude/agents/persona-reviewer.md"
+
+[[expect.none]]
+path = ".claude/agents/persona-security-officer.md"
