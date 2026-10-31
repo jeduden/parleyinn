@@ -63,10 +63,14 @@ fn diff_file(stem: &str) -> String {
 ///
 /// # Errors
 ///
-/// Fails when a part's diff cannot be written.
+/// Fails when its diff is there but does not read, or a part's diff
+/// cannot be written, so a failure is named, never run as no diff (I6).
 pub fn prepare(workdir: &Path, name: &str, limit: usize) -> Result<Vec<Part>, String> {
-    let Ok(text) = fs::read(workdir.join(diff_file(name))) else {
-        return Ok(Vec::new());
+    let path = workdir.join(diff_file(name));
+    let text = match fs::read(&path) {
+        Ok(text) => text,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(Vec::new()),
+        Err(e) => return Err(format!("read {}: {e}", path.display())),
     };
     if text.len() <= limit {
         return Ok(Vec::new());

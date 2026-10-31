@@ -45,6 +45,21 @@ fn a_specialist_without_a_diff_is_not_split() {
 }
 
 #[test]
+fn a_diff_that_does_not_read_fails_the_split() {
+    let dir = TempDir::new().unwrap();
+    let diff = dir.path().join("review/diffs/lang-rust.diff");
+    fs::create_dir_all(&diff).unwrap();
+
+    assert_eq!(
+        prepare(dir.path(), "lang-rust", 100),
+        Err(format!(
+            "read {}: Is a directory (os error 21)",
+            diff.display()
+        ))
+    );
+}
+
+#[test]
 fn a_diff_past_the_limit_is_written_in_parts_each_told_every_part_s_files() {
     let diff = [
         section("b.rs", 60),
@@ -258,4 +273,96 @@ fn a_merge_of_no_part_is_a_run_that_did_not_answer() {
     assert_eq!(run.failure.as_deref(), Some("it ran in no part"));
     assert_eq!(report, "incomplete: it ran in no part\n");
     assert_eq!((run.attempts, run.parts), (0, 0));
+}
+
+/// `run` with its model and usage on `model` alone.
+fn on_model(mut run: AgentRun, model: &str) -> AgentRun {
+    let usage = run.log.usage.remove("claude-haiku-5-5").unwrap();
+    run.log.usage.insert(model.to_owned(), usage);
+    run.log.resolved_model = model.to_owned();
+    run
+}
+
+#[test]
+fn a_merge_adds_every_usage_field_and_its_cost_by_model() {
+    let parts = vec![
+        (
+            part_run(None, "outcome: none — a.", 0.25),
+            "outcome: none — a.\n".to_owned(),
+        ),
+        (
+            on_model(part_run(None, "outcome: none — b.", 0.5), "claude-opus-5-5"),
+            "outcome: none — b.\n".to_owned(),
+        ),
+        (
+            part_run(None, "outcome: none — c.", 0.125),
+            "outcome: none — c.\n".to_owned(),
+        ),
+    ];
+
+    let (run, _) = merge("lang-rust", parts);
+
+    let haiku = Usage {
+        calls: 2,
+        fresh: 4,
+        cache_write: 6,
+        cache_read: 8,
+        output: 10,
+        cost: 0.375,
+    };
+    let opus = Usage {
+        calls: 1,
+        fresh: 2,
+        cache_write: 3,
+        cache_read: 4,
+        output: 5,
+        cost: 0.5,
+    };
+    assert_eq!(
+        run.log.usage,
+        BTreeMap::from([
+            ("claude-haiku-5-5".to_owned(), haiku),
+            ("claude-opus-5-5".to_owned(), opus),
+        ])
+    );
+    assert!((run.log.cost - 0.875).abs() < 1e-9);
+}
+
+#[test]
+fn a_merge_keeps_the_model_its_first_part_resolved_to() {
+    let parts = vec![
+        (
+            on_model(part_run(None, "outcome: none — a.", 0.0), "claude-opus-5-5"),
+            "outcome: none — a.\n".to_owned(),
+        ),
+        (
+            part_run(None, "outcome: none — b.", 0.0),
+            "outcome: none — b.\n".to_owned(),
+        ),
+    ];
+
+    let (run, _) = merge("lang-rust", parts);
+
+    assert_eq!(run.log.resolved_model, "claude-opus-5-5");
+}
+
+#[test]
+fn a_merge_keeps_the_subtype_of_its_first_failed_part() {
+    let mut late = part_run(Some("its run errored"), "", 0.0);
+    late.log.subtype = "error_during_execution".to_owned();
+    let parts = vec![
+        (
+            part_run(None, "outcome: none — a.", 0.0),
+            "outcome: none — a.\n".to_owned(),
+        ),
+        (
+            part_run(Some("it ran out of turns"), "", 0.0),
+            String::new(),
+        ),
+        (late, String::new()),
+    ];
+
+    let (run, _) = merge("lang-rust", parts);
+
+    assert_eq!(run.log.subtype, "error_max_turns");
 }
