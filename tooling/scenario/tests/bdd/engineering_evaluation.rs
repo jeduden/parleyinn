@@ -52,6 +52,18 @@ fn evaluate_job_runs(w: &mut World, cmd: String, key: String) -> Result<(), Stri
     outcome(review_workflow::parse(&body).evaluate_job_runs(&cmd, &key)?)
 }
 
+#[then(
+    regex = r#"^a pull request that changes only the shared section "([^"]+)" runs the cases of one component per distinct set of such sections instead of every component's$"#
+)]
+fn a_shared_section_change_plans_one_per_set(w: &mut World, section: String) -> Result<(), String> {
+    let head = testkit::TempDir::new().map_err(|e| e.to_string())?;
+    outcome(review_evaluation::shared_section_plans_one_per_set(
+        eng(w).checkout()?,
+        &section,
+        head.path(),
+    )?)
+}
+
 #[then(regex = r"^a run of a case is graded:$")]
 fn a_run_is_graded(_w: &mut World, step: &Step) -> Result<(), String> {
     let table = step.table.as_ref().ok_or("the step has no table")?;

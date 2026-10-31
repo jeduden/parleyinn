@@ -809,7 +809,8 @@ fn test_shards_case() -> Case {
 /// adding them moves no earlier case to another shard: the agents' run
 /// logs leaving their job, and the Claude Code command line, installed
 /// by the composite action, in the key's job or starting an agent
-/// outside review-run.
+/// outside review-run; and the ENG-32 evaluation planning every
+/// component a shared section change reaches, not one per set.
 fn review_late_cases() -> Vec<Case> {
     vec![
         case(
@@ -844,6 +845,17 @@ fn review_late_cases() -> Vec<Case> {
             ),
             scenario("ENG-28"),
             "job review starts the Claude Code command line outside review-run and review-eval, which would route the review",
+        ),
+        case(
+            "the evaluation planning every component a shared section change reaches",
+            "ENG-32",
+            Injection::replace(
+                "tooling/review-eval/src/plan.rs",
+                "                shared.entry(sections_of(&a)).or_default().push(name);\n",
+                "                shared.entry(sections_of(&a)).or_default().push(name.clone());\n                out.push(Planned { component: name, reason: \"shared sections changed\".to_owned() });\n",
+            ),
+            scenario("ENG-32"),
+            "components planned for the sections",
         ),
     ]
 }

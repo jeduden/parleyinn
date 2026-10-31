@@ -5,17 +5,20 @@
 //! evaluate job runs; the decision tables here drive its grader and its
 //! two-of-three rule without a model.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
+use std::fs;
+use std::path::Path;
 
 use review_eval::case::{Case, Expect, Expected};
 use review_eval::component::{Component, Kind};
 use review_eval::grade::{Run, grade};
 use review_eval::log::RunLog;
+use review_eval::plan::{self, Planned};
 use review_eval::published::{self, Line};
 use review_eval::score::{CaseRecord, GateFinding, RunRecord, Scorecard, SuiteRecord, decided};
 use review_eval::{CASES, check};
 
-use crate::Checkout;
+use crate::{Checkout, list};
 
 /// The component's name and report the decision table grades.
 const COMPONENT: &str = "lang-rust";
@@ -381,6 +384,159 @@ fn decide(runs: &str) -> (&'static str, usize) {
     }
 
     ("fails", runs.split(',').count())
+}
+
+/// The line a pull request adds to a shared section's text, as every
+/// component that includes it holds it expanded.
+const SHARED_EDIT: &str = "A line the pull request adds to the shared section.";
+
+/// The trees the evaluation's plan reads: the components, the sections
+/// and files that name them, and their cases.
+const PLANNED_TREES: [&str; 4] = [".claude/agents", "docs/srs", "docs/domain-model", CASES];
+
+/// Requires the evaluation's plan, for a pull request that changes only
+/// the shared `section` (ENG-32), to run one component per distinct set
+/// of sections among those that include it, standing for the rest of
+/// its set: it copies the checkout's components into `head`, adds a
+/// line to the section's text in each that includes it, and plans
+/// `head` against the checkout.
+///
+/// # Errors
+///
+/// Fails when the trees cannot be copied or planned, or no component
+/// includes `section`.
+pub fn shared_section_plans_one_per_set(
+    checkout: &Checkout,
+    section: &str,
+    head: &Path,
+) -> Result<Vec<String>, String> {
+    for tree in PLANNED_TREES {
+        copy_dir(&checkout.root.join(tree), &head.join(tree))?;
+    }
+    let agents = head.join(".claude/agents");
+    let mut sets: BTreeMap<Vec<String>, Vec<String>> = BTreeMap::new();
+    for entry in fs::read_dir(&agents).map_err(|e| format!("read {}: {e}", agents.display()))? {
+        let path = entry
+            .map_err(|e| format!("read {}: {e}", agents.display()))?
+            .path();
+        let Some(name) = path
+            .file_name()
+            .and_then(|f| f.to_str())
+            .and_then(|f| f.strip_suffix(".md"))
+        else {
+            continue;
+        };
+        let text =
+            fs::read_to_string(&path).map_err(|e| format!("read {}: {e}", path.display()))?;
+        if let Some((edited, sections)) = edit_section(&text, section) {
+            fs::write(&path, edited).map_err(|e| format!("write {}: {e}", path.display()))?;
+            sets.entry(sections).or_default().push(name.to_owned());
+        }
+    }
+    if sets.is_empty() {
+        return Err(format!("no reviewer component includes {section}"));
+    }
+
+    Ok(plan_problems(&sets, &plan::between(&checkout.root, head)?))
+}
+
+/// `text` with [`SHARED_EDIT`] added to the expanded text of its
+/// include of `section`, and every section it includes, sorted; `None`
+/// when it does not include `section`.
+fn edit_section(text: &str, section: &str) -> Option<(String, Vec<String>)> {
+    let (mut out, mut sections) = (String::new(), BTreeSet::new());
+    let (mut header, mut hit, mut edited) = (false, false, false);
+    for line in text.split_inclusive('\n') {
+        let trimmed = line.trim();
+        out.push_str(line);
+        if trimmed.starts_with("<?include") {
+            header = true;
+        } else if header && trimmed == "?>" {
+            header = false;
+            if hit {
+                out.push_str(&format!("{SHARED_EDIT}\n"));
+                (hit, edited) = (false, true);
+            }
+        } else if let Some(file) = header.then(|| trimmed.strip_prefix("file:")).flatten() {
+            let file = file.trim();
+            hit = file == section || file.ends_with(&format!("/{section}"));
+            sections.insert(file.to_owned());
+        }
+    }
+
+    edited.then(|| (out, sections.into_iter().collect()))
+}
+
+/// What is wrong with `planned` for a change to one shared section that
+/// the components of each set in `sets` include: each planned component
+/// must be planned for that change alone and include it, and each set
+/// must have exactly one planned, which covers the rest of its set.
+fn plan_problems(sets: &BTreeMap<Vec<String>, Vec<String>>, planned: &[Planned]) -> Vec<String> {
+    let mut problems = Vec::new();
+    for p in planned {
+        if !p.reason.starts_with("shared sections changed") {
+            problems.push(format!(
+                "component {} planned for {}, want the shared section's change alone",
+                p.component, p.reason
+            ));
+        }
+        if !sets.values().any(|names| names.contains(&p.component)) {
+            problems.push(format!(
+                "component {} planned, but it includes no changed section",
+                p.component
+            ));
+        }
+    }
+    for (sections, names) in sets {
+        let members: Vec<&Planned> = planned
+            .iter()
+            .filter(|p| names.contains(&p.component))
+            .collect();
+        let [one] = members.as_slice() else {
+            problems.push(format!(
+                "{} components planned for the sections {}, want one",
+                members.len(),
+                list(sections)
+            ));
+            continue;
+        };
+        let mut covered: Vec<String> = one
+            .reason
+            .split_once("; also covers ")
+            .map(|(_, rest)| rest.split(", ").map(str::to_owned).collect())
+            .unwrap_or_default();
+        covered.push(one.component.clone());
+        covered.sort();
+        let mut want = names.clone();
+        want.sort();
+        if covered != want {
+            problems.push(format!(
+                "component {} covers {}, want {}",
+                one.component,
+                list(&covered),
+                list(&want)
+            ));
+        }
+    }
+
+    problems
+}
+
+/// Copies the tree at `from` to `to`, directories included.
+fn copy_dir(from: &Path, to: &Path) -> Result<(), String> {
+    let read = |e: std::io::Error| format!("read {}: {e}", from.display());
+    fs::create_dir_all(to).map_err(|e| format!("write {}: {e}", to.display()))?;
+    for entry in fs::read_dir(from).map_err(read)? {
+        let path = entry.map_err(read)?.path();
+        let target = to.join(path.file_name().unwrap_or_default());
+        if path.is_dir() {
+            copy_dir(&path, &target)?;
+        } else {
+            fs::copy(&path, &target).map_err(|e| format!("copy {}: {e}", path.display()))?;
+        }
+    }
+
+    Ok(())
 }
 
 #[cfg(test)]
