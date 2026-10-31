@@ -113,15 +113,15 @@ fn answer(command: &Command, agent: &str) -> Result<(), String> {
 ///
 /// Fails naming the file that cannot be read or written.
 pub fn prepare(checkout: &Checkout, workdir: &Path) -> Result<(), String> {
-    let write = |rel: &str, text: &str| {
-        let path = workdir.join(rel);
-        if let Some(dir) = path.parent() {
-            fs::create_dir_all(dir).map_err(|e| format!("make {}: {e}", dir.display()))?;
-        }
+    let write = |dir: &str, file: &str, text: &str| {
+        let dir = workdir.join(dir);
+        fs::create_dir_all(&dir).map_err(|e| format!("make {}: {e}", dir.display()))?;
+        let path = dir.join(file);
         fs::write(&path, text).map_err(|e| format!("write {}: {e}", path.display()))
     };
-    write("review/dispatch.json", DISPATCH)?;
+    write("review", "dispatch.json", DISPATCH)?;
     write(
+        "",
         "class.txt",
         "class=standard\ntouched=1\nfindings=0\nconsults=5\n",
     )?;
@@ -129,8 +129,9 @@ pub fn prepare(checkout: &Checkout, workdir: &Path) -> Result<(), String> {
         .iter()
         .chain(GENERALISTS.iter().map(|(g, _, _)| g));
     for name in names {
-        let rel = format!(".claude/agents/{name}.md");
-        write(&rel, &checkout.read(&rel)?)?;
+        let file = format!("{name}.md");
+        let text = checkout.read(&format!(".claude/agents/{file}"))?;
+        write(".claude/agents", &file, &text)?;
     }
 
     Ok(())

@@ -57,6 +57,22 @@ fn a_generalist_started_before_a_specialist_ended_is_named() {
 }
 
 #[test]
+fn a_generalist_that_never_started_is_named_once_and_not_as_early() {
+    let mut events = in_order();
+    events.retain(|e| *e != started("review-spec"));
+    let last = events.remove(5);
+    events.push(last);
+
+    assert_eq!(
+        order_problems(&events),
+        [
+            "review-spec ran 0 times, not once as its own agent",
+            "review-code started before test-engineer-unit ended"
+        ]
+    );
+}
+
+#[test]
 fn an_agent_run_twice_never_or_undispatched_is_named() {
     let mut events = in_order();
     events.retain(|e| *e != started("lang-rust"));
