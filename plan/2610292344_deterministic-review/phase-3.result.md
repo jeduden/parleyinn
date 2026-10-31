@@ -4,11 +4,11 @@ title: "Retire the orchestrator"
 status: "✅"
 result: true
 summary: >-
-  The review skill, its ENG-32 component and cases, and what only the
+  The review skill's ENG-32 component and cases, and what only the
   orchestrator used are gone, and ENG-32's row, scenario and the docs
   name no orchestrator. The grader and review-run read a dropped line
   by one rule, and review-run fails closed on a silent generalist and a
-  blocking specialist report. The live run waits for consent.
+  blocking specialist report. The skill's file goes in a follow-up.
 ---
 # Phase 3 handoff
 
@@ -27,8 +27,9 @@ summary: >-
   specialist report the gate takes that ends `outcome: blocking` is a
   blocking finding on its report file whatever its generalist answers.
   `docs/agents/generalist-report.md` gives the none shape.
-- Retired: `.claude/skills/review/SKILL.md`,
-  `tooling/review-eval/cases/review/` (five cases), the `Orchestrator`
+- Retired: the `review` skill as a reviewer component (its file stays
+  until the follow-up below), `tooling/review-eval/cases/review/`
+  (five cases), the `Orchestrator`
   kind, its model, effort, turn budget, tools, prompt and outcome
   schema, the grader's review-outcome branch, the run log's agent
   calls, structured output and main-thread write list, the world's
@@ -79,10 +80,9 @@ summary: >-
 ## Next
 
 - The live check, one review decided by the gate on its first run,
-  needs this branch on main, after the stakeholder's consent to the
-  `.github/`, SRS, scenario, agent-instruction and ADR paths.
-- ADR-2610300031 stays `proposed` until the stakeholder accepts it;
-  then ADR-2610262245 is marked superseded.
+  needs this branch on main.
+- ADR-2610300031 is `accepted`, its Approval citing comment
+  6534291701; ADR-2610262245 is `superseded`.
 - Waiting on the stakeholder, untouched: the empty dispatch, the
   consent finding, retries, the parallel bound and the since-last
   step.

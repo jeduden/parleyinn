@@ -105,7 +105,8 @@ the reports.
   agent, and its scenario holds the review workflow to `review-run`
   and refuses an agent session that would route the review.
 - The orchestrator's skill, its reviewer component under ENG-32, its
-  cases and its prompt and schema in the runner are retired, together
+  cases and its prompt and schema in the runner are retired (the
+  skill's file goes in a follow-up once main runs `review-run`), together
   with its mentions in the SRS, the docs and the generalists' input
   section. The accepted records that describe it, ADR-2609301941,
   ADR-2610262245 and ADR-2610290002, keep their text as the record of

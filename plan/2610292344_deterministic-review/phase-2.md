@@ -34,7 +34,7 @@ GREEN.
 
 - `review.yml`'s review job installs the pinned Claude Code command
   line as the evaluate job does, builds `review-run` before the Claude
-  token is in any step's environment, and runs it offline with 24
+  token is in any step's environment, and runs it offline with 32
   agents at once. Its outputs read `review/outcome.json` and
   `review/consulted.json`; the cost step reads `review/usage.json`. The
   orchestrator's step, its turn budget and its log parsing go.

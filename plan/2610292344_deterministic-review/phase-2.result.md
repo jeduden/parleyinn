@@ -7,8 +7,8 @@ summary: >-
   review.yml runs review-run in place of the orchestrating agent, and
   ENG-28, its scenario, binding and drift cases now ask for a review run
   by code; the gate names an unanswered agent without an orchestrator,
-  ADR-2610300031 proposes the decision, and the generalists keep their
-  models. The live run waits for the stakeholder's consent.
+  ADR-2610300031 records the decision, since accepted on the
+  stakeholder's consent, and the generalists keep their models.
 ---
 # Phase 2 handoff
 
@@ -18,7 +18,7 @@ summary: >-
   line (`CLAUDE_CODE_VERSION` 2.1.312, npm, as the evaluate job does).
   It builds `review-run` with no secret in the environment, then runs
   `cargo run --locked --quiet --offline -p review-run -- --workdir .
-  --parallel 24` with only `CLAUDE_CODE_OAUTH_TOKEN` added. The job's
+  --parallel 32` with only `CLAUDE_CODE_OAUTH_TOKEN` added. The job's
   `outcome` and `consulted` outputs read `review/outcome.json` and
   `review/consulted.json`, and the cost step reads `review/usage.json`.
   The `claude-code-action` step, the class's turn budget and the run
@@ -39,15 +39,18 @@ summary: >-
 - PR #98 (`claude/wizardly-faraday-u3k1e6`) merged cleanly. Its
   generalist report shape starts a dropped line with `dropped —`, which
   review-run already leaves out.
-- ADR-2610300031, `proposed`, with its Approval section left for the
-  stakeholder. ADR-2610262245 stays `accepted` until then.
+- ADR-2610300031, written `proposed` with its Approval section left
+  for the stakeholder. The stakeholder has since consented in PR #98's
+  comment 6534291701, which its Approval cites: it is `accepted`, and
+  ADR-2610262245 is `superseded` by it.
 - `docs/development.md` and `docs/review-evaluation.md` describe
   review-run.
 
 ## Decisions
 
-- `--parallel 24`, so a dispatch of up to 24 specialists fits one wave.
-  45 minutes fits two 900-second waves and the setup.
+- `--parallel 32`, as ADR-2610300031 says: a dispatch of up to 32
+  specialists fits one wave. The job's 120-minute cap fits the
+  three-wave worst case of 90 minutes and the setup.
 - The agents' job is found by `-p review-run`, and also by
   `claude-code-action@`, so an agent session is still held to the
   agents' rules wherever it appears.
@@ -63,7 +66,6 @@ summary: >-
   components and needs their cases run), the dispatch module's doc
   comment, ENG-32's row and scenario, and `review-evaluation.md`.
 - The gate's live check, one review decided on its first run, needs
-  this change on main. The stakeholder must consent to the `.github/`,
-  SRS, scenario and ADR paths first.
-- A dispatch of more than 24 specialists takes a third wave and may
-  exceed the 45-minute cap.
+  this change on main.
+- A dispatch of more than 32 specialists takes another wave, which
+  the 120-minute cap still holds.

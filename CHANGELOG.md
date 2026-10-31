@@ -21,7 +21,8 @@ its upgrade notes (ENG-23). ParleyInn follows semantic versioning.
   agent (ENG-28): the `review-run` tooling crate runs every specialist
   the review bundle dispatches, then every dispatched generalist, each
   as its own agent, and writes the review outcome from what they
-  answered. The review skill and its evaluation cases are retired.
+  answered. No review runs the review skill or its evaluation cases
+  any more; the skill's file goes in a follow-up.
   A change no rule routes gets one generalist, an agent that did not
   answer runs once more, a change to a stakeholder path blocks until a
   stakeholder comment consents (ENG-21), and every review reads the whole

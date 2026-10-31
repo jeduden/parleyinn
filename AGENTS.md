@@ -200,7 +200,7 @@ Open only the [SRS](docs/srs/index.md) section a task touches.
 - Red/Green TDD: failing test, pass, commit; keep commits small, one change each
 - Run tools through `mise exec --`; `mdsmith check .` must pass before a push
 - Run `scripts/review-local.sh` before a push ([ci.md](docs/ci.md))
-- An orchestrating agent hands code changes to specialized subagents
+- A session's main agent hands code changes to specialized subagents
 - Never modify `.mdsmith.yml` (linter configuration) without explicit consent
 - Every direct dependency needs an accepted ADR under `docs/adr/`, listed in
   [DEPENDENCIES.md](DEPENDENCIES.md) (ENG-18, ENG-26); aim to add none
