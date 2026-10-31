@@ -230,3 +230,41 @@ fn a_member_without_a_package_name_or_a_root_manifest_fails() {
     fs::remove_file(c.root.join("Cargo.toml")).unwrap();
     assert!(packages(&c).unwrap_err().starts_with("read Cargo.toml: "));
 }
+
+/// A job whose text is `text`.
+fn job(text: &str) -> Job {
+    Job {
+        name: TEST_JOB.to_owned(),
+        text: text.to_owned(),
+    }
+}
+
+#[test]
+fn matrix_size_counts_the_entries_of_the_shard_list() {
+    assert_eq!(matrix_size(&job("    shard: [1, 2, 3]\n")), Some(3));
+    assert_eq!(matrix_size(&job("  shard: [0, 1,]\n")), Some(2));
+    assert_eq!(matrix_size(&job("  shard: []\n")), Some(0));
+    assert_eq!(matrix_size(&job("  shard: 3\n")), None);
+    assert_eq!(matrix_size(&job("  os: [a, b]\n")), None);
+}
+
+#[test]
+fn selection_names_each_missing_line_and_the_missing_command() {
+    let whole = format!("{}\n{SHARD_COMMAND}\n", SELECTION.join("\n"));
+    let without_total = whole.replace(SELECTION[1], "");
+
+    assert!(selection(&job(&whole)).is_empty());
+    assert_eq!(
+        selection(&job(&without_total)),
+        [format!(
+            "{LEAD}: the job does not choose its list by its place in the matrix in {CI_WORKFLOW}: {}",
+            SELECTION[1]
+        )]
+    );
+    assert_eq!(
+        selection(&job(&SELECTION.join("\n"))),
+        [format!(
+            "{LEAD}: the job does not run {SHARD_COMMAND} in {CI_WORKFLOW}"
+        )]
+    );
+}
