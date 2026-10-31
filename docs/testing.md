@@ -181,11 +181,11 @@ decides from two samples files. CI's `benchmark` job runs both.
 
 The benchmark jobs (ENG-15) compare the head with its first parent:
 the `main` a pull request's merge commit sits on, or `main` before a
-push. `benchmark-suites` builds both sides' suites and cores once, in
-release mode. Ten `benchmark (shard N)` jobs each sample them on one
-runner, three of the thirty rounds of ten samples a side. A shard
-interleaves the sides and keeps the alternation of which goes first, so
-a drift in a runner's speed lands on both. The `benchmark` job pools the
+push. A `benchmark suite` job a side builds its suite and core once,
+in release mode, side by side. Ten `benchmark (shard N)` jobs each
+sample both on one runner, three of the thirty rounds of ten samples a
+side. A shard interleaves them and keeps the alternation of which goes
+first, so a drift in a runner's speed lands on both. `benchmark` pools the
 shards' samples; the head's gate writes its report into the job summary
 and fails naming each benchmark that regressed more than 10% with
 significance. Each shard is one stratum: a sample is ranked only against

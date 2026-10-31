@@ -578,11 +578,24 @@ jobs:
   # naming each benchmark whose median is more than 10% slower with
   # significance (one-sided Mann-Whitney U, alpha 0.01). The suite
   # times the core's start-up today. Three jobs share the work so each
-  # fits its budget: this one builds both sides once, the shards sample,
-  # and the benchmark job pools every shard's samples and runs the gate.
+  # fits its budget: these build each side once, the shards sample, and
+  # the benchmark job pools every shard's samples and runs the gate.
+  #
+  # The two sides build at the same time, one job each; the build is
+  # all that moves, for both sides still sample on one runner in each
+  # shard. Each job builds in the checkout of its own side: the head's,
+  # or its first parent's, the base. The shards and the gate download
+  # both sides' artifacts into one suites/ directory, head/ and base/.
   benchmark-suites:
+    name: benchmark suite (${{ matrix.side }})
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    strategy:
+      fail-fast: false
+      matrix:
+        side: [head, base]
+    env:
+      SIDE: ${{ matrix.side }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -590,6 +603,7 @@ jobs:
           # The head and its first parent, the base.
           fetch-depth: 2
       - name: Check out the base beside the head
+        if: matrix.side == 'base'
         run: git worktree add --detach "$RUNNER_TEMP/base" HEAD^1
       - name: Install the head's pinned Rust with mise
         uses: ./.github/actions/setup-mise
@@ -598,35 +612,41 @@ jobs:
           cache: true
       # The base predates mise.toml when this change first lands, so
       # read its own Rust pin from rust-toolchain.toml.
-      - name: Install the pinned Rust toolchains
+      - name: Install the base's pinned Rust toolchain
+        if: matrix.side == 'base'
         shell: bash
         run: |
           base_version="$(sed -n 's/^channel = "\(.*\)"$/\1/p' "$RUNNER_TEMP/base/rust-toolchain.toml")"
           mise install "rust@$base_version"
       - name: Build the head's suite and core
+        if: matrix.side == 'head'
         run: cargo build --release --locked -p benchmark -p parinn
       # Until the suite reaches main, the base has none to build.
       - name: Build the base's suite and core
+        if: matrix.side == 'base'
         shell: bash
         run: |
           cd "$RUNNER_TEMP/base"
           if [ -f tooling/benchmark/Cargo.toml ]; then
             cargo build --release --locked -p benchmark -p parinn
           fi
-      # Both sides' release suites and cores, for every shard and the
+      # This side's release suite and core, for every shard and the
       # gate, so each builds nothing.
-      - name: Collect both sides' suites and cores
+      - name: Collect this side's suite and core
         shell: bash
         run: |
-          mkdir -p "$RUNNER_TEMP/suites/head" "$RUNNER_TEMP/suites/base"
-          cp target/release/benchmark target/release/parinn "$RUNNER_TEMP/suites/head/"
-          base="$RUNNER_TEMP/base/target/release"
-          if [ -x "$base/benchmark" ]; then
-            cp "$base/benchmark" "$base/parinn" "$RUNNER_TEMP/suites/base/"
+          mkdir -p "$RUNNER_TEMP/suites/$SIDE"
+          if [ "$SIDE" = head ]; then
+            cp target/release/benchmark target/release/parinn "$RUNNER_TEMP/suites/head/"
+          else
+            base="$RUNNER_TEMP/base/target/release"
+            if [ -x "$base/benchmark" ]; then
+              cp "$base/benchmark" "$base/parinn" "$RUNNER_TEMP/suites/base/"
+            fi
           fi
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: benchmark-suites
+          name: benchmark-suites-${{ matrix.side }}
           path: ${{ runner.temp }}/suites/
 
   # The rounds, sharded across runners: each shard interleaves both
@@ -649,8 +669,10 @@ jobs:
     steps:
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
-          name: benchmark-suites
+          # Both sides' artifacts, each holding its own side's directory.
+          pattern: benchmark-suites-*
           path: ${{ runner.temp }}/suites
+          merge-multiple: true
       - name: Sample both sides, this shard's rounds
         shell: bash
         run: |
@@ -728,8 +750,9 @@ jobs:
         run: git worktree add --detach "$RUNNER_TEMP/base" HEAD^1
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
-          name: benchmark-suites
+          pattern: benchmark-suites-*
           path: ${{ runner.temp }}/suites
+          merge-multiple: true
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           pattern: benchmark-samples-*
