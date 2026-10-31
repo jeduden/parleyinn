@@ -629,19 +629,25 @@ fn gate_args(reviewed: &str, head: &str) -> Vec<String> {
 }
 
 /// The report and run-log answer of the row's one specialist: a
-/// `report` cell of `given`, or none, hands the gate a report that ends
-/// with the outcome its answer gives, `missing` no report, `empty` a
-/// blank one, `no outcome` one that ends with a finding, and `other
-/// outcome` one that ends with another outcome; `None` for any other
-/// value.
+/// `report` cell of `given`, or none, hands the gate a report with a
+/// linked finding that ends with the outcome its answer gives,
+/// `request` one with a requirement request instead, `missing` no
+/// report, `empty` a blank one, `no outcome` one that ends with a
+/// finding, `other outcome` one that ends with another outcome, and
+/// `malformed finding` one whose finding gives a severity where its
+/// consequence and requirements belong; `None` for any other value.
 fn report(row: &BTreeMap<String, String>) -> Option<(Option<&'static str>, &'static str)> {
-    const ANSWERS: &str = r#"{"lang-rust":"outcome: sound — fine\nreport: review/reports/lang-rust.md","review-code":"r"}"#;
+    const ANSWERS: &str = r#"{"lang-rust":"outcome: findings — fine\nreport: review/reports/lang-rust.md","review-code":"r"}"#;
     let report = match row.get("report").map_or("given", String::as_str) {
-        "given" => Some("a.rs:1 — nit — x\noutcome: sound — fine\n"),
+        "given" => Some("a.rs:1 — if not addressed: x breaks — I2\noutcome: findings — fine\n"),
+        "request" => {
+            Some("a.rs:1 — request: add a rule on x — none says so\noutcome: findings — fine\n")
+        }
         "missing" => None,
         "empty" => Some("  \n"),
-        "no outcome" => Some("a.rs:1 — nit — x\n"),
-        "other outcome" => Some("outcome: blocking — not fine\n"),
+        "no outcome" => Some("a.rs:1 — if not addressed: x breaks — I2\n"),
+        "other outcome" => Some("outcome: none — not fine\n"),
+        "malformed finding" => Some("a.rs:1 — nit — x\noutcome: findings — fine\n"),
         _ => return None,
     };
 

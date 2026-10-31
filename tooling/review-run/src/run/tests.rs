@@ -82,7 +82,7 @@ fn every_specialist_runs_before_any_generalist() {
     assert_eq!(runs[3].kind, Kind::Generalist);
     assert_eq!(
         runs[0].log.answer.lines().next().unwrap(),
-        "outcome: nits — lang-markdown saw one nit."
+        "outcome: findings — lang-markdown saw one finding."
     );
 }
 
@@ -245,9 +245,9 @@ fn a_report_from_before_the_run_is_removed_first() {
     let dir = workdir();
     let report = dir.path().join("review/reports/lang-rust.md");
     fs::create_dir_all(report.parent().unwrap()).unwrap();
-    fs::write(&report, "outcome: sound — stale.\n").unwrap();
+    fs::write(&report, "outcome: none — stale.\n").unwrap();
 
-    let run = one_run(dir.path(), |c| fake::answer(c, "outcome: sound — x.", None));
+    let run = one_run(dir.path(), |c| fake::answer(c, "outcome: none — x.", None));
 
     assert!(run.answered());
     assert!(!report.exists());

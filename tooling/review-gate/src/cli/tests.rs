@@ -17,10 +17,10 @@ fn inputs() -> BTreeMap<String, String> {
         ("checked.json", "[]"),
         ("dispatch.json", r#"{"review-code":["lang-rust"]}"#),
         ("consulted.json", r#"["lang-rust","review-code"]"#),
-        ("reports/lang-rust.md", "Outcome: sound.\n"),
+        ("reports/lang-rust.md", "Outcome: none.\n"),
         (
             "answers.json",
-            r#"{"lang-rust":"Outcome: sound.","review-code":"r"}"#,
+            r#"{"lang-rust":"Outcome: none.","review-code":"r"}"#,
         ),
     ]
     .into_iter()
@@ -278,7 +278,10 @@ fn run_fails_closed_on_a_missing_or_malformed_dispatch_or_a_skipped_agent() {
         (
             "a report another agent wrote",
             args(HEAD),
-            with("reports/lang-rust.md", "Outcome: blocking.\n"),
+            with(
+                "reports/lang-rust.md",
+                "a.rs:1 — if not addressed: x — I2\nOutcome: findings.\n",
+            ),
             "lang-rust has a report whose outcome differs from its answer in the run log",
             EXIT_FAILURE,
         ),

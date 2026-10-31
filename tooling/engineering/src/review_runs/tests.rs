@@ -193,7 +193,7 @@ fn the_stand_in_answers_as_the_agent_and_records_its_run() {
     );
     let report = fs::read_to_string(work.path().join("review/reports/lang-rust.md")).unwrap();
     assert!(
-        report.ends_with("outcome: nits — lang-rust saw one nit.\n"),
+        report.ends_with("outcome: findings — lang-rust saw one finding.\n"),
         "{report}"
     );
     assert!(fs::read_to_string(&log).unwrap().contains("\"success\""));

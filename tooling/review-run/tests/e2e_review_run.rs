@@ -19,10 +19,10 @@ use std::process::{Command, Output};
 use testkit::TempDir;
 
 /// A `claude` that answers as the agent it runs as: a specialist
-/// writes its report with one nit and answers its outcome line and
-/// path; a generalist keeps the nit and closes with a sentence. Started
-/// as a harness session's child it refuses, and the agent `SILENT_AGENT` names
-/// never answers.
+/// writes its report with one linked finding and answers its outcome
+/// line and path; a generalist keeps it as a nit and closes with a
+/// sentence. Started as a harness session's child it refuses, and the
+/// agent `SILENT_AGENT` names never answers.
 const CLAUDE: &str = r#"#!/bin/sh
 if [ -n "$CLAUDE_CODE_CHILD_SESSION" ] || [ -n "$CLAUDE_AUTO_BACKGROUND_TASKS" ]; then
   echo "started as a harness session's child" >&2
@@ -39,8 +39,8 @@ if [ "$agent" = "$SILENT_AGENT" ]; then exec sleep 30; fi
 printf '{"type":"assistant","parent_tool_use_id":null,"message":{"id":"m-%s","model":"claude-haiku-5-5","usage":{"input_tokens":3,"cache_read_input_tokens":7,"output_tokens":2},"content":[]}}\n' "$agent"
 case "$prompt" in
   *"a specialist"*)
-    printf 'src/a.rs:3 — nit — a long line — ENG-02\n\noutcome: nits — %s saw one nit.\n' "$agent" > "review/reports/$agent.md"
-    printf '{"type":"result","subtype":"success","is_error":false,"result":"outcome: nits — %s saw one nit.\\nreview/reports/%s.md","total_cost_usd":0.01,"num_turns":2}\n' "$agent" "$agent"
+    printf 'src/a.rs:3 — if not addressed: a long line hides a bug — I9\n\noutcome: findings — %s saw one finding.\n' "$agent" > "review/reports/$agent.md"
+    printf '{"type":"result","subtype":"success","is_error":false,"result":"outcome: findings — %s saw one finding.\\nreview/reports/%s.md","total_cost_usd":0.01,"num_turns":2}\n' "$agent" "$agent"
     ;;
   *)
     printf '{"type":"result","subtype":"success","is_error":false,"result":"src/a.rs:3 — nit — a long line — lang-rust\\n%s finds its scope sound.","total_cost_usd":0.05,"num_turns":4}\n' "$agent"

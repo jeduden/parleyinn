@@ -93,15 +93,16 @@ pub(crate) fn write_log(command: &Command, text: &str) {
     fs::write(command.stdout_to.as_ref().unwrap(), text).unwrap();
 }
 
-/// A specialist's report with one nit, its outcome line and its answer.
+/// A specialist's report with one linked finding, its outcome line and
+/// its answer.
 pub(crate) fn specialist(command: &Command) -> Result<Output, String> {
     let name = agent_of(command);
-    let outcome = format!("outcome: nits — {name} saw one nit.");
+    let outcome = format!("outcome: findings — {name} saw one finding.");
     answer(
         command,
         &format!("{outcome}\nreview/reports/{name}.md"),
         Some(&format!(
-            "src/a.rs:3 — nit — a long line — ENG-02\n\n{outcome}\n"
+            "src/a.rs:3 — if not addressed: a long line hides a bug — I9\n\n{outcome}\n"
         )),
     )
 }

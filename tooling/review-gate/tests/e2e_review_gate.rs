@@ -29,11 +29,11 @@ fn review_gate(dir: &TempDir, args: &[&str]) -> std::process::Output {
     .unwrap();
     fs::create_dir_all(dir.path().join("reports")).unwrap();
     if !dir.path().join("reports/lang-rust.md").exists() {
-        fs::write(dir.path().join("reports/lang-rust.md"), "Outcome: sound.\n").unwrap();
+        fs::write(dir.path().join("reports/lang-rust.md"), "Outcome: none.\n").unwrap();
     }
     fs::write(
         dir.path().join("answers.json"),
-        r#"{"lang-rust":"Outcome: sound."}"#,
+        r#"{"lang-rust":"Outcome: none."}"#,
     )
     .unwrap();
     Command::new(env!("CARGO_BIN_EXE_review-gate"))
@@ -206,7 +206,7 @@ fn the_executable_exits_1_when_a_report_s_outcome_is_not_what_its_agent_answered
     fs::create_dir_all(dir.path().join("reports")).unwrap();
     fs::write(
         dir.path().join("reports/lang-rust.md"),
-        "Outcome: blocking.\n",
+        "a.rs:1 — if not addressed: x — I2\nOutcome: findings.\n",
     )
     .unwrap();
 

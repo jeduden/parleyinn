@@ -79,8 +79,9 @@ pub fn agent_of(command: &Command) -> String {
 }
 
 /// Answers `command` as `agent` would: a specialist writes its report
-/// with one nit and answers its outcome line; a generalist keeps the
-/// nit of the specialist [`GENERALISTS`] names for it.
+/// with one linked finding and answers its outcome line; a generalist
+/// keeps, as a nit, the finding of the specialist [`GENERALISTS`] names
+/// for it.
 fn answer(command: &Command, agent: &str) -> Result<(), String> {
     let write = |path: &Path, text: &str| {
         fs::write(path, text).map_err(|e| format!("write {}: {e}", path.display()))
@@ -88,11 +89,11 @@ fn answer(command: &Command, agent: &str) -> Result<(), String> {
     let result = if let Some((_, path, from)) = GENERALISTS.iter().find(|(g, _, _)| *g == agent) {
         format!("{path}:1 — nit — a long line — {from}\n{agent} finds its scope sound.")
     } else {
-        let outcome = format!("outcome: nits — {agent} saw one nit.");
+        let outcome = format!("outcome: findings — {agent} saw one finding.");
         let report = command.cwd.join(format!("review/reports/{agent}.md"));
         write(
             &report,
-            &format!("src/a.rs:1 — nit — a long line — ENG-02\n\n{outcome}\n"),
+            &format!("src/a.rs:1 — if not addressed: a long line hides a bug — I9\n\n{outcome}\n"),
         )?;
         format!("{outcome}\nreview/reports/{agent}.md")
     };

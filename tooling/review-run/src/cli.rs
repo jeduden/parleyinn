@@ -1,7 +1,8 @@
 //! The `review-run` command line: a work directory in, the one the
 //! review workflow prepares (main's checkout with the pull request's
 //! tree in `pr-head/`, its diff in `pr.diff`, the bundle's printed
-//! output in `class.txt` and what it wrote under `review/`); the
+//! output in `class.txt` and what it wrote under `review/`), whose
+//! SRS in both trees names the ids a specialist's finding may cite; the
 //! review outcome, the agents consulted, their answers and their usage
 //! written under `review/`, with each run's log under `review/logs/`.
 //! It prints the verdict and the counts for the workflow's step
@@ -19,6 +20,7 @@ use serde::Serialize;
 
 use crate::outcome::{Decision, decide};
 use crate::plan::{self, report_file};
+use crate::requirements;
 use crate::run::{self, Options};
 use crate::usage::{self, AgentUsage};
 use crate::{ANSWERS, CONSULTED, OUTCOME, USAGE as USAGE_FILE};
@@ -76,6 +78,9 @@ fn review(
     progress: &(dyn Fn(&str) + Sync),
 ) -> Result<String, String> {
     let plan = plan::read(workdir)?;
+    // Read before any agent runs: an SRS that does not read fails the
+    // review before it costs anything.
+    let known = requirements::ids(workdir)?;
     let runs = run::review(host, workdir, &plan, options, progress)?;
     let reports: BTreeMap<String, String> = plan
         .specialists()
@@ -90,7 +95,7 @@ fn review(
         outcome,
         consulted,
         answers,
-    } = decide(&plan, &runs, &reports);
+    } = decide(&plan, &runs, &reports, &known);
     let usage = usage::usage(&runs);
     write_json(workdir, OUTCOME, &outcome)?;
     write_json(workdir, CONSULTED, &consulted)?;

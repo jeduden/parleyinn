@@ -910,16 +910,20 @@ fn reported(answer: &str, report: Option<&str>) -> Input {
 
 #[test]
 fn a_specialist_s_report_must_end_with_the_outcome_it_answered() {
-    let report = "a.rs:1 — nit — x\n\noutcome: nits — one sentence.";
+    let report =
+        "a.rs:1 — if not addressed: a hook panics — ENG-04\n\noutcome: findings — one sentence.";
     for answer in [
-        "outcome: nits — one sentence.\nreport: review/reports/lang-rust.md",
-        "agentId: z\n  outcome: nits — one sentence.  \n",
+        "outcome: findings — one sentence.\nreport: review/reports/lang-rust.md",
+        "agentId: z\n  outcome: findings — one sentence.  \n",
     ] {
         let r = decide(&reported(answer, Some(&format!("{report}\n\n"))));
         assert_eq!(r.unwrap().unwrap().event, APPROVE, "{answer}");
     }
-    let reworded = "a.rs:1 — nit — x, said otherwise\noutcome: nits — one sentence.";
-    let r = decide(&reported("outcome: nits — one sentence.", Some(reworded)));
+    let reworded = "a.rs:1 — if not addressed: a hook panics, said otherwise — ENG-04\noutcome: findings — one sentence.";
+    let r = decide(&reported(
+        "outcome: findings — one sentence.",
+        Some(reworded),
+    ));
     assert_eq!(r.unwrap().unwrap().event, APPROVE);
 
     for (answer, file, want) in [
@@ -935,17 +939,22 @@ fn a_specialist_s_report_must_end_with_the_outcome_it_answered() {
             "review: lang-rust has a report that does not end with its outcome",
         ),
         (
-            "outcome: maybe — x",
-            Some("outcome: maybe — x"),
+            "outcome: blocking — x",
+            Some("outcome: blocking — x"),
             "review: lang-rust has a report that does not end with its outcome",
         ),
         (
-            "outcome: blocking — one sentence.",
+            "outcome: findings — one sentence.",
+            Some("a.rs:1 — nit — x\noutcome: findings — one sentence."),
+            "review: lang-rust has a report whose line 1 is neither a linked finding nor a requirement request",
+        ),
+        (
+            "outcome: none — one sentence.",
             Some(report),
             "review: lang-rust has a report whose outcome differs from its answer in the run log",
         ),
         (
-            "the outcome: nits — one sentence. was it",
+            "the outcome: findings — one sentence. was it",
             Some(report),
             "review: lang-rust has a report whose outcome differs from its answer in the run log",
         ),
@@ -959,51 +968,20 @@ fn a_specialist_s_report_must_end_with_the_outcome_it_answered() {
     assert!(matches!(
         decide(&no_answer),
         Err(Error::Report {
-            problem: "has a report whose outcome differs from its answer in the run log",
+            problem: report::Problem::AnswerDiffers,
             ..
         })
     ));
 }
 
 #[test]
-fn an_answer_line_is_the_outcome_whatever_its_whitespace_punctuation_dashes_or_markup() {
-    let outcome = "outcome: nits — the change adds `x`.";
-    for line in [
-        "outcome: nits — the change adds `x`.",
-        "  outcome:  nits —  the change adds `x`  ",
-        "outcome: nits — the change adds x",
-        "**Outcome: nits** - the change adds `x`;",
-        "*outcome: nits* – the change adds _x_!",
-        "`outcome: nits — the change adds x.`",
-        "outcome: nits \u{2212} the change adds `x`.",
-    ] {
-        assert!(same_outcome(outcome, line), "{line:?}");
-    }
-    for line in [
-        "outcome: blocking — the change adds `x`.",
-        "outcome: nits — the change adds y.",
-        "outcome: nits",
-        "review/reports/lang-rust.md — outcome: nits — the change adds x.",
-        "the outcome: nits — the change adds x. was it",
-        "",
-    ] {
-        assert!(!same_outcome(outcome, line), "{line:?}");
-    }
-}
+fn the_gate_holds_a_cited_id_to_its_shape_alone() {
+    let report =
+        "a.rs:1 — if not addressed: a hook panics — ENG-99\noutcome: findings — one sentence.";
 
-#[test]
-fn an_outcome_line_names_sound_nits_or_blocking_in_any_case_and_markup() {
-    for (text, want) in [
-        ("x\noutcome: sound — y\n\n", Some("outcome: sound — y")),
-        ("Outcome: **blocking**. y", Some("Outcome: **blocking**. y")),
-        ("outcome: `nits`", Some("outcome: `nits`")),
-        ("outcome: sound — y\nmore", None),
-        ("outcome: soundly", None),
-        ("outcome:", None),
-        ("", None),
-    ] {
-        assert_eq!(outcome_line(text), want, "{text:?}");
-    }
+    let r = decide(&reported("outcome: findings — one sentence.", Some(report)));
+
+    assert_eq!(r.unwrap().unwrap().event, APPROVE);
 }
 
 #[test]
@@ -1029,27 +1007,6 @@ fn parse_specialists_reads_the_dispatch_s_lists_and_refuses_a_path() {
     let err = parse_specialists("nope").unwrap_err();
     assert!(err.to_string().starts_with("review: malformed dispatch: "));
     assert!(std::error::Error::source(&err).is_some());
-}
-
-#[test]
-fn a_report_check_reads_a_report_and_an_answer_alone() {
-    let report = "a.rs:1 — nit — x\n\noutcome: nits — one sentence.\n";
-    let answer = "outcome: nits — one sentence.\nreview/reports/lang-rust.md";
-
-    assert_eq!(report_check(Some(report), Some(answer)), None);
-    assert_eq!(report_check(None, Some(answer)), Some("wrote no report"));
-    assert_eq!(
-        report_check(Some(" \n"), Some(answer)),
-        Some("wrote an empty report")
-    );
-    assert_eq!(
-        report_check(Some("a.rs:1 — nit — x"), Some(answer)),
-        Some("has a report that does not end with its outcome")
-    );
-    assert_eq!(
-        report_check(Some(report), None),
-        Some("has a report whose outcome differs from its answer in the run log")
-    );
 }
 
 #[test]

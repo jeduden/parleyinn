@@ -9,6 +9,9 @@
 //! repository tooling and never links into a shipped executable.
 
 pub mod cli;
+pub mod report;
+
+pub use report::report_check;
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
@@ -147,10 +150,11 @@ pub enum Error {
     /// The agents' answers from the run log do not read.
     Answers(serde_json::Error),
     /// A specialist's report is missing or empty, does not end with its
-    /// outcome, or ends with another outcome than it answered.
+    /// outcome, holds a finding line in neither of its forms, or ends
+    /// with another outcome than it answered.
     Report {
         agent: String,
-        problem: &'static str,
+        problem: report::Problem,
     },
 }
 
@@ -316,79 +320,15 @@ pub fn parse_answers(data: &str) -> Result<BTreeMap<String, String>, Error> {
     serde_json::from_str(data).map_err(Error::Answers)
 }
 
-/// The words a report's outcome line may give.
-const OUTCOMES: [&str; 3] = ["sound", "nits", "blocking"];
-
-/// The outcome line `text` ends with, trimmed: its last non-empty line,
-/// when that line starts with `outcome:`, in any case, and its first
-/// word, markup aside, is `sound`, `nits` or `blocking`.
-fn outcome_line(text: &str) -> Option<&str> {
-    let line = text.lines().map(str::trim).rfind(|l| !l.is_empty())?;
-    let rest = line
-        .get(..8)?
-        .eq_ignore_ascii_case("outcome:")
-        .then(|| &line[8..])?;
-    let word = rest
-        .split_whitespace()
-        .next()?
-        .trim_matches(|c: char| !c.is_ascii_alphanumeric());
-
-    OUTCOMES.contains(&word).then_some(line)
-}
-
-/// The problem with `agent`'s report, if any: it has none, it is empty,
-/// it does not end with an outcome line, or its run-log answer holds no
-/// line that is the same outcome.
-fn report_problem(input: &Input, agent: &str) -> Option<&'static str> {
+/// The problem with `agent`'s report, if any, held to its form alone:
+/// the gate holds no tree to read the requirement ids from, so the
+/// review's runner, which holds both, refuses an id no requirement has.
+fn report_problem(input: &Input, agent: &str) -> Option<report::Problem> {
     report_check(
         input.reports.get(agent).map(String::as_str),
         input.answers.get(agent).map(String::as_str),
+        None,
     )
-}
-
-/// The problem with a specialist's `report`, its file's text when it
-/// has one, beside `answer`, its final answer when it gave one: what
-/// the gate refuses a review for, so the review's runner can name the
-/// same problem before the gate runs.
-#[must_use]
-pub fn report_check(report: Option<&str>, answer: Option<&str>) -> Option<&'static str> {
-    let outcome = match report.map(str::trim) {
-        None => return Some("wrote no report"),
-        Some("") => return Some("wrote an empty report"),
-        Some(text) => outcome_line(text),
-    };
-    let Some(outcome) = outcome else {
-        return Some("has a report that does not end with its outcome");
-    };
-
-    (!answer.is_some_and(|answer| answer.lines().any(|l| same_outcome(outcome, l))))
-        .then_some("has a report whose outcome differs from its answer in the run log")
-}
-
-/// Whether an answer's `line` repeats the report's `outcome` line:
-/// the same words, whatever their case, spacing, emphasis markup, kind
-/// of dash or trailing punctuation.
-fn same_outcome(outcome: &str, line: &str) -> bool {
-    normalised(line) == normalised(outcome)
-}
-
-/// `text` lowercased, without emphasis or code markup, with every dash
-/// a hyphen, its whitespace collapsed to single spaces and no trailing
-/// punctuation: what a harmless retelling of a line does not change.
-fn normalised(text: &str) -> String {
-    let words: String = text
-        .chars()
-        .filter(|c| !matches!(c, '*' | '_' | '`' | '~'))
-        .map(|c| match c {
-            '\u{2012}'..='\u{2015}' | '\u{2212}' => '-',
-            c => c.to_ascii_lowercase(),
-        })
-        .collect();
-    let spaced = words.split_whitespace().collect::<Vec<_>>().join(" ");
-
-    spaced
-        .trim_end_matches(['.', ',', ';', ':', '!', '?', ' '])
-        .to_owned()
 }
 
 /// Reads the agents the review consulted, a list of names.

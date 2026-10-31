@@ -528,10 +528,12 @@ fn gate_outcome_hands_the_gate_the_specialist_s_report() {
 
     for (value, want) in [
         ("given", "APPROVE"),
+        ("request", "APPROVE"),
         ("missing", "an error"),
         ("empty", "an error"),
         ("no outcome", "an error"),
         ("other outcome", "an error"),
+        ("malformed finding", "an error"),
         ("givne", UNKNOWN_CELL),
     ] {
         assert_eq!(gate_outcome(&row("report", value)), want, "{value}");

@@ -1262,6 +1262,7 @@ version = "0.0.0"
 dependencies = [
  "adr",
  "review-bundle",
+ "review-gate",
  "serde",
  "serde_json",
  "sha2",
@@ -1287,6 +1288,7 @@ dependencies = [
  "review-gate",
  "serde",
  "serde_json",
+ "srs",
  "testkit",
 ]
 

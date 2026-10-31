@@ -1,19 +1,24 @@
 //! The review outcome, decided from the runs alone: a pure function of
-//! the plan, each agent's run and each specialist's report file. It
-//! approves exactly when every dispatched agent answered, every
-//! specialist's report ends with the outcome it answered, and no
-//! generalist kept a blocking finding. An agent that did not answer,
-//! or a report the gate would refuse, is named in the summary and in a
-//! blocking finding of its own, so the review is decided all the same
-//! and the author sees why it was not approved; the gate still refuses
-//! to post such a review (ENG-28), as its consulted list and reports
-//! show it.
+//! the plan, each agent's run, each specialist's report file and the
+//! requirement ids the reports may cite. It approves exactly when every
+//! dispatched agent answered, every specialist's report takes the form
+//! the gate takes and ends with the outcome it answered, and no
+//! generalist kept a blocking finding. A specialist carries no
+//! severity: its findings reach the verdict only as its generalist
+//! weighs them, and a finding a generalist keeps from a specialist's
+//! requirement request stays a nit. An agent that did not answer, or a
+//! report the gate would refuse or that cites an id no requirement has,
+//! is named in the summary and in a blocking finding of its own, so the
+//! review is decided all the same and the author sees why it was not
+//! approved; the gate still refuses to post such a review (ENG-28), as
+//! its consulted list and reports show it.
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::Write as _;
 
 use review_eval::component::Kind;
 use review_eval::report;
+use review_gate::report::Line;
 use review_gate::{
     APPROVE_VERDICT, BLOCKING, Finding, NIT, REQUEST_CHANGES_VERDICT, ReviewOutcome, report_check,
 };
@@ -36,13 +41,18 @@ pub struct Decision {
 }
 
 /// Decides the review of `plan` from `runs` and `reports`, each
-/// specialist's report file by name, when it wrote one.
+/// specialist's report file by name, when it wrote one, holding each
+/// linked finding to the ids in `known`.
 #[must_use]
-pub fn decide(plan: &Plan, runs: &[AgentRun], reports: &BTreeMap<String, String>) -> Decision {
+pub fn decide(
+    plan: &Plan,
+    runs: &[AgentRun],
+    reports: &BTreeMap<String, String>,
+    known: &BTreeSet<String>,
+) -> Decision {
     let mut findings = Vec::new();
     let (answers, silent) = answers(plan, runs, &mut findings);
-    let refused = refused_reports(plan, &answers, reports, &mut findings);
-    blocking_reports(plan, &answers, reports, &refused, &mut findings);
+    let refused = refused_reports(plan, &answers, reports, known, &mut findings);
     if plan.dispatch.is_empty() {
         findings.push(blocking(
             REVIEW_PATH,
@@ -53,7 +63,7 @@ pub fn decide(plan: &Plan, runs: &[AgentRun], reports: &BTreeMap<String, String>
         kept: kept_counts,
         closings,
         unread,
-    } = weighed(plan, &answers, &mut findings);
+    } = weighed(plan, &answers, reports, &mut findings);
     let consulted: BTreeSet<String> = answers.keys().cloned().collect();
     let approves = silent.is_empty()
         && refused.is_empty()
@@ -121,13 +131,14 @@ fn answers(
     (answers, silent)
 }
 
-/// The answering specialists whose report the gate refuses, each with
-/// its problem, and a blocking finding on its report file added to
-/// `findings`.
+/// The answering specialists whose report the gate refuses, or whose
+/// linked finding cites an id outside `known`, each with its problem,
+/// and a blocking finding on its report file added to `findings`.
 fn refused_reports(
     plan: &Plan,
     answers: &BTreeMap<String, String>,
     reports: &BTreeMap<String, String>,
+    known: &BTreeSet<String>,
     findings: &mut Vec<Finding>,
 ) -> Vec<String> {
     let mut refused = Vec::new();
@@ -135,43 +146,14 @@ fn refused_reports(
         let Some(answer) = answers.get(&name) else {
             continue;
         };
-        if let Some(problem) = report_check(reports.get(&name).map(String::as_str), Some(answer)) {
+        let report = reports.get(&name).map(String::as_str);
+        if let Some(problem) = report_check(report, Some(answer), Some(known)) {
             findings.push(blocking(&report_file(&name), format!("{name} {problem}")));
             refused.push(format!("{name} ({problem})"));
         }
     }
 
     refused
-}
-
-/// Adds a blocking finding on each answering specialist's report that
-/// the gate takes and that ends with `outcome: blocking`, so the
-/// specialist layer counts toward the verdict whatever its generalist
-/// answers. A refused report, named in `refused`, is blocking already.
-fn blocking_reports(
-    plan: &Plan,
-    answers: &BTreeMap<String, String>,
-    reports: &BTreeMap<String, String>,
-    refused: &[String],
-    findings: &mut Vec<Finding>,
-) {
-    for name in plan.specialists() {
-        if !answers.contains_key(&name)
-            || refused.iter().any(|r| r.starts_with(&format!("{name} ")))
-        {
-            continue;
-        }
-        let ends_blocking = reports
-            .get(&name)
-            .is_some_and(|text| report::parse(text).outcome.as_deref() == Some(BLOCKING));
-        if ends_blocking {
-            let path = report_file(&name);
-            findings.push(blocking(
-                &path,
-                format!("{name}'s report {path} ends with outcome: {BLOCKING}"),
-            ));
-        }
-    }
 }
 
 /// What weighing the generalists' answers gave.
@@ -188,10 +170,12 @@ struct Weighed {
 /// Adds each answering generalist's kept findings to `findings`, each
 /// once, counts them, and names each generalist whose answer says
 /// neither a finding nor that it has none, with a blocking finding of
-/// its own: silence is no clean pass.
+/// its own: silence is no clean pass. A blocking finding kept from a
+/// specialist's requirement request, in `reports`, is kept as a nit.
 fn weighed(
     plan: &Plan,
     answers: &BTreeMap<String, String>,
+    reports: &BTreeMap<String, String>,
     findings: &mut Vec<Finding>,
 ) -> Weighed {
     let mut counts = (0, 0);
@@ -214,7 +198,11 @@ fn weighed(
             ));
             unread.push(name.clone());
         }
-        for f in kept(answer) {
+        for mut f in kept(answer) {
+            if f.severity == BLOCKING && from_request(plan, &name, reports, &f) {
+                f.severity = NIT.to_owned();
+                f.body = format!("{} (kept from a requirement request, so a nit)", f.body);
+            }
             if findings.contains(&f) {
                 continue;
             }
@@ -235,6 +223,43 @@ fn weighed(
         closings,
         unread,
     }
+}
+
+/// Whether `f`, a finding `generalist` kept, came from a requirement
+/// request: its source, the last part of its line, names one of the
+/// generalist's specialists, whose report asks for a requirement at
+/// the same path and line and links no finding there. A generalist
+/// that finds a blocking defect at that line itself names itself.
+fn from_request(
+    plan: &Plan,
+    generalist: &str,
+    reports: &BTreeMap<String, String>,
+    f: &Finding,
+) -> bool {
+    let source = f
+        .body
+        .rsplit(" — ")
+        .next()
+        .unwrap_or_default()
+        .trim()
+        .trim_matches(['`', '*', '_', '.'])
+        .to_lowercase();
+    let Some(report) = plan
+        .dispatch
+        .get(generalist)
+        .filter(|specialists| specialists.contains(&source))
+        .and_then(|_| reports.get(&source))
+    else {
+        return false;
+    };
+    let at = |path: &str, line: usize| path == f.path && i64::try_from(line).ok() == Some(f.line);
+    let lines: Vec<Line> = report.lines().map(review_gate::report::line).collect();
+    lines
+        .iter()
+        .any(|l| matches!(l, Line::Request(r) if at(&r.path, r.line)))
+        && !lines
+            .iter()
+            .any(|l| matches!(l, Line::Linked(k) if at(&k.path, k.line)))
 }
 
 /// A blocking finding on the whole of `path`.

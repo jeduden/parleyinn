@@ -35,7 +35,14 @@ fn silent(name: &str, kind: Kind, why: &str) -> AgentRun {
 }
 
 fn outcome_line(name: &str) -> String {
-    format!("outcome: nits — {name} saw a nit.")
+    format!("outcome: findings — {name} saw a finding.")
+}
+
+/// The ids the reports may cite: the invariants and two requirements.
+fn known() -> BTreeSet<String> {
+    let mut ids = review_gate::report::invariants();
+    ids.extend(["ENG-02".to_owned(), "ENG-16".to_owned()]);
+    ids
 }
 
 /// A specialist that answered with its report's outcome line.
@@ -49,7 +56,7 @@ fn specialist(name: &str) -> (AgentRun, (String, String)) {
         ),
         (
             name.to_owned(),
-            format!("a.rs:1 — nit — x — ENG-02\n\n{line}\n"),
+            format!("a.rs:1 — if not addressed: x breaks — ENG-02\n\n{line}\n"),
         ),
     )
 }
@@ -73,7 +80,7 @@ fn a_review_whose_agents_all_answered_with_only_nits_approves() {
          The code is sound.",
     );
 
-    let d = decide(&plan(DISPATCH), &runs, &reports);
+    let d = decide(&plan(DISPATCH), &runs, &reports, &known());
 
     assert_eq!(d.outcome.verdict, "approve");
     assert_eq!(
@@ -99,14 +106,14 @@ fn a_review_whose_agents_all_answered_with_only_nits_approves() {
             .into()
     );
     assert_eq!(d.answers.len(), 3);
-    assert!(d.answers["lang-rust"].starts_with("outcome: nits"));
+    assert!(d.answers["lang-rust"].starts_with("outcome: findings"));
 }
 
 #[test]
 fn a_kept_blocking_finding_requests_changes() {
     let (runs, reports) = all_answered("src/a.rs:3 — blocking — an unwrap — lang-rust\nDone.");
 
-    let d = decide(&plan(DISPATCH), &runs, &reports);
+    let d = decide(&plan(DISPATCH), &runs, &reports, &known());
 
     assert_eq!(d.outcome.verdict, "request_changes");
     assert_eq!(d.outcome.findings[0].severity, "blocking");
@@ -123,7 +130,7 @@ fn an_agent_that_did_not_answer_is_counted_named_and_blocks() {
     );
     runs.pop();
 
-    let d = decide(&plan(DISPATCH), &runs, &reports);
+    let d = decide(&plan(DISPATCH), &runs, &reports, &known());
 
     assert_eq!(d.outcome.verdict, "request_changes");
     assert_eq!(
@@ -170,8 +177,19 @@ fn a_report_the_gate_would_refuse_blocks_and_is_named() {
             "has a report that does not end with its outcome",
         ),
         (
-            Some("outcome: sound — another."),
+            Some("outcome: none — another."),
             "has a report whose outcome differs from its answer in the run log",
+        ),
+        (
+            Some("a.rs:1 — nit — x\noutcome: findings — lang-rust saw a finding."),
+            "has a report whose line 1 is neither a linked finding nor a requirement request",
+        ),
+        (
+            Some(
+                "I read it.\na.rs:1 — if not addressed: x breaks — ENG-99\n\
+                 outcome: findings — lang-rust saw a finding.",
+            ),
+            "has a report whose line 2 cites ENG-99, which no requirement or invariant has",
         ),
     ] {
         let (runs, mut reports) = all_answered("none — nothing to add — review-code\nSound.");
@@ -180,7 +198,7 @@ fn a_report_the_gate_would_refuse_blocks_and_is_named() {
             Some(text) => reports.insert("lang-rust".to_owned(), text.to_owned()),
         };
 
-        let d = decide(&plan(DISPATCH), &runs, &reports);
+        let d = decide(&plan(DISPATCH), &runs, &reports, &known());
 
         assert_eq!(d.outcome.verdict, "request_changes", "{problem}");
         assert_eq!(
@@ -204,14 +222,14 @@ fn a_report_the_gate_would_refuse_blocks_and_is_named() {
 #[test]
 fn an_answer_that_repeats_the_outcome_with_harmless_differences_is_accepted() {
     for answer in [
-        "outcome: nits - lang-rust saw a nit\nreview/reports/lang-rust.md",
-        "**Outcome: nits** — lang-rust  saw a nit.\nreview/reports/lang-rust.md",
-        "`outcome: nits – lang-rust saw a nit`",
+        "outcome: findings - lang-rust saw a finding\nreview/reports/lang-rust.md",
+        "**Outcome: findings** — lang-rust  saw a finding.\nreview/reports/lang-rust.md",
+        "`outcome: findings – lang-rust saw a finding`",
     ] {
         let (mut runs, reports) = all_answered("none — nothing to add — review-code\nSound.");
         runs[0] = ran("lang-rust", Kind::Specialist, answer);
 
-        let d = decide(&plan(DISPATCH), &runs, &reports);
+        let d = decide(&plan(DISPATCH), &runs, &reports, &known());
 
         assert_eq!(d.outcome.verdict, "approve", "{answer}");
         assert!(d.outcome.findings.is_empty(), "{answer}");
@@ -220,7 +238,7 @@ fn an_answer_that_repeats_the_outcome_with_harmless_differences_is_accepted() {
 
 #[test]
 fn an_empty_dispatch_is_decided_but_not_approved() {
-    let d = decide(&plan("{}"), &[], &BTreeMap::new());
+    let d = decide(&plan("{}"), &[], &BTreeMap::new(), &known());
 
     assert_eq!(d.outcome.verdict, "request_changes");
     assert_eq!(d.outcome.summary, "The review bundle dispatched no agent.");
@@ -251,7 +269,7 @@ fn generalists_findings_are_kept_once_each_with_every_closing() {
         ),
     ];
 
-    let d = decide(&p, &runs, &[rust_report, officer_report].into());
+    let d = decide(&p, &runs, &[rust_report, officer_report].into(), &known());
 
     assert_eq!(d.outcome.verdict, "approve");
     assert_eq!(d.outcome.findings.len(), 1);
@@ -338,7 +356,7 @@ fn plural_names_one_and_many() {
 fn a_generalist_that_says_neither_a_finding_nor_none_requests_changes() {
     let (runs, reports) = all_answered("The code is sound.");
 
-    let d = decide(&plan(DISPATCH), &runs, &reports);
+    let d = decide(&plan(DISPATCH), &runs, &reports, &known());
 
     assert_eq!(d.outcome.verdict, "request_changes");
     assert_eq!(
@@ -363,7 +381,7 @@ fn a_generalist_that_says_neither_a_finding_nor_none_requests_changes() {
 fn a_generalist_that_says_none_is_a_clean_pass() {
     let (runs, reports) = all_answered("none — nothing to add — review-code\nThe code is sound.");
 
-    let d = decide(&plan(DISPATCH), &runs, &reports);
+    let d = decide(&plan(DISPATCH), &runs, &reports, &known());
 
     assert_eq!(d.outcome.verdict, "approve");
     assert!(d.outcome.findings.is_empty());
@@ -375,28 +393,89 @@ fn a_generalist_that_says_none_is_a_clean_pass() {
 }
 
 #[test]
-fn a_specialist_s_blocking_report_counts_whatever_its_generalist_answers() {
-    let (mut runs, mut reports) =
+fn a_specialist_s_finding_counts_only_as_its_generalist_weighs_it() {
+    let (runs, reports) =
         all_answered("dropped — a.rs:1 — no bug there — lang-rust\nThe code is sound.");
-    let line = "outcome: blocking — lang-rust saw an unwrap.";
-    runs[0] = ran(
-        "lang-rust",
-        Kind::Specialist,
-        &format!("{line}\nreview/reports/lang-rust.md"),
-    );
+
+    let d = decide(&plan(DISPATCH), &runs, &reports, &known());
+
+    assert_eq!(d.outcome.verdict, "approve");
+    assert!(d.outcome.findings.is_empty());
+}
+
+/// [`DISPATCH`]'s run with lang-rust's report asking for a requirement
+/// at `src/a.rs:3`, beside `linked` when given, and the generalist
+/// answering `answer`.
+fn requested(linked: Option<&str>, answer: &str) -> Decision {
+    let (runs, mut reports) = all_answered(answer);
+    let line = outcome_line("lang-rust");
+    let linked = linked.map(|l| format!("{l}\n")).unwrap_or_default();
     reports.insert(
         "lang-rust".to_owned(),
-        format!("a.rs:1 — blocking — an unwrap — ENG-16\n\n{line}\n"),
+        format!("src/a.rs:3 — request: add a rule on line length — none says so\n{linked}{line}\n"),
     );
 
-    let d = decide(&plan(DISPATCH), &runs, &reports);
+    decide(&plan(DISPATCH), &runs, &reports, &known())
+}
 
-    assert_eq!(d.outcome.verdict, "request_changes");
+#[test]
+fn a_blocking_finding_kept_from_a_requirement_request_stays_a_nit() {
+    let d = requested(
+        None,
+        "src/a.rs:3 — blocking — no rule on line length — `lang-rust`.\nDone.",
+    );
+
+    assert_eq!(d.outcome.verdict, "approve");
     assert_eq!(
         d.outcome.findings,
-        vec![blocking(
-            "review/reports/lang-rust.md",
-            "lang-rust's report review/reports/lang-rust.md ends with outcome: blocking".to_owned()
-        )]
+        vec![Finding {
+            path: "src/a.rs".to_owned(),
+            line: 3,
+            severity: NIT.to_owned(),
+            body:
+                "no rule on line length — `lang-rust`. (kept from a requirement request, so a nit)"
+                    .to_owned(),
+        }]
+    );
+    assert!(d.outcome.summary.contains("kept 0 blocking and 1 nit"));
+}
+
+#[test]
+fn a_blocking_finding_with_another_ground_stays_blocking() {
+    for (linked, answer) in [
+        // The generalist's own finding at the requested line.
+        (None, "src/a.rs:3 — blocking — an unwrap — review-code"),
+        // The specialist links a finding at the same line.
+        (
+            Some("src/a.rs:3 — if not addressed: a hook panics — ENG-16"),
+            "src/a.rs:3 — blocking — a hook panics — lang-rust",
+        ),
+        // Another line than the request's.
+        (None, "src/a.rs:4 — blocking — no rule — lang-rust"),
+        // Another file than the request's.
+        (None, "src/b.rs:3 — blocking — no rule — lang-rust"),
+        // A source that is not this generalist's specialist.
+        (None, "src/a.rs:3 — blocking — no rule — lang-shell"),
+    ] {
+        let d = requested(linked, answer);
+
+        assert_eq!(d.outcome.verdict, "request_changes", "{answer}");
+        assert_eq!(d.outcome.findings[0].severity, BLOCKING, "{answer}");
+    }
+}
+
+#[test]
+fn a_source_whose_report_is_missing_reads_as_no_request() {
+    let (runs, mut reports) =
+        all_answered("src/a.rs:3 — blocking — no rule — test-engineer-unit\nDone.");
+    reports.remove("test-engineer-unit");
+
+    let d = decide(&plan(DISPATCH), &runs, &reports, &known());
+
+    assert!(
+        d.outcome
+            .findings
+            .iter()
+            .any(|f| f.path == "src/a.rs" && f.severity == BLOCKING)
     );
 }
