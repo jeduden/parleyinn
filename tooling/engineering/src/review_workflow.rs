@@ -235,7 +235,7 @@ fn uploads_dir(paths: &[String], dir: &str) -> bool {
     let excluded = paths
         .iter()
         .filter_map(|p| p.strip_prefix('!'))
-        .map(|p| bare(p))
+        .map(&bare)
         .any(|p| p == dir || above(&p));
 
     paths
