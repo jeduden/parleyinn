@@ -45,15 +45,12 @@ fn known() -> BTreeSet<String> {
     ids
 }
 
-/// A specialist that answered with its report's outcome line.
+/// A specialist that answered its outcome line, with the report the run
+/// assembled from its log.
 fn specialist(name: &str) -> (AgentRun, (String, String)) {
     let line = outcome_line(name);
     (
-        ran(
-            name,
-            Kind::Specialist,
-            &format!("{line}\nreview/reports/{name}.md"),
-        ),
+        ran(name, Kind::Specialist, &line),
         (
             name.to_owned(),
             format!("a.rs:1 — if not addressed: x breaks — ENG-02\n\n{line}\n"),
@@ -170,15 +167,25 @@ fn an_agent_that_did_not_answer_is_counted_named_and_blocks() {
 #[test]
 fn a_report_the_gate_would_refuse_blocks_and_is_named() {
     for (report, problem) in [
-        (None, "wrote no report"),
-        (Some(""), "wrote an empty report"),
+        (None, "has no report"),
+        (Some(""), "has an empty report"),
         (
             Some("a.rs:1 — nit — x"),
             "has a report that does not end with its outcome",
         ),
         (
+            Some(
+                "incomplete: its run ended with error_max_turns\na.rs:1 — if not addressed: x breaks — ENG-02",
+            ),
+            "has a report that does not end with its outcome",
+        ),
+        (
             Some("outcome: none — another."),
-            "has a report whose outcome differs from its answer in the run log",
+            "answered another outcome in the run log than its report ends with",
+        ),
+        (
+            Some("withdrawn: a.rs:2 — nothing there\noutcome: none — lang-rust saw none."),
+            "has a report whose line 1 revises or withdraws a finding at a.rs:2, where it found none",
         ),
         (
             Some("a.rs:1 — nit — x\noutcome: findings — lang-rust saw a finding."),
@@ -220,11 +227,11 @@ fn a_report_the_gate_would_refuse_blocks_and_is_named() {
 }
 
 #[test]
-fn an_answer_that_repeats_the_outcome_with_harmless_differences_is_accepted() {
+fn an_answer_whose_outcome_line_carries_markup_or_a_stray_line_is_accepted() {
     for answer in [
         "outcome: findings - lang-rust saw a finding\nreview/reports/lang-rust.md",
-        "**Outcome: findings** — lang-rust  saw a finding.\nreview/reports/lang-rust.md",
-        "`outcome: findings – lang-rust saw a finding`",
+        "**Outcome: findings** — lang-rust  saw a finding.\n\nThat is all.",
+        "I am done.\n`outcome: findings – lang-rust saw a finding`",
     ] {
         let (mut runs, reports) = all_answered("none — nothing to add — review-code\nSound.");
         runs[0] = ran("lang-rust", Kind::Specialist, answer);

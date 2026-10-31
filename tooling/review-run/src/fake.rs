@@ -1,6 +1,7 @@
 //! A host for the tests: `claude` runs a closure the test hands in,
-//! which writes the run's log, and its report for a specialist, as the
-//! real command line would; every command is kept.
+//! which writes the run's log as the real command line would: a
+//! specialist's text blocks, its findings among them, and its result;
+//! every command is kept.
 
 use std::fs;
 use std::sync::Mutex;
@@ -54,33 +55,37 @@ pub(crate) fn prompt_of(command: &Command) -> String {
     command.args.get(1).cloned().unwrap_or_default()
 }
 
-/// A run's log: one model call with usage, and a result answering
-/// `answer` at `cost`.
-pub(crate) fn log(answer: &str, cost: f64) -> String {
+/// The finding a fake specialist states.
+pub(crate) const FINDING: &str = "src/a.rs:3 — if not addressed: a long line hides a bug — I9";
+
+/// A run's log: one model call with usage and a text block per entry of
+/// `texts`, and a result of `subtype` answering `answer` at `cost`.
+pub(crate) fn log_of(texts: &[&str], subtype: &str, answer: &str, cost: f64) -> String {
+    let blocks: Vec<serde_json::Value> = texts
+        .iter()
+        .map(|t| json!({"type": "text", "text": t}))
+        .collect();
     let call = json!({"type": "assistant", "parent_tool_use_id": null, "message": {
         "id": "m1", "model": "claude-haiku-5-5",
         "usage": {"input_tokens": 10, "cache_creation_input_tokens": 20,
                   "cache_read_input_tokens": 30, "output_tokens": 5},
-        "content": []}});
-    let result = json!({"type": "result", "subtype": "success", "is_error": false,
+        "content": blocks}});
+    let result = json!({"type": "result", "subtype": subtype, "is_error": subtype != "success",
         "result": answer, "total_cost_usd": cost, "num_turns": 3, "duration_ms": 9});
 
     format!("{call}\n{result}\n")
 }
 
-/// Answers `command` as its agent would: `report` written to its report
-/// file when there is one, and a log answering `answer`.
-pub(crate) fn answer(
-    command: &Command,
-    answer: &str,
-    report: Option<&str>,
-) -> Result<Output, String> {
-    if let Some(report) = report {
-        let dir = command.cwd.join("review/reports");
-        fs::create_dir_all(&dir).unwrap();
-        fs::write(dir.join(format!("{}.md", agent_of(command))), report).unwrap();
-    }
-    write_log(command, &log(answer, 0.01));
+/// A successful run's log answering `answer` at `cost`, with no text
+/// but the answer's.
+pub(crate) fn log(answer: &str, cost: f64) -> String {
+    log_of(&[answer], "success", answer, cost)
+}
+
+/// Answers `command` as its agent would: a log whose text blocks are
+/// `texts`, then a successful result answering `answer`.
+pub(crate) fn answer(command: &Command, texts: &[&str], answer: &str) -> Result<Output, String> {
+    write_log(command, &log_of(texts, "success", answer, 0.01));
 
     Ok(Output {
         code: Some(0),
@@ -93,47 +98,38 @@ pub(crate) fn write_log(command: &Command, text: &str) {
     fs::write(command.stdout_to.as_ref().unwrap(), text).unwrap();
 }
 
-/// A specialist's report with one linked finding, its outcome line and
-/// its answer.
+/// A specialist's run: one linked finding stated in its text, then its
+/// outcome line as its answer.
 pub(crate) fn specialist(command: &Command) -> Result<Output, String> {
     let name = agent_of(command);
     let outcome = format!("outcome: findings — {name} saw one finding.");
-    answer(
-        command,
-        &format!("{outcome}\nreview/reports/{name}.md"),
-        Some(&format!(
-            "src/a.rs:3 — if not addressed: a long line hides a bug — I9\n\n{outcome}\n"
-        )),
-    )
+    answer(command, &[FINDING, &outcome], &outcome)
 }
 
 /// A generalist's answer: the specialist's nit kept, its closing
 /// sentence.
 pub(crate) fn generalist(command: &Command) -> Result<Output, String> {
     let name = agent_of(command);
-    answer(
-        command,
-        &format!("src/a.rs:3 — nit — a long line — lang-rust\n{name} finds the change sound."),
-        None,
-    )
+    let text =
+        format!("src/a.rs:3 — nit — a long line — lang-rust\n{name} finds the change sound.");
+    answer(command, &[&text], &text)
 }
 
 /// Writes agent `name`'s definition under `.claude/agents` of `dir`,
-/// with `turns` as its turn budget: a specialist's tools for a name
-/// that is no generalist's.
+/// with `turns` as its turn budget: every agent reads and writes
+/// nothing; a name that is no generalist's runs on haiku.
 pub(crate) fn define(dir: &std::path::Path, name: &str, turns: usize) {
-    let generalist = name.starts_with("review-");
-    let (tools, model) = if generalist {
-        ("Read, Grep, Glob", "opus")
+    let model = if name.starts_with("review-") {
+        "opus"
     } else {
-        ("Read, Grep, Glob, Write", "haiku")
+        "haiku"
     };
     let agents = dir.join(".claude/agents");
     fs::create_dir_all(&agents).unwrap();
     fs::write(
         agents.join(format!("{name}.md")),
         format!(
-            "---\nname: {name}\ndescription: d\ntools: {tools}\nmodel: {model}\neffort: low\nmaxTurns: {turns}\n---\n# {name}\n"
+            "---\nname: {name}\ndescription: d\ntools: Read, Grep, Glob\nmodel: {model}\neffort: low\nmaxTurns: {turns}\n---\n# {name}\n"
         ),
     )
     .unwrap();

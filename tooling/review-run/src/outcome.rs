@@ -1,9 +1,10 @@
 //! The review outcome, decided from the runs alone: a pure function of
-//! the plan, each agent's run, each specialist's report file and the
-//! requirement ids the reports may cite. It approves exactly when every
-//! dispatched agent answered, every specialist's report takes the form
-//! the gate takes and ends with the outcome it answered, and no
-//! generalist kept a blocking finding. A specialist carries no
+//! the plan, each agent's run, each specialist's report as the run
+//! assembled it from the specialist's log, and the requirement ids the
+//! reports may cite. It approves exactly when every dispatched agent
+//! answered, every specialist's report takes the form the gate takes
+//! and ends with the outcome it answered, and no generalist kept a
+//! blocking finding. A specialist carries no
 //! severity: its findings reach the verdict only as its generalist
 //! weighs them, and a finding a generalist keeps from a specialist's
 //! requirement request stays a nit. An agent that did not answer, or a
@@ -41,8 +42,8 @@ pub struct Decision {
 }
 
 /// Decides the review of `plan` from `runs` and `reports`, each
-/// specialist's report file by name, when it wrote one, holding each
-/// linked finding to the ids in `known`.
+/// specialist's assembled report by name, when the run wrote one,
+/// holding each linked finding to the ids in `known`.
 #[must_use]
 pub fn decide(
     plan: &Plan,

@@ -1,10 +1,15 @@
 //! The runs: every dispatched specialist, in parallel up to a bound,
 //! then, once every one has finished, every dispatched generalist the
 //! same way, each as `claude --agent` through the evaluation's runner,
-//! with the review's tools, write rule and turn budget, and a deadline
-//! of its own. A run that cannot start, ends without a successful
-//! result, misses its deadline or answers nothing has not answered;
-//! the review goes on without it.
+//! with the review's reading tools and turn budget, and a deadline of
+//! its own. A run that cannot start, ends without a successful result,
+//! misses its deadline or answers nothing has not answered; the review
+//! goes on without it. A specialist's report is assembled from its run
+//! log, the finding lines it stated and its answer's outcome line, and
+//! written to the report file its generalist reads; a run that did not
+//! answer leaves what it stated there too, headed incomplete, so the
+//! findings it logged are not lost, while the run stays one that did
+//! not answer.
 
 use std::fs;
 use std::io;
@@ -19,6 +24,7 @@ use review_eval::host::Host;
 use review_eval::log::RunLog;
 use review_eval::runner;
 use review_eval::world::World;
+use review_gate::report::assemble;
 
 use crate::LOGS;
 use crate::plan::{Plan, report_file};
@@ -124,10 +130,11 @@ pub fn describe(run: &AgentRun) -> String {
 /// Runs agent `name`, a `kind`, and once more when its run did not
 /// answer: a command that would not start, ended without a result,
 /// missed its deadline or answered nothing. A definition that does not
-/// read, or a report that cannot be cleared, fails at once, and a report
-/// the agent wrote is judged where the outcome is decided, never rerun.
-/// The first failure is told to `progress` before the second attempt,
-/// and its log kept as `<name>.first.jsonl` beside the second's.
+/// read fails at once, and a report assembled from the log is judged
+/// where the outcome is decided, never rerun. The first failure is told
+/// to `progress` before the second attempt, and its log kept as
+/// `<name>.first.jsonl` beside the second's, whose report replaces the
+/// first's.
 fn run_one(
     host: &dyn Host,
     workdir: &Path,
@@ -158,9 +165,9 @@ fn run_one(
     second
 }
 
-/// Runs agent `name` once, logging under the logs' directory. A
-/// specialist's report file from before is removed first, so only what
-/// this run wrote is read. A run that never started has no attempts.
+/// Runs agent `name` once, logging under the logs' directory, and for a
+/// specialist writes the report assembled from its log. A run that
+/// never started has no attempts.
 fn attempt(
     host: &dyn Host,
     workdir: &Path,
@@ -169,22 +176,18 @@ fn attempt(
     kind: Kind,
     deadline: Duration,
 ) -> AgentRun {
-    let failed = |failure: String| AgentRun {
-        name: name.to_owned(),
-        kind,
-        failure: Some(failure),
-        log: RunLog::default(),
-        attempts: 0,
-    };
     let component = match component::load(workdir, name) {
         Ok(component) => component,
-        Err(e) => return failed(format!("its definition does not read: {e}")),
+        Err(e) => {
+            return AgentRun {
+                name: name.to_owned(),
+                kind,
+                failure: Some(format!("its definition does not read: {e}")),
+                log: RunLog::default(),
+                attempts: 0,
+            };
+        }
     };
-    if kind == Kind::Specialist
-        && let Err(e) = remove_stale(&workdir.join(report_file(name)))
-    {
-        return failed(e);
-    }
     let world = World {
         main: workdir.to_path_buf(),
         class: plan.class.clone(),
@@ -194,21 +197,26 @@ fn attempt(
     };
     let log_path = workdir.join(LOGS).join(format!("{name}.jsonl"));
     let command = runner::command(&component, &world, None, &log_path, deadline);
-    let log = match runner::run(host, &command) {
-        Ok(log) => log,
-        Err(e) => {
-            return AgentRun {
-                attempts: 1,
-                ..failed(e)
+    let (log, failure) = match runner::run(host, &command) {
+        Ok(log) => {
+            let failure = if !log.answered {
+                Some(format!("its run ended with {}", log.subtype))
+            } else if log.answer.trim().is_empty() {
+                Some("its run answered nothing".to_owned())
+            } else {
+                None
             };
+            (log, failure)
         }
+        Err(e) => (RunLog::default(), Some(e)),
     };
-    let failure = if !log.answered {
-        Some(format!("its run ended with {}", log.subtype))
-    } else if log.answer.trim().is_empty() {
-        Some("its run answered nothing".to_owned())
+    let failure = if kind == Kind::Specialist {
+        match report(workdir, name, &log, failure.as_deref()) {
+            Ok(()) => failure,
+            Err(e) => Some(failure.map_or(e.clone(), |f| format!("{f}; {e}"))),
+        }
     } else {
-        None
+        failure
     };
 
     AgentRun {
@@ -218,6 +226,23 @@ fn attempt(
         log,
         attempts: 1,
     }
+}
+
+/// Writes specialist `name`'s report, assembled from `log`: the finding
+/// lines it stated, revised and withdrew, then its answer's outcome
+/// line; headed incomplete with `failure` when the run did not answer,
+/// so the findings it logged reach its generalist while the run stays
+/// one that did not answer.
+///
+/// # Errors
+///
+/// Fails, as a run that did not answer, when the report cannot be
+/// written: a generalist would read a stale one otherwise.
+fn report(workdir: &Path, name: &str, log: &RunLog, failure: Option<&str>) -> Result<(), String> {
+    let path = workdir.join(report_file(name));
+    let text = assemble(&log.texts, &log.answer, failure);
+    fs::write(&path, text)
+        .map_err(|e| format!("its report could not be written: {}: {e}", path.display()))
 }
 
 /// Moves agent `name`'s log and its errors, each when there is one, to
@@ -241,16 +266,6 @@ fn keep_first_log(workdir: &Path, name: &str) -> Result<(), String> {
     }
 
     Ok(())
-}
-
-/// Removes the file at `path` when there is one.
-fn remove_stale(path: &Path) -> Result<(), String> {
-    match fs::remove_file(path) {
-        Err(e) if e.kind() != io::ErrorKind::NotFound => {
-            Err(format!("remove {}: {e}", path.display()))
-        }
-        _ => Ok(()),
-    }
 }
 
 /// `f` of each of `items`, at most `bound` at once, in the order of

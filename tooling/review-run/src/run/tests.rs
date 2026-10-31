@@ -5,7 +5,7 @@ use std::sync::{Barrier, Mutex};
 use std::time::Duration;
 
 use review_eval::host::{Command, Output};
-use review_eval::runner::{GENERALIST_TOOLS, SPECIALIST_TOOLS};
+use review_eval::runner::TOOLS;
 use testkit::TempDir;
 
 use super::*;
@@ -102,13 +102,122 @@ fn a_specialist_runs_with_the_review_s_tools_turns_deadline_and_log() {
         rust.stdout_to.as_deref(),
         Some(dir.path().join("review/logs/lang-rust.jsonl").as_path())
     );
-    assert_eq!(arg_after(rust, "--allowedTools"), SPECIALIST_TOOLS);
+    assert_eq!(arg_after(rust, "--allowedTools"), TOOLS);
     assert_eq!(arg_after(rust, "--max-turns"), "20");
     assert_eq!(arg_after(rust, "--output-format"), "stream-json");
     assert!(!rust.args.iter().any(|a| a == "--model"));
     let prompt = prompt_of(rust);
     assert!(prompt.contains("`review/diffs/lang-rust.diff`"), "{prompt}");
-    assert!(prompt.contains("`review/reports/lang-rust.md`"), "{prompt}");
+    assert!(prompt.contains("You write no file"), "{prompt}");
+    assert!(!prompt.contains("review/reports"), "{prompt}");
+}
+
+#[test]
+fn a_specialist_s_report_is_assembled_from_its_log_and_written_for_its_generalist() {
+    let dir = workdir();
+    let host = FakeHost::new(fake::either);
+
+    let runs = review_with(&host, dir.path(), &plan(DISPATCH));
+
+    assert!(runs.iter().all(AgentRun::answered));
+    let report = fs::read_to_string(dir.path().join("review/reports/lang-rust.md")).unwrap();
+    assert_eq!(
+        report,
+        format!(
+            "{}\noutcome: findings — lang-rust saw one finding.\n",
+            fake::FINDING
+        )
+    );
+    assert!(dir.path().join("review/reports/lang-markdown.md").is_file());
+    assert!(!dir.path().join("review/reports/review-code.md").exists());
+}
+
+#[test]
+fn a_run_cut_off_before_its_answer_keeps_what_it_stated_as_an_incomplete_report() {
+    let dir = workdir();
+
+    let run = one_run(dir.path(), |c| {
+        fake::write_log(
+            c,
+            &fake::log_of(
+                &[
+                    "Reading.",
+                    fake::FINDING,
+                    "a.rs:9 — not a form",
+                    "Checking more.",
+                ],
+                "error_max_turns",
+                "",
+                0.02,
+            ),
+        );
+        Ok(Output::default())
+    });
+
+    assert_eq!(
+        run.failure.as_deref(),
+        Some("its run ended with error_max_turns")
+    );
+    assert_eq!(
+        fs::read_to_string(dir.path().join("review/reports/lang-rust.md")).unwrap(),
+        format!(
+            "incomplete: its run ended with error_max_turns\n{}\na.rs:9 — not a form\n",
+            fake::FINDING
+        )
+    );
+}
+
+#[test]
+fn a_run_that_cannot_start_leaves_an_incomplete_report_saying_so() {
+    let dir = workdir();
+
+    let run = one_run(dir.path(), |_| Err("cannot start".to_owned()));
+
+    assert!(!run.answered());
+    assert_eq!(
+        fs::read_to_string(dir.path().join("review/reports/lang-rust.md")).unwrap(),
+        "incomplete: cannot start\n"
+    );
+}
+
+#[test]
+fn a_report_that_cannot_be_written_fails_the_run_closed() {
+    let dir = workdir();
+    fs::create_dir_all(dir.path().join("review/reports/lang-rust.md")).unwrap();
+
+    let run = one_run(dir.path(), fake::specialist);
+
+    let failure = run.failure.clone().unwrap();
+    assert!(
+        failure.starts_with("its report could not be written: "),
+        "{failure}"
+    );
+    assert_eq!(run.attempts, 2);
+
+    let run = one_run(dir.path(), |_| Err("cannot start".to_owned()));
+    let failure = run.failure.unwrap();
+    assert!(
+        failure.starts_with("cannot start; its report could not be written: "),
+        "{failure}"
+    );
+}
+
+#[test]
+fn a_generalist_s_run_writes_no_report() {
+    let dir = workdir();
+    let host = FakeHost::new(fake::either);
+
+    review_with(&host, dir.path(), &plan(DISPATCH));
+
+    let reports: Vec<String> = fs::read_dir(dir.path().join("review/reports"))
+        .unwrap()
+        .map(|e| e.unwrap().file_name().into_string().unwrap())
+        .collect();
+    assert!(
+        !reports.iter().any(|r| r.starts_with("review-")),
+        "{reports:?}"
+    );
+    assert_eq!(reports.len(), 3);
 }
 
 #[test]
@@ -120,7 +229,7 @@ fn a_generalist_is_told_its_specialists_report_files_and_reads_only() {
 
     let calls = host.calls.lock().unwrap().clone();
     let code = calls.iter().find(|c| agent_of(c) == "review-code").unwrap();
-    assert_eq!(arg_after(code, "--allowedTools"), GENERALIST_TOOLS);
+    assert_eq!(arg_after(code, "--allowedTools"), TOOLS);
     assert_eq!(arg_after(code, "--max-turns"), "40");
     let prompt = prompt_of(code);
     assert!(
@@ -213,7 +322,7 @@ fn a_run_that_does_not_answer_says_why() {
         ),
         (
             "its run answered nothing",
-            Box::new(|c| fake::answer(c, "  \n", None)),
+            Box::new(|c| fake::answer(c, &[], "  \n")),
         ),
         ("read ", Box::new(|_| Ok(Output::default()))),
     ];
@@ -241,20 +350,20 @@ fn an_agent_without_a_definition_does_not_run() {
 }
 
 #[test]
-fn a_report_from_before_the_run_is_removed_first() {
+fn a_report_from_before_the_run_is_written_over() {
     let dir = workdir();
     let report = dir.path().join("review/reports/lang-rust.md");
     fs::create_dir_all(report.parent().unwrap()).unwrap();
-    fs::write(&report, "outcome: none — stale.\n").unwrap();
+    fs::write(
+        &report,
+        "a.rs:1 — if not addressed: stale — I2\noutcome: findings — stale.\n",
+    )
+    .unwrap();
 
-    let run = one_run(dir.path(), |c| fake::answer(c, "outcome: none — x.", None));
+    let run = one_run(dir.path(), |c| fake::answer(c, &[], "outcome: none — x."));
 
     assert!(run.answered());
-    assert!(!report.exists());
-
-    fs::create_dir_all(&report).unwrap();
-    let run = one_run(dir.path(), fake::either);
-    assert!(run.failure.unwrap().starts_with("remove "));
+    assert_eq!(fs::read_to_string(&report).unwrap(), "outcome: none — x.\n");
 }
 
 #[test]
@@ -424,26 +533,34 @@ fn a_first_log_that_cannot_be_kept_is_told() {
 }
 
 #[test]
-fn a_stale_file_is_removed_and_a_missing_one_is_no_error() {
-    let dir = TempDir::new().unwrap();
-    let stale = dir.path().join("a.md");
-    fs::write(&stale, "x").unwrap();
+fn a_second_attempt_s_report_replaces_the_first_s() {
+    let dir = workdir();
+    let calls = AtomicUsize::new(0);
 
-    assert_eq!(remove_stale(&stale), Ok(()));
-    assert!(!stale.exists());
-    assert_eq!(remove_stale(&stale), Ok(()));
-}
+    let (run, _) = one_run_told(dir.path(), move |c| {
+        if calls.fetch_add(1, Ordering::SeqCst) == 0 {
+            fake::write_log(
+                c,
+                &fake::log_of(
+                    &["b.rs:2 — if not addressed: y — I2"],
+                    "error_max_turns",
+                    "",
+                    0.1,
+                ),
+            );
+            Ok(Output::default())
+        } else {
+            fake::specialist(c)
+        }
+    });
 
-#[test]
-fn a_stale_path_that_cannot_be_removed_is_told() {
-    let dir = TempDir::new().unwrap();
-    let at = dir.path().join("a.md");
-    fs::create_dir(&at).unwrap();
-
-    let err = remove_stale(&at).unwrap_err();
-    assert!(
-        err.starts_with(&format!("remove {}: ", at.display())),
-        "{err}"
+    assert!(run.answered());
+    assert_eq!(
+        fs::read_to_string(dir.path().join("review/reports/lang-rust.md")).unwrap(),
+        format!(
+            "{}\noutcome: findings — lang-rust saw one finding.\n",
+            fake::FINDING
+        )
     );
 }
 

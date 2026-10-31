@@ -1,10 +1,12 @@
 //! The `review-run` executable as the review workflow runs it: a work
 //! directory holding a recorded review bundle, the repository's own
 //! agent definitions, and a stand-in `claude` on the path that writes
-//! each specialist's report and every run's stream-json log. The review
-//! gate then reads what the run wrote, as the post job does. Each run
-//! has a temporary `HOME` and `PARINN_HOME`, and the variables a Claude
-//! Code harness session sets for its children, which the run must clear.
+//! every run's stream-json log, a specialist's findings stated in its
+//! text. The run assembles each specialist's report from its log, and
+//! the review gate then reads what the run wrote, as the post job does.
+//! Each run has a temporary `HOME` and `PARINN_HOME`, and the variables
+//! a Claude Code harness session sets for its children, which the run
+//! must clear.
 
 #![allow(
     clippy::unwrap_used,
@@ -18,11 +20,12 @@ use std::process::{Command, Output};
 
 use testkit::TempDir;
 
-/// A `claude` that answers as the agent it runs as: a specialist
-/// writes its report with one linked finding and answers its outcome
-/// line and path; a generalist keeps it as a nit and closes with a
-/// sentence. Started as a harness session's child it refuses, and the
-/// agent `SILENT_AGENT` names never answers.
+/// A `claude` that answers as the agent it runs as: a specialist states
+/// one linked finding in its text and answers its outcome line; a
+/// generalist keeps it as a nit and closes with a sentence. Started as a
+/// harness session's child it refuses; the agent `SILENT_AGENT` names
+/// never answers, and the one `CUT_AGENT` names states its finding and
+/// ends at its turn budget without an answer.
 const CLAUDE: &str = r#"#!/bin/sh
 if [ -n "$CLAUDE_CODE_CHILD_SESSION" ] || [ -n "$CLAUDE_AUTO_BACKGROUND_TASKS" ]; then
   echo "started as a harness session's child" >&2
@@ -36,13 +39,17 @@ for a in "$@"; do
   prev="$a"
 done
 if [ "$agent" = "$SILENT_AGENT" ]; then exec sleep 30; fi
-printf '{"type":"assistant","parent_tool_use_id":null,"message":{"id":"m-%s","model":"claude-haiku-5-5","usage":{"input_tokens":3,"cache_read_input_tokens":7,"output_tokens":2},"content":[]}}\n' "$agent"
 case "$prompt" in
   *"a specialist"*)
-    printf 'src/a.rs:3 — if not addressed: a long line hides a bug — I9\n\noutcome: findings — %s saw one finding.\n' "$agent" > "review/reports/$agent.md"
-    printf '{"type":"result","subtype":"success","is_error":false,"result":"outcome: findings — %s saw one finding.\\nreview/reports/%s.md","total_cost_usd":0.01,"num_turns":2}\n' "$agent" "$agent"
+    printf '{"type":"assistant","parent_tool_use_id":null,"message":{"id":"m-%s","model":"claude-haiku-5-5","usage":{"input_tokens":3,"cache_read_input_tokens":7,"output_tokens":2},"content":[{"type":"text","text":"I read the diff.\\nsrc/a.rs:3 — if not addressed: a long line hides a bug — I9"}]}}\n' "$agent"
+    if [ "$agent" = "$CUT_AGENT" ]; then
+      printf '{"type":"result","subtype":"error_max_turns","is_error":true,"result":"","total_cost_usd":0.03,"num_turns":20}\n'
+    else
+      printf '{"type":"result","subtype":"success","is_error":false,"result":"outcome: findings — %s saw one finding.","total_cost_usd":0.01,"num_turns":2}\n' "$agent"
+    fi
     ;;
   *)
+    printf '{"type":"assistant","parent_tool_use_id":null,"message":{"id":"m-%s","model":"claude-haiku-5-5","usage":{"input_tokens":3,"cache_read_input_tokens":7,"output_tokens":2},"content":[]}}\n' "$agent"
     printf '{"type":"result","subtype":"success","is_error":false,"result":"src/a.rs:3 — nit — a long line — lang-rust\\n%s finds its scope sound.","total_cost_usd":0.05,"num_turns":4}\n' "$agent"
     ;;
 esac
@@ -99,8 +106,10 @@ fn workdir(root: &Path) {
 }
 
 /// Runs the executable on `dir` with `args`, the stand-in first on the
-/// path, as a Claude Code harness session's child would.
-fn review_run(home: &Path, dir: &Path, silent: &str, args: &[&str]) -> Output {
+/// path, as a Claude Code harness session's child would; `silent` names
+/// the agent that never answers and `cut` the one its turn budget cuts
+/// off.
+fn review_run(home: &Path, dir: &Path, silent: &str, cut: &str, args: &[&str]) -> Output {
     let bin = home.join("bin");
     fs::create_dir_all(&bin).unwrap();
     let claude = bin.join("claude");
@@ -113,6 +122,7 @@ fn review_run(home: &Path, dir: &Path, silent: &str, args: &[&str]) -> Output {
         .env("PARINN_HOME", home)
         .env("PATH", format!("{}:/usr/bin:/bin", bin.display()))
         .env("SILENT_AGENT", silent)
+        .env("CUT_AGENT", cut)
         .env("CLAUDE_CODE_CHILD_SESSION", "1")
         .env("CLAUDE_AUTO_BACKGROUND_TASKS", "1")
         .arg("--workdir")
@@ -178,7 +188,7 @@ fn the_gate_approves_what_the_run_wrote() {
     let dir = home.path().join("work");
     workdir(&dir);
 
-    let out = review_run(home.path(), &dir, "", &[]);
+    let out = review_run(home.path(), &dir, "", "", &[]);
 
     let stderr = String::from_utf8_lossy(&out.stderr);
     assert_eq!(out.status.code(), Some(0), "{stderr}");
@@ -191,6 +201,13 @@ fn the_gate_approves_what_the_run_wrote() {
         let log = fs::read_to_string(dir.join(format!("review/logs/{name}.jsonl"))).unwrap();
         assert!(log.contains("\"type\":\"result\""), "{log}");
     }
+    // The report the run assembled from the specialist's log: the
+    // finding it stated, then the outcome line it answered, no prose.
+    assert_eq!(
+        fs::read_to_string(dir.join("review/reports/lang-rust.md")).unwrap(),
+        "src/a.rs:3 — if not addressed: a long line hides a bug — I9\n\
+         outcome: findings — lang-rust saw one finding.\n"
+    );
     let usage: serde_json::Value =
         serde_json::from_str(&fs::read_to_string(dir.join("review/usage.json")).unwrap()).unwrap();
     assert_eq!(usage.as_array().unwrap().len(), 5);
@@ -217,7 +234,7 @@ fn a_specialist_past_its_deadline_is_decided_and_the_gate_posts_nothing() {
 
     // The deadline binds every agent, not only the silent one: two
     // seconds leave the stand-in's shell room to start on a loaded host.
-    let out = review_run(home.path(), &dir, "lang-rust", &["--deadline", "2"]);
+    let out = review_run(home.path(), &dir, "lang-rust", "", &["--deadline", "2"]);
 
     let stderr = String::from_utf8_lossy(&out.stderr);
     assert_eq!(out.status.code(), Some(0), "{stderr}");
@@ -251,15 +268,60 @@ fn a_specialist_past_its_deadline_is_decided_and_the_gate_posts_nothing() {
 }
 
 #[test]
+fn a_specialist_cut_off_at_its_turn_budget_blocks_the_review_but_keeps_what_it_stated() {
+    let home = TempDir::new().unwrap();
+    let dir = home.path().join("work");
+    workdir(&dir);
+
+    let out = review_run(home.path(), &dir, "", "lang-rust", &[]);
+
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert_eq!(out.status.code(), Some(0), "{stderr}");
+    assert!(
+        String::from_utf8_lossy(&out.stdout).starts_with("verdict=request_changes\n"),
+        "{stderr}"
+    );
+    assert!(
+        stderr.contains(
+            "review-run: lang-rust (specialist): did not answer: its run ended with error_max_turns; running it once more"
+        ),
+        "{stderr}"
+    );
+    let outcome = fs::read_to_string(dir.join("review/outcome.json")).unwrap();
+    let outcome = review_gate::parse_outcome(&outcome).unwrap();
+    assert!(outcome.findings.iter().any(|f| f.path == "review/"
+        && f.severity == "blocking"
+        && f.body == "lang-rust did not answer (its run ended with error_max_turns), so the review is incomplete"));
+    // The finding it stated before the cut is kept for the author and
+    // the generalists, under a line that says the report is partial.
+    assert_eq!(
+        fs::read_to_string(dir.join("review/reports/lang-rust.md")).unwrap(),
+        "incomplete: its run ended with error_max_turns\n\
+         src/a.rs:3 — if not addressed: a long line hides a bug — I9\n"
+    );
+    let consulted = fs::read_to_string(dir.join("review/consulted.json")).unwrap();
+    assert!(!consulted.contains("lang-rust"), "{consulted}");
+
+    let (code, review, err) = gate(home.path(), &dir);
+
+    assert_eq!(code, review_gate::cli::EXIT_FAILURE);
+    assert_eq!(review, "");
+    assert_eq!(
+        err,
+        "review-gate: review: dispatched but not consulted: lang-rust\n"
+    );
+}
+
+#[test]
 fn a_work_directory_without_a_dispatch_cannot_run_and_a_wrong_line_is_usage() {
     let home = TempDir::new().unwrap();
 
-    let out = review_run(home.path(), home.path(), "", &[]);
+    let out = review_run(home.path(), home.path(), "", "", &[]);
 
     assert_eq!(out.status.code(), Some(1));
     assert!(String::from_utf8_lossy(&out.stderr).starts_with("review-run: read "));
 
-    let out = review_run(home.path(), home.path(), "", &["--parallel", "none"]);
+    let out = review_run(home.path(), home.path(), "", "", &["--parallel", "none"]);
 
     assert_eq!(out.status.code(), Some(2));
     assert!(String::from_utf8_lossy(&out.stderr).contains("usage: review-run --workdir DIR"));

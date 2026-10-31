@@ -1,12 +1,12 @@
 //! `review-run`: the review of a pull request run by code (ENG-28). It
 //! reads the dispatch the review bundle wrote, runs every specialist
 //! it names as an agent of its own, in parallel up to a bound and each
-//! with its own deadline, then, once every specialist has finished,
-//! every generalist, told its specialists' report files. From what the
-//! runs produced it writes the review outcome, the agents consulted,
-//! their answers and their usage, the files the review gate reads. No
-//! model decides whether an agent is called or waited for; the
-//! generalists do the weighing.
+//! with its own deadline, assembles each one's report from its run log
+//! into a file, then, once every specialist has finished, runs every
+//! generalist, told those files. From what the runs produced it writes
+//! the review outcome, the agents consulted, their answers and their
+//! usage, the files the review gate reads. No model decides whether an
+//! agent is called or waited for; the generalists do the weighing.
 //!
 //! It starts only the `claude` command line, through the evaluation's
 //! host, and runs in CI alone. It is repository tooling and never
@@ -29,7 +29,8 @@ mod fake;
 /// Where, under the work directory, the review keeps what it runs on
 /// and what it writes.
 pub const REVIEW: &str = review_eval::world::REVIEW;
-/// The specialists' reports, one `<name>.md` each.
+/// The specialists' reports, one `<name>.md` each, assembled from the
+/// run logs.
 pub const REPORTS: &str = review_eval::world::REPORTS;
 /// Each run's stream-json log, `<name>.jsonl`, and its errors,
 /// `<name>.stderr`; a first attempt's that did not answer as

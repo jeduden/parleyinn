@@ -4,7 +4,9 @@
 //! output in `class.txt` and what it wrote under `review/`), whose
 //! SRS in both trees names the ids a specialist's finding may cite; the
 //! review outcome, the agents consulted, their answers and their usage
-//! written under `review/`, with each run's log under `review/logs/`.
+//! written under `review/`, with each run's log under `review/logs/`
+//! and each specialist's report, assembled from its log, under
+//! `review/reports/`.
 //! It prints the verdict and the counts for the workflow's step
 //! outputs, and each run as it ends on standard error.
 
