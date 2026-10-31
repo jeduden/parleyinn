@@ -41,8 +41,16 @@ fn an_invariant_edit_without_its_record_is_a_blocking_finding() {
 
     assert_eq!(got.class, Class::Deep);
     // ENG-29's, and ENG-21's: the SRS has a code owner.
-    assert_eq!(got.findings.len(), 2, "{:?}", got.findings);
-    assert!(got.findings.iter().any(|f| f.body.contains("ENG-29")));
+    assert!(
+        got.findings.iter().any(|f| f.body.contains("ENG-29")),
+        "{:?}",
+        got.findings
+    );
+    assert!(
+        got.findings.iter().any(|f| f.body.contains("(ENG-21)")),
+        "{:?}",
+        got.findings
+    );
 }
 
 #[test]

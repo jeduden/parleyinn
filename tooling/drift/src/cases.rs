@@ -784,7 +784,7 @@ fn consent_case() -> Case {
         cargo_test(
             "review-bundle",
             "e2e_review_bundle",
-            "the_executable_blocks_a_stakeholder_path_until_the_stakeholder_consents",
+            "the_executable_blocks_a_stakeholder_path_without_a_consent",
         ),
         "no ENG-21 finding for a stakeholder path",
     )
