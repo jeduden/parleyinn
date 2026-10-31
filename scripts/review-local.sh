@@ -15,7 +15,9 @@
 # with its estimate. Exits 0 when the review approves and no deterministic
 # finding blocks, as the gate decides; 1 when it requests changes or one
 # blocks; 2 on a wrong command line or a setup that fails. Run files stay
-# under target/review-local/.
+# under target/review-local/. The agents run with PARINN_HOME and
+# CLAUDE_CONFIG_DIR in a temporary directory that holds a copy of the
+# login and is removed at the end.
 #
 # By default the base is origin/main, as in CI. --base REF reviews only
 # what changed since REF, for the fix cycle after a review: the commit
@@ -61,13 +63,30 @@ git -C "$repo" fetch -q origin main
 
 start=$SECONDS
 work=$(mktemp -d)
+# The agents get a home and a Claude Code configuration of their own,
+# beside the work directory and outside the tree they review, so a live
+# agent never writes to the real ~/.parinn, $PARINN_HOME or ~/.claude
+# (ENG-14). Claude Code refuses a changed HOME, so CLAUDE_CONFIG_DIR
+# moves its configuration instead.
+iso="$work.iso"
 cleanup() {
   git -C "$repo" worktree remove --force "$work/pr-head" 2>/dev/null || true
   git -C "$repo" worktree remove --force "$work" 2>/dev/null || true
   git -C "$repo" worktree prune
-  rm -rf "${work:?}"
+  rm -rf "${work:?}" "${iso:?}"
 }
 trap cleanup EXIT
+mkdir -m 700 "$iso" "$iso/parinn" "$iso/claude"
+# The login is copied, never linked, so a token the agents refresh stays
+# in the copy. CLAUDE_CODE_OAUTH_TOKEN or ANTHROPIC_API_KEY, when set,
+# reach the agents unchanged.
+login="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/.credentials.json"
+if [ -f "$login" ]; then
+  install -m 600 "$login" "$iso/claude/.credentials.json"
+elif [ -z "${CLAUDE_CODE_OAUTH_TOKEN:-}" ] && [ -z "${ANTHROPIC_API_KEY:-}" ]; then
+  echo "review-local: no login file at $login and no CLAUDE_CODE_OAUTH_TOKEN; the agents may not authenticate" >&2
+fi
+export PARINN_HOME="$iso/parinn" CLAUDE_CONFIG_DIR="$iso/claude"
 
 run() {
   if command -v mise > /dev/null; then
