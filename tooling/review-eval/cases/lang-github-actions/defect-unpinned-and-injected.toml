@@ -25,7 +25,9 @@ jobs:
 [expect]
 outcome = ["findings"]
 
+# No requirement yet holds an action to a pinned sha or keeps untrusted
+# context out of a script, so each may come back as a requirement
+# request as well as a linked finding: either form must name it.
 [[expect.finding]]
 path = ".github/workflows/greet.yml"
-form = "linked"
 mentions_any = ["pin", "sha", "inject", "${{", "env:", "untrusted"]

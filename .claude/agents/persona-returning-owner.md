@@ -55,8 +55,8 @@ or a spec. Read it, and the files it touches, from where you stand.
 2. Check every item in "When you give up" against the target.
 3. Report each finding on one line, with no severity word, since the
    review that reads yours weighs: `path:line — if not addressed:
-   <what breaks for you, quoting the target> — <ids>`, the most
-   specific requirement ids or invariants that outcome breaks.
+   <what breaks for you, quoting the target> — <ids>`, ending with the
+   requirement ids or invariants it breaks, comma-separated: `I2, I6`.
 4. Where no requirement covers what you need, write a request, never
    prose: `path:line — request: add|change|remove <the requirement as
    one MUST sentence> — <why, from where you stand>`.
