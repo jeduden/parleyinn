@@ -35,6 +35,11 @@ fn workdir() -> TempDir {
     dir
 }
 
+/// The ids a report may cite: the invariants.
+pub(crate) fn known() -> std::collections::BTreeSet<String> {
+    review_gate::report::invariants()
+}
+
 fn options() -> Options {
     Options {
         parallel: 8,
@@ -49,7 +54,7 @@ fn arg_after<'a>(command: &'a Command, flag: &str) -> &'a str {
 }
 
 fn review_with(host: &FakeHost, dir: &Path, p: &Plan) -> Vec<AgentRun> {
-    review(host, dir, p, options(), &|_| {}).unwrap()
+    review(host, dir, p, &known(), options(), &|_| {}).unwrap()
 }
 
 #[test]
@@ -249,9 +254,16 @@ fn progress_names_each_run() {
     let host = FakeHost::new(fake::either);
     let lines = Mutex::new(Vec::new());
 
-    review(&host, dir.path(), &plan(DISPATCH), options(), &|l| {
-        lines.lock().unwrap().push(l.to_owned());
-    })
+    review(
+        &host,
+        dir.path(),
+        &plan(DISPATCH),
+        &known(),
+        options(),
+        &|l| {
+            lines.lock().unwrap().push(l.to_owned());
+        },
+    )
     .unwrap();
 
     let lines = lines.into_inner().unwrap();
@@ -411,7 +423,15 @@ fn a_work_directory_without_room_for_logs_fails_the_review() {
     fs::write(dir.path().join("review"), "a file").unwrap();
     let host = FakeHost::new(fake::either);
 
-    let err = review(&host, dir.path(), &plan(DISPATCH), options(), &|_| {}).unwrap_err();
+    let err = review(
+        &host,
+        dir.path(),
+        &plan(DISPATCH),
+        &known(),
+        options(),
+        &|_| {},
+    )
+    .unwrap_err();
 
     assert!(err.starts_with("make "), "{err}");
     assert!(host.agents().is_empty());
@@ -495,6 +515,7 @@ fn one_run_told(
         &host,
         dir,
         &plan(r#"{"review-code": ["lang-rust"]}"#),
+        &known(),
         options(),
         &|l| lines.lock().unwrap().push(l.to_owned()),
     )
@@ -655,6 +676,7 @@ fn split_run(
         &host,
         dir,
         &plan(r#"{"review-code": ["lang-rust"]}"#),
+        &known(),
         Options {
             split: SPLIT,
             ..options()

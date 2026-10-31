@@ -12,8 +12,10 @@
 //! not answer. A specialist whose diff is past the split limit runs
 //! in parts, each a run of its own under the same bound, and its
 //! report and run are merged from theirs; a part that did not answer
-//! leaves the specialist one that did not answer.
+//! leaves the specialist one that did not answer. A run is tried once
+//! more as `retry` says.
 
+use std::collections::BTreeSet;
 use std::fs;
 use std::io;
 use std::path::Path;
@@ -32,6 +34,7 @@ use review_gate::report::assemble;
 use crate::LOGS;
 use crate::parts::{self, Part};
 use crate::plan::{Plan, report_file};
+use crate::retry::run_one;
 
 /// How many agents run at once unless the run says otherwise.
 pub const PARALLEL: usize = 8;
@@ -87,7 +90,9 @@ impl AgentRun {
 }
 
 /// Runs every agent `plan` dispatches in the work directory `workdir`:
-/// the specialists, then the generalists, telling `progress` of each.
+/// the specialists, then the generalists, telling `progress` of each;
+/// a specialist's report is held to the ids in `known` before it is
+/// taken.
 ///
 /// # Errors
 ///
@@ -96,6 +101,7 @@ pub fn review(
     host: &dyn Host,
     workdir: &Path,
     plan: &Plan,
+    known: &BTreeSet<String>,
     options: Options,
     progress: &(dyn Fn(&str) + Sync),
 ) -> Result<Vec<AgentRun>, String> {
@@ -104,7 +110,7 @@ pub fn review(
         fs::create_dir_all(&path).map_err(|e| format!("make {}: {e}", path.display()))?;
     }
     let one = |unit: &Unit| {
-        let (run, report) = run_one(host, workdir, plan, unit, options.deadline, progress);
+        let (run, report) = run_one(host, workdir, plan, known, unit, options.deadline, progress);
         progress(&describe(&run));
         (run, report)
     };
@@ -121,10 +127,10 @@ pub fn review(
 /// One run the review starts: an agent whole, or one part of a
 /// specialist's.
 #[derive(Debug, Clone, PartialEq, Eq)]
-struct Unit {
-    name: String,
-    kind: Kind,
-    part: Option<Part>,
+pub(crate) struct Unit {
+    pub(crate) name: String,
+    pub(crate) kind: Kind,
+    pub(crate) part: Option<Part>,
 }
 
 impl Unit {
@@ -138,14 +144,14 @@ impl Unit {
     }
 
     /// The stem of its log's file name.
-    fn stem(&self) -> String {
+    pub(crate) fn stem(&self) -> String {
         self.part
             .as_ref()
             .map_or_else(|| self.name.clone(), |p| p.stem(&self.name))
     }
 
     /// How progress names it.
-    fn label(&self) -> String {
+    pub(crate) fn label(&self) -> String {
         self.part
             .as_ref()
             .map_or_else(|| self.name.clone(), |p| p.label(&self.name))
@@ -251,51 +257,17 @@ pub fn describe(run: &AgentRun) -> String {
     }
 }
 
-/// Runs `unit`, and once more when its run did not answer: a command
-/// that would not start, ended without a result, missed its deadline
-/// or answered nothing. A definition that does not read fails at once,
-/// and a report assembled from the log is judged where the outcome is
-/// decided, never rerun. The first failure is told to `progress` before
-/// the second attempt, and its log kept as `<stem>.first.jsonl` beside
-/// the second's, whose report replaces the first's. A part's assembled
-/// report comes back with its run, for the merge.
-fn run_one(
+/// Runs `unit` once, logging under the logs' directory, with `note`,
+/// when there is one, added to its prompt, and for a specialist returns
+/// the report assembled from its log, written when it runs whole. A run
+/// that never started has no attempts.
+pub(crate) fn attempt(
     host: &dyn Host,
     workdir: &Path,
     plan: &Plan,
     unit: &Unit,
     deadline: Duration,
-    progress: &(dyn Fn(&str) + Sync),
-) -> (AgentRun, Option<String>) {
-    let (first, report) = attempt(host, workdir, plan, unit, deadline);
-    if first.answered() || first.attempts == 0 {
-        let attempts = first.attempts.max(1);
-        return (AgentRun { attempts, ..first }, report);
-    }
-    progress(&format!("{}; running it once more", describe(&first)));
-    if let Err(e) = keep_first_log(workdir, &unit.stem()) {
-        progress(&format!(
-            "{} ({}): its first log was not kept: {e}",
-            unit.label(),
-            unit.kind.word()
-        ));
-    }
-    let (mut second, report) = attempt(host, workdir, plan, unit, deadline);
-    second.log.cost += first.log.cost;
-    second.attempts = 2;
-
-    (second, report)
-}
-
-/// Runs `unit` once, logging under the logs' directory, and for a
-/// specialist run whole writes the report assembled from its log; for
-/// a part returns it. A run that never started has no attempts.
-fn attempt(
-    host: &dyn Host,
-    workdir: &Path,
-    plan: &Plan,
-    unit: &Unit,
-    deadline: Duration,
+    note: Option<&str>,
 ) -> (AgentRun, Option<String>) {
     let (name, kind) = (unit.name.as_str(), unit.kind);
     let component = match component::load(workdir, name) {
@@ -331,6 +303,9 @@ fn attempt(
     if let Some(part) = &unit.part {
         told(&mut command.args, &part.note);
     }
+    if let Some(note) = note {
+        told(&mut command.args, note);
+    }
     let (log, failure) = match runner::run(host, &command) {
         Ok(log) => {
             let failure = if !log.answered {
@@ -349,13 +324,16 @@ fn attempt(
             let text = assemble(&log.texts, &log.answer, failure.as_deref());
             (failure, Some(text))
         }
-        (Kind::Specialist, None) => match report(workdir, name, &log, failure.as_deref()) {
-            Ok(()) => (failure, None),
-            Err(e) => (
-                Some(failure.map_or(e.clone(), |f| format!("{f}; {e}"))),
-                None,
-            ),
-        },
+        (Kind::Specialist, None) => {
+            let text = assemble(&log.texts, &log.answer, failure.as_deref());
+            match write_report(workdir, name, &text) {
+                Ok(()) => (failure, Some(text)),
+                Err(e) => (
+                    Some(failure.map_or(e.clone(), |f| format!("{f}; {e}"))),
+                    Some(text),
+                ),
+            }
+        }
         _ => (failure, None),
     };
 
@@ -381,26 +359,12 @@ fn told(args: &mut [String], note: &str) {
     }
 }
 
-/// Writes specialist `name`'s report, assembled from `log`: the finding
-/// lines it stated, revised and withdrew, then its answer's outcome
-/// line; headed incomplete with `failure` when the run did not answer,
-/// so the findings it logged reach its generalist while the run stays
-/// one that did not answer.
-///
-/// # Errors
-///
-/// Fails, as a run that did not answer, when the report cannot be
-/// written: a generalist would read a stale one otherwise.
-fn report(workdir: &Path, name: &str, log: &RunLog, failure: Option<&str>) -> Result<(), String> {
-    write_report(workdir, name, &assemble(&log.texts, &log.answer, failure))
-}
-
 /// Writes `text` as specialist `name`'s report.
 ///
 /// # Errors
 ///
 /// Fails when the report cannot be written.
-fn write_report(workdir: &Path, name: &str, text: &str) -> Result<(), String> {
+pub(crate) fn write_report(workdir: &Path, name: &str, text: &str) -> Result<(), String> {
     let path = workdir.join(report_file(name));
     fs::write(&path, text)
         .map_err(|e| format!("its report could not be written: {}: {e}", path.display()))
@@ -409,7 +373,7 @@ fn write_report(workdir: &Path, name: &str, text: &str) -> Result<(), String> {
 /// Moves the log named `name` and its errors, each when there is one,
 /// to `<name>.first.jsonl` and `<name>.first.stderr`, so its second
 /// attempt does not write over them.
-fn keep_first_log(workdir: &Path, name: &str) -> Result<(), String> {
+pub(crate) fn keep_first_log(workdir: &Path, name: &str) -> Result<(), String> {
     let logs = workdir.join(LOGS);
     for extension in ["jsonl", "stderr"] {
         let from = logs.join(format!("{name}.{extension}"));

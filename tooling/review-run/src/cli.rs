@@ -83,7 +83,7 @@ fn review(
     // Read before any agent runs: an SRS that does not read fails the
     // review before it costs anything.
     let known = requirements::ids(workdir)?;
-    let runs = run::review(host, workdir, &plan, options, progress)?;
+    let runs = run::review(host, workdir, &plan, &known, options, progress)?;
     let reports: BTreeMap<String, String> = plan
         .specialists()
         .into_iter()

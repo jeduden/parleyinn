@@ -17,6 +17,7 @@ pub mod outcome;
 pub mod parts;
 pub mod plan;
 pub mod requirements;
+pub mod retry;
 pub mod run;
 pub mod usage;
 

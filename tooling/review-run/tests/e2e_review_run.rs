@@ -27,7 +27,9 @@ use testkit::TempDir;
 /// never answers, and the one `CUT_AGENT` names states its finding and
 /// ends at its turn budget without an answer, or only its part
 /// `CUT_PART` does. A specialist run on a part of its diff also states
-/// a finding of that part's own.
+/// a finding of that part's own. The agent `REFUSE_AGENT` names also
+/// states a revision in no form, until its prompt tells it of its
+/// previous attempt, or always when `REFUSE_ALWAYS` is set.
 const CLAUDE: &str = r#"#!/bin/sh
 if [ -n "$CLAUDE_CODE_CHILD_SESSION" ] || [ -n "$CLAUDE_AUTO_BACKGROUND_TASKS" ]; then
   echo "started as a harness session's child" >&2
@@ -49,6 +51,12 @@ case "$prompt" in
     own="\\nsrc/part$part.rs:1 — if not addressed: part $part breaks — I9"
     ;;
 esac
+if [ "$agent" = "$REFUSE_AGENT" ]; then
+  case "$prompt" in
+    *"previous attempt"*) if [ -n "$REFUSE_ALWAYS" ]; then own="$own$BAD"; fi ;;
+    *) own="$own$BAD" ;;
+  esac
+fi
 case "$prompt" in
   *"a specialist"*)
     printf '{"type":"assistant","parent_tool_use_id":null,"message":{"id":"m-%s","model":"claude-haiku-5-5","usage":{"input_tokens":3,"cache_read_input_tokens":7,"output_tokens":2},"content":[{"type":"text","text":"I read the diff.\\nsrc/a.rs:3 — if not addressed: a long line hides a bug — I9%s"}]}}\n' "$agent" "$own"
@@ -64,6 +72,10 @@ case "$prompt" in
     ;;
 esac
 "#;
+
+/// The revision in no form the refused agent states, as the stand-in
+/// writes it into the log's JSON.
+const BAD: &str = r"\nrevised: `src/a.rs:3 — old` → `src/a.rs:3 — new`";
 
 const DISPATCH: &str = r#"{
   "review-code": ["lang-rust", "test-engineer-unit"],
@@ -120,7 +132,21 @@ fn workdir(root: &Path) {
 /// the agent that never answers and `cut` the one its turn budget cuts
 /// off, `name:i` only its part `i`.
 fn review_run(home: &Path, dir: &Path, silent: &str, cut: &str, args: &[&str]) -> Output {
+    review_run_refusing(home, dir, silent, cut, "", args)
+}
+
+/// [`review_run`], with `refuse` naming the agent whose report is
+/// refused on its first attempt, `name:always` on both.
+fn review_run_refusing(
+    home: &Path,
+    dir: &Path,
+    silent: &str,
+    cut: &str,
+    refuse: &str,
+    args: &[&str],
+) -> Output {
     let (cut, cut_part) = cut.split_once(':').unwrap_or((cut, ""));
+    let (refuse, always) = refuse.split_once(':').unwrap_or((refuse, ""));
     let bin = home.join("bin");
     fs::create_dir_all(&bin).unwrap();
     let claude = bin.join("claude");
@@ -135,6 +161,9 @@ fn review_run(home: &Path, dir: &Path, silent: &str, cut: &str, args: &[&str]) -
         .env("SILENT_AGENT", silent)
         .env("CUT_AGENT", cut)
         .env("CUT_PART", cut_part)
+        .env("REFUSE_AGENT", refuse)
+        .env("REFUSE_ALWAYS", always)
+        .env("BAD", BAD)
         .env("CLAUDE_CODE_CHILD_SESSION", "1")
         .env("CLAUDE_AUTO_BACKGROUND_TASKS", "1")
         .arg("--workdir")
@@ -482,4 +511,85 @@ fn a_part_cut_off_at_its_turn_budget_blocks_the_review_naming_it_and_keeps_every
         err,
         "review-gate: review: dispatched but not consulted: test-engineer-unit\n"
     );
+}
+
+#[test]
+fn a_refused_report_runs_once_more_told_why_and_the_gate_approves_the_second() {
+    let home = TempDir::new().unwrap();
+    let dir = home.path().join("work");
+    workdir(&dir);
+
+    let out = review_run_refusing(home.path(), &dir, "", "", "lang-rust", &[]);
+
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert_eq!(out.status.code(), Some(0), "{stderr}");
+    assert!(
+        String::from_utf8_lossy(&out.stdout).starts_with("verdict=approve\n"),
+        "{stderr}"
+    );
+    assert!(
+        stderr.contains(
+            "review-run: lang-rust (specialist) has a report whose line 2 is neither a linked \
+             finding nor a requirement request: `revised: `src/a.rs:3 — old` → `src/a.rs:3 — \
+             new``; running it once more"
+        ),
+        "{stderr}"
+    );
+    assert!(
+        stderr.contains(
+            "lang-rust (specialist): answered (0.0200 USD, 2 turns) on its second attempt"
+        ),
+        "{stderr}"
+    );
+    // The second run is judged alone: its report is its own.
+    assert_eq!(
+        fs::read_to_string(dir.join("review/reports/lang-rust.md")).unwrap(),
+        "src/a.rs:3 — if not addressed: a long line hides a bug — I9\n\
+         outcome: findings — lang-rust saw one finding.\n"
+    );
+    assert!(dir.join("review/logs/lang-rust.first.jsonl").is_file());
+    assert_eq!(usage_of(&dir, "lang-rust")["attempts"].as_u64(), Some(2));
+
+    let (code, review, err) = gate(home.path(), &dir);
+
+    assert_eq!(code, review_gate::cli::EXIT_OK, "{err}");
+    let review: serde_json::Value = serde_json::from_str(&review).unwrap();
+    assert_eq!(review["event"], "APPROVE");
+}
+
+#[test]
+fn a_report_refused_on_both_attempts_blocks_the_review_and_the_gate_posts_nothing() {
+    let home = TempDir::new().unwrap();
+    let dir = home.path().join("work");
+    workdir(&dir);
+
+    let out = review_run_refusing(home.path(), &dir, "", "", "lang-rust:always", &[]);
+
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert_eq!(out.status.code(), Some(0), "{stderr}");
+    assert!(
+        String::from_utf8_lossy(&out.stdout).starts_with("verdict=request_changes\n"),
+        "{stderr}"
+    );
+    let outcome = fs::read_to_string(dir.join("review/outcome.json")).unwrap();
+    let outcome = review_gate::parse_outcome(&outcome).unwrap();
+    assert!(
+        outcome
+            .findings
+            .iter()
+            .any(|f| f.path == "review/reports/lang-rust.md"
+                && f.severity == "blocking"
+                && f.body
+                    == "lang-rust has a report whose line 2 is neither a linked finding nor a \
+                    requirement request"),
+        "{:?}",
+        outcome.findings
+    );
+    assert_eq!(usage_of(&dir, "lang-rust")["attempts"].as_u64(), Some(2));
+
+    let (code, review, err) = gate(home.path(), &dir);
+
+    assert_eq!(code, review_gate::cli::EXIT_FAILURE);
+    assert_eq!(review, "");
+    assert!(err.contains("lang-rust"), "{err}");
 }
