@@ -73,10 +73,21 @@ tool. Write that answer to `review/reports/<your name>.md`, the one
 file you may change, by your fifth turn, and rewrite it as you find
 more. Keep your last five turns to write it a last time and answer,
 since a run that uses all its turns gives no answer. End it
-with one line, however long, never wrapped: `outcome: sound`,
-`outcome: nits` or `outcome: blocking`, a dash, and whether the target
-serves you. Then answer exactly two lines and nothing else: that
-outcome line copied character for character from the file, then the
-file's path. If your tools do not list Write, never try to write a
-file: answer with the findings and the line.
+with one line, however long: `outcome: sound`, `outcome: nits` or
+`outcome: blocking`, a dash, and whether the target serves you.
+
+<?include
+source-dir: "docs/agents"
+file: outcome-answer.md
+heading-level: "absolute"
+?>
+### How you answer
+
+Keep the outcome line one line in the file, never wrapped. Answer exactly
+two lines and nothing else: that outcome line copied character for
+character from the file, then the report's path.
+<?/include?>
+
+If your tools do not list Write, never try to write a file: answer with
+the findings and the line.
 <?/include?>
