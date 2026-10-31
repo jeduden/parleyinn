@@ -41,11 +41,14 @@ summary: >-
   agents, such as CI or runner agents.
 - **Managed policy**: Settings belonging to root that an organisation sets on a
   machine, overriding every other settings layer (ADM-04). ParleyInn never
-  overrides
-  it (I7). Among its powers are SEC-22's and certifying service accounts by
-  listing their principal keys (PRV-10). The harness's own managed settings,
-  which ParleyInn also never writes (ADM-03), are part of the **harness
-  configuration**: the harness's settings, hooks and MCP registrations (I7).
+  overrides it (I7). Its other powers are those SEC-22 gives it, such as
+  disabling a B1–B3 component or the launcher, though it turns no component on,
+  and certifying service accounts by listing their principal keys (PRV-10).
+- **Harness configuration**: The harness's settings, hooks and MCP
+  registrations, which ParleyInn changes only through explicit install and
+  uninstall operations, showing the change first (I7). The harness's own managed
+  settings are part of it, and ParleyInn never writes to or overrides them
+  (ADM-03, I7).
 - **Agent**: A worker a harness runs for exactly one principal: the principal of
   the node that records its runs (OWN-01). It receives restore blocks and
   recalls history; an agent is never a principal. It is identified by its node,

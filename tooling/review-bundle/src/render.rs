@@ -62,8 +62,8 @@ fn class(b: &mut String, a: &Analysis) {
     }
 }
 
-/// The agents the orchestrator consults, each generalist with the
-/// specialists whose findings it weighs (ENG-28).
+/// The agents the review runs, each generalist with the specialists
+/// whose findings it weighs (ENG-28).
 fn consult(b: &mut String, a: &Analysis) {
     b.push_str("\n## Agents to consult\n\n");
     if a.dispatch.is_empty() {
@@ -71,7 +71,7 @@ fn consult(b: &mut String, a: &Analysis) {
         return;
     }
     b.push_str(
-        "The orchestrator calls each specialist below, handing it its own \
+        "The review runs each specialist below, handing it its own \
          diff, `diffs/<its name>.diff` beside this bundle, which holds only \
          the changed files it reads; then each generalist with its \
          specialists' report files. The gate fails a review that leaves one \
@@ -105,6 +105,12 @@ fn findings(b: &mut String, a: &Analysis) {
         for line in r.summary.lines() {
             let _ = writeln!(b, "> {line}");
         }
+        b.push_str(
+            "\nA stakeholder comment on the pull request, which this bundle read, gives \
+             the consent ENG-29 asks for; the record's approval rests on it, not on the \
+             pull request's own text. Which owned paths a comment consents to, by naming \
+             them, the ENG-21 finding says.\n",
+        );
     }
 }
 

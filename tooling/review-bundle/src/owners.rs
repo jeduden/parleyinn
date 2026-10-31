@@ -7,6 +7,8 @@
 //! other matches at any depth; a trailing `/` names a directory's
 //! contents; and `*` matches within one path segment.
 
+use std::collections::BTreeSet;
+
 /// The patterns `codeowners` assigns, in file order: each line's first
 /// field, comments and blank lines left out.
 #[must_use]
@@ -46,6 +48,39 @@ pub fn owns(pattern: &str, path: &str) -> bool {
             && !(dir && rest.len() == want.len())
             && want.iter().zip(rest).all(|(w, h)| glob(w, h))
     })
+}
+
+/// The characters besides whitespace a consenting comment splits on.
+const SEPARATORS: [char; 10] = ['`', ',', ';', ':', '(', ')', '[', ']', '"', '\''];
+
+/// The words of `comment`: split on whitespace and [`SEPARATORS`], each
+/// with its trailing dots dropped, empty ones left out.
+fn tokens(comment: &str) -> BTreeSet<&str> {
+    comment
+        .split(|c: char| c.is_whitespace() || SEPARATORS.contains(&c))
+        .map(|t| t.trim_end_matches('.'))
+        .filter(|t| !t.is_empty())
+        .collect()
+}
+
+/// Whether `comment` names `path`, an owned path, so it consents to it
+/// (ENG-21): a word of it is the path itself; the text of a pattern of
+/// `patterns` that owns it, its leading `/` removed; or a directory that
+/// holds it, other than the root, with a trailing `/`, or without one
+/// when it holds a `/` itself. A bare `docs` is prose and names nothing.
+#[must_use]
+pub fn names(patterns: &[String], comment: &str, path: &str) -> bool {
+    let words = tokens(comment);
+    let owning = patterns
+        .iter()
+        .filter(|pat| owns(pat, path))
+        .map(|pat| pat.trim_start_matches('/'));
+    let dirs = path
+        .match_indices('/')
+        .flat_map(|(at, _)| [&path[..=at], &path[..at]])
+        .filter(|d| d.ends_with('/') || d.contains('/'));
+
+    words.contains(path) || owning.chain(dirs).any(|name| words.contains(name))
 }
 
 /// Whether `pattern`, where `*` matches any run of characters, matches

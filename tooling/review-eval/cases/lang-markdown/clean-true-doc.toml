@@ -7,15 +7,19 @@ file = "docs/review-eval/running.md"
 content = '''
 ---
 summary: >-
-  How the reviewer evaluation is run from the command line.
+  Where the reviewer evaluation keeps each run of a case, and what it keeps.
 ---
-# Running the reviewer evaluation
+# Reading the runs of a case
 
-`review-eval check` checks every case against every reviewer component
-without a model call: each case applies to the tree and the review
-bundle dispatches its component. `review-eval run --component NAME
---out DIR` then runs one component's cases on the model its front
-matter names, and writes the scorecard under `DIR`.
+`cargo run -p review-eval -- run --component NAME --out DIR`, which
+[Evaluating the reviewers](../review-evaluation.md) describes, keeps one
+folder for each run of a case under `DIR/runs/`, named by the component,
+the case and the run's number from 1, such as
+`runs/lang-rust/clean-module/1/`.
+
+That folder holds `log.jsonl`, the model's log, and `grade.txt`, whose
+first line reads `passed` when the run passed and otherwise names what
+failed. It holds `report.md` only when the component wrote a report.
 '''
 
 [expect]

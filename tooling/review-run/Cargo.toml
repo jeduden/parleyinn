@@ -1,0 +1,27 @@
+[package]
+name = "review-run"
+version = "0.0.0"
+description = "Runs the review's dispatched specialists and generalists as agents and writes the review outcome the review gate reads (ENG-28)"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+review-bundle.workspace = true
+review-eval.workspace = true
+review-gate.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+
+[dev-dependencies]
+testkit.workspace = true
+
+[lints]
+workspace = true
+
+# ENG-02: see crates/parinn/Cargo.toml.
+[package.metadata.parinn]
+responsibility = "Runs the review's dispatched agents and writes the review outcome the review gate reads"
+may-depend-on = ["review-bundle", "review-eval", "review-gate"]
+may-dev-depend-on = ["testkit"]

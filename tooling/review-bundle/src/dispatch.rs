@@ -1,9 +1,9 @@
-//! Which agents the review's orchestrator consults (ENG-28): from the
-//! paths a pull request changes and the requirement rows it touches,
-//! the low-effort specialists that read them, grouped under the
-//! medium-effort generalist that weighs their findings. It is a pure
-//! function of its inputs, so the review gate can check the
-//! orchestrator against the same list.
+//! Which agents the review runs (ENG-28): from the paths a pull
+//! request changes and the requirement rows it touches, the low-effort
+//! specialists that read them, grouped under the medium-effort
+//! generalist that weighs their findings. It is a pure function of its
+//! inputs: `review-run` runs every agent it names, and the review gate
+//! checks the review against the same list.
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
@@ -165,13 +165,20 @@ pub fn model_specialist(file: &str) -> Option<String> {
     }
 }
 
-/// `name` when it reads as an agent's name, lowercase letters, digits
-/// and hyphens, so no path a pull request names writes markup into the
-/// review bundle.
+/// Whether `name` reads as an agent's name: lowercase letters, digits
+/// and hyphens, never empty, so it can name a file.
+#[must_use]
+pub fn is_agent_name(name: &str) -> bool {
+    !name.is_empty()
+        && name
+            .chars()
+            .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-')
+}
+
+/// `name` when it reads as an agent's name, so no path a pull request
+/// names writes markup into the review bundle.
 fn agent_name(name: &str) -> Option<String> {
-    name.chars()
-        .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-')
-        .then(|| name.to_owned())
+    is_agent_name(name).then(|| name.to_owned())
 }
 
 /// The agents to consult for `paths`, the changed paths, and `rows`,

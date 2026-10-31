@@ -1,13 +1,44 @@
-//! ENG-28: the review workflow keeps the reviewing agent away from the
-//! reviewer app's key, and the review gate that posts the review
-//! decides as the requirement says.
+//! ENG-28: the review workflow runs the review's agents by code, keeps
+//! them away from the reviewer app's key, and the review gate that
+//! posts the review decides as the requirement says.
 
 use std::collections::BTreeMap;
 
+use review_eval::runner::{GENERALIST_TOOLS, SPECIALIST_TOOLS};
+
 use crate::list;
 
-/// The action that runs the reviewing agent.
+/// What a job runs the review's agents with: review-run, which starts
+/// every dispatched agent.
+const AGENT_RUN: &str = "-p review-run";
+
+/// An action that runs one harness session, which would route the review
+/// itself; a job that uses one is held to the agents' rules too.
 const AGENT_ACTION: &str = "anthropics/claude-code-action@";
+
+/// The ways a job installs the Claude Code command line, which starts
+/// an agent from any later step: the repository's composite action and
+/// the npm package it installs.
+const AGENT_CLI: [&str; 2] = ["./.github/actions/claude-code", "@anthropic-ai/claude-code"];
+
+/// The run of review-eval, which may start the command line beside
+/// review-run: it runs the reviewer evaluation's cases (ENG-32) and
+/// routes no review. Its `plan` starts no agent, so it grants none.
+const EVAL_RUN: &str = "cargo run --locked --quiet -p review-eval -- run";
+
+/// Where review-run writes each agent's run log, which holds every tool
+/// result the agent read: it stays in the agents' job.
+pub const RUN_LOGS: &str = "review/logs";
+
+/// The action that uploads an artifact out of the job.
+const UPLOAD_ACTION: &str = "actions/upload-artifact@";
+
+/// The tools review-run gives its agents, by kind, as the evaluation's
+/// runner sets them.
+pub const RUN_TOOLS: [(&str, &str); 2] = [
+    ("specialist", SPECIALIST_TOOLS),
+    ("generalist", GENERALIST_TOOLS),
+];
 
 /// A GitHub Actions workflow split the way the ENG-28 steps read it:
 /// its triggers and its jobs, comments left out.
@@ -124,6 +155,97 @@ fn is_word(c: char) -> bool {
     c.is_ascii_alphanumeric() || c == '_'
 }
 
+/// Whether a job's `text` installs the Claude Code command line.
+fn installs_cli(text: &str) -> bool {
+    AGENT_CLI.iter().any(|cli| text.contains(cli))
+}
+
+/// Whether a job's `text` runs the review's agents, a harness session,
+/// or installs the command line any of its steps can start one with.
+fn runs_agents(text: &str) -> bool {
+    text.contains(AGENT_RUN) || text.contains(AGENT_ACTION) || installs_cli(text)
+}
+
+/// A job's steps, each from its `- ` line at the steps' indent.
+fn steps(text: &str) -> Vec<String> {
+    let mut out: Vec<String> = Vec::new();
+    for line in text.split_inclusive('\n') {
+        if line.starts_with("      - ") {
+            out.push(line.to_owned());
+        } else if let Some(step) = out.last_mut() {
+            step.push_str(line);
+        }
+    }
+
+    out
+}
+
+/// The paths an upload step names, one inline or one a line in its
+/// block; none for a step that uploads nothing.
+fn upload_paths(step: &str) -> Vec<String> {
+    if !step.contains(UPLOAD_ACTION) {
+        return Vec::new();
+    }
+    let mut lines = step.lines();
+    let Some(line) = lines.find(|l| l.trim_start().starts_with("path:")) else {
+        return Vec::new();
+    };
+    let indent = line.len() - line.trim_start().len();
+    let value = line.trim_start()["path:".len()..].trim();
+    if !value.is_empty() && !value.starts_with(['|', '>']) {
+        return vec![value.trim_matches(['"', '\'']).to_owned()];
+    }
+
+    lines
+        .take_while(|l| l.len() - l.trim_start().len() > indent)
+        .map(|l| l.trim().trim_matches(['"', '\'']).to_owned())
+        .filter(|l| !l.is_empty())
+        .collect()
+}
+
+/// Whether the upload `paths` carry `dir` out of the job: a path at or
+/// under it, or one above it that no `!` path excludes it from.
+fn uploads_dir(paths: &[String], dir: &str) -> bool {
+    let bare = |p: &str| {
+        p.trim_start_matches("./")
+            .trim_end_matches(['*', '/'])
+            .to_owned()
+    };
+    let excluded = paths
+        .iter()
+        .filter_map(|p| p.strip_prefix('!'))
+        .any(|p| bare(p).starts_with(dir));
+    let above = |p: &str| {
+        p.is_empty()
+            || p == "."
+            || dir
+                .strip_prefix(p)
+                .is_some_and(|rest| rest.starts_with('/'))
+    };
+
+    paths
+        .iter()
+        .filter(|p| !p.starts_with('!'))
+        .map(|p| bare(p))
+        .any(|p| p.starts_with(dir) || (!excluded && above(&p)))
+}
+
+/// The tools of the comma-separated `tools` other than reading and
+/// `scoped`: anything that writes, runs a command, reaches the web or
+/// starts an agent.
+fn unscoped<'a>(tools: &'a str, scoped: &'a str) -> impl Iterator<Item = &'a str> {
+    tools
+        .split(',')
+        .map(str::trim)
+        .filter(|t| !t.is_empty())
+        .filter(move |t| {
+            *t != scoped
+                && !["Read", "Glob", "Grep"]
+                    .iter()
+                    .any(|r| t == r || t.starts_with(&format!("{r}(")))
+        })
+}
+
 impl Workflow {
     /// Requires exactly two triggers: `workflow_run` on the named
     /// workflow's completion, and `issue_comment` on a new comment, so
@@ -174,9 +296,44 @@ impl Workflow {
         out
     }
 
-    /// The jobs that run the reviewing agent.
+    /// The jobs that run the review's agents, or a harness session.
     fn agent_jobs(&self) -> impl Iterator<Item = &Job> {
-        self.jobs.iter().filter(|j| j.text.contains(AGENT_ACTION))
+        self.jobs.iter().filter(|j| runs_agents(&j.text))
+    }
+
+    /// Requires a job to run the review's agents with `cmd`, and no job
+    /// to run a harness session, or the command line outside review-run
+    /// and review-eval, that would route the review instead.
+    #[must_use]
+    pub fn agents_run_by(&self, cmd: &str) -> Vec<String> {
+        let mut problems: Vec<String> = self
+            .jobs
+            .iter()
+            .filter(|j| j.text.contains(AGENT_ACTION))
+            .map(|j| {
+                format!(
+                    "job {} runs a harness session, {AGENT_ACTION}, which would route the review",
+                    j.name
+                )
+            })
+            .collect();
+        problems.extend(
+            self.jobs
+                .iter()
+                .filter(|j| installs_cli(&j.text))
+                .filter(|j| !j.text.contains(cmd) && !j.text.contains(EVAL_RUN))
+                .map(|j| {
+                    format!(
+                        "job {} starts the Claude Code command line outside review-run and review-eval, which would route the review",
+                        j.name
+                    )
+                }),
+        );
+        if !self.jobs.iter().any(|j| j.text.contains(cmd)) {
+            problems.insert(0, format!("no job runs the review's agents with {cmd:?}"));
+        }
+
+        problems
     }
 
     /// Requires an agent job, and that none of them is granted a write
@@ -196,46 +353,64 @@ impl Workflow {
             }
         }
         if self.agent_jobs().next().is_none() {
-            problems.push("no job runs the reviewing agent".to_owned());
+            problems.push("no job runs the review's agents".to_owned());
         }
 
         problems
     }
 
-    /// Requires every agent job to list its allowed tools and to allow
-    /// writing only under `dir`: `Edit(./<dir>/**)` and no other
+    /// Requires the agents to write only under `dir`: `run`, the tools
+    /// review-run gives each kind of agent, and every `--allowedTools`
+    /// an agent job passes, allow `Edit(./<dir>/**)` and no other
     /// writing tool. An `Edit` rule governs every tool that changes a
     /// file, `Write` included; a `Write(path)` rule grants nothing, so
-    /// an agent job that lists one cannot write its reports.
+    /// an agent that has one cannot write its reports.
     #[must_use]
-    pub fn agents_write_only(&self, dir: &str) -> Vec<String> {
+    pub fn agents_write_only(&self, dir: &str, run: &[(&str, &str)]) -> Vec<String> {
         let scoped = format!("Edit(./{dir}/**)");
         let mut problems = Vec::new();
-        for j in self.agent_jobs() {
-            let Some(line) = j.text.lines().find(|l| l.contains("--allowedTools")) else {
-                problems.push(format!("agent job {} lists no --allowedTools", j.name));
-                continue;
-            };
-            let tools = line
-                .split_once("--allowedTools")
-                .map_or("", |(_, rest)| rest)
-                .trim()
-                .trim_matches('"');
+        for (kind, tools) in run {
             problems.extend(
-                tools
-                    .split(',')
-                    .map(str::trim)
-                    .filter(|t| {
-                        ["Write", "Edit", "NotebookEdit", "Bash"]
-                            .iter()
-                            .any(|w| t.starts_with(w))
-                    })
-                    .filter(|t| *t != scoped)
-                    .map(|t| format!("agent job {} may use {t}, want {scoped} alone", j.name)),
+                unscoped(tools, &scoped)
+                    .map(|t| format!("review-run's {kind} may use {t}, want {scoped} alone")),
             );
+        }
+        for j in self.agent_jobs() {
+            for line in j.text.lines().filter(|l| l.contains("--allowedTools")) {
+                let tools = line
+                    .split_once("--allowedTools")
+                    .map_or("", |(_, rest)| rest)
+                    .trim()
+                    .trim_matches('"');
+                problems.extend(
+                    unscoped(tools, &scoped)
+                        .map(|t| format!("agent job {} may use {t}, want {scoped} alone", j.name)),
+                );
+            }
         }
 
         problems
+    }
+
+    /// Requires every agent job to keep `logs`, its agents' run logs,
+    /// inside the job: no step of one uploads them as an artifact, which
+    /// would carry whatever an agent read, its environment included, out
+    /// of the job.
+    #[must_use]
+    pub fn run_logs_stay(&self, logs: &str) -> Vec<String> {
+        self.agent_jobs()
+            .filter(|j| {
+                steps(&j.text)
+                    .iter()
+                    .any(|s| uploads_dir(&upload_paths(s), logs))
+            })
+            .map(|j| {
+                format!(
+                    "agent job {} uploads {logs}, every tool result its agents read",
+                    j.name
+                )
+            })
+            .collect()
     }
 
     /// The one job that reads `key`.
@@ -262,8 +437,8 @@ impl Workflow {
     /// agent.
     pub fn key_held_apart(&self, key: &str) -> Result<(), String> {
         let j = self.key_job(key)?;
-        if j.text.contains(AGENT_ACTION) {
-            return Err(format!("job {} holds {key} and runs the agent", j.name));
+        if runs_agents(&j.text) {
+            return Err(format!("job {} holds {key} and runs the agents", j.name));
         }
 
         Ok(())
@@ -355,7 +530,7 @@ impl Workflow {
         let own_needs = needs(j);
         problems.extend(
             self.agent_jobs()
-                .filter(|a| !has_word(&own_needs, &a.name))
+                .filter(|a| a.name != j.name && !has_word(&own_needs, &a.name))
                 .map(|a| format!("job {} does not need agent job {}", j.name, a.name)),
         );
         // The key's job among the others: an evaluate job that reads the
@@ -494,7 +669,7 @@ fn dispatch(row: &BTreeMap<String, String>) -> Option<Option<&'static str>> {
     }
 }
 
-/// The agents a row says the orchestrator consulted: both of
+/// The agents a row says the review consulted: both of
 /// [`DISPATCH`] for `all` or no `consulted` column, the generalist alone
 /// for `not all`, and a file that is no list for `malformed`; `None` for
 /// any other value.

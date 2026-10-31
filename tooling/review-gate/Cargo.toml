@@ -1,7 +1,7 @@
 [package]
 name = "review-gate"
 version = "0.0.0"
-description = "The review gate between the reviewing agent and the review the reviewer app posts (ENG-21, ENG-28)"
+description = "The review gate between the review's agents and the review the reviewer app posts (ENG-21, ENG-28)"
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
@@ -19,6 +19,6 @@ workspace = true
 
 # ENG-02: see crates/parinn/Cargo.toml.
 [package.metadata.parinn]
-responsibility = "Gates the review the reviewer app posts on the reviewing agent's outcome"
+responsibility = "Gates the review the reviewer app posts on the review outcome"
 may-depend-on = []
 may-dev-depend-on = ["testkit"]

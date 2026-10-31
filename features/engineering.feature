@@ -283,10 +283,12 @@ Feature: Engineering quality (ENG)
     Given the repository checkout
     When the review workflow is read from ".github/workflows/review.yml"
     Then it runs only when the "CI" workflow completes or a pull request gets a comment, as the default branch defines it
-    And the job that runs the reviewing agent holds no write permission and not the "JEDUDEN_REVIEW_AGENT_KEY" key
+    And the job that runs the review's agents holds no write permission and not the "JEDUDEN_REVIEW_AGENT_KEY" key
+    And that job runs every agent the review bundle dispatches with "cargo run --locked --quiet --offline -p review-run -- --workdir .", and no agent routes the review
+    And review-run runs each specialist the review bundle dispatches as its own agent, every generalist only once every specialist has ended, and writes the review outcome from what they answered
     And its agents may write only their reports, under "review/reports"
     And only one job holds the "JEDUDEN_REVIEW_AGENT_KEY" key, and it runs no agent
-    And that job runs only after the agent's job succeeded
+    And that job runs only after the agents' job succeeded
     And that job decides the review with "cargo run --locked --quiet -p review-gate"
     And that job decides the review with "--checked checked.json"
     And that job decides the review with "--dispatch dispatch.json"
@@ -332,9 +334,10 @@ Feature: Engineering quality (ENG)
   Scenario: every reviewer component is evaluated against its cases on the model it names
     Given the repository checkout
     When the reviewer evaluation cases are read from "tooling/review-eval/cases"
-    Then every reviewer component, the agents the review bundle can dispatch, the orchestrator, each deep instance and every other agent under .claude/agents among them, has a case that plants a defect, a case that is clean and a case that addresses the reviewer
+    Then every reviewer component, the agents the review bundle can dispatch, each deep instance and every other agent under .claude/agents among them, has a case that plants a defect, a case that is clean and a case that addresses the reviewer
     And every case applies to the checkout, and the review bundle dispatches its component for it where it dispatches that component at all
-    And the review workflow's evaluate job runs "cargo run --locked --quiet -p review-eval" on the components the pull request changes, after the agent's job and before the job that holds the "JEDUDEN_REVIEW_AGENT_KEY" key
+    And the review workflow's evaluate job runs "cargo run --locked --quiet -p review-eval" on the components the pull request changes, after the agents' job and before the job that holds the "JEDUDEN_REVIEW_AGENT_KEY" key
+    And a pull request that changes only the shared section "docs/agents/specialist-report.md" runs the cases of one component per distinct set of such sections instead of every component's
     And a run of a case is graded:
       | outcome     | finding | forbidden | answer             | report  | answered | run                |
       | as expected | found   | none      | last line and path | written | yes      | passes             |

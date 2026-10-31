@@ -68,7 +68,7 @@ pub fn added_lines(diff: &str) -> Vec<(String, &str)> {
 
 /// The old and new path a `diff --git` header names, or `None` when
 /// either side does not read.
-fn header(line: &str) -> Option<(String, String)> {
+pub(crate) fn header(line: &str) -> Option<(String, String)> {
     let rest = line.strip_prefix(HEADER)?;
     let (a, rest) = if rest.starts_with('"') {
         let (a, rest) = quoted(rest)?;

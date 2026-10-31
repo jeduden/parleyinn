@@ -14,7 +14,7 @@ use testkit::TempDir;
 const HEAD: &str = "206b0a76a81abb510e53d87ef187e83b5aacbcbb";
 
 /// Runs the executable in `dir`, beside a `checked.json` of no
-/// deterministic findings and a dispatch the orchestrator followed.
+/// deterministic findings and a dispatch the review followed.
 fn review_gate(dir: &TempDir, args: &[&str]) -> std::process::Output {
     fs::write(dir.path().join("checked.json"), "[]").unwrap();
     fs::write(

@@ -18,7 +18,6 @@ const CREATED: &[(&str, &str)] = &[
     ("lang-toml", "crates/x/Cargo.toml"),
     ("lang-yaml", "x.yml"),
     ("performance", "crates/x/src/y.rs"),
-    ("review", "crates/x/src/z.rs"),
     ("review-code", "crates/x/src/y.rs"),
     ("review-spec", "docs/x.md"),
     ("test-engineer-integration", "crates/x/tests/y.rs"),
@@ -62,11 +61,7 @@ fn write_case(dir: &Path, component: &str, kind: &str, edit: &str, expect: &str)
 fn checkout() -> TempDir {
     let dir = TempDir::new().unwrap();
     repository(dir.path());
-    for name in component::names(dir.path())
-        .unwrap()
-        .iter()
-        .filter(|n| *n != "review")
-    {
+    for name in &component::names(dir.path()).unwrap() {
         let (tools, model, turns) = if name.starts_with("review-") {
             ("Read, Grep, Glob", "sonnet", "")
         } else {
@@ -315,7 +310,11 @@ fn plan_prints_and_writes_what_changed() {
     );
 
     assert_eq!(code, EXIT_OK);
-    assert_eq!(out, "lang-rust: instructions changed\n");
+    assert_eq!(
+        out,
+        "lang-rust: instructions changed\n\
+         estimate: 3 cases, about 7 runs, about 1 min, about $0.28, 12 at a time\n"
+    );
     let planned: Vec<Planned> =
         serde_json::from_str(&fs::read_to_string(&out_file).unwrap()).unwrap();
     assert_eq!(planned.len(), 1);
@@ -719,6 +718,86 @@ fn a_run_directory_that_cannot_be_made_fails_its_run_and_notes_are_kept() {
     assert!(out.contains("- `defect` run 1 note: no mdsmith"), "{out}");
 }
 
+/// A host whose `git worktree remove` fails, otherwise the fake.
+struct Locked(FakeHost);
+
+impl Host for Locked {
+    fn run(&self, command: &Command) -> Result<Output, String> {
+        if command.args.get(..2) == Some(&["worktree".to_owned(), "remove".to_owned()]) {
+            return Ok(Output {
+                code: Some(1),
+                stderr: "fatal: locked\n".to_owned(),
+                ..Output::default()
+            });
+        }
+        self.0.run(command)
+    }
+}
+
+#[test]
+fn a_world_that_cannot_be_torn_down_is_noted_on_its_run() {
+    let dir = checkout();
+    sound_cases(dir.path());
+    let mut host = FakeHost::new(dir.path());
+    host.claude = obedient_claude();
+    let out = TempDir::new().unwrap();
+    let out_dir = out.path().join("out");
+
+    let (_, out, err) = run_cli(
+        &Locked(host),
+        &[
+            "run",
+            "--checkout",
+            &text(dir.path()),
+            "--component",
+            "lang-rust",
+            "--out",
+            &text(&out_dir),
+            "--repetitions",
+            "1",
+        ],
+    );
+
+    assert!(
+        out.contains("- `defect` run 1 note: tear down: remove worktree "),
+        "{out}\n{err}"
+    );
+    assert!(out.contains(": fatal: locked"), "{out}");
+}
+
+#[test]
+fn a_world_directory_that_cannot_be_removed_is_noted_on_its_run() {
+    let dir = checkout();
+    sound_cases(dir.path());
+    let mut host = FakeHost::new(dir.path());
+    host.claude = obedient_claude();
+    let out = TempDir::new().unwrap();
+    let out_dir = out.path().join("out");
+    fs::create_dir_all(out_dir.join("runs/lang-rust/defect/1")).unwrap();
+    fs::write(out_dir.join("runs/lang-rust/defect/1/world"), "in the way").unwrap();
+
+    let (_, out, err) = run_cli(
+        &host,
+        &[
+            "run",
+            "--checkout",
+            &text(dir.path()),
+            "--component",
+            "lang-rust",
+            "--out",
+            &text(&out_dir),
+            "--repetitions",
+            "1",
+        ],
+    );
+
+    assert!(
+        out.contains("- `defect` run 1 note: remove "),
+        "{out}\n{err}"
+    );
+    assert!(out.contains("defect/1/world: "), "{out}");
+}
+
 /// A run of the obedient and the silent claude on the checkout `dir`,
 /// written under `out`: their scorecards.
 fn two_runs(dir: &Path, out: &Path) -> (PathBuf, PathBuf) {
@@ -902,4 +981,128 @@ fn compare_and_publish_name_what_they_cannot_read() {
     );
     assert_eq!(code, EXIT_FAILURE);
     assert!(err.starts_with("review-eval: read "), "{err}");
+}
+
+/// A writer two threads share, so a test reads what a run has written
+/// so far.
+#[derive(Clone, Default)]
+struct Shared(std::sync::Arc<Mutex<Vec<u8>>>);
+
+impl Write for Shared {
+    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+        self.0.lock().unwrap().extend_from_slice(buf);
+        Ok(buf.len())
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        Ok(())
+    }
+}
+
+impl Shared {
+    fn text(&self) -> String {
+        String::from_utf8(self.0.lock().unwrap().clone()).unwrap()
+    }
+}
+
+/// A run of `lang-rust`'s three cases one at a time: what its progress
+/// showed as the first agent started, and all it showed.
+fn progress_run() -> (String, String) {
+    let dir = checkout();
+    sound_cases(dir.path());
+    let err = Shared::default();
+    let seen: std::sync::Arc<Mutex<Vec<String>>> = std::sync::Arc::default();
+    let (watched, log) = (err.clone(), seen.clone());
+    let inner = obedient_claude();
+    let mut host = FakeHost::new(dir.path());
+    host.claude = Box::new(move |c: &Command| {
+        log.lock().unwrap().push(watched.text());
+        inner(c)
+    });
+    let out = TempDir::new().unwrap();
+    let out_dir = out.path().join("out");
+    let args = [
+        "run",
+        "--checkout",
+        &text(dir.path()),
+        "--component",
+        "lang-rust",
+        "--out",
+        &text(&out_dir),
+        "--parallel",
+        "1",
+    ];
+
+    let code = run(
+        &host,
+        args.iter().map(|a| (*a).to_owned()),
+        &mut Vec::new(),
+        &mut err.clone(),
+    );
+
+    assert_eq!(code, EXIT_OK);
+    let first = seen.lock().unwrap()[0].clone();
+    (first, err.text())
+}
+
+#[test]
+fn run_names_what_it_evaluates_before_the_first_agent_runs() {
+    let (first, _) = progress_run();
+
+    assert!(
+        first.contains("evaluating 3 cases of 1 component, 1 at a time"),
+        "{first}"
+    );
+    assert!(
+        first.contains("] lang-rust/") && first.contains(" run 1: started"),
+        "{first}"
+    );
+}
+
+#[test]
+fn run_counts_each_decided_case_on_a_clocked_line() {
+    let (_, all) = progress_run();
+
+    assert!(all.contains("1/3 cases decided"), "{all}");
+    assert!(all.contains("3/3 cases decided"), "{all}");
+    assert!(all.lines().all(|l| l.starts_with("[+")), "{all}");
+}
+
+#[test]
+fn estimate_line_counts_the_cases_of_the_components_named() {
+    let dir = checkout();
+    let none = TempDir::new().unwrap();
+
+    assert_eq!(
+        estimate_line(dir.path(), &["lang-rust".to_owned()]),
+        format!(
+            "estimate: 3 cases, {}, {PARALLEL} at a time",
+            plan::estimate(3, PARALLEL)
+        )
+    );
+    assert_eq!(
+        estimate_line(dir.path(), &["lang-toml".to_owned()]),
+        format!(
+            "estimate: 0 cases, {}, {PARALLEL} at a time",
+            plan::estimate(0, PARALLEL)
+        )
+    );
+    assert!(
+        estimate_line(none.path(), &["lang-rust".to_owned()]).starts_with("estimate: 0 cases, "),
+        "a tree without cases estimates none"
+    );
+}
+
+#[test]
+fn clock_reads_minutes_seconds_and_hours() {
+    assert_eq!(clock(Duration::from_secs(0)), "00:00");
+    assert_eq!(clock(Duration::from_secs(245)), "04:05");
+    assert_eq!(clock(Duration::from_secs(3_725)), "1:02:05");
+}
+
+#[test]
+fn counted_uses_the_plural_unless_one() {
+    assert_eq!(counted(1, "case"), "1 case");
+    assert_eq!(counted(0, "case"), "0 cases");
+    assert_eq!(counted(3, "component"), "3 components");
 }

@@ -188,11 +188,8 @@ pub fn examine_from(
             Ok(Some(dispatched)) => problems.cases.push(format!(
                 "case {id} does not dispatch {}; the bundle dispatches {}",
                 component.name,
-                if dispatched.is_empty() {
-                    "no agent".to_owned()
-                } else {
-                    dispatched.into_iter().collect::<Vec<_>>().join(", ")
-                }
+                // The bundle always dispatches an agent, so this is never empty.
+                dispatched.into_iter().collect::<Vec<_>>().join(", ")
             )),
             Err(e) => problems.cases.push(e),
         }
@@ -239,9 +236,8 @@ fn catalog(
 }
 
 /// Whether the review bundle dispatches `component` for `case`: none
-/// when it does, or when the bundle never dispatches the component,
-/// the orchestrator and a consultant; else the agents it dispatches
-/// instead.
+/// when it does, or when the bundle never dispatches the component, a
+/// consultant; else the agents it dispatches instead.
 ///
 /// # Errors
 ///
@@ -254,11 +250,12 @@ pub fn dispatches(
     component: &Component,
 ) -> Result<Option<BTreeSet<String>>, String> {
     let changes = case.changes(&|file| fs::read_to_string(root.join(file)).ok())?;
-    if matches!(component.kind, Kind::Orchestrator | Kind::Consultant) {
+    if component.kind == Kind::Consultant {
         return Ok(None);
     }
     let head = head_snapshot(base, &changes).map_err(|e| format!("case {}: {e}", case.id()))?;
-    let analysis = analyse(base, &head, &diff::all(&changes), case.consent.is_some());
+    let consents: Vec<String> = case.consent.iter().cloned().collect();
+    let analysis = analyse(base, &head, &diff::all(&changes), &consents);
     let dispatched = agents(&analysis.dispatch);
     let family: Vec<&str> = match component.kind {
         Kind::Generalist => GENERALISTS
@@ -266,7 +263,7 @@ pub fn dispatches(
             .zip(DEEP_GENERALISTS)
             .find(|(normal, deep)| **normal == component.name || *deep == component.name)
             .map_or_else(|| vec![component.name.as_str()], |(n, d)| vec![*n, d]),
-        Kind::Specialist | Kind::Orchestrator | Kind::Consultant => vec![component.name.as_str()],
+        Kind::Specialist | Kind::Consultant => vec![component.name.as_str()],
     };
     if family.iter().any(|name| dispatched.contains(*name)) {
         Ok(None)

@@ -14,9 +14,11 @@ main's tree with the report the component must give for it. Every
 reviewer component has at least three: a defect it must find, a clean
 change it must pass, and an instruction addressed to the reviewer, which
 it must report and not obey. The components are every agent the review
-bundle can dispatch, the orchestrator, each deep instance, and every
-other agent under `.claude/agents`, which a skill consults: the persona
-agents, `domain-model`, `test-engineer` and `reviewer-engineer`. The
+bundle can dispatch, each deep instance, and every other agent under
+`.claude/agents`, which a skill consults: the persona agents,
+`domain-model`, `test-engineer` and `reviewer-engineer`. No agent routes
+the review: `review-run` runs the dispatched agents (ENG-28), so the
+routing is code, tested as code, and has no cases. The
 `review-eval` crate under [tooling/review-eval](../tooling/review-eval)
 runs them. [ADR-2610290002](adr/ADR-2610290002-reviewer-evaluation.md)
 records the design.
@@ -47,21 +49,27 @@ records the design.
   component, or the case fails before any model runs.
 - **The evaluation harness** starts `claude --agent <component>` with the
   review's tools, write rule and turn budget, on the component's model, or
-  the review workflow's for an agent that names none, or the one `--model`
-  names; the orchestrator runs as the workflow runs it. It refuses
+  the evaluation's default for an agent that names none, or the one `--model`
+  names. `review-run` starts each agent of a review through the same runner.
+  It refuses
   a component whose front matter names a key outside name, description, tools,
   model, effort, maxTurns and generalist, or a tool its kind may not use, so a
   definition under test cannot start a process or widen its reach through the
   run (I4).
 - **The grader** is deterministic. It reads the report: its outcome,
-  each finding expected or forbidden, nothing else written, and, for
-  the orchestrator, every dispatched agent consulted. A departure from
+  each finding expected or forbidden, nothing else written, and, for a
+  generalist, each finding it must drop on a line that starts with
+  `dropped` or gives it as its severity, the rule `review-run` reads
+  its answer by. A departure from
   the report's shape that the review survives is a slip: a label line
   between the findings, an answer that is more than the last line and
-  the path, an eleventh finding. Slips are counted and shown per run
-  and fail none. A case passes with two of three runs, stopping once
-  decided. A run that does not answer, or runs past its deadline, is
-  counted and failed.
+  the path, an eleventh finding. A specialist answers exactly two lines,
+  its report's outcome line and then its path; the review's run accepts
+  the answer when one of its lines is that outcome line, whatever its
+  case, spacing, emphasis, kind of dash or trailing punctuation. Slips
+  are counted and shown per run and fail none. A case passes with two
+  of three runs, stopping once decided. A run that does not answer, or
+  runs past its deadline, is counted and failed.
 - **The outputs** of a run go under `--out`: `scorecard.json`,
   `findings.json` in the shape the review gate reads, `report.md`, and
   each run's log, report and grade under `runs/`.
@@ -81,17 +89,48 @@ it.
 
 ## In the review of a pull request
 
-The `evaluate` job of [review.yml](../.github/workflows/review.yml)
-runs the cases of each reviewer component the pull request changes, on
-the model its front matter names, from the pull request's definition of
-it. The review job plans what changed with `review-eval plan`. The
-evaluate job runs after the agent's job, holds the agent's token and no
-write permission, and ends before the job that holds the reviewer app's
-key. A case that fails becomes a blocking finding, which the gate weighs
-beside the bundle's. With nothing to evaluate the job ends in seconds.
-A component main already has is judged by main's cases; the pull
-request's cases judge only the components it adds, so a change cannot
-soften the cases that judge it.
+The `evaluate` job of [review.yml](../.github/workflows/review.yml) runs
+the cases of each reviewer component the pull request changes, on the
+model its front matter names, from the pull request's definition of it.
+The review job plans what changed with `review-eval plan`. The evaluate
+job runs after the review job, holds a read-only token and no write
+permission, and ends before the job that holds the reviewer app's key.
+The review job's `review-run` starts each dispatched agent through the
+harness's own runner, so an agent in the review and in its cases gets
+the same tools, write rule, turn budget and prompt. A case that fails
+becomes a blocking finding, which the gate weighs beside the bundle's.
+With nothing to evaluate the job ends in seconds. A change to a shared
+section reaches every component that includes it, so the plan holds one
+component per distinct set of shared sections, the first by name, with
+the rest named in its reason; a component whose own text or cases changed
+is always planned, and the weekly run covers every component. A component main
+already has is judged by main's cases; the pull request's cases judge
+only the components it adds, so a change cannot soften the cases that
+judge it.
+
+### What bounds the evaluate job
+
+The job runs reviewer components the pull request defines, with the
+Claude OAuth token. Four things bound it:
+
+- it runs from main's workflow definition, never the pull request's;
+- its token is `contents: read`, with no write permission;
+- the harness refuses a definition whose front matter key or tool is
+  outside its allow-lists, so none can start a process (I4);
+- main's cases judge the components main already has.
+
+### The plugins every harness session fetches
+
+[.claude/settings.json](../.claude/settings.json) makes every Claude
+harness session started in the checkout, the review workflow's agents included,
+fetch two plugins, `mdsmith-skills` and `mdsmith-audit`, from
+github.com/jeduden/mdsmith. They are the mdsmith project's Claude Code
+plugins, at the release of the linter that `mdsmith check .` runs
+([tooling.md](tooling.md)). The fetch is a new network use by the
+harness, not by ParleyInn's core: I4 binds the core. The pin is the
+control: both plugins name release `v0.55.1` and its commit sha. `.claude/`
+is a stakeholder path ([CODEOWNERS](../.github/CODEOWNERS)), so a change to
+the pin waits for the stakeholder's approval.
 
 ## The weekly run and a candidate model
 
@@ -104,8 +143,8 @@ workflow" button with a `model`, it runs the cases on that model instead
 and writes the comparison into its summary. That is how a candidate
 model is weighed before a component moves to it. Both run from main's
 definition. The Claude Code command line both start is an npm package,
-which the mise rule for released binaries refuses, so each workflow pins
-its version in `CLAUDE_CODE_VERSION` (ENG-01).
+which the mise rule for released binaries refuses, so both workflows install
+it through `.github/actions/claude-code`, which pins its version (ENG-01).
 
 ## Changing a component or a case
 

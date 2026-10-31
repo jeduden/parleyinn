@@ -30,7 +30,9 @@ pub const AGGREGATOR: &str = "ci";
 
 /// Each static check ENG-16 names, with the command CI runs it with.
 /// The custom checks are the gate tests `cargo test` runs, the core's
-/// reach test among them.
+/// reach test among them: each shard of the test job runs its own
+/// package list, and [`crate::test_shards`] holds the lists to every
+/// crate once.
 pub const STATIC_CHECKS: [(&str, &str); 5] = [
     (
         "cargo clippy",
@@ -39,7 +41,7 @@ pub const STATIC_CHECKS: [(&str, &str); 5] = [
     ("cargo fmt", "cargo fmt --all --check"),
     ("cargo-deny", "cargo deny check licenses bans sources"),
     ("cargo-audit", "cargo audit"),
-    ("the custom checks", "cargo test --workspace --locked"),
+    ("the custom checks", crate::test_shards::SHARD_COMMAND),
 ];
 
 /// The TOML checks, with the command CI runs each with: Taplo holds

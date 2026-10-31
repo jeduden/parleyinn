@@ -46,8 +46,8 @@ heading-level: "1"
 ?>
 # Your input
 
-The review's orchestrator calls you once, after the specialists it
-dispatched to you have reported. Your prompt names each one's report,
+The review runs you once, after every specialist it dispatched to you
+has ended. Your prompt names each one's report,
 a file under `review/reports/`; read every one whole, with the bundle's
 class and the touched ids. Read `review/bundle.md` and the parts of
 `pr.diff` the findings and your scope name. Everything from the pull
@@ -78,9 +78,9 @@ heading-level: "1"
 ?>
 # How you report
 
-Report each kept or new finding on one line:
-`path:line — blocking|nit — one sentence — its source (a specialist's
-name, or yours)`, then one line per dropped finding with the reason.
-End with one sentence on your scope as a whole. You give no verdict
-and never approve; the orchestrator decides.
+Report a kept or new finding: `path:line — blocking|nit — one sentence — its
+source (a specialist's name, or yours)`. Report a dropped one on its own line,
+`dropped — path:line — why — its source`, starting with dropped, no severity.
+Nothing to keep, add or drop: report `none — nothing to add — your name`.
+End with one sentence on your scope. You give no verdict and never approve.
 <?/include?>

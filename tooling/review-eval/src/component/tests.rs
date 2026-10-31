@@ -5,7 +5,7 @@ use testkit::TempDir;
 use super::*;
 
 /// A tree with one SRS section, one model file, an agent of each kind
-/// and the orchestrator's skill.
+/// and a skill, which is no reviewer component.
 fn tree() -> TempDir {
     let dir = TempDir::new().unwrap();
     let write = |rel: &str, body: &str| {
@@ -38,12 +38,12 @@ fn tree() -> TempDir {
 }
 
 #[test]
-fn names_list_the_orchestrator_the_generalists_and_every_specialist() {
+fn names_list_the_generalists_and_every_specialist_and_no_skill() {
     let dir = tree();
 
     let got = names(dir.path()).unwrap();
 
-    assert!(got.contains(&"review".to_owned()));
+    assert!(!got.contains(&"review".to_owned()), "{got:?}");
     assert!(got.contains(&"review-code".to_owned()));
     assert!(got.contains(&"review-spec-deep".to_owned()));
     assert!(got.contains(&"lang-rust".to_owned()));
@@ -98,14 +98,12 @@ fn names_fail_on_a_section_whose_name_is_not_utf_8() {
 
 #[test]
 fn each_name_has_its_kind_suite_and_file() {
-    assert_eq!(kind_of("review"), Kind::Orchestrator);
     assert_eq!(kind_of("review-spec"), Kind::Generalist);
     assert_eq!(kind_of("review-spec-deep"), Kind::Generalist);
     assert_eq!(kind_of("lang-rust"), Kind::Specialist);
     assert_eq!(suite_of("review-code-deep"), "review-code");
     assert_eq!(suite_of("review-code"), "review-code");
     assert_eq!(suite_of("lang-rust"), "lang-rust");
-    assert_eq!(file_of("review"), ".claude/skills/review/SKILL.md");
     assert_eq!(file_of("lang-rust"), ".claude/agents/lang-rust.md");
 }
 
@@ -134,6 +132,18 @@ fn load_reads_a_specialist_s_front_matter() {
 }
 
 #[test]
+fn a_report_that_must_be_all_findings_holds_a_specialist_to_one_line_each() {
+    for sentence in [
+        "Every line of the report is a finding or the outcome: no heading.",
+        "Every line is a finding or the\noutcome, never a heading.",
+        "Findings, each on one line.",
+    ] {
+        assert!(one_finding_per_line(sentence), "{sentence}");
+    }
+    assert!(!one_finding_per_line("Report each finding you keep."));
+}
+
+#[test]
 fn load_gives_a_generalist_without_a_turn_budget_the_default() {
     let dir = tree();
 
@@ -143,19 +153,6 @@ fn load_gives_a_generalist_without_a_turn_budget_the_default() {
     assert_eq!(c.max_turns, GENERALIST_TURNS);
     assert!(!c.strict_lines);
     assert_eq!(load(dir.path(), "review-code-deep").unwrap().max_turns, 40);
-}
-
-#[test]
-fn load_gives_the_orchestrator_the_workflow_s_settings() {
-    let dir = tree();
-
-    let c = load(dir.path(), "review").unwrap();
-
-    assert_eq!(c.kind, Kind::Orchestrator);
-    assert_eq!(c.model, ORCHESTRATOR_MODEL);
-    assert_eq!(c.effort, ORCHESTRATOR_EFFORT);
-    assert_eq!(c.max_turns, ORCHESTRATOR_TURNS);
-    assert_eq!(c.tools, vec!["Read", "Glob", "Grep", "Agent", "Write"]);
 }
 
 #[test]
@@ -226,14 +223,6 @@ fn load_refuses_a_key_or_a_tool_a_component_may_not_carry() {
         load(dir.path(), "review-code").unwrap_err(),
         ".claude/agents/review-code.md: lists tool Write, which a generalist may not"
     );
-    write(
-        ".claude/skills/review/SKILL.md",
-        "---\nname: review\ndescription: r\nhooks: []\n---\n# r\n",
-    );
-    assert_eq!(
-        load(dir.path(), "review").unwrap_err(),
-        ".claude/skills/review/SKILL.md: front matter names hooks, which a reviewer component may not"
-    );
     // A nested block and a flow mapping are what an agent's hooks look
     // like in YAML; the parser refuses the one and the allow-list the
     // other, so neither reaches a run.
@@ -296,7 +285,6 @@ fn names_list_every_other_agent_under_the_agents_directory_as_a_consultant() {
 
 #[test]
 fn each_kind_has_its_word() {
-    assert_eq!(Kind::Orchestrator.word(), "orchestrator");
     assert_eq!(Kind::Generalist.word(), "generalist");
     assert_eq!(Kind::Specialist.word(), "specialist");
     assert_eq!(Kind::Consultant.word(), "consultant");

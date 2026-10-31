@@ -10,6 +10,7 @@
 
 pub mod analysis;
 pub mod cli;
+pub mod copies;
 pub mod diff;
 pub mod dispatch;
 pub mod owners;

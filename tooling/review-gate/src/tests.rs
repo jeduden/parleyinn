@@ -207,7 +207,7 @@ fn parse_dispatch_lists_every_generalist_and_specialist() {
 }
 
 #[test]
-fn parse_consulted_reads_the_agents_the_orchestrator_called() {
+fn parse_consulted_reads_the_agents_the_review_consulted() {
     assert_eq!(
         parse_consulted(r#"["lang-rust","review-code","lang-rust"]"#).unwrap(),
         set(&["lang-rust", "review-code"])
@@ -237,7 +237,7 @@ fn decide_refuses_a_review_that_left_a_dispatched_agent_out() {
 
     assert_eq!(
         err.to_string(),
-        "review: the orchestrator did not consult lang-rust, srs-security"
+        "review: dispatched but not consulted: lang-rust, srs-security"
     );
     assert!(std::error::Error::source(&err).is_none());
 
@@ -966,6 +966,32 @@ fn a_specialist_s_report_must_end_with_the_outcome_it_answered() {
 }
 
 #[test]
+fn an_answer_line_is_the_outcome_whatever_its_whitespace_punctuation_dashes_or_markup() {
+    let outcome = "outcome: nits — the change adds `x`.";
+    for line in [
+        "outcome: nits — the change adds `x`.",
+        "  outcome:  nits —  the change adds `x`  ",
+        "outcome: nits — the change adds x",
+        "**Outcome: nits** - the change adds `x`;",
+        "*outcome: nits* – the change adds _x_!",
+        "`outcome: nits — the change adds x.`",
+        "outcome: nits \u{2212} the change adds `x`.",
+    ] {
+        assert!(same_outcome(outcome, line), "{line:?}");
+    }
+    for line in [
+        "outcome: blocking — the change adds `x`.",
+        "outcome: nits — the change adds y.",
+        "outcome: nits",
+        "review/reports/lang-rust.md — outcome: nits — the change adds x.",
+        "the outcome: nits — the change adds x. was it",
+        "",
+    ] {
+        assert!(!same_outcome(outcome, line), "{line:?}");
+    }
+}
+
+#[test]
 fn an_outcome_line_names_sound_nits_or_blocking_in_any_case_and_markup() {
     for (text, want) in [
         ("x\noutcome: sound — y\n\n", Some("outcome: sound — y")),
@@ -1003,6 +1029,40 @@ fn parse_specialists_reads_the_dispatch_s_lists_and_refuses_a_path() {
     let err = parse_specialists("nope").unwrap_err();
     assert!(err.to_string().starts_with("review: malformed dispatch: "));
     assert!(std::error::Error::source(&err).is_some());
+}
+
+#[test]
+fn a_report_check_reads_a_report_and_an_answer_alone() {
+    let report = "a.rs:1 — nit — x\n\noutcome: nits — one sentence.\n";
+    let answer = "outcome: nits — one sentence.\nreview/reports/lang-rust.md";
+
+    assert_eq!(report_check(Some(report), Some(answer)), None);
+    assert_eq!(report_check(None, Some(answer)), Some("wrote no report"));
+    assert_eq!(
+        report_check(Some(" \n"), Some(answer)),
+        Some("wrote an empty report")
+    );
+    assert_eq!(
+        report_check(Some("a.rs:1 — nit — x"), Some(answer)),
+        Some("has a report that does not end with its outcome")
+    );
+    assert_eq!(
+        report_check(Some(report), None),
+        Some("has a report whose outcome differs from its answer in the run log")
+    );
+}
+
+#[test]
+fn an_outcome_written_out_reads_back_as_itself() {
+    let outcome = ReviewOutcome {
+        verdict: REQUEST_CHANGES_VERDICT.to_owned(),
+        summary: "s".to_owned(),
+        findings: vec![finding("a.rs", 3, BLOCKING, "b")],
+    };
+
+    let json = serde_json::to_string(&outcome).unwrap();
+
+    assert_eq!(parse_outcome(&json).unwrap(), outcome);
 }
 
 #[test]

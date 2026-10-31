@@ -2,6 +2,10 @@ use super::*;
 
 const KEY: &str = "APP_KEY";
 
+/// The step that runs the review's agents.
+const RUN: &str =
+    "      - run: cargo run --locked --quiet --offline -p review-run -- --workdir .\n";
+
 /// The smallest workflow the ENG-28 steps accept.
 const REVIEW_FLOW: &str = "name: Review
 on: # a comment
@@ -16,7 +20,7 @@ jobs:
     permissions:
       contents: read # never write
     steps:
-      - uses: anthropics/claude-code-action@abc
+      - run: cargo run --locked --quiet --offline -p review-run -- --workdir .
   # a comment between jobs
   post:
     needs: [review]
@@ -98,7 +102,7 @@ fn grants_write_and_has_word_match_whole_words() {
 #[test]
 fn runs_after_wants_the_named_workflow_and_comments_only() {
     let mut w = parse(REVIEW_FLOW);
-    assert!(w.runs_after("CI").is_ok());
+    assert_eq!(w.runs_after("CI"), Ok(()));
     assert_eq!(
         w.runs_after("Build").unwrap_err(),
         r#"the workflow_run trigger does not say "workflows: [Build]""#
@@ -151,21 +155,124 @@ fn agents_unprivileged_names_each_privilege() {
     let none = parse("on:\n  workflow_run:\njobs:\n  a:\n    steps: []\n");
     assert_eq!(
         none.agents_unprivileged(KEY),
-        ["no job runs the reviewing agent"]
+        ["no job runs the review's agents"]
+    );
+}
+
+#[test]
+fn a_harness_session_in_any_job_is_held_to_the_agents_rules() {
+    let mut w = parse(REVIEW_FLOW);
+    w.jobs.push(Job {
+        name: "route".into(),
+        text: "    permissions:\n      contents: write\n    steps:\n      - uses: anthropics/claude-code-action@abc\n"
+            .into(),
+    });
+
+    assert_eq!(
+        w.agents_unprivileged(KEY),
+        ["agent job route is granted a write permission"]
+    );
+}
+
+#[test]
+fn agents_run_by_wants_the_command_and_no_harness_session() {
+    let cmd = "-p review-run -- --workdir .";
+    let mut w = parse(REVIEW_FLOW);
+    assert!(w.agents_run_by(cmd).is_empty());
+
+    assert_eq!(
+        w.agents_run_by("-p review-run -- --workdir other"),
+        [r#"no job runs the review's agents with "-p review-run -- --workdir other""#]
+    );
+
+    w.jobs[0]
+        .text
+        .push_str("      - uses: anthropics/claude-code-action@abc\n");
+    assert_eq!(
+        w.agents_run_by(cmd),
+        [
+            "job review runs a harness session, anthropics/claude-code-action@, which would route the review"
+        ]
+    );
+}
+
+/// A step that installs the Claude Code command line, which starts an
+/// agent from any later step of its job.
+const CLI: &str = "      - uses: ./.github/actions/claude-code\n";
+
+#[test]
+fn runs_agents_sees_the_command_line_however_it_is_installed() {
+    assert!(runs_agents(RUN));
+    assert!(runs_agents(
+        "      - uses: anthropics/claude-code-action@abc\n"
+    ));
+    assert!(runs_agents(CLI));
+    assert!(runs_agents(
+        "      - run: npm install --global @anthropic-ai/claude-code@2\n"
+    ));
+    assert!(!runs_agents("      - run: cargo run -p review-gate\n"));
+}
+
+#[test]
+fn agents_run_by_refuses_the_command_line_outside_the_review_s_runners() {
+    let cmd = "-p review-run -- --workdir .";
+    let mut w = parse(EVALUATING_FLOW);
+    w.jobs[0].text.push_str(CLI);
+    w.jobs[1].text.push_str(CLI);
+    assert!(
+        w.agents_run_by(cmd).is_empty(),
+        "review-run and review-eval"
+    );
+
+    w.jobs.push(Job {
+        name: "route".into(),
+        // Building review-run is not running it, and planning the
+        // evaluation runs no case.
+        text: format!(
+            "    steps:\n{CLI}      - run: cargo build --locked --quiet -p review-run\n      - run: cargo run --locked --quiet -p review-eval -- plan\n      - run: claude -p review\n"
+        ),
+    });
+    assert_eq!(
+        w.agents_run_by(cmd),
+        [
+            "job route starts the Claude Code command line outside review-run and review-eval, which would route the review"
+        ]
+    );
+}
+
+#[test]
+fn key_held_apart_refuses_the_command_line_in_the_key_s_job() {
+    let mut w = parse(REVIEW_FLOW);
+    w.jobs[1].text.push_str(CLI);
+
+    assert_eq!(
+        w.key_held_apart(KEY).unwrap_err(),
+        "job post holds APP_KEY and runs the agents"
+    );
+}
+
+#[test]
+fn evaluate_job_runs_with_the_command_line_needs_not_itself() {
+    let w = parse(&EVALUATING_FLOW.replace(
+        "      - run: cargo run --locked --quiet -p review-eval -- run\n",
+        &format!("{CLI}      - run: cargo run --locked --quiet -p review-eval -- run\n"),
+    ));
+
+    assert_eq!(
+        w.evaluate_job_runs("cargo run --locked --quiet -p review-eval", KEY),
+        Ok(Vec::new())
     );
 }
 
 #[test]
 fn key_held_apart_wants_one_holder_that_runs_no_agent() {
     let mut w = parse(REVIEW_FLOW);
-    assert!(w.key_held_apart(KEY).is_ok());
+    assert_eq!(w.key_held_apart(KEY), Ok(()));
 
-    w.jobs[1]
-        .text
-        .push_str("      - uses: anthropics/claude-code-action@abc\n");
+    w.jobs[1].text.push_str(RUN);
     assert_eq!(
         w.key_held_apart(KEY).unwrap_err(),
-        "job post holds APP_KEY and runs the agent"
+        "job post holds APP_KEY and runs the agents"
     );
     assert_eq!(
         w.key_held_apart("OTHER").unwrap_err(),
@@ -187,19 +294,26 @@ fn key_job_after_agents_wants_the_agents_needed_and_no_override() {
             "job post runs on always(), even after a failed review"
         ]
     );
-    assert!(w.key_job_after_agents("OTHER").is_err());
+    assert_eq!(
+        w.key_job_after_agents("OTHER").unwrap_err(),
+        r#"0 jobs read "OTHER", want exactly one"#
+    );
 }
 
 #[test]
 fn key_job_runs_wants_the_command() {
     let w = parse(REVIEW_FLOW);
 
-    assert!(w.key_job_runs(KEY, "cargo run -p review-gate").is_ok());
+    assert_eq!(w.key_job_runs(KEY, "cargo run -p review-gate"), Ok(()));
     assert_eq!(
         w.key_job_runs(KEY, "cargo run -p other").unwrap_err(),
         r#"job post does not run "cargo run -p other""#
     );
-    assert!(w.key_job_runs("OTHER", "cargo run -p review-gate").is_err());
+    assert_eq!(
+        w.key_job_runs("OTHER", "cargo run -p review-gate")
+            .unwrap_err(),
+        r#"0 jobs read "OTHER", want exactly one"#
+    );
 }
 
 #[test]
@@ -226,10 +340,11 @@ fn key_job_posts_check_wants_the_permission_the_post_and_a_failing_default() {
             "job post does not fail the check by default: conclusion=failure".to_owned(),
         ])
     );
-    assert!(
+    assert_eq!(
         parse(REVIEW_FLOW)
             .key_job_posts_check("OTHER", "review-gate")
-            .is_err()
+            .unwrap_err(),
+        r#"0 jobs read "OTHER", want exactly one"#
     );
 }
 
@@ -449,37 +564,63 @@ fn grants_write_reads_quoted_values_and_write_all() {
     assert!(!grants_write("    permissions: read-all\n"));
 }
 
+/// The tool lists of review-run's agents, as the runner gives them.
+const SCOPED: [(&str, &str); 2] = [
+    ("specialist", "Read,Glob,Grep,Edit(./review/reports/**)"),
+    ("generalist", "Read,Glob,Grep"),
+];
+
 #[test]
 fn agents_write_only_wants_writes_scoped_to_the_reports() {
     let with = |tools: &str| {
         REVIEW_FLOW.replace(
-            "      - uses: anthropics/claude-code-action@abc\n",
-            &format!("      - uses: anthropics/claude-code-action@abc\n        with:\n          claude_args: --allowedTools {tools}\n"),
+            RUN,
+            &format!("{RUN}      - run: claude -p review --allowedTools {tools}\n"),
         )
     };
 
     assert!(
+        parse(REVIEW_FLOW)
+            .agents_write_only("review/reports", &SCOPED)
+            .is_empty()
+    );
+    assert!(
         parse(&with("\"Read,Grep,Edit(./review/reports/**)\""))
-            .agents_write_only("review/reports")
+            .agents_write_only("review/reports", &SCOPED)
             .is_empty()
     );
     assert_eq!(
-        parse(&with("Read,Write,Bash(ls:*)")).agents_write_only("review/reports"),
+        parse(&with("Read,Write,Bash(ls:*)")).agents_write_only("review/reports", &SCOPED),
         [
             "agent job review may use Write, want Edit(./review/reports/**) alone",
             "agent job review may use Bash(ls:*), want Edit(./review/reports/**) alone",
         ]
     );
     assert_eq!(
-        parse(&with("\"Read,Write(./review/reports/**)\"")).agents_write_only("review/reports"),
+        parse(&with("\"Read,Write(./review/reports/**)\""))
+            .agents_write_only("review/reports", &SCOPED),
         [
             "agent job review may use Write(./review/reports/**), want Edit(./review/reports/**) alone"
         ]
     );
+}
+
+#[test]
+fn agents_write_only_holds_review_run_s_tools_to_the_reports() {
+    let loose = [("specialist", "Read,Write"), ("generalist", "Read,Bash")];
+
     assert_eq!(
-        parse(REVIEW_FLOW).agents_write_only("review/reports"),
-        ["agent job review lists no --allowedTools"]
+        parse(REVIEW_FLOW).agents_write_only("review/reports", &loose),
+        [
+            "review-run's specialist may use Write, want Edit(./review/reports/**) alone",
+            "review-run's generalist may use Bash, want Edit(./review/reports/**) alone",
+        ]
     );
+}
+
+#[test]
+fn review_run_s_tools_are_the_runner_s() {
+    assert_eq!(RUN_TOOLS, SCOPED);
 }
 
 /// The review workflow with the evaluate job ENG-32 asks for.
@@ -496,7 +637,7 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: anthropics/claude-code-action@abc
+      - run: cargo run --locked --quiet --offline -p review-run -- --workdir .
   evaluate:
     needs: review
     permissions:
@@ -563,4 +704,84 @@ fn evaluate_job_runs_fails_without_the_job_or_the_key_s_job() {
         no_key.evaluate_job_runs("x", KEY).unwrap_err(),
         "0 jobs read \"APP_KEY\", want exactly one"
     );
+}
+
+#[test]
+fn agents_write_only_allows_only_reading_and_the_scoped_report() {
+    let loose = [("specialist", "Read,Glob,Grep,WebFetch,Agent,mcp__x__y")];
+
+    assert_eq!(
+        parse(REVIEW_FLOW).agents_write_only("review/reports", &loose),
+        [
+            "review-run's specialist may use WebFetch, want Edit(./review/reports/**) alone",
+            "review-run's specialist may use Agent, want Edit(./review/reports/**) alone",
+            "review-run's specialist may use mcp__x__y, want Edit(./review/reports/**) alone",
+        ]
+    );
+}
+
+/// An agent job's step that uploads `path` as an artifact.
+fn upload(path: &str) -> String {
+    format!(
+        "      - uses: actions/upload-artifact@abc # v7\n        with:\n          name: x\n          path: {path}\n"
+    )
+}
+
+#[test]
+fn run_logs_stay_in_the_agent_job() {
+    let mut w = parse(REVIEW_FLOW);
+    assert!(w.run_logs_stay(RUN_LOGS).is_empty());
+
+    w.jobs[0].text.push_str(&upload(
+        "|\n            review/reports/\n            review/answers.json",
+    ));
+    assert!(
+        w.run_logs_stay(RUN_LOGS).is_empty(),
+        "the reports leave the job"
+    );
+
+    for path in [
+        "review/logs/",
+        "review/logs",
+        "review/",
+        "review",
+        ".",
+        "review/**",
+        "|\n            review/reports/\n            review/logs/agent.jsonl",
+    ] {
+        let mut leaks = parse(REVIEW_FLOW);
+        leaks.jobs[0].text.push_str(&upload(path));
+        assert_eq!(
+            leaks.run_logs_stay(RUN_LOGS),
+            ["agent job review uploads review/logs, every tool result its agents read"],
+            "{path}"
+        );
+    }
+
+    let mut excluded = parse(REVIEW_FLOW);
+    excluded.jobs[0].text.push_str(&upload(
+        "|\n            review/\n            !review/logs/**",
+    ));
+    assert!(
+        excluded.run_logs_stay(RUN_LOGS).is_empty(),
+        "an excluded log stays"
+    );
+
+    let mut other = parse(REVIEW_FLOW);
+    other.jobs[1].text.push_str(&upload("review/logs/"));
+    assert!(
+        other.run_logs_stay(RUN_LOGS).is_empty(),
+        "a job that runs no agent has no log"
+    );
+}
+
+#[test]
+fn upload_paths_reads_inline_and_block_paths() {
+    assert_eq!(upload_paths(&upload("a/")), ["a/"]);
+    assert_eq!(
+        upload_paths(&upload("|\n            a/\n            !b\n")),
+        ["a/", "!b"]
+    );
+    assert!(upload_paths("      - run: echo path: x\n").is_empty());
+    assert!(upload_paths("      - uses: actions/upload-artifact@abc\n").is_empty());
 }

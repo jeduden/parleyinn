@@ -7,7 +7,8 @@
 //! wrote on the pull request, each `{"author", "at", "body"}` and, for a
 //! review, its `state`, which the workflow filters before the command
 //! reads it. One with a non-blank body, other than a review that
-//! requests changes, is the stakeholder's consent ENG-29 asks for.
+//! requests changes, consents: to each owned path it names (ENG-21),
+//! and, whatever it names, to the change ENG-29 guards.
 
 use std::collections::BTreeSet;
 use std::fs;
@@ -39,8 +40,8 @@ const CHANGES_REQUESTED: &str = "CHANGES_REQUESTED";
 pub const BUNDLE: &str = "bundle.md";
 /// The deterministic findings' file name under `--out`.
 pub const CHECKED: &str = "checked.json";
-/// The agents the orchestrator consults, each generalist with its
-/// specialists, which the review gate holds the review to (ENG-28).
+/// The agents the review runs, each generalist with its specialists,
+/// which the review gate holds the review to (ENG-28).
 pub const DISPATCH: &str = "dispatch.json";
 /// The directory under `--out` that holds each specialist's diff,
 /// `<its name>.diff`: only the changed files it reads.
@@ -96,7 +97,7 @@ fn build(
     let diff = String::from_utf8_lossy(&diff);
     let read = |path: &Path| fs::read_to_string(path).map_err(failed("read", path));
     let consent = consents(&read(consent)?).map_err(failed("read", consent))?;
-    let a = analyse(&base_tree, &head_tree, &diff, consent);
+    let a = analyse(&base_tree, &head_tree, &diff, &consent);
     let write = |name: &str, body: &str| {
         let path = out.join(name);
         fs::write(&path, body).map_err(failed("write", &path))
@@ -108,10 +109,11 @@ fn build(
     write(DISPATCH, &format!("{dispatch}\n"))?;
     let diffs = out.join(DIFFS);
     fs::create_dir_all(&diffs).map_err(failed("write", &diffs))?;
+    let tree = |path: &str| tree_file(head, path);
     for (specialist, scope) in &a.scopes {
         write(
             &format!("{DIFFS}/{specialist}.diff"),
-            &diff_for(&diff, scope),
+            &diff_for(&diff, scope, &tree),
         )?;
     }
 
@@ -126,13 +128,24 @@ fn build(
 
 /// The part of `diff` a specialist whose files are `scope` reads: those
 /// files' sections, or the whole diff when it has none of its own, as a
-/// specialist a row brings may not.
-fn diff_for(diff: &str, scope: &BTreeSet<String>) -> String {
-    if scope.is_empty() {
+/// specialist a row brings may not; either without the hunks inside a
+/// copy an `<?include?>` makes of its source in the tree `tree` reads.
+fn diff_for(diff: &str, scope: &BTreeSet<String>, tree: &dyn Fn(&str) -> Option<String>) -> String {
+    let own = if scope.is_empty() {
         diff.to_owned()
     } else {
         crate::diff::only(diff, scope)
-    }
+    };
+
+    crate::copies::prune(&own, tree)
+}
+
+/// The text of the regular file at `path` in the tree at `root`, or
+/// `None` when it is no regular file there or does not read.
+fn tree_file(root: &Path, path: &str) -> Option<String> {
+    let file = root.join(path);
+    let regular = fs::symlink_metadata(&file).is_ok_and(|m| m.is_file());
+    regular.then(|| fs::read_to_string(&file).ok()).flatten()
 }
 
 /// The message for a failure to `verb` the file at `path`.
@@ -141,14 +154,13 @@ fn failed<E: std::fmt::Display>(verb: &'static str, path: &Path) -> impl FnOnce(
     move |e| format!("review-bundle: {verb} {path}: {e}")
 }
 
-/// Whether `json`, the owners' comments, holds the stakeholder's
-/// consent: at least one comment with a non-blank body that is no
-/// review requesting changes. Each comment must carry a string
-/// `author`, `at` and `body`.
-fn consents(json: &str) -> Result<bool, String> {
+/// The bodies of the comments in `json`, the owners' comments, that
+/// consent: each non-blank one that is no review requesting changes.
+/// Each comment must carry a string `author`, `at` and `body`.
+fn consents(json: &str) -> Result<Vec<String>, String> {
     let value: Value = serde_json::from_str(json).map_err(|e| e.to_string())?;
     let comments = value.as_array().ok_or("not an array of comments")?;
-    let mut consent = false;
+    let mut consent = Vec::new();
     for comment in comments {
         let field = |name: &str| {
             comment
@@ -159,7 +171,10 @@ fn consents(json: &str) -> Result<bool, String> {
         field("author")?;
         field("at")?;
         let objects = comment.get("state").and_then(Value::as_str) == Some(CHANGES_REQUESTED);
-        consent |= !objects && !field("body")?.trim().is_empty();
+        let body = field("body")?;
+        if !objects && !body.trim().is_empty() {
+            consent.push(body.to_owned());
+        }
     }
 
     Ok(consent)

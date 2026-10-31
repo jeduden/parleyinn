@@ -2,7 +2,8 @@
 //! line in the shape the shared report section asks for,
 //! `path:line — blocking|nit — what it breaks — the ids it touches`,
 //! and the outcome line the report ends with, as the review gate reads
-//! it.
+//! it, and a generalist's dropped finding,
+//! `dropped — path:line — why — source`.
 
 /// The outcomes a report may end with.
 pub const OUTCOMES: [&str; 3] = ["sound", "nits", "blocking"];
@@ -65,6 +66,43 @@ pub fn outcome_word(line: &str) -> Option<&'static str> {
         .trim_matches(|c: char| !c.is_ascii_alphanumeric());
 
     OUTCOMES.iter().find(|o| **o == word).copied()
+}
+
+/// The word a generalist's dropped-finding line starts with, or gives
+/// as its severity.
+pub const DROPPED: &str = "dropped";
+
+/// Whether `line` reports a dropped finding: its first word is
+/// [`DROPPED`], in any case, after any list marker or emphasis, as
+/// `dropped — path:line — why — source`, or it reads as a finding whose
+/// severity is [`DROPPED`]. A path that merely starts with the letters,
+/// `dropped_events.rs:12`, is a finding on that path. The one rule the
+/// evaluation's grader and the review's run both read a generalist's
+/// answer by.
+#[must_use]
+pub fn dropped(line: &str) -> bool {
+    bare(line).split_whitespace().next().is_some_and(|word| {
+        word.trim_end_matches(['*', '_', '`', ':', ',', '.'])
+            .eq_ignore_ascii_case(DROPPED)
+    }) || finding(line).is_some_and(|f| f.severity == DROPPED)
+}
+
+/// The word a generalist's line starts with when it keeps, adds and
+/// drops nothing.
+pub const NONE: &str = "none";
+
+/// Whether `line` says a generalist has nothing to add, in the shape
+/// `none — nothing to add — source`: a first part of [`NONE`] alone,
+/// in any case, after any list marker or emphasis, and a dash after it.
+#[must_use]
+pub fn nothing(line: &str) -> bool {
+    match split_dashes(bare(line)).as_slice() {
+        [first, _, ..] => first
+            .trim()
+            .trim_end_matches(['*', '_', '`'])
+            .eq_ignore_ascii_case(NONE),
+        _ => false,
+    }
 }
 
 /// `line` without a leading list marker, emphasis or quote.

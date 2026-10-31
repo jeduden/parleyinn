@@ -153,7 +153,7 @@ struct Files<'a> {
 }
 
 /// Loads the review outcome, the check runs, the deterministic checks'
-/// findings, the dispatch and the agents the orchestrator called.
+/// findings, the dispatch and the agents the review consulted.
 fn read_input(files: &Files, read: &dyn Fn(&str) -> io::Result<String>) -> Result<Input, String> {
     let load = |path: &str| read(path).map_err(|e| format!("read {path}: {e}"));
     let outcome = parse_outcome(&load(files.outcome)?).map_err(|e| e.to_string())?;

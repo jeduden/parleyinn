@@ -1,7 +1,8 @@
 //! Compares main's tree with the pull request's: which requirements and
 //! scenarios changed, which the diff names, the review class, and the
 //! findings a machine can decide alone. It reads nothing but its inputs:
-//! the stakeholder's consent arrives as a flag the command line read.
+//! the stakeholder's consenting comments arrive as the command line read
+//! them.
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
@@ -111,17 +112,19 @@ pub struct Analysis {
     /// The record that satisfies ENG-29, when a guarded change has one
     /// and the stakeholder consented.
     pub eng_29_record: Option<Record>,
-    /// The agents the review's orchestrator consults (ENG-28).
+    /// The agents the review runs (ENG-28).
     pub dispatch: dispatch::Dispatch,
     /// Each specialist with the changed files it reads.
     pub scopes: dispatch::Scopes,
 }
 
 /// Compares `base`, main's tree, with `head`, the pull request's, whose
-/// diff against main is `diff`. `consent` says whether a stakeholder
-/// comment on the pull request consents to it.
+/// diff against main is `diff`. `consents` are the bodies of the
+/// stakeholder's comments on the pull request that consent: each to the
+/// owned paths it names (ENG-21), and any one of them to an ENG-29
+/// change.
 #[must_use]
-pub fn analyse(base: &Snapshot, head: &Snapshot, diff: &str, consent: bool) -> Analysis {
+pub fn analyse(base: &Snapshot, head: &Snapshot, diff: &str, consents: &[String]) -> Analysis {
     let diff::Paths { paths, unparsed } = diff::changed_paths(diff);
     let patterns = owners::patterns(&base.codeowners);
     let owned: Vec<String> = paths
@@ -140,8 +143,13 @@ pub fn analyse(base: &Snapshot, head: &Snapshot, diff: &str, consent: bool) -> A
         .filter(|id| known.contains(id.as_str()))
         .collect();
     let mut findings = ratchet(base, head);
-    let (guard, eng_29_record) = eng_29(base, head, &paths, &requirements, consent);
+    let (guard, eng_29_record) = eng_29(base, head, &paths, &requirements, !consents.is_empty());
     findings.extend(guard);
+    let unconsented: Vec<&String> = owned
+        .iter()
+        .filter(|p| !consents.iter().any(|c| owners::names(&patterns, c, p)))
+        .collect();
+    findings.extend(stakeholder_paths(&owned, &unconsented));
     findings.extend(unparsed.iter().map(|h| nit(h, UNPARSED)));
     findings.extend(lifted_bans(diff));
     let crates = security_crates(base);
@@ -171,9 +179,14 @@ pub fn analyse(base: &Snapshot, head: &Snapshot, diff: &str, consent: bool) -> A
         .collect();
     let class = classify(&paths, deep || !owned.is_empty(), &unparsed);
     let scopes = dispatch::scopes(&paths, &rows, &crates, &diff::ids_by_file(diff));
+    let mut routed = dispatch::grouped(&scopes);
+    if routed.is_empty() {
+        // No rule routes the change: one generalist still reads it.
+        routed.insert(dispatch::CODE.to_owned(), BTreeSet::new());
+    }
     let dispatch = match class {
-        Class::Deep => dispatch::deepened(dispatch::grouped(&scopes)),
-        Class::Light | Class::Standard => dispatch::grouped(&scopes),
+        Class::Deep => dispatch::deepened(routed),
+        Class::Light | Class::Standard => routed,
     };
 
     Analysis {
@@ -189,6 +202,49 @@ pub fn analyse(base: &Snapshot, head: &Snapshot, diff: &str, consent: bool) -> A
         dispatch,
         scopes,
     }
+}
+
+/// How many unconsented paths the ENG-21 finding lists before it counts
+/// the rest.
+const LISTED: usize = 10;
+
+/// ENG-21: a change to a path CODEOWNERS assigns needs the stakeholder's
+/// consent, by a comment that names it. Blocks at the first of the
+/// `unconsented` paths, listing them; when every `owned` path is
+/// consented, a nit that names the paths.
+fn stakeholder_paths(owned: &[String], unconsented: &[&String]) -> Option<Finding> {
+    let first = owned.first()?;
+    let Some(blocked) = unconsented.first() else {
+        return Some(Finding {
+            path: first.clone(),
+            line: 0,
+            severity: NIT,
+            body: format!(
+                "this change touches paths CODEOWNERS assigns ({}) (ENG-21), and a \
+                 stakeholder comment names each of them, consenting to it",
+                owned.join(", ")
+            ),
+        });
+    };
+    let listed: Vec<&str> = unconsented
+        .iter()
+        .take(LISTED)
+        .map(|p| p.as_str())
+        .collect();
+    let more = match unconsented.len().saturating_sub(LISTED) {
+        0 => String::new(),
+        n => format!(" and {n} more"),
+    };
+    Some(Finding {
+        path: (*blocked).clone(),
+        line: 0,
+        severity: BLOCKING,
+        body: format!(
+            "this change touches paths CODEOWNERS assigns (ENG-21) that no stakeholder \
+             comment names, so none consents to them: {}{more}",
+            listed.join(", ")
+        ),
+    })
 }
 
 /// What an unparsed diff header weighs.
@@ -361,7 +417,8 @@ fn ratchet(base: &Snapshot, head: &Snapshot) -> Vec<Finding> {
 /// ENG-29: a change to an invariant, or to a requirement ENG-29 marks
 /// for I2 review, lands only with an accepted decision record, changed
 /// in the same pull request, that names ENG-29 and what it covers, and
-/// with the stakeholder's consent. Returns the finding when either is
+/// with the stakeholder's consent: `consent`, a consenting comment on
+/// the pull request, whatever paths it names. Returns the finding when either is
 /// missing, else the record that satisfies it.
 fn eng_29(
     base: &Snapshot,

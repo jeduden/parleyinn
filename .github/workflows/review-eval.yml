@@ -35,9 +35,6 @@ jobs:
     timeout-minutes: 300
     permissions:
       contents: read
-    env:
-      # The Claude Code command line the harness starts, pinned (ENG-01).
-      CLAUDE_CODE_VERSION: "2.1.312"
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -48,10 +45,8 @@ jobs:
           tools: "rust github:jeduden/mdsmith"
           # Jobs handling review credentials never restore executable caches.
           cache: false
-      # The command line is an npm package, which mise's released-binary
-      # rule refuses, so it is pinned here and installed with npm.
       - name: Install the pinned Claude Code command line
-        run: npm install --global --no-fund --no-audit "@anthropic-ai/claude-code@$CLAUDE_CODE_VERSION" # zizmor: ignore[adhoc-packages] pinned to one version by CLAUDE_CODE_VERSION, which no mise backend the repository allows can install
+        uses: ./.github/actions/claude-code
       # Exit 1 says a case failed, which the last step turns into the
       # job's failure once the report and the comparison are in the
       # summary. Any other exit is the harness's own failure.
@@ -68,7 +63,9 @@ jobs:
             set -- "$@" --model "$MODEL"
           fi
           if [ -n "$COMPONENTS" ]; then
-            for component in $COMPONENTS; do
+            # Split on spaces only: a `*` in the input names no file.
+            read -ra names <<< "$COMPONENTS"
+            for component in "${names[@]}"; do
               set -- "$@" --component "$component"
             done
           else

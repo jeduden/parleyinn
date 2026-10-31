@@ -92,6 +92,9 @@ pub fn cases() -> Vec<Case> {
         isolation_cases(),
         instruction_cases(),
         transcript_contract_cases(),
+        // Late, so adding it moves no earlier case to another shard.
+        vec![consent_case(), test_shards_case()],
+        review_late_cases(),
         // Last: its cases edit source the later cases would run stale.
         license_text_cases(),
     ]
@@ -418,8 +421,8 @@ fn repository_cases() -> Vec<Case> {
     ]
 }
 
-/// The drifts ENG-28 exists to catch in the reviewing agent's reach: the
-/// agent reaching the approval. [`review_gate_cases`] holds the approval
+/// The drifts ENG-28 exists to catch in the review's agents' reach: an
+/// agent reaching the approval, or routing the review. [`review_gate_cases`] holds the approval
 /// skipping the review gate.
 fn review_cases() -> Vec<Case> {
     vec![
@@ -450,8 +453,8 @@ fn review_cases() -> Vec<Case> {
             "ENG-28",
             Injection::replace(
                 REVIEW_WORKFLOW,
-                "          github_token: ${{ github.token }}\n",
-                "          github_token: ${{ secrets.JEDUDEN_REVIEW_AGENT_KEY }}\n",
+                "        run: |\n          cargo run --locked --quiet --offline -p review-run",
+                "          KEY: ${{ secrets.JEDUDEN_REVIEW_AGENT_KEY }}\n        run: |\n          cargo run --locked --quiet --offline -p review-run",
             ),
             scenario("ENG-28"),
             "agent job review reads JEDUDEN_REVIEW_AGENT_KEY",
@@ -459,9 +462,24 @@ fn review_cases() -> Vec<Case> {
         case(
             "the reviewing agents allowed to write anywhere",
             "ENG-28",
-            Injection::replace(REVIEW_WORKFLOW, "Edit(./review/reports/**)", "Write"),
+            Injection::replace(
+                REVIEW_WORKFLOW,
+                "            > review/run.txt\n",
+                "            > review/run.txt\n          claude -p review --allowedTools Write\n",
+            ),
             scenario("ENG-28"),
             "may use Write, want Edit(./review/reports/**) alone",
+        ),
+        case(
+            "the review routed by an agent instead of review-run",
+            "ENG-28",
+            Injection::replace(
+                REVIEW_WORKFLOW,
+                "          cargo run --locked --quiet --offline -p review-run -- --workdir . --parallel 32 \\\n            > review/run.txt\n",
+                "          echo routed\n      - uses: anthropics/claude-code-action@1d6de8cb0c237e7c15e9e1bdf973826ebae490cc\n",
+            ),
+            scenario("ENG-28"),
+            "no job runs the review's agents with \"cargo run --locked --quiet --offline -p review-run -- --workdir .\"",
         ),
         case(
             "the review gate without the specialists' reports",
@@ -571,8 +589,9 @@ fn review_agent_cases() -> Vec<Case> {
 
 /// The drifts ENG-32 exists to catch: a component without one of its
 /// kinds of case, an agent the dispatch never names without any, a case
-/// whose edit no longer applies, a case that dispatches another
-/// component, and a review workflow that skips the evaluation.
+/// whose edit no longer applies, a case of no component, such as the
+/// retired orchestrator, a case that dispatches another component, and
+/// a review workflow that skips the evaluation.
 fn review_evaluation_cases() -> Vec<Case> {
     vec![
         protection_case(
@@ -601,13 +620,22 @@ fn review_evaluation_cases() -> Vec<Case> {
             "lang-rust/defect-unwrap: tooling/review-bundle/src/lib.rs: does not contain",
         ),
         protection_case(
-            "a reviewer evaluation case that dispatches no one",
+            "a case for the retired review orchestrator",
+            Injection::create(
+                "tooling/review-eval/cases/review/defect-unwrap.toml",
+                "component = \"review\"\nkind = \"defect\"\ntitle = \"an unwrap\"\n\n[[create]]\nfile = \"crates/x/src/rogue.rs\"\ncontent = \"x\"\n\n[expect]\noutcome = \"blocking\"\n",
+            ),
+            "the_checkout_s_reviewer_evaluation_cases_apply_and_dispatch",
+            "case review/defect-unwrap names no component",
+        ),
+        protection_case(
+            "a reviewer evaluation case no rule routes to its component",
             Injection::create(
                 "tooling/review-eval/cases/lang-toml/stray.toml",
                 "component = \"lang-toml\"\nkind = \"other\"\ntitle = \"a note\"\n\n[[create]]\nfile = \"research/note.txt\"\ncontent = \"x\"\n\n[expect]\n",
             ),
             "the_checkout_s_reviewer_evaluation_cases_apply_and_dispatch",
-            "case lang-toml/stray does not dispatch lang-toml; the bundle dispatches no agent",
+            "case lang-toml/stray does not dispatch lang-toml; the bundle dispatches review-code",
         ),
         case(
             "the review workflow's evaluate job removed",
@@ -648,7 +676,7 @@ fn review_report_case() -> Case {
         "ENG-28",
         Injection::replace(
             "tooling/review-gate/src/lib.rs",
-            ".is_some_and(|answer| answer.lines().any(|l| l.trim() == outcome)))",
+            ".is_some_and(|answer| answer.lines().any(|l| same_outcome(outcome, l))))",
             ".is_some_and(|_| true))",
         ),
         scenario("ENG-28"),
@@ -694,7 +722,7 @@ fn review_gate_cases() -> Vec<Case> {
             r#"job post does not run "--checked checked.json""#,
         ),
         case(
-            "the review posted without holding the orchestrator to the dispatch",
+            "the review posted without holding it to the dispatch",
             "ENG-28",
             Injection::replace(
                 REVIEW_WORKFLOW,
@@ -738,6 +766,108 @@ fn review_gate_cases() -> Vec<Case> {
                 "the_executable_bundles_this_repository_against_itself",
             ),
             "class=light",
+        ),
+    ]
+}
+
+/// The ENG-21 finding comes from the same CODEOWNERS the class reads;
+/// the test asserts with its own message, which names the finding.
+fn consent_case() -> Case {
+    case(
+        "CODEOWNERS no longer asking consent for the SRS",
+        "ENG-21",
+        Injection::replace(
+            ".github/CODEOWNERS",
+            "/docs/srs/                    @jeduden",
+            "/docs/srsx/                   @jeduden",
+        ),
+        cargo_test(
+            "review-bundle",
+            "e2e_review_bundle",
+            "the_executable_blocks_a_stakeholder_path_without_a_consent",
+        ),
+        "no ENG-21 finding for a stakeholder path",
+    )
+}
+
+/// The test job's shards leave a crate out, so its tests run nowhere.
+fn test_shards_case() -> Case {
+    case(
+        "a crate the test job's shards leave out",
+        "the_ci_test_shards_run_every_crate_once",
+        Injection::replace(CI_WORKFLOW, " -p review-run -p srs\"", " -p review-run\""),
+        cargo_test(
+            "engineering",
+            "static_analysis",
+            "the_ci_test_shards_run_every_crate_once",
+        ),
+        "the test job's shards: crate srs runs in no shard",
+    )
+}
+
+/// The review workflow drifts registered after the first ones, late so
+/// adding them moves no earlier case to another shard: the agents' run
+/// logs leaving their job, and the Claude Code command line, installed
+/// by the composite action, in the key's job or starting an agent
+/// outside review-run; the ENG-32 evaluation planning every component
+/// a shared section change reaches, not one per set; and review-run
+/// starting a generalist before every specialist has ended.
+fn review_late_cases() -> Vec<Case> {
+    vec![
+        case(
+            "the reviewing agents' run logs uploaded out of their job",
+            "ENG-28",
+            Injection::replace(
+                REVIEW_WORKFLOW,
+                "            review/usage.json\n          if-no-files-found: error\n",
+                "            review/usage.json\n            review/logs/\n          if-no-files-found: error\n",
+            ),
+            scenario("ENG-28"),
+            "agent job review uploads review/logs, every tool result its agents read",
+        ),
+        case(
+            "the key's job given the Claude Code command line",
+            "ENG-28",
+            Injection::replace(
+                REVIEW_WORKFLOW,
+                "      - name: Build the review gate\n",
+                "      - uses: ./.github/actions/claude-code\n      - name: Build the review gate\n",
+            ),
+            scenario("ENG-28"),
+            "agent job post reads JEDUDEN_REVIEW_AGENT_KEY",
+        ),
+        case(
+            "the review routed by the Claude Code command line instead of review-run",
+            "ENG-28",
+            Injection::replace(
+                REVIEW_WORKFLOW,
+                "          cargo run --locked --quiet --offline -p review-run -- --workdir . --parallel 32 \\\n            > review/run.txt\n",
+                "          claude -p review > review/run.txt\n",
+            ),
+            scenario("ENG-28"),
+            "job review starts the Claude Code command line outside review-run and review-eval, which would route the review",
+        ),
+        case(
+            "the evaluation planning every component a shared section change reaches",
+            "ENG-32",
+            Injection::replace(
+                "tooling/review-eval/src/plan.rs",
+                "                shared.entry(sections_of(&a)).or_default().push(name);\n",
+                "                shared.entry(sections_of(&a)).or_default().push(name.clone());\n                out.push(Planned { component: name, reason: \"shared sections changed\".to_owned() });\n",
+            ),
+            scenario("ENG-32"),
+            "components planned for the sections",
+        ),
+        case(
+            "review-run starting the generalists before the specialists",
+            "ENG-28",
+            Injection::replace(
+                "tooling/review-run/src/run.rs",
+                "    let mut runs = parallel(&plan.specialists(), options.parallel, &|name| {\n        one(name, Kind::Specialist)\n    });\n    runs.extend(parallel(&plan.generalists(), options.parallel, &|name| {\n        one(name, Kind::Generalist)\n    }));\n",
+                "    let mut runs = parallel(&plan.generalists(), options.parallel, &|name| {\n        one(name, Kind::Generalist)\n    });\n    runs.extend(parallel(&plan.specialists(), options.parallel, &|name| {\n        one(name, Kind::Specialist)\n    }));\n",
+            ),
+            scenario("ENG-28"),
+            "review-code started before lang-markdown ended",
         ),
     ]
 }
@@ -2518,8 +2648,8 @@ fn instruction_cases() -> Vec<Case> {
             "the_ci_test_job_runs_with_a_decoy_home",
             Injection::replace(
                 ".github/workflows/ci.yml",
-                "HOME=\"$decoy\" cargo test --workspace --locked",
-                "cargo test --workspace --locked",
+                "HOME=\"$decoy\" cargo test --locked \"${packages[@]}\"",
+                "cargo test --locked \"${packages[@]}\"",
             ),
             cargo_test(
                 "engineering",

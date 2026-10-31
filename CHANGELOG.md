@@ -9,12 +9,24 @@ its upgrade notes (ENG-23). ParleyInn follows semantic versioning.
 
 ## Unreleased
 
+- A stakeholder comment consents only to the stakeholder paths it names,
+  by path, owning pattern or directory (ENG-21).
 - Every reviewer component of the layered review, and every other agent
   under `.claude/agents`, is held to evaluation cases, run on the model
   its front matter names by the review of a pull request that changes
   it, weekly against the published scorecard, and on demand on a
   candidate model for a comparison (ENG-32). The `review-eval` tooling
   crate runs them.
+- The review of a pull request is run by code, not by an orchestrating
+  agent (ENG-28): the `review-run` tooling crate runs every specialist
+  the review bundle dispatches, then every dispatched generalist, each
+  as its own agent, and writes the review outcome from what they
+  answered. No review runs the review skill or its evaluation cases
+  any more; the skill's file goes in a follow-up.
+  A change no rule routes gets one generalist, an agent that did not
+  answer runs once more, a change to a stakeholder path blocks until a
+  stakeholder comment consents (ENG-21), and every review reads the whole
+  diff.
 - Redaction now also redacts a secret that a neighbouring match hid from
   a rule's word boundary, such as an AWS access key directly followed by
   a principal's pattern (SEC-08). Its work is bounded by the redaction
