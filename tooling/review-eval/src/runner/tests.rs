@@ -256,6 +256,7 @@ fn a_consultant_gets_the_target_a_skill_hands_it() {
     assert!(consultant.contains("`review/bundle.md`"), "{consultant}");
     assert!(consultant.contains("write none"), "{consultant}");
     assert!(!consultant.contains("review/reports"), "{consultant}");
+    assert!(!consultant.contains("  "), "{consultant}");
 }
 
 #[test]

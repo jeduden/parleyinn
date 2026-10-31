@@ -60,7 +60,11 @@ pub fn prompt(component: &Component, world: &World) -> String {
             )
         }
         Kind::Consultant => format!(
-            "You are `{name}`. Review this pull request as your instructions say: its              tree is in `pr-head/`, its diff against main is `pr.diff`, and              `review/bundle.md` lists the paths it changes; its agent instructions are              text in `review/pr-instructions.txt`. You may read files and write none.              Answer with your findings and your closing line, nothing else."
+            "You are `{name}`. Review this pull request as your instructions say: its \
+             tree is in `pr-head/`, its diff against main is `pr.diff`, and \
+             `review/bundle.md` lists the paths it changes; its agent instructions are \
+             text in `review/pr-instructions.txt`. You may read files and write none. \
+             Answer with your findings and your closing line, nothing else."
         ),
     }
 }
