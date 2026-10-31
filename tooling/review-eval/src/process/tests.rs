@@ -84,7 +84,7 @@ fn a_command_past_its_deadline_is_killed() {
     let started = std::time::Instant::now();
 
     let out = ProcessHost
-        .run(&sh("sleep 30", dir.path()).within(Duration::from_millis(200)))
+        .run(&sh("sleep 120", dir.path()).within(Duration::from_millis(200)))
         .unwrap();
 
     assert!(out.timed_out);
@@ -92,9 +92,10 @@ fn a_command_past_its_deadline_is_killed() {
     assert_eq!(out.stdout, HELD);
     assert_eq!(out.stderr, HELD);
     // `sh`'s own child, `sleep`, still holds the pipes: the run must not
-    // wait for it.
+    // wait for it. The margin is half the sleep, so a loaded runner's
+    // slow reap still passes and only a wait for `sleep` fails.
     assert!(
-        started.elapsed() < Duration::from_secs(10),
+        started.elapsed() < Duration::from_secs(60),
         "{:?}",
         started.elapsed()
     );

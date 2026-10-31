@@ -266,11 +266,19 @@ fn the_invariants_consent_names_every_stakeholder_path_its_case_changes() {
         .map(|(file, _)| *file)
         .chain([INVARIANTS, INVARIANTS_ADR_PATH]);
 
-    for path in changed.filter(|p| {
-        patterns
-            .iter()
-            .any(|pat| review_bundle::owners::owns(pat, p))
-    }) {
+    let owned: Vec<&str> = changed
+        .filter(|p| {
+            patterns
+                .iter()
+                .any(|pat| review_bundle::owners::owns(pat, p))
+        })
+        .collect();
+
+    assert!(
+        !owned.is_empty(),
+        "CODEOWNERS owns no path the case changes"
+    );
+    for path in owned {
         assert!(
             review_bundle::owners::names(&patterns, INVARIANTS_CONSENT, path),
             "{path}"
