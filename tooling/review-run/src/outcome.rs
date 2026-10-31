@@ -170,8 +170,9 @@ struct Weighed {
 
 /// Adds each answering generalist's kept findings to `findings`, each
 /// once, counts them, and names each generalist whose answer says
-/// neither a finding nor that it has none, with a blocking finding of
-/// its own: silence is no clean pass. A blocking finding kept from a
+/// neither a finding nor that it has none, or holds a finding line it
+/// cannot read, with a blocking finding of its own: silence is no clean
+/// pass, and a finding the review cannot read is never dropped. A blocking finding kept from a
 /// specialist's requirement request, in `reports`, is kept as a nit.
 fn weighed(
     plan: &Plan,
@@ -198,6 +199,19 @@ fn weighed(
                 ),
             ));
             unread.push(name.clone());
+        }
+        for line in answer.lines().filter(|l| report::unread(l)) {
+            findings.push(blocking(
+                REVIEW_PATH,
+                format!(
+                    "{name} answered a finding line the review cannot read, so its weighing \
+                     cannot be read: {}",
+                    line.trim()
+                ),
+            ));
+            if !unread.contains(&name) {
+                unread.push(name.clone());
+            }
         }
         for mut f in kept(answer) {
             if f.severity == BLOCKING && from_request(plan, &name, reports, &f) {

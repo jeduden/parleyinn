@@ -88,5 +88,22 @@ pub fn finding(line: &str) -> Option<Finding> {
     })
 }
 
+/// The severities a generalist's finding gives.
+pub const SEVERITIES: [&str; 2] = ["blocking", "nit"];
+
+/// Whether `line` is a generalist's finding the review cannot read: a
+/// part after its first is a severity of [`SEVERITIES`] alone, markup
+/// aside, yet the line reads as no finding and no dropped one, its
+/// place unreadable. Such a line is never left out as prose.
+#[must_use]
+pub fn unread(line: &str) -> bool {
+    let shaped = split_dashes(bare(line)).iter().skip(1).any(|part| {
+        let word = part.trim().trim_matches(['`', '*', '_']);
+        SEVERITIES.iter().any(|s| s.eq_ignore_ascii_case(word))
+    });
+
+    shaped && finding(line).is_none() && !dropped(line)
+}
+
 #[cfg(test)]
 mod tests;

@@ -411,6 +411,63 @@ fn a_specialist_s_finding_counts_only_as_its_generalist_weighs_it() {
     assert!(d.outcome.findings.is_empty());
 }
 
+#[test]
+fn a_generalist_s_blocking_finding_with_its_place_in_bold_is_kept_and_counted() {
+    let (runs, reports) = all_answered("**src/a.rs:3** — blocking — an unwrap — lang-rust\nDone.");
+
+    let d = decide(&plan(DISPATCH), &runs, &reports, &known());
+
+    assert_eq!(d.outcome.verdict, "request_changes");
+    assert_eq!(
+        (
+            d.outcome.findings[0].path.as_str(),
+            d.outcome.findings[0].line
+        ),
+        ("src/a.rs", 3)
+    );
+    assert!(d.outcome.summary.contains("kept 1 blocking and 0 nit"));
+}
+
+#[test]
+fn a_generalist_s_finding_line_the_review_cannot_read_blocks_and_is_named() {
+    let (runs, reports) = all_answered(
+        "src/b.rs:2 — nit — tidy — lang-rust\n\
+         src/a.rs:x — blocking — an unwrap — lang-rust\nDone.",
+    );
+
+    let d = decide(&plan(DISPATCH), &runs, &reports, &known());
+
+    assert_eq!(d.outcome.verdict, "request_changes");
+    assert!(
+        d.outcome.findings.contains(&blocking(
+            "review/",
+            "review-code answered a finding line the review cannot read, so its weighing \
+             cannot be read: src/a.rs:x — blocking — an unwrap — lang-rust"
+                .to_owned()
+        )),
+        "{:?}",
+        d.outcome.findings
+    );
+    assert!(
+        d.outcome
+            .summary
+            .contains(" Answers the review cannot read: review-code."),
+        "{}",
+        d.outcome.summary
+    );
+
+    let (runs, reports) = all_answered("src/a.rs:x — blocking — an unwrap — lang-rust\nDone.");
+    let d = decide(&plan(DISPATCH), &runs, &reports, &known());
+    assert_eq!(d.outcome.findings.len(), 2, "{:?}", d.outcome.findings);
+    assert!(
+        d.outcome
+            .summary
+            .contains(" Answers the review cannot read: review-code."),
+        "{}",
+        d.outcome.summary
+    );
+}
+
 /// [`DISPATCH`]'s run with lang-rust's report asking for a requirement
 /// at `src/a.rs:3`, beside `linked` when given, and the generalist
 /// answering `answer`.
