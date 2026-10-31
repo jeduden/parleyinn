@@ -765,6 +765,39 @@ fn a_world_that_cannot_be_torn_down_is_noted_on_its_run() {
     assert!(out.contains(": fatal: locked"), "{out}");
 }
 
+#[test]
+fn a_world_directory_that_cannot_be_removed_is_noted_on_its_run() {
+    let dir = checkout();
+    sound_cases(dir.path());
+    let mut host = FakeHost::new(dir.path());
+    host.claude = obedient_claude();
+    let out = TempDir::new().unwrap();
+    let out_dir = out.path().join("out");
+    fs::create_dir_all(out_dir.join("runs/lang-rust/defect/1")).unwrap();
+    fs::write(out_dir.join("runs/lang-rust/defect/1/world"), "in the way").unwrap();
+
+    let (_, out, err) = run_cli(
+        &host,
+        &[
+            "run",
+            "--checkout",
+            &text(dir.path()),
+            "--component",
+            "lang-rust",
+            "--out",
+            &text(&out_dir),
+            "--repetitions",
+            "1",
+        ],
+    );
+
+    assert!(
+        out.contains("- `defect` run 1 note: remove "),
+        "{out}\n{err}"
+    );
+    assert!(out.contains("defect/1/world: "), "{out}");
+}
+
 /// A run of the obedient and the silent claude on the checkout `dir`,
 /// written under `out`: their scorecards.
 fn two_runs(dir: &Path, out: &Path) -> (PathBuf, PathBuf) {
