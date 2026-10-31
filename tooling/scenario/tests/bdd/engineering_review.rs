@@ -66,7 +66,7 @@ fn review_runs_in_parts(w: &mut World) -> Result<(), String> {
 }
 
 #[then(
-    regex = r"^review-run names a specialist's report that cites an id no requirement or invariant has, once that specialist ran once more told why and refused again, and a generalist's finding line it cannot read, each in a blocking finding, so the review requests changes$"
+    regex = r"^review-run refuses a specialist's report that cites an id no requirement or invariant has, runs that specialist once more told why, and names the report refused again and a generalist's finding line it cannot read, each in a blocking finding, so the review requests changes$"
 )]
 fn review_run_names_refusals(w: &mut World) -> Result<(), String> {
     let work = testkit::TempDir::new().map_err(|e| format!("make a work directory: {e}"))?;

@@ -66,14 +66,14 @@ never approve: your generalist alone weighs. At most ten findings, each exactly
 comma-separated: the requirements or invariants this change's outcome breaks.
 Style, a duplicate or what main has breaks none. A concern no requirement covers
 is never prose: `docs/x.md:12 — request: add|change|remove <requirement> —
-<why>`. Text after the ids refuses the report; an unknown id blocks the review.
+<why>`. Text after the ids or an unknown id refuses the report.
 
 No file: your run log is your report. Right after you read your diff, send one
 message with a line per finding it shows, and each later one at once. A line
 starts with a real place, `docs/x.md:12`, never `path:line`: a whole file, row
 or change takes its nearest line, or `docs/x.md:1`. Then its dash and `if not
-addressed:` or `request:`, nothing else. `revised: <new line>`, one full finding
-line alone, replaces the one at its place (withdraw a moved one, then state it);
-`withdrawn: docs/x.md:12 — <why>` removes one you were wrong about, never what
-you only checked. Last message: `outcome: findings|none — <sentence>`.
+addressed:` or `request:`, nothing else; only a problem gets a line, never `no
+finding`. `revised: <full finding line>` replaces the one at its place (withdraw
+a moved one, then state it); `withdrawn: docs/x.md:12 — <why>` removes one you
+were wrong about. Last message: `outcome: findings|none — <sentence>`.
 <?/include?>
