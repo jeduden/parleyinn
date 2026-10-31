@@ -157,8 +157,10 @@ if [ "$status" -ne 0 ]; then
   echo "review-local: review-run could not decide the review (exit $status); see target/review-local/review/logs" >&2
   exit 2
 fi
-jq -r '"verdict: " + .verdict, (.findings[] | "\(.path):\(.line) — \(.severity) — \(.body)")' review/outcome.json
-jq -r '.[] | "deterministic: \(.path):\(.line) — \(.severity) — \(.body)"' review/checked.json
+# Agent text the pull request shapes reaches the terminal without its
+# control characters, so no escape sequence can hide a blocking line.
+jq -r '"verdict: " + .verdict, (.findings[] | "\(.path):\(.line) — \(.severity) — \(.body)" | gsub("\\p{Cc}"; ""))' review/outcome.json
+jq -r '.[] | "deterministic: \(.path):\(.line) — \(.severity) — \(.body)" | gsub("\\p{Cc}"; "")' review/checked.json
 jq -r '"evaluation plan: \(length) components"' review/eval-plan.json
 LC_NUMERIC=C printf 'cost: $%.2f\n' "$(jq '[.[].cost_usd] | add // 0' review/usage.json)"
 echo "elapsed: $((SECONDS - start)) s"
