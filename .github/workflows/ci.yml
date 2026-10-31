@@ -310,7 +310,7 @@ jobs:
           path: target/coverage/${{ matrix.layer }}.lcov
 
   # ENG-11: the end-to-end layer of coverage-layer, its scenarios
-  # divided over four jobs as the scenarios job divides them, each on
+  # divided over six jobs by the hash the scenarios job uses, each on
   # its own instrumented build. Shard K of N is the job's position in
   # the matrix, so every scenario runs in exactly one job; the first
   # also runs the layer's targets other than the scenario runner. The
@@ -323,7 +323,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2, 3, 4]
+        shard: [1, 2, 3, 4, 5, 6]
     env:
       JOB_INDEX: ${{ strategy.job-index }}
       JOB_TOTAL: ${{ strategy.job-total }}

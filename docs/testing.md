@@ -69,7 +69,7 @@ carries `PARINN_COVERAGE_MEASURING`, and a run that finds it set refuses
 to start, so a test cannot set off a measurement inside a measurement.
 
 CI measures each test layer in a job of its own, the end-to-end layer in
-four shards ([ci.md](ci.md)). The `coverage` job merges them, adds the
+six shards ([ci.md](ci.md)). The `coverage` job merges them, adds the
 shards up, fails on a missing one, writes the table and the test counts
 into its summary, holds the floors, and uploads one Codecov flag per
 test layer. Codecov's [thresholds](../codecov.yml) are a soft ratchet.
