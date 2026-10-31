@@ -972,8 +972,9 @@ impl Shared {
     }
 }
 
-#[test]
-fn run_reports_its_progress_as_it_goes() {
+/// A run of `lang-rust`'s three cases one at a time: what its progress
+/// showed as the first agent started, and all it showed.
+fn progress_run() -> (String, String) {
     let dir = checkout();
     sound_cases(dir.path());
     let err = Shared::default();
@@ -1008,6 +1009,13 @@ fn run_reports_its_progress_as_it_goes() {
 
     assert_eq!(code, EXIT_OK);
     let first = seen.lock().unwrap()[0].clone();
+    (first, err.text())
+}
+
+#[test]
+fn run_names_what_it_evaluates_before_the_first_agent_runs() {
+    let (first, _) = progress_run();
+
     assert!(
         first.contains("evaluating 3 cases of 1 component, 1 at a time"),
         "{first}"
@@ -1016,10 +1024,40 @@ fn run_reports_its_progress_as_it_goes() {
         first.contains("] lang-rust/") && first.contains(" run 1: started"),
         "{first}"
     );
-    let all = err.text();
+}
+
+#[test]
+fn run_counts_each_decided_case_on_a_clocked_line() {
+    let (_, all) = progress_run();
+
     assert!(all.contains("1/3 cases decided"), "{all}");
     assert!(all.contains("3/3 cases decided"), "{all}");
     assert!(all.lines().all(|l| l.starts_with("[+")), "{all}");
+}
+
+#[test]
+fn estimate_line_counts_the_cases_of_the_components_named() {
+    let dir = checkout();
+    let none = TempDir::new().unwrap();
+
+    assert_eq!(
+        estimate_line(dir.path(), &["lang-rust".to_owned()]),
+        format!(
+            "estimate: 3 cases, {}, {PARALLEL} at a time",
+            plan::estimate(3, PARALLEL)
+        )
+    );
+    assert_eq!(
+        estimate_line(dir.path(), &["lang-toml".to_owned()]),
+        format!(
+            "estimate: 0 cases, {}, {PARALLEL} at a time",
+            plan::estimate(0, PARALLEL)
+        )
+    );
+    assert!(
+        estimate_line(none.path(), &["lang-rust".to_owned()]).starts_with("estimate: 0 cases, "),
+        "a tree without cases estimates none"
+    );
 }
 
 #[test]
