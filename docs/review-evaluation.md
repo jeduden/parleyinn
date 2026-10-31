@@ -29,8 +29,10 @@ records the design.
   one TOML file each. A case names the files it creates, the text it
   replaces, the reports it seeds for a generalist, the stakeholder's
   consent when it grants one, and what the report must say. A finding
-  is matched by its path and the words, severity, ids and source the
-  case names; `none` forbids one; `absent` forbids text. Cases belong to
+  is matched by its path and the words, ids and source the case names,
+  and by its form, `linked` or `request`, for a specialist or a persona,
+  which weighs nothing, or its severity for a generalist; `none` forbids
+  one; `absent` forbids text. Cases belong to
   the normal instance of a generalist; its deep instance runs the same
   ones. An agent the bundle never dispatches answers in text and is
   graded from it, as a generalist is; the dispatch rule below does not
@@ -60,7 +62,9 @@ records the design.
   each finding expected or forbidden, nothing else written, and, for a
   generalist, each finding it must drop on a line that starts with
   `dropped` or gives it as its severity, the rule `review-run` reads
-  its answer by. A departure from
+  its answer by. A specialist's report the review would refuse, with a
+  finding line in neither form or an outcome its lines contradict,
+  fails its run. A departure from
   the report's shape that the review survives is a slip: a label line
   between the findings, an answer that is more than the last line and
   the path, an eleventh finding. A specialist answers exactly two lines,
