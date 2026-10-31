@@ -104,6 +104,7 @@ pub fn cases() -> Vec<Case> {
         review_finding_shape_cases(),
         review_limit_cases(),
         review_withdrawal_cases(),
+        review_place_form_cases(),
         // Last: its cases edit source the later cases would run stale.
         license_text_cases(),
     ]
@@ -364,6 +365,44 @@ fn review_withdrawal_cases() -> Vec<Case> {
                 "report::tests::a_report_check_reads_a_leftover_revision_as_its_finding_and_a_withdrawal_as_nothing",
             ),
             "a_report_check_reads_a_leftover_revision_as_its_finding_and_a_withdrawal_as_nothing",
+        ),
+    ]
+}
+
+/// The drifts the gate's reading of a finding's place exists to catch
+/// (ENG-28, I6), late so adding them moves no earlier case to another
+/// shard: a finding missing the dash after its place read as prose, and
+/// a line at the forms' template place refused without naming it.
+fn review_place_form_cases() -> Vec<Case> {
+    const REPORT: &str = "tooling/review-gate/src/report.rs";
+    vec![
+        case(
+            "the gate reading a finding missing the dash after its place as prose",
+            "ENG-28",
+            Injection::replace(
+                REPORT,
+                "finding_shaped(&parts) || undashed(text)",
+                "finding_shaped(&parts)",
+            ),
+            cargo_lib_test(
+                "review-gate",
+                "report::tests::a_finding_line_missing_the_dash_after_its_place_is_malformed_not_prose",
+            ),
+            "a_finding_line_missing_the_dash_after_its_place_is_malformed_not_prose",
+        ),
+        case(
+            "the gate refusing a line at the template's place without naming it",
+            "ENG-28",
+            Injection::replace(
+                REPORT,
+                "Line::Malformed if at_template(l) => {",
+                "Line::Malformed if at_template(l) && number == 0 => {",
+            ),
+            cargo_lib_test(
+                "review-gate",
+                "report::tests::a_report_check_names_a_line_at_the_template_s_place",
+            ),
+            "a_report_check_names_a_line_at_the_template_s_place",
         ),
     ]
 }
@@ -1316,8 +1355,8 @@ fn review_finding_shape_cases() -> Vec<Case> {
             "ENG-28",
             Injection::replace(
                 REPORT,
-                "return if finding_shaped(&parts) {",
-                "return if finding_shaped(&parts[..1]) {",
+                "return if finding_shaped(&parts) || undashed(text) {",
+                "return if finding_shaped(&parts[..1]) || undashed(text) {",
             ),
             cargo_lib_test(
                 "review-gate",
