@@ -120,9 +120,11 @@ the reports.
   third: 3 x 2 x 15 = 90 minutes at worst, and the job's cap is 120.
   Agents end in minutes in practice.
 - No new third-party dependency.
-- ADR-2610311717 amends the verdict rule: a specialist no longer weighs
-  its findings, and a report ending `outcome: blocking` no longer
-  blocks the review by itself. The rest of this record stands.
+- ADR-2610311717 amends the verdict rule and the reports as files: a
+  specialist no longer weighs its findings, a report ending `outcome:
+  blocking` no longer blocks the review by itself, and a specialist
+  writes no file; `review-run` assembles its report from its run log.
+  The rest of this record stands.
 
 ## Approval
 

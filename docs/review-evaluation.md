@@ -50,7 +50,7 @@ records the design.
   and `review/` from `review-bundle`. The dispatch must bring the
   component, or the case fails before any model runs.
 - **The evaluation harness** starts `claude --agent <component>` with the
-  review's tools, write rule and turn budget, on the component's model, or
+  review's reading tools and turn budget, on the component's model, or
   the evaluation's default for an agent that names none, or the one `--model`
   names. `review-run` starts each agent of a review through the same runner.
   It refuses
@@ -58,25 +58,29 @@ records the design.
   model, effort, maxTurns and generalist, or a tool its kind may not use, so a
   definition under test cannot start a process or widen its reach through the
   run (I4).
-- **The grader** is deterministic. It reads the report: its outcome,
-  each finding expected or forbidden, nothing else written, and, for a
-  generalist, each finding it must drop on a line that starts with
-  `dropped` or gives it as its severity, the rule `review-run` reads
-  its answer by. A specialist's report the review would refuse, with a
-  finding line in neither form or an outcome its lines contradict,
-  fails its run. A departure from
-  the report's shape that the review survives is a slip: a label line
-  between the findings, an answer that is more than the last line and
-  the path, an eleventh finding. A specialist answers exactly two lines,
-  its report's outcome line and then its path; the review's run accepts
-  the answer when one of its lines is that outcome line, whatever its
-  case, spacing, emphasis, kind of dash or trailing punctuation. Slips
-  are counted and shown per run and fail none. A case passes with two
-  of three runs, stopping once decided. A run that does not answer, or
-  runs past its deadline, is counted and failed.
+- **The grader** is deterministic and reads the run log alone. A
+  specialist writes no file: its report is assembled from the log as
+  `review-run` assembles it, every finding, request, `revised:` and
+  `withdrawn:` line it stated in its text replayed in order, then the
+  outcome line its final answer gives. The grader reads that report:
+  its outcome, each finding expected or forbidden, nothing written; a
+  case may also want a finding `stated` before the final answer, or a
+  finding `withdrawn` or revised, read from the log's text. For a
+  generalist it reads the answer: each finding it must drop on a line
+  that starts with `dropped` or gives it as its severity, the rule
+  `review-run` reads its answer by. A specialist's report the review
+  would refuse, with a line in no form, a revision of a finding never
+  stated or an outcome its lines contradict, fails its run, as does an
+  answer with no outcome line. A departure the review survives is a
+  slip: an answer that is more than the outcome line, an eleventh
+  finding. Slips are counted and shown per run and fail none. A case
+  passes with two of three runs, stopping once decided. A run that
+  does not answer, or runs past its deadline, is counted and failed,
+  whatever it stated.
 - **The outputs** of a run go under `--out`: `scorecard.json`,
   `findings.json` in the shape the review gate reads, `report.md`, and
-  each run's log, report and grade under `runs/`.
+  each run's log, the report assembled from it and its grade under
+  `runs/`.
 
 ## The commands
 
@@ -101,7 +105,7 @@ job runs after the review job, holds a read-only token and no write
 permission, and ends before the job that holds the reviewer app's key.
 The review job's `review-run` starts each dispatched agent through the
 harness's own runner, so an agent in the review and in its cases gets
-the same tools, write rule, turn budget and prompt. A case that fails
+the same reading tools, turn budget and prompt. A case that fails
 becomes a blocking finding, which the gate weighs beside the bundle's.
 With nothing to evaluate the job ends in seconds. A change to a shared
 section reaches every component that includes it, so the plan holds one
