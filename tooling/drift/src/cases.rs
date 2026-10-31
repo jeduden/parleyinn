@@ -106,6 +106,7 @@ pub fn cases() -> Vec<Case> {
         review_withdrawal_cases(),
         review_place_form_cases(),
         review_retry_cases(),
+        vec![review_unlinked_case()],
         // Last: its cases edit source the later cases would run stale.
         license_text_cases(),
     ]
@@ -440,6 +441,27 @@ fn review_retry_cases() -> Vec<Case> {
         ),
         "a_report_refused_twice_stays_refused_and_the_first_s_findings_do_not_rescue_it",
     )]
+}
+
+/// The drift the gate's refusal of a line citing no id must not bring
+/// (ENG-28, I6), late so adding it moves no earlier case to another
+/// shard: a line saying all is well refused as a line in no form, so
+/// its second attempt is not told why.
+fn review_unlinked_case() -> Case {
+    case(
+        "the gate refusing a line that cites no id as one in no form",
+        "ENG-28",
+        Injection::replace(
+            "tooling/review-gate/src/report.rs",
+            "Line::Malformed if unlinked(l) => return Some(Problem::Unlinked { line: number }),",
+            "Line::Malformed if unlinked(l) && false => return Some(Problem::Unlinked { line: number }),",
+        ),
+        cargo_lib_test(
+            "review-gate",
+            "report::tests::a_report_check_names_a_line_at_a_place_that_cites_no_id",
+        ),
+        "a_report_check_names_a_line_at_a_place_that_cites_no_id",
+    )
 }
 
 /// The drifts ENG-30 exists to catch: a license the tool keeps no text

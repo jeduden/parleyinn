@@ -61,6 +61,21 @@ fn an_unknown_id_and_a_template_place_quote_their_line_too() {
 }
 
 #[test]
+fn a_line_saying_all_is_well_quotes_its_line_and_says_to_leave_it_out() {
+    let report = "a.rs:1 — if not addressed: the range matches — no finding.\n\
+                  outcome: none — clean.\n";
+
+    assert_eq!(
+        refusal(report, "outcome: none — clean.", &known()).as_deref(),
+        Some(
+            "has a report whose line 1 cites no requirement or invariant id: a line saying all \
+             is well is not a finding, so leave it out: \
+             `a.rs:1 — if not addressed: the range matches — no finding.`"
+        )
+    );
+}
+
+#[test]
 fn a_problem_of_no_line_is_the_gate_s_problem_alone() {
     let cases = [
         ("outcome: findings — one.\n", "outcome: findings — one."),
@@ -119,6 +134,7 @@ fn the_forms_are_two_lines_each_with_a_real_place() {
     assert_eq!(FORMS.lines().count(), 2);
     assert!(FORMS.contains("`revised: <one full finding line>`"));
     assert!(FORMS.contains("`withdrawn: docs/x.md:12 — <reason>`"));
+    assert!(FORMS.contains("A line is only for a problem: what is sound gets none"));
     assert!(FORMS.contains("`outcome: findings — <sentence>`"));
     assert!(!FORMS.contains(review_gate::report::TEMPLATE_PLACE));
 }

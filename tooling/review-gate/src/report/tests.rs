@@ -172,6 +172,41 @@ fn a_report_check_names_a_line_at_the_template_s_place() {
 }
 
 #[test]
+fn a_report_check_names_a_line_at_a_place_that_cites_no_id() {
+    for text in [
+        "a.rs:1 — if not addressed: the range matches, so no reader is misled — no finding.",
+        "a.rs:1 — if not addressed: the range matches",
+        "a.rs:1 — the range matches the section. No finding there.",
+    ] {
+        let report = format!("{text}\noutcome: none — one sentence.");
+
+        assert_eq!(
+            report_check(Some(&report), Some("outcome: none — one sentence."), None),
+            Some(Problem::Unlinked { line: 1 }),
+            "{text:?}"
+        );
+    }
+}
+
+#[test]
+fn a_line_at_a_place_with_a_request_or_more_dashes_stays_malformed() {
+    for text in [
+        "a.rs:1 — request: add",
+        "a.rs:1 — nit — path:line",
+        "revised: a.rs:1 — if not addressed: x",
+        "a.rs:x — if not addressed: x",
+    ] {
+        let report = format!("{text}\noutcome: findings — one sentence.");
+
+        assert_eq!(
+            report_check(Some(&report), Some(ANSWER), None),
+            Some(Problem::Malformed { line: 1 }),
+            "{text:?}"
+        );
+    }
+}
+
+#[test]
 fn a_malformed_line_naming_a_real_place_is_no_template() {
     let report = "a.rs:1 — nit — path:line\noutcome: findings — one sentence.";
 
@@ -415,6 +450,11 @@ fn every_problem_reads_as_a_sentence_about_the_report() {
         (
             Problem::Malformed { line: 3 },
             "has a report whose line 3 is neither a linked finding nor a requirement request",
+        ),
+        (
+            Problem::Unlinked { line: 2 },
+            "has a report whose line 2 cites no requirement or invariant id: a line saying all \
+             is well is not a finding, so leave it out",
         ),
         (
             Problem::TemplatePlace { line: 5 },

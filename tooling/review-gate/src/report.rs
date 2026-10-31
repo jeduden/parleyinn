@@ -155,6 +155,10 @@ pub enum Problem {
     /// report, whose place is the forms' template, [`TEMPLATE_PLACE`],
     /// copied rather than filled in.
     TemplatePlace { line: usize },
+    /// A line, its line number in the report, at a real place that cites
+    /// no id: `if not addressed:` with no ids after its last dash, or
+    /// prose after a single dash, as a line saying all is well reads.
+    Unlinked { line: usize },
     /// A linked finding, its line number in the report, cites an id no
     /// requirement or invariant has.
     UnknownId { line: usize, id: String },
@@ -181,6 +185,10 @@ impl fmt::Display for Problem {
             Self::TemplatePlace { line } => write!(
                 f,
                 "has a report whose line {line} names the place {TEMPLATE_PLACE}, the form's template, not a file and line"
+            ),
+            Self::Unlinked { line } => write!(
+                f,
+                "has a report whose line {line} cites no requirement or invariant id: a line saying all is well is not a finding, so leave it out"
             ),
             Self::UnknownId { line, id } => write!(
                 f,
@@ -587,6 +595,7 @@ pub fn findings_check(text: &str, known: Option<&BTreeSet<String>>) -> Option<Pr
             Line::Malformed if at_template(l) => {
                 return Some(Problem::TemplatePlace { line: number });
             }
+            Line::Malformed if unlinked(l) => return Some(Problem::Unlinked { line: number }),
             Line::Malformed => return Some(Problem::Malformed { line: number }),
             Line::Request(_) => held = true,
             Line::Revised(Revision { finding, .. }) => {
@@ -609,6 +618,31 @@ pub fn findings_check(text: &str, known: Option<&BTreeSet<String>>) -> Option<Pr
         (false, false) => Some(Problem::FindingsWithNone),
         _ => None,
     }
+}
+
+/// Whether `text`, a malformed line, starts at a place and cites no id:
+/// `if not addressed:` with no ids after its last dash, or prose after
+/// the one dash after its place. A revision, a withdrawal and a request
+/// stay malformed.
+fn unlinked(text: &str) -> bool {
+    let text = bare(text);
+    if strip_word(text, REVISED).is_some() || strip_word(text, WITHDRAWN).is_some() {
+        return false;
+    }
+    let parts = split_dashes(text);
+    let [first, second, rest @ ..] = parts.as_slice() else {
+        return false;
+    };
+    let second = second.trim();
+    let ids = |part: &str| {
+        part.split(',')
+            .all(|id| id_shaped(id.trim().trim_matches(['`', '*', '_', '.'])))
+    };
+    place(first).is_some()
+        && match strip_word(second, IF_NOT_ADDRESSED) {
+            Some(_) => rest.last().is_none_or(|last| !ids(last)),
+            None => rest.is_empty() && strip_word(second, REQUEST).is_none(),
+        }
 }
 
 /// Whether `text`, a malformed line, names [`TEMPLATE_PLACE`] where its

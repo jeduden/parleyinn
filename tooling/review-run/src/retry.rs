@@ -24,7 +24,8 @@ use crate::run::{AgentRun, Unit, attempt, describe, keep_first_log, write_report
 pub const FORMS: &str = "Each finding is one line, `docs/x.md:12 — if not addressed: \
 <consequence> — <ID>[, <ID>...]` or `docs/x.md:12 — request: add|change|remove <requirement> — \
 <motivation>`; `revised: <one full finding line>` replaces the one at its place, nothing else \
-beside it, and `withdrawn: docs/x.md:12 — <reason>` removes one.\nYour final answer is only the \
+beside it, and `withdrawn: docs/x.md:12 — <reason>` removes one. A line is only for a problem: what is \
+sound gets none, never `no finding`.\nYour final answer is only the \
 outcome line: `outcome: findings — <sentence>` or `outcome: none — <sentence>`.";
 
 /// Why a run is tried once more.
@@ -45,6 +46,7 @@ pub fn refusal(report: &str, answer: &str, known: &BTreeSet<String>) -> Option<S
     let line = match &problem {
         Problem::Malformed { line }
         | Problem::TemplatePlace { line }
+        | Problem::Unlinked { line }
         | Problem::UnknownId { line, .. } => report.lines().nth(line - 1),
         _ => None,
     };
