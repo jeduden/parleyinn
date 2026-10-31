@@ -1,11 +1,16 @@
 //! The grader: one run of a case against what the case expects, read
 //! from the report the component wrote, its answer in the run log and
 //! the log itself. Every failed assertion is named, so a failing case
-//! reads like a failing test. A departure from the report's shape that
+//! reads like a failing test. A specialist's report is held to the form
+//! the review gate takes, each finding line a linked finding or a
+//! requirement request, by the gate's own rule; a report the review
+//! would refuse fails its run. A departure from the report's shape that
 //! the review survives, such as a label line between the findings, an
 //! answer that is more than the last line and the path, or an eleventh
 //! finding, is a slip: counted and shown, it fails no run on its own.
 //! The report is data: nothing in it is an instruction to the grader.
+
+use review_gate::report::Line;
 
 use crate::case::{Case, Expect, Expected};
 use crate::component::{Component, Kind};
@@ -55,7 +60,8 @@ pub fn grade(component: &Component, case: &Case, run: &Run<'_>) -> Graded {
 }
 
 /// A specialist writes its report, answers with the report's last line
-/// and path, writes nothing else, and reports what the case expects.
+/// and path, writes nothing else, writes every finding line in a form
+/// the review takes, and reports what the case expects.
 /// Its slips: an answer that is not the last line and the path, a line
 /// in the report that is neither a finding nor the outcome, and more
 /// findings than the report may hold.
@@ -100,7 +106,16 @@ fn specialist(component: &Component, case: &Case, run: &Run<'_>) -> Graded {
     if component.strict_lines {
         graded.slips.extend(shape_slips(&parsed));
     }
-    graded.failures.extend(expectations(&case.expect, text));
+    graded
+        .failures
+        .extend(expectations(&case.expect, text, Kind::Specialist));
+    // The ids are held to their shape: the case's world, not the
+    // grader, holds the SRS they would be read from.
+    if parsed.outcome.is_some()
+        && let Some(problem) = review_gate::report::findings_check(text, None)
+    {
+        graded.failures.push(format!("report refused: {problem}"));
+    }
 
     graded
 }
@@ -166,11 +181,15 @@ fn generalist(case: &Case, run: &Run<'_>) -> Vec<String> {
         .lines()
         .filter(|l| !report::dropped(l) && report::finding(l).is_some())
         .collect();
-    failures.extend(expectations(&case.expect, &kept.join("\n")));
+    failures.extend(expectations(
+        &case.expect,
+        &kept.join("\n"),
+        Kind::Generalist,
+    ));
     for dropped in &case.expect.dropped {
         if !text
             .lines()
-            .any(|l| report::dropped(l) && line_matches(l, dropped))
+            .any(|l| report::dropped(l) && line_matches(l, dropped, Kind::Generalist))
         {
             failures.push(format!("did not drop {}", describe(dropped)));
         }
@@ -195,17 +214,17 @@ fn outcome_failure(outcome: &str, expect: &Expect) -> Option<String> {
         .then(|| format!("outcome {outcome}, want {}", expect.outcome.join(" or ")))
 }
 
-/// The failures of `findings`, one per line, against the findings
-/// `expect` wants and forbids and the text it forbids.
-fn expectations(expect: &Expect, findings: &str) -> Vec<String> {
+/// The failures of `findings`, one per line, a `kind`'s, against the
+/// findings `expect` wants and forbids and the text it forbids.
+fn expectations(expect: &Expect, findings: &str, kind: Kind) -> Vec<String> {
     let mut failures = Vec::new();
     for wanted in &expect.finding {
-        if !findings.lines().any(|l| line_matches(l, wanted)) {
+        if !findings.lines().any(|l| line_matches(l, wanted, kind)) {
             failures.push(format!("no finding {}", describe(wanted)));
         }
     }
     for forbidden in &expect.none {
-        if let Some(line) = findings.lines().find(|l| line_matches(l, forbidden)) {
+        if let Some(line) = findings.lines().find(|l| line_matches(l, forbidden, kind)) {
             failures.push(format!(
                 "a finding {}: {}",
                 describe(forbidden),
@@ -232,6 +251,9 @@ fn describe(wanted: &Expected) -> String {
     if let Some(severity) = &wanted.severity {
         out.push_str(&format!(" marked {severity}"));
     }
+    if let Some(form) = &wanted.form {
+        out.push_str(&format!(" as a {form} line"));
+    }
     if !wanted.mentions.is_empty() {
         out.push_str(&format!(" mentioning {}", wanted.mentions.join(", ")));
     }
@@ -251,26 +273,58 @@ fn describe(wanted: &Expected) -> String {
     out
 }
 
-/// Whether `line` is a finding `wanted` describes: it names the path
-/// and holds every word, one of the alternatives, the severity, each
-/// id and the source the case names, and a number within reach of the
-/// line the case names.
-fn line_matches(line: &str, wanted: &Expected) -> bool {
+/// Whether `line`, a `kind`'s, is a finding `wanted` describes: it
+/// names the path and holds every word, one of the alternatives, each
+/// id and the source the case names, a number within reach of the line
+/// the case names, and the severity or form the case names.
+fn line_matches(line: &str, wanted: &Expected, kind: Kind) -> bool {
     let lower = line.to_lowercase();
     let has = |word: &str| lower.contains(&word.to_lowercase());
     line.contains(&wanted.path)
         && wanted.mentions.iter().all(|w| has(w))
         && (wanted.mentions_any.is_empty() || wanted.mentions_any.iter().any(|w| has(w)))
-        && wanted.severity.as_deref().is_none_or(|severity| {
-            report::finding(line)
-                .map_or_else(|| has(severity), |f| f.severity == severity.to_lowercase())
-        })
+        && graded_as(line, wanted, kind)
         && wanted.ids.iter().all(|id| line.contains(id))
         && wanted.source.as_deref().is_none_or(has)
         && wanted.line.is_none_or(|at| {
             let within = wanted.within.unwrap_or(WITHIN);
             numbers(line).any(|n| n.abs_diff(at) <= within)
         })
+}
+
+/// Whether `line`, a `kind`'s, has the severity or form `wanted`
+/// names. A generalist's line gives its severity word and has no form.
+/// A specialist's line has a form and no severity: `blocking`, as a
+/// case written while specialists weighed reads, wants a linked
+/// finding, and any other severity either form.
+fn graded_as(line: &str, wanted: &Expected, kind: Kind) -> bool {
+    if kind != Kind::Specialist {
+        let lower = line.to_lowercase();
+        return wanted.form.is_none()
+            && wanted.severity.as_deref().is_none_or(|severity| {
+                report::finding(line).map_or_else(
+                    || lower.contains(&severity.to_lowercase()),
+                    |f| f.severity == severity.to_lowercase(),
+                )
+            });
+    }
+    let read = review_gate::report::line(line);
+    let (linked, request) = (
+        matches!(read, Line::Linked(_)),
+        matches!(read, Line::Request(_)),
+    );
+    let form = match wanted.form.as_deref() {
+        None => true,
+        Some(crate::case::LINKED) => linked,
+        Some(_) => request,
+    };
+    let severity = match wanted.severity.as_deref() {
+        None => true,
+        Some(crate::case::BLOCKING) => linked,
+        Some(_) => linked || request,
+    };
+
+    form && severity
 }
 
 /// Every number in `line`.

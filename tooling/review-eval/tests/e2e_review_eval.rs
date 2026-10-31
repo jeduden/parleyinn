@@ -30,9 +30,9 @@ for a in "$@"; do
   prev="$a"
 done
 mkdir -p review/reports
-printf 'pr-head/crates/x/src/rogue.rs:1 — blocking — an unwrap outside tests — ENG-16\n\noutcome: blocking — unwraps.\n' > "review/reports/$agent.md"
+printf 'pr-head/crates/x/src/rogue.rs:1 — if not addressed: an unwrap outside tests panics — ENG-16\n\noutcome: findings — unwraps.\n' > "review/reports/$agent.md"
 printf '{"type":"assistant","message":{"id":"m1","model":"claude-haiku-5-5","usage":{"input_tokens":1,"output_tokens":2},"content":[{"type":"tool_use","id":"t1","name":"Write","input":{"file_path":"review/reports/%s.md"}}]}}\n' "$agent"
-printf '{"type":"result","subtype":"success","is_error":false,"result":"outcome: blocking — unwraps.\\nreview/reports/%s.md","total_cost_usd":0.02,"num_turns":2,"duration_ms":50,"modelUsage":{"claude-haiku-5-5":{"costUSD":0.02}}}\n' "$agent"
+printf '{"type":"result","subtype":"success","is_error":false,"result":"outcome: findings — unwraps.\\nreview/reports/%s.md","total_cost_usd":0.02,"num_turns":2,"duration_ms":50,"modelUsage":{"claude-haiku-5-5":{"costUSD":0.02}}}\n' "$agent"
 "#;
 
 /// A `claude` that never answers.

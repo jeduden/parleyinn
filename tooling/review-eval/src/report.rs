@@ -1,14 +1,22 @@
-//! A report as data: the findings a reviewer component wrote, one per
-//! line in the shape the shared report section asks for,
-//! `path:line — blocking|nit — what it breaks — the ids it touches`,
-//! and the outcome line the report ends with, as the review gate reads
-//! it, and a generalist's dropped finding,
-//! `dropped — path:line — why — source`.
+//! A report as data. A specialist's report holds its linked findings,
+//! `path:line — if not addressed: <consequence> — <ID>[, <ID>...]`,
+//! and its requirement requests,
+//! `path:line — request: add|change|remove <requirement> — <motivation>`,
+//! read by the review gate's own rule (`review_gate::report`), and ends
+//! with the outcome line, `outcome: findings|none — <sentence>`. A
+//! generalist's answer holds its kept findings,
+//! `path:line — blocking|nit — what it breaks — its source`, and its
+//! dropped ones, `dropped — path:line — why — source`: severity is the
+//! generalists' alone.
+
+use review_gate::report::Line;
+
+pub use review_gate::report::{bare, split_dashes};
 
 /// The outcomes a report may end with.
-pub const OUTCOMES: [&str; 3] = ["sound", "nits", "blocking"];
+pub const OUTCOMES: [&str; 2] = review_gate::report::OUTCOMES;
 
-/// One finding line, read.
+/// One finding line of a generalist's answer, read.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Finding {
     pub path: String,
@@ -20,16 +28,19 @@ pub struct Finding {
     pub raw: String,
 }
 
-/// A report, read.
+/// A specialist's report, read.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Report {
-    pub findings: Vec<Finding>,
+    /// Its linked findings and requirement requests, in order.
+    pub findings: Vec<Line>,
+    /// Its finding lines in neither form, as written.
+    pub malformed: Vec<String>,
     /// The outcome the last line names.
     pub outcome: Option<String>,
     /// The last line as written, when it is an outcome line.
     pub outcome_line: Option<String>,
-    /// Non-blank lines that are neither a finding, a heading nor the
-    /// outcome line.
+    /// Non-blank lines that are neither a finding line, a heading nor
+    /// the outcome line.
     pub other: Vec<String>,
 }
 
@@ -45,10 +56,13 @@ pub fn parse(text: &str) -> Report {
         {
             report.outcome = Some(outcome.to_owned());
             report.outcome_line = Some(line.trim().to_owned());
-        } else if let Some(finding) = finding(line) {
-            report.findings.push(finding);
-        } else if !line.trim_start().starts_with('#') {
-            report.other.push(line.trim().to_owned());
+        } else {
+            match review_gate::report::line(line) {
+                Line::Malformed => report.malformed.push(line.trim().to_owned()),
+                Line::Prose if line.trim_start().starts_with('#') => {}
+                Line::Prose => report.other.push(line.trim().to_owned()),
+                read => report.findings.push(read),
+            }
         }
     }
 
@@ -105,80 +119,28 @@ pub fn nothing(line: &str) -> bool {
     }
 }
 
-/// `line` without a leading list marker, emphasis or quote.
-fn bare(line: &str) -> &str {
-    let line = line.trim();
-    let line = line
-        .strip_prefix("- ")
-        .or_else(|| line.strip_prefix("* "))
-        .unwrap_or(line);
-    let line = strip_number(line);
-    line.trim_start_matches(['*', '_', '`', '>', ' '])
-}
-
-/// `line` without a leading `N. `.
-fn strip_number(line: &str) -> &str {
-    let digits = line.chars().take_while(char::is_ascii_digit).count();
-    match line[digits..].strip_prefix(". ") {
-        Some(rest) if digits > 0 => rest,
-        _ => line,
-    }
-}
-
-/// `line` as a finding, when it reads as one: `path:line`, a dash, a
-/// severity word, a dash and the rest. A line range, `path:12-20`,
-/// reads as its first line.
+/// `line` as a generalist's finding, when it reads as one:
+/// `path:line`, a dash, a severity word, a dash and the rest. A line
+/// range, `path:12-20`, reads as its first line.
 #[must_use]
 pub fn finding(line: &str) -> Option<Finding> {
     let parts = split_dashes(bare(line));
     let [place, severity, rest @ ..] = parts.as_slice() else {
         return None;
     };
-    let place = place.trim().trim_matches('`');
-    let (path, number) = place.rsplit_once(':')?;
-    let path = path.trim_matches('`').trim();
-    let number: usize = number
-        .trim()
-        .split(['-', '–'])
-        .next()?
-        .trim()
-        .parse()
-        .ok()?;
+    let (path, number) = review_gate::report::place(place)?;
     let severity = severity.trim().trim_matches(['`', '*', '_']);
-    if path.is_empty() || severity.is_empty() || severity.contains(' ') {
+    if severity.is_empty() || severity.contains(' ') {
         return None;
     }
 
     Some(Finding {
-        path: path.to_owned(),
+        path,
         line: number,
         severity: severity.to_lowercase(),
         text: rest.join(" — ").trim().to_owned(),
         raw: line.trim().to_owned(),
     })
-}
-
-/// `text` split at each dash that stands between spaces: an em dash,
-/// an en dash, or one or two hyphens.
-fn split_dashes(text: &str) -> Vec<&str> {
-    let mut out = Vec::new();
-    let mut rest = text;
-    loop {
-        let cut = [" — ", " – ", " -- ", " - "]
-            .iter()
-            .filter_map(|sep| rest.find(sep).map(|at| (at, sep.len())))
-            .min();
-        match cut {
-            Some((at, len)) => {
-                out.push(&rest[..at]);
-                rest = &rest[at + len..];
-            }
-            None => {
-                out.push(rest);
-                return out;
-            }
-        }
-    }
 }
 
 #[cfg(test)]

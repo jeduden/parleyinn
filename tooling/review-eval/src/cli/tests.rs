@@ -127,12 +127,12 @@ fn obedient_claude() -> crate::host::fake::Claude {
             .unwrap_or("none")
             .to_owned();
         let report = format!(
-            "{file}:1 — blocking — an unwrap outside tests — ENG-16\n\noutcome: blocking — unwraps.\n"
+            "{file}:1 — if not addressed: an unwrap outside tests panics — ENG-16\n\noutcome: findings — unwraps.\n"
         );
         fs::write(c.cwd.join(format!("review/reports/{agent}.md")), &report).unwrap();
         let log = format!(
             "{{\"type\":\"assistant\",\"message\":{{\"id\":\"m1\",\"model\":\"claude-haiku-5-5\",\"usage\":{{\"input_tokens\":5,\"output_tokens\":7}},\"content\":[{{\"type\":\"tool_use\",\"id\":\"t1\",\"name\":\"Write\",\"input\":{{\"file_path\":\"review/reports/{agent}.md\"}}}}]}}}}\n\
-             {{\"type\":\"result\",\"subtype\":\"success\",\"is_error\":false,\"result\":\"outcome: blocking — unwraps.\\nreview/reports/{agent}.md\",\"total_cost_usd\":0.01,\"num_turns\":3,\"duration_ms\":1000,\"modelUsage\":{{\"claude-haiku-5-5\":{{\"costUSD\":0.01}}}}}}\n"
+             {{\"type\":\"result\",\"subtype\":\"success\",\"is_error\":false,\"result\":\"outcome: findings — unwraps.\\nreview/reports/{agent}.md\",\"total_cost_usd\":0.01,\"num_turns\":3,\"duration_ms\":1000,\"modelUsage\":{{\"claude-haiku-5-5\":{{\"costUSD\":0.01}}}}}}\n"
         );
         fs::write(c.stdout_to.as_ref().unwrap(), log).unwrap();
         Ok(Output {

@@ -133,6 +133,29 @@ pub fn examine(
     examine_from(root, tree, cases_dir, None, selection)
 }
 
+/// The problem with `case` when its component, a generalist or a
+/// consultant, has lines with a severity and no form, and the case names
+/// a form: it would want or forbid what no answer can hold.
+fn form_problem(case: &Case, component: &Component) -> Option<String> {
+    if !matches!(component.kind, Kind::Generalist | Kind::Consultant) {
+        return None;
+    }
+    let form = [
+        &case.expect.finding,
+        &case.expect.none,
+        &case.expect.dropped,
+    ]
+    .into_iter()
+    .flatten()
+    .find_map(|e| e.form.as_deref())?;
+
+    Some(format!(
+        "case {} expects a {form} line of a {}, which writes none",
+        case.id(),
+        component.kind.word()
+    ))
+}
+
 /// [`examine`], with the cases read as [`all_cases_from`] reads them.
 ///
 /// # Errors
@@ -182,6 +205,9 @@ pub fn examine_from(
                 "case {id} expects an outcome of a {}, which gives none",
                 component.kind.word()
             ));
+        }
+        if let Some(problem) = form_problem(case, component) {
+            problems.cases.push(problem);
         }
         match dispatches(root, &base, case, component) {
             Ok(None) => {}

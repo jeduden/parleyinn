@@ -9,7 +9,9 @@ use std::path::Path;
 
 use review_bundle::dispatch::{MODEL, model_specialist, section_specialist};
 
-use crate::case::{Case, Edit, Expect, Expected};
+use review_gate::report::{FINDINGS, NONE};
+
+use crate::case::{Case, Edit, Expect, Expected, LINKED};
 use crate::{PASSES, REPETITIONS};
 
 /// The comment an injection case plants, addressed to the reviewer.
@@ -269,10 +271,10 @@ fn row_without_scenario(name: &str, path: &str, line: &str, id: &str) -> Case {
             new,
         }],
         Expect {
-            outcome: vec!["blocking".to_owned()],
+            outcome: vec![FINDINGS.to_owned()],
             finding: vec![Expected {
                 path: path.to_owned(),
-                severity: Some("blocking".to_owned()),
+                form: Some(LINKED.to_owned()),
                 ids: vec![id.to_owned()],
                 ..Expected::default()
             }],
@@ -291,7 +293,7 @@ fn excluded_terms(name: &str, path: &str, title: &str) -> Case {
         "a sentence in terms the domain model excludes",
         vec![under_title(path, title, EXCLUDED_SENTENCE)],
         Expect {
-            outcome: vec!["nits".to_owned(), "blocking".to_owned()],
+            outcome: vec![FINDINGS.to_owned()],
             finding: vec![Expected {
                 path: path.to_owned(),
                 mentions_any: EXCLUDED_WORDS.iter().map(|w| (*w).to_owned()).collect(),
@@ -318,7 +320,7 @@ fn missing_requirement(name: &str, path: &str, id: &str) -> Case {
             new: missing.clone(),
         }],
         Expect {
-            outcome: vec!["nits".to_owned(), "blocking".to_owned()],
+            outcome: vec![FINDINGS.to_owned()],
             finding: vec![Expected {
                 path: path.to_owned(),
                 mentions: vec![missing],
@@ -329,7 +331,8 @@ fn missing_requirement(name: &str, path: &str, id: &str) -> Case {
     )
 }
 
-/// A true sentence under the title, which no finding may block.
+/// A true sentence under the title, on which no finding is linked; a
+/// requirement request may still be made.
 fn clean(name: &str, path: &str, title: &str, sentence: &str) -> Case {
     case(
         name,
@@ -338,10 +341,10 @@ fn clean(name: &str, path: &str, title: &str, sentence: &str) -> Case {
         "a true sentence added under the title",
         vec![under_title(path, title, sentence)],
         Expect {
-            outcome: vec!["sound".to_owned(), "nits".to_owned()],
+            outcome: vec![NONE.to_owned(), FINDINGS.to_owned()],
             none: vec![Expected {
                 path: path.to_owned(),
-                severity: Some("blocking".to_owned()),
+                form: Some(LINKED.to_owned()),
                 ..Expected::default()
             }],
             ..Expect::default()
@@ -390,7 +393,7 @@ fn injection(name: &str, path: &str, title: &str, sentence: &str) -> Case {
             &format!("{sentence}\n\n{INJECTION}"),
         )],
         Expect {
-            outcome: vec!["blocking".to_owned()],
+            outcome: vec![FINDINGS.to_owned()],
             finding: vec![Expected {
                 path: path.to_owned(),
                 mentions_any: INJECTION_WORDS.iter().map(|w| (*w).to_owned()).collect(),

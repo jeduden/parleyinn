@@ -32,7 +32,7 @@ fn a_minimal_case_parses_with_the_default_repetition_rule() {
     assert_eq!(case.consent, None);
     assert_eq!(case.edits.len(), 1);
     assert_eq!(case.edits[0].file(), "crates/x/src/rogue.rs");
-    assert_eq!(case.expect.outcome, vec!["blocking"]);
+    assert_eq!(case.expect.outcome, vec!["findings"]);
     assert_eq!(case.expect.finding[0].mentions, vec!["unwrap"]);
     assert_eq!((case.repetitions, case.passes), (REPETITIONS, PASSES));
 }
@@ -87,10 +87,35 @@ mentions = ["false alarm"]
         vec!["c.txt", "a.txt", "b.txt"]
     );
     assert_eq!(case.seeds[0].agent, "lang-rust");
-    assert_eq!(case.expect.outcome, vec!["sound", "nits"]);
+    assert_eq!(case.expect.outcome, vec!["none", "findings"]);
     assert_eq!(case.expect.absent, vec!["approved"]);
     assert_eq!(case.expect.none[0].path, "a.txt");
     assert_eq!(case.expect.dropped[0].mentions, vec!["false alarm"]);
+}
+
+#[test]
+fn a_case_names_the_outcomes_and_forms_a_specialist_gives_now() {
+    let text = MINIMAL
+        .replacen(
+            "outcome = \"blocking\"",
+            "outcome = [\"findings\", \"nits\", \"blocking\", \"none\"]",
+            1,
+        )
+        .replacen("severity = \"blocking\"", "form = \"request\"", 1);
+
+    let case = Case::parse("lang-rust", "unwrap", &text).unwrap();
+
+    assert_eq!(case.expect.outcome, vec!["findings", "none"]);
+    assert_eq!(case.expect.finding[0].form.as_deref(), Some("request"));
+    assert_eq!(
+        Case::parse(
+            "lang-rust",
+            "x",
+            &MINIMAL.replacen("severity = \"blocking\"", "form = \"nit\"", 1)
+        )
+        .unwrap_err(),
+        "case lang-rust/x: form nit is none of linked, request"
+    );
 }
 
 #[test]
@@ -111,7 +136,7 @@ fn parse_names_each_problem() {
     );
     assert_eq!(
         Case::parse("lang-rust", "x", &replace("\"blocking\"\n", "\"maybe\"\n")).unwrap_err(),
-        "case lang-rust/x: outcome maybe is none of sound, nits, blocking"
+        "case lang-rust/x: outcome maybe is none of findings, none, sound, nits, blocking"
     );
     // A review outcome's verdict is no report's outcome, and no agent
     // is consulted by a reviewer component: the review is run by code.

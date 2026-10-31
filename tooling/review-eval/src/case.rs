@@ -18,7 +18,27 @@ use crate::{PASSES, REPETITIONS};
 pub const KINDS: [&str; 4] = ["defect", "clean", "injection", "other"];
 
 /// The outcomes a specialist's report ends with.
-pub const OUTCOMES: [&str; 3] = crate::report::OUTCOMES;
+pub const OUTCOMES: [&str; 2] = crate::report::OUTCOMES;
+
+/// The outcomes a case written while specialists weighed their own
+/// findings names, each with the outcome it is read as: a sound report
+/// held no finding, a report of nits or blocking findings held some.
+pub const LEGACY_OUTCOMES: [(&str, &str); 3] = [
+    ("sound", crate::report::OUTCOMES[1]),
+    ("nits", crate::report::OUTCOMES[0]),
+    ("blocking", crate::report::OUTCOMES[0]),
+];
+
+/// The severity a case written while specialists weighed names for a
+/// specialist's linked finding.
+pub const BLOCKING: &str = "blocking";
+
+/// The form of a specialist's finding linked to its requirements.
+pub const LINKED: &str = "linked";
+/// The form of a specialist's requirement request.
+pub const REQUEST: &str = "request";
+/// The forms of a specialist's finding line a case may name.
+pub const FORMS: [&str; 2] = [LINKED, REQUEST];
 
 /// One edit to a file of main's tree, its path relative to the root.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -47,14 +67,18 @@ impl Edit {
 
 /// A finding the report must hold, or must not: matched against each
 /// line of the report, which must name the path and hold every word of
-/// `mentions`, one of `mentions_any`, the severity word, each id, and
-/// the source, where the case names them; and a line number within
-/// `within` of `line` where the case names one.
+/// `mentions`, one of `mentions_any`, each id, and the source, where
+/// the case names them; a line number within `within` of `line` where
+/// the case names one; and, for a generalist, the severity word it
+/// gives. A specialist gives no severity: `form` names the form of its
+/// line, `linked` or `request`, and a case written before reads its
+/// `severity`, `blocking` as a linked finding and `nit` as either form.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize)]
 #[serde(deny_unknown_fields, default)]
 pub struct Expected {
     pub path: String,
     pub severity: Option<String>,
+    pub form: Option<String>,
     pub line: Option<usize>,
     pub within: Option<usize>,
     pub mentions: Vec<String>,
@@ -67,7 +91,8 @@ pub struct Expected {
 #[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize)]
 #[serde(deny_unknown_fields, default)]
 pub struct Expect {
-    /// The outcomes the report may end with.
+    /// The outcomes the report may end with, each a word of
+    /// [`OUTCOMES`] once the case is read.
     #[serde(deserialize_with = "one_or_many")]
     pub outcome: Vec<String>,
     /// Findings the report must hold.
@@ -228,16 +253,15 @@ impl Case {
         if edits.is_empty() {
             return Err(format!("{at}: makes no edit"));
         }
-        if let Some(bad) = file
-            .expect
-            .outcome
-            .iter()
-            .find(|o| !OUTCOMES.contains(&o.as_str()))
+        let mut expect = file.expect;
+        expect.outcome = outcomes(&expect.outcome).map_err(|e| format!("{at}: {e}"))?;
+        if let Some(bad) = [&expect.finding, &expect.none, &expect.dropped]
+            .into_iter()
+            .flatten()
+            .filter_map(|e| e.form.as_deref())
+            .find(|f| !FORMS.contains(f))
         {
-            return Err(format!(
-                "{at}: outcome {bad} is none of {}",
-                OUTCOMES.join(", ")
-            ));
+            return Err(format!("{at}: form {bad} is none of {}", FORMS.join(", ")));
         }
         let (repetitions, passes) = file
             .runs
@@ -256,7 +280,7 @@ impl Case {
             consent: file.consent,
             edits,
             seeds: file.report,
-            expect: file.expect,
+            expect,
             repetitions,
             passes,
         })
@@ -345,6 +369,35 @@ impl Case {
 
         Ok(changes)
     }
+}
+
+/// `words`, a case's outcomes, each read as a word of [`OUTCOMES`] and
+/// named once, in order.
+fn outcomes(words: &[String]) -> Result<Vec<String>, String> {
+    let mut out: Vec<String> = Vec::new();
+    for word in words {
+        let read = OUTCOMES
+            .iter()
+            .find(|o| **o == word)
+            .or_else(|| {
+                LEGACY_OUTCOMES
+                    .iter()
+                    .find(|(old, _)| old == word)
+                    .map(|(_, now)| now)
+            })
+            .ok_or_else(|| {
+                let all: Vec<&str> = OUTCOMES
+                    .into_iter()
+                    .chain(LEGACY_OUTCOMES.map(|(old, _)| old))
+                    .collect();
+                format!("outcome {word} is none of {}", all.join(", "))
+            })?;
+        if !out.iter().any(|o| o == read) {
+            out.push((*read).to_owned());
+        }
+    }
+
+    Ok(out)
 }
 
 /// Every case under `dir`: `<component>/<name>.toml`, in name order.

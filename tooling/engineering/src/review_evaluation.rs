@@ -82,7 +82,7 @@ fn table_case() -> Case {
         edits: Vec::new(),
         seeds: Vec::new(),
         expect: Expect {
-            outcome: vec!["blocking".to_owned()],
+            outcome: vec!["findings".to_owned()],
             finding: vec![Expected {
                 path: WANTED.to_owned(),
                 mentions: vec!["unwrap".to_owned()],
@@ -106,18 +106,20 @@ fn run_outcome(row: &BTreeMap<String, String>) -> String {
     let column = |key: &str| row.get(key).map_or("", String::as_str);
     let (component, case) = (table_component(), table_case());
     let outcome_line = if column("outcome") == "as expected" {
-        "outcome: blocking — it unwraps."
+        "outcome: findings — it unwraps."
     } else {
-        "outcome: sound — it is fine."
+        "outcome: none — it is fine."
     };
     let mut report = String::new();
     if column("finding") == "found" {
         report.push_str(&format!(
-            "{WANTED}:6 — blocking — an unwrap outside tests — ENG-16\n"
+            "{WANTED}:6 — if not addressed: an unwrap outside tests panics — ENG-16\n"
         ));
     }
     if column("forbidden") == "found" {
-        report.push_str(&format!("{FORBIDDEN}:2 — nit — a long line — ENG-16\n"));
+        report.push_str(&format!(
+            "{FORBIDDEN}:2 — request: add a rule on line length — a long line\n"
+        ));
     }
     report.push_str(&format!("\n{outcome_line}\n"));
     let answer = if column("answer") == "more" {
@@ -332,6 +334,7 @@ fn failed_on(failure: &str) -> &'static str {
     } else if failure.starts_with("wrote no report")
         || failure.starts_with("wrote an empty report")
         || failure.starts_with("report does not end")
+        || failure.starts_with("report refused")
     {
         "report"
     } else if failure.starts_with("outcome ") {

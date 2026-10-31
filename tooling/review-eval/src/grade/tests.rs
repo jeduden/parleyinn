@@ -47,7 +47,7 @@ fn answered_log(answer: &str) -> RunLog {
     }
 }
 
-const REPORT: &str = "crates/x/src/a.rs:12 — blocking — an unwrap outside tests — ENG-16\n\noutcome: blocking — it unwraps.\n";
+const REPORT: &str = "crates/x/src/a.rs:12 — if not addressed: an unwrap outside tests panics — ENG-16\n\noutcome: findings — it unwraps.\n";
 
 fn run<'a>(log: &'a RunLog, report: Option<&'a str>) -> Run<'a> {
     Run { log, report }
@@ -57,7 +57,7 @@ fn run<'a>(log: &'a RunLog, report: Option<&'a str>) -> Run<'a> {
 fn a_specialist_run_that_does_everything_right_passes() {
     let c = component(Kind::Specialist, "lang-rust", true);
     let expect = Expect {
-        outcome: vec!["blocking".into()],
+        outcome: vec!["findings".into()],
         finding: vec![Expected {
             severity: Some("blocking".into()),
             line: Some(10),
@@ -69,7 +69,7 @@ fn a_specialist_run_that_does_everything_right_passes() {
         absent: vec!["approved".into()],
         ..Expect::default()
     };
-    let mut log = answered_log("outcome: blocking — it unwraps.\nreview/reports/lang-rust.md\n");
+    let mut log = answered_log("outcome: findings — it unwraps.\nreview/reports/lang-rust.md\n");
     log.writes = vec!["/work/main/review/reports/lang-rust.md".into()];
 
     let graded = grade(&c, &case("lang-rust", expect), &run(&log, Some(REPORT)));
@@ -82,7 +82,7 @@ fn a_specialist_run_that_does_everything_right_passes() {
 fn a_specialist_run_names_each_failed_assertion() {
     let c = component(Kind::Specialist, "lang-rust", true);
     let expect = Expect {
-        outcome: vec!["sound".into()],
+        outcome: vec!["none".into()],
         finding: vec![Expected {
             mentions: vec!["panic".into()],
             ..wanted("crates/x/src/b.rs")
@@ -91,12 +91,12 @@ fn a_specialist_run_names_each_failed_assertion() {
         absent: vec!["everything".into()],
         ..Expect::default()
     };
-    let mut log = answered_log("I looked.\noutcome: sound\n");
+    let mut log = answered_log("I looked.\noutcome: none\n");
     log.writes = vec!["review/reports/lang-toml.md".into()];
     let eleven = (1..=11)
-        .map(|n| format!("crates/x/src/a.rs:{n} — nit — one\n"))
+        .map(|n| format!("crates/x/src/a.rs:{n} — if not addressed: one breaks — I2\n"))
         .collect::<String>()
-        + "I read everything.\noutcome: blocking\n";
+        + "I read everything.\noutcome: findings\n";
 
     let graded = grade(&c, &case("lang-rust", expect), &run(&log, Some(&eleven)));
 
@@ -104,9 +104,9 @@ fn a_specialist_run_names_each_failed_assertion() {
         graded.failures,
         vec![
             "wrote review/reports/lang-toml.md",
-            "outcome blocking, want sound",
+            "outcome findings, want none",
             "no finding at crates/x/src/b.rs mentioning panic",
-            "a finding at crates/x/src/a.rs: crates/x/src/a.rs:1 — nit — one",
+            "a finding at crates/x/src/a.rs: crates/x/src/a.rs:1 — if not addressed: one breaks — I2",
             "holds \"everything\"",
         ]
     );
@@ -126,7 +126,7 @@ fn a_specialist_run_names_each_failed_assertion() {
 fn a_specialist_run_that_only_slips_passes_with_its_slips_counted() {
     let c = component(Kind::Specialist, "lang-rust", true);
     let expect = Expect {
-        outcome: vec!["blocking".into()],
+        outcome: vec!["findings".into()],
         finding: vec![Expected {
             mentions: vec!["unwrap".into()],
             line: Some(22),
@@ -134,9 +134,9 @@ fn a_specialist_run_that_only_slips_passes_with_its_slips_counted() {
         }],
         ..Expect::default()
     };
-    let report = "Findings:\n\n- crates/x/src/a.rs:20-23 — blocking — an unwrap outside tests — ENG-16\n\noutcome: blocking — it unwraps.\n";
+    let report = "Findings:\n\n- crates/x/src/a.rs:20-23 — if not addressed: an unwrap panics — ENG-16\n\noutcome: findings — it unwraps.\n";
     let log =
-        answered_log("outcome: blocking — unwraps, see the report.\nreview/reports/lang-rust.md\n");
+        answered_log("outcome: findings — unwraps, see the report.\nreview/reports/lang-rust.md\n");
 
     let graded = grade(&c, &case("lang-rust", expect), &run(&log, Some(report)));
 
@@ -150,20 +150,20 @@ fn a_specialist_run_that_only_slips_passes_with_its_slips_counted() {
 #[test]
 fn answer_slips_name_what_the_answer_lacks_and_what_it_adds() {
     let own = "review/reports/lang-rust.md";
-    let slips = |answer: &str| answer_slips(&answered_log(answer), "sound", own);
+    let slips = |answer: &str| answer_slips(&answered_log(answer), "none", own);
 
-    assert!(slips("outcome: sound — fine.\nreview/reports/lang-rust.md").is_empty());
-    assert!(slips("review/reports/lang-rust.md — Outcome: sound — fine.").is_empty());
+    assert!(slips("outcome: none — fine.\nreview/reports/lang-rust.md").is_empty());
+    assert!(slips("review/reports/lang-rust.md — Outcome: none — fine.").is_empty());
     assert_eq!(
         slips("review/reports/lang-rust.md"),
         vec!["answer does not name the report's outcome"]
     );
     assert_eq!(
-        slips("outcome: sound"),
+        slips("outcome: none"),
         vec!["answer does not name the report's path"]
     );
     assert_eq!(
-        slips("Done.\noutcome: sound — fine.\nreview/reports/lang-rust.md"),
+        slips("Done.\noutcome: none — fine.\nreview/reports/lang-rust.md"),
         vec!["answer holds more than the outcome and the path: Done."]
     );
 }
@@ -171,17 +171,20 @@ fn answer_slips_name_what_the_answer_lacks_and_what_it_adds() {
 #[test]
 fn shape_slips_name_an_eleventh_finding_and_a_stray_line() {
     let eleven = (1..=11)
-        .map(|n| format!("a.rs:{n} — nit — one\n"))
+        .map(|n| format!("a.rs:{n} — request: add a rule — one\n"))
         .collect::<String>();
+    let one = "a.rs:1 — if not addressed: one breaks — I2\n";
 
-    assert!(shape_slips(&report::parse(&format!("{eleven}outcome: nits\n")).clone()).len() == 1);
+    assert!(
+        shape_slips(&report::parse(&format!("{eleven}outcome: findings\n")).clone()).len() == 1
+    );
     assert_eq!(
-        shape_slips(&report::parse(
-            "Findings:\na.rs:1 — nit — one\noutcome: nits\n"
-        )),
+        shape_slips(&report::parse(&format!(
+            "Findings:\n{one}outcome: findings\n"
+        ))),
         vec!["a line that is neither a finding nor the outcome: Findings:"]
     );
-    assert!(shape_slips(&report::parse("a.rs:1 — nit — one\noutcome: nits\n")).is_empty());
+    assert!(shape_slips(&report::parse(&format!("{one}outcome: findings\n"))).is_empty());
 }
 
 #[test]
@@ -228,7 +231,7 @@ fn a_specialist_that_did_not_answer_or_write_fails_on_that() {
     let graded = grade(
         &c,
         &case("lang-rust", Expect::default()),
-        &run(&log, Some("outcome: sound\n")),
+        &run(&log, Some("outcome: none\n")),
     );
     assert_eq!(graded.failures, vec!["did not answer: error_max_turns"]);
 }
@@ -236,12 +239,14 @@ fn a_specialist_that_did_not_answer_or_write_fails_on_that() {
 #[test]
 fn a_lenient_specialist_is_not_held_to_the_line_shape() {
     let c = component(Kind::Specialist, "test-engineer-unit", false);
-    let report = "tooling/x/src/a.rs line 4: the function has no unit test, blocking.\n\noutcome: blocking — no tests.\n";
-    let log = answered_log("outcome: blocking — no tests.\nreview/reports/test-engineer-unit.md");
+    let report = "tooling/x/src/a.rs line 4: the function has no unit test.\n\
+                  tooling/x/src/a.rs:4 — request: add a floor per module — none holds it\n\n\
+                  outcome: findings — no tests.\n";
+    let log = answered_log("outcome: findings — no tests.\nreview/reports/test-engineer-unit.md");
     let expect = Expect {
         finding: vec![Expected {
-            severity: Some("blocking".into()),
             line: Some(5),
+            mentions: vec!["no unit test".into()],
             ..wanted("tooling/x/src/a.rs")
         }],
         ..Expect::default()
@@ -254,6 +259,63 @@ fn a_lenient_specialist_is_not_held_to_the_line_shape() {
     );
 
     assert!(graded.passed(), "{:?}", graded.failures);
+}
+
+#[test]
+fn a_specialist_report_the_review_would_refuse_fails_its_run() {
+    let c = component(Kind::Specialist, "lang-rust", true);
+    let log = answered_log("outcome: findings — x.\nreview/reports/lang-rust.md");
+    for (report, problem) in [
+        (
+            "a.rs:1 — blocking — an unwrap — ENG-16\noutcome: findings — x.\n",
+            "has a report whose line 1 is neither a linked finding nor a requirement request",
+        ),
+        (
+            "a.rs:1 — if not addressed: a panic — ENG-16\noutcome: none — x.\n",
+            "has a report whose outcome is none but which holds findings",
+        ),
+    ] {
+        let graded = grade(
+            &c,
+            &case("lang-rust", Expect::default()),
+            &run(&log, Some(report)),
+        );
+
+        assert_eq!(graded.failures, vec![format!("report refused: {problem}")]);
+    }
+}
+
+#[test]
+fn a_specialist_s_line_is_matched_by_its_form_and_never_by_a_severity_word() {
+    let form = |form: &str| Expected {
+        form: Some(form.into()),
+        ..wanted("a.rs")
+    };
+    let severity = |severity: &str| Expected {
+        severity: Some(severity.into()),
+        ..wanted("a.rs")
+    };
+    let linked = "a.rs:3 — if not addressed: a pin is lost — I3";
+    let request = "a.rs:3 — request: change I3 — it reads two ways";
+    let weighed = "a.rs:3 — blocking — a pin is lost — I3";
+    let s = Kind::Specialist;
+
+    assert!(line_matches(linked, &form("linked"), s));
+    assert!(!line_matches(request, &form("linked"), s));
+    assert!(line_matches(request, &form("request"), s));
+    assert!(!line_matches(linked, &form("request"), s));
+    // A case written while specialists weighed: blocking wants a
+    // linked finding, a nit either form, and neither a severity word.
+    assert!(line_matches(linked, &severity("blocking"), s));
+    assert!(!line_matches(request, &severity("blocking"), s));
+    assert!(line_matches(request, &severity("nit"), s));
+    assert!(line_matches(linked, &severity("nit"), s));
+    assert!(!line_matches(weighed, &severity("blocking"), s));
+    assert!(!line_matches(weighed, &severity("nit"), s));
+    assert!(line_matches(weighed, &wanted("a.rs"), s));
+    // A generalist's line has no form.
+    assert!(!line_matches(weighed, &form("linked"), Kind::Generalist));
+    assert_eq!(describe(&form("request")), "at a.rs as a request line");
 }
 
 #[test]
@@ -311,19 +373,22 @@ fn a_line_matches_what_the_case_names_and_nothing_less() {
     };
     let line = "pr-head/a.rs:12 — blocking — an unwrap outside tests — ENG-16 — lang-rust";
 
-    assert!(line_matches(line, &full));
-    assert!(!line_matches(&line.replace("12", "13"), &full));
-    assert!(!line_matches(&line.replace("ENG-16", "ENG-17"), &full));
-    assert!(!line_matches(&line.replace("tests", "code"), &full));
-    assert!(!line_matches(&line.replace("lang-rust", "yours"), &full));
-    assert!(!line_matches(&line.replace("blocking", "nit"), &full));
+    let g = Kind::Generalist;
+    assert!(line_matches(line, &full, g));
+    assert!(!line_matches(&line.replace("12", "13"), &full, g));
+    assert!(!line_matches(&line.replace("ENG-16", "ENG-17"), &full, g));
+    assert!(!line_matches(&line.replace("tests", "code"), &full, g));
+    assert!(!line_matches(&line.replace("lang-rust", "yours"), &full, g));
+    assert!(!line_matches(&line.replace("blocking", "nit"), &full, g));
     assert!(!line_matches(
         "b.rs:12 — blocking — unwrap tests ENG-16 lang-rust",
-        &full
+        &full,
+        g
     ));
     assert!(line_matches(
         "a.rs:9 — blocking — Unwrap in tests — ENG-16 by lang-rust",
-        &full
+        &full,
+        g
     ));
     assert_eq!(
         describe(&full),
@@ -378,14 +443,20 @@ fn a_severity_is_read_from_its_slot_only() {
         ..wanted("a.rs")
     };
 
-    assert!(line_matches("a.rs:3 — blocking — it breaks I2", &blocking));
+    let g = Kind::Generalist;
+    assert!(line_matches(
+        "a.rs:3 — blocking — it breaks I2",
+        &blocking,
+        g
+    ));
     assert!(!line_matches(
         "a.rs:3 — nit — this is not blocking",
-        &blocking
+        &blocking,
+        g
     ));
     // A line that is no finding line has no slot; its prose is read whole.
-    assert!(line_matches("a.rs mentions blocking prose", &blocking));
-    assert!(!line_matches("a.rs mentions nothing", &blocking));
+    assert!(line_matches("a.rs mentions blocking prose", &blocking, g));
+    assert!(!line_matches("a.rs mentions nothing", &blocking, g));
 }
 
 #[test]

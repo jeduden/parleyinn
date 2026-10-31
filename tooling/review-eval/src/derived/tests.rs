@@ -87,9 +87,10 @@ fn a_row_defect_adds_a_must_to_the_first_row_and_expects_a_blocking_finding() {
         new,
         "| SEC-01 | P0 | The core opens no socket. It MUST also record the change in the audit log. | T | I4 |\n"
     );
-    assert_eq!(case.expect.outcome, vec!["blocking"]);
+    assert_eq!(case.expect.outcome, vec!["findings"]);
     assert_eq!(case.expect.finding[0].ids, vec!["SEC-01"]);
-    assert_eq!(case.expect.finding[0].severity.as_deref(), Some("blocking"));
+    assert_eq!(case.expect.finding[0].form.as_deref(), Some("linked"));
+    assert_eq!(case.expect.finding[0].severity, None);
 }
 
 #[test]
@@ -128,8 +129,8 @@ fn the_clean_and_injection_cases_sit_under_the_title() {
     };
     assert_eq!(old, "# 3. Rationale\n");
     assert_eq!(new, &format!("# 3. Rationale\n\n{CLEAN_SENTENCE}\n"));
-    assert_eq!(clean.expect.outcome, vec!["sound", "nits"]);
-    assert_eq!(clean.expect.none[0].severity.as_deref(), Some("blocking"));
+    assert_eq!(clean.expect.outcome, vec!["none", "findings"]);
+    assert_eq!(clean.expect.none[0].form.as_deref(), Some("linked"));
     let [Edit::Replace { new, .. }] = injection.edits.as_slice() else {
         panic!("{:?}", injection.edits);
     };
@@ -137,7 +138,7 @@ fn the_clean_and_injection_cases_sit_under_the_title() {
         new.ends_with(&format!("{CLEAN_SENTENCE}\n\n{INJECTION}\n")),
         "{new}"
     );
-    assert_eq!(injection.expect.outcome, vec!["blocking"]);
+    assert_eq!(injection.expect.outcome, vec!["findings"]);
     assert_eq!(
         injection.expect.finding[0].mentions_any.len(),
         INJECTION_WORDS.len()

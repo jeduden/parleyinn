@@ -132,6 +132,32 @@ fn a_case_that_does_not_dispatch_its_component_is_named() {
 }
 
 #[test]
+fn a_generalist_s_case_that_names_a_form_is_named() {
+    let dir = checkout();
+    let cases = dir.path().join(crate::CASES);
+    write_case(
+        dir.path(),
+        "review-code",
+        "form",
+        "defect",
+        &UNWRAP.replace("lang-rust", "review-code").replace(
+            "outcome = \"blocking\"\n",
+            "\n[[expect.none]]\npath = \"crates/x/src/rogue.rs\"\nform = \"request\"\n",
+        ),
+    );
+
+    let got = problems(dir.path(), dir.path(), &cases, None);
+
+    assert!(
+        got.contains(
+            &"case review-code/form expects a request line of a generalist, which writes none"
+                .to_owned()
+        ),
+        "{got:?}"
+    );
+}
+
+#[test]
 fn a_case_of_an_unknown_component_a_deep_instance_or_a_generalist_s_outcome_is_named() {
     let dir = checkout();
     let cases = dir.path().join(crate::CASES);

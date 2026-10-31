@@ -1,53 +1,70 @@
 use super::*;
 
 #[test]
-fn a_report_reads_its_findings_and_outcome() {
-    let text = "crates/x/src/a.rs:12 — blocking — an unwrap outside tests — ENG-16\n\
-                `docs/x.md:3` - nit - a term outside the model - I2\n\n\
-                outcome: blocking — the change unwraps.\n";
+fn a_report_reads_its_findings_requests_and_outcome() {
+    let text = "crates/x/src/a.rs:12 — if not addressed: a hook panics — ENG-04\n\
+                `docs/x.md:3` - request: change I2 - it reads two ways\n\
+                docs/y.md:4 — nit — a term outside the model — I2\n\n\
+                outcome: findings — the change unwraps.\n";
 
     let r = parse(text);
 
     assert_eq!(r.findings.len(), 2);
-    assert_eq!(r.findings[0].path, "crates/x/src/a.rs");
-    assert_eq!(r.findings[0].line, 12);
-    assert_eq!(r.findings[0].severity, "blocking");
-    assert_eq!(r.findings[0].text, "an unwrap outside tests — ENG-16");
-    assert_eq!(r.findings[1].path, "docs/x.md");
-    assert_eq!(r.findings[1].severity, "nit");
-    assert_eq!(r.outcome.as_deref(), Some("blocking"));
+    let Line::Linked(linked) = &r.findings[0] else {
+        panic!("{:?}", r.findings[0]);
+    };
+    assert_eq!(
+        (linked.path.as_str(), linked.line),
+        ("crates/x/src/a.rs", 12)
+    );
+    assert_eq!(linked.ids, ["ENG-04"]);
+    assert!(matches!(&r.findings[1], Line::Request(q) if q.path == "docs/x.md"));
+    assert_eq!(
+        r.malformed,
+        ["docs/y.md:4 — nit — a term outside the model — I2"]
+    );
+    assert_eq!(r.outcome.as_deref(), Some("findings"));
     assert_eq!(
         r.outcome_line.as_deref(),
-        Some("outcome: blocking — the change unwraps.")
+        Some("outcome: findings — the change unwraps.")
     );
     assert!(r.other.is_empty());
 }
 
 #[test]
 fn a_report_without_an_outcome_at_its_end_has_none() {
-    let r = parse("outcome: sound — fine\nbut then more text\n");
+    let r = parse("outcome: none — fine\nbut then more text\n");
 
     assert_eq!(r.outcome, None);
-    assert_eq!(r.other, vec!["outcome: sound — fine", "but then more text"]);
+    assert_eq!(r.other, vec!["outcome: none — fine", "but then more text"]);
+}
+
+#[test]
+fn an_outcome_that_weighs_reads_as_no_outcome() {
+    assert_eq!(parse("outcome: blocking — it unwraps").outcome, None);
+    assert_eq!(parse("outcome: sound — fine").outcome, None);
 }
 
 #[test]
 fn headings_are_not_other_lines_but_prose_is() {
-    let r = parse("# lang-rust\n\nI read the diff.\n\noutcome: sound\n");
+    let r = parse("# lang-rust\n\nI read the diff.\n\noutcome: none\n");
 
     assert_eq!(r.other, vec!["I read the diff."]);
-    assert_eq!(r.outcome.as_deref(), Some("sound"));
+    assert_eq!(r.outcome.as_deref(), Some("none"));
 }
 
 #[test]
 fn the_outcome_word_tolerates_markers_and_punctuation() {
-    assert_eq!(outcome_word("outcome: sound"), Some("sound"));
-    assert_eq!(outcome_word("**outcome: nits** — one nit"), Some("nits"));
-    assert_eq!(outcome_word("- outcome: blocking."), Some("blocking"));
-    assert_eq!(outcome_word("> outcome: blocking"), Some("blocking"));
+    assert_eq!(outcome_word("outcome: none"), Some("none"));
+    assert_eq!(
+        outcome_word("**outcome: findings** — one"),
+        Some("findings")
+    );
+    assert_eq!(outcome_word("- outcome: findings."), Some("findings"));
+    assert_eq!(outcome_word("> outcome: none"), Some("none"));
     assert_eq!(outcome_word("outcome: maybe"), None);
     assert_eq!(outcome_word("outcome:"), None);
-    assert_eq!(outcome_word("the outcome: sound"), None);
+    assert_eq!(outcome_word("the outcome: none"), None);
 }
 
 #[test]
@@ -141,6 +158,6 @@ fn split_dashes_cuts_at_each_spaced_dash_only() {
         vec!["a", "b", "c", "d", "e"]
     );
     assert_eq!(split_dashes("no-dash here"), vec!["no-dash here"]);
-    assert_eq!(strip_number("12. x"), "x");
-    assert_eq!(strip_number(". x"), ". x");
+    assert_eq!(bare("12. x"), "x");
+    assert_eq!(bare(". x"), ". x");
 }
