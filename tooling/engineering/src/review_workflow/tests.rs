@@ -102,7 +102,7 @@ fn grants_write_and_has_word_match_whole_words() {
 #[test]
 fn runs_after_wants_the_named_workflow_and_comments_only() {
     let mut w = parse(REVIEW_FLOW);
-    assert!(w.runs_after("CI").is_ok());
+    assert_eq!(w.runs_after("CI"), Ok(()));
     assert_eq!(
         w.runs_after("Build").unwrap_err(),
         r#"the workflow_run trigger does not say "workflows: [Build]""#
@@ -267,7 +267,7 @@ fn evaluate_job_runs_with_the_command_line_needs_not_itself() {
 #[test]
 fn key_held_apart_wants_one_holder_that_runs_no_agent() {
     let mut w = parse(REVIEW_FLOW);
-    assert!(w.key_held_apart(KEY).is_ok());
+    assert_eq!(w.key_held_apart(KEY), Ok(()));
 
     w.jobs[1].text.push_str(RUN);
     assert_eq!(
@@ -294,19 +294,26 @@ fn key_job_after_agents_wants_the_agents_needed_and_no_override() {
             "job post runs on always(), even after a failed review"
         ]
     );
-    assert!(w.key_job_after_agents("OTHER").is_err());
+    assert_eq!(
+        w.key_job_after_agents("OTHER").unwrap_err(),
+        r#"0 jobs read "OTHER", want exactly one"#
+    );
 }
 
 #[test]
 fn key_job_runs_wants_the_command() {
     let w = parse(REVIEW_FLOW);
 
-    assert!(w.key_job_runs(KEY, "cargo run -p review-gate").is_ok());
+    assert_eq!(w.key_job_runs(KEY, "cargo run -p review-gate"), Ok(()));
     assert_eq!(
         w.key_job_runs(KEY, "cargo run -p other").unwrap_err(),
         r#"job post does not run "cargo run -p other""#
     );
-    assert!(w.key_job_runs("OTHER", "cargo run -p review-gate").is_err());
+    assert_eq!(
+        w.key_job_runs("OTHER", "cargo run -p review-gate")
+            .unwrap_err(),
+        r#"0 jobs read "OTHER", want exactly one"#
+    );
 }
 
 #[test]
@@ -333,10 +340,11 @@ fn key_job_posts_check_wants_the_permission_the_post_and_a_failing_default() {
             "job post does not fail the check by default: conclusion=failure".to_owned(),
         ])
     );
-    assert!(
+    assert_eq!(
         parse(REVIEW_FLOW)
             .key_job_posts_check("OTHER", "review-gate")
-            .is_err()
+            .unwrap_err(),
+        r#"0 jobs read "OTHER", want exactly one"#
     );
 }
 
