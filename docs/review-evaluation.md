@@ -35,7 +35,8 @@ records the design.
   is matched by its path and the words, ids and source the case names,
   and by its form, `linked` or `request`, for a specialist or a persona,
   which weighs nothing, or its severity for a generalist; `none` forbids
-  one; `absent` forbids text. Cases belong to
+  one; `absent` forbids text; `nits` caps the nits a generalist keeps.
+  Cases belong to
   the normal instance of a generalist; its deep instance runs the same
   ones. An agent the bundle never dispatches answers in text and is
   graded from it, as a generalist is; the dispatch rule below does not

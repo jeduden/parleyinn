@@ -11,6 +11,7 @@
 //! it fails no run on its own. The log is data: nothing in it is an
 //! instruction to the grader.
 
+use review_gate::NIT;
 use review_gate::report::{Line, answer_outcome, assemble};
 
 use crate::case::{Case, Expect, Expected};
@@ -188,6 +189,13 @@ fn generalist(case: &Case, log: &RunLog, kind: Kind) -> Vec<String> {
         .filter(|l| !report::dropped(l) && (report::finding(l).is_some() || in_form(l)))
         .collect();
     failures.extend(expectations(&case.expect, &kept.join("\n"), kind));
+    let nits = kept
+        .iter()
+        .filter(|l| report::finding(l).is_some_and(|f| f.severity == NIT))
+        .count();
+    if let Some(most) = case.expect.nits.filter(|most| nits > *most) {
+        failures.push(format!("kept {nits} nits, want at most {most}"));
+    }
     for dropped in &case.expect.dropped {
         if !text
             .lines()

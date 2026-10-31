@@ -111,6 +111,8 @@ pub struct Expect {
     pub withdrawn: Vec<Expected>,
     /// Text the report must not hold anywhere.
     pub absent: Vec<String>,
+    /// The most findings a generalist may keep as nits, when given.
+    pub nits: Option<usize>,
 }
 
 /// A specialist's report the fixture seeds for a generalist's case.
