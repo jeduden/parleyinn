@@ -79,9 +79,10 @@ jobs:
 
   # Every unit and integration test but the scenario crate's, which
   # the scenarios job runs beside its scenarios, so each job stays
-  # under its budget.
+  # under its budget. None of them starts the release core or the
+  # calibration workload (only the scenario runner's NFR-02 steps do),
+  # so it starts at once instead of waiting on release-core.
   test:
-    needs: release-core
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -119,12 +120,6 @@ jobs:
       # ENG-30: the license check reads only the sources cargo has
       # already fetched, for every release target.
       - run: cargo fetch --locked
-      - name: Take the release core the budget rows time
-        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
-        with:
-          name: release-core
-          path: target/release
-      - run: chmod +x target/release/parinn target/release/calibrate
       # ENG-14: the suite runs with HOME pointed at an empty decoy
       # directory, the toolchain keeping its own homes. The isolation
       # guard (testkit::guard) aborts a test that resolves real
@@ -227,10 +222,12 @@ jobs:
   # end-to-end) and per crate. Each layer is measured in a job of its
   # own, on its own instrumented build, so each stays under its
   # budget; the coverage job below merges them and holds the floors.
-  # The end-to-end layer, the longest, is sharded in coverage-e2e.
+  # The end-to-end layer, the longest, is sharded in coverage-e2e. The
+  # unit and integration layers leave out the scenario runner, the one
+  # target that starts the release core, so they do not wait on
+  # release-core.
   coverage-layer:
     name: coverage (${{ matrix.layer }})
-    needs: release-core
     runs-on: ubuntu-latest
     timeout-minutes: 5
     strategy:
@@ -272,14 +269,6 @@ jobs:
       # ENG-30: the license check reads only the sources cargo has
       # already fetched, for every release target.
       - run: cargo fetch --locked
-      # NFR-02: the budget rows time the release core, which the
-      # instrumented run does not build.
-      - name: Take the release core the budget rows time
-        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
-        with:
-          name: release-core
-          path: target/release
-      - run: chmod +x target/release/parinn target/release/calibrate
       - run: cargo run --locked -p coverage -- --layer "$LAYER"
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
