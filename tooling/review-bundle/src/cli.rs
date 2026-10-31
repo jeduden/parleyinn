@@ -109,10 +109,11 @@ fn build(
     write(DISPATCH, &format!("{dispatch}\n"))?;
     let diffs = out.join(DIFFS);
     fs::create_dir_all(&diffs).map_err(failed("write", &diffs))?;
+    let tree = |path: &str| tree_file(head, path);
     for (specialist, scope) in &a.scopes {
         write(
             &format!("{DIFFS}/{specialist}.diff"),
-            &diff_for(&diff, scope),
+            &diff_for(&diff, scope, &tree),
         )?;
     }
 
@@ -127,13 +128,24 @@ fn build(
 
 /// The part of `diff` a specialist whose files are `scope` reads: those
 /// files' sections, or the whole diff when it has none of its own, as a
-/// specialist a row brings may not.
-fn diff_for(diff: &str, scope: &BTreeSet<String>) -> String {
-    if scope.is_empty() {
+/// specialist a row brings may not; either without the hunks inside a
+/// copy an `<?include?>` makes of its source in the tree `tree` reads.
+fn diff_for(diff: &str, scope: &BTreeSet<String>, tree: &dyn Fn(&str) -> Option<String>) -> String {
+    let own = if scope.is_empty() {
         diff.to_owned()
     } else {
         crate::diff::only(diff, scope)
-    }
+    };
+
+    crate::copies::prune(&own, tree)
+}
+
+/// The text of the regular file at `path` in the tree at `root`, or
+/// `None` when it is no regular file there or does not read.
+fn tree_file(root: &Path, path: &str) -> Option<String> {
+    let file = root.join(path);
+    let regular = fs::symlink_metadata(&file).is_ok_and(|m| m.is_file());
+    regular.then(|| fs::read_to_string(&file).ok()).flatten()
 }
 
 /// The message for a failure to `verb` the file at `path`.

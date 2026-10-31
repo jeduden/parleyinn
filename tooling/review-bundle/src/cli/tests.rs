@@ -284,9 +284,44 @@ fn consents_returns_each_comment_with_a_body() {
 fn a_specialist_with_no_file_of_its_own_reads_the_whole_diff() {
     let diff = "diff --git a/a.rs b/a.rs\n+x\ndiff --git a/b.md b/b.md\n+y\n";
 
-    assert_eq!(diff_for(diff, &BTreeSet::new()), diff);
+    let none = |_: &str| None;
+
+    assert_eq!(diff_for(diff, &BTreeSet::new(), &none), diff);
     assert_eq!(
-        diff_for(diff, &["b.md".to_owned()].into()),
+        diff_for(diff, &["b.md".to_owned()].into(), &none),
         "diff --git a/b.md b/b.md\n+y\n"
     );
+}
+
+#[test]
+fn a_specialist_s_diff_leaves_out_a_copy_that_matches_its_source() {
+    let head = TempDir::new().unwrap();
+    fs::create_dir_all(head.path().join("docs")).unwrap();
+    fs::write(head.path().join("docs/rule.md"), "# Rule\nNew.\n").unwrap();
+    fs::write(
+        head.path().join("a.md"),
+        "<?include\nfile: docs/rule.md\n?>\n## Rule\nNew.\n<?/include?>\n",
+    )
+    .unwrap();
+    let diff = "diff --git a/a.md b/a.md\n@@ -5 +5 @@\n-Old.\n+New.\n";
+    let tree = |p: &str| tree_file(head.path(), p);
+
+    assert_eq!(
+        diff_for(diff, &BTreeSet::new(), &tree),
+        format!(
+            "{}\n{}`a.md`\n",
+            crate::copies::NOTE,
+            crate::copies::LEFT_OUT
+        )
+    );
+}
+
+#[test]
+fn tree_file_reads_only_a_regular_file() {
+    let head = TempDir::new().unwrap();
+    fs::write(head.path().join("a.md"), "text").unwrap();
+
+    assert_eq!(tree_file(head.path(), "a.md").as_deref(), Some("text"));
+    assert_eq!(tree_file(head.path(), "gone.md"), None);
+    assert_eq!(tree_file(head.path(), "."), None);
 }
