@@ -82,9 +82,27 @@ jobs:
   # under its budget. None of them starts the release core or the
   # calibration workload (only the scenario runner's NFR-02 steps do),
   # so it starts at once instead of waiting on release-core.
+  #
+  # The crates divide over three jobs, each running cargo test on a
+  # package list of its own: the shard is the job's position among the
+  # jobs of the matrix, and a matrix with more or fewer jobs than lists
+  # fails. The gate test the_ci_test_shards_run_every_crate_once fails
+  # when a crate runs in no shard or in two; the last list takes every
+  # crate the others leave, so a new crate lands there. Together they
+  # ran 120 s of tests after an 80 s build; the lists split that 44, 37
+  # and 39 s, the review tooling (cucumber, no SQLite) apart from the
+  # store's crates and the core's.
   test:
+    name: test (shard ${{ matrix.shard }})
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3]
+    env:
+      JOB_INDEX: ${{ strategy.job-index }}
+      JOB_TOTAL: ${{ strategy.job-total }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -129,12 +147,28 @@ jobs:
       # HOME was swapped, leaves none; the guard and the
       # one-resolver gate test carry those.
       - name: Run the tests with a decoy HOME
+        shell: bash
         run: |
+          shards=(
+            "-p adr -p calibrate -p coverage -p drift -p engineering \
+              -p review-bundle -p review-eval -p review-gate -p review-run -p srs"
+            "-p redaction -p repository -p store -p testkit"
+            "--workspace --exclude scenario \
+              --exclude adr --exclude calibrate --exclude coverage --exclude drift \
+              --exclude engineering --exclude review-bundle --exclude review-eval \
+              --exclude review-gate --exclude review-run --exclude srs \
+              --exclude redaction --exclude repository --exclude store --exclude testkit"
+          )
+          if [ "${#shards[@]}" -ne "$JOB_TOTAL" ]; then
+            echo "::error::the matrix has $JOB_TOTAL shards but the step lists ${#shards[@]}: give each shard one package list"
+            exit 1
+          fi
+          read -ra packages <<< "${shards[$JOB_INDEX]}"
           decoy="$RUNNER_TEMP/decoy-home"
           mkdir "$decoy"
           export CARGO_HOME="${CARGO_HOME:-$HOME/.cargo}"
           export RUSTUP_HOME="${RUSTUP_HOME:-$HOME/.rustup}"
-          HOME="$decoy" cargo test --workspace --locked --exclude scenario
+          HOME="$decoy" cargo test --locked "${packages[@]}"
           if [ -n "$(ls -A "$decoy")" ]; then
             echo "::error::a test left files under the real HOME"
             ls -lA "$decoy"

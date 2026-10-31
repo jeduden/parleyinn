@@ -31,7 +31,9 @@ and the `ci-review` skill measures them.
   matrix lists, so the shards cover the work once whatever the list says.
   The scenarios divide by a hash of the feature file and scenario name
   (`--shard K/N`, or `PARINN_BDD_SHARD` for `cargo test -p scenario`),
-  the drift cases and benchmark rounds by position.
+  the drift cases and benchmark rounds by position. The `test` job's
+  shards each run the crates of the package list at their position, and a
+  gate test fails when a crate is in no list or in two.
 - The `CI` job records each job's duration and result in its job summary
   and uploads them as the `ci-timings` artifact. Read those; do not
   measure again.

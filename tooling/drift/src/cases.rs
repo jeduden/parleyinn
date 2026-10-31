@@ -1315,6 +1315,17 @@ fn ci_gate_cases() -> Vec<Case> {
             gates(),
             "the ci job does not run after a failed job",
         ),
+        case(
+            "a crate the test job's shards leave out",
+            "the_ci_test_shards_run_every_crate_once",
+            Injection::replace(CI, " -p review-run -p srs\"", " -p review-run\""),
+            cargo_test(
+                "engineering",
+                "static_analysis",
+                "the_ci_test_shards_run_every_crate_once",
+            ),
+            "the test job's shards: crate srs runs in no shard",
+        ),
     ]
 }
 
@@ -2565,8 +2576,8 @@ fn instruction_cases() -> Vec<Case> {
             "the_ci_test_job_runs_with_a_decoy_home",
             Injection::replace(
                 ".github/workflows/ci.yml",
-                "HOME=\"$decoy\" cargo test --workspace --locked",
-                "cargo test --workspace --locked",
+                "HOME=\"$decoy\" cargo test --locked \"${packages[@]}\"",
+                "cargo test --locked \"${packages[@]}\"",
             ),
             cargo_test(
                 "engineering",

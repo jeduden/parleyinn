@@ -18,7 +18,8 @@ pub const CHECKOUT_STEP: &str = "the repository checkout";
 /// domain-model finding stays in the text, and the core executable's
 /// dependency reach (SEC-01); the three isolation gates of ENG-14: the
 /// scan for a read of real state around the guard, the decoy `HOME` CI runs
-/// the suite with, and the scan of the agent instruction files; and the
+/// the suite with, and the scan of the agent instruction files; the
+/// gate that holds the test job's shards to every crate once; and the
 /// gates that prove what a pending scenario cannot yet: the core rows
 /// of ENG-12 and ENG-16, ENG-15's benchmark gate, and ENG-21's ruleset
 /// and CODEOWNERS; and the gates behind ENG-03, ENG-20's three
@@ -27,7 +28,7 @@ pub const CHECKOUT_STEP: &str = "the repository checkout";
 /// CI to the TOML checks; the two gates of ENG-32 over the reviewer
 /// evaluation cases; and the gates behind SEC-01's core row,
 /// SEC-15, SEC-17, SEC-19 and ENG-22.
-pub const GATE_TESTS: [&str; 45] = [
+pub const GATE_TESTS: [&str; 46] = [
     "specification_parses",
     "decision_records_parse",
     "specification_and_features_agree",
@@ -39,6 +40,7 @@ pub const GATE_TESTS: [&str; 45] = [
     "only_the_isolation_guard_reads_the_home",
     "the_ci_test_job_runs_with_a_decoy_home",
     "the_agent_instructions_direct_no_destructive_command_at_real_state",
+    "the_ci_test_shards_run_every_crate_once",
     "the_core_s_tests_start_it_confined",
     "the_ci_workflow_gates_on_the_static_checks",
     "every_crate_forbids_unsafe_code",

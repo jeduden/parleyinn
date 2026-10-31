@@ -31,6 +31,7 @@ pub mod review_languages;
 pub mod review_workflow;
 pub mod static_analysis;
 pub mod telemetry;
+pub mod test_shards;
 pub mod third_party;
 pub mod threat_model;
 pub mod toolchain;
