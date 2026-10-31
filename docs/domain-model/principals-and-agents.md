@@ -47,7 +47,8 @@ summary: >-
 - **Harness configuration**: The harness's settings, hooks and MCP
   registrations, which ParleyInn changes only through explicit install and
   uninstall operations, showing the change first (I7). The harness's own managed
-  settings are part of it, and ParleyInn never writes them (ADM-03).
+  settings are part of it, and ParleyInn never writes to or overrides them
+  (ADM-03, I7).
 - **Agent**: A worker a harness runs for exactly one principal: the principal of
   the node that records its runs (OWN-01). It receives restore blocks and
   recalls history; an agent is never a principal. It is identified by its node,
