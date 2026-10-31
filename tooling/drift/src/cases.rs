@@ -682,7 +682,7 @@ fn review_reach_cases() -> Vec<Case> {
             Injection::replace(
                 REVIEW_WORKFLOW,
                 "            > review/run.txt\n",
-                "            > review/run.txt\n          claude -p review --allowedTools Write\n",
+                "            > review/run.txt\n          npx @anthropic-ai/claude-code -p review --allowedTools Write\n",
             ),
             scenario("ENG-28"),
             "may use Write, want Read, Glob, Grep alone",
