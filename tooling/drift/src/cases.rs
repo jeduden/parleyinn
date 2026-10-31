@@ -676,7 +676,7 @@ fn review_report_case() -> Case {
         "ENG-28",
         Injection::replace(
             "tooling/review-gate/src/lib.rs",
-            ".is_some_and(|answer| answer.lines().any(|l| l.trim() == outcome)))",
+            ".is_some_and(|answer| answer.lines().any(|l| same_outcome(outcome, l))))",
             ".is_some_and(|_| true))",
         ),
         scenario("ENG-28"),
