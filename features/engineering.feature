@@ -225,7 +225,7 @@ Feature: Engineering quality (ENG)
   Scenario: workflows pin every outside action to a commit sha and expand no untrusted value in a script
     Given the repository checkout
     When every workflow under ".github/workflows" and composite action under ".github/actions" is read
-    Then every action and reusable workflow they use from outside the repository is pinned to a full commit sha, with its version in a comment
+    Then every action and reusable workflow they use from outside the repository is pinned to a full commit sha, with its version in a comment, and every docker:// image to its sha256 digest
     And no run script expands a github.event field, github.head_ref or an inputs value with an expression
     And the CI workflow runs "zizmor .github"
 

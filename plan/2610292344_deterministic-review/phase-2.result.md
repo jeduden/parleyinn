@@ -7,8 +7,9 @@ summary: >-
   review.yml runs review-run in place of the orchestrating agent, and
   ENG-28, its scenario, binding and drift cases now ask for a review run
   by code; the gate names an unanswered agent without an orchestrator,
-  ADR-2610300031 records the decision, since accepted on the
-  stakeholder's consent, and the generalists keep their models.
+  ADR-2610300031 records the decision, proposed until the stakeholder
+  accepts it on this pull request, and the generalists keep their
+  models.
 ---
 # Phase 2 handoff
 
@@ -40,9 +41,11 @@ summary: >-
   generalist report shape starts a dropped line with `dropped —`, which
   review-run already leaves out.
 - ADR-2610300031, written `proposed` with its Approval section left
-  for the stakeholder. The stakeholder has since consented in PR #98's
-  comment 6534291701, which its Approval cites: it is `accepted`, and
-  ADR-2610262245 is `superseded` by it.
+  for the stakeholder. The stakeholder consented to its first text in
+  PR #98's comment 6534291701, which its Approval cites; the finding
+  forms folded in since leave it `proposed` until the stakeholder
+  accepts the whole record on that pull request. ADR-2610262245 is
+  marked `superseded` by it already, so the pair lands together.
 - `docs/development.md` and `docs/review-evaluation.md` describe
   review-run.
 
@@ -54,8 +57,9 @@ summary: >-
 - The agents' job is found by `-p review-run`, and also by
   `claude-code-action@`, so a harness session is still held to the
   agents' rules wherever it appears.
-- ADR-2610262245 is marked superseded only once ADR-2610300031 is
-  accepted, since a proposal changes no decision (ENG-26).
+- ADR-2610262245 was to be marked superseded only once ADR-2610300031
+  was accepted, since a proposal changes no decision (ENG-26); it is
+  marked already, so the stakeholder accepts both on PR #98 at once.
 
 ## Next
 

@@ -43,7 +43,8 @@ summary: >-
   machine, overriding every other settings layer (ADM-04). ParleyInn never
   overrides it (I7). Its other powers are those SEC-22 gives it, such as
   disabling a B1–B3 component or the launcher, though it turns no component on,
-  and certifying service accounts by listing their principal keys (PRV-10).
+  and the one PRV-10 gives it: certifying service accounts by listing their
+  principal keys.
 - **Harness configuration**: The harness's settings, hooks and MCP
   registrations, which ParleyInn changes only through explicit install and
   uninstall operations, showing the change first (I7). The harness's own managed

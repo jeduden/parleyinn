@@ -177,4 +177,6 @@ workflow has no model of its own.
 ## Approval
 
 This record is proposed. The stakeholder accepts it, or not, on the
-pull request that carries it.
+pull request that carries it. Until then ADR-2610290002 is marked
+superseded by a proposed record, on purpose: the stakeholder accepts
+this one before that pull request merges.

@@ -112,19 +112,22 @@ repeat them, which costs tokens.
 - **The form fails closed.** The gate and `review-run` refuse a report
   with a line in no form, an outcome of `none` beside a finding or
   `findings` beside none, an answer with no outcome line or another
-  outcome than the report ends with. `review-run` also refuses a cited
-  id that neither main's SRS nor the pull request's defines, so a
-  made-up requirement cannot carry a finding. Free prose is left out
-  of the report, but the instructions tell a specialist to write an
-  unlinked concern as a request, never as prose, and to start no other
-  line with `path:line —`.
+  outcome than the report ends with: `review-run` names a refused
+  report in a blocking finding of the outcome, and the gate then posts
+  no review. `review-run` also names a report citing an id that
+  neither main's SRS nor the pull request's defines in a blocking
+  finding, which the gate posts as a request for changes, so a made-up
+  requirement cannot carry a finding. Free prose is left out of the
+  report, but the instructions tell a specialist to write an unlinked
+  concern as a request, never as prose, and to start no other line
+  with a place and a dash.
 - **An incomplete run is salvaged and still fails closed.** A run that
   did not end with a successful result, at its turn budget, its
-  deadline, an error or an empty answer, stays a blocking finding and
-  is not consulted, so the gate posts no approval. Its report is
-  assembled all the same, headed `incomplete: <why>` and ending with no
-  outcome line, so the findings it stated reach its generalist and the
-  author instead of being lost with the run.
+  deadline, an error or an empty answer, is named in a blocking finding
+  of the outcome and is not consulted, so the gate posts no review. Its
+  report is assembled all the same, headed `incomplete: <why>` and
+  ending with no outcome line, so the findings it stated reach its
+  generalist and the author instead of being lost with the run.
 - **The generalists alone weigh.** A specialist's outcome never
   becomes a blocking finding by itself. A generalist keeps a linked
   finding as `blocking` only when its consequence breaks the
@@ -259,3 +262,6 @@ review run by code, in `jeduden`'s comment 6534291701 on
 finding forms, the run log as the report and the generalists alone
 weighing were folded in after that comment and await the
 stakeholder's acceptance of the whole record on that pull request.
+Until then ADR-2610262245 is marked superseded by a proposed record,
+on purpose: the stakeholder accepts this one before that pull request
+merges.

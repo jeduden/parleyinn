@@ -41,7 +41,7 @@ fn each_file(w: &mut World, check: fn(&str, &str) -> Vec<String>) -> Vec<String>
 }
 
 #[then(
-    regex = r"^every action and reusable workflow they use from outside the repository is pinned to a full commit sha, with its version in a comment$"
+    regex = r"^every action and reusable workflow they use from outside the repository is pinned to a full commit sha, with its version in a comment, and every docker:// image to its sha256 digest$"
 )]
 fn every_use_is_pinned(w: &mut World) -> Result<(), String> {
     outcome(each_file(w, workflows::unpinned))
