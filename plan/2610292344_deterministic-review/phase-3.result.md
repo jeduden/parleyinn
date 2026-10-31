@@ -67,7 +67,7 @@ summary: >-
 
 ## Decisions
 
-- The accepted ADRs that describe the orchestrator (ADR-2609301941,
+- The ADRs that describe the orchestrator (ADR-2609301941,
   ADR-2610262245, ADR-2610290002) keep their text as the record of
   what was decided; ADR-2610300031 says so. The old plans keep theirs.
 - A case's `consent` key and the world's consent file stay: the
@@ -81,10 +81,8 @@ summary: >-
 
 - The live check, one review decided by the gate on its first run,
   needs this branch on main.
-- ADR-2610300031 is `proposed` again: the specialists' finding forms
-  and the run log as the report were folded into it, so it awaits the
-  stakeholder's acceptance; its Approval cites comment 6534291701 for
-  the first text. ADR-2610262245 is `superseded`.
+- ADR-2610300031 is `proposed` again, the finding forms folded in;
+  ADR-2610262245 and ADR-2610290002 are `superseded`.
 - Waiting on the stakeholder, untouched: the empty dispatch, the
   consent finding, retries, the parallel bound and the since-last
   step.

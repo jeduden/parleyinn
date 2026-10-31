@@ -223,13 +223,13 @@ repeat them, which costs tokens.
   cases and its prompt and schema in the runner are retired (the
   skill's file goes in a follow-up once main runs `review-run`), together
   with its mentions in the SRS, the docs and the generalists' input
-  section. The accepted records that describe it, ADR-2609301941,
-  ADR-2610262245 and ADR-2610290002, keep their text as the record of
-  what was decided then.
-- With no orchestrator the review workflow has no model of its own, so
-  an agent whose front matter names none runs its cases on the
-  evaluation's default model (ENG-32), Sonnet, where ADR-2610290002
-  named the review workflow's model. This record supersedes that clause.
+  section. ADR-2609301941 and ADR-2610262245 keep their text as the
+  record of what was decided then.
+- ADR-2610290002, the reviewer evaluation, also describes the
+  orchestrator, and names the review workflow's model for an agent
+  whose front matter names none, a model the workflow no longer has.
+  ADR-2610311947 supersedes it whole and names the evaluation's
+  default model (ENG-32) instead.
 - The shared report sections under `docs/agents/`, the specialists'
   and the personas' own report text, the generalists' input section and
   the persona-review skill follow the finding forms; every specialist's

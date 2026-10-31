@@ -20,7 +20,7 @@ bundle can dispatch, each deep instance, and every other agent under
 the review: `review-run` runs the dispatched agents (ENG-28), so the
 routing is code, tested as code, and has no cases. The
 `review-eval` crate under [tooling/review-eval](../tooling/review-eval)
-runs them. [ADR-2610290002](adr/ADR-2610290002-reviewer-evaluation.md)
+runs them. [ADR-2610311947](adr/ADR-2610311947-reviewer-evaluation.md)
 records the design.
 
 ## The cases
