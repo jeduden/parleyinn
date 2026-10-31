@@ -100,6 +100,7 @@ pub fn cases() -> Vec<Case> {
         review_report_grading_cases(),
         workflow_cases(),
         review_log_report_cases(),
+        review_run_parts_cases(),
         // Last: its cases edit source the later cases would run stale.
         license_text_cases(),
     ]
@@ -1154,6 +1155,44 @@ fn review_log_report_cases() -> Vec<Case> {
                 "grade::tests::a_finding_stated_only_in_the_answer_was_not_stated_before_it",
             ),
             "a_finding_stated_only_in_the_answer_was_not_stated_before_it",
+        ),
+    ]
+}
+
+/// The drifts running a specialist in parts exists to catch (ENG-28),
+/// late so adding them moves no earlier case to another shard: a merge
+/// that drops a later part's findings, and a part that did not answer
+/// leaving the specialist one that did.
+fn review_run_parts_cases() -> Vec<Case> {
+    const PARTS: &str = "tooling/review-run/src/parts.rs";
+    vec![
+        case(
+            "the merge of a specialist's parts dropping a later part's findings",
+            "ENG-28",
+            Injection::replace(
+                PARTS,
+                "} else if !lines.iter().any(|l| l == line) {",
+                "} else if at == 0 && !lines.iter().any(|l| l == line) {",
+            ),
+            cargo_lib_test(
+                "review-run",
+                "parts::tests::the_merged_report_is_the_union_of_the_parts_in_order_with_one_outcome",
+            ),
+            "the_merged_report_is_the_union_of_the_parts_in_order_with_one_outcome",
+        ),
+        case(
+            "a specialist's part that did not answer not failing the review",
+            "ENG-28",
+            Injection::replace(
+                PARTS,
+                "if let Some(why) = &run.failure {",
+                "if let Some(why) = run.failure.as_ref().filter(|_| false) {",
+            ),
+            cargo_lib_test(
+                "review-run",
+                "parts::tests::a_failed_part_makes_the_merged_run_incomplete_naming_it_and_keeps_every_part_s_findings",
+            ),
+            "a_failed_part_makes_the_merged_run_incomplete_naming_it_and_keeps_every_part_s_findings",
         ),
     ]
 }
