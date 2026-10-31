@@ -536,6 +536,8 @@ fn gate_outcome_hands_the_gate_the_specialist_s_report() {
         ("other outcome answered", "an error"),
         ("malformed finding", "an error"),
         ("revised nothing", "an error"),
+        ("none beside a finding", "an error"),
+        ("findings with none", "an error"),
         ("reportd", UNKNOWN_CELL),
     ] {
         assert_eq!(gate_outcome(&row("specialist", value)), want, "{value}");

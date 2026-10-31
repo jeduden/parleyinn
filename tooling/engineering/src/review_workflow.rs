@@ -637,9 +637,10 @@ fn gate_args(reviewed: &str, head: &str) -> Vec<String> {
 /// outcome answered` an answer with no outcome line, `other outcome
 /// answered` an answer whose outcome is not the report's, `malformed
 /// finding` a logged finding that gives a severity where its
-/// consequence and requirements belong, and `revised nothing` a
-/// revision of a finding the specialist never stated; `None` for any
-/// other value.
+/// consequence and requirements belong, `revised nothing` a
+/// revision of a finding the specialist never stated, `none beside a
+/// finding` an outcome of none after a finding, and `findings with
+/// none` an outcome of findings after none; `None` for any other value.
 fn specialist(row: &BTreeMap<String, String>) -> Option<(Option<&'static str>, &'static str)> {
     const FINDINGS: &str = r#"{"lang-rust":"outcome: findings — fine","review-code":"r"}"#;
     const NONE: &str = r#"{"lang-rust":"outcome: none — fine","review-code":"r"}"#;
@@ -679,6 +680,11 @@ fn specialist(row: &BTreeMap<String, String>) -> Option<(Option<&'static str>, &
             ),
             FINDINGS,
         ),
+        "none beside a finding" => (
+            Some("a.rs:1 — if not addressed: x breaks — I2\noutcome: none — fine\n"),
+            NONE,
+        ),
+        "findings with none" => (Some("outcome: findings — fine\n"), FINDINGS),
         _ => return None,
     };
 

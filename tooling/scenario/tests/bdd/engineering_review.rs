@@ -65,6 +65,19 @@ fn review_runs_in_parts(w: &mut World) -> Result<(), String> {
     ))
 }
 
+#[then(
+    regex = r"^review-run names a specialist's report that cites an id no requirement or invariant has, and a generalist's finding line it cannot read, each in a blocking finding, so the review requests changes$"
+)]
+fn review_run_names_refusals(w: &mut World) -> Result<(), String> {
+    let work = testkit::TempDir::new().map_err(|e| format!("make a work directory: {e}"))?;
+    outcome(
+        engineering::review_refusals::review_run_names_what_it_refuses(
+            eng(w).checkout()?,
+            work.path(),
+        ),
+    )
+}
+
 #[then(regex = r"^its agents can write nothing: review-run allows them Read, Glob and Grep alone$")]
 fn agents_write_nothing(w: &mut World) -> Result<(), String> {
     outcome(

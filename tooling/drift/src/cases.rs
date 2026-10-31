@@ -1202,7 +1202,7 @@ fn review_run_parts_cases() -> Vec<Case> {
 /// moves no earlier case to another shard: a specialist's place in bold
 /// read as prose, a finding-shaped line with a place that cannot be
 /// read left out, and a generalist's finding line the review cannot
-/// read passed by (I6).
+/// read passed by, or a report citing an unknown id left unnamed (I6).
 fn review_finding_shape_cases() -> Vec<Case> {
     const REPORT: &str = "tooling/review-gate/src/report.rs";
     vec![
@@ -1247,6 +1247,20 @@ fn review_finding_shape_cases() -> Vec<Case> {
                 "outcome::tests::a_generalist_s_finding_line_the_review_cannot_read_blocks_and_is_named",
             ),
             "a_generalist_s_finding_line_the_review_cannot_read_blocks_and_is_named",
+        ),
+        case(
+            "review-run deciding a review whose report cites an unknown id unnamed",
+            "ENG-28",
+            Injection::replace(
+                "tooling/review-run/src/outcome.rs",
+                "report_check(report, Some(answer), Some(known))",
+                "report_check(report, Some(answer), None)",
+            ),
+            cargo_lib_test(
+                "engineering",
+                "review_refusals::tests::the_checkout_s_review_run_names_an_unknown_id_and_an_unread_line",
+            ),
+            "the_checkout_s_review_run_names_an_unknown_id_and_an_unread_line",
         ),
     ]
 }
