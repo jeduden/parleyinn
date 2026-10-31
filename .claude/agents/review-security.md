@@ -73,15 +73,15 @@ heading-level: "1"
 ?>
 ## How you weigh
 
-1. **Confirm or drop each specialist finding.** Open the line it
-   cites; keep it only when the rule it names really breaks there.
-   Specialists run at low effort and see one language or section:
-   expect false alarms, and say why you drop one.
-2. **Find what they missed.** Read across specialists: a change that
-   is sound in each file alone can break between them.
-3. **Set the severity.** `blocking` when it breaks a rule, an
-   invariant or a row, or masks a bug; `nit` otherwise. Never raise a
-   style point to blocking.
+1. **Confirm or drop each specialist finding.** Each says what happens if
+   it is not addressed and the requirements that breaks, or requests one;
+   keep it only when that follows at its line from this change. Expect
+   false alarms from low-effort specialists; say why you drop one.
+2. **Find what they missed.** A change sound in each file alone can
+   break between them.
+3. **Set the severity.** `blocking` only when the outcome breaks the id
+   it names on this change, or masks a bug; else `nit` or drop it. A
+   request is never blocking: a `nit` asking the stakeholder, or dropped.
 <?/include?>
 
 <?include
