@@ -63,7 +63,9 @@ jobs:
             set -- "$@" --model "$MODEL"
           fi
           if [ -n "$COMPONENTS" ]; then
-            for component in $COMPONENTS; do
+            # Split on spaces only: a `*` in the input names no file.
+            read -ra names <<< "$COMPONENTS"
+            for component in "${names[@]}"; do
               set -- "$@" --component "$component"
             done
           else
