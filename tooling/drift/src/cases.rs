@@ -93,7 +93,7 @@ pub fn cases() -> Vec<Case> {
         instruction_cases(),
         transcript_contract_cases(),
         // Late, so adding it moves no earlier case to another shard.
-        vec![consent_case()],
+        vec![consent_case(), test_shards_case()],
         // Last: its cases edit source the later cases would run stale.
         license_text_cases(),
     ]
@@ -789,6 +789,21 @@ fn consent_case() -> Case {
     )
 }
 
+/// The test job's shards leave a crate out, so its tests run nowhere.
+fn test_shards_case() -> Case {
+    case(
+        "a crate the test job's shards leave out",
+        "the_ci_test_shards_run_every_crate_once",
+        Injection::replace(CI_WORKFLOW, " -p review-run -p srs\"", " -p review-run\""),
+        cargo_test(
+            "engineering",
+            "static_analysis",
+            "the_ci_test_shards_run_every_crate_once",
+        ),
+        "the test job's shards: crate srs runs in no shard",
+    )
+}
+
 /// The drifts the gate tests and mdsmith catch between the SRS, the
 /// scenarios and the generated sections.
 fn gate_cases() -> Vec<Case> {
@@ -1314,17 +1329,6 @@ fn ci_gate_cases() -> Vec<Case> {
             Injection::replace(CI, "    if: ${{ always() }}\n    needs: [", "    needs: ["),
             gates(),
             "the ci job does not run after a failed job",
-        ),
-        case(
-            "a crate the test job's shards leave out",
-            "the_ci_test_shards_run_every_crate_once",
-            Injection::replace(CI, " -p review-run -p srs\"", " -p review-run\""),
-            cargo_test(
-                "engineering",
-                "static_analysis",
-                "the_ci_test_shards_run_every_crate_once",
-            ),
-            "the test job's shards: crate srs runs in no shard",
         ),
     ]
 }
