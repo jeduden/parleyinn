@@ -95,6 +95,9 @@ pub fn cases() -> Vec<Case> {
         // Late, so adding it moves no earlier case to another shard.
         vec![consent_case(), test_shards_case()],
         review_late_cases(),
+        review_report_form_cases(),
+        review_run_report_cases(),
+        review_report_grading_cases(),
         // Last: its cases edit source the later cases would run stale.
         license_text_cases(),
     ]
@@ -675,7 +678,7 @@ fn review_report_case() -> Case {
         "a specialist's report ending with another outcome than it answered",
         "ENG-28",
         Injection::replace(
-            "tooling/review-gate/src/lib.rs",
+            "tooling/review-gate/src/report.rs",
             ".is_some_and(|answer| answer.lines().any(|l| same_outcome(outcome, l))))",
             ".is_some_and(|_| true))",
         ),
@@ -868,6 +871,156 @@ fn review_late_cases() -> Vec<Case> {
             ),
             scenario("ENG-28"),
             "review-code started before lang-markdown ended",
+        ),
+    ]
+}
+
+/// The drifts the form of a specialist's report exists to catch in the
+/// gate's report check, late so adding them moves no earlier case to
+/// another shard: a finding line in neither form, an outcome its lines
+/// contradict, and a cited id no requirement has.
+fn review_report_form_cases() -> Vec<Case> {
+    const REPORT: &str = "tooling/review-gate/src/report.rs";
+    let gate_test = "report::tests::a_report_check_refuses_what_the_gate_refuses";
+    vec![
+        case(
+            "the gate taking a finding line in neither form",
+            "ENG-28",
+            Injection::replace(
+                REPORT,
+                "Line::Malformed => return Some(Problem::Malformed { line: number }),",
+                "Line::Malformed => {}",
+            ),
+            cargo_lib_test("review-gate", gate_test),
+            "a_report_check_refuses_what_the_gate_refuses",
+        ),
+        case(
+            "the gate taking an outcome of none beside a finding",
+            "ENG-28",
+            Injection::replace(
+                REPORT,
+                "(true, true) => Some(Problem::NoneWithFindings),",
+                "(true, true) => None,",
+            ),
+            cargo_lib_test("review-gate", gate_test),
+            "a_report_check_refuses_what_the_gate_refuses",
+        ),
+        case(
+            "a report check taking an id no requirement has",
+            "ENG-28",
+            Injection::replace(
+                REPORT,
+                "if let Some(id) = unknown {",
+                "if let Some(id) = unknown.filter(|_| false) {",
+            ),
+            cargo_lib_test(
+                "review-gate",
+                "report::tests::a_report_check_with_the_known_ids_refuses_an_id_no_requirement_has",
+            ),
+            "a_report_check_with_the_known_ids_refuses_an_id_no_requirement_has",
+        ),
+    ]
+}
+
+/// The drifts the form of a specialist's report exists to catch in
+/// review-run: a report held to no requirement ids, the pull request's
+/// own requirements left out of them, and a blocking finding kept from
+/// a requirement request.
+fn review_run_report_cases() -> Vec<Case> {
+    const OUTCOME: &str = "tooling/review-run/src/outcome.rs";
+    vec![
+        case(
+            "review-run holding a report to no requirement ids",
+            "ENG-28",
+            Injection::replace(
+                OUTCOME,
+                "report_check(report, Some(answer), Some(known))",
+                "report_check(report, Some(answer), Some(known).filter(|_| false))",
+            ),
+            cargo_lib_test(
+                "review-run",
+                "outcome::tests::a_report_the_gate_would_refuse_blocks_and_is_named",
+            ),
+            "a_report_the_gate_would_refuse_blocks_and_is_named",
+        ),
+        case(
+            "review-run reading the requirement ids from main's tree alone",
+            "ENG-28",
+            Injection::replace(
+                "tooling/review-run/src/requirements.rs",
+                "[workdir.join(SRS), workdir.join(PR_HEAD).join(SRS)]",
+                "[workdir.join(SRS), workdir.join(SRS).join(PR_HEAD)]",
+            ),
+            cargo_lib_test(
+                "review-run",
+                "requirements::tests::the_ids_are_main_s_and_the_pull_request_s_and_the_invariants",
+            ),
+            "the_ids_are_main_s_and_the_pull_request_s_and_the_invariants",
+        ),
+        case(
+            "review-run keeping a requirement request's finding blocking",
+            "ENG-28",
+            Injection::replace(
+                OUTCOME,
+                "if f.severity == BLOCKING && from_request(plan, &name, reports, &f) {",
+                "if f.severity == BLOCKING && from_request(plan, &name, reports, &f) && f.line < 0 {",
+            ),
+            cargo_lib_test(
+                "review-run",
+                "outcome::tests::a_blocking_finding_kept_from_a_requirement_request_stays_a_nit",
+            ),
+            "a_blocking_finding_kept_from_a_requirement_request_stays_a_nit",
+        ),
+    ]
+}
+
+/// The drifts the evaluation's grading of a specialist's report exists
+/// to catch: a grader that takes a report the review would refuse or
+/// reads a specialist's severity word, and a check that lets a
+/// generalist's case name a form.
+fn review_report_grading_cases() -> Vec<Case> {
+    vec![
+        case(
+            "the grader passing a report the review would refuse",
+            "ENG-32",
+            Injection::replace(
+                "tooling/review-eval/src/grade.rs",
+                "graded.failures.push(format!(\"report refused: {problem}\"));",
+                "graded.slips.push(format!(\"report refused: {problem}\"));",
+            ),
+            cargo_lib_test(
+                "review-eval",
+                "grade::tests::a_specialist_report_the_review_would_refuse_fails_its_run",
+            ),
+            "a_specialist_report_the_review_would_refuse_fails_its_run",
+        ),
+        case(
+            "the grader reading a specialist's line by a severity word",
+            "ENG-32",
+            Injection::replace(
+                "tooling/review-eval/src/grade.rs",
+                "if kind != Kind::Specialist {",
+                "if kind != Kind::Consultant {",
+            ),
+            cargo_lib_test(
+                "review-eval",
+                "grade::tests::a_specialist_s_line_is_matched_by_its_form_and_never_by_a_severity_word",
+            ),
+            "a_specialist_s_line_is_matched_by_its_form_and_never_by_a_severity_word",
+        ),
+        case(
+            "the evaluation's check taking a generalist's case that names a form",
+            "ENG-32",
+            Injection::replace(
+                "tooling/review-eval/src/check.rs",
+                "if !matches!(component.kind, Kind::Generalist | Kind::Consultant) {",
+                "if !matches!(component.kind, Kind::Consultant) {",
+            ),
+            cargo_lib_test(
+                "review-eval",
+                "check::tests::a_generalist_s_case_that_names_a_form_is_named",
+            ),
+            "a_generalist_s_case_that_names_a_form_is_named",
         ),
     ]
 }
