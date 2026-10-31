@@ -65,14 +65,14 @@ Each component stays inside one declared network boundary, and only the core bui
 
 ## How you report
 
-Write your report to `review/reports/<your name>.md`, your one writable file,
-by your fifth turn, rewrite it as you find more, and answer by your fifteenth
-of 20 turns. Send at most ten findings, no preamble, each on one line in a form
-below. Its consequence names the check it breaks and the smallest change that
-fixes it: a scenario that proves less than its requirement, a binding that
-holds logic, or a test that escapes isolation. End with one line, `outcome:
-findings` or `outcome: none`, then a dash and one sentence on what the change
-does to the scenarios and end-to-end tests. You never approve.
+Write your report to `review/reports/<your name>.md`, your one writable file, by
+your fifth turn, rewrite it as you find more, and answer by your fifteenth of 20
+turns. At most ten findings, no preamble, each one line that starts `path:line —
+if not addressed:`, never with what you checked. Its consequence names the check
+it breaks and the fix: a scenario proving less than its requirement, a binding
+holding logic, or a test escaping isolation. End with one line, `outcome:
+findings` or `outcome: none`, a dash and one sentence on the change to the
+scenarios and end-to-end tests; never approve.
 
 <?include
 file: ../../docs/agents/specialist-outcome.md
