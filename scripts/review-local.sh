@@ -7,8 +7,12 @@
 # comments, the head's agent instructions moved out of the agents' load
 # path. It then runs the same tools: review-bundle, review-eval plan and
 # review-run. The tools are this checkout's, so a change to them is what
-# runs; CI runs main's. The agents are the base's definitions: main's by
-# default, as in CI, and REF's under --base REF.
+# runs; CI runs main's. The tools expect the report grammar the head's
+# agent definitions define, so the agents are the head's definitions by
+# default (--agents head), what main has after the merge: the head's
+# .claude/agents/*.md replace the base's. --agents base keeps the base's
+# definitions (main's, or REF's under --base REF), as CI runs them today.
+# The review reads no skill: review-run dispatches agents only.
 #
 # Prints the verdict, each finding on one line, the bundle's deterministic
 # findings, what the run cost, how long it took and the evaluation plan
@@ -27,7 +31,8 @@
 # stakeholder comment consents, so pass --consent FILE (the JSON the
 # workflow collects) to see the review as it stands with that comment.
 #
-# usage: scripts/review-local.sh [--base REF] [--consent FILE] [--parallel N]
+# usage: scripts/review-local.sh [--base REF] [--agents base|head]
+#        [--consent FILE] [--parallel N]
 set -Eeuo pipefail
 # Any step that fails is a setup that fails: exit 2, never its own status,
 # so a caller never reads it as 1, a review that requests changes.
@@ -35,15 +40,21 @@ trap 'exit 2' ERR
 
 base=origin/main
 consent=""
+agents=head
 parallel=16
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --base) base="${2:?--base needs a ref}"; shift 2 ;;
+    --agents) agents="${2:?--agents needs base or head}"; shift 2 ;;
     --consent) consent="${2:?--consent needs a file}"; shift 2 ;;
     --parallel) parallel="${2:?--parallel needs a number}"; shift 2 ;;
-    *) echo "usage: scripts/review-local.sh [--base REF] [--consent FILE] [--parallel N]" >&2; exit 2 ;;
+    *) echo "usage: scripts/review-local.sh [--base REF] [--agents base|head] [--consent FILE] [--parallel N]" >&2; exit 2 ;;
   esac
 done
+case "$agents" in
+  base | head) ;;
+  *) echo "review-local: --agents needs base or head, not '$agents'" >&2; exit 2 ;;
+esac
 case "$parallel" in
   "" | *[!0-9]* | 0) echo "review-local: --parallel needs a positive number, not '$parallel'" >&2; exit 2 ;;
 esac
@@ -113,6 +124,14 @@ run mdsmith help patterns -f json > review/mdsmith-patterns.json
 tool review-bundle -- --base . --head pr-head --diff pr.diff \
   --consent stakeholder-comments.json --out review > class.txt
 tool review-eval -- plan --base . --head pr-head --out review/eval-plan.json
+
+# The head's agent definitions run in place of the base's, copied before
+# the head's instruction files leave the tree below.
+if [ "$agents" = head ]; then
+  mkdir -p .claude/agents
+  rm -f .claude/agents/*.md
+  cp pr-head/.claude/agents/*.md .claude/agents/
+fi
 
 # The head's agent instructions are data to review, never instructions to
 # load; they leave the tree as in the workflow.

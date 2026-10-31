@@ -46,7 +46,8 @@ is short, because a finding found late costs a whole round.
 - Review here before every push: `scripts/review-local.sh` runs the
   review against `origin/main`, or with `--base REF` against the commit
   last reviewed, so a fix cycle reviews only what moved. A small change
-  reviews in about a minute.
+  reviews in about a minute. The agents are the head's definitions, what
+  main has after the merge; `--agents base` runs main's, as CI does.
 - CI ends within ten minutes of a push. The slowest chain of jobs sets
   that; a job that grows toward its five-minute limit is split before it
   fails.
