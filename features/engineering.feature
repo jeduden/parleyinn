@@ -221,6 +221,14 @@ Feature: Engineering quality (ENG)
     And the release build fails when a built executable's output differs from its target's regenerated file
     And the core gains no dependency and opens no socket
 
+  @ENG-33 @P0
+  Scenario: workflows pin every outside action to a commit sha and expand no untrusted value in a script
+    Given the repository checkout
+    When every workflow under ".github/workflows" and composite action under ".github/actions" is read
+    Then every action and reusable workflow they use from outside the repository is pinned to a full commit sha, with its version in a comment
+    And no run script expands a github.event field, github.head_ref or an inputs value with an expression
+    And the CI workflow runs "zizmor .github"
+
   @ENG-21 @P0
   Scenario: main only moves through reviewed, signed pull requests
     Given the repository's branch protection for main

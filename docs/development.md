@@ -119,9 +119,9 @@ log sink and clock.
 
 ## CI, nightly and release
 
-Every workflow lives in `.github/workflows`. Every action is fixed to a commit
-SHA with its version in a trailing comment. Dependabot proposes bumps under
-the policy in [dependabot.yml](../.github/dependabot.yml).
+Every action is pinned by commit SHA with a version comment, and a script reads
+event fields via `env:` (ENG-33). Dependabot bumps them per
+[dependabot.yml](../.github/dependabot.yml).
 
 [ci.yml](../.github/workflows/ci.yml) runs on every push and pull request to
 `main`. It runs every test and scenario, with `HOME` pointed at an empty
