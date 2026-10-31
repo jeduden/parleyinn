@@ -491,3 +491,41 @@ fn a_consultant_is_graded_from_its_answer_as_a_generalist_is() {
         ]
     );
 }
+
+#[test]
+fn a_consultant_s_line_in_a_specialist_s_form_is_kept_and_matched_by_its_form() {
+    let c = component(Kind::Consultant, "persona-agent", false);
+    let at = |form: &str| Expected {
+        form: Some(form.into()),
+        ..wanted("plan/2610301001_x.md")
+    };
+    let answer = answered_log(
+        "plan/2610301001_x.md:14 — if not addressed: pins come back summarised — I3\n\
+         plan/2610301001_x.md:20 — request: add a rule that a digest names its pins — none says so\n\
+         outcome: findings — the plan does not serve me\n",
+    );
+    let expect = Expect {
+        finding: vec![at("linked"), at("request")],
+        ..Expect::default()
+    };
+    let graded = grade(&c, &case("persona-agent", expect), &run(&answer, None));
+    assert!(graded.passed(), "{:?}", graded.failures);
+
+    // A linked line is what a case written while personas weighed
+    // reads its blocking finding as; another consultant keeps its
+    // severity word.
+    let s = Kind::Consultant;
+    let linked = "a.rs:3 — if not addressed: a pin is lost — I3";
+    let blocking = Expected {
+        severity: Some("blocking".into()),
+        ..wanted("a.rs")
+    };
+    assert!(line_matches(linked, &blocking, s));
+    assert!(line_matches(
+        "a.rs:3 — blocking — a pin is lost",
+        &blocking,
+        s
+    ));
+    assert!(!line_matches("a.rs:3 — nit — a pin is lost", &blocking, s));
+    assert!(!line_matches(linked, &at("request"), s));
+}

@@ -133,11 +133,12 @@ pub fn examine(
     examine_from(root, tree, cases_dir, None, selection)
 }
 
-/// The problem with `case` when its component, a generalist or a
-/// consultant, has lines with a severity and no form, and the case names
-/// a form: it would want or forbid what no answer can hold.
+/// The problem with `case` when its component, a generalist, has lines
+/// with a severity and no form, and the case names a form: it would
+/// want or forbid what no answer can hold. A consultant may write a
+/// specialist's forms, as a persona does, so its case may name one.
 fn form_problem(case: &Case, component: &Component) -> Option<String> {
-    if !matches!(component.kind, Kind::Generalist | Kind::Consultant) {
+    if !matches!(component.kind, Kind::Generalist) {
         return None;
     }
     let form = [

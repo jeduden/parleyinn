@@ -999,8 +999,8 @@ fn review_report_grading_cases() -> Vec<Case> {
             "ENG-32",
             Injection::replace(
                 "tooling/review-eval/src/grade.rs",
-                "if kind != Kind::Specialist {",
-                "if kind != Kind::Consultant {",
+                "kind == Kind::Generalist || (kind == Kind::Consultant",
+                "kind != Kind::Consultant || (kind == Kind::Consultant",
             ),
             cargo_lib_test(
                 "review-eval",
@@ -1013,7 +1013,7 @@ fn review_report_grading_cases() -> Vec<Case> {
             "ENG-32",
             Injection::replace(
                 "tooling/review-eval/src/check.rs",
-                "if !matches!(component.kind, Kind::Generalist | Kind::Consultant) {",
+                "if !matches!(component.kind, Kind::Generalist) {",
                 "if !matches!(component.kind, Kind::Consultant) {",
             ),
             cargo_lib_test(

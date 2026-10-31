@@ -470,11 +470,26 @@ fn a_consultant_s_case_needs_no_dispatch_and_expects_no_outcome() {
         "other",
         &plan.replace("[expect]\n", "[expect]\noutcome = \"blocking\"\n"),
     );
+    // A persona writes a specialist's forms, so its case may name one.
+    write_case(
+        dir.path(),
+        "persona-agent",
+        "form",
+        "other",
+        &plan.replace(
+            "[expect]\n",
+            "[expect]\n\n[[expect.none]]\npath = \"plan/2610301001_x.md\"\nform = \"linked\"\n",
+        ),
+    );
 
     let got = problems(dir.path(), dir.path(), &cases, None);
 
     assert!(
         !got.iter().any(|p| p.contains("persona-agent/digest")),
+        "{got:?}"
+    );
+    assert!(
+        !got.iter().any(|p| p.contains("persona-agent/form")),
         "{got:?}"
     );
     assert!(

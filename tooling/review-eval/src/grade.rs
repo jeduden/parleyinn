@@ -52,8 +52,8 @@ impl Graded {
 pub fn grade(component: &Component, case: &Case, run: &Run<'_>) -> Graded {
     match component.kind {
         Kind::Specialist => specialist(component, case, run),
-        Kind::Generalist | Kind::Consultant => Graded {
-            failures: generalist(case, run),
+        kind @ (Kind::Generalist | Kind::Consultant) => Graded {
+            failures: generalist(case, run, kind),
             slips: Vec::new(),
         },
     }
@@ -171,21 +171,19 @@ fn shape_slips(parsed: &report::Report) -> Vec<String> {
 /// nothing. A kept finding is a line in the finding shape that is no
 /// dropped one; a dropped one is a line [`report::dropped`] reads as
 /// one, in which the path and words the case
-/// names are no kept finding. A consultant answers the same way, with
-/// nothing to drop.
-fn generalist(case: &Case, run: &Run<'_>) -> Vec<String> {
+/// names are no kept finding. A consultant, `kind`, answers the same
+/// way, with nothing to drop; a line of it in a specialist's form, as a
+/// persona writes, is a kept finding too.
+fn generalist(case: &Case, run: &Run<'_>, kind: Kind) -> Vec<String> {
     let mut failures = answered(run.log);
     failures.extend(run.log.writes.iter().map(|path| format!("wrote {path}")));
     let text = &run.log.answer;
+    let in_form = |l: &str| kind == Kind::Consultant && specialist_form(l);
     let kept: Vec<&str> = text
         .lines()
-        .filter(|l| !report::dropped(l) && report::finding(l).is_some())
+        .filter(|l| !report::dropped(l) && (report::finding(l).is_some() || in_form(l)))
         .collect();
-    failures.extend(expectations(
-        &case.expect,
-        &kept.join("\n"),
-        Kind::Generalist,
-    ));
+    failures.extend(expectations(&case.expect, &kept.join("\n"), kind));
     for dropped in &case.expect.dropped {
         if !text
             .lines()
@@ -292,13 +290,30 @@ fn line_matches(line: &str, wanted: &Expected, kind: Kind) -> bool {
         })
 }
 
+/// Whether `line` is a linked finding or a requirement request.
+fn specialist_form(line: &str) -> bool {
+    matches!(
+        review_gate::report::line(line),
+        Line::Linked(_) | Line::Request(_)
+    )
+}
+
 /// Whether `line`, a `kind`'s, has the severity or form `wanted`
-/// names. A generalist's line gives its severity word and has no form.
-/// A specialist's line has a form and no severity: `blocking`, as a
-/// case written while specialists weighed reads, wants a linked
-/// finding, and any other severity either form.
+/// names. A generalist's line gives its severity word and has no form,
+/// and so does a consultant's that is in neither of a specialist's
+/// forms. A specialist's line, and a consultant's in one of its forms,
+/// has a form and no severity: `blocking`, as a case written while
+/// they weighed reads, wants a linked finding, and any other severity
+/// either form.
 fn graded_as(line: &str, wanted: &Expected, kind: Kind) -> bool {
-    if kind != Kind::Specialist {
+    let read = review_gate::report::line(line);
+    let (linked, request) = (
+        matches!(read, Line::Linked(_)),
+        matches!(read, Line::Request(_)),
+    );
+    let by_severity =
+        kind == Kind::Generalist || (kind == Kind::Consultant && !(linked || request));
+    if by_severity {
         let lower = line.to_lowercase();
         return wanted.form.is_none()
             && wanted.severity.as_deref().is_none_or(|severity| {
@@ -308,11 +323,6 @@ fn graded_as(line: &str, wanted: &Expected, kind: Kind) -> bool {
                 )
             });
     }
-    let read = review_gate::report::line(line);
-    let (linked, request) = (
-        matches!(read, Line::Linked(_)),
-        matches!(read, Line::Request(_)),
-    );
     let form = match wanted.form.as_deref() {
         None => true,
         Some(crate::case::LINKED) => linked,
