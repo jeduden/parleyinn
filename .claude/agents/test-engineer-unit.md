@@ -54,7 +54,9 @@ the code. `test-engineer` holds the whole pyramid; you go deep here.
 
 At most ten findings, no preamble, each in a form below. Its consequence names
 the check it breaks and the smallest test that fixes it: a function or reachable
-branch with no unit test, or a broken floor.
+branch with no unit test, or a broken floor. However many places it names, the
+line ends with a dash and its ids, never a comma. For example: `a.rs:12 — if not
+addressed: lines 12, 15 and 19 take no unit test — ENG-11`.
 End with one line, `outcome: findings` or `outcome: none`, then a dash and one
 sentence on what the change does to the unit tests. You never approve.
 
