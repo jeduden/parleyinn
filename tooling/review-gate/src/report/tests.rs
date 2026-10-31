@@ -140,6 +140,48 @@ fn a_finding_shaped_line_with_no_place_it_can_read_is_malformed_not_prose() {
 }
 
 #[test]
+fn a_finding_line_missing_the_dash_after_its_place_is_malformed_not_prose() {
+    for text in [
+        "a.rs:1 if not addressed: x — I2",
+        "a.rs:1— if not addressed: x — ENG-04",
+        "`a.rs:1` request: add a cap — why",
+        "— if not addressed: x — ENG-04",
+        "–request: add a cap — why",
+    ] {
+        assert_eq!(line(text), Line::Malformed, "{text:?}");
+    }
+}
+
+#[test]
+fn a_place_followed_by_prose_without_a_dash_stays_prose() {
+    for text in ["a.rs:1 is fine", "a.rs:1— fine", "— and so on"] {
+        assert_eq!(line(text), Line::Prose, "{text:?}");
+    }
+}
+
+#[test]
+fn a_report_check_names_a_line_at_the_template_s_place() {
+    let report = "a.rs:1 — if not addressed: a hook panics — ENG-04\n\
+                  `path:line` — if not addressed: x — ENG-28\n\
+                  outcome: findings — one sentence.";
+
+    assert_eq!(
+        report_check(Some(report), Some(ANSWER), None),
+        Some(Problem::TemplatePlace { line: 2 })
+    );
+}
+
+#[test]
+fn a_malformed_line_naming_a_real_place_is_no_template() {
+    let report = "a.rs:1 — nit — path:line\noutcome: findings — one sentence.";
+
+    assert_eq!(
+        report_check(Some(report), Some(ANSWER), None),
+        Some(Problem::Malformed { line: 1 })
+    );
+}
+
+#[test]
 fn a_revision_reads_its_place_and_finding_and_an_arrow_moves_the_place() {
     let finding = "a.rs:3 — if not addressed: a pin is lost — I3";
 
@@ -373,6 +415,10 @@ fn every_problem_reads_as_a_sentence_about_the_report() {
         (
             Problem::Malformed { line: 3 },
             "has a report whose line 3 is neither a linked finding nor a requirement request",
+        ),
+        (
+            Problem::TemplatePlace { line: 5 },
+            "has a report whose line 5 names the place path:line, the form's template, not a file and line",
         ),
         (
             Problem::UnknownId {

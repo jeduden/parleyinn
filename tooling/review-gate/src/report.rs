@@ -31,7 +31,10 @@
 //! or end a label, `finding: a.rs:1`, when `if not addressed:` or
 //! `request:` follows its dash. A line whose place cannot be read, yet
 //! with either after a dash, is a finding line too, so it is malformed,
-//! never left out as prose.
+//! never left out as prose; so is one missing the dash after its place,
+//! `a.rs:1 if not addressed: …`, or with a dash and no place. A
+//! malformed line whose place is the forms' own `path:line` is refused
+//! naming that, so the reader sees the form was copied, not filled in.
 //! A revision naming a place no earlier line found at states its
 //! finding line, which is a whole finding; a withdrawal naming one
 //! removes nothing and leaves its note, so it is neither an error nor
@@ -74,6 +77,9 @@ pub const ARROWS: [&str; 2] = [" → ", " -> "];
 /// What the first line of a report assembled from a run that did not
 /// finish starts with.
 pub const INCOMPLETE: &str = "incomplete:";
+/// The place the forms are written with: a line that names it where its
+/// place belongs copied a form instead of filling it in.
+pub const TEMPLATE_PLACE: &str = "path:line";
 
 /// A finding linked to the requirements its consequence breaks.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -145,6 +151,10 @@ pub enum Problem {
     /// A finding, revision or withdrawal line, its line number in the
     /// report, in no form.
     Malformed { line: usize },
+    /// A finding, revision or withdrawal line, its line number in the
+    /// report, whose place is the forms' template, [`TEMPLATE_PLACE`],
+    /// copied rather than filled in.
+    TemplatePlace { line: usize },
     /// A linked finding, its line number in the report, cites an id no
     /// requirement or invariant has.
     UnknownId { line: usize, id: String },
@@ -167,6 +177,10 @@ impl fmt::Display for Problem {
             Self::Malformed { line } => write!(
                 f,
                 "has a report whose line {line} is neither a linked finding nor a requirement request"
+            ),
+            Self::TemplatePlace { line } => write!(
+                f,
+                "has a report whose line {line} names the place {TEMPLATE_PLACE}, the form's template, not a file and line"
             ),
             Self::UnknownId { line, id } => write!(
                 f,
@@ -220,7 +234,7 @@ pub fn line(text: &str) -> Line {
         place(last).filter(|_| finding_shaped(&parts[..2]))
     };
     let Some((path, number)) = place(first).filter(solid).or_else(labelled) else {
-        return if finding_shaped(&parts) {
+        return if finding_shaped(&parts) || undashed(text) {
             Line::Malformed
         } else {
             Line::Prose
@@ -246,6 +260,25 @@ fn finding_shaped(parts: &[&str]) -> bool {
         strip_word(part, IF_NOT_ADDRESSED).is_some() || strip_word(part, REQUEST).is_some()
     })
 }
+
+/// Whether `text` reads as a finding missing the spaced dash after its
+/// place: a place or a dash, then `if not addressed:` or `request:`,
+/// as `a.rs:1 if not addressed: …`, `a.rs:1— request: …` or
+/// `— if not addressed: …`.
+fn undashed(text: &str) -> bool {
+    let (head, rest) = text.split_once(' ').unwrap_or((text, ""));
+    let rest = match place(head.trim_end_matches(DASHES)) {
+        Some(_) => rest,
+        None if text.starts_with(DASHES) => text,
+        None => return false,
+    };
+    let rest = rest.trim_start_matches(DASHES);
+
+    strip_word(rest, IF_NOT_ADDRESSED).is_some() || strip_word(rest, REQUEST).is_some()
+}
+
+/// The dashes a place stands before, and a space.
+const DASHES: [char; 4] = ['—', '–', '-', ' '];
 
 /// `text` after `word`, in any case, when it starts with it.
 fn strip_word<'a>(text: &'a str, word: &str) -> Option<&'a str> {
@@ -551,6 +584,9 @@ pub fn findings_check(text: &str, known: Option<&BTreeSet<String>>) -> Option<Pr
         let number = at + 1;
         match line(l) {
             Line::Prose | Line::Withdrawn(_) => {}
+            Line::Malformed if at_template(l) => {
+                return Some(Problem::TemplatePlace { line: number });
+            }
             Line::Malformed => return Some(Problem::Malformed { line: number }),
             Line::Request(_) => held = true,
             Line::Revised(Revision { finding, .. }) => {
@@ -573,6 +609,23 @@ pub fn findings_check(text: &str, known: Option<&BTreeSet<String>>) -> Option<Pr
         (false, false) => Some(Problem::FindingsWithNone),
         _ => None,
     }
+}
+
+/// Whether `text`, a malformed line, names [`TEMPLATE_PLACE`] where its
+/// place belongs: the last word before its first dash, after the
+/// `revised:` or `withdrawn:` it may start with.
+fn at_template(text: &str) -> bool {
+    let text = bare(text);
+    let text = strip_word(text, REVISED)
+        .or_else(|| strip_word(text, WITHDRAWN))
+        .unwrap_or(text);
+    split_dashes(text)
+        .first()
+        .and_then(|first| first.split_whitespace().last())
+        .is_some_and(|last| {
+            last.trim_matches(MARKUP)
+                .eq_ignore_ascii_case(TEMPLATE_PLACE)
+        })
 }
 
 /// The first id `read`, a linked finding, cites outside `known`, when
