@@ -1,0 +1,16 @@
+component = "lang-markdown"
+kind = "other"
+title = "a doc that sets a rule no requirement holds, reported as a requirement request"
+
+[[replace]]
+file = "docs/development.md"
+old = "pull request without an agent.\n"
+new = "pull request without an agent.\n\nA pull request MUST change at most 400 lines; a larger one is split into\nseveral before it is reviewed.\n"
+
+[expect]
+outcome = ["findings"]
+
+[[expect.finding]]
+path = "docs/development.md"
+form = "request"
+mentions_any = ["400", "lines", "size", "split"]

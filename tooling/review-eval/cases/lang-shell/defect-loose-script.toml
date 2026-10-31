@@ -11,9 +11,9 @@ du -h $1 | cut -f1
 '''
 
 [expect]
-outcome = ["blocking"]
+outcome = ["findings"]
 
 [[expect.finding]]
 path = "scripts/file-size.sh"
-severity = "blocking"
+form = "linked"
 mentions_any = ["quot", "set -e", "strict", "pipefail", "$1", "split"]

@@ -1,0 +1,29 @@
+component = "lang-rust"
+kind = "other"
+title = "an expect in shipped code, reported with its consequence and requirement and no severity word"
+
+[[create]]
+file = "tooling/review-bundle/src/tail.rs"
+content = '''
+//! The last byte of a payload.
+
+/// The last byte of `payload`.
+#[must_use]
+pub fn last(payload: &[u8]) -> u8 {
+    *payload.last().expect("a payload holds a byte")
+}
+'''
+
+[[replace]]
+file = "tooling/review-bundle/src/lib.rs"
+old = "pub mod render;\n"
+new = "pub mod render;\npub mod tail;\n"
+
+[expect]
+outcome = ["findings"]
+absent = ["blocking", "— nit", "nit —", "severity"]
+
+[[expect.finding]]
+path = "tooling/review-bundle/src/tail.rs"
+form = "linked"
+mentions = ["expect"]

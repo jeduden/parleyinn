@@ -86,8 +86,8 @@ fn publish_adds_a_component_to_the_scorecard_file_on_disk() {
 '''
 
 [expect]
-outcome = ["sound", "nits"]
+outcome = ["none", "findings"]
 
 [[expect.none]]
 path = "tooling/review-eval/tests/published.rs"
-severity = "blocking"
+form = "linked"

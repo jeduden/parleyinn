@@ -23,9 +23,9 @@ jobs:
 '''
 
 [expect]
-outcome = ["blocking"]
+outcome = ["findings"]
 
 [[expect.finding]]
 path = ".github/workflows/greet.yml"
-severity = "blocking"
+form = "linked"
 mentions_any = ["pin", "sha", "inject", "${{", "env:", "untrusted"]

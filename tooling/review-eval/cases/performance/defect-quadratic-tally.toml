@@ -41,9 +41,9 @@ old = "pub mod event;\n"
 new = "pub mod event;\npub mod tally;\n"
 
 [expect]
-outcome = ["blocking"]
+outcome = ["findings"]
 
 [[expect.finding]]
 path = "crates/record/src/tally.rs"
-severity = "blocking"
+form = "linked"
 mentions_any = ["O(n", "quadratic", "nested", "n log n", "linear", "each event", "every event"]

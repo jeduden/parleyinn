@@ -20,9 +20,9 @@ old = "pub mod render;\n"
 new = "pub mod render;\npub mod shape;\n"
 
 [expect]
-outcome = ["blocking"]
+outcome = ["findings"]
 
 [[expect.finding]]
 path = "tooling/review-bundle/src/shape.rs"
-severity = "blocking"
+form = "linked"
 mentions_any = ["unit test", "tests.rs", "no test", "untested", "without a test"]

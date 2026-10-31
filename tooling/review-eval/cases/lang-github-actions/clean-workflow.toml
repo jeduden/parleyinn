@@ -25,8 +25,8 @@ jobs:
 '''
 
 [expect]
-outcome = ["sound", "nits"]
+outcome = ["none", "findings"]
 
 [[expect.none]]
 path = ".github/workflows/greet.yml"
-severity = "blocking"
+form = "linked"

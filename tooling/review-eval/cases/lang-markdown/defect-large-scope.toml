@@ -172,7 +172,7 @@ and the `reviewer-engineer` agent reviews it.
 '''
 
 [expect]
-outcome = ["nits", "blocking"]
+outcome = ["findings"]
 
 [[expect.finding]]
 path = "docs/review-eval/commands.md"

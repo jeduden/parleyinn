@@ -22,8 +22,8 @@ old = "#[then(regex = r#\"^that job posts its decision as the \"([^\"]+)\" check
 new = "#[then(regex = r#\"^that job posts what it decides as the \"([^\"]+)\" check$\"#)]\n"
 
 [expect]
-outcome = ["sound", "nits"]
+outcome = ["none", "findings"]
 
 [[expect.none]]
 path = "features/engineering.feature"
-severity = "blocking"
+form = "linked"

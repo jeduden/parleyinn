@@ -54,5 +54,5 @@ the rows it changes and the `@pending` scenarios it takes off.
 
 [[expect.none]]
 path = "plan/2610301004_answer_anywhere.md"
-severity = "blocking"
+form = "linked"
 mentions_any = ["required step", "silent", "slow the agent"]

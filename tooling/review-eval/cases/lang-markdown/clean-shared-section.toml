@@ -61,11 +61,11 @@ old = "   noisy or confusing.\n"
 new = "   noisy, confusing or costly.\n"
 
 [expect]
-outcome = ["sound", "nits"]
+outcome = ["none", "findings"]
 
 [[expect.none]]
 path = "docs/agents/persona-review.md"
-severity = "blocking"
+form = "linked"
 
 [[expect.none]]
 path = ".claude/agents/persona-agent.md"

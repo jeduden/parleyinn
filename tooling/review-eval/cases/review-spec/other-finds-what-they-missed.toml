@@ -10,13 +10,13 @@ new = "  @ENG-24 @P0 @pending\n"
 [[report]]
 agent = "lang-gherkin"
 content = '''
-outcome: sound — a tag added
+outcome: none — a tag added
 '''
 
 [[report]]
 agent = "domain-model-hub"
 content = '''
-outcome: sound — no concept touched
+outcome: none — no concept touched
 '''
 
 [expect]

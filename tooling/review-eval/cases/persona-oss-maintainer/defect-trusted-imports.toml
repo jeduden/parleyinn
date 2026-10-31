@@ -54,5 +54,5 @@ the rows it changes and the `@pending` scenarios it takes off.
 
 [[expect.finding]]
 path = "plan/2610301009_trusted_imports.md"
-severity = "blocking"
+form = "linked"
 mentions_any = ["untrusted", "trust", "I2", "I8", "inject", "foreign", "instruct", "steer"]

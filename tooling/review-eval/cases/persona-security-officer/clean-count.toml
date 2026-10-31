@@ -35,8 +35,8 @@ old = "pub mod account;\n"
 new = "pub mod account;\npub mod count;\n"
 
 [expect]
-outcome = ["sound", "nits"]
+outcome = ["none", "findings"]
 
 [[expect.none]]
 path = "crates/redaction/src/count.rs"
-severity = "blocking"
+form = "linked"

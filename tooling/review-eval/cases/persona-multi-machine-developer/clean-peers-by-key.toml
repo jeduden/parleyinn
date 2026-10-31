@@ -55,5 +55,5 @@ the rows it changes and the `@pending` scenarios it takes off.
 
 [[expect.none]]
 path = "plan/2610301008_peers_by_key.md"
-severity = "blocking"
+form = "linked"
 mentions_any = ["relay", "central service", "vendor", "account"]

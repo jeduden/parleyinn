@@ -8,9 +8,9 @@ old = "review-bundle.workspace = true\n"
 new = "regex-lite = \"0.1.6\"\nreview-bundle.workspace = true\n"
 
 [expect]
-outcome = ["blocking"]
+outcome = ["findings"]
 
 [[expect.finding]]
 path = "tooling/review-eval/Cargo.toml"
-severity = "blocking"
+form = "linked"
 mentions_any = ["ADR", "ENG-18", "depend", "decision record"]

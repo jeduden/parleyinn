@@ -23,8 +23,8 @@ failed. It holds `report.md` only when the component wrote a report.
 '''
 
 [expect]
-outcome = ["sound", "nits"]
+outcome = ["none", "findings"]
 
 [[expect.none]]
 path = "docs/review-eval/running.md"
-severity = "blocking"
+form = "linked"

@@ -8,9 +8,9 @@ old = "          release-core/parinn-eval recall --published tooling/eval/recall
 new = "          release-core/parinn-eval recall --published tooling/eval/recall-v1.txt | tee -a \"$GITHUB_STEP_SUMMARY\" || true\n"
 
 [expect]
-outcome = ["blocking"]
+outcome = ["findings"]
 
 [[expect.finding]]
 path = ".github/workflows/ci.yml"
-severity = "blocking"
+form = "linked"
 mentions_any = ["|| true", "mask", "green", "fail"]

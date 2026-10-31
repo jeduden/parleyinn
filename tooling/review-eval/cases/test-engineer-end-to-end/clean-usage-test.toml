@@ -31,8 +31,8 @@ fn a_wrong_command_line_exits_2_with_the_usage() {
 '''
 
 [expect]
-outcome = ["sound", "nits"]
+outcome = ["none", "findings"]
 
 [[expect.none]]
 path = "tooling/review-eval/tests/e2e_usage.rs"
-severity = "blocking"
+form = "linked"

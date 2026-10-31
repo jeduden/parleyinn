@@ -8,8 +8,8 @@ old = "Feature: Engineering quality (ENG)\n"
 new = "# The engineering scenarios, one per ENG row of the SRS.\nFeature: Engineering quality (ENG)\n"
 
 [expect]
-outcome = ["sound", "nits"]
+outcome = ["none", "findings"]
 
 [[expect.none]]
 path = "features/engineering.feature"
-severity = "blocking"
+form = "linked"
