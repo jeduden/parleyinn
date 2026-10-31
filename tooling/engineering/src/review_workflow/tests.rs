@@ -241,6 +241,50 @@ fn agents_run_by_refuses_the_command_line_outside_the_review_s_runners() {
 }
 
 #[test]
+fn agents_run_by_refuses_the_command_line_started_beside_review_run() {
+    let cmd = "-p review-run -- --workdir .";
+    let mut w = parse(REVIEW_FLOW);
+    w.jobs[0].text.push_str(CLI);
+    w.jobs[0]
+        .text
+        .push_str("      - run: claude --permission-mode bypassPermissions -p review\n");
+
+    assert_eq!(
+        w.agents_run_by(cmd),
+        [
+            "job review starts the Claude Code command line itself, outside review-run and review-eval, which would route the review"
+        ]
+    );
+}
+
+#[test]
+fn agents_run_by_refuses_the_command_line_in_a_job_that_installs_none() {
+    let cmd = "-p review-run -- --workdir .";
+    let mut w = parse(REVIEW_FLOW);
+    w.jobs[1]
+        .text
+        .push_str("      - run: |\n          claude -p review\n");
+
+    assert_eq!(
+        w.agents_run_by(cmd),
+        [
+            "job post starts the Claude Code command line itself, outside review-run and review-eval, which would route the review"
+        ]
+    );
+}
+
+#[test]
+fn starts_cli_reads_a_command_at_a_line_s_start_alone() {
+    assert!(starts_cli("      - run: claude -p review"));
+    assert!(starts_cli("          claude"));
+    assert!(starts_cli("        run: claude --agent x"));
+    assert!(!starts_cli("      # claude -p review"));
+    assert!(!starts_cli("          echo claude -p review"));
+    assert!(!starts_cli("          claude-code --version"));
+    assert!(!starts_cli("      - uses: ./.github/actions/claude-code"));
+}
+
+#[test]
 fn key_held_apart_refuses_the_command_line_in_the_key_s_job() {
     let mut w = parse(REVIEW_FLOW);
     w.jobs[1].text.push_str(CLI);

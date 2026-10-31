@@ -372,7 +372,9 @@ fn review_withdrawal_cases() -> Vec<Case> {
 /// The drifts the gate's reading of a finding's place exists to catch
 /// (ENG-28, I6), late so adding them moves no earlier case to another
 /// shard: a finding missing the dash after its place read as prose, and
-/// a line at the forms' template place refused without naming it.
+/// a line at the forms' template place refused without naming it; and,
+/// for the workflow check beside them, the review's job starting the
+/// Claude Code command line itself beside review-run.
 fn review_place_form_cases() -> Vec<Case> {
     const REPORT: &str = "tooling/review-gate/src/report.rs";
     vec![
@@ -403,6 +405,17 @@ fn review_place_form_cases() -> Vec<Case> {
                 "report::tests::a_report_check_names_a_line_at_the_template_s_place",
             ),
             "a_report_check_names_a_line_at_the_template_s_place",
+        ),
+        case(
+            "the review's job starting the Claude Code command line beside review-run",
+            "ENG-28",
+            Injection::replace(
+                REVIEW_WORKFLOW,
+                "          cargo run --locked --quiet --offline -p review-run -- --workdir . --parallel 32 \\\n",
+                "          claude --permission-mode bypassPermissions -p review\n          cargo run --locked --quiet --offline -p review-run -- --workdir . --parallel 32 \\\n",
+            ),
+            scenario("ENG-28"),
+            "job review starts the Claude Code command line itself, outside review-run and review-eval",
         ),
     ]
 }

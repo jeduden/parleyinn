@@ -161,6 +161,17 @@ fn installs_cli(text: &str) -> bool {
     AGENT_CLI.iter().any(|cli| text.contains(cli))
 }
 
+/// Whether `line` of a job starts the Claude Code command line itself,
+/// `claude` the first word of a script line, so whatever tools and
+/// permission mode it passes go past review-run's and review-eval's.
+fn starts_cli(line: &str) -> bool {
+    let line = line.trim_start();
+    let line = line.strip_prefix("- ").unwrap_or(line).trim_start();
+    let line = line.strip_prefix("run:").unwrap_or(line).trim_start();
+
+    line == "claude" || line.starts_with("claude ")
+}
+
 /// Whether a job's `text` runs the review's agents, a harness session,
 /// or installs the command line any of its steps can start one with.
 fn runs_agents(text: &str) -> bool {
@@ -320,18 +331,20 @@ impl Workflow {
                 )
             })
             .collect();
-        problems.extend(
-            self.jobs
-                .iter()
-                .filter(|j| installs_cli(&j.text))
-                .filter(|j| !j.text.contains(cmd) && !j.text.contains(EVAL_RUN))
-                .map(|j| {
-                    format!(
-                        "job {} starts the Claude Code command line outside review-run and review-eval, which would route the review",
-                        j.name
-                    )
-                }),
-        );
+        for j in &self.jobs {
+            let runner = j.text.contains(cmd) || j.text.contains(EVAL_RUN);
+            if installs_cli(&j.text) && !runner {
+                problems.push(format!(
+                    "job {} starts the Claude Code command line outside review-run and review-eval, which would route the review",
+                    j.name
+                ));
+            } else if j.text.lines().any(starts_cli) {
+                problems.push(format!(
+                    "job {} starts the Claude Code command line itself, outside review-run and review-eval, which would route the review",
+                    j.name
+                ));
+            }
+        }
         if !self.jobs.iter().any(|j| j.text.contains(cmd)) {
             problems.insert(0, format!("no job runs the review's agents with {cmd:?}"));
         }
