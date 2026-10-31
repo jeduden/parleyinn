@@ -975,6 +975,7 @@ fn an_answer_line_is_the_outcome_whatever_its_whitespace_punctuation_dashes_or_m
         "**Outcome: nits** - the change adds `x`;",
         "*outcome: nits* – the change adds _x_!",
         "`outcome: nits — the change adds x.`",
+        "outcome: nits \u{2212} the change adds `x`.",
     ] {
         assert!(same_outcome(outcome, line), "{line:?}");
     }

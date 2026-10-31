@@ -113,3 +113,8 @@ fn a_plan_reads_from_the_work_directory() {
     assert_eq!(plan.touched, 2);
     assert_eq!(plan.dispatch.len(), 2);
 }
+
+#[test]
+fn a_specialist_s_report_file_is_its_name_under_the_reports() {
+    assert_eq!(report_file("lang-rust"), "review/reports/lang-rust.md");
+}

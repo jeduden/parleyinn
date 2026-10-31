@@ -422,3 +422,44 @@ fn a_first_log_that_cannot_be_kept_is_told() {
         "{lines:?}"
     );
 }
+
+#[test]
+fn a_stale_file_is_removed_and_a_missing_one_is_no_error() {
+    let dir = TempDir::new().unwrap();
+    let stale = dir.path().join("a.md");
+    fs::write(&stale, "x").unwrap();
+
+    assert_eq!(remove_stale(&stale), Ok(()));
+    assert!(!stale.exists());
+    assert_eq!(remove_stale(&stale), Ok(()));
+}
+
+#[test]
+fn a_stale_path_that_cannot_be_removed_is_told() {
+    let dir = TempDir::new().unwrap();
+    let at = dir.path().join("a.md");
+    fs::create_dir(&at).unwrap();
+
+    let err = remove_stale(&at).unwrap_err();
+    assert!(
+        err.starts_with(&format!("remove {}: ", at.display())),
+        "{err}"
+    );
+}
+
+#[test]
+fn a_first_log_and_its_errors_move_aside_and_missing_ones_are_no_error() {
+    let dir = TempDir::new().unwrap();
+    let logs = dir.path().join(LOGS);
+    fs::create_dir_all(&logs).unwrap();
+    fs::write(logs.join("lang-rust.jsonl"), "log").unwrap();
+
+    assert_eq!(keep_first_log(dir.path(), "lang-rust"), Ok(()));
+    assert_eq!(
+        fs::read_to_string(logs.join("lang-rust.first.jsonl")).unwrap(),
+        "log"
+    );
+    assert!(!logs.join("lang-rust.jsonl").exists());
+    assert!(!logs.join("lang-rust.first.stderr").exists());
+    assert_eq!(keep_first_log(dir.path(), "lang-markdown"), Ok(()));
+}

@@ -268,3 +268,27 @@ fn selection_names_each_missing_line_and_the_missing_command() {
         )]
     );
 }
+
+#[test]
+fn a_job_s_shard_lists_are_its_quoted_package_lists() {
+    let flow = workflow("1, 2", &["\"-p a\"", "\"-p b \\", "  -p c\""]);
+
+    assert_eq!(
+        lists(&flow.jobs[0]),
+        Ok(vec!["-p a".to_owned(), "-p b -p c".to_owned()])
+    );
+}
+
+#[test]
+fn a_job_with_no_shards_array_has_no_lists() {
+    let mut flow = workflow("1", &["\"-p a\""]);
+    flow.jobs[0].text = flow.jobs[0].text.replace("shards=(", "lists=(");
+
+    assert_eq!(
+        lists(&flow.jobs[0]),
+        Err(
+            "the test job's shards: no shards=( ... ) array in .github/workflows/ci.yml lists their packages"
+                .to_owned()
+        )
+    );
+}
