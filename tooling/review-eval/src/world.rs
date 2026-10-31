@@ -94,12 +94,14 @@ pub fn build(
         .map_err(|e| format!("copy {}: {e}", component.file))?;
     let changes = case.apply(&pr_head)?;
     write(&main.join(DIFF), &diff::all(&changes))?;
-    move_instructions(&pr_head, &main.join(INSTRUCTIONS_TEXT))?;
     fs::create_dir_all(main.join(REPORTS)).map_err(|e| format!("{REPORTS}: {e}"))?;
     let mut notes = Vec::new();
     write(&main.join(PATTERNS), &patterns(host, &main, &mut notes))?;
     write(&main.join(CONSENT), &consent(case.consent.as_deref()))?;
+    // The workflow builds the bundle from the whole tree, then moves its
+    // instruction files out, so a specialist's diff is built alike.
     let (class, touched) = bundle(&main, &pr_head)?;
+    move_instructions(&pr_head, &main.join(INSTRUCTIONS_TEXT))?;
     let mut seeded = Vec::new();
     for seed in &case.seeds {
         let rel = format!("{REPORTS}/{}.md", seed.agent);

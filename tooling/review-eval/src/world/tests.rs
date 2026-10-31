@@ -206,6 +206,48 @@ fn build_seeds_reports_and_consent_and_notes_a_missing_mdsmith() {
 }
 
 #[test]
+fn build_runs_the_bundle_on_the_tree_before_its_instructions_move_out() {
+    let repo = TempDir::new().unwrap();
+    repository(repo.path());
+    fs::create_dir_all(repo.path().join("docs/agents")).unwrap();
+    fs::write(repo.path().join("docs/agents/rule.md"), "# Rule\n\nOld.\n").unwrap();
+    fs::write(
+        repo.path().join(".claude/agents/copy.md"),
+        "<?include\nfile: ../../docs/agents/rule.md\n?>\n## Rule\n\nOld.\n<?/include?>\n",
+    )
+    .unwrap();
+    let host = FakeHost::new(repo.path());
+    let component = load(repo.path(), "lang-rust").unwrap();
+    let mut case = unwrap_case();
+    case.edits = ["docs/agents/rule.md", ".claude/agents/copy.md"]
+        .map(|file| Edit::Replace {
+            file: file.to_owned(),
+            old: "Old.".to_owned(),
+            new: "New.".to_owned(),
+        })
+        .to_vec();
+    let dir = TempDir::new().unwrap();
+
+    let world = build(
+        &host,
+        repo.path(),
+        repo.path(),
+        &component,
+        &case,
+        dir.path(),
+        &Mutex::new(()),
+    )
+    .unwrap();
+
+    let diff = fs::read_to_string(world.main.join("review/diffs/lang-markdown.diff")).unwrap();
+    assert!(
+        !diff.contains("diff --git a/.claude/agents/copy.md"),
+        "{diff}"
+    );
+    assert!(!world.main.join("pr-head/.claude").exists());
+}
+
+#[test]
 fn build_notes_an_mdsmith_that_fails() {
     let repo = TempDir::new().unwrap();
     repository(repo.path());
