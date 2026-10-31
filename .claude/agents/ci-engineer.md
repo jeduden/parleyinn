@@ -54,6 +54,19 @@ so in its finding, since the stakeholder approves it. End with one line,
 sentence on what the change does to CI's speed, stability and failure output,
 and never approve.
 
-Keep the outcome line one line in the file, never wrapped. Answer exactly two
-lines and nothing else: that outcome line copied character for character from
-the file, then the report's path.
+<?include
+file: ../../docs/agents/specialist-outcome.md
+heading-level: "2"
+?>
+## When a finding blocks
+
+A report that ends `outcome: blocking` fails the review whatever your
+generalist decides. Mark a finding `blocking` only for a defect this
+change adds, after you read its line in `pr-head/` and in main's tree.
+A defect main already has, a clause the change leaves as it was, style,
+and a claim you could not check are each a `nit`.
+
+Keep the outcome line one line in the file, never wrapped. Answer exactly
+two lines and nothing else: that outcome line copied character for
+character from the file, then the report's path.
+<?/include?>
