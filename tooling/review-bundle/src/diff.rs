@@ -246,5 +246,62 @@ pub fn only(diff: &str, keep: &BTreeSet<String>) -> String {
     out
 }
 
+/// One part of a diff split by file: the files it holds, in path
+/// order, and their sections.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Part {
+    /// Each file's path, the new side of its header, or the header
+    /// line itself when that does not read.
+    pub files: Vec<String>,
+    pub text: String,
+}
+
+/// `diff` split into parts of at most `limit` bytes each, a file's
+/// section never split: the sections sorted by path, so related files
+/// stay together, and packed in that order, each part taking the next
+/// section while it fits; a section larger than `limit` makes a part
+/// alone. What precedes the first header leads the first part. An
+/// empty diff has no part.
+#[must_use]
+pub fn split(diff: &str, limit: usize) -> Vec<Part> {
+    let mut preamble = String::new();
+    let mut sections: Vec<(String, String)> = Vec::new();
+    for line in diff.split_inclusive('\n') {
+        if line.starts_with(HEADER) {
+            let header_line = line.trim_end_matches('\n');
+            let path = header(header_line).map_or_else(|| header_line.to_owned(), |(_, b)| b);
+            sections.push((path, String::new()));
+        }
+        match sections.last_mut() {
+            Some((_, text)) => text.push_str(line),
+            None => preamble.push_str(line),
+        }
+    }
+    sections.sort_by(|a, b| a.0.cmp(&b.0));
+    let mut parts: Vec<Part> = Vec::new();
+    for (path, text) in sections {
+        match parts.last_mut() {
+            Some(part) if part.text.len() + text.len() <= limit => {
+                part.files.push(path);
+                part.text.push_str(&text);
+            }
+            _ => parts.push(Part {
+                files: vec![path],
+                text,
+            }),
+        }
+    }
+    match parts.first_mut() {
+        Some(first) => first.text.insert_str(0, &preamble),
+        None if !preamble.is_empty() => parts.push(Part {
+            files: Vec::new(),
+            text: preamble,
+        }),
+        None => {}
+    }
+
+    parts
+}
+
 #[cfg(test)]
 mod tests;
