@@ -20,9 +20,10 @@ use crate::REVIEW;
 use crate::run::AgentRun;
 
 /// The size, in bytes, past which a specialist's diff runs in parts,
-/// each at most this large unless one file is larger: a run on more
-/// than this ran out of turns before it finished.
-pub const LIMIT: usize = 120 * 1024;
+/// each at most this large unless one file is larger: one read of the
+/// agent's file tool returns about 50 KB, and a run whose part took
+/// three reads ran out of turns before it stated a finding.
+pub const LIMIT: usize = 48 * 1024;
 
 /// One part of a specialist's split diff.
 #[derive(Debug, Clone, PartialEq, Eq)]

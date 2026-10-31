@@ -24,8 +24,8 @@ fn with_diff(name: &str, diff: &str) -> TempDir {
 }
 
 #[test]
-fn the_limit_splits_a_half_megabyte_diff_into_about_five_parts() {
-    assert_eq!(LIMIT, 120 * 1024);
+fn the_limit_keeps_a_part_within_one_read_of_the_agent_s_file_tool() {
+    assert_eq!(LIMIT, 48 * 1024);
 }
 
 #[test]
