@@ -371,3 +371,19 @@ fn tree_file_reads_only_a_regular_file() {
     assert_eq!(tree_file(head.path(), "gone.md"), None);
     assert_eq!(tree_file(head.path(), "."), None);
 }
+
+#[test]
+fn tree_lines_counts_a_file_that_is_not_utf_8() {
+    let head = TempDir::new().unwrap();
+    fs::write(head.path().join("a.rs"), b"one\n\xff two\nthree\n").unwrap();
+
+    assert_eq!(tree_lines(head.path(), "a.rs"), Some(3));
+}
+
+#[test]
+fn tree_lines_counts_only_a_regular_file() {
+    let head = TempDir::new().unwrap();
+
+    assert_eq!(tree_lines(head.path(), "gone.rs"), None);
+    assert_eq!(tree_lines(head.path(), "."), None);
+}

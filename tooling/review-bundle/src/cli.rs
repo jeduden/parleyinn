@@ -98,7 +98,7 @@ fn build(
     let read = |path: &Path| fs::read_to_string(path).map_err(failed("read", path));
     let consent = consents(&read(consent)?).map_err(failed("read", consent))?;
     let mut a = analyse(&base_tree, &head_tree, &diff, &consent);
-    let lines = |path: &str| tree_file(head, path).map(|text| text.lines().count());
+    let lines = |path: &str| tree_lines(head, path);
     a.findings
         .extend(crate::limits::findings(&a.paths, &a.scopes, &lines));
     a.findings.sort();
@@ -150,6 +150,17 @@ fn tree_file(root: &Path, path: &str) -> Option<String> {
     let file = root.join(path);
     let regular = fs::symlink_metadata(&file).is_ok_and(|m| m.is_file());
     regular.then(|| fs::read_to_string(&file).ok()).flatten()
+}
+
+/// The lines of the regular file at `path` in the tree at `root`, read
+/// as bytes, so a file that is not UTF-8 is still held to its limit
+/// (ENG-34); `None` when it is no regular file there or does not read.
+fn tree_lines(root: &Path, path: &str) -> Option<usize> {
+    let file = root.join(path);
+    let regular = fs::symlink_metadata(&file).is_ok_and(|m| m.is_file());
+    let bytes = regular.then(|| fs::read(&file).ok()).flatten()?;
+
+    Some(String::from_utf8_lossy(&bytes).lines().count())
 }
 
 /// The message for a failure to `verb` the file at `path`.

@@ -168,6 +168,13 @@ fn prune_keeps_a_hunk_that_reaches_past_the_copy() {
 }
 
 #[test]
+fn prune_keeps_a_section_with_copies_and_no_hunk_whole() {
+    let mode = "diff --git a/.claude/agents/a.md b/.claude/agents/a.md\nold mode 100644\nnew mode 100755\n";
+
+    assert_eq!(prune(mode, &tree), mode);
+}
+
+#[test]
 fn prune_keeps_a_hunk_that_adds_a_line_past_the_copy() {
     let added =
         "diff --git a/.claude/agents/a.md b/.claude/agents/a.md\n@@ -11,0 +11 @@\n+Added text.\n";
