@@ -371,3 +371,14 @@ Feature: Engineering quality (ENG)
     And a case that fails is a blocking finding at its component's file, naming the case, the model and the first failure
     And a scorecard line records a component's cases, runs, slips, cost, turns and seconds on its model
     And the scheduled run's workflow ".github/workflows/review-eval.yml" fails on a failed case, with the report that names it in its summary
+
+  @ENG-34 @P0 @pending
+  Scenario: the review bundle flags a file past its line limit and a file no specialist reads
+    Given the repository checkout
+    Then the review bundle's line limits are those the ENG-34 row states
+    When the review bundle is built for a change that adds a Rust file past its limit and a file no review specialist reads
+    Then its deterministic findings hold a nit at the Rust file in the finding form, citing ENG-34
+    And its deterministic findings hold a nit at the unread file in the finding form, citing ENG-28
+    And the review bundle lists both nits
+    When the review bundle is built for a change within its limits that review specialists read
+    Then its deterministic findings hold no nit citing ENG-34 or ENG-28
