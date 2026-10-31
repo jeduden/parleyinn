@@ -25,7 +25,9 @@ use testkit::TempDir;
 /// generalist keeps it as a nit and closes with a sentence. Started as a
 /// harness session's child it refuses; the agent `SILENT_AGENT` names
 /// never answers, and the one `CUT_AGENT` names states its finding and
-/// ends at its turn budget without an answer.
+/// ends at its turn budget without an answer, or only its part
+/// `CUT_PART` does. A specialist run on a part of its diff also states
+/// a finding of that part's own.
 const CLAUDE: &str = r#"#!/bin/sh
 if [ -n "$CLAUDE_CODE_CHILD_SESSION" ] || [ -n "$CLAUDE_AUTO_BACKGROUND_TASKS" ]; then
   echo "started as a harness session's child" >&2
@@ -39,10 +41,18 @@ for a in "$@"; do
   prev="$a"
 done
 if [ "$agent" = "$SILENT_AGENT" ]; then exec sleep 30; fi
+part=""
+own=""
+case "$prompt" in
+  *"you are part "*)
+    part=$(printf '%s' "$prompt" | sed -n 's/.*you are part \([0-9]*\) of.*/\1/p')
+    own="\\nsrc/part$part.rs:1 — if not addressed: part $part breaks — I9"
+    ;;
+esac
 case "$prompt" in
   *"a specialist"*)
-    printf '{"type":"assistant","parent_tool_use_id":null,"message":{"id":"m-%s","model":"claude-haiku-5-5","usage":{"input_tokens":3,"cache_read_input_tokens":7,"output_tokens":2},"content":[{"type":"text","text":"I read the diff.\\nsrc/a.rs:3 — if not addressed: a long line hides a bug — I9"}]}}\n' "$agent"
-    if [ "$agent" = "$CUT_AGENT" ]; then
+    printf '{"type":"assistant","parent_tool_use_id":null,"message":{"id":"m-%s","model":"claude-haiku-5-5","usage":{"input_tokens":3,"cache_read_input_tokens":7,"output_tokens":2},"content":[{"type":"text","text":"I read the diff.\\nsrc/a.rs:3 — if not addressed: a long line hides a bug — I9%s"}]}}\n' "$agent" "$own"
+    if [ "$agent" = "$CUT_AGENT" ] && { [ -z "$CUT_PART" ] || [ "$part" = "$CUT_PART" ]; }; then
       printf '{"type":"result","subtype":"error_max_turns","is_error":true,"result":"","total_cost_usd":0.03,"num_turns":20}\n'
     else
       printf '{"type":"result","subtype":"success","is_error":false,"result":"outcome: findings — %s saw one finding.","total_cost_usd":0.01,"num_turns":2}\n' "$agent"
@@ -108,8 +118,9 @@ fn workdir(root: &Path) {
 /// Runs the executable on `dir` with `args`, the stand-in first on the
 /// path, as a Claude Code harness session's child would; `silent` names
 /// the agent that never answers and `cut` the one its turn budget cuts
-/// off.
+/// off, `name:i` only its part `i`.
 fn review_run(home: &Path, dir: &Path, silent: &str, cut: &str, args: &[&str]) -> Output {
+    let (cut, cut_part) = cut.split_once(':').unwrap_or((cut, ""));
     let bin = home.join("bin");
     fs::create_dir_all(&bin).unwrap();
     let claude = bin.join("claude");
@@ -123,6 +134,7 @@ fn review_run(home: &Path, dir: &Path, silent: &str, cut: &str, args: &[&str]) -
         .env("PATH", format!("{}:/usr/bin:/bin", bin.display()))
         .env("SILENT_AGENT", silent)
         .env("CUT_AGENT", cut)
+        .env("CUT_PART", cut_part)
         .env("CLAUDE_CODE_CHILD_SESSION", "1")
         .env("CLAUDE_AUTO_BACKGROUND_TASKS", "1")
         .arg("--workdir")
@@ -325,4 +337,149 @@ fn a_work_directory_without_a_dispatch_cannot_run_and_a_wrong_line_is_usage() {
 
     assert_eq!(out.status.code(), Some(2));
     assert!(String::from_utf8_lossy(&out.stderr).contains("usage: review-run --workdir DIR"));
+}
+
+/// Writes test-engineer-unit's diff past the split limit: three files
+/// of 100,000 bytes each, of which no two fit one part, so it runs in
+/// three parts.
+fn big_diff(dir: &Path) {
+    let section = |path: &str| {
+        let head = format!("diff --git a/{path} b/{path}\n+++ b/{path}\n");
+        let line = format!("+{}\n", "x".repeat(99));
+        format!("{head}{}", line.repeat((100_000 - head.len()) / line.len()))
+    };
+    let diff = ["src/x3.rs", "src/x1.rs", "src/x2.rs"]
+        .map(section)
+        .concat();
+    fs::write(dir.join("review/diffs/test-engineer-unit.diff"), diff).unwrap();
+}
+
+/// The usage entry of `agent` that the run wrote.
+fn usage_of(dir: &Path, agent: &str) -> serde_json::Value {
+    let usage: serde_json::Value =
+        serde_json::from_str(&fs::read_to_string(dir.join("review/usage.json")).unwrap()).unwrap();
+    usage
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|u| u["agent"] == agent)
+        .unwrap()
+        .clone()
+}
+
+#[test]
+fn a_specialist_whose_diff_is_past_the_limit_runs_in_parts_and_the_gate_reads_the_merge() {
+    let home = TempDir::new().unwrap();
+    let dir = home.path().join("work");
+    workdir(&dir);
+    big_diff(&dir);
+
+    let out = review_run(home.path(), &dir, "", "", &[]);
+
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert_eq!(out.status.code(), Some(0), "{stderr}");
+    assert!(
+        String::from_utf8_lossy(&out.stdout).starts_with("verdict=approve\ndispatched=5\n"),
+        "{stderr}"
+    );
+    for i in 1..=3 {
+        let part =
+            fs::read_to_string(dir.join(format!("review/diffs/test-engineer-unit.{i}.diff")))
+                .unwrap();
+        assert!(
+            part.starts_with(&format!("diff --git a/src/x{i}.rs b/src/x{i}.rs\n")),
+            "part {i}"
+        );
+        assert!(
+            dir.join(format!("review/logs/test-engineer-unit.{i}.jsonl"))
+                .is_file()
+        );
+    }
+    assert!(
+        stderr.contains("review-run: test-engineer-unit (specialist): answered (0.0300 USD, 6 turns) in 3 parts, 3 attempts"),
+        "{stderr}"
+    );
+    // The finding every part stated once, each part's own, then one
+    // outcome line saying each part's.
+    assert_eq!(
+        fs::read_to_string(dir.join("review/reports/test-engineer-unit.md")).unwrap(),
+        "src/a.rs:3 — if not addressed: a long line hides a bug — I9\n\
+         src/part1.rs:1 — if not addressed: part 1 breaks — I9\n\
+         src/part2.rs:1 — if not addressed: part 2 breaks — I9\n\
+         src/part3.rs:1 — if not addressed: part 3 breaks — I9\n\
+         outcome: findings — in 3 parts: part 1, findings — test-engineer-unit saw one \
+         finding.; part 2, findings — test-engineer-unit saw one finding.; part 3, findings \
+         — test-engineer-unit saw one finding.\n"
+    );
+    let unit = usage_of(&dir, "test-engineer-unit");
+    assert_eq!(
+        (unit["parts"].as_u64(), unit["attempts"].as_u64()),
+        (Some(3), Some(3))
+    );
+    assert_eq!(usage_of(&dir, "lang-rust")["parts"], 1);
+
+    let (code, review, err) = gate(home.path(), &dir);
+
+    assert_eq!(code, review_gate::cli::EXIT_OK, "{err}");
+    let review: serde_json::Value = serde_json::from_str(&review).unwrap();
+    assert_eq!(review["event"], "APPROVE");
+}
+
+#[test]
+fn a_part_cut_off_at_its_turn_budget_blocks_the_review_naming_it_and_keeps_every_part_s_findings() {
+    let home = TempDir::new().unwrap();
+    let dir = home.path().join("work");
+    workdir(&dir);
+    big_diff(&dir);
+
+    let out = review_run(home.path(), &dir, "", "test-engineer-unit:2", &[]);
+
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert_eq!(out.status.code(), Some(0), "{stderr}");
+    assert!(
+        String::from_utf8_lossy(&out.stdout).starts_with("verdict=request_changes\n"),
+        "{stderr}"
+    );
+    assert!(
+        stderr.contains(
+            "review-run: test-engineer-unit part 2 of 3 (specialist): did not answer: its run \
+             ended with error_max_turns; running it once more"
+        ),
+        "{stderr}"
+    );
+    let outcome = fs::read_to_string(dir.join("review/outcome.json")).unwrap();
+    let outcome = review_gate::parse_outcome(&outcome).unwrap();
+    assert!(
+        outcome.findings.iter().any(|f| f.path == "review/"
+            && f.severity == "blocking"
+            && f.body
+                == "test-engineer-unit did not answer (part 2 of 3: its run ended with \
+                    error_max_turns), so the review is incomplete"),
+        "{:?}",
+        outcome.findings
+    );
+    assert_eq!(
+        fs::read_to_string(dir.join("review/reports/test-engineer-unit.md")).unwrap(),
+        "incomplete: part 2 of 3: its run ended with error_max_turns\n\
+         src/a.rs:3 — if not addressed: a long line hides a bug — I9\n\
+         src/part1.rs:1 — if not addressed: part 1 breaks — I9\n\
+         src/part2.rs:1 — if not addressed: part 2 breaks — I9\n\
+         src/part3.rs:1 — if not addressed: part 3 breaks — I9\n"
+    );
+    let unit = usage_of(&dir, "test-engineer-unit");
+    assert_eq!(
+        (unit["parts"].as_u64(), unit["attempts"].as_u64()),
+        (Some(3), Some(4))
+    );
+    let consulted = fs::read_to_string(dir.join("review/consulted.json")).unwrap();
+    assert!(!consulted.contains("test-engineer-unit"), "{consulted}");
+
+    let (code, review, err) = gate(home.path(), &dir);
+
+    assert_eq!(code, review_gate::cli::EXIT_FAILURE);
+    assert_eq!(review, "");
+    assert_eq!(
+        err,
+        "review-gate: review: dispatched but not consulted: test-engineer-unit\n"
+    );
 }
