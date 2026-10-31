@@ -97,7 +97,11 @@ fn build(
     let diff = String::from_utf8_lossy(&diff);
     let read = |path: &Path| fs::read_to_string(path).map_err(failed("read", path));
     let consent = consents(&read(consent)?).map_err(failed("read", consent))?;
-    let a = analyse(&base_tree, &head_tree, &diff, &consent);
+    let mut a = analyse(&base_tree, &head_tree, &diff, &consent);
+    let lines = |path: &str| tree_file(head, path).map(|text| text.lines().count());
+    a.findings
+        .extend(crate::limits::findings(&a.paths, &a.scopes, &lines));
+    a.findings.sort();
     let write = |name: &str, body: &str| {
         let path = out.join(name);
         fs::write(&path, body).map_err(failed("write", &path))

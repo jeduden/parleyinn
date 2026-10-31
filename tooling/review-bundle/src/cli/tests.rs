@@ -150,8 +150,54 @@ fn run_reads_a_diff_that_holds_bytes_that_are_not_text() {
     let (code, out, err) = w.run();
 
     assert_eq!(code, EXIT_OK, "{err}");
-    assert_eq!(out, "class=deep\ntouched=1\nfindings=1\nconsults=4\n");
+    // The ENG-21 finding, and the seed no specialist reads (ENG-34).
+    assert_eq!(out, "class=deep\ntouched=1\nfindings=2\nconsults=4\n");
     assert!(w.output(BUNDLE).contains("### REC-01"));
+}
+
+#[test]
+fn run_lists_a_file_past_its_limit_and_a_file_no_specialist_reads() {
+    let w = World::new(
+        "diff --git a/a.rs b/a.rs\n+x\n\
+         diff --git a/small.rs b/small.rs\n+x\n\
+         diff --git a/gone.rs b/gone.rs\n-x\n\
+         diff --git a/LICENSE b/LICENSE\n+x\n",
+    );
+    let big = "x\n".repeat(crate::limits::RUST_LINES + 1);
+    fs::write(w.head.path().join("a.rs"), big).unwrap();
+    fs::write(w.head.path().join("small.rs"), "x\n").unwrap();
+    fs::write(w.head.path().join("LICENSE"), "x\n").unwrap();
+
+    let (code, out, err) = w.run();
+
+    assert_eq!(code, EXIT_OK, "{err}");
+    assert!(out.contains("findings=2"), "{out}");
+    let checked: serde_json::Value = serde_json::from_str(&w.output(CHECKED)).unwrap();
+    let found: Vec<(&str, &str, bool)> = checked
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|f| {
+            (
+                f["path"].as_str().unwrap(),
+                f["severity"].as_str().unwrap(),
+                f["body"]
+                    .as_str()
+                    .unwrap()
+                    .contains(" — if not addressed: "),
+            )
+        })
+        .collect();
+    assert_eq!(found, vec![("LICENSE", "nit", true), ("a.rs", "nit", true)]);
+    let bundle = w.output(BUNDLE);
+    assert!(
+        bundle.contains("- nit `a.rs:0`: a.rs — if not addressed: "),
+        "{bundle}"
+    );
+    assert!(
+        bundle.contains("- nit `LICENSE:0`: LICENSE — if not"),
+        "{bundle}"
+    );
 }
 
 /// A change that breaks one input.
