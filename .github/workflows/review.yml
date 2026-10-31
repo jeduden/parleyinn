@@ -286,14 +286,18 @@ jobs:
       - name: Read the review outcome and the agents consulted
         id: outcome
         if: steps.pull_head.outputs.number != ''
+        # Each file is read into a variable first, so one jq cannot read
+        # fails the step here instead of passing an empty output on.
         run: |
+          outcome=$(jq -ce . review/outcome.json)
+          consulted=$(jq -ce . review/consulted.json)
           {
-            echo "outcome=$(jq -c . review/outcome.json)"
-            echo "consulted=$(jq -c . review/consulted.json)"
+            echo "outcome=$outcome"
+            echo "consulted=$consulted"
           } >> "$GITHUB_OUTPUT"
           {
             cat review/run.txt
-            echo "consulted: $(jq -c . review/consulted.json)"
+            echo "consulted: $consulted"
           } >> "$GITHUB_STEP_SUMMARY"
       # What the review cost, per agent, as review-run read it from each
       # run's log: its model calls, fresh input, cache writes and reads,
@@ -315,9 +319,10 @@ jobs:
               review/usage.json
           } >> "$GITHUB_STEP_SUMMARY" || exit 0
       # The reports and the answers, for the post job's gate and for the
-      # review's readers: the review and its check link here.
+      # review's readers: the review and its check link here. A review
+      # that failed keeps what it wrote too, so its author can read why.
       - name: Keep the specialists' reports
-        if: steps.pull_head.outputs.number != ''
+        if: always() && steps.pull_head.outputs.number != ''
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: review-reports
