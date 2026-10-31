@@ -24,6 +24,7 @@ drift.workspace = true
 review-bundle.workspace = true
 review-eval.workspace = true
 review-gate.workspace = true
+review-run.workspace = true
 scenario.workspace = true
 serde_json.workspace = true
 srs.workspace = true
@@ -37,5 +38,5 @@ workspace = true
 # ENG-02: see crates/parinn/Cargo.toml.
 [package.metadata.parinn]
 responsibility = "Checks the repository against the requirements of SRS section 10 for the bound scenarios"
-may-depend-on = ["adr", "benchmark", "calibrate", "coverage", "drift", "review-bundle", "review-eval", "review-gate", "scenario", "srs"]
+may-depend-on = ["adr", "benchmark", "calibrate", "coverage", "drift", "review-bundle", "review-eval", "review-gate", "review-run", "scenario", "srs"]
 may-dev-depend-on = ["testkit"]

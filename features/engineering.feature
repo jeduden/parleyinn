@@ -285,6 +285,7 @@ Feature: Engineering quality (ENG)
     Then it runs only when the "CI" workflow completes or a pull request gets a comment, as the default branch defines it
     And the job that runs the review's agents holds no write permission and not the "JEDUDEN_REVIEW_AGENT_KEY" key
     And that job runs every agent the review bundle dispatches with "cargo run --locked --quiet --offline -p review-run -- --workdir .", and no agent routes the review
+    And review-run runs each specialist the review bundle dispatches as its own agent, every generalist only once every specialist has ended, and writes the review outcome from what they answered
     And its agents may write only their reports, under "review/reports"
     And only one job holds the "JEDUDEN_REVIEW_AGENT_KEY" key, and it runs no agent
     And that job runs only after the agents' job succeeded

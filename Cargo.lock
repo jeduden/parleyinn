@@ -497,6 +497,7 @@ dependencies = [
  "review-bundle",
  "review-eval",
  "review-gate",
+ "review-run",
  "scenario",
  "serde_json",
  "srs",

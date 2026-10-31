@@ -809,8 +809,9 @@ fn test_shards_case() -> Case {
 /// adding them moves no earlier case to another shard: the agents' run
 /// logs leaving their job, and the Claude Code command line, installed
 /// by the composite action, in the key's job or starting an agent
-/// outside review-run; and the ENG-32 evaluation planning every
-/// component a shared section change reaches, not one per set.
+/// outside review-run; the ENG-32 evaluation planning every component
+/// a shared section change reaches, not one per set; and review-run
+/// starting a generalist before every specialist has ended.
 fn review_late_cases() -> Vec<Case> {
     vec![
         case(
@@ -856,6 +857,17 @@ fn review_late_cases() -> Vec<Case> {
             ),
             scenario("ENG-32"),
             "components planned for the sections",
+        ),
+        case(
+            "review-run starting the generalists before the specialists",
+            "ENG-28",
+            Injection::replace(
+                "tooling/review-run/src/run.rs",
+                "    let mut runs = parallel(&plan.specialists(), options.parallel, &|name| {\n        one(name, Kind::Specialist)\n    });\n    runs.extend(parallel(&plan.generalists(), options.parallel, &|name| {\n        one(name, Kind::Generalist)\n    }));\n",
+                "    let mut runs = parallel(&plan.generalists(), options.parallel, &|name| {\n        one(name, Kind::Generalist)\n    });\n    runs.extend(parallel(&plan.specialists(), options.parallel, &|name| {\n        one(name, Kind::Specialist)\n    }));\n",
+            ),
+            scenario("ENG-28"),
+            "review-code started before lang-markdown ended",
         ),
     ]
 }
