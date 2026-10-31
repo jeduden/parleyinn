@@ -24,9 +24,10 @@
 //! line and must take one of the two forms; a line that starts with
 //! `revised:` or `withdrawn:` must take its form; any other line is
 //! prose, which the assembly leaves out and the report check passes by.
-//! A place may stand in emphasis, backticks or a link, `**a.rs:1**`. A
-//! line whose place cannot be read, yet with `if not addressed:` or
-//! `request:` after a dash, is a finding line too, so it is malformed,
+//! A place may stand in emphasis, backticks or a link, `**a.rs:1**`,
+//! or end a label, `finding: a.rs:1`, when `if not addressed:` or
+//! `request:` follows its dash. A line whose place cannot be read, yet
+//! with either after a dash, is a finding line too, so it is malformed,
 //! never left out as prose.
 //! A finding, revision or withdrawal line in no form is malformed, and
 //! the report holding it is refused rather than handed to the generalist
@@ -204,10 +205,16 @@ pub fn line(text: &str) -> Line {
     let [first, second, rest @ ..] = parts.as_slice() else {
         return Line::Prose;
     };
-    // A path holds no space: `I read line: 3 — fine` is prose, unless
-    // it reads as a finding, which is malformed then, never dropped.
-    let Some((path, number)) = place(first).filter(|(p, _)| !p.contains(char::is_whitespace))
-    else {
+    // A path holds no space: `I read line: 3 — fine` is prose. A line
+    // that reads as a finding after a label, `finding: a.rs:1 — if not
+    // addressed: …`, is read at the place the label ends with; one
+    // whose place cannot be read is malformed, never dropped.
+    let solid = |at: &(String, usize)| !at.0.contains(char::is_whitespace);
+    let labelled = || {
+        let last = first.split_whitespace().last()?;
+        place(last).filter(|_| finding_shaped(&parts[..2]))
+    };
+    let Some((path, number)) = place(first).filter(solid).or_else(labelled) else {
         return if finding_shaped(&parts) {
             Line::Malformed
         } else {

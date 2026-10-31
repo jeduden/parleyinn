@@ -89,6 +89,7 @@ fn a_line_with_no_place_is_prose() {
         "I read the diff.",
         "outcome: findings — one sentence.",
         "I read line: 3 — and it is fine",
+        "I checked a.rs:3 — and it is fine",
         "a.rs:12",
         "incomplete: its run ended with error_max_turns",
     ] {
@@ -106,16 +107,23 @@ fn a_finding_with_its_place_in_markup_reads_as_one() {
         "**a.rs**:1 — if not addressed: a hook panics — ENG-04",
         "[a.rs:1](a.rs#L1) — if not addressed: a hook panics — ENG-04",
         "**[a.rs:1](a.rs#L1)** — if not addressed: a hook panics — ENG-04",
+        "finding: a.rs:1 — if not addressed: a hook panics — ENG-04",
+        "Finding, from the row: `a.rs:1` — if not addressed: a hook panics — ENG-04",
     ] {
         let Line::Linked(l) = line(text) else {
             panic!("not linked: {text:?}");
         };
         assert_eq!((l.path.as_str(), l.line), ("a.rs", 1), "{text:?}");
     }
-    let Line::Request(r) = line("**a.rs:2** — request: add a cap — reports grow") else {
-        panic!("not a request");
-    };
-    assert_eq!((r.path.as_str(), r.line), ("a.rs", 2));
+    for text in [
+        "**a.rs:2** — request: add a cap — reports grow",
+        "In a.rs:2 — request: add a cap — reports grow",
+    ] {
+        let Line::Request(r) = line(text) else {
+            panic!("not a request: {text:?}");
+        };
+        assert_eq!((r.path.as_str(), r.line), ("a.rs", 2), "{text:?}");
+    }
 }
 
 #[test]
@@ -123,7 +131,7 @@ fn a_finding_shaped_line_with_no_place_it_can_read_is_malformed_not_prose() {
     for text in [
         "a.rs — if not addressed: x — ENG-04",
         "a.rs:x — if not addressed: x — ENG-04",
-        "In ci.yml:95 — request: change the shards — they repeat the build",
+        "In ci.yml:x — request: change the shards — they repeat the build",
         "see the diff — If not addressed: x — ENG-04",
         "a.rs:1x — request: add a cap — why",
     ] {
