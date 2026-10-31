@@ -111,6 +111,10 @@ the reports.
   section. The accepted records that describe it, ADR-2609301941,
   ADR-2610262245 and ADR-2610290002, keep their text as the record of
   what was decided then.
+- With no orchestrator the review workflow has no model of its own, so
+  an agent whose front matter names none runs its cases on the
+  evaluation's default model (ENG-32), Sonnet, where ADR-2610290002
+  named the review workflow's model. This record supersedes that clause.
 - A review runs in waves of agents, each up to 900 seconds and each
   agent at most twice. The repository has 56 specialists and the job
   starts 32 at once, so they take two waves and the generalists a
