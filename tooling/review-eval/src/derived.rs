@@ -43,8 +43,9 @@ pub const INVARIANTS: &str = "docs/srs/invariants.md";
 pub const INVARIANTS_SENTENCE: &str = "These ten invariants change only as ENG-29 requires: with an accepted ADR recording a named human security reviewer's approval.";
 /// The decision record the clean change to the invariants adds.
 pub const INVARIANTS_ADR_PATH: &str = "docs/adr/ADR-2610290999-invariants-change-through-review.md";
-/// The stakeholder's consent to the clean change to the invariants.
-pub const INVARIANTS_CONSENT: &str = "I, jeduden, consent to this change to the invariants as the named security reviewer ENG-29 asks for.";
+/// The stakeholder's consent to the clean change to the invariants,
+/// naming each stakeholder path it changes (ENG-21).
+pub const INVARIANTS_CONSENT: &str = "I, jeduden, consent to this change to the invariants (docs/srs/invariants.md, CLAUDE.md, AGENTS.md and docs/adr/) as the named security reviewer ENG-29 asks for.";
 /// The record: accepted, names ENG-29 and the invariants it changes.
 const INVARIANTS_ADR: &str = "---
 id: ADR-2610290999

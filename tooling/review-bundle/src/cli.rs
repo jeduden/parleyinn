@@ -7,7 +7,8 @@
 //! wrote on the pull request, each `{"author", "at", "body"}` and, for a
 //! review, its `state`, which the workflow filters before the command
 //! reads it. One with a non-blank body, other than a review that
-//! requests changes, is the stakeholder's consent ENG-29 asks for.
+//! requests changes, consents: to each owned path it names (ENG-21),
+//! and, whatever it names, to the change ENG-29 guards.
 
 use std::collections::BTreeSet;
 use std::fs;
@@ -96,7 +97,7 @@ fn build(
     let diff = String::from_utf8_lossy(&diff);
     let read = |path: &Path| fs::read_to_string(path).map_err(failed("read", path));
     let consent = consents(&read(consent)?).map_err(failed("read", consent))?;
-    let a = analyse(&base_tree, &head_tree, &diff, consent);
+    let a = analyse(&base_tree, &head_tree, &diff, &consent);
     let write = |name: &str, body: &str| {
         let path = out.join(name);
         fs::write(&path, body).map_err(failed("write", &path))
@@ -141,14 +142,13 @@ fn failed<E: std::fmt::Display>(verb: &'static str, path: &Path) -> impl FnOnce(
     move |e| format!("review-bundle: {verb} {path}: {e}")
 }
 
-/// Whether `json`, the owners' comments, holds the stakeholder's
-/// consent: at least one comment with a non-blank body that is no
-/// review requesting changes. Each comment must carry a string
-/// `author`, `at` and `body`.
-fn consents(json: &str) -> Result<bool, String> {
+/// The bodies of the comments in `json`, the owners' comments, that
+/// consent: each non-blank one that is no review requesting changes.
+/// Each comment must carry a string `author`, `at` and `body`.
+fn consents(json: &str) -> Result<Vec<String>, String> {
     let value: Value = serde_json::from_str(json).map_err(|e| e.to_string())?;
     let comments = value.as_array().ok_or("not an array of comments")?;
-    let mut consent = false;
+    let mut consent = Vec::new();
     for comment in comments {
         let field = |name: &str| {
             comment
@@ -159,7 +159,10 @@ fn consents(json: &str) -> Result<bool, String> {
         field("author")?;
         field("at")?;
         let objects = comment.get("state").and_then(Value::as_str) == Some(CHANGES_REQUESTED);
-        consent |= !objects && !field("body")?.trim().is_empty();
+        let body = field("body")?;
+        if !objects && !body.trim().is_empty() {
+            consent.push(body.to_owned());
+        }
     }
 
     Ok(consent)

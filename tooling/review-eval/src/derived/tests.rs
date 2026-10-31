@@ -255,3 +255,24 @@ fn a_model_file_gets_a_sentence_true_of_the_model_not_of_the_specification() {
         assert!(!new.contains("specification"), "{new}");
     }
 }
+
+#[test]
+fn the_invariants_consent_names_every_stakeholder_path_its_case_changes() {
+    let codeowners = fs::read_to_string(testkit::repo_root().join(".github/CODEOWNERS")).unwrap();
+    let patterns = review_bundle::owners::patterns(&codeowners);
+    let changed = INVARIANTS_COPIES
+        .iter()
+        .map(|(file, _)| *file)
+        .chain([INVARIANTS, INVARIANTS_ADR_PATH]);
+
+    for path in changed.filter(|p| {
+        patterns
+            .iter()
+            .any(|pat| review_bundle::owners::owns(pat, p))
+    }) {
+        assert!(
+            review_bundle::owners::names(&patterns, INVARIANTS_CONSENT, path),
+            "{path}"
+        );
+    }
+}

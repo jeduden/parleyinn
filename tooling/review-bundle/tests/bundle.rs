@@ -20,7 +20,7 @@ fn the_repository_reads_and_compares_equal_to_itself() {
         &t,
         &t,
         "diff --git a/docs/testing.md b/docs/testing.md\n",
-        false,
+        &[],
     );
 
     assert_eq!(got.class, Class::Light);
@@ -36,7 +36,7 @@ fn an_invariant_edit_without_its_record_is_a_blocking_finding() {
         &t,
         &t,
         "diff --git a/docs/srs/invariants.md b/docs/srs/invariants.md\n",
-        false,
+        &[],
     );
 
     assert_eq!(got.class, Class::Deep);
@@ -61,7 +61,7 @@ fn the_requirements_eng_29_marks_follow_its_row() {
         &base,
         &head,
         &format!("diff --git a/{path} b/{path}\n"),
-        false,
+        &[],
     );
 
     assert!(

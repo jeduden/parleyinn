@@ -240,7 +240,7 @@ fn run_takes_an_eng_29_record_with_the_stakeholder_s_consent() {
     .unwrap();
 
     let (_, refused, _) = w.run();
-    w.consent(r#"[{"author": "owner", "at": "2026-10-11T12:00:00Z", "body": "ok"}]"#);
+    w.consent(r#"[{"author": "owner", "at": "2026-10-11T12:00:00Z", "body": "ok for docs/srs/ and docs/adr/"}]"#);
     let (code, out, err) = w.run();
 
     assert!(refused.contains("findings=2"), "{refused}");
@@ -255,16 +255,26 @@ fn run_takes_an_eng_29_record_with_the_stakeholder_s_consent() {
 }
 
 #[test]
-fn consents_holds_on_one_comment_with_a_body() {
+fn consents_returns_each_comment_with_a_body() {
     let comment = |body: &str| format!(r#"[{{"author": "o", "at": "t", "body": "{body}"}}]"#);
+    let none: Vec<String> = Vec::new();
 
-    assert_eq!(consents("[]"), Ok(false));
-    assert_eq!(consents(&comment(" \\n\\t")), Ok(false));
-    assert_eq!(consents(&comment("I consent")), Ok(true));
+    assert_eq!(consents("[]"), Ok(none.clone()));
+    assert_eq!(consents(&comment(" \\n\\t")), Ok(none.clone()));
+    assert_eq!(
+        consents(&comment("I consent")),
+        Ok(vec!["I consent".into()])
+    );
     let review =
         |state: &str| format!(r#"[{{"author": "o", "at": "t", "body": "b", "state": "{state}"}}]"#);
-    assert_eq!(consents(&review("CHANGES_REQUESTED")), Ok(false));
-    assert_eq!(consents(&review("APPROVED")), Ok(true));
+    assert_eq!(consents(&review("CHANGES_REQUESTED")), Ok(none));
+    assert_eq!(consents(&review("APPROVED")), Ok(vec!["b".into()]));
+    assert_eq!(
+        consents(
+            r#"[{"author": "o", "at": "t", "body": "a"}, {"author": "o", "at": "t", "body": "b"}]"#
+        ),
+        Ok(vec!["a".into(), "b".into()])
+    );
     for bad in ["", "{}", "[1]", r#"[{"author": "o", "body": "x"}]"#] {
         assert!(consents(bad).is_err(), "{bad}");
     }

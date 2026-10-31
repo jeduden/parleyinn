@@ -254,7 +254,8 @@ pub fn dispatches(
         return Ok(None);
     }
     let head = head_snapshot(base, &changes).map_err(|e| format!("case {}: {e}", case.id()))?;
-    let analysis = analyse(base, &head, &diff::all(&changes), case.consent.is_some());
+    let consents: Vec<String> = case.consent.iter().cloned().collect();
+    let analysis = analyse(base, &head, &diff::all(&changes), &consents);
     let dispatched = agents(&analysis.dispatch);
     let family: Vec<&str> = match component.kind {
         Kind::Generalist => GENERALISTS

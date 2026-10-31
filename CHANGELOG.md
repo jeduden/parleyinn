@@ -9,6 +9,8 @@ its upgrade notes (ENG-23). ParleyInn follows semantic versioning.
 
 ## Unreleased
 
+- A stakeholder comment consents only to the stakeholder paths it names,
+  by path, owning pattern or directory (ENG-21).
 - Every reviewer component of the layered review, and every other agent
   under `.claude/agents`, is held to evaluation cases, run on the model
   its front matter names by the review of a pull request that changes
