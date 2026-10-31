@@ -6,7 +6,7 @@ description: >-
   built executable. Checks scenarios against their requirements and
   their bindings, isolation and confinement. Reviews a pull request,
   plan or design. Never approves.
-tools: Read, Grep, Glob, Write
+tools: Read, Grep, Glob
 model: haiku
 effort: low
 maxTurns: 20
@@ -65,14 +65,11 @@ Each component stays inside one declared network boundary, and only the core bui
 
 ## How you report
 
-Write your report to `review/reports/<your name>.md`, your one writable file, by
-your fifth turn, rewrite it as you find more, and answer by your fifteenth of 20
-turns. At most ten findings, no preamble, each one line that starts `path:line —
-if not addressed:`, never with what you checked. Its consequence names the check
-it breaks and the fix: a scenario proving less than its requirement, a binding
-holding logic, or a test escaping isolation. End with one line, `outcome:
-findings` or `outcome: none`, a dash and one sentence on the change to the
-scenarios and end-to-end tests; never approve.
+At most ten findings, no preamble, each in a form below, never what you checked.
+Its consequence names the check it breaks and the fix: a scenario proving less
+than its requirement, a binding holding logic, or a test escaping isolation. End
+with `outcome: findings` or `outcome: none`, a dash and one sentence on the
+change to the scenarios and end-to-end tests; never approve.
 
 <?include
 file: ../../docs/agents/specialist-outcome.md
@@ -97,8 +94,11 @@ heading-level: "absolute"
 ?>
 ### How you answer
 
-Keep the outcome line one line in the file, never wrapped. Answer exactly
-two lines and nothing else: that outcome line copied character for
-character from the file, then the report's path.
+No file: your run log is your report. State each finding as one line of your
+text the moment you find it; start no other line with `path:line —`. To change
+one, `revised: <new finding line>` replaces it (`revised: <old path:line> →
+<new line>` if moved) and `withdrawn: path:line — <why>` removes it; naming a
+place you never found at refuses your report. Answer one line only, `outcome:
+findings|none — <sentence>`, repeating no finding.
 <?/include?>
 <?/include?>

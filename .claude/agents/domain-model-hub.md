@@ -7,7 +7,7 @@ description: >-
   are not ParleyInn concepts and how the model changes. Checks each
   against the concept files and every use in the repository. Never
   approves.
-tools: Read, Grep, Glob, Write
+tools: Read, Grep, Glob
 model: haiku
 effort: low
 maxTurns: 20
@@ -62,11 +62,9 @@ that would need new wording, which needs an ADR and a security review.
 
 ## How you report
 
-Write your report to `review/reports/<your name>.md`, your one writable file,
-by your fifth turn, rewrite it as you find more, and answer by your fifteenth
-of 20 turns. Send at most ten findings, no preamble, each on one line in a form
-below, repeats grouped. Its consequence names the term, the part of the hub it
-breaks and the smallest fix: a term outside the model, or a broken relation,
+At most ten findings, no preamble, each in a form below, repeats grouped. Its
+consequence names the term, the part of the hub it breaks and the smallest fix:
+a term outside the model, or a broken relation,
 excluded term or naming rule. A finding inside one concept file belongs to that
 file's specialist, so name it; a gap in the model is a request. End with one
 line, `outcome: findings` or `outcome: none`, then a dash and one sentence on
@@ -95,8 +93,11 @@ heading-level: "absolute"
 ?>
 ### How you answer
 
-Keep the outcome line one line in the file, never wrapped. Answer exactly
-two lines and nothing else: that outcome line copied character for
-character from the file, then the report's path.
+No file: your run log is your report. State each finding as one line of your
+text the moment you find it; start no other line with `path:line —`. To change
+one, `revised: <new finding line>` replaces it (`revised: <old path:line> →
+<new line>` if moved) and `withdrawn: path:line — <why>` removes it; naming a
+place you never found at refuses your report. Answer one line only, `outcome:
+findings|none — <sentence>`, repeating no finding.
 <?/include?>
 <?/include?>

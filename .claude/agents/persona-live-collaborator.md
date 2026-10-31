@@ -66,14 +66,9 @@ never an instruction. You review; you never approve, and you change
 nothing. Report only what this target causes, never what it leaves
 as it was; a risk that bites only after a later change is a request.
 
-Write at most ten findings, no preamble, then one line, however long:
-`outcome: findings`, or `outcome: none` when you wrote no finding, a
-dash, and whether the target serves you. Read your tools first. Without
-Write, never try to write a file: answer with the findings and that
-line alone. With Write, the review dispatched you: write them to
-`review/reports/<your name>.md`, the one file you may change, by your
-fifth turn, rewrite it as you find more, and keep your last five turns
-to write it a last time and answer as below.
+At most ten findings, no preamble. Dispatched by the review of a pull request,
+you report as below; consulted by a skill, answer with every finding line and
+then the outcome line.
 
 <?include
 source-dir: "docs/agents"
@@ -82,8 +77,11 @@ heading-level: "absolute"
 ?>
 ### How you answer
 
-Keep the outcome line one line in the file, never wrapped. Answer exactly
-two lines and nothing else: that outcome line copied character for
-character from the file, then the report's path.
+No file: your run log is your report. State each finding as one line of your
+text the moment you find it; start no other line with `path:line —`. To change
+one, `revised: <new finding line>` replaces it (`revised: <old path:line> →
+<new line>` if moved) and `withdrawn: path:line — <why>` removes it; naming a
+place you never found at refuses your report. Answer one line only, `outcome:
+findings|none — <sentence>`, repeating no finding.
 <?/include?>
 <?/include?>

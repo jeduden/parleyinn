@@ -205,8 +205,9 @@ jobs:
         id: bundle
         if: steps.pull_head.outputs.number != ''
         run: |
-          # Each specialist writes its report here; the generalists read
-          # it, and the gate checks it against the agent's answer.
+          # review-run writes each specialist's report here, assembled
+          # from its run log; the generalists read it, and the gate
+          # checks its form against the agent's answer.
           mkdir -p review/reports
           # mdsmith's own catalog of the Markdown patterns its rules cannot
           # see until a kind, include or catalog declares them, from main's
@@ -261,8 +262,8 @@ jobs:
         run: cargo build --locked --quiet -p review-run
       # review-run starts each dispatched specialist, then each
       # generalist once every specialist ended, as `claude --agent` from
-      # main's definition of it: read tools, writes to review/reports
-      # alone for a specialist and none for a generalist, no Bash, the
+      # main's definition of it: read tools alone, no Write and no Bash
+      # (a specialist's report is assembled from its run log), the
       # pull request's tree added as data, each with a 900-second
       # deadline. No agent gets a GitHub token: the step's environment
       # adds the Claude token and nothing else. It writes
@@ -318,9 +319,11 @@ jobs:
             jq -r '.[] | "| \(.agent) | \(.attempts) | \(.calls) | \(.fresh) | \(.cache_write) | \(.cache_read) | \(.output) | \(.cost_usd) |"' \
               review/usage.json
           } >> "$GITHUB_STEP_SUMMARY" || exit 0
-      # The reports and the answers, for the post job's gate and for the
-      # review's readers: the review and its check link here. A review
-      # that failed keeps what it wrote too, so its author can read why.
+      # The reports review-run assembled from the run logs, and the
+      # answers, for the post job's gate and for the review's readers:
+      # the review and its check link here. A review that failed keeps
+      # what it wrote too, a specialist cut off before its answer leaving
+      # its findings headed incomplete, so its author can read why.
       - name: Keep the specialists' reports
         if: always() && steps.pull_head.outputs.number != ''
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2

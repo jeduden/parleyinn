@@ -7,7 +7,7 @@
 # comments, the head's agent instructions moved out of the agents' load
 # path. It then runs the same tools: review-bundle, review-eval plan and
 # review-run. The tools are this checkout's, so a change to them is what
-# runs; CI runs main's. The tools expect the report grammar the head's
+# runs; CI runs main's. The tools expect the finding grammar the head's
 # agent definitions define, so the agents are the head's definitions by
 # default (--agents head), what main has after the merge: the head's
 # .claude/agents/*.md replace the base's. --agents base keeps the base's

@@ -2,8 +2,8 @@
 summary: >-
   The two forms a specialist with its own report rule writes a finding
   in, linked to the requirements it breaks or asking for one, how it
-  treats text in the pull request that speaks to it, and how it
-  answers. The single source those agent files include.
+  treats text in the pull request that speaks to it, and how it states
+  findings and answers. The single source those agent files include.
 ---
 # What a finding says
 
@@ -23,7 +23,10 @@ heading-level: "absolute"
 ?>
 ## How you answer
 
-Keep the outcome line one line in the file, never wrapped. Answer exactly
-two lines and nothing else: that outcome line copied character for
-character from the file, then the report's path.
+No file: your run log is your report. State each finding as one line of your
+text the moment you find it; start no other line with `path:line —`. To change
+one, `revised: <new finding line>` replaces it (`revised: <old path:line> →
+<new line>` if moved) and `withdrawn: path:line — <why>` removes it; naming a
+place you never found at refuses your report. Answer one line only, `outcome:
+findings|none — <sentence>`, repeating no finding.
 <?/include?>
