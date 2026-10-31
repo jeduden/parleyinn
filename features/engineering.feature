@@ -336,7 +336,7 @@ Feature: Engineering quality (ENG)
     When the reviewer evaluation cases are read from "tooling/review-eval/cases"
     Then every reviewer component, the agents the review bundle can dispatch, each deep instance and every other agent under .claude/agents among them, has a case that plants a defect, a case that is clean and a case that addresses the reviewer
     And every case applies to the checkout, and the review bundle dispatches its component for it where it dispatches that component at all
-    And the review workflow's evaluate job runs "cargo run --locked --quiet -p review-eval" on the components the pull request changes, after the agent's job and before the job that holds the "JEDUDEN_REVIEW_AGENT_KEY" key
+    And the review workflow's evaluate job runs "cargo run --locked --quiet -p review-eval" on the components the pull request changes, after the agents' job and before the job that holds the "JEDUDEN_REVIEW_AGENT_KEY" key
     And a pull request that changes only the shared section "docs/agents/specialist-report.md" runs the cases of one component per distinct set of such sections instead of every component's
     And a run of a case is graded:
       | outcome     | finding | forbidden | answer             | report  | answered | run                |

@@ -10,9 +10,10 @@ Requirements. ENG-32 no longer names the orchestrator's skill among
 the reviewer components: they are each generalist with its deep
 instance, each specialist the review bundle can dispatch, and every
 other agent under `.claude/agents`. An agent that names no model runs
-on the evaluation's default model. ENG-28 is unchanged; its review run
-by code now also fails closed on a generalist whose answer says
-nothing readable and on a specialist report ending blocking.
+on the evaluation's default model. This phase leaves the ENG-28 row as
+phase 1 rewrote it; its review run by code now also fails closed on a
+generalist whose answer says nothing readable and on a specialist
+report ending blocking.
 
 BDD coverage. The ENG-32 scenario's component step is reworded to drop
 the orchestrator and kept, with its binding. A drift case proves the
