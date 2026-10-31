@@ -6,7 +6,7 @@
 
 use std::fs::File;
 use std::io::{self, Read};
-use std::process::{Command as Process, Stdio};
+use std::process::{Child, Command as Process, ExitStatus, Stdio};
 use std::sync::mpsc::{self, Receiver};
 use std::thread;
 use std::time::{Duration, Instant};
@@ -77,23 +77,10 @@ impl Host for ProcessHost {
         let stdout = drain(child.stdout.take());
         let stderr = drain(child.stderr.take());
         let deadline = command.deadline.unwrap_or(DEFAULT_DEADLINE);
-        let started = Instant::now();
-        let wait_failed = |e: io::Error| format!("wait for {}: {e}", command.program);
-        let timed_out = loop {
-            if child.try_wait().map_err(wait_failed)?.is_some() {
-                break false;
-            }
-            if started.elapsed() >= deadline {
-                // `kill` answers Ok for a child that has already exited, so
-                // an error means the command may still run past its deadline.
-                child
-                    .kill()
-                    .map_err(|e| format!("kill {}: {e}", command.program))?;
-                break true;
-            }
-            thread::sleep(POLL);
-        };
-        let status = child.wait().map_err(wait_failed)?;
+        let timed_out = watch(&mut child, &command.program, deadline)?;
+        let status = child
+            .wait()
+            .map_err(|e| format!("wait for {}: {e}", command.program))?;
         let until = Instant::now() + DRAIN;
 
         Ok(Output {
@@ -102,6 +89,50 @@ impl Host for ProcessHost {
             stderr: collect(&stderr, until),
             timed_out,
         })
+    }
+}
+
+/// What [`watch`] needs of a running child, so a test can stand in for
+/// one whose wait or kill fails.
+trait Watched {
+    fn try_wait(&mut self) -> io::Result<Option<ExitStatus>>;
+    fn kill(&mut self) -> io::Result<()>;
+}
+
+impl Watched for Child {
+    fn try_wait(&mut self) -> io::Result<Option<ExitStatus>> {
+        Child::try_wait(self)
+    }
+    fn kill(&mut self) -> io::Result<()> {
+        Child::kill(self)
+    }
+}
+
+/// Looks at `child` until it ends or `deadline` passes, and answers
+/// whether it was killed at its deadline. A child that cannot be waited
+/// for is killed before the error returns, so it never runs on unwatched.
+fn watch(child: &mut impl Watched, program: &str, deadline: Duration) -> Result<bool, String> {
+    let started = Instant::now();
+    // `kill` answers Ok for a child that has already exited, so an error
+    // means the command may still run past its deadline.
+    let kill = |child: &mut dyn Watched| child.kill().map_err(|e| format!("kill {program}: {e}"));
+    loop {
+        match child.try_wait() {
+            Ok(Some(_)) => return Ok(false),
+            Ok(None) => {}
+            Err(e) => {
+                let wait = format!("wait for {program}: {e}");
+                return Err(match kill(child) {
+                    Ok(()) => format!("{wait}; killed it"),
+                    Err(kill) => format!("{wait}; {kill}"),
+                });
+            }
+        }
+        if started.elapsed() >= deadline {
+            kill(child)?;
+            return Ok(true);
+        }
+        thread::sleep(POLL);
     }
 }
 

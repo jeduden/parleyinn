@@ -175,3 +175,72 @@ fn a_pipe_that_fails_mid_read_keeps_what_it_read_and_says_so() {
         "ab\nreview-eval: reading this output failed: boom\n"
     );
 }
+
+/// A child whose `try_wait` and `kill` answer as told, and which
+/// counts its kills.
+struct FakeChild {
+    wait: fn() -> std::io::Result<Option<std::process::ExitStatus>>,
+    kill: fn() -> std::io::Result<()>,
+    kills: usize,
+}
+
+impl Watched for FakeChild {
+    fn try_wait(&mut self) -> std::io::Result<Option<std::process::ExitStatus>> {
+        (self.wait)()
+    }
+    fn kill(&mut self) -> std::io::Result<()> {
+        self.kills += 1;
+        (self.kill)()
+    }
+}
+
+fn fake(
+    wait: fn() -> std::io::Result<Option<std::process::ExitStatus>>,
+    kill: fn() -> std::io::Result<()>,
+) -> FakeChild {
+    FakeChild {
+        wait,
+        kill,
+        kills: 0,
+    }
+}
+
+#[test]
+fn a_child_that_cannot_be_waited_for_is_killed_and_the_error_kept() {
+    let mut child = fake(|| Err(std::io::Error::other("lost")), || Ok(()));
+
+    let err = watch(&mut child, "agent", Duration::from_secs(60)).unwrap_err();
+
+    assert_eq!(child.kills, 1);
+    assert_eq!(err, "wait for agent: lost; killed it");
+}
+
+#[test]
+fn a_child_that_cannot_be_waited_for_or_killed_reports_both() {
+    let mut child = fake(
+        || Err(std::io::Error::other("lost")),
+        || Err(std::io::Error::other("denied")),
+    );
+
+    let err = watch(&mut child, "agent", Duration::from_secs(60)).unwrap_err();
+
+    assert_eq!(child.kills, 1);
+    assert_eq!(err, "wait for agent: lost; kill agent: denied");
+}
+
+#[test]
+fn a_child_still_running_at_its_deadline_is_killed() {
+    let mut child = fake(|| Ok(None), || Ok(()));
+
+    assert_eq!(watch(&mut child, "agent", Duration::ZERO), Ok(true));
+    assert_eq!(child.kills, 1);
+}
+
+#[test]
+fn a_child_that_cannot_be_killed_at_its_deadline_fails_the_run() {
+    let mut child = fake(|| Ok(None), || Err(std::io::Error::other("denied")));
+
+    let err = watch(&mut child, "agent", Duration::ZERO).unwrap_err();
+
+    assert_eq!(err, "kill agent: denied");
+}
