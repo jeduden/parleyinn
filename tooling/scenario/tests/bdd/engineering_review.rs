@@ -54,6 +54,17 @@ fn review_runs_by_code(w: &mut World) -> Result<(), String> {
     ))
 }
 
+#[then(
+    regex = r"^review-run runs a specialist whose diff is past its split limit in parts, each on whole files of its diff, merges their reports into its one report, and fails the review naming a part that did not answer$"
+)]
+fn review_runs_in_parts(w: &mut World) -> Result<(), String> {
+    let work = testkit::TempDir::new().map_err(|e| format!("make a work directory: {e}"))?;
+    outcome(engineering::review_parts::review_runs_in_parts(
+        eng(w).checkout()?,
+        work.path(),
+    ))
+}
+
 #[then(regex = r"^its agents can write nothing: review-run allows them Read, Glob and Grep alone$")]
 fn agents_write_nothing(w: &mut World) -> Result<(), String> {
     outcome(

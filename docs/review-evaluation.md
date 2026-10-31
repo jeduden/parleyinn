@@ -18,7 +18,10 @@ bundle can dispatch, each deep instance, and every other agent under
 `.claude/agents`, which a skill consults: the persona agents,
 `domain-model`, `test-engineer` and `reviewer-engineer`. No agent routes
 the review: `review-run` runs the dispatched agents (ENG-28), so the
-routing is code, tested as code, and has no cases. The
+routing is code, tested as code, and has no cases. A specialist whose
+diff is past 120 KiB runs in parts there, each on whole files of it, its
+report merged from theirs, and fails if one part does not answer. A case
+runs a component whole. The
 `review-eval` crate under [tooling/review-eval](../tooling/review-eval)
 runs them. [ADR-2610311947](adr/ADR-2610311947-reviewer-evaluation.md)
 records the design.

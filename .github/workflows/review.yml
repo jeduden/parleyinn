@@ -265,7 +265,11 @@ jobs:
       # main's definition of it: read tools alone, no Write and no Bash
       # (a specialist's report is assembled from its run log), the
       # pull request's tree added as data, each with a 900-second
-      # deadline. No agent gets a GitHub token: the step's environment
+      # deadline. A specialist whose diff is past 120 KiB runs in parts,
+      # each on a part of its diff split by file, and its report is
+      # merged from theirs; a part that does not answer leaves the
+      # specialist one that did not answer (ENG-28).
+      # No agent gets a GitHub token: the step's environment
       # adds the Claude token and nothing else. It writes
       # review/outcome.json, review/consulted.json (every agent that
       # answered), review/answers.json and review/usage.json, with each
@@ -302,8 +306,9 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
       # What the review cost, per agent, as review-run read it from each
       # run's log: its model calls, fresh input, cache writes and reads,
-      # output, the attempts it took (two when its first run did not
-      # answer) and the cost its result reported. A review that recorded
+      # output, the parts it ran in (more than one when its diff was past
+      # the split limit), the attempts it took (one more for each run
+      # that did not answer) and the cost its result reported. A review that recorded
       # none reports nothing; this step only reports and never fails the
       # review.
       - name: Record what the review cost
@@ -314,9 +319,9 @@ jobs:
           {
             echo "### What the review cost: \$$cost"
             echo
-            echo "| agent | attempts | calls | fresh in | cache write | cache read | out | cost |"
-            echo "|---|---:|---:|---:|---:|---:|---:|---:|"
-            jq -r '.[] | "| \(.agent) | \(.attempts) | \(.calls) | \(.fresh) | \(.cache_write) | \(.cache_read) | \(.output) | \(.cost_usd) |"' \
+            echo "| agent | parts | attempts | calls | fresh in | cache write | cache read | out | cost |"
+            echo "|---|---:|---:|---:|---:|---:|---:|---:|---:|"
+            jq -r '.[] | "| \(.agent) | \(.parts) | \(.attempts) | \(.calls) | \(.fresh) | \(.cache_write) | \(.cache_read) | \(.output) | \(.cost_usd) |"' \
               review/usage.json
           } >> "$GITHUB_STEP_SUMMARY" || exit 0
       # The reports review-run assembled from the run logs, and the
