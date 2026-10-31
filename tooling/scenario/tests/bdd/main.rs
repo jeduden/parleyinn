@@ -30,6 +30,7 @@ mod engineering_evaluation;
 mod engineering_fuzz;
 mod engineering_isolation;
 mod engineering_licenses;
+mod engineering_limits;
 mod engineering_logs;
 mod engineering_panics;
 mod engineering_protection;

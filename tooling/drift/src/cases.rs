@@ -101,6 +101,7 @@ pub fn cases() -> Vec<Case> {
         workflow_cases(),
         review_log_report_cases(),
         review_run_parts_cases(),
+        review_limit_cases(),
         // Last: its cases edit source the later cases would run stale.
         license_text_cases(),
     ]
@@ -272,6 +273,50 @@ fn workflow_cases() -> Vec<Case> {
             Injection::replace(CI_WORKFLOW, "run: zizmor .github", "run: zizmor --version"),
             scenario("ENG-33"),
             r#"the CI workflow does not run "zizmor .github""#,
+        ),
+    ]
+}
+
+/// The drifts ENG-34 exists to catch, late so adding them moves no
+/// earlier case to another shard: the review bundle no longer flagging
+/// a file past its limit, no longer flagging a file no specialist
+/// reads, and a limit the ENG-34 row states that the bundle does not
+/// hold.
+fn review_limit_cases() -> Vec<Case> {
+    const LIMITS: &str = "tooling/review-bundle/src/limits.rs";
+    vec![
+        case(
+            "the review bundle no longer flagging a file past its limit",
+            "ENG-34",
+            Injection::replace(
+                LIMITS,
+                "let size = lines(path).and_then(|n| oversize(path, n));",
+                "let size = lines(path).and_then(|n| oversize(path, n)).filter(|_| false);",
+            ),
+            scenario("ENG-34"),
+            "no nit at crates/a/src/lib.rs in the finding form citing ENG-34",
+        ),
+        case(
+            "the review bundle no longer flagging a file no specialist reads",
+            "ENG-34",
+            Injection::replace(
+                LIMITS,
+                "size.into_iter().chain(unread(path, scopes))",
+                "size.into_iter().chain(unread(path, scopes).filter(|_| false))",
+            ),
+            scenario("ENG-34"),
+            "no nit at LICENSE in the finding form citing ENG-28",
+        ),
+        case(
+            "the ENG-34 row stating a limit the review bundle does not hold",
+            "ENG-34",
+            Injection::replace(
+                "docs/srs/10-engineering-quality.md",
+                "200 for TOML (`.toml`)",
+                "250 for TOML (`.toml`)",
+            ),
+            scenario("ENG-34"),
+            "the ENG-34 row states no limit of 200 for TOML, which the review bundle holds",
         ),
     ]
 }

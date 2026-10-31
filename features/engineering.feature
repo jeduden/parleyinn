@@ -372,7 +372,7 @@ Feature: Engineering quality (ENG)
     And a scorecard line records a component's cases, runs, slips, cost, turns and seconds on its model
     And the scheduled run's workflow ".github/workflows/review-eval.yml" fails on a failed case, with the report that names it in its summary
 
-  @ENG-34 @P0 @pending
+  @ENG-34 @P0
   Scenario: the review bundle flags a file past its line limit and a file no specialist reads
     Given the repository checkout
     Then the review bundle's line limits are those the ENG-34 row states
