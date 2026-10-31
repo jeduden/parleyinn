@@ -37,6 +37,7 @@ pub mod third_party;
 pub mod threat_model;
 pub mod toolchain;
 pub mod trusted_text;
+pub mod workflows;
 
 use std::fs;
 use std::path::{Path, PathBuf};
