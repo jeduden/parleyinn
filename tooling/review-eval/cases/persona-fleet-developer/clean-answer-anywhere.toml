@@ -33,7 +33,7 @@ A developer with ten worktrees switches terminals all day and must not be slowed
 ## Acceptance Criteria
 
 - A held request shows in the terminal, the TUI and a paired phone, and any one answer closes it everywhere.
-- The hook returns within its budget with no answer, the request stays under Needs you, and the action waits on the harness's own prompt; the missing answer allows no action.
+- The hook returns within its budget with no answer, the request stays under Needs you, and the action waits on the harness's own prompt where a harness adapter keeps it answerable (ASM-18); the missing answer allows no action.
 - `parinn install` prints the exact settings change and writes nothing on a no.
 
 ## Requirements
