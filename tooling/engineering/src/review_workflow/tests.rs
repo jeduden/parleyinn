@@ -196,6 +196,74 @@ fn agents_run_by_wants_the_command_and_no_agent_session() {
     );
 }
 
+/// A step that installs the Claude Code command line, which starts an
+/// agent from any later step of its job.
+const CLI: &str = "      - uses: ./.github/actions/claude-code\n";
+
+#[test]
+fn runs_agents_sees_the_command_line_however_it_is_installed() {
+    assert!(runs_agents(RUN));
+    assert!(runs_agents(
+        "      - uses: anthropics/claude-code-action@abc\n"
+    ));
+    assert!(runs_agents(CLI));
+    assert!(runs_agents(
+        "      - run: npm install --global @anthropic-ai/claude-code@2\n"
+    ));
+    assert!(!runs_agents("      - run: cargo run -p review-gate\n"));
+}
+
+#[test]
+fn agents_run_by_refuses_the_command_line_outside_the_review_s_runners() {
+    let cmd = "-p review-run -- --workdir .";
+    let mut w = parse(EVALUATING_FLOW);
+    w.jobs[0].text.push_str(CLI);
+    w.jobs[1].text.push_str(CLI);
+    assert!(
+        w.agents_run_by(cmd).is_empty(),
+        "review-run and review-eval"
+    );
+
+    w.jobs.push(Job {
+        name: "route".into(),
+        // Building review-run is not running it, and planning the
+        // evaluation runs no case.
+        text: format!(
+            "    steps:\n{CLI}      - run: cargo build --locked --quiet -p review-run\n      - run: cargo run --locked --quiet -p review-eval -- plan\n      - run: claude -p review\n"
+        ),
+    });
+    assert_eq!(
+        w.agents_run_by(cmd),
+        [
+            "job route starts the Claude Code command line outside review-run and review-eval, which would route the review"
+        ]
+    );
+}
+
+#[test]
+fn key_held_apart_refuses_the_command_line_in_the_key_s_job() {
+    let mut w = parse(REVIEW_FLOW);
+    w.jobs[1].text.push_str(CLI);
+
+    assert_eq!(
+        w.key_held_apart(KEY).unwrap_err(),
+        "job post holds APP_KEY and runs the agents"
+    );
+}
+
+#[test]
+fn evaluate_job_runs_with_the_command_line_needs_not_itself() {
+    let w = parse(&EVALUATING_FLOW.replace(
+        "      - run: cargo run --locked --quiet -p review-eval -- run\n",
+        &format!("{CLI}      - run: cargo run --locked --quiet -p review-eval -- run\n"),
+    ));
+
+    assert_eq!(
+        w.evaluate_job_runs("cargo run --locked --quiet -p review-eval", KEY),
+        Ok(Vec::new())
+    );
+}
+
 #[test]
 fn key_held_apart_wants_one_holder_that_runs_no_agent() {
     let mut w = parse(REVIEW_FLOW);
@@ -642,4 +710,70 @@ fn agents_write_only_allows_only_reading_and_the_scoped_report() {
             "review-run's specialist may use mcp__x__y, want Edit(./review/reports/**) alone",
         ]
     );
+}
+
+/// An agent job's step that uploads `path` as an artifact.
+fn upload(path: &str) -> String {
+    format!(
+        "      - uses: actions/upload-artifact@abc # v7\n        with:\n          name: x\n          path: {path}\n"
+    )
+}
+
+#[test]
+fn run_logs_stay_in_the_agent_job() {
+    let mut w = parse(REVIEW_FLOW);
+    assert!(w.run_logs_stay(RUN_LOGS).is_empty());
+
+    w.jobs[0].text.push_str(&upload(
+        "|\n            review/reports/\n            review/answers.json",
+    ));
+    assert!(
+        w.run_logs_stay(RUN_LOGS).is_empty(),
+        "the reports leave the job"
+    );
+
+    for path in [
+        "review/logs/",
+        "review/logs",
+        "review/",
+        "review",
+        ".",
+        "review/**",
+        "|\n            review/reports/\n            review/logs/agent.jsonl",
+    ] {
+        let mut leaks = parse(REVIEW_FLOW);
+        leaks.jobs[0].text.push_str(&upload(path));
+        assert_eq!(
+            leaks.run_logs_stay(RUN_LOGS),
+            ["agent job review uploads review/logs, every tool result its agents read"],
+            "{path}"
+        );
+    }
+
+    let mut excluded = parse(REVIEW_FLOW);
+    excluded.jobs[0].text.push_str(&upload(
+        "|\n            review/\n            !review/logs/**",
+    ));
+    assert!(
+        excluded.run_logs_stay(RUN_LOGS).is_empty(),
+        "an excluded log stays"
+    );
+
+    let mut other = parse(REVIEW_FLOW);
+    other.jobs[1].text.push_str(&upload("review/logs/"));
+    assert!(
+        other.run_logs_stay(RUN_LOGS).is_empty(),
+        "a job that runs no agent has no log"
+    );
+}
+
+#[test]
+fn upload_paths_reads_inline_and_block_paths() {
+    assert_eq!(upload_paths(&upload("a/")), ["a/"]);
+    assert_eq!(
+        upload_paths(&upload("|\n            a/\n            !b\n")),
+        ["a/", "!b"]
+    );
+    assert!(upload_paths("      - run: echo path: x\n").is_empty());
+    assert!(upload_paths("      - uses: actions/upload-artifact@abc\n").is_empty());
 }

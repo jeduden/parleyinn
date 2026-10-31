@@ -94,6 +94,7 @@ pub fn cases() -> Vec<Case> {
         transcript_contract_cases(),
         // Late, so adding it moves no earlier case to another shard.
         vec![consent_case(), test_shards_case()],
+        review_late_cases(),
         // Last: its cases edit source the later cases would run stale.
         license_text_cases(),
     ]
@@ -802,6 +803,49 @@ fn test_shards_case() -> Case {
         ),
         "the test job's shards: crate srs runs in no shard",
     )
+}
+
+/// The review workflow drifts registered after the first ones, late so
+/// adding them moves no earlier case to another shard: the agents' run
+/// logs leaving their job, and the Claude Code command line, installed
+/// by the composite action, in the key's job or starting an agent
+/// outside review-run.
+fn review_late_cases() -> Vec<Case> {
+    vec![
+        case(
+            "the reviewing agents' run logs uploaded out of their job",
+            "ENG-28",
+            Injection::replace(
+                REVIEW_WORKFLOW,
+                "            review/usage.json\n          if-no-files-found: error\n",
+                "            review/usage.json\n            review/logs/\n          if-no-files-found: error\n",
+            ),
+            scenario("ENG-28"),
+            "agent job review uploads review/logs, every tool result its agents read",
+        ),
+        case(
+            "the key's job given the Claude Code command line",
+            "ENG-28",
+            Injection::replace(
+                REVIEW_WORKFLOW,
+                "      - name: Build the review gate\n",
+                "      - uses: ./.github/actions/claude-code\n      - name: Build the review gate\n",
+            ),
+            scenario("ENG-28"),
+            "agent job post reads JEDUDEN_REVIEW_AGENT_KEY",
+        ),
+        case(
+            "the review routed by the Claude Code command line instead of review-run",
+            "ENG-28",
+            Injection::replace(
+                REVIEW_WORKFLOW,
+                "          cargo run --locked --quiet --offline -p review-run -- --workdir . --parallel 32 \\\n            > review/run.txt\n",
+                "          claude -p review > review/run.txt\n",
+            ),
+            scenario("ENG-28"),
+            "job review starts the Claude Code command line outside review-run and review-eval, which would route the review",
+        ),
+    ]
 }
 
 /// The drifts the gate tests and mdsmith catch between the SRS, the

@@ -16,6 +16,23 @@ const AGENT_RUN: &str = "-p review-run";
 /// itself; a job that uses one is held to the agents' rules too.
 const AGENT_ACTION: &str = "anthropics/claude-code-action@";
 
+/// The ways a job installs the Claude Code command line, which starts
+/// an agent from any later step: the repository's composite action and
+/// the npm package it installs.
+const AGENT_CLI: [&str; 2] = ["./.github/actions/claude-code", "@anthropic-ai/claude-code"];
+
+/// The run of review-eval, which may start the command line beside
+/// review-run: it runs the reviewer evaluation's cases (ENG-32) and
+/// routes no review. Its `plan` starts no agent, so it grants none.
+const EVAL_RUN: &str = "cargo run --locked --quiet -p review-eval -- run";
+
+/// Where review-run writes each agent's run log, which holds every tool
+/// result the agent read: it stays in the agents' job.
+pub const RUN_LOGS: &str = "review/logs";
+
+/// The action that uploads an artifact out of the job.
+const UPLOAD_ACTION: &str = "actions/upload-artifact@";
+
 /// The tools review-run gives its agents, by kind, as the evaluation's
 /// runner sets them.
 pub const RUN_TOOLS: [(&str, &str); 2] = [
@@ -138,9 +155,79 @@ fn is_word(c: char) -> bool {
     c.is_ascii_alphanumeric() || c == '_'
 }
 
-/// Whether a job's `text` runs the review's agents or an agent session.
+/// Whether a job's `text` installs the Claude Code command line.
+fn installs_cli(text: &str) -> bool {
+    AGENT_CLI.iter().any(|cli| text.contains(cli))
+}
+
+/// Whether a job's `text` runs the review's agents, an agent session,
+/// or installs the command line any of its steps can start one with.
 fn runs_agents(text: &str) -> bool {
-    text.contains(AGENT_RUN) || text.contains(AGENT_ACTION)
+    text.contains(AGENT_RUN) || text.contains(AGENT_ACTION) || installs_cli(text)
+}
+
+/// A job's steps, each from its `- ` line at the steps' indent.
+fn steps(text: &str) -> Vec<String> {
+    let mut out: Vec<String> = Vec::new();
+    for line in text.split_inclusive('\n') {
+        if line.starts_with("      - ") {
+            out.push(line.to_owned());
+        } else if let Some(step) = out.last_mut() {
+            step.push_str(line);
+        }
+    }
+
+    out
+}
+
+/// The paths an upload step names, one inline or one a line in its
+/// block; none for a step that uploads nothing.
+fn upload_paths(step: &str) -> Vec<String> {
+    if !step.contains(UPLOAD_ACTION) {
+        return Vec::new();
+    }
+    let mut lines = step.lines();
+    let Some(line) = lines.find(|l| l.trim_start().starts_with("path:")) else {
+        return Vec::new();
+    };
+    let indent = line.len() - line.trim_start().len();
+    let value = line.trim_start()["path:".len()..].trim();
+    if !value.is_empty() && !value.starts_with(['|', '>']) {
+        return vec![value.trim_matches(['"', '\'']).to_owned()];
+    }
+
+    lines
+        .take_while(|l| l.len() - l.trim_start().len() > indent)
+        .map(|l| l.trim().trim_matches(['"', '\'']).to_owned())
+        .filter(|l| !l.is_empty())
+        .collect()
+}
+
+/// Whether the upload `paths` carry `dir` out of the job: a path at or
+/// under it, or one above it that no `!` path excludes it from.
+fn uploads_dir(paths: &[String], dir: &str) -> bool {
+    let bare = |p: &str| {
+        p.trim_start_matches("./")
+            .trim_end_matches(['*', '/'])
+            .to_owned()
+    };
+    let excluded = paths
+        .iter()
+        .filter_map(|p| p.strip_prefix('!'))
+        .any(|p| bare(p).starts_with(dir));
+    let above = |p: &str| {
+        p.is_empty()
+            || p == "."
+            || dir
+                .strip_prefix(p)
+                .is_some_and(|rest| rest.starts_with('/'))
+    };
+
+    paths
+        .iter()
+        .filter(|p| !p.starts_with('!'))
+        .map(|p| bare(p))
+        .any(|p| p.starts_with(dir) || (!excluded && above(&p)))
 }
 
 /// The tools of the comma-separated `tools` other than reading and
@@ -215,7 +302,8 @@ impl Workflow {
     }
 
     /// Requires a job to run the review's agents with `cmd`, and no job
-    /// to run an agent session that would route the review instead.
+    /// to run an agent session, or the command line outside review-run
+    /// and review-eval, that would route the review instead.
     #[must_use]
     pub fn agents_run_by(&self, cmd: &str) -> Vec<String> {
         let mut problems: Vec<String> = self
@@ -229,6 +317,18 @@ impl Workflow {
                 )
             })
             .collect();
+        problems.extend(
+            self.jobs
+                .iter()
+                .filter(|j| installs_cli(&j.text))
+                .filter(|j| !j.text.contains(cmd) && !j.text.contains(EVAL_RUN))
+                .map(|j| {
+                    format!(
+                        "job {} starts the Claude Code command line outside review-run and review-eval, which would route the review",
+                        j.name
+                    )
+                }),
+        );
         if !self.jobs.iter().any(|j| j.text.contains(cmd)) {
             problems.insert(0, format!("no job runs the review's agents with {cmd:?}"));
         }
@@ -290,6 +390,27 @@ impl Workflow {
         }
 
         problems
+    }
+
+    /// Requires every agent job to keep `logs`, its agents' run logs,
+    /// inside the job: no step of one uploads them as an artifact, which
+    /// would carry whatever an agent read, its environment included, out
+    /// of the job.
+    #[must_use]
+    pub fn run_logs_stay(&self, logs: &str) -> Vec<String> {
+        self.agent_jobs()
+            .filter(|j| {
+                steps(&j.text)
+                    .iter()
+                    .any(|s| uploads_dir(&upload_paths(s), logs))
+            })
+            .map(|j| {
+                format!(
+                    "agent job {} uploads {logs}, every tool result its agents read",
+                    j.name
+                )
+            })
+            .collect()
     }
 
     /// The one job that reads `key`.
@@ -409,7 +530,7 @@ impl Workflow {
         let own_needs = needs(j);
         problems.extend(
             self.agent_jobs()
-                .filter(|a| !has_word(&own_needs, &a.name))
+                .filter(|a| a.name != j.name && !has_word(&own_needs, &a.name))
                 .map(|a| format!("job {} does not need agent job {}", j.name, a.name)),
         );
         // The key's job among the others: an evaluate job that reads the

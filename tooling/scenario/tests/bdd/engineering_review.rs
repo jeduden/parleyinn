@@ -29,7 +29,11 @@ fn runs_after(w: &mut World, name: String) -> Result<(), String> {
 fn agents_unprivileged(w: &mut World, key: String) -> Result<(), String> {
     let e = eng(w);
     e.key = key;
-    outcome(e.flow.agents_unprivileged(&e.key))
+    // The run logs hold every tool result, the token in the agents'
+    // environment among what an agent can read: they never leave the job.
+    let mut problems = e.flow.agents_unprivileged(&e.key);
+    problems.extend(e.flow.run_logs_stay(review_workflow::RUN_LOGS));
+    outcome(problems)
 }
 
 #[then(

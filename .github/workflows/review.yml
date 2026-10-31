@@ -325,18 +325,9 @@ jobs:
             review/answers.json
             review/usage.json
           if-no-files-found: error
-
-      # Each agent's run log, kept even when the review failed or timed
-      # out, so a run that did not answer can be read; they hold what the
-      # agents read, so they stay a week.
-      - name: Keep the run logs
-        if: always() && steps.pull_head.outputs.number != ''
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: review-logs
-          path: review/logs/
-          retention-days: 7
-          if-no-files-found: ignore
+      # The run logs under review/logs/ stay in the job: they hold every
+      # tool result an agent read, its environment's token among what it
+      # can read (ENG-28).
 
   evaluate:
     # The cases of each reviewer component the pull request changes, run
