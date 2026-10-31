@@ -24,6 +24,11 @@
 //! line and must take one of the two forms; a line that starts with
 //! `revised:` or `withdrawn:` must take its form; any other line is
 //! prose, which the assembly leaves out and the report check passes by.
+//! A place may stand in emphasis, backticks or a link, `**a.rs:1**`,
+//! or end a label, `finding: a.rs:1`, when `if not addressed:` or
+//! `request:` follows its dash. A line whose place cannot be read, yet
+//! with either after a dash, is a finding line too, so it is malformed,
+//! never left out as prose.
 //! A finding, revision or withdrawal line in no form is malformed, and
 //! the report holding it is refused rather than handed to the generalist
 //! marked unlinked: a severity word where the consequence belongs, or a
@@ -200,10 +205,21 @@ pub fn line(text: &str) -> Line {
     let [first, second, rest @ ..] = parts.as_slice() else {
         return Line::Prose;
     };
-    // A path holds no space: `I read line: 3 — fine` is prose.
-    let Some((path, number)) = place(first).filter(|(p, _)| !p.contains(char::is_whitespace))
-    else {
-        return Line::Prose;
+    // A path holds no space: `I read line: 3 — fine` is prose. A line
+    // that reads as a finding after a label, `finding: a.rs:1 — if not
+    // addressed: …`, is read at the place the label ends with; one
+    // whose place cannot be read is malformed, never dropped.
+    let solid = |at: &(String, usize)| !at.0.contains(char::is_whitespace);
+    let labelled = || {
+        let last = first.split_whitespace().last()?;
+        place(last).filter(|_| finding_shaped(&parts[..2]))
+    };
+    let Some((path, number)) = place(first).filter(solid).or_else(labelled) else {
+        return if finding_shaped(&parts) {
+            Line::Malformed
+        } else {
+            Line::Prose
+        };
     };
     let second = second.trim();
     let read = if let Some(consequence) = strip_word(second, IF_NOT_ADDRESSED) {
@@ -215,6 +231,15 @@ pub fn line(text: &str) -> Line {
     };
 
     read.unwrap_or(Line::Malformed)
+}
+
+/// Whether `parts`, a line cut at its dashes, reads as a finding: a
+/// part after the first starts with `if not addressed:` or `request:`.
+fn finding_shaped(parts: &[&str]) -> bool {
+    parts.iter().skip(1).any(|part| {
+        let part = part.trim();
+        strip_word(part, IF_NOT_ADDRESSED).is_some() || strip_word(part, REQUEST).is_some()
+    })
 }
 
 /// `text` after `word`, in any case, when it starts with it.
@@ -541,14 +566,18 @@ pub fn findings_check(text: &str, known: Option<&BTreeSet<String>>) -> Option<Pr
     }
 }
 
+/// The markup a place may stand in: emphasis and backticks.
+const MARKUP: [char; 3] = ['`', '*', '_'];
+
 /// A finding's place, `path:line`, read: the path and the line, or the
-/// first line of a range, `path:12-20`; backticks around either part or
-/// the whole are dropped.
+/// first line of a range, `path:12-20`; emphasis and backticks around
+/// either part or the whole are dropped, from either end, as is a
+/// link's target: `[path:line](url)` reads as `path:line`.
 #[must_use]
 pub fn place(part: &str) -> Option<(String, usize)> {
-    let part = part.trim().trim_matches('`');
+    let part = link_text(part.trim().trim_matches(MARKUP)).trim_matches(MARKUP);
     let (path, number) = part.rsplit_once(':')?;
-    let path = path.trim_matches('`').trim();
+    let path = path.trim_matches(MARKUP).trim();
     let number: usize = number
         .trim()
         .split(['-', '–'])
@@ -558,6 +587,19 @@ pub fn place(part: &str) -> Option<(String, usize)> {
         .ok()?;
 
     (!path.is_empty()).then(|| (path.to_owned(), number))
+}
+
+/// The text of `part` when it is a link, `[text](url)` or `[text]`;
+/// `part` itself otherwise.
+fn link_text(part: &str) -> &str {
+    let Some(inner) = part.strip_prefix('[') else {
+        return part;
+    };
+    match inner.split_once(']') {
+        Some((text, "")) => text,
+        Some((text, target)) if target.starts_with('(') && target.ends_with(')') => text,
+        _ => part,
+    }
 }
 
 /// `line` without a leading list marker, emphasis or quote.

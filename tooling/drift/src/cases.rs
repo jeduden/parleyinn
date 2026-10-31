@@ -101,6 +101,7 @@ pub fn cases() -> Vec<Case> {
         workflow_cases(),
         review_log_report_cases(),
         review_run_parts_cases(),
+        review_finding_shape_cases(),
         review_limit_cases(),
         // Last: its cases edit source the later cases would run stale.
         license_text_cases(),
@@ -1238,6 +1239,73 @@ fn review_run_parts_cases() -> Vec<Case> {
                 "parts::tests::a_failed_part_makes_the_merged_run_incomplete_naming_it_and_keeps_every_part_s_findings",
             ),
             "a_failed_part_makes_the_merged_run_incomplete_naming_it_and_keeps_every_part_s_findings",
+        ),
+    ]
+}
+
+/// The drifts that would drop a finding unseen, late so adding them
+/// moves no earlier case to another shard: a specialist's place in bold
+/// read as prose, a finding-shaped line with a place that cannot be
+/// read left out, and a generalist's finding line the review cannot
+/// read passed by, or a report citing an unknown id left unnamed (I6).
+fn review_finding_shape_cases() -> Vec<Case> {
+    const REPORT: &str = "tooling/review-gate/src/report.rs";
+    vec![
+        case(
+            "the gate reading a finding whose place is in bold as prose",
+            "ENG-28",
+            Injection::replace(
+                REPORT,
+                "link_text(part.trim().trim_matches(MARKUP)).trim_matches(MARKUP);",
+                "link_text(part.trim().trim_matches('`')).trim_matches('`');",
+            ),
+            cargo_lib_test(
+                "review-gate",
+                "report::tests::a_finding_with_its_place_in_markup_reads_as_one",
+            ),
+            "a_finding_with_its_place_in_markup_reads_as_one",
+        ),
+        case(
+            "the gate leaving out a finding-shaped line whose place cannot be read",
+            "ENG-28",
+            Injection::replace(
+                REPORT,
+                "return if finding_shaped(&parts) {",
+                "return if finding_shaped(&parts[..1]) {",
+            ),
+            cargo_lib_test(
+                "review-gate",
+                "report::tests::a_finding_shaped_line_with_no_place_it_can_read_is_malformed_not_prose",
+            ),
+            "a_finding_shaped_line_with_no_place_it_can_read_is_malformed_not_prose",
+        ),
+        case(
+            "review-run passing by a generalist's finding line it cannot read",
+            "ENG-28",
+            Injection::replace(
+                "tooling/review-run/src/outcome.rs",
+                "for line in answer.lines().filter(|l| report::unread(l)) {",
+                "for line in answer.lines().filter(|_| false) {",
+            ),
+            cargo_lib_test(
+                "review-run",
+                "outcome::tests::a_generalist_s_finding_line_the_review_cannot_read_blocks_and_is_named",
+            ),
+            "a_generalist_s_finding_line_the_review_cannot_read_blocks_and_is_named",
+        ),
+        case(
+            "review-run deciding a review whose report cites an unknown id unnamed",
+            "ENG-28",
+            Injection::replace(
+                "tooling/review-run/src/outcome.rs",
+                "report_check(report, Some(answer), Some(known))",
+                "report_check(report, Some(answer), None)",
+            ),
+            cargo_lib_test(
+                "engineering",
+                "review_refusals::tests::the_checkout_s_review_run_names_an_unknown_id_and_an_unread_line",
+            ),
+            "the_checkout_s_review_run_names_an_unknown_id_and_an_unread_line",
         ),
     ]
 }

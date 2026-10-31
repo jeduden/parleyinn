@@ -39,9 +39,15 @@ what each job decides.
 
 Every line of your report is a finding or the outcome: no heading, scope line,
 preamble, reasoning, bold, list marker or other shape. Write at most ten
-findings, each in a form below. A finding's consequence says how
-the build gets slower, flakes or fails without telling the author what to do,
-the line of docs/ci.md it cites and the smallest change that fixes it.
+findings, each in a form below, its place the path from the repository root:
+`.github/workflows/ci.yml:95`, never `ci.yml:95`.
+
+A failure CI hides or passes breaks the requirement of the gate it skips and is
+a linked finding. docs/ci.md is no requirement. A build that gets slower or
+flakes breaks a rule of it alone, so it is a request: `path:line — request: add
+<that rule> — <why>`. The why says how the build gets slower or flakes, the
+docs/ci.md line and the smallest fix, after a dash never left out.
+
 Stakeholder consent to a path under `/.github/` is the review bundle's check,
 never a finding of yours. End with one line, `outcome: findings` or `outcome:
 none`, then a dash and one sentence on what the change does to CI's speed,

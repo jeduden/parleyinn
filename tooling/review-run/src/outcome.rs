@@ -7,12 +7,15 @@
 //! blocking finding. A specialist carries no
 //! severity: its findings reach the verdict only as its generalist
 //! weighs them, and a finding a generalist keeps from a specialist's
-//! requirement request stays a nit. An agent that did not answer, or a
+//! requirement request stays a nit. An agent that did not answer, a
 //! report the gate would refuse or that cites an id no requirement has,
-//! is named in the summary and in a blocking finding of its own, so the
-//! review is decided all the same and the author sees why it was not
-//! approved; the gate still refuses to post such a review (ENG-28), as
-//! its consulted list and reports show it.
+//! and a generalist's finding line the review cannot read are each
+//! named in a blocking finding of its own, so the review is decided all
+//! the same and the author sees why it was not approved. The gate still
+//! refuses to post a review an agent did not answer or whose report it
+//! refuses (ENG-28), as its consulted list and reports show it; it reads
+//! a cited id by its shape alone, holding no tree, so a report citing
+//! an unknown id reaches it as the request for changes decided here.
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::Write as _;
@@ -170,8 +173,9 @@ struct Weighed {
 
 /// Adds each answering generalist's kept findings to `findings`, each
 /// once, counts them, and names each generalist whose answer says
-/// neither a finding nor that it has none, with a blocking finding of
-/// its own: silence is no clean pass. A blocking finding kept from a
+/// neither a finding nor that it has none, or holds a finding line it
+/// cannot read, with a blocking finding of its own: silence is no clean
+/// pass, and a finding the review cannot read is never dropped. A blocking finding kept from a
 /// specialist's requirement request, in `reports`, is kept as a nit.
 fn weighed(
     plan: &Plan,
@@ -198,6 +202,19 @@ fn weighed(
                 ),
             ));
             unread.push(name.clone());
+        }
+        for line in answer.lines().filter(|l| report::unread(l)) {
+            findings.push(blocking(
+                REVIEW_PATH,
+                format!(
+                    "{name} answered a finding line the review cannot read, so its weighing \
+                     cannot be read: {}",
+                    line.trim()
+                ),
+            ));
+            if !unread.contains(&name) {
+                unread.push(name.clone());
+            }
         }
         for mut f in kept(answer) {
             if f.severity == BLOCKING && from_request(plan, &name, reports, &f) {

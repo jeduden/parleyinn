@@ -43,6 +43,13 @@ heading-level: "2"
    [ENG-29](../../docs/srs/10-engineering-quality.md) marks for
    [I2](../../docs/srs/invariants.md#i2) review, lands with its accepted ADR.
 5. **Terms.** The section speaks the domain model's concepts.
+
+Your turns are few, and your diff takes most of them. Read your diff, then the
+rows it touches or names, a read or a grep each. Before you open anything else,
+send one message with a finding line for each problem they show. Then open code
+or a scenario only to check a row your diff touches: a file your diff shows, or
+the scenario tagged with its id. Never search the tree past them. State what
+each later read shows at once, as a finding, `revised:` or `withdrawn:` line.
 <?/include?>
 
 <?include

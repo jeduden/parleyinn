@@ -89,12 +89,53 @@ fn a_line_with_no_place_is_prose() {
         "I read the diff.",
         "outcome: findings — one sentence.",
         "I read line: 3 — and it is fine",
-        "a.rs — if not addressed: x — ENG-04",
-        "a.rs:x — if not addressed: x — ENG-04",
+        "I checked a.rs:3 — and it is fine",
         "a.rs:12",
         "incomplete: its run ended with error_max_turns",
     ] {
         assert_eq!(line(text), Line::Prose, "{text:?}");
+    }
+}
+
+#[test]
+fn a_finding_with_its_place_in_markup_reads_as_one() {
+    for text in [
+        "**a.rs:1** — if not addressed: a hook panics — ENG-04",
+        "- **`a.rs:1`** — if not addressed: a hook panics — ENG-04",
+        "*a.rs:1* — if not addressed: a hook panics — ENG-04",
+        "__a.rs:1__ — if not addressed: a hook panics — ENG-04",
+        "**a.rs**:1 — if not addressed: a hook panics — ENG-04",
+        "[a.rs:1](a.rs#L1) — if not addressed: a hook panics — ENG-04",
+        "**[a.rs:1](a.rs#L1)** — if not addressed: a hook panics — ENG-04",
+        "finding: a.rs:1 — if not addressed: a hook panics — ENG-04",
+        "Finding, from the row: `a.rs:1` — if not addressed: a hook panics — ENG-04",
+    ] {
+        let Line::Linked(l) = line(text) else {
+            panic!("not linked: {text:?}");
+        };
+        assert_eq!((l.path.as_str(), l.line), ("a.rs", 1), "{text:?}");
+    }
+    for text in [
+        "**a.rs:2** — request: add a cap — reports grow",
+        "In a.rs:2 — request: add a cap — reports grow",
+    ] {
+        let Line::Request(r) = line(text) else {
+            panic!("not a request: {text:?}");
+        };
+        assert_eq!((r.path.as_str(), r.line), ("a.rs", 2), "{text:?}");
+    }
+}
+
+#[test]
+fn a_finding_shaped_line_with_no_place_it_can_read_is_malformed_not_prose() {
+    for text in [
+        "a.rs — if not addressed: x — ENG-04",
+        "a.rs:x — if not addressed: x — ENG-04",
+        "In ci.yml:x — request: change the shards — they repeat the build",
+        "see the diff — If not addressed: x — ENG-04",
+        "a.rs:1x — request: add a cap — why",
+    ] {
+        assert_eq!(line(text), Line::Malformed, "{text:?}");
     }
 }
 
@@ -416,6 +457,29 @@ fn an_assembled_report_replays_the_logged_findings_once_each_and_ends_with_the_a
 }
 
 #[test]
+fn an_assembled_report_keeps_a_finding_whose_place_is_in_bold_and_refuses_one_it_cannot_read() {
+    let got = assemble(
+        &texts(&[
+            "**a.rs:1** — if not addressed: a hook panics — ENG-04",
+            "a.rs:x — if not addressed: a pin is lost — I3",
+        ]),
+        "outcome: findings — two.",
+        None,
+    );
+
+    assert_eq!(
+        got,
+        "a.rs:1 — if not addressed: a hook panics — ENG-04\n\
+         a.rs:x — if not addressed: a pin is lost — I3\n\
+         outcome: findings — two.\n"
+    );
+    assert_eq!(
+        report_check(Some(&got), Some("outcome: findings — two."), None),
+        Some(Problem::Malformed { line: 2 })
+    );
+}
+
+#[test]
 fn a_revision_replaces_every_earlier_finding_at_its_place_where_the_first_stood() {
     let mut logged = texts(&LOGGED);
     logged.push("a.rs:1 — request: change ENG-04 — it reads two ways".to_owned());
@@ -550,6 +614,19 @@ fn a_place_reads_a_path_and_a_line_or_a_range() {
     assert_eq!(place("`a/b.rs:12`"), Some(("a/b.rs".to_owned(), 12)));
     assert_eq!(place("a/b.rs:3–4"), Some(("a/b.rs".to_owned(), 3)));
     assert_eq!(place("`a/b.rs`:7"), Some(("a/b.rs".to_owned(), 7)));
+    assert_eq!(place("a/b.rs:12**"), Some(("a/b.rs".to_owned(), 12)));
+    assert_eq!(place("**a/b.rs**:12"), Some(("a/b.rs".to_owned(), 12)));
+    assert_eq!(place("a/b.rs:12`**"), Some(("a/b.rs".to_owned(), 12)));
+    assert_eq!(
+        place("[a/b.rs:12](a/b.rs#L12)"),
+        Some(("a/b.rs".to_owned(), 12))
+    );
+    assert_eq!(place("[a/b.rs:12-14]"), Some(("a/b.rs".to_owned(), 12)));
+    // A link that is not the whole place is read as written.
+    assert_eq!(
+        place("[a/b.rs](x):12"),
+        Some(("[a/b.rs](x)".to_owned(), 12))
+    );
     assert_eq!(place("a/b.rs:-4"), None);
     assert_eq!(place(":4"), None);
     assert_eq!(place("a/b.rs"), None);

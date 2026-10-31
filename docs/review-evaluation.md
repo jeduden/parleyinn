@@ -19,7 +19,7 @@ bundle can dispatch, each deep instance, and every other agent under
 `domain-model`, `test-engineer` and `reviewer-engineer`. No agent routes
 the review: `review-run` runs the dispatched agents (ENG-28), so the
 routing is code, tested as code, and has no cases. A specialist whose
-diff is past 120 KiB runs in parts there, each on whole files of it, its
+diff is past 48 KiB runs in parts there, each on whole files of it, its
 report merged from theirs, and fails if one part does not answer. A case
 runs a component whole. The
 `review-eval` crate under [tooling/review-eval](../tooling/review-eval)

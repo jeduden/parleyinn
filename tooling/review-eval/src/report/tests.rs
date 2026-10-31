@@ -15,6 +15,40 @@ fn a_finding_line_tolerates_list_markers_and_hyphens() {
 }
 
 #[test]
+fn a_finding_whose_place_is_in_markup_reads_as_one() {
+    for line in [
+        "**a/b.md:3** — blocking — x — lang-markdown",
+        "- **`a/b.md:3`** — blocking — x — lang-markdown",
+        "[a/b.md:3](a/b.md#L3) — blocking — x — lang-markdown",
+    ] {
+        let f = finding(line).unwrap_or_else(|| panic!("{line}"));
+        assert_eq!((f.path.as_str(), f.line), ("a/b.md", 3), "{line}");
+        assert!(!unread(line), "{line}");
+    }
+}
+
+#[test]
+fn a_finding_shaped_line_that_does_not_read_is_unread() {
+    for line in [
+        "a/b.md — blocking — no line — lang-markdown",
+        "a/b.md:x — **nit** — no number",
+        "the place — Blocking — breaks I2",
+    ] {
+        assert!(finding(line).is_none(), "{line}");
+        assert!(unread(line), "{line}");
+    }
+    for line in [
+        "a/b.md:3 — blocking — x",
+        "dropped — a.rs:1 — blocking — gone — lang-rust",
+        "none — nothing to add — review-code",
+        "The code is sound — no nit — and no blocker.",
+        "The code is sound.",
+    ] {
+        assert!(!unread(line), "{line}");
+    }
+}
+
+#[test]
 fn a_line_range_reads_as_its_first_line() {
     let f = finding("- crates/x/src/a.rs:12-20 — blocking — an unwrap — ENG-16").unwrap();
     assert_eq!((f.path.as_str(), f.line), ("crates/x/src/a.rs", 12));
