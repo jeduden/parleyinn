@@ -4,7 +4,7 @@
 
 use std::collections::BTreeMap;
 
-use review_eval::runner::{GENERALIST_TOOLS, SPECIALIST_TOOLS};
+use review_eval::runner::TOOLS;
 
 use crate::list;
 
@@ -34,11 +34,12 @@ pub const RUN_LOGS: &str = "review/logs";
 const UPLOAD_ACTION: &str = "actions/upload-artifact@";
 
 /// The tools review-run gives its agents, by kind, as the evaluation's
-/// runner sets them.
-pub const RUN_TOOLS: [(&str, &str); 2] = [
-    ("specialist", SPECIALIST_TOOLS),
-    ("generalist", GENERALIST_TOOLS),
-];
+/// runner sets them: reading tools alone, a specialist's report being
+/// assembled from its run log.
+pub const RUN_TOOLS: [(&str, &str); 2] = [("specialist", TOOLS), ("generalist", TOOLS)];
+
+/// The tools that read and nothing more, which every agent may use.
+pub const READING: [&str; 3] = ["Read", "Glob", "Grep"];
 
 /// A GitHub Actions workflow split the way the ENG-28 steps read it:
 /// its triggers and its jobs, comments left out.
@@ -230,19 +231,18 @@ fn uploads_dir(paths: &[String], dir: &str) -> bool {
         .any(|p| p.starts_with(dir) || (!excluded && above(&p)))
 }
 
-/// The tools of the comma-separated `tools` other than reading and
-/// `scoped`: anything that writes, runs a command, reaches the web or
-/// starts an agent.
-fn unscoped<'a>(tools: &'a str, scoped: &'a str) -> impl Iterator<Item = &'a str> {
+/// The tools of the comma-separated `tools` other than reading:
+/// anything that writes, runs a command, reaches the web or starts an
+/// agent, a scoped `Edit(...)` or `Write(...)` rule included.
+fn beyond_reading(tools: &str) -> impl Iterator<Item = &str> {
     tools
         .split(',')
         .map(str::trim)
         .filter(|t| !t.is_empty())
-        .filter(move |t| {
-            *t != scoped
-                && !["Read", "Glob", "Grep"]
-                    .iter()
-                    .any(|r| t == r || t.starts_with(&format!("{r}(")))
+        .filter(|t| {
+            !READING
+                .iter()
+                .any(|r| t == r || t.starts_with(&format!("{r}(")))
         })
 }
 
@@ -359,20 +359,19 @@ impl Workflow {
         problems
     }
 
-    /// Requires the agents to write only under `dir`: `run`, the tools
-    /// review-run gives each kind of agent, and every `--allowedTools`
-    /// an agent job passes, allow `Edit(./<dir>/**)` and no other
-    /// writing tool. An `Edit` rule governs every tool that changes a
-    /// file, `Write` included; a `Write(path)` rule grants nothing, so
-    /// an agent that has one cannot write its reports.
+    /// Requires the agents to write nothing: `run`, the tools review-run
+    /// gives each kind of agent, and every `--allowedTools` an agent job
+    /// passes, allow the reading tools and no other, a scoped writing
+    /// rule included. A specialist's report is assembled from its run
+    /// log, so no agent needs to write.
     #[must_use]
-    pub fn agents_write_only(&self, dir: &str, run: &[(&str, &str)]) -> Vec<String> {
-        let scoped = format!("Edit(./{dir}/**)");
+    pub fn agents_write_nothing(&self, run: &[(&str, &str)]) -> Vec<String> {
+        let want = format!("{} alone", READING.join(", "));
         let mut problems = Vec::new();
         for (kind, tools) in run {
             problems.extend(
-                unscoped(tools, &scoped)
-                    .map(|t| format!("review-run's {kind} may use {t}, want {scoped} alone")),
+                beyond_reading(tools)
+                    .map(|t| format!("review-run's {kind} may use {t}, want {want}")),
             );
         }
         for j in self.agent_jobs() {
@@ -383,8 +382,8 @@ impl Workflow {
                     .trim()
                     .trim_matches('"');
                 problems.extend(
-                    unscoped(tools, &scoped)
-                        .map(|t| format!("agent job {} may use {t}, want {scoped} alone", j.name)),
+                    beyond_reading(tools)
+                        .map(|t| format!("agent job {} may use {t}, want {want}", j.name)),
                 );
             }
         }
@@ -628,30 +627,62 @@ fn gate_args(reviewed: &str, head: &str) -> Vec<String> {
     .to_vec()
 }
 
-/// The report and run-log answer of the row's one specialist: a
-/// `report` cell of `given`, or none, hands the gate a report with a
-/// linked finding that ends with the outcome its answer gives,
-/// `request` one with a requirement request instead, `missing` no
-/// report, `empty` a blank one, `no outcome` one that ends with a
-/// finding, `other outcome` one that ends with another outcome, and
-/// `malformed finding` one whose finding gives a severity where its
-/// consequence and requirements belong; `None` for any other value.
-fn report(row: &BTreeMap<String, String>) -> Option<(Option<&'static str>, &'static str)> {
-    const ANSWERS: &str = r#"{"lang-rust":"outcome: findings — fine\nreport: review/reports/lang-rust.md","review-code":"r"}"#;
-    let report = match row.get("report").map_or("given", String::as_str) {
-        "given" => Some("a.rs:1 — if not addressed: x breaks — I2\noutcome: findings — fine\n"),
-        "request" => {
-            Some("a.rs:1 — request: add a rule on x — none says so\noutcome: findings — fine\n")
-        }
-        "missing" => None,
-        "empty" => Some("  \n"),
-        "no outcome" => Some("a.rs:1 — if not addressed: x breaks — I2\n"),
-        "other outcome" => Some("outcome: none — not fine\n"),
-        "malformed finding" => Some("a.rs:1 — nit — x\noutcome: findings — fine\n"),
+/// The report review-run assembled from the row's one specialist's run
+/// log, and the answers file holding its final answer: a `specialist`
+/// cell of `reported`, or none, hands the gate a report with a linked
+/// finding that ends with the outcome line the specialist answered,
+/// `requested` one with a requirement request instead, `no report` no
+/// report, `empty report` a blank one, `incomplete` the report of a run
+/// cut off before its answer, headed so and ending with no outcome, `no
+/// outcome answered` an answer with no outcome line, `other outcome
+/// answered` an answer whose outcome is not the report's, `malformed
+/// finding` a logged finding that gives a severity where its
+/// consequence and requirements belong, and `revised nothing` a
+/// revision of a finding the specialist never stated; `None` for any
+/// other value.
+fn specialist(row: &BTreeMap<String, String>) -> Option<(Option<&'static str>, &'static str)> {
+    const FINDINGS: &str = r#"{"lang-rust":"outcome: findings — fine","review-code":"r"}"#;
+    const NONE: &str = r#"{"lang-rust":"outcome: none — fine","review-code":"r"}"#;
+    const NO_OUTCOME: &str = r#"{"lang-rust":"I am done.","review-code":"r"}"#;
+    let (report, answers) = match row.get("specialist").map_or("reported", String::as_str) {
+        "reported" => (
+            Some("a.rs:1 — if not addressed: x breaks — I2\noutcome: findings — fine\n"),
+            FINDINGS,
+        ),
+        "requested" => (
+            Some("a.rs:1 — request: add a rule on x — none says so\noutcome: findings — fine\n"),
+            FINDINGS,
+        ),
+        "no report" => (None, FINDINGS),
+        "empty report" => (Some("  \n"), FINDINGS),
+        "incomplete" => (
+            Some(
+                "incomplete: its run ended with error_max_turns\na.rs:1 — if not addressed: x breaks — I2\n",
+            ),
+            NO_OUTCOME,
+        ),
+        "no outcome answered" => (
+            Some("a.rs:1 — if not addressed: x breaks — I2\noutcome: findings — fine\n"),
+            NO_OUTCOME,
+        ),
+        "other outcome answered" => (
+            Some("a.rs:1 — if not addressed: x breaks — I2\noutcome: findings — fine\n"),
+            NONE,
+        ),
+        "malformed finding" => (
+            Some("a.rs:1 — nit — x\noutcome: findings — fine\n"),
+            FINDINGS,
+        ),
+        "revised nothing" => (
+            Some(
+                "a.rs:1 — if not addressed: x breaks — I2\nrevised: b.rs:2 — request: add y — why\noutcome: findings — fine\n",
+            ),
+            FINDINGS,
+        ),
         _ => return None,
     };
 
-    Some((report, ANSWERS))
+    Some((report, answers))
 }
 
 /// The dispatch a table row hands the gate by default: one generalist
@@ -659,7 +690,7 @@ fn report(row: &BTreeMap<String, String>) -> Option<(Option<&'static str>, &'sta
 const DISPATCH: &str = r#"{"review-code":["lang-rust"]}"#;
 
 /// What [`gate_outcome`] names for a row whose `dispatch`, `consulted`,
-/// `report` or `own check` cell holds a value it does not define, so a
+/// `specialist` or `own check` cell holds a value it does not define, so a
 /// mistyped row fails rather than reads as the default.
 pub const UNKNOWN_CELL: &str = "a cell value the table does not define";
 
@@ -712,7 +743,7 @@ fn own_check(cell: &str) -> Option<String> {
 /// list, `nit` or `blocking` one deterministic finding of that
 /// severity, `malformed` a file that is no list, and `missing` no file.
 /// It always gets `--dispatch`, `--consulted`, `--reports` and
-/// `--answers` (see [`dispatch`], [`consulted`] and [`report`]), and a
+/// `--answers` (see [`dispatch`], [`consulted`] and [`specialist`]), and a
 /// row whose cell for any of them, or for `own check`, it does not
 /// define gives [`UNKNOWN_CELL`].
 #[must_use]
@@ -723,7 +754,7 @@ pub fn gate_outcome(row: &BTreeMap<String, String>) -> &'static str {
     let (Some(dispatched), Some(consulted), Some((report, answers)), Some(own)) = (
         dispatch(row),
         consulted(row),
-        report(row),
+        specialist(row),
         own_check(cell("own check")),
     ) else {
         return UNKNOWN_CELL;

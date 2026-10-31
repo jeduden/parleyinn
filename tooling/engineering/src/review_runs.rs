@@ -1,11 +1,11 @@
 //! ENG-28: the review is run by code. `review-run`, given a dispatch,
-//! runs each dispatched specialist as its own agent, every dispatched
-//! generalist only once every specialist has ended, and writes the
-//! review outcome from what they answered. The check runs `review-run`
-//! on a work directory holding the checkout's definitions of the
-//! dispatched agents, with a stand-in for the `claude` command line that
-//! records when each agent's run starts and ends and answers as the
-//! agent would.
+//! runs each dispatched specialist as its own agent, assembles its
+//! report from its run log, runs every dispatched generalist only once
+//! every specialist has ended, and writes the review outcome from what
+//! they answered. The check runs `review-run` on a work directory
+//! holding the checkout's definitions of the dispatched agents, with a
+//! stand-in for the `claude` command line that records when each
+//! agent's run starts and ends and answers as the agent would.
 
 use std::fs;
 use std::path::Path;
@@ -78,32 +78,35 @@ pub fn agent_of(command: &Command) -> String {
         .unwrap_or_default()
 }
 
-/// Answers `command` as `agent` would: a specialist writes its report
-/// with one linked finding and answers its outcome line; a generalist
-/// keeps, as a nit, the finding of the specialist [`GENERALISTS`] names
-/// for it.
+/// The finding a stand-in specialist states in its text.
+pub const FINDING: &str = "src/a.rs:1 — if not addressed: a long line hides a bug — I9";
+
+/// Answers `command` as `agent` would, in its log alone: a specialist
+/// states one linked finding in its text and answers its outcome line;
+/// a generalist keeps, as a nit, the finding of the specialist
+/// [`GENERALISTS`] names for it.
 fn answer(command: &Command, agent: &str) -> Result<(), String> {
-    let write = |path: &Path, text: &str| {
-        fs::write(path, text).map_err(|e| format!("write {}: {e}", path.display()))
-    };
-    let result = if let Some((_, path, from)) = GENERALISTS.iter().find(|(g, _, _)| *g == agent) {
-        format!("{path}:1 — nit — a long line — {from}\n{agent} finds its scope sound.")
-    } else {
-        let outcome = format!("outcome: findings — {agent} saw one finding.");
-        let report = command.cwd.join(format!("review/reports/{agent}.md"));
-        write(
-            &report,
-            &format!("src/a.rs:1 — if not addressed: a long line hides a bug — I9\n\n{outcome}\n"),
-        )?;
-        format!("{outcome}\nreview/reports/{agent}.md")
-    };
+    let (text, result) =
+        if let Some((_, path, from)) = GENERALISTS.iter().find(|(g, _, _)| *g == agent) {
+            let answer =
+                format!("{path}:1 — nit — a long line — {from}\n{agent} finds its scope sound.");
+            (answer.clone(), answer)
+        } else {
+            (
+                format!("I read the diff.\n{FINDING}"),
+                format!("outcome: findings — {agent} saw one finding."),
+            )
+        };
     let log = command
         .stdout_to
         .as_deref()
         .ok_or("the run logs to no file")?;
+    let call = serde_json::json!({"type": "assistant", "parent_tool_use_id": null, "message": {
+        "id": format!("m-{agent}"), "model": "claude-haiku-5-5", "usage": {},
+        "content": [{"type": "text", "text": text}]}});
     let line = serde_json::json!({"type": "result", "subtype": "success", "is_error": false,
         "result": result, "total_cost_usd": 0.01, "num_turns": 2});
-    write(log, &format!("{line}\n"))
+    fs::write(log, format!("{call}\n{line}\n")).map_err(|e| format!("write {}: {e}", log.display()))
 }
 
 /// Lays out in `workdir` what the review job prepares for `review-run`:
@@ -189,7 +192,9 @@ pub fn order_problems(events: &[Event]) -> Vec<String> {
 
 /// What is wrong with the files `review-run` wrote in `workdir`: an
 /// outcome that does not read, a finding a generalist answered that it
-/// leaves out, and an agent that answered but is not consulted.
+/// leaves out, an agent that answered but is not consulted, and a
+/// specialist's report not assembled from its log: the finding it
+/// stated, then the outcome line it answered, nothing else.
 #[must_use]
 pub fn outcome_problems(workdir: &Path) -> Vec<String> {
     let read = |rel: &str| {
@@ -197,6 +202,16 @@ pub fn outcome_problems(workdir: &Path) -> Vec<String> {
         fs::read_to_string(&path).map_err(|e| format!("read {}: {e}", path.display()))
     };
     let mut problems = Vec::new();
+    for name in SPECIALISTS {
+        let want = format!("{FINDING}\noutcome: findings — {name} saw one finding.\n");
+        match read(&format!("review/reports/{name}.md")) {
+            Ok(report) if report == want => {}
+            Ok(report) => problems.push(format!(
+                "{name}'s report is not assembled from its log: {report:?}"
+            )),
+            Err(e) => problems.push(e),
+        }
+    }
     match read("review/outcome.json").and_then(|text| {
         review_gate::parse_outcome(&text).map_err(|e| format!("review/outcome.json: {e}"))
     }) {

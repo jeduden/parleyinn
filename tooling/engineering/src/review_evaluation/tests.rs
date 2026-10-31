@@ -16,7 +16,7 @@ fn graded(
     finding: &str,
     forbidden: &str,
     answer: &str,
-    report: &str,
+    stated: &str,
     answered: &str,
     run: &str,
 ) -> BTreeMap<String, String> {
@@ -25,7 +25,7 @@ fn graded(
         ("finding", finding),
         ("forbidden", forbidden),
         ("answer", answer),
-        ("report", report),
+        ("stated", stated),
         ("answered", answered),
         ("run", run),
     ])
@@ -41,6 +41,7 @@ fn the_table_s_component_is_a_strict_lined_specialist_and_its_case_a_defect() {
     assert_eq!(case.kind, "defect");
     assert_eq!(case.expect.finding[0].path, WANTED);
     assert_eq!(case.expect.none[0].path, FORBIDDEN);
+    assert_eq!(case.expect.stated[0].path, WANTED);
     assert_eq!((case.repetitions, case.passes), (3, 2));
 }
 
@@ -51,8 +52,8 @@ fn the_grading_table_of_the_scenario_holds() {
             "as expected",
             "found",
             "none",
-            "last line and path",
-            "written",
+            "outcome line",
+            "before answer",
             "yes",
             "passes",
         ),
@@ -60,8 +61,8 @@ fn the_grading_table_of_the_scenario_holds() {
             "other",
             "found",
             "none",
-            "last line and path",
-            "written",
+            "outcome line",
+            "before answer",
             "yes",
             "fails on outcome",
         ),
@@ -69,8 +70,8 @@ fn the_grading_table_of_the_scenario_holds() {
             "as expected",
             "missing",
             "none",
-            "last line and path",
-            "written",
+            "outcome line",
+            "before answer",
             "yes",
             "fails on finding",
         ),
@@ -78,8 +79,8 @@ fn the_grading_table_of_the_scenario_holds() {
             "as expected",
             "found",
             "found",
-            "last line and path",
-            "written",
+            "outcome line",
+            "before answer",
             "yes",
             "fails on forbidden",
         ),
@@ -88,7 +89,7 @@ fn the_grading_table_of_the_scenario_holds() {
             "found",
             "none",
             "more",
-            "written",
+            "before answer",
             "yes",
             "passes, slips on answer",
         ),
@@ -96,17 +97,26 @@ fn the_grading_table_of_the_scenario_holds() {
             "as expected",
             "found",
             "none",
-            "last line and path",
-            "missing",
+            "no outcome",
+            "before answer",
             "yes",
-            "fails on report",
+            "fails on answer",
         ),
         graded(
             "as expected",
             "found",
             "none",
-            "last line and path",
-            "written",
+            "outcome line",
+            "only in answer",
+            "yes",
+            "fails on stating",
+        ),
+        graded(
+            "as expected",
+            "found",
+            "none",
+            "outcome line",
+            "before answer",
             "no",
             "fails on no answer",
         ),
@@ -122,8 +132,8 @@ fn a_wrong_grading_row_is_named() {
             "other",
             "found",
             "none",
-            "last line and path",
-            "written",
+            "outcome line",
+            "before answer",
             "yes",
             "passes",
         ),
@@ -132,7 +142,7 @@ fn a_wrong_grading_row_is_named() {
             "found",
             "none",
             "more",
-            "written",
+            "before answer",
             "yes",
             "fails on answer",
         ),
@@ -157,9 +167,6 @@ fn a_wrong_grading_row_is_named() {
 #[test]
 fn every_failure_is_named_by_its_first_words() {
     assert_eq!(failed_on("did not answer: deadline"), "no answer");
-    assert_eq!(failed_on("wrote no report"), "report");
-    assert_eq!(failed_on("wrote an empty report"), "report");
-    assert_eq!(failed_on("report does not end with its outcome"), "report");
     assert_eq!(
         failed_on(
             "report refused: has a report whose line 1 is neither a linked finding nor a requirement request"
@@ -170,9 +177,14 @@ fn every_failure_is_named_by_its_first_words() {
     assert_eq!(failed_on("no finding at a.rs"), "finding");
     assert_eq!(failed_on("a finding at b.rs: x"), "forbidden");
     assert_eq!(
-        failed_on("answer holds more than the last line and the path: x"),
+        failed_on("did not state before its answer at a.rs"),
+        "stating"
+    );
+    assert_eq!(
+        failed_on("answer holds more than the outcome line: x"),
         "answer"
     );
+    assert_eq!(failed_on("answered no outcome line"), "answer");
     assert_eq!(failed_on("wrote review/reports/other.md"), "something else");
 }
 
@@ -228,7 +240,6 @@ fn a_wrong_decision_row_is_named_and_an_undecided_list_fails() {
     assert_eq!(decide("pass"), ("fails", 1));
     assert_eq!(decide("pass, pass, pass"), ("passes", 2));
 }
-
 #[test]
 fn a_failed_case_is_one_blocking_finding_and_the_scorecard_line_reads_back() {
     assert_eq!(failed_case_is_a_blocking_finding(), Vec::<String>::new());

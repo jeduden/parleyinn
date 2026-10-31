@@ -88,13 +88,45 @@ fn an_agent_run_twice_never_or_undispatched_is_named() {
     );
 }
 
-/// Writes `outcome` and `consulted` where review-run writes them.
+/// Writes `outcome` and `consulted` where review-run writes them, and
+/// each specialist's report as review-run assembles it.
 fn written(outcome: &str, consulted: &str) -> TempDir {
     let work = TempDir::new().unwrap();
-    fs::create_dir_all(work.path().join("review")).unwrap();
+    fs::create_dir_all(work.path().join("review/reports")).unwrap();
     fs::write(work.path().join("review/outcome.json"), outcome).unwrap();
     fs::write(work.path().join("review/consulted.json"), consulted).unwrap();
+    for name in SPECIALISTS {
+        fs::write(
+            work.path().join(format!("review/reports/{name}.md")),
+            format!("{FINDING}\noutcome: findings — {name} saw one finding.\n"),
+        )
+        .unwrap();
+    }
     work
+}
+
+#[test]
+fn a_specialist_s_report_not_assembled_from_its_log_is_named() {
+    let work = written(
+        r#"{"verdict": "approve", "summary": "s", "findings": [{"path": "src/a.rs", "line": 1, "severity": "nit", "body": "b"}, {"path": "docs/a.md", "line": 1, "severity": "nit", "body": "b"}]}"#,
+        r#"["lang-markdown", "lang-rust", "test-engineer-unit", "review-code", "review-spec"]"#,
+    );
+    assert!(outcome_problems(work.path()).is_empty());
+    fs::write(
+        work.path().join("review/reports/lang-rust.md"),
+        "outcome: findings — lang-rust saw one finding.\n",
+    )
+    .unwrap();
+    fs::remove_file(work.path().join("review/reports/lang-markdown.md")).unwrap();
+
+    let problems = outcome_problems(work.path());
+
+    assert_eq!(problems.len(), 2, "{problems:?}");
+    assert!(problems[0].starts_with("read "), "{problems:?}");
+    assert_eq!(
+        problems[1],
+        "lang-rust's report is not assembled from its log: \"outcome: findings — lang-rust saw one finding.\\n\""
+    );
 }
 
 #[test]
@@ -177,9 +209,8 @@ fn a_review_run_that_cannot_write_its_outcome_is_named() {
 }
 
 #[test]
-fn the_stand_in_answers_as_the_agent_and_records_its_run() {
+fn the_stand_in_answers_as_the_agent_in_its_log_alone_and_records_its_run() {
     let work = TempDir::new().unwrap();
-    fs::create_dir_all(work.path().join("review/reports")).unwrap();
     let log = work.path().join("log.jsonl");
     let host = Recorder::default();
     let command = Command::new("claude", &["--agent", "lang-rust"], work.path()).logging_to(&log);
@@ -191,16 +222,18 @@ fn the_stand_in_answers_as_the_agent_and_records_its_run() {
         host.events.lock().unwrap().clone(),
         [started("lang-rust"), ended("lang-rust")]
     );
-    let report = fs::read_to_string(work.path().join("review/reports/lang-rust.md")).unwrap();
-    assert!(
-        report.ends_with("outcome: findings — lang-rust saw one finding.\n"),
-        "{report}"
+    let logged = review_eval::log::parse(&fs::read_to_string(&log).unwrap());
+    assert!(logged.answered);
+    assert_eq!(
+        logged.answer,
+        "outcome: findings — lang-rust saw one finding."
     );
-    assert!(fs::read_to_string(&log).unwrap().contains("\"success\""));
+    assert_eq!(logged.texts, [format!("I read the diff.\n{FINDING}")]);
+    assert!(!work.path().join("review/reports").exists());
 }
 
 #[test]
-fn the_stand_in_fails_a_run_that_logs_nowhere_or_cannot_report() {
+fn the_stand_in_fails_a_run_that_logs_nowhere() {
     let work = TempDir::new().unwrap();
     let host = Recorder::default();
 
@@ -210,7 +243,7 @@ fn the_stand_in_fails_a_run_that_logs_nowhere_or_cannot_report() {
         "the run logs to no file"
     );
 
-    let specialist = Command::new("claude", &[], work.path());
+    let specialist = Command::new("claude", &[], work.path()).logging_to(&work.path().join("x/y"));
     assert!(host.run(&specialist).unwrap_err().starts_with("write "));
     assert_eq!(agent_of(&specialist), "");
 }

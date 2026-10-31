@@ -44,7 +44,7 @@ fn agents_run_by(w: &mut World, cmd: String) -> Result<(), String> {
 }
 
 #[then(
-    regex = r"^review-run runs each specialist the review bundle dispatches as its own agent, every generalist only once every specialist has ended, and writes the review outcome from what they answered$"
+    regex = r"^review-run runs each specialist the review bundle dispatches as its own agent, assembles its report from its run log, runs every generalist only once every specialist has ended, and writes the review outcome from what they answered$"
 )]
 fn review_runs_by_code(w: &mut World) -> Result<(), String> {
     let work = testkit::TempDir::new().map_err(|e| format!("make a work directory: {e}"))?;
@@ -54,12 +54,12 @@ fn review_runs_by_code(w: &mut World) -> Result<(), String> {
     ))
 }
 
-#[then(regex = r#"^its agents may write only their reports, under "([^"]+)"$"#)]
-fn agents_write_only(w: &mut World, dir: String) -> Result<(), String> {
+#[then(regex = r"^its agents can write nothing: review-run allows them Read, Glob and Grep alone$")]
+fn agents_write_nothing(w: &mut World) -> Result<(), String> {
     outcome(
         eng(w)
             .flow
-            .agents_write_only(&dir, &review_workflow::RUN_TOOLS),
+            .agents_write_nothing(&review_workflow::RUN_TOOLS),
     )
 }
 

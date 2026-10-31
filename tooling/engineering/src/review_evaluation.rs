@@ -11,7 +11,7 @@ use std::path::Path;
 
 use review_eval::case::{Case, Expect, Expected};
 use review_eval::component::{Component, Kind};
-use review_eval::grade::{Run, grade};
+use review_eval::grade::grade;
 use review_eval::log::RunLog;
 use review_eval::plan::{self, Planned};
 use review_eval::published::{self, Line};
@@ -20,9 +20,8 @@ use review_eval::{CASES, check};
 
 use crate::{Checkout, list};
 
-/// The component's name and report the decision table grades.
+/// The component's name the decision table grades.
 const COMPONENT: &str = "lang-rust";
-const REPORT: &str = "review/reports/lang-rust.md";
 /// The paths the table's case expects a finding at, and forbids one at.
 const WANTED: &str = "crates/x/src/a.rs";
 const FORBIDDEN: &str = "crates/x/src/b.rs";
@@ -71,8 +70,13 @@ fn table_component() -> Component {
 }
 
 /// The decision table's case: a defect that wants an unwrap finding at
-/// one path and forbids a finding at another.
+/// one path, stated before the answer, and forbids a finding at another.
 fn table_case() -> Case {
+    let unwrap = Expected {
+        path: WANTED.to_owned(),
+        mentions: vec!["unwrap".to_owned()],
+        ..Expected::default()
+    };
     Case {
         component: COMPONENT.to_owned(),
         name: "table".to_owned(),
@@ -83,15 +87,12 @@ fn table_case() -> Case {
         seeds: Vec::new(),
         expect: Expect {
             outcome: vec!["findings".to_owned()],
-            finding: vec![Expected {
-                path: WANTED.to_owned(),
-                mentions: vec!["unwrap".to_owned()],
-                ..Expected::default()
-            }],
+            finding: vec![unwrap.clone()],
             none: vec![Expected {
                 path: FORBIDDEN.to_owned(),
                 ..Expected::default()
             }],
+            stated: vec![unwrap],
             ..Expect::default()
         },
         repetitions: 3,
@@ -101,7 +102,12 @@ fn table_case() -> Case {
 
 /// What the grader says of the run `row` describes: `passes`, `passes,
 /// slips on` what it slips on first, or `fails on` what it fails on
-/// first.
+/// first. The row's `finding` and `forbidden` say which lines the
+/// specialist stated in its text, `stated` whether it stated them before
+/// its answer or only in it, `answer` whether its answer is the outcome
+/// line, `more` than it or `no outcome` line, `outcome` whether that
+/// line gives the outcome the case expects, and `answered` whether the
+/// run ended with a successful result.
 fn run_outcome(row: &BTreeMap<String, String>) -> String {
     let column = |key: &str| row.get(key).map_or("", String::as_str);
     let (component, case) = (table_component(), table_case());
@@ -110,22 +116,30 @@ fn run_outcome(row: &BTreeMap<String, String>) -> String {
     } else {
         "outcome: none — it is fine."
     };
-    let mut report = String::new();
+    let mut lines = Vec::new();
     if column("finding") == "found" {
-        report.push_str(&format!(
-            "{WANTED}:6 — if not addressed: an unwrap outside tests panics — ENG-16\n"
+        lines.push(format!(
+            "{WANTED}:6 — if not addressed: an unwrap outside tests panics — ENG-16"
         ));
     }
     if column("forbidden") == "found" {
-        report.push_str(&format!(
-            "{FORBIDDEN}:2 — request: add a rule on line length — a long line\n"
+        lines.push(format!(
+            "{FORBIDDEN}:2 — request: add a rule on line length — a long line"
         ));
     }
-    report.push_str(&format!("\n{outcome_line}\n"));
-    let answer = if column("answer") == "more" {
-        format!("I read the diff.\n{outcome_line}\n{REPORT}\n")
+    let ending = match column("answer") {
+        "more" => format!("I read the diff.\n{outcome_line}\n"),
+        "no outcome" => "I read the diff and I am done.\n".to_owned(),
+        _ => format!("{outcome_line}\n"),
+    };
+    // The harness logs the answer as the last text block too.
+    let (texts, answer) = if column("stated") == "only in answer" {
+        let whole = format!("{}\n{ending}", lines.join("\n"));
+        (vec![whole.clone()], whole)
     } else {
-        format!("{outcome_line}\n{REPORT}\n")
+        let mut texts = lines;
+        texts.push(ending.clone());
+        (texts, ending)
     };
     let log = RunLog {
         answered: column("answered") == "yes",
@@ -135,17 +149,10 @@ fn run_outcome(row: &BTreeMap<String, String>) -> String {
             "error_max_turns".to_owned()
         },
         answer,
-        writes: vec![REPORT.to_owned()],
+        texts,
         ..RunLog::default()
     };
-    let graded = grade(
-        &component,
-        &case,
-        &Run {
-            log: &log,
-            report: (column("report") == "written").then_some(report.as_str()),
-        },
-    );
+    let graded = grade(&component, &case, &log);
     match (graded.failures.first(), graded.slips.first()) {
         (Some(f), _) => format!("fails on {}", failed_on(f)),
         (None, Some(s)) => format!("passes, slips on {}", failed_on(s)),
@@ -315,10 +322,7 @@ fn table_suite() -> SuiteRecord {
                 vec![
                     run(
                         true,
-                        vec![
-                            "a line that is neither a finding nor the outcome: Findings:"
-                                .to_owned(),
-                        ],
+                        vec!["answer holds more than the outcome line: Findings:".to_owned()],
                     ),
                     run(true, Vec::new()),
                 ],
@@ -331,11 +335,7 @@ fn table_suite() -> SuiteRecord {
 fn failed_on(failure: &str) -> &'static str {
     if failure.starts_with("did not answer") {
         "no answer"
-    } else if failure.starts_with("wrote no report")
-        || failure.starts_with("wrote an empty report")
-        || failure.starts_with("report does not end")
-        || failure.starts_with("report refused")
-    {
+    } else if failure.starts_with("report refused") {
         "report"
     } else if failure.starts_with("outcome ") {
         "outcome"
@@ -343,7 +343,9 @@ fn failed_on(failure: &str) -> &'static str {
         "finding"
     } else if failure.starts_with("a finding at") {
         "forbidden"
-    } else if failure.starts_with("answer ") {
+    } else if failure.starts_with("did not state") {
+        "stating"
+    } else if failure.starts_with("answer") {
         "answer"
     } else {
         "something else"

@@ -527,16 +527,18 @@ fn gate_outcome_hands_the_gate_the_specialist_s_report() {
     };
 
     for (value, want) in [
-        ("given", "APPROVE"),
-        ("request", "APPROVE"),
-        ("missing", "an error"),
-        ("empty", "an error"),
-        ("no outcome", "an error"),
-        ("other outcome", "an error"),
+        ("reported", "APPROVE"),
+        ("requested", "APPROVE"),
+        ("no report", "an error"),
+        ("empty report", "an error"),
+        ("incomplete", "an error"),
+        ("no outcome answered", "an error"),
+        ("other outcome answered", "an error"),
         ("malformed finding", "an error"),
-        ("givne", UNKNOWN_CELL),
+        ("revised nothing", "an error"),
+        ("reportd", UNKNOWN_CELL),
     ] {
-        assert_eq!(gate_outcome(&row("report", value)), want, "{value}");
+        assert_eq!(gate_outcome(&row("specialist", value)), want, "{value}");
     }
     for (value, want) in [
         ("none", "APPROVE"),
@@ -566,14 +568,15 @@ fn grants_write_reads_quoted_values_and_write_all() {
     assert!(!grants_write("    permissions: read-all\n"));
 }
 
-/// The tool lists of review-run's agents, as the runner gives them.
-const SCOPED: [(&str, &str); 2] = [
-    ("specialist", "Read,Glob,Grep,Edit(./review/reports/**)"),
+/// The tool lists of review-run's agents, as the runner gives them:
+/// reading tools alone for both kinds.
+const READING_ONLY: [(&str, &str); 2] = [
+    ("specialist", "Read,Glob,Grep"),
     ("generalist", "Read,Glob,Grep"),
 ];
 
 #[test]
-fn agents_write_only_wants_writes_scoped_to_the_reports() {
+fn agents_write_nothing_refuses_every_tool_beyond_reading() {
     let with = |tools: &str| {
         REVIEW_FLOW.replace(
             RUN,
@@ -583,46 +586,48 @@ fn agents_write_only_wants_writes_scoped_to_the_reports() {
 
     assert!(
         parse(REVIEW_FLOW)
-            .agents_write_only("review/reports", &SCOPED)
+            .agents_write_nothing(&READING_ONLY)
             .is_empty()
     );
     assert!(
-        parse(&with("\"Read,Grep,Edit(./review/reports/**)\""))
-            .agents_write_only("review/reports", &SCOPED)
+        parse(&with("\"Read(./pr-head/**),Grep,Glob\""))
+            .agents_write_nothing(&READING_ONLY)
             .is_empty()
     );
     assert_eq!(
-        parse(&with("Read,Write,Bash(ls:*)")).agents_write_only("review/reports", &SCOPED),
+        parse(&with("Read,Write,Bash(ls:*)")).agents_write_nothing(&READING_ONLY),
         [
-            "agent job review may use Write, want Edit(./review/reports/**) alone",
-            "agent job review may use Bash(ls:*), want Edit(./review/reports/**) alone",
+            "agent job review may use Write, want Read, Glob, Grep alone",
+            "agent job review may use Bash(ls:*), want Read, Glob, Grep alone",
         ]
     );
+    // A scoped writing rule is a writing tool all the same: the reports
+    // are assembled from the run logs, not written by an agent.
     assert_eq!(
-        parse(&with("\"Read,Write(./review/reports/**)\""))
-            .agents_write_only("review/reports", &SCOPED),
+        parse(&with("\"Read,Edit(./review/reports/**)\"")).agents_write_nothing(&READING_ONLY),
+        ["agent job review may use Edit(./review/reports/**), want Read, Glob, Grep alone"]
+    );
+}
+
+#[test]
+fn agents_write_nothing_holds_review_run_s_tools_to_reading() {
+    let loose = [
+        ("specialist", "Read,Glob,Grep,Edit(./review/reports/**)"),
+        ("generalist", "Read,Bash"),
+    ];
+
+    assert_eq!(
+        parse(REVIEW_FLOW).agents_write_nothing(&loose),
         [
-            "agent job review may use Write(./review/reports/**), want Edit(./review/reports/**) alone"
+            "review-run's specialist may use Edit(./review/reports/**), want Read, Glob, Grep alone",
+            "review-run's generalist may use Bash, want Read, Glob, Grep alone",
         ]
     );
 }
 
 #[test]
-fn agents_write_only_holds_review_run_s_tools_to_the_reports() {
-    let loose = [("specialist", "Read,Write"), ("generalist", "Read,Bash")];
-
-    assert_eq!(
-        parse(REVIEW_FLOW).agents_write_only("review/reports", &loose),
-        [
-            "review-run's specialist may use Write, want Edit(./review/reports/**) alone",
-            "review-run's generalist may use Bash, want Edit(./review/reports/**) alone",
-        ]
-    );
-}
-
-#[test]
-fn review_run_s_tools_are_the_runner_s() {
-    assert_eq!(RUN_TOOLS, SCOPED);
+fn review_run_s_tools_are_the_runner_s_reading_tools() {
+    assert_eq!(RUN_TOOLS, READING_ONLY);
 }
 
 /// The review workflow with the evaluate job ENG-32 asks for.
@@ -709,15 +714,15 @@ fn evaluate_job_runs_fails_without_the_job_or_the_key_s_job() {
 }
 
 #[test]
-fn agents_write_only_allows_only_reading_and_the_scoped_report() {
+fn agents_write_nothing_names_the_web_an_agent_and_a_server_tool() {
     let loose = [("specialist", "Read,Glob,Grep,WebFetch,Agent,mcp__x__y")];
 
     assert_eq!(
-        parse(REVIEW_FLOW).agents_write_only("review/reports", &loose),
+        parse(REVIEW_FLOW).agents_write_nothing(&loose),
         [
-            "review-run's specialist may use WebFetch, want Edit(./review/reports/**) alone",
-            "review-run's specialist may use Agent, want Edit(./review/reports/**) alone",
-            "review-run's specialist may use mcp__x__y, want Edit(./review/reports/**) alone",
+            "review-run's specialist may use WebFetch, want Read, Glob, Grep alone",
+            "review-run's specialist may use Agent, want Read, Glob, Grep alone",
+            "review-run's specialist may use mcp__x__y, want Read, Glob, Grep alone",
         ]
     );
 }

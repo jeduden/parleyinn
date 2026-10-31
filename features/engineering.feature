@@ -293,8 +293,8 @@ Feature: Engineering quality (ENG)
     Then it runs only when the "CI" workflow completes or a pull request gets a comment, as the default branch defines it
     And the job that runs the review's agents holds no write permission and not the "JEDUDEN_REVIEW_AGENT_KEY" key
     And that job runs every agent the review bundle dispatches with "cargo run --locked --quiet --offline -p review-run -- --workdir .", and no agent routes the review
-    And review-run runs each specialist the review bundle dispatches as its own agent, every generalist only once every specialist has ended, and writes the review outcome from what they answered
-    And its agents may write only their reports, under "review/reports"
+    And review-run runs each specialist the review bundle dispatches as its own agent, assembles its report from its run log, runs every generalist only once every specialist has ended, and writes the review outcome from what they answered
+    And its agents can write nothing: review-run allows them Read, Glob and Grep alone
     And only one job holds the "JEDUDEN_REVIEW_AGENT_KEY" key, and it runs no agent
     And that job runs only after the agents' job succeeded
     And that job decides the review with "cargo run --locked --quiet -p review-gate"
@@ -306,31 +306,33 @@ Feature: Engineering quality (ENG)
     And every agent the review bundle can dispatch is defined, specialists at low effort with 20 turns, generalists at medium and their deep instances on opus at high effort with 40 turns
     And every language the repository's source and configuration are written in has its specialist
     And the review gate decides:
-      | verdict         | finding  | check finding | head    | CI     | other check | consulted | dispatch  | own check | report            | review          |
-      | approve         | none     | none          | current | passed | passed      | all       | given     | none      | given             | APPROVE         |
-      | approve         | nit      | none          | current | passed | passed      | all       | given     | none      | given             | APPROVE         |
-      | approve         | blocking | none          | current | passed | passed      | all       | given     | none      | given             | REQUEST_CHANGES |
-      | approve         | none     | nit           | current | passed | passed      | all       | given     | none      | given             | APPROVE         |
-      | approve         | none     | blocking      | current | passed | passed      | all       | given     | none      | given             | REQUEST_CHANGES |
-      | approve         | none     | malformed     | current | passed | passed      | all       | given     | none      | given             | an error        |
-      | approve         | none     | none          | current | passed | failed      | all       | given     | none      | given             | REQUEST_CHANGES |
-      | request_changes | none     | none          | current | passed | passed      | all       | given     | none      | given             | REQUEST_CHANGES |
-      | approve         | none     | none          | moved   | passed | passed      | all       | given     | none      | given             | nothing         |
-      | approve         | none     | none          | current | failed | passed      | all       | given     | none      | given             | an error        |
-      | malformed       | none     | none          | current | passed | passed      | all       | given     | none      | given             | an error        |
-      | missing         | none     | none          | current | passed | passed      | all       | given     | none      | given             | an error        |
-      | approve         | none     | missing       | current | passed | passed      | all       | given     | none      | given             | an error        |
-      | approve         | none     | none          | current | passed | passed      | not all   | given     | none      | given             | an error        |
-      | approve         | none     | none          | current | passed | passed      | malformed | given     | none      | given             | an error        |
-      | approve         | none     | none          | current | passed | passed      | all       | missing   | none      | given             | an error        |
-      | approve         | none     | none          | current | passed | passed      | all       | malformed | none      | given             | an error        |
-      | approve         | none     | none          | current | passed | passed      | all       | given     | failed    | given             | APPROVE         |
-      | approve         | none     | none          | current | passed | passed      | all       | given     | none      | missing           | an error        |
-      | approve         | none     | none          | current | passed | passed      | all       | given     | none      | empty             | an error        |
-      | approve         | none     | none          | current | passed | passed      | all       | given     | none      | no outcome        | an error        |
-      | approve         | none     | none          | current | passed | passed      | all       | given     | none      | other outcome     | an error        |
-      | approve         | none     | none          | current | passed | passed      | all       | given     | none      | request           | APPROVE         |
-      | approve         | none     | none          | current | passed | passed      | all       | given     | none      | malformed finding | an error        |
+      | verdict         | finding  | check finding | head    | CI     | other check | consulted | dispatch  | own check | specialist             | review          |
+      | approve         | none     | none          | current | passed | passed      | all       | given     | none      | reported               | APPROVE         |
+      | approve         | nit      | none          | current | passed | passed      | all       | given     | none      | reported               | APPROVE         |
+      | approve         | blocking | none          | current | passed | passed      | all       | given     | none      | reported               | REQUEST_CHANGES |
+      | approve         | none     | nit           | current | passed | passed      | all       | given     | none      | reported               | APPROVE         |
+      | approve         | none     | blocking      | current | passed | passed      | all       | given     | none      | reported               | REQUEST_CHANGES |
+      | approve         | none     | malformed     | current | passed | passed      | all       | given     | none      | reported               | an error        |
+      | approve         | none     | none          | current | passed | failed      | all       | given     | none      | reported               | REQUEST_CHANGES |
+      | request_changes | none     | none          | current | passed | passed      | all       | given     | none      | reported               | REQUEST_CHANGES |
+      | approve         | none     | none          | moved   | passed | passed      | all       | given     | none      | reported               | nothing         |
+      | approve         | none     | none          | current | failed | passed      | all       | given     | none      | reported               | an error        |
+      | malformed       | none     | none          | current | passed | passed      | all       | given     | none      | reported               | an error        |
+      | missing         | none     | none          | current | passed | passed      | all       | given     | none      | reported               | an error        |
+      | approve         | none     | missing       | current | passed | passed      | all       | given     | none      | reported               | an error        |
+      | approve         | none     | none          | current | passed | passed      | not all   | given     | none      | reported               | an error        |
+      | approve         | none     | none          | current | passed | passed      | malformed | given     | none      | reported               | an error        |
+      | approve         | none     | none          | current | passed | passed      | all       | missing   | none      | reported               | an error        |
+      | approve         | none     | none          | current | passed | passed      | all       | malformed | none      | reported               | an error        |
+      | approve         | none     | none          | current | passed | passed      | all       | given     | failed    | reported               | APPROVE         |
+      | approve         | none     | none          | current | passed | passed      | all       | given     | none      | no report              | an error        |
+      | approve         | none     | none          | current | passed | passed      | all       | given     | none      | empty report           | an error        |
+      | approve         | none     | none          | current | passed | passed      | all       | given     | none      | incomplete             | an error        |
+      | approve         | none     | none          | current | passed | passed      | all       | given     | none      | no outcome answered    | an error        |
+      | approve         | none     | none          | current | passed | passed      | all       | given     | none      | other outcome answered | an error        |
+      | approve         | none     | none          | current | passed | passed      | all       | given     | none      | requested              | APPROVE         |
+      | approve         | none     | none          | current | passed | passed      | all       | given     | none      | malformed finding      | an error        |
+      | approve         | none     | none          | current | passed | passed      | all       | given     | none      | revised nothing        | an error        |
 
   @ENG-29 @P0 @pending
   Scenario: an invariant or I2-review change lands only with an ADR recording a named security reviewer's approval
@@ -349,14 +351,15 @@ Feature: Engineering quality (ENG)
     And the review workflow's evaluate job runs "cargo run --locked --quiet -p review-eval" on the components the pull request changes, after the agents' job and before the job that holds the "JEDUDEN_REVIEW_AGENT_KEY" key
     And a pull request that changes only the shared section "docs/agents/specialist-report.md" runs the cases of one component per distinct set of such sections instead of every component's
     And a run of a case is graded:
-      | outcome     | finding | forbidden | answer             | report  | answered | run                |
-      | as expected | found   | none      | last line and path | written | yes      | passes             |
-      | other       | found   | none      | last line and path | written | yes      | fails on outcome   |
-      | as expected | missing | none      | last line and path | written | yes      | fails on finding   |
-      | as expected | found   | found     | last line and path | written | yes      | fails on forbidden |
-      | as expected | found   | none      | more               | written | yes      | passes, slips on answer |
-      | as expected | found   | none      | last line and path | missing | yes      | fails on report    |
-      | as expected | found   | none      | last line and path | written | no       | fails on no answer |
+      | outcome     | finding | forbidden | answer       | stated         | answered | run                     |
+      | as expected | found   | none      | outcome line | before answer  | yes      | passes                  |
+      | other       | found   | none      | outcome line | before answer  | yes      | fails on outcome        |
+      | as expected | missing | none      | outcome line | before answer  | yes      | fails on finding        |
+      | as expected | found   | found     | outcome line | before answer  | yes      | fails on forbidden      |
+      | as expected | found   | none      | more         | before answer  | yes      | passes, slips on answer |
+      | as expected | found   | none      | no outcome   | before answer  | yes      | fails on answer         |
+      | as expected | found   | none      | outcome line | only in answer | yes      | fails on stating        |
+      | as expected | found   | none      | outcome line | before answer  | no       | fails on no answer      |
     And a case passes with two of three runs, stopping once decided:
       | runs             | case   | runs made |
       | pass, pass       | passes | 2         |

@@ -99,6 +99,7 @@ pub fn cases() -> Vec<Case> {
         review_run_report_cases(),
         review_report_grading_cases(),
         workflow_cases(),
+        review_log_report_cases(),
         // Last: its cases edit source the later cases would run stale.
         license_text_cases(),
     ]
@@ -466,6 +467,14 @@ fn repository_cases() -> Vec<Case> {
 /// agent reaching the approval, or routing the review. [`review_gate_cases`] holds the approval
 /// skipping the review gate.
 fn review_cases() -> Vec<Case> {
+    let mut cases = review_reach_cases();
+    cases.extend(review_post_cases());
+    cases
+}
+
+/// The agents' job reaching past its bounds: the wrong trigger, a write
+/// permission, the key, a writing tool, or an agent routing the review.
+fn review_reach_cases() -> Vec<Case> {
     vec![
         case(
             "the reviewer run as the pull request defines it",
@@ -509,7 +518,7 @@ fn review_cases() -> Vec<Case> {
                 "            > review/run.txt\n          claude -p review --allowedTools Write\n",
             ),
             scenario("ENG-28"),
-            "may use Write, want Edit(./review/reports/**) alone",
+            "may use Write, want Read, Glob, Grep alone",
         ),
         case(
             "the review routed by an agent instead of review-run",
@@ -522,6 +531,13 @@ fn review_cases() -> Vec<Case> {
             scenario("ENG-28"),
             "no job runs the review's agents with \"cargo run --locked --quiet --offline -p review-run -- --workdir .\"",
         ),
+    ]
+}
+
+/// The post job's bounds: the gate's inputs, its check and its order
+/// after the agents.
+fn review_post_cases() -> Vec<Case> {
+    vec![
         case(
             "the review gate without the specialists' reports",
             "ENG-28",
@@ -709,19 +725,19 @@ fn review_evaluation_cases() -> Vec<Case> {
     ]
 }
 
-/// The drift the ENG-28 table's report rows exist to catch: a gate that
-/// takes a report whatever outcome it ends with.
+/// The drift the ENG-28 table's specialist rows exist to catch: a gate
+/// that takes a report whatever outcome the specialist answered.
 fn review_report_case() -> Case {
     case(
         "a specialist's report ending with another outcome than it answered",
         "ENG-28",
         Injection::replace(
             "tooling/review-gate/src/report.rs",
-            ".is_some_and(|answer| answer.lines().any(|l| same_outcome(outcome, l))))",
-            ".is_some_and(|_| true))",
+            "    (answered != outcome).then_some(Problem::AnswerDiffers)",
+            "    (answered != outcome && answered.is_empty()).then_some(Problem::AnswerDiffers)",
         ),
         scenario("ENG-28"),
-        "other outcome",
+        "other outcome answered",
     )
 }
 
@@ -1059,6 +1075,85 @@ fn review_report_grading_cases() -> Vec<Case> {
                 "check::tests::a_generalist_s_case_that_names_a_form_is_named",
             ),
             "a_generalist_s_case_that_names_a_form_is_named",
+        ),
+    ]
+}
+
+/// The drifts the report assembled from a specialist's run log exists to
+/// catch (ENG-28, ENG-32), late so adding them moves no earlier case to
+/// another shard: an assembly that keeps a withdrawn finding, a cut-off
+/// run whose salvaged findings make it one that answered, a gate taking
+/// an answer with no outcome line, a specialist given a writing tool,
+/// and a grader reading a finding stated only in the answer as stated
+/// before it.
+fn review_log_report_cases() -> Vec<Case> {
+    const REPORT: &str = "tooling/review-gate/src/report.rs";
+    vec![
+        case(
+            "the assembly keeping a withdrawn finding",
+            "ENG-28",
+            Injection::replace(
+                REPORT,
+                "kept.retain(|k| !k.at((&w.path, w.line)));",
+                "kept.retain(|_| true);",
+            ),
+            cargo_lib_test(
+                "review-gate",
+                "report::tests::a_withdrawal_removes_every_earlier_finding_at_its_place",
+            ),
+            "a_withdrawal_removes_every_earlier_finding_at_its_place",
+        ),
+        case(
+            "a cut-off run counted as answered once its findings are salvaged",
+            "ENG-28",
+            Injection::replace(
+                "tooling/review-run/src/run.rs",
+                "                Some(format!(\"its run ended with {}\", log.subtype))\n",
+                "                log.texts\n                    .is_empty()\n                    .then(|| format!(\"its run ended with {}\", log.subtype))\n",
+            ),
+            cargo_lib_test(
+                "review-run",
+                "run::tests::a_run_cut_off_before_its_answer_keeps_what_it_stated_as_an_incomplete_report",
+            ),
+            "a_run_cut_off_before_its_answer_keeps_what_it_stated_as_an_incomplete_report",
+        ),
+        case(
+            "the gate taking a specialist that answered no outcome line",
+            "ENG-28",
+            Injection::replace(
+                REPORT,
+                "        return Some(Problem::NoAnswerOutcome);\n",
+                "        return None;\n",
+            ),
+            cargo_lib_test(
+                "review-gate",
+                "report::tests::a_report_check_refuses_what_the_gate_refuses",
+            ),
+            "a_report_check_refuses_what_the_gate_refuses",
+        ),
+        protection_case(
+            "a specialist given a writing tool",
+            Injection::replace(
+                ".claude/agents/lang-rust.md",
+                "tools: Read, Grep, Glob\n",
+                "tools: Read, Grep, Glob, Write\n",
+            ),
+            "the_checkout_s_review_agents_are_all_defined",
+            "lang-rust has tools Read, Grep, Glob, Write, want Read, Grep, Glob",
+        ),
+        case(
+            "the grader reading a finding stated only in the answer as stated before it",
+            "ENG-32",
+            Injection::replace(
+                "tooling/review-eval/src/grade.rs",
+                "        .filter(|t| t.trim() != answer)\n",
+                "        .filter(|t| t.trim() != answer || true)\n",
+            ),
+            cargo_lib_test(
+                "review-eval",
+                "grade::tests::a_finding_stated_only_in_the_answer_was_not_stated_before_it",
+            ),
+            "a_finding_stated_only_in_the_answer_was_not_stated_before_it",
         ),
     ]
 }
