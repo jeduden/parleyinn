@@ -256,20 +256,20 @@ jobs:
   # end-to-end) and per crate. Each layer is measured in a job of its
   # own, on its own instrumented build, so each stays under its
   # budget; the coverage job below merges them and holds the floors.
-  # The end-to-end layer, the longest, is sharded in coverage-e2e. The
-  # unit and integration layers leave out the scenario runner, the one
-  # target that starts the release core, so they do not wait on
-  # release-core.
+  # The end-to-end layer, the longest, is divided: its scenarios are
+  # sharded in coverage-e2e, and its other targets run here as the
+  # e2e-others part. The scenario runner is the one target that starts
+  # the release core, so none of these parts waits on release-core.
   coverage-layer:
-    name: coverage (${{ matrix.layer }})
+    name: coverage (${{ matrix.part }})
     runs-on: ubuntu-latest
     timeout-minutes: 5
     strategy:
       fail-fast: false
       matrix:
-        layer: [unit, integration]
+        part: [unit, integration, e2e-others]
     env:
-      LAYER: ${{ matrix.layer }}
+      PART: ${{ matrix.part }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -303,18 +303,24 @@ jobs:
       # ENG-30: the license check reads only the sources cargo has
       # already fetched, for every release target.
       - run: cargo fetch --locked
-      - run: cargo run --locked -p coverage -- --layer "$LAYER"
+      - name: Measure the ${{ matrix.part }} part
+        run: |
+          case "$PART" in
+            e2e-others) cargo run --locked -p coverage -- --layer e2e --others ;;
+            *) cargo run --locked -p coverage -- --layer "$PART" ;;
+          esac
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: coverage-${{ matrix.layer }}
-          path: target/coverage/${{ matrix.layer }}.lcov
+          name: coverage-${{ matrix.part }}
+          path: target/coverage/${{ matrix.part }}.lcov
 
-  # ENG-11: the end-to-end layer of coverage-layer, its scenarios
-  # divided over six jobs by the hash the scenarios job uses, each on
-  # its own instrumented build. Shard K of N is the job's position in
-  # the matrix, so every scenario runs in exactly one job; the first
-  # also runs the layer's targets other than the scenario runner. The
-  # coverage job adds the shards' lcov up and fails when one is missing.
+  # ENG-11: the scenarios of the end-to-end layer, divided over six
+  # jobs by the hash the scenarios job uses, each on its own
+  # instrumented build. Shard K of N is the job's position in the
+  # matrix, so every scenario runs in exactly one job; each builds the
+  # layer's other targets, which coverage-layer runs. The coverage job
+  # adds the shards' lcov and the others' up and fails when one is
+  # missing.
   coverage-e2e:
     name: coverage (e2e shard ${{ matrix.shard }})
     needs: release-core

@@ -158,6 +158,10 @@ fn run_merges_the_shards_of_the_end_to_end_layer() {
             format!("SF:/w/srs/src/lib.rs\nDA:{index},1\n"),
         );
     }
+    host.files.borrow_mut().insert(
+        "cov/e2e-others.lcov".into(),
+        "SF:/w/srs/src/lib.rs\nDA:1,1\n".into(),
+    );
 
     let (code, out, err) = invoke(&["--merge", "--out", "cov"], &host, None);
 
@@ -178,6 +182,62 @@ fn run_merges_the_shards_of_the_end_to_end_layer() {
     let (code, _, err) = invoke(&["--merge", "--out", "cov"], &host, None);
     assert_eq!(code, EXIT_FAILURE);
     assert!(err.contains("lack shard 2 of 2"), "{err}");
+
+    host.files
+        .borrow_mut()
+        .remove(Path::new("cov/e2e-others.lcov"));
+    host.files.borrow_mut().insert(
+        "cov/e2e-2-of-2.lcov".into(),
+        "SF:/w/srs/src/lib.rs\nDA:2,1\n".into(),
+    );
+    let (code, _, err) = invoke(&["--merge", "--out", "cov"], &host, None);
+    assert_eq!(code, EXIT_FAILURE);
+    assert!(err.contains("lack e2e-others.lcov"), "{err}");
+}
+
+#[test]
+fn run_measures_the_end_to_end_targets_beside_the_scenario_runner() {
+    let host = FakeHost {
+        metadata: METADATA.replace(
+            r#""targets": []"#,
+            r#""targets": [{"name": "bdd", "kind": ["test"]}, {"name": "e2e_x", "kind": ["test"]}]"#,
+        ),
+        ..host("SF:/w/srs/src/lib.rs\nDA:1,1\n")
+    };
+
+    let (code, out, err) = invoke(&["--out", "cov", "--layer", "e2e", "--others"], &host, None);
+
+    assert_eq!(code, EXIT_OK, "{err}");
+    assert_eq!(out, "wrote cov/e2e-others.lcov\n");
+    let calls = host.calls.borrow();
+    assert!(
+        calls.contains(&"cargo llvm-cov --no-report --workspace --locked --test e2e_x".to_owned()),
+        "{calls:?}"
+    );
+    assert!(!calls.iter().any(|c| c.contains("bdd")), "{calls:?}");
+}
+
+#[test]
+fn run_refuses_the_others_it_cannot_use() {
+    let host = host("");
+
+    for (args, want) in [
+        (&["--others"][..], "--others goes with --layer e2e"),
+        (
+            &["--layer", "unit", "--others"],
+            "--others goes with --layer e2e",
+        ),
+        (&["--merge", "--others"], "--others goes with --layer e2e"),
+        (
+            &["--layer", "e2e", "--others", "--shard", "1/2"],
+            "--shard and --others are one or the other",
+        ),
+    ] {
+        let (code, _, err) = invoke(args, &host, None);
+        assert_eq!(code, EXIT_USAGE, "{args:?}");
+        assert!(err.contains(want), "{err}");
+    }
+    assert!(host.calls.borrow().is_empty());
 }
 
 #[test]

@@ -6,7 +6,7 @@ use std::path::{Path, PathBuf};
 
 use crate::Host;
 use crate::lcov;
-use crate::measure::{Shard, measure, measure_layer, merge_layers, shard_file_name};
+use crate::measure::{Part, Shard, measure, measure_layer, merge_layers, part_file_name};
 use crate::plan::{Plan, TestLayer};
 use crate::report::{shortfalls, table, tally};
 use crate::shape;
@@ -18,7 +18,7 @@ pub const EXIT_FAILURE: u8 = 1;
 /// The command line is wrong.
 pub const EXIT_USAGE: u8 = 2;
 
-const USAGE: &str = "usage: coverage [--out DIR] [--layer NAME [--shard K/N] | --merge]
+const USAGE: &str = "usage: coverage [--out DIR] [--layer NAME [--shard K/N | --others] | --merge]
 
 Runs cargo-llvm-cov once per test layer (unit, integration, e2e),
 prints line coverage per crate and layer, writes each layer's lcov to
@@ -31,8 +31,9 @@ DIR and prints the table and the floors without running a test. CI
 measures each layer in a job of its own, then merges them.
 
 --shard K/N, for --layer e2e, runs shard K of N of the scenarios and
-writes DIR/e2e-K-of-N.lcov; --merge adds the N files up as e2e.lcov
-and fails when one is missing.";
+writes DIR/e2e-K-of-N.lcov; --others runs the layer's targets beside
+the scenario runner and writes DIR/e2e-others.lcov. --merge adds the N
+files and the others up as e2e.lcov and fails when one is missing.";
 
 /// What one run does.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -40,8 +41,8 @@ enum Mode {
     /// Every layer, then the table and the floors.
     Measure,
     /// One layer's lcov, nothing else; of the end-to-end layer, one
-    /// shard's when the shard is set.
-    Layer(TestLayer, Option<Shard>),
+    /// shard's or its others' when the part says so.
+    Layer(TestLayer, Part),
     /// The table and the floors from the lcov files already written.
     Merge,
 }
@@ -104,6 +105,7 @@ fn parse_args(args: impl IntoIterator<Item = String>) -> Result<Option<(PathBuf,
     let mut out = PathBuf::from("target/coverage");
     let mut mode = Mode::Measure;
     let mut shard = None;
+    let mut others = false;
     let mut args = args.into_iter();
     while let Some(arg) = args.next() {
         let (flag, value) = match arg.split_once('=') {
@@ -124,7 +126,7 @@ fn parse_args(args: impl IntoIterator<Item = String>) -> Result<Option<(PathBuf,
                     .ok_or("--layer needs a name: unit, integration or e2e")?;
                 let layer = TestLayer::from_name(&name)
                     .ok_or_else(|| format!("no test layer {name:?}: unit, integration or e2e"))?;
-                mode = set_mode(mode, Mode::Layer(layer, None))?;
+                mode = set_mode(mode, Mode::Layer(layer, Part::Whole))?;
             }
             "--shard" => {
                 let text = value
@@ -132,18 +134,23 @@ fn parse_args(args: impl IntoIterator<Item = String>) -> Result<Option<(PathBuf,
                     .ok_or("--shard needs K/N, such as 1/4")?;
                 shard = Some(text.parse::<Shard>()?);
             }
+            "--others" => others = true,
             "--merge" => mode = set_mode(mode, Mode::Merge)?,
             _ => return Err(format!("unexpected argument {arg:?}")),
         }
     }
 
-    let mode = match (mode, shard) {
-        (mode, None) => mode,
-        (Mode::Layer(TestLayer::EndToEnd, _), shard) => Mode::Layer(TestLayer::EndToEnd, shard),
-        _ => return Err("--shard goes with --layer e2e".to_owned()),
+    let (part, flag) = match (shard, others) {
+        (None, false) => return Ok(Some((out, mode))),
+        (Some(shard), false) => (Part::Shard(shard), "--shard"),
+        (None, true) => (Part::Others, "--others"),
+        (Some(_), true) => return Err("--shard and --others are one or the other".to_owned()),
+    };
+    let Mode::Layer(TestLayer::EndToEnd, _) = mode else {
+        return Err(format!("{flag} goes with --layer e2e"));
     };
 
-    Ok(Some((out, mode)))
+    Ok(Some((out, Mode::Layer(TestLayer::EndToEnd, part))))
 }
 
 /// `wanted` in place of `Measure`; a second mode is refused.
@@ -169,9 +176,9 @@ fn report(
     let layers = match mode {
         Mode::Measure => measure(host, &plan, out)?,
         Mode::Merge => merge_layers(host, out)?,
-        Mode::Layer(layer, shard) => {
-            let name = shard.map_or_else(|| format!("{layer}.lcov"), |s| shard_file_name(layer, s));
-            let line = match measure_layer(host, &plan, layer, shard, out)? {
+        Mode::Layer(layer, part) => {
+            let name = part_file_name(layer, part);
+            let line = match measure_layer(host, &plan, layer, part, out)? {
                 Some(_) => format!("wrote {}\n", out.join(name).display()),
                 None => format!("no {layer} tests to measure\n"),
             };

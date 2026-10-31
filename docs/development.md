@@ -131,8 +131,8 @@ the benchmark gate, and the release build of every target (NFR-10, CON-02).
 It also runs `mdsmith check .`, [taplo](../.taplo.toml), and zizmor over the
 workflows and local actions. Every job has five minutes: the release
 core is built once and handed to the jobs that run it, the tests run as
-three shards, the scenarios as four, the end-to-end coverage layer as six,
-each other coverage layer and benchmark shard in jobs of their own,
+three shards, the scenarios as four, the end-to-end coverage scenarios as six,
+each other coverage part and benchmark shard in jobs of their own,
 and `build.yml` builds one target per job ([ci.md](ci.md)). A final job
 named `CI` passes only when every other job passed, and names each job
 that did not. It is the one check the branch and release-tag rulesets

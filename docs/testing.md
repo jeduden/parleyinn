@@ -68,11 +68,11 @@ crate, where the unit tests reach it. Every cargo the tool starts
 carries `PARINN_COVERAGE_MEASURING`, and a run that finds it set refuses
 to start, so a test cannot set off a measurement inside a measurement.
 
-CI measures each test layer in a job of its own, the end-to-end layer in
-six shards ([ci.md](ci.md)). The `coverage` job merges them, adds the
-shards up, fails on a missing one, writes the table and the test counts
-into its summary, holds the floors, and uploads one Codecov flag per
-test layer. Codecov's [thresholds](../codecov.yml) are a soft ratchet.
+CI measures each test layer in its own job, the end-to-end scenarios in
+six shards and the layer's other targets apart ([ci.md](ci.md)). The
+`coverage` job adds the parts up, fails on a missing one, and writes the
+table and test counts to its summary. It holds the floors and uploads a Codecov
+flag per layer. Codecov's [thresholds](../codecov.yml) are a soft ratchet.
 
 ## The executable requirement matrix
 
