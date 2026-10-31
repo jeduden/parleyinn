@@ -17,6 +17,9 @@
 //!   `revised: <old path:line> → <finding line>` when the place moved;
 //! - a withdrawal, `withdrawn: path:line — <reason>`, which removes
 //!   every earlier finding at that place;
+//! - a note the assembly writes, never a specialist:
+//!   `note: withdrew nothing at path:line — <reason>`, which a withdrawal
+//!   naming a place no earlier line found at leaves in its stead;
 //! - the outcome line, the report's last: `outcome: findings — <sentence>`
 //!   or `outcome: none — <sentence>`.
 //!
@@ -29,13 +32,16 @@
 //! `request:` follows its dash. A line whose place cannot be read, yet
 //! with either after a dash, is a finding line too, so it is malformed,
 //! never left out as prose.
+//! A revision naming a place no earlier line found at states its
+//! finding line, which is a whole finding; a withdrawal naming one
+//! removes nothing and leaves its note, so it is neither an error nor
+//! silent (I6).
 //! A finding, revision or withdrawal line in no form is malformed, and
 //! the report holding it is refused rather than handed to the generalist
 //! marked unlinked: a severity word where the consequence belongs, or a
 //! finding that links nothing, is the categorizing this format exists to
 //! end, and a refused report fails the review closed, as a report that
-//! ends with no outcome does. So is a revision or withdrawal that names
-//! a place no earlier line found at. A linked finding citing an id no
+//! ends with no outcome does. A linked finding citing an id no
 //! requirement has is refused too, naming the id, so a made-up
 //! requirement cannot carry a finding (`report_check` with the known
 //! ids; the gate, which holds no tree, checks each id's shape alone).
@@ -60,6 +66,9 @@ pub const CHANGES: [&str; 3] = ["add", "change", "remove"];
 pub const REVISED: &str = "revised:";
 /// What a withdrawal starts with.
 pub const WITHDRAWN: &str = "withdrawn:";
+/// What the note a withdrawal that removes nothing leaves starts with,
+/// before its place; a line that starts with it is prose.
+pub const WITHDREW_NOTHING: &str = "note: withdrew nothing at";
 /// What stands between a revision's old place and its finding line.
 pub const ARROWS: [&str; 2] = [" → ", " -> "];
 /// What the first line of a report assembled from a run that did not
@@ -136,9 +145,6 @@ pub enum Problem {
     /// A finding, revision or withdrawal line, its line number in the
     /// report, in no form.
     Malformed { line: usize },
-    /// A revision or withdrawal, its line number in the report, names
-    /// a place no earlier line found at.
-    RevisesNothing { line: usize, place: String },
     /// A linked finding, its line number in the report, cites an id no
     /// requirement or invariant has.
     UnknownId { line: usize, id: String },
@@ -161,10 +167,6 @@ impl fmt::Display for Problem {
             Self::Malformed { line } => write!(
                 f,
                 "has a report whose line {line} is neither a linked finding nor a requirement request"
-            ),
-            Self::RevisesNothing { line, place } => write!(
-                f,
-                "has a report whose line {line} revises or withdraws a finding at {place}, where it found none"
             ),
             Self::UnknownId { line, id } => write!(
                 f,
@@ -195,6 +197,9 @@ impl fmt::Display for Problem {
 #[must_use]
 pub fn line(text: &str) -> Line {
     let text = bare(text);
+    if strip_word(text, WITHDREW_NOTHING).is_some() {
+        return Line::Prose;
+    }
     if let Some(rest) = strip_word(text, REVISED) {
         return revision(rest).map_or(Line::Malformed, Line::Revised);
     }
@@ -384,9 +389,11 @@ pub fn answer_outcome(answer: &str) -> Option<(&str, &'static str)> {
 /// text blocks in order, and `answer`, its final answer: every finding
 /// line replayed, a line identical to an earlier one dropped, a revision
 /// put in place of every earlier finding at its place, a withdrawal
-/// removing them, then the answer's outcome line. A malformed line, and
-/// a revision or withdrawal that finds nothing to change, stay as
-/// written, so the report check names them; prose is left out. A run
+/// removing them, then the answer's outcome line. A revision that finds
+/// nothing to replace states its finding line; a withdrawal that finds
+/// nothing to remove leaves a note in its stead
+/// ([`WITHDREW_NOTHING`]), so the reader sees it. A malformed line
+/// stays as written, so the report check names it; prose is left out. A run
 /// that did not finish passes `incomplete`, which heads the report and
 /// says why, so a reader sees the report is partial.
 #[must_use]
@@ -402,15 +409,17 @@ pub fn assemble(texts: &[String], answer: &str, incomplete: Option<&str>) -> Str
             Line::Malformed => push_unique(&mut kept, Kept::of(text)),
             Line::Revised(r) => {
                 let finding = render(&line(&r.finding)).unwrap_or(r.finding);
-                if !replace(&mut kept, (&r.path, r.line), Kept::of(finding)) {
-                    push_unique(&mut kept, Kept::of(text));
+                let finding = Kept::of(finding);
+                if !replace(&mut kept, (&r.path, r.line), finding.clone()) {
+                    push_unique(&mut kept, finding);
                 }
             }
             Line::Withdrawn(w) => {
                 let before = kept.len();
                 kept.retain(|k| !k.at((&w.path, w.line)));
                 if kept.len() == before {
-                    push_unique(&mut kept, Kept::of(text));
+                    let note = format!("{WITHDREW_NOTHING} {}:{} — {}", w.path, w.line, w.reason);
+                    push_unique(&mut kept, Kept::of(note));
                 }
             }
         }
@@ -452,6 +461,7 @@ fn render(read: &Line) -> Option<String> {
 
 /// A line the assembly keeps, with the place it stands at when it has
 /// one.
+#[derive(Clone)]
 struct Kept {
     text: String,
     place: Option<(String, usize)>,
@@ -526,10 +536,11 @@ pub fn report_check(
 }
 
 /// The problem with the lines of `text`, a report that ends with its
-/// outcome line, or none: the first line in no form, the first revision
-/// or withdrawal left in place, the first id outside `known` when it is
-/// given, or an outcome that says otherwise than the lines do. A report
-/// with no outcome line is refused for that.
+/// outcome line, or none: the first line in no form, the first id
+/// outside `known` when it is given, or an outcome that says otherwise
+/// than the lines do. A revision left in the text is read as the finding
+/// it states, and a withdrawal left in it as nothing, as the assembly
+/// reads them. A report with no outcome line is refused for that.
 #[must_use]
 pub fn findings_check(text: &str, known: Option<&BTreeSet<String>>) -> Option<Problem> {
     let Some((_, outcome)) = outcome_line(text) else {
@@ -539,20 +550,18 @@ pub fn findings_check(text: &str, known: Option<&BTreeSet<String>>) -> Option<Pr
     for (at, l) in text.lines().enumerate() {
         let number = at + 1;
         match line(l) {
-            Line::Prose => {}
+            Line::Prose | Line::Withdrawn(_) => {}
             Line::Malformed => return Some(Problem::Malformed { line: number }),
-            Line::Revised(Revision { path, line, .. })
-            | Line::Withdrawn(Withdrawal { path, line, .. }) => {
-                return Some(Problem::RevisesNothing {
-                    line: number,
-                    place: format!("{path}:{line}"),
-                });
-            }
             Line::Request(_) => held = true,
+            Line::Revised(Revision { finding, .. }) => {
+                held = true;
+                if let Some(id) = unknown_id(&line(&finding), known) {
+                    return Some(Problem::UnknownId { line: number, id });
+                }
+            }
             Line::Linked(linked) => {
                 held = true;
-                let unknown = known.and_then(|k| linked.ids.into_iter().find(|id| !k.contains(id)));
-                if let Some(id) = unknown {
+                if let Some(id) = unknown_id(&Line::Linked(linked), known) {
                     return Some(Problem::UnknownId { line: number, id });
                 }
             }
@@ -564,6 +573,15 @@ pub fn findings_check(text: &str, known: Option<&BTreeSet<String>>) -> Option<Pr
         (false, false) => Some(Problem::FindingsWithNone),
         _ => None,
     }
+}
+
+/// The first id `read`, a linked finding, cites outside `known`, when
+/// `known` is given; none for a request or any other line.
+fn unknown_id(read: &Line, known: Option<&BTreeSet<String>>) -> Option<String> {
+    let (Line::Linked(linked), Some(known)) = (read, known) else {
+        return None;
+    };
+    linked.ids.iter().find(|id| !known.contains(*id)).cloned()
 }
 
 /// The markup a place may stand in: emphasis and backticks.

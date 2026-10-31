@@ -95,25 +95,29 @@ repeat them, which costs tokens.
   line's `path:line`; `revised: <old path:line> → <finding line>` does
   so for a finding whose place moved. `withdrawn: path:line — <reason>`
   removes every earlier finding at that place. One rule: the place names
-  the finding.
+  the finding. A revision naming a place no earlier line found at
+  states its finding line, a whole finding in its own right. A
+  withdrawal naming such a place removes nothing, so it is no error:
+  a specialist that writes one for something it only checked has
+  lost nothing. The assembly leaves `note: withdrew nothing at
+  path:line — <reason>` in its stead, prose to the check, so the
+  withdrawal stays visible (I6).
 - **`review-run` assembles the report.** From the specialist's run log
   it replays the finding, request, revision and withdrawal lines of the
   main thread's text, in order, a line identical to an earlier one
   dropped, each finding in its canonical shape, then appends the outcome
   line the answer gives, and writes the result to
   `review/reports/<name>.md`, the file its generalist reads. A malformed
-  line, and a revision or withdrawal that names a place no earlier line
-  found at, stay in the report as written, so the check names them.
+  line stays in the report as written, so the check names it.
 - **The form fails closed.** The gate and `review-run` refuse a report
-  with a line in no form, a revision or withdrawal of a finding never
-  stated, an outcome of `none` beside a finding or `findings` beside
-  none, an answer with no outcome line or another outcome than the
-  report ends with. `review-run` also refuses a cited id that neither
-  main's SRS nor the pull request's defines, so a made-up requirement
-  cannot carry a finding. Free prose is left out of the report, but the
-  instructions tell a specialist to write an unlinked concern as a
-  request, never as prose, and to start no other line with
-  `path:line —`.
+  with a line in no form, an outcome of `none` beside a finding or
+  `findings` beside none, an answer with no outcome line or another
+  outcome than the report ends with. `review-run` also refuses a cited
+  id that neither main's SRS nor the pull request's defines, so a
+  made-up requirement cannot carry a finding. Free prose is left out
+  of the report, but the instructions tell a specialist to write an
+  unlinked concern as a request, never as prose, and to start no other
+  line with `path:line —`.
 - **An incomplete run is salvaged and still fails closed.** A run that
   did not end with a successful result, at its turn budget, its
   deadline, an error or an empty answer, stays a blocking finding and
@@ -217,8 +221,9 @@ repeat them, which costs tokens.
   incomplete report, that the agents write nothing and that the
   generalists alone weigh; its scenario's gate table takes a report
   with a request, which approves, and one with a malformed finding, an
-  incomplete one, one whose answer gives no or another outcome, and one
-  revising a finding never stated, each an error.
+  incomplete one and one whose answer gives no or another outcome, each
+  an error, and one revising or withdrawing a finding never stated,
+  which approves.
 - The orchestrator's skill, its reviewer component under ENG-32, its
   cases and its prompt and schema in the runner are retired (the
   skill's file goes in a follow-up once main runs `review-run`), together

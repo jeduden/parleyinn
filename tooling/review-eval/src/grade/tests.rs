@@ -317,9 +317,12 @@ fn a_specialist_report_the_review_would_refuse_fails_its_run() {
             "has a report whose outcome is none but which holds findings",
         ),
         (
-            vec!["withdrawn: a.rs:1 — nothing was there"],
+            vec![
+                "withdrawn: a.rs:1 — nothing was there",
+                "revised: a.rs:2 — if not addressed: a panic — ENG-16",
+            ],
             "outcome: none — x.",
-            "has a report whose line 1 revises or withdraws a finding at a.rs:1, where it found none",
+            "has a report whose outcome is none but which holds findings",
         ),
     ] {
         let log = stated_log(&texts, answer);
@@ -328,6 +331,23 @@ fn a_specialist_report_the_review_would_refuse_fails_its_run() {
 
         assert_eq!(graded.failures, vec![format!("report refused: {problem}")]);
     }
+}
+
+#[test]
+fn a_specialist_that_withdraws_what_it_only_checked_passes() {
+    let c = component(Kind::Specialist, "lang-rust", true);
+    let log = stated_log(
+        &["withdrawn: a.rs:1 — I checked it and it holds"],
+        "outcome: none — x.",
+    );
+    let expect = Expect {
+        outcome: vec!["none".into()],
+        ..Expect::default()
+    };
+
+    let graded = grade(&c, &case("lang-rust", expect), &log);
+
+    assert!(graded.passed(), "{:?}", graded.failures);
 }
 
 #[test]

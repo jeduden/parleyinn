@@ -637,11 +637,13 @@ fn gate_args(reviewed: &str, head: &str) -> Vec<String> {
 /// outcome answered` an answer with no outcome line, `other outcome
 /// answered` an answer whose outcome is not the report's, `malformed
 /// finding` a logged finding that gives a severity where its
-/// consequence and requirements belong, `revised nothing` a
-/// revision of a finding the specialist never stated, `none beside a
-/// finding` an outcome of none after a finding, and `findings with
-/// none` an outcome of findings after none; `None` for any other value.
-fn specialist(row: &BTreeMap<String, String>) -> Option<(Option<&'static str>, &'static str)> {
+/// consequence and requirements belong, `revised nothing` the report
+/// assembled from a log that revises a finding the specialist never
+/// stated, `withdrew nothing` the one assembled from a log that
+/// withdraws a finding it never stated, `none beside a finding` an
+/// outcome of none after a finding, and `findings with none` an outcome
+/// of findings after none; `None` for any other value.
+fn specialist(row: &BTreeMap<String, String>) -> Option<(Option<String>, &'static str)> {
     const FINDINGS: &str = r#"{"lang-rust":"outcome: findings — fine","review-code":"r"}"#;
     const NONE: &str = r#"{"lang-rust":"outcome: none — fine","review-code":"r"}"#;
     const NO_OUTCOME: &str = r#"{"lang-rust":"I am done.","review-code":"r"}"#;
@@ -674,12 +676,18 @@ fn specialist(row: &BTreeMap<String, String>) -> Option<(Option<&'static str>, &
             Some("a.rs:1 — nit — x\noutcome: findings — fine\n"),
             FINDINGS,
         ),
-        "revised nothing" => (
-            Some(
-                "a.rs:1 — if not addressed: x breaks — I2\nrevised: b.rs:2 — request: add y — why\noutcome: findings — fine\n",
-            ),
-            FINDINGS,
-        ),
+        "revised nothing" => {
+            return Some((
+                Some(assembled("revised: b.rs:2 — request: add y — why")),
+                FINDINGS,
+            ));
+        }
+        "withdrew nothing" => {
+            return Some((
+                Some(assembled("withdrawn: b.rs:2 — I checked it and it holds")),
+                FINDINGS,
+            ));
+        }
         "none beside a finding" => (
             Some("a.rs:1 — if not addressed: x breaks — I2\noutcome: none — fine\n"),
             NONE,
@@ -688,7 +696,17 @@ fn specialist(row: &BTreeMap<String, String>) -> Option<(Option<&'static str>, &
         _ => return None,
     };
 
-    Some((report, answers))
+    Some((report.map(str::to_owned), answers))
+}
+
+/// The report review-run assembles from a run log that states a linked
+/// finding, then `line`, and answers an outcome of findings.
+fn assembled(line: &str) -> String {
+    let texts = [
+        format!("a.rs:1 — if not addressed: x breaks — I2\n{line}"),
+        "outcome: findings — fine".to_owned(),
+    ];
+    review_gate::report::assemble(&texts, "outcome: findings — fine", None)
 }
 
 /// The dispatch a table row hands the gate by default: one generalist
@@ -813,7 +831,7 @@ pub fn gate_outcome(row: &BTreeMap<String, String>) -> &'static str {
     }
     files.insert("consulted.json", consulted.to_owned());
     if let Some(body) = report {
-        files.insert("reports/lang-rust.md", body.to_owned());
+        files.insert("reports/lang-rust.md", body);
     }
     files.insert("answers.json", answers.to_owned());
     if let Some(body) = check {

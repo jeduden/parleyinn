@@ -289,26 +289,6 @@ fn a_report_check_refuses_what_the_gate_refuses() {
             Problem::Malformed { line: 2 },
         ),
         (
-            Some(format!(
-                "{finding}revised: b.rs:2 — request: add x — why\n{ending}"
-            )),
-            Some(ANSWER),
-            Problem::RevisesNothing {
-                line: 2,
-                place: "b.rs:2".to_owned(),
-            },
-        ),
-        (
-            Some(format!(
-                "{finding}withdrawn: a.rs:3 — it was fine\n{ending}"
-            )),
-            Some(ANSWER),
-            Problem::RevisesNothing {
-                line: 2,
-                place: "a.rs:3".to_owned(),
-            },
-        ),
-        (
             Some(format!("{finding}outcome: none — one sentence.")),
             Some("outcome: none — one sentence."),
             Problem::NoneWithFindings,
@@ -393,13 +373,6 @@ fn every_problem_reads_as_a_sentence_about_the_report() {
         (
             Problem::Malformed { line: 3 },
             "has a report whose line 3 is neither a linked finding nor a requirement request",
-        ),
-        (
-            Problem::RevisesNothing {
-                line: 5,
-                place: "a.rs:3".to_owned(),
-            },
-            "has a report whose line 5 revises or withdraws a finding at a.rs:3, where it found none",
         ),
         (
             Problem::UnknownId {
@@ -528,11 +501,12 @@ fn a_withdrawal_removes_every_earlier_finding_at_its_place() {
 }
 
 #[test]
-fn a_revision_or_withdrawal_that_finds_nothing_stays_and_refuses_the_report() {
+fn a_withdrawal_that_finds_nothing_leaves_a_note_and_a_revision_states_its_finding() {
     let logged = texts(&[
         "a.rs:1 — if not addressed: a hook panics — ENG-04",
-        "withdrawn: a.rs:2 — nothing there",
+        "withdrawn: a.rs:2 — I checked it and it holds",
         "revised: c.rs:1 — if not addressed: x — I2",
+        "revised: d.rs:9 → d.rs:4 — request: add y — why",
     ]);
 
     let got = assemble(&logged, "outcome: findings — x", None);
@@ -540,16 +514,63 @@ fn a_revision_or_withdrawal_that_finds_nothing_stays_and_refuses_the_report() {
     assert_eq!(
         got,
         "a.rs:1 — if not addressed: a hook panics — ENG-04\n\
-         withdrawn: a.rs:2 — nothing there\n\
-         revised: c.rs:1 — if not addressed: x — I2\n\
+         note: withdrew nothing at a.rs:2 — I checked it and it holds\n\
+         c.rs:1 — if not addressed: x — I2\n\
+         d.rs:4 — request: add y — why\n\
          outcome: findings — x\n"
     );
     assert_eq!(
         report_check(Some(&got), Some("outcome: findings — x"), None),
-        Some(Problem::RevisesNothing {
-            line: 2,
-            place: "a.rs:2".to_owned()
+        None
+    );
+}
+
+#[test]
+fn a_note_of_a_withdrawal_reads_as_prose_whatever_its_reason_says() {
+    for text in [
+        "note: withdrew nothing at a.rs:2 — I checked it",
+        "note: withdrew nothing at a.rs:2 — if not addressed: x — I2",
+        "note: withdrew nothing at a.rs:2 — request: add x — why",
+    ] {
+        assert_eq!(line(text), Line::Prose, "{text}");
+    }
+}
+
+#[test]
+fn a_withdrawal_that_finds_nothing_beside_no_finding_keeps_an_outcome_of_none() {
+    let logged = texts(&["withdrawn: a.rs:2 — it holds"]);
+
+    let got = assemble(&logged, "outcome: none — fine", None);
+
+    assert_eq!(
+        got,
+        "note: withdrew nothing at a.rs:2 — it holds\noutcome: none — fine\n"
+    );
+    assert_eq!(
+        report_check(Some(&got), Some("outcome: none — fine"), None),
+        None
+    );
+}
+
+#[test]
+fn a_report_check_reads_a_leftover_revision_as_its_finding_and_a_withdrawal_as_nothing() {
+    let report = "revised: b.rs:2 — request: add x — why\n\
+                  withdrawn: a.rs:3 — it was fine\n\
+                  outcome: findings — one sentence.";
+    assert_eq!(report_check(Some(report), Some(ANSWER), None), None);
+    let unknown =
+        "revised: b.rs:2 — if not addressed: x — ENG-99\noutcome: findings — one sentence.";
+    assert_eq!(
+        report_check(Some(unknown), Some(ANSWER), Some(&ids(&["ENG-04"]))),
+        Some(Problem::UnknownId {
+            line: 1,
+            id: "ENG-99".to_owned()
         })
+    );
+    let none = "withdrawn: a.rs:3 — it was fine\noutcome: none — one sentence.";
+    assert_eq!(
+        report_check(Some(none), Some("outcome: none — one sentence."), None),
+        None
     );
 }
 

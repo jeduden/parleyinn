@@ -334,7 +334,8 @@ Feature: Engineering quality (ENG)
       | approve         | none     | none          | current | passed | passed      | all       | given     | none      | other outcome answered | an error        |
       | approve         | none     | none          | current | passed | passed      | all       | given     | none      | requested              | APPROVE         |
       | approve         | none     | none          | current | passed | passed      | all       | given     | none      | malformed finding      | an error        |
-      | approve         | none     | none          | current | passed | passed      | all       | given     | none      | revised nothing        | an error        |
+      | approve         | none     | none          | current | passed | passed      | all       | given     | none      | revised nothing        | APPROVE         |
+      | approve         | none     | none          | current | passed | passed      | all       | given     | none      | withdrew nothing       | APPROVE         |
       | approve         | none     | none          | current | passed | passed      | all       | given     | none      | none beside a finding  | an error        |
       | approve         | none     | none          | current | passed | passed      | all       | given     | none      | findings with none     | an error        |
 

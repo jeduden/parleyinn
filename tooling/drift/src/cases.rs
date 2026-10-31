@@ -103,6 +103,7 @@ pub fn cases() -> Vec<Case> {
         review_run_parts_cases(),
         review_finding_shape_cases(),
         review_limit_cases(),
+        review_withdrawal_cases(),
         // Last: its cases edit source the later cases would run stale.
         license_text_cases(),
     ]
@@ -318,6 +319,51 @@ fn review_limit_cases() -> Vec<Case> {
             ),
             scenario("ENG-34"),
             "the ENG-34 row states no limit of 200 for TOML, which the review bundle holds",
+        ),
+    ]
+}
+
+/// The drifts the rule for a revision or withdrawal naming a place where
+/// no finding was stated exists to catch (ENG-28, I6), late so adding
+/// them moves no earlier case to another shard: a withdrawal that
+/// removed nothing left out of the report unseen, a revision of such a
+/// place left out instead of stated, and the gate refusing a withdrawal
+/// left in a report.
+fn review_withdrawal_cases() -> Vec<Case> {
+    const REPORT: &str = "tooling/review-gate/src/report.rs";
+    let assembly = "report::tests::a_withdrawal_that_finds_nothing_leaves_a_note_and_a_revision_states_its_finding";
+    vec![
+        case(
+            "the assembly dropping a withdrawal that removed nothing unseen",
+            "ENG-28",
+            Injection::replace(
+                REPORT,
+                "if kept.len() == before {",
+                "if kept.len() == before && w.line == usize::MAX {",
+            ),
+            cargo_lib_test("review-gate", assembly),
+            "a_withdrawal_that_finds_nothing_leaves_a_note_and_a_revision_states_its_finding",
+        ),
+        case(
+            "the assembly leaving out a revision of a place where nothing was stated",
+            "ENG-28",
+            Injection::replace(REPORT, "push_unique(&mut kept, finding);", "drop(finding);"),
+            cargo_lib_test("review-gate", assembly),
+            "a_withdrawal_that_finds_nothing_leaves_a_note_and_a_revision_states_its_finding",
+        ),
+        case(
+            "the gate refusing a withdrawal left in a report",
+            "ENG-28",
+            Injection::replace(
+                REPORT,
+                "Line::Prose | Line::Withdrawn(_) => {}",
+                "Line::Prose => {}\n            Line::Withdrawn(_) => return Some(Problem::Malformed { line: number }),",
+            ),
+            cargo_lib_test(
+                "review-gate",
+                "report::tests::a_report_check_reads_a_leftover_revision_as_its_finding_and_a_withdrawal_as_nothing",
+            ),
+            "a_report_check_reads_a_leftover_revision_as_its_finding_and_a_withdrawal_as_nothing",
         ),
     ]
 }
@@ -1011,8 +1057,8 @@ fn review_report_form_cases() -> Vec<Case> {
             "ENG-28",
             Injection::replace(
                 REPORT,
-                "if let Some(id) = unknown {",
-                "if let Some(id) = unknown.filter(|_| false) {",
+                "if let Some(id) = unknown_id(&Line::Linked(linked), known) {",
+                "if let Some(id) = unknown_id(&Line::Linked(linked), known).filter(|_| false) {",
             ),
             cargo_lib_test(
                 "review-gate",

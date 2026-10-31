@@ -72,8 +72,8 @@ records the design.
   generalist it reads the answer: each finding it must drop on a line
   that starts with `dropped` or gives it as its severity, the rule
   `review-run` reads its answer by. A specialist's report the review
-  would refuse, with a line in no form, a revision of a finding never
-  stated or an outcome its lines contradict, fails its run, as does an
+  would refuse, with a line in no form or an outcome its lines
+  contradict, fails its run, as does an
   answer with no outcome line. A departure the review survives is a
   slip: an answer that is more than the outcome line, an eleventh
   finding. Slips are counted and shown per run and fail none. A case

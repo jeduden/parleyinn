@@ -185,8 +185,11 @@ fn a_report_the_gate_would_refuse_blocks_and_is_named() {
             "answered another outcome in the run log than its report ends with",
         ),
         (
-            Some("withdrawn: a.rs:2 — nothing there\noutcome: none — lang-rust saw none."),
-            "has a report whose line 1 revises or withdraws a finding at a.rs:2, where it found none",
+            Some(
+                "note: withdrew nothing at a.rs:2 — nothing there\n\
+                 a.rs:3 — if not addressed: x breaks — ENG-02\noutcome: none — lang-rust saw none.",
+            ),
+            "has a report whose outcome is none but which holds findings",
         ),
         (
             Some("a.rs:1 — nit — x\noutcome: findings — lang-rust saw a finding."),
