@@ -142,7 +142,9 @@ fn a_matrix_with_more_shards_than_lists_fails() {
 
     assert_eq!(
         shards_cover_the_workspace(&c, &flow),
-        ["the test job's shards: the matrix does not list one shard per package list (1 lists)"]
+        [
+            "the test job's shards: the matrix in .github/workflows/ci.yml does not list one shard per package list (1 lists)"
+        ]
     );
 }
 
@@ -160,10 +162,12 @@ fn a_job_that_picks_its_shard_otherwise_fails() {
         shards_cover_the_workspace(&c, &flow),
         [
             format!(
-                "the test job's shards: the job does not choose its list by its place in the matrix: {}",
+                "the test job's shards: the job does not choose its list by its place in the matrix in .github/workflows/ci.yml: {}",
                 SELECTION[3]
             ),
-            format!("the test job's shards: the job does not run {SHARD_COMMAND}"),
+            format!(
+                "the test job's shards: the job does not run {SHARD_COMMAND} in .github/workflows/ci.yml"
+            ),
         ]
     );
 }
@@ -175,7 +179,7 @@ fn a_shards_array_holding_more_than_quoted_lists_fails() {
     let open = workflow("1", &["\"-p a"]);
 
     let want = [
-        "the test job's shards: the shards=( ... ) array holds more than double-quoted package lists",
+        "the test job's shards: the shards=( ... ) array in .github/workflows/ci.yml holds more than double-quoted package lists",
     ];
     assert_eq!(shards_cover_the_workspace(&c, &flow), want);
     assert_eq!(shards_cover_the_workspace(&c, &open), want);
@@ -189,7 +193,9 @@ fn a_job_without_a_shards_array_fails() {
     flow.jobs[0].text = flow.jobs[0].text.replace("shards=(", "lists=(");
     open.jobs[0].text = open.jobs[0].text.replace("          )\n", "");
 
-    let want = ["the test job's shards: no shards=( ... ) array lists their packages"];
+    let want = [
+        "the test job's shards: no shards=( ... ) array in .github/workflows/ci.yml lists their packages",
+    ];
     assert_eq!(shards_cover_the_workspace(&c, &flow), want);
     assert_eq!(shards_cover_the_workspace(&c, &open), want);
 }

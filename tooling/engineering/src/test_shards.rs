@@ -54,14 +54,14 @@ pub fn lists(job: &Job) -> Result<Vec<String>, String> {
     });
     let (Some(open), Some(close)) = (open, close) else {
         return Err(format!(
-            "{LEAD}: no shards=( ... ) array lists their packages"
+            "{LEAD}: no shards=( ... ) array in {CI_WORKFLOW} lists their packages"
         ));
     };
     let body = lines[open + 1..close].join("\n").replace("\\\n", " ");
     let parts: Vec<&str> = body.split('"').collect();
     if parts.len().is_multiple_of(2) || parts.iter().step_by(2).any(|p| !p.trim().is_empty()) {
         return Err(format!(
-            "{LEAD}: the shards=( ... ) array holds more than double-quoted package lists"
+            "{LEAD}: the shards=( ... ) array in {CI_WORKFLOW} holds more than double-quoted package lists"
         ));
     }
 
@@ -188,11 +188,15 @@ fn selection(job: &Job) -> Vec<String> {
         .iter()
         .filter(|line| !job.text.contains(*line))
         .map(|line| {
-            format!("{LEAD}: the job does not choose its list by its place in the matrix: {line}")
+            format!(
+                "{LEAD}: the job does not choose its list by its place in the matrix in {CI_WORKFLOW}: {line}"
+            )
         })
         .collect();
     if !runs(job, SHARD_COMMAND) {
-        problems.push(format!("{LEAD}: the job does not run {SHARD_COMMAND}"));
+        problems.push(format!(
+            "{LEAD}: the job does not run {SHARD_COMMAND} in {CI_WORKFLOW}"
+        ));
     }
 
     problems
@@ -216,7 +220,7 @@ pub fn shards_cover_the_workspace(c: &Checkout, flow: &Workflow) -> Vec<String> 
     };
     if matrix_size(job) != Some(lists.len()) {
         problems.push(format!(
-            "{LEAD}: the matrix does not list one shard per package list ({} lists)",
+            "{LEAD}: the matrix in {CI_WORKFLOW} does not list one shard per package list ({} lists)",
             lists.len()
         ));
     }
