@@ -115,9 +115,8 @@ pub fn big_diff() -> String {
 pub fn prepare(checkout: &Checkout, workdir: &Path) -> Result<(), String> {
     let write = |rel: &str, text: &str| {
         let path = workdir.join(rel);
-        if let Some(dir) = path.parent() {
-            fs::create_dir_all(dir).map_err(|e| format!("make {}: {e}", dir.display()))?;
-        }
+        let dir = path.parent().unwrap_or(workdir);
+        fs::create_dir_all(dir).map_err(|e| format!("make {}: {e}", dir.display()))?;
         fs::write(&path, text).map_err(|e| format!("write {}: {e}", path.display()))
     };
     write(
