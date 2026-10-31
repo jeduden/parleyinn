@@ -1,0 +1,29 @@
+component = "lang-gherkin"
+kind = "clean"
+title = "a step reworded in a scenario that checks less than its row, as on main"
+
+# One step of the ENG-28 scenario is reworded, with its binding. The
+# row names a specialist per section of the specification and per
+# language; the scenario checks only the languages, on main as in this
+# change. A blocking report fails the review whatever its generalist
+# decides, so the gap this change leaves as main has it is at most a
+# nit.
+
+consent = "Approved: the reworded ENG-28 step in features/engineering.feature and its binding in tooling/scenario/tests/bdd/engineering_review.rs."
+
+[[replace]]
+file = "features/engineering.feature"
+old = "    And that job posts its decision as the \"review-gate\" check\n"
+new = "    And that job posts what it decides as the \"review-gate\" check\n"
+
+[[replace]]
+file = "tooling/scenario/tests/bdd/engineering_review.rs"
+old = "#[then(regex = r#\"^that job posts its decision as the \"([^\"]+)\" check$\"#)]\n"
+new = "#[then(regex = r#\"^that job posts what it decides as the \"([^\"]+)\" check$\"#)]\n"
+
+[expect]
+outcome = ["sound", "nits"]
+
+[[expect.none]]
+path = "features/engineering.feature"
+severity = "blocking"
