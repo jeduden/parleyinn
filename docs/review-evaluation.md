@@ -63,10 +63,13 @@ records the design.
   its answer by. A departure from
   the report's shape that the review survives is a slip: a label line
   between the findings, an answer that is more than the last line and
-  the path, an eleventh finding. Slips are counted and shown per run
-  and fail none. A case passes with two of three runs, stopping once
-  decided. A run that does not answer, or runs past its deadline, is
-  counted and failed.
+  the path, an eleventh finding. A specialist answers exactly two lines,
+  its report's outcome line and then its path; the review's run accepts
+  the answer when one of its lines is that outcome line, whatever its
+  case, spacing, emphasis, kind of dash or trailing punctuation. Slips
+  are counted and shown per run and fail none. A case passes with two
+  of three runs, stopping once decided. A run that does not answer, or
+  runs past its deadline, is counted and failed.
 - **The outputs** of a run go under `--out`: `scorecard.json`,
   `findings.json` in the shape the review gate reads, `report.md`, and
   each run's log, report and grade under `runs/`.

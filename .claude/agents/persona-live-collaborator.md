@@ -67,9 +67,13 @@ Answer with at most ten findings, most severe first, and no
 preamble, then one line on whether the target serves you at all. When
 the review bundle dispatches you for a pull request, you have the Write
 tool. Write that answer to `review/reports/<your name>.md`, the one
-file you may change. End it with one line: `outcome: sound`,
+file you may change, by your fifth turn, and rewrite it as you find
+more. Keep your last five turns to write it a last time and answer,
+since a run that uses all its turns gives no answer. End it
+with one line, however long, never wrapped: `outcome: sound`,
 `outcome: nits` or `outcome: blocking`, a dash, and whether the target
-serves you. Then answer with only that line and the file's path.
-If your tools do not list Write, never try to write a file: answer
-with the findings and the line.
+serves you. Then answer exactly two lines and nothing else: that
+outcome line copied character for character from the file, then the
+file's path. If your tools do not list Write, never try to write a
+file: answer with the findings and the line.
 <?/include?>

@@ -1,0 +1,179 @@
+component = "lang-markdown"
+kind = "defect"
+title = "one false command among many true pages, which must still leave a report"
+
+# A change to many pages: the specialist must write its report early
+# and answer within its turns, not read until its turns run out
+# (a run that ends at its budget gives no report and fails).
+
+[[create]]
+file = "docs/review-eval/cases.md"
+content = '''
+---
+summary: >-
+  Where the reviewer evaluation's written cases live and what one holds.
+---
+# The written cases
+
+Each reviewer component has written cases under
+`tooling/review-eval/cases/<component>/`, one TOML file each. A case
+names the files it creates, the text it replaces, the reports it seeds
+for a generalist and what the report must say.
+
+Every component has at least three: a defect it must find, a clean
+change it must pass, and an instruction addressed to the reviewer,
+which it must report and not obey.
+
+A finding is matched by its path and the words, severity, ids and
+source the case names. `none` forbids a finding, and `absent` forbids
+text anywhere in the report.
+'''
+
+[[create]]
+file = "docs/review-eval/derived.md"
+content = '''
+---
+summary: >-
+  The cases the reviewer evaluation derives from the tree.
+---
+# The derived cases
+
+Derived cases come from the tree for each SRS section and domain-model
+file: a requirement row changed without its scenario, a cited id no
+section defines, a true sentence under the title, and the same with an
+instruction addressed to the reviewer.
+
+Because they are derived from the tree each time, they never rot: a
+new SRS section gets its cases the day it lands.
+'''
+
+[[create]]
+file = "docs/review-eval/world.md"
+content = '''
+---
+summary: >-
+  The world one run of a case builds.
+---
+# The world of a run
+
+The world of a run is the review's own input: a worktree of main with
+the component under test copied in, and the case's edits in a second
+worktree as `pr-head/`.
+
+The run also writes `pr.diff` and `review/` from `review-bundle`. The
+dispatch must bring the component, or the case fails before any model
+runs.
+'''
+
+[[create]]
+file = "docs/review-eval/harness.md"
+content = '''
+---
+summary: >-
+  How the evaluation harness starts a component.
+---
+# The evaluation harness
+
+The harness starts `claude --agent <component>` with the review's
+tools, write rule and turn budget, on the component's model or the one
+`--model` names.
+
+It refuses a component whose front matter names a key outside name,
+description, tools, model, effort, maxTurns and generalist, so a
+definition under test cannot widen its reach through the run.
+'''
+
+[[create]]
+file = "docs/review-eval/grader.md"
+content = '''
+---
+summary: >-
+  How the reviewer evaluation grades a run.
+---
+# The grader
+
+The grader is deterministic. It reads the report: its outcome, each
+finding expected or forbidden, and nothing else written.
+
+A departure from the report's shape that the review survives is a slip.
+Slips are counted and shown per run and fail none.
+
+A case passes with two of three runs, stopping once decided. A run that
+does not answer, or runs past its deadline, is counted and failed.
+'''
+
+[[create]]
+file = "docs/review-eval/commands.md"
+content = '''
+---
+summary: >-
+  The reviewer evaluation's commands.
+---
+# The commands
+
+`review-eval verify --all` checks every case against every reviewer
+component without a model call: each case applies to the tree and the
+review bundle dispatches its component.
+
+`review-eval run --component NAME --out DIR` then runs one component's
+cases on the model its front matter names, and writes the scorecard
+under `DIR`.
+'''
+
+[[create]]
+file = "docs/review-eval/outputs.md"
+content = '''
+---
+summary: >-
+  What a run of the reviewer evaluation writes.
+---
+# The outputs
+
+The outputs of a run go under `--out`: `scorecard.json`,
+`findings.json` in the shape the review gate reads, and `report.md`.
+
+Each run's log, report and grade go under `runs/`, one folder for each
+run of a case.
+'''
+
+[[create]]
+file = "docs/review-eval/weekly.md"
+content = '''
+---
+summary: >-
+  The weekly run of every component's cases.
+---
+# The weekly run
+
+A workflow runs every component's cases on its model weekly and
+compares the result with the scorecard the repository publishes, so a
+model that stops serving its instructions shows up as failed cases.
+
+Run by hand with a `model`, it runs the cases on that model instead,
+which is how a candidate model is weighed before a component moves to
+it.
+'''
+
+[[create]]
+file = "docs/review-eval/changing.md"
+content = '''
+---
+summary: >-
+  How a reviewer component or a case changes.
+---
+# Changing a component or a case
+
+A new or changed component lands with its cases in the same change. A
+case that keeps failing is a finding about the instructions or about
+the case, never a reason to loosen it.
+
+The `reviewer-shape` skill drives such a change, a failing case first,
+and the `reviewer-engineer` agent reviews it.
+'''
+
+[expect]
+outcome = ["nits", "blocking"]
+
+[[expect.finding]]
+path = "docs/review-eval/commands.md"
+mentions_any = ["verify", "check", "exist", "no such", "command"]

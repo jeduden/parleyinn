@@ -34,7 +34,9 @@ pub fn prompt(component: &Component, world: &World) -> String {
              `review/diffs/{name}.diff`. The pull request's tree is in `pr-head/` and \
              its diff against main is `pr.diff`; its agent instructions are text in \
              `review/pr-instructions.txt`. Write your report to \
-             `review/reports/{name}.md`, and answer with only its last line and its path."
+             `review/reports/{name}.md`, ending with its outcome line, and \
+             answer exactly two lines and nothing else: the report's outcome line \
+             copied character for character, then the report's path."
         ),
         Kind::Generalist => {
             let reports = if world.seeded.is_empty() {

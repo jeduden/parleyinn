@@ -48,6 +48,13 @@ fn each_kind_gets_its_prompt() {
         specialist.contains("`review/reports/lang-rust.md`"),
         "{specialist}"
     );
+    assert!(
+        specialist.ends_with(
+            "answer exactly two lines and nothing else: the report's outcome line \
+             copied character for character, then the report's path."
+        ),
+        "{specialist}"
+    );
 
     let generalist = prompt(&component(Kind::Generalist, "review-code"), &w);
     assert!(
