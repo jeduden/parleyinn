@@ -118,16 +118,49 @@ fn a_review_without_its_plan_cannot_run() {
     assert!(host.agents().is_empty());
 }
 
-#[test]
-fn a_review_whose_outcome_cannot_be_written_fails() {
+/// Runs a review whose file `rel` the gate reads cannot be written, and
+/// requires it to fail naming that file.
+fn fails_writing(rel: &str) {
     let dir = workdir();
-    fs::create_dir_all(dir.path().join("review/outcome.json")).unwrap();
+    let path = dir.path().join(rel);
+    fs::create_dir_all(&path).unwrap();
     let host = FakeHost::new(fake::either);
 
     let (code, _, err) = run_in(&host, dir.path());
 
     assert_eq!(code, EXIT_FAILURE);
-    assert!(err.contains("review-run: write "), "{err}");
+    // Each agent's progress line comes first, in the order they end.
+    assert_eq!(
+        err.lines().last(),
+        Some(
+            format!(
+                "review-run: write {}: Is a directory (os error 21)",
+                path.display()
+            )
+            .as_str()
+        ),
+        "{err}"
+    );
+}
+
+#[test]
+fn a_review_whose_outcome_cannot_be_written_fails() {
+    fails_writing(OUTCOME);
+}
+
+#[test]
+fn a_review_whose_consulted_list_cannot_be_written_fails() {
+    fails_writing(CONSULTED);
+}
+
+#[test]
+fn a_review_whose_answers_cannot_be_written_fails() {
+    fails_writing(ANSWERS);
+}
+
+#[test]
+fn a_review_whose_usage_cannot_be_written_fails() {
+    fails_writing(USAGE_FILE);
 }
 
 fn refusal(bad: &[&str]) -> String {

@@ -1,7 +1,7 @@
 use std::fs;
 use std::path::Path;
 use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::{Barrier, Mutex};
+use std::sync::{Condvar, Mutex};
 use std::time::Duration;
 
 use review_eval::host::{Command, Output};
@@ -262,26 +262,64 @@ fn progress_names_each_run() {
     );
 }
 
+/// A meeting of two runs, again and again, that a run waits at for its
+/// partner within a deadline: a barrier of two that cannot hang a test.
+#[derive(Default)]
+struct Meeting {
+    /// The runs waiting, and how many meetings have closed.
+    state: Mutex<(usize, u64)>,
+    met: Condvar,
+}
+
+impl Meeting {
+    /// Waits for a second run within `deadline`; whether one came.
+    fn wait(&self, deadline: Duration) -> bool {
+        let mut state = self.state.lock().unwrap();
+        let meeting = state.1;
+        state.0 += 1;
+        if state.0 == 2 {
+            *state = (0, meeting + 1);
+            self.met.notify_all();
+            return true;
+        }
+        let (state, waited) = self
+            .met
+            .wait_timeout_while(state, deadline, |s| s.1 == meeting)
+            .unwrap();
+        drop(state);
+        !waited.timed_out()
+    }
+}
+
+#[test]
+fn a_meeting_no_second_run_comes_to_ends_at_its_deadline() {
+    assert!(!Meeting::default().wait(Duration::from_millis(10)));
+}
+
 #[test]
 fn runs_stay_within_the_bound_and_use_it() {
     let active = AtomicUsize::new(0);
     let most = AtomicUsize::new(0);
+    let alone = AtomicUsize::new(0);
     let items: Vec<usize> = (0..6).collect();
 
     // Each run waits for a second one to be running, so two overlap
-    // without a clock; a third would raise the count past the bound.
-    let both = Barrier::new(2);
+    // without a clock; a third would raise the count past the bound. A
+    // run left alone past the deadline is counted, never waited on.
+    let both = Meeting::default();
 
     let out = parallel(&items, 2, &|n| {
         let now = active.fetch_add(1, Ordering::SeqCst) + 1;
         most.fetch_max(now, Ordering::SeqCst);
-        both.wait();
+        let met = both.wait(Duration::from_secs(30));
+        alone.fetch_add(usize::from(!met), Ordering::SeqCst);
         active.fetch_sub(1, Ordering::SeqCst);
         n * 10
     });
 
     assert_eq!(out, [0, 10, 20, 30, 40, 50]);
     assert_eq!(most.load(Ordering::SeqCst), 2);
+    assert_eq!(alone.load(Ordering::SeqCst), 0);
 }
 
 #[test]
