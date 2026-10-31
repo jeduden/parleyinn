@@ -1,8 +1,9 @@
 //! What each agent's run cost, from its log, in the shape the review
 //! workflow's cost step writes: one entry per agent with its model
 //! calls, fresh input, cache writes and reads and output, summed over
-//! the models it ran on, the most cached first; with the cost its
-//! result reported.
+//! the models it ran on, the most cached first; with the parts it ran
+//! in, a specialist run in parts being one entry, and the cost its
+//! results reported.
 
 use serde::Serialize;
 
@@ -17,8 +18,11 @@ pub struct AgentUsage {
     pub cache_write: u64,
     pub cache_read: u64,
     pub output: u64,
-    /// How many times it ran.
+    /// How many times it ran: for a specialist run in parts, every
+    /// part's attempts.
     pub attempts: u32,
+    /// How many parts it ran in: one unless its diff was split.
+    pub parts: u32,
     /// The cost the run's result reported, in US dollars.
     pub cost_usd: f64,
 }
@@ -37,6 +41,7 @@ pub fn usage(runs: &[AgentRun]) -> Vec<AgentUsage> {
                 cache_read: 0,
                 output: 0,
                 attempts: run.attempts,
+                parts: run.parts,
                 cost_usd: run.log.cost,
             };
             for m in run.log.usage.values() {

@@ -10,6 +10,7 @@ fn run(name: &str, log: RunLog) -> AgentRun {
         failure: None,
         log,
         attempts: 1,
+        parts: 1,
     }
 }
 
@@ -37,6 +38,7 @@ fn each_agent_s_usage_sums_its_models_the_most_cached_first() {
             cache_read: 33,
             output: 44,
             attempts: 1,
+            parts: 1,
             cost_usd: 0.5,
         }
     );
@@ -52,8 +54,21 @@ fn each_agent_s_usage_sums_its_models_the_most_cached_first() {
         "cache_read",
         "output",
         "attempts",
+        "parts",
         "cost_usd",
     ] {
         assert!(json.get(key).is_some(), "{key}");
     }
+}
+
+#[test]
+fn a_specialist_run_in_parts_is_one_entry_counting_its_parts_and_attempts() {
+    let mut split = run("test-engineer-unit", RunLog::default());
+    split.parts = 5;
+    split.attempts = 6;
+
+    let u = usage(&[split]);
+
+    assert_eq!(u.len(), 1);
+    assert_eq!((u[0].parts, u[0].attempts), (5, 6));
 }

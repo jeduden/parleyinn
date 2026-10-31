@@ -151,6 +151,7 @@ fn the_flags_read_inline_or_as_the_next_argument() {
             Options {
                 parallel: 2,
                 deadline: Duration::from_secs(30),
+                split: crate::parts::LIMIT,
             }
         )
     );

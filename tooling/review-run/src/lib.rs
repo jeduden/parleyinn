@@ -14,6 +14,7 @@
 
 pub mod cli;
 pub mod outcome;
+pub mod parts;
 pub mod plan;
 pub mod requirements;
 pub mod run;

@@ -39,6 +39,7 @@ fn options() -> Options {
     Options {
         parallel: 8,
         deadline: Duration::from_secs(77),
+        split: crate::parts::LIMIT,
     }
 }
 
@@ -579,4 +580,277 @@ fn a_first_log_and_its_errors_move_aside_and_missing_ones_are_no_error() {
     assert!(!logs.join("lang-rust.jsonl").exists());
     assert!(!logs.join("lang-rust.first.stderr").exists());
     assert_eq!(keep_first_log(dir.path(), "lang-markdown"), Ok(()));
+}
+
+/// A file's section of a diff, `size` bytes long, for `path`.
+fn section(path: &str, size: usize) -> String {
+    let head = format!("diff --git a/{path} b/{path}\n");
+    let body = "+".repeat(size - head.len() - 1);
+    format!("{head}{body}\n")
+}
+
+/// Writes lang-rust's diff, three files of which two fit a part of
+/// [`SPLIT`] bytes, so it runs in two parts.
+fn big_diff(dir: &Path) {
+    let diffs = dir.join("review/diffs");
+    fs::create_dir_all(&diffs).unwrap();
+    let diff = [
+        section("a.rs", 60),
+        section("b.rs", 30),
+        section("c.rs", 60),
+    ]
+    .concat();
+    fs::write(diffs.join("lang-rust.diff"), diff).unwrap();
+}
+
+const SPLIT: usize = 100;
+
+/// Runs the one-specialist plan, its split at [`SPLIT`], with `claude`
+/// answering as `script`: its runs, the progress lines and the host.
+fn split_run(
+    dir: &Path,
+    script: impl Fn(&Command) -> Result<Output, String> + Sync + 'static,
+) -> (Vec<AgentRun>, Vec<String>, FakeHost) {
+    let host = FakeHost::new(script);
+    let lines = Mutex::new(Vec::new());
+    let runs = review(
+        &host,
+        dir,
+        &plan(r#"{"review-code": ["lang-rust"]}"#),
+        Options {
+            split: SPLIT,
+            ..options()
+        },
+        &|l| lines.lock().unwrap().push(l.to_owned()),
+    )
+    .unwrap();
+    (runs, lines.into_inner().unwrap(), host)
+}
+
+/// A specialist part that states a finding on the part it is told,
+/// `src/part2.rs` for part 2, and one every part states.
+fn part_specialist(c: &Command) -> Result<Output, String> {
+    let prompt = prompt_of(c);
+    if !prompt.contains("a specialist") {
+        return fake::generalist(c);
+    }
+    let part = if prompt.contains("you are part 2 of 2") {
+        2
+    } else {
+        1
+    };
+    let own = format!("src/part{part}.rs:1 — if not addressed: part {part} breaks — I9");
+    let outcome = format!("outcome: findings — part {part} saw two.");
+    fake::answer(c, &[fake::FINDING, &own, &outcome], &outcome)
+}
+
+#[test]
+fn a_specialist_whose_diff_is_past_the_split_runs_in_parts_and_its_reports_merge() {
+    let dir = workdir();
+    big_diff(dir.path());
+
+    let (runs, lines, host) = split_run(dir.path(), part_specialist);
+
+    assert_eq!(host.agents(), ["lang-rust", "lang-rust", "review-code"]);
+    let calls = host.calls.lock().unwrap().clone();
+    let mut prompts: Vec<String> = calls[..2].iter().map(prompt_of).collect();
+    prompts.sort();
+    for (i, prompt) in prompts.iter().enumerate() {
+        assert!(
+            prompt.contains(&format!(
+                "you are part {} of 2. Read only your part's diff, `review/diffs/lang-rust.{}.diff`",
+                i + 1,
+                i + 1
+            )),
+            "{prompt}"
+        );
+        assert!(
+            prompt.contains("by part: part 1: a.rs, b.rs; part 2: c.rs."),
+            "{prompt}"
+        );
+    }
+    let mut logs: Vec<_> = calls[..2]
+        .iter()
+        .map(|c| c.stdout_to.clone().unwrap())
+        .collect();
+    logs.sort();
+    assert_eq!(
+        logs,
+        [
+            dir.path().join("review/logs/lang-rust.1.jsonl"),
+            dir.path().join("review/logs/lang-rust.2.jsonl")
+        ]
+    );
+    assert_eq!(runs.len(), 2);
+    let rust = &runs[0];
+    assert_eq!(rust.name, "lang-rust");
+    assert!(rust.answered());
+    assert_eq!((rust.parts, rust.attempts), (2, 2));
+    assert_eq!(
+        rust.log.answer,
+        "outcome: findings — in 2 parts: part 1, findings — part 1 saw two.; part 2, \
+         findings — part 2 saw two."
+    );
+    assert_eq!(
+        fs::read_to_string(dir.path().join("review/reports/lang-rust.md")).unwrap(),
+        format!(
+            "{}\nsrc/part1.rs:1 — if not addressed: part 1 breaks — I9\n\
+             src/part2.rs:1 — if not addressed: part 2 breaks — I9\n{}\n",
+            fake::FINDING,
+            rust.log.answer
+        )
+    );
+    assert!(
+        lines.contains(
+            &"lang-rust (specialist): answered (0.0200 USD, 6 turns) in 2 parts, 2 attempts"
+                .to_owned()
+        ),
+        "{lines:?}"
+    );
+    assert!(
+        lines.contains(
+            &"lang-rust part 2 of 2 (specialist): answered (0.0100 USD, 3 turns)".to_owned()
+        ),
+        "{lines:?}"
+    );
+    assert!(!dir.path().join("review/reports/lang-rust.1.md").exists());
+}
+
+#[test]
+fn a_part_that_does_not_answer_is_retried_and_then_fails_the_specialist_naming_it() {
+    let dir = workdir();
+    big_diff(dir.path());
+
+    let (runs, lines, host) = split_run(dir.path(), |c| {
+        if prompt_of(c).contains("you are part 2 of 2") {
+            fake::write_log(
+                c,
+                &fake::log_of(
+                    &["b.rs:2 — if not addressed: y — I2"],
+                    "error_max_turns",
+                    "",
+                    0.1,
+                ),
+            );
+            Ok(Output::default())
+        } else {
+            part_specialist(c)
+        }
+    });
+
+    assert_eq!(host.agents().len(), 4);
+    let rust = &runs[0];
+    assert_eq!(
+        rust.failure.as_deref(),
+        Some("part 2 of 2: its run ended with error_max_turns")
+    );
+    assert_eq!((rust.parts, rust.attempts), (2, 3));
+    assert_eq!(
+        fs::read_to_string(dir.path().join("review/reports/lang-rust.md")).unwrap(),
+        format!(
+            "incomplete: part 2 of 2: its run ended with error_max_turns\n{}\n\
+             src/part1.rs:1 — if not addressed: part 1 breaks — I9\n\
+             b.rs:2 — if not addressed: y — I2\n",
+            fake::FINDING
+        )
+    );
+    assert!(
+        dir.path()
+            .join("review/logs/lang-rust.2.first.jsonl")
+            .is_file()
+    );
+    assert!(
+        lines.iter().any(|l| l.starts_with(
+            "lang-rust part 2 of 2 (specialist): did not answer: its run ended with \
+             error_max_turns; running it once more"
+        )),
+        "{lines:?}"
+    );
+}
+
+#[test]
+fn a_diff_that_cannot_be_split_fails_its_specialist_without_running_it() {
+    let dir = workdir();
+    big_diff(dir.path());
+    fs::create_dir_all(dir.path().join("review/diffs/lang-rust.1.diff")).unwrap();
+
+    let (runs, _, host) = split_run(dir.path(), fake::either);
+
+    assert_eq!(host.agents(), ["review-code"]);
+    let failure = runs[0].failure.clone().unwrap();
+    assert!(
+        failure.starts_with("its diff could not be split: write "),
+        "{failure}"
+    );
+    assert_eq!((runs[0].attempts, runs[0].parts), (0, 0));
+    assert!(
+        fs::read_to_string(dir.path().join("review/reports/lang-rust.md"))
+            .unwrap()
+            .starts_with("incomplete: its diff could not be split: write ")
+    );
+
+    fs::remove_file(dir.path().join("review/reports/lang-rust.md")).unwrap();
+    fs::create_dir_all(dir.path().join("review/reports/lang-rust.md")).unwrap();
+    let (runs, _, _) = split_run(dir.path(), fake::either);
+    let failure = runs[0].failure.clone().unwrap();
+    assert!(
+        failure.contains("; its report could not be written: "),
+        "{failure}"
+    );
+}
+
+#[test]
+fn a_merged_report_that_cannot_be_written_fails_the_specialist() {
+    let dir = workdir();
+    big_diff(dir.path());
+    fs::create_dir_all(dir.path().join("review/reports/lang-rust.md")).unwrap();
+
+    let (runs, _, _) = split_run(dir.path(), part_specialist);
+    let failure = runs[0].failure.clone().unwrap();
+    assert!(
+        failure.starts_with("its report could not be written: "),
+        "{failure}"
+    );
+
+    let (runs, _, _) = split_run(dir.path(), |_| Err("cannot start".to_owned()));
+    let failure = runs[0].failure.clone().unwrap();
+    assert!(
+        failure.starts_with("part 1 of 2: cannot start; part 2 of 2: cannot start; its report"),
+        "{failure}"
+    );
+}
+
+#[test]
+fn a_part_without_a_definition_fails_its_specialist() {
+    let dir = workdir();
+    big_diff(dir.path());
+    fs::remove_file(dir.path().join(".claude/agents/lang-rust.md")).unwrap();
+
+    let (runs, _, host) = split_run(dir.path(), fake::either);
+
+    assert_eq!(host.agents(), ["review-code"]);
+    let failure = runs[0].failure.clone().unwrap();
+    assert!(
+        failure.starts_with("part 1 of 2: its definition does not read: "),
+        "{failure}"
+    );
+    assert!(
+        fs::read_to_string(dir.path().join("review/reports/lang-rust.md"))
+            .unwrap()
+            .starts_with("incomplete: part 1 of 2: its definition does not read: ")
+    );
+}
+
+#[test]
+fn a_note_is_added_to_the_prompt_and_args_without_one_are_left_alone() {
+    let mut args = vec!["-p".to_owned(), "Read.".to_owned(), "--verbose".to_owned()];
+    told(&mut args, "Part 1.");
+    assert_eq!(args, ["-p", "Read. Part 1.", "--verbose"]);
+
+    let mut args = vec!["--verbose".to_owned()];
+    told(&mut args, "Part 1.");
+    assert_eq!(args, ["--verbose"]);
+    let mut args = vec!["-p".to_owned()];
+    told(&mut args, "Part 1.");
+    assert_eq!(args, ["-p"]);
 }

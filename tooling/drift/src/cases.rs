@@ -920,8 +920,8 @@ fn review_late_cases() -> Vec<Case> {
             "ENG-28",
             Injection::replace(
                 "tooling/review-run/src/run.rs",
-                "    let mut runs = parallel(&plan.specialists(), options.parallel, &|name| {\n        one(name, Kind::Specialist)\n    });\n    runs.extend(parallel(&plan.generalists(), options.parallel, &|name| {\n        one(name, Kind::Generalist)\n    }));\n",
-                "    let mut runs = parallel(&plan.generalists(), options.parallel, &|name| {\n        one(name, Kind::Generalist)\n    });\n    runs.extend(parallel(&plan.specialists(), options.parallel, &|name| {\n        one(name, Kind::Specialist)\n    }));\n",
+                "    let (units, unsplit) = specialist_units(workdir, plan, options.split);\n    let done = parallel(&units, options.parallel, &one);\n    let mut runs = gather(workdir, plan, &units, done, unsplit, progress);\n    let generalists: Vec<Unit> = plan.generalists().into_iter().map(Unit::whole).collect();\n    let done = parallel(&generalists, options.parallel, &one);\n    runs.extend(done.into_iter().map(|(run, _)| run));\n",
+                "    let generalists: Vec<Unit> = plan.generalists().into_iter().map(Unit::whole).collect();\n    let early = parallel(&generalists, options.parallel, &one);\n    let (units, unsplit) = specialist_units(workdir, plan, options.split);\n    let done = parallel(&units, options.parallel, &one);\n    let mut runs = gather(workdir, plan, &units, done, unsplit, progress);\n    runs.extend(early.into_iter().map(|(run, _)| run));\n",
             ),
             scenario("ENG-28"),
             "review-code started before lang-markdown ended",

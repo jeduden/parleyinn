@@ -24,6 +24,7 @@ fn ran(name: &str, kind: Kind, answer: &str) -> AgentRun {
             ..RunLog::default()
         },
         attempts: 1,
+        parts: 1,
     }
 }
 
