@@ -777,11 +777,33 @@ fn run_logs_stay_in_the_agent_job() {
         "an excluded log stays"
     );
 
+    let mut whole = parse(REVIEW_FLOW);
+    whole.jobs[0]
+        .text
+        .push_str(&upload("|\n            review/\n            !review/"));
+    assert!(
+        whole.run_logs_stay(RUN_LOGS).is_empty(),
+        "excluding what holds the logs keeps them"
+    );
+
     let mut other = parse(REVIEW_FLOW);
     other.jobs[1].text.push_str(&upload("review/logs/"));
     assert!(
         other.run_logs_stay(RUN_LOGS).is_empty(),
         "a job that runs no agent has no log"
+    );
+}
+
+#[test]
+fn excluding_one_log_still_uploads_the_rest() {
+    let mut one = parse(REVIEW_FLOW);
+    one.jobs[0].text.push_str(&upload(
+        "|\n            review/\n            !review/logs/a.jsonl",
+    ));
+
+    assert_eq!(
+        one.run_logs_stay(RUN_LOGS),
+        ["agent job review uploads review/logs, every tool result its agents read"]
     );
 }
 

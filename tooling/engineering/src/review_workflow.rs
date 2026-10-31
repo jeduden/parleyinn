@@ -205,17 +205,15 @@ fn upload_paths(step: &str) -> Vec<String> {
 }
 
 /// Whether the upload `paths` carry `dir` out of the job: a path at or
-/// under it, or one above it that no `!` path excludes it from.
+/// under it, or one above it that no `!` path excludes it from. Only a
+/// `!` path at `dir` or above it excludes it: one under it, a single
+/// log, leaves the rest uploaded.
 fn uploads_dir(paths: &[String], dir: &str) -> bool {
     let bare = |p: &str| {
         p.trim_start_matches("./")
             .trim_end_matches(['*', '/'])
             .to_owned()
     };
-    let excluded = paths
-        .iter()
-        .filter_map(|p| p.strip_prefix('!'))
-        .any(|p| bare(p).starts_with(dir));
     let above = |p: &str| {
         p.is_empty()
             || p == "."
@@ -223,6 +221,11 @@ fn uploads_dir(paths: &[String], dir: &str) -> bool {
                 .strip_prefix(p)
                 .is_some_and(|rest| rest.starts_with('/'))
     };
+    let excluded = paths
+        .iter()
+        .filter_map(|p| p.strip_prefix('!'))
+        .map(|p| bare(p))
+        .any(|p| p == dir || above(&p));
 
     paths
         .iter()
