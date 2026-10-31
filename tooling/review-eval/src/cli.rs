@@ -600,10 +600,20 @@ fn one_run(
         let _ = fs::write(dir.join("grade.txt"), grade);
         Ok(record)
     });
-    let _ = world::teardown(host, &options.checkout, &world_dir, worktrees);
-    let _ = fs::remove_dir_all(&world_dir);
+    let mut record = result.unwrap_or_else(|e| RunRecord::failed(&e));
+    // A world left behind fails no run, but it is noted on it (I6).
+    if let Err(e) = world::teardown(host, &options.checkout, &world_dir, worktrees) {
+        record.notes.push(format!("tear down: {e}"));
+    }
+    if let Err(e) = fs::remove_dir_all(&world_dir)
+        && e.kind() != std::io::ErrorKind::NotFound
+    {
+        record
+            .notes
+            .push(format!("remove {}: {e}", world_dir.display()));
+    }
 
-    result.unwrap_or_else(|e| RunRecord::failed(&e))
+    record
 }
 
 /// Writes the scorecard, its published lines, the gate's findings and

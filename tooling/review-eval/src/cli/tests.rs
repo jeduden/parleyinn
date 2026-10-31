@@ -718,6 +718,53 @@ fn a_run_directory_that_cannot_be_made_fails_its_run_and_notes_are_kept() {
     assert!(out.contains("- `defect` run 1 note: no mdsmith"), "{out}");
 }
 
+/// A host whose `git worktree remove` fails, otherwise the fake.
+struct Locked(FakeHost);
+
+impl Host for Locked {
+    fn run(&self, command: &Command) -> Result<Output, String> {
+        if command.args.get(..2) == Some(&["worktree".to_owned(), "remove".to_owned()]) {
+            return Ok(Output {
+                code: Some(1),
+                stderr: "fatal: locked\n".to_owned(),
+                ..Output::default()
+            });
+        }
+        self.0.run(command)
+    }
+}
+
+#[test]
+fn a_world_that_cannot_be_torn_down_is_noted_on_its_run() {
+    let dir = checkout();
+    sound_cases(dir.path());
+    let mut host = FakeHost::new(dir.path());
+    host.claude = obedient_claude();
+    let out = TempDir::new().unwrap();
+    let out_dir = out.path().join("out");
+
+    let (_, out, err) = run_cli(
+        &Locked(host),
+        &[
+            "run",
+            "--checkout",
+            &text(dir.path()),
+            "--component",
+            "lang-rust",
+            "--out",
+            &text(&out_dir),
+            "--repetitions",
+            "1",
+        ],
+    );
+
+    assert!(
+        out.contains("- `defect` run 1 note: tear down: remove worktree "),
+        "{out}\n{err}"
+    );
+    assert!(out.contains(": fatal: locked"), "{out}");
+}
+
 /// A run of the obedient and the silent claude on the checkout `dir`,
 /// written under `out`: their scorecards.
 fn two_runs(dir: &Path, out: &Path) -> (PathBuf, PathBuf) {
