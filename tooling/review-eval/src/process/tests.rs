@@ -81,12 +81,37 @@ fn an_error_file_that_cannot_be_created_fails_the_start() {
 fn a_command_past_its_deadline_is_killed() {
     let dir = TempDir::new().unwrap();
 
+    let started = std::time::Instant::now();
+
     let out = ProcessHost
         .run(&sh("sleep 30", dir.path()).within(Duration::from_millis(200)))
         .unwrap();
 
     assert!(out.timed_out);
     assert!(!out.ok());
+    assert_eq!(out.stdout, HELD);
+    assert_eq!(out.stderr, HELD);
+    // `sh`'s own child, `sleep`, still holds the pipes: the run must not
+    // wait for it.
+    assert!(
+        started.elapsed() < Duration::from_secs(10),
+        "{:?}",
+        started.elapsed()
+    );
+}
+
+#[test]
+fn a_command_that_prints_more_than_a_pipe_holds_ends_on_its_own() {
+    let dir = TempDir::new().unwrap();
+    let script = "head -c 300000 /dev/zero | tr '\\0' a; head -c 300000 /dev/zero >&2";
+
+    let out = ProcessHost
+        .run(&sh(script, dir.path()).within(Duration::from_secs(20)))
+        .unwrap();
+
+    assert!(out.ok(), "{:?}", out.code);
+    assert_eq!(out.stdout.len(), 300_000);
+    assert_eq!(out.stderr.len(), 300_000);
 }
 
 #[test]
@@ -103,17 +128,26 @@ fn a_program_that_does_not_exist_fails_to_start() {
 #[test]
 fn a_command_gets_its_own_variables_but_never_a_nested_sessions() {
     let dir = TempDir::new().unwrap();
+    let echo: Vec<String> = NESTED_SESSION_VARS
+        .iter()
+        .map(|v| format!("${{{v}:-unset}}"))
+        .collect();
     let mut command = sh(
-        "echo \"$REVIEW_VAR ${CLAUDE_CODE_CHILD_SESSION:-unset}\"",
+        &format!("echo \"$REVIEW_VAR {}\"", echo.join(" ")),
         dir.path(),
     );
-    command.env = vec![
-        ("REVIEW_VAR".to_owned(), "set".to_owned()),
-        ("CLAUDE_CODE_CHILD_SESSION".to_owned(), "1".to_owned()),
-    ];
+    command.env = std::iter::once(("REVIEW_VAR".to_owned(), "set".to_owned()))
+        .chain(
+            NESTED_SESSION_VARS
+                .iter()
+                .map(|v| ((*v).to_owned(), "1".to_owned())),
+        )
+        .collect();
 
     let out = ProcessHost.run(&command).unwrap();
 
-    assert_eq!(out.stdout, "set unset\n");
-    assert!(NESTED_SESSION_VARS.contains(&"CLAUDE_AUTO_BACKGROUND_TASKS"));
+    assert_eq!(
+        out.stdout,
+        format!("set {}\n", ["unset"; NESTED_SESSION_VARS.len()].join(" "))
+    );
 }

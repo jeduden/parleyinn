@@ -5,8 +5,9 @@
 //! a program.
 
 use std::fs::File;
-use std::io;
+use std::io::{self, Read};
 use std::process::{Command as Process, Stdio};
+use std::sync::mpsc::{self, Receiver};
 use std::thread;
 use std::time::{Duration, Instant};
 
@@ -17,6 +18,14 @@ pub const DEFAULT_DEADLINE: Duration = Duration::from_secs(600);
 
 /// How often a running command is looked at.
 const POLL: Duration = Duration::from_millis(50);
+
+/// How long, once a command has ended, its output may still take to
+/// arrive: a process it started may hold its pipes past its end.
+const DRAIN: Duration = Duration::from_secs(2);
+
+/// What stands for a pipe still held open once [`DRAIN`] has passed, so
+/// the output lost is never silent.
+pub const HELD: &str = "review-eval: a process the command started still holds this output\n";
 
 /// What a Claude Code session sets for the commands it starts, which
 /// would make an agent started here a child of that session: its tool
@@ -63,6 +72,10 @@ impl Host for ProcessHost {
         let mut child = process
             .spawn()
             .map_err(|e| format!("start {}: {e}", command.program))?;
+        // Each pipe is read as the command writes, so a chatty command
+        // never blocks on a full pipe.
+        let stdout = drain(child.stdout.take());
+        let stderr = drain(child.stderr.take());
         let deadline = command.deadline.unwrap_or(DEFAULT_DEADLINE);
         let started = Instant::now();
         let wait_failed = |e: io::Error| format!("wait for {}: {e}", command.program);
@@ -71,20 +84,51 @@ impl Host for ProcessHost {
                 break false;
             }
             if started.elapsed() >= deadline {
-                let _ = child.kill();
+                // `kill` answers Ok for a child that has already exited, so
+                // an error means the command may still run past its deadline.
+                child
+                    .kill()
+                    .map_err(|e| format!("kill {}: {e}", command.program))?;
                 break true;
             }
             thread::sleep(POLL);
         };
-        let out = child.wait_with_output().map_err(wait_failed)?;
+        let status = child.wait().map_err(wait_failed)?;
+        let until = Instant::now() + DRAIN;
 
         Ok(Output {
-            code: out.status.code(),
-            stdout: String::from_utf8_lossy(&out.stdout).into_owned(),
-            stderr: String::from_utf8_lossy(&out.stderr).into_owned(),
+            code: status.code(),
+            stdout: collect(&stdout, until),
+            stderr: collect(&stderr, until),
             timed_out,
         })
     }
+}
+
+/// Reads `pipe` to its end on a thread of its own, and hands what it
+/// read to the receiver.
+fn drain(pipe: Option<impl Read + Send + 'static>) -> Receiver<Vec<u8>> {
+    let (tx, rx) = mpsc::channel();
+    thread::spawn(move || {
+        let mut read = Vec::new();
+        if let Some(mut pipe) = pipe {
+            // What was read before an error is kept; the exit code says
+            // whether the command ran well.
+            let _ = pipe.read_to_end(&mut read);
+        }
+        let _ = tx.send(read);
+    });
+    rx
+}
+
+/// What a pipe's reader read, waiting until `until` for a pipe a process
+/// the command started still holds, and [`HELD`] in its place then.
+fn collect(rx: &Receiver<Vec<u8>>, until: Instant) -> String {
+    rx.recv_timeout(until.saturating_duration_since(Instant::now()))
+        .map_or_else(
+            |_| HELD.to_owned(),
+            |read| String::from_utf8_lossy(&read).into_owned(),
+        )
 }
 
 #[cfg(test)]
