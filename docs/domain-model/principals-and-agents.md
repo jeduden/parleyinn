@@ -2,7 +2,7 @@
 title: "Principals and agents"
 order: "01"
 summary: >-
-  Who acts in ParleyInn: principals, persons and service accounts, managed policy, agents, runs and subagents, the facilitator, authors, members, the owner and delegates.
+  Who acts in ParleyInn: principals, persons and service accounts, managed policy, harness configuration, agents, runs and subagents, the facilitator, authors, members, the owner and delegates.
 ---
 # Principals and agents
 

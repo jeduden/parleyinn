@@ -41,7 +41,7 @@ sort: order
 header: ""
 row: "- [{title}]({filename}) — {summary}"
 ?>
-- [Principals and agents](principals-and-agents.md) — Who acts in ParleyInn: principals, persons and service accounts, managed policy, agents, runs and subagents, the facilitator, authors, members, the owner and delegates.
+- [Principals and agents](principals-and-agents.md) — Who acts in ParleyInn: principals, persons and service accounts, managed policy, harness configuration, agents, runs and subagents, the facilitator, authors, members, the owner and delegates.
 - [Harness facts](harness-facts.md) — The harness's own facts that ParleyInn records and names: the harness, harness sessions and transcripts, hooks, turns and compaction.
 - [Places](places.md) — Where ParleyInn's state lives and is shared: homes, nodes, devices and paired phones, sandboxes, rooms and their kinds, visibility, peers and blind peers.
 - [Record](record.md) — The record and what derives from it: writers, events, addresses, segments, seals, provenance and origin, spans and landmarks, quarantine and purge, receipts, backups, bundles and exports.
