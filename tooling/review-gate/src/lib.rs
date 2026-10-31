@@ -361,8 +361,34 @@ pub fn report_check(report: Option<&str>, answer: Option<&str>) -> Option<&'stat
         return Some("has a report that does not end with its outcome");
     };
 
-    (!answer.is_some_and(|answer| answer.lines().any(|l| l.trim() == outcome)))
+    (!answer.is_some_and(|answer| answer.lines().any(|l| same_outcome(outcome, l))))
         .then_some("has a report whose outcome differs from its answer in the run log")
+}
+
+/// Whether an answer's `line` repeats the report's `outcome` line:
+/// the same words, whatever their case, spacing, emphasis markup, kind
+/// of dash or trailing punctuation.
+fn same_outcome(outcome: &str, line: &str) -> bool {
+    normalised(line) == normalised(outcome)
+}
+
+/// `text` lowercased, without emphasis or code markup, with every dash
+/// a hyphen, its whitespace collapsed to single spaces and no trailing
+/// punctuation: what a harmless retelling of a line does not change.
+fn normalised(text: &str) -> String {
+    let words: String = text
+        .chars()
+        .filter(|c| !matches!(c, '*' | '_' | '`' | '~'))
+        .map(|c| match c {
+            '\u{2012}'..='\u{2015}' | '\u{2212}' => '-',
+            c => c.to_ascii_lowercase(),
+        })
+        .collect();
+    let spaced = words.split_whitespace().collect::<Vec<_>>().join(" ");
+
+    spaced
+        .trim_end_matches(['.', ',', ';', ':', '!', '?', ' '])
+        .to_owned()
 }
 
 /// Reads the agents the review consulted, a list of names.

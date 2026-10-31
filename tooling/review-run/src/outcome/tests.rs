@@ -202,6 +202,23 @@ fn a_report_the_gate_would_refuse_blocks_and_is_named() {
 }
 
 #[test]
+fn an_answer_that_repeats_the_outcome_with_harmless_differences_is_accepted() {
+    for answer in [
+        "outcome: nits - lang-rust saw a nit\nreview/reports/lang-rust.md",
+        "**Outcome: nits** — lang-rust  saw a nit.\nreview/reports/lang-rust.md",
+        "`outcome: nits – lang-rust saw a nit`",
+    ] {
+        let (mut runs, reports) = all_answered("none — nothing to add — review-code\nSound.");
+        runs[0] = ran("lang-rust", Kind::Specialist, answer);
+
+        let d = decide(&plan(DISPATCH), &runs, &reports);
+
+        assert_eq!(d.outcome.verdict, "approve", "{answer}");
+        assert!(d.outcome.findings.is_empty(), "{answer}");
+    }
+}
+
+#[test]
 fn an_empty_dispatch_is_decided_but_not_approved() {
     let d = decide(&plan("{}"), &[], &BTreeMap::new());
 

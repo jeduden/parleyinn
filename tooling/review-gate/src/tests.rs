@@ -966,6 +966,31 @@ fn a_specialist_s_report_must_end_with_the_outcome_it_answered() {
 }
 
 #[test]
+fn an_answer_line_is_the_outcome_whatever_its_whitespace_punctuation_dashes_or_markup() {
+    let outcome = "outcome: nits — the change adds `x`.";
+    for line in [
+        "outcome: nits — the change adds `x`.",
+        "  outcome:  nits —  the change adds `x`  ",
+        "outcome: nits — the change adds x",
+        "**Outcome: nits** - the change adds `x`;",
+        "*outcome: nits* – the change adds _x_!",
+        "`outcome: nits — the change adds x.`",
+    ] {
+        assert!(same_outcome(outcome, line), "{line:?}");
+    }
+    for line in [
+        "outcome: blocking — the change adds `x`.",
+        "outcome: nits — the change adds y.",
+        "outcome: nits",
+        "review/reports/lang-rust.md — outcome: nits — the change adds x.",
+        "the outcome: nits — the change adds x. was it",
+        "",
+    ] {
+        assert!(!same_outcome(outcome, line), "{line:?}");
+    }
+}
+
+#[test]
 fn an_outcome_line_names_sound_nits_or_blocking_in_any_case_and_markup() {
     for (text, want) in [
         ("x\noutcome: sound — y\n\n", Some("outcome: sound — y")),
