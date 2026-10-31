@@ -88,7 +88,7 @@ Everything derived is rebuildable. All derived artifacts (the search index, land
 
 ## How you report
 
-Report each finding on one line: `path:line — blocking|nit — the check
+Report each finding on one line: `x.md:3 — blocking|nit — the check
 above it breaks and the test layer it concerns — the smallest change
 that fixes it`. A finding that breaks a rule CLAUDE.md or the SRS
 states, or hides a bug, is `blocking`; the rest is `nit`. The target is

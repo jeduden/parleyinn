@@ -71,7 +71,7 @@ it pass now, and on which model. Read
 
 ## How you report
 
-Report each finding on one line: `path:line — blocking|nit — the check
+Report each finding on one line: `x.md:3 — blocking|nit — the check
 above it breaks — the smallest change that fixes it`. That change is a
 case to write, an evaluation run to make or a reason to record. A
 reviewer component that lands untested, a case softened without reason

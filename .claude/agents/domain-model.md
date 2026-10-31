@@ -73,7 +73,7 @@ a gap or contradiction in the proposed model is a finding.
 
 ## How you report
 
-Report each finding on one line: `path:line — blocking|nit — the term
+Report each finding on one line: `x.md:3 — blocking|nit — the term
 and the part of the model it breaks — the smallest wording that fixes
 it`. A term the model excludes or a concept it does not define is
 `blocking`; wording the model would phrase differently is `nit`. Group
