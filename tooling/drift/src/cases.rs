@@ -98,6 +98,7 @@ pub fn cases() -> Vec<Case> {
         review_report_form_cases(),
         review_run_report_cases(),
         review_report_grading_cases(),
+        workflow_cases(),
         // Last: its cases edit source the later cases would run stale.
         license_text_cases(),
     ]
@@ -233,6 +234,43 @@ fn decision_cases() -> Vec<Case> {
                 "ADR-99",
             )
         },
+    ]
+}
+
+/// The drifts ENG-33 exists to catch: an action used by a tag rather
+/// than a commit sha, an event field expanded into a script, and CI no
+/// longer running zizmor over the workflows.
+fn workflow_cases() -> Vec<Case> {
+    vec![
+        case(
+            "an action used by its tag, not its commit sha",
+            "ENG-33",
+            Injection::replace(
+                ".github/workflows/codeql.yml",
+                "github/codeql-action/init@24c54180a607b1449ed407dd24f251e4e9147c8d # v4.38.3",
+                "github/codeql-action/init@v4.38.3",
+            ),
+            scenario("ENG-33"),
+            "uses github/codeql-action/init@v4.38.3, not pinned to a full commit sha",
+        ),
+        case(
+            "a pull request's title expanded into a run script",
+            "ENG-33",
+            Injection::replace(
+                CI_WORKFLOW,
+                "      - run: taplo lint\n",
+                "      - run: taplo lint ${{ github.event.pull_request.title }}\n",
+            ),
+            scenario("ENG-33"),
+            "expands github.event.pull_request.title in a run script, not through env",
+        ),
+        case(
+            "CI no longer runs zizmor over the workflows",
+            "ENG-33",
+            Injection::replace(CI_WORKFLOW, "run: zizmor .github", "run: zizmor --version"),
+            scenario("ENG-33"),
+            r#"the CI workflow does not run "zizmor .github""#,
+        ),
     ]
 }
 
