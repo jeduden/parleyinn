@@ -399,6 +399,8 @@ fn a_shared_section_change_to_a_tree_plans_one_component_per_set() {
     write("docs/srs/06-security.md", "# 6\n");
     write("docs/domain-model/index.md", "# hub\n");
     write("tooling/review-eval/cases/lang-a/x.toml", "case\n");
+    // No component: only a .md file under .claude/agents is one.
+    write(".claude/agents/notes.txt", "file: ../../docs/agents/s.md\n");
     for (name, sections) in [
         ("lang-a", &["docs/agents/s.md"][..]),
         ("lang-b", &["docs/agents/s.md"][..]),
