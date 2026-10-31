@@ -68,6 +68,23 @@ fn an_include_without_a_file_or_a_close_is_not_copied() {
 }
 
 #[test]
+fn an_include_whose_directive_never_ends_is_not_copied() {
+    let read = |_: &str| Some("A\n".to_owned());
+
+    assert!(copied("x.md", "<?include\nfile: a.md\nA\n", &read).is_empty());
+}
+
+#[test]
+fn an_empty_copy_of_an_empty_source_is_copied() {
+    let read = |_: &str| Some("---\na: b\n---\n\n".to_owned());
+
+    assert_eq!(
+        copied("x.md", "<?include\nfile: a.md\n?>\n\n<?/include?>\n", &read),
+        [(3, 5)]
+    );
+}
+
+#[test]
 fn resolve_joins_a_path_to_the_including_file_s_directory() {
     assert_eq!(
         resolve(".claude/agents/a.md", "../../docs/x.md").as_deref(),
@@ -148,6 +165,24 @@ fn prune_keeps_a_hunk_that_reaches_past_the_copy() {
     assert_eq!(prune(directive, &tree), directive);
     assert_eq!(prune(across, &tree), across);
     assert_eq!(prune(DIFF, &|_: &str| None), DIFF);
+}
+
+#[test]
+fn prune_keeps_a_hunk_that_adds_a_line_past_the_copy() {
+    let added =
+        "diff --git a/.claude/agents/a.md b/.claude/agents/a.md\n@@ -11,0 +11 @@\n+Added text.\n";
+
+    assert_eq!(prune(added, &tree), added);
+}
+
+#[test]
+fn prune_reads_past_a_no_newline_marker_inside_a_copy() {
+    let marked = "diff --git a/.claude/agents/a.md b/.claude/agents/a.md\n@@ -9 +9 @@\n-Write two lines.\n\\ No newline at end of file\n+Write one line.\n";
+
+    assert_eq!(
+        prune(marked, &tree),
+        format!("{NOTE}\n{LEFT_OUT}`.claude/agents/a.md`\n")
+    );
 }
 
 #[test]
