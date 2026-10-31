@@ -31,7 +31,8 @@ pub const REVIEW: &str = review_eval::world::REVIEW;
 /// The specialists' reports, one `<name>.md` each.
 pub const REPORTS: &str = review_eval::world::REPORTS;
 /// Each run's stream-json log, `<name>.jsonl`, and its errors,
-/// `<name>.stderr`.
+/// `<name>.stderr`; a first attempt's that did not answer as
+/// `<name>.first.jsonl` and `<name>.first.stderr`.
 pub const LOGS: &str = "review/logs";
 /// The review outcome, in the shape the review gate reads.
 pub const OUTCOME: &str = "review/outcome.json";

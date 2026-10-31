@@ -88,7 +88,7 @@ pub fn review(
         fs::create_dir_all(&path).map_err(|e| format!("make {}: {e}", path.display()))?;
     }
     let one = |name: &String, kind: Kind| {
-        let run = run_one(host, workdir, plan, name, kind, options.deadline);
+        let run = run_one(host, workdir, plan, name, kind, options.deadline, progress);
         progress(&describe(&run));
         run
     };
@@ -102,16 +102,22 @@ pub fn review(
     Ok(runs)
 }
 
-/// One line on `run`, for the progress the command prints.
+/// One line on `run`, for the progress the command prints; a run that
+/// took two attempts says so.
 #[must_use]
 pub fn describe(run: &AgentRun) -> String {
     let kind = run.kind.word();
-    match &run.failure {
+    let line = match &run.failure {
         None => format!(
             "{} ({kind}): answered ({:.4} USD, {} turns)",
             run.name, run.log.cost, run.log.turns
         ),
         Some(why) => format!("{} ({kind}): did not answer: {why}", run.name),
+    };
+    if run.attempts > 1 {
+        format!("{line} on its second attempt")
+    } else {
+        line
     }
 }
 
@@ -120,6 +126,8 @@ pub fn describe(run: &AgentRun) -> String {
 /// missed its deadline or answered nothing. A definition that does not
 /// read, or a report that cannot be cleared, fails at once, and a report
 /// the agent wrote is judged where the outcome is decided, never rerun.
+/// The first failure is told to `progress` before the second attempt,
+/// and its log kept as `<name>.first.jsonl` beside the second's.
 fn run_one(
     host: &dyn Host,
     workdir: &Path,
@@ -127,6 +135,7 @@ fn run_one(
     name: &str,
     kind: Kind,
     deadline: Duration,
+    progress: &(dyn Fn(&str) + Sync),
 ) -> AgentRun {
     let first = attempt(host, workdir, plan, name, kind, deadline);
     if first.answered() || first.attempts == 0 {
@@ -134,6 +143,13 @@ fn run_one(
             attempts: first.attempts.max(1),
             ..first
         };
+    }
+    progress(&format!("{}; running it once more", describe(&first)));
+    if let Err(e) = keep_first_log(workdir, name) {
+        progress(&format!(
+            "{name} ({}): its first log was not kept: {e}",
+            kind.word()
+        ));
     }
     let mut second = attempt(host, workdir, plan, name, kind, deadline);
     second.log.cost += first.log.cost;
@@ -202,6 +218,29 @@ fn attempt(
         log,
         attempts: 1,
     }
+}
+
+/// Moves agent `name`'s log and its errors, each when there is one, to
+/// `<name>.first.jsonl` and `<name>.first.stderr`, so its second
+/// attempt does not write over them.
+fn keep_first_log(workdir: &Path, name: &str) -> Result<(), String> {
+    let logs = workdir.join(LOGS);
+    for extension in ["jsonl", "stderr"] {
+        let from = logs.join(format!("{name}.{extension}"));
+        let to = logs.join(format!("{name}.first.{extension}"));
+        match fs::rename(&from, &to) {
+            Err(e) if e.kind() != io::ErrorKind::NotFound => {
+                return Err(format!(
+                    "rename {} to {}: {e}",
+                    from.display(),
+                    to.display()
+                ));
+            }
+            _ => {}
+        }
+    }
+
+    Ok(())
 }
 
 /// Removes the file at `path` when there is one.

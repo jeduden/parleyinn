@@ -334,3 +334,91 @@ fn a_definition_that_does_not_read_is_not_tried_again() {
     assert!(runs.iter().all(|r| r.attempts == 1));
     assert!(host.agents().is_empty());
 }
+
+/// Runs the one-specialist plan with `claude` answering as `script`,
+/// and returns its run and the progress lines it printed.
+fn one_run_told(
+    dir: &Path,
+    script: impl Fn(&Command) -> Result<Output, String> + Sync + 'static,
+) -> (AgentRun, Vec<String>) {
+    let host = FakeHost::new(script);
+    let lines = Mutex::new(Vec::new());
+    let runs = review(
+        &host,
+        dir,
+        &plan(r#"{"review-code": ["lang-rust"]}"#),
+        options(),
+        &|l| lines.lock().unwrap().push(l.to_owned()),
+    )
+    .unwrap();
+    (
+        runs.into_iter().next().unwrap(),
+        lines.into_inner().unwrap(),
+    )
+}
+
+/// Fails the first run with a log reading `first`, then answers.
+fn fails_once(c: &Command, calls: &AtomicUsize) -> Result<Output, String> {
+    if calls.fetch_add(1, Ordering::SeqCst) == 0 {
+        fake::write_log(c, "first\n");
+        let errors = c.stdout_to.as_ref().unwrap().with_extension("stderr");
+        fs::write(errors, "first error\n").unwrap();
+        Ok(Output::default())
+    } else {
+        fake::specialist(c)
+    }
+}
+
+#[test]
+fn a_first_run_that_did_not_answer_is_told_before_the_second() {
+    let dir = workdir();
+    let calls = AtomicUsize::new(0);
+
+    let (_, lines) = one_run_told(dir.path(), move |c| fails_once(c, &calls));
+
+    assert_eq!(
+        lines[..2],
+        [
+            "lang-rust (specialist): did not answer: its run ended with none; running it once more",
+            "lang-rust (specialist): answered (0.0100 USD, 3 turns) on its second attempt",
+        ]
+    );
+}
+
+#[test]
+fn a_first_run_that_did_not_answer_keeps_its_log_beside_the_second_s() {
+    let dir = workdir();
+    let calls = AtomicUsize::new(0);
+
+    one_run_told(dir.path(), move |c| fails_once(c, &calls));
+
+    let logs = dir.path().join("review/logs");
+    assert_eq!(
+        fs::read_to_string(logs.join("lang-rust.first.jsonl")).unwrap(),
+        "first\n"
+    );
+    assert_eq!(
+        fs::read_to_string(logs.join("lang-rust.first.stderr")).unwrap(),
+        "first error\n"
+    );
+    assert!(
+        fs::read_to_string(logs.join("lang-rust.jsonl"))
+            .unwrap()
+            .contains("\"result\"")
+    );
+}
+
+#[test]
+fn a_first_log_that_cannot_be_kept_is_told() {
+    let dir = workdir();
+    let calls = AtomicUsize::new(0);
+    fs::create_dir_all(dir.path().join("review/logs/lang-rust.first.jsonl/x")).unwrap();
+
+    let (run, lines) = one_run_told(dir.path(), move |c| fails_once(c, &calls));
+
+    assert!(run.answered());
+    assert!(
+        lines[1].starts_with("lang-rust (specialist): its first log was not kept: rename "),
+        "{lines:?}"
+    );
+}

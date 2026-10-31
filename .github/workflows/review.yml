@@ -297,7 +297,8 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
       # What the review cost, per agent, as review-run read it from each
       # run's log: its model calls, fresh input, cache writes and reads,
-      # output and the cost its result reported. A review that recorded
+      # output, the attempts it took (two when its first run did not
+      # answer) and the cost its result reported. A review that recorded
       # none reports nothing; this step only reports and never fails the
       # review.
       - name: Record what the review cost
@@ -308,9 +309,9 @@ jobs:
           {
             echo "### What the review cost: \$$cost"
             echo
-            echo "| agent | calls | fresh in | cache write | cache read | out | cost |"
-            echo "|---|---:|---:|---:|---:|---:|---:|"
-            jq -r '.[] | "| \(.agent) | \(.calls) | \(.fresh) | \(.cache_write) | \(.cache_read) | \(.output) | \(.cost_usd) |"' \
+            echo "| agent | attempts | calls | fresh in | cache write | cache read | out | cost |"
+            echo "|---|---:|---:|---:|---:|---:|---:|---:|"
+            jq -r '.[] | "| \(.agent) | \(.attempts) | \(.calls) | \(.fresh) | \(.cache_write) | \(.cache_read) | \(.output) | \(.cost_usd) |"' \
               review/usage.json
           } >> "$GITHUB_STEP_SUMMARY" || exit 0
       # The reports and the answers, for the post job's gate and for the
