@@ -650,10 +650,13 @@ jobs:
               cp "$base/benchmark" "$base/parinn" "$RUNNER_TEMP/suites/base/"
             fi
           fi
+      # A base without a suite uploads nothing, which the rounds read as
+      # no base; the head always has one.
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: benchmark-suites-${{ matrix.side }}
           path: ${{ runner.temp }}/suites/
+          if-no-files-found: ${{ matrix.side == 'head' && 'error' || 'ignore' }}
 
   # The rounds, sharded across runners: each shard interleaves both
   # sides on its one runner and keeps the global alternation of which
