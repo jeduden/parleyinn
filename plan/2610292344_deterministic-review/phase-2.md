@@ -17,7 +17,7 @@ orchestrating agent once accepted.
 BDD coverage. The ENG-28 scenario changes with the row. The job that
 runs the review's agents holds no write permission and not the reviewer
 app's key. It runs every dispatched agent with `review-run`, and no job
-runs an agent session that would route the review. review-run's tools
+runs a harness session that would route the review. review-run's tools
 and any `--allowedTools` an agent job passes write only under
 `review/reports`. The post job runs after the agents' job. A drift case
 proves the routing check fails on a review routed by
@@ -27,7 +27,7 @@ RED. Write tests for each of these, in order:
 
 - The gate names a dispatched agent left out without an orchestrator.
 - The workflow checks find the agents' job by `review-run`, refuse an
-  agent session, and hold review-run's tool lists and every
+  harness session, and hold review-run's tool lists and every
   `--allowedTools` line to the reports.
 
 GREEN.

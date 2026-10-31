@@ -26,7 +26,7 @@ summary: >-
   prints `verdict`, `dispatched`, `consulted`, `findings` and `cost`.
 - Each run is `runner::command` of `review-eval`, so the tools, the
   write rule, the turn budget from the agent's front matter, the
-  prompts and the nested-session scrub are the evaluation's. The
+  prompts and the nested harness session scrub are the evaluation's. The
   process host moved from `review-eval`'s executable into its library,
   shared by both executables.
 - The verdict is a pure function: approve exactly when every

@@ -160,7 +160,7 @@ fn agents_unprivileged_names_each_privilege() {
 }
 
 #[test]
-fn an_agent_session_in_any_job_is_held_to_the_agents_rules() {
+fn a_harness_session_in_any_job_is_held_to_the_agents_rules() {
     let mut w = parse(REVIEW_FLOW);
     w.jobs.push(Job {
         name: "route".into(),
@@ -175,7 +175,7 @@ fn an_agent_session_in_any_job_is_held_to_the_agents_rules() {
 }
 
 #[test]
-fn agents_run_by_wants_the_command_and_no_agent_session() {
+fn agents_run_by_wants_the_command_and_no_harness_session() {
     let cmd = "-p review-run -- --workdir .";
     let mut w = parse(REVIEW_FLOW);
     assert!(w.agents_run_by(cmd).is_empty());
@@ -191,7 +191,7 @@ fn agents_run_by_wants_the_command_and_no_agent_session() {
     assert_eq!(
         w.agents_run_by(cmd),
         [
-            "job review runs an agent session, anthropics/claude-code-action@, which would route the review"
+            "job review runs a harness session, anthropics/claude-code-action@, which would route the review"
         ]
     );
 }

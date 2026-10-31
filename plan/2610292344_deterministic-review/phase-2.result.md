@@ -30,7 +30,7 @@ summary: >-
   every dispatched generalist, and writes the outcome from what they
   answered. A dispatched agent that did not answer fails the review.
   The ENG-28 scenario holds the agents' job to `review-run` and refuses
-  an agent session that would route the review. It holds review-run's
+  a harness session that would route the review. It holds review-run's
   tool lists and every `--allowedTools` an agent job passes to
   `review/reports`. New drift case: the review routed by
   `claude-code-action`. The cases that inject the key and a write tool
@@ -52,7 +52,7 @@ summary: >-
   specialists fits one wave. The job's 120-minute cap fits the
   three-wave worst case of 90 minutes and the setup.
 - The agents' job is found by `-p review-run`, and also by
-  `claude-code-action@`, so an agent session is still held to the
+  `claude-code-action@`, so a harness session is still held to the
   agents' rules wherever it appears.
 - ADR-2610262245 is marked superseded only once ADR-2610300031 is
   accepted, since a proposal changes no decision (ENG-26).

@@ -1,5 +1,5 @@
 //! The host on the machine: real processes, each killed at its
-//! deadline, with the variables a Claude Code session sets for its
+//! deadline, with the variables a Claude Code harness session sets for its
 //! children cleared. The `review-eval` and `review-run` executables
 //! both start their commands through it; nothing else of either starts
 //! a program.
@@ -27,10 +27,10 @@ const DRAIN: Duration = Duration::from_secs(2);
 /// the output lost is never silent.
 pub const HELD: &str = "review-eval: a process the command started still holds this output\n";
 
-/// What a Claude Code session sets for the commands it starts, which
-/// would make an agent started here a child of that session: its tool
+/// What a Claude Code harness session sets for the commands it starts, which
+/// would make an agent started here a child of that harness session: its tool
 /// calls run in the background and its subagents are capped. The
-/// review runs each agent as a session of its own, so the host clears
+/// review runs each agent as a harness session of its own, so the host clears
 /// them.
 pub const NESTED_SESSION_VARS: [&str; 4] = [
     "CLAUDE_AUTO_BACKGROUND_TASKS",

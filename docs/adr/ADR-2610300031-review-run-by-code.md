@@ -96,14 +96,14 @@ the reports.
   often, but still decides whether to wait, and costs more on every
   review.
 - **Keep `claude-code-action` and give it a script.** The action runs
-  one agent session; it cannot start an agent per dispatched name
+  one harness session; it cannot start an agent per dispatched name
   and wait for each.
 
 ## Consequences
 
 - ENG-28 asks for the review to be run by code, not by an orchestrating
   agent, and its scenario holds the review workflow to `review-run`
-  and refuses an agent session that would route the review.
+  and refuses a harness session that would route the review.
 - The orchestrator's skill, its reviewer component under ENG-32, its
   cases and its prompt and schema in the runner are retired (the
   skill's file goes in a follow-up once main runs `review-run`), together
@@ -129,5 +129,5 @@ The stakeholder, `jeduden`, gave it in a comment on the pull request
 comment consents to the specification, scenarios, decision records,
 `.github/`, `docs/agents`, `.claude/` and evaluation-case changes. It
 also asks for a ruling on this record. The stakeholder confirmed in the
-session that the comment is consent. This record changes the review's
+harness session that the comment is consent. This record changes the review's
 workflow under `.github/` and ENG-28, which need that consent (ENG-21).

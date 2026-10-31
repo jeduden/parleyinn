@@ -119,10 +119,10 @@ Claude OAuth token. Four things bound it:
   outside its allow-lists, so none can start a process (I4);
 - main's cases judge the components main already has.
 
-### The plugins every session fetches
+### The plugins every harness session fetches
 
 [.claude/settings.json](../.claude/settings.json) makes every Claude
-session started in the checkout, the review workflow's agents included,
+harness session started in the checkout, the review workflow's agents included,
 fetch two plugins, `mdsmith-skills` and `mdsmith-audit`, from
 github.com/jeduden/mdsmith. They are the mdsmith project's Claude Code
 plugins, at the release of the linter that `mdsmith check .` runs

@@ -51,7 +51,7 @@ What was searched, and what is reused:
   posts, so the orchestrator's copies of them go; the weighing of
   findings stays with the generalists.
 - `claude-code-action` is not reused for the review: it runs one
-  agent session. The evaluate job already installs a pinned `claude`
+  harness session. The evaluate job already installs a pinned `claude`
   command line for the same reason.
 
 Not reused: asking a model to call a list of agents, which is the

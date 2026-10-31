@@ -4,7 +4,7 @@
 //! each specialist's report and every run's stream-json log. The review
 //! gate then reads what the run wrote, as the post job does. Each run
 //! has a temporary `HOME` and `PARINN_HOME`, and the variables a Claude
-//! Code session sets for its children, which the run must clear.
+//! Code harness session sets for its children, which the run must clear.
 
 #![allow(
     clippy::unwrap_used,
@@ -21,11 +21,11 @@ use testkit::TempDir;
 /// A `claude` that answers as the agent it runs as: a specialist
 /// writes its report with one nit and answers its outcome line and
 /// path; a generalist keeps the nit and closes with a sentence. Started
-/// as a session's child it refuses, and the agent `SILENT_AGENT` names
+/// as a harness session's child it refuses, and the agent `SILENT_AGENT` names
 /// never answers.
 const CLAUDE: &str = r#"#!/bin/sh
 if [ -n "$CLAUDE_CODE_CHILD_SESSION" ] || [ -n "$CLAUDE_AUTO_BACKGROUND_TASKS" ]; then
-  echo "started as a session's child" >&2
+  echo "started as a harness session's child" >&2
   exit 3
 fi
 prompt="$2"
@@ -99,7 +99,7 @@ fn workdir(root: &Path) {
 }
 
 /// Runs the executable on `dir` with `args`, the stand-in first on the
-/// path, as a Claude Code session's child would.
+/// path, as a Claude Code harness session's child would.
 fn review_run(home: &Path, dir: &Path, silent: &str, args: &[&str]) -> Output {
     let bin = home.join("bin");
     fs::create_dir_all(&bin).unwrap();

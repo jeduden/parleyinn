@@ -12,7 +12,7 @@ use crate::list;
 /// every dispatched agent.
 const AGENT_RUN: &str = "-p review-run";
 
-/// An action that runs one agent session, which would route the review
+/// An action that runs one harness session, which would route the review
 /// itself; a job that uses one is held to the agents' rules too.
 const AGENT_ACTION: &str = "anthropics/claude-code-action@";
 
@@ -160,7 +160,7 @@ fn installs_cli(text: &str) -> bool {
     AGENT_CLI.iter().any(|cli| text.contains(cli))
 }
 
-/// Whether a job's `text` runs the review's agents, an agent session,
+/// Whether a job's `text` runs the review's agents, a harness session,
 /// or installs the command line any of its steps can start one with.
 fn runs_agents(text: &str) -> bool {
     text.contains(AGENT_RUN) || text.contains(AGENT_ACTION) || installs_cli(text)
@@ -296,13 +296,13 @@ impl Workflow {
         out
     }
 
-    /// The jobs that run the review's agents, or an agent session.
+    /// The jobs that run the review's agents, or a harness session.
     fn agent_jobs(&self) -> impl Iterator<Item = &Job> {
         self.jobs.iter().filter(|j| runs_agents(&j.text))
     }
 
     /// Requires a job to run the review's agents with `cmd`, and no job
-    /// to run an agent session, or the command line outside review-run
+    /// to run a harness session, or the command line outside review-run
     /// and review-eval, that would route the review instead.
     #[must_use]
     pub fn agents_run_by(&self, cmd: &str) -> Vec<String> {
@@ -312,7 +312,7 @@ impl Workflow {
             .filter(|j| j.text.contains(AGENT_ACTION))
             .map(|j| {
                 format!(
-                    "job {} runs an agent session, {AGENT_ACTION}, which would route the review",
+                    "job {} runs a harness session, {AGENT_ACTION}, which would route the review",
                     j.name
                 )
             })
