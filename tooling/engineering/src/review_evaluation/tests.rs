@@ -160,7 +160,13 @@ fn every_failure_is_named_by_its_first_words() {
     assert_eq!(failed_on("wrote no report"), "report");
     assert_eq!(failed_on("wrote an empty report"), "report");
     assert_eq!(failed_on("report does not end with its outcome"), "report");
-    assert_eq!(failed_on("outcome sound, want blocking"), "outcome");
+    assert_eq!(
+        failed_on(
+            "report refused: has a report whose line 1 is neither a linked finding nor a requirement request"
+        ),
+        "report"
+    );
+    assert_eq!(failed_on("outcome none, want findings"), "outcome");
     assert_eq!(failed_on("no finding at a.rs"), "finding");
     assert_eq!(failed_on("a finding at b.rs: x"), "forbidden");
     assert_eq!(
