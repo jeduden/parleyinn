@@ -3,13 +3,17 @@
 //! runner, which reads the SRS, names a specialist's report that cites
 //! an id no requirement or invariant has in a blocking finding. A
 //! generalist's finding line the runner cannot read is named the same
-//! way, never dropped as prose. The check runs `review-run` on a work
-//! directory with a stand-in for the `claude` command line whose
-//! specialist cites such an id and whose generalist answers such a
-//! line, and requires a review that requests changes naming both.
+//! way, never dropped as prose. A refused report first runs its
+//! specialist once more, told the refusal and the forms, and is judged
+//! by that run alone. The check runs `review-run` on a work directory
+//! with a stand-in for the `claude` command line whose specialist cites
+//! such an id on every run and whose generalist answers such a line, and
+//! requires the specialist run twice, its second run told why, and a
+//! review that requests changes naming both.
 
 use std::fs;
 use std::path::Path;
+use std::sync::{Mutex, PoisonError};
 
 use review_eval::host::{Command, Host, Output};
 
@@ -26,14 +30,35 @@ pub const UNKNOWN_ID: &str = "ENG-999";
 pub const UNREAD: &str = "src/a.rs:x — blocking — an unwrap — lang-rust";
 
 /// A stand-in for the `claude` command line: the specialist states a
-/// finding citing [`UNKNOWN_ID`] and answers its outcome line; the
-/// generalist answers [`UNREAD`] and a closing sentence.
+/// finding citing [`UNKNOWN_ID`] and answers its outcome line on every
+/// run, each run's prompt kept; the generalist answers [`UNREAD`] and a
+/// closing sentence.
 #[derive(Debug, Default)]
-pub struct RefusalHost;
+pub struct RefusalHost {
+    prompts: Mutex<Vec<String>>,
+}
+
+impl RefusalHost {
+    /// The prompt of each specialist run, in the order they started.
+    #[must_use]
+    pub fn prompts(&self) -> Vec<String> {
+        self.prompts
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .clone()
+    }
+}
 
 impl Host for RefusalHost {
     fn run(&self, command: &Command) -> Result<Output, String> {
         let agent = agent_of(command);
+        if agent == SPECIALIST {
+            let prompt = command.args.get(1).cloned().unwrap_or_default();
+            self.prompts
+                .lock()
+                .unwrap_or_else(PoisonError::into_inner)
+                .push(prompt);
+        }
         let (text, result) = if agent == GENERALIST {
             let answer = format!("{UNREAD}\n{agent} finds its scope sound.");
             (answer.clone(), answer)
@@ -129,9 +154,37 @@ pub fn outcome_problems(workdir: &Path) -> Vec<String> {
     problems
 }
 
+/// What is wrong with the specialist's runs, by `prompts`, each one's
+/// prompt: not run exactly once more, or its second run not told that
+/// its report cites [`UNKNOWN_ID`] and the forms again.
+#[must_use]
+pub fn retry_problems(prompts: &[String]) -> Vec<String> {
+    let [_, second] = prompts else {
+        return vec![format!(
+            "review-run ran {SPECIALIST} {} time{}, not once more after its report was refused",
+            prompts.len(),
+            if prompts.len() == 1 { "" } else { "s" }
+        )];
+    };
+    let mut problems = Vec::new();
+    if !second.contains(&format!("cites {UNKNOWN_ID}")) {
+        problems.push(format!(
+            "{SPECIALIST}'s second run was not told its report cites {UNKNOWN_ID}"
+        ));
+    }
+    if !second.contains(review_run::retry::FORMS) {
+        problems.push(format!(
+            "{SPECIALIST}'s second run was not told the forms again"
+        ));
+    }
+
+    problems
+}
+
 /// Runs `review-run` on `workdir`, prepared from `checkout`, with the
 /// [`RefusalHost`] standing in for the `claude` command line, and
-/// returns what is wrong with the review it decided.
+/// returns what is wrong with the review it decided and the runs it
+/// started.
 #[must_use]
 pub fn review_run_names_what_it_refuses(checkout: &Checkout, workdir: &Path) -> Vec<String> {
     if let Err(e) = prepare(checkout, workdir) {
@@ -140,14 +193,18 @@ pub fn review_run_names_what_it_refuses(checkout: &Checkout, workdir: &Path) -> 
     let mut out = Vec::new();
     let mut err = Vec::new();
     let args = ["--workdir".to_owned(), workdir.display().to_string()];
-    let code = review_run::cli::run(&RefusalHost, args, &mut out, &mut err);
+    let host = RefusalHost::default();
+    let code = review_run::cli::run(&host, args, &mut out, &mut err);
     if code != review_run::cli::EXIT_OK {
         let err = String::from_utf8_lossy(&err);
         let why = err.lines().last().unwrap_or_default();
         return vec![format!("review-run exited {code}: {why}")];
     }
 
-    outcome_problems(workdir)
+    let mut problems = outcome_problems(workdir);
+    problems.extend(retry_problems(&host.prompts()));
+
+    problems
 }
 
 #[cfg(test)]

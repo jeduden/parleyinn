@@ -108,7 +108,9 @@ job runs after the review job, holds a read-only token and no write
 permission, and ends before the job that holds the reviewer app's key.
 The review job's `review-run` starts each dispatched agent through the
 harness's own runner, so an agent in the review and in its cases gets
-the same reading tools, turn budget and prompt. A case that fails
+the same reading tools, turn budget and prompt. Only the review runs a
+specialist that did not answer, or whose report the gate refuses, once
+more, told why; a case's run gets no second attempt. A case that fails
 becomes a blocking finding, which the gate weighs beside the bundle's.
 With nothing to evaluate the job ends in seconds. A change to a shared
 section reaches every component that includes it, so the plan holds one

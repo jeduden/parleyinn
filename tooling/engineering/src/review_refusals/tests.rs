@@ -100,15 +100,55 @@ fn the_stand_in_fails_a_run_that_logs_nowhere_or_cannot_log() {
 
     let generalist = Command::new("claude", &["-p", "x", "--agent", GENERALIST], work.path());
     assert_eq!(
-        RefusalHost.run(&generalist).unwrap_err(),
+        RefusalHost::default().run(&generalist).unwrap_err(),
         "the run logs to no file"
     );
 
     let specialist = Command::new("claude", &[], work.path()).logging_to(&work.path().join("x/y"));
     assert!(
-        RefusalHost
+        RefusalHost::default()
             .run(&specialist)
             .unwrap_err()
             .starts_with("write ")
+    );
+}
+
+#[test]
+fn the_stand_in_keeps_each_specialist_run_s_prompt() {
+    let work = TempDir::new().unwrap();
+    let host = RefusalHost::default();
+    let log = work.path().join("log.jsonl");
+    for (agent, prompt) in [
+        (SPECIALIST, "first"),
+        (GENERALIST, "weigh"),
+        (SPECIALIST, "second"),
+    ] {
+        let c =
+            Command::new("claude", &["-p", prompt, "--agent", agent], work.path()).logging_to(&log);
+        host.run(&c).unwrap();
+    }
+
+    assert_eq!(host.prompts(), ["first", "second"]);
+}
+
+#[test]
+fn a_specialist_not_run_once_more_told_its_refusal_is_named() {
+    let told = format!(
+        "x {} cites {UNKNOWN_ID} y {}",
+        "z",
+        review_run::retry::FORMS
+    );
+
+    assert!(retry_problems(&["a".to_owned(), told.clone()]).is_empty());
+    assert_eq!(
+        retry_problems(&["a".to_owned()]),
+        ["review-run ran lang-rust 1 time, not once more after its report was refused"]
+    );
+    assert_eq!(
+        retry_problems(&["a".to_owned(), "b".to_owned()]),
+        [
+            "lang-rust's second run was not told its report cites ENG-999",
+            "lang-rust's second run was not told the forms again",
+        ]
     );
 }
