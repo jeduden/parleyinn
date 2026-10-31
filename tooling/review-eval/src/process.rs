@@ -112,9 +112,13 @@ fn drain(pipe: Option<impl Read + Send + 'static>) -> Receiver<Vec<u8>> {
     thread::spawn(move || {
         let mut read = Vec::new();
         if let Some(mut pipe) = pipe {
-            // What was read before an error is kept; the exit code says
-            // whether the command ran well.
-            let _ = pipe.read_to_end(&mut read);
+            // What was read before an error is kept, and a line says the
+            // rest was lost, so a truncated output is never silent.
+            if let Err(e) = pipe.read_to_end(&mut read) {
+                read.extend_from_slice(
+                    format!("\nreview-eval: reading this output failed: {e}\n").as_bytes(),
+                );
+            }
         }
         let _ = tx.send(read);
     });

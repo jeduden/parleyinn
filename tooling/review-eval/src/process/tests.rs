@@ -151,3 +151,27 @@ fn a_command_gets_its_own_variables_but_never_a_nested_sessions() {
         format!("set {}\n", ["unset"; NESTED_SESSION_VARS.len()].join(" "))
     );
 }
+
+/// A pipe that yields `ab`, then fails.
+struct FailingPipe(bool);
+
+impl Read for FailingPipe {
+    fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
+        if self.0 {
+            return Err(std::io::Error::other("boom"));
+        }
+        self.0 = true;
+        buf[..2].copy_from_slice(b"ab");
+        Ok(2)
+    }
+}
+
+#[test]
+fn a_pipe_that_fails_mid_read_keeps_what_it_read_and_says_so() {
+    let rx = drain(Some(FailingPipe(false)));
+
+    assert_eq!(
+        collect(&rx, Instant::now() + Duration::from_secs(5)),
+        "ab\nreview-eval: reading this output failed: boom\n"
+    );
+}
