@@ -230,7 +230,7 @@ fn the_executable_exits_1_when_a_report_s_outcome_is_not_what_its_agent_answered
     assert!(out.stdout.is_empty());
     let err = String::from_utf8_lossy(&out.stderr);
     assert!(
-        err.contains("lang-rust has a report whose outcome differs"),
+        err.contains("lang-rust answered another outcome in the run log than its report ends with"),
         "{err}"
     );
 }

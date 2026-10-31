@@ -927,11 +927,11 @@ fn a_specialist_s_report_must_end_with_the_outcome_it_answered() {
     assert_eq!(r.unwrap().unwrap().event, APPROVE);
 
     for (answer, file, want) in [
-        (report, None, "review: lang-rust wrote no report"),
+        (report, None, "review: lang-rust has no report"),
         (
             report,
             Some("  \n"),
-            "review: lang-rust wrote an empty report",
+            "review: lang-rust has an empty report",
         ),
         (
             "a.rs:1 — nit — x",
@@ -951,12 +951,12 @@ fn a_specialist_s_report_must_end_with_the_outcome_it_answered() {
         (
             "outcome: none — one sentence.",
             Some(report),
-            "review: lang-rust has a report whose outcome differs from its answer in the run log",
+            "review: lang-rust answered another outcome in the run log than its report ends with",
         ),
         (
             "the outcome: findings — one sentence. was it",
             Some(report),
-            "review: lang-rust has a report whose outcome differs from its answer in the run log",
+            "review: lang-rust answered no outcome line in the run log",
         ),
     ] {
         let err = decide(&reported(answer, file)).unwrap_err();
@@ -968,7 +968,7 @@ fn a_specialist_s_report_must_end_with_the_outcome_it_answered() {
     assert!(matches!(
         decide(&no_answer),
         Err(Error::Report {
-            problem: report::Problem::AnswerDiffers,
+            problem: report::Problem::NoAnswerOutcome,
             ..
         })
     ));

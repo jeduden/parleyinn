@@ -5,24 +5,35 @@
 //! alone weighs a finding into `blocking` or `nit`. The report ends
 //! with its outcome: whether it holds findings, and one sentence.
 //!
+//! The specialist writes no file: it states each finding as one line in
+//! its text as it finds it, and its final answer is the outcome line.
+//! The review assembles the report from its run log ([`assemble`]):
+//!
 //! - a linked finding: `path:line — if not addressed: <consequence> — <ID>[, <ID>...]`,
 //!   each id an SRS requirement id or an invariant, `I1` to `I10`;
 //! - a requirement request: `path:line — request: add|change|remove <requirement> — <motivation>`;
+//! - a revision, `revised: <finding line>`, which replaces every earlier
+//!   finding at the same `path:line`, or
+//!   `revised: <old path:line> → <finding line>` when the place moved;
+//! - a withdrawal, `withdrawn: path:line — <reason>`, which removes
+//!   every earlier finding at that place;
 //! - the outcome line, the report's last: `outcome: findings — <sentence>`
 //!   or `outcome: none — <sentence>`.
 //!
 //! A line that starts with a place, `path:line` and a dash, is a finding
-//! line and must take one of the two forms; any other line is prose,
-//! which the report check passes by as it always has. A finding line in
-//! neither form is malformed, and the report holding it is refused
-//! rather than handed to the generalist marked unlinked: a severity
-//! word where the consequence belongs, or a finding that links nothing,
-//! is the categorizing this format exists to end, and a refused report
-//! fails the review closed, as a report that ends with no outcome does.
-//! A linked finding citing an id no requirement has is refused too,
-//! naming the id, so a made-up requirement cannot carry a finding
-//! (`report_check` with the known ids; the gate, which holds no tree,
-//! checks each id's shape alone).
+//! line and must take one of the two forms; a line that starts with
+//! `revised:` or `withdrawn:` must take its form; any other line is
+//! prose, which the assembly leaves out and the report check passes by.
+//! A finding, revision or withdrawal line in no form is malformed, and
+//! the report holding it is refused rather than handed to the generalist
+//! marked unlinked: a severity word where the consequence belongs, or a
+//! finding that links nothing, is the categorizing this format exists to
+//! end, and a refused report fails the review closed, as a report that
+//! ends with no outcome does. So is a revision or withdrawal that names
+//! a place no earlier line found at. A linked finding citing an id no
+//! requirement has is refused too, naming the id, so a made-up
+//! requirement cannot carry a finding (`report_check` with the known
+//! ids; the gate, which holds no tree, checks each id's shape alone).
 
 use std::collections::BTreeSet;
 use std::fmt;
@@ -40,6 +51,15 @@ pub const IF_NOT_ADDRESSED: &str = "if not addressed:";
 pub const REQUEST: &str = "request:";
 /// The changes a requirement request may ask for.
 pub const CHANGES: [&str; 3] = ["add", "change", "remove"];
+/// What a revision starts with.
+pub const REVISED: &str = "revised:";
+/// What a withdrawal starts with.
+pub const WITHDRAWN: &str = "withdrawn:";
+/// What stands between a revision's old place and its finding line.
+pub const ARROWS: [&str; 2] = [" → ", " -> "];
+/// What the first line of a report assembled from a run that did not
+/// finish starts with.
+pub const INCOMPLETE: &str = "incomplete:";
 
 /// A finding linked to the requirements its consequence breaks.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -65,12 +85,34 @@ pub struct Request {
     pub motivation: String,
 }
 
+/// A revision: the finding line that replaces every earlier finding at
+/// `path:line`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Revision {
+    /// The place of the finding it replaces.
+    pub path: String,
+    pub line: usize,
+    /// The finding line that stands in its place, bare: a linked
+    /// finding or a request.
+    pub finding: String,
+}
+
+/// A withdrawal: every earlier finding at `path:line` is removed.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Withdrawal {
+    pub path: String,
+    pub line: usize,
+    pub reason: String,
+}
+
 /// One line of a specialist's report, read.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Line {
     Linked(Linked),
     Request(Request),
-    /// A finding line, one that starts with a place, in neither form.
+    Revised(Revision),
+    Withdrawn(Withdrawal),
+    /// A finding, revision or withdrawal line in no form.
     Malformed,
     /// Any other line: blank, a heading or prose.
     Prose,
@@ -79,34 +121,45 @@ pub enum Line {
 /// What a specialist's report is refused for.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Problem {
-    /// The specialist wrote no report file.
+    /// The review holds no report for the specialist.
     Missing,
     /// Its report holds only whitespace.
     Empty,
-    /// Its last line is no outcome line.
+    /// Its last line is no outcome line: its final answer gave none, or
+    /// its run did not finish.
     NoOutcome,
-    /// A finding line, its line number in the file, in neither form.
+    /// A finding, revision or withdrawal line, its line number in the
+    /// report, in no form.
     Malformed { line: usize },
-    /// A linked finding, its line number in the file, cites an id no
+    /// A revision or withdrawal, its line number in the report, names
+    /// a place no earlier line found at.
+    RevisesNothing { line: usize, place: String },
+    /// A linked finding, its line number in the report, cites an id no
     /// requirement or invariant has.
     UnknownId { line: usize, id: String },
     /// The outcome says none, yet the report holds a finding.
     NoneWithFindings,
     /// The outcome says findings, yet the report holds none.
     FindingsWithNone,
-    /// No line of its answer repeats its outcome line.
+    /// Its final answer in the run log holds no outcome line.
+    NoAnswerOutcome,
+    /// Its final answer's outcome is not the one its report ends with.
     AnswerDiffers,
 }
 
 impl fmt::Display for Problem {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::Missing => write!(f, "wrote no report"),
-            Self::Empty => write!(f, "wrote an empty report"),
+            Self::Missing => write!(f, "has no report"),
+            Self::Empty => write!(f, "has an empty report"),
             Self::NoOutcome => write!(f, "has a report that does not end with its outcome"),
             Self::Malformed { line } => write!(
                 f,
                 "has a report whose line {line} is neither a linked finding nor a requirement request"
+            ),
+            Self::RevisesNothing { line, place } => write!(
+                f,
+                "has a report whose line {line} revises or withdraws a finding at {place}, where it found none"
             ),
             Self::UnknownId { line, id } => write!(
                 f,
@@ -124,9 +177,10 @@ impl fmt::Display for Problem {
                     "has a report whose outcome is findings but which holds none"
                 )
             }
+            Self::NoAnswerOutcome => write!(f, "answered no outcome line in the run log"),
             Self::AnswerDiffers => write!(
                 f,
-                "has a report whose outcome differs from its answer in the run log"
+                "answered another outcome in the run log than its report ends with"
             ),
         }
     }
@@ -135,7 +189,14 @@ impl fmt::Display for Problem {
 /// Reads one line of a specialist's report.
 #[must_use]
 pub fn line(text: &str) -> Line {
-    let parts = split_dashes(bare(text));
+    let text = bare(text);
+    if let Some(rest) = strip_word(text, REVISED) {
+        return revision(rest).map_or(Line::Malformed, Line::Revised);
+    }
+    if let Some(rest) = strip_word(text, WITHDRAWN) {
+        return withdrawal(rest).map_or(Line::Malformed, Line::Withdrawn);
+    }
+    let parts = split_dashes(text);
     let [first, second, rest @ ..] = parts.as_slice() else {
         return Line::Prose;
     };
@@ -203,6 +264,46 @@ fn request(path: String, number: usize, asked: &str, rest: &[&str]) -> Option<Re
     )
 }
 
+/// A revision, `rest` after `revised:`: a finding line in one of the two
+/// forms, after the old place and an arrow when the place moved.
+fn revision(rest: &str) -> Option<Revision> {
+    let (old, finding) = ARROWS
+        .iter()
+        .find_map(|arrow| rest.split_once(arrow))
+        .map_or((None, rest), |(old, finding)| (Some(old), finding));
+    let finding = bare(finding);
+    let (path, number) = match line(finding) {
+        Line::Linked(l) => (l.path, l.line),
+        Line::Request(r) => (r.path, r.line),
+        Line::Revised(_) | Line::Withdrawn(_) | Line::Malformed | Line::Prose => return None,
+    };
+    let (path, number) = match old {
+        Some(old) => place(old).filter(|(p, _)| !p.contains(char::is_whitespace))?,
+        None => (path, number),
+    };
+
+    Some(Revision {
+        path,
+        line: number,
+        finding: finding.to_owned(),
+    })
+}
+
+/// A withdrawal, `rest` after `withdrawn:`: a place, a dash and a
+/// reason.
+fn withdrawal(rest: &str) -> Option<Withdrawal> {
+    let parts = split_dashes(rest);
+    let (first, reason) = parts.split_first()?;
+    let (path, number) = place(first).filter(|(p, _)| !p.contains(char::is_whitespace))?;
+    let reason = reason.join(" — ").trim().to_owned();
+
+    (!reason.is_empty()).then_some(Withdrawal {
+        path,
+        line: number,
+        reason,
+    })
+}
+
 /// Whether `id` has the shape of a requirement id, a family and a
 /// number, `ENG-28`, or of an invariant, `I2`.
 fn id_shaped(id: &str) -> bool {
@@ -221,13 +322,12 @@ pub fn invariants() -> BTreeSet<String> {
     (1..=10).map(|n| format!("I{n}")).collect()
 }
 
-/// The outcome line `text` ends with, trimmed, and the word it gives:
-/// its last non-empty line, when that line starts with `outcome:`, in
-/// any case, and its first word, markup aside, is one of [`OUTCOMES`].
-#[must_use]
-pub fn outcome_line(text: &str) -> Option<(&str, &'static str)> {
-    let line = text.lines().map(str::trim).rfind(|l| !l.is_empty())?;
-    let rest = strip_word(line, "outcome:")?;
+/// `line` as an outcome line, trimmed, and the word it gives: it starts
+/// with `outcome:`, in any case, and its first word, markup aside, is
+/// one of [`OUTCOMES`].
+fn outcome_of(line: &str) -> Option<(&str, &'static str)> {
+    let line = line.trim();
+    let rest = strip_word(bare(line), "outcome:")?;
     let word = rest
         .split_whitespace()
         .next()?
@@ -239,11 +339,143 @@ pub fn outcome_line(text: &str) -> Option<(&str, &'static str)> {
         .map(|outcome| (line, *outcome))
 }
 
-/// The problem with a specialist's `report`, its file's text when it
-/// has one, beside `answer`, its final answer when it gave one, or none.
-/// With `known`, the ids a linked finding may cite; without, each id is
-/// held to its shape alone. What the gate refuses a review for, so the
-/// review's runner and the evaluation's grader name the same problem.
+/// The outcome line a report `text` ends with, and the word it gives:
+/// its last non-empty line, when that line is an outcome line.
+#[must_use]
+pub fn outcome_line(text: &str) -> Option<(&str, &'static str)> {
+    let line = text.lines().map(str::trim).rfind(|l| !l.is_empty())?;
+    outcome_of(line)
+}
+
+/// The outcome line a specialist's final `answer` gives, and the word
+/// it gives: its last line that is one, so a blank or a stray line
+/// after it is tolerated, and nothing else of the answer is read.
+#[must_use]
+pub fn answer_outcome(answer: &str) -> Option<(&str, &'static str)> {
+    answer.lines().rev().find_map(outcome_of)
+}
+
+/// The report of a specialist, assembled from `texts`, its run log's
+/// text blocks in order, and `answer`, its final answer: every finding
+/// line replayed, a line identical to an earlier one dropped, a revision
+/// put in place of every earlier finding at its place, a withdrawal
+/// removing them, then the answer's outcome line. A malformed line, and
+/// a revision or withdrawal that finds nothing to change, stay as
+/// written, so the report check names them; prose is left out. A run
+/// that did not finish passes `incomplete`, which heads the report and
+/// says why, so a reader sees the report is partial.
+#[must_use]
+pub fn assemble(texts: &[String], answer: &str, incomplete: Option<&str>) -> String {
+    let mut kept: Vec<Kept> = Vec::new();
+    for raw in texts.iter().flat_map(|t| t.lines()) {
+        let text = bare(raw).to_owned();
+        match line(&text) {
+            Line::Prose => {}
+            read @ (Line::Linked(_) | Line::Request(_)) => {
+                push_unique(&mut kept, Kept::of(render(&read).unwrap_or(text)));
+            }
+            Line::Malformed => push_unique(&mut kept, Kept::of(text)),
+            Line::Revised(r) => {
+                let finding = render(&line(&r.finding)).unwrap_or(r.finding);
+                if !replace(&mut kept, (&r.path, r.line), Kept::of(finding)) {
+                    push_unique(&mut kept, Kept::of(text));
+                }
+            }
+            Line::Withdrawn(w) => {
+                let before = kept.len();
+                kept.retain(|k| !k.at((&w.path, w.line)));
+                if kept.len() == before {
+                    push_unique(&mut kept, Kept::of(text));
+                }
+            }
+        }
+    }
+    let mut out = String::new();
+    if let Some(why) = incomplete {
+        out.push_str(&format!("{INCOMPLETE} {why}\n"));
+    }
+    for k in &kept {
+        out.push_str(&k.text);
+        out.push('\n');
+    }
+    if let Some((outcome, _)) = answer_outcome(answer) {
+        out.push_str(outcome);
+        out.push('\n');
+    }
+
+    out
+}
+
+/// `read`, a linked finding or a request, in its canonical shape, so
+/// two writings of one finding are one line; none for any other line.
+fn render(read: &Line) -> Option<String> {
+    match read {
+        Line::Linked(l) => Some(format!(
+            "{}:{} — {IF_NOT_ADDRESSED} {} — {}",
+            l.path,
+            l.line,
+            l.consequence,
+            l.ids.join(", ")
+        )),
+        Line::Request(r) => Some(format!(
+            "{}:{} — {REQUEST} {} {} — {}",
+            r.path, r.line, r.change, r.requirement, r.motivation
+        )),
+        Line::Revised(_) | Line::Withdrawn(_) | Line::Malformed | Line::Prose => None,
+    }
+}
+
+/// A line the assembly keeps, with the place it stands at when it has
+/// one.
+struct Kept {
+    text: String,
+    place: Option<(String, usize)>,
+}
+
+impl Kept {
+    /// `text`, a bare finding line, with its place: the first part
+    /// before a dash, read as one.
+    fn of(text: String) -> Self {
+        let place = split_dashes(&text).first().and_then(|first| place(first));
+        Self { text, place }
+    }
+
+    /// Whether the line stands at `at`.
+    fn at(&self, at: (&str, usize)) -> bool {
+        self.place
+            .as_ref()
+            .is_some_and(|(p, n)| (p.as_str(), *n) == at)
+    }
+}
+
+/// Adds `k` to `kept` unless a line identical to it is there already.
+fn push_unique(kept: &mut Vec<Kept>, k: Kept) {
+    if !kept.iter().any(|have| have.text == k.text) {
+        kept.push(k);
+    }
+}
+
+/// Puts `with` where the first of `kept` at `at` stands and removes
+/// the rest at `at`, unless a line identical to `with` stands elsewhere
+/// already; whether anything stood at `at`.
+fn replace(kept: &mut Vec<Kept>, at: (&str, usize), with: Kept) -> bool {
+    let Some(first) = kept.iter().position(|k| k.at(at)) else {
+        return false;
+    };
+    kept.retain(|k| !k.at(at));
+    if !kept.iter().any(|k| k.text == with.text) {
+        kept.insert(first, with);
+    }
+
+    true
+}
+
+/// The problem with a specialist's `report`, the text the review
+/// assembled when it holds one, beside `answer`, its final answer in the
+/// run log when it gave one, or none. With `known`, the ids a linked
+/// finding may cite; without, each id is held to its shape alone. What
+/// the gate refuses a review for, so the review's runner and the
+/// evaluation's grader name the same problem.
 #[must_use]
 pub fn report_check(
     report: Option<&str>,
@@ -255,22 +487,24 @@ pub fn report_check(
         Some("") => return Some(Problem::Empty),
         Some(text) => text,
     };
-    let Some((outcome, _)) = outcome_line(text) else {
+    let Some((_, outcome)) = outcome_line(text) else {
         return Some(Problem::NoOutcome);
     };
     if let Some(problem) = findings_check(text, known) {
         return Some(problem);
     }
+    let Some((_, answered)) = answer.and_then(answer_outcome) else {
+        return Some(Problem::NoAnswerOutcome);
+    };
 
-    (!answer.is_some_and(|answer| answer.lines().any(|l| same_outcome(outcome, l))))
-        .then_some(Problem::AnswerDiffers)
+    (answered != outcome).then_some(Problem::AnswerDiffers)
 }
 
 /// The problem with the lines of `text`, a report that ends with its
-/// outcome line, or none: the first finding line in neither form, the
-/// first id outside `known` when it is given, or an outcome that says
-/// otherwise than the lines do. A report with no outcome line is
-/// refused for that.
+/// outcome line, or none: the first line in no form, the first revision
+/// or withdrawal left in place, the first id outside `known` when it is
+/// given, or an outcome that says otherwise than the lines do. A report
+/// with no outcome line is refused for that.
 #[must_use]
 pub fn findings_check(text: &str, known: Option<&BTreeSet<String>>) -> Option<Problem> {
     let Some((_, outcome)) = outcome_line(text) else {
@@ -282,6 +516,13 @@ pub fn findings_check(text: &str, known: Option<&BTreeSet<String>>) -> Option<Pr
         match line(l) {
             Line::Prose => {}
             Line::Malformed => return Some(Problem::Malformed { line: number }),
+            Line::Revised(Revision { path, line, .. })
+            | Line::Withdrawn(Withdrawal { path, line, .. }) => {
+                return Some(Problem::RevisesNothing {
+                    line: number,
+                    place: format!("{path}:{line}"),
+                });
+            }
             Line::Request(_) => held = true,
             Line::Linked(linked) => {
                 held = true;
@@ -298,33 +539,6 @@ pub fn findings_check(text: &str, known: Option<&BTreeSet<String>>) -> Option<Pr
         (false, false) => Some(Problem::FindingsWithNone),
         _ => None,
     }
-}
-
-/// Whether an answer's `line` repeats the report's `outcome` line:
-/// the same words, whatever their case, spacing, emphasis markup, kind
-/// of dash or trailing punctuation.
-#[must_use]
-pub fn same_outcome(outcome: &str, line: &str) -> bool {
-    normalised(line) == normalised(outcome)
-}
-
-/// `text` lowercased, without emphasis or code markup, with every dash
-/// a hyphen, its whitespace collapsed to single spaces and no trailing
-/// punctuation: what a harmless retelling of a line does not change.
-fn normalised(text: &str) -> String {
-    let words: String = text
-        .chars()
-        .filter(|c| !matches!(c, '*' | '_' | '`' | '~'))
-        .map(|c| match c {
-            '\u{2012}'..='\u{2015}' | '\u{2212}' => '-',
-            c => c.to_ascii_lowercase(),
-        })
-        .collect();
-    let spaced = words.split_whitespace().collect::<Vec<_>>().join(" ");
-
-    spaced
-        .trim_end_matches(['.', ',', ';', ':', '!', '?', ' '])
-        .to_owned()
 }
 
 /// A finding's place, `path:line`, read: the path and the line, or the

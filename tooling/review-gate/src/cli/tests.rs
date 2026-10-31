@@ -272,7 +272,7 @@ fn run_fails_closed_on_a_missing_or_malformed_dispatch_or_a_skipped_agent() {
             "a specialist with no report",
             args(HEAD),
             without("reports/lang-rust.md"),
-            "lang-rust wrote no report",
+            "lang-rust has no report",
             EXIT_FAILURE,
         ),
         (
@@ -282,7 +282,7 @@ fn run_fails_closed_on_a_missing_or_malformed_dispatch_or_a_skipped_agent() {
                 "reports/lang-rust.md",
                 "a.rs:1 — if not addressed: x — I2\nOutcome: findings.\n",
             ),
-            "lang-rust has a report whose outcome differs from its answer in the run log",
+            "lang-rust answered another outcome in the run log than its report ends with",
             EXIT_FAILURE,
         ),
         (

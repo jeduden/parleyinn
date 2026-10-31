@@ -106,10 +106,11 @@ pub struct Input {
     /// The specialists the review bundle dispatched, whose reports the
     /// generalists read.
     pub specialists: BTreeSet<String>,
-    /// Each specialist's report file, by name; one with no file is
-    /// absent.
+    /// Each specialist's report, by name, as the review assembled it
+    /// from the specialist's run log; one with no file is absent.
     pub reports: BTreeMap<String, String>,
-    /// Each agent's final answer, by name, as its run log shows it.
+    /// Each agent's final answer, by name, as its run log shows it: a
+    /// specialist's is its outcome line.
     pub answers: BTreeMap<String, String>,
 }
 
@@ -150,8 +151,8 @@ pub enum Error {
     /// The agents' answers from the run log do not read.
     Answers(serde_json::Error),
     /// A specialist's report is missing or empty, does not end with its
-    /// outcome, holds a finding line in neither of its forms, or ends
-    /// with another outcome than it answered.
+    /// outcome, holds a finding line in none of its forms, or ends with
+    /// another outcome than the specialist answered.
     Report {
         agent: String,
         problem: report::Problem,

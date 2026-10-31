@@ -4,7 +4,7 @@ fn ids(names: &[&str]) -> BTreeSet<String> {
     names.iter().map(|n| (*n).to_owned()).collect()
 }
 
-const ANSWER: &str = "outcome: findings — one sentence.\nreview/reports/lang-rust.md";
+const ANSWER: &str = "outcome: findings — one sentence.";
 
 #[test]
 fn a_linked_finding_reads_its_place_consequence_and_ids() {
@@ -92,8 +92,77 @@ fn a_line_with_no_place_is_prose() {
         "a.rs — if not addressed: x — ENG-04",
         "a.rs:x — if not addressed: x — ENG-04",
         "a.rs:12",
+        "incomplete: its run ended with error_max_turns",
     ] {
         assert_eq!(line(text), Line::Prose, "{text:?}");
+    }
+}
+
+#[test]
+fn a_revision_reads_its_place_and_finding_and_an_arrow_moves_the_place() {
+    let finding = "a.rs:3 — if not addressed: a pin is lost — I3";
+
+    assert_eq!(
+        line(&format!("- **Revised:** {finding}")),
+        Line::Revised(Revision {
+            path: "a.rs".to_owned(),
+            line: 3,
+            finding: finding.to_owned(),
+        })
+    );
+    assert_eq!(
+        line(&format!("revised: `a.rs:2` → {finding}")),
+        Line::Revised(Revision {
+            path: "a.rs".to_owned(),
+            line: 2,
+            finding: finding.to_owned(),
+        })
+    );
+    let request = "b.rs:9 — request: add a rule — none says so";
+    assert_eq!(
+        line(&format!("revised: a.rs:2 -> {request}")),
+        Line::Revised(Revision {
+            path: "a.rs".to_owned(),
+            line: 2,
+            finding: request.to_owned(),
+        })
+    );
+}
+
+#[test]
+fn a_revision_in_no_form_is_malformed() {
+    for text in [
+        "revised:",
+        "revised: a.rs:3 — nit — x",
+        "revised: a.rs:3 — if not addressed: x",
+        "revised: I changed my mind",
+        "revised: a.rs → a.rs:3 — if not addressed: x — I3",
+        "revised: a b.rs:1 → a.rs:3 — if not addressed: x — I3",
+        "revised: revised: a.rs:3 — if not addressed: x — I3",
+        "revised: withdrawn: a.rs:3 — x",
+    ] {
+        assert_eq!(line(text), Line::Malformed, "{text:?}");
+    }
+}
+
+#[test]
+fn a_withdrawal_reads_its_place_and_reason() {
+    assert_eq!(
+        line("Withdrawn: `a.rs:3-5` — the line is in a test — I was wrong"),
+        Line::Withdrawn(Withdrawal {
+            path: "a.rs".to_owned(),
+            line: 3,
+            reason: "the line is in a test — I was wrong".to_owned(),
+        })
+    );
+    for text in [
+        "withdrawn:",
+        "withdrawn: a.rs:3",
+        "withdrawn: a.rs:3 — ",
+        "withdrawn: a.rs — no line",
+        "withdrawn: a b.rs:3 — a space",
+    ] {
+        assert_eq!(line(text), Line::Malformed, "{text:?}");
     }
 }
 
@@ -125,6 +194,20 @@ fn an_outcome_line_names_findings_or_none_in_any_case_and_markup() {
     ] {
         assert_eq!(outcome_line(text), want, "{text:?}");
     }
+}
+
+#[test]
+fn an_answer_s_outcome_is_its_last_outcome_line() {
+    assert_eq!(
+        answer_outcome("outcome: findings — a\n\nThanks."),
+        Some(("outcome: findings — a", FINDINGS))
+    );
+    assert_eq!(
+        answer_outcome("outcome: findings — a\noutcome: none — b"),
+        Some(("outcome: none — b", NONE))
+    );
+    assert_eq!(answer_outcome("done\nreview/reports/x.md"), None);
+    assert_eq!(answer_outcome(""), None);
 }
 
 #[test]
@@ -165,6 +248,26 @@ fn a_report_check_refuses_what_the_gate_refuses() {
             Problem::Malformed { line: 2 },
         ),
         (
+            Some(format!(
+                "{finding}revised: b.rs:2 — request: add x — why\n{ending}"
+            )),
+            Some(ANSWER),
+            Problem::RevisesNothing {
+                line: 2,
+                place: "b.rs:2".to_owned(),
+            },
+        ),
+        (
+            Some(format!(
+                "{finding}withdrawn: a.rs:3 — it was fine\n{ending}"
+            )),
+            Some(ANSWER),
+            Problem::RevisesNothing {
+                line: 2,
+                place: "a.rs:3".to_owned(),
+            },
+        ),
+        (
             Some(format!("{finding}outcome: none — one sentence.")),
             Some("outcome: none — one sentence."),
             Problem::NoneWithFindings,
@@ -174,7 +277,12 @@ fn a_report_check_refuses_what_the_gate_refuses() {
             Some(ANSWER),
             Problem::FindingsWithNone,
         ),
-        (Some(report.clone()), None, Problem::AnswerDiffers),
+        (Some(report.clone()), None, Problem::NoAnswerOutcome),
+        (
+            Some(report.clone()),
+            Some("I am done.\nreview/reports/lang-rust.md"),
+            Problem::NoAnswerOutcome,
+        ),
         (
             Some(report.clone()),
             Some("outcome: none — one sentence."),
@@ -185,6 +293,24 @@ fn a_report_check_refuses_what_the_gate_refuses() {
             report_check(report.as_deref(), answer, None),
             Some(want.clone()),
             "{report:?}"
+        );
+    }
+}
+
+#[test]
+fn a_report_check_reads_the_answer_s_last_outcome_line_and_tolerates_a_trailing_line() {
+    let report =
+        "a.rs:1 — if not addressed: a hook panics — ENG-04\noutcome: findings — one sentence.";
+    for answer in [
+        "outcome: findings — one sentence.",
+        "**Outcome: findings** - another sentence;\n",
+        "I read the diff.\noutcome: findings — fine\n\nThat is all.",
+        "outcome: none — early\noutcome: findings — final",
+    ] {
+        assert_eq!(
+            report_check(Some(report), Some(answer), None),
+            None,
+            "{answer:?}"
         );
     }
 }
@@ -217,8 +343,8 @@ fn a_findings_check_refuses_a_report_without_an_outcome() {
 #[test]
 fn every_problem_reads_as_a_sentence_about_the_report() {
     for (problem, want) in [
-        (Problem::Missing, "wrote no report"),
-        (Problem::Empty, "wrote an empty report"),
+        (Problem::Missing, "has no report"),
+        (Problem::Empty, "has an empty report"),
         (
             Problem::NoOutcome,
             "has a report that does not end with its outcome",
@@ -226,6 +352,13 @@ fn every_problem_reads_as_a_sentence_about_the_report() {
         (
             Problem::Malformed { line: 3 },
             "has a report whose line 3 is neither a linked finding nor a requirement request",
+        ),
+        (
+            Problem::RevisesNothing {
+                line: 5,
+                place: "a.rs:3".to_owned(),
+            },
+            "has a report whose line 5 revises or withdraws a finding at a.rs:3, where it found none",
         ),
         (
             Problem::UnknownId {
@@ -243,37 +376,172 @@ fn every_problem_reads_as_a_sentence_about_the_report() {
             "has a report whose outcome is findings but which holds none",
         ),
         (
+            Problem::NoAnswerOutcome,
+            "answered no outcome line in the run log",
+        ),
+        (
             Problem::AnswerDiffers,
-            "has a report whose outcome differs from its answer in the run log",
+            "answered another outcome in the run log than its report ends with",
         ),
     ] {
         assert_eq!(problem.to_string(), want);
     }
 }
 
+const LOGGED: [&str; 3] = [
+    "I read the diff.\na.rs:1 — if not addressed: a hook panics — ENG-04\n",
+    "- `b.rs:2` — request: add a cap — reports grow\na.rs:1 — if not addressed: a hook panics — ENG-04",
+    "a.rs:7 — if not addressed: a pin is lost — I3\n`a.rs:1` -- If not addressed: a hook panics -- `ENG-04`.\nTime to answer.",
+];
+
+fn texts(lines: &[&str]) -> Vec<String> {
+    lines.iter().map(|l| (*l).to_owned()).collect()
+}
+
 #[test]
-fn an_answer_line_is_the_outcome_whatever_its_whitespace_punctuation_dashes_or_markup() {
-    let outcome = "outcome: findings — the change adds `x`.";
-    for line in [
-        "outcome: findings — the change adds `x`.",
-        "  outcome:  findings —  the change adds `x`  ",
-        "outcome: findings — the change adds x",
-        "**Outcome: findings** - the change adds `x`;",
-        "*outcome: findings* – the change adds _x_!",
-        "`outcome: findings — the change adds x.`",
-        "outcome: findings \u{2212} the change adds `x`.",
-    ] {
-        assert!(same_outcome(outcome, line), "{line:?}");
-    }
-    for line in [
-        "outcome: none — the change adds `x`.",
-        "outcome: findings — the change adds y.",
-        "outcome: findings",
-        "review/reports/lang-rust.md — outcome: findings — the change adds x.",
-        "the outcome: findings — the change adds x. was it",
+fn an_assembled_report_replays_the_logged_findings_once_each_and_ends_with_the_answer_s_outcome() {
+    let got = assemble(&texts(&LOGGED), "outcome: findings — three.\n", None);
+
+    assert_eq!(
+        got,
+        "a.rs:1 — if not addressed: a hook panics — ENG-04\n\
+         b.rs:2 — request: add a cap — reports grow\n\
+         a.rs:7 — if not addressed: a pin is lost — I3\n\
+         outcome: findings — three.\n"
+    );
+    assert_eq!(
+        report_check(Some(&got), Some("outcome: findings — three."), None),
+        None
+    );
+}
+
+#[test]
+fn a_revision_replaces_every_earlier_finding_at_its_place_where_the_first_stood() {
+    let mut logged = texts(&LOGGED);
+    logged.push("a.rs:1 — request: change ENG-04 — it reads two ways".to_owned());
+    logged.push("revised: a.rs:1 — if not addressed: a hook hangs — ENG-03".to_owned());
+
+    let got = assemble(&logged, "outcome: findings — x", None);
+
+    assert_eq!(
+        got,
+        "a.rs:1 — if not addressed: a hook hangs — ENG-03\n\
+         b.rs:2 — request: add a cap — reports grow\n\
+         a.rs:7 — if not addressed: a pin is lost — I3\n\
+         outcome: findings — x\n"
+    );
+}
+
+#[test]
+fn a_revision_with_an_arrow_moves_the_finding_and_never_doubles_a_line() {
+    let logged = texts(&[
+        "a.rs:1 — if not addressed: a hook panics — ENG-04",
+        "a.rs:9 — if not addressed: a hook panics — ENG-04",
+        "revised: a.rs:1 → a.rs:9 — if not addressed: a hook panics — ENG-04",
+    ]);
+
+    let got = assemble(&logged, "outcome: findings — x", None);
+
+    assert_eq!(
+        got,
+        "a.rs:9 — if not addressed: a hook panics — ENG-04\noutcome: findings — x\n"
+    );
+}
+
+#[test]
+fn a_withdrawal_removes_every_earlier_finding_at_its_place() {
+    let mut logged = texts(&LOGGED);
+    logged.push("withdrawn: a.rs:1 — the hook is a test's".to_owned());
+
+    let got = assemble(&logged, "outcome: findings — x", None);
+
+    assert_eq!(
+        got,
+        "b.rs:2 — request: add a cap — reports grow\n\
+         a.rs:7 — if not addressed: a pin is lost — I3\n\
+         outcome: findings — x\n"
+    );
+}
+
+#[test]
+fn a_revision_or_withdrawal_that_finds_nothing_stays_and_refuses_the_report() {
+    let logged = texts(&[
+        "a.rs:1 — if not addressed: a hook panics — ENG-04",
+        "withdrawn: a.rs:2 — nothing there",
+        "revised: c.rs:1 — if not addressed: x — I2",
+    ]);
+
+    let got = assemble(&logged, "outcome: findings — x", None);
+
+    assert_eq!(
+        got,
+        "a.rs:1 — if not addressed: a hook panics — ENG-04\n\
+         withdrawn: a.rs:2 — nothing there\n\
+         revised: c.rs:1 — if not addressed: x — I2\n\
+         outcome: findings — x\n"
+    );
+    assert_eq!(
+        report_check(Some(&got), Some("outcome: findings — x"), None),
+        Some(Problem::RevisesNothing {
+            line: 2,
+            place: "a.rs:2".to_owned()
+        })
+    );
+}
+
+#[test]
+fn a_malformed_line_stays_in_the_assembled_report_and_a_withdrawal_can_remove_it() {
+    let logged = texts(&["a.rs:1 — nit — x", "a.rs:1 — nit — x"]);
+    let got = assemble(&logged, "outcome: findings — x", None);
+    assert_eq!(got, "a.rs:1 — nit — x\noutcome: findings — x\n");
+    assert_eq!(
+        report_check(Some(&got), Some("outcome: findings — x"), None),
+        Some(Problem::Malformed { line: 1 })
+    );
+
+    let logged = texts(&["a.rs:1 — nit — x", "withdrawn: a.rs:1 — said wrong"]);
+    assert_eq!(
+        assemble(&logged, "outcome: none — x", None),
+        "outcome: none — x\n"
+    );
+}
+
+#[test]
+fn an_incomplete_run_s_report_is_headed_and_ends_with_no_outcome() {
+    let got = assemble(
+        &texts(&LOGGED[..1]),
         "",
-    ] {
-        assert!(!same_outcome(outcome, line), "{line:?}");
+        Some("its run ended with error_max_turns after 20 turns"),
+    );
+
+    assert_eq!(
+        got,
+        "incomplete: its run ended with error_max_turns after 20 turns\n\
+         a.rs:1 — if not addressed: a hook panics — ENG-04\n"
+    );
+    assert_eq!(
+        report_check(Some(&got), None, None),
+        Some(Problem::NoOutcome)
+    );
+    assert_eq!(assemble(&[], "", None), "");
+    assert_eq!(
+        assemble(&[], "", Some("it was not run")),
+        "incomplete: it was not run\n"
+    );
+}
+
+#[test]
+fn render_gives_a_finding_its_canonical_shape_and_another_line_nothing() {
+    assert_eq!(
+        render(&line("- `a.rs:1` -- If not addressed: x -- `I2`, ENG-04.")),
+        Some("a.rs:1 — if not addressed: x — I2, ENG-04".to_owned())
+    );
+    assert_eq!(
+        render(&line("a.rs:1 — Request: Add a rule — why — not")),
+        Some("a.rs:1 — request: add a rule — why — not".to_owned())
+    );
+    for text in ["prose", "a.rs:1 — nit — x", "withdrawn: a.rs:1 — x"] {
+        assert_eq!(render(&line(text)), None, "{text:?}");
     }
 }
 
