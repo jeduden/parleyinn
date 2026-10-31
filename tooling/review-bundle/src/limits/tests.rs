@@ -78,8 +78,8 @@ fn a_file_no_specialist_reads_is_a_nit_and_one_a_specialist_reads_is_not() {
                 path: "LICENSE".to_owned(),
                 line: 0,
                 severity: NIT,
-                body: "LICENSE — if not addressed: LICENSE reached the merge unread, as no \
-                       review specialist reads its type — ENG-28"
+                body: "LICENSE — if not addressed: LICENSE reached the merge unread \
+                       — ENG-28"
                     .to_owned(),
             },
             Finding {
@@ -87,7 +87,7 @@ fn a_file_no_specialist_reads_is_a_nit_and_one_a_specialist_reads_is_not() {
                 line: 0,
                 severity: NIT,
                 body: "testdata/a.json — if not addressed: testdata/a.json reached the merge \
-                       unread, as no review specialist reads its type — ENG-28"
+                       unread — ENG-28"
                     .to_owned(),
             },
         ]

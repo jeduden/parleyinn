@@ -88,10 +88,7 @@ pub fn unread(path: &str, scopes: &dispatch::Scopes) -> Option<Finding> {
     }
     Some(nit(
         path,
-        format!(
-            "{path} — if not addressed: {path} reached the merge unread, as no review \
-             specialist reads its type — ENG-28"
-        ),
+        format!("{path} — if not addressed: {path} reached the merge unread — ENG-28"),
     ))
 }
 

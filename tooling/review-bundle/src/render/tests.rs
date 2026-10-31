@@ -248,7 +248,7 @@ fn bundle_quotes_the_eng_29_record_and_the_unread_headers() {
         "{got}"
     );
     assert!(
-        got.contains("> By them.\n\nA stakeholder comment on the pull request, which this bundle read, gives the consent ENG-29 asks for; the record's approval rests on it, not on the pull request's own text. Which owned paths a comment consents to, by naming them, the ENG-21 finding says.\n"),
+        got.contains("> By them.\n\nThis change changes that accepted ADR, which names ENG-29 and what it guards, and a stakeholder comment on the pull request, which this bundle read, consents to the change; the bundle checks no more. Whether the record names the human security reviewer whose approval ENG-29 asks for, the review checks, from the record, not from the pull request's own text. Which owned paths a comment consents to, by naming them, the ENG-21 finding says.\n"),
         "{got}"
     );
 }
