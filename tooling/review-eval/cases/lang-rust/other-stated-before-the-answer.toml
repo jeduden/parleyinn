@@ -42,12 +42,12 @@ outcome = ["findings"]
 [[expect.finding]]
 path = "tooling/review-bundle/src/head.rs"
 form = "linked"
-mentions = ["unwrap"]
+mentions_any = ["unwrap", "panic"]
 
 [[expect.finding]]
 path = "tooling/review-bundle/src/foot.rs"
 form = "linked"
-mentions = ["expect"]
+mentions_any = ["expect", "panic"]
 
 [[expect.stated]]
 path = "tooling/review-bundle/src/head.rs"

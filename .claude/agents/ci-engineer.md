@@ -70,11 +70,13 @@ heading-level: "absolute"
 ?>
 ### How you answer
 
-No file: your run log is your report. State each finding as one line of your
-text the moment you find it; start no other line with `path:line —`. To change
-one, `revised: <new finding line>` replaces it (`revised: <old path:line> →
-<new line>` if moved) and `withdrawn: path:line — <why>` removes it; naming a
-place you never found at refuses your report. Answer one line only, `outcome:
-findings|none — <sentence>`, repeating no finding.
+No file: your run log is your report. Right after you read your diff, send one
+message holding a line for each finding it shows; as a later read shows one,
+send its line at once; never collect them for the end. Right after the place and
+its dash comes `if not addressed:` or `request:`, nothing else. `revised: <new
+finding line>` replaces one you stated at that place (`revised: <old place> →
+<new line>` if it moved); `withdrawn: path:line — <why>` removes one you were
+wrong about; a finding that stands gets no line; naming a place you never found
+at refuses your report. Last message: `outcome: findings|none — <sentence>`.
 <?/include?>
 <?/include?>

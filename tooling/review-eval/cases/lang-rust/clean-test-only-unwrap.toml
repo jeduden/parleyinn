@@ -1,11 +1,12 @@
 component = "lang-rust"
-kind = "other"
-title = "an unwrap added to a test-only module, stated on the diff and withdrawn once the module's place is read"
+kind = "clean"
+title = "an unwrap added to a test-only module, whose path does not say so"
 
 # The diff shows an unwrap in a file whose path does not say it is test
-# code; the crate's lib.rs declares the module under `#[cfg(test)]`. A
-# specialist that states what the diff shows and then checks its claim
-# withdraws the finding; the report it ends with holds none.
+# code; the crate's lib.rs declares the module under `#[cfg(test)]`. The
+# specialist checks the module's place before it reports, or states the
+# finding on the diff and withdraws it once it reads lib.rs; either way
+# the report it ends with holds none.
 
 [[replace]]
 file = "tooling/review-run/src/fake.rs"
@@ -18,6 +19,3 @@ outcome = ["none"]
 [[expect.none]]
 path = "tooling/review-run/src/fake.rs"
 form = "linked"
-
-[[expect.withdrawn]]
-path = "tooling/review-run/src/fake.rs"
