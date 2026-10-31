@@ -1,11 +1,11 @@
-//! The review gate between a reviewing agent and the approval it may
-//! earn (ENG-21, ENG-28). The agent only writes a structured review
-//! outcome; this crate, run by the workflow step that alone holds the
-//! reviewer app's key, decides what review to post. It approves only an
-//! approving outcome with no blocking finding, on the head the agent
-//! read, once CI passed there. The deterministic checks the review
-//! workflow runs before the agent add their own findings, and a
-//! blocking one withholds approval whatever the agent says. It is
+//! The review gate between the review's agents and the approval they
+//! may earn (ENG-21, ENG-28). The agents' runs only yield a structured
+//! review outcome; this crate, run by the workflow step that alone
+//! holds the reviewer app's key, decides what review to post. It
+//! approves only an approving outcome with no blocking finding, on the
+//! head the agents read, once CI passed there. The deterministic checks
+//! the review workflow runs before the agents add their own findings,
+//! and a blocking one withholds approval whatever the agents say. It is
 //! repository tooling and never links into a shipped executable.
 
 pub mod cli;
@@ -40,7 +40,7 @@ pub const REVIEWER_APP_ID: i64 = 5_140_085;
 /// every CI job passed.
 const CI_CHECK: &str = "CI";
 
-/// The reviewing agent's structured output.
+/// The review outcome: the review's structured output.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields, default)]
 pub struct ReviewOutcome {
