@@ -16,13 +16,17 @@
 #
 # By default the base is origin/main, as in CI. --base REF reviews only
 # what changed since REF, for the fix cycle after a review: the commit
-# you last reviewed or pushed. Commit first: only committed work is reviewed. A change to a path
-# CODEOWNERS assigns is a blocking finding until a stakeholder comment
-# consents, so pass --consent FILE (the JSON the workflow collects) to see
-# the review as it stands with that comment.
+# you last reviewed or pushed. Commit first: only committed work is
+# reviewed, and uncommitted changes to tracked files stop the run. A
+# change to a path CODEOWNERS assigns is a blocking finding until a
+# stakeholder comment consents, so pass --consent FILE (the JSON the
+# workflow collects) to see the review as it stands with that comment.
 #
 # usage: scripts/review-local.sh [--base REF] [--consent FILE] [--parallel N]
-set -euo pipefail
+set -Eeuo pipefail
+# Any step that fails is a setup that fails: exit 2, never its own status,
+# so a caller never reads it as 1, a review that requests changes.
+trap 'exit 2' ERR
 
 base=origin/main
 consent=""
@@ -35,10 +39,16 @@ while [ "$#" -gt 0 ]; do
     *) echo "usage: scripts/review-local.sh [--base REF] [--consent FILE] [--parallel N]" >&2; exit 2 ;;
   esac
 done
+# The consent file is read after the cd into the work directory below.
+case "$consent" in
+  "" | /*) ;;
+  *) consent="$PWD/$consent" ;;
+esac
 
 repo=$(git rev-parse --show-toplevel)
 if [ -n "$(git -C "$repo" status --porcelain --untracked-files=no)" ]; then
-  echo "review-local: uncommitted changes are not reviewed; commit them first" >&2
+  echo "review-local: uncommitted changes would not be reviewed; commit them first" >&2
+  exit 2
 fi
 git -C "$repo" fetch -q origin main
 
@@ -90,6 +100,7 @@ echo "review-local: $(tr '\n' ' ' < class.txt)"
 status=0
 tool review-run -- --workdir . --parallel "$parallel" || status=$?
 mkdir -p "$repo/target/review-local"
+rm -rf "$repo/target/review-local/review"
 cp -R review "$repo/target/review-local/"
 
 if [ "$status" -ne 0 ]; then
@@ -98,6 +109,6 @@ if [ "$status" -ne 0 ]; then
 fi
 jq -r '"verdict: " + .verdict, (.findings[] | "\(.path):\(.line) — \(.severity) — \(.body)")' review/outcome.json
 jq -r '"evaluation plan: \(length) components"' review/eval-plan.json
-jq -r '"cost: $" + (([.[].cost_usd] | add // 0) * 100 | round / 100 | tostring)' review/usage.json
+LC_NUMERIC=C printf 'cost: $%.2f\n' "$(jq '[.[].cost_usd] | add // 0' review/usage.json)"
 echo "elapsed: $((SECONDS - start)) s"
-[ "$(jq -r .verdict review/outcome.json)" = approve ]
+if [ "$(jq -r .verdict review/outcome.json)" = approve ]; then exit 0; else exit 1; fi
