@@ -239,13 +239,17 @@ fn plan_command(flags: &Flags, stdout: &mut dyn Write) -> Result<u8, Problem> {
 
 /// What evaluating `components` of the tree `head` is expected to take
 /// at the run's own bound, so a plan too big to wait for shows before the
-/// evaluation starts.
+/// evaluation starts; cases that do not load are named, never counted as
+/// none (I6).
 fn estimate_line(head: &Path, components: &[String]) -> String {
-    let cases = check::all_cases_from(head, &head.join(CASES), None).map_or(0, |all| {
-        all.iter()
-            .filter(|c| components.iter().any(|n| suite_of(n) == c.component))
-            .count()
-    });
+    let all = match check::all_cases_from(head, &head.join(CASES), None) {
+        Ok(all) => all,
+        Err(why) => return format!("estimate: none, the cases do not load: {why}"),
+    };
+    let cases = all
+        .iter()
+        .filter(|c| components.iter().any(|n| suite_of(n) == c.component))
+        .count();
 
     format!(
         "estimate: {} cases, {}, {PARALLEL} at a time",

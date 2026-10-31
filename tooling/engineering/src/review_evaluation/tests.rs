@@ -405,8 +405,9 @@ fn plan_problems_wants_one_component_per_set_covering_the_rest() {
     );
 }
 
-#[test]
-fn a_shared_section_change_to_a_tree_plans_one_component_per_set() {
+/// A checkout of four components over the shared sections `s` and `t`:
+/// `lang-a` and `lang-b` include `s`, `lang-c` both, `lang-d` `t`.
+fn sectioned_checkout() -> (TempDir, Checkout) {
     let checkout = TempDir::new().unwrap();
     let write = |rel: &str, body: &str| {
         let path = checkout.path().join(rel);
@@ -429,25 +430,46 @@ fn a_shared_section_change_to_a_tree_plans_one_component_per_set() {
             &agent(name, sections, "body"),
         );
     }
-    let checkout = Checkout::new(checkout.path());
+    let root = Checkout::new(checkout.path());
 
+    (checkout, root)
+}
+
+#[test]
+fn a_shared_section_change_to_a_tree_plans_one_component_per_set() {
+    let (_dir, checkout) = sectioned_checkout();
     let head = TempDir::new().unwrap();
+
     assert_eq!(
         shared_section_plans_one_per_set(&checkout, "docs/agents/s.md", head.path()),
         Ok(Vec::new())
     );
+}
+
+#[test]
+fn a_shared_section_no_component_includes_is_named() {
+    let (_dir, checkout) = sectioned_checkout();
     let head = TempDir::new().unwrap();
+
     assert_eq!(
         shared_section_plans_one_per_set(&checkout, "docs/agents/u.md", head.path()),
         Err("no reviewer component includes docs/agents/u.md".to_owned())
     );
-    let err = shared_section_plans_one_per_set(
-        &Checkout::new(&checkout.root.join("none")),
-        "docs/agents/s.md",
-        head.path(),
-    )
-    .unwrap_err();
-    assert!(err.starts_with("read "), "{err}");
+}
+
+#[test]
+fn a_shared_section_plan_names_a_checkout_it_cannot_read() {
+    let (_dir, checkout) = sectioned_checkout();
+    let none = checkout.root.join("none");
+    let head = TempDir::new().unwrap();
+
+    assert_eq!(
+        shared_section_plans_one_per_set(&Checkout::new(&none), "docs/agents/s.md", head.path()),
+        Err(format!(
+            "read {}: No such file or directory (os error 2)",
+            none.join(PLANNED_TREES[0]).display()
+        ))
+    );
 }
 
 #[test]

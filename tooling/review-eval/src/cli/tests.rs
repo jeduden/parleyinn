@@ -1064,7 +1064,6 @@ fn run_counts_each_decided_case_on_a_clocked_line() {
 #[test]
 fn estimate_line_counts_the_cases_of_the_components_named() {
     let dir = checkout();
-    let none = TempDir::new().unwrap();
 
     assert_eq!(
         estimate_line(dir.path(), &["lang-rust".to_owned()]),
@@ -1080,9 +1079,30 @@ fn estimate_line_counts_the_cases_of_the_components_named() {
             plan::estimate(0, PARALLEL)
         )
     );
-    assert!(
-        estimate_line(none.path(), &["lang-rust".to_owned()]).starts_with("estimate: 0 cases, "),
-        "a tree without cases estimates none"
+}
+
+#[test]
+fn estimate_line_names_a_tree_whose_cases_cannot_be_derived() {
+    let none = TempDir::new().unwrap();
+    let why = check::all_cases_from(none.path(), &none.path().join(CASES), None).unwrap_err();
+
+    assert_eq!(
+        estimate_line(none.path(), &["lang-rust".to_owned()]),
+        format!("estimate: none, the cases do not load: {why}")
+    );
+}
+
+#[test]
+fn estimate_line_names_cases_that_do_not_load() {
+    let dir = TempDir::new().unwrap();
+    let bad = dir.path().join(CASES).join("lang-rust/bad.toml");
+    fs::create_dir_all(bad.parent().unwrap()).unwrap();
+    fs::write(&bad, "nope").unwrap();
+    let why = check::all_cases_from(dir.path(), &dir.path().join(CASES), None).unwrap_err();
+
+    assert_eq!(
+        estimate_line(dir.path(), &["lang-rust".to_owned()]),
+        format!("estimate: none, the cases do not load: {why}")
     );
 }
 

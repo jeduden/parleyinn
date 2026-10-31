@@ -32,6 +32,51 @@ fn unpinned_names_a_tag_a_short_sha_a_missing_comment_and_an_undigested_image() 
 }
 
 #[test]
+fn unpinned_names_a_sha_of_forty_non_hex_characters() {
+    let body = format!("        uses: owner/act@{} # v1\n", "g".repeat(40));
+
+    assert_eq!(
+        unpinned("w.yml", &body),
+        [format!(
+            "w.yml:1 uses owner/act@{}, not pinned to a full commit sha",
+            "g".repeat(40)
+        )]
+    );
+}
+
+#[test]
+fn unpinned_names_a_docker_digest_too_short_or_not_hex() {
+    let body = format!(
+        "        uses: docker://alpine@sha256:abc\n        uses: docker://alpine@sha256:{}\n",
+        "z".repeat(64)
+    );
+
+    assert_eq!(
+        unpinned("w.yml", &body),
+        [
+            "w.yml:1 uses docker://alpine@sha256:abc, not pinned to a sha256 digest".to_owned(),
+            format!(
+                "w.yml:2 uses docker://alpine@sha256:{}, not pinned to a sha256 digest",
+                "z".repeat(64)
+            ),
+        ]
+    );
+}
+
+#[test]
+fn unpinned_names_a_sha_whose_version_comment_is_empty() {
+    let body = format!("        uses: owner/act@{SHA} #\n        uses: owner/act@{SHA} #   \n");
+
+    assert_eq!(
+        unpinned("w.yml", &body),
+        [
+            format!("w.yml:1 uses owner/act@{SHA}, with no version in a comment"),
+            format!("w.yml:2 uses owner/act@{SHA}, with no version in a comment"),
+        ]
+    );
+}
+
+#[test]
 fn unpinned_reads_no_uses_a_comment_names() {
     assert!(unpinned("w.yml", "      # uses: actions/checkout@v4\n  uses:\n").is_empty());
 }
