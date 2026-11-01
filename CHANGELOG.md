@@ -9,6 +9,17 @@ its upgrade notes (ENG-23). ParleyInn follows semantic versioning.
 
 ## Unreleased
 
+- CI now fails on a source, test, feature or configuration file past its
+  kind's line limit that the record of sizes
+  (`tooling/engineering/oversize.txt`) does not list, and on a listed
+  file that grows past its recorded lines; a listed file that fits, or
+  is gone, must leave the record, so it only shrinks (ENG-34). The
+  review bundle's finding for a changed file past its limit stays a
+  nit. The drift registry, the review workflow check, the review
+  workflow and the reviewer evaluation's CLI tests were split under
+  their limits, with no change in behaviour; the review workflow's long
+  `run:` bodies are scripts under `scripts/`, which the ENG-28 and
+  ENG-32 checks read as the steps' own text.
 - A stakeholder comment consents only to the stakeholder paths it names,
   by path, owning pattern or directory (ENG-21).
 - Every reviewer component of the layered review, and every other agent

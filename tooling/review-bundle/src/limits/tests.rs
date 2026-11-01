@@ -139,3 +139,12 @@ fn findings_is_empty_for_files_within_their_limits_that_specialists_read() {
 
     assert!(findings(&list, &scopes, &|_| Some(1)).is_empty());
 }
+
+#[test]
+fn a_file_s_lines_are_counted_whatever_its_encoding() {
+    assert_eq!(line_count(b""), 0);
+    assert_eq!(line_count(b"a"), 1);
+    assert_eq!(line_count(b"a\n"), 1);
+    assert_eq!(line_count(b"a\r\n\nb\n"), 3);
+    assert_eq!(line_count(&[0xff, b'\n', 0xfe]), 2);
+}

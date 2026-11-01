@@ -17,7 +17,7 @@ use std::path::Path;
 
 use serde_json::Value;
 
-use crate::{Snapshot, analyse, render};
+use crate::{Snapshot, analyse, limits, render};
 
 /// The review bundle and the findings were written.
 pub const EXIT_OK: u8 = 0;
@@ -167,7 +167,7 @@ fn tree_lines(root: &Path, path: &str) -> Result<Option<usize>, String> {
     }
     let bytes = fs::read(&file).map_err(failed("read", &file))?;
 
-    Ok(Some(String::from_utf8_lossy(&bytes).lines().count()))
+    Ok(Some(limits::line_count(&bytes)))
 }
 
 /// The message for a failure to `verb` the file at `path`.

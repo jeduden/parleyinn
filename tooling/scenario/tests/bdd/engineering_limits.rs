@@ -4,16 +4,19 @@
 //! those the ENG-34 row states.
 
 use cucumber::{then, when};
+use engineering::file_sizes;
 use engineering::outcome;
 use engineering::review_limits::{self, Built, OVERSIZE, UNREAD};
 
 use crate::World;
 use crate::engineering::eng;
 
-/// What the review bundle wrote for the change the scenario built.
+/// What the review bundle wrote for the change the scenario built, and
+/// what the size check found in its fixture tree.
 #[derive(Debug, Default)]
 struct Read {
     built: Option<Built>,
+    sizes: Vec<String>,
 }
 
 #[then(regex = r"^the review bundle's line limits are those the ENG-34 row states$")]
@@ -80,4 +83,37 @@ fn the_bundle_lists_both(w: &mut World) -> Result<(), String> {
 #[then(regex = r"^its deterministic findings hold no nit citing ENG-34 or ENG-28$")]
 fn no_nit(w: &mut World) -> Result<(), String> {
     outcome(review_limits::no_nit(&built(w)?))
+}
+
+#[then(
+    regex = r"^no file of the checkout is past its kind's line limit unless the recorded sizes list it at no fewer lines than it holds$"
+)]
+fn no_file_past_its_limit(w: &mut World) -> Result<(), String> {
+    outcome(file_sizes::check_parts(eng(w).checkout()?).0)
+}
+
+#[then(regex = r"^the recorded sizes list no file that fits its limit and no file that is gone$")]
+fn the_record_lists_no_stale_file(w: &mut World) -> Result<(), String> {
+    outcome(file_sizes::check_parts(eng(w).checkout()?).1)
+}
+
+#[when(
+    regex = r"^the size check reads a tree with a listed file grown, a file past its limit that is not listed, a listed file that fits and a listed file that is gone$"
+)]
+fn size_check_reads_a_drifted_tree(w: &mut World) -> Result<(), String> {
+    let work = testkit::TempDir::new().map_err(|e| format!("make a work directory: {e}"))?;
+    w.section::<Read>().sizes = file_sizes::fixture_problems(work.path())?;
+    Ok(())
+}
+
+#[then(
+    regex = r"^it names the grown file, the unlisted file, the file that fits and the file that is gone$"
+)]
+fn it_names_each_drift(w: &mut World) -> Result<(), String> {
+    outcome(file_sizes::names_each_drift(&w.section::<Read>().sizes))
+}
+
+#[then(regex = r"^it names no file held at its recorded size or within its limit$")]
+fn it_names_no_held_file(w: &mut World) -> Result<(), String> {
+    outcome(file_sizes::names_no_held_file(&w.section::<Read>().sizes))
 }

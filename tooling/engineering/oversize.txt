@@ -1,0 +1,24 @@
+# The recorded sizes of the files past their kind's line limit (ENG-34),
+# one a line: <path> <lines>. CI fails on a file past its limit that is
+# not listed here and on a listed file that grows past its recorded
+# lines; a listed file that fits its limit, or is gone, must be removed.
+# The record only shrinks: split a file, then drop its line. Never add a
+# line, and never raise a number, without the stakeholder's acceptance.
+# The limits are the review bundle's (tooling/review-bundle/src/limits.rs);
+# see tooling/engineering/src/file_sizes.rs and docs/ci.md.
+.github/workflows/ci.yml 937
+crates/administration/src/verify/tests.rs 1549
+crates/ingest/src/reading.rs 1232
+crates/ingest/src/tests.rs 1475
+crates/mcp/src/tests/recall_calls.rs 1007
+crates/parinn/src/lib.rs 2259
+crates/parinn/src/tests.rs 3647
+crates/store/src/lib.rs 2123
+crates/store/src/search_index/tests.rs 1128
+crates/store/src/tests.rs 1568
+features/lane.feature 594
+tooling/engineering/src/trusted_text.rs 1038
+tooling/scenario/tests/bdd/assumptions.rs 1297
+tooling/scenario/tests/bdd/erasure.rs 1070
+tooling/scenario/tests/bdd/recall.rs 1150
+tooling/testkit/src/boundary/tests.rs 1015

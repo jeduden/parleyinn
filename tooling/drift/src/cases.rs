@@ -4,6 +4,7 @@
 mod architecture;
 mod boundary;
 mod ci;
+mod file_sizes;
 mod records;
 mod release;
 mod review_agents;
@@ -13,6 +14,7 @@ mod review_reports;
 use architecture::*;
 use boundary::*;
 use ci::*;
+use file_sizes::*;
 use records::*;
 use release::*;
 use review_agents::*;
@@ -133,6 +135,7 @@ pub fn cases() -> Vec<Case> {
         review_resume_cases(),
         vec![review_moved_revision_case()],
         review_token_cases(),
+        file_size_cases(),
         // Last: its cases edit source the later cases would run stale.
         license_text_cases(),
     ]
