@@ -73,9 +73,16 @@ repeat them, which costs tokens.
   and, once every one has ended, every dispatched generalist, told its
   specialists' report files. Each agent runs through
   `review-eval`'s runner and process host with a 900-second deadline,
-  and runs once more when its run did not answer: it would not start,
-  ended without a result, missed its deadline or answered nothing.
-  The usage file counts the runs. No agent routes the review, calls
+  and runs once more as the same agent when its run did not answer: it
+  would not start, ended without a result, missed its deadline or
+  answered nothing. A specialist, whole or one part, also runs once
+  more when the check would refuse its assembled report: a line in no
+  form, an unknown id, the forms' template place, an outcome its lines
+  contradict, no outcome line or an empty report. The second prompt
+  names what was wrong, the refused line among it, and the forms
+  again, and the second run is judged alone; only a second run that
+  again did not answer shows what both stated. The usage file counts
+  the runs. No agent routes the review, calls
   another agent or writes the review outcome.
 - **A specialist's report has two kinds of finding.** A linked finding,
   `path:line — if not addressed: <consequence> — <ID>[, <ID>...]`, each
@@ -224,7 +231,8 @@ repeat them, which costs tokens.
   and refuses a harness session that would route the review.
 - ENG-28 also describes the finding grammar, the revision and
   withdrawal forms, the assembly from the run log, its refusals, the
-  incomplete report, that the agents write nothing and that the
+  incomplete report, the second run after a run that did not answer or
+  a refused report, that the agents write nothing and that the
   generalists alone weigh; its scenario's gate table takes a report
   with a request, which approves, and one with a malformed finding, an
   incomplete one and one whose answer gives no or another outcome, each
