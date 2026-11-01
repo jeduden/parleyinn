@@ -1,7 +1,7 @@
 //! ENG-28: the review is run by code. `review-run`, given a dispatch,
 //! runs each dispatched specialist as its own agent, assembles its
 //! report from its run log, runs each dispatched generalist only once
-//! its own specialists have ended, not waiting for the others, and
+//! its own specialists have ended and the breaker is decided, and
 //! writes the review outcome from what they answered. The check runs
 //! `review-run` on a work directory holding the checkout's definitions
 //! of the dispatched agents, with a stand-in for the `claude` command

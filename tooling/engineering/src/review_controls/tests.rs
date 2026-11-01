@@ -173,3 +173,87 @@ fn the_clock_moves_on_by_each_wait_and_draws_no_jitter() {
     assert_eq!(clock.now(), Duration::from_secs(5));
     assert!(clock.jitter().abs() < f64::EPSILON);
 }
+
+#[test]
+fn a_capped_review_is_named_when_its_gaps_or_its_count_alone_miss_the_agents_not_started() {
+    let over = |n: usize| -> BTreeMap<String, String> {
+        (0..n)
+            .map(|i| (format!("a{i}"), "over budget: x".to_owned()))
+            .collect()
+    };
+    let four = "verdict=request_changes\nover_budget=4\n";
+    let three = "verdict=request_changes\nover_budget=3\n";
+
+    let gaps_alone = capped_problems(1, four, &over(3));
+    let count_alone = capped_problems(1, three, &over(4));
+
+    assert_eq!(gaps_alone.len(), 1, "{gaps_alone:?}");
+    assert!(gaps_alone[0].starts_with("3 agents named over budget, not the 4"));
+    assert_eq!(count_alone.len(), 1, "{count_alone:?}");
+    assert!(count_alone[0].starts_with("4 agents named over budget, not the 4"));
+}
+
+#[test]
+fn an_abort_is_named_when_the_outcome_or_the_printed_count_alone_misses_it() {
+    let gaps: BTreeMap<String, String> = ["review-code", "review-spec"]
+        .into_iter()
+        .map(|n| {
+            (
+                n.to_owned(),
+                format!("aborted: {ABORT} (x), so it was not started"),
+            )
+        })
+        .collect();
+    let opening = format!(
+        r#"{{"verdict": "request_changes", "summary": "s", "findings": [{{"path": "review/", "line": 0, "severity": "blocking", "body": "review aborted: {ABORT} (x)"}}]}}"#
+    );
+    let silent = r#"{"verdict": "request_changes", "summary": "s", "findings": []}"#;
+
+    let outcome_alone = aborted_problems(&[], "aborted=2\n", silent, &gaps);
+    let count_alone = aborted_problems(&[], "aborted=0\n", &opening, &gaps);
+
+    assert_eq!(outcome_alone.len(), 1, "{outcome_alone:?}");
+    assert!(outcome_alone[0].starts_with("the review outcome does not open with the abort"));
+    assert_eq!(count_alone.len(), 1, "{count_alone:?}");
+    assert!(count_alone[0].starts_with("the review outcome does not open with the abort"));
+}
+
+#[test]
+fn an_overloaded_run_is_named_when_its_runs_or_its_waits_alone_are_wrong() {
+    let runs =
+        |lang_rust: usize| move |agent: &str| if agent == "lang-rust" { lang_rust } else { 1 };
+    let fifteen = Duration::from_secs(15);
+
+    let three_runs = retried_problems(&runs(3), &[fifteen]);
+    let short_wait = retried_problems(&runs(2), &[Duration::from_secs(14)]);
+    let two_waits = retried_problems(&runs(2), &[fifteen, fifteen * 2]);
+    let no_wait = retried_problems(&runs(2), &[]);
+
+    for problems in [three_runs, short_wait, two_waits, no_wait] {
+        assert_eq!(problems.len(), 1, "{problems:?}");
+        assert!(problems[0].starts_with("lang-rust, turned away as overloaded"));
+    }
+}
+
+#[test]
+fn a_gap_list_that_is_missing_or_does_not_parse_is_an_error_not_no_gaps() {
+    let dir = TempDir::new().unwrap();
+    let path = dir.path().join("review/gaps.json");
+
+    let missing = gaps(dir.path()).unwrap_err();
+    assert!(
+        missing.starts_with(&format!("read {}: ", path.display())),
+        "{missing}"
+    );
+
+    fs::create_dir_all(path.parent().unwrap()).unwrap();
+    fs::write(&path, "{").unwrap();
+    let malformed = gaps(dir.path()).unwrap_err();
+    assert!(
+        malformed.starts_with(&format!("{}: ", path.display())),
+        "{malformed}"
+    );
+
+    fs::write(&path, "[]").unwrap();
+    assert_eq!(gaps(dir.path()), Ok(BTreeMap::new()));
+}

@@ -21,14 +21,27 @@ use crate::live::Live;
 pub const MAX_COST_USD: f64 = 40.0;
 /// The fraction of the dispatched specialists that may end in a gap
 /// before no generalist starts, unless the run says otherwise: more
-/// than a third.
-pub const BREAKER_FRACTION: f64 = 0.34;
+/// than a third, exactly one third not tripping it.
+pub const BREAKER_FRACTION: Fraction = Fraction { num: 1, den: 3 };
 /// How a gap's reason starts for a run the cost caps stopped or kept
 /// from starting.
 pub const OVER_BUDGET: &str = "over budget:";
 /// How a gap's reason starts for a generalist the breaker kept from
 /// starting.
 pub const ABORTED: &str = "aborted:";
+
+/// A share of a whole, whole numbers so that "more than" is exact.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Fraction {
+    pub num: u64,
+    pub den: u64,
+}
+
+impl Fraction {
+    /// All of them: more than all of the specialists never ended in a
+    /// gap, so a breaker of it never trips.
+    pub const WHOLE: Self = Self { num: 1, den: 1 };
+}
 
 /// What one review's runs are held to and watched by.
 #[derive(Debug)]
@@ -139,7 +152,7 @@ impl Budget {
 /// fraction of them.
 #[derive(Debug)]
 pub struct Breaker {
-    fraction: f64,
+    fraction: Fraction,
     dispatched: usize,
     failed: AtomicUsize,
     ended: AtomicUsize,
@@ -149,7 +162,7 @@ impl Breaker {
     /// A breaker over `dispatched` specialists that trips past
     /// `fraction` of them.
     #[must_use]
-    pub fn new(fraction: f64, dispatched: usize) -> Self {
+    pub fn new(fraction: Fraction, dispatched: usize) -> Self {
         Self {
             fraction,
             dispatched,
@@ -194,14 +207,12 @@ impl Breaker {
 }
 
 /// Whether `failed` of `dispatched` specialists is more than `fraction`
-/// of them.
+/// of them, compared in whole numbers.
 #[must_use]
-pub fn trips(failed: usize, dispatched: usize, fraction: f64) -> bool {
-    let (failed, dispatched) = (
-        f64::from(u32::try_from(failed).unwrap_or(u32::MAX)),
-        f64::from(u32::try_from(dispatched).unwrap_or(u32::MAX)),
-    );
-    failed > fraction * dispatched
+pub fn trips(failed: usize, dispatched: usize, fraction: Fraction) -> bool {
+    let wide = |n: usize| u128::try_from(n).unwrap_or(u128::MAX);
+    let (failed, dispatched) = (wide(failed), wide(dispatched));
+    failed * u128::from(fraction.den) > dispatched * u128::from(fraction.num)
 }
 
 /// How the review names a mass failure of `failed` of `dispatched`

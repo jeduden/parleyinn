@@ -82,9 +82,32 @@ fn the_breaker_trips_once_more_than_its_fraction_of_specialists_failed() {
 
 #[test]
 fn a_breaker_over_no_specialist_never_trips() {
+    let zero = Fraction { num: 0, den: 1 };
     assert!(!trips(0, 0, BREAKER_FRACTION));
-    assert!(trips(1, 3, 0.0));
+    assert!(trips(1, 3, zero));
     assert!(!trips(1, 3, BREAKER_FRACTION));
     assert!(trips(2, 3, BREAKER_FRACTION));
-    assert!(!trips(3, 3, 1.0));
+    assert!(!trips(3, 3, Fraction::WHOLE));
+}
+
+#[test]
+fn more_than_a_third_trips_in_whole_numbers_and_exactly_a_third_does_not() {
+    assert!(trips(17, 50, BREAKER_FRACTION), "17 of 50 is over a third");
+    assert!(!trips(16, 50, BREAKER_FRACTION));
+    assert!(trips(18, 53, BREAKER_FRACTION), "18 of 53 is over a third");
+    assert!(!trips(17, 53, BREAKER_FRACTION));
+    assert!(!trips(2, 6, BREAKER_FRACTION), "exactly a third");
+    assert!(!trips(17, 51, BREAKER_FRACTION), "exactly a third");
+    assert!(trips(18, 51, BREAKER_FRACTION));
+}
+
+#[test]
+fn a_breaker_of_fifty_trips_on_the_seventeenth_failure() {
+    let breaker = Breaker::new(BREAKER_FRACTION, 50);
+    for _ in 0..16 {
+        breaker.end(true);
+    }
+    assert_eq!(breaker.refusal(), None);
+    breaker.end(true);
+    assert!(breaker.refusal().is_some());
 }

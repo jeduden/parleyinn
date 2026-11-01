@@ -31,13 +31,24 @@ fn controlled(
     jitter: f64,
     script: impl Fn(&Command) -> Result<Output, String> + Sync + 'static,
 ) -> (TempDir, Ran) {
+    told_to(Arc::default(), dispatch, options, jitter, script)
+}
+
+/// [`controlled`], the lines progress is told kept in `lines`, which
+/// the script may read while the review runs.
+fn told_to(
+    lines: Arc<Mutex<Vec<String>>>,
+    dispatch: &str,
+    options: Options,
+    jitter: f64,
+    script: impl Fn(&Command) -> Result<Output, String> + Sync + 'static,
+) -> (TempDir, Ran) {
     let dir = workdir();
     let host = FakeHost::new(script);
     let clock = FakeClock {
         jitter,
         ..FakeClock::default()
     };
-    let lines = Mutex::new(Vec::new());
     let runs = review_on(&Review {
         host: &host,
         clock: &clock,
@@ -52,7 +63,7 @@ fn controlled(
         progress: &|l| lines.lock().unwrap().push(l.to_owned()),
     })
     .unwrap();
-    let lines = lines.into_inner().unwrap();
+    let lines = lines.lock().unwrap().clone();
     (
         dir,
         Ran {
@@ -322,7 +333,7 @@ fn a_run_overloaded_after_another_failure_waits_before_its_third_attempt() {
 }
 
 #[test]
-fn an_overloaded_run_past_its_deadline_runs_once_more_without_a_wait() {
+fn an_overloaded_run_past_its_deadline_is_not_run_again_and_stays_a_named_gap() {
     let options = Options {
         deadline: Duration::from_secs(5),
         ..options()
@@ -349,12 +360,26 @@ fn an_overloaded_run_past_its_deadline_runs_once_more_without_a_wait() {
     let (_dir, ran) = controlled(ONE, options, 0.0, after(1, OVERLOADED));
 
     assert!(ran.clock.slept().is_empty());
+    let agents = ran.host.agents();
+    assert_eq!(
+        agents.iter().filter(|a| *a == "lang-rust").count(),
+        1,
+        "{agents:?}"
+    );
+    assert_eq!(ran.run("lang-rust").attempts, 1);
     assert!(
         ran.lines[0].ends_with(
-            "; the API was overloaded and its deadline is spent, so it runs once more now"
+            "; the API was overloaded and its backoff deadline is spent, so it is not run again"
         ),
         "{:?}",
         ran.lines
+    );
+    let failure = ran.run("lang-rust").failure.clone().unwrap_or_default();
+    assert!(
+        failure.ends_with(
+            "; the API was overloaded and its backoff deadline is spent, so it was not run again"
+        ),
+        "{failure}"
     );
 }
 
@@ -383,30 +408,112 @@ fn the_breaker_starts_no_generalist_once_more_than_its_fraction_of_specialists_f
     }
 }
 
-#[test]
-fn the_breaker_counts_a_refused_report_and_not_a_run_a_cap_stopped() {
+const CAPPED: &str = r#"{"type":"result","subtype":"error_max_budget_usd","is_error":true,"result":"","total_cost_usd":1.01,"num_turns":9}"#;
+
+/// `DISPATCH` run with lang-rust's report refused by the gate and
+/// lang-markdown, when `capped`, stopped by its cost cap.
+fn refused_and_capped(capped: bool) -> Ran {
     let options = Options {
         breaker: BREAKER_FRACTION,
         ..options()
     };
-    let capped = r#"{"type":"result","subtype":"error_max_budget_usd","is_error":true,"result":"","total_cost_usd":1.01,"num_turns":9}"#;
-    let (_dir, ran) = controlled(DISPATCH, options, 0.0, move |c| {
+    controlled(DISPATCH, options, 0.0, move |c| {
         match agent_of(c).as_str() {
             "lang-rust" => {
                 let outcome = "outcome: none — clean.";
                 fake::answer(c, &[fake::FINDING, outcome], outcome)
             }
-            "lang-markdown" => {
-                fake::write_log(c, &format!("{capped}\n"));
+            "lang-markdown" if capped => {
+                fake::write_log(c, &format!("{CAPPED}\n"));
                 Ok(Output::default())
             }
             _ => fake::either(c),
         }
-    });
+    })
+    .1
+}
 
-    // One refused of three is a third, no more: both generalists run.
+#[test]
+fn one_refused_report_of_three_is_a_third_and_trips_nothing() {
+    let ran = refused_and_capped(false);
+
     assert!(ran.run("review-code").answered(), "{:?}", ran.lines);
     assert!(ran.run("review-spec").answered(), "{:?}", ran.lines);
+}
+
+#[test]
+fn a_refused_report_tips_the_breaker_past_a_third_beside_a_run_a_cap_stopped() {
+    let ran = refused_and_capped(true);
+
+    // The capped specialist counts as one that ended without an
+    // accepted report, and the refused report is the second of three.
+    let aborted = "aborted: 2 of 3 specialists failed (mass failure; likely an outage or a \
+                   broken prompt), so it was not started";
+    for generalist in ["review-code", "review-spec"] {
+        let run = ran.run(generalist);
+        assert!(!run.answered(), "{generalist}");
+        assert_eq!(run.failure.as_deref(), Some(aborted), "{generalist}");
+    }
+}
+
+#[test]
+fn runs_a_cost_cap_stopped_tip_the_breaker_like_any_that_ended_without_a_report() {
+    let options = Options {
+        breaker: BREAKER_FRACTION,
+        ..options()
+    };
+    let (_dir, ran) = controlled(DISPATCH, options, 0.0, |c| {
+        if ["lang-rust", "lang-markdown"].contains(&agent_of(c).as_str()) {
+            fake::write_log(c, &format!("{CAPPED}\n"));
+            return Ok(Output::default());
+        }
+        fake::either(c)
+    });
+
+    assert!(!ran.run("review-code").answered());
+    assert!(!ran.run("review-spec").answered());
+}
+
+#[test]
+fn a_generalist_a_reached_cap_and_a_tripped_breaker_both_keep_back_is_named_over_budget() {
+    let options = Options {
+        breaker: BREAKER_FRACTION,
+        max_cost_usd: 0.0,
+        ..options()
+    };
+    let (_dir, ran) = controlled(DISPATCH, options, 0.0, fake::either);
+
+    assert!(ran.host.agents().is_empty(), "nothing started");
+    for generalist in ["review-code", "review-spec"] {
+        let failure = ran.run(generalist).failure.clone().unwrap_or_default();
+        assert!(failure.starts_with("over budget: "), "{failure}");
+    }
+}
+
+#[test]
+fn errors_that_cannot_be_read_are_told_and_taken_as_none() {
+    let (_dir, ran) = controlled(ONE, options(), 0.0, |c| {
+        if prompt_of(c).contains("a specialist") {
+            let log = c.stdout_to.as_ref().unwrap();
+            // A directory where the errors file belongs does not read.
+            let _ = fs::create_dir(log.with_extension("stderr"));
+            fake::write_log(c, "cut\n");
+            return Ok(Output::default());
+        }
+        fake::either(c)
+    });
+
+    let told = ran
+        .lines
+        .iter()
+        .find(|l| l.starts_with("lang-rust: read "))
+        .unwrap_or_else(|| panic!("{:?}", ran.lines));
+    assert!(
+        told.contains("lang-rust.stderr: ") && told.ends_with("; its errors are taken as none"),
+        "{told}"
+    );
+    // The run is run once more, as any failure no errors explain is.
+    assert!(ran.run("lang-rust").attempts >= 2);
 }
 
 #[test]
@@ -415,9 +522,20 @@ fn what_is_running_is_told_every_so_often() {
         every: Duration::from_millis(1),
         ..options()
     };
-    let (_dir, ran) = controlled(ONE, options, 0.0, |c| {
-        // Long enough for a block or two to be told while it runs.
-        std::thread::sleep(Duration::from_millis(30));
+    let lines = Arc::new(Mutex::new(Vec::new()));
+    let seen = Arc::clone(&lines);
+    let (_dir, ran) = told_to(lines, ONE, options, 0.0, move |c| {
+        // The run ends once a block was told, or after half a minute.
+        let give_up = std::time::Instant::now() + Duration::from_secs(30);
+        while std::time::Instant::now() < give_up
+            && !seen
+                .lock()
+                .unwrap()
+                .iter()
+                .any(|l| l.starts_with("progress: "))
+        {
+            std::thread::sleep(Duration::from_millis(1));
+        }
         fake::either(c)
     });
 

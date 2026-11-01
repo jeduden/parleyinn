@@ -89,7 +89,7 @@ fn reviewed(
         options: Options {
             deadline: Duration::from_secs(9),
             split,
-            breaker: 1.0,
+            breaker: crate::controls::Fraction::WHOLE,
             ..Options::default()
         },
         resume: None,

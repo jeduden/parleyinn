@@ -569,7 +569,7 @@ fn the_flags_read_inline_or_as_the_next_argument() {
             "old",
             "--max-cost-usd=12.5",
             "--breaker-fraction",
-            "0.5",
+            "1/2",
             "--summary",
             "s.md",
             "--answers-read-only",
@@ -588,7 +588,7 @@ fn the_flags_read_inline_or_as_the_next_argument() {
                 deadline: Duration::from_secs(30),
                 split: crate::parts::LIMIT,
                 max_cost_usd: 12.5,
-                breaker: 0.5,
+                breaker: Fraction { num: 1, den: 2 },
                 ..Options::default()
             },
             head: Some(HEAD.to_owned()),
@@ -948,10 +948,10 @@ fn a_cap_or_a_fraction_out_of_range_is_refused() {
         refusal(&["--workdir", "w", "--max-cost-usd", "-1"]),
         "--max-cost-usd \"-1\" is not a number above zero"
     );
-    for value in ["0", "1.5", "most"] {
+    for value in ["0", "1.5", "most", "2", "0/3", "4/3", "1/0", "1/x", "1/3/4"] {
         assert_eq!(
             refusal(&["--workdir", "w", "--breaker-fraction", value]),
-            format!("--breaker-fraction {value:?} is no fraction above zero and at most one")
+            format!("--breaker-fraction {value:?} is no ratio above zero and at most one, as 1/3")
         );
     }
 }
@@ -1025,4 +1025,62 @@ fn a_job_summary_that_cannot_be_added_to_is_told_and_the_review_still_decided() 
         )),
         "{err}"
     );
+}
+
+#[test]
+fn a_run_whose_text_holds_the_token_is_scrubbed_from_the_job_summary_and_counted() {
+    let dir = TempDir::new().unwrap();
+    let summary = dir.path().join("summary.md");
+    let mut run = crate::run::reused(
+        "lang-rust".to_owned(),
+        review_eval::component::Kind::Specialist,
+        "a",
+        Vec::new(),
+    );
+    run.reused = false;
+    run.failure = Some(format!("its run ended with {TOKEN} twice, {TOKEN}"));
+    let leaks = AtomicUsize::new(0);
+
+    let scrubber = Scrubber::new(&[TOKEN]);
+    let written = Written {
+        workdir: dir.path(),
+        scrubber: &scrubber,
+        leaks: &leaks,
+    };
+
+    add_scrubbed_to_summary(&summary, &[run], &written, &|_| {});
+
+    let text = fs::read_to_string(&summary).unwrap();
+    assert!(!text.contains(TOKEN), "{text}");
+    assert!(text.contains(review_eval::secret::REDACTED), "{text}");
+    assert_eq!(leaks.load(Ordering::SeqCst), 2);
+}
+
+#[test]
+fn a_review_whose_failed_run_stated_the_token_leaves_it_out_of_the_job_summary() {
+    let dir = workdir();
+    let summary = dir.path().join("summary.md");
+    let host = FakeHost::new(|c: &review_eval::host::Command| {
+        if fake::agent_of(c) == "lang-rust" {
+            fake::write_log(c, &fake::log_of(&[], &format!("error_{TOKEN}"), "", 0.0));
+            return Ok(review_eval::host::Output::default());
+        }
+        fake::either(c)
+    });
+
+    let (code, out, err) = run_holding(
+        &host,
+        dir.path(),
+        Some(TOKEN),
+        &["--summary", summary.to_str().unwrap()],
+    );
+
+    assert_eq!(code, EXIT_FAILURE, "{err}");
+    assert!(
+        out.starts_with("failed=an agent's output contained the Claude token: "),
+        "{out}"
+    );
+    let text = fs::read_to_string(&summary).unwrap();
+    assert!(!text.contains(TOKEN), "{text}");
+    assert!(text.contains("| lang-rust | specialist |"), "{text}");
 }

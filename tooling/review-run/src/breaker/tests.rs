@@ -3,7 +3,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use review_gate::{APPROVE_VERDICT, ReviewOutcome};
 
 use super::*;
-use crate::controls::BREAKER_FRACTION;
+use crate::controls::{BREAKER_FRACTION, Fraction};
 use crate::gaps::Gap;
 use crate::plan::parse_dispatch;
 
@@ -43,7 +43,11 @@ fn a_specialist_counts_once_however_many_of_its_parts_failed() {
         Gap::new("lang-python", None, "silent: not dispatched".to_owned()),
     ];
 
-    assert_eq!(failed(&plan(), &decision(gaps)), 2);
+    assert_eq!(
+        failed(&plan(), &decision(gaps)),
+        3,
+        "a cost cap's gap counts, a part twice or a generalist does not"
+    );
 }
 
 #[test]
@@ -83,5 +87,5 @@ fn a_third_or_fewer_failed_leaves_the_decision_as_it_was() {
 
     assert_eq!(amend(&plan(), before.clone(), BREAKER_FRACTION), before);
     assert_eq!(abort(&plan(), &before, BREAKER_FRACTION), None);
-    assert!(abort(&plan(), &before, 0.3).is_some());
+    assert!(abort(&plan(), &before, Fraction { num: 3, den: 10 }).is_some());
 }

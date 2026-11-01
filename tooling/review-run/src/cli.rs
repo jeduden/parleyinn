@@ -40,7 +40,7 @@ use serde::Serialize;
 
 use crate::answers;
 use crate::breaker;
-use crate::controls::{ABORTED, OVER_BUDGET, SystemClock};
+use crate::controls::{ABORTED, Fraction, OVER_BUDGET, SystemClock};
 use crate::findings::{self, Tracked};
 use crate::gaps::{self, GAPS, Gap, NOT_REVIEWED};
 use crate::key::{self, Keys};
@@ -67,7 +67,7 @@ pub const EXIT_USAGE: u8 = 2;
 
 /// How to call it.
 pub const USAGE: &str = "usage: review-run --workdir DIR [--parallel N] [--deadline SECONDS] \
-[--head-sha SHA] [--only GAPS --from DIR] [--max-cost-usd USD] [--breaker-fraction F] \
+[--head-sha SHA] [--only GAPS --from DIR] [--max-cost-usd USD] [--breaker-fraction N/D] \
 [--answers DIR [--answers-read-only]] [--previous FINDINGS] [--max-resumes N] [--summary FILE] \
 [--credential DIR]\n\
        review-run answers drop KEY --answers DIR";
@@ -394,7 +394,7 @@ fn decision(
     plan: &plan::Plan,
     runs: &[AgentRun],
     known: &BTreeSet<String>,
-    breaker_fraction: f64,
+    breaker_fraction: Fraction,
     progress: &(dyn Fn(&str) + Sync),
 ) -> Decision {
     let reports = reports(workdir, plan, progress);
@@ -683,13 +683,15 @@ fn parse(args: impl IntoIterator<Item = String>) -> Result<Args, String> {
     })
 }
 
-/// `value`, flag `name`'s, as a fraction above zero and at most one.
-fn fraction(name: &str, value: &str) -> Result<f64, String> {
-    value
-        .parse()
-        .ok()
-        .filter(|f: &f64| *f > 0.0 && *f <= 1.0)
-        .ok_or_else(|| format!("--{name} {value:?} is no fraction above zero and at most one"))
+/// `value`, flag `name`'s, as a ratio above zero and at most one: `N/D`, or `N` alone for `N/1`.
+fn fraction(name: &str, value: &str) -> Result<Fraction, String> {
+    let (num, den) = value.split_once('/').unwrap_or((value, "1"));
+    match (num.parse::<u64>(), den.parse::<u64>()) {
+        (Ok(num), Ok(den)) if num > 0 && num <= den => Ok(Fraction { num, den }),
+        _ => Err(format!(
+            "--{name} {value:?} is no ratio above zero and at most one, as 1/3"
+        )),
+    }
 }
 
 /// `value`, flag `name`'s, as a number above zero.

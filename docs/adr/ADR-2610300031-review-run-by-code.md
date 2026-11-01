@@ -273,15 +273,15 @@ repeat them, which costs tokens.
   progress), not yet accepted: each run gets `--max-budget-usd`, 1.00
   for a specialist and 5.00 for a generalist, and `review-run
   --max-cost-usd` (40) starts no run once the runs that ended cost that
-  much; once more than `--breaker-fraction` (0.34) of the specialists
-  ended in a gap no generalist starts and the outcome opens with a
-  `review aborted:` finding. Each agent kept back is an `over budget:`
-  or `aborted:` gap, never an approval, so `--only` finishes the review
-  once fixed. A run the API turned away as overloaded waits 15 s, then
-  30 s, each with jitter, before it runs again; a run a cost cap
+  much; once more than `--breaker-fraction` (1/3, in whole numbers) of
+  the specialists, capped ones too, ended in a gap no generalist starts
+  and the outcome opens with a `review aborted:` finding. Each agent
+  kept back is an `over budget:` or `aborted:` gap, never an approval,
+  so `--only` finishes the review once fixed. A run the API turned away
+  as overloaded waits 15 s, then 30 s, with jitter, before it runs
+  again, or stays a named gap with no deadline left; a run a cost cap
   stopped or whose credential was refused is not run again. Every 20 s
-  the run prints what is running, its calls and tokens so far, and adds
-  the table of every run to the job summary.
+  the run prints what runs, and adds every run's table to the summary.
 - What a run leaves without an accepted report is said, never read as
   clean: `review/gaps.json` and `review/not-reviewed.md` list each such
   agent or part and why. `review-run --only <gaps> --from <dir>`, behind
