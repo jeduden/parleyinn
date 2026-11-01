@@ -149,6 +149,7 @@ fn a_checkout_without_the_definitions_is_named() {
     for problems in [
         review_run_scrubs_what_it_writes(&c, work.path()),
         review_run_fails_closed_on_a_leak(&c, work.path()),
+        review_run_refuses_the_credential(&c, work.path()),
     ] {
         assert_eq!(problems.len(), 1, "{problems:?}");
         assert!(
