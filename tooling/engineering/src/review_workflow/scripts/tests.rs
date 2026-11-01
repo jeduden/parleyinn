@@ -7,6 +7,9 @@ fn script(path: &str) -> Result<String, String> {
     }
 }
 
+/// The refusal of the script step of job `j`.
+const REFUSED: &str = "run: scripts/a.sh in job j runs before a checkout of main's tree";
+
 /// A job with a checkout of main's tree, then the step `line`.
 fn in_a_job(line: &str) -> String {
     format!("jobs:\n  j:\n    steps:\n      - uses: actions/checkout@v7\n      - {line}\n")
@@ -66,7 +69,7 @@ fn a_script_step_before_a_checkout_of_mains_tree_is_refused() {
     );
 
     let none = "jobs:\n  j:\n    steps:\n      - run: scripts/a.sh\n";
-    assert!(inline_scripts(none, script).is_err());
+    assert_eq!(inline_scripts(none, script).unwrap_err(), REFUSED);
 }
 
 #[test]
@@ -75,19 +78,33 @@ fn a_checkout_that_is_conditional_or_of_another_path_does_not_count() {
         "        if: x == 'y'\n",
         "        with:\n          path: pr-head\n",
         "        with:\n          ref: abc\n",
+        "        with:\n          repository: other/repo\n",
+        "        with: {ref: abc}\n",
+        "        with: {path: pr-head}\n",
     ] {
         let body = format!(
             "jobs:\n  j:\n    steps:\n      - uses: actions/checkout@v7\n{extra}      - run: scripts/a.sh\n"
         );
-        assert!(inline_scripts(&body, script).is_err(), "{extra}");
+        assert_eq!(
+            inline_scripts(&body, script).unwrap_err(),
+            REFUSED,
+            "{extra}"
+        );
     }
     let lead_if = "jobs:\n  j:\n    steps:\n      - if: x\n        uses: actions/checkout@v7\n      - run: scripts/a.sh\n";
-    assert!(inline_scripts(lead_if, script).is_err());
+    assert_eq!(inline_scripts(lead_if, script).unwrap_err(), REFUSED);
 }
 
 #[test]
 fn a_checkout_in_another_job_does_not_count() {
     let body = "jobs:\n  a:\n    steps:\n      - uses: actions/checkout@v7\n  b:\n    steps:\n      - run: scripts/a.sh\n";
     let err = inline_scripts(body, script).unwrap_err();
-    assert!(err.contains("in job b"), "{err}");
+    assert_eq!(err, REFUSED.replace("job j", "job b"));
+}
+
+#[test]
+fn a_comment_ending_in_a_colon_does_not_end_the_job() {
+    let body = "jobs:\n  j:\n    steps:\n      - uses: actions/checkout@v7\n  # why:\n  #   this\n      - run: scripts/a.sh\n";
+
+    assert!(inline_scripts(body, script).is_ok());
 }

@@ -44,7 +44,7 @@ pub fn inline_scripts(
             (job, checked) = (name, false);
         }
         if trimmed.starts_with("- ") {
-            checked |= checks_out_main(&lines[at..]);
+            checked |= checks_out_main(line.len() - trimmed.len(), trimmed, &lines[at + 1..]);
         }
         let step = trimmed.strip_prefix("- ").unwrap_or(trimmed);
         let Some(name) = step.strip_prefix(RUN) else {
@@ -79,24 +79,23 @@ fn job_header(line: &str) -> Option<&str> {
     (!key.is_empty() && !key.starts_with([' ', '#', '-']) && !key.contains(' ')).then_some(key)
 }
 
-/// Whether the step that `lines` open, ending where a line is no deeper
-/// than its first, is a checkout of main's tree: that action, with no
-/// condition and no other path or ref.
-fn checks_out_main(lines: &[&str]) -> bool {
-    let Some((first, rest)) = lines.split_first() else {
-        return false;
-    };
-    let indent = first.len() - first.trim_start().len();
+/// Whether the step that opens with `first`, trimmed from `indent`
+/// spaces in, and goes on
+/// through the lines of `rest` deeper than it, is a checkout of main's
+/// tree: that action, with no condition, other path, ref or repository,
+/// in block or flow form.
+fn checks_out_main(indent: usize, first: &str, rest: &[&str]) -> bool {
     let deeper =
         |line: &&&str| line.trim().is_empty() || line.len() - line.trim_start().len() > indent;
-    let step = std::iter::once(first.trim_start().trim_start_matches("- "))
+    let step = std::iter::once(first.trim_start_matches("- "))
         .chain(rest.iter().take_while(deeper).map(|line| line.trim_start()));
     let (mut action, mut other) = (false, false);
     for line in step {
         action |= line.starts_with("uses: actions/checkout@");
-        other |= ["if:", "path:", "ref:"]
-            .iter()
-            .any(|key| line.starts_with(key));
+        other |= line.starts_with("if:")
+            || ["path:", "ref:", "repository:"]
+                .iter()
+                .any(|key| line.contains(key));
     }
 
     action && !other
