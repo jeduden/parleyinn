@@ -213,7 +213,8 @@ fn resumed(
     for note in &plan_of.notes {
         progress(note);
     }
-    resume::copy(workdir, Path::new(from), plan, &plan_of)?;
+    let left = resume::copy(workdir, Path::new(from), plan, &plan_of)?;
+    left.iter().for_each(|note| progress(note));
 
     Ok(plan_of)
 }

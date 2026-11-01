@@ -440,8 +440,12 @@ fn a_log_whose_name_is_not_utf8_is_not_copied() {
         notes: Vec::new(),
     };
 
-    copy(&work, &old, &plan(), &resume).unwrap();
+    let notes = copy(&work, &old, &plan(), &resume).unwrap();
 
+    assert_eq!(
+        notes,
+        ["lang-rust: log lang-rust.\u{fffd}.jsonl not copied: its name is not UTF-8"]
+    );
     assert!(!work.join(LOGS).join(odd).exists());
     assert!(work.join(LOGS).join("lang-rust.jsonl").exists());
 }

@@ -113,7 +113,8 @@ fn part_logs(from: &Path, name: &str) -> Result<BTreeMap<usize, RunLog>, String>
     let logs = earlier_file(from, LOGS);
     let entries = fs::read_dir(&logs).map_err(|e| format!("read {}: {e}", logs.display()))?;
     let mut out = BTreeMap::new();
-    for entry in entries.flatten() {
+    for entry in entries {
+        let entry = entry.map_err(|e| format!("read {}: {e}", logs.display()))?;
         let file = entry.file_name();
         let Some(index) = file
             .to_str()
@@ -276,12 +277,20 @@ fn keep(name: &str, gaps: &[&Gap], earlier: &Earlier, now: &RunId) -> Result<Reu
 
 /// Copies into the work directory `workdir`, from the earlier run's
 /// review directory `from`, what `resume` keeps: each whole specialist's
-/// report, and each kept agent's or part's logs.
+/// report, and each kept agent's or part's logs; returns a note naming
+/// each log of a kept agent left behind because its name is not UTF-8.
 ///
 /// # Errors
 ///
-/// Fails naming a file that is there but cannot be copied.
-pub fn copy(workdir: &Path, from: &Path, plan: &Plan, resume: &Resume) -> Result<(), String> {
+/// Fails naming a file that is there but cannot be copied, or the logs'
+/// directory when it does not list.
+pub fn copy(
+    workdir: &Path,
+    from: &Path,
+    plan: &Plan,
+    resume: &Resume,
+) -> Result<Vec<String>, String> {
+    let mut notes = Vec::new();
     for dir in [LOGS, crate::REPORTS] {
         let path = workdir.join(dir);
         fs::create_dir_all(&path).map_err(|e| format!("make {}: {e}", path.display()))?;
@@ -298,9 +307,16 @@ pub fn copy(workdir: &Path, from: &Path, plan: &Plan, resume: &Resume) -> Result
             Err(e) if e.kind() == io::ErrorKind::NotFound => continue,
             Err(e) => return Err(format!("read {}: {e}", logs.display())),
         };
-        for entry in entries.flatten() {
+        for entry in entries {
+            let entry = entry.map_err(|e| format!("read {}: {e}", logs.display()))?;
             let file = entry.file_name();
             let Some(file) = file.to_str() else {
+                let lossy = file.to_string_lossy();
+                if lossy.starts_with(&format!("{name}.")) {
+                    notes.push(format!(
+                        "{name}: log {lossy} not copied: its name is not UTF-8"
+                    ));
+                }
                 continue;
             };
             if is_log_of(file, name, reuse) {
@@ -309,7 +325,7 @@ pub fn copy(workdir: &Path, from: &Path, plan: &Plan, resume: &Resume) -> Result
         }
     }
 
-    Ok(())
+    Ok(notes)
 }
 
 /// Whether the log file named `file` is one of agent `name`'s that
