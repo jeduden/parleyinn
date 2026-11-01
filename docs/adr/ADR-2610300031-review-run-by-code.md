@@ -259,10 +259,10 @@ repeat them, which costs tokens.
   seeded reports use the new lines; the grader reads the run log alone.
 - A requirement request lands with the stakeholder as a nit; the SRS
   changes only through the stakeholder's own change.
-- A review runs its agents in one bounded pipeline, each up to 900 seconds
-  and at most twice (three times when the API turned it away): 56
-  specialists, then each generalist once its own specialists ended and
-  the mass failure below is decided; 90 minutes at worst (job cap 120).
+- A review runs its agents in one pipeline (`--parallel 32` in the workflow),
+  each up to 900 seconds and at most twice (three times when the API turned
+  it away): 56 specialists, then each generalist once its own specialists
+  ended and the mass failure below is decided; 90 minutes at worst (cap 120).
 - Cost and failure are bounded by code (proposed): `--max-budget-usd`
   caps a run (1.00 a specialist, 5.00 a generalist), `--max-cost-usd`
   (40) starts no run once finished runs cost it, and over a third of

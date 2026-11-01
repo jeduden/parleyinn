@@ -89,12 +89,10 @@ fn retire(r: &Review, store: &Store, key: &str, label: &str) {
         return;
     }
     let said = store.drop(key).map_or_else(
-        |e| format!("was not dropped: {e}"),
-        |()| "was dropped".to_owned(),
+        |e| format!("was not dropped: {e}, so its new answer is not stored"),
+        |()| "was dropped, so its new answer is stored in its place".to_owned(),
     );
-    (r.progress)(&format!(
-        "{label}: its stored answer {key} {said}, so its new answer is stored in its place"
-    ));
+    (r.progress)(&format!("{label}: its stored answer {key} {said}"));
 }
 
 /// Stores `done`, `unit`'s run under `key`, when it is accepted: its

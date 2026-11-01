@@ -869,8 +869,7 @@ fn stability_workflow_cases() -> Vec<Case> {
 fn review_token_cases() -> Vec<Case> {
     const RUN_CLI: &str = "tooling/review-run/src/cli.rs";
     let eval = |name: &'static str| cargo_lib_test("review-eval", name);
-    let leak_test =
-        "cli::tests::a_review_whose_agent_leaked_the_token_scrubs_it_everywhere_and_fails_closed";
+    let leak_test = "cli::tests::leaks::a_review_whose_agent_leaked_the_token_scrubs_it_everywhere_and_fails_closed";
     vec![
         case(
             "the scrub counting and replacing no form of the token",
