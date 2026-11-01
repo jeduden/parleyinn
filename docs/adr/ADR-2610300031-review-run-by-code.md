@@ -239,12 +239,11 @@ repeat them, which costs tokens.
   incomplete one and one whose answer gives no or another outcome, each
   an error, and one revising or withdrawing a finding never stated,
   which approves.
-- The orchestrator's skill, its reviewer component under ENG-32, its
-  cases and its prompt and schema in the runner are retired (the
-  skill's file goes in a follow-up once main runs `review-run`), together
-  with its mentions in the SRS, the docs and the generalists' input
-  section. ADR-2609301941 and ADR-2610262245 keep their text as the
-  record of what was decided then.
+- The orchestrator's skill, its file, its reviewer component under
+  ENG-32, its cases and its prompt and schema in the runner are
+  retired, together with its mentions in the SRS, the docs and the
+  generalists' input section. ADR-2609301941 and ADR-2610262245 keep
+  their text as the record of what was decided then.
 - ADR-2610290002, the reviewer evaluation, also describes the
   orchestrator, and names the review workflow's model for an agent
   whose front matter names none, a model the workflow no longer has.

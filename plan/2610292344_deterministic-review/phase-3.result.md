@@ -8,7 +8,7 @@ summary: >-
   orchestrator used are gone, and ENG-32's row, scenario and the docs
   name no orchestrator. The grader and review-run read a dropped line
   by one rule, and review-run fails closed on a silent generalist and a
-  blocking specialist report. The skill's file goes in a follow-up.
+  blocking specialist report. A follow-up deleted the skill's file.
 ---
 # Phase 3 handoff
 
@@ -89,9 +89,9 @@ summary: >-
 
 ## Follow-up: remove the orchestrator skill after this merges
 
-The `evaluate` job runs main's harness against this pull request's tree, and
-main's harness still reads `.claude/skills/review/SKILL.md` for the `review`
-component. With the file removed, the job stops with "read
-.claude/skills/review/SKILL.md: No such file". The file is kept, unchanged from
-main, until main runs `review-run`. A follow-up pull request then deletes it.
-No review reads it any more: the review job runs `review-run`.
+The `evaluate` job ran main's harness against this pull request's tree, and
+main's harness then still read `.claude/skills/review/SKILL.md` for the
+`review` component. With the file removed, the job would have stopped with
+"read .claude/skills/review/SKILL.md: No such file". The file was kept,
+unchanged from main, until main ran `review-run`. The follow-up pull request
+that came after this one merged deleted it; no review reads it.
