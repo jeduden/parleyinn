@@ -212,3 +212,21 @@ fn a_headline_that_does_not_print_fails_the_step_and_says_so() {
         "named"
     );
 }
+
+#[test]
+fn two_agreeing_reviews_of_the_three_expected_are_not_within_limits() {
+    let root = TempDir::new().unwrap();
+    let one = review(&root, "one", "approve", "abc");
+    let two = review(&root, "two", "approve", "abc");
+    let out = root.path().join("stability.json").display().to_string();
+
+    let (code, printed, err) = call(&["stability", "--out", &out, &one, &two]);
+
+    assert_eq!(code, EXIT_OK);
+    assert!(printed.contains("within_limits=false"), "{printed}");
+    assert!(printed.contains("stable=false"), "{printed}");
+    assert!(
+        err.contains("2 of 3 expected reviews were measured"),
+        "{err}"
+    );
+}

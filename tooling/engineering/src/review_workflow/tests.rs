@@ -1207,3 +1207,17 @@ fn every_spelling_of_the_review_run_start_runs_agents() {
         "      - run: cargo build --package review-run\n"
     ));
 }
+
+#[test]
+fn only_a_leading_work_directory_is_cut_from_a_scrubbed_or_uploaded_path() {
+    assert_eq!(tree_path("\"$work/review/logs/\""), "review/logs");
+    assert_eq!(tree_path("${{ runner.temp }}/work/class.txt"), "class.txt");
+    assert_eq!(
+        tree_path("review/framework/report.html"),
+        "review/framework/report.html"
+    );
+    assert_eq!(
+        tree_path("review/work/report.html"),
+        "review/work/report.html"
+    );
+}

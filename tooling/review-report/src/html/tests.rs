@@ -211,3 +211,19 @@ fn notes_past_the_cut_and_untimed_runs_are_counted_as_they_are() {
     // Two runs, both shown or untimed, so the timeline cuts none.
     assert_eq!(report.matches("more rows not shown").count(), 1, "{report}");
 }
+
+#[test]
+fn the_timeline_counts_only_timed_runs_in_its_cut() {
+    let mut agent_runs: Vec<AgentRun> = (0..MAX_ROWS + 1)
+        .map(|_| agent_run("u", Status::Accepted, (None, None)))
+        .collect();
+    agent_runs.push(agent_run("t", Status::Accepted, (Some(1), Some(2))));
+    let mut t = runs_of(agent_runs);
+    t.header.notes = Vec::new();
+
+    let report = render(&t, &[]);
+
+    let timeline = report.split("<h2>Timeline</h2>").nth(1).unwrap();
+    let timeline = timeline.split("<h2>").next().unwrap();
+    assert!(!timeline.contains("more rows"), "{timeline}");
+}
