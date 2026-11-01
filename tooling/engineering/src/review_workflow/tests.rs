@@ -583,6 +583,7 @@ fn gate_outcome_hands_the_gate_the_specialist_s_report() {
         ("withdrew nothing", "APPROVE"),
         ("none beside a finding", "an error"),
         ("findings with none", "an error"),
+        ("unknown id", "APPROVE"),
         ("reportd", UNKNOWN_CELL),
     ] {
         assert_eq!(gate_outcome(&row("specialist", value)), want, "{value}");

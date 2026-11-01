@@ -110,14 +110,17 @@ repeat them, which costs tokens.
   `review/reports/<name>.md`, the file its generalist reads. A malformed
   line stays in the report as written, so the check names it.
 - **The form fails closed.** The gate and `review-run` refuse a report
-  with a line in no form, an outcome of `none` beside a finding or
-  `findings` beside none, an answer with no outcome line or another
-  outcome than the report ends with: `review-run` names a refused
-  report in a blocking finding of the outcome, and the gate then posts
-  no review. `review-run` also names a report citing an id that
-  neither main's SRS nor the pull request's defines in a blocking
-  finding, which the gate posts as a request for changes, so a made-up
-  requirement cannot carry a finding. Free prose is left out of the
+  with a finding, revision or withdrawal line in no form, at the forms'
+  template place or citing no id, an outcome of `none` beside a finding
+  or `findings` beside none, an answer with no outcome line or another
+  outcome than the report ends with: each is read from the report
+  alone, `review-run` names a report its second run left refused in a
+  blocking finding of the outcome, and the gate then posts no review.
+  Only `review-run`, which holds both trees, refuses a report citing an
+  id that neither main's SRS nor the pull request's defines; it names
+  it in a blocking finding the same way, and the gate, which reads an
+  id by its shape alone, posts that outcome as a request for changes,
+  so a made-up requirement cannot carry a finding. Free prose is left out of the
   report, but the instructions tell a specialist to write an unlinked
   concern as a request, never as prose, and to start no other line
   with a place and a dash.

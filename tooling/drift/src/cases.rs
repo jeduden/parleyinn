@@ -107,6 +107,7 @@ pub fn cases() -> Vec<Case> {
         review_place_form_cases(),
         review_retry_cases(),
         vec![review_unlinked_case()],
+        vec![review_unknown_id_post_case()],
         // Last: its cases edit source the later cases would run stale.
         license_text_cases(),
     ]
@@ -461,6 +462,27 @@ fn review_unlinked_case() -> Case {
             "report::tests::a_report_check_names_a_line_at_a_place_that_cites_no_id",
         ),
         "a_report_check_names_a_line_at_a_place_that_cites_no_id",
+    )
+}
+
+/// The drift the review's posting of an unknown id must not bring
+/// (ENG-28), late so adding it moves no earlier case to another shard:
+/// the gate refusing a report for an id it cannot know, so a review
+/// `review-run` decided as a request for changes posts nothing.
+fn review_unknown_id_post_case() -> Case {
+    case(
+        "the gate failing without posting on a report citing an unknown id",
+        "ENG-28",
+        Injection::replace(
+            "tooling/review-gate/src/lib.rs",
+            "        input.answers.get(agent).map(String::as_str),\n        None,\n",
+            "        input.answers.get(agent).map(String::as_str),\n        Some(&BTreeSet::new()),\n",
+        ),
+        cargo_lib_test(
+            "engineering",
+            "review_refusals::tests::the_checkout_s_review_run_names_an_unknown_id_and_an_unread_line",
+        ),
+        "the_checkout_s_review_run_names_an_unknown_id_and_an_unread_line",
     )
 }
 

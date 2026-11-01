@@ -657,8 +657,10 @@ fn gate_args(reviewed: &str, head: &str) -> Vec<String> {
 /// assembled from a log that revises a finding the specialist never
 /// stated, `withdrew nothing` the one assembled from a log that
 /// withdraws a finding it never stated, `none beside a finding` an
-/// outcome of none after a finding, and `findings with none` an outcome
-/// of findings after none; `None` for any other value.
+/// outcome of none after a finding, `findings with none` an outcome of
+/// findings after none, and `unknown id` a finding citing ENG-999, an id
+/// of the right shape that no requirement has, which the gate, holding
+/// no tree, takes; `None` for any other value.
 fn specialist(row: &BTreeMap<String, String>) -> Option<(Option<String>, &'static str)> {
     const FINDINGS: &str = r#"{"lang-rust":"outcome: findings — fine","review-code":"r"}"#;
     const NONE: &str = r#"{"lang-rust":"outcome: none — fine","review-code":"r"}"#;
@@ -709,6 +711,10 @@ fn specialist(row: &BTreeMap<String, String>) -> Option<(Option<String>, &'stati
             NONE,
         ),
         "findings with none" => (Some("outcome: findings — fine\n"), FINDINGS),
+        "unknown id" => (
+            Some("a.rs:1 — if not addressed: x breaks — ENG-999\noutcome: findings — fine\n"),
+            FINDINGS,
+        ),
         _ => return None,
     };
 

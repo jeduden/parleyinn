@@ -8,8 +8,11 @@
 //! by that run alone. The check runs `review-run` on a work directory
 //! with a stand-in for the `claude` command line whose specialist cites
 //! such an id on every run and whose generalist answers such a line, and
-//! requires the specialist run twice, its second run told why, and a
-//! review that requests changes naming both.
+//! requires the specialist run twice, its second run told why, a review
+//! that requests changes naming both, and the gate, run on what
+//! `review-run` wrote, posting that request rather than failing: an
+//! unknown id is the one refusal the gate cannot read from the report
+//! alone.
 
 use std::fs;
 use std::path::Path;
@@ -181,10 +184,68 @@ pub fn retry_problems(prompts: &[String]) -> Vec<String> {
     problems
 }
 
+/// The check runs the gate reads, written beside what `review-run`
+/// wrote: CI passed on the reviewed head.
+pub const CHECK_RUNS: &str = "check-runs.jsonl";
+/// The deterministic findings the gate reads: none.
+pub const CHECKED: &str = "checked.json";
+/// The head the check reviews, and the pull request's head.
+const HEAD: &str = "0123456789abcdef0123456789abcdef01234567";
+
+/// What is wrong with the review the gate decides from what `review-run`
+/// wrote in `workdir`, on a head whose CI passed and with no
+/// deterministic finding: a gate that fails rather than posting, or
+/// posts anything but a request for changes.
+#[must_use]
+pub fn gate_problems(workdir: &Path) -> Vec<String> {
+    let ci = r#"{"id": 1, "name": "CI", "status": "completed", "conclusion": "success"}"#;
+    for (rel, text) in [(CHECK_RUNS, ci), (CHECKED, "[]")] {
+        let path = workdir.join(rel);
+        if let Err(e) = fs::write(&path, text) {
+            return vec![format!("write {}: {e}", path.display())];
+        }
+    }
+    let at = |rel: &str| workdir.join(rel).display().to_string();
+    let args = [
+        ("--outcome", at(review_run::OUTCOME)),
+        ("--check-runs", at(CHECK_RUNS)),
+        ("--reviewed", HEAD.to_owned()),
+        ("--head", HEAD.to_owned()),
+        ("--checked", at(CHECKED)),
+        ("--dispatch", at("review/dispatch.json")),
+        ("--consulted", at(review_run::CONSULTED)),
+        ("--reports", at("review/reports")),
+        ("--answers", at(review_run::ANSWERS)),
+    ]
+    .into_iter()
+    .flat_map(|(flag, value)| [flag.to_owned(), value]);
+    let mut out = Vec::new();
+    let mut err = Vec::new();
+    let read = |path: &str| fs::read_to_string(path);
+    let code = review_gate::cli::run(args, &mut out, &mut err, &read);
+    match serde_json::from_slice::<review_gate::Review>(&out) {
+        Ok(review) if code == review_gate::cli::EXIT_OK => {
+            if review.event == review_gate::REQUEST_CHANGES {
+                Vec::new()
+            } else {
+                vec![format!(
+                    "the gate posts {}, not a request for changes",
+                    review.event
+                )]
+            }
+        }
+        _ => {
+            let err = String::from_utf8_lossy(&err);
+            let why = err.lines().last().unwrap_or_default();
+            vec![format!("the gate failed rather than posting: {why}")]
+        }
+    }
+}
+
 /// Runs `review-run` on `workdir`, prepared from `checkout`, with the
 /// [`RefusalHost`] standing in for the `claude` command line, and
-/// returns what is wrong with the review it decided and the runs it
-/// started.
+/// returns what is wrong with the review it decided, the runs it
+/// started and the review the gate posts from it.
 #[must_use]
 pub fn review_run_names_what_it_refuses(checkout: &Checkout, workdir: &Path) -> Vec<String> {
     if let Err(e) = prepare(checkout, workdir) {
@@ -203,6 +264,7 @@ pub fn review_run_names_what_it_refuses(checkout: &Checkout, workdir: &Path) -> 
 
     let mut problems = outcome_problems(workdir);
     problems.extend(retry_problems(&host.prompts()));
+    problems.extend(gate_problems(workdir));
 
     problems
 }

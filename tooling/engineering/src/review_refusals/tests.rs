@@ -152,3 +152,53 @@ fn a_specialist_not_run_once_more_told_its_refusal_is_named() {
         ]
     );
 }
+
+#[test]
+fn a_gate_that_fails_on_what_review_run_wrote_is_named() {
+    let work = TempDir::new().unwrap();
+
+    let problems = gate_problems(work.path());
+
+    assert_eq!(problems.len(), 1, "{problems:?}");
+    assert!(
+        problems[0].starts_with("the gate failed rather than posting: review-gate: read "),
+        "{problems:?}"
+    );
+}
+
+#[test]
+fn a_gate_that_posts_an_approval_is_named() {
+    let work = TempDir::new().unwrap();
+    prepare(&repo(), work.path()).unwrap();
+    let write = |rel: &str, text: &str| {
+        let path = work.path().join(rel);
+        fs::create_dir_all(path.parent().unwrap()).unwrap();
+        fs::write(path, text).unwrap();
+    };
+    write(
+        "review/outcome.json",
+        r#"{"verdict": "approve", "summary": "s", "findings": []}"#,
+    );
+    write("review/consulted.json", r#"["lang-rust", "review-code"]"#);
+    write(
+        "review/answers.json",
+        r#"{"lang-rust": "outcome: none — fine", "review-code": "r"}"#,
+    );
+    write("review/reports/lang-rust.md", "outcome: none — fine\n");
+
+    assert_eq!(
+        gate_problems(work.path()),
+        ["the gate posts APPROVE, not a request for changes"]
+    );
+}
+
+#[test]
+fn a_gate_whose_files_cannot_be_written_is_named() {
+    let work = TempDir::new().unwrap();
+    fs::create_dir_all(work.path().join(CHECK_RUNS)).unwrap();
+
+    let problems = gate_problems(work.path());
+
+    assert_eq!(problems.len(), 1, "{problems:?}");
+    assert!(problems[0].starts_with("write "), "{problems:?}");
+}

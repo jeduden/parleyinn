@@ -295,7 +295,7 @@ Feature: Engineering quality (ENG)
     And that job runs every agent the review bundle dispatches with "cargo run --locked --quiet --offline -p review-run -- --workdir .", and no agent routes the review
     And review-run runs each specialist the review bundle dispatches as its own agent, assembles its report from its run log, runs every generalist only once every specialist has ended, and writes the review outcome from what they answered
     And review-run runs a specialist whose diff is past its split limit in parts, each on whole files of its diff, merges their reports into its one report, and fails the review naming a part that did not answer
-    And review-run refuses a specialist's report that cites an id no requirement or invariant has, runs that specialist once more told why, and names the report refused again and a generalist's finding line it cannot read, each in a blocking finding, so the review requests changes
+    And review-run refuses a specialist's report that cites an id no requirement or invariant has, runs that specialist once more told why, and names the report refused again and a generalist's finding line it cannot read, each in a blocking finding, so the review requests changes and the gate posts that request rather than failing
     And its agents can write nothing: review-run allows them Read, Glob and Grep alone
     And only one job holds the "JEDUDEN_REVIEW_AGENT_KEY" key, and it runs no agent
     And that job runs only after the agents' job succeeded
@@ -338,6 +338,7 @@ Feature: Engineering quality (ENG)
       | approve         | none     | none          | current | passed | passed      | all       | given     | none      | withdrew nothing       | APPROVE         |
       | approve         | none     | none          | current | passed | passed      | all       | given     | none      | none beside a finding  | an error        |
       | approve         | none     | none          | current | passed | passed      | all       | given     | none      | findings with none     | an error        |
+      | request_changes | blocking | none          | current | passed | passed      | all       | given     | none      | unknown id             | REQUEST_CHANGES |
 
   @ENG-29 @P0 @pending
   Scenario: an invariant or I2-review change lands only with an ADR recording a named security reviewer's approval
