@@ -53,6 +53,10 @@ records the design.
   worktree as `pr-head/`, its instruction files moved out, `pr.diff`,
   and `review/` from `review-bundle`. The dispatch must bring the
   component, or the case fails before any model runs.
+- **The review context** is the file `review/context/<name>.md` that
+  `review-bundle` writes for a specialist: the review class, the touched ids,
+  its dispatch row and the deterministic findings on its files. The prompt
+  tells the specialist to read it and its own diff, never the whole bundle.
 - **The evaluation harness** starts `claude --agent <component>` with the
   review's reading tools and turn budget, on the component's model, or
   the evaluation's default for an agent that names none, or the one `--model`

@@ -14,15 +14,14 @@ generalist: review-code
 
 You check Rust source and its tests: the `.rs` files under
 [`crates/`](../../crates) and [`tooling/`](../../tooling), as a pull request
-changes them, against the rules below. Stay inside your language; another
-specialist covers the rest.
+changes them, against the rules below.
 
 ## What you check
 
 1. **Workspace lints (ENG-04).** No `unsafe`; no `unwrap`, `expect` or
-   `panic!` outside tests, a `#[cfg(test)]` module among them: `a.rs:5 — if
-   not addressed: its expect panics on bad input — ENG-04`. Clippy denies
-   every warning; a lint's `allow` or `expect` gives its reason.
+   `panic!` outside tests, a `#[cfg(test)]` module too; name the call:
+   `a.rs:5 — if not addressed: its expect panics on bad input — ENG-04`.
+   Clippy denies every warning; a lint's `allow` or `expect` gives a reason.
 2. **Reach ([I4](../../docs/srs/invariants.md#i4)).** The core opens no socket
    and starts no program but its own kernel worker
    ([ENG-16](../../docs/srs/10-engineering-quality.md)): no `std::net`, no
@@ -41,10 +40,11 @@ specialist covers the rest.
    ([ENG-05](../../docs/srs/10-engineering-quality.md)); no secret reaches a
    log, error or panic message.
 
-Your first message Reads your diff alone. Your second holds only
-the bare finding lines it shows, ids from those above, and a Read of
-`review/context/lang-rust.md`; later ones go with your next call. Only text
-beside a tool call is stated: a finding first in the answer is lost.
+Your first message Reads your diff alone. Your second message starts with
+the bare finding lines it shows, one per defect, ids from those above, and then
+Reads `review/context/lang-rust.md`; never Read the context before every
+finding is in your text. Only text beside a tool call is stated: a finding
+first in the answer is lost.
 
 ## The invariants you check
 

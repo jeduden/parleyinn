@@ -553,3 +553,14 @@ fn what_a_recorder_with_a_poisoned_lock_recorded_is_checked_by_naming_the_lock()
     let ok = with_recorded(Recorder::default(), |_, _| vec!["checked".to_owned()]);
     assert_eq!(ok, ["checked"]);
 }
+
+#[test]
+fn a_context_naming_fewer_touched_ids_than_the_bundle_counted_is_named() {
+    let mut o = bundle_outputs();
+    o.0 = o.0.replace("touched=1", "touched=2");
+
+    assert_eq!(
+        lacks(&o, &o.3),
+        ["the context for lang-markdown lacks the touched id ENG-28"]
+    );
+}

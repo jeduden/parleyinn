@@ -123,3 +123,36 @@ fn review_report_missing_a_flip_recomputing_cost_or_leaving_markup_is_named() {
         ]
     );
 }
+
+#[test]
+fn each_overlap_clause_of_the_check_fails_alone() {
+    let good = made();
+    let message = "review-report stability does not find that reviews with different findings overlap less than whole";
+
+    // Two reviews that differ where the same pair should not.
+    let mut half = good.same.clone();
+    half.jaccard = 0.5;
+    let same_differs = Made {
+        same: half,
+        ..good.clone()
+    };
+    assert_eq!(report_problems(&same_differs), [message]);
+
+    // Different findings that overlap whole as a set.
+    let mut whole = good.differ.clone();
+    whole.jaccard = 1.0;
+    let set_whole = Made {
+        differ: whole,
+        ..good.clone()
+    };
+    assert_eq!(report_problems(&set_whole), [message]);
+
+    // Different findings whose one agent overlaps whole.
+    let mut agent = good.differ.clone();
+    agent.agents[0].jaccard = 1.0;
+    let agent_whole = Made {
+        differ: agent,
+        ..good
+    };
+    assert_eq!(report_problems(&agent_whole), [message]);
+}
