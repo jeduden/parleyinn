@@ -186,7 +186,12 @@ pub fn packages(c: &Checkout) -> Result<Vec<String>, String> {
 fn selection(job: &Job) -> Vec<String> {
     let mut problems: Vec<String> = SELECTION
         .iter()
-        .filter(|line| !job.text.contains(*line))
+        .filter(|line| {
+            // A commented-out line chooses nothing.
+            !job.text
+                .lines()
+                .any(|l| !l.trim_start().starts_with('#') && l.contains(*line))
+        })
         .map(|line| {
             format!(
                 "{LEAD}: the job does not choose its list by its place in the matrix in {CI_WORKFLOW}: {line}"

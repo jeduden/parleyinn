@@ -270,6 +270,20 @@ fn selection_names_each_missing_line_and_the_missing_command() {
 }
 
 #[test]
+fn selection_takes_no_commented_out_line() {
+    let whole = format!("{}\n{SHARD_COMMAND}\n", SELECTION.join("\n"));
+    let commented = whole.replace(SELECTION[3], &format!("  # {}", SELECTION[3]));
+
+    assert_eq!(
+        selection(&job(&commented)),
+        [format!(
+            "{LEAD}: the job does not choose its list by its place in the matrix in {CI_WORKFLOW}: {}",
+            SELECTION[3]
+        )]
+    );
+}
+
+#[test]
 fn a_job_s_shard_lists_are_its_quoted_package_lists() {
     let flow = workflow("1, 2", &["\"-p a\"", "\"-p b \\", "  -p c\""]);
 
