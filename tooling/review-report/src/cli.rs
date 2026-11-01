@@ -86,7 +86,7 @@ fn stable(args: &[String], stdout: &mut dyn Write, stderr: &mut dyn Write) -> Re
     for note in &notes {
         let _ = writeln!(stderr, "review-report: {note}");
     }
-    let measured = stability::compare(&reviews);
+    let measured = stability::compare_expecting(&reviews, crate::snapshots::SAMPLES);
     let written = serde_json::to_string_pretty(&measured)
         .map_err(|e| e.to_string())
         .and_then(|text| fs::write(out, format!("{text}\n")).map_err(|e| e.to_string()));

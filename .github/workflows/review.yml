@@ -314,7 +314,7 @@ jobs:
             --path review/logs --path review/reports --path review/answers.json \
             --path review/usage.json --path review/outcome.json --path review/consulted.json \
             --path review/gaps.json --path review/not-reviewed.md --path review/run-id.json \
-            --path review/run.txt
+            --path review/run.txt --path review/agent-runs.jsonl --path review/report.html
           code=$?
           set -e
           rm -rf "$RUNNER_TEMP/claude-credential"

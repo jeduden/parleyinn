@@ -21,7 +21,8 @@
 //!   without which the comparison means nothing;
 //! - `unmeasured`, why the comparison measures nothing: no reviews, reviews
 //!   of different snapshots, a review with no verdict (a review that
-//!   failed), or an agent that reported in none; empty when it is measured;
+//!   failed), fewer reviews than the measurement expects ([`compare_expecting`]),
+//!   or an agent that reported in none; empty when it is measured;
 //! - `within_limits`, whether it is measured, the flip rate is at most
 //!   [`FLIP_RATE_LIMIT`] and the overlap at least [`JACCARD_FLOOR`],
 //!   which the stability measurement warns on.
@@ -213,6 +214,24 @@ fn unmeasured(reviews: &[Review], same_snapshot: bool, silent: &[&str]) -> Vec<S
     }
 
     why
+}
+
+/// The stability of `reviews` when `expected` of them were to be
+/// measured: fewer, because a sample job failed before its upload, are
+/// named in `unmeasured` and neither stable nor within the limits.
+#[must_use]
+pub fn compare_expecting(reviews: &[Review], expected: usize) -> Stability {
+    let mut s = compare(reviews);
+    if reviews.len() < expected {
+        s.unmeasured.push(format!(
+            "{} of {expected} expected reviews were measured",
+            reviews.len()
+        ));
+        s.stable = false;
+        s.within_limits = false;
+    }
+
+    s
 }
 
 /// The stability of `reviews`. No reviews measure nothing, so they are

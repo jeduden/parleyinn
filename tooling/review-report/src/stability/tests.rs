@@ -294,3 +294,18 @@ fn an_agent_in_no_review_makes_the_comparison_unmeasured_and_never_raises_the_me
     assert!(!s.within_limits && !s.stable);
     assert_eq!(s.unmeasured.len(), 1);
 }
+
+#[test]
+fn fewer_reviews_than_expected_measure_nothing_though_they_agree() {
+    let one = review("approve", &[("a", &["x.rs"])], 1.0);
+
+    let short = compare_expecting(&[one.clone(), one.clone()], 3);
+    assert!(!short.stable && !short.within_limits, "{short:?}");
+    assert_eq!(
+        short.unmeasured,
+        vec!["2 of 3 expected reviews were measured".to_owned()]
+    );
+
+    let full = compare_expecting(&[one.clone(), one.clone(), one], 3);
+    assert!(full.stable && full.within_limits && full.unmeasured.is_empty());
+}

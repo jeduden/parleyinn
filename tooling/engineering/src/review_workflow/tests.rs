@@ -1158,3 +1158,35 @@ fn the_workflows_that_cannot_be_listed_or_read_are_an_error() {
     let err = every_workflow_keeps_the_token(&checkout, CLAUDE).unwrap_err();
     assert!(err.contains("bad.yml"), "{err}");
 }
+
+#[test]
+fn an_upload_of_a_path_the_gating_scrub_does_not_name_is_named() {
+    let kept = |scrub: &str, up: &str| {
+        let text = KEPT
+            .replace("--path review\n", &format!("{scrub}\n"))
+            .replace(
+                "uses: actions/upload-artifact@abc\n",
+                &format!(
+                    "uses: actions/upload-artifact@abc\n        with:\n          path: |\n{up}"
+                ),
+            );
+        unscrubbed_uploads(&steps(&text))
+    };
+    let up = "            review/reports/\n            review/report.html\n";
+    assert!(kept("--path review", up).is_empty());
+    assert!(kept("--path review/reports --path review/report.html", up).is_empty());
+    assert_eq!(kept("--path review/reports", up), ["Keep"]);
+    // A staged work directory is the same tree under another prefix.
+    let up = "            ${{ runner.temp }}/work/review/report.html\n";
+    assert!(kept("--path \"$work/review/report.html\"", up).is_empty());
+    assert_eq!(kept("--path \"$work/review/logs\"", up), ["Keep"]);
+}
+
+#[test]
+fn an_exclusion_in_an_upload_needs_no_scrub_of_its_own() {
+    let text = KEPT.replace(
+        "uses: actions/upload-artifact@abc\n",
+        "uses: actions/upload-artifact@abc\n        with:\n          path: |\n            review/\n            !review/runs/**/log.jsonl\n",
+    );
+    assert!(unscrubbed_uploads(&steps(&text)).is_empty());
+}

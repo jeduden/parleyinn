@@ -28,6 +28,7 @@ fn the_executable_writes_a_run_list_and_measures_stability() {
     let root = TempDir::new().unwrap();
     let one = review(&root, "one", "approve");
     let two = review(&root, "two", "approve");
+    let three = review(&root, "three", "approve");
     let out = root.path().join("stability.json");
 
     let runs = Command::new(env!("CARGO_BIN_EXE_review-report"))
@@ -35,7 +36,14 @@ fn the_executable_writes_a_run_list_and_measures_stability() {
         .output()
         .unwrap();
     let stability = Command::new(env!("CARGO_BIN_EXE_review-report"))
-        .args(["stability", "--out", out.to_str().unwrap(), &one, &two])
+        .args([
+            "stability",
+            "--out",
+            out.to_str().unwrap(),
+            &one,
+            &two,
+            &three,
+        ])
         .output()
         .unwrap();
     let usage = Command::new(env!("CARGO_BIN_EXE_review-report"))

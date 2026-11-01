@@ -355,22 +355,56 @@ fn step_id(step: &str) -> Option<&str> {
 /// whose `scrubbed` output the upload's `if:` requires.
 fn unscrubbed_uploads(steps: &[String]) -> Vec<String> {
     let last_agent = steps.iter().rposition(|s| runs_agent_step(s));
-    let gates: Vec<String> = steps
+    let scrubs: Vec<&String> = steps
         .iter()
         .enumerate()
         .filter(|(at, s)| s.contains(SCRUB) && last_agent.is_none_or(|last| *at > last))
-        .filter_map(|(_, s)| step_id(s))
+        .map(|(_, s)| s)
+        .collect();
+    let gates: Vec<String> = scrubs
+        .iter()
+        .filter_map(|s| step_id(s))
         .map(|id| format!("steps.{id}.outputs.scrubbed == 'true'"))
         .collect();
+    let scrubbed: Vec<String> = scrubs.iter().flat_map(|s| scrub_paths(s)).collect();
     steps
         .iter()
         .filter(|s| s.contains(UPLOAD_ACTION))
         .filter(|s| {
             !s.lines()
                 .any(|l| is_condition(l) && gates.iter().any(|g| l.contains(g.as_str())))
+                || upload_paths(s)
+                    .iter()
+                    .any(|u| !u.starts_with('!') && !covered(&scrubbed, u))
         })
         .map(|s| step_name(s))
         .collect()
+}
+
+/// A path as the scrub or the upload names it, without the work
+/// directory a staged job puts before it and without a trailing slash.
+fn tree_path(path: &str) -> String {
+    let path = path.trim_matches(['"', '\'']);
+    let path = path.rsplit_once("work/").map_or(path, |(_, rest)| rest);
+    path.trim_end_matches('/').to_owned()
+}
+
+/// The paths a scrub step lists with `--path`.
+fn scrub_paths(step: &str) -> Vec<String> {
+    let words: Vec<&str> = step.split_whitespace().collect();
+    words
+        .windows(2)
+        .filter(|w| w[0] == "--path")
+        .map(|w| tree_path(w[1]))
+        .collect()
+}
+
+/// Whether one of the `scrubbed` paths is `upload` or holds it.
+fn covered(scrubbed: &[String], upload: &str) -> bool {
+    let upload = tree_path(upload);
+    scrubbed
+        .iter()
+        .any(|s| upload == *s || upload.starts_with(&format!("{s}/")))
 }
 
 /// Whether `line` is a step's `if:`, its first line or not.
