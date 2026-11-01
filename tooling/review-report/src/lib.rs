@@ -26,7 +26,8 @@
 //!
 //! `review-report stability` compares the work directories of N
 //! reviews of one pull-request state and writes `stability.json`
-//! ([`stability`]).
+//! ([`stability`]); `review-report corpus` reads the stability probe's
+//! corpus of such states ([`corpus`]).
 //!
 //! It is repository tooling and never links into a shipped executable.
 
@@ -34,6 +35,7 @@ use std::fs;
 use std::path::Path;
 
 pub mod cli;
+pub mod corpus;
 pub mod html;
 pub mod identity;
 pub mod inputs;

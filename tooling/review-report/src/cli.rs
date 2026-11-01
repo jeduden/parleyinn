@@ -6,7 +6,9 @@
 //! - `review-report stability --out FILE DIR DIR...` compares the
 //!   reviews in two or more work directories of one pull-request state
 //!   and writes their stability to `FILE`, printing its headline,
-//!   `key=value` per line, for the workflow's step outputs.
+//!   `key=value` per line, for the workflow's step outputs;
+//! - `review-report corpus FILE` reads the stability probe's corpus and
+//!   prints its job matrices, for the same ([`crate::corpus`]).
 
 use std::fs;
 use std::io::Write;
@@ -22,8 +24,8 @@ pub const EXIT_FAILURE: u8 = 1;
 pub const EXIT_USAGE: u8 = 2;
 
 /// How to call it.
-pub const USAGE: &str =
-    "usage: review-report trace --workdir DIR | review-report stability --out FILE DIR DIR...";
+pub const USAGE: &str = "usage: review-report trace --workdir DIR | \
+review-report stability --out FILE DIR DIR... | review-report corpus FILE";
 
 /// Runs the command on `args` and returns its exit code.
 pub fn run(
@@ -35,6 +37,7 @@ pub fn run(
     let result = match args.split_first() {
         Some((command, rest)) if command == "trace" => trace(rest, stderr),
         Some((command, rest)) if command == "stability" => stable(rest, stdout, stderr),
+        Some((command, [file])) if command == "corpus" => corpus(file, stdout, stderr),
         _ => Err(EXIT_USAGE),
     };
     match result {
@@ -100,6 +103,23 @@ fn stable(args: &[String], stdout: &mut dyn Write, stderr: &mut dyn Write) -> Re
     let _ = write!(stdout, "{}", headline(&measured));
 
     Ok(())
+}
+
+/// `corpus FILE`.
+fn corpus(file: &str, stdout: &mut dyn Write, stderr: &mut dyn Write) -> Result<(), u8> {
+    let states = fs::read_to_string(file)
+        .map_err(|e| format!("read {file}: {e}"))
+        .and_then(|text| crate::corpus::parse(&text));
+    match states {
+        Ok(states) => {
+            let _ = write!(stdout, "{}", crate::corpus::matrices(&states));
+            Ok(())
+        }
+        Err(e) => {
+            let _ = writeln!(stderr, "review-report: {e}");
+            Err(EXIT_FAILURE)
+        }
+    }
 }
 
 /// The headline of `s`, `key=value` per line.

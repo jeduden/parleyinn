@@ -41,6 +41,8 @@ fn a_wrong_command_line_prints_the_usage() {
         &["stability", "--out", "x", "one"],
         &["stability", "--in", "x", "one", "two"],
         &["stability"],
+        &["corpus"],
+        &["corpus", "a", "b"],
     ] {
         let (code, _, err) = call(args);
         assert_eq!(code, EXIT_USAGE, "{args:?}");
@@ -126,4 +128,32 @@ fn stability_fails_naming_a_file_it_could_not_write() {
 
     assert_eq!(code, EXIT_FAILURE);
     assert!(err.contains("s.json not written: "), "{err}");
+}
+
+#[test]
+fn corpus_prints_the_probe_s_matrices_or_fails_naming_why() {
+    let root = TempDir::new().unwrap();
+    let file = root.path().join("corpus.toml");
+    fs::write(
+        &file,
+        "[[state]]\nname = \"pr-99\"\npull = 99\n\
+         base = \"cbf144c6e74833535424c54cbfd04a23d90b47b0\"\n\
+         head = \"86ec49030e8e8fe2af2bc2fd9441a64167e12ab6\"\n",
+    )
+    .unwrap();
+    let file = file.display().to_string();
+
+    let (code, out, err) = call(&["corpus", &file]);
+    assert_eq!((code, err.as_str()), (EXIT_OK, ""));
+    assert!(out.starts_with("states={\"include\":[{"), "{out}");
+    assert!(out.contains("\nsamples={\"include\":[{"), "{out}");
+
+    fs::write(&file, "state = []").unwrap();
+    let (code, _, err) = call(&["corpus", &file]);
+    assert_eq!(code, EXIT_FAILURE);
+    assert!(err.contains("the corpus holds no state"), "{err}");
+
+    let (code, _, err) = call(&["corpus", "/nonexistent/corpus.toml"]);
+    assert_eq!(code, EXIT_FAILURE);
+    assert!(err.contains("read /nonexistent/corpus.toml: "), "{err}");
 }
