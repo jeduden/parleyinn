@@ -2,8 +2,9 @@
 //! a specialist's, left without an accepted report or answer. A run
 //! that did not answer after its second attempt is silent, or
 //! incomplete when its turns ran out, over budget when a cost cap
-//! stopped it or kept it from starting, and aborted when the circuit
-//! breaker kept it from starting; a report the gate refuses is
+//! stopped it or kept it from starting, aborted when the circuit
+//! breaker kept it from starting, and stalled when the loop breaker
+//! kept it from running again; a report the gate refuses is
 //! refused, with the gate's problem; a generalist's answer the review
 //! cannot read is unread. The review writes the list beside its outcome,
 //! empty when there is none, so a later run can run just these again,
@@ -18,6 +19,7 @@ use review_eval::component::{Kind, kind_of};
 use review_eval::runner::OVER_BUDGET as OVER_BUDGET_SUBTYPE;
 
 use crate::controls::{ABORTED, OVER_BUDGET};
+use crate::findings::STALLED;
 
 /// The list's file under the work directory.
 pub const GAPS: &str = "review/gaps.json";
@@ -71,7 +73,7 @@ impl Gap {
 /// it off, silent otherwise.
 #[must_use]
 pub fn silent(why: &str) -> String {
-    if why.starts_with(OVER_BUDGET) || why.starts_with(ABORTED) {
+    if why.starts_with(OVER_BUDGET) || why.starts_with(ABORTED) || why.starts_with(STALLED) {
         return why.to_owned();
     }
     let word = if why.contains(OVER_BUDGET_SUBTYPE) {

@@ -41,6 +41,7 @@ pub mod resume;
 pub mod retry;
 pub mod run;
 pub mod run_id;
+pub mod stall;
 pub mod store;
 pub(crate) mod tasks;
 pub mod usage;

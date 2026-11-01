@@ -43,6 +43,7 @@ use crate::requirements;
 use crate::resume::{self, Resume};
 use crate::run::{self, AgentRun, Options};
 use crate::run_id::{self, RUN_ID};
+use crate::stall;
 use crate::store::Store;
 use crate::usage::{self, AgentUsage};
 use crate::{ANSWERS, CONSULTED, OUTCOME, USAGE as USAGE_FILE};
@@ -58,7 +59,7 @@ pub const EXIT_USAGE: u8 = 2;
 /// How to call it.
 pub const USAGE: &str = "usage: review-run --workdir DIR [--parallel N] [--deadline SECONDS] \
 [--head-sha SHA] [--only GAPS --from DIR] [--max-cost-usd USD] [--breaker-fraction F] \
-[--answers DIR [--answers-read-only]] [--previous FINDINGS] [--summary FILE]\n\
+[--answers DIR [--answers-read-only]] [--previous FINDINGS] [--max-resumes N] [--summary FILE]\n\
        review-run answers drop KEY --answers DIR";
 
 /// The command line, read.
@@ -77,6 +78,9 @@ pub struct Args {
     pub answers: Option<(String, bool)>,
     /// The previous review's kept findings, when given.
     pub previous: Option<String>,
+    /// How many resumes in a row may end in the same gap before its
+    /// agent is not run again.
+    pub max_resumes: u32,
 }
 
 /// Runs the command on `args` and returns its exit code. It is `main`
@@ -135,6 +139,7 @@ struct Prepared {
     resume: Option<Resume>,
     /// The previous review's kept findings, when given.
     previous: Option<Vec<Tracked>>,
+    max_resumes: u32,
 }
 
 /// Reads the review `args` name: its plan, the ids its reports may cite,
@@ -184,7 +189,13 @@ fn prepare(
     id.claude = version.ok();
     let resume = match &args.resume {
         Some((only, from)) => {
-            let resume = resumed(workdir, &plan, &id, only, from, progress)?;
+            let resume = resumed(
+                workdir,
+                &plan,
+                &id,
+                (only, from, args.max_resumes),
+                progress,
+            )?;
             id.resumed_from = Some(from.clone());
             Some(resume)
         }
@@ -199,6 +210,7 @@ fn prepare(
         id,
         resume,
         previous,
+        max_resumes: args.max_resumes,
     })
 }
 
@@ -258,7 +270,13 @@ fn record(
     if let Some(line) = from_store_line(runs) {
         outcome.summary.push_str(&line);
     }
-    let stalled = follow(workdir, p, &mut outcome, &answers)?;
+    let stalls = stall::tally(
+        &not_reviewed,
+        p.resume.as_ref().map_or(&[][..], |r| r.stalls.as_slice()),
+    );
+    let stalled = stall::amend(&mut outcome, &stalls, p.max_resumes)
+        + follow(workdir, p, &mut outcome, &answers)?;
+    write_json::<Vec<stall::Stall>>(workdir, stall::STALLS, &stalls)?;
     let usage = usage::usage(runs, p.resume.as_ref().map(|r| r.from.as_str()));
     let reused = runs.iter().filter(|r| r.reused).count();
     let store_failed = runs.iter().filter(|r| r.store_failed).count();
@@ -350,8 +368,7 @@ fn resumed(
     workdir: &Path,
     plan: &plan::Plan,
     id: &run_id::RunId,
-    only: &str,
-    from: &str,
+    (only, from, max_resumes): (&str, &str, u32),
     progress: &(dyn Fn(&str) + Sync),
 ) -> Result<Resume, String> {
     let own = workdir.join(crate::REVIEW);
@@ -361,7 +378,7 @@ fn resumed(
         ));
     }
     let earlier = resume::read(Path::new(only), Path::new(from))?;
-    let plan_of = resume::plan(plan, &earlier, id, from);
+    let plan_of = resume::plan(plan, &earlier, id, from, max_resumes);
     for note in &plan_of.notes {
         progress(note);
     }
@@ -458,6 +475,7 @@ fn parse(args: impl IntoIterator<Item = String>) -> Result<Args, String> {
     let mut options = Options::default();
     let (mut head, mut only, mut from, mut summary) = (None, None, None, None);
     let (mut answers, mut read_only, mut previous) = (None, false, None);
+    let mut max_resumes = stall::MAX_RESUMES;
     let mut args = args.into_iter();
     while let Some(arg) = args.next() {
         let Some(flag) = arg.strip_prefix("--") else {
@@ -483,6 +501,7 @@ fn parse(args: impl IntoIterator<Item = String>) -> Result<Args, String> {
             "summary",
             "answers",
             "previous",
+            "max-resumes",
         ]
         .contains(&name)
         {
@@ -504,6 +523,7 @@ fn parse(args: impl IntoIterator<Item = String>) -> Result<Args, String> {
             "breaker-fraction" => options.breaker = fraction(name, &value)?,
             "answers" => answers = Some(value),
             "previous" => previous = Some(value),
+            "max-resumes" => max_resumes = positive(name, &value)?,
             _ => summary = Some(value),
         }
     }
@@ -526,6 +546,7 @@ fn parse(args: impl IntoIterator<Item = String>) -> Result<Args, String> {
         summary,
         answers: answers.map(|dir| (dir, read_only)),
         previous,
+        max_resumes,
     })
 }
 

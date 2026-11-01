@@ -104,14 +104,20 @@ pub(crate) fn run_all(r: &Review, c: &Controls) -> Vec<AgentRun> {
         .filter_map(|n| whole(r, c, n))
         .collect();
     runs.iter().for_each(|_| c.breaker.end(false));
+    for name in r.plan.specialists() {
+        if let Some(run) = stalled(r, c, &name) {
+            c.breaker.end(true);
+            runs.push(run);
+        }
+    }
     let (units, mut unsplit) = specialist_units(r.workdir, r.plan, r.options.split, &|n| {
-        matches!(reuse(r, n), Some(Reuse::Whole(_)))
+        matches!(reuse(r, n), Some(Reuse::Whole(_))) || stalled_why(r, n).is_some()
     });
     unsplit.iter().for_each(|_| settle(c, true));
     let mut kept = BTreeMap::new();
     let mut generalists = Vec::new();
     for name in r.plan.generalists() {
-        match whole(r, c, &name) {
+        match stalled(r, c, &name).or_else(|| whole(r, c, &name)) {
             Some(run) => {
                 kept.insert(name, run);
             }
@@ -205,6 +211,23 @@ fn ended_in_gap(run: &AgentRun, report: Option<&str>, r: &Review) -> bool {
         Some(why) => not_budget(why),
         None => refusal(report.unwrap_or_default(), &run.log.answer, r.known).is_some(),
     }
+}
+
+/// Why the resume plan does not run `name` again, when it stalled.
+fn stalled_why<'a>(r: &'a Review, name: &str) -> Option<&'a str> {
+    r.resume
+        .and_then(|resume| resume.stalled.get(name))
+        .map(String::as_str)
+}
+
+/// Agent `name`'s run, not started because it stalled, told to
+/// progress; none when it did not stall.
+fn stalled(r: &Review, c: &Controls, name: &str) -> Option<AgentRun> {
+    let why = stalled_why(r, name)?;
+    let (run, _) = not_started(r.workdir, &Unit::whole(name.to_owned()), why.to_owned());
+    (r.progress)(&describe(&run));
+    c.live.finish();
+    Some(run)
 }
 
 /// What the resume plan keeps of `name`, when the review resumes.

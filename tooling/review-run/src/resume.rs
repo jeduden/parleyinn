@@ -23,6 +23,7 @@ use review_eval::log::{self, RunLog};
 use crate::gaps::{self, Gap};
 use crate::plan::{Plan, report_file};
 use crate::run_id::{self, RUN_ID, RunId};
+use crate::stall::{self, STALLS, Stall};
 use crate::{ANSWERS, CONSULTED, LOGS, REVIEW};
 
 /// What the earlier run left, read.
@@ -39,6 +40,9 @@ pub struct Earlier {
     /// For each specialist the gaps name by part, each part's log, by
     /// its place from one.
     pub parts: BTreeMap<String, BTreeMap<usize, RunLog>>,
+    /// Its gaps counted across the runs before it; none when it wrote
+    /// none.
+    pub stalls: Vec<Stall>,
 }
 
 /// What one agent keeps from the earlier run.
@@ -59,6 +63,10 @@ pub struct Resume {
     pub from: String,
     pub reuse: BTreeMap<String, Reuse>,
     pub notes: Vec<String>,
+    /// Each agent not run again because it stalled, with why.
+    pub stalled: BTreeMap<String, String>,
+    /// The earlier run's stalls, which this run's gaps count on from.
+    pub stalls: Vec<Stall>,
 }
 
 /// `rel`, a path under the work directory's `review/`, under the
@@ -92,6 +100,12 @@ pub fn read(only: &Path, from: &Path) -> Result<Earlier, String> {
     let answers = review_gate::parse_answers(&text).map_err(|e| named(&path, e.to_string()))?;
     let (path, text) = load(earlier_file(from, CONSULTED))?;
     let consulted = review_gate::parse_consulted(&text).map_err(|e| named(&path, e.to_string()))?;
+    let path = earlier_file(from, STALLS);
+    let stalls = match fs::read_to_string(&path) {
+        Ok(text) => stall::parse(&text).map_err(|e| named(&path, e))?,
+        Err(e) if e.kind() == io::ErrorKind::NotFound => Vec::new(),
+        Err(e) => return Err(format!("read {}: {e}", path.display())),
+    };
     let mut parts = BTreeMap::new();
     for gap in gaps.iter().filter(|g| g.part.is_some()) {
         if !parts.contains_key(&gap.name) {
@@ -106,6 +120,7 @@ pub fn read(only: &Path, from: &Path) -> Result<Earlier, String> {
         answers,
         consulted,
         parts,
+        stalls,
     })
 }
 
@@ -180,19 +195,31 @@ fn changed(name: &str, earlier: &Earlier, now: &RunId) -> Option<String> {
 }
 
 /// What each of `plan`'s agents keeps from `earlier`, for a review on
-/// `now`, the earlier run's directory given as `from`.
+/// `now`, the earlier run's directory given as `from`; an agent whose
+/// gap recurred in more than `max_resumes` resumes in a row is not run
+/// again.
 #[must_use]
-pub fn plan(plan: &Plan, earlier: &Earlier, now: &RunId, from: &str) -> Resume {
+pub fn plan(plan: &Plan, earlier: &Earlier, now: &RunId, from: &str, max_resumes: u32) -> Resume {
     let mut resume = Resume {
         from: from.to_owned(),
+        stalls: earlier.stalls.clone(),
         ..Resume::default()
     };
+    for (name, why) in stall::stuck(&earlier.stalls, max_resumes) {
+        if plan.agents().contains(&name) {
+            resume.notes.push(format!("{name}: not run again: {why}"));
+            resume.stalled.insert(name, why);
+        }
+    }
     if let Some(note) = moved(&earlier.id, now) {
         resume.notes.push(note);
     }
     let gapped =
         |name: &str| -> Vec<&Gap> { earlier.gaps.iter().filter(|g| g.name == name).collect() };
     for name in plan.specialists() {
+        if resume.stalled.contains_key(&name) {
+            continue;
+        }
         match keep(&name, &gapped(&name), earlier, now) {
             Ok(reuse) => {
                 if let Reuse::Parts(kept) = &reuse {
@@ -207,6 +234,9 @@ pub fn plan(plan: &Plan, earlier: &Earlier, now: &RunId, from: &str) -> Resume {
         }
     }
     for name in plan.generalists() {
+        if resume.stalled.contains_key(&name) {
+            continue;
+        }
         let rerun = plan
             .dispatch
             .get(&name)

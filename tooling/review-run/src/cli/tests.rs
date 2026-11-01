@@ -7,6 +7,7 @@ use super::*;
 use crate::fake::{self, FakeHost};
 
 mod findings;
+mod stall;
 mod store;
 
 fn args(list: &[&str]) -> Vec<String> {
@@ -547,6 +548,7 @@ fn the_work_directory_alone_takes_the_default_options() {
             summary: None,
             answers: None,
             previous: None,
+            max_resumes: crate::stall::MAX_RESUMES,
         }
     );
 }
@@ -573,6 +575,7 @@ fn the_flags_read_inline_or_as_the_next_argument() {
             "--answers=store",
             "--previous",
             "f.json",
+            "--max-resumes=4",
         ]))
         .unwrap(),
         Args {
@@ -590,6 +593,7 @@ fn the_flags_read_inline_or_as_the_next_argument() {
             summary: Some("s.md".to_owned()),
             answers: Some(("store".to_owned(), true)),
             previous: Some("f.json".to_owned()),
+            max_resumes: 4,
         }
     );
 }

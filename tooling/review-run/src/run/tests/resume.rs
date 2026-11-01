@@ -40,6 +40,7 @@ fn keeping_part_one(text: &str, answer: &str) -> Resume {
         from: "old".to_owned(),
         reuse: [("lang-rust".to_owned(), Reuse::Parts([(1, log)].into()))].into(),
         notes: Vec::new(),
+        ..Resume::default()
     }
 }
 
@@ -110,6 +111,7 @@ fn a_resume_keeping_an_agent_whole_starts_no_run_of_it() {
         ]
         .into(),
         notes: Vec::new(),
+        ..Resume::default()
     };
     let host = FakeHost::new(fake::either);
 

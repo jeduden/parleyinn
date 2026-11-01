@@ -72,6 +72,7 @@ fn earlier(gaps: Vec<Gap>) -> Earlier {
             .collect(),
         consulted: names.iter().map(|n| (*n).to_owned()).collect(),
         parts: BTreeMap::new(),
+        stalls: Vec::new(),
     }
 }
 
@@ -91,7 +92,7 @@ fn with_no_gap_and_nothing_changed_every_agent_keeps_its_answer() {
 }
 
 fn plan_of(earlier: &Earlier, now: &RunId) -> Resume {
-    super::plan(&plan(), earlier, now, "old")
+    super::plan(&plan(), earlier, now, "old", crate::stall::MAX_RESUMES)
 }
 
 #[test]
@@ -375,6 +376,7 @@ fn a_kept_agent_s_report_and_logs_are_copied_and_a_kept_part_s_alone() {
         ]
         .into(),
         notes: Vec::new(),
+        ..Resume::default()
     };
 
     copy(&work, &old, &plan(), &resume).unwrap();
@@ -412,6 +414,7 @@ fn a_kept_file_that_cannot_be_copied_is_named_and_missing_logs_are_none() {
         from: "old".to_owned(),
         reuse: [("lang-rust".to_owned(), whole("lang-rust"))].into(),
         notes: Vec::new(),
+        ..Resume::default()
     };
     copy(&work, &old, &plan(), &resume).unwrap();
 
@@ -462,6 +465,7 @@ fn a_log_whose_name_is_not_utf8_is_not_copied() {
         from: "old".to_owned(),
         reuse: [("lang-rust".to_owned(), whole("lang-rust"))].into(),
         notes: Vec::new(),
+        ..Resume::default()
     };
 
     let notes = copy(&work, &old, &plan(), &resume).unwrap();
@@ -472,4 +476,56 @@ fn a_log_whose_name_is_not_utf8_is_not_copied() {
     );
     assert!(!work.join(LOGS).join(odd).exists());
     assert!(work.join(LOGS).join("lang-rust.jsonl").exists());
+}
+
+#[test]
+fn an_agent_stalled_past_the_resumes_allowed_is_not_run_again() {
+    let gaps = vec![Gap::new("lang-rust", None, "silent: x".to_owned())];
+    let mut was = earlier(gaps.clone());
+    was.stalls = (0..3).fold(Vec::new(), |s, _| crate::stall::tally(&gaps, &s));
+
+    let resume = plan_of(&was, &id());
+
+    let why = "stalled: lang-rust failed 3 times the same way; needs a person: silent: x; \
+               silent: x; silent: x";
+    assert_eq!(resume.stalled["lang-rust"], why);
+    assert_eq!(resume.stalls, was.stalls);
+    assert!(!resume.reuse.contains_key("lang-rust"));
+    assert_eq!(
+        resume.notes,
+        [
+            format!("lang-rust: not run again: {why}"),
+            "review-code: runs again: its specialist lang-rust runs again".to_owned(),
+        ]
+    );
+    // Allowed one more resume, it runs again.
+    let more = super::plan(&plan(), &was, &id(), "old", 3);
+    assert!(more.stalled.is_empty());
+}
+
+#[test]
+fn an_earlier_run_s_stalls_read_when_there_and_as_none_when_not() {
+    let dir = TempDir::new().unwrap();
+    let old = earlier_dir(dir.path(), "[]");
+    assert!(
+        read(&old.join("gaps.json"), &old)
+            .unwrap()
+            .stalls
+            .is_empty()
+    );
+
+    write(
+        &old,
+        "stalls.json",
+        r#"[{"name": "lang-rust", "class": "silent:", "times": 2, "reasons": ["a", "b"]}]"#,
+    );
+    assert_eq!(
+        read(&old.join("gaps.json"), &old).unwrap().stalls[0].times,
+        2
+    );
+
+    fs::remove_file(old.join("stalls.json")).unwrap();
+    fs::create_dir(old.join("stalls.json")).unwrap();
+    let err = read(&old.join("gaps.json"), &old).unwrap_err();
+    assert!(err.starts_with("read "), "{err}");
 }
