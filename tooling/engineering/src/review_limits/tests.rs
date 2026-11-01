@@ -188,6 +188,14 @@ fn findings_that_do_not_read_are_named() {
 }
 
 #[test]
+fn findings_that_are_no_array_are_refused() {
+    assert_eq!(
+        read_checked("{}"),
+        Err(format!("read {}: not an array of findings", cli::CHECKED))
+    );
+}
+
+#[test]
 fn findings_that_read_are_kept() {
     assert_eq!(
         read_checked(r#"[{"path": "a", "line": 0, "severity": "nit", "body": "b"}]"#),

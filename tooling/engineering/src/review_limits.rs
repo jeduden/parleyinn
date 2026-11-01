@@ -187,10 +187,12 @@ fn read_checked(json: &str) -> Result<Vec<Nit>, String> {
         serde_json::from_str(json).map_err(|e| format!("read {}: {e}", cli::CHECKED))?;
     let field = |f: &Value, name: &str| f[name].as_str().unwrap_or_default().to_owned();
 
-    Ok(value
+    let findings = value
         .as_array()
-        .into_iter()
-        .flatten()
+        .ok_or_else(|| format!("read {}: not an array of findings", cli::CHECKED))?;
+
+    Ok(findings
+        .iter()
         .map(|f| Nit {
             path: field(f, "path"),
             severity: field(f, "severity"),
