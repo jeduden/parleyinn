@@ -27,7 +27,10 @@ use std::time::Duration;
 use review_eval::host::Host;
 use serde::Serialize;
 
+use crate::breaker;
+use crate::controls::{ABORTED, OVER_BUDGET};
 use crate::gaps::{self, GAPS, Gap, NOT_REVIEWED};
+use crate::live;
 use crate::outcome::{Decision, decide};
 use crate::plan::{self, report_file};
 use crate::requirements;
@@ -47,10 +50,11 @@ pub const EXIT_USAGE: u8 = 2;
 
 /// How to call it.
 pub const USAGE: &str = "usage: review-run --workdir DIR [--parallel N] [--deadline SECONDS] \
-[--head-sha SHA] [--only GAPS --from DIR]";
+[--head-sha SHA] [--only GAPS --from DIR] [--max-cost-usd USD] [--breaker-fraction F] \
+[--summary FILE]";
 
 /// The command line, read.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Args {
     pub workdir: String,
     pub options: Options,
@@ -59,6 +63,8 @@ pub struct Args {
     /// The gap list and the earlier run's review directory a resumed
     /// review runs from.
     pub resume: Option<(String, String)>,
+    /// The job summary the table of every run is added to, when given.
+    pub summary: Option<String>,
 }
 
 /// Runs the command on `args` and returns its exit code. It is `main`
@@ -138,30 +144,19 @@ fn review(
         resume.as_ref(),
         progress,
     )?;
-    let reports: BTreeMap<String, String> = plan
-        .specialists()
-        .into_iter()
-        .filter_map(|name| {
-            let path = workdir.join(report_file(&name));
-            match fs::read_to_string(&path) {
-                Ok(text) => Some((name, text)),
-                // A report that is there but does not read stands as
-                // none, and the cause is named (I6).
-                Err(e) => {
-                    if e.kind() != std::io::ErrorKind::NotFound {
-                        progress(&format!("read {}: {e}", path.display()));
-                    }
-                    None
-                }
-            }
-        })
-        .collect();
+    let reports = reports(workdir, &plan, progress);
+    let decision = breaker::amend(
+        &plan,
+        decide(&plan, &runs, &reports, &known),
+        options.breaker,
+    );
+    let held = held_back(&decision.not_reviewed);
     let Decision {
         outcome,
         consulted,
         answers,
         not_reviewed,
-    } = decide(&plan, &runs, &reports, &known);
+    } = decision;
     let usage = usage::usage(&runs, resume.as_ref().map(|r| r.from.as_str()));
     write_json(workdir, OUTCOME, &outcome)?;
     write_json(workdir, CONSULTED, &consulted)?;
@@ -179,15 +174,67 @@ fn review(
         let names: Vec<String> = not_reviewed.iter().map(Gap::label).collect();
         progress(&format!("not reviewed: {}", names.join(", ")));
     }
+    if let Some(summary) = &args.summary {
+        add_to_summary(Path::new(summary), &live::table(&runs), progress);
+    }
 
     Ok(format!(
-        "verdict={}\ndispatched={}\nconsulted={}\nfindings={}\ncost={:.4}\n",
+        "verdict={}\ndispatched={}\nconsulted={}\nfindings={}\ncost={:.4}\nover_budget={}\n\
+         aborted={}\n",
         outcome.verdict,
         plan.agents().len(),
         consulted.len(),
         outcome.findings.len(),
-        usage::total(&usage)
+        usage::total(&usage),
+        held.0,
+        held.1,
     ))
+}
+
+/// Each of `plan`'s specialists' report the runs wrote in `workdir`, by
+/// name.
+fn reports(
+    workdir: &Path,
+    plan: &plan::Plan,
+    progress: &(dyn Fn(&str) + Sync),
+) -> BTreeMap<String, String> {
+    plan.specialists()
+        .into_iter()
+        .filter_map(|name| {
+            let path = workdir.join(report_file(&name));
+            match fs::read_to_string(&path) {
+                Ok(text) => Some((name, text)),
+                // A report that is there but does not read stands as
+                // none, and the cause is named (I6).
+                Err(e) => {
+                    if e.kind() != std::io::ErrorKind::NotFound {
+                        progress(&format!("read {}: {e}", path.display()));
+                    }
+                    None
+                }
+            }
+        })
+        .collect()
+}
+
+/// How many of `gaps` a cost cap stopped or kept from starting, and how
+/// many the breaker kept from starting: each a counted failure (I6).
+fn held_back(gaps: &[Gap]) -> (usize, usize) {
+    let count = |word: &str| gaps.iter().filter(|g| g.reason.starts_with(word)).count();
+    (count(OVER_BUDGET), count(ABORTED))
+}
+
+/// Adds `table` to the job summary at `path`; one that cannot be added
+/// to is told to `progress`, and the review goes on (I6).
+fn add_to_summary(path: &Path, table: &str, progress: &(dyn Fn(&str) + Sync)) {
+    let added = fs::OpenOptions::new()
+        .append(true)
+        .create(true)
+        .open(path)
+        .and_then(|mut file| file.write_all(format!("\n{table}").as_bytes()));
+    if let Err(e) = added {
+        progress(&format!("add to the job summary {}: {e}", path.display()));
+    }
 }
 
 /// Reads the earlier run in `from` for the gap list `only`, plans what
@@ -259,7 +306,7 @@ fn write_json<T: Serialize>(workdir: &Path, rel: &str, value: &T) -> Result<(), 
 fn parse(args: impl IntoIterator<Item = String>) -> Result<Args, String> {
     let mut workdir = None;
     let mut options = Options::default();
-    let (mut head, mut only, mut from) = (None, None, None);
+    let (mut head, mut only, mut from, mut summary) = (None, None, None, None);
     let mut args = args.into_iter();
     while let Some(arg) = args.next() {
         let Some(flag) = arg.strip_prefix("--") else {
@@ -270,7 +317,15 @@ fn parse(args: impl IntoIterator<Item = String>) -> Result<Args, String> {
             None => (flag, None),
         };
         if ![
-            "workdir", "parallel", "deadline", "head-sha", "only", "from",
+            "workdir",
+            "parallel",
+            "deadline",
+            "head-sha",
+            "only",
+            "from",
+            "max-cost-usd",
+            "breaker-fraction",
+            "summary",
         ]
         .contains(&name)
         {
@@ -287,7 +342,10 @@ fn parse(args: impl IntoIterator<Item = String>) -> Result<Args, String> {
             "head-sha" if run_id::is_commit(&value) => head = Some(value),
             "head-sha" => return Err(format!("--head-sha {value:?} is no commit id")),
             "only" => only = Some(value),
-            _ => from = Some(value),
+            "from" => from = Some(value),
+            "max-cost-usd" => options.max_cost_usd = positive(name, &value)?,
+            "breaker-fraction" => options.breaker = fraction(name, &value)?,
+            _ => summary = Some(value),
         }
     }
     let workdir = workdir.ok_or("--workdir is required")?;
@@ -302,7 +360,17 @@ fn parse(args: impl IntoIterator<Item = String>) -> Result<Args, String> {
         options,
         head,
         resume,
+        summary,
     })
+}
+
+/// `value`, flag `name`'s, as a fraction above zero and at most one.
+fn fraction(name: &str, value: &str) -> Result<f64, String> {
+    value
+        .parse()
+        .ok()
+        .filter(|f: &f64| *f > 0.0 && *f <= 1.0)
+        .ok_or_else(|| format!("--{name} {value:?} is no fraction above zero and at most one"))
 }
 
 /// `value`, flag `name`'s, as a number above zero.

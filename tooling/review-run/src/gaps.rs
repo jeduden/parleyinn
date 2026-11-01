@@ -1,7 +1,9 @@
 //! What the review did not review: every dispatched agent, or part of
 //! a specialist's, left without an accepted report or answer. A run
 //! that did not answer after its second attempt is silent, or
-//! incomplete when its turns ran out; a report the gate refuses is
+//! incomplete when its turns ran out, over budget when a cost cap
+//! stopped it or kept it from starting, and aborted when the circuit
+//! breaker kept it from starting; a report the gate refuses is
 //! refused, with the gate's problem; a generalist's answer the review
 //! cannot read is unread. The review writes the list beside its outcome,
 //! empty when there is none, so a later run can run just these again,
@@ -13,6 +15,9 @@ use std::fmt::Write as _;
 use serde::{Deserialize, Serialize};
 
 use review_eval::component::{Kind, kind_of};
+use review_eval::runner::OVER_BUDGET as OVER_BUDGET_SUBTYPE;
+
+use crate::controls::{ABORTED, OVER_BUDGET};
 
 /// The list's file under the work directory.
 pub const GAPS: &str = "review/gaps.json";
@@ -33,8 +38,8 @@ pub struct Gap {
     /// the agent as a whole is not reviewed.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub part: Option<usize>,
-    /// Why: `silent:`, `incomplete:`, `refused:` or `unread:`, then the
-    /// cause.
+    /// Why: `silent:`, `incomplete:`, `over budget:`, `aborted:`,
+    /// `refused:` or `unread:`, then the cause.
     pub reason: String,
 }
 
@@ -60,16 +65,23 @@ impl Gap {
     }
 }
 
-/// The reason of a run that did not answer for `why`: incomplete when
-/// its turn budget cut it off, silent otherwise.
+/// The reason of a run that did not answer for `why`: over budget when
+/// a cost cap stopped it or kept it from starting, aborted when the
+/// breaker kept it from starting, incomplete when its turn budget cut
+/// it off, silent otherwise.
 #[must_use]
 pub fn silent(why: &str) -> String {
-    let word = if why.contains(MAX_TURNS) {
-        "incomplete"
+    if why.starts_with(OVER_BUDGET) || why.starts_with(ABORTED) {
+        return why.to_owned();
+    }
+    let word = if why.contains(OVER_BUDGET_SUBTYPE) {
+        OVER_BUDGET
+    } else if why.contains(MAX_TURNS) {
+        "incomplete:"
     } else {
-        "silent"
+        "silent:"
     };
-    format!("{word}: {why}")
+    format!("{word} {why}")
 }
 
 /// Reads a gap list: every entry an agent the review can dispatch, of

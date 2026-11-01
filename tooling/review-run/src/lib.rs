@@ -1,9 +1,12 @@
 //! `review-run`: the review of a pull request run by code (ENG-28). It
 //! reads the dispatch the review bundle wrote, runs every specialist
 //! it names as an agent of its own, in parallel up to a bound and each
-//! with its own deadline, assembles each one's report from its run log
-//! into a file, then, once every specialist has finished, runs every
-//! generalist, told those files. From what the runs produced it writes
+//! with its own deadline and cost cap, assembles each one's report from
+//! its run log into a file, and runs each generalist once its own
+//! specialists have finished, told those files; it starts no run once
+//! the review's cost cap is reached, and no generalist once a mass
+//! failure of the specialists tripped its breaker, and tells what is
+//! running as it goes. From what the runs produced it writes
 //! the review outcome, the agents consulted, their answers and their
 //! usage, the files the review gate reads, with every agent left
 //! without an accepted report or answer, never as clean, and what the
@@ -16,16 +19,22 @@
 //! host, and runs in CI alone. It is repository tooling and never
 //! links into a shipped executable.
 
+pub mod backoff;
+pub mod breaker;
 pub mod cli;
+pub mod controls;
 pub mod gaps;
+pub mod live;
 pub mod outcome;
 pub mod parts;
+pub mod pipeline;
 pub mod plan;
 pub mod requirements;
 pub mod resume;
 pub mod retry;
 pub mod run;
 pub mod run_id;
+pub(crate) mod tasks;
 pub mod usage;
 
 #[cfg(test)]
