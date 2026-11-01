@@ -18,8 +18,9 @@ its upgrade notes (ENG-23). ParleyInn follows semantic versioning.
   second read, so each is stated before its answer (ENG-32).
 - CI's gates are defined once, in `scripts/ci-gates.txt`: `ci.yml` runs
   each through `scripts/ci-gate.sh`, a check fails CI when it writes a
-  gate's command inline (ENG-27), and `scripts/ci-local.sh` runs the same
-  gates here, coverage floors and drift cases included, before a push.
+  gate's command inline (ENG-27), and `scripts/ci-local.sh` reads the same
+  list and runs its fast gates here (`--full` adds the heavy ones),
+  coverage floors and drift cases included, before a push.
 - A stakeholder comment consents only to the stakeholder paths it names,
   by path, owning pattern or directory (ENG-21).
 - Every reviewer component of the layered review, and every other agent

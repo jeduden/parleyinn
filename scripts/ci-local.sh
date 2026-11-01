@@ -110,7 +110,7 @@ execute() {
 warn_uncovered() {
   local lcov="$logs/$1.lcov" diff="$logs/$1.diff" lines
   git diff -U0 "$mb" -- "$2" > "$diff"
-  run cargo llvm-cov report --lcov --output-path "$lcov" -p "$1" --ignore-filename-regex "/tests\\.rs$" > /dev/null 2>&1 || return 0
+  run cargo llvm-cov report --lcov --output-path "$lcov" -p "$1" --ignore-filename-regex "/tests\\.rs$" > /dev/null 2>&1 || { note "$1" WARNING "no unit coverage report, so the lines the diff adds were not checked"; return 0; }
   lines=$(scripts/uncovered-added.sh "$diff" "$lcov" "$repo" | paste -sd' ' -)
   [ -z "$lines" ] || note "$1" WARNING "CI also counts the integration and e2e layers; these added lines are uncovered by the unit layer: $lines"
 }
