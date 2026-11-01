@@ -192,9 +192,11 @@ pub fn run_scripts(body: &str) -> Vec<(usize, String)> {
 }
 
 /// Whether `expression`, the inside of a `${{ }}`, reads a context of
-/// [`UNTRUSTED`].
+/// [`UNTRUSTED`], in any case, as GitHub reads contexts, and through a
+/// quoted index as through a dot: `github['head_ref']` reads
+/// `github.head_ref`.
 fn reads_untrusted(expression: &str) -> bool {
-    expression
+    dotted(&expression.to_ascii_lowercase())
         .split(|c: char| !(c.is_ascii_alphanumeric() || matches!(c, '_' | '.' | '-')))
         .any(|word| {
             UNTRUSTED.iter().any(|context| {
@@ -204,6 +206,37 @@ fn reads_untrusted(expression: &str) -> bool {
                         .is_some_and(|rest| rest.starts_with('.'))
             })
         })
+}
+
+/// `expression` with each quoted index, `['x']` or `["x"]`, spaces
+/// around it aside, written `.x`; any other bracket stays.
+fn dotted(expression: &str) -> String {
+    let mut out = String::new();
+    let mut rest = expression;
+    while let Some(open) = rest.find('[') {
+        out.push_str(&rest[..open]);
+        let inside = rest[open + 1..].trim_start();
+        let quoted = inside.chars().next().filter(|q| matches!(q, '\'' | '"'));
+        let index = quoted.and_then(|q| {
+            let (name, after) = inside[1..].split_once(q)?;
+            Some((name, after.trim_start().strip_prefix(']')?))
+        });
+        match index {
+            Some((name, after)) => {
+                out.truncate(out.trim_end().len());
+                out.push('.');
+                out.push_str(name);
+                rest = after;
+            }
+            None => {
+                out.push('[');
+                rest = &rest[open + 1..];
+            }
+        }
+    }
+    out.push_str(rest);
+
+    out
 }
 
 /// Every `${{ }}` expression a `run:` script of `body`, the text of
