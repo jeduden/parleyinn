@@ -108,7 +108,7 @@ pub(crate) fn run_one(r: &Review, c: &Controls, unit: &Unit) -> (AgentRun, Optio
     }
     let class = match &refused {
         Some(_) => Class::Again,
-        None => class_of(r.workdir, unit, &first),
+        None => class_of(r, unit, &first),
     };
     if let Class::Never(why) = class {
         (r.progress)(&format!("{}; not run again: {why}", describe(&first)));
@@ -180,7 +180,7 @@ fn again(
         let (mut next, report) = tried(r, c, unit, note);
         add_usage(&mut next.log, &last.0.log);
         next.attempts = last.0.attempts + 1;
-        class = class_of(r.workdir, unit, &next);
+        class = class_of(r, unit, &next);
         if next.answered() || next.attempts >= MAX_ATTEMPTS || class != Class::Overloaded {
             let report = salvage(r.workdir, unit, first.run, &mut next, report);
             return (next, report);
@@ -214,10 +214,20 @@ fn tried(r: &Review, c: &Controls, unit: &Unit, note: Option<&str>) -> (AgentRun
 }
 
 /// What running `unit` again would do after `run` failed, from its
-/// failure and the errors in the `.stderr` beside its log.
-fn class_of(workdir: &Path, unit: &Unit, run: &AgentRun) -> Class {
-    let errors = workdir.join(LOGS).join(format!("{}.stderr", unit.stem()));
-    let stderr = std::fs::read_to_string(errors).unwrap_or_default();
+/// failure and the errors in the `.stderr` beside its log; errors that
+/// are there but do not read are told to progress, and count as none.
+fn class_of(r: &Review, unit: &Unit, run: &AgentRun) -> Class {
+    let errors = r.workdir.join(LOGS).join(format!("{}.stderr", unit.stem()));
+    let stderr = std::fs::read_to_string(&errors).unwrap_or_else(|e| {
+        if e.kind() != std::io::ErrorKind::NotFound {
+            (r.progress)(&format!(
+                "{}: read {}: {e}; its errors are taken as none",
+                unit.label(),
+                errors.display()
+            ));
+        }
+        String::new()
+    });
     backoff::class(run.failure.as_deref().unwrap_or_default(), &stderr)
 }
 

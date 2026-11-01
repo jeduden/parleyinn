@@ -477,6 +477,32 @@ fn a_generalist_a_reached_cap_and_a_tripped_breaker_both_keep_back_is_named_over
 }
 
 #[test]
+fn errors_that_cannot_be_read_are_told_and_taken_as_none() {
+    let (_dir, ran) = controlled(ONE, options(), 0.0, |c| {
+        if prompt_of(c).contains("a specialist") {
+            let log = c.stdout_to.as_ref().unwrap();
+            // A directory where the errors file belongs does not read.
+            let _ = fs::create_dir(log.with_extension("stderr"));
+            fake::write_log(c, "cut\n");
+            return Ok(Output::default());
+        }
+        fake::either(c)
+    });
+
+    let told = ran
+        .lines
+        .iter()
+        .find(|l| l.starts_with("lang-rust: read "))
+        .unwrap_or_else(|| panic!("{:?}", ran.lines));
+    assert!(
+        told.contains("lang-rust.stderr: ") && told.ends_with("; its errors are taken as none"),
+        "{told}"
+    );
+    // The run is run once more, as any failure no errors explain is.
+    assert!(ran.run("lang-rust").attempts >= 2);
+}
+
+#[test]
 fn what_is_running_is_told_every_so_often() {
     let options = Options {
         every: Duration::from_millis(1),
