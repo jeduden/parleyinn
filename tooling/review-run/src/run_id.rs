@@ -4,7 +4,7 @@
 //! review class, the dispatch, the bundle, the diff against main and the
 //! pull request's agent instructions), the split limit, and per agent a
 //! SHA-256 of its definition file and, for a specialist, of its own
-//! diff. Nothing is reused across a changed head, input, definition or
+//! diff and of the context the bundle wrote for it. Nothing is reused across a changed head, input, definition or
 //! diff.
 
 use std::collections::BTreeMap;
@@ -58,6 +58,10 @@ pub struct AgentId {
     /// none.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub diff: Option<String>,
+    /// For a specialist, the SHA-256 of the context the bundle wrote
+    /// for it; none when it has none.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub context: Option<String>,
 }
 
 /// The SHA-256 of `bytes`, in hex.
@@ -97,11 +101,22 @@ pub fn compute(workdir: &Path, plan: &Plan, head: Option<String>, split: usize) 
         .into_iter()
         .map(|name| {
             let definition = file_hash(&workdir.join(review_eval::component::file_of(&name)));
-            let diff = specialists
-                .contains(&name)
-                .then(|| file_hash(&workdir.join(format!("{REVIEW}/diffs/{name}.diff"))))
-                .flatten();
-            (name, AgentId { definition, diff })
+            let own = |dir: &str, ext: &str| {
+                specialists
+                    .contains(&name)
+                    .then(|| file_hash(&workdir.join(format!("{REVIEW}/{dir}/{name}.{ext}"))))
+                    .flatten()
+            };
+            let diff = own("diffs", "diff");
+            let context = own("context", "md");
+            (
+                name,
+                AgentId {
+                    definition,
+                    diff,
+                    context,
+                },
+            )
         })
         .collect();
 

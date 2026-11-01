@@ -23,6 +23,7 @@ fn agent(definition: &str, diff: Option<&str>) -> AgentId {
     AgentId {
         definition: Some(definition.to_owned()),
         diff: diff.map(str::to_owned),
+        context: None,
     }
 }
 
@@ -448,4 +449,16 @@ fn a_log_whose_name_is_not_utf8_is_not_copied() {
     );
     assert!(!work.join(LOGS).join(odd).exists());
     assert!(work.join(LOGS).join("lang-rust.jsonl").exists());
+}
+
+#[test]
+fn a_changed_context_runs_the_specialist_again() {
+    let mut now = id();
+    now.agents.get_mut("lang-rust").unwrap().context = Some("c9".to_owned());
+    let parts = vec![Gap::new("lang-rust", Some(1), "silent: x".to_owned())];
+    let resume = plan_of(&earlier(parts), &now);
+    assert_eq!(
+        resume.notes[0],
+        "lang-rust: runs again: its context changed"
+    );
 }

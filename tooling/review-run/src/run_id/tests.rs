@@ -36,6 +36,7 @@ fn a_run_id_hashes_each_definition_each_specialist_s_diff_and_the_inputs() {
     let dir = TempDir::new().unwrap();
     write(dir.path(), ".claude/agents/lang-rust.md", "abc");
     write(dir.path(), "review/diffs/lang-rust.diff", "abc");
+    write(dir.path(), "review/context/lang-rust.md", "ctx");
 
     let id = compute(dir.path(), &plan(), Some(HEAD.to_owned()), 9);
 
@@ -47,6 +48,7 @@ fn a_run_id_hashes_each_definition_each_specialist_s_diff_and_the_inputs() {
         AgentId {
             definition: Some(sha256(b"abc")),
             diff: Some(sha256(b"abc")),
+            context: Some(sha256(b"ctx")),
         }
     );
     // A generalist has no diff of its own, and a definition that does
@@ -56,11 +58,28 @@ fn a_run_id_hashes_each_definition_each_specialist_s_diff_and_the_inputs() {
         AgentId {
             definition: None,
             diff: None,
+            context: None,
         }
     );
     let text = serde_json::to_string(&id).unwrap();
     assert_eq!(parse(&text).unwrap(), id);
     assert!(!text.contains("resumed_from"), "{text}");
+}
+
+#[test]
+fn changing_only_a_specialist_s_context_changes_its_id() {
+    let dir = TempDir::new().unwrap();
+    write(dir.path(), "review/diffs/lang-rust.diff", "abc");
+    write(dir.path(), "review/context/lang-rust.md", "one");
+    let before = compute(dir.path(), &plan(), None, 9);
+    write(dir.path(), "review/context/lang-rust.md", "two");
+    let after = compute(dir.path(), &plan(), None, 9);
+    assert_ne!(before.agents["lang-rust"], after.agents["lang-rust"]);
+    assert_eq!(
+        before.agents["lang-rust"].diff,
+        after.agents["lang-rust"].diff
+    );
+    assert_eq!(before.inputs, after.inputs);
 }
 
 #[test]

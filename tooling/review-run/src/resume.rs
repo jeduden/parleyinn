@@ -161,8 +161,8 @@ fn stale(earlier: &RunId, now: &RunId) -> Option<String> {
     })
 }
 
-/// Why agent `name` cannot keep its earlier answer: its definition or
-/// its diff changed, it was not in the earlier run, or that run took no
+/// Why agent `name` cannot keep its earlier answer: its definition,
+/// its diff or its context changed, it was not in the earlier run, or that run took no
 /// answer from it; none when it can.
 fn changed(name: &str, earlier: &Earlier, now: &RunId) -> Option<String> {
     let (Some(was), Some(is)) = (earlier.id.agents.get(name), now.agents.get(name)) else {
@@ -173,6 +173,9 @@ fn changed(name: &str, earlier: &Earlier, now: &RunId) -> Option<String> {
     }
     if was.diff != is.diff {
         return Some("its diff changed".to_owned());
+    }
+    if was.context != is.context {
+        return Some("its context changed".to_owned());
     }
     None
 }
