@@ -258,7 +258,11 @@ fn a_killed_server_s_remainder_is_audited_once_by_the_next_reader() {
     assert_eq!(count_stopped(&f.home, "ingest", &audit), 0, "it still runs");
     // Killed: its marker's lock is released, its file left.
     drop(running);
-    assert_eq!(count_stopped(&f.home, "ingest", &audit), 1);
+    let audited = once_released(
+        || count_stopped(&f.home, "ingest", &audit),
+        |&n| n == 0 && !f.markers().is_empty(),
+    );
+    assert_eq!(audited, 1);
     assert_eq!(count_stopped(&f.home, "ingest", &audit), 0);
     assert_eq!(f.counted(), ["ingest_remainder_left"]);
     assert!(f.markers().is_empty());
@@ -281,7 +285,28 @@ fn only_a_running_server_serves_the_transcripts_its_marker_names() {
 
     // Killed: the marker stays, its lock released.
     drop(marker);
-    assert_eq!(served(&f.home), Vec::<PathBuf>::new());
+    let after = once_released(|| served(&f.home), |named| !named.is_empty());
+    assert_eq!(after, Vec::<PathBuf>::new());
+}
+
+/// What `look` answers once a dropped start marker's lock is released
+/// everywhere, retried while `held` reads it as still held, up to a
+/// deadline (ENG-03). Dropping the marker closes the test's own file,
+/// but a program another test starts meanwhile, `mkfifo` say, holds a
+/// copy of the descriptor between its fork and its exec, and the lock
+/// is released only when that copy closes too: the server's lock reads
+/// as held, as a running server's does, until the copy is gone.
+fn once_released<T>(look: impl Fn() -> T, held: impl Fn(&T) -> bool) -> T {
+    let step = std::time::Duration::from_millis(10);
+    let mut waited = std::time::Duration::ZERO;
+    loop {
+        let answer = look();
+        if !held(&answer) || waited >= std::time::Duration::from_secs(10) {
+            return answer;
+        }
+        std::thread::sleep(step);
+        waited += step;
+    }
 }
 
 /// Start markers as a test sets them out: each path with what it names
