@@ -31,7 +31,6 @@ use crate::{
     taplo_fmt, taplo_lint,
 };
 
-
 /// The dependency decision the ENG-18 and ENG-26 cases drift.
 const TEST_STACK: &str = "docs/adr/ADR-2610142221-json-serde-json.md";
 
