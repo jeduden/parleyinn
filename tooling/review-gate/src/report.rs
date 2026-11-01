@@ -629,20 +629,22 @@ fn unlinked(text: &str) -> bool {
     if strip_word(text, REVISED).is_some() || strip_word(text, WITHDRAWN).is_some() {
         return false;
     }
+    // A malformed line other than a revision or a withdrawal holds a
+    // dash, so it has a second part.
     let parts = split_dashes(text);
-    let [first, second, rest @ ..] = parts.as_slice() else {
-        return false;
-    };
-    let second = second.trim();
+    let rest = parts.get(2..).unwrap_or_default();
     let ids = |part: &str| {
         part.split(',')
             .all(|id| id_shaped(id.trim().trim_matches(['`', '*', '_', '.'])))
     };
-    place(first).is_some()
-        && match strip_word(second, IF_NOT_ADDRESSED) {
-            Some(_) => rest.last().is_none_or(|last| !ids(last)),
-            None => rest.is_empty() && strip_word(second, REQUEST).is_none(),
-        }
+    parts.first().and_then(|first| place(first)).is_some()
+        && parts.get(1).is_some_and(|second| {
+            let second = second.trim();
+            match strip_word(second, IF_NOT_ADDRESSED) {
+                Some(_) => rest.last().is_none_or(|last| !ids(last)),
+                None => rest.is_empty() && strip_word(second, REQUEST).is_none(),
+            }
+        })
 }
 
 /// Whether `text`, a malformed line, names [`TEMPLATE_PLACE`] where its
