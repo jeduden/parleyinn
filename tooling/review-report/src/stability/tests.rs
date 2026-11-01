@@ -100,8 +100,12 @@ fn partly_shared_sets_overlap_in_proportion_and_a_missing_agent_is_unstable() {
     let json = &s.agents[0];
     assert_eq!((json.agent.as_str(), json.reported), ("lang-json", 1));
     assert_eq!(json.findings, vec![Some(0), None]);
+    assert_eq!(
+        json.jaccard, 0.0,
+        "an agent a review missed overlaps nothing"
+    );
     assert_eq!(s.agents[1].jaccard, 0.333_333);
-    assert_eq!(s.jaccard, 0.666_667);
+    assert_eq!(s.jaccard, 0.166_667);
     assert!(!s.stable);
 }
 
@@ -156,7 +160,12 @@ fn a_dispatched_agent_left_in_a_gap_makes_the_runs_unstable() {
     let s = compare(&[gapped.clone(), gapped.clone(), gapped]);
     let json = s.agents.iter().find(|a| a.agent == "lang-json").unwrap();
     assert_eq!((json.reported, json.findings.clone()), (0, vec![None; 3]));
-    assert!(!s.stable);
+    assert!(!s.stable && !s.within_limits);
+    assert_eq!(json.jaccard, 0.0);
+    assert_eq!(
+        s.unmeasured,
+        vec!["no review holds a report or answer of lang-json".to_owned()]
+    );
 
     let mixed = compare(&[plain.clone(), plain]);
     assert!(mixed.stable, "an empty finding set is a report");
@@ -251,4 +260,37 @@ fn a_report_entry_that_does_not_read_is_named_and_the_rest_are_read() {
     assert_eq!(notes.len(), 1, "{notes:?}");
     assert!(notes[0].ends_with("does not read: gone"), "{notes:?}");
     assert_eq!(reports.get("lang-rust").map(String::as_str), Some("text"));
+}
+
+#[test]
+fn an_agent_missing_from_one_review_lowers_the_mean_even_with_no_findings() {
+    let with = review(
+        "approve",
+        &[("lang-rust", &["a.rs"]), ("lang-json", &[])],
+        0.1,
+    );
+    let without = review("approve", &[("lang-rust", &["a.rs"])], 0.1);
+
+    let s = compare(&[with.clone(), with, without]);
+
+    let json = s.agents.iter().find(|a| a.agent == "lang-json").unwrap();
+    assert_eq!((json.reported, json.jaccard), (2, 0.0));
+    assert_eq!(s.jaccard, 0.5);
+    assert!(s.unmeasured.is_empty());
+    assert!(
+        !s.within_limits,
+        "absence cannot keep the mean above the floor"
+    );
+}
+
+#[test]
+fn an_agent_in_no_review_makes_the_comparison_unmeasured_and_never_raises_the_mean() {
+    let mut gapped = review("approve", &[("lang-rust", &["a.rs"])], 0.1);
+    gapped.gaps.insert("lang-json".to_owned());
+
+    let s = compare(&[gapped.clone(), gapped]);
+
+    assert_eq!(s.jaccard, 0.5);
+    assert!(!s.within_limits && !s.stable);
+    assert_eq!(s.unmeasured.len(), 1);
 }

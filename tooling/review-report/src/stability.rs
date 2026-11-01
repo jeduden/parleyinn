@@ -7,10 +7,11 @@
 //!
 //! - `flip_rate`, the share of reviews whose verdict differs from the most
 //!   common one (the mode; a tie goes to the verdict first in order);
-//! - per agent, the Jaccard overlap of its finding sets across the reviews
-//!   it reported in, the size of the sets they share over the size of
-//!   their union, one when every set is empty; how many reviews it reported
-//!   in; its findings per review; and the spread of its cost;
+//! - per agent, the Jaccard overlap of its finding sets across the reviews,
+//!   the size of the sets they share over the size of their union, one
+//!   when every set is empty, and zero when it missed a review (left in
+//!   a gap, or never dispatched), so absence never raises the mean; how
+//!   many reviews it reported in; its findings per review; and the spread of its cost;
 //! - `jaccard`, the mean of the agents' overlaps;
 //! - `stable`, true only when the comparison is measured and every
 //!   agent, dispatched or reported, reported in every review with the same
@@ -19,8 +20,8 @@
 //! - `same_snapshot`, whether every review covered the same head and inputs,
 //!   without which the comparison means nothing;
 //! - `unmeasured`, why the comparison measures nothing: no reviews, reviews
-//!   of different snapshots, or a review with no verdict (a review that
-//!   failed); empty when it is measured;
+//!   of different snapshots, a review with no verdict (a review that
+//!   failed), or an agent that reported in none; empty when it is measured;
 //! - `within_limits`, whether it is measured, the flip rate is at most
 //!   [`FLIP_RATE_LIMIT`] and the overlap at least [`JACCARD_FLOOR`],
 //!   which the stability measurement warns on.
@@ -144,7 +145,11 @@ pub fn flip_rate(verdicts: &[String]) -> f64 {
     round(flipped as f64 / verdicts.len() as f64)
 }
 
-/// Agent `name`'s stability across `reviews`.
+/// Agent `name`'s stability across `reviews`. A review it missed,
+/// left in a gap or never dispatched, shares nothing with the others,
+/// so an agent that reported in fewer reviews than there are has an
+/// overlap of zero: absence never raises the mean that decides the
+/// limits.
 fn agent(name: &str, reviews: &[Review]) -> Agent {
     let sets: Vec<&BTreeSet<Fid>> = reviews
         .iter()
@@ -159,7 +164,11 @@ fn agent(name: &str, reviews: &[Review]) -> Agent {
 
     Agent {
         agent: name.to_owned(),
-        jaccard: jaccard(&sets),
+        jaccard: if sets.len() < reviews.len() {
+            0.0
+        } else {
+            jaccard(&sets)
+        },
         reported: sets.len(),
         findings: reviews
             .iter()
@@ -171,9 +180,10 @@ fn agent(name: &str, reviews: &[Review]) -> Agent {
     }
 }
 
-/// Why `reviews` measure nothing: none, different snapshots, or a review with
-/// no verdict, which is a review that failed and is no sample.
-fn unmeasured(reviews: &[Review], same_snapshot: bool) -> Vec<String> {
+/// Why `reviews` measure nothing: none, different snapshots, a review with
+/// no verdict, which is a review that failed and is no sample, or an
+/// agent, in `silent`, that reported in none of them.
+fn unmeasured(reviews: &[Review], same_snapshot: bool, silent: &[&str]) -> Vec<String> {
     let mut why = Vec::new();
     if reviews.is_empty() {
         why.push("there are no reviews".to_owned());
@@ -192,6 +202,13 @@ fn unmeasured(reviews: &[Review], same_snapshot: bool) -> Vec<String> {
             failed.len(),
             reviews.len(),
             failed.join(", ")
+        ));
+    }
+
+    if !reviews.is_empty() && !silent.is_empty() {
+        why.push(format!(
+            "no review holds a report or answer of {}",
+            silent.join(", ")
         ));
     }
 
@@ -218,7 +235,12 @@ pub fn compare(reviews: &[Review]) -> Stability {
         .iter()
         .all(|a| a.reported == reviews.len() && a.jaccard >= 1.0);
     let same_snapshot = reviews.windows(2).all(|w| w[0].snapshot == w[1].snapshot);
-    let unmeasured = unmeasured(reviews, same_snapshot);
+    let silent: Vec<&str> = agents
+        .iter()
+        .filter(|a| a.reported == 0)
+        .map(|a| a.agent.as_str())
+        .collect();
+    let unmeasured = unmeasured(reviews, same_snapshot, &silent);
     let measured = unmeasured.is_empty();
 
     Stability {
