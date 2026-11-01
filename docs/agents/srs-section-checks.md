@@ -22,7 +22,10 @@ summary: >-
 
 Your turns are few, and your diff takes most of them. Read your diff, then the
 rows it touches or names, a read or a grep each. Before you open anything else,
-send one message with a finding line for each problem they show. Then open code
+send one message with a finding line for each problem they show; a row that is
+fine gets no line, never one that ends with `no finding`, `none`, `fine` or
+`sound`, and an id you are unsure of is checked against its row before you state
+the line, never marked provisional after it. Then open code
 or a scenario only to check a row your diff touches: a file your diff shows, or
 the scenario tagged with its id. Never search the tree past them. State what
 each later read shows at once, as a finding, `revised:` or `withdrawn:` line.

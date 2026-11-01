@@ -30,6 +30,15 @@ below. Stay inside your language; another specialist covers the rest.
    `pr-head/`, whose regex matches the step text exactly.
 6. **Steps speak the domain model's terms**, not the source's.
 
+Your turns are few: each message spends one, however many searches it holds.
+Read your diff and send at once a finding line for each problem it shows. Then
+check one changed scenario per message, in diff order, every search for it in
+that one message. Grep `^\| <ID> \| P[0-9]`, with `-o`, in `pr-head/docs/srs/`
+for its row's priority, and its steps' words in
+`pr-head/tooling/scenario/tests/bdd/` for their bindings. Search nowhere else,
+and read `review/bundle.md` only in parts. State each scenario's findings once
+its check returns; after ten messages, check nothing more and send your outcome.
+
 <?include
 file: ../../docs/agents/specialist-report.md
 heading-level: "2"
@@ -48,10 +57,10 @@ is never prose: `docs/x.md:12 — request: add|change|remove <requirement> —
 
 No file: your run log is your report. Right after you read your diff, send one
 message with a line per finding it shows, and each later one at once. A line
-starts with a real place, `docs/x.md:12`, never `path:line`: a whole file, row
-or change takes its nearest line, or `docs/x.md:1`. Then its dash and `if not
-addressed:` or `request:`, nothing else; only a problem gets a line, never `no
-finding`. `revised: <full finding line>` replaces the one at its place (withdraw
-a moved one, then state it); `withdrawn: docs/x.md:12 — <why>` removes one you
-were wrong about. Last message: `outcome: findings|none — <sentence>`.
+starts with a real place, `docs/x.md:12`, never `path:line` (a whole file takes
+`docs/x.md:1`), then its dash and `if not addressed:` or `request:`; bare, in no
+backticks, nothing after its ids. A fine row gets no line, none ending `no
+finding`, `none`, `fine` or `sound`. `revised: <full finding line>` replaces the
+one at its place (withdraw a moved one, then state it); `withdrawn: x.md:12 —
+<why>` removes one. Last message: `outcome: findings|none — <sentence>`.
 <?/include?>

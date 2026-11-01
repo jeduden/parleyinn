@@ -247,7 +247,8 @@ pub fn examine_from(
             Ok(Some(dispatched)) => problems.cases.push(format!(
                 "case {id} does not dispatch {}; the bundle dispatches {}",
                 component.name,
-                // The bundle always dispatches an agent, so this is never empty.
+                // Never empty: the analysis hands a change no rule routes,
+                // a LICENSE-only one among them, to review-code.
                 dispatched.into_iter().collect::<Vec<_>>().join(", ")
             )),
             Err(e) => problems.cases.push(e),

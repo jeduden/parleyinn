@@ -44,7 +44,10 @@ heading-level: "2"
 
 Your turns are few, and your diff takes most of them. Read your diff, then the
 rows it touches or names, a read or a grep each. Before you open anything else,
-send one message with a finding line for each problem they show. Then open code
+send one message with a finding line for each problem they show; a row that is
+fine gets no line, never one that ends with `no finding`, `none`, `fine` or
+`sound`, and an id you are unsure of is checked against its row before you state
+the line, never marked provisional after it. Then open code
 or a scenario only to check a row your diff touches: a file your diff shows, or
 the scenario tagged with its id. Never search the tree past them. State what
 each later read shows at once, as a finding, `revised:` or `withdrawn:` line.
@@ -68,10 +71,10 @@ is never prose: `docs/x.md:12 — request: add|change|remove <requirement> —
 
 No file: your run log is your report. Right after you read your diff, send one
 message with a line per finding it shows, and each later one at once. A line
-starts with a real place, `docs/x.md:12`, never `path:line`: a whole file, row
-or change takes its nearest line, or `docs/x.md:1`. Then its dash and `if not
-addressed:` or `request:`, nothing else; only a problem gets a line, never `no
-finding`. `revised: <full finding line>` replaces the one at its place (withdraw
-a moved one, then state it); `withdrawn: docs/x.md:12 — <why>` removes one you
-were wrong about. Last message: `outcome: findings|none — <sentence>`.
+starts with a real place, `docs/x.md:12`, never `path:line` (a whole file takes
+`docs/x.md:1`), then its dash and `if not addressed:` or `request:`; bare, in no
+backticks, nothing after its ids. A fine row gets no line, none ending `no
+finding`, `none`, `fine` or `sound`. `revised: <full finding line>` replaces the
+one at its place (withdraw a moved one, then state it); `withdrawn: x.md:12 —
+<why>` removes one. Last message: `outcome: findings|none — <sentence>`.
 <?/include?>

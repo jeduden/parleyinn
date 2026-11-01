@@ -111,8 +111,24 @@ fn untrusted_expansions_names_each_untrusted_context_a_script_expands() {
 }
 
 #[test]
+fn untrusted_expansions_reads_a_context_in_any_case_and_through_brackets() {
+    let body = "      - run: |\n          echo ${{ GITHUB.head_ref }}\n          echo ${{ github['head_ref'] }}\n          echo ${{ github[\"Event\"].issue.title }}\n          echo ${{ Inputs.ref }}\n          echo ${{ github [ 'event' ] }} ${{ github['event_name'] }}\n";
+
+    assert_eq!(
+        untrusted_expansions("w.yml", body),
+        [
+            "w.yml:2 expands GITHUB.head_ref in a run script, not through env",
+            "w.yml:3 expands github['head_ref'] in a run script, not through env",
+            "w.yml:4 expands github[\"Event\"].issue.title in a run script, not through env",
+            "w.yml:5 expands Inputs.ref in a run script, not through env",
+            "w.yml:6 expands github [ 'event' ] in a run script, not through env",
+        ]
+    );
+}
+
+#[test]
 fn untrusted_expansions_passes_trusted_contexts_env_and_values_outside_scripts() {
-    let body = "    name: ${{ github.event.pull_request.title }}\n    steps:\n      - env:\n          TITLE: ${{ github.event.pull_request.title }}\n        run: |\n          echo \"$TITLE\" ${{ matrix.shard }} ${{ github.event_name }} ${{ steps.inputs_x.outputs.y }}\n          echo ${{ unclosed\n";
+    let body = "    name: ${{ github.event.pull_request.title }}\n    steps:\n      - env:\n          TITLE: ${{ github.event.pull_request.title }}\n        run: |\n          echo \"$TITLE\" ${{ matrix.shard }} ${{ github.event_name }} ${{ steps.inputs_x.outputs.y }} ${{ steps.a.outputs.l[0] }} ${{ x[ 'a' }} ${{ y['b }}\n          echo ${{ unclosed\n";
 
     assert!(untrusted_expansions("w.yml", body).is_empty());
 }
