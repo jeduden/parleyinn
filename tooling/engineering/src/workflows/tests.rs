@@ -77,6 +77,27 @@ fn unpinned_names_a_sha_whose_version_comment_is_empty() {
 }
 
 #[test]
+fn unpinned_names_a_sha_whose_comment_is_no_version() {
+    let body = ["todo", "v", "v.1", "1.", "1..2", "vx1", "latest v1"]
+        .iter()
+        .map(|c| format!("        uses: owner/act@{SHA} # {c}\n"))
+        .collect::<String>();
+
+    let problems = unpinned("w.yml", &body);
+
+    assert_eq!(problems.len(), 7, "{problems:?}");
+    assert!(
+        problems
+            .iter()
+            .all(|p| p.ends_with("with no version in a comment"))
+    );
+    for version in ["v1", "1", "v7.0.2", "4.38.3 (codeql)"] {
+        let line = format!("        uses: owner/act@{SHA} # {version}\n");
+        assert!(unpinned("w.yml", &line).is_empty(), "{version}");
+    }
+}
+
+#[test]
 fn unpinned_reads_no_uses_a_comment_names() {
     assert!(unpinned("w.yml", "      # uses: actions/checkout@v4\n  uses:\n").is_empty());
 }

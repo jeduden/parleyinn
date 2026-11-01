@@ -97,7 +97,8 @@ fn is_hex(s: &str, len: usize) -> bool {
 
 /// Why `target`, which `line` uses, is not pinned; none when it is: a
 /// local action or workflow, a container image by its sha256 digest,
-/// or anything else by a full commit sha with a comment after it.
+/// or anything else by a full commit sha with its version in a comment
+/// after it.
 fn pin_problem(target: &str, line: &str) -> Option<&'static str> {
     if target.starts_with("./") {
         return None;
@@ -114,11 +115,21 @@ fn pin_problem(target: &str, line: &str) -> Option<&'static str> {
         return Some("not pinned to a full commit sha");
     }
     let comment = line.split_once(" #").map(|(_, c)| c.trim());
-    if comment.is_some_and(|c| !c.is_empty()) {
+    let first = comment.and_then(|c| c.split_whitespace().next());
+    if first.is_some_and(is_version) {
         None
     } else {
         Some("with no version in a comment")
     }
+}
+
+/// Whether `word` reads as a version: dot-separated numbers, `v` before
+/// them or not, as `v7.0.2` or `4`.
+fn is_version(word: &str) -> bool {
+    let numbers = word.strip_prefix('v').unwrap_or(word);
+    numbers
+        .split('.')
+        .all(|n| !n.is_empty() && n.chars().all(|c| c.is_ascii_digit()))
 }
 
 /// Every action or reusable workflow `body`, the text of `file`, uses
