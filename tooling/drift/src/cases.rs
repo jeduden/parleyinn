@@ -112,6 +112,7 @@ pub fn cases() -> Vec<Case> {
         review_resume_cases(),
         vec![review_moved_revision_case()],
         review_control_cases(),
+        answers::review_answer_cases(),
         // Last: its cases edit source the later cases would run stale.
         license_text_cases(),
     ]
@@ -515,28 +516,28 @@ fn review_resume_cases() -> Vec<Case> {
     let resume_test = |name: &'static str| cargo_lib_test("review-run", name);
     vec![
         case(
-            "a resumed review reusing an answer given on another head",
+            "a resumed review reusing an answer whose answer key changed",
             "ENG-28",
             Injection::replace(
                 RESUME,
-                "(Some(was), Some(is)) if was != is => {",
-                "(Some(was), Some(is)) if was != is && was.is_empty() => {",
+                "let same = matches!((&was.key, &is.key), (Some(a), Some(b)) if a == b);",
+                "let same = was.key.is_some() && is.key.is_some();",
             ),
-            resume_test("resume::tests::a_moved_unknown_or_otherwise_fed_review_reuses_nothing"),
-            "a_moved_unknown_or_otherwise_fed_review_reuses_nothing",
+            resume_test("resume::tests::a_changed_key_runs_its_agent_again_with_why"),
+            "a_changed_key_runs_its_agent_again_with_why",
         ),
         case(
-            "a resumed review reusing an answer whose agent's definition changed",
+            "an answer key that ignores the agent's definition, so a changed one reuses the old answer",
             "ENG-28",
             Injection::replace(
-                RESUME,
-                "if was.definition.is_none() || was.definition != is.definition {",
-                "if was.definition.is_none() {",
+                "tooling/review-run/src/key.rs",
+                "    f.add(\"definition\", &bytes);\n",
+                "    f.add(\"definition\", b\"\");\n",
             ),
             resume_test(
-                "resume::tests::a_changed_definition_or_diff_or_an_agent_new_or_unanswered_runs_again",
+                "key::tests::a_changed_definition_changes_its_agent_s_key_and_its_generalist_s_alone",
             ),
-            "a_changed_definition_or_diff_or_an_agent_new_or_unanswered_runs_again",
+            "a_changed_definition_changes_its_agent_s_key_and_its_generalist_s_alone",
         ),
         case(
             "an agent that did not answer left out of what was not reviewed, so it reads as clean",
@@ -3576,6 +3577,8 @@ fn transcript_contract_cases() -> Vec<Case> {
         ),
     ]
 }
+
+mod answers;
 
 #[cfg(test)]
 mod tests;
