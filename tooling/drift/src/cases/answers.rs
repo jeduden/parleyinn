@@ -19,7 +19,7 @@ pub(super) fn review_answer_cases() -> Vec<Case> {
             Injection::replace(
                 MEMO,
                 "Ok(Some(stored)) => stored,",
-                "Ok(Some(_)) => return None,",
+                "Ok(Some(stored)) => {\n            if true {\n                return None;\n            }\n            stored\n        }",
             ),
             test("memo::tests::an_unchanged_key_is_taken_from_the_store_and_runs_nothing"),
             "an_unchanged_key_is_taken_from_the_store_and_runs_nothing",
