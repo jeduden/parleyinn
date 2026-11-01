@@ -24,6 +24,7 @@ pub mod breaker;
 pub mod cli;
 pub mod controls;
 pub mod gaps;
+pub mod key;
 pub mod live;
 pub mod outcome;
 pub mod parts;
@@ -34,6 +35,7 @@ pub mod resume;
 pub mod retry;
 pub mod run;
 pub mod run_id;
+pub mod store;
 pub(crate) mod tasks;
 pub mod usage;
 

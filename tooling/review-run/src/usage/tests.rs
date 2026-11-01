@@ -13,6 +13,8 @@ fn run(name: &str, log: RunLog) -> AgentRun {
         parts: 1,
         failed_parts: Vec::new(),
         reused: false,
+        from_store: false,
+        answer_key: None,
     }
 }
 
@@ -43,6 +45,8 @@ fn each_agent_s_usage_sums_its_models_the_most_cached_first() {
             parts: 1,
             cost_usd: 0.5,
             reused: false,
+            answer_key: None,
+            answer_store: false,
             resumed_from: None,
         }
     );

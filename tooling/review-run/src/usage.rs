@@ -3,8 +3,10 @@
 //! calls, fresh input, cache writes and reads and output, summed over
 //! the models it ran on, the most cached first; with the parts it ran
 //! in, a specialist run in parts being one entry, and the cost its
-//! results reported. An agent a resumed run reused from an earlier run
-//! cost nothing this time: its entry says so, and names that run.
+//! results reported, and its answer key. An agent a resumed run reused
+//! from an earlier run, or one whose answer the answer store held, cost
+//! nothing this time: its entry says so, and names that run or the
+//! store.
 
 use serde::Serialize;
 
@@ -33,6 +35,13 @@ pub struct AgentUsage {
     /// The earlier run's directory it was reused from; absent when not.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub resumed_from: Option<String>,
+    /// Its answer key; absent when it has none.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub answer_key: Option<String>,
+    /// Whether its answer was reused from the answer store; absent when
+    /// not.
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub answer_store: bool,
 }
 
 /// Each run's usage, the most cached first, then by name; a run reused
@@ -53,7 +62,11 @@ pub fn usage(runs: &[AgentRun], resumed_from: Option<&str>) -> Vec<AgentUsage> {
                 parts: run.parts,
                 cost_usd: if run.reused { 0.0 } else { run.log.cost },
                 reused: run.reused,
-                resumed_from: resumed_from.filter(|_| run.reused).map(str::to_owned),
+                resumed_from: resumed_from
+                    .filter(|_| run.reused && !run.from_store)
+                    .map(str::to_owned),
+                answer_key: run.answer_key.clone(),
+                answer_store: run.from_store,
             };
             for m in run.log.usage.values() {
                 u.calls += m.calls;

@@ -99,6 +99,10 @@ pub struct AgentRun {
     /// Whether its answer was taken from an earlier run of the same
     /// inputs rather than run again.
     pub reused: bool,
+    /// Whether that answer came from the answer store.
+    pub from_store: bool,
+    /// Its answer key; none when it has none.
+    pub answer_key: Option<String>,
 }
 
 impl AgentRun {
@@ -114,6 +118,8 @@ impl AgentRun {
             parts: 1,
             failed_parts: Vec::new(),
             reused: false,
+            from_store: false,
+            answer_key: None,
         }
     }
 
@@ -301,6 +307,8 @@ pub(crate) fn specialist_units(
                     parts: 0,
                     failed_parts: Vec::new(),
                     reused: false,
+                    from_store: false,
+                    answer_key: None,
                 });
             }
         }
@@ -375,13 +383,7 @@ pub(crate) fn attempt(
             );
         }
     };
-    let world = World {
-        main: workdir.to_path_buf(),
-        class: plan.class.clone(),
-        touched: plan.touched,
-        seeded: plan.reports_of(name),
-        notes: Vec::new(),
-    };
+    let world = world_of(workdir, plan, name);
     let log_path = workdir.join(LOGS).join(format!("{}.jsonl", unit.stem()));
     let mut command = runner::command(&component, &world, None, &log_path, deadline);
     if let Some(part) = &unit.part {
@@ -422,6 +424,19 @@ pub(crate) fn attempt(
     };
 
     (AgentRun::of(unit.label(), kind, failure, log, 1), report)
+}
+
+/// The world agent `name` of `plan` runs on in `workdir`: the review's
+/// class and touched count, and for a generalist its specialists'
+/// report files.
+pub(crate) fn world_of(workdir: &Path, plan: &Plan, name: &str) -> World {
+    World {
+        main: workdir.to_path_buf(),
+        class: plan.class.clone(),
+        touched: plan.touched,
+        seeded: plan.reports_of(name),
+        notes: Vec::new(),
+    }
 }
 
 /// Adds `note` to the prompt among `args`, the value after `-p`.

@@ -182,6 +182,8 @@ pub fn merge(name: &str, parts: Vec<(AgentRun, String)>) -> (AgentRun, String) {
             parts: u32::try_from(count).unwrap_or(u32::MAX),
             failed_parts,
             reused: false,
+            from_store: false,
+            answer_key: None,
         },
         report,
     )

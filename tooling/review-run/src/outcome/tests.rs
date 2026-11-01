@@ -27,6 +27,8 @@ fn ran(name: &str, kind: Kind, answer: &str) -> AgentRun {
         parts: 1,
         failed_parts: Vec::new(),
         reused: false,
+        from_store: false,
+        answer_key: None,
     }
 }
 

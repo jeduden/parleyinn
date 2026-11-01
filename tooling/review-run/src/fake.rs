@@ -14,7 +14,12 @@ pub(crate) type Claude = Box<dyn Fn(&Command) -> Result<Output, String> + Sync>;
 pub(crate) struct FakeHost {
     pub claude: Claude,
     pub calls: Mutex<Vec<Command>>,
+    /// Each `claude --version` asked, kept apart from the agents' runs.
+    pub versions: Mutex<Vec<Command>>,
 }
+
+/// What the fake's `claude --version` prints.
+pub(crate) const VERSION: &str = "2.1.0 (Claude Code)";
 
 impl FakeHost {
     pub(crate) fn new(
@@ -23,6 +28,7 @@ impl FakeHost {
         Self {
             claude: Box::new(claude),
             calls: Mutex::new(Vec::new()),
+            versions: Mutex::new(Vec::new()),
         }
     }
 
@@ -34,6 +40,14 @@ impl FakeHost {
 
 impl Host for FakeHost {
     fn run(&self, command: &Command) -> Result<Output, String> {
+        if command.args == ["--version"] {
+            self.versions.lock().unwrap().push(command.clone());
+            return Ok(Output {
+                code: Some(0),
+                stdout: format!("{VERSION}\n"),
+                ..Output::default()
+            });
+        }
         self.calls.lock().unwrap().push(command.clone());
         (self.claude)(command)
     }
