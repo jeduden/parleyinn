@@ -18,6 +18,7 @@
 
 pub mod cli;
 pub mod gaps;
+pub mod leak;
 pub mod outcome;
 pub mod parts;
 pub mod plan;
