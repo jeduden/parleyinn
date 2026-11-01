@@ -3,7 +3,7 @@
 //! check the registry itself, so they run without mdsmith.
 
 use cucumber::{then, when};
-use engineering::{outcome, registry};
+use engineering::{ci_gates, outcome, registry};
 
 use crate::World;
 use crate::engineering::eng;
@@ -18,6 +18,21 @@ fn ci_runs_the_drift_suite(w: &mut World, cmd: String) -> Result<(), String> {
     eng(w)
         .checkout()?
         .contains(".github/workflows/ci.yml", &cmd)
+}
+
+#[then(
+    regex = r#"^the CI workflow runs each gate of "([^"]+)" through "([^"]+)", with no gate's command written inline$"#
+)]
+fn ci_runs_each_gate_from_the_list(
+    w: &mut World,
+    list: String,
+    runner: String,
+) -> Result<(), String> {
+    if list != ci_gates::GATES || runner != ci_gates::CALL.trim_end() {
+        return Err(format!("the step names {list} and {runner}, not CI's"));
+    }
+    let checkout = eng(w).checkout()?;
+    outcome(ci_gates::check_repository(&checkout))
 }
 
 #[then(regex = r"^every drift case's edit applies to the checkout$")]

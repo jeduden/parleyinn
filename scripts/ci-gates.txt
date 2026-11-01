@@ -1,0 +1,53 @@
+# The gates of ParleyInn's CI, defined once: ci.yml runs each through
+# scripts/ci-gate.sh NAME and scripts/ci-local.sh runs the same list
+# here, so a gate's command lives in this file and nowhere else. A check
+# (ENG-27) fails CI when ci.yml runs a gate's command inline or a gate
+# has no CI job. One gate a line, fields separated by |:
+#
+#   name    what ci.yml and the local runner call the gate
+#   fit     fast (runs by default), full (runs with --full, needs the
+#           room its "needs" names) or no (CI's runner only)
+#   needs   why a gate that does not run here does not: - (nothing),
+#           disk, network, parinn (a built release core), runner (a CI
+#           runner's services or artifacts) or a tool
+#   scope   ws (once), pkgs (once; {pkgs} is the touched crates as
+#           "-p a -p b" here and "--workspace" in CI), crate (once per
+#           touched crate, {crate}, {floor} its unit-line floor), tags
+#           (once; {tags} is the requirement ids the diff touches) or
+#           files (once; the drift cases the touched files inject)
+#   ci      the command CI runs, or @job:NAME / @workflow:NAME when the
+#           job or workflow is the gate's definition (its shards, decoy
+#           HOME and artifacts are the job's own) and this file only
+#           names it
+#   local   the command here, or = for the CI command; @size is the
+#           ENG-34 line limits through the review bundle
+#
+# A command holds no | character.
+# name|fit|needs|scope|ci|local
+fmt|fast|-|ws|cargo fmt --all --check|=
+clippy|fast|-|pkgs|cargo clippy {pkgs} --all-targets --locked -- -D warnings|=
+markdown|fast|-|ws|mdsmith check .|=
+toml-fmt|fast|-|ws|taplo fmt --check|=
+toml-lint|fast|-|ws|taplo lint|=
+zizmor|fast|-|ws|zizmor .github|zizmor --offline .github
+deny|fast|-|ws|cargo deny check licenses bans sources|=
+deny-fuzz|fast|-|ws|cargo deny --manifest-path fuzz/Cargo.toml check licenses bans sources|=
+audit|full|network|ws|cargo audit|=
+audit-fuzz|full|network|ws|cargo audit --file fuzz/Cargo.lock|=
+license-check|fast|-|ws|cargo run --locked -p engineering --bin license-check|=
+tests|fast|-|pkgs|@job:test|cargo test --locked {pkgs}
+srs-gates|fast|-|ws|@job:test|cargo test --locked -p srs --test gates
+scenario-gates|fast|-|ws|@job:scenarios|cargo test --locked -p scenario --test gate
+cucumber|fast|-|tags|@job:scenarios|cargo build --locked -p parinn && cargo test --locked -p scenario --test bdd -- --tags "{tags}"
+size|fast|-|ws|@workflow:review|@size
+drift|fast|-|files|cargo test --locked -p drift --test suite -- --ignored|=
+coverage-unit|fast|-|crate|cargo run --locked -p coverage -- --layer unit|cargo llvm-cov --locked -p {crate} --lib --bins --ignore-filename-regex "/tests\.rs$" --fail-under-lines {floor}
+coverage-integration|full|disk|ws|cargo run --locked -p coverage -- --layer integration|=
+coverage-e2e-others|no|runner|ws|cargo run --locked -p coverage -- --layer e2e --others|=
+coverage-e2e|no|runner|ws|cargo run --locked -p coverage -- --layer e2e --shard "$((JOB_INDEX + 1))/$JOB_TOTAL"|=
+coverage-merge|full|disk|ws|cargo run --locked -p coverage -- --merge|cargo run --locked -p coverage
+release-core|full|disk|ws|cargo build --release --locked -p parinn -p calibrate -p parinn-eval|=
+eval|full|parinn|ws|@job:eval|cargo run --release --locked -p parinn-eval -- recall --published tooling/eval/recall-v1.txt
+scenarios|full|parinn|ws|@job:scenarios|cargo build --locked -p parinn && cargo test --locked -p scenario
+benchmark|no|runner|ws|@job:benchmark|-
+miri|no|nightly|ws|@job:miri|-

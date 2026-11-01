@@ -8,7 +8,9 @@
 //! It needs mdsmith and taplo on PATH, so its tests are ignored by
 //! default; CI's drift jobs run them with `--ignored`, each one shard
 //! of the cases named by `DRIFT_SHARD=i/n`, so the suite fits a job's
-//! budget. Unset, one run holds every case.
+//! budget. Unset, one run holds every case. `DRIFT_TOUCHING`, the
+//! changed files one path a line, keeps the cases that inject one of
+//! them, which is how `scripts/ci-local.sh` runs the suite.
 
 #![allow(
     clippy::unwrap_used,
@@ -22,7 +24,7 @@ use std::process::{Command, Stdio};
 use std::thread;
 use std::time::{Duration, Instant, SystemTime};
 
-use drift::{Check, apply, build_core, cases, shard};
+use drift::{Check, apply, build_core, cases, shard, touching};
 use testkit::TempDir;
 
 /// Bounds one check; a run of one test target takes seconds once the
@@ -43,7 +45,12 @@ fn every_drift_is_caught() {
     let (work, target) = (tmp.path().join("work"), tmp.path().join("target"));
 
     let spec = std::env::var("DRIFT_SHARD").ok();
-    let selected = shard(cases(), spec.as_deref()).unwrap();
+    let files = std::env::var("DRIFT_TOUCHING").ok();
+    let selected = touching(shard(cases(), spec.as_deref()).unwrap(), files.as_deref());
+    if files.is_some() && selected.is_empty() {
+        println!("no drift case injects a file the change touches");
+        return;
+    }
     assert!(!selected.is_empty(), "shard {spec:?} holds no case");
 
     sync_copy(&testkit::repo_root(), &work);

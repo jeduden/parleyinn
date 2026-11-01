@@ -282,6 +282,7 @@ Feature: Engineering quality (ENG)
     Given the repository checkout
     When the drift cases are read
     Then the CI workflow runs the drift suite with "cargo test --locked -p drift --test suite -- --ignored"
+    And the CI workflow runs each gate of "scripts/ci-gates.txt" through "scripts/ci-gate.sh", with no gate's command written inline
     And every drift case's edit applies to the checkout
     And every non-pending scenario that inspects the repository checkout has a drift case guarding its id
     And the requirement-scenario gate, the Appendix B check and the persona gates each have a drift case
