@@ -36,9 +36,9 @@ fn each_file_not_written_is_named_and_counted() {
 
     let lines = lines.into_inner();
     assert_eq!(lines.len(), 3, "{lines:?}");
-    assert!(lines[0].starts_with("report: review/agent-runs.jsonl not written: "));
-    assert!(lines[1].starts_with("report: review/report.html not written: "));
-    assert_eq!(lines[2], "report: 2 of 2 report files not written");
+    assert!(lines[0].starts_with("run report: review/agent-runs.jsonl not written: "));
+    assert!(lines[1].starts_with("run report: review/report.html not written: "));
+    assert_eq!(lines[2], "run report: 2 of 2 files not written");
 }
 
 #[test]

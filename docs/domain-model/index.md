@@ -156,7 +156,9 @@ The review's tooling words are engineering-tooling words too, described in
   pull-request state.
 - **Run list**: a review's file with one entry per agent run, holding its
   tokens, its cost and why its answer was not taken.
-- **Report**: the static HTML built from the run list.
+- **Run report**: the static HTML built from the run list.
+- **Specialist report**: what one of the review's specialist agents gives, its
+  findings and outcome; neither the run report nor a forge report.
 
 An agent run here is one run of a review's agent, never a ParleyInn run, and a
 run-list entry is no span.

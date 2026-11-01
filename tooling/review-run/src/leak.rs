@@ -65,7 +65,7 @@ pub fn fail_closed(outcome: &mut ReviewOutcome, n: usize) {
 #[cfg(test)]
 mod tests;
 
-/// Writes the run list and the report of the review in `workdir`,
+/// Writes the run list and the run report of the review in `workdir`,
 /// `failure` saying why it could not run, then scrubs both of the
 /// token; answers how many forms it replaced, and tells `progress`
 /// each file not scrubbed (I6).
@@ -80,7 +80,7 @@ pub fn report(
     for rel in [review_report::AGENT_RUNS, review_report::REPORT] {
         match scrubber.scrub_file(&workdir.join(rel)) {
             Ok(n) => found += n,
-            Err(e) => progress(&format!("report: {e}")),
+            Err(e) => progress(&format!("run report: {e}")),
         }
     }
 

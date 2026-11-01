@@ -1,4 +1,4 @@
-//! The `review-report` command: a review's run list and report from
+//! The `review-report` command: a review's run list and run report from
 //! its work directory, and the stability of repeated reviews of one
 //! pull-request snapshot (ENG-28, ENG-32). It reads and writes files only.
 //! It is CI tooling and never ships.

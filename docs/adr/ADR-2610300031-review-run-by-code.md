@@ -274,7 +274,7 @@ repeat them, which costs tokens.
 - After every run, failed or not, `review-run` writes
   `review/agent-runs.jsonl`, one entry per agent run with its tokens, the
   cost its log reported and why it was not accepted, and
-  `review/report.html`, a static report with every string a run shaped
+  `review/report.html`, a static run report with every string a run shaped
   escaped; the `review-report` crate builds both from the review's
   files, best effort, so neither changes the verdict. They go with the
   reports; the run logs stay in the job. No server or socket is added.

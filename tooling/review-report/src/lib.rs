@@ -19,10 +19,10 @@
 //!   is the `total_cost_usd` the `claude` command line reported in the
 //!   run's log, never recomputed from tokens; `status` is `accepted`
 //!   or `gap`, and a gap says why.
-//! - `review/report.html`, a static report built from the run list: the
+//! - `review/report.html`, a static run report built from the run list: the
 //!   verdict and counts, a timeline, cost and token tables, the gap
 //!   reasons and what was not reviewed. Every string an agent's run
-//!   could shape is escaped, and the report is size-bounded.
+//!   could shape is escaped, and the run report is size-bounded.
 //!
 //! `review-report stability` compares the work directories of N
 //! reviews of one pull-request snapshot and writes `stability.json`
@@ -46,10 +46,10 @@ pub mod stability;
 const REVIEW: &str = "review";
 /// The run list, under the work directory.
 pub const AGENT_RUNS: &str = "review/agent-runs.jsonl";
-/// The report, under the work directory.
+/// The run report, under the work directory.
 pub const REPORT: &str = "review/report.html";
 
-/// Writes the run list and the report of the review in `workdir`,
+/// Writes the run list and the run report of the review in `workdir`,
 /// `failure` saying why it could not run, when it could not. Returns
 /// each file that could not be written, with why; best effort, so a
 /// review's verdict never depends on it.
@@ -78,11 +78,11 @@ pub fn write(workdir: &Path, failure: Option<&str>) -> Vec<String> {
 pub fn write_reported(workdir: &Path, failure: Option<&str>, progress: &dyn Fn(&str)) {
     let problems = write(workdir, failure);
     for problem in &problems {
-        progress(&format!("report: {problem}"));
+        progress(&format!("run report: {problem}"));
     }
     if !problems.is_empty() {
         progress(&format!(
-            "report: {} of 2 report files not written",
+            "run report: {} of 2 files not written",
             problems.len()
         ));
     }

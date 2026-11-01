@@ -115,7 +115,7 @@ jobs:
         run: |
           "$GITHUB_WORKSPACE/target/debug/review-run" --workdir "$RUNNER_TEMP/work" \
             --parallel 32 --head-sha "$HEAD_SHA" > "$RUNNER_TEMP/work/review/run.txt"
-      # What the comparison reads, and the run list and the report; the run
+      # What the comparison reads, and the run list and the run report; the run
       # logs stay in the job, as in the review (ENG-28). A snapshot's name
       # holds no underscore, so the comparison's pattern takes its own
       # three reviews alone.

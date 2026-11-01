@@ -1,7 +1,7 @@
 //! The `review-report` command line:
 //!
 //! - `review-report write --workdir DIR` writes the run list and the
-//!   report of the review in `DIR`, as review-run does after every
+//!   run report of the review in `DIR`, as review-run does after every
 //!   run, so they can be written again from a kept work directory;
 //! - `review-report stability --out FILE DIR DIR...` compares the
 //!   reviews in two or more work directories of one pull-request snapshot

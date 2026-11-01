@@ -120,7 +120,7 @@ pub fn run_with(
         };
         let reviewed =
             review(host, &args, &scrubber, &leaks, &scrubbed).map_err(|msg| scrubber.scrub(&msg).0);
-        // The run list and the report, after every run, best effort:
+        // The run list and the run report, after every run, best effort:
         // built from the files above, already scrubbed, and scrubbed
         // again, so a form they hold fails the review (ENG-28).
         let failure = reviewed.as_ref().err().map(String::as_str);

@@ -1,10 +1,10 @@
-//! The report: one static, self-contained HTML file built from a
+//! The run report: one static, self-contained HTML file built from a
 //! review's run list and its gaps. It loads nothing: its style is inline,
 //! it holds no script, and its content security policy refuses any
 //! that an escaping slip would let in. Every string a run could shape
 //! (an agent's name, a model, a reason, the head) is untrusted: it is
 //! cut to [`MAX_TEXT`] characters and escaped before it reaches the
-//! report. At most [`MAX_ROWS`] rows stand in a table, so the report stays
+//! run report. At most [`MAX_ROWS`] rows stand in a table, so it stays
 //! small whatever the review ran; the run list holds every agent run.
 
 use std::fmt::Write as _;
@@ -14,10 +14,10 @@ use crate::inputs::Gap;
 
 /// The most rows a table holds; the rest are counted below it.
 pub const MAX_ROWS: usize = 300;
-/// The most characters of one string the report shows.
+/// The most characters of one string the run report shows.
 pub const MAX_TEXT: usize = 300;
 
-/// The report's style: no external load, nothing executable.
+/// The run report's style: no external load, nothing executable.
 const STYLE: &str = "body{font:14px/1.4 system-ui,sans-serif;margin:2em;color:#222}\
 table{border-collapse:collapse;margin:1em 0}td,th{border:1px solid #ccc;padding:2px 6px;\
 text-align:left}td.n{text-align:right}.tl{width:100%}.row{display:flex;align-items:center;\
@@ -53,7 +53,7 @@ pub fn text(text: &str) -> String {
     }
 }
 
-/// The report for the run list `runs`, `gaps` being what the review did not review.
+/// The run report for the run list `runs`, `gaps` being what the review did not review.
 #[must_use]
 pub fn render(runs: &AgentRuns, gaps: &[Gap]) -> String {
     let h = &runs.header;

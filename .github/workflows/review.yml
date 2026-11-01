@@ -381,7 +381,7 @@ jobs:
       # The run list review-run wrote after the run, failed or not, on one
       # screen: the verdict, the counts, the wall time and each run
       # whose answer was not taken, by name alone. The run list and the
-      # report, review/report.html, go with the reports below; they
+      # run report, review/report.html, go with the reports below; they
       # hold timings, tokens, costs and gap reasons, never a tool result
       # (ENG-28). It only reports and never fails the review.
       - name: Summarize the review's run list
@@ -395,7 +395,7 @@ jobs:
             echo
             tail -n +2 review/agent-runs.jsonl | jq -r 'select(.status == "gap") | "- gap: \(.name) part \(.part // "-") attempt \(.attempt)"' | head -n 30
             echo
-            echo "The report, report.html, and the run list, agent-runs.jsonl, are in the review-reports artifact."
+            echo "The run report, report.html, and the run list, agent-runs.jsonl, are in the review-reports artifact."
           } >> "$GITHUB_STEP_SUMMARY" || exit 0
       # The reports review-run assembled from the run logs, and the
       # answers, for the post job's gate and for the review's readers:

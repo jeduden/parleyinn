@@ -942,11 +942,11 @@ fn a_report_that_cannot_be_written_is_named_and_changes_no_verdict() {
     assert_eq!(code, EXIT_OK, "{err}");
     assert!(out.starts_with("verdict=approve\n"), "{out}");
     assert!(
-        err.contains("review-run: report: review/report.html not written: "),
+        err.contains("review-run: run report: review/report.html not written: "),
         "{err}"
     );
     assert!(
-        err.contains("review-run: report: 1 of 2 report files not written"),
+        err.contains("review-run: run report: 1 of 2 files not written"),
         "{err}"
     );
 }
