@@ -3,7 +3,8 @@
 # from (scripts/ci-gates.txt, ENG-27), so a defect CI would find shows
 # in a minute. By default it runs the fast gates on what the diff
 # against origin/main touches: formatting, clippy, the tests and the
-# unit-line coverage floor of each touched crate, the markdown, TOML and
+# unit-line coverage floor of each touched crate (with a warning naming
+# the added lines its unit layer leaves uncovered), the markdown, TOML and
 # workflow checks, the srs and scenario gate tests, the cucumber
 # scenarios of the requirement ids the diff names, the ENG-34 line
 # limits and the drift cases the touched files inject. --full adds the
@@ -58,9 +59,10 @@ fi
 git rev-parse -q --verify "$base" > /dev/null || { echo "ci-local: no $base here: git fetch origin main" >&2; exit 2; }
 mb=$(git merge-base "$base" HEAD)
 files=$({ git diff --name-only "$mb"; git ls-files -o --exclude-standard; } | sort -u)
-crates=()
+crates=() dirs=()
 while read -r d; do
-  [ -f "$d/Cargo.toml" ] && crates+=("$(sed -n 's/^name = "\(.*\)"/\1/p' "$d/Cargo.toml" | head -1)")
+  [ -f "$d/Cargo.toml" ] || continue
+  crates+=("$(sed -n 's/^name = "\(.*\)"/\1/p' "$d/Cargo.toml" | head -1)"); dirs+=("$d")
 done < <(printf '%s\n' "$files" | sed -nE 's#^((tooling|crates)/[^/]+)/.*#\1#p' | sort -u)
 # The ids of the requirements the diff touches: the SRS rows it changes
 # and the scenarios whose lines it changes.
@@ -102,6 +104,17 @@ execute() {
   tail -n 40 "$logs/$1.log"; note "$1" FAILED "see $logs/$1.log"; failed=1
 }
 
+# CI's merge counts a line covered by any layer, which a unit-only run
+# cannot see: names the lines the diff adds in crate dir $2 that crate $1's
+# unit layer leaves uncovered, as a warning that never fails the gate.
+warn_uncovered() {
+  local lcov="$logs/$1.lcov" diff="$logs/$1.diff" lines
+  git diff -U0 "$mb" -- "$2" > "$diff"
+  run cargo llvm-cov report --lcov --output-path "$lcov" -p "$1" --ignore-filename-regex "/tests\\.rs$" > /dev/null 2>&1 || return 0
+  lines=$(scripts/uncovered-added.sh "$diff" "$lcov" "$repo" | paste -sd' ' -)
+  [ -z "$lines" ] || note "$1" WARNING "CI also counts the integration and e2e layers; these added lines are uncovered by the unit layer: $lines"
+}
+
 while IFS='|' read -r name fit needs scope ci loc <&3; do
   if [ "${#only[@]}" -gt 0 ]; then [[ " ${only[*]} " == *" $name "* ]] || continue
   elif [ "$fit" = full ] && [ "$full" = no ]; then note "$name" skipped "heavy ($needs): run with --full"; continue
@@ -124,9 +137,10 @@ while IFS='|' read -r name fit needs scope ci loc <&3; do
       execute "$name" "${loc//\{pkgs\}/$pkgs}" ;;
     crate)
       [ "${#crates[@]}" -gt 0 ] || { note "$name" skipped "no touched crate"; continue; }
-      for c in "${crates[@]}"; do
-        floor=$(floor_of "$c"); floor="${floor:-$default_floor}"; cmd="${loc//\{crate\}/$c}"
+      for i in "${!crates[@]}"; do
+        c=${crates[$i]}; floor=$(floor_of "$c"); floor="${floor:-$default_floor}"; cmd="${loc//\{crate\}/$c}"
         execute "$name:$c" "${cmd//\{floor\}/$floor}"
+        [ "$name" != coverage-unit ] || warn_uncovered "$c" "${dirs[$i]}"
       done ;;
     tags)
       [ -n "$tags" ] || { note "$name" skipped "no requirement id in the diff (NFR ids need a release core)"; continue; }
