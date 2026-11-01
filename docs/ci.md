@@ -94,18 +94,17 @@ with the reason for a skip: a gate that needs a CI runner (the end-to-end
 coverage shards, the benchmark, Miri), a core not built, or too little
 free disk. The exit status is 1 when a gate failed.
 
-The unit-line floor is the only coverage CI shows a pull request before
-it merges: `coverage --merge` wants every line of a crate covered by the
-unit, integration and end-to-end layers together, so a line the unit
-layer misses can still pass CI and a line it covers cannot fail. Locally
-only the unit layer runs, so after each crate's unit coverage
-`scripts/uncovered-added.sh` reads the report and the diff and lists the
-lines the diff adds that the unit layer leaves uncovered, as a `WARNING`
-in the summary: "CI also counts the integration and e2e layers; these
-added lines are uncovered by the unit layer". It never fails the gate,
-because the runner cannot tell a line an integration test covers from a
-line nothing covers; cover each listed line with a unit test unless a
-test of another layer takes it.
+CI's coverage merge wants every line of a crate covered by the unit,
+integration and end-to-end layers together. The unit-line floor is only
+the unit layer's share, so a line the unit layer misses can still pass
+here and fail there. Locally only the unit layer runs. After each
+crate's unit coverage `scripts/uncovered-added.sh` reads the report and
+the diff and lists the lines the diff adds that the unit layer leaves
+uncovered, as a `WARNING` in the summary: "CI also counts the
+integration and e2e layers; these added lines are uncovered by the unit
+layer". It never fails the gate, because the runner cannot tell a line
+an integration test covers from a line nothing covers. Cover each listed
+line with a unit test unless a test of another layer takes it.
 
 Builds go to `target/ci-local` with `CARGO_PROFILE_DEV_DEBUG=0` and
 `CARGO_INCREMENTAL=0`: debug information and the incremental cache are
