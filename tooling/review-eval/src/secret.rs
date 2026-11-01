@@ -3,9 +3,10 @@
 //! token before it leaves, and each form of it found is replaced with
 //! [`REDACTED`] and counted (ENG-28, I6). A form is the token itself,
 //! its base64 at any offset in either alphabet, its percent encoding
-//! and its hex, and any token of the Claude shape, `sk-ant-` and a run
-//! of token characters, the review holds or not. A count above zero
-//! means an agent's output held the token: the review fails closed.
+//! and its hex with hex digits in either case, and any token of the
+//! Claude shape, `sk-ant-` and a run of token characters, the review
+//! holds or not. A count above zero means an agent's output held the
+//! token: the review fails closed.
 
 use std::fs;
 use std::io;
@@ -119,12 +120,16 @@ impl Scrubber {
     }
 }
 
-/// Every form `secret` can take in text: itself, its percent encoding,
-/// its hex in either case, and its base64 at each of the three offsets
-/// in either alphabet, the characters the neighbouring bytes share left
-/// off.
+/// Every form `secret` can take in text: itself, its percent encoding
+/// and its hex, each with hex digits in either case, and its base64 at
+/// each of the three offsets in either alphabet, the characters the
+/// neighbouring bytes share left off.
 fn forms_of(secret: &str) -> Vec<String> {
-    let mut forms = vec![secret.to_owned(), percent(secret)];
+    let mut forms = vec![
+        secret.to_owned(),
+        percent(secret, true),
+        percent(secret, false),
+    ];
     let hex: String = secret.bytes().map(|b| format!("{b:02x}")).collect();
     forms.push(hex.to_uppercase());
     forms.push(hex);
@@ -144,14 +149,17 @@ fn forms_of(secret: &str) -> Vec<String> {
     forms
 }
 
-/// `text` percent-encoded: every byte outside the unreserved set.
-fn percent(text: &str) -> String {
+/// `text` percent-encoded: every byte outside the unreserved set, its
+/// hex digits in `upper` case or lower.
+fn percent(text: &str, upper: bool) -> String {
     text.bytes()
         .map(|b| {
             if b.is_ascii_alphanumeric() || b"-._~".contains(&b) {
                 char::from(b).to_string()
-            } else {
+            } else if upper {
                 format!("%{b:02X}")
+            } else {
+                format!("%{b:02x}")
             }
         })
         .collect()

@@ -64,6 +64,17 @@ fn the_token_percent_or_hex_encoded_is_replaced() {
 }
 
 #[test]
+fn the_token_percent_encoded_with_lowercase_hex_is_replaced() {
+    let odd = "tok/en+with=odd&chars-0123456789";
+    let s = Scrubber::new(&[odd]);
+
+    let (text, n) = s.scrub("q=tok%2fen%2bwith%3dodd%26chars-0123456789&x");
+
+    assert_eq!(text, format!("q={REDACTED}&x"));
+    assert_eq!(n, 1);
+}
+
+#[test]
 fn any_token_of_the_claude_shape_is_replaced_even_unknown() {
     let s = Scrubber::new(&[]);
 
