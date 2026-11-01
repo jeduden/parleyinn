@@ -74,15 +74,56 @@ fn id_shaped(word: &str) -> bool {
     }
 }
 
-/// The identities of a specialist's findings in its report `text`.
+/// The identities of the findings a specialist's report `text` still
+/// holds: its lines applied in order as the review's report assembly
+/// does, a revision replacing every finding at its place (and standing
+/// as a finding where none did) and a withdrawal removing every finding
+/// at its place.
 #[must_use]
 pub fn of_report(text: &str) -> BTreeSet<Fid> {
-    text.lines()
-        .filter_map(|l| of_line(&report::line(l)))
-        .collect()
+    let mut held: Vec<(Place, Fid)> = Vec::new();
+    for l in text.lines() {
+        match report::line(l) {
+            Line::Revised(r) => {
+                let place = (r.path, r.line);
+                if let Some(finding) = of_line(&report::line(&r.finding)) {
+                    replace(&mut held, &place, finding);
+                }
+            }
+            Line::Withdrawn(w) => held.retain(|(at, _)| *at != (w.path.clone(), w.line)),
+            read => {
+                if let Some(found) = of_line(&read) {
+                    held.push((place_of(&read), found));
+                }
+            }
+        }
+    }
+
+    held.into_iter().map(|(_, fid)| fid).collect()
 }
 
-/// The identity of the finding a report line holds.
+/// A finding's place: its path and line.
+type Place = (String, usize);
+
+/// The place a finding line stands at.
+fn place_of(line: &Line) -> Place {
+    match line {
+        Line::Linked(l) => (l.path.clone(), l.line),
+        Line::Request(r) => (r.path.clone(), r.line),
+        _ => (String::new(), 0),
+    }
+}
+
+/// Puts `with` where the first finding at `place` stands and removes
+/// the rest there; a place with none holds `with` alone.
+fn replace(held: &mut Vec<(Place, Fid)>, place: &Place, with: Fid) {
+    let first = held.iter().position(|(at, _)| at == place);
+    held.retain(|(at, _)| at != place);
+    let at = first.map_or(held.len(), |f| f.min(held.len()));
+    held.insert(at, (place.clone(), with));
+}
+
+/// The identity of the finding a linked or request line holds.
 fn of_line(line: &Line) -> Option<Fid> {
     match line {
         Line::Linked(l) => Some(Fid::new(&l.path, l.ids.clone(), &l.consequence)),
@@ -91,7 +132,6 @@ fn of_line(line: &Line) -> Option<Fid> {
             Vec::new(),
             &format!("request: {} {}", r.change, r.requirement),
         )),
-        Line::Revised(r) => of_line(&report::line(&r.finding)),
         _ => None,
     }
 }

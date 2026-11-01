@@ -88,3 +88,51 @@ fn a_review_s_findings_are_each_specialist_s_report_and_each_generalist_s_answer
     assert_eq!(review["lang-rust"].len(), 1);
     assert_eq!(review["review-code"].len(), 1);
 }
+
+#[test]
+fn a_revision_replaces_the_finding_it_revises_and_a_withdrawal_removes_it() {
+    let one = |line: &str| of_report(&format!("{line}\n"));
+    let revised = of_report(
+        "a.rs:1 — if not addressed: x — I1\n\
+         b.rs:2 — if not addressed: kept — I2\n\
+         revised: a.rs:1 — if not addressed: y — I3\n",
+    );
+    assert_eq!(
+        revised,
+        BTreeSet::from([
+            Fid::new("a.rs", vec!["I3".to_owned()], "y"),
+            Fid::new("b.rs", vec!["I2".to_owned()], "kept"),
+        ])
+    );
+
+    let withdrawn = of_report(
+        "a.rs:1 — if not addressed: x — I1\n\
+         withdrawn: a.rs:1 — wrong\n\
+         b.rs:2 — request: add a requirement for z — why\n",
+    );
+    assert_eq!(
+        withdrawn,
+        one("b.rs:2 — request: add a requirement for z — why")
+    );
+
+    // A revision of a place nothing stood at is a finding; a withdrawal
+    // of one removes nothing; a finding stated after its withdrawal stands.
+    let fresh = of_report(
+        "withdrawn: z.rs:9 — nothing\n\
+         revised: a.rs:1 — if not addressed: y — I3\n\
+         a.rs:1 — if not addressed: y — I3\n\
+         revised: a.rs:1 — request: change r — because\n",
+    );
+    assert_eq!(fresh, one("a.rs:1 — request: change r — because"));
+    let again = of_report(
+        "a.rs:1 — if not addressed: x — I1\nwithdrawn: a.rs:1 — w\na.rs:1 — if not addressed: x — I1\n",
+    );
+    assert_eq!(again.len(), 1);
+}
+
+#[test]
+fn a_revision_that_is_no_finding_changes_nothing() {
+    let report = "a.rs:1 — if not addressed: x — I1\nrevised: a.rs:1 — no finding here\n";
+
+    assert_eq!(of_report(report).len(), 1);
+}
