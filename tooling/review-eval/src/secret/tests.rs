@@ -44,8 +44,15 @@ fn the_token_base64_encoded_at_any_offset_is_replaced() {
             encode(raw.as_bytes(), URL_SAFE),
         ] {
             let (text, n) = s.scrub(&format!("blob {encoded} end"));
-            assert!(n >= 1, "{prefix:?}: {encoded}");
-            assert!(text.contains(REDACTED), "{text}");
+            assert_eq!(n, 1, "{prefix:?}: {encoded}");
+            // Only the characters that hold a neighbouring byte's bits,
+            // and the prefix's own, are left beside the replacement.
+            let inner = text
+                .strip_prefix("blob ")
+                .and_then(|t| t.strip_suffix(" end"));
+            let (head, tail) = inner.and_then(|t| t.split_once(REDACTED)).unwrap();
+            assert!(encoded.starts_with(head) && head.len() <= 4, "{text}");
+            assert!(encoded.ends_with(tail) && tail.len() <= 4, "{text}");
         }
     }
 }
@@ -56,7 +63,8 @@ fn the_token_percent_or_hex_encoded_is_replaced() {
     let s = Scrubber::new(&[odd]);
 
     let (text, n) = s.scrub("q=tok%2Fen%2Bwith%3Dodd%26chars-0123456789&x");
-    assert_eq!(n, 1, "{text}");
+    assert_eq!(text, format!("q={REDACTED}&x"));
+    assert_eq!(n, 1);
     let hex: String = TOKEN.bytes().map(|b| format!("{b:02x}")).collect();
     let (text, n) = Scrubber::new(&[TOKEN]).scrub(&format!("[{hex}] [{}]", hex.to_uppercase()));
     assert_eq!(text, format!("[{REDACTED}] [{REDACTED}]"));
