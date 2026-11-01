@@ -234,3 +234,21 @@ fn a_gap_list_and_an_unreadable_reports_directory_are_read_and_named() {
     assert_eq!(notes.len(), 1, "{notes:?}");
     assert!(notes[0].contains("does not read"), "{notes:?}");
 }
+
+#[test]
+fn a_report_entry_that_does_not_read_is_named_and_the_rest_are_read() {
+    let dir = TempDir::new().unwrap();
+    fs::write(dir.path().join("lang-rust.md"), "text").unwrap();
+    let paths = vec![
+        Err(io::Error::other("gone")),
+        Ok(dir.path().join("lang-rust.md")),
+    ];
+    let mut notes = Vec::new();
+    let mut reports = BTreeMap::new();
+
+    read_reports(paths.into_iter(), dir.path(), &mut notes, &mut reports);
+
+    assert_eq!(notes.len(), 1, "{notes:?}");
+    assert!(notes[0].ends_with("does not read: gone"), "{notes:?}");
+    assert_eq!(reports.get("lang-rust").map(String::as_str), Some("text"));
+}

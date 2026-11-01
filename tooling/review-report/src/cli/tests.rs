@@ -37,6 +37,7 @@ fn a_wrong_command_line_prints_the_usage() {
         &[][..],
         &["other"],
         &["review"],
+        &["write"],
         &["write", "--out", "x"],
         &["stability", "--out", "x", "one"],
         &["stability", "--in", "x", "one", "two"],

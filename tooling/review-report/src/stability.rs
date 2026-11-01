@@ -31,7 +31,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::io;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use serde::Serialize;
 
@@ -249,11 +249,25 @@ fn reports(dir: &Path, notes: &mut Vec<String>) -> BTreeMap<String, String> {
             return reports;
         }
     };
-    for entry in entries {
-        let path = match entry {
-            Ok(entry) => entry.path(),
+    let paths = entries.map(|entry| entry.map(|entry| entry.path()));
+    read_reports(paths, &reports_dir, notes, &mut reports);
+    reports
+}
+
+/// Reads each `.md` file among `paths`, the entries of `dir`, into
+/// `reports` by name; an entry or file that does not read is named in
+/// `notes`.
+fn read_reports(
+    paths: impl Iterator<Item = io::Result<PathBuf>>,
+    dir: &Path,
+    notes: &mut Vec<String>,
+    reports: &mut BTreeMap<String, String>,
+) {
+    for path in paths {
+        let path = match path {
+            Ok(path) => path,
             Err(e) => {
-                notes.push(format!("{} does not read: {e}", reports_dir.display()));
+                notes.push(format!("{} does not read: {e}", dir.display()));
                 continue;
             }
         };
@@ -271,8 +285,6 @@ fn reports(dir: &Path, notes: &mut Vec<String>) -> BTreeMap<String, String> {
             Err(e) => notes.push(format!("{} does not read: {e}", path.display())),
         }
     }
-
-    reports
 }
 
 /// The review in work directory `dir`: its verdict, each specialist's
