@@ -305,6 +305,29 @@ fn starts_cli_reads_a_command_started_through_another() {
 }
 
 #[test]
+fn starts_cli_reads_every_wrapper_a_subshell_and_a_shell_s_command() {
+    for line in [
+        "          npx --yes claude -p review",
+        "          command claude -p review",
+        "          nohup claude -p review",
+        "          time claude -p review",
+        "          sudo -E claude -p review",
+        "          timeout 30m claude -p review",
+        "          timeout -k 5 30m claude -p review",
+        "          bash -c \"claude -p review\"",
+        "          sh -c 'cd pr-head; claude -p review'",
+        "          (claude -p review)",
+        "          out=$(claude -p review)",
+        "          echo `claude -p review`",
+    ] {
+        assert!(starts_cli(line), "{line}");
+    }
+    assert!(!starts_cli("          timeout 30m cargo run -p review-run"));
+    assert!(!starts_cli("          bash -c \"echo claude\""));
+    assert!(!starts_cli("          out=$(git rev-parse HEAD)"));
+}
+
+#[test]
 fn key_held_apart_refuses_the_command_line_in_the_key_s_job() {
     let mut w = parse(REVIEW_FLOW);
     w.jobs[1].text.push_str(CLI);
@@ -834,6 +857,12 @@ fn run_logs_stay_in_the_agent_job() {
         "review",
         ".",
         "review/**",
+        "review/**/*.jsonl",
+        "**/*.jsonl",
+        "./**",
+        "review/log?/",
+        "review/[l]ogs/",
+        "|\n            review/\n            !review/**/*.jsonl",
         "|\n            review/reports/\n            review/logs/agent.jsonl",
     ] {
         let mut leaks = parse(REVIEW_FLOW);

@@ -163,14 +163,19 @@ fn installs_cli(text: &str) -> bool {
 }
 
 /// The commands that start the command after them, as `npx` and `env`
-/// do, each skipped with its flags to find what a script line starts.
-const WRAPPERS: [&str; 7] = ["env", "npx", "exec", "command", "nohup", "time", "sudo"];
+/// do, each skipped with its flags to find what a script line starts;
+/// `timeout` with its duration too, and a shell with the `-c` command it
+/// is given.
+const WRAPPERS: [&str; 10] = [
+    "env", "npx", "exec", "command", "nohup", "time", "sudo", "timeout", "bash", "sh",
+];
 
 /// Whether `line` of a job starts the Claude Code command line itself:
 /// `claude`, a path to it or the npm package the first word of any
-/// command on a script line, after its assignments and any wrapper such
-/// as `env` or `npx`, so whatever tools and permission mode it passes go
-/// past review-run's and review-eval's.
+/// command on a script line, in a subshell or a command substitution
+/// too, after its assignments and any wrapper such as `env`, `npx` or
+/// `bash -c`, so whatever tools and permission mode it passes go past
+/// review-run's and review-eval's.
 fn starts_cli(line: &str) -> bool {
     let line = line.trim_start();
     let line = line.strip_prefix("- ").unwrap_or(line).trim_start();
@@ -179,10 +184,11 @@ fn starts_cli(line: &str) -> bool {
         return false;
     }
 
-    line.split(['&', '|', ';']).any(|command| {
+    line.split(['&', '|', ';', '(', ')', '`']).any(|command| {
         let mut rest = without_assignments(command.trim());
         loop {
             let (word, after) = rest.split_once(' ').unwrap_or((rest, ""));
+            let word = word.trim_matches(['"', '\'']);
             if !WRAPPERS.contains(&word) {
                 return word == "claude"
                     || word.ends_with("/claude")
@@ -191,7 +197,11 @@ fn starts_cli(line: &str) -> bool {
                         .is_some_and(|v| v.is_empty() || v.starts_with('@'));
             }
             rest = after.trim_start();
-            while rest.starts_with('-') {
+            let skipped = |r: &str| {
+                r.starts_with('-')
+                    || (word == "timeout" && r.starts_with(|c: char| c.is_ascii_digit()))
+            };
+            while skipped(rest) {
                 rest = rest.split_once(' ').map_or("", |(_, r)| r.trim_start());
             }
             rest = without_assignments(rest);
@@ -243,7 +253,8 @@ fn upload_paths(step: &str) -> Vec<String> {
 }
 
 /// Whether the upload `paths` carry `dir` out of the job: a path at or
-/// under it, or one above it that no `!` path excludes it from. Only a
+/// under it, or one above it, or a glob that can match it, that no `!`
+/// path excludes it from. Only a
 /// `!` path at `dir` or above it excludes it: one under it, a single
 /// log, leaves the rest uploaded.
 fn uploads_dir(paths: &[String], dir: &str) -> bool {
@@ -265,11 +276,18 @@ fn uploads_dir(paths: &[String], dir: &str) -> bool {
         .map(&bare)
         .any(|p| p == dir || above(&p));
 
+    // A glob can match anything under what comes before its first
+    // wildcard, `dir` included when that is a prefix of it.
     paths
         .iter()
         .filter(|p| !p.starts_with('!'))
-        .map(|p| bare(p))
-        .any(|p| p.starts_with(dir) || (!excluded && above(&p)))
+        .any(|p| match p.find(['*', '?', '[']) {
+            Some(at) if !excluded && dir.starts_with(&bare(&p[..at])) => true,
+            _ => {
+                let p = bare(p);
+                p.starts_with(dir) || (!excluded && above(&p))
+            }
+        })
 }
 
 /// The tools of the comma-separated `tools` other than reading:
