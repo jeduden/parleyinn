@@ -48,40 +48,50 @@ how the components ship.
 
 §12.2 lists M1's scope, and this plan takes all of it. These rows land in full:
 
-- REC P0, PRV P0 (PRV-01 to PRV-06, PRV-08, PRV-09, PRV-11, PRV-14)
-  and RCL P0, with RCL-08
-- MEM-01, SEC-02 to SEC-08, SEC-12, SEC-15, SEC-16, SEC-18 and SEC-22
-- OPS-01 to OPS-03, ADM-04, ADM-09 and ADM-11
+- REC P0, PRV P0 but PRV-09 (PRV-01, -02, -04, -05, -06 and -08 in
+  part, below) and RCL P0, with RCL-08
+- MEM-01, SEC-02 to SEC-07, SEC-15, SEC-16, SEC-18 and SEC-22
+- OPS-01 to OPS-03, ADM-04 and ADM-11
 - LANE-02 and OWN-01
 
 These land in part, as §12.2 bounds them or as their scenarios reach past M1:
 
-| Row            | M1's part                                                               | The rest                             |
-| -------------- | ----------------------------------------------------------------------- | ------------------------------------ |
-| REC-19         | ingest seats, holding a run's events, closing segments, verify's report | sealing, M7                          |
-| LANE-16        | the owner's device seat, a run seat's contributor role                  | other roles, M7                      |
-| LANE-23        | how a seat id derives                                                   | joins, M2 and M7                     |
-| LANE-31        | the rule for two branch links naming one branch                         | room state, M7                       |
-| SEC-01         | the core's row: no socket, no program start, one component per process  | the B1 components, M7                |
-| SEC-27         | the new seat and writer a key minted in place starts                    | rotation, M7                         |
-| OWN-11, OWN-12 | the act classes; widening acts only through the CLI at a terminal       | other surfaces, M7                   |
-| OWN-22         | the precondition: every run counts as unsandboxed                       | sandbox state, M7                    |
-| PRV-12         | the key event log, rotation and recovery                                | M3, M7, M8, PRV-10                   |
-| PRV-13         | origin from the record and the key set                                  | arrival, M3, M8, M9                  |
-| ENG-08         | every property but the restore delimiters'                              | restore delimiters, M2               |
-| ENG-10         | the envelope's golden files                                             | the restore block's, M2              |
-| ENG-17         | the contract replay, drift and residual-identifier checks               | the nightly run through restore, M2  |
-| ADM-05         | versions, and the refusal of a newer one                                | migration and its backup, M3         |
-| ADM-07         | `parinn purge --range`                                                  | other scopes, SEC-31, seals, M3      |
-| SEC-10         | keys kept per ruling 2; no key in the store, a log or output            | backup M3, at-rest key M5, launch M7 |
-| LANE-01        | routing to personal-room and device seats; branch links                 | joins, M2 and M7                     |
-| ADM-13         | the core writes to no git repository                                    | install M2; commit hook, launcher M7 |
-| SEC-17, SEC-19 | the threat model and the register's check, as tripwires                 | the review and the release gate      |
-| ENG-22         | statements found by phrase, each citing a test that exists              | every statement, a passing test      |
+| Row                             | M1's part                                                               | The rest                                                                |
+| ------------------------------- | ----------------------------------------------------------------------- | ----------------------------------------------------------------------- |
+| REC-19                          | ingest seats, holding a run's events, closing segments, verify's report | sealing, M7                                                             |
+| LANE-16                         | the owner's device seat, a run seat's contributor role                  | other roles, M7                                                         |
+| LANE-23                         | how a seat id derives                                                   | joins, M2 and M7                                                        |
+| LANE-31                         | the rule for two branch links naming one branch                         | room state, M7                                                          |
+| SEC-01                          | the core's row: no socket, no program start, one component per process  | the B1 components, M7                                                   |
+| SEC-27                          | the new seat and writer a key minted in place starts                    | rotation, M7                                                            |
+| OWN-11, OWN-12                  | the act classes; widening acts only through the CLI at a terminal       | other surfaces, M7                                                      |
+| OWN-22                          | the precondition: every run counts as unsandboxed                       | sandbox state, M7                                                       |
+| PRV-12                          | the key event log, rotation and recovery                                | M3, M7, M8, PRV-10                                                      |
+| PRV-13                          | origin from the record and the key set                                  | arrival, M3, M8, M9                                                     |
+| ENG-08                          | every property but the restore delimiters'                              | restore delimiters, M2                                                  |
+| ENG-10                          | the envelope's golden files                                             | the restore block's, M2                                                 |
+| ENG-17                          | the contract replay, drift and residual-identifier checks               | the nightly run through restore, M2                                     |
+| ADM-05                          | versions, and the refusal of a newer one                                | migration and its backup, M3                                            |
+| ADM-07                          | `parinn purge --range`                                                  | other scopes, SEC-31, seals, M3                                         |
+| SEC-10                          | keys kept per ruling 2; no key in the store, a log or output            | backup M3, at-rest key M5, launch M7                                    |
+| LANE-01                         | routing to personal-room and device seats; branch links                 | joins, M2 and M7                                                        |
+| ADM-13                          | the core writes to no git repository                                    | install M2; commit hook, launcher M7                                    |
+| SEC-17, SEC-19                  | the threat model and the register's check, as tripwires                 | review and release gate, M5; B1 to B3 reach, M7                         |
+| ENG-22                          | statements found by phrase, each citing a test that exists              | every statement, a passing test, M5                                     |
+| SEC-12                          | quarantine by selector: seven of its eight rows                         | the flag row, PRV-07, M5                                                |
+| SEC-08                          | redaction in `parinn ingest` and the hook handlers                      | `parinn purge --run`, M3                                                |
+| ADM-09                          | verify's rows but the landmark row                                      | the landmark row, M3                                                    |
+| ENG-06                          | kills of ingest, purge and rebuild                                      | kills of migration, M3                                                  |
+| ENG-15                          | the suite and gate for NFR-02 to NFR-04 and NFR-05's floor              | NFR-01, M7; NFR-05's target, M5                                         |
+| PRV-01, -02, -04, -05, -06, -08 | rows a transcript, hook input or the key set prove                      | a signed sandbox state, rooms, the launcher, M7; another node's key, M8 |
 
 A scenario of a row that lands in part stays `@pending`, its M1 part
 proven by bound steps or named tests, as ENG-12 in plan 2609292011. One
 that cannot pass as written is a finding to raise, never re-pended.
+
+The "rest" column and §12.2 give each item the milestone that can do it.
+PRV-09 went whole to M8, ENG-23 to M5 and ENG-29 to M7.
+phase-16.result.md lists what M1 still owes: bound steps and rulings.
 
 Each test kind lands with its code: ENG-07's fuzz targets, ENG-08's
 properties, ENG-06, ENG-17 and NFR-01 to NFR-05's benchmarks (ENG-15).
@@ -177,37 +187,38 @@ changed M1's row in §12.2.
     SEC-06, SEC-07; the estimator ported from S8; the envelope's golden
     files (ENG-10), its round-trip property and its encoder's fuzz
     target; freeze RCL-03's cap
-14. Quarantine and `parinn purge --range`: SEC-12, RCL-06, REC-17,
+14. Quarantine and `parinn purge --range`: SEC-12 in part, RCL-06, REC-17,
     ADM-07 in part; crash consistency over purge (ENG-06)
-15. Operations: ADM-09, ADM-11, OPS-01, SEC-01's core row, SEC-15,
-    SEC-17, SEC-19; every privacy statement tied to its test (ENG-22)
-16. Exit: the NFR-05 benchmark; ENG-11's coverage floors; ENG-23's
-    migration tests; the `parinn-eval` module of §11.1 and its recall
-    evaluation; the two-writer rebuild test (S12)
+15. Operations: ADM-09 in part, ADM-11, OPS-01, SEC-01's core row, SEC-15,
+    SEC-17 and SEC-19 in part; every privacy statement tied to its test
+    (ENG-22 in part)
+16. Exit: the NFR-05 floor benchmark; ENG-11's coverage floors; the
+    `parinn-eval` module of §11.1 and its recall evaluation; the
+    two-writer rebuild test (S12)
 
 ## Execution
 
 Phase 1 fixed the test approach; ENG-18's rewording landed before 4, 5
 and 7. Tracks 2-3; 4; 5-6; 7 ran in parallel; 8 to 16 run in order.
 
-| Phase | Model  | Gate                                                                                                                                                     |
-| ----- | ------ | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1     | opus   | The slice's end-to-end test in an isolated home; `@REC-10` passes                                                                                        |
-| 2     | sonnet | `@SEC-02`, `@SEC-03`, `@OPS-02`, `@OPS-03` and `@ENG-04` pass                                                                                            |
-| 3     | opus   | Its end-to-end tests pass; so do ADM-04's rows 1 to 4 and the M1 steps of OWN-11, -12 and -22                                                            |
-| 4     | sonnet | `@SEC-05`, `@SEC-08`, `@SEC-18` and `@ENG-05` pass; no fixture secret reaches the store or a log                                                         |
-| 5     | opus   | `@PRV-09`, `@PRV-11` and `@REC-24` pass; PRV-12, SEC-10, SEC-27, LANE-16 and LANE-23's M1 steps bound and passing                                        |
-| 6     | opus   | `@REC-09` and `@REC-12` pass; REC-19's segment steps pass; a newer segment or store is refused; the crash-consistency job runs nightly                   |
-| 7     | opus   | `@PRV-01`, `@PRV-03`, `@PRV-08`, `@REC-05` and `@REC-26` pass; the parser's fuzz target and the residual-identifier drift case run                       |
-| 8     | opus   | `@REC-01` to `@REC-04`, `@REC-07`, `@REC-08`, `@REC-22` and PRV-05's transcript rows pass; both properties hold; NFR-04 benchmarked                      |
-| 9     | opus   | `@SEC-16`, `@NFR-02` and `@PRV-04`'s rows 1-3 pass; REC-19's holding steps bound; NFR-01 and NFR-02 benchmarked                                          |
-| 10    | opus   | `@REC-06`, `@REC-13` and `@PRV-14` pass against a live MCP server                                                                                        |
-| 11    | opus   | `@PRV-02`, `@PRV-06`, `@LANE-02`, `@OWN-01` and `@MEM-01` pass; PRV-13, LANE-01, LANE-31 and ADM-13's M1 steps pass                                      |
-| 12    | sonnet | `@REC-11`, `@SEC-04` and `@RCL-02` pass; NFR-03 benchmarked                                                                                              |
-| 13    | opus   | `@RCL-01`, `@RCL-03` to `@RCL-05`, `@RCL-07`, `@RCL-08`, `@SEC-06` and `@SEC-07` pass; the envelope's golden files match                                 |
-| 14    | opus   | `@SEC-12`, `@RCL-06`, `@REC-17` and `@SEC-22` pass; a purged event leaves nothing confirming a guess                                                     |
-| 15    | sonnet | `@ADM-09`, `@ADM-11`, `@OPS-01`, `@SEC-15`, `@SEC-17`, `@SEC-19` and `@ENG-22` pass; SEC-01's core row passes                                            |
-| 16    | opus   | `@ENG-03`, `@ENG-06`, `@ENG-07`, `@ENG-09`, `@ENG-11`, `@ENG-15`, `@ENG-23` and `@ENG-29` pass; 95% recall in `parinn-eval`; the S12 rebuild test passes |
+| Phase | Model  | Gate                                                                                                                                   |
+| ----- | ------ | -------------------------------------------------------------------------------------------------------------------------------------- |
+| 1     | opus   | The slice's end-to-end test in an isolated home; `@REC-10` passes                                                                      |
+| 2     | sonnet | `@SEC-02`, `@SEC-03`, `@OPS-02`, `@OPS-03` and `@ENG-04` pass                                                                          |
+| 3     | opus   | Its end-to-end tests pass; so do ADM-04's rows 1 to 4 and the M1 steps of OWN-11, -12 and -22                                          |
+| 4     | sonnet | `@SEC-05`, `@SEC-08`, `@SEC-18` and `@ENG-05` pass; no fixture secret reaches the store or a log                                       |
+| 5     | opus   | `@PRV-11` passes; REC-24 awaits a ruling; PRV-12, SEC-10, SEC-27, LANE-16 and LANE-23's M1 steps pass                                  |
+| 6     | opus   | `@REC-09` and `@REC-12` pass; REC-19's segment steps pass; a newer segment or store is refused; the crash-consistency job runs nightly |
+| 7     | opus   | `@PRV-03`, `@REC-05` and `@REC-26` pass; PRV-01 and PRV-08's M1 rows pass; the parser's fuzz target runs                               |
+| 8     | opus   | `@REC-01` to `@REC-04`, `@REC-07`, `@REC-08`, `@REC-22` and PRV-05's transcript rows pass; both properties hold; NFR-04 benchmarked    |
+| 9     | opus   | `@SEC-16`, `@NFR-02` and `@PRV-04`'s rows 1-3 pass; REC-19's holding steps bound; NFR-01 and NFR-02 benchmarked                        |
+| 10    | opus   | `@REC-06`, `@REC-13` and `@PRV-14` pass against a live MCP server                                                                      |
+| 11    | opus   | `@OWN-01` and `@MEM-01` pass; LANE-02 awaits a ruling; PRV-02, PRV-06, PRV-13, LANE-01, LANE-31 and ADM-13's M1 steps pass             |
+| 12    | sonnet | `@REC-11`, `@SEC-04` and `@RCL-02` pass; NFR-03 benchmarked                                                                            |
+| 13    | opus   | `@RCL-01`, `@RCL-03` to `@RCL-05`, `@RCL-07`, `@RCL-08`, `@SEC-06` and `@SEC-07` pass; the envelope's golden files match               |
+| 14    | opus   | `@RCL-06`, `@REC-17` and `@SEC-22` pass; SEC-12's seven rows pass; a purged event leaves nothing confirming a guess                    |
+| 15    | sonnet | `@ADM-11`, `@OPS-01` and `@SEC-15` pass; ADM-09, SEC-17, SEC-19 and ENG-22's M1 parts pass; SEC-01's core row passes                   |
+| 16    | opus   | `@ENG-03`, `@ENG-07` and `@ENG-11` pass; ENG-06 and ENG-15's M1 parts hold; 95% recall in `parinn-eval`; the S12 rebuild test passes   |
 
 ## Phases
 
@@ -261,7 +272,7 @@ footer: |
 | 14  | ✅     | [Quarantine and parinn purge --range](phase-14.md)                                                                                                                                                                                                                                                                                                                                                                     |
 |     | ↳      | @RCL-06, @REC-17 and @SEC-22 off @pending and passing; so are @RCL-08 and @REC-06, whose purged-range steps now run. A purge erases a range and records a tombstone in one transaction, a quarantine holds events out of recall by selector, and an ingest purges what a retention policy has aged out. @SEC-12 passes seven rows of eight and stays @pending: its flag row needs PRV-07 (M5).                         |
 | 15  | ✅     | [Operations: verify, status, audit, the boundary and the threat model](phase-15.md)                                                                                                                                                                                                                                                                                                                                    |
-|     | ↳      | @ADM-11, @OPS-01 and @SEC-15 off @pending and passing; SEC-01's core row passes as gate tests. @ADM-09 passes seven rows of eight and stays @pending (landmarks, M2). @SEC-17, @SEC-19 and @ENG-22 are bound in part and stay @pending, their findings raised below.                                                                                                                                                   |
+|     | ↳      | @ADM-11, @OPS-01 and @SEC-15 off @pending and passing; SEC-01's core row passes as gate tests. @ADM-09 passes seven rows of eight and stays @pending (landmarks, M3). @SEC-17, @SEC-19 and @ENG-22 are bound in part and stay @pending, their findings raised below.                                                                                                                                                   |
 | 16  | ✅     | [Exit: the engineering gates, the recall evaluation and the S12 rebuild test](phase-16.md)                                                                                                                                                                                                                                                                                                                             |
 |     | ↳      | @ENG-03, @ENG-07 and @ENG-11 off @pending and passing. parinn-eval recalls 216 of 216 planted values after one to three compactions within ten hits; the S12 rebuild test passes. @ENG-06, @ENG-09, @ENG-15, @ENG-23 and @ENG-29 stay @pending, each raised.                                                                                                                                                           |
 <?/catalog?>
@@ -277,14 +288,15 @@ footer: |
 - [x] Two writers' logs rebuild one search index identical in content
   in either order (S12)
 - [ ] A purged event leaves no value that confirms a guess at it
-  (open: phase-15.result.md's erasure residue finding)
+  (awaiting ruling: phase-15.result.md's erasure residue finding)
 - [x] Every dependency M1 adds has an accepted ADR (ENG-18, ENG-26),
   within the budget the stakeholder rules
 - [x] ENG-11's coverage floors hold for every security-sensitive crate
 - [x] The fuzz targets of ENG-07 run nightly from committed corpora
 - [x] The six targets §12.3 assigns to M1 are frozen, each with its
   evidence
-- [ ] @ENG-03 (passes) and @ENG-15 close plan 2609292011's 3 and 4
+- [ ] @ENG-03 passes and closes plan 2609292011's 3; its 4 (@ENG-15)
+  closes with NFR-01 in M7 and NFR-05's target in M5
 - [x] All tests pass: `cargo test --workspace`
 - [x] `cargo clippy --workspace --all-targets --locked -- -D warnings`
   and `cargo fmt --all --check` are clean

@@ -85,15 +85,15 @@ For the stakeholder:
 - Inherited items untouched: S2 `integrity`, phase 14/15 counters and
   renames, `tombstones`.
 
-Plan close (stays 🔳): met are recall, S12, dependencies, ENG-11,
-fuzzing, frozen targets, tests and checks. Open: the raised full-row
-scenarios (SEC-12, SEC-17, SEC-19, ENG-22, ADM-09, RCL-02, PRV-09,
-REC-24, LANE-02), the in-part rows' audit, verify's landmark row, the
-erasure residue (phase 15), and ENG-15.
+Plan close (stays 🔳): met are recall, S12 and the checks. The raised
+items moved (plan.md, §12.2). To M3: ADM-09's landmark row, ENG-06's
+migration, SEC-08's `purge --run`. To M5: SEC-12's flag row, SEC-17,
+ENG-22, ENG-23, NFR-05's target. To M7: SEC-19, ENG-29, NFR-01, the PRV
+remainders. To M8: PRV-09. Open in M1: bound steps for RCL-02 and
+ADM-09's other rows; rulings on LANE-02, REC-24, ENG-09, the residue.
 
 - [x] ADM-09's two pending-purge rows (PR #90) are bound and pass
-- [ ] The phase closing ADM-09 binds the rest: the deadline row, the
-  source, ingest marker and consumed-prefix rows, and the landmark row
-  (M2)
+- [ ] M1 binds ADM-09's deadline, source, ingest marker and
+  consumed-prefix rows; the landmark row is M3's
 
 [consent]: https://github.com/jeduden/parleyinn/pull/91#issuecomment-6402652493
