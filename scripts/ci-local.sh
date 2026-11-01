@@ -68,10 +68,10 @@ ids=$({
   git diff -U0 "$mb" -- docs/srs | sed -nE 's/^\+\| ([A-Z]{2,4}-[0-9]+) .*/\1/p'
   git diff -U0 "$mb" -- features | awk '/^\+\+\+ b\// { f = substr($2, 3) } /^@@/ { split($3, r, ","); print f, substr(r[1], 2) + 0 }' |
     while read -r f n; do
-      awk -v n="$n" '/^ *@/ { for (i = 1; i <= NF; i++) if ($i ~ /^@[A-Z]{2,4}-[0-9]+$/) id = substr($i, 2) } NR >= n { print id; exit }' "$f"
+      awk -v n="$n" '/^ *@/ { for (i = 1; i <= NF; i++) if ($i ~ /^@[A-Z][A-Z]+-[0-9]+$/) id = substr($i, 2) } NR >= n { print id; exit }' "$f"
     done
 } | grep . | sort -u || true)
-tags=$(printf '%s\n' $ids | grep -v '^NFR-' | sed 's/^/@/' | paste -sd' ' - | sed 's/ / or /g' || true)
+tags=$(printf '%s\n' $ids | grep -v '^NFR-' | grep . | sed 's/^/@/' | paste -sd' ' - | sed 's/ / or /g' || true)
 echo "ci-local: $(printf '%s\n' "$files" | grep -c .) changed files; crates: ${crates[*]:-none}; ids: ${ids//$'\n'/ }"
 echo "ci-local: target $CARGO_TARGET_DIR, debug=$CARGO_PROFILE_DEV_DEBUG incremental=$CARGO_INCREMENTAL, free-space floor ${min_gb} GB"
 
@@ -98,7 +98,7 @@ size_check() {
 execute() {
   local start=$SECONDS
   echo "ci-local: running $1 ..."
-  if [ "$2" = @size ]; then size_check > "$logs/$1.log" 2>&1; else run bash -c "$2" < /dev/null > "$logs/$1.log" 2>&1; fi && { note "$1" ran "$((SECONDS - start)) s"; cat "$logs/$1.log" | grep '^  nit:' || true; return 0; }
+  if [ "$2" = @size ]; then size_check > "$logs/$1.log" 2>&1; else run bash -c "$2" < /dev/null > "$logs/$1.log" 2>&1; fi && { note "$1" ran "$((SECONDS - start)) s $(awk '/^TOTAL/ { print "lines " $10 }' "$logs/$1.log")"; grep '^  nit:' "$logs/$1.log" || true; return 0; }
   tail -n 40 "$logs/$1.log"; note "$1" FAILED "see $logs/$1.log"; failed=1
 }
 
@@ -116,10 +116,11 @@ while IFS='|' read -r name fit needs scope ci loc <&3; do
   need=$((min_gb / 2)); [ "$fit" = full ] && need=$min_gb
   case "$loc" in *cargo* | @size) [ "$(free_gb)" -ge "$need" ] || { note "$name" skipped "$(free_gb) GB free, below the $need GB floor (PARINN_CI_MIN_FREE_GB)"; continue; } ;; esac
   case "$scope" in
-    pkgs)
-      if [ "$full" = yes ]; then pkgs=--workspace
-      elif [ "${#crates[@]}" -eq 0 ]; then note "$name" skipped "no touched crate"; continue
-      else pkgs=$(printf -- '-p %s ' "${crates[@]}"); fi
+    pkgs | units)
+      sel=(${crates[@]+"${crates[@]}"}); [ "$scope" = pkgs ] || { sel=(); for c in ${crates[@]+"${crates[@]}"}; do [ "$c" = scenario ] || sel+=("$c"); done; }
+      if [ "$full" = yes ]; then pkgs=--workspace; [ "$scope" = pkgs ] || pkgs="--workspace --exclude scenario"
+      elif [ "${#sel[@]}" -eq 0 ]; then note "$name" skipped "no touched crate"; continue
+      else pkgs=$(printf -- '-p %s ' "${sel[@]}"); fi
       execute "$name" "${loc//\{pkgs\}/$pkgs}" ;;
     crate)
       [ "${#crates[@]}" -gt 0 ] || { note "$name" skipped "no touched crate"; continue; }

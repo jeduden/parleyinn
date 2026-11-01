@@ -88,9 +88,11 @@ impl Checkout {
         if file != ci_gates::CI {
             return Ok(text);
         }
-        Ok(self.read_raw(ci_gates::GATES).map_or(text.clone(), |gates| {
-            ci_gates::expand(&text, &ci_gates::parse(&gates).0)
-        }))
+        Ok(self
+            .read_raw(ci_gates::GATES)
+            .map_or(text.clone(), |gates| {
+                ci_gates::expand(&text, &ci_gates::parse(&gates).0)
+            }))
     }
 
     /// Checks that `file` contains `want`.

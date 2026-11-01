@@ -25,7 +25,7 @@ pub const CALL: &str = "scripts/ci-gate.sh ";
 const FITS: [&str; 3] = ["fast", "full", "no"];
 
 /// The scopes a gate may declare.
-const SCOPES: [&str; 5] = ["ws", "pkgs", "crate", "tags", "files"];
+const SCOPES: [&str; 6] = ["ws", "pkgs", "units", "crate", "tags", "files"];
 
 /// One gate: a line of the list.
 #[derive(Debug, Clone, PartialEq, Eq)]

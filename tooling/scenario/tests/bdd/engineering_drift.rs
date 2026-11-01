@@ -32,7 +32,7 @@ fn ci_runs_each_gate_from_the_list(
         return Err(format!("the step names {list} and {runner}, not CI's"));
     }
     let checkout = eng(w).checkout()?;
-    outcome(ci_gates::check_repository(&checkout))
+    outcome(ci_gates::check_repository(checkout))
 }
 
 #[then(regex = r"^every drift case's edit applies to the checkout$")]

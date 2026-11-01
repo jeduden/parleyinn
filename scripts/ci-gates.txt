@@ -11,7 +11,9 @@
 #           disk, network, parinn (a built release core), runner (a CI
 #           runner's services or artifacts) or a tool
 #   scope   ws (once), pkgs (once; {pkgs} is the touched crates as
-#           "-p a -p b" here and "--workspace" in CI), crate (once per
+#           "-p a -p b" here and "--workspace" in CI), units (as pkgs,
+#           without the scenario crate, whose scenarios need a built
+#           core and run as the cucumber and scenarios gates), crate (once per
 #           touched crate, {crate}, {floor} its unit-line floor), tags
 #           (once; {tags} is the requirement ids the diff touches) or
 #           files (once; the drift cases the touched files inject)
@@ -35,7 +37,7 @@ deny-fuzz|fast|-|ws|cargo deny --manifest-path fuzz/Cargo.toml check licenses ba
 audit|full|network|ws|cargo audit|=
 audit-fuzz|full|network|ws|cargo audit --file fuzz/Cargo.lock|=
 license-check|fast|-|ws|cargo run --locked -p engineering --bin license-check|=
-tests|fast|-|pkgs|@job:test|cargo test --locked {pkgs}
+tests|fast|-|units|@job:test|cargo test --locked {pkgs}
 srs-gates|fast|-|ws|@job:test|cargo test --locked -p srs --test gates
 scenario-gates|fast|-|ws|@job:scenarios|cargo test --locked -p scenario --test gate
 cucumber|fast|-|tags|@job:scenarios|cargo build --locked -p parinn && cargo test --locked -p scenario --test bdd -- --tags "{tags}"
