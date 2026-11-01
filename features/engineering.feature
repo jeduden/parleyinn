@@ -298,6 +298,7 @@ Feature: Engineering quality (ENG)
     And review-run refuses a specialist's report that cites an id no requirement or invariant has, runs that specialist once more told why, and names the report refused again and a generalist's finding line it cannot read, each in a blocking finding, so the review requests changes and the gate posts that request rather than failing
     And review-run writes each dispatched agent left without an accepted report beside the review outcome and names it not reviewed, and a review resumed from that list runs again that agent, each agent whose head, inputs, definition or diff changed and each generalist whose specialist runs again, keeps nothing across a changed head, definition or diff, and approves as a full run would
     And its agents can write nothing: review-run allows them Read, Glob and Grep alone
+    And no step that runs an agent holds the "CLAUDE_CODE_OAUTH_TOKEN" token: one step alone stages it where no agent reads it, review-run refuses its agents every read of the process, system and device files and outside their trees, and every artifact an agent job uploads waits for a scrub of that token
     And only one job holds the "JEDUDEN_REVIEW_AGENT_KEY" key, and it runs no agent
     And that job runs only after the agents' job succeeded
     And that job decides the review with "cargo run --locked --quiet -p review-gate"

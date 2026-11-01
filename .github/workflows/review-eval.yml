@@ -47,18 +47,27 @@ jobs:
           cache: false
       - name: Install the pinned Claude Code command line
         uses: ./.github/actions/claude-code
+      # This step alone holds the Claude token, and stages it where no
+      # agent's environment or tools reach it (ENG-28).
+      - name: Stage the Claude token where no agent reads it
+        env:
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+        run: |
+          cargo run --locked --quiet -p review-eval -- stage-credential \
+            --dir "$RUNNER_TEMP/claude-credential"
       # Exit 1 says a case failed, which the last step turns into the
       # job's failure once the report and the comparison are in the
-      # summary. Any other exit is the harness's own failure.
+      # summary. Exit 3 says an agent's output held the token, and any
+      # other exit is the harness's own failure.
       - name: Run the cases
         id: run
         env:
-          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           MODEL: ${{ inputs.model }}
           COMPONENTS: ${{ inputs.components }}
           REPETITIONS: ${{ inputs.repetitions || '3' }}
         run: |
-          set -- --checkout . --out review-eval --parallel 4 --repetitions "$REPETITIONS"
+          set -- --checkout . --out review-eval --parallel 4 --repetitions "$REPETITIONS" \
+            --credential "$RUNNER_TEMP/claude-credential"
           if [ -n "$MODEL" ]; then
             set -- "$@" --model "$MODEL"
           fi
@@ -75,12 +84,31 @@ jobs:
           cargo run --locked --quiet -p review-eval -- run "$@"
           code=$?
           set -e
-          cat review-eval/report.md >> "$GITHUB_STEP_SUMMARY"
           if [ "$code" -gt 1 ]; then
             echo "::error::the reviewer evaluation did not run to its end (exit $code)"
             exit "$code"
           fi
           echo "code=$code" >> "$GITHUB_OUTPUT"
+      # What the evaluation wrote is scrubbed of the token once more
+      # before the summary reads it or the upload keeps it; a form found
+      # fails the job.
+      - name: Scrub what the evaluation wrote of the Claude token
+        id: scrub
+        if: always()
+        run: |
+          set +e
+          cargo run --locked --quiet -p review-eval -- scrub \
+            --credential "$RUNNER_TEMP/claude-credential" --path review-eval
+          code=$?
+          set -e
+          rm -rf "$RUNNER_TEMP/claude-credential"
+          if [ "$code" -eq 0 ] || [ "$code" -eq 3 ]; then
+            echo "scrubbed=true" >> "$GITHUB_OUTPUT"
+            if [ -f review-eval/report.md ]; then
+              cat review-eval/report.md >> "$GITHUB_STEP_SUMMARY"
+            fi
+          fi
+          exit "$code"
       - name: Compare with the published scorecard
         run: |
           cargo run --locked --quiet -p review-eval -- compare \
@@ -89,6 +117,7 @@ jobs:
       # The scorecard to publish with `review-eval publish`, the report,
       # and each run's grade and report; the run logs stay in the job.
       - name: Keep the scorecard
+        if: steps.scrub.outputs.scrubbed == 'true'
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: review-evaluation

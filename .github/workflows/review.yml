@@ -260,6 +260,19 @@ jobs:
       - name: Build review-run
         if: steps.pull_head.outputs.number != ''
         run: cargo build --locked --quiet -p review-run
+      # The Claude token reaches no agent's environment and no file its
+      # tools can read (ENG-28). This step alone holds it, and writes it
+      # into a credentials file only its owner reads, under the runner's
+      # temporary directory, outside both trees the agents are given;
+      # review-run points each agent there and refuses it every read of
+      # that directory, of /proc, /sys and /dev, and outside its trees.
+      - name: Stage the Claude token where no agent reads it
+        if: steps.pull_head.outputs.number != ''
+        env:
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+        run: |
+          cargo run --locked --quiet --offline -p review-eval -- stage-credential \
+            --dir "$RUNNER_TEMP/claude-credential"
       # review-run starts each dispatched specialist, then each
       # generalist once every specialist ended, as `claude --agent` from
       # main's definition of it: read tools alone, no Write and no Bash
@@ -269,8 +282,11 @@ jobs:
       # each on a part of its diff split by file, and its report is
       # merged from theirs; a part that does not answer leaves the
       # specialist one that did not answer (ENG-28).
-      # No agent gets a GitHub token: the step's environment
-      # adds the Claude token and nothing else. It writes
+      # No agent gets a GitHub token, and no step that runs one holds
+      # the Claude token: review-run reads it from the staged
+      # credential only to scrub every file it writes and every line it
+      # prints of it, and a review whose agent's output held it requests
+      # changes naming the leak and fails, so nothing is posted. It writes
       # review/outcome.json, review/consulted.json (every agent that
       # answered), review/answers.json and review/usage.json, with each
       # run's log under review/logs/. An exit other than 0 says it could
@@ -281,11 +297,31 @@ jobs:
       - name: Review
         id: review
         if: steps.pull_head.outputs.number != ''
-        env:
-          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
         run: |
           cargo run --locked --quiet --offline -p review-run -- --workdir . --parallel 32 \
-            > review/run.txt
+            --credential "$RUNNER_TEMP/claude-credential" > review/run.txt
+      # Whatever review-run wrote is scrubbed of the token once more, a
+      # run cut off before its own scrub included, before any step reads
+      # it into the job summary or uploads it; a form found fails the
+      # job. Only then is the staged credential removed.
+      - name: Scrub what the review wrote of the Claude token
+        id: scrub
+        if: always() && steps.pull_head.outputs.number != ''
+        run: |
+          set +e
+          cargo run --locked --quiet --offline -p review-eval -- scrub \
+            --credential "$RUNNER_TEMP/claude-credential" \
+            --path review/logs --path review/reports --path review/answers.json \
+            --path review/usage.json --path review/outcome.json --path review/consulted.json \
+            --path review/gaps.json --path review/not-reviewed.md --path review/run-id.json \
+            --path review/run.txt
+          code=$?
+          set -e
+          rm -rf "$RUNNER_TEMP/claude-credential"
+          if [ "$code" -eq 0 ] || [ "$code" -eq 3 ]; then
+            echo "scrubbed=true" >> "$GITHUB_OUTPUT"
+          fi
+          exit "$code"
       # A review that could not run says why in the job summary, not in
       # its log alone: review-run prints the reason as failed=<reason>.
       - name: Say why the review could not run
@@ -345,7 +381,7 @@ jobs:
       # what it wrote too, a specialist cut off before its answer leaving
       # its findings headed incomplete, so its author can read why.
       - name: Keep the specialists' reports
-        if: always() && steps.pull_head.outputs.number != ''
+        if: always() && steps.scrub.outputs.scrubbed == 'true'
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: review-reports
@@ -355,8 +391,8 @@ jobs:
             review/usage.json
           if-no-files-found: error
       # The run logs under review/logs/ stay in the job: they hold every
-      # tool result an agent read, its environment's token among what it
-      # can read (ENG-28).
+      # tool result an agent read, scrubbed of the token but whatever
+      # else it read (ENG-28).
 
   evaluate:
     # The cases of each reviewer component the pull request changes, run
@@ -413,14 +449,24 @@ jobs:
       - name: Install the pinned Claude Code command line
         if: steps.plan.outputs.empty == 'false'
         uses: ./.github/actions/claude-code
-      # Exit 1 says a case failed: its blocking finding reaches the gate
-      # through findings.json, so the review requests changes and names
-      # the case. Any other exit is the harness's own failure and fails
-      # the job, so nothing is posted and the red run says why.
-      - name: Run the cases of each changed component
+      # As in the review: this step alone holds the Claude token, and
+      # stages it where no agent reads it (ENG-28).
+      - name: Stage the Claude token where no agent reads it
         if: steps.plan.outputs.empty == 'false'
         env:
           CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+        run: |
+          cargo run --locked --quiet -p review-eval -- stage-credential \
+            --dir "$RUNNER_TEMP/claude-credential"
+      # Exit 1 says a case failed: its blocking finding reaches the gate
+      # through findings.json, so the review requests changes and names
+      # the case. Exit 3 says an agent's output held the token, and any
+      # other exit is the harness's own failure: either fails the job, so
+      # nothing is posted and the red run says why.
+      - name: Run the cases of each changed component
+        id: cases
+        if: steps.plan.outputs.empty == 'false'
+        env:
           EVAL_PLAN: ${{ needs.review.outputs.eval_plan }}
         run: |
           mkdir -p review-eval
@@ -428,17 +474,38 @@ jobs:
           set +e
           cargo run --locked --quiet -p review-eval -- run --checkout . --tree pr-head \
             --cases pr-head/tooling/review-eval/cases --base-cases tooling/review-eval/cases \
-            --plan eval-plan.json --out review-eval --parallel 12
+            --plan eval-plan.json --out review-eval --parallel 12 \
+            --credential "$RUNNER_TEMP/claude-credential"
           code=$?
           set -e
-          cat review-eval/report.md >> "$GITHUB_STEP_SUMMARY"
           if [ "$code" -gt 1 ]; then
             echo "::error::the reviewer evaluation did not run to its end (exit $code)"
             exit "$code"
           fi
+      # What the evaluation wrote is scrubbed of the token once more
+      # before the summary reads it or the upload keeps it; a form found
+      # fails the job.
+      - name: Scrub what the evaluation wrote of the Claude token
+        id: scrub
+        if: always() && steps.plan.outputs.empty == 'false'
+        run: |
+          set +e
+          cargo run --locked --quiet -p review-eval -- scrub \
+            --credential "$RUNNER_TEMP/claude-credential" --path review-eval
+          code=$?
+          set -e
+          rm -rf "$RUNNER_TEMP/claude-credential"
+          if [ "$code" -eq 0 ] || [ "$code" -eq 3 ]; then
+            echo "scrubbed=true" >> "$GITHUB_OUTPUT"
+            if [ -f review-eval/report.md ]; then
+              cat review-eval/report.md >> "$GITHUB_STEP_SUMMARY"
+            fi
+          fi
+          exit "$code"
       # The findings for the gate, the report, the scorecard and each
       # run's grade and report; the run logs stay in the job.
       - name: Keep the evaluation
+        if: steps.plan.outputs.empty == 'true' || steps.scrub.outputs.scrubbed == 'true'
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: review-evaluation

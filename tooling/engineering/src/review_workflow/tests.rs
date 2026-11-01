@@ -923,3 +923,118 @@ fn upload_paths_reads_inline_and_block_paths() {
     assert!(upload_paths("      - run: echo path: x\n").is_empty());
     assert!(upload_paths("      - uses: actions/upload-artifact@abc\n").is_empty());
 }
+
+#[test]
+fn reads_of_the_process_files_and_outside_the_trees_must_be_refused() {
+    use review_eval::runner::{DISALLOWED, SETTINGS};
+    assert!(Workflow::reads_refused(DISALLOWED, SETTINGS).is_empty());
+
+    assert_eq!(
+        Workflow::reads_refused("Bash,Read(//proc/**), Read(//dev/**)", "{}"),
+        [
+            "review-run does not refuse its agents Read(//sys/**)",
+            "review-run does not refuse its agents reads outside their trees",
+        ]
+    );
+}
+
+const TOKEN: &str = "MODEL_TOKEN";
+
+/// An agent job that keeps the token from its agents: one step stages
+/// it, the agents run on the staged credential, a scrub follows and
+/// gates the upload.
+const KEPT: &str = "jobs:
+  review:
+    steps:
+      - name: Stage
+        env:
+          T: ${{ secrets.MODEL_TOKEN }}
+        run: cargo run --locked --quiet --offline -p review-eval -- stage-credential --dir d
+      - name: Review
+        run: cargo run --locked --quiet --offline -p review-run -- --workdir . --credential d
+      - name: Scrub
+        id: scrub
+        if: always()
+        run: cargo run --locked --quiet --offline -p review-eval -- scrub --path review
+      - name: Keep
+        if: always() && steps.scrub.outputs.scrubbed == 'true'
+        uses: actions/upload-artifact@abc
+";
+
+#[test]
+fn a_job_that_stages_the_token_and_scrubs_before_it_uploads_keeps_it_from_its_agents() {
+    assert!(parse(KEPT).token_kept_from_agents(TOKEN).is_empty());
+    assert!(parse(REVIEW_FLOW).token_kept_from_agents(KEY).len() == 2);
+}
+
+#[test]
+fn the_token_in_a_step_that_runs_agents_or_the_whole_job_is_named() {
+    let in_review = KEPT.replace(
+        "      - name: Review\n",
+        "      - name: Review\n        env:\n          T: ${{ secrets.MODEL_TOKEN }}\n",
+    );
+    assert_eq!(
+        parse(&in_review).token_kept_from_agents(TOKEN),
+        ["agent job review hands MODEL_TOKEN to step \"Review\", which does more than stage it"]
+    );
+    let job_wide = KEPT.replace(
+        "    steps:\n",
+        "    env:\n      T: ${{ secrets.MODEL_TOKEN }}\n    steps:\n",
+    );
+    assert_eq!(
+        parse(&job_wide).token_kept_from_agents(TOKEN),
+        ["agent job review sets MODEL_TOKEN for every step"]
+    );
+    let staged_and_run = KEPT.replace(
+        "stage-credential --dir d\n",
+        "stage-credential --dir d && claude -p x\n",
+    );
+    assert_eq!(
+        parse(&staged_and_run).token_kept_from_agents(TOKEN),
+        [
+            "agent job review hands MODEL_TOKEN to step \"Stage\", which does more than stage it",
+            "agent job review runs agents in step \"Stage\" without --credential",
+        ]
+    );
+}
+
+#[test]
+fn agents_without_the_staged_credential_or_a_job_that_stages_none_are_named() {
+    let unstaged = KEPT.replace("${{ secrets.MODEL_TOKEN }}", "x");
+    assert_eq!(
+        parse(&unstaged).token_kept_from_agents(TOKEN),
+        ["agent job review stages no MODEL_TOKEN with \"-p review-eval -- stage-credential\""]
+    );
+    let bare = KEPT.replace(" --credential d\n", "\n");
+    assert_eq!(
+        parse(&bare).token_kept_from_agents(TOKEN),
+        ["agent job review runs agents in step \"Review\" without --credential"]
+    );
+}
+
+#[test]
+fn an_upload_no_scrub_after_the_agents_gates_is_named() {
+    let want = [
+        "agent job review uploads in step \"Keep\" before a scrub of MODEL_TOKEN after its agents gates it",
+    ];
+    let ungated = KEPT.replace(
+        "        if: always() && steps.scrub.outputs.scrubbed == 'true'\n",
+        "        if: always()\n",
+    );
+    assert_eq!(parse(&ungated).token_kept_from_agents(TOKEN), want);
+    let no_scrub = KEPT.replace("-- scrub --path", "-- plan --path");
+    assert_eq!(parse(&no_scrub).token_kept_from_agents(TOKEN), want);
+    let early = KEPT.replace(
+        "      - name: Review\n        run: cargo run --locked --quiet --offline -p review-run -- --workdir . --credential d\n",
+        "",
+    ) + "      - name: Review\n        run: cargo run --locked --quiet --offline -p review-run -- --workdir . --credential d\n";
+    assert_eq!(parse(&early).token_kept_from_agents(TOKEN), want);
+    let unnamed = KEPT.replace("      - name: Keep\n        if:", "      - if:");
+    assert_eq!(
+        parse(&unnamed.replace("&& steps.scrub.outputs.scrubbed == 'true'", ""))
+            .token_kept_from_agents(TOKEN),
+        [
+            "agent job review uploads in step \"- if: always()\" before a scrub of MODEL_TOKEN after its agents gates it"
+        ]
+    );
+}

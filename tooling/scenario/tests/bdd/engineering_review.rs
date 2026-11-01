@@ -29,8 +29,8 @@ fn runs_after(w: &mut World, name: String) -> Result<(), String> {
 fn agents_unprivileged(w: &mut World, key: String) -> Result<(), String> {
     let e = eng(w);
     e.key = key;
-    // The run logs hold every tool result, the token in the agents'
-    // environment among what an agent can read: they never leave the job.
+    // The run logs hold every tool result an agent read: they never
+    // leave the job.
     let mut problems = e.flow.agents_unprivileged(&e.key);
     problems.extend(e.flow.run_logs_stay(review_workflow::RUN_LOGS));
     outcome(problems)
@@ -96,6 +96,18 @@ fn agents_write_nothing(w: &mut World) -> Result<(), String> {
             .flow
             .agents_write_nothing(&review_workflow::RUN_TOOLS),
     )
+}
+
+#[then(
+    regex = r#"^no step that runs an agent holds the "([^"]+)" token: one step alone stages it where no agent reads it, review-run refuses its agents every read of the process, system and device files and outside their trees, and every artifact an agent job uploads waits for a scrub of that token$"#
+)]
+fn token_kept_from_agents(w: &mut World, token: String) -> Result<(), String> {
+    let mut problems = eng(w).flow.token_kept_from_agents(&token);
+    problems.extend(review_workflow::Workflow::reads_refused(
+        review_eval::runner::DISALLOWED,
+        review_eval::runner::SETTINGS,
+    ));
+    outcome(problems)
 }
 
 #[then(regex = r#"^only one job holds the "([^"]+)" key, and it runs no agent$"#)]

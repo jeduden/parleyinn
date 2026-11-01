@@ -271,6 +271,13 @@ repeat them, which costs tokens.
   changed, keyed by `review/run-id.json`: the head, an inputs hash, and
   each definition's and diff's SHA-256. The verdict function is the
   same; nothing is reused across a changed head, definition or diff.
+- The Claude token stays out of every agent's reach: one step stages
+  it in a credentials file under the runner's temporary directory, no
+  step that runs an agent holds it, each agent is refused reads of that
+  directory, `/proc`, `/sys`, `/dev` and outside its trees, and every
+  file and line review-run writes is scrubbed of the token first; a
+  review whose agent's output held it requests changes naming the leak
+  and fails, so nothing is posted.
 - No new third-party dependency.
 
 ## Approval

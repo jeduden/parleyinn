@@ -111,6 +111,7 @@ pub fn cases() -> Vec<Case> {
         review_undashed_cases(),
         review_resume_cases(),
         vec![review_moved_revision_case()],
+        review_token_cases(),
         // Last: its cases edit source the later cases would run stale.
         license_text_cases(),
     ]
@@ -626,6 +627,108 @@ fn review_moved_revision_case() -> Case {
     )
 }
 
+/// The drifts that would let the Claude token reach an agent or leave
+/// the review's job (ENG-28, I6), late so adding them moves no earlier
+/// case to another shard: the scrub replacing nothing, a leak no longer
+/// failing the review or naming itself in its outcome, an agent started
+/// with the token in its environment, let read the process files or
+/// the staged credential, and the workflow handing the token to the
+/// step that runs the agents or uploading before the scrub.
+fn review_token_cases() -> Vec<Case> {
+    const RUN_CLI: &str = "tooling/review-run/src/cli.rs";
+    let eval = |name: &'static str| cargo_lib_test("review-eval", name);
+    let leak_test =
+        "cli::tests::a_review_whose_agent_leaked_the_token_scrubs_it_everywhere_and_fails_closed";
+    vec![
+        case(
+            "the scrub counting and replacing no form of the token",
+            "ENG-28",
+            Injection::replace(
+                "tooling/review-eval/src/secret.rs",
+                "let n = out.matches(form.as_str()).count();",
+                "let n = out.matches(form.as_str()).count().min(0);",
+            ),
+            eval("secret::tests::the_exact_token_is_replaced_and_counted"),
+            "the_exact_token_is_replaced_and_counted",
+        ),
+        case(
+            "a review whose agent leaked the token deciding as if it had not",
+            "ENG-28",
+            Injection::replace(
+                RUN_CLI,
+                "        return Err(leak::reason(leaked));",
+                "        progress(&leak::reason(leaked));",
+            ),
+            cargo_lib_test("review-run", leak_test),
+            "a_review_whose_agent_leaked_the_token_scrubs_it_everywhere_and_fails_closed",
+        ),
+        case(
+            "a leak of the token left out of the review outcome",
+            "ENG-28",
+            Injection::replace(
+                RUN_CLI,
+                "        leak::fail_closed(&mut outcome, leaked);",
+                "        let _ = &mut outcome;",
+            ),
+            cargo_lib_test("review-run", leak_test),
+            "a_review_whose_agent_leaked_the_token_scrubs_it_everywhere_and_fails_closed",
+        ),
+        case(
+            "an agent started with the Claude token in its environment",
+            "ENG-28",
+            Injection::replace(
+                "tooling/review-eval/src/process.rs",
+                "NESTED_SESSION_VARS.iter().chain(&WITHHELD_VARS)",
+                "NESTED_SESSION_VARS.iter().chain(&WITHHELD_VARS[..0])",
+            ),
+            eval("process::tests::a_command_never_gets_the_claude_token_in_its_environment"),
+            "a_command_never_gets_the_claude_token_in_its_environment",
+        ),
+        case(
+            "an agent let read the process files",
+            "ENG-28",
+            Injection::replace("tooling/review-eval/src/runner.rs", "Read(//proc/**),", ""),
+            scenario("ENG-28"),
+            "review-run does not refuse its agents Read(//proc/**)",
+        ),
+        case(
+            "an agent let read the staged credential",
+            "ENG-28",
+            Injection::replace(
+                "tooling/review-eval/src/credential.rs",
+                "let rules = format!(\"Read(/{shown}/**),Read(/{shown})\");",
+                "let rules = String::new();",
+            ),
+            eval(
+                "credential::tests::a_confined_claude_reads_the_staged_config_and_may_not_read_it",
+            ),
+            "a_confined_claude_reads_the_staged_config_and_may_not_read_it",
+        ),
+        case(
+            "the Claude token handed to the step that runs the agents",
+            "ENG-28",
+            Injection::replace(
+                REVIEW_WORKFLOW,
+                "      - name: Review\n        id: review\n",
+                "      - name: Review\n        id: review\n        env:\n          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}\n",
+            ),
+            scenario("ENG-28"),
+            "agent job review hands CLAUDE_CODE_OAUTH_TOKEN to step \"Review\", which does more than stage it",
+        ),
+        case(
+            "the specialists' reports uploaded before the scrub of the token",
+            "ENG-28",
+            Injection::replace(
+                REVIEW_WORKFLOW,
+                "        if: always() && steps.scrub.outputs.scrubbed == 'true'\n",
+                "        if: always()\n",
+            ),
+            scenario("ENG-28"),
+            "agent job review uploads in step \"Keep the specialists' reports\" before a scrub",
+        ),
+    ]
+}
+
 /// The drifts ENG-30 exists to catch: a license the tool keeps no text
 /// for, a canonical text that no longer fits, and CI that no longer runs
 /// the check.
@@ -865,8 +968,8 @@ fn review_reach_cases() -> Vec<Case> {
             "ENG-28",
             Injection::replace(
                 REVIEW_WORKFLOW,
-                "            > review/run.txt\n",
-                "            > review/run.txt\n          ./review/agents.sh -p review --allowedTools Write\n",
+                "            --credential \"$RUNNER_TEMP/claude-credential\" > review/run.txt\n",
+                "            --credential \"$RUNNER_TEMP/claude-credential\" > review/run.txt\n          ./review/agents.sh -p review --allowedTools Write\n",
             ),
             scenario("ENG-28"),
             "may use Write, want Read, Glob, Grep alone",
@@ -876,7 +979,7 @@ fn review_reach_cases() -> Vec<Case> {
             "ENG-28",
             Injection::replace(
                 REVIEW_WORKFLOW,
-                "          cargo run --locked --quiet --offline -p review-run -- --workdir . --parallel 32 \\\n            > review/run.txt\n",
+                "          cargo run --locked --quiet --offline -p review-run -- --workdir . --parallel 32 \\\n            --credential \"$RUNNER_TEMP/claude-credential\" > review/run.txt\n",
                 "          echo routed\n      - uses: anthropics/claude-code-action@1d6de8cb0c237e7c15e9e1bdf973826ebae490cc\n",
             ),
             scenario("ENG-28"),
@@ -1249,7 +1352,7 @@ fn review_late_cases() -> Vec<Case> {
             "ENG-28",
             Injection::replace(
                 REVIEW_WORKFLOW,
-                "          cargo run --locked --quiet --offline -p review-run -- --workdir . --parallel 32 \\\n            > review/run.txt\n",
+                "          cargo run --locked --quiet --offline -p review-run -- --workdir . --parallel 32 \\\n            --credential \"$RUNNER_TEMP/claude-credential\" > review/run.txt\n",
                 "          claude -p review > review/run.txt\n",
             ),
             scenario("ENG-28"),

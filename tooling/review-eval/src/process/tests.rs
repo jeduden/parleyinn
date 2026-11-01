@@ -154,7 +154,7 @@ fn a_command_gets_its_own_variables_but_never_a_nested_sessions() {
 }
 
 #[test]
-fn a_command_never_gets_the_access_token_in_its_environment() {
+fn a_command_never_gets_the_claude_token_in_its_environment() {
     let dir = TempDir::new().unwrap();
     let var = crate::credential::TOKEN_VAR;
     let mut command = sh(&format!("echo \"${{{var}:-unset}}\""), dir.path());

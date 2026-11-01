@@ -96,12 +96,16 @@ cleanup() {
 trap cleanup EXIT
 mkdir -m 700 "$iso" "$iso/parinn" "$iso/claude"
 # The login is copied, never linked, so a token the agents refresh stays
-# in the copy. CLAUDE_CODE_OAUTH_TOKEN or ANTHROPIC_API_KEY, when set,
-# reach the agents unchanged.
+# in the copy. A CLAUDE_CODE_OAUTH_TOKEN is staged there instead when no
+# login file is: no agent gets it in its environment (ENG-28). An
+# ANTHROPIC_API_KEY, when set, reaches the agents unchanged.
 login="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/.credentials.json"
+stage=no
 if [ -f "$login" ]; then
   install -m 600 "$login" "$iso/claude/.credentials.json"
-elif [ -z "${CLAUDE_CODE_OAUTH_TOKEN:-}" ] && [ -z "${ANTHROPIC_API_KEY:-}" ]; then
+elif [ -n "${CLAUDE_CODE_OAUTH_TOKEN:-}" ]; then
+  stage=yes
+elif [ -z "${ANTHROPIC_API_KEY:-}" ]; then
   echo "review-local: no login file at $login and no CLAUDE_CODE_OAUTH_TOKEN; the agents may not authenticate" >&2
 fi
 export PARINN_HOME="$iso/parinn" CLAUDE_CONFIG_DIR="$iso/claude"
@@ -131,6 +135,13 @@ run mdsmith help patterns -f json > review/mdsmith-patterns.json
 tool review-bundle -- --base . --head pr-head --diff pr.diff \
   --consent stakeholder-comments.json --out review > class.txt
 tool review-eval -- plan --base . --head pr-head --out review/eval-plan.json
+# A staged token's directory is refused to every agent, and what they
+# write is scrubbed of the token.
+credential=()
+if [ "$stage" = yes ]; then
+  tool review-eval -- stage-credential --dir "$iso/claude" > /dev/null
+  credential=(--credential "$iso/claude")
+fi
 
 # The head's agent definitions run in place of the base's, copied before
 # the head's instruction files leave the tree below.
@@ -172,7 +183,7 @@ if [ "$resume" = yes ]; then
     from=(--only "$prev/gaps.json" --from "$prev")
   fi
 fi
-status=0; tool review-run -- --workdir . --parallel "$parallel" --head-sha "$head_sha" ${from[@]+"${from[@]}"} || status=$?
+status=0; tool review-run -- --workdir . --parallel "$parallel" --head-sha "$head_sha" ${from[@]+"${from[@]}"} ${credential[@]+"${credential[@]}"} || status=$?
 rm -rf "$repo/target/review-local/review"; mkdir -p "$repo/target/review-local"
 cp -R review "$repo/target/review-local/"
 

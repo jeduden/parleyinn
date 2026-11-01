@@ -31,6 +31,16 @@ const EVAL_RUN: &str = "cargo run --locked --quiet -p review-eval -- run";
 /// result the agent read: it stays in the agents' job.
 pub const RUN_LOGS: &str = "review/logs";
 
+/// What stages the Claude token where no agent reads it.
+pub const STAGE: &str = "-p review-eval -- stage-credential";
+
+/// What scrubs the files a job keeps of that token.
+pub const SCRUB: &str = "-p review-eval -- scrub";
+
+/// The roots that hold every process's environment and open files, no
+/// agent's to read.
+pub const PROCESS_FILES: [&str; 3] = ["/proc", "/sys", "/dev"];
+
 /// The action that uploads an artifact out of the job.
 const UPLOAD_ACTION: &str = "actions/upload-artifact@";
 
@@ -290,6 +300,62 @@ fn uploads_dir(paths: &[String], dir: &str) -> bool {
         })
 }
 
+/// Whether a `step` runs the review's agents: review-run, review-eval's
+/// `run`, or the command line itself.
+fn runs_agent_step(step: &str) -> bool {
+    // A build of review-run passes it no arguments, and runs nothing.
+    step.contains(&format!("{AGENT_RUN} --"))
+        || step.contains(EVAL_RUN)
+        || step.lines().any(starts_cli)
+}
+
+/// A step's name, or its first line when it has none.
+fn step_name(step: &str) -> String {
+    step.lines()
+        .find_map(|l| {
+            l.trim_start()
+                .trim_start_matches("- ")
+                .strip_prefix("name:")
+        })
+        .unwrap_or_else(|| step.lines().next().unwrap_or_default().trim())
+        .trim()
+        .to_owned()
+}
+
+/// The `id:` a step gives itself, when it gives one.
+fn step_id(step: &str) -> Option<&str> {
+    step.lines().find_map(|l| {
+        l.trim_start()
+            .trim_start_matches("- ")
+            .strip_prefix("id:")
+            .map(str::trim)
+    })
+}
+
+/// The names of the upload steps among `steps` that no scrub gates: a
+/// step that runs [`SCRUB`] after the last step that runs an agent,
+/// whose `scrubbed` output the upload's `if:` requires.
+fn unscrubbed_uploads(steps: &[String]) -> Vec<String> {
+    let last_agent = steps.iter().rposition(|s| runs_agent_step(s));
+    let gates: Vec<String> = steps
+        .iter()
+        .enumerate()
+        .filter(|(at, s)| s.contains(SCRUB) && last_agent.is_none_or(|last| *at > last))
+        .filter_map(|(_, s)| step_id(s))
+        .map(|id| format!("steps.{id}.outputs.scrubbed == 'true'"))
+        .collect();
+    steps
+        .iter()
+        .filter(|s| s.contains(UPLOAD_ACTION))
+        .filter(|s| {
+            !s.lines().any(|l| {
+                l.trim_start().starts_with("if:") && gates.iter().any(|g| l.contains(g.as_str()))
+            })
+        })
+        .map(|s| step_name(s))
+        .collect()
+}
+
 /// The tools of the comma-separated `tools` other than reading:
 /// anything that writes, runs a command, reaches the web or starts an
 /// agent, a scoped `Edit(...)` or `Write(...)` rule included.
@@ -447,6 +513,28 @@ impl Workflow {
                         .map(|t| format!("agent job {} may use {t}, want {want}", j.name)),
                 );
             }
+        }
+
+        problems
+    }
+
+    /// Requires review-run's agents, by `disallowed`, the rules it
+    /// refuses them, and `settings`, the settings it runs them with, to
+    /// be refused every read of [`PROCESS_FILES`] and outside their
+    /// trees, where the environment of every process on the machine
+    /// and the staged credential lie (ENG-28).
+    #[must_use]
+    pub fn reads_refused(disallowed: &str, settings: &str) -> Vec<String> {
+        let rules: Vec<&str> = disallowed.split(',').map(str::trim).collect();
+        let mut problems: Vec<String> = PROCESS_FILES
+            .iter()
+            .map(|root| format!("Read(/{root}/**)"))
+            .filter(|rule| !rules.contains(&rule.as_str()))
+            .map(|rule| format!("review-run does not refuse its agents {rule}"))
+            .collect();
+        if !settings.contains(r#""blockReadsOutsideWorkingDirectories":true"#) {
+            problems
+                .push("review-run does not refuse its agents reads outside their trees".to_owned());
         }
 
         problems
@@ -611,6 +699,64 @@ impl Workflow {
         }
 
         Ok(problems)
+    }
+
+    /// Requires every agent job to keep the Claude token `token`
+    /// from its agents (ENG-28): one step alone holds it, and that step
+    /// only stages it with [`STAGE`]; no step that runs an agent, and no
+    /// job-wide variable, holds it; every step that runs agents passes
+    /// them the staged credential with `--credential`; and every upload
+    /// waits for a step that ran [`SCRUB`] after the last of them.
+    #[must_use]
+    pub fn token_kept_from_agents(&self, token: &str) -> Vec<String> {
+        let held = format!("secrets.{token}");
+        let mut problems = Vec::new();
+        for j in self.agent_jobs() {
+            let steps = steps(&j.text);
+            let in_steps: usize = steps.iter().map(|s| s.matches(&held).count()).sum();
+            if j.text.matches(&held).count() > in_steps {
+                problems.push(format!("agent job {} sets {token} for every step", j.name));
+            }
+            let holders: Vec<&String> = steps.iter().filter(|s| s.contains(&held)).collect();
+            if holders.is_empty() {
+                problems.push(format!(
+                    "agent job {} stages no {token} with {STAGE:?}",
+                    j.name
+                ));
+            }
+            problems.extend(
+                holders
+                    .iter()
+                    .filter(|s| !s.contains(STAGE) || runs_agent_step(s))
+                    .map(|s| {
+                        format!(
+                            "agent job {} hands {token} to step {:?}, which does more than stage it",
+                            j.name,
+                            step_name(s)
+                        )
+                    }),
+            );
+            problems.extend(
+                steps
+                    .iter()
+                    .filter(|s| runs_agent_step(s) && !s.contains("--credential"))
+                    .map(|s| {
+                        format!(
+                            "agent job {} runs agents in step {:?} without --credential",
+                            j.name,
+                            step_name(s)
+                        )
+                    }),
+            );
+            problems.extend(unscrubbed_uploads(&steps).into_iter().map(|s| {
+                format!(
+                    "agent job {} uploads in step {:?} before a scrub of {token} after its agents gates it",
+                    j.name, s
+                )
+            }));
+        }
+
+        problems
     }
 
     /// Requires the key's job to run `cmd`.
