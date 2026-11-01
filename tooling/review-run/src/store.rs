@@ -150,7 +150,7 @@ impl Store {
             std::process::id(),
             std::thread::current().id()
         ));
-        let written = write_all(&tmp, log_text, report, usage);
+        let written = write_all(&tmp, log_text, report, usage, &|p, t| fs::write(p, t));
         between();
         let renamed =
             written.and_then(|()| fs::rename(&tmp, &target).map_err(|e| named(&target, e)));
@@ -187,17 +187,28 @@ impl Store {
     }
 }
 
-/// Writes an answer's files into the fresh directory `dir`.
+/// `path` and why it failed, as the store names a failure.
+fn named(path: &Path, e: &dyn std::fmt::Display) -> String {
+    format!("store {}: {e}", path.display())
+}
+
+/// `value` as pretty JSON, or why it does not serialize.
+fn pretty<T: serde::Serialize + ?Sized>(value: &T, dir: &Path) -> Result<String, String> {
+    serde_json::to_string_pretty(value).map_err(|e| named(dir, &e))
+}
+
+/// Writes an answer's files into the fresh directory `dir`, each with
+/// `write`.
 fn write_all(
     dir: &Path,
     log_text: &str,
     report: Option<&str>,
     usage: &AgentUsage,
+    write: &dyn Fn(&Path, &str) -> io::Result<()>,
 ) -> Result<(), String> {
-    let named = |path: &Path, e: &dyn std::fmt::Display| format!("store {}: {e}", path.display());
     let _ = fs::remove_dir_all(dir);
     fs::create_dir(dir).map_err(|e| named(dir, &e))?;
-    let usage = serde_json::to_string_pretty(usage).map_err(|e| named(dir, &e))?;
+    let usage = pretty(usage, dir)?;
     let files = [
         (LOG, Some(log_text)),
         (REPORT, report),
@@ -206,7 +217,7 @@ fn write_all(
     for (name, text) in files {
         if let Some(text) = text {
             let path = dir.join(name);
-            fs::write(&path, text).map_err(|e| named(&path, &e))?;
+            write(&path, text).map_err(|e| named(&path, &e))?;
         }
     }
     Ok(())

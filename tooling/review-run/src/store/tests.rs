@@ -253,3 +253,43 @@ fn a_rename_that_fails_with_no_answer_in_place_is_named() {
     assert!(err.starts_with("store "), "{err}");
     assert_eq!(fs::read_dir(&store.dir).unwrap().count(), 1);
 }
+
+#[test]
+fn an_answer_that_cannot_be_written_is_named_by_the_file_that_failed() {
+    let dir = TempDir::new().unwrap();
+    let (log, report) = answer();
+    let refuse = |_: &Path, _: &str| Err(io::Error::other("disk full"));
+
+    let err = write_all(
+        &dir.path().join("a"),
+        &log,
+        Some(&report),
+        &usage(),
+        &refuse,
+    )
+    .unwrap_err();
+    assert!(
+        err.starts_with("store ") && err.contains(LOG) && err.ends_with("disk full"),
+        "{err}"
+    );
+
+    let under_a_file = dir.path().join("file");
+    fs::write(&under_a_file, "x").unwrap();
+    let err = write_all(&under_a_file.join("a"), &log, None, &usage(), &refuse).unwrap_err();
+    assert!(err.starts_with("store "), "{err}");
+}
+
+#[test]
+fn a_value_that_does_not_serialize_is_named_with_its_directory() {
+    struct Unserializable;
+    impl serde::Serialize for Unserializable {
+        fn serialize<S: serde::Serializer>(&self, _: S) -> Result<S::Ok, S::Error> {
+            Err(serde::ser::Error::custom("no"))
+        }
+    }
+
+    let err = pretty(&Unserializable, Path::new("d")).unwrap_err();
+
+    assert_eq!(err, "store d: no");
+    assert!(pretty(&usage(), Path::new("d")).unwrap().contains('{'));
+}
