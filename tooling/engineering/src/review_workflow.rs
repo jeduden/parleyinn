@@ -879,11 +879,15 @@ pub fn every_workflow_keeps_the_token(
             continue;
         }
         // A workflow that runs a script with arguments, or before its
-        // checkout, is read as written: only the review's workflows keep
-        // to the script form, and `load` holds those strictly.
+        // checkout, is read with those scripts inline all the same: only
+        // the review's workflows keep to the script form, `load` holds
+        // those strictly, and no script hides an agent run from the sweep.
         let flow = match load(checkout, &file) {
             Ok(flow) => flow,
-            Err(_) => parse(&checkout.read(&file)?),
+            Err(_) => parse(&scripts::inline_scripts_lenient(
+                &checkout.read(&file)?,
+                |path| checkout.read(path),
+            )?),
         };
         problems.extend(
             flow.token_kept_from_agents(token)
@@ -899,7 +903,7 @@ mod gate;
 mod scripts;
 
 pub use gate::*;
-pub use scripts::{inline_scripts, load};
+pub use scripts::{inline_scripts, inline_scripts_lenient, load};
 
 #[cfg(test)]
 mod tests;

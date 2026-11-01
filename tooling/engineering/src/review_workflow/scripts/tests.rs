@@ -119,6 +119,8 @@ fn the_token_sweep_still_reads_a_workflow_that_runs_a_script_with_arguments() {
         "on:\n  push:\njobs:\n  t:\n    steps:\n      - run: scripts/a.sh x\n      - run: cargo run -p review-run -- --workdir w\n",
     )
     .unwrap();
+    std::fs::create_dir_all(dir.path().join("scripts")).unwrap();
+    std::fs::write(dir.path().join("scripts/a.sh"), "echo a\n").unwrap();
     let problems = crate::review_workflow::every_workflow_keeps_the_token(
         &crate::Checkout::new(dir.path()),
         "CLAUDE_CODE_OAUTH_TOKEN",
@@ -131,4 +133,15 @@ fn the_token_sweep_still_reads_a_workflow_that_runs_a_script_with_arguments() {
             .iter()
             .all(|p| p.starts_with(".github/workflows/a.yml: agent job t "))
     );
+}
+
+#[test]
+fn a_lenient_read_keeps_the_arguments_and_skips_the_checkout_rule() {
+    let body = "jobs:\n  j:\n    steps:\n      - run: scripts/a.sh x y\n";
+
+    assert_eq!(
+        inline_scripts_lenient(body, script).unwrap(),
+        "jobs:\n  j:\n    steps:\n      - run: |\n          : run: scripts/a.sh x y\n          #!/bin/bash\n          set -e\n          echo a\n"
+    );
+    assert!(inline_scripts_lenient("- run: scripts/b.sh\n", script).is_err());
 }

@@ -36,6 +36,30 @@ pub fn inline_scripts(
     body: &str,
     read: impl Fn(&str) -> Result<String, String>,
 ) -> Result<String, String> {
+    inline(body, read, false)
+}
+
+/// Like [`inline_scripts`], for a workflow the review does not run: a
+/// step that passes its script arguments, or runs it before a checkout,
+/// still holds the script, headed by a no-op command with the step's own
+/// words, so a hidden agent run or a token handed in the arguments is
+/// seen by the ENG-28 sweep and not skipped.
+///
+/// # Errors
+///
+/// Fails when `read` fails.
+pub fn inline_scripts_lenient(
+    body: &str,
+    read: impl Fn(&str) -> Result<String, String>,
+) -> Result<String, String> {
+    inline(body, read, true)
+}
+
+fn inline(
+    body: &str,
+    read: impl Fn(&str) -> Result<String, String>,
+    lenient: bool,
+) -> Result<String, String> {
     let lines: Vec<&str> = body.split_inclusive('\n').collect();
     let (mut out, mut job, mut checked) = (String::new(), "", false);
     for (at, line) in lines.iter().enumerate() {
@@ -52,18 +76,22 @@ pub fn inline_scripts(
             continue;
         };
         let name = name.trim_end();
-        if name.contains(char::is_whitespace) {
+        if !lenient && name.contains(char::is_whitespace) {
             return Err(format!("{RUN}{name} passes the script arguments"));
         }
-        if !checked {
+        if !lenient && !checked {
             return Err(format!(
                 "{RUN}{name} in job {job} runs before a checkout of main's tree"
             ));
         }
-        let script = read(&format!("scripts/{name}"))?;
+        let file = name.split_whitespace().next().unwrap_or(name);
+        let script = read(&format!("scripts/{file}"))?;
         let head = &line[..line.len() - step.len()];
         let indent = " ".repeat(head.len());
         out.push_str(&format!("{head}run: |\n"));
+        if name != file {
+            out.push_str(&format!("{indent}  : {RUN}{name}\n"));
+        }
         for text in script.lines() {
             out.push_str(&format!("{indent}  {text}\n"));
         }
