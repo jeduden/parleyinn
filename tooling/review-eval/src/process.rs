@@ -1,8 +1,8 @@
 //! The host on the machine: real processes, each killed at its
-//! deadline, with the variables a Claude Code harness session sets for its
-//! children cleared. The `review-eval` and `review-run` executables
-//! both start their commands through it; nothing else of either starts
-//! a program.
+//! deadline, with the variables a Claude Code harness session sets for
+//! its children cleared and the Claude token withheld. The
+//! `review-eval` and `review-run` executables both start their commands
+//! through it; nothing else of either starts a program.
 
 use std::fs::File;
 use std::io::{self, Read};
@@ -39,6 +39,12 @@ pub const NESTED_SESSION_VARS: [&str; 4] = [
     "CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH",
 ];
 
+/// What no command the host starts finds in its environment: the
+/// Claude token, which a `claude` reads from its staged
+/// credentials file instead, so an agent's tools never find it in the
+/// environment they run in (ENG-28).
+pub const WITHHELD_VARS: [&str; 1] = [crate::credential::TOKEN_VAR];
+
 /// The machine: real processes, each killed at its deadline.
 #[derive(Debug, Clone, Copy, Default)]
 pub struct ProcessHost;
@@ -51,7 +57,7 @@ impl Host for ProcessHost {
             .current_dir(&command.cwd)
             .envs(command.env.iter().cloned())
             .stdin(Stdio::null());
-        for var in NESTED_SESSION_VARS {
+        for var in NESTED_SESSION_VARS.iter().chain(&WITHHELD_VARS) {
             process.env_remove(var);
         }
         // A log file takes the output and the errors, so a chatty run
