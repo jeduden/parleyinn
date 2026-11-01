@@ -31,8 +31,13 @@
 # stakeholder comment consents, so pass --consent FILE (the JSON the
 # workflow collects) to see the review as it stands with that comment.
 #
+# --resume reruns only what the last run left without an accepted report
+# (its review/gaps.json), and what changed since, when that run reviewed
+# the same head with the same agent definitions; otherwise it is a full
+# run, and says why. The resumed review is decided as a full one.
+#
 # usage: scripts/review-local.sh [--base REF] [--agents base|head]
-#        [--consent FILE] [--parallel N]
+#        [--consent FILE] [--parallel N] [--resume]
 set -Eeuo pipefail
 # Any step that fails is a setup that fails: exit 2, never its own status,
 # so a caller never reads it as 1, a review that requests changes.
@@ -42,13 +47,15 @@ base=origin/main
 consent=""
 agents=head
 parallel=16
+resume=no
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --base) base="${2:?--base needs a ref}"; shift 2 ;;
     --agents) agents="${2:?--agents needs base or head}"; shift 2 ;;
     --consent) consent="${2:?--consent needs a file}"; shift 2 ;;
     --parallel) parallel="${2:?--parallel needs a number}"; shift 2 ;;
-    *) echo "usage: scripts/review-local.sh [--base REF] [--agents base|head] [--consent FILE] [--parallel N]" >&2; exit 2 ;;
+    --resume) resume=yes; shift ;;
+    *) echo "usage: scripts/review-local.sh [--base REF] [--agents base|head] [--consent FILE] [--parallel N] [--resume]" >&2; exit 2 ;;
   esac
 done
 case "$agents" in
@@ -147,8 +154,24 @@ while IFS= read -r -d '' f; do
 done < instructions.list > review/pr-instructions.txt
 
 echo "review-local: $(tr '\n' ' ' < class.txt)"
+# A resumed run starts from the last run's review directory, kept until
+# this run replaces it below, and only on the same head and definitions.
+head_sha=$(git -C "$repo" rev-parse HEAD)
+prev="$repo/target/review-local/review"
+from=()
+if [ "$resume" = yes ]; then
+  was=$(jq -r '.head // "none"' "$prev/run-id.json" 2>/dev/null || echo none)
+  if [ "$was" != "$head_sha" ]; then
+    echo "review-local: a full run: the last run reviewed head $was, not $head_sha" >&2
+  elif ! jq -r '.agents | to_entries[] | "\(.value.definition // "-")  .claude/agents/\(.key).md"' \
+    "$prev/run-id.json" | sha256sum --check --status --strict 2>/dev/null; then
+    echo "review-local: a full run: an agent definition changed since the last run" >&2
+  else
+    from=(--only "$prev/gaps.json" --from "$prev")
+  fi
+fi
 status=0
-tool review-run -- --workdir . --parallel "$parallel" || status=$?
+tool review-run -- --workdir . --parallel "$parallel" --head-sha "$head_sha" ${from[@]+"${from[@]}"} || status=$?
 mkdir -p "$repo/target/review-local"
 rm -rf "$repo/target/review-local/review"
 cp -R review "$repo/target/review-local/"
@@ -162,6 +185,12 @@ fi
 jq -r '"verdict: " + .verdict, (.findings[] | "\(.path):\(.line) — \(.severity) — \(.body)" | gsub("\\p{Cc}"; ""))' review/outcome.json
 jq -r '.[] | "deterministic: \(.path):\(.line) — \(.severity) — \(.body)" | gsub("\\p{Cc}"; "")' review/checked.json
 jq -r '"evaluation plan: \(length) components"' review/eval-plan.json
+if [ "${#from[@]}" -gt 0 ]; then
+  jq -r '[.[] | select(.reused | not) | .agent] as $again
+    | "resumed: reused \([.[] | select(.reused)] | length) agents, re-ran \($again | length) (\($again | join(", ")))"' review/usage.json
+fi
+# Nothing without an accepted report reads as clean.
+jq -r 'select(length > 0) | "not reviewed: " + ([.[] | .name + (if .part then " part \(.part)" else "" end)] | join(", "))' review/gaps.json
 LC_NUMERIC=C printf 'cost: $%.2f\n' "$(jq '[.[].cost_usd] | add // 0' review/usage.json)"
 echo "elapsed: $((SECONDS - start)) s"
 # The gate withholds approval on a blocking deterministic finding
