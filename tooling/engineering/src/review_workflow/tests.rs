@@ -1077,7 +1077,14 @@ fn an_upload_no_scrub_after_the_agents_gates_is_named() {
         "",
     ) + "      - name: Review\n        run: cargo run --locked --quiet --offline -p review-run -- --workdir . --credential d\n";
     assert_eq!(parse(&early).token_kept_from_agents(TOKEN), want);
+    // An upload whose `if:` is its first line is gated by it all the
+    // same, and named by that line when nothing gates it.
     let unnamed = KEPT.replace("      - name: Keep\n        if:", "      - if:");
+    assert!(
+        parse(&unnamed).token_kept_from_agents(TOKEN).is_empty(),
+        "{:?}",
+        parse(&unnamed).token_kept_from_agents(TOKEN)
+    );
     assert_eq!(
         parse(&unnamed.replace("&& steps.scrub.outputs.scrubbed == 'true'", ""))
             .token_kept_from_agents(TOKEN),

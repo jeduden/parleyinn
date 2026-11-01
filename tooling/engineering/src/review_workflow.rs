@@ -348,12 +348,18 @@ fn unscrubbed_uploads(steps: &[String]) -> Vec<String> {
         .iter()
         .filter(|s| s.contains(UPLOAD_ACTION))
         .filter(|s| {
-            !s.lines().any(|l| {
-                l.trim_start().starts_with("if:") && gates.iter().any(|g| l.contains(g.as_str()))
-            })
+            !s.lines()
+                .any(|l| is_condition(l) && gates.iter().any(|g| l.contains(g.as_str())))
         })
         .map(|s| step_name(s))
         .collect()
+}
+
+/// Whether `line` is a step's `if:`, its first line or not.
+fn is_condition(line: &str) -> bool {
+    line.trim_start()
+        .trim_start_matches("- ")
+        .starts_with("if:")
 }
 
 /// The names of the upload steps among `steps` whose `if:` lacks
@@ -362,11 +368,7 @@ fn uploads_skipped_on_failure(steps: &[String]) -> Vec<String> {
     steps
         .iter()
         .filter(|s| s.contains(UPLOAD_ACTION))
-        .filter(|s| {
-            !s.lines().any(|l| {
-                l.trim_start().trim_start_matches("- ").starts_with("if:") && l.contains("always()")
-            })
-        })
+        .filter(|s| !s.lines().any(|l| is_condition(l) && l.contains("always()")))
         .map(|s| step_name(s))
         .collect()
 }
