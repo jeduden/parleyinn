@@ -8,6 +8,14 @@
 //! run's MCP server and `parinn ingest` append beside each other in two
 //! processes (REC-06, REC-13). Every case is seeded, so a failure names
 //! a seed that reproduces it; `PARINN_PROPERTY_CASES` runs more.
+//!
+//! A write that waits past the store's busy deadline for another
+//! connection's lock fails with `DatabaseBusy`, its transaction rolled
+//! back, and its caller tries again, as the MCP server does on its next
+//! pass (ENG-03, ENG-09's soak). On a loaded machine the threads can
+//! hold one another off that long, so each step is tried again while it
+//! fails so, a bounded number of times; the property must hold whatever
+//! the retries leave behind.
 
 #![allow(
     clippy::unwrap_used,
@@ -21,12 +29,18 @@ use record::chain;
 use record::commitment::CommitmentKey;
 use record::event::{EventKind, Provenance};
 use record::id::WriterId;
+use rusqlite::ErrorCode;
 use serde_json::json;
 use store::{NewEvent, Store, StoreError};
 use testkit::TempDir;
 
 /// How many records the property is checked over by default.
 const CASES: u64 = 64;
+
+/// How many times a step that waited past the busy deadline is tried
+/// again before the failure stands: each try waits at most the
+/// deadline, so the retries are bounded too (ENG-03).
+const RETRIES: usize = 20;
 
 /// A small seeded generator (xorshift64*): no clock, no OS randomness, so
 /// a seed replays its record exactly.
@@ -74,23 +88,45 @@ fn events(rng: &mut Rng, n: usize, bad: Option<usize>) -> Vec<NewEvent> {
         .collect()
 }
 
+/// Whether `e` is a write that waited past the store's busy deadline.
+fn busy(e: &StoreError) -> bool {
+    matches!(e, StoreError::Sqlite(rusqlite::Error::SqliteFailure(f, _)) if f.code == ErrorCode::DatabaseBusy)
+}
+
+/// What `write` answers, tried again while it waits past the busy
+/// deadline, up to [`RETRIES`] times.
+fn retried<T>(mut write: impl FnMut() -> Result<T, StoreError>) -> Result<T, StoreError> {
+    for _ in 0..RETRIES {
+        match write() {
+            Err(e) if busy(&e) => {}
+            done => return done,
+        }
+    }
+    write()
+}
+
 /// One random operation on one of `stores`.
 fn step(rng: &mut Rng, stores: &mut [Store], writers: &[WriterId]) {
     let writer = writers[rng.below(writers.len() as u64) as usize];
     let store = &mut stores[rng.below(stores.len() as u64) as usize];
     let n = 1 + rng.below(220) as usize;
     match rng.below(5) {
-        0 => drop(store.append(writer, &events(rng, n, None)).unwrap()),
-        1 => drop(store.append_open(writer, &events(rng, n, None)).unwrap()),
+        0 => {
+            let new = events(rng, n, None);
+            drop(retried(|| store.append(writer, &new)).unwrap());
+        }
+        1 => {
+            let new = events(rng, n, None);
+            drop(retried(|| store.append_open(writer, &new)).unwrap());
+        }
         2 => {
             let bad = rng.below(n as u64) as usize;
-            let err = store
-                .append(writer, &events(rng, n, Some(bad)))
-                .unwrap_err();
+            let new = events(rng, n, Some(bad));
+            let err = retried(|| store.append(writer, &new)).unwrap_err();
             assert!(matches!(err, StoreError::Encoding(_)), "{err}");
         }
-        3 => store.close_segment(writer).unwrap(),
-        _ => drop(store.append(writer, &[]).unwrap()),
+        3 => retried(|| store.close_segment(writer)).unwrap(),
+        _ => drop(retried(|| store.append(writer, &[])).unwrap()),
     }
 }
 
@@ -174,9 +210,36 @@ fn seq_stays_gap_free_with_appends_on_several_threads_at_once() {
 /// One random record of up to eight steps, seeded by `seed`, over its
 /// own connection to the store at `path`.
 fn record(path: &std::path::Path, writers: &[WriterId], seed: u64) {
-    let mut stores = [Store::open(path).unwrap()];
+    let mut stores = [retried(|| Store::open(path)).unwrap()];
     let mut rng = Rng::new(seed);
     for _ in 0..1 + rng.below(8) {
         step(&mut rng, &mut stores, writers);
     }
+}
+
+#[test]
+fn a_step_held_off_past_the_busy_deadline_is_tried_again() {
+    let dir = TempDir::new().unwrap();
+    let path = dir.path().join("store.db");
+    let mut store = Store::open(&path).unwrap();
+    let writer = WriterId::derive(&[1; 32]);
+    let new = events(&mut Rng::new(0), 3, None);
+    let (held, hold) = std::sync::mpsc::channel();
+
+    let appended = std::thread::scope(|scope| {
+        scope.spawn(|| {
+            let other = rusqlite::Connection::open(&path).unwrap();
+            other.execute_batch("BEGIN IMMEDIATE").unwrap();
+            held.send(()).unwrap();
+            // Past the store's five-second busy deadline.
+            std::thread::sleep(std::time::Duration::from_secs(6));
+            other.execute_batch("COMMIT").unwrap();
+        });
+        hold.recv_timeout(std::time::Duration::from_secs(10))
+            .unwrap();
+        retried(|| store.append(writer, &new))
+    });
+
+    assert_eq!(appended.unwrap().len(), 3);
+    check(&path, 0);
 }

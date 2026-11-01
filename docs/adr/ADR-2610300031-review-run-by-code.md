@@ -260,29 +260,17 @@ repeat them, which costs tokens.
 - A requirement request lands with the stakeholder as a nit; the SRS
   changes only through the stakeholder's own change.
 - A review runs in waves of agents, each up to 900 seconds and each
-  agent at most twice, or three times when the API turned it away as
-  overloaded. The repository has 56 specialists and the job starts 32
-  at once, so they take two waves and the generalists a third: 3 x 2 x
-  15 = 90 minutes at worst, and the job's cap is 120. Agents end in
-  minutes in practice, and a generalist starts as soon as its own
-  specialists have ended and the mass failure below is decided, so the
-  third wave overlaps the second.
-- What a review may spend and how it fails are bounded by code, as
-  proposed by the engine comparison of 2026-11-01 (cost caps, a mass
-  failure breaker, pipelined generalists, retry backoff, live
-  progress), not yet accepted: each run gets `--max-budget-usd`, 1.00
-  for a specialist and 5.00 for a generalist, and `review-run
-  --max-cost-usd` (40) starts no run once the runs that ended cost that
-  much; once more than `--breaker-fraction` (1/3, in whole numbers) of
-  the specialists, capped ones too, ended in a gap no generalist starts
-  and the outcome opens with a `review aborted:` finding. Each agent
-  kept back is an `over budget:` or `aborted:` gap, never an approval,
-  so `--only` finishes the review once fixed. A run the API turned away
-  as overloaded waits 15 s, then 30 s, each with jitter, before it runs
-  again, or stays a named gap with no deadline left; a run a cost cap
-  stopped or whose credential was refused is not run again. Every 20 s
-  the run prints what is running, its calls and tokens so far, and adds
-  the table of every run to the job summary.
+  agent at most twice (three times when the API turned it away). The
+  56 specialists run in two waves of 32 and the generalists follow,
+  each once its own specialists ended and the mass failure below is
+  decided: 3 x 2 x 15 = 90 minutes at worst, and the job's cap is 120.
+- Cost and mass failure are bounded by code (proposed, not yet
+  accepted): each run gets `--max-budget-usd` (1.00 a specialist, 5.00
+  a generalist), none starts once finished runs cost `--max-cost-usd`
+  (40), and when more than a third of the specialists, capped ones too,
+  ended in a gap no generalist starts and the outcome opens with
+  `review aborted:`. Each is an `over budget:` or `aborted:` gap. An
+  overloaded run waits 15 s, then 30 s.
 - What a run leaves without an accepted report is said, never read as
   clean: `review/gaps.json` and `review/not-reviewed.md` list each such
   agent or part and why. `review-run --only <gaps> --from <dir>`, behind
@@ -290,6 +278,18 @@ repeat them, which costs tokens.
   changed, keyed by `review/run-id.json`: the head, an inputs hash, and
   each definition's and diff's SHA-256. The verdict function is the
   same; nothing is reused across a changed head, definition or diff.
+- After every run, failed or not, `review-run` writes
+  `review/agent-runs.jsonl`, one entry per agent run with its tokens, the
+  cost its log reported and why it was not accepted, and
+  `review/report.html`, a static run report with every string a run shaped
+  escaped; the `review-report` crate builds both from the review's
+  files, best effort, so neither changes the verdict. They go with the
+  reports; the run logs stay in the job. No server or socket is added.
+- A stability measurement, `.github/workflows/stability.yml`, reviews each
+  snapshot of `tooling/review-eval/stability-snapshots.toml` three times
+  afresh and measures the verdict flip rate and each agent's finding
+  overlap (ENG-32). It runs on dispatch alone: about $15 a measurement, so
+  its weekly schedule waits, commented out, for the stakeholder.
 - The Claude Code OAuth token stays out of every agent's reach: one
   step in each agent job stages it in a credentials file under the
   runner's temporary directory, no step that runs an agent holds it,

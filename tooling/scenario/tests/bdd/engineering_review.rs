@@ -135,7 +135,7 @@ fn agents_write_nothing(w: &mut World) -> Result<(), String> {
     regex = r#"^no step that runs an agent holds the "([^"]+)" token: one step in each agent job stages it where no agent reads it, review-run refuses its agents every read of the staged credential's directory by name, of the process, system and device files and outside their trees, and every file an agent job uploads waits for a scrub of that token$"#
 )]
 fn token_kept_from_agents(w: &mut World, token: String) -> Result<(), String> {
-    let mut problems = eng(w).flow.token_kept_from_agents(&token);
+    let mut problems = review_workflow::every_workflow_keeps_the_token(eng(w).checkout()?, &token)?;
     problems.extend(review_workflow::Workflow::reads_refused(
         review_eval::runner::DISALLOWED,
         review_eval::runner::SETTINGS,
