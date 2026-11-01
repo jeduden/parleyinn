@@ -1258,6 +1258,51 @@ fn scrub_replaces_the_token_in_every_path_and_fails_closed_when_it_found_one() {
 }
 
 #[test]
+fn a_token_too_short_for_the_scrub_is_neither_staged_nor_run_with() {
+    let dir = checkout();
+    sound_cases(dir.path());
+    let root = TempDir::new().unwrap();
+    let cred = root.path().join("cred");
+    let host = FakeHost::new(dir.path());
+    let short = "dummy-short";
+
+    let (code, _, err) = run_cli_with(
+        &host,
+        Some(short),
+        &["stage-credential", "--dir", &text(&cred)],
+    );
+    assert_eq!(code, EXIT_FAILURE);
+    assert!(err.ends_with("refusing to stage it\n"), "{err}");
+    assert!(!cred.exists());
+
+    let out_dir = root.path().join("out");
+    let (code, _, err) = run_cli_with(
+        &host,
+        Some(short),
+        &[
+            "run",
+            "--checkout",
+            &text(dir.path()),
+            "--component",
+            "lang-rust",
+            "--out",
+            &text(&out_dir),
+        ],
+    );
+    assert_eq!(code, EXIT_FAILURE);
+    assert_eq!(
+        err,
+        format!(
+            "review-eval: the Claude token is shorter than the {} characters the scrub can \
+             match; refusing to use it\n",
+            crate::secret::SHORTEST
+        )
+    );
+    assert!(!out_dir.exists());
+    assert!(!err.contains(short));
+}
+
+#[test]
 fn leaked_names_the_count_and_what_to_do() {
     assert_eq!(
         leaked(2),

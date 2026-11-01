@@ -95,6 +95,24 @@ fn a_secret_too_short_to_tell_from_text_is_not_a_form() {
 }
 
 #[test]
+fn a_guarded_scrubber_refuses_a_secret_too_short_to_be_a_form() {
+    let err = Scrubber::guarded(&[TOKEN, "short"]).unwrap_err();
+
+    assert_eq!(
+        err,
+        format!(
+            "the Claude token is shorter than the {SHORTEST} characters the scrub can match; \
+             refusing to use it"
+        )
+    );
+    // An empty secret is none at all: there is nothing of it to leak.
+    assert_eq!(
+        Scrubber::guarded(&[TOKEN, "", "  "]),
+        Ok(Scrubber::new(&[TOKEN]))
+    );
+}
+
+#[test]
 fn a_file_is_rewritten_only_when_it_held_the_token() {
     let dir = TempDir::new().unwrap();
     let clean = dir.path().join("clean.md");

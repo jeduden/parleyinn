@@ -145,7 +145,8 @@ pub fn run_with(
 ///
 /// # Errors
 ///
-/// Fails when the credential does not resolve or read.
+/// Fails when the credential does not resolve or read, or a token is
+/// too short for the scrub to match.
 fn guard(args: &Args, token: Option<&str>) -> Result<(Scrubber, Option<PathBuf>), String> {
     let located = args
         .credential
@@ -155,7 +156,7 @@ fn guard(args: &Args, token: Option<&str>) -> Result<(Scrubber, Option<PathBuf>)
     let staged = located.as_deref().map(credential::read).transpose()?;
     let secrets: Vec<&str> = staged.as_deref().into_iter().chain(token).collect();
 
-    Ok((Scrubber::new(&secrets), located))
+    Ok((Scrubber::guarded(&secrets)?, located))
 }
 
 /// Runs the review `args` name and writes its files, each scrubbed by

@@ -314,14 +314,14 @@ fn stage_command(
 }
 
 /// The scrubber for the token staged under `--credential`, when given,
-/// and `token`.
+/// and `token`; refused when either is too short for it to match.
 fn scrubber(flags: &Flags, token: Option<&str>) -> Result<Scrubber, Problem> {
     let staged = one(flags, "credential")?
         .map(|dir| credential::read(Path::new(&dir)))
         .transpose()?;
     let secrets: Vec<&str> = staged.as_deref().into_iter().chain(token).collect();
 
-    Ok(Scrubber::new(&secrets))
+    Ok(Scrubber::guarded(&secrets)?)
 }
 
 /// Scrubs every `--path`, a file or a directory, and fails closed when

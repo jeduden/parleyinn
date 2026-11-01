@@ -816,6 +816,25 @@ fn a_token_the_process_holds_is_scrubbed_without_a_staged_credential() {
 }
 
 #[test]
+fn a_review_holding_a_token_too_short_for_the_scrub_runs_no_agent() {
+    let dir = workdir();
+    let host = FakeHost::new(fake::either);
+
+    let (code, out, _) = run_holding(&host, dir.path(), Some("dummy-short"), &[]);
+
+    assert_eq!(code, EXIT_FAILURE);
+    assert_eq!(
+        out,
+        format!(
+            "failed=the Claude token is shorter than the {} characters the scrub can match; \
+             refusing to use it\n",
+            review_eval::secret::SHORTEST
+        )
+    );
+    assert!(host.agents().is_empty());
+}
+
+#[test]
 fn a_review_whose_credential_does_not_read_runs_no_agent() {
     let dir = workdir();
     let host = FakeHost::new(fake::either);

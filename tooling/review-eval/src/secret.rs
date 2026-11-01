@@ -26,6 +26,23 @@ pub const SHAPE_TAIL: usize = 20;
 /// shorter one would match ordinary text.
 pub const SHORTEST: usize = 12;
 
+/// Whether `secret`, trimmed, holds something yet is shorter than
+/// [`SHORTEST`]: the scrub cannot match it, so it must not be used.
+#[must_use]
+pub fn too_short(secret: &str) -> bool {
+    let secret = secret.trim();
+    !secret.is_empty() && secret.len() < SHORTEST
+}
+
+/// Why a token [`too_short`] is refused, `doing` what with it.
+#[must_use]
+pub fn refusal(doing: &str) -> String {
+    format!(
+        "the Claude token is shorter than the {SHORTEST} characters the scrub can match; \
+         refusing to {doing} it"
+    )
+}
+
 /// The two base64 alphabets.
 pub const STANDARD: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 pub const URL_SAFE: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
@@ -52,6 +69,21 @@ impl Scrubber {
         forms.dedup();
 
         Self { forms }
+    }
+
+    /// A scrubber for `secrets` that fails closed, never naming the
+    /// secret, when one is too short to be a form: the scrub could not
+    /// match it, so nothing it guards may run. An empty one is none.
+    ///
+    /// # Errors
+    ///
+    /// Fails when a secret is shorter than [`SHORTEST`] after trimming.
+    pub fn guarded(secrets: &[&str]) -> Result<Self, String> {
+        if secrets.iter().any(|s| too_short(s)) {
+            return Err(refusal("use"));
+        }
+
+        Ok(Self::new(secrets))
     }
 
     /// `text` with every form replaced, and how many were.

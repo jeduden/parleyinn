@@ -17,6 +17,7 @@ use serde_json::json;
 
 use crate::host::{Command, Host, Output};
 use crate::runner::PROGRAM;
+use crate::secret::{self, too_short};
 
 /// The variable the workflow hands the token in, to the staging step
 /// alone.
@@ -38,12 +39,16 @@ const SCOPE: &str = "user:inference";
 ///
 /// # Errors
 ///
-/// Fails, never naming the token, when it is empty or holds a
-/// character no token has, or the directory or file cannot be written.
+/// Fails, never naming the token, when it is empty, holds a character
+/// no token has or is shorter than the scrub can match, or the
+/// directory or file cannot be written.
 pub fn stage(dir: &Path, token: &str) -> Result<(), String> {
     let token = token.trim();
     if token.is_empty() || !token.chars().all(token_char) {
         return Err("the Claude token is empty or holds a character no token has".to_owned());
+    }
+    if too_short(token) {
+        return Err(secret::refusal("stage"));
     }
     fs::create_dir_all(dir).map_err(|e| format!("make {}: {e}", dir.display()))?;
     fs::set_permissions(dir, fs::Permissions::from_mode(0o700))

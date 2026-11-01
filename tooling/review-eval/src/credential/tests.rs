@@ -53,6 +53,41 @@ fn a_token_that_is_empty_or_not_one_line_of_token_characters_is_refused_unnamed(
 }
 
 #[test]
+fn a_token_too_short_for_the_scrub_to_match_is_refused_unnamed() {
+    let root = TempDir::new().unwrap();
+    let dir = root.path().join("cred");
+    let short = "x".repeat(crate::secret::SHORTEST - 1);
+
+    let err = stage(&dir, &format!(" {short}\n")).unwrap_err();
+
+    assert_eq!(
+        err,
+        format!(
+            "the Claude token is shorter than the {} characters the scrub can match; \
+             refusing to stage it",
+            crate::secret::SHORTEST
+        )
+    );
+    assert!(!dir.exists());
+}
+
+#[test]
+fn the_shortest_token_staged_is_one_the_scrub_matches() {
+    // Staging and the scrub share one minimum: a token just long enough
+    // to stage is a form the scrub replaces.
+    let root = TempDir::new().unwrap();
+    let dir = root.path().join("cred");
+    let shortest = "x".repeat(crate::secret::SHORTEST);
+
+    stage(&dir, &shortest).unwrap();
+
+    let staged = read(&dir).unwrap();
+    let (text, n) = crate::secret::Scrubber::new(&[&staged]).scrub(&format!("a {shortest} b"));
+    assert_eq!(text, format!("a {} b", crate::secret::REDACTED));
+    assert_eq!(n, 1);
+}
+
+#[test]
 fn a_credential_that_cannot_be_staged_or_read_fails_naming_its_path() {
     let root = TempDir::new().unwrap();
     let file = root.path().join("f");
