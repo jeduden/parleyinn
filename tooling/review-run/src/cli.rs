@@ -118,7 +118,14 @@ pub fn run_with(
             leaks.fetch_add(n, Ordering::SeqCst);
             progress(&line);
         };
-        review(host, &args, &scrubber, &leaks, &scrubbed).map_err(|msg| scrubber.scrub(&msg).0)
+        let reviewed =
+            review(host, &args, &scrubber, &leaks, &scrubbed).map_err(|msg| scrubber.scrub(&msg).0);
+        // The run list and the run report, after every run, best effort:
+        // built from the files above, already scrubbed, and scrubbed
+        // again, so a form they hold fails the review (ENG-28).
+        let failure = reviewed.as_ref().err().map(String::as_str);
+        let found = leak::report(&scrubber, Path::new(&args.workdir), failure, &scrubbed);
+        with_leaks(reviewed, found)
     });
     match guarded {
         // The step outputs carry the verdict to the workflow: one that
@@ -137,6 +144,17 @@ pub fn run_with(
             let _ = writeln!(stdout, "failed={}", msg.replace('\n', " "));
             EXIT_FAILURE
         }
+    }
+}
+
+/// `reviewed`, failed when `found` forms of the token turned up in what
+/// the run list and report hold; a review that failed already keeps its
+/// own message and names the leak after it, so it asks for the rotation.
+fn with_leaks(reviewed: Result<String, String>, found: usize) -> Result<String, String> {
+    match (reviewed, found) {
+        (Ok(_), n) if n > 0 => Err(leak::reason(n)),
+        (Err(msg), n) if n > 0 => Err(format!("{msg}; {}", leak::reason(n))),
+        (reviewed, _) => reviewed,
     }
 }
 

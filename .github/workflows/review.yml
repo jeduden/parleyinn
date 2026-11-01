@@ -314,7 +314,7 @@ jobs:
             --path review/logs --path review/reports --path review/answers.json \
             --path review/usage.json --path review/outcome.json --path review/consulted.json \
             --path review/gaps.json --path review/not-reviewed.md --path review/run-id.json \
-            --path review/run.txt
+            --path review/run.txt --path review/agent-runs.jsonl --path review/report.html
           code=$?
           set -e
           rm -rf "$RUNNER_TEMP/claude-credential"
@@ -378,6 +378,25 @@ jobs:
             jq -r '.[] | "| \(.agent) | \(.parts) | \(.attempts) | \(.calls) | \(.fresh) | \(.cache_write) | \(.cache_read) | \(.output) | \(.cost_usd) |"' \
               review/usage.json
           } >> "$GITHUB_STEP_SUMMARY" || exit 0
+      # The run list review-run wrote after the run, failed or not, on one
+      # screen: the verdict, the counts, the wall time and each run
+      # whose answer was not taken, by name alone. The run list and the
+      # run report, review/report.html, go with the reports below; they
+      # hold timings, tokens, costs and gap reasons, never a tool result
+      # (ENG-28). It only reports and never fails the review.
+      - name: Summarize the review's run list
+        if: always() && steps.pull_head.outputs.number != ''
+        run: |
+          [ -s review/agent-runs.jsonl ] || exit 0
+          {
+            echo "### The review's run list"
+            echo
+            head -n 1 review/agent-runs.jsonl | jq -r '.review | "verdict \(.verdict): \(.findings_blocking) blocking, \(.findings_nit) nits, \(.gaps) not reviewed, \((((.finished // 0) - (.started // 0)) / 1000) | floor) s"'
+            echo
+            tail -n +2 review/agent-runs.jsonl | jq -r 'select(.status == "gap") | "- gap: \(.name) part \(.part // "-") attempt \(.attempt)"' | head -n 30
+            echo
+            echo "The run report, report.html, and the run list, agent-runs.jsonl, are in the review-reports artifact."
+          } >> "$GITHUB_STEP_SUMMARY" || exit 0
       # The reports review-run assembled from the run logs, and the
       # answers, for the post job's gate and for the review's readers:
       # the review and its check link here. A review that failed keeps
@@ -391,6 +410,8 @@ jobs:
           path: |
             review/reports/
             review/answers.json
+            review/report.html
+            review/agent-runs.jsonl
             review/usage.json
           if-no-files-found: error
       # The run logs under review/logs/ stay in the job: they hold every

@@ -5,6 +5,8 @@
 //! blocking finding of its own and exits as one that could not run, so
 //! nothing it decided is posted.
 
+use std::path::Path;
+
 use review_eval::secret::Scrubber;
 use review_gate::{BLOCKING, Finding, REQUEST_CHANGES_VERDICT, ReviewOutcome};
 
@@ -62,3 +64,25 @@ pub fn fail_closed(outcome: &mut ReviewOutcome, n: usize) {
 
 #[cfg(test)]
 mod tests;
+
+/// Writes the run list and the run report of the review in `workdir`,
+/// `failure` saying why it could not run, then scrubs both of the
+/// token; answers how many forms it replaced, and tells `progress`
+/// each file not scrubbed (I6).
+pub fn report(
+    scrubber: &Scrubber,
+    workdir: &Path,
+    failure: Option<&str>,
+    progress: &dyn Fn(&str),
+) -> usize {
+    review_report::write_reported(workdir, failure, progress);
+    let mut found = 0;
+    for rel in [review_report::AGENT_RUNS, review_report::REPORT] {
+        match scrubber.scrub_file(&workdir.join(rel)) {
+            Ok(n) => found += n,
+            Err(e) => progress(&format!("run report: {e}")),
+        }
+    }
+
+    found
+}
