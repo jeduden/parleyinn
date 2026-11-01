@@ -285,6 +285,26 @@ fn starts_cli_reads_a_command_at_a_line_s_start_alone() {
 }
 
 #[test]
+fn starts_cli_reads_a_command_started_through_another() {
+    assert!(starts_cli(
+        "          npx @anthropic-ai/claude-code -p review"
+    ));
+    assert!(starts_cli(
+        "          npx -y @anthropic-ai/claude-code@2.1.0 -p review"
+    ));
+    assert!(starts_cli(
+        "      - run: cd pr-head && claude --permission-mode x"
+    ));
+    assert!(starts_cli("          env X=1 claude -p review"));
+    assert!(starts_cli("          HOME=\"$tmp\" exec claude -p review"));
+    assert!(starts_cli(
+        "          true; ./node_modules/.bin/claude -p review"
+    ));
+    assert!(!starts_cli("          cd pr-head && echo claude"));
+    assert!(!starts_cli("          env X=1 cargo run -p review-run"));
+}
+
+#[test]
 fn key_held_apart_refuses_the_command_line_in_the_key_s_job() {
     let mut w = parse(REVIEW_FLOW);
     w.jobs[1].text.push_str(CLI);

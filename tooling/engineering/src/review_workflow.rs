@@ -7,6 +7,7 @@ use std::collections::BTreeMap;
 use review_eval::runner::TOOLS;
 
 use crate::list;
+use crate::static_analysis::without_assignments;
 
 /// What a job runs the review's agents with: review-run, which starts
 /// every dispatched agent.
@@ -161,15 +162,41 @@ fn installs_cli(text: &str) -> bool {
     AGENT_CLI.iter().any(|cli| text.contains(cli))
 }
 
-/// Whether `line` of a job starts the Claude Code command line itself,
-/// `claude` the first word of a script line, so whatever tools and
-/// permission mode it passes go past review-run's and review-eval's.
+/// The commands that start the command after them, as `npx` and `env`
+/// do, each skipped with its flags to find what a script line starts.
+const WRAPPERS: [&str; 7] = ["env", "npx", "exec", "command", "nohup", "time", "sudo"];
+
+/// Whether `line` of a job starts the Claude Code command line itself:
+/// `claude`, a path to it or the npm package the first word of any
+/// command on a script line, after its assignments and any wrapper such
+/// as `env` or `npx`, so whatever tools and permission mode it passes go
+/// past review-run's and review-eval's.
 fn starts_cli(line: &str) -> bool {
     let line = line.trim_start();
     let line = line.strip_prefix("- ").unwrap_or(line).trim_start();
     let line = line.strip_prefix("run:").unwrap_or(line).trim_start();
+    if line.starts_with('#') {
+        return false;
+    }
 
-    line == "claude" || line.starts_with("claude ")
+    line.split(['&', '|', ';']).any(|command| {
+        let mut rest = without_assignments(command.trim());
+        loop {
+            let (word, after) = rest.split_once(' ').unwrap_or((rest, ""));
+            if !WRAPPERS.contains(&word) {
+                return word == "claude"
+                    || word.ends_with("/claude")
+                    || word
+                        .strip_prefix(AGENT_CLI[1])
+                        .is_some_and(|v| v.is_empty() || v.starts_with('@'));
+            }
+            rest = after.trim_start();
+            while rest.starts_with('-') {
+                rest = rest.split_once(' ').map_or("", |(_, r)| r.trim_start());
+            }
+            rest = without_assignments(rest);
+        }
+    })
 }
 
 /// Whether a job's `text` runs the review's agents, a harness session,

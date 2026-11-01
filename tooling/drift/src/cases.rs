@@ -415,7 +415,7 @@ fn review_place_form_cases() -> Vec<Case> {
             Injection::replace(
                 REVIEW_WORKFLOW,
                 "          cargo run --locked --quiet --offline -p review-run -- --workdir . --parallel 32 \\\n",
-                "          claude --permission-mode bypassPermissions -p review\n          cargo run --locked --quiet --offline -p review-run -- --workdir . --parallel 32 \\\n",
+                "          cd pr-head && claude --permission-mode bypassPermissions -p review\n          cargo run --locked --quiet --offline -p review-run -- --workdir . --parallel 32 \\\n",
             ),
             scenario("ENG-28"),
             "job review starts the Claude Code command line itself, outside review-run and review-eval",
@@ -742,7 +742,7 @@ fn review_reach_cases() -> Vec<Case> {
             Injection::replace(
                 REVIEW_WORKFLOW,
                 "            > review/run.txt\n",
-                "            > review/run.txt\n          npx @anthropic-ai/claude-code -p review --allowedTools Write\n",
+                "            > review/run.txt\n          ./review/agents.sh -p review --allowedTools Write\n",
             ),
             scenario("ENG-28"),
             "may use Write, want Read, Glob, Grep alone",
