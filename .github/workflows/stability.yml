@@ -12,8 +12,12 @@ name: Stability measurement
 # and JACCARD_FLOOR) is a warning, not a failure: the measurement measures,
 # the stakeholder decides.
 #
-# It runs from main's definition on the stakeholder's Claude token, as
-# the review does, with nothing it can write with. One measurement is nine
+# It runs from the default branch's definition alone (the first job
+# refuses any other ref, so a dispatch from a branch measures nothing)
+# on the stakeholder's Claude token, as the review does: one step stages
+# the token where no agent reads it, no step that runs an agent holds it,
+# and every upload waits for a scrub of it (ENG-28). Nothing it has can
+# write. One measurement is nine
 # reviews, about $15 of model usage, so it runs on demand alone.
 on:
   workflow_dispatch:
@@ -30,6 +34,9 @@ concurrency:
 
 jobs:
   snapshots:
+    # A dispatch from another ref would run that ref's definition with
+    # the token; only the default branch's runs.
+    if: github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
@@ -78,9 +85,11 @@ jobs:
           cache: false
       - name: Install the pinned Claude Code command line
         uses: ./.github/actions/claude-code
-      # Built before the Claude token is in any step's environment.
+      # Built, its crates fetched and their build scripts run, before the
+      # Claude token is in any step's environment; the steps that hold or
+      # use it run offline.
       - name: Build the review's tools
-        run: cargo build --locked --quiet -p review-bundle -p review-run
+        run: cargo build --locked --quiet -p review-bundle -p review-run -p review-eval
       # As the review workflow prepares its work directory, the pull
       # request's agent instructions copied out of its tree as data.
       - name: Prepare a fresh work directory
@@ -108,19 +117,59 @@ jobs:
           mdsmith help patterns -f json > review/mdsmith-patterns.json
           "$GITHUB_WORKSPACE/target/debug/review-bundle" --base . --head pr-head \
             --diff pr.diff --consent stakeholder-comments.json --out review > class.txt
-      - name: Review
+      # The Claude token reaches no agent's environment and no file its
+      # tools can read (ENG-28). This step alone holds it, and writes it
+      # into a credentials file only its owner reads, under the runner's
+      # temporary directory, outside both trees the agents are given.
+      - name: Stage the Claude token where no agent reads it
         env:
           CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+        run: |
+          cargo run --locked --quiet --offline -p review-eval -- stage-credential \
+            --dir "$RUNNER_TEMP/claude-credential"
+      # No step that runs an agent holds the token: review-run reads it
+      # from the staged credential only to scrub what it writes of it.
+      - name: Review
+        env:
           HEAD_SHA: ${{ matrix.head }}
         run: |
-          "$GITHUB_WORKSPACE/target/debug/review-run" --workdir "$RUNNER_TEMP/work" \
-            --parallel 32 --head-sha "$HEAD_SHA" > "$RUNNER_TEMP/work/review/run.txt"
+          cargo run --locked --quiet --offline -p review-run -- --workdir "$RUNNER_TEMP/work" \
+            --parallel 32 --head-sha "$HEAD_SHA" \
+            --credential "$RUNNER_TEMP/claude-credential" > "$RUNNER_TEMP/work/review/run.txt"
+      # Whatever review-run wrote is scrubbed of the token once more, a
+      # run cut off before its own scrub included, before any step keeps
+      # it; a form found fails the job. Only then is the staged
+      # credential removed.
+      - name: Scrub what the review wrote of the Claude token
+        id: scrub
+        if: always()
+        run: |
+          set +e
+          work="$RUNNER_TEMP/work"
+          cargo run --locked --quiet --offline -p review-eval -- scrub \
+            --credential "$RUNNER_TEMP/claude-credential" \
+            --path "$work/review/logs" --path "$work/review/reports" \
+            --path "$work/review/answers.json" --path "$work/review/usage.json" \
+            --path "$work/review/outcome.json" --path "$work/review/consulted.json" \
+            --path "$work/review/gaps.json" --path "$work/review/run-id.json" \
+            --path "$work/review/agent-runs.jsonl" --path "$work/review/report.html" \
+            --path "$work/review/run.txt" --path "$work/class.txt"
+          code=$?
+          set -e
+          rm -rf "$RUNNER_TEMP/claude-credential"
+          if [ "$code" -eq 0 ] || [ "$code" -eq 3 ]; then
+            echo "scrubbed=true" >> "$GITHUB_OUTPUT"
+          fi
+          if [ "$code" -eq 3 ]; then
+            echo "::error::what the review wrote held the Claude Code OAuth token, now redacted; revoke and rotate it, and nothing is kept"
+          fi
+          exit "$code"
       # What the comparison reads, and the run list and the run report; the run
       # logs stay in the job, as in the review (ENG-28). A snapshot's name
       # holds no underscore, so the comparison's pattern takes its own
       # three reviews alone.
       - name: Keep the review
-        if: always()
+        if: always() && steps.scrub.outputs.scrubbed == 'true'
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: review_${{ matrix.name }}_${{ matrix.sample }}

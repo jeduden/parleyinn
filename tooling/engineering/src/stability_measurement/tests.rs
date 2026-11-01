@@ -33,11 +33,35 @@ fn a_measurement_that_is_scheduled_or_misses_a_part_is_named() {
         )]
     );
 
-    let bare = "on:\n  push:\n  uses review/logs\n";
+    let bare = "on:\n  push:\njobs:\n  j:\n    steps:\n      - uses: actions/upload-artifact@x\n        with:\n          path: work/review/logs\n";
     let problems = measurement_problems(bare);
-    assert_eq!(problems.len(), 8, "{problems:?}");
+    assert_eq!(problems.len(), 9, "{problems:?}");
     assert!(problems[0].ends_with("cannot be started on demand"));
-    assert!(problems[7].ends_with("every tool result its agents read"));
+    assert!(problems[1].ends_with("not the default branch's definition alone"));
+    assert!(problems[8].ends_with("every tool result its agents read"));
+}
+
+#[test]
+fn a_measurement_that_hands_its_agents_the_token_or_keeps_unscrubbed_is_named() {
+    let measurement = checkout().read(MEASUREMENT).unwrap();
+    let handed = measurement.replace(
+        "      - name: Review\n        env:\n",
+        "      - name: Review\n        env:\n          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}\n",
+    );
+    let problems = measurement_problems(&handed);
+    assert_eq!(problems.len(), 1, "{problems:?}");
+    assert!(problems[0].contains("which does more than stage it"));
+
+    let ungated = measurement.replace(
+        "if: always() && steps.scrub.outputs.scrubbed == 'true'",
+        "if: always()",
+    );
+    let problems = measurement_problems(&ungated);
+    assert_eq!(problems.len(), 1, "{problems:?}");
+    assert!(problems[0].contains("uploads in step \"Keep the review\" before a scrub"));
+
+    let unguarded = measurement.replace("github.event.repository.default_branch", "x");
+    assert_eq!(measurement_problems(&unguarded).len(), 1);
 }
 
 #[test]
@@ -54,14 +78,14 @@ fn a_review_workflow_that_keeps_no_run_list_or_report_is_named() {
 }
 
 #[test]
-fn a_states_that_does_not_read_is_named() {
-    assert!(states_problems(SNAPSHOTS, 3).is_empty());
+fn a_snapshots_file_that_does_not_read_is_named() {
+    assert!(snapshots_problems(SNAPSHOTS, 3).is_empty());
     assert_eq!(
-        states_problems(SNAPSHOTS, 2),
+        snapshots_problems(SNAPSHOTS, 2),
         vec!["the measurement reviews each snapshot 2 times, not three"]
     );
 
-    let problems = states_problems("snapshot = []", 3);
+    let problems = snapshots_problems("snapshot = []", 3);
     assert_eq!(problems.len(), 1);
     assert!(
         problems[0].ends_with("the snapshots file holds no snapshot"),

@@ -6,12 +6,16 @@ use std::collections::BTreeMap;
 
 use review_eval::runner::TOOLS;
 
-use crate::list;
 use crate::static_analysis::without_assignments;
+use crate::{Checkout, list};
 
 /// What a job runs the review's agents with: review-run, which starts
-/// every dispatched agent.
-const AGENT_RUN: &str = "-p review-run";
+/// every dispatched agent. Only a call that passes it arguments starts
+/// one: a build or a test of the crate runs no agent.
+const AGENT_RUN: &str = "-p review-run --";
+
+/// The same, run from the binary built beforehand.
+const AGENT_BINARY: &str = "target/debug/review-run";
 
 /// An action that runs one harness session, which would route the review
 /// itself; a job that uses one is held to the agents' rules too.
@@ -222,7 +226,10 @@ fn starts_cli(line: &str) -> bool {
 /// Whether a job's `text` runs the review's agents, a harness session,
 /// or installs the command line any of its steps can start one with.
 fn runs_agents(text: &str) -> bool {
-    text.contains(AGENT_RUN) || text.contains(AGENT_ACTION) || installs_cli(text)
+    text.contains(AGENT_RUN)
+        || text.contains(AGENT_BINARY)
+        || text.contains(AGENT_ACTION)
+        || installs_cli(text)
 }
 
 /// A job's steps, each from its `- ` line at the steps' indent.
@@ -259,6 +266,16 @@ fn upload_paths(step: &str) -> Vec<String> {
         .take_while(|l| l.len() - l.trim_start().len() > indent)
         .map(|l| l.trim().trim_matches(['"', '\'']).to_owned())
         .filter(|l| !l.is_empty())
+        .collect()
+}
+
+/// Every path the upload steps of `text` keep, across its jobs.
+pub(crate) fn uploaded_paths(text: &str) -> Vec<String> {
+    parse(text)
+        .jobs
+        .iter()
+        .flat_map(|j| steps(&j.text))
+        .flat_map(|s| upload_paths(&s))
         .collect()
 }
 
@@ -304,7 +321,8 @@ fn uploads_dir(paths: &[String], dir: &str) -> bool {
 /// `run`, or the command line itself.
 fn runs_agent_step(step: &str) -> bool {
     // A build of review-run passes it no arguments, and runs nothing.
-    step.contains(&format!("{AGENT_RUN} --"))
+    step.contains(AGENT_RUN)
+        || step.contains(AGENT_BINARY)
         || step.contains(EVAL_RUN)
         || step.lines().any(starts_cli)
 }
@@ -795,6 +813,35 @@ impl Workflow {
 
         Ok(())
     }
+}
+
+/// Requires every workflow in `checkout` that runs agents to keep the
+/// Claude token `token` from them (ENG-28), by
+/// [`Workflow::token_kept_from_agents`], each problem naming its file, so
+/// the next agent job added to any workflow is covered too.
+///
+/// # Errors
+///
+/// Fails when a workflow cannot be listed or read.
+pub fn every_workflow_keeps_the_token(
+    checkout: &Checkout,
+    token: &str,
+) -> Result<Vec<String>, String> {
+    let mut problems = Vec::new();
+    let prefix = format!("{}/", crate::workflows::WORKFLOWS);
+    for file in crate::workflows::files(checkout)? {
+        if !file.starts_with(&prefix) {
+            continue;
+        }
+        let flow = parse(&checkout.read(&file)?);
+        problems.extend(
+            flow.token_kept_from_agents(token)
+                .into_iter()
+                .map(|p| format!("{file}: {p}")),
+        );
+    }
+
+    Ok(problems)
 }
 
 /// Keys each body row of `rows` by the header row.

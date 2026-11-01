@@ -24,6 +24,9 @@ pub const MEASUREMENT: &str = ".github/workflows/stability.yml";
 /// The review's workflow.
 pub const REVIEW: &str = ".github/workflows/review.yml";
 
+/// The Claude token the measurement's agents are kept from (ENG-28).
+const TOKEN: &str = "CLAUDE_CODE_OAUTH_TOKEN";
+
 /// What a hostile run could make an agent's name and its reason.
 const HOSTILE: &str = "<script>alert(\"x\")</script>";
 
@@ -43,9 +46,20 @@ pub fn measurement_problems(text: &str) -> Vec<String> {
             "{MEASUREMENT} runs on a schedule, which only the stakeholder turns on"
         ));
     }
+    if !has("github.event.repository.default_branch") {
+        problems.push(format!(
+            "{MEASUREMENT} runs from any ref a dispatch picks, not the default branch's definition alone"
+        ));
+    }
+    problems.extend(
+        crate::review_workflow::parse(text)
+            .token_kept_from_agents(TOKEN)
+            .into_iter()
+            .map(|p| format!("{MEASUREMENT}: {p}")),
+    );
     for (want, what) in [
         (
-            "target/debug/review-run\" --workdir \"$RUNNER_TEMP/work\"",
+            "-p review-run -- --workdir \"$RUNNER_TEMP/work\"",
             "reviews no snapshot with review-run in a fresh work directory",
         ),
         (
@@ -67,7 +81,10 @@ pub fn measurement_problems(text: &str) -> Vec<String> {
             problems.push(format!("{MEASUREMENT} {what}"));
         }
     }
-    if has("review/logs") {
+    if crate::review_workflow::uploaded_paths(text)
+        .iter()
+        .any(|p| p.contains("review/logs"))
+    {
         problems.push(format!(
             "{MEASUREMENT} uploads review/logs, every tool result its agents read"
         ));
@@ -91,7 +108,7 @@ pub fn review_problems(text: &str) -> Vec<String> {
 /// its snapshots `samples` times: it does not read, or holds no snapshot; or
 /// the measurement does not review each snapshot three times.
 #[must_use]
-pub fn states_problems(text: &str, samples: usize) -> Vec<String> {
+pub fn snapshots_problems(text: &str, samples: usize) -> Vec<String> {
     let mut problems = match snapshots::parse(text) {
         Ok(_) => Vec::new(),
         Err(e) => vec![format!("{}: {e}", snapshots::SNAPSHOTS)],
@@ -194,7 +211,7 @@ pub fn problems(
     snapshots: &str,
 ) -> Result<Vec<String>, String> {
     let mut problems = measurement_problems(&checkout.read(measurement)?);
-    problems.extend(states_problems(
+    problems.extend(snapshots_problems(
         &checkout.read(snapshots)?,
         snapshots::SAMPLES,
     ));

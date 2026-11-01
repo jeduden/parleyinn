@@ -1093,3 +1093,68 @@ fn an_upload_no_scrub_after_the_agents_gates_is_named() {
         ]
     );
 }
+
+fn workflow_checkout(files: &[(&str, &str)]) -> (testkit::TempDir, Checkout) {
+    let dir = testkit::TempDir::new().unwrap();
+    let flows = dir.path().join(".github/workflows");
+    std::fs::create_dir_all(&flows).unwrap();
+    for (name, text) in files {
+        std::fs::write(flows.join(name), text).unwrap();
+    }
+    let checkout = Checkout::new(dir.path());
+
+    (dir, checkout)
+}
+
+const CLAUDE: &str = "CLAUDE_CODE_OAUTH_TOKEN";
+
+const AGENT_FLOW: &str = "on:\n  workflow_dispatch:\njobs:\n  go:\n    steps:\n      - name: Go\n        run: cargo run -p review-run -- --workdir w --credential c\n";
+
+#[test]
+fn every_workflow_in_the_checkout_keeps_the_token_from_its_agents() {
+    let checkout = Checkout::new(&testkit::repo_root());
+
+    assert_eq!(
+        every_workflow_keeps_the_token(&checkout, CLAUDE),
+        Ok(Vec::new())
+    );
+}
+
+#[test]
+fn an_agent_job_in_any_workflow_is_held_to_the_token_rules_naming_its_file() {
+    let (_dir, checkout) = workflow_checkout(&[
+        (
+            "a.yml",
+            "on:\n  push:\njobs:\n  t:\n    steps:\n      - run: cargo test -p review-run\n",
+        ),
+        ("b.yml", AGENT_FLOW),
+    ]);
+    let problems = every_workflow_keeps_the_token(&checkout, CLAUDE).unwrap();
+
+    assert_eq!(problems.len(), 1, "{problems:?}");
+    assert!(problems[0].starts_with(".github/workflows/b.yml: agent job go "));
+}
+
+#[test]
+fn a_build_or_test_of_review_run_is_no_agent_job_and_its_binary_is() {
+    assert!(!runs_agents("run: cargo test -p review-run -p srs\n"));
+    assert!(!runs_agents("run: cargo build --locked -p review-run\n"));
+    assert!(runs_agents(
+        "run: \"$W/target/debug/review-run\" --workdir w\n"
+    ));
+    assert!(runs_agent_step(
+        "run: \"$W/target/debug/review-run\" --workdir w\n"
+    ));
+}
+
+#[test]
+fn the_workflows_that_cannot_be_listed_or_read_are_an_error() {
+    let dir = testkit::TempDir::new().unwrap();
+    let err = every_workflow_keeps_the_token(&Checkout::new(dir.path()), CLAUDE).unwrap_err();
+    assert!(err.starts_with("read .github/workflows: "), "{err}");
+
+    let (_dir, checkout) = workflow_checkout(&[]);
+    std::fs::create_dir(_dir.path().join(".github/workflows/bad.yml")).unwrap();
+    let err = every_workflow_keeps_the_token(&checkout, CLAUDE).unwrap_err();
+    assert!(err.contains("bad.yml"), "{err}");
+}

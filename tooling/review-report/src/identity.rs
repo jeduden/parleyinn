@@ -86,16 +86,12 @@ pub fn of_report(text: &str) -> BTreeSet<Fid> {
         match report::line(l) {
             Line::Revised(r) => {
                 let place = (r.path, r.line);
-                if let Some(finding) = of_line(&report::line(&r.finding)) {
+                if let Some((_, finding)) = of_line(&report::line(&r.finding)) {
                     replace(&mut held, &place, finding);
                 }
             }
             Line::Withdrawn(w) => held.retain(|(at, _)| *at != (w.path.clone(), w.line)),
-            read => {
-                if let Some(found) = of_line(&read) {
-                    held.push((place_of(&read), found));
-                }
-            }
+            read => held.extend(of_line(&read)),
         }
     }
 
@@ -105,32 +101,30 @@ pub fn of_report(text: &str) -> BTreeSet<Fid> {
 /// A finding's place: its path and line.
 type Place = (String, usize);
 
-/// The place a finding line stands at.
-fn place_of(line: &Line) -> Place {
-    match line {
-        Line::Linked(l) => (l.path.clone(), l.line),
-        Line::Request(r) => (r.path.clone(), r.line),
-        _ => (String::new(), 0),
-    }
-}
-
 /// Puts `with` where the first finding at `place` stands and removes
 /// the rest there; a place with none holds `with` alone.
 fn replace(held: &mut Vec<(Place, Fid)>, place: &Place, with: Fid) {
     let first = held.iter().position(|(at, _)| at == place);
     held.retain(|(at, _)| at != place);
-    let at = first.map_or(held.len(), |f| f.min(held.len()));
-    held.insert(at, (place.clone(), with));
+    // Everything before the first one at `place` stays, so it is in range.
+    held.insert(first.unwrap_or(held.len()), (place.clone(), with));
 }
 
-/// The identity of the finding a linked or request line holds.
-fn of_line(line: &Line) -> Option<Fid> {
+/// The place and identity of the finding a linked or request line
+/// holds.
+fn of_line(line: &Line) -> Option<(Place, Fid)> {
     match line {
-        Line::Linked(l) => Some(Fid::new(&l.path, l.ids.clone(), &l.consequence)),
-        Line::Request(r) => Some(Fid::new(
-            &r.path,
-            Vec::new(),
-            &format!("request: {} {}", r.change, r.requirement),
+        Line::Linked(l) => Some((
+            (l.path.clone(), l.line),
+            Fid::new(&l.path, l.ids.clone(), &l.consequence),
+        )),
+        Line::Request(r) => Some((
+            (r.path.clone(), r.line),
+            Fid::new(
+                &r.path,
+                Vec::new(),
+                &format!("request: {} {}", r.change, r.requirement),
+            ),
         )),
         _ => None,
     }

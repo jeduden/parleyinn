@@ -174,8 +174,13 @@ times afresh. `review-report stability` then writes `stability.json`:
 the share of reviews whose verdict differs from the most common one,
 and per agent the Jaccard overlap of its finding sets. A finding is its
 path, ids and the hash of its normalised consequence, never its line.
-It warns past a flip rate of 0.2 or an overlap below 0.7. Every review
-also leaves `review/agent-runs.jsonl`, the run list: first `{"review": {id,
+An agent a review missed overlaps nothing, and one in no review makes the
+comparison unmeasured. A specialist's findings are those its report still
+holds after its revisions and withdrawals. The workflow runs from the default
+branch's definition alone, stages the Claude token and scrubs what it wrote of
+it before any upload, as the review does (ENG-28). It warns past a flip
+rate of 0.2 or an overlap below 0.7. Every review also leaves
+`review/agent-runs.jsonl`, the run list: first `{"review": {id,
 started, finished, verdict, findings_blocking, findings_nit, gaps}}`, then one
 entry per agent run, `{name, kind, part?, attempt, model, effort,
 started_ms, ended_ms, turns, tokens, cost_usd, status, reason?}`. Its
