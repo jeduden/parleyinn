@@ -8,9 +8,9 @@ fn fid(path: &str) -> Fid {
     Fid::new(path, vec!["ENG-28".to_owned()], "the gate posts unread")
 }
 
-fn run(verdict: &str, findings: &[(&str, &[&str])], cost: f64) -> Run {
-    Run {
-        dir: format!("run-{verdict}"),
+fn review(verdict: &str, findings: &[(&str, &[&str])], cost: f64) -> Review {
+    Review {
+        dir: format!("review-{verdict}"),
         verdict: verdict.to_owned(),
         snapshot: (Some("abc".to_owned()), "inputs".to_owned()),
         findings: findings
@@ -27,16 +27,16 @@ fn run(verdict: &str, findings: &[(&str, &[&str])], cost: f64) -> Run {
 
 #[test]
 fn identical_runs_are_stable() {
-    let one = run(
+    let one = review(
         "approve",
         &[("lang-rust", &["a.rs", "b.rs"]), ("review-code", &[])],
         0.5,
     );
-    let runs = [one.clone(), one.clone(), one];
+    let reviews = [one.clone(), one.clone(), one];
 
-    let s = compare(&runs);
+    let s = compare(&reviews);
 
-    assert_eq!(s.runs, 3);
+    assert_eq!(s.reviews, 3);
     assert!(s.same_snapshot);
     assert_eq!(s.mode, "approve");
     assert_eq!((s.flip_rate, s.jaccard), (0.0, 1.0));
@@ -49,21 +49,21 @@ fn identical_runs_are_stable() {
 
 #[test]
 fn one_verdict_flip_in_three_is_detected_and_past_the_limit() {
-    let approve = run("approve", &[("lang-rust", &["a.rs"])], 0.4);
-    let runs = [
+    let approve = review("approve", &[("lang-rust", &["a.rs"])], 0.4);
+    let reviews = [
         approve.clone(),
-        run("request_changes", &[("lang-rust", &["a.rs"])], 0.7),
+        review("request_changes", &[("lang-rust", &["a.rs"])], 0.7),
         approve,
     ];
 
-    let s = compare(&runs);
+    let s = compare(&reviews);
 
     assert_eq!(s.mode, "approve");
     assert_eq!(s.flip_rate, 0.333_333);
     assert!(!s.stable);
     assert!(
         !s.within_limits,
-        "a third of the runs flipping is past {FLIP_RATE_LIMIT}"
+        "a third of the reviews flipping is past {FLIP_RATE_LIMIT}"
     );
     assert_eq!(s.jaccard, 1.0);
     let a = &s.agents[0];
@@ -72,12 +72,12 @@ fn one_verdict_flip_in_three_is_detected_and_past_the_limit() {
 
 #[test]
 fn disjoint_finding_sets_overlap_nowhere() {
-    let runs = [
-        run("approve", &[("lang-rust", &["a.rs"])], 0.1),
-        run("approve", &[("lang-rust", &["b.rs"])], 0.1),
+    let reviews = [
+        review("approve", &[("lang-rust", &["a.rs"])], 0.1),
+        review("approve", &[("lang-rust", &["b.rs"])], 0.1),
     ];
 
-    let s = compare(&runs);
+    let s = compare(&reviews);
 
     assert_eq!(s.flip_rate, 0.0);
     assert_eq!(s.jaccard, 0.0);
@@ -86,16 +86,16 @@ fn disjoint_finding_sets_overlap_nowhere() {
 
 #[test]
 fn partly_shared_sets_overlap_in_proportion_and_a_missing_agent_is_unstable() {
-    let runs = [
-        run(
+    let reviews = [
+        review(
             "approve",
             &[("lang-rust", &["a.rs", "b.rs"]), ("lang-json", &[])],
             0.1,
         ),
-        run("approve", &[("lang-rust", &["a.rs", "c.rs"])], 0.1),
+        review("approve", &[("lang-rust", &["a.rs", "c.rs"])], 0.1),
     ];
 
-    let s = compare(&runs);
+    let s = compare(&reviews);
 
     let json = &s.agents[0];
     assert_eq!((json.agent.as_str(), json.reported), ("lang-json", 1));
@@ -107,7 +107,7 @@ fn partly_shared_sets_overlap_in_proportion_and_a_missing_agent_is_unstable() {
 
 #[test]
 fn runs_with_no_findings_are_stable_and_no_runs_measure_nothing() {
-    let empty = run("approve", &[], 0.0);
+    let empty = review("approve", &[], 0.0);
     let s = compare(&[empty.clone(), empty]);
     assert!(s.agents.is_empty());
     assert_eq!(s.jaccard, 1.0);
@@ -115,20 +115,20 @@ fn runs_with_no_findings_are_stable_and_no_runs_measure_nothing() {
 
     let none = compare(&[]);
     assert_eq!(
-        (none.runs, none.flip_rate, none.mode.as_str()),
+        (none.reviews, none.flip_rate, none.mode.as_str()),
         (0, 0.0, "")
     );
     assert!(!none.stable && !none.within_limits);
     assert!(none.same_snapshot);
-    assert_eq!(none.unmeasured, vec!["there are no runs".to_owned()]);
+    assert_eq!(none.unmeasured, vec!["there are no reviews".to_owned()]);
 }
 
 #[test]
 fn runs_of_different_states_are_named_so() {
-    let mut other = run("approve", &[], 0.0);
+    let mut other = review("approve", &[], 0.0);
     other.snapshot.0 = Some("def".to_owned());
 
-    let s = compare(&[run("approve", &[], 0.0), other]);
+    let s = compare(&[review("approve", &[], 0.0), other]);
 
     assert!(!s.same_snapshot);
     assert!(!s.stable && !s.within_limits);
@@ -137,21 +137,21 @@ fn runs_of_different_states_are_named_so() {
 
 #[test]
 fn runs_of_reviews_that_failed_are_unmeasured_never_stable() {
-    let failed = run(crate::agent_runs::NO_VERDICT, &[], 0.0);
+    let failed = review(crate::agent_runs::NO_VERDICT, &[], 0.0);
 
     let s = compare(&[failed.clone(), failed.clone(), failed]);
 
     assert_eq!(s.flip_rate, 0.0);
     assert!(!s.stable && !s.within_limits);
     assert_eq!(s.unmeasured.len(), 1);
-    assert!(s.unmeasured[0].starts_with("3 of 3 runs have no verdict"));
+    assert!(s.unmeasured[0].starts_with("3 of 3 reviews have no verdict"));
 }
 
 #[test]
 fn a_dispatched_agent_left_in_a_gap_makes_the_runs_unstable() {
-    let mut gapped = run("approve", &[("lang-rust", &[])], 0.1);
+    let mut gapped = review("approve", &[("lang-rust", &[])], 0.1);
     gapped.gaps.insert("lang-json".to_owned());
-    let plain = run("approve", &[("lang-rust", &[])], 0.1);
+    let plain = review("approve", &[("lang-rust", &[])], 0.1);
 
     let s = compare(&[gapped.clone(), gapped.clone(), gapped]);
     let json = s.agents.iter().find(|a| a.agent == "lang-json").unwrap();

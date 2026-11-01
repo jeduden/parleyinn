@@ -1,7 +1,7 @@
 //! A finding's identity across reviews of one pull-request snapshot: its
 //! path, the requirement ids and invariants it links, and the SHA-256
 //! of its consequence normalised, never its line number, which moves
-//! with any edit and says nothing about whether two runs found the same
+//! with any edit and says nothing about whether two reviews found the same
 //! thing. A specialist's findings are read from its report, linked
 //! findings and requirement requests alike; a generalist's from its
 //! answer, each finding line it kept.

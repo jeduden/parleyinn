@@ -5,28 +5,28 @@
 //! ([`crate::identity`]) and each agent's cost, and writes
 //! `stability.json`:
 //!
-//! - `flip_rate`, the share of runs whose verdict differs from the most
+//! - `flip_rate`, the share of reviews whose verdict differs from the most
 //!   common one (the mode; a tie goes to the verdict first in order);
-//! - per agent, the Jaccard overlap of its finding sets across the runs
+//! - per agent, the Jaccard overlap of its finding sets across the reviews
 //!   it reported in, the size of the sets they share over the size of
-//!   their union, one when every set is empty; how many runs it reported
-//!   in; its findings per run; and the spread of its cost;
+//!   their union, one when every set is empty; how many reviews it reported
+//!   in; its findings per review; and the spread of its cost;
 //! - `jaccard`, the mean of the agents' overlaps;
 //! - `stable`, true only when the comparison is measured and every
-//!   agent, dispatched or reported, reported in every run with the same
+//!   agent, dispatched or reported, reported in every review with the same
 //!   finding set and no verdict flipped; an agent left in a gap counts
 //!   as one that did not report;
-//! - `same_snapshot`, whether every run reviewed the same head and inputs,
+//! - `same_snapshot`, whether every review covered the same head and inputs,
 //!   without which the comparison means nothing;
-//! - `unmeasured`, why the comparison measures nothing: no runs, runs
-//!   of different snapshots, or a run with no verdict (a review that
+//! - `unmeasured`, why the comparison measures nothing: no reviews, reviews
+//!   of different snapshots, or a review with no verdict (a review that
 //!   failed); empty when it is measured;
 //! - `within_limits`, whether it is measured, the flip rate is at most
 //!   [`FLIP_RATE_LIMIT`] and the overlap at least [`JACCARD_FLOOR`],
 //!   which the stability measurement warns on.
 //!
 //! Every function here but [`read`] is pure, and the output is ordered,
-//! so the same runs give the same file.
+//! so the same reviews give the same file.
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
@@ -40,14 +40,14 @@ use crate::identity::{self, Fid};
 use crate::inputs;
 
 /// The highest flip rate the measurement passes without a warning: more than
-/// one run in five deciding otherwise than the rest.
+/// one review in five deciding otherwise than the rest.
 pub const FLIP_RATE_LIMIT: f64 = 0.2;
 /// The lowest mean finding overlap the measurement passes without a warning.
 pub const JACCARD_FLOOR: f64 = 0.7;
 
 /// One review, as the comparison reads it.
 #[derive(Debug, Clone, Default, PartialEq)]
-pub struct Run {
+pub struct Review {
     /// Its work directory.
     pub dir: String,
     pub verdict: String,
@@ -61,14 +61,14 @@ pub struct Run {
     pub gaps: BTreeSet<String>,
 }
 
-/// One agent's stability across the runs.
+/// One agent's stability across the reviews.
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct Agent {
     pub agent: String,
     pub jaccard: f64,
-    /// How many runs it reported findings, or none, in.
+    /// How many reviews it reported findings, or none, in.
     pub reported: usize,
-    /// Its findings in each run, in the runs' order; none where it did
+    /// Its findings in each review, in the reviews' order; none where it did
     /// not report.
     pub findings: Vec<Option<usize>>,
     pub cost_min: f64,
@@ -76,10 +76,10 @@ pub struct Agent {
     pub cost_spread: f64,
 }
 
-/// The stability of the runs.
+/// The stability of the reviews.
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct Stability {
-    pub runs: usize,
+    pub reviews: usize,
     pub dirs: Vec<String>,
     pub same_snapshot: bool,
     pub verdicts: Vec<String>,
@@ -144,10 +144,13 @@ pub fn flip_rate(verdicts: &[String]) -> f64 {
     round(flipped as f64 / verdicts.len() as f64)
 }
 
-/// Agent `name`'s stability across `runs`.
-fn agent(name: &str, runs: &[Run]) -> Agent {
-    let sets: Vec<&BTreeSet<Fid>> = runs.iter().filter_map(|r| r.findings.get(name)).collect();
-    let costs: Vec<f64> = runs
+/// Agent `name`'s stability across `reviews`.
+fn agent(name: &str, reviews: &[Review]) -> Agent {
+    let sets: Vec<&BTreeSet<Fid>> = reviews
+        .iter()
+        .filter_map(|r| r.findings.get(name))
+        .collect();
+    let costs: Vec<f64> = reviews
         .iter()
         .filter_map(|r| r.costs.get(name).copied())
         .collect();
@@ -158,7 +161,7 @@ fn agent(name: &str, runs: &[Run]) -> Agent {
         agent: name.to_owned(),
         jaccard: jaccard(&sets),
         reported: sets.len(),
-        findings: runs
+        findings: reviews
             .iter()
             .map(|r| r.findings.get(name).map(BTreeSet::len))
             .collect(),
@@ -168,26 +171,26 @@ fn agent(name: &str, runs: &[Run]) -> Agent {
     }
 }
 
-/// Why `runs` measure nothing: none, different snapshots, or a run with
+/// Why `reviews` measure nothing: none, different snapshots, or a review with
 /// no verdict, which is a review that failed and is no sample.
-fn unmeasured(runs: &[Run], same_snapshot: bool) -> Vec<String> {
+fn unmeasured(reviews: &[Review], same_snapshot: bool) -> Vec<String> {
     let mut why = Vec::new();
-    if runs.is_empty() {
-        why.push("there are no runs".to_owned());
+    if reviews.is_empty() {
+        why.push("there are no reviews".to_owned());
     }
     if !same_snapshot {
-        why.push("the runs reviewed different heads or inputs".to_owned());
+        why.push("the reviews covered different heads or inputs".to_owned());
     }
-    let failed: Vec<&str> = runs
+    let failed: Vec<&str> = reviews
         .iter()
         .filter(|r| r.verdict == NO_VERDICT)
         .map(|r| r.dir.as_str())
         .collect();
     if !failed.is_empty() {
         why.push(format!(
-            "{} of {} runs have no verdict: {}",
+            "{} of {} reviews have no verdict: {}",
             failed.len(),
-            runs.len(),
+            reviews.len(),
             failed.join(", ")
         ));
     }
@@ -195,16 +198,16 @@ fn unmeasured(runs: &[Run], same_snapshot: bool) -> Vec<String> {
     why
 }
 
-/// The stability of `runs`. No runs measure nothing, so they are
+/// The stability of `reviews`. No reviews measure nothing, so they are
 /// neither stable nor within the limits.
 #[must_use]
-pub fn compare(runs: &[Run]) -> Stability {
-    let verdicts: Vec<String> = runs.iter().map(|r| r.verdict.clone()).collect();
-    let names: BTreeSet<&String> = runs
+pub fn compare(reviews: &[Review]) -> Stability {
+    let verdicts: Vec<String> = reviews.iter().map(|r| r.verdict.clone()).collect();
+    let names: BTreeSet<&String> = reviews
         .iter()
         .flat_map(|r| r.findings.keys().chain(r.costs.keys()).chain(&r.gaps))
         .collect();
-    let agents: Vec<Agent> = names.into_iter().map(|n| agent(n, runs)).collect();
+    let agents: Vec<Agent> = names.into_iter().map(|n| agent(n, reviews)).collect();
     let jaccard = if agents.is_empty() {
         1.0
     } else {
@@ -213,14 +216,14 @@ pub fn compare(runs: &[Run]) -> Stability {
     let flip_rate = flip_rate(&verdicts);
     let identical = agents
         .iter()
-        .all(|a| a.reported == runs.len() && a.jaccard >= 1.0);
-    let same_snapshot = runs.windows(2).all(|w| w[0].snapshot == w[1].snapshot);
-    let unmeasured = unmeasured(runs, same_snapshot);
+        .all(|a| a.reported == reviews.len() && a.jaccard >= 1.0);
+    let same_snapshot = reviews.windows(2).all(|w| w[0].snapshot == w[1].snapshot);
+    let unmeasured = unmeasured(reviews, same_snapshot);
     let measured = unmeasured.is_empty();
 
     Stability {
-        runs: runs.len(),
-        dirs: runs.iter().map(|r| r.dir.clone()).collect(),
+        reviews: reviews.len(),
+        dirs: reviews.iter().map(|r| r.dir.clone()).collect(),
         same_snapshot,
         mode: mode(&verdicts),
         verdicts,
@@ -291,7 +294,7 @@ fn read_reports(
 /// report and each generalist's answer read for their findings, and
 /// each agent's cost from its usage; each file that does not read named
 /// in `notes`.
-pub fn read(dir: &Path, notes: &mut Vec<String>) -> Run {
+pub fn read(dir: &Path, notes: &mut Vec<String>) -> Review {
     let outcome = inputs::outcome(dir, notes);
     let run_id = inputs::run_id(dir, notes);
     let answers = inputs::answers(dir, notes);
@@ -305,7 +308,7 @@ pub fn read(dir: &Path, notes: &mut Vec<String>) -> Run {
         .map(|u| (u.agent, u.cost_usd))
         .collect();
 
-    Run {
+    Review {
         dir: dir.display().to_string(),
         verdict: if outcome.verdict.is_empty() {
             NO_VERDICT.to_owned()

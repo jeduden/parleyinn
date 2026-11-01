@@ -96,7 +96,7 @@ fn stability_writes_its_file_and_prints_its_headline() {
     assert_eq!((code, err.as_str()), (EXIT_OK, ""));
     assert_eq!(
         printed,
-        "runs=3\nflip_rate=0.333333\njaccard=1\nstable=false\nsame_snapshot=true\nwithin_limits=false\n"
+        "reviews=3\nflip_rate=0.333333\njaccard=1\nstable=false\nsame_snapshot=true\nwithin_limits=false\n"
     );
     let file: serde_json::Value = serde_json::from_str(&fs::read_to_string(&out).unwrap()).unwrap();
     assert_eq!(file["flip_rate"], 0.333_333);
@@ -174,5 +174,5 @@ fn stability_says_why_failed_reviews_measure_nothing() {
     assert_eq!(code, EXIT_OK);
     assert!(printed.contains("stable=false"), "{printed}");
     assert!(printed.contains("within_limits=false"), "{printed}");
-    assert!(err.contains("2 of 2 runs have no verdict"), "{err}");
+    assert!(err.contains("2 of 2 reviews have no verdict"), "{err}");
 }

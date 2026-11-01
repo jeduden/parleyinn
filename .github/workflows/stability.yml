@@ -5,7 +5,7 @@ name: Stability measurement
 # only measured by repetition: for each frozen snapshot listed in
 # tooling/review-eval/stability-snapshots.toml, main's review-run reviews
 # it three times, each in a fresh work directory with nothing reused,
-# and `review-report stability` compares the three: the share of runs
+# and `review-report stability` compares the three: the share of reviews
 # whose verdict differs from the most common one (the flip rate) and,
 # per agent, the overlap of its finding sets (Jaccard). A flip rate
 # above 0.2 or an overlap below 0.7 (review-report's FLIP_RATE_LIMIT
@@ -54,7 +54,7 @@ jobs:
 
   # One fresh review of one snapshot: main's tree as the work directory,
   # the snapshot's head as the pull request's tree, its diff against its
-  # base, and no answer from any other run.
+  # base, and no answer from any other review.
   sample:
     needs: snapshots
     runs-on: ubuntu-latest
@@ -159,13 +159,13 @@ jobs:
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           pattern: review_${{ matrix.name }}_*
-          path: runs
+          path: reviews
       - name: Measure the stability
         id: measure
         run: |
           set -o pipefail
           cargo run --locked --quiet -p review-report -- stability --out stability.json \
-            runs/*/ | tee measured.txt
+            reviews/*/ | tee measured.txt
           {
             echo "### Stability of the review"
             echo

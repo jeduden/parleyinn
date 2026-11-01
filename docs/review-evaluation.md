@@ -46,7 +46,7 @@ records the design.
   cited id no section defines, a true sentence under the title, and the
   same with an instruction addressed to the reviewer. They never rot.
 
-## A run
+## A case run
 
 - **The world** of a run is the review's own input: a worktree of main
   with the component under test copied in, the case's edits in a second

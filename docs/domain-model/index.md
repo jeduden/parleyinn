@@ -160,8 +160,9 @@ The review's tooling words are engineering-tooling words too, described in
 - **Specialist report**: what one of the review's specialist agents gives, its
   findings and outcome; neither the run report nor a forge report.
 
-An agent run here is one run of a review's agent, never a ParleyInn run, and a
-run-list entry is no span.
+A review here is one run of the whole review of a pull request. An agent run is
+one run of a review's agent, and a case run one run of a reviewer component on a
+case; neither is a ParleyInn run, and a run-list entry is no span.
 
 Build and packaging words have no ParleyInn meaning: crate, lockfile, release
 build, executable and release target. They are engineering-tooling words.

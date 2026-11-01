@@ -79,14 +79,14 @@ fn stable(args: &[String], stdout: &mut dyn Write, stderr: &mut dyn Write) -> Re
         return Err(EXIT_USAGE);
     }
     let mut notes = Vec::new();
-    let runs: Vec<_> = dirs
+    let reviews: Vec<_> = dirs
         .iter()
         .map(|d| stability::read(Path::new(d), &mut notes))
         .collect();
     for note in &notes {
         let _ = writeln!(stderr, "review-report: {note}");
     }
-    let measured = stability::compare(&runs);
+    let measured = stability::compare(&reviews);
     let written = serde_json::to_string_pretty(&measured)
         .map_err(|e| e.to_string())
         .and_then(|text| fs::write(out, format!("{text}\n")).map_err(|e| e.to_string()));
@@ -126,8 +126,8 @@ fn snapshots(file: &str, stdout: &mut dyn Write, stderr: &mut dyn Write) -> Resu
 #[must_use]
 pub fn headline(s: &Stability) -> String {
     format!(
-        "runs={}\nflip_rate={}\njaccard={}\nstable={}\nsame_snapshot={}\nwithin_limits={}\n",
-        s.runs, s.flip_rate, s.jaccard, s.stable, s.same_snapshot, s.within_limits
+        "reviews={}\nflip_rate={}\njaccard={}\nstable={}\nsame_snapshot={}\nwithin_limits={}\n",
+        s.reviews, s.flip_rate, s.jaccard, s.stable, s.same_snapshot, s.within_limits
     )
 }
 
