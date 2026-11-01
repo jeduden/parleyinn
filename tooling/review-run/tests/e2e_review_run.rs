@@ -246,7 +246,7 @@ fn the_gate_approves_what_the_run_wrote() {
     assert_eq!(out.status.code(), Some(0), "{stderr}");
     assert_eq!(
         String::from_utf8_lossy(&out.stdout),
-        "verdict=approve\ndispatched=5\nconsulted=5\nfindings=1\ncost=0.1300\nreused=0\nstore_failed=0\nover_budget=0\n\
+        "verdict=approve\ndispatched=5\nconsulted=5\nfindings=1\ncost=0.1300\nreused=0\nstore_failed=0\nstalled=0\nover_budget=0\n\
          aborted=0\n"
     );
     assert_eq!(stderr.lines().count(), 5, "{stderr}");

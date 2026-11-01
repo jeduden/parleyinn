@@ -27,6 +27,7 @@ pub mod backoff;
 pub mod breaker;
 pub mod cli;
 pub mod controls;
+pub mod findings;
 pub mod gaps;
 pub mod key;
 pub mod live;

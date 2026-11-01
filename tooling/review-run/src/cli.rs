@@ -33,6 +33,7 @@ use serde::Serialize;
 use crate::answers;
 use crate::breaker;
 use crate::controls::{ABORTED, OVER_BUDGET, SystemClock};
+use crate::findings::{self, Tracked};
 use crate::gaps::{self, GAPS, Gap, NOT_REVIEWED};
 use crate::key::{self, Keys};
 use crate::live;
@@ -57,7 +58,7 @@ pub const EXIT_USAGE: u8 = 2;
 /// How to call it.
 pub const USAGE: &str = "usage: review-run --workdir DIR [--parallel N] [--deadline SECONDS] \
 [--head-sha SHA] [--only GAPS --from DIR] [--max-cost-usd USD] [--breaker-fraction F] \
-[--answers DIR [--answers-read-only]] [--summary FILE]\n\
+[--answers DIR [--answers-read-only]] [--previous FINDINGS] [--summary FILE]\n\
        review-run answers drop KEY --answers DIR";
 
 /// The command line, read.
@@ -74,6 +75,8 @@ pub struct Args {
     pub summary: Option<String>,
     /// The answer store, when given, and whether it is read alone.
     pub answers: Option<(String, bool)>,
+    /// The previous review's kept findings, when given.
+    pub previous: Option<String>,
 }
 
 /// Runs the command on `args` and returns its exit code. It is `main`
@@ -130,6 +133,8 @@ struct Prepared {
     store: Option<Store>,
     id: run_id::RunId,
     resume: Option<Resume>,
+    /// The previous review's kept findings, when given.
+    previous: Option<Vec<Tracked>>,
 }
 
 /// Reads the review `args` name: its plan, the ids its reports may cite,
@@ -147,6 +152,13 @@ fn prepare(
     let workdir = Path::new(&args.workdir);
     let split = args.options.split;
     let plan = plan::read(workdir)?;
+    let previous = match &args.previous {
+        Some(path) => {
+            let text = fs::read_to_string(path).map_err(|e| format!("read {path}: {e}"))?;
+            Some(findings::parse(&text).map_err(|e| format!("{path}: {e}"))?)
+        }
+        None => None,
+    };
     // Read before any agent runs: an SRS that does not read fails the
     // review before it costs anything.
     let known = requirements::ids(workdir)?;
@@ -186,6 +198,7 @@ fn prepare(
         store,
         id,
         resume,
+        previous,
     })
 }
 
@@ -245,6 +258,7 @@ fn record(
     if let Some(line) = from_store_line(runs) {
         outcome.summary.push_str(&line);
     }
+    let stalled = follow(workdir, p, &mut outcome, &answers)?;
     let usage = usage::usage(runs, p.resume.as_ref().map(|r| r.from.as_str()));
     let reused = runs.iter().filter(|r| r.reused).count();
     let store_failed = runs.iter().filter(|r| r.store_failed).count();
@@ -267,7 +281,7 @@ fn record(
 
     Ok(format!(
         "verdict={}\ndispatched={}\nconsulted={}\nfindings={}\ncost={:.4}\nreused={reused}\n\
-         store_failed={store_failed}\nover_budget={}\naborted={}\n",
+         store_failed={store_failed}\nstalled={stalled}\nover_budget={}\naborted={}\n",
         outcome.verdict,
         p.plan.agents().len(),
         consulted.len(),
@@ -357,6 +371,43 @@ fn resumed(
     Ok(plan_of)
 }
 
+/// Tracks `outcome`'s findings, `answers` holding each generalist's,
+/// beside the previous review's when `p` has them: writes them to
+/// [`findings::FINDINGS`] and [`findings::FINDINGS_NOTES`] in `workdir`,
+/// adds what changed to the summary, and a blocking finding for each
+/// that needs a stakeholder ruling, so the review requests changes;
+/// returns how many do.
+///
+/// # Errors
+///
+/// Fails when the findings cannot be written.
+fn follow(
+    workdir: &Path,
+    p: &Prepared,
+    outcome: &mut review_gate::ReviewOutcome,
+    answers: &std::collections::BTreeMap<String, String>,
+) -> Result<usize, String> {
+    let found = findings::attributed(&outcome.findings, answers, &p.plan);
+    let run = p.id.head.as_deref().unwrap_or("unknown head");
+    let tracking = findings::track(&found, p.previous.as_deref(), run, &|path| {
+        findings::cited(workdir, path)
+    });
+    let rulings = findings::rulings(&tracking);
+    outcome.summary.push_str(&findings::summary(&tracking));
+    if !rulings.is_empty() {
+        outcome.verdict = review_gate::REQUEST_CHANGES_VERDICT.to_owned();
+        outcome.findings.extend(rulings.iter().cloned());
+    }
+    write_json(workdir, findings::FINDINGS, &tracking.kept)?;
+    write_text(
+        workdir,
+        findings::FINDINGS_NOTES,
+        &findings::markdown(&tracking),
+    )?;
+
+    Ok(rulings.len())
+}
+
 /// The summary's sentence naming each agent whose answer the answer
 /// store held, in plan order; none when none was.
 fn from_store_line(runs: &[AgentRun]) -> Option<String> {
@@ -406,7 +457,7 @@ fn parse(args: impl IntoIterator<Item = String>) -> Result<Args, String> {
     let mut workdir = None;
     let mut options = Options::default();
     let (mut head, mut only, mut from, mut summary) = (None, None, None, None);
-    let (mut answers, mut read_only) = (None, false);
+    let (mut answers, mut read_only, mut previous) = (None, false, None);
     let mut args = args.into_iter();
     while let Some(arg) = args.next() {
         let Some(flag) = arg.strip_prefix("--") else {
@@ -431,6 +482,7 @@ fn parse(args: impl IntoIterator<Item = String>) -> Result<Args, String> {
             "breaker-fraction",
             "summary",
             "answers",
+            "previous",
         ]
         .contains(&name)
         {
@@ -451,6 +503,7 @@ fn parse(args: impl IntoIterator<Item = String>) -> Result<Args, String> {
             "max-cost-usd" => options.max_cost_usd = positive(name, &value)?,
             "breaker-fraction" => options.breaker = fraction(name, &value)?,
             "answers" => answers = Some(value),
+            "previous" => previous = Some(value),
             _ => summary = Some(value),
         }
     }
@@ -472,6 +525,7 @@ fn parse(args: impl IntoIterator<Item = String>) -> Result<Args, String> {
         resume,
         summary,
         answers: answers.map(|dir| (dir, read_only)),
+        previous,
     })
 }
 

@@ -6,6 +6,7 @@ use testkit::TempDir;
 use super::*;
 use crate::fake::{self, FakeHost};
 
+mod findings;
 mod store;
 
 fn args(list: &[&str]) -> Vec<String> {
@@ -51,7 +52,7 @@ fn a_review_writes_every_file_the_gate_reads() {
     assert_eq!(
         out,
         "verdict=approve\ndispatched=3\nconsulted=3\nfindings=1\ncost=0.0300\nreused=0\n\
-         store_failed=0\nover_budget=0\naborted=0\n"
+         store_failed=0\nstalled=0\nover_budget=0\naborted=0\n"
     );
     assert_eq!(err.lines().count(), 3, "{err}");
     let outcome = fs::read_to_string(dir.path().join("review/outcome.json")).unwrap();
@@ -545,6 +546,7 @@ fn the_work_directory_alone_takes_the_default_options() {
             resume: None,
             summary: None,
             answers: None,
+            previous: None,
         }
     );
 }
@@ -569,6 +571,8 @@ fn the_flags_read_inline_or_as_the_next_argument() {
             "s.md",
             "--answers-read-only",
             "--answers=store",
+            "--previous",
+            "f.json",
         ]))
         .unwrap(),
         Args {
@@ -585,6 +589,7 @@ fn the_flags_read_inline_or_as_the_next_argument() {
             resume: Some(("g.json".to_owned(), "old".to_owned())),
             summary: Some("s.md".to_owned()),
             answers: Some(("store".to_owned(), true)),
+            previous: Some("f.json".to_owned()),
         }
     );
 }
