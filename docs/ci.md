@@ -96,8 +96,12 @@ Builds go to `target/ci-local` with `CARGO_PROFILE_DEV_DEBUG=0` and
 `CARGO_INCREMENTAL=0`: debug information and the incremental cache are
 most of a checkout's build size, and a sandbox's disk is what runs out.
 A build step is refused, and reported skipped, below
-`PARINN_CI_MIN_FREE_GB` of free space (8 for a heavy gate, half that for a
-fast one). `scripts/review-local.sh` is the other half of the loop.
+`PARINN_CI_MIN_FREE_GB` of free space. A heavy gate needs 8 GB, a fast one
+half that.
+
+`scripts/review-local.sh` is the other half of the loop. With
+`PARINN_REVIEW_CI_LOCAL=1` it runs `scripts/ci-local.sh` first. It stops
+when a gate failed.
 
 ## Stable
 
