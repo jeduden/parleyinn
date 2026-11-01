@@ -144,6 +144,34 @@ fn a_report_that_must_be_all_findings_holds_a_specialist_to_one_line_each() {
 }
 
 #[test]
+fn every_specialist_the_checkout_ships_is_held_to_one_line_each() {
+    let root = testkit::repo_root();
+    for name in [
+        "lang-rust",
+        "srs-engineering-quality",
+        "domain-model-places",
+    ] {
+        let c = load(&root, name).unwrap();
+        assert_eq!(c.kind, Kind::Specialist, "{name}");
+        assert!(c.strict_lines, "{name}");
+    }
+}
+
+#[test]
+fn a_specialist_is_held_to_one_line_each_whatever_its_wording() {
+    let dir = tree();
+    let file = dir.path().join(".claude/agents/lang-rust.md");
+    let text = fs::read_to_string(&file).unwrap();
+    fs::write(
+        &file,
+        text.replace("findings, each on one line.", "Report."),
+    )
+    .unwrap();
+
+    assert!(load(dir.path(), "lang-rust").unwrap().strict_lines);
+}
+
+#[test]
 fn load_gives_a_generalist_without_a_turn_budget_the_default() {
     let dir = tree();
 

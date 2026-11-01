@@ -24,9 +24,9 @@ const AGENTS: &str = ".claude/agents";
 /// section and per domain-model file.
 const SECTION_PREFIX: &str = "srs-";
 const MODEL_PREFIX: &str = "domain-model-";
-/// The sentences of the shared report sections whose specialists write
-/// one finding per line in a fixed shape: the earlier wording and the
-/// two of the current ones, which a file may wrap anywhere.
+/// The sentences that hold an agent other than a specialist, which is
+/// held by its kind, to one finding per line in a fixed shape, however a
+/// file wraps them.
 const ONE_LINE_EACH: [&str; 3] = [
     "each on one line",
     "every line of the report is a finding or the outcome",
@@ -203,7 +203,10 @@ pub fn load(tree: &Path, name: &str) -> Result<Component, String> {
     let file = file_of(name);
     let text = fs::read_to_string(tree.join(&file)).map_err(|e| format!("read {file}: {e}"))?;
     let kind = kind_of(name);
-    let strict_lines = one_finding_per_line(&text);
+    // Every specialist's report is assembled from its log one line per
+    // finding, whatever its wording says; another agent is held so only
+    // where its wording asks for it.
+    let strict_lines = kind == Kind::Specialist || one_finding_per_line(&text);
     let (fields, _) = adr::front_matter(&text).map_err(|e| format!("{file}: {e}"))?;
     allowed_keys(&file, &fields, &AGENT_KEYS)?;
     let field = |key: &str| fields.get(key).map_or("", String::as_str).to_owned();
