@@ -13,7 +13,9 @@ its upgrade notes (ENG-23). ParleyInn follows semantic versioning.
   and a small context the review bundle writes for it, its class,
   touched ids, dispatch row and the deterministic findings on its
   files, never the whole bundle, which on a large change is too large
-  for one read (ENG-28).
+  for one read (ENG-28). It reads its diff alone first, then its
+  context, and the Rust specialist sends its diff's findings beside that
+  second read, so each is stated before its answer (ENG-32).
 - A stakeholder comment consents only to the stakeholder paths it names,
   by path, owning pattern or directory (ENG-21).
 - Every reviewer component of the layered review, and every other agent

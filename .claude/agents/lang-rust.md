@@ -19,9 +19,10 @@ specialist covers the rest.
 
 ## What you check
 
-1. **Workspace lints.** No `unsafe`; no `unwrap`, `expect` or `panic!`
-   outside tests; clippy with every warning denied. An `allow` or
-   `expect` of a lint carries its reason.
+1. **Workspace lints (ENG-04).** No `unsafe`; no `unwrap`, `expect` or
+   `panic!` outside tests, a `#[cfg(test)]` module among them: `a.rs:5 — if
+   not addressed: its expect panics on bad input — ENG-04`. Clippy denies
+   every warning; a lint's `allow` or `expect` gives its reason.
 2. **Reach ([I4](../../docs/srs/invariants.md#i4)).** The core opens no socket
    and starts no program but its own kernel worker
    ([ENG-16](../../docs/srs/10-engineering-quality.md)): no `std::net`, no
@@ -32,15 +33,18 @@ specialist covers the rest.
    its own variant ([I6](../../docs/srs/invariants.md#i6)); messages are
    lowercase with no trailing punctuation; errors are returned, never panicked.
 5. **Seams and deadlines.** I/O sits behind a trait or closure a test can
-   inject; every blocking call takes a deadline
-   ([ENG-03](../../docs/srs/10-engineering-quality.md)). No mutable global
-   state.
-6. **Small functions, each with a unit test** in the `tests.rs` beside
-   its module; a defensive branch only with the failing test that takes
-   it.
+   inject; every blocking call takes a deadline; no mutable global state
+   ([ENG-03](../../docs/srs/10-engineering-quality.md)).
+6. **Small functions, each with a unit test** in the `tests.rs` beside its
+   module; a defensive branch only with the failing test that takes it.
 7. **Logging** goes through `tracing` and redaction
    ([ENG-05](../../docs/srs/10-engineering-quality.md)); no secret reaches a
-   log, an error or a panic message.
+   log, error or panic message.
+
+Your first message Reads your diff alone. Your second holds only
+the bare finding lines it shows, ids from those above, and a Read of
+`review/context/lang-rust.md`; later ones go with your next call. Only text
+beside a tool call is stated: a finding first in the answer is lost.
 
 ## The invariants you check
 

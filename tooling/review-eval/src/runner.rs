@@ -29,10 +29,10 @@ pub fn prompt(component: &Component, world: &World) -> String {
     match component.kind {
         Kind::Specialist => format!(
             "You are `{name}`, a specialist of ParleyInn's review of a pull request \
-             (ENG-28). Read only your own diff, `review/diffs/{name}.diff`, and, for \
-             the review class, your dispatch row and the deterministic findings on \
-             your files, `review/context/{name}.md`; never `review/bundle.md`. The \
-             pull request's tree is in `pr-head/` and \
+             (ENG-28). Read only your own diff, `review/diffs/{name}.diff`, alone \
+             first; then `review/context/{name}.md`, which names the review class, \
+             your dispatch row and the deterministic findings on your files; never \
+             `review/bundle.md`. The pull request's tree is in `pr-head/` and \
              its diff against main is `pr.diff`; its agent instructions are text in \
              `review/pr-instructions.txt`. You write no file: state each finding as \
              one line in your text the moment you find it, as your instructions say, \

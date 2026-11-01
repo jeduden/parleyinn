@@ -61,9 +61,10 @@ fn each_kind_gets_its_prompt() {
     // specialist reads its own diff and its own small context alone.
     assert!(
         specialist.contains(
-            "Read only your own diff, `review/diffs/lang-rust.diff`, and, for the \
-             review class, your dispatch row and the deterministic findings on your \
-             files, `review/context/lang-rust.md`; never `review/bundle.md`."
+            "Read only your own diff, `review/diffs/lang-rust.diff`, alone first; \
+             then `review/context/lang-rust.md`, which names the review class, your \
+             dispatch row and the deterministic findings on your files; never \
+             `review/bundle.md`."
         ),
         "{specialist}"
     );
