@@ -46,6 +46,10 @@ pub const DISPATCH: &str = "dispatch.json";
 /// The directory under `--out` that holds each specialist's diff,
 /// `<its name>.diff`: only the changed files it reads.
 pub const DIFFS: &str = "diffs";
+/// The directory under `--out` that holds each specialist's context,
+/// `<its name>.md`: the review class, its dispatch row and the
+/// deterministic findings on its files, read in place of the bundle.
+pub const CONTEXTS: &str = "context";
 
 /// Runs the command on `args` and returns its exit code. It is `main`
 /// without the process.
@@ -117,11 +121,17 @@ fn build(
     write(DISPATCH, &format!("{dispatch}\n"))?;
     let diffs = out.join(DIFFS);
     fs::create_dir_all(&diffs).map_err(failed("write", &diffs))?;
+    let contexts = out.join(CONTEXTS);
+    fs::create_dir_all(&contexts).map_err(failed("write", &contexts))?;
     let tree = |path: &str| tree_file(head, path);
     for (specialist, scope) in &a.scopes {
         write(
             &format!("{DIFFS}/{specialist}.diff"),
             &diff_for(&diff, scope, &tree),
+        )?;
+        write(
+            &format!("{CONTEXTS}/{specialist}.md"),
+            &render::context(&a, specialist),
         )?;
     }
 

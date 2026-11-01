@@ -1,32 +1,50 @@
 //! `review-run`: the review of a pull request run by code (ENG-28). It
 //! reads the dispatch the review bundle wrote, runs every specialist
 //! it names as an agent of its own, in parallel up to a bound and each
-//! with its own deadline, assembles each one's report from its run log
-//! into a file, then, once every specialist has finished, runs every
-//! generalist, told those files. From what the runs produced it writes
+//! with its own deadline and cost cap, assembles each one's report from
+//! its run log into a file, and runs each generalist once its own
+//! specialists have finished, told those files; it starts no run once
+//! the review's cost cap is reached, and no generalist once a mass
+//! failure of the specialists tripped its breaker, and tells what is
+//! running as it goes. From what the runs produced it writes
 //! the review outcome, the agents consulted, their answers and their
 //! usage, the files the review gate reads, with every agent left
 //! without an accepted report or answer, never as clean, and what the
-//! review ran on. Resumed from an earlier run, it runs again only what
-//! that run left without one or whose inputs changed, and decides as a
-//! full run would. No model decides whether an agent is called or
+//! review ran on. Each agent has an answer key over what its answer is
+//! a function of; given an answer store, an agent whose key holds an
+//! accepted answer there is not run again, and an accepted answer is
+//! kept there. Resumed from an earlier run, it runs again only what that
+//! run left without one or whose key changed, and decides as a full run
+//! would. No model decides whether an agent is called or
 //! waited for; the generalists do the weighing.
 //!
 //! It starts only the `claude` command line, through the evaluation's
 //! host, and runs in CI alone. It is repository tooling and never
 //! links into a shipped executable.
 
+pub mod answers;
+pub mod backoff;
+pub mod breaker;
 pub mod cli;
+pub mod controls;
+pub mod findings;
 pub mod gaps;
+pub mod key;
 pub mod leak;
+pub mod live;
+pub(crate) mod memo;
 pub mod outcome;
 pub mod parts;
+pub mod pipeline;
 pub mod plan;
 pub mod requirements;
 pub mod resume;
 pub mod retry;
 pub mod run;
 pub mod run_id;
+pub mod stall;
+pub mod store;
+pub(crate) mod tasks;
 pub mod usage;
 
 #[cfg(test)]

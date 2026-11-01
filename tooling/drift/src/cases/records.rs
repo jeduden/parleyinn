@@ -150,7 +150,11 @@ pub(super) fn license_check_cases() -> Vec<Case> {
         case(
             "CI no longer runs the license check",
             "ENG-30",
-            Injection::replace(CI_WORKFLOW, "--bin license-check", "--bin protection-check"),
+            Injection::replace(
+                "scripts/ci-gates.txt",
+                "--bin license-check",
+                "--bin protection-check",
+            ),
             scenario("ENG-30"),
             "the CI workflow does not run license-check with --locked",
         ),
@@ -298,7 +302,7 @@ pub(super) fn repository_cases() -> Vec<Case> {
             "ENG-27",
             Injection::replace(
                 ".github/workflows/ci.yml",
-                "cargo test --locked -p drift --test suite -- --ignored",
+                "scripts/ci-gate.sh drift",
                 "true",
             ),
             scenario("ENG-27"),

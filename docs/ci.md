@@ -52,7 +52,11 @@ is short, because a finding found late costs a whole round.
   reviews in about a minute. The agents are the head's definitions, what
   main has after the merge; `--agents base` runs main's, as CI does.
   `--resume` reruns only what the last run left without an accepted
-  report, on the same head and definitions, so a slip costs one run.
+  report and each agent whose answer key changed, so a slip costs one run.
+  `review-run --answers DIR` also reuses every stored answer whose key is
+  unchanged; no workflow gives it a store yet.
+  A review that aborts on a mass failure of its specialists says so
+  apart from any finding: fix the outage or prompt, then `--resume`.
 - CI ends within ten minutes of a push. The slowest chain of jobs sets
   that; a job that grows toward its five-minute limit is split before it
   fails.
@@ -62,6 +66,56 @@ is short, because a finding found late costs a whole round.
   rest.
 - A workflow or tool change that makes any step of this loop slower is a
   finding, with the measured time before and after.
+
+## Run CI's gates here
+
+Review is not the only gate a push meets. The coverage floors, the drift
+suite, the supply-chain checks and the rest run in CI alone unless they
+run here first, and a defect they find costs a round. So CI's gates are
+defined once, in [scripts/ci-gates.txt](../scripts/ci-gates.txt): each
+line names a gate, whether it fits a small machine, what it needs, its
+scope and its command. A job of `ci.yml` runs a gate through
+`scripts/ci-gate.sh NAME`; `scripts/ci-local.sh` reads the same list. A
+check (ENG-27) fails CI when `ci.yml` writes a gate's command inline,
+calls a gate the list does not define, or leaves a gate without a job.
+A gate whose job is its definition, because its shards, decoy `HOME` and
+artifacts are the job's own (`test`, `scenarios`, `eval`, `benchmark`,
+`miri`), is listed with `@job:NAME`, so the runner can still report it.
+
+`scripts/ci-local.sh` runs the fast gates on what the diff against
+`origin/main` touches: formatting, clippy, the tests and the unit-line
+coverage floor of each touched crate, `mdsmith check .`, Taplo, zizmor
+`--offline`, the srs and scenario gate tests, the scenarios of the
+requirement ids the diff names, the ENG-34 line limits, and the drift
+cases whose injection files the diff touches. `--full` adds the gates
+that need disk or the network, `--gate NAME...` runs the ones named, and
+`--list` prints the list. Every gate is reported ran, skipped or failed,
+with the reason for a skip: a gate that needs a CI runner (the end-to-end
+coverage shards, the benchmark, Miri), a core not built, or too little
+free disk. The exit status is 1 when a gate failed.
+
+CI's coverage merge wants every line of a crate covered by the unit,
+integration and end-to-end layers together. The unit-line floor is only
+the unit layer's share, so a line the unit layer misses can still pass
+here and fail there. Locally only the unit layer runs. After each
+crate's unit coverage `scripts/uncovered-added.sh` reads the report and
+the diff and lists the lines the diff adds that the unit layer leaves
+uncovered, as a `WARNING` in the summary: "CI also counts the
+integration and e2e layers; these added lines are uncovered by the unit
+layer". It never fails the gate, because the runner cannot tell a line
+an integration test covers from a line nothing covers. Cover each listed
+line with a unit test unless a test of another layer takes it.
+
+Builds go to `target/ci-local` with `CARGO_PROFILE_DEV_DEBUG=0` and
+`CARGO_INCREMENTAL=0`: debug information and the incremental cache are
+most of a checkout's build size, and a sandbox's disk is what runs out.
+A build step is refused, and reported skipped, below
+`PARINN_CI_MIN_FREE_GB` of free space. A heavy gate needs 8 GB, a fast one
+half that.
+
+`scripts/review-local.sh` is the other half of the loop. With
+`PARINN_REVIEW_CI_LOCAL=1` it runs `scripts/ci-local.sh` first. It stops
+when a gate failed.
 
 ## Stable
 

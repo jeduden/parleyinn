@@ -31,6 +31,7 @@ use testkit::TempDir;
 /// states a revision in no form, until its prompt tells it of its
 /// previous attempt, or always when `REFUSE_ALWAYS` is set.
 const CLAUDE: &str = r#"#!/bin/sh
+if [ "$1" = "--version" ]; then echo "2.1.0 (Claude Code)"; exit 0; fi
 if [ -n "$CLAUDE_CODE_CHILD_SESSION" ] || [ -n "$CLAUDE_AUTO_BACKGROUND_TASKS" ]; then
   echo "started as a harness session's child" >&2
   exit 3
@@ -169,6 +170,21 @@ fn review_run_holding(
 ) -> Output {
     let (cut, cut_part) = cut.split_once(':').unwrap_or((cut, ""));
     let (refuse, always) = refuse.split_once(':').unwrap_or((refuse, ""));
+    let mut all = vec![
+        ("SILENT_AGENT", silent),
+        ("CUT_AGENT", cut),
+        ("CUT_PART", cut_part),
+        ("REFUSE_AGENT", refuse),
+        ("REFUSE_ALWAYS", always),
+    ];
+    all.extend_from_slice(env);
+    stand_in(home, dir, &all, args)
+}
+
+/// Runs the executable on `dir` with `args`, the stand-in first on the
+/// path, as a Claude Code harness session's child would, with the
+/// variables `env` set.
+fn stand_in(home: &Path, dir: &Path, env: &[(&str, &str)], args: &[&str]) -> Output {
     let bin = home.join("bin");
     fs::create_dir_all(&bin).unwrap();
     let claude = bin.join("claude");
@@ -180,11 +196,6 @@ fn review_run_holding(
         .env("HOME", home)
         .env("PARINN_HOME", home)
         .env("PATH", format!("{}:/usr/bin:/bin", bin.display()))
-        .env("SILENT_AGENT", silent)
-        .env("CUT_AGENT", cut)
-        .env("CUT_PART", cut_part)
-        .env("REFUSE_AGENT", refuse)
-        .env("REFUSE_ALWAYS", always)
         .env("BAD", BAD)
         .env("CLAUDE_CODE_CHILD_SESSION", "1")
         .env("CLAUDE_AUTO_BACKGROUND_TASKS", "1")
@@ -338,7 +349,8 @@ fn the_gate_approves_what_the_run_wrote() {
     assert_eq!(out.status.code(), Some(0), "{stderr}");
     assert_eq!(
         String::from_utf8_lossy(&out.stdout),
-        "verdict=approve\ndispatched=5\nconsulted=5\nfindings=1\ncost=0.1300\n"
+        "verdict=approve\ndispatched=5\nconsulted=5\nfindings=1\ncost=0.1300\nreused=0\n\
+         store_failed=0\nstalled=0\nover_budget=0\naborted=0\n"
     );
     assert_eq!(stderr.lines().count(), 5, "{stderr}");
     for name in ["lang-rust", "review-security"] {
@@ -768,7 +780,7 @@ fn a_resumed_run_reruns_only_the_specialist_cut_off_and_its_generalist_and_the_g
 }
 
 #[test]
-fn a_resumed_run_on_another_head_reuses_nothing() {
+fn a_resumed_run_on_another_head_keeps_every_agent_whose_key_is_unchanged() {
     let home = TempDir::new().unwrap();
     let first = home.path().join("first");
     workdir(&first);
@@ -797,8 +809,112 @@ fn a_resumed_run_on_another_head_reuses_nothing() {
     let stderr = String::from_utf8_lossy(&out.stderr);
     assert_eq!(out.status.code(), Some(0), "{stderr}");
     assert!(
-        stderr.contains("review-run: nothing reused: the head changed from"),
+        stderr.contains(&format!(
+            "review-run: the head changed from {HEAD} to {}: only agents whose answer key is \
+             unchanged keep their answer",
+            "f".repeat(40)
+        )),
         "{stderr}"
     );
-    assert!(stderr.contains("reused 0 agents, re-ran 5"), "{stderr}");
+    assert!(
+        stderr.contains("reused 3 agents, re-ran 2 (lang-rust, review-code)"),
+        "{stderr}"
+    );
+}
+
+#[test]
+fn the_job_summary_gets_the_table_of_every_run() {
+    let home = TempDir::new().unwrap();
+    let dir = home.path().join("work");
+    workdir(&dir);
+    let summary = home.path().join("summary.md");
+    fs::write(&summary, "# Before\n").unwrap();
+
+    let out = stand_in(
+        home.path(),
+        &dir,
+        &[("GITHUB_STEP_SUMMARY", summary.to_str().unwrap())],
+        &[],
+    );
+
+    assert_eq!(out.status.code(), Some(0));
+    let text = fs::read_to_string(&summary).unwrap();
+    assert!(
+        text.starts_with("# Before\n\n### How each agent ran\n"),
+        "{text}"
+    );
+    assert!(
+        text.contains("| lang-rust | specialist | answered | 1 | 2 | 10 | 2 | 0.0100 |"),
+        "{text}"
+    );
+    assert!(
+        text.contains("| review-security | generalist | answered | 1 | 4 | 10 | 2 | 0.0500 |"),
+        "{text}"
+    );
+}
+
+#[test]
+fn a_mass_failure_of_the_specialists_starts_no_generalist_and_names_the_abort() {
+    let home = TempDir::new().unwrap();
+    let dir = home.path().join("work");
+    workdir(&dir);
+
+    let out = review_run(
+        home.path(),
+        &dir,
+        "lang-rust",
+        "test-engineer-unit",
+        &["--deadline", "2"],
+    );
+
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert_eq!(out.status.code(), Some(0), "{stdout}");
+    assert!(stdout.starts_with("verdict=request_changes\n"), "{stdout}");
+    assert!(stdout.ends_with("aborted=2\n"), "{stdout}");
+    for name in ["review-code", "review-security"] {
+        assert!(
+            !dir.join(format!("review/logs/{name}.jsonl")).exists(),
+            "{name} ran"
+        );
+    }
+    let outcome = fs::read_to_string(dir.join("review/outcome.json")).unwrap();
+    let outcome = review_gate::parse_outcome(&outcome).unwrap();
+    assert!(
+        outcome.findings[0].body.starts_with(
+            "review aborted: 2 of 3 specialists failed (mass failure; likely an outage or a \
+             broken prompt)"
+        ),
+        "{outcome:?}"
+    );
+    let gaps = fs::read_to_string(dir.join("review/gaps.json")).unwrap();
+    assert!(
+        gaps.contains("\"reason\": \"aborted: 2 of 3 specialists failed"),
+        "{gaps}"
+    );
+}
+
+#[test]
+fn a_review_past_its_cost_cap_starts_no_further_run_and_never_approves() {
+    let home = TempDir::new().unwrap();
+    let dir = home.path().join("work");
+    workdir(&dir);
+
+    let out = review_run(
+        home.path(),
+        &dir,
+        "",
+        "",
+        &["--parallel", "1", "--max-cost-usd", "0.01"],
+    );
+
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert_eq!(out.status.code(), Some(0), "{stdout}");
+    assert!(stdout.starts_with("verdict=request_changes\n"), "{stdout}");
+    assert!(stdout.contains("\nover_budget=4\n"), "{stdout}");
+    let gaps = fs::read_to_string(dir.join("review/gaps.json")).unwrap();
+    assert_eq!(
+        gaps.matches("\"reason\": \"over budget: ").count(),
+        4,
+        "{gaps}"
+    );
 }

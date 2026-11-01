@@ -24,8 +24,8 @@ pub(super) fn workflow_cases() -> Vec<Case> {
             "ENG-33",
             Injection::replace(
                 CI_WORKFLOW,
-                "      - run: taplo lint\n",
-                "      - run: taplo lint ${{ github.event.pull_request.title }}\n",
+                "      - run: scripts/ci-gate.sh toml-lint\n",
+                "      - run: scripts/ci-gate.sh toml-lint ${{ github.event.pull_request.title }}\n",
             ),
             scenario("ENG-33"),
             "expands github.event.pull_request.title in a run script, not through env",
@@ -33,7 +33,11 @@ pub(super) fn workflow_cases() -> Vec<Case> {
         case(
             "CI no longer runs zizmor over the workflows",
             "ENG-33",
-            Injection::replace(CI_WORKFLOW, "run: zizmor .github", "run: zizmor --version"),
+            Injection::replace(
+                CI_WORKFLOW,
+                "run: scripts/ci-gate.sh zizmor",
+                "run: zizmor --version",
+            ),
             scenario("ENG-33"),
             r#"the CI workflow does not run "zizmor .github""#,
         ),
@@ -73,7 +77,7 @@ pub(super) fn ci_gate_cases() -> Vec<Case> {
             "the_ci_workflow_gates_on_the_static_checks",
             Injection::replace(
                 CI,
-                "      - run: cargo audit\n      - run: cargo audit --file fuzz/Cargo.lock\n",
+                "      - run: scripts/ci-gate.sh audit\n      - run: scripts/ci-gate.sh audit-fuzz\n",
                 "",
             ),
             gates(),
@@ -213,8 +217,8 @@ pub(super) fn coverage_floor_cases() -> Vec<Case> {
             "ENG-11",
             Injection::replace(
                 CI_WORKFLOW,
-                "cargo run --locked -p coverage -- --merge",
-                "cargo run --locked -p coverage -- --layer unit",
+                "scripts/ci-gate.sh coverage-merge",
+                "scripts/ci-gate.sh coverage-unit",
             ),
             scenario("ENG-11"),
             "job coverage does not run \"-p coverage -- --merge\"",
@@ -280,7 +284,7 @@ pub(super) fn toml_cases() -> Vec<Case> {
         case(
             "CI no longer running taplo lint",
             GATE,
-            Injection::replace(CI, "      - run: taplo lint\n", ""),
+            Injection::replace(CI, "      - run: scripts/ci-gate.sh toml-lint\n", ""),
             gate(),
             "no CI job runs taplo lint: taplo lint",
         ),

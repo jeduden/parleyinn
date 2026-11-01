@@ -282,6 +282,7 @@ Feature: Engineering quality (ENG)
     Given the repository checkout
     When the drift cases are read
     Then the CI workflow runs the drift suite with "cargo test --locked -p drift --test suite -- --ignored"
+    And the CI workflow runs each gate of "scripts/ci-gates.txt" through "scripts/ci-gate.sh", with no gate's command written inline
     And every drift case's edit applies to the checkout
     And every non-pending scenario that inspects the repository checkout has a drift case guarding its id
     And the requirement-scenario gate, the Appendix B check and the persona gates each have a drift case
@@ -293,10 +294,17 @@ Feature: Engineering quality (ENG)
     Then it runs only when the "CI" workflow completes or a pull request gets a comment, as the default branch defines it
     And the job that runs the review's agents holds no write permission and not the "JEDUDEN_REVIEW_AGENT_KEY" key
     And that job runs every agent the review bundle dispatches with "cargo run --locked --quiet --offline -p review-run -- --workdir .", and no agent routes the review
-    And review-run runs each specialist the review bundle dispatches as its own agent, assembles its report from its run log, runs every generalist only once every specialist has ended, and writes the review outcome from what they answered
+    And review-run runs each specialist the review bundle dispatches as its own agent, told to read only its own diff, its part's when the diff runs in parts, and the review context the review bundle wrote for it, which names the review class, the touched ids, its dispatch row and the deterministic findings on its files, never the whole bundle, assembles its report from its run log, runs each generalist once its own specialists have ended and the mass failure is decided, and writes the review outcome from what they answered
+    And review-run passes each agent the cost cap of its tier, starts no run once the runs that ended cost the review's cap, and names each agent it did not start over budget, so the review requests changes
+    And review-run starts no generalist once more than a third of the dispatched specialists, those a cost cap stopped or kept from starting among them, ended without an accepted report, and opens the review outcome with a blocking finding naming the mass failure
+    And review-run waits with backoff before it runs again an agent the API turned away as overloaded or rate-limited, runs it a third time at most, leaves it a named gap when no deadline is left to wait, and never runs again one a cost cap stopped or whose credential was refused
     And review-run runs a specialist whose diff is past its split limit in parts, each on whole files of its diff, merges their reports into its one report, and fails the review naming a part that did not answer
     And review-run refuses a specialist's report that cites an id no requirement or invariant has, runs that specialist once more told why, and names the report refused again and a generalist's finding line it cannot read, each in a blocking finding, so the review requests changes and the gate posts that request rather than failing
-    And review-run writes each dispatched agent left without an accepted report beside the review outcome and names it not reviewed, and a review resumed from that list runs again that agent, each agent whose head, inputs, definition or diff changed and each generalist whose specialist runs again, keeps nothing across a changed head, definition or diff, and approves as a full run would
+    And review-run writes each dispatched agent left without an accepted report beside the review outcome and names it not reviewed, and a review resumed from that list runs again that agent, each agent whose answer key changed and each generalist whose specialist runs again, keeps every agent whose key is unchanged on a new commit, keeps nothing across a changed file every key reads, and approves as a full run would
+    And review-run given an answer store takes every accepted answer stored under an unchanged key, runs on a new commit only the specialist whose diff changed and its generalist, never stores a refused report, and runs again an agent whose stored report fails the report check
+    And review-run removes the answer stored under a key on request and no other, so a review given the store runs that agent again and nothing else
+    And review-run runs no more an agent whose gap recurred the same way in two resumes in a row, and names it stalled in a blocking finding so a person acts
+    And review-run names a blocking finding kept in three reviews in a row with its cited file unchanged in a blocking finding of its own, as needing a stakeholder ruling
     And its agents can write nothing: review-run allows them Read, Glob and Grep alone
     And no step that runs an agent holds the "CLAUDE_CODE_OAUTH_TOKEN" token: one step in each agent job stages it where no agent reads it, review-run refuses its agents every read of the staged credential's directory by name, of the process, system and device files and outside their trees, and every file an agent job uploads waits for a scrub of that token
     And every text the review writes, prints or uploads is scrubbed of that token: review-run, its agents' output holding the token, leaves it in no file under review/ and in no line it prints

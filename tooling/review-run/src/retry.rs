@@ -13,12 +13,17 @@ use std::path::Path;
 use std::time::Duration;
 
 use review_eval::component::Kind;
-use review_eval::host::Host;
 use review_gate::report::{Problem, assemble, report_check};
 
+use crate::LOGS;
+use crate::backoff::{self, Class, MAX_ATTEMPTS};
+use crate::controls::Controls;
+use crate::live::Running;
 use crate::parts::add_usage;
-use crate::plan::Plan;
-use crate::run::{AgentRun, Unit, attempt, describe, keep_first_log, write_report};
+use crate::run::{AgentRun, Review, Unit, attempt, describe, keep_log, not_started, write_report};
+
+/// Why an overloaded run gets no wait and so no further run.
+const SPENT: &str = "the API was overloaded and its backoff deadline is spent";
 
 /// The forms, restated to a specialist on its second attempt, in two
 /// lines: the finding lines, then the final answer.
@@ -79,27 +84,34 @@ pub fn note(why: &Why) -> String {
 
 /// Runs `unit`, and once more when its run did not answer, or, for a
 /// specialist, when the gate would refuse its assembled report, holding
-/// its ids to `known`. A definition that does not read fails at once.
-/// The first failure or refusal is told to `progress` before the second
+/// its ids to the known ones. A definition that does not read, a run a
+/// cost cap stopped or kept from starting, and a run whose credential
+/// was refused are not run again, and progress is told why. A run the
+/// API turned away as overloaded first waits, as `backoff` says, and an
+/// attempt so turned away is followed by another while waits are left.
+/// The first failure or refusal is told to progress before the second
 /// attempt, which a specialist runs told [`note`], and the first log is
-/// kept as `<stem>.first.jsonl` beside the second's. A part's
-/// assembled report comes back with its run, for the merge.
-pub(crate) fn run_one(
-    host: &dyn Host,
-    workdir: &Path,
-    plan: &Plan,
-    known: &BTreeSet<String>,
-    unit: &Unit,
-    deadline: Duration,
-    progress: &(dyn Fn(&str) + Sync),
-) -> (AgentRun, Option<String>) {
-    let (first, report) = attempt(host, workdir, plan, unit, deadline, None);
+/// kept as `<stem>.first.jsonl` beside the second's, a second turned
+/// away as `<stem>.second.jsonl`. No attempt starts once the finished
+/// runs reached the review's cost cap. A part's assembled report comes
+/// back with its run, for the merge.
+pub(crate) fn run_one(r: &Review, c: &Controls, unit: &Unit) -> (AgentRun, Option<String>) {
+    let started = r.clock.now();
+    let (first, report) = tried(r, c, unit, None);
     let refused = match (&report, first.answered()) {
-        (Some(text), true) => refusal(text, &first.log.answer, known),
+        (Some(text), true) => refusal(text, &first.log.answer, r.known),
         _ => None,
     };
     // A run whose definition did not read keeps its count of none.
     if first.attempts == 0 || (first.answered() && refused.is_none()) {
+        return (first, report);
+    }
+    let class = match &refused {
+        Some(_) => Class::Again,
+        None => class_of(r, unit, &first),
+    };
+    if let Class::Never(why) = class {
+        (r.progress)(&format!("{}; not run again: {why}", describe(&first)));
         return (first, report);
     }
     let (why, told) = match (&refused, &first.failure) {
@@ -112,21 +124,145 @@ pub(crate) fn run_one(
             Why::Silent(failure.as_deref().unwrap_or("")),
         ),
     };
-    progress(&format!("{why}; running it once more"));
-    if let Err(e) = keep_first_log(workdir, &unit.stem()) {
-        progress(&format!(
-            "{} ({}): its first log was not kept: {e}",
+    if class == Class::Again {
+        (r.progress)(&format!("{why}; running it once more"));
+    }
+    keep(r, unit, "first");
+    let note = (unit.kind == Kind::Specialist).then(|| note(&told));
+    let first = Attempt {
+        run: &first,
+        report,
+        class,
+        started,
+    };
+    again(r, c, unit, first, note.as_deref())
+}
+
+/// The first attempt, as the attempts after it need it.
+struct Attempt<'a> {
+    run: &'a AgentRun,
+    report: Option<String>,
+    /// What running it again would do.
+    class: Class,
+    /// When it started.
+    started: Duration,
+}
+
+/// The attempts after `first`, each told `note`: one, and another after
+/// each turned away as overloaded while waits are left, each such
+/// waiting first; the last judged alone.
+fn again(
+    r: &Review,
+    c: &Controls,
+    unit: &Unit,
+    first: Attempt,
+    note: Option<&str>,
+) -> (AgentRun, Option<String>) {
+    let mut last = (first.run.clone(), first.report);
+    let mut class = first.class;
+    let mut waited = 0;
+    loop {
+        if class == Class::Overloaded {
+            if !pause(r, &last.0, waited, first.started) {
+                let (mut run, report) = last;
+                let before = run.failure.unwrap_or_default();
+                run.failure = Some(format!("{before}; {SPENT}, so it was not run again"));
+                return (run, report);
+            }
+            waited += 1;
+        }
+        if let Some(why) = c.budget.refusal() {
+            let (mut run, report) = last;
+            let before = run.failure.unwrap_or_default();
+            run.failure = Some(format!("{why} again; before that {before}"));
+            return (run, report);
+        }
+        let (mut next, report) = tried(r, c, unit, note);
+        add_usage(&mut next.log, &last.0.log);
+        next.attempts = last.0.attempts + 1;
+        class = class_of(r, unit, &next);
+        if next.answered() || next.attempts >= MAX_ATTEMPTS || class != Class::Overloaded {
+            let report = salvage(r.workdir, unit, first.run, &mut next, report);
+            return (next, report);
+        }
+        keep(r, unit, "second");
+        last = (next, report);
+    }
+}
+
+/// Runs `unit` once, with `note`, unless the review's finished runs
+/// reached its cost cap: noted as running while it runs, and its cost
+/// added once it ends.
+fn tried(r: &Review, c: &Controls, unit: &Unit, note: Option<&str>) -> (AgentRun, Option<String>) {
+    if let Some(why) = c.budget.refusal() {
+        return not_started(r.workdir, unit, why);
+    }
+    let label = unit.label();
+    c.live.start(
+        &label,
+        Running {
+            kind: unit.kind,
+            log: r.workdir.join(LOGS).join(format!("{}.jsonl", unit.stem())),
+            since: r.clock.now(),
+        },
+    );
+    let done = attempt(r.host, r.workdir, r.plan, unit, r.options.deadline, note);
+    c.live.end(&label);
+    c.budget.charge(done.0.log.cost);
+
+    done
+}
+
+/// What running `unit` again would do after `run` failed, from its
+/// failure and the errors in the `.stderr` beside its log; errors that
+/// are there but do not read are told to progress, and count as none.
+fn class_of(r: &Review, unit: &Unit, run: &AgentRun) -> Class {
+    let errors = r.workdir.join(LOGS).join(format!("{}.stderr", unit.stem()));
+    let stderr = std::fs::read_to_string(&errors).unwrap_or_else(|e| {
+        if e.kind() != std::io::ErrorKind::NotFound {
+            (r.progress)(&format!(
+                "{}: read {}: {e}; its errors are taken as none",
+                unit.label(),
+                errors.display()
+            ));
+        }
+        String::new()
+    });
+    backoff::class(run.failure.as_deref().unwrap_or_default(), &stderr)
+}
+
+/// Waits before a run again after `run` was turned away as overloaded,
+/// `waited` waits so far, the agent started at `started`; whether it
+/// waited. Once its deadline is spent there is no wait to take, and
+/// progress says it is not run again.
+fn pause(r: &Review, run: &AgentRun, waited: u32, started: Duration) -> bool {
+    let ran = r.clock.now().saturating_sub(started);
+    let left = r.options.deadline.saturating_sub(ran);
+    let Some(wait) = backoff::wait(waited, r.clock.jitter(), left) else {
+        (r.progress)(&format!(
+            "{}; {SPENT}, so it is not run again",
+            describe(run)
+        ));
+        return false;
+    };
+    (r.progress)(&format!(
+        "{}; the API was overloaded, so it waits {:.1} s and runs once more",
+        describe(run),
+        wait.as_secs_f64()
+    ));
+    r.clock.sleep(wait);
+    true
+}
+
+/// Keeps `unit`'s log as `which`, telling progress when it cannot.
+fn keep(r: &Review, unit: &Unit, which: &str) {
+    if let Err(e) = keep_log(r.workdir, &unit.stem(), which) {
+        (r.progress)(&format!(
+            "{} ({}): its {which} log was not kept: {e}",
             unit.label(),
             unit.kind.word()
         ));
     }
-    let note = (unit.kind == Kind::Specialist).then(|| note(&told));
-    let (mut second, report) = attempt(host, workdir, plan, unit, deadline, note.as_deref());
-    add_usage(&mut second.log, &first.log);
-    second.attempts = 2;
-    let report = salvage(workdir, unit, &first, &mut second, report);
-
-    (second, report)
 }
 
 /// `report`, the second attempt's, or, when that attempt did not answer

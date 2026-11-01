@@ -24,7 +24,7 @@ pub(super) fn review_report_case() -> Case {
 /// by the composite action, in the key's job or starting an agent
 /// outside review-run; the ENG-32 evaluation planning every component
 /// a shared section change reaches, not one per set; and review-run
-/// starting a generalist before every specialist has ended.
+/// starting a generalist before its own specialists have ended.
 pub(super) fn review_late_cases() -> Vec<Case> {
     vec![
         case(
@@ -72,15 +72,15 @@ pub(super) fn review_late_cases() -> Vec<Case> {
             "components planned for the sections",
         ),
         case(
-            "review-run starting the generalists before the specialists",
+            "review-run starting a generalist before its own specialists ended",
             "ENG-28",
             Injection::replace(
-                "tooling/review-run/src/run.rs",
-                "    let done = parallel(&units, options.parallel, &one);\n    runs.extend(gather(workdir, plan, &units, done, unsplit, progress));\n    let mut generalists = Vec::new();\n    for name in plan.generalists() {\n        match whole(&name) {\n            Some(run) => runs.push(run),\n            None => generalists.push(Unit::whole(name)),\n        }\n    }\n    let done = parallel(&generalists, options.parallel, &one);\n    runs.extend(done.into_iter().map(|(run, _)| run));\n",
-                "    let mut generalists = Vec::new();\n    for name in plan.generalists() {\n        match whole(&name) {\n            Some(run) => runs.push(run),\n            None => generalists.push(Unit::whole(name)),\n        }\n    }\n    let early = parallel(&generalists, options.parallel, &one);\n    let done = parallel(&units, options.parallel, &one);\n    runs.extend(gather(workdir, plan, &units, done, unsplit, progress));\n    runs.extend(early.into_iter().map(|(run, _)| run));\n",
+                "tooling/review-run/src/tasks.rs",
+                "            .filter_map(|s| g.last.get(s).copied())\n            .collect();\n        g.last.insert(unit.name.clone(), g.tasks.len());\n",
+                "            .filter_map(|s| g.last.get(s).copied().filter(|_| false))\n            .collect();\n        g.last.insert(unit.name.clone(), g.tasks.len());\n",
             ),
             scenario("ENG-28"),
-            "review-code started before lang-markdown ended",
+            "review-code started before its specialist lang-rust ended",
         ),
     ]
 }

@@ -70,8 +70,8 @@ if [ -n "$(git -C "$repo" status --porcelain --untracked-files=no)" ]; then
   exit 2
 fi
 git -C "$repo" fetch -q origin main
+[ -z "${PARINN_REVIEW_CI_LOCAL:-}" ] || "$repo/scripts/ci-local.sh" >&2 || exit 1; start=$SECONDS
 
-start=$SECONDS
 work=$(mktemp -d)
 # The agents get a home and a Claude Code configuration of their own, so
 # none writes to the real ~/.parinn, $PARINN_HOME or ~/.claude (ENG-14);

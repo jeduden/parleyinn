@@ -1,9 +1,12 @@
 //! The registry: every drift a check that keeps the records in step
 //! exists to catch.
 
+mod answers;
 mod architecture;
 mod boundary;
 mod ci;
+mod ci_gates;
+mod context;
 mod file_sizes;
 mod records;
 mod release;
@@ -27,6 +30,7 @@ use crate::{
     Case, Check, Injection, cargo_lib_test, cargo_test, clippy, mdsmith, scenario, setup_tools,
     taplo_fmt, taplo_lint,
 };
+
 
 /// The dependency decision the ENG-18 and ENG-26 cases drift.
 const TEST_STACK: &str = "docs/adr/ADR-2610142221-json-serde-json.md";
@@ -136,9 +140,15 @@ pub fn cases() -> Vec<Case> {
         review_undashed_cases(),
         review_resume_cases(),
         vec![review_moved_revision_case()],
+        review_control_cases(),
+        answers::review_answer_cases(),
         review_stability_cases(),
         review_token_cases(),
         stability_workflow_cases(),
+        context::review_context_cases(),
+        context::review_context_file_cases(),
+        context::review_identity_cases(),
+        ci_gates::cases(),
         file_size_cases(),
         // Last: its cases edit source the later cases would run stale.
         license_text_cases(),

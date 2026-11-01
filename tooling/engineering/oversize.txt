@@ -8,7 +8,7 @@
 # without the stakeholder's acceptance.
 # The limits are the review bundle's (tooling/review-bundle/src/limits.rs);
 # see tooling/engineering/src/file_sizes.rs and docs/ci.md.
-.github/workflows/ci.yml 937
+.github/workflows/ci.yml 936
 crates/administration/src/verify/tests.rs 1549
 crates/ingest/src/reading.rs 1232
 crates/ingest/src/tests.rs 1475

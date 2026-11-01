@@ -32,6 +32,9 @@ pub struct Part {
     pub index: usize,
     /// How many parts there are.
     pub count: usize,
+    /// Its diff file, relative to the work directory, which its prompt
+    /// tells it to read in place of its specialist's whole diff.
+    pub diff: String,
     /// What its prompt adds: which part it has, its diff file, and
     /// every part's files.
     pub note: String,
@@ -97,7 +100,12 @@ pub fn prepare(workdir: &Path, name: &str, limit: usize) -> Result<Vec<Part>, St
              {by_part}.",
             diff_file(name)
         );
-        parts.push(Part { index, count, note });
+        parts.push(Part {
+            index,
+            count,
+            diff: own,
+            note,
+        });
     }
 
     Ok(parts)
@@ -182,6 +190,9 @@ pub fn merge(name: &str, parts: Vec<(AgentRun, String)>) -> (AgentRun, String) {
             parts: u32::try_from(count).unwrap_or(u32::MAX),
             failed_parts,
             reused: false,
+            from_store: false,
+            answer_key: None,
+            store_failed: false,
         },
         report,
     )

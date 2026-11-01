@@ -12,6 +12,7 @@ use super::*;
 use crate::fake::{self, FakeHost, agent_of, prompt_of};
 use crate::plan::parse_dispatch;
 
+mod controls;
 mod resume;
 
 fn plan(dispatch: &str) -> Plan {
@@ -47,6 +48,9 @@ fn options() -> Options {
         parallel: 8,
         deadline: Duration::from_secs(77),
         split: crate::parts::LIMIT,
+        // Each of these runs tests one run, so no failure trips the breaker.
+        breaker: Fraction::WHOLE,
+        ..Options::default()
     }
 }
 
@@ -60,20 +64,34 @@ fn review_with(host: &FakeHost, dir: &Path, p: &Plan) -> Vec<AgentRun> {
 }
 
 #[test]
-fn every_specialist_runs_before_any_generalist() {
+fn each_generalist_runs_after_its_own_specialists_and_the_runs_come_in_plan_order() {
     let dir = workdir();
-    let host = FakeHost::new(fake::either);
+    let events = std::sync::Arc::new(Mutex::new(Vec::new()));
+    let seen = std::sync::Arc::clone(&events);
+    let host = FakeHost::new(move |c| {
+        let agent = agent_of(c);
+        seen.lock().unwrap().push(format!("start {agent}"));
+        let out = fake::either(c);
+        seen.lock().unwrap().push(format!("end {agent}"));
+        out
+    });
 
     let runs = review_with(&host, dir.path(), &plan(DISPATCH));
 
-    let agents = host.agents();
-    assert_eq!(agents.len(), 5);
-    let mut first: Vec<String> = agents[..3].to_vec();
-    first.sort();
-    assert_eq!(first, ["lang-markdown", "lang-rust", "test-engineer-unit"]);
-    let mut last: Vec<String> = agents[3..].to_vec();
-    last.sort();
-    assert_eq!(last, ["review-code", "review-spec"]);
+    let events = events.lock().unwrap().clone();
+    let at = |e: &str| events.iter().position(|x| x == e).unwrap();
+    for (generalist, specialists) in [
+        ("review-code", &["lang-rust", "test-engineer-unit"][..]),
+        ("review-spec", &["lang-markdown"][..]),
+    ] {
+        for specialist in specialists {
+            assert!(
+                at(&format!("end {specialist}")) < at(&format!("start {generalist}")),
+                "{events:?}"
+            );
+        }
+    }
+    assert_eq!(host.agents().len(), 5);
     let names: Vec<&str> = runs.iter().map(|r| r.name.as_str()).collect();
     assert_eq!(
         names,
@@ -316,14 +334,14 @@ fn runs_stay_within_the_bound_and_use_it() {
     let active = AtomicUsize::new(0);
     let most = AtomicUsize::new(0);
     let alone = AtomicUsize::new(0);
-    let items: Vec<usize> = (0..6).collect();
+    let waits: Vec<Vec<usize>> = (0..6).map(|_| Vec::new()).collect();
 
     // Each run waits for a second one to be running, so two overlap
     // without a clock; a third would raise the count past the bound. A
     // run left alone past the deadline is counted, never waited on.
     let both = Meeting::default();
 
-    let out = parallel(&items, 2, &|n| {
+    let out = crate::pipeline::pipeline(&waits, 2, &|_| true, &|n, _: Vec<usize>| {
         let now = active.fetch_add(1, Ordering::SeqCst) + 1;
         most.fetch_max(now, Ordering::SeqCst);
         let met = both.wait(Duration::from_secs(30));
@@ -335,12 +353,6 @@ fn runs_stay_within_the_bound_and_use_it() {
     assert_eq!(out, [0, 10, 20, 30, 40, 50]);
     assert_eq!(most.load(Ordering::SeqCst), 2);
     assert_eq!(alone.load(Ordering::SeqCst), 0);
-}
-
-#[test]
-fn a_bound_of_zero_still_runs_one_at_a_time_and_nothing_runs_nothing() {
-    assert_eq!(parallel(&[1, 2], 0, &|n| n + 1), [2, 3]);
-    assert_eq!(parallel::<u8, u8>(&[], 4, &|n| *n), Vec::<u8>::new());
 }
 
 /// Runs the one-specialist plan with `claude` answering as `script`.
@@ -659,14 +671,14 @@ fn a_first_log_and_its_errors_move_aside_and_missing_ones_are_no_error() {
     fs::create_dir_all(&logs).unwrap();
     fs::write(logs.join("lang-rust.jsonl"), "log").unwrap();
 
-    assert_eq!(keep_first_log(dir.path(), "lang-rust"), Ok(()));
+    assert_eq!(keep_log(dir.path(), "lang-rust", "first"), Ok(()));
     assert_eq!(
         fs::read_to_string(logs.join("lang-rust.first.jsonl")).unwrap(),
         "log"
     );
     assert!(!logs.join("lang-rust.jsonl").exists());
     assert!(!logs.join("lang-rust.first.stderr").exists());
-    assert_eq!(keep_first_log(dir.path(), "lang-markdown"), Ok(()));
+    assert_eq!(keep_log(dir.path(), "lang-markdown", "first"), Ok(()));
 }
 
 /// A file's section of a diff, `size` bytes long, for `path`.

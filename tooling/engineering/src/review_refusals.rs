@@ -54,6 +54,9 @@ impl RefusalHost {
 
 impl Host for RefusalHost {
     fn run(&self, command: &Command) -> Result<Output, String> {
+        if let Some(out) = crate::review_runs::version(command) {
+            return Ok(out);
+        }
         let agent = agent_of(command);
         if agent == SPECIALIST {
             let prompt = command.args.get(1).cloned().unwrap_or_default();
@@ -253,7 +256,14 @@ pub fn review_run_names_what_it_refuses(checkout: &Checkout, workdir: &Path) -> 
     }
     let mut out = Vec::new();
     let mut err = Vec::new();
-    let args = ["--workdir".to_owned(), workdir.display().to_string()];
+    // Its one specialist is refused, which would trip the breaker and
+    // keep the generalist whose unread line the check needs from
+    // starting: this review's breaker never trips.
+    let args = [
+        "--workdir".to_owned(),
+        workdir.display().to_string(),
+        "--breaker-fraction=1".to_owned(),
+    ];
     let host = RefusalHost::default();
     let code = review_run::cli::run(&host, args, &mut out, &mut err);
     if code != review_run::cli::EXIT_OK {

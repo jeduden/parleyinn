@@ -14,7 +14,12 @@ pub(crate) type Claude = Box<dyn Fn(&Command) -> Result<Output, String> + Sync>;
 pub(crate) struct FakeHost {
     pub claude: Claude,
     pub calls: Mutex<Vec<Command>>,
+    /// Each `claude --version` asked, kept apart from the agents' runs.
+    pub versions: Mutex<Vec<Command>>,
 }
+
+/// What the fake's `claude --version` prints.
+pub(crate) const VERSION: &str = "2.1.0 (Claude Code)";
 
 impl FakeHost {
     pub(crate) fn new(
@@ -23,6 +28,7 @@ impl FakeHost {
         Self {
             claude: Box::new(claude),
             calls: Mutex::new(Vec::new()),
+            versions: Mutex::new(Vec::new()),
         }
     }
 
@@ -34,8 +40,48 @@ impl FakeHost {
 
 impl Host for FakeHost {
     fn run(&self, command: &Command) -> Result<Output, String> {
+        // A confined probe carries the refused tools after it (ENG-28).
+        if command.args.first().is_some_and(|a| a == "--version") {
+            self.versions.lock().unwrap().push(command.clone());
+            return Ok(Output {
+                code: Some(0),
+                stdout: format!("{VERSION}\n"),
+                ..Output::default()
+            });
+        }
         self.calls.lock().unwrap().push(command.clone());
         (self.claude)(command)
+    }
+}
+
+/// A clock for the tests: it never sleeps, but moves on by each wait,
+/// keeps every wait, and draws the jitter it is given.
+#[derive(Debug, Default)]
+pub(crate) struct FakeClock {
+    pub now: Mutex<std::time::Duration>,
+    pub slept: Mutex<Vec<std::time::Duration>>,
+    pub jitter: f64,
+}
+
+impl crate::controls::Clock for FakeClock {
+    fn now(&self) -> std::time::Duration {
+        *self.now.lock().unwrap()
+    }
+
+    fn sleep(&self, duration: std::time::Duration) {
+        *self.now.lock().unwrap() += duration;
+        self.slept.lock().unwrap().push(duration);
+    }
+
+    fn jitter(&self) -> f64 {
+        self.jitter
+    }
+}
+
+impl FakeClock {
+    /// The waits slept, in order.
+    pub(crate) fn slept(&self) -> Vec<std::time::Duration> {
+        self.slept.lock().unwrap().clone()
     }
 }
 

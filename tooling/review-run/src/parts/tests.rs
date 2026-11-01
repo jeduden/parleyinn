@@ -86,6 +86,7 @@ fn a_diff_past_the_limit_is_written_in_parts_each_told_every_part_s_files() {
          findings on its files; you may Read and Grep the rest of the tree. The full \
          diff's files, by part: part 1: a.rs; part 2: b.rs, c.rs."
     );
+    assert_eq!(parts[1].diff, "review/diffs/lang-rust.2.diff");
     assert_eq!(parts[1].label("lang-rust"), "lang-rust part 2 of 2");
     assert_eq!(parts[1].stem("lang-rust"), "lang-rust.2");
 }
@@ -142,6 +143,9 @@ fn part_run(failure: Option<&str>, answer: &str, cost: f64) -> AgentRun {
         parts: 1,
         failed_parts: Vec::new(),
         reused: false,
+        from_store: false,
+        answer_key: None,
+        store_failed: false,
     }
 }
 
