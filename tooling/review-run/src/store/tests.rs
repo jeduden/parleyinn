@@ -236,3 +236,20 @@ fn a_generalist_s_answer_is_accepted_only_when_the_review_can_read_it() {
     let err = accepted(Kind::Generalist, &says_nothing, None, &known()).unwrap_err();
     assert!(err.contains("no finding"), "{err}");
 }
+
+#[test]
+fn a_rename_that_fails_with_no_answer_in_place_is_named() {
+    let dir = TempDir::new().unwrap();
+    let store = store(&dir);
+    let (log, report) = answer();
+
+    let err = store
+        .put_racing(KEY, &log, Some(&report), &usage(), &|| {
+            let other = store.dir.join(KEY);
+            fs::create_dir_all(other.join("half")).unwrap();
+        })
+        .unwrap_err();
+
+    assert!(err.starts_with("store "), "{err}");
+    assert_eq!(fs::read_dir(&store.dir).unwrap().count(), 1);
+}

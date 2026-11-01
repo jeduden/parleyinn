@@ -529,3 +529,16 @@ fn an_earlier_run_s_stalls_read_when_there_and_as_none_when_not() {
     let err = read(&old.join("gaps.json"), &old).unwrap_err();
     assert!(err.starts_with("read "), "{err}");
 }
+
+#[test]
+fn a_stalled_generalist_is_not_run_again_and_its_specialists_keep_theirs() {
+    let gaps = vec![Gap::new("review-security", None, "unread: y".to_owned())];
+    let mut was = earlier(gaps.clone());
+    was.stalls = (0..3).fold(Vec::new(), |s, _| crate::stall::tally(&gaps, &s));
+
+    let resume = plan_of(&was, &id());
+
+    assert!(resume.stalled.contains_key("review-security"));
+    assert!(!resume.reuse.contains_key("review-security"));
+    assert_eq!(resume.reuse.len(), 3);
+}

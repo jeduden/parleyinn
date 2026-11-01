@@ -104,3 +104,10 @@ fn a_previous_findings_file_that_does_not_read_fails_before_any_run() {
     }
     assert!(host.agents().is_empty());
 }
+
+#[test]
+fn a_review_whose_findings_or_stalls_cannot_be_written_fails() {
+    fails_writing(crate::findings::FINDINGS);
+    fails_writing(crate::findings::FINDINGS_NOTES);
+    fails_writing(crate::stall::STALLS);
+}
