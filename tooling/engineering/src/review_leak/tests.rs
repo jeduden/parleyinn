@@ -58,7 +58,7 @@ fn an_agent_not_refused_the_staged_directory_by_name_is_named() {
         Path::new("/w"),
     );
 
-    assert!(confinement_problems(&[refused.clone()], dir).is_empty());
+    assert!(confinement_problems(std::slice::from_ref(&refused), dir).is_empty());
     assert_eq!(
         confinement_problems(&[refused, open], dir),
         [
