@@ -21,6 +21,7 @@ fn run(verdict: &str, findings: &[(&str, &[&str])], cost: f64) -> Run {
             .iter()
             .map(|(agent, _)| ((*agent).to_owned(), cost))
             .collect(),
+        gaps: BTreeSet::new(),
     }
 }
 
@@ -119,6 +120,7 @@ fn runs_with_no_findings_are_stable_and_no_runs_measure_nothing() {
     );
     assert!(!none.stable && !none.within_limits);
     assert!(none.same_state);
+    assert_eq!(none.unmeasured, vec!["there are no runs".to_owned()]);
 }
 
 #[test]
@@ -126,7 +128,38 @@ fn runs_of_different_states_are_named_so() {
     let mut other = run("approve", &[], 0.0);
     other.state.0 = Some("def".to_owned());
 
-    assert!(!compare(&[run("approve", &[], 0.0), other]).same_state);
+    let s = compare(&[run("approve", &[], 0.0), other]);
+
+    assert!(!s.same_state);
+    assert!(!s.stable && !s.within_limits);
+    assert_eq!(s.unmeasured.len(), 1, "{:?}", s.unmeasured);
+}
+
+#[test]
+fn runs_of_reviews_that_failed_are_unmeasured_never_stable() {
+    let failed = run(crate::trace::NO_VERDICT, &[], 0.0);
+
+    let s = compare(&[failed.clone(), failed.clone(), failed]);
+
+    assert_eq!(s.flip_rate, 0.0);
+    assert!(!s.stable && !s.within_limits);
+    assert_eq!(s.unmeasured.len(), 1);
+    assert!(s.unmeasured[0].starts_with("3 of 3 runs have no verdict"));
+}
+
+#[test]
+fn a_dispatched_agent_left_in_a_gap_makes_the_runs_unstable() {
+    let mut gapped = run("approve", &[("lang-rust", &[])], 0.1);
+    gapped.gaps.insert("lang-json".to_owned());
+    let plain = run("approve", &[("lang-rust", &[])], 0.1);
+
+    let s = compare(&[gapped.clone(), gapped.clone(), gapped]);
+    let json = s.agents.iter().find(|a| a.agent == "lang-json").unwrap();
+    assert_eq!((json.reported, json.findings.clone()), (0, vec![None; 3]));
+    assert!(!s.stable);
+
+    let mixed = compare(&[plain.clone(), plain]);
+    assert!(mixed.stable, "an empty finding set is a report");
 }
 
 #[test]
@@ -181,4 +214,23 @@ fn a_review_is_read_from_its_work_directory() {
     )
     .unwrap();
     assert_eq!(read(dir.path(), &mut notes).verdict, "approve");
+}
+
+#[test]
+fn a_gap_list_and_an_unreadable_reports_directory_are_read_and_named() {
+    let dir = TempDir::new().unwrap();
+    fs::create_dir_all(dir.path().join("review")).unwrap();
+    fs::write(dir.path().join(inputs::REPORTS), "a file, not a directory").unwrap();
+    fs::write(
+        dir.path().join(inputs::GAPS),
+        r#"[{"name":"lang-json","kind":"specialist","part":null,"reason":"no report"}]"#,
+    )
+    .unwrap();
+    let mut notes = Vec::new();
+
+    let r = read(dir.path(), &mut notes);
+
+    assert!(r.gaps.contains("lang-json"), "{notes:?}");
+    assert_eq!(notes.len(), 1, "{notes:?}");
+    assert!(notes[0].contains("does not read"), "{notes:?}");
 }

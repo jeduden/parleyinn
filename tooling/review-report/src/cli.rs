@@ -94,10 +94,10 @@ fn stable(args: &[String], stdout: &mut dyn Write, stderr: &mut dyn Write) -> Re
         let _ = writeln!(stderr, "review-report: {out} not written: {e}");
         return Err(EXIT_FAILURE);
     }
-    if !measured.same_state {
+    for why in &measured.unmeasured {
         let _ = writeln!(
             stderr,
-            "review-report: the runs reviewed different heads or inputs; their stability means nothing"
+            "review-report: {why}; their stability means nothing"
         );
     }
     let _ = write!(stdout, "{}", headline(&measured));

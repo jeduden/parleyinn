@@ -12,11 +12,16 @@
 //!   their union, one when every set is empty; how many runs it reported
 //!   in; its findings per run; and the spread of its cost;
 //! - `jaccard`, the mean of the agents' overlaps;
-//! - `stable`, true only when every agent reported in every run with
-//!   the same finding set and no verdict flipped;
+//! - `stable`, true only when the comparison is measured and every
+//!   agent, dispatched or reported, reported in every run with the same
+//!   finding set and no verdict flipped; an agent left in a gap counts
+//!   as one that did not report;
 //! - `same_state`, whether every run reviewed the same head and inputs,
 //!   without which the comparison means nothing;
-//! - `within_limits`, whether the flip rate is at most
+//! - `unmeasured`, why the comparison measures nothing: no runs, runs
+//!   of different states, or a run with no verdict (a review that
+//!   failed); empty when it is measured;
+//! - `within_limits`, whether it is measured, the flip rate is at most
 //!   [`FLIP_RATE_LIMIT`] and the overlap at least [`JACCARD_FLOOR`],
 //!   which the stability probe warns on.
 //!
@@ -25,12 +30,14 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
+use std::io;
 use std::path::Path;
 
 use serde::Serialize;
 
 use crate::identity::{self, Fid};
 use crate::inputs;
+use crate::trace::NO_VERDICT;
 
 /// The highest flip rate the probe passes without a warning: more than
 /// one run in five deciding otherwise than the rest.
@@ -50,6 +57,8 @@ pub struct Run {
     pub findings: BTreeMap<String, BTreeSet<Fid>>,
     /// Each agent's cost, by name.
     pub costs: BTreeMap<String, f64>,
+    /// The agents left without an accepted report or answer.
+    pub gaps: BTreeSet<String>,
 }
 
 /// One agent's stability across the runs.
@@ -79,6 +88,8 @@ pub struct Stability {
     pub jaccard: f64,
     pub agents: Vec<Agent>,
     pub stable: bool,
+    /// Why the comparison measures nothing; empty when it measures.
+    pub unmeasured: Vec<String>,
     pub within_limits: bool,
     pub flip_rate_limit: f64,
     pub jaccard_floor: f64,
@@ -157,6 +168,33 @@ fn agent(name: &str, runs: &[Run]) -> Agent {
     }
 }
 
+/// Why `runs` measure nothing: none, different states, or a run with
+/// no verdict, which is a review that failed and is no sample.
+fn unmeasured(runs: &[Run], same_state: bool) -> Vec<String> {
+    let mut why = Vec::new();
+    if runs.is_empty() {
+        why.push("there are no runs".to_owned());
+    }
+    if !same_state {
+        why.push("the runs reviewed different heads or inputs".to_owned());
+    }
+    let failed: Vec<&str> = runs
+        .iter()
+        .filter(|r| r.verdict == NO_VERDICT)
+        .map(|r| r.dir.as_str())
+        .collect();
+    if !failed.is_empty() {
+        why.push(format!(
+            "{} of {} runs have no verdict: {}",
+            failed.len(),
+            runs.len(),
+            failed.join(", ")
+        ));
+    }
+
+    why
+}
+
 /// The stability of `runs`. No runs measure nothing, so they are
 /// neither stable nor within the limits.
 #[must_use]
@@ -164,7 +202,7 @@ pub fn compare(runs: &[Run]) -> Stability {
     let verdicts: Vec<String> = runs.iter().map(|r| r.verdict.clone()).collect();
     let names: BTreeSet<&String> = runs
         .iter()
-        .flat_map(|r| r.findings.keys().chain(r.costs.keys()))
+        .flat_map(|r| r.findings.keys().chain(r.costs.keys()).chain(&r.gaps))
         .collect();
     let agents: Vec<Agent> = names.into_iter().map(|n| agent(n, runs)).collect();
     let jaccard = if agents.is_empty() {
@@ -176,22 +214,65 @@ pub fn compare(runs: &[Run]) -> Stability {
     let identical = agents
         .iter()
         .all(|a| a.reported == runs.len() && a.jaccard >= 1.0);
-    let measured = !runs.is_empty();
+    let same_state = runs.windows(2).all(|w| w[0].state == w[1].state);
+    let unmeasured = unmeasured(runs, same_state);
+    let measured = unmeasured.is_empty();
 
     Stability {
         runs: runs.len(),
         dirs: runs.iter().map(|r| r.dir.clone()).collect(),
-        same_state: runs.windows(2).all(|w| w[0].state == w[1].state),
+        same_state,
         mode: mode(&verdicts),
         verdicts,
         flip_rate,
         jaccard,
         agents,
+        unmeasured,
         stable: measured && identical && flip_rate == 0.0,
         within_limits: measured && flip_rate <= FLIP_RATE_LIMIT && jaccard >= JACCARD_FLOOR,
         flip_rate_limit: FLIP_RATE_LIMIT,
         jaccard_floor: JACCARD_FLOOR,
     }
+}
+
+/// Each specialist's report text under `dir`, by name. A missing
+/// directory holds none; any other file or directory that does not read
+/// is named in `notes` (I6).
+fn reports(dir: &Path, notes: &mut Vec<String>) -> BTreeMap<String, String> {
+    let mut reports = BTreeMap::new();
+    let reports_dir = dir.join(inputs::REPORTS);
+    let entries = match fs::read_dir(&reports_dir) {
+        Ok(entries) => entries,
+        Err(e) if e.kind() == io::ErrorKind::NotFound => return reports,
+        Err(e) => {
+            notes.push(format!("{} does not read: {e}", reports_dir.display()));
+            return reports;
+        }
+    };
+    for entry in entries {
+        let path = match entry {
+            Ok(entry) => entry.path(),
+            Err(e) => {
+                notes.push(format!("{} does not read: {e}", reports_dir.display()));
+                continue;
+            }
+        };
+        let Some(name) = path
+            .file_name()
+            .and_then(|f| f.to_str())
+            .and_then(|f| f.strip_suffix(".md"))
+        else {
+            continue;
+        };
+        match fs::read_to_string(&path) {
+            Ok(text) => {
+                reports.insert(name.to_owned(), text);
+            }
+            Err(e) => notes.push(format!("{} does not read: {e}", path.display())),
+        }
+    }
+
+    reports
 }
 
 /// The review in work directory `dir`: its verdict, each specialist's
@@ -202,25 +283,11 @@ pub fn read(dir: &Path, notes: &mut Vec<String>) -> Run {
     let outcome = inputs::outcome(dir, notes);
     let run_id = inputs::run_id(dir, notes);
     let answers = inputs::answers(dir, notes);
-    let mut reports = BTreeMap::new();
-    let reports_dir = dir.join(inputs::REPORTS);
-    if let Ok(entries) = fs::read_dir(&reports_dir) {
-        for path in entries.filter_map(Result::ok).map(|e| e.path()) {
-            let Some(name) = path
-                .file_name()
-                .and_then(|f| f.to_str())
-                .and_then(|f| f.strip_suffix(".md"))
-            else {
-                continue;
-            };
-            match fs::read_to_string(&path) {
-                Ok(text) => {
-                    reports.insert(name.to_owned(), text);
-                }
-                Err(e) => notes.push(format!("{} does not read: {e}", path.display())),
-            }
-        }
-    }
+    let reports = reports(dir, notes);
+    let gaps = inputs::gaps(dir, notes)
+        .into_iter()
+        .map(|g| g.name)
+        .collect();
     let costs = inputs::usage(dir, notes)
         .into_iter()
         .map(|u| (u.agent, u.cost_usd))
@@ -229,13 +296,14 @@ pub fn read(dir: &Path, notes: &mut Vec<String>) -> Run {
     Run {
         dir: dir.display().to_string(),
         verdict: if outcome.verdict.is_empty() {
-            crate::trace::NO_VERDICT.to_owned()
+            NO_VERDICT.to_owned()
         } else {
             outcome.verdict
         },
         state: (run_id.head, run_id.inputs),
         findings: identity::of_review(&reports, &answers),
         costs,
+        gaps,
     }
 }
 

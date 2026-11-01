@@ -157,3 +157,18 @@ fn corpus_prints_the_probe_s_matrices_or_fails_naming_why() {
     assert_eq!(code, EXIT_FAILURE);
     assert!(err.contains("read /nonexistent/corpus.toml: "), "{err}");
 }
+
+#[test]
+fn stability_says_why_failed_reviews_measure_nothing() {
+    let root = TempDir::new().unwrap();
+    let one = root.path().join("one").display().to_string();
+    let two = root.path().join("two").display().to_string();
+    let out = root.path().join("s.json").display().to_string();
+
+    let (code, printed, err) = call(&["stability", "--out", &out, &one, &two]);
+
+    assert_eq!(code, EXIT_OK);
+    assert!(printed.contains("stable=false"), "{printed}");
+    assert!(printed.contains("within_limits=false"), "{printed}");
+    assert!(err.contains("2 of 2 runs have no verdict"), "{err}");
+}
