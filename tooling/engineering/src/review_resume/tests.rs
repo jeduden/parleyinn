@@ -151,3 +151,16 @@ fn a_definition_that_cannot_be_changed_is_named() {
 
     assert!(err.starts_with("change "), "{err}");
 }
+
+#[test]
+fn a_file_is_changed_or_named_when_it_cannot_be() {
+    let work = TempDir::new().unwrap();
+    change_file(work.path(), "review/diffs/x.diff").unwrap();
+    let path = work.path().join("review/diffs/x.diff");
+    assert!(!fs::read_to_string(&path).unwrap().is_empty());
+
+    let blocked = TempDir::new().unwrap();
+    write(blocked.path(), "review/diffs", "a file");
+    let err = change_file(blocked.path(), "review/diffs/x.diff").unwrap_err();
+    assert!(err.starts_with("change "), "{err}");
+}

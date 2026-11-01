@@ -4,9 +4,10 @@
 //! accepted report or answer, and names it not reviewed; run again
 //! with that list and the earlier run, it runs that agent again with
 //! the generalist that weighs it, keeps every other answer, and decides
-//! the review as a full run would; across a changed head or a changed
-//! definition it keeps nothing of what changed. The check runs
-//! `review-run` four times on work directories holding the checkout's
+//! the review as a full run would; across a changed head or input it
+//! keeps nothing, and across a changed definition or diff nothing of
+//! the agent whose it is. The check runs
+//! `review-run` six times on work directories holding the checkout's
 //! definitions, with a stand-in for the `claude` command line that
 //! fails one specialist on the first run alone, and requires each run
 //! to start exactly the agents it must.
@@ -26,6 +27,10 @@ pub const GAP: &str = "lang-rust";
 pub const ITS_GENERALIST: &str = "review-code";
 /// The specialist whose definition the last run changes.
 pub const CHANGED: &str = "test-engineer-unit";
+/// The specialist whose diff the last run changes.
+pub const DIFFED: &str = "lang-markdown";
+/// The generalist that weighs it.
+pub const DIFFED_GENERALIST: &str = "review-spec";
 /// The head the runs review.
 pub const HEAD: &str = "0123456789abcdef0123456789abcdef01234567";
 /// Another head.
@@ -201,11 +206,26 @@ pub fn change_definition(dir: &Path) -> Result<(), String> {
         .map_err(|e| format!("change {}: {e}", path.display()))
 }
 
-/// Runs the four reviews under `work`, prepared from `checkout`, and
+/// Writes a changed line as the file `rel` under the work directory
+/// `dir`, where the earlier run had none.
+///
+/// # Errors
+///
+/// Fails when it cannot be written.
+pub fn change_file(dir: &Path, rel: &str) -> Result<(), String> {
+    let path = dir.join(rel);
+    path.parent()
+        .map_or(Ok(()), fs::create_dir_all)
+        .and_then(|()| fs::write(&path, "+a changed line\n"))
+        .map_err(|e| format!("change {}: {e}", path.display()))
+}
+
+/// Runs the six reviews under `work`, prepared from `checkout`, and
 /// returns what is wrong with what each started and wrote: the first,
 /// which cannot start [`GAP`]; the one resumed from it on the same head;
-/// one resumed on [`MOVED`]; and one resumed with [`CHANGED`]'s
-/// definition changed.
+/// one resumed on [`MOVED`]; one resumed with the pull request's diff,
+/// an input every agent reads, changed; one resumed with [`CHANGED`]'s
+/// definition changed; and one resumed with [`DIFFED`]'s diff changed.
 #[must_use]
 pub fn review_resumes(checkout: &Checkout, work: &Path) -> Vec<String> {
     let first = work.join("first");
@@ -248,11 +268,29 @@ pub fn review_resumes(checkout: &Checkout, work: &Path) -> Vec<String> {
         }
         Err(e) => problems.push(e),
     }
+    match again("inputs", HEAD, &|d| change_file(d, "pr.diff")) {
+        Ok((_, started)) => problems.extend(started_problems(
+            &started,
+            &all(),
+            "a review resumed with a changed input",
+        )),
+        Err(e) => problems.push(e),
+    }
     match again("changed", HEAD, &change_definition) {
         Ok((_, started)) => problems.extend(started_problems(
             &started,
             &[GAP, CHANGED, ITS_GENERALIST],
             "a review resumed with a changed definition",
+        )),
+        Err(e) => problems.push(e),
+    }
+    match again("diffed", HEAD, &|d| {
+        change_file(d, &format!("review/diffs/{DIFFED}.diff"))
+    }) {
+        Ok((_, started)) => problems.extend(started_problems(
+            &started,
+            &[GAP, DIFFED, ITS_GENERALIST, DIFFED_GENERALIST],
+            "a review resumed with a changed diff",
         )),
         Err(e) => problems.push(e),
     }
