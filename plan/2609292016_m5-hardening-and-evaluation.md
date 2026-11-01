@@ -40,8 +40,8 @@ ENG-25, the §11 evaluation, the external review and the pilot.
    benchmark against its target on the reference hardware
 8. External security review and the two-week pilot; SEC-17's recorded
    review and release gate, the rest of ENG-22 (every statement cites a
-   passing test) and ENG-23 (semantic versions, a changelog, migration
-   tests from every previous minor version), which M1 left
+   passing test) and ENG-23's migration tests from every previous minor version,
+   which M1 left
 9. M5's initial targets (§12.3): freeze §11's evaluation targets from
    the evaluation's results, removing their † and their §12.3 row
 

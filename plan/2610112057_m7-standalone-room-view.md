@@ -35,10 +35,12 @@ Scope, by requirement family:
 - SEC-20, SEC-21, SEC-23, SEC-27, SEC-29, SEC-32
 - ADM-15, ADM-16, OPS-06, NFR-01, NFR-09, NFR-15
 - ENG-12 and ENG-16, as changed
-- ENG-29, the rest of SEC-19 (B1 to B3 reach, tunnel features), ENG-15's
-  NFR-01 benchmark, and the rest of PRV-01, PRV-02, PRV-04, PRV-05,
-  PRV-06 and PRV-08 (rows needing a signed sandbox state, a room or the
-  launcher), which M1 left
+- ENG-29's clause on building B1 to B3 components past a prototype, the
+  rest of SEC-19 (B1 to B3 reach, and a feature that reaches off the
+  machine through a tool the principal runs outside ParleyInn),
+  ENG-15's NFR-01 benchmark, and the rest of PRV-01, PRV-02, PRV-04,
+  PRV-05, PRV-06 and PRV-08 (rows needing a signed sandbox state, a
+  room or the launcher), which M1 left
 
 ## Tasks
 

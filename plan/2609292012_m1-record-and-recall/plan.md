@@ -48,8 +48,8 @@ how the components ship.
 
 §12.2 lists M1's scope, and this plan takes all of it. These rows land in full:
 
-- REC P0, PRV P0 but PRV-09 (PRV-01, -02, -04, -05, -06 and -08 in
-  part, below) and RCL P0, with RCL-08
+- REC P0, PRV P0 but PRV-09 and the in-part rows below, and RCL P0,
+  with RCL-08
 - MEM-01, SEC-02 to SEC-07, SEC-15, SEC-16, SEC-18 and SEC-22
 - OPS-01 to OPS-03, ADM-04 and ADM-11
 - LANE-02 and OWN-01
@@ -83,6 +83,7 @@ These land in part, as §12.2 bounds them or as their scenarios reach past M1:
 | ADM-09                          | verify's rows but the landmark row                                      | the landmark row, M3                                                    |
 | ENG-06                          | kills of ingest, purge and rebuild                                      | kills of migration, M3                                                  |
 | ENG-15                          | the suite and gate for NFR-02 to NFR-04 and NFR-05's floor              | NFR-01, M7; NFR-05's target, M5                                         |
+| ENG-23, ENG-29                  | semantic versions, a changelog, the ADR gate                            | migration tests, M5; B1 to B3 past a prototype, M7                      |
 | PRV-01, -02, -04, -05, -06, -08 | rows a transcript, hook input or the key set prove                      | a signed sandbox state, rooms, the launcher, M7; another node's key, M8 |
 
 A scenario of a row that lands in part stays `@pending`, its M1 part
@@ -90,8 +91,7 @@ proven by bound steps or named tests, as ENG-12 in plan 2609292011. One
 that cannot pass as written is a finding to raise, never re-pended.
 
 The "rest" column and §12.2 give each item the milestone that can do it.
-PRV-09 went whole to M8, ENG-23 to M5 and ENG-29 to M7.
-phase-16.result.md lists what M1 still owes: bound steps and rulings.
+PRV-09 went whole to M8. phase-16.result.md lists what M1 still owes.
 
 Each test kind lands with its code: ENG-07's fuzz targets, ENG-08's
 properties, ENG-06, ENG-17 and NFR-01 to NFR-05's benchmarks (ENG-15).
