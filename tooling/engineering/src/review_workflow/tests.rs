@@ -985,32 +985,3 @@ fn only_a_leading_work_directory_is_cut_from_a_scrubbed_or_uploaded_path() {
         "review/work/report.html"
     );
 }
-
-#[test]
-fn a_script_with_arguments_in_any_workflow_is_still_read_for_agents_and_the_token() {
-    let flow = |run: &str| {
-        format!(
-            "on:\n  workflow_dispatch:\njobs:\n  go:\n    steps:\n      - uses: actions/checkout@v7\n      - name: Go\n        run: {run}\n"
-        )
-    };
-    let hidden_agents = flow("scripts/go.sh x");
-    let hidden_token = flow(&format!("scripts/go.sh ${{{{ secrets.{CLAUDE} }}}}"));
-    for (text, want) in [
-        (&hidden_agents, "without --credential"),
-        (&hidden_token, "more than stage it"),
-    ] {
-        let (dir, checkout) = workflow_checkout(&[("b.yml", text)]);
-        std::fs::create_dir_all(dir.path().join("scripts")).unwrap();
-        std::fs::write(
-            dir.path().join("scripts/go.sh"),
-            "cargo run -p review-run -- --workdir w\n",
-        )
-        .unwrap();
-        let problems = every_workflow_keeps_the_token(&checkout, CLAUDE).unwrap();
-
-        assert!(
-            problems.iter().any(|p| p.contains(want)),
-            "{want}: {problems:?}"
-        );
-    }
-}

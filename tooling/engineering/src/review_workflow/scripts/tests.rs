@@ -145,3 +145,46 @@ fn a_lenient_read_keeps_the_arguments_and_skips_the_checkout_rule() {
     );
     assert!(inline_scripts_lenient("- run: scripts/b.sh\n", script).is_err());
 }
+
+const CLAUDE: &str = "CLAUDE_CODE_OAUTH_TOKEN";
+
+fn arg_checkout(text: &str) -> (testkit::TempDir, crate::Checkout) {
+    let dir = testkit::TempDir::new().unwrap();
+    let flows = dir.path().join(".github/workflows");
+    std::fs::create_dir_all(&flows).unwrap();
+    std::fs::write(flows.join("b.yml"), text).unwrap();
+
+    let checkout = crate::Checkout::new(dir.path());
+
+    (dir, checkout)
+}
+
+#[test]
+fn a_script_with_arguments_in_any_workflow_is_still_read_for_agents_and_the_token() {
+    let flow = |run: &str| {
+        format!(
+            "on:\n  workflow_dispatch:\njobs:\n  go:\n    steps:\n      - uses: actions/checkout@v7\n      - name: Go\n        run: {run}\n"
+        )
+    };
+    let hidden_agents = flow("scripts/go.sh x");
+    let hidden_token = flow(&format!("scripts/go.sh ${{{{ secrets.{CLAUDE} }}}}"));
+    for (text, want) in [
+        (&hidden_agents, "without --credential"),
+        (&hidden_token, "more than stage it"),
+    ] {
+        let (dir, checkout) = arg_checkout(text);
+        std::fs::create_dir_all(dir.path().join("scripts")).unwrap();
+        std::fs::write(
+            dir.path().join("scripts/go.sh"),
+            "cargo run -p review-run -- --workdir w\n",
+        )
+        .unwrap();
+        let problems =
+            crate::review_workflow::every_workflow_keeps_the_token(&checkout, CLAUDE).unwrap();
+
+        assert!(
+            problems.iter().any(|p| p.contains(want)),
+            "{want}: {problems:?}"
+        );
+    }
+}
