@@ -111,9 +111,14 @@ pub fn cases() -> Vec<Case> {
         review_undashed_cases(),
         review_resume_cases(),
         vec![review_moved_revision_case()],
+        review_control_cases(),
+        answers::review_answer_cases(),
         review_stability_cases(),
         review_token_cases(),
         stability_workflow_cases(),
+        context::review_context_cases(),
+        context::review_context_file_cases(),
+        context::review_identity_cases(),
         // Last: its cases edit source the later cases would run stale.
         license_text_cases(),
     ]
@@ -517,28 +522,28 @@ fn review_resume_cases() -> Vec<Case> {
     let resume_test = |name: &'static str| cargo_lib_test("review-run", name);
     vec![
         case(
-            "a resumed review reusing an answer given on another head",
+            "a resumed review reusing an answer whose answer key changed",
             "ENG-28",
             Injection::replace(
                 RESUME,
-                "(Some(was), Some(is)) if was != is => {",
-                "(Some(was), Some(is)) if was != is && was.is_empty() => {",
+                "let same = matches!((&was.key, &is.key), (Some(a), Some(b)) if a == b);",
+                "let same = was.key.is_some() && is.key.is_some();",
             ),
-            resume_test("resume::tests::a_moved_unknown_or_otherwise_fed_review_reuses_nothing"),
-            "a_moved_unknown_or_otherwise_fed_review_reuses_nothing",
+            resume_test("resume::tests::a_changed_key_runs_its_agent_again_with_why"),
+            "a_changed_key_runs_its_agent_again_with_why",
         ),
         case(
-            "a resumed review reusing an answer whose agent's definition changed",
+            "an answer key that ignores the agent's definition, so a changed one reuses the old answer",
             "ENG-28",
             Injection::replace(
-                RESUME,
-                "if was.definition.is_none() || was.definition != is.definition {",
-                "if was.definition.is_none() {",
+                "tooling/review-run/src/key.rs",
+                "    f.add(\"definition\", &bytes);\n",
+                "    f.add(\"definition\", b\"\");\n",
             ),
             resume_test(
-                "resume::tests::a_changed_definition_or_diff_or_an_agent_new_or_unanswered_runs_again",
+                "key::tests::a_changed_definition_changes_its_agent_s_key_and_its_generalist_s_alone",
             ),
-            "a_changed_definition_or_diff_or_an_agent_new_or_unanswered_runs_again",
+            "a_changed_definition_changes_its_agent_s_key_and_its_generalist_s_alone",
         ),
         case(
             "an agent that did not answer left out of what was not reviewed, so it reads as clean",
@@ -557,14 +562,87 @@ fn review_resume_cases() -> Vec<Case> {
             "a resumed review leaving a reused agent out of those consulted",
             "ENG-28",
             Injection::replace(
-                "tooling/review-run/src/run.rs",
-                ".filter_map(|n| whole(n)).collect();",
-                ".filter_map(|n| whole(n)).filter(|_| false).collect();",
+                "tooling/review-run/src/tasks.rs",
+                "        .filter_map(|n| whole(r, c, n))\n        .collect();\n",
+                "        .filter_map(|n| whole(r, c, n))\n        .filter(|_| false)\n        .collect();\n",
             ),
             resume_test(
                 "cli::tests::a_resumed_review_runs_only_the_gap_and_its_generalist_and_approves",
             ),
             "a_resumed_review_runs_only_the_gap_and_its_generalist_and_approves",
+        ),
+    ]
+}
+
+/// The drifts the review's controls exist to rule out (ENG-28, I6), late
+/// so adding them moves no earlier case to another shard: a run without
+/// its tier's cost cap, a review that starts runs past its own cap, a
+/// breaker that never trips, a generalist that waits for specialists it
+/// does not weigh, and a run that can never succeed run again.
+fn review_control_cases() -> Vec<Case> {
+    const CONTROLS: &str = "tooling/review-run/src/controls.rs";
+    const TEST: &str =
+        "review_controls::tests::the_checkout_s_review_run_holds_its_agents_to_the_controls";
+    let controlled = || cargo_lib_test("engineering", TEST);
+    let want = "the_checkout_s_review_run_holds_its_agents_to_the_controls";
+    vec![
+        case(
+            "an agent's run without its tier's cost cap",
+            "ENG-28",
+            Injection::replace(
+                "tooling/review-eval/src/runner.rs",
+                "        \"--max-budget-usd\".to_owned(),\n",
+                "        \"--max-budget\".to_owned(),\n",
+            ),
+            controlled(),
+            want,
+        ),
+        case(
+            "review-run starting runs past the review's cost cap",
+            "ENG-28",
+            Injection::replace(
+                CONTROLS,
+                "(spent >= self.cap).then(|| {",
+                "(spent >= self.cap && false).then(|| {",
+            ),
+            controlled(),
+            want,
+        ),
+        case(
+            "review-run starting generalists after a mass failure of its specialists",
+            "ENG-28",
+            Injection::replace(
+                CONTROLS,
+                "        trips(failed, self.dispatched, self.fraction).then(|| {",
+                "        (trips(failed, self.dispatched, self.fraction) && false).then(|| {",
+            ),
+            controlled(),
+            want,
+        ),
+        case(
+            "review-run running again a run whose credential was refused",
+            "ENG-28",
+            Injection::replace(
+                "tooling/review-run/src/backoff.rs",
+                "        Class::Never(\"its credential was refused, and no run with it can succeed\")\n",
+                "        Class::Again\n",
+            ),
+            controlled(),
+            want,
+        ),
+        case(
+            "review-run starting a generalist only once every specialist ended",
+            "ENG-28",
+            Injection::replace(
+                "tooling/review-run/src/tasks.rs",
+                "            .filter_map(|s| g.last.get(s).copied())\n            .collect();\n        g.last.insert(unit.name.clone(), g.tasks.len());\n",
+                "            .filter_map(|_| None::<usize>)\n            .chain(g.last.values().copied())\n            .collect();\n        g.last.insert(unit.name.clone(), g.tasks.len());\n",
+            ),
+            cargo_lib_test(
+                "engineering",
+                "review_runs::tests::a_review_run_on_the_checkout_s_definitions_has_no_problem",
+            ),
+            "a_review_run_on_the_checkout_s_definitions_has_no_problem",
         ),
     ]
 }
@@ -794,8 +872,7 @@ fn stability_workflow_cases() -> Vec<Case> {
 fn review_token_cases() -> Vec<Case> {
     const RUN_CLI: &str = "tooling/review-run/src/cli.rs";
     let eval = |name: &'static str| cargo_lib_test("review-eval", name);
-    let leak_test =
-        "cli::tests::a_review_whose_agent_leaked_the_token_scrubs_it_everywhere_and_fails_closed";
+    let leak_test = "cli::tests::leaks::a_review_whose_agent_leaked_the_token_scrubs_it_everywhere_and_fails_closed";
     vec![
         case(
             "the scrub counting and replacing no form of the token",
@@ -1504,7 +1581,7 @@ fn test_shards_case() -> Case {
 /// by the composite action, in the key's job or starting an agent
 /// outside review-run; the ENG-32 evaluation planning every component
 /// a shared section change reaches, not one per set; and review-run
-/// starting a generalist before every specialist has ended.
+/// starting a generalist before its own specialists have ended.
 fn review_late_cases() -> Vec<Case> {
     vec![
         case(
@@ -1552,15 +1629,15 @@ fn review_late_cases() -> Vec<Case> {
             "components planned for the sections",
         ),
         case(
-            "review-run starting the generalists before the specialists",
+            "review-run starting a generalist before its own specialists ended",
             "ENG-28",
             Injection::replace(
-                "tooling/review-run/src/run.rs",
-                "    let done = parallel(&units, options.parallel, &one);\n    runs.extend(gather(workdir, plan, &units, done, unsplit, progress));\n    let mut generalists = Vec::new();\n    for name in plan.generalists() {\n        match whole(&name) {\n            Some(run) => runs.push(run),\n            None => generalists.push(Unit::whole(name)),\n        }\n    }\n    let done = parallel(&generalists, options.parallel, &one);\n    runs.extend(done.into_iter().map(|(run, _)| run));\n",
-                "    let mut generalists = Vec::new();\n    for name in plan.generalists() {\n        match whole(&name) {\n            Some(run) => runs.push(run),\n            None => generalists.push(Unit::whole(name)),\n        }\n    }\n    let early = parallel(&generalists, options.parallel, &one);\n    let done = parallel(&units, options.parallel, &one);\n    runs.extend(gather(workdir, plan, &units, done, unsplit, progress));\n    runs.extend(early.into_iter().map(|(run, _)| run));\n",
+                "tooling/review-run/src/tasks.rs",
+                "            .filter_map(|s| g.last.get(s).copied())\n            .collect();\n        g.last.insert(unit.name.clone(), g.tasks.len());\n",
+                "            .filter_map(|s| g.last.get(s).copied().filter(|_| false))\n            .collect();\n        g.last.insert(unit.name.clone(), g.tasks.len());\n",
             ),
             scenario("ENG-28"),
-            "review-code started before lang-markdown ended",
+            "review-code started before its specialist lang-rust ended",
         ),
     ]
 }
@@ -3787,6 +3864,9 @@ fn transcript_contract_cases() -> Vec<Case> {
         ),
     ]
 }
+
+mod answers;
+mod context;
 
 #[cfg(test)]
 mod tests;

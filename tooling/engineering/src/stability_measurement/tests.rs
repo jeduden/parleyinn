@@ -103,6 +103,9 @@ fn review_report_missing_a_flip_recomputing_cost_or_leaving_markup_is_named() {
     let good = made();
     let bad = Made {
         flip: good.same.clone(),
+        differ: good.same.clone(),
+        reworded: false,
+        moved: true,
         cost: 9.0,
         report: "<script>".to_owned(),
         ..good
@@ -112,6 +115,9 @@ fn review_report_missing_a_flip_recomputing_cost_or_leaving_markup_is_named() {
         report_problems(&bad),
         vec![
             "review-report stability does not find a verdict that flips",
+            "review-report stability does not find that reviews with different findings overlap less than whole",
+            "a finding reworded or bolded is not the same finding in review-report stability",
+            "a finding on another path is the same finding in review-report stability",
             "an agent run's cost is 9, not the 0.25 its run log reported",
             "the report holds a run's text as markup",
         ]

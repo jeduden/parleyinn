@@ -36,9 +36,8 @@ fn a_run_id_hashes_each_definition_each_specialist_s_diff_and_the_inputs() {
     let dir = TempDir::new().unwrap();
     write(dir.path(), ".claude/agents/lang-rust.md", "abc");
     write(dir.path(), "review/diffs/lang-rust.diff", "abc");
-    write(dir.path(), "review/context/lang-rust.md", "ctx");
 
-    let id = compute(dir.path(), &plan(), Some(HEAD.to_owned()), 9);
+    let id = compute(dir.path(), &plan(), Some(HEAD.to_owned()), 9, None);
 
     assert_eq!(id.head.as_deref(), Some(HEAD));
     assert_eq!(id.split, 9);
@@ -48,7 +47,7 @@ fn a_run_id_hashes_each_definition_each_specialist_s_diff_and_the_inputs() {
         AgentId {
             definition: Some(sha256(b"abc")),
             diff: Some(sha256(b"abc")),
-            context: Some(sha256(b"ctx")),
+            key: None,
         }
     );
     // A generalist has no diff of its own, and a definition that does
@@ -58,46 +57,50 @@ fn a_run_id_hashes_each_definition_each_specialist_s_diff_and_the_inputs() {
         AgentId {
             definition: None,
             diff: None,
-            context: None,
+            key: None,
         }
     );
     let text = serde_json::to_string(&id).unwrap();
     assert_eq!(parse(&text).unwrap(), id);
     assert!(!text.contains("resumed_from"), "{text}");
+    assert!(!text.contains("claude"), "{text}");
 }
 
 #[test]
-fn changing_only_a_specialist_s_context_changes_its_id() {
+fn a_run_id_holds_each_agent_s_own_key() {
     let dir = TempDir::new().unwrap();
-    write(dir.path(), "review/diffs/lang-rust.diff", "abc");
-    write(dir.path(), "review/context/lang-rust.md", "one");
-    let before = compute(dir.path(), &plan(), None, 9);
-    write(dir.path(), "review/context/lang-rust.md", "two");
-    let after = compute(dir.path(), &plan(), None, 9);
-    assert_ne!(before.agents["lang-rust"], after.agents["lang-rust"]);
-    assert_eq!(
-        before.agents["lang-rust"].diff,
-        after.agents["lang-rust"].diff
-    );
-    assert_eq!(before.inputs, after.inputs);
+    crate::fake::define(dir.path(), "lang-rust", 20);
+    crate::fake::define(dir.path(), "review-code", 40);
+    let keys = Keys::compute(dir.path(), &plan(), "v", 9);
+
+    let id = compute(dir.path(), &plan(), None, 9, Some(&keys));
+
+    for name in ["lang-rust", "review-code"] {
+        assert_eq!(id.agents[name].key.as_deref(), keys.own(name), "{name}");
+        assert!(id.agents[name].key.is_some(), "{name}");
+    }
+    // A run id from before keys reads, with none.
+    let old = r#"{"head": null, "inputs": "x", "split": 1,
+        "agents": {"lang-rust": {"definition": "d"}}}"#;
+    assert_eq!(parse(old).unwrap().agents["lang-rust"].key, None);
 }
 
 #[test]
 fn every_input_changes_the_inputs_hash_and_nothing_else_does() {
     let dir = TempDir::new().unwrap();
-    let before = compute(dir.path(), &plan(), None, 9).inputs;
+    let before = compute(dir.path(), &plan(), None, 9, None).inputs;
     write(dir.path(), "review/checked.json", "[]");
-    assert_eq!(compute(dir.path(), &plan(), None, 9).inputs, before);
+    assert_eq!(compute(dir.path(), &plan(), None, 9, None).inputs, before);
     let mut seen = vec![before];
     for rel in INPUTS {
         write(dir.path(), rel, "x");
-        let now = compute(dir.path(), &plan(), None, 9).inputs;
+        let now = compute(dir.path(), &plan(), None, 9, None).inputs;
         assert!(!seen.contains(&now), "{rel}");
         seen.push(now);
     }
     // An empty file is not a missing one.
     write(dir.path(), "pr.diff", "");
-    assert!(!seen.contains(&compute(dir.path(), &plan(), None, 9).inputs));
+    assert!(!seen.contains(&compute(dir.path(), &plan(), None, 9, None).inputs));
 }
 
 #[test]

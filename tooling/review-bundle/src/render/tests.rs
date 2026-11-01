@@ -313,6 +313,10 @@ fn context_names_the_class_the_specialist_s_row_its_files_and_their_findings() {
     assert!(!got.contains("no consent"), "{got}");
     assert!(got.contains("1 more, on files that are not yours"), "{got}");
     assert!(
+        !got.contains("bundle.md"),
+        "the context never names the bundle it tells the specialist not to read: {got}"
+    );
+    assert!(
         !got.contains("REC-01 name"),
         "the context quotes no row: {got}"
     );

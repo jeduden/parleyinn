@@ -160,6 +160,12 @@ The review's tooling words are engineering-tooling words too, described in
 - **Run list**: a review's file with one entry per agent run, holding its
   tokens, its cost and why its answer was not taken.
 - **Run report**: the static HTML built from the run list.
+- **Answer key, answer store**: a hash of everything one review agent's answer
+  depends on, and the directory of accepted answers filed under such keys. The
+  key is a content hash, not a ParleyInn key and not a seat or signing key.
+- **Stalled**: an agent whose gap came back in the tool's limit of resumes in a
+  row, or a blocking finding kept in three reviews in a row on an unchanged
+  file; a person acts on it.
 - **Specialist report**: what one of the review's specialist agents gives, its
   findings and outcome; neither the run report nor a forge report.
 

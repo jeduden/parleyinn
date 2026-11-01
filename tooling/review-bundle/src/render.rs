@@ -104,7 +104,7 @@ pub fn context(a: &Analysis, name: &str) -> String {
     if !other.is_empty() {
         let _ = write!(
             b,
-            "\n{} more, on files that are not yours, are in `review/bundle.md`; the \
+            "\n{} more, on files that are not yours, are not shown here; the \
              gate weighs every deterministic finding already.\n",
             other.len()
         );

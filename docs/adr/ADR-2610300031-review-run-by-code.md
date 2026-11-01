@@ -168,6 +168,11 @@ repeat them, which costs tokens.
   dispatches `review-code`, or its deep instance, so something always
   reads the change. A dispatch that is empty all the same requests
   changes.
+- **A specialist reads only its own diff and its context.** Its prompt
+  names its diff (its part's, in parts) and `review/context/<name>.md`,
+  which the bundle writes for it (class, touched ids, dispatch row,
+  findings on its files), never the whole bundle: a large bundle is too
+  big for one read.
 - **Stakeholder consent is checked in code.** The review bundle raises
   the ENG-21 finding for a change to a path CODEOWNERS assigns: blocking
   until a stakeholder comment consents, a nit once one does.
@@ -177,16 +182,15 @@ repeat them, which costs tokens.
   the gate already reads, beside the report files it assembles. The
   gate still refuses to post a review that left a dispatched agent out,
   now a review whose run of that agent did not answer.
-- **The models stay.** Each agent runs on the model, effort and turn
-  budget its front matter names; `review-run` passes no model.
 - **The workflow.** The review job installs the pinned Claude Code
   command line as the evaluate job does, builds `review-run` before the
   Claude Code OAuth token is in any step's environment, and runs it
   offline. The job keeps its read-only permissions, holds no
   reviewer-app key and hands the agents no GitHub token.
-- **What stays.** The layers, the deep instances, the generalists
-  reading report files, the post job's gate, the required
-  `review-gate` check and the triggers stay as ADR-2610262245 has them.
+- **What stays.** The layers, deep instances, generalists reading report
+  files, the post job's gate, the required `review-gate` check and the
+  triggers, as ADR-2610262245 has them, and each agent's model, effort
+  and turn budget from its front matter: `review-run` passes no model.
 
 ## Alternatives
 
@@ -227,80 +231,80 @@ repeat them, which costs tokens.
 
 ## Consequences
 
-- ENG-28 asks for the review to be run by code, not by an orchestrating
-  agent, and its scenario holds the review workflow to `review-run`
-  and refuses a harness session that would route the review.
-- ENG-28 also describes the finding grammar, the revision and
-  withdrawal forms, the assembly from the run log, its refusals, the
-  incomplete report, the second run after a run that did not answer or
-  a refused report, that the agents write nothing and that the
-  generalists alone weigh; its scenario's gate table takes a report
-  with a request, which approves, and one with a malformed finding, an
-  incomplete one and one whose answer gives no or another outcome, each
-  an error, and one revising or withdrawing a finding never stated,
-  which approves.
-- The orchestrator's skill, its file, its reviewer component under
-  ENG-32, its cases and its prompt and schema in the runner are
-  retired, together with its mentions in the SRS, the docs and the
-  generalists' input section. ADR-2609301941 and ADR-2610262245 keep
-  their text as the record of what was decided then.
-- ADR-2610290002, the reviewer evaluation, also describes the
-  orchestrator, and names the review workflow's model for an agent
-  whose front matter names none, a model the workflow no longer has.
-  ADR-2610311947 supersedes it whole and names the evaluation's
-  default model (ENG-32) instead.
-- The shared report sections under `docs/agents/`, the specialists'
-  and the personas' own report text, the generalists' input section and
-  the persona-review skill follow the finding forms; every specialist's
-  tools line loses Write. The evaluation cases (ENG-32) expect
-  `findings` or `none` and a `linked` or `request` line, may expect a
-  finding stated before the answer or withdrawn, and the generalists'
-  seeded reports use the new lines; the grader reads the run log alone.
-- A requirement request lands with the stakeholder as a nit; the SRS
-  changes only through the stakeholder's own change.
-- A review runs in waves of agents, each up to 900 seconds and each
-  agent at most twice. The repository has 56 specialists and the job
-  starts 32 at once, so they take two waves and the generalists a
-  third: 3 x 2 x 15 = 90 minutes at worst, and the job's cap is 120.
-  Agents end in minutes in practice.
-- What a run leaves without an accepted report is said, never read as
-  clean: `review/gaps.json` and `review/not-reviewed.md` list each such
-  agent or part and why. `review-run --only <gaps> --from <dir>`, behind
-  `scripts/review-local.sh --resume`, reruns only those and what
-  changed, keyed by `review/run-id.json`: the head, an inputs hash, and
-  each definition's and diff's SHA-256. The verdict function is the
-  same; nothing is reused across a changed head, definition or diff.
-- After every run, failed or not, `review-run` writes
-  `review/agent-runs.jsonl`, one entry per agent run with its tokens, the
-  cost its log reported and why it was not accepted, and
-  `review/report.html`, a static run report with every string a run shaped
-  escaped; the `review-report` crate builds both from the review's
-  files, best effort, so neither changes the verdict. They go with the
-  reports; the run logs stay in the job. No server or socket is added.
+- ENG-28 asks for the review to be run by code, not by an orchestrating agent,
+  and its scenario holds the review workflow to `review-run` and refuses a
+  harness session that would route the review.
+- ENG-28 also describes the finding grammar, the revision and withdrawal forms,
+  the assembly from the run log, its refusals, the incomplete report, the second
+  run after a run that did not answer or a refused report, that the agents write
+  nothing and that the generalists alone weigh; its scenario's gate table takes
+  a report with a request, which approves, and one with a malformed finding, an
+  incomplete one and one whose answer gives no or another outcome, each an
+  error, and one revising or withdrawing a finding never stated, which approves.
+- The orchestrator's skill, its file, its reviewer component under ENG-32, its
+  cases and its prompt and schema in the runner are retired, together with its
+  mentions in the SRS, the docs and the generalists' input section.
+  ADR-2609301941 and ADR-2610262245 keep their text as the record of what was
+  decided then.
+- ADR-2610290002, the reviewer evaluation, also describes the orchestrator, and
+  names the review workflow's model for an agent whose front matter names none,
+  a model the workflow no longer has. ADR-2610311947 supersedes it whole and
+  names the evaluation's default model (ENG-32) instead.
+- The shared report sections under `docs/agents/`, the specialists' and the
+  personas' own report text, the generalists' input section and the
+  persona-review skill follow the finding forms; every specialist's tools line
+  loses Write. The evaluation cases (ENG-32) expect `findings` or `none` and a
+  `linked` or `request` line, may expect a finding stated before the answer or
+  withdrawn, and the generalists' seeded reports use the new lines; the grader
+  reads the run log alone.
+- A requirement request lands with the stakeholder as a nit; the SRS changes
+  only through the stakeholder's own change.
+- A review runs its agents in one pipeline (`--parallel 32` in the workflow),
+  each up to 900 seconds and at most twice (three times when the API turned it
+  away): 56 specialists, then each generalist once its own specialists ended and
+  the mass failure below is decided; 90 minutes at worst (cap 120).
+- Cost and failure are bounded by code (proposed): `--max-budget-usd` caps a run
+  (1.00 a specialist, 5.00 a generalist), `--max-cost-usd` (40) starts no run
+  once finished runs cost it, and over a third of the specialists in a gap
+  starts no generalist: `review aborted:`.
+- A run left without an accepted report is said, never read as clean:
+  `review/gaps.json` and `review/not-reviewed.md` list it and why. `review-run
+  --only <gaps> --from <dir>` reruns those and each agent whose answer key
+  changed, on any head. A key (proposed) hashes the definition, model, effort,
+  turns, `claude --version`, command line, prompt, split limit, instructions,
+  own diff and context and a salt; a generalist's also hashes its specialists'
+  keys and the reports it weighs. `--answers DIR` reuses an answer that passes
+  the report check, and stores no refused, cut-off, silent, capped or
+  token-holding run; `answers drop` removes one. Risks: an injected answer
+  frozen in the store (no workflow writes it yet), and a key blind to files read
+  outside it.
+- After every run, failed or not, `review-run` writes `review/agent-runs.jsonl`,
+  one entry per agent run with its tokens, the cost its log reported and why it
+  was not accepted, and `review/report.html`, a static run report with every
+  string a run shaped escaped; the `review-report` crate builds both from the
+  files, best effort, so neither changes the verdict. They go with the reports;
+  the run logs stay in the job. No server or socket is added.
 - A stability measurement, `.github/workflows/stability.yml`, reviews each
-  snapshot of `tooling/review-eval/stability-snapshots.toml` three times
-  afresh and measures the verdict flip rate and each agent's finding
-  overlap (ENG-32). It runs on dispatch alone: about $15 a measurement, so
-  its weekly schedule waits, commented out, for the stakeholder.
-- The Claude Code OAuth token stays out of every agent's reach: one
-  step in each agent job stages it in a credentials file under the
-  runner's temporary directory, no step that runs an agent holds it,
-  each agent is refused reads of that directory by name in its
-  `--disallowedTools`, and of `/proc`, `/sys`, `/dev` and outside its
-  trees, and every file and line review-run writes is
-  scrubbed of that OAuth token first; a review whose agent's output
-  held it requests changes naming the leak and fails, so nothing is
-  posted.
+  snapshot of `tooling/review-eval/stability-snapshots.toml` three times afresh
+  and measures the verdict flip rate and each agent's finding overlap (ENG-32).
+  It runs on dispatch alone: about $15 a measurement, so its weekly schedule
+  waits, commented out, for the stakeholder.
+- The Claude Code OAuth token stays out of every agent's reach: one step in each
+  agent job stages it in a credentials file under the runner's temporary
+  directory, no step that runs an agent holds it, each agent is refused reads of
+  that directory by name in its `--disallowedTools`, and of `/proc`, `/sys`,
+  `/dev` and outside its trees, and every file and line review-run writes is
+  scrubbed of it first; a review whose agent's output held it requests changes
+  naming the leak and fails, so nothing is posted.
 - No new third-party dependency.
 
 ## Approval
 
-This record is proposed. The stakeholder accepted its first text, the
-review run by code, in `jeduden`'s comment 6534291701 on
-<https://github.com/jeduden/parleyinn/pull/98>. The decisions on the
-finding forms, the run log as the report and the generalists alone
-weighing were folded in after that comment and await the
-stakeholder's acceptance of the whole record on that pull request.
-Until then ADR-2610262245 is marked superseded by a proposed record,
-on purpose: the stakeholder accepts this one before that pull request
-merges.
+This record is proposed. The stakeholder accepted its first text, the review run
+by code, in `jeduden`'s comment 6534291701 on
+<https://github.com/jeduden/parleyinn/pull/98>. The decisions on the finding
+forms, the run log as the report and the generalists alone weighing were folded
+in after that comment and await the stakeholder's acceptance of the whole record
+on that pull request. Until then ADR-2610262245 is marked superseded by a
+proposed record, on purpose: the stakeholder accepts this one before that pull
+request merges. The keyed answers and the store's write policy await a ruling.

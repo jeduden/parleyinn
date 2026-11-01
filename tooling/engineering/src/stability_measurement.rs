@@ -141,6 +141,13 @@ fn review(verdict: &str, path: &str) -> Review {
 pub struct Made {
     pub same: Stability,
     pub flip: Stability,
+    /// Two reviews whose one agent found its finding on different paths.
+    pub differ: Stability,
+    /// Whether a finding reworded, bolded and ended with a full stop has
+    /// the identity it had.
+    pub reworded: bool,
+    /// Whether the same finding on another path has the identity it had.
+    pub moved: bool,
     pub cost: f64,
     pub report: String,
 }
@@ -154,6 +161,11 @@ pub fn made() -> Made {
         review("request_changes", "a.rs"),
         review("approve", "a.rs"),
     ]);
+    let differ = stability::compare(&[review("approve", "a.rs"), review("approve", "b.rs")]);
+    let fid = |path: &str, text: &str| Fid::new(path, vec!["ENG-28".to_owned()], text);
+    let found = fid("a.rs", "the gate posts unread");
+    let reworded = found == fid("a.rs", "The gate **posts** unread.");
+    let moved = found == fid("b.rs", "the gate posts unread");
     let log = LogFile {
         file: "lang-rust.jsonl".to_owned(),
         text: r#"{"type":"result","subtype":"success","result":"x","total_cost_usd":0.25,"modelUsage":{"m":{"costUSD":9.0}}}"#.to_owned(),
@@ -173,6 +185,9 @@ pub fn made() -> Made {
     Made {
         same,
         flip,
+        differ,
+        reworded,
+        moved,
         cost,
         report,
     }
@@ -185,6 +200,26 @@ pub fn report_problems(made: &Made) -> Vec<String> {
     let (same, flip) = (&made.same, &made.flip);
     if !same.stable || flip.stable || flip.flip_rate <= 0.0 || flip.within_limits {
         problems.push("review-report stability does not find a verdict that flips".to_owned());
+    }
+    if made.same.jaccard < 1.0
+        || made.differ.jaccard >= 1.0
+        || made.differ.agents.iter().any(|a| a.jaccard >= 1.0)
+    {
+        problems.push(
+            "review-report stability does not find that reviews with different findings overlap less than whole"
+                .to_owned(),
+        );
+    }
+    if !made.reworded {
+        problems.push(
+            "a finding reworded or bolded is not the same finding in review-report stability"
+                .to_owned(),
+        );
+    }
+    if made.moved {
+        problems.push(
+            "a finding on another path is the same finding in review-report stability".to_owned(),
+        );
     }
     if (made.cost - 0.25).abs() > 1e-12 {
         problems.push(format!(

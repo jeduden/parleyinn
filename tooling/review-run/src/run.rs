@@ -1,30 +1,25 @@
 //! The runs: every dispatched specialist, in parallel up to a bound,
-//! then, once every one has finished, every dispatched generalist the
-//! same way, each as `claude --agent` through the evaluation's runner,
-//! with the review's reading tools and turn budget, and a deadline of
-//! its own. A run that cannot start, ends without a successful result,
-//! misses its deadline or answers nothing has not answered; the review
-//! goes on without it. A specialist's report is assembled from its run
-//! log, the finding lines it stated and its answer's outcome line, and
-//! written to the report file its generalist reads; a run that did not
-//! answer leaves what it stated there too, headed incomplete, so the
-//! findings it logged are not lost, while the run stays one that did
-//! not answer. A specialist whose diff is past the split limit runs
-//! in parts, each a run of its own under the same bound, and its
-//! report and run are merged from theirs; a part that did not answer
-//! leaves the specialist one that did not answer. A run is tried once
-//! more as `retry` says. A resumed review runs only what its resume
-//! plan does not keep: an agent kept whole is taken as it answered in
-//! the earlier run, and a part kept as its log there answered, held to
-//! the report check again.
+//! and every dispatched generalist the same way once its own
+//! specialists have ended, each as `claude --agent` through the
+//! evaluation's runner, with the review's reading tools, turn budget and
+//! cost cap, and a deadline of its own. A run that cannot start, ends
+//! without a successful result, misses its deadline or answers nothing
+//! has not answered; the review goes on without it. A specialist's
+//! report is assembled from its run log, the finding lines it stated
+//! and its answer's outcome line, and written to the report file its
+//! generalist reads; a run that did not answer leaves what it stated
+//! there too, headed incomplete, so the findings it logged are not
+//! lost, while the run stays one that did not answer. A specialist
+//! whose diff is past the split limit runs in parts, each a run of its
+//! own under the same bound, and its report and run are merged from
+//! theirs; a part that did not answer leaves the specialist one that
+//! did not answer. A run is tried again as `retry` says. What starts
+//! when is `tasks`'s; what holds the runs back, `controls`'s.
 
 use std::collections::BTreeSet;
 use std::fs;
 use std::io;
 use std::path::Path;
-use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::{Mutex, PoisonError};
-use std::thread;
 use std::time::Duration;
 
 use review_eval::component::{self, Kind};
@@ -35,10 +30,16 @@ use review_eval::world::World;
 use review_gate::report::assemble;
 
 use crate::LOGS;
+use crate::controls::{
+    BREAKER_FRACTION, Breaker, Budget, Clock, Controls, Fraction, MAX_COST_USD, SystemClock,
+};
+use crate::key::Keys;
+use crate::live::{self, EVERY, Live, Watch};
 use crate::parts::{self, Part};
 use crate::plan::{Plan, report_file};
-use crate::resume::{Resume, Reuse};
-use crate::retry::{refusal, run_one};
+use crate::resume::Resume;
+use crate::store::Store;
+use crate::tasks;
 
 /// How many agents run at once unless the run says otherwise.
 pub const PARALLEL: usize = 8;
@@ -47,7 +48,7 @@ pub const PARALLEL: usize = 8;
 pub const DEADLINE: Duration = Duration::from_secs(review_eval::DEADLINE_SECONDS);
 
 /// How the runs go.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Options {
     /// How many agents run at once, at least one.
     pub parallel: usize,
@@ -55,6 +56,14 @@ pub struct Options {
     pub deadline: Duration,
     /// The size, in bytes, past which a specialist's diff runs in parts.
     pub split: usize,
+    /// What the finished runs may cost, in US dollars, before no run
+    /// starts.
+    pub max_cost_usd: f64,
+    /// The fraction of the dispatched specialists that may end in a gap
+    /// before no generalist starts.
+    pub breaker: Fraction,
+    /// How often what is running is told.
+    pub every: Duration,
 }
 
 impl Default for Options {
@@ -63,6 +72,9 @@ impl Default for Options {
             parallel: PARALLEL,
             deadline: DEADLINE,
             split: parts::LIMIT,
+            max_cost_usd: MAX_COST_USD,
+            breaker: BREAKER_FRACTION,
+            every: EVERY,
         }
     }
 }
@@ -89,6 +101,12 @@ pub struct AgentRun {
     /// Whether its answer was taken from an earlier run of the same
     /// inputs rather than run again.
     pub reused: bool,
+    /// Whether that answer came from the answer store.
+    pub from_store: bool,
+    /// Its answer key; none when it has none.
+    pub answer_key: Option<String>,
+    /// Whether its accepted answer could not be stored.
+    pub store_failed: bool,
 }
 
 impl AgentRun {
@@ -104,6 +122,9 @@ impl AgentRun {
             parts: 1,
             failed_parts: Vec::new(),
             reused: false,
+            from_store: false,
+            answer_key: None,
+            store_failed: false,
         }
     }
 
@@ -114,10 +135,31 @@ impl AgentRun {
     }
 }
 
-/// Runs every agent `plan` dispatches in the work directory `workdir`:
-/// the specialists, then the generalists, telling `progress` of each;
-/// a specialist's report is held to the ids in `known` before it is
-/// taken. What `resume` keeps is not run again.
+/// One review's runs: what starts them, the clock they keep, the work
+/// directory, the plan, the ids a specialist's report may cite, how
+/// they go, what a resumed review keeps, the answer keys and store, and
+/// what is told of each.
+pub struct Review<'a> {
+    pub host: &'a dyn Host,
+    pub clock: &'a dyn Clock,
+    pub workdir: &'a Path,
+    pub plan: &'a Plan,
+    pub known: &'a BTreeSet<String>,
+    pub options: Options,
+    pub resume: Option<&'a Resume>,
+    /// Each agent's answer key; none when the keys are unknown.
+    pub keys: Option<&'a Keys>,
+    /// The answer store answers are taken from and kept in; none when
+    /// the review uses none.
+    pub store: Option<&'a Store>,
+    /// The scrubber of the Claude token; an answer it finds the token
+    /// in is never stored (ENG-28). None without a token to scrub.
+    pub scrubber: Option<&'a review_eval::secret::Scrubber>,
+    pub progress: &'a (dyn Fn(&str) + Sync),
+}
+
+/// Runs every agent `plan` dispatches in the work directory `workdir`,
+/// on the machine's clock, as [`review_on`] does.
 ///
 /// # Errors
 ///
@@ -131,72 +173,75 @@ pub fn review(
     resume: Option<&Resume>,
     progress: &(dyn Fn(&str) + Sync),
 ) -> Result<Vec<AgentRun>, String> {
+    review_on(&Review {
+        host,
+        clock: &SystemClock::default(),
+        workdir,
+        plan,
+        known,
+        options,
+        resume,
+        keys: None,
+        store: None,
+        scrubber: None,
+        progress,
+    })
+}
+
+/// Runs every agent the review's plan dispatches: each specialist, and
+/// each generalist once its own specialists have ended, telling
+/// progress of each, and every so often of what is running; a
+/// specialist's report is held to the known ids before it is taken.
+/// What the resume plan keeps is not run again; no run starts once the
+/// finished runs cost the review's cap, and no generalist once the
+/// breaker tripped.
+///
+/// # Errors
+///
+/// Fails when the logs' or the reports' directory cannot be made.
+pub fn review_on(r: &Review) -> Result<Vec<AgentRun>, String> {
     for dir in [LOGS, crate::REPORTS] {
-        let path = workdir.join(dir);
+        let path = r.workdir.join(dir);
         fs::create_dir_all(&path).map_err(|e| format!("make {}: {e}", path.display()))?;
     }
-    let reuse = |name: &str| resume.and_then(|r| r.reuse.get(name));
-    let one = |unit: &Unit| {
-        let kept = match (reuse(&unit.name), &unit.part) {
-            (Some(Reuse::Parts(kept)), Some(part)) => kept.get(&part.index),
-            _ => None,
-        };
-        if let Some(log) = kept {
-            let report = assemble(&log.texts, &log.answer, None);
-            // A kept part is held to the report check as a fresh one.
-            match refusal(&report, &log.answer, known) {
-                None => {
-                    let run = reused(unit.label(), unit.kind, &log.answer, log.texts.clone());
-                    progress(&describe(&run));
-                    return (run, Some(report));
-                }
-                Some(why) => progress(&format!(
-                    "{} ({}): its kept report was refused, so it runs again: {why}",
-                    unit.label(),
-                    unit.kind.word()
-                )),
-            }
-        }
-        let (run, report) = run_one(host, workdir, plan, known, unit, options.deadline, progress);
-        progress(&describe(&run));
-        (run, report)
+    let c = Controls {
+        budget: Budget::new(r.options.max_cost_usd),
+        breaker: Breaker::new(r.options.breaker, r.plan.specialists().len()),
+        live: Live::default(),
     };
-    let whole = |name: &str| match reuse(name) {
-        Some(Reuse::Whole(answer)) => {
-            let run = reused(
-                name.to_owned(),
-                component::kind_of(name),
-                answer,
-                Vec::new(),
-            );
-            progress(&describe(&run));
-            Some(run)
-        }
-        _ => None,
+    let watch = Watch {
+        clock: r.clock,
+        every: r.options.every,
+        total: r.plan.agents().len(),
+        cost: &|| c.budget.spent(),
+        progress: r.progress,
     };
-    let mut runs: Vec<AgentRun> = plan.specialists().iter().filter_map(|n| whole(n)).collect();
-    let (units, unsplit) = specialist_units(workdir, plan, options.split, &|n| {
-        matches!(reuse(n), Some(Reuse::Whole(_)))
-    });
-    let done = parallel(&units, options.parallel, &one);
-    runs.extend(gather(workdir, plan, &units, done, unsplit, progress));
-    let mut generalists = Vec::new();
-    for name in plan.generalists() {
-        match whole(&name) {
-            Some(run) => runs.push(run),
-            None => generalists.push(Unit::whole(name)),
-        }
-    }
-    let done = parallel(&generalists, options.parallel, &one);
-    runs.extend(done.into_iter().map(|(run, _)| run));
 
-    Ok(runs)
+    Ok(live::watching(&c.live, &watch, || tasks::run_all(r, &c)))
+}
+
+/// The run of `unit`, not started for `why`: it costs nothing and has
+/// no attempt, so it is never tried again; a specialist's report says
+/// why, headed incomplete, and is written when it runs whole.
+pub(crate) fn not_started(workdir: &Path, unit: &Unit, why: String) -> (AgentRun, Option<String>) {
+    let report = (unit.kind == Kind::Specialist).then(|| assemble(&[], "", Some(&why)));
+    let mut failure = why;
+    if let (Some(text), None) = (&report, &unit.part)
+        && let Err(e) = write_report(workdir, &unit.name, text)
+    {
+        failure = format!("{failure}; {e}");
+    }
+
+    (
+        AgentRun::of(unit.label(), unit.kind, Some(failure), RunLog::default(), 0),
+        report,
+    )
 }
 
 /// The run of agent or part `name`, of `kind`, kept from an earlier
 /// run in which it answered `answer`, having stated `texts`: it costs
 /// nothing and was not started.
-fn reused(name: String, kind: Kind, answer: &str, texts: Vec<String>) -> AgentRun {
+pub(crate) fn reused(name: String, kind: Kind, answer: &str, texts: Vec<String>) -> AgentRun {
     let log = RunLog {
         answered: true,
         subtype: SUCCESS.to_owned(),
@@ -221,7 +266,7 @@ pub(crate) struct Unit {
 
 impl Unit {
     /// Agent `name` run whole, its kind by its name.
-    fn whole(name: String) -> Self {
+    pub(crate) fn whole(name: String) -> Self {
         Self {
             kind: review_eval::component::kind_of(&name),
             name,
@@ -248,7 +293,7 @@ impl Unit {
 /// whole, or in its parts when its diff is past `split`; and, run in
 /// none, each specialist whose diff could not be split, as a run that
 /// did not answer, its report saying why.
-fn specialist_units(
+pub(crate) fn specialist_units(
     workdir: &Path,
     plan: &Plan,
     split: usize,
@@ -279,6 +324,9 @@ fn specialist_units(
                     parts: 0,
                     failed_parts: Vec::new(),
                     reused: false,
+                    from_store: false,
+                    answer_key: None,
+                    store_failed: false,
                 });
             }
         }
@@ -287,53 +335,14 @@ fn specialist_units(
     (units, unsplit)
 }
 
-/// Each of `plan`'s specialists' run, in its order: its one run, its
-/// parts' runs in `done` merged, with the merged report written and
-/// told to `progress`, or its run in `unsplit`.
-fn gather(
-    workdir: &Path,
-    plan: &Plan,
-    units: &[Unit],
-    done: Vec<(AgentRun, Option<String>)>,
-    mut unsplit: Vec<AgentRun>,
-    progress: &(dyn Fn(&str) + Sync),
-) -> Vec<AgentRun> {
-    let mut by_name: Vec<(&Unit, (AgentRun, Option<String>))> = units.iter().zip(done).collect();
-    let mut runs = Vec::new();
-    for name in plan.specialists() {
-        if let Some(at) = unsplit.iter().position(|r| r.name == name) {
-            runs.push(unsplit.remove(at));
-            continue;
-        }
-        let (own, rest): (Vec<_>, Vec<_>) = by_name.into_iter().partition(|(u, _)| u.name == name);
-        by_name = rest;
-        let split = own.iter().any(|(u, _)| u.part.is_some());
-        let mut own: Vec<(AgentRun, Option<String>)> = own.into_iter().map(|(_, d)| d).collect();
-        if !split {
-            runs.extend(own.pop().map(|(run, _)| run));
-            continue;
-        }
-        let (mut run, report) = parts::merge(
-            &name,
-            own.into_iter()
-                .map(|(run, report)| (run, report.unwrap_or_default()))
-                .collect(),
-        );
-        if let Err(e) = write_report(workdir, &name, &report) {
-            run.failure = Some(run.failure.map_or(e.clone(), |f| format!("{f}; {e}")));
-        }
-        progress(&describe(&run));
-        runs.push(run);
-    }
-
-    runs
-}
-
 /// One line on `run`, for the progress the command prints; a run that
 /// took two attempts says so, and one run in parts how many.
 #[must_use]
 pub fn describe(run: &AgentRun) -> String {
     let kind = run.kind.word();
+    if run.from_store {
+        return format!("{} ({kind}): reused from the answer store", run.name);
+    }
     if run.reused {
         return format!("{} ({kind}): reused from the earlier run", run.name);
     }
@@ -346,6 +355,8 @@ pub fn describe(run: &AgentRun) -> String {
     };
     if run.parts > 1 {
         format!("{line} in {} parts, {} attempts", run.parts, run.attempts)
+    } else if run.attempts > 2 {
+        format!("{line} on its third attempt")
     } else if run.attempts > 1 {
         format!("{line} on its second attempt")
     } else {
@@ -393,15 +404,10 @@ pub(crate) fn attempt(
             );
         }
     };
-    let world = World {
-        main: workdir.to_path_buf(),
-        class: plan.class.clone(),
-        touched: plan.touched,
-        seeded: plan.reports_of(name),
-        notes: Vec::new(),
-    };
+    let world = world_of(workdir, plan, name);
     let log_path = workdir.join(LOGS).join(format!("{}.jsonl", unit.stem()));
-    let mut command = runner::command(&component, &world, None, &log_path, deadline);
+    let diff = unit.part.as_ref().map(|part| part.diff.as_str());
+    let mut command = runner::command_over(&component, &world, None, &log_path, deadline, diff);
     if let Some(part) = &unit.part {
         told(&mut command.args, &part.note);
     }
@@ -442,6 +448,19 @@ pub(crate) fn attempt(
     (AgentRun::of(unit.label(), kind, failure, log, 1), report)
 }
 
+/// The world agent `name` of `plan` runs on in `workdir`: the review's
+/// class and touched count, and for a generalist its specialists'
+/// report files.
+pub(crate) fn world_of(workdir: &Path, plan: &Plan, name: &str) -> World {
+    World {
+        main: workdir.to_path_buf(),
+        class: plan.class.clone(),
+        touched: plan.touched,
+        seeded: plan.reports_of(name),
+        notes: Vec::new(),
+    }
+}
+
 /// Adds `note` to the prompt among `args`, the value after `-p`.
 fn told(args: &mut [String], note: &str) {
     let at = args.iter().position(|a| a == "-p").map(|at| at + 1);
@@ -463,13 +482,12 @@ pub(crate) fn write_report(workdir: &Path, name: &str, text: &str) -> Result<(),
 }
 
 /// Moves the log named `name` and its errors, each when there is one,
-/// to `<name>.first.jsonl` and `<name>.first.stderr`, so its second
-/// attempt does not write over them.
-pub(crate) fn keep_first_log(workdir: &Path, name: &str) -> Result<(), String> {
+/// to `<name>.<which>.jsonl` and `<name>.<which>.stderr`.
+pub(crate) fn keep_log(workdir: &Path, name: &str, which: &str) -> Result<(), String> {
     let logs = workdir.join(LOGS);
     for extension in ["jsonl", "stderr"] {
         let from = logs.join(format!("{name}.{extension}"));
-        let to = logs.join(format!("{name}.first.{extension}"));
+        let to = logs.join(format!("{name}.{which}.{extension}"));
         match fs::rename(&from, &to) {
             Err(e) if e.kind() != io::ErrorKind::NotFound => {
                 return Err(format!(
@@ -483,39 +501,6 @@ pub(crate) fn keep_first_log(workdir: &Path, name: &str) -> Result<(), String> {
     }
 
     Ok(())
-}
-
-/// `f` of each of `items`, at most `bound` at once, in the order of
-/// `items`.
-pub fn parallel<T: Sync, R: Send>(
-    items: &[T],
-    bound: usize,
-    f: &(dyn Fn(&T) -> R + Sync),
-) -> Vec<R> {
-    let next = AtomicUsize::new(0);
-    let done: Mutex<Vec<(usize, R)>> = Mutex::new(Vec::with_capacity(items.len()));
-    let worker = || {
-        while let Some((at, item)) = {
-            let at = next.fetch_add(1, Ordering::SeqCst);
-            items.get(at).map(|item| (at, item))
-        } {
-            let out = f(item);
-            // A poisoned lock still holds every result pushed before
-            // the panic; this one joins them, so none is dropped.
-            done.lock()
-                .unwrap_or_else(PoisonError::into_inner)
-                .push((at, out));
-        }
-    };
-    thread::scope(|scope| {
-        for _ in 0..bound.max(1).min(items.len()) {
-            scope.spawn(worker);
-        }
-    });
-    let mut done = done.into_inner().unwrap_or_else(PoisonError::into_inner);
-    done.sort_by_key(|(at, _)| *at);
-
-    done.into_iter().map(|(_, out)| out).collect()
 }
 
 #[cfg(test)]

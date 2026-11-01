@@ -1,15 +1,17 @@
-//! A review resumed from an earlier run of the same inputs: every
-//! agent the earlier run took an answer from, and that its gap list does
-//! not name, keeps that answer, its report and its logs, copied from the
-//! earlier run, when the head, the inputs every agent reads, its
-//! definition and, for a specialist, its diff are each the same; every
-//! other agent runs again, and why is noted. A specialist named only by
-//! parts of its split diff runs just those parts again, the parts that
-//! answered keeping their logs. A generalist runs again whenever one of
-//! its specialists does, so it always weighs the reports the review
-//! decides on. The verdict is then decided as for a full run: a reused
-//! answer is judged exactly as a fresh one. A changed or unknown head,
-//! a changed input or a changed split limit reuses nothing.
+//! A review resumed from an earlier run: every agent the earlier run
+//! took an answer from, and that its gap list does not name, keeps that
+//! answer, its report and its logs, copied from the earlier run, when
+//! its own answer key (`key`) is the one the earlier run recorded for
+//! it, whatever the head; every other agent runs again, and why is
+//! noted. So a resume on a new commit reuses every specialist whose
+//! definition, diff, prompt, model, `claude` and salted files are the
+//! same. A specialist named only by parts of its split diff runs just
+//! those parts again, the parts that answered keeping their logs. A
+//! generalist runs again whenever one of its specialists does, so it
+//! always weighs the reports the review decides on. The verdict is then
+//! decided as for a full run: a reused answer is judged exactly as a
+//! fresh one. An earlier run that recorded no key, or a review whose
+//! keys are unknown, reuses nothing of that agent.
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
@@ -21,6 +23,7 @@ use review_eval::log::{self, RunLog};
 use crate::gaps::{self, Gap};
 use crate::plan::{Plan, report_file};
 use crate::run_id::{self, RUN_ID, RunId};
+use crate::stall::{self, STALLS, Stall};
 use crate::{ANSWERS, CONSULTED, LOGS, REVIEW};
 
 /// What the earlier run left, read.
@@ -37,6 +40,9 @@ pub struct Earlier {
     /// For each specialist the gaps name by part, each part's log, by
     /// its place from one.
     pub parts: BTreeMap<String, BTreeMap<usize, RunLog>>,
+    /// Its gaps counted across the runs before it; none when it wrote
+    /// none.
+    pub stalls: Vec<Stall>,
 }
 
 /// What one agent keeps from the earlier run.
@@ -57,6 +63,10 @@ pub struct Resume {
     pub from: String,
     pub reuse: BTreeMap<String, Reuse>,
     pub notes: Vec<String>,
+    /// Each agent not run again because it stalled, with why.
+    pub stalled: BTreeMap<String, String>,
+    /// The earlier run's stalls, which this run's gaps count on from.
+    pub stalls: Vec<Stall>,
 }
 
 /// `rel`, a path under the work directory's `review/`, under the
@@ -90,6 +100,12 @@ pub fn read(only: &Path, from: &Path) -> Result<Earlier, String> {
     let answers = review_gate::parse_answers(&text).map_err(|e| named(&path, e.to_string()))?;
     let (path, text) = load(earlier_file(from, CONSULTED))?;
     let consulted = review_gate::parse_consulted(&text).map_err(|e| named(&path, e.to_string()))?;
+    let path = earlier_file(from, STALLS);
+    let stalls = match fs::read_to_string(&path) {
+        Ok(text) => stall::parse(&text).map_err(|e| named(&path, e))?,
+        Err(e) if e.kind() == io::ErrorKind::NotFound => Vec::new(),
+        Err(e) => return Err(format!("read {}: {e}", path.display())),
+    };
     let mut parts = BTreeMap::new();
     for gap in gaps.iter().filter(|g| g.part.is_some()) {
         if !parts.contains_key(&gap.name) {
@@ -104,6 +120,7 @@ pub fn read(only: &Path, from: &Path) -> Result<Earlier, String> {
         answers,
         consulted,
         parts,
+        stalls,
     })
 }
 
@@ -113,8 +130,7 @@ fn part_logs(from: &Path, name: &str) -> Result<BTreeMap<usize, RunLog>, String>
     let logs = earlier_file(from, LOGS);
     let entries = fs::read_dir(&logs).map_err(|e| format!("read {}: {e}", logs.display()))?;
     let mut out = BTreeMap::new();
-    for entry in entries {
-        let entry = entry.map_err(|e| format!("read {}: {e}", logs.display()))?;
+    for entry in listed(entries, &logs)? {
         let file = entry.file_name();
         let Some(index) = file
             .to_str()
@@ -136,65 +152,73 @@ fn part_logs(from: &Path, name: &str) -> Result<BTreeMap<usize, RunLog>, String>
     Ok(out)
 }
 
-/// Why nothing of `earlier` can be reused for a review on `now`; none
-/// when the head, the inputs and the split limit are each the same.
-fn stale(earlier: &RunId, now: &RunId) -> Option<String> {
+/// A note on what a head that moved from `earlier`'s to `now`'s keeps;
+/// none when it did not move or one is unknown.
+fn moved(earlier: &RunId, now: &RunId) -> Option<String> {
     match (&earlier.head, &now.head) {
-        (Some(was), Some(is)) if was != is => {
-            return Some(format!("the head changed from {was} to {is}"));
-        }
-        (Some(_), Some(_)) => {}
-        _ => return Some("the head reviewed is unknown".to_owned()),
+        (Some(was), Some(is)) if was != is => Some(format!(
+            "the head changed from {was} to {is}: only agents whose answer key is unchanged \
+             keep their answer"
+        )),
+        _ => None,
     }
-    if earlier.inputs != now.inputs {
-        return Some(
-            "the inputs every agent reads changed: the class, the dispatch, the bundle, the \
-             diff or the agent instructions"
-                .to_owned(),
-        );
-    }
-    (earlier.split != now.split).then(|| {
-        format!(
-            "the split limit changed from {} to {}",
-            earlier.split, now.split
-        )
-    })
 }
 
-/// Why agent `name` cannot keep its earlier answer: its definition,
-/// its diff or its context changed, it was not in the earlier run, or that run took no
-/// answer from it; none when it can.
+/// Why agent `name` cannot keep its earlier answer: its answer key is
+/// not the one the earlier run recorded, with the change named when its
+/// definition or diff is it, or it was not in the earlier run; none when
+/// it can.
 fn changed(name: &str, earlier: &Earlier, now: &RunId) -> Option<String> {
     let (Some(was), Some(is)) = (earlier.id.agents.get(name), now.agents.get(name)) else {
         return Some("it was not in the earlier run".to_owned());
     };
-    if was.definition.is_none() || was.definition != is.definition {
-        return Some("its definition changed".to_owned());
+    let same = matches!((&was.key, &is.key), (Some(a), Some(b)) if a == b);
+    if same {
+        return None;
     }
-    if was.diff != is.diff {
-        return Some("its diff changed".to_owned());
-    }
-    if was.context != is.context {
-        return Some("its context changed".to_owned());
-    }
-    None
+    Some(
+        if was.key.is_none() {
+            "the earlier run recorded no answer key for it"
+        } else if is.key.is_none() {
+            "its answer key is unknown"
+        } else if was.definition != is.definition {
+            "its definition changed"
+        } else if was.diff != is.diff {
+            "its diff changed"
+        } else {
+            "its answer key changed: its model, effort, turns or prompt, the claude version, \
+             the split limit, the pull request's agent instructions or a file every key reads"
+        }
+        .to_owned(),
+    )
 }
 
 /// What each of `plan`'s agents keeps from `earlier`, for a review on
-/// `now`, the earlier run's directory given as `from`.
+/// `now`, the earlier run's directory given as `from`; an agent whose
+/// gap recurred in `max_resumes` resumes in a row after its first run is not run
+/// again.
 #[must_use]
-pub fn plan(plan: &Plan, earlier: &Earlier, now: &RunId, from: &str) -> Resume {
+pub fn plan(plan: &Plan, earlier: &Earlier, now: &RunId, from: &str, max_resumes: u32) -> Resume {
     let mut resume = Resume {
         from: from.to_owned(),
+        stalls: earlier.stalls.clone(),
         ..Resume::default()
     };
-    if let Some(why) = stale(&earlier.id, now) {
-        resume.notes.push(format!("nothing reused: {why}"));
-        return resume;
+    for (name, why) in stall::stuck(&earlier.stalls, max_resumes) {
+        if plan.agents().contains(&name) {
+            resume.notes.push(format!("{name}: not run again: {why}"));
+            resume.stalled.insert(name, why);
+        }
+    }
+    if let Some(note) = moved(&earlier.id, now) {
+        resume.notes.push(note);
     }
     let gapped =
         |name: &str| -> Vec<&Gap> { earlier.gaps.iter().filter(|g| g.name == name).collect() };
     for name in plan.specialists() {
+        if resume.stalled.contains_key(&name) {
+            continue;
+        }
         match keep(&name, &gapped(&name), earlier, now) {
             Ok(reuse) => {
                 if let Reuse::Parts(kept) = &reuse {
@@ -209,6 +233,9 @@ pub fn plan(plan: &Plan, earlier: &Earlier, now: &RunId, from: &str) -> Resume {
         }
     }
     for name in plan.generalists() {
+        if resume.stalled.contains_key(&name) {
+            continue;
+        }
         let rerun = plan
             .dispatch
             .get(&name)
@@ -310,8 +337,7 @@ pub fn copy(
             Err(e) if e.kind() == io::ErrorKind::NotFound => continue,
             Err(e) => return Err(format!("read {}: {e}", logs.display())),
         };
-        for entry in entries {
-            let entry = entry.map_err(|e| format!("read {}: {e}", logs.display()))?;
+        for entry in listed(entries, &logs)? {
             let file = entry.file_name();
             let Some(file) = file.to_str() else {
                 let lossy = file.to_string_lossy();
@@ -329,6 +355,13 @@ pub fn copy(
     }
 
     Ok(notes)
+}
+
+/// The entries of the directory `dir`, or why one of them did not list.
+fn listed<T>(entries: impl Iterator<Item = io::Result<T>>, dir: &Path) -> Result<Vec<T>, String> {
+    entries
+        .collect::<io::Result<Vec<T>>>()
+        .map_err(|e| format!("read {}: {e}", dir.display()))
 }
 
 /// Whether the log file named `file` is one of agent `name`'s that

@@ -19,11 +19,12 @@ fn plan() -> Plan {
     }
 }
 
+/// An agent's identity, its key one its definition and diff give.
 fn agent(definition: &str, diff: Option<&str>) -> AgentId {
     AgentId {
         definition: Some(definition.to_owned()),
         diff: diff.map(str::to_owned),
-        context: None,
+        key: Some(format!("k-{definition}-{diff:?}")),
     }
 }
 
@@ -40,6 +41,7 @@ fn id() -> RunId {
         ]
         .into(),
         resumed_from: None,
+        claude: None,
     }
 }
 
@@ -70,6 +72,7 @@ fn earlier(gaps: Vec<Gap>) -> Earlier {
             .collect(),
         consulted: names.iter().map(|n| (*n).to_owned()).collect(),
         parts: BTreeMap::new(),
+        stalls: Vec::new(),
     }
 }
 
@@ -89,7 +92,7 @@ fn with_no_gap_and_nothing_changed_every_agent_keeps_its_answer() {
 }
 
 fn plan_of(earlier: &Earlier, now: &RunId) -> Resume {
-    super::plan(&plan(), earlier, now, "old")
+    super::plan(&plan(), earlier, now, "old", crate::stall::MAX_RESUMES)
 }
 
 #[test]
@@ -122,31 +125,51 @@ fn a_generalist_that_was_a_gap_runs_again_alone() {
 }
 
 #[test]
-fn a_moved_unknown_or_otherwise_fed_review_reuses_nothing() {
+fn a_moved_or_otherwise_fed_review_keeps_every_agent_whose_key_is_unchanged() {
     let mut moved = id();
     moved.head = Some("89abcdef0123456789abcdef0123456789abcdef".to_owned());
     let mut unknown = id();
     unknown.head = None;
     let mut inputs = id();
     inputs.inputs = "j".to_owned();
-    let mut split = id();
-    split.split = 10;
-    for (now, why) in [
-        (moved, "the head changed from 0123"),
-        (unknown, "the head reviewed is unknown"),
-        (inputs, "the inputs every agent reads changed"),
-        (split, "the split limit changed from 9 to 10"),
-    ] {
+    for (now, notes) in [(moved, 1), (unknown, 0), (inputs, 0)] {
         let resume = plan_of(&earlier(Vec::new()), &now);
 
-        assert!(resume.reuse.is_empty(), "{why}");
-        assert_eq!(resume.notes.len(), 1);
-        assert!(
-            resume.notes[0].starts_with(&format!("nothing reused: {why}")),
-            "{:?}",
-            resume.notes
-        );
+        assert_eq!(resume.reuse.len(), 4, "{:?}", resume.notes);
+        assert_eq!(resume.notes.len(), notes, "{:?}", resume.notes);
     }
+    let mut moved = id();
+    moved.head = Some("89abcdef0123456789abcdef0123456789abcdef".to_owned());
+    let resume = plan_of(&earlier(Vec::new()), &moved);
+    assert!(
+        resume.notes[0].starts_with(&format!("the head changed from {HEAD} to 89ab")),
+        "{:?}",
+        resume.notes
+    );
+}
+
+#[test]
+fn a_changed_key_runs_its_agent_again_with_why() {
+    let mut now = id();
+    now.agents.get_mut("lang-rust").unwrap().key = Some("other".to_owned());
+    now.agents.get_mut("review-security").unwrap().key = None;
+    let mut was = earlier(Vec::new());
+    was.id.agents.get_mut("test-engineer-unit").unwrap().key = None;
+
+    let resume = plan_of(&was, &now);
+
+    assert_eq!(
+        resume.notes,
+        [
+            "lang-rust: runs again: its answer key changed: its model, effort, turns or \
+             prompt, the claude version, the split limit, the pull request's agent \
+             instructions or a file every key reads",
+            "test-engineer-unit: runs again: the earlier run recorded no answer key for it",
+            "review-code: runs again: its specialist lang-rust runs again",
+            "review-security: runs again: its answer key is unknown",
+        ]
+    );
+    assert!(resume.reuse.is_empty());
 }
 
 #[test]
@@ -173,9 +196,10 @@ fn a_changed_definition_or_diff_or_an_agent_new_or_unanswered_runs_again() {
     );
     assert!(resume.reuse.is_empty());
 
-    // A definition that did not read in the earlier run never matches.
+    // A definition that did not read in the earlier run has no key, so
+    // it never matches.
     let mut was = earlier(Vec::new());
-    was.id.agents.get_mut("review-security").unwrap().definition = None;
+    was.id.agents.get_mut("review-security").unwrap().key = None;
     was.answers.remove("lang-rust");
     let resume = plan_of(&was, &id());
     assert_eq!(
@@ -183,7 +207,7 @@ fn a_changed_definition_or_diff_or_an_agent_new_or_unanswered_runs_again() {
         [
             "lang-rust: runs again: the earlier run took no answer from it",
             "review-code: runs again: its specialist lang-rust runs again",
-            "review-security: runs again: its definition changed",
+            "review-security: runs again: the earlier run recorded no answer key for it",
         ]
     );
 }
@@ -288,6 +312,9 @@ fn the_earlier_run_reads_with_its_parts_logs() {
     assert_eq!(was.gaps.len(), 2);
     assert_eq!(was.answers["lang-rust"], "outcome: none — a.");
     assert_eq!(was.consulted, ["lang-rust".to_owned()].into());
+    write(&old, "logs/other.1.jsonl", "");
+    let again = read(&old.join("gaps.json"), &old).unwrap();
+    assert_eq!(again.parts["lang-rust"].len(), 2);
     let parts = &was.parts["lang-rust"];
     assert_eq!(parts.keys().collect::<Vec<_>>(), [&1, &2]);
     assert!(parts[&1].answered);
@@ -314,6 +341,21 @@ fn an_earlier_run_that_does_not_read_is_named() {
     fs::remove_file(old.join("run-id.json")).unwrap();
     let err = read(&old.join("gaps.json"), &old).unwrap_err();
     assert!(err.starts_with("read "), "{err}");
+    for gone in ["answers.json", "consulted.json"] {
+        let dir = TempDir::new().unwrap();
+        let old = earlier_dir(dir.path(), "[]");
+        fs::remove_file(old.join(gone)).unwrap();
+        let err = read(&old.join("gaps.json"), &old).unwrap_err();
+        assert!(err.starts_with("read ") && err.contains(gone), "{err}");
+    }
+}
+
+#[test]
+fn a_directory_entry_that_does_not_list_is_named_with_its_directory() {
+    let entries = vec![Ok(1), Err(io::Error::other("gone")), Ok(3)];
+    let err = listed(entries.into_iter(), Path::new("logs")).unwrap_err();
+    assert_eq!(err, "read logs: gone");
+    assert_eq!(listed([Ok(1)].into_iter(), Path::new("x")).unwrap(), [1]);
 }
 
 #[test]
@@ -352,6 +394,7 @@ fn a_kept_agent_s_report_and_logs_are_copied_and_a_kept_part_s_alone() {
         ]
         .into(),
         notes: Vec::new(),
+        ..Resume::default()
     };
 
     copy(&work, &old, &plan(), &resume).unwrap();
@@ -389,6 +432,7 @@ fn a_kept_file_that_cannot_be_copied_is_named_and_missing_logs_are_none() {
         from: "old".to_owned(),
         reuse: [("lang-rust".to_owned(), whole("lang-rust"))].into(),
         notes: Vec::new(),
+        ..Resume::default()
     };
     copy(&work, &old, &plan(), &resume).unwrap();
 
@@ -405,6 +449,26 @@ fn a_kept_file_that_cannot_be_copied_is_named_and_missing_logs_are_none() {
     write(dir.path(), "blocked", "a file");
     let err = copy(&dir.path().join("blocked"), &old, &plan(), &resume).unwrap_err();
     assert!(err.starts_with("make "), "{err}");
+}
+
+#[test]
+fn a_kept_log_that_cannot_be_copied_is_named() {
+    let dir = TempDir::new().unwrap();
+    let old = earlier_dir(dir.path(), "[]");
+    let work = dir.path().join("work");
+    let resume = Resume {
+        from: "old".to_owned(),
+        reuse: [("lang-rust".to_owned(), whole("lang-rust"))].into(),
+        ..Resume::default()
+    };
+    fs::create_dir_all(work.join(LOGS).join("lang-rust.jsonl")).unwrap();
+
+    let err = copy(&work, &old, &plan(), &resume).unwrap_err();
+
+    assert!(
+        err.starts_with("copy ") && err.contains("lang-rust.jsonl"),
+        "{err}"
+    );
 }
 
 #[test]
@@ -439,6 +503,7 @@ fn a_log_whose_name_is_not_utf8_is_not_copied() {
         from: "old".to_owned(),
         reuse: [("lang-rust".to_owned(), whole("lang-rust"))].into(),
         notes: Vec::new(),
+        ..Resume::default()
     };
 
     let notes = copy(&work, &old, &plan(), &resume).unwrap();
@@ -452,13 +517,66 @@ fn a_log_whose_name_is_not_utf8_is_not_copied() {
 }
 
 #[test]
-fn a_changed_context_runs_the_specialist_again() {
-    let mut now = id();
-    now.agents.get_mut("lang-rust").unwrap().context = Some("c9".to_owned());
-    let parts = vec![Gap::new("lang-rust", Some(1), "silent: x".to_owned())];
-    let resume = plan_of(&earlier(parts), &now);
+fn an_agent_stalled_past_the_resumes_allowed_is_not_run_again() {
+    let gaps = vec![Gap::new("lang-rust", None, "silent: x".to_owned())];
+    let mut was = earlier(gaps.clone());
+    was.stalls = (0..3).fold(Vec::new(), |s, _| crate::stall::tally(&gaps, &s));
+
+    let resume = plan_of(&was, &id());
+
+    let why = "stalled: lang-rust failed 3 times the same way; needs a person: silent: x; \
+               silent: x; silent: x";
+    assert_eq!(resume.stalled["lang-rust"], why);
+    assert_eq!(resume.stalls, was.stalls);
+    assert!(!resume.reuse.contains_key("lang-rust"));
     assert_eq!(
-        resume.notes[0],
-        "lang-rust: runs again: its context changed"
+        resume.notes,
+        [
+            format!("lang-rust: not run again: {why}"),
+            "review-code: runs again: its specialist lang-rust runs again".to_owned(),
+        ]
     );
+    // Allowed one more resume, it runs again.
+    let more = super::plan(&plan(), &was, &id(), "old", 3);
+    assert!(more.stalled.is_empty());
+}
+
+#[test]
+fn an_earlier_run_s_stalls_read_when_there_and_as_none_when_not() {
+    let dir = TempDir::new().unwrap();
+    let old = earlier_dir(dir.path(), "[]");
+    assert!(
+        read(&old.join("gaps.json"), &old)
+            .unwrap()
+            .stalls
+            .is_empty()
+    );
+
+    write(
+        &old,
+        "stalls.json",
+        r#"[{"name": "lang-rust", "class": "silent:", "times": 2, "reasons": ["a", "b"]}]"#,
+    );
+    assert_eq!(
+        read(&old.join("gaps.json"), &old).unwrap().stalls[0].times,
+        2
+    );
+
+    fs::remove_file(old.join("stalls.json")).unwrap();
+    fs::create_dir(old.join("stalls.json")).unwrap();
+    let err = read(&old.join("gaps.json"), &old).unwrap_err();
+    assert!(err.starts_with("read "), "{err}");
+}
+
+#[test]
+fn a_stalled_generalist_is_not_run_again_and_its_specialists_keep_theirs() {
+    let gaps = vec![Gap::new("review-security", None, "unread: y".to_owned())];
+    let mut was = earlier(gaps.clone());
+    was.stalls = (0..3).fold(Vec::new(), |s, _| crate::stall::tally(&gaps, &s));
+
+    let resume = plan_of(&was, &id());
+
+    assert!(resume.stalled.contains_key("review-security"));
+    assert!(!resume.reuse.contains_key("review-security"));
+    assert_eq!(resume.reuse.len(), 3);
 }

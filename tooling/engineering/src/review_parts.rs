@@ -51,6 +51,9 @@ pub struct PartHost {
 
 impl Host for PartHost {
     fn run(&self, command: &Command) -> Result<Output, String> {
+        if let Some(out) = crate::review_runs::version(command) {
+            return Ok(out);
+        }
         let agent = agent_of(command);
         let prompt = command.args.get(1).cloned().unwrap_or_default();
         let (text, subtype, result) = if agent == GENERALIST {

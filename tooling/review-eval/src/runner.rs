@@ -30,16 +30,46 @@ pub const DISALLOWED: &str = "Bash,Edit,Write,NotebookEdit,WebFetch,WebSearch,Ag
 /// `--disallowedTools`.
 pub const SETTINGS: &str = r#"{"permissions":{"blockReadsOutsideWorkingDirectories":true}}"#;
 
+/// The most, in US dollars, one specialist's run may spend, passed as
+/// `--max-budget-usd`: the specialists of the reviews of pull request 98
+/// cost 0.01 to 0.30 each, so about three times the dearest leaves room
+/// for a long diff and stops a run gone round in circles. A run the cap
+/// stops ends with the result subtype [`OVER_BUDGET`].
+pub const SPECIALIST_BUDGET_USD: &str = "1.00";
+/// The same for a generalist, or a consultant, on the strongest model:
+/// those of pull request 98 cost up to 2.00, so 2.5 times that.
+pub const GENERALIST_BUDGET_USD: &str = "5.00";
+
+/// The result subtype of a run its `--max-budget-usd` cap stopped.
+pub const OVER_BUDGET: &str = "error_max_budget_usd";
+
+/// The cap of one run of an agent of `kind`.
+#[must_use]
+pub fn budget_usd(kind: Kind) -> &'static str {
+    match kind {
+        Kind::Specialist => SPECIALIST_BUDGET_USD,
+        Kind::Generalist | Kind::Consultant => GENERALIST_BUDGET_USD,
+    }
+}
+
 /// The prompt `component` gets for `world`: for a specialist or a
 /// generalist what the review's run tells it, and for a consultant the
 /// target a skill hands it: the tree, the diff and the changed paths.
 #[must_use]
 pub fn prompt(component: &Component, world: &World) -> String {
+    prompt_over(component, world, None)
+}
+
+/// [`prompt`] for a specialist run over `diff`, the work directory's
+/// path of its part of a split diff, in place of its own whole one;
+/// `diff` is ignored for any other agent.
+#[must_use]
+pub fn prompt_over(component: &Component, world: &World, diff: Option<&str>) -> String {
     let name = &component.name;
     match component.kind {
         Kind::Specialist => format!(
             "You are `{name}`, a specialist of ParleyInn's review of a pull request \
-             (ENG-28). Read only your own diff, `review/diffs/{name}.diff`, alone \
+             (ENG-28). Read only your own diff, `{diff}`, alone \
              first; then `review/context/{name}.md`, which names the review class, \
              your dispatch row and the deterministic findings on your files; never \
              `review/bundle.md`. The pull request's tree is in `pr-head/` and \
@@ -48,7 +78,8 @@ pub fn prompt(component: &Component, world: &World) -> String {
              one line in your text the moment you find it, as your instructions say, \
              and answer with your outcome line alone, `outcome: findings — <sentence>` \
              or `outcome: none — <sentence>`. The review assembles your report from \
-             the lines you stated."
+             the lines you stated.",
+            diff = diff.map_or_else(|| format!("review/diffs/{name}.diff"), str::to_owned)
         ),
         Kind::Generalist => {
             let reports = if world.seeded.is_empty() {
@@ -91,9 +122,23 @@ pub fn command(
     log: &Path,
     deadline: Duration,
 ) -> Command {
+    command_over(component, world, model, log, deadline, None)
+}
+
+/// [`command`] for a specialist run over `diff`, its part's diff file
+/// in place of its whole one, as [`prompt_over`] says.
+#[must_use]
+pub fn command_over(
+    component: &Component,
+    world: &World,
+    model: Option<&str>,
+    log: &Path,
+    deadline: Duration,
+    diff: Option<&str>,
+) -> Command {
     let mut args: Vec<String> = vec![
         "-p".into(),
-        prompt(component, world),
+        prompt_over(component, world, diff),
         "--output-format".into(),
         "stream-json".into(),
         "--verbose".into(),
@@ -107,6 +152,10 @@ pub fn command(
     args.extend(["--allowedTools".to_owned(), TOOLS.to_owned()]);
     args.extend(["--disallowedTools".to_owned(), DISALLOWED.to_owned()]);
     args.extend(["--settings".to_owned(), SETTINGS.to_owned()]);
+    args.extend([
+        "--max-budget-usd".to_owned(),
+        budget_usd(component.kind).to_owned(),
+    ]);
     match component.kind {
         Kind::Specialist | Kind::Generalist => {
             args.extend(["--agent".to_owned(), component.name.clone()]);
