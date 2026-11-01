@@ -32,7 +32,14 @@
 //! `request:` follows its dash. A line whose place cannot be read, yet
 //! with either after a dash, is a finding line too, so it is malformed,
 //! never left out as prose; so is one missing the dash after its place,
-//! `a.rs:1 if not addressed: …`, or with a dash and no place. A
+//! `a.rs:1 if not addressed: …` or `a.rs:1: request: …`, with no later
+//! dash or with one, which is refused naming the missing dash, or with
+//! a dash and no place. A linked finding with a remark after its ids,
+//! `… — ENG-11 (provisional)`, is refused naming the remark. A line at
+//! a place whose last part says all is well, `no finding`, `none`,
+//! `fine` or `sound`, is no defect in what is reviewed: the assembly
+//! keeps it as a note, `note: all is well, not a finding: <line>`, the
+//! reader sees, and the report check passes it by (I6). A
 //! malformed line whose place is the forms' own `path:line` is refused
 //! naming that, so the reader sees the form was copied, not filled in.
 //! A revision naming a place no earlier line found at states its
@@ -72,6 +79,12 @@ pub const WITHDRAWN: &str = "withdrawn:";
 /// What the note a withdrawal that removes nothing leaves starts with,
 /// before its place; a line that starts with it is prose.
 pub const WITHDREW_NOTHING: &str = "note: withdrew nothing at";
+/// What the note a line at a place that says all is well becomes starts
+/// with, before the line; a line that starts with it is prose.
+pub const ALL_WELL: &str = "note: all is well, not a finding:";
+/// The words a line saying all is well ends with, in any case, after
+/// its last dash: a finding line ending with one is a note, not refused.
+pub const ALL_WELL_WORDS: [&str; 5] = ["no finding", "no findings", "none", "fine", "sound"];
 /// What stands between a revision's old place and its finding line.
 pub const ARROWS: [&str; 2] = [" → ", " -> "];
 /// What the first line of a report assembled from a run that did not
@@ -159,6 +172,13 @@ pub enum Problem {
     /// no id: `if not addressed:` with no ids after its last dash, or
     /// prose after a single dash, as a line saying all is well reads.
     Unlinked { line: usize },
+    /// A finding line, its line number in the report, with no spaced
+    /// dash after its place: a space or a colon where it belongs, as
+    /// `a.rs:1 if not addressed: …` or `a.rs:1: request: …` reads.
+    Undashed { line: usize },
+    /// A linked finding, its line number in the report, with a remark
+    /// after its ids, as `… — ENG-11 (provisional)` reads.
+    AfterIds { line: usize },
     /// A linked finding, its line number in the report, cites an id no
     /// requirement or invariant has.
     UnknownId { line: usize, id: String },
@@ -190,6 +210,17 @@ impl fmt::Display for Problem {
                 f,
                 "has a report whose line {line} cites no requirement or invariant id: a line saying all is well is not a finding, so leave it out"
             ),
+            Self::Undashed { line } => write!(
+                f,
+                "has a report whose line {line} names a place with no spaced dash after it: write \
+                 `path:line — if not addressed: …` or `path:line — request: …`, the dash between \
+                 spaces"
+            ),
+            Self::AfterIds { line } => write!(
+                f,
+                "has a report whose line {line} writes more after its ids: a finding line ends with its \
+                 ids, so state a finding only once it stands, and correct it later with revised:"
+            ),
             Self::UnknownId { line, id } => write!(
                 f,
                 "has a report whose line {line} cites {id}, which no requirement or invariant has"
@@ -219,7 +250,7 @@ impl fmt::Display for Problem {
 #[must_use]
 pub fn line(text: &str) -> Line {
     let text = bare(text);
-    if strip_word(text, WITHDREW_NOTHING).is_some() {
+    if strip_word(text, WITHDREW_NOTHING).is_some() || strip_word(text, ALL_WELL).is_some() {
         return Line::Prose;
     }
     if let Some(rest) = strip_word(text, REVISED) {
@@ -230,7 +261,11 @@ pub fn line(text: &str) -> Line {
     }
     let parts = split_dashes(text);
     let [first, second, rest @ ..] = parts.as_slice() else {
-        return Line::Prose;
+        return if undashed(text) {
+            Line::Malformed
+        } else {
+            Line::Prose
+        };
     };
     // A path holds no space: `I read line: 3 — fine` is prose. A line
     // that reads as a finding after a label, `finding: a.rs:1 — if not
@@ -274,15 +309,40 @@ fn finding_shaped(parts: &[&str]) -> bool {
 /// as `a.rs:1 if not addressed: …`, `a.rs:1— request: …` or
 /// `— if not addressed: …`.
 fn undashed(text: &str) -> bool {
-    let (head, rest) = text.split_once(' ').unwrap_or((text, ""));
-    let rest = match place(head.trim_end_matches(DASHES)) {
-        Some(_) => rest,
+    let rest = match place_undashed(text) {
+        Some(rest) => rest,
         None if text.starts_with(DASHES) => text,
         None => return false,
     };
-    let rest = rest.trim_start_matches(DASHES);
+    form_starts(rest.trim_start_matches(DASHES))
+}
 
-    strip_word(rest, IF_NOT_ADDRESSED).is_some() || strip_word(rest, REQUEST).is_some()
+/// Whether `text` reads as a finding at a place with no spaced dash
+/// after it: [`undashed`], with a place before the form.
+fn missing_dash(text: &str) -> bool {
+    place_undashed(bare(text)).is_some_and(|rest| {
+        !SPACED_DASHES.iter().any(|dash| rest.starts_with(dash))
+            && form_starts(rest.trim_start_matches(DASHES))
+    })
+}
+
+/// A dash a place stands before, with the space after it.
+const SPACED_DASHES: [&str; 4] = ["— ", "– ", "-- ", "- "];
+
+/// `text` after its first word, when that word, its dash, colon or
+/// comma aside, is a place.
+fn place_undashed(text: &str) -> Option<&str> {
+    let (head, rest) = text.split_once(' ').unwrap_or((text, ""));
+    place(
+        head.trim_end_matches(DASHES)
+            .trim_end_matches([':', ',', ';']),
+    )
+    .map(|_| rest)
+}
+
+/// Whether `text` starts with `if not addressed:` or `request:`.
+fn form_starts(text: &str) -> bool {
+    strip_word(text, IF_NOT_ADDRESSED).is_some() || strip_word(text, REQUEST).is_some()
 }
 
 /// The dashes a place stands before, and a space.
@@ -447,6 +507,9 @@ pub fn assemble(texts: &[String], answer: &str, incomplete: Option<&str>) -> Str
             read @ (Line::Linked(_) | Line::Request(_)) => {
                 push_unique(&mut kept, Kept::of(render(&read).unwrap_or(text)));
             }
+            Line::Malformed if all_well(&text) => {
+                push_unique(&mut kept, Kept::of(format!("{ALL_WELL} {text}")));
+            }
             Line::Malformed => push_unique(&mut kept, Kept::of(text)),
             Line::Revised(r) => {
                 let finding = render(&line(&r.finding)).unwrap_or(r.finding);
@@ -595,6 +658,9 @@ pub fn findings_check(text: &str, known: Option<&BTreeSet<String>>) -> Option<Pr
             Line::Malformed if at_template(l) => {
                 return Some(Problem::TemplatePlace { line: number });
             }
+            Line::Malformed if all_well(l) => {}
+            Line::Malformed if missing_dash(l) => return Some(Problem::Undashed { line: number }),
+            Line::Malformed if after_ids(l) => return Some(Problem::AfterIds { line: number }),
             Line::Malformed if unlinked(l) => return Some(Problem::Unlinked { line: number }),
             Line::Malformed => return Some(Problem::Malformed { line: number }),
             Line::Request(_) => held = true,
@@ -645,6 +711,39 @@ fn unlinked(text: &str) -> bool {
                 None => rest.is_empty() && strip_word(second, REQUEST).is_none(),
             }
         })
+}
+
+/// Whether `text`, a malformed line, says all is well at a place: a
+/// place, a dash, and after its last dash one of [`ALL_WELL_WORDS`]
+/// alone, markup and trailing punctuation aside. Such a line is no
+/// defect in what is reviewed, so the assembly keeps it as a note
+/// ([`ALL_WELL`]) the reader sees, and the report check passes it by.
+fn all_well(text: &str) -> bool {
+    let parts = split_dashes(bare(text));
+    let [first, .., last] = parts.as_slice() else {
+        return false;
+    };
+    let last = last
+        .trim()
+        .trim_matches(|c: char| MARKUP.contains(&c) || c.is_ascii_punctuation());
+    place(first).is_some_and(|(path, _)| !path.contains(char::is_whitespace))
+        && ALL_WELL_WORDS.iter().any(|w| w.eq_ignore_ascii_case(last))
+}
+
+/// Whether `text`, a malformed line, is a linked finding with a remark
+/// after its ids: after its last dash, an id first, then more.
+fn after_ids(text: &str) -> bool {
+    let parts = split_dashes(bare(text));
+    let [first, second, .., last] = parts.as_slice() else {
+        return false;
+    };
+    let id = last
+        .split_whitespace()
+        .next()
+        .map(|id| id.trim_matches(['`', '*', '_', '.', ',', ';']));
+    place(first).is_some()
+        && strip_word(second.trim(), IF_NOT_ADDRESSED).is_some()
+        && id.is_some_and(id_shaped)
 }
 
 /// Whether `text`, a malformed line, names [`TEMPLATE_PLACE`] where its

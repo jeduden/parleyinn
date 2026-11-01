@@ -152,10 +152,136 @@ fn a_finding_line_missing_the_dash_after_its_place_is_malformed_not_prose() {
     }
 }
 
+/// Finding lines with no spaced dash after their place, and none or
+/// one later: a space or a colon where the dash belongs.
+const UNDASHED: [&str; 8] = [
+    "a.rs:1 if not addressed: x",
+    "a.rs:1 if not addressed: x, I2",
+    "a.rs:1: if not addressed: x — I2",
+    "a.rs:1: if not addressed: x",
+    "`a.rs:1`: if not addressed: x — I2",
+    "a.rs:1 request: add a cap",
+    "a.rs:1: request: add a cap — why",
+    "- **a.rs:1**, request: add a cap",
+];
+
+#[test]
+fn a_finding_line_with_a_space_or_colon_for_the_dash_after_its_place_is_malformed() {
+    for text in UNDASHED {
+        assert_eq!(line(text), Line::Malformed, "{text:?}");
+    }
+}
+
+#[test]
+fn a_finding_line_with_no_dash_after_its_place_is_kept_and_refused_naming_the_dash() {
+    for (at, text) in UNDASHED.iter().enumerate() {
+        let got = assemble(&texts(&[text]), ANSWER, None);
+
+        assert_eq!(got, format!("{}\n{ANSWER}\n", bare(text)), "{text:?}");
+        assert_eq!(
+            report_check(Some(&got), Some(ANSWER), None),
+            Some(Problem::Undashed { line: 1 }),
+            "{at}: {text:?}"
+        );
+    }
+}
+
+#[test]
+fn a_dash_with_no_place_before_its_form_stays_malformed_not_undashed() {
+    let report = format!("— if not addressed: x — ENG-04\n{ANSWER}");
+
+    assert_eq!(
+        report_check(Some(&report), Some(ANSWER), None),
+        Some(Problem::Malformed { line: 1 })
+    );
+}
+
 #[test]
 fn a_place_followed_by_prose_without_a_dash_stays_prose() {
-    for text in ["a.rs:1 is fine", "a.rs:1— fine", "— and so on"] {
+    for text in [
+        "a.rs:1 is fine",
+        "a.rs:1— fine",
+        "— and so on",
+        "a.rs:1: it holds",
+        "see a.rs:1: if not addressed: is the form",
+    ] {
         assert_eq!(line(text), Line::Prose, "{text:?}");
+    }
+}
+
+#[test]
+fn a_finding_line_ending_with_all_is_well_is_kept_as_a_visible_note_not_refused() {
+    let logged = texts(&[
+        "a.rs:1 — if not addressed: the range matches — no finding.",
+        "- b.rs:2 — the row holds — Fine",
+        "c.rs:3 — if not addressed: nothing — **None**",
+        "d.rs:4 — sound!",
+        "e.rs:5 — if not addressed: x — No findings",
+    ]);
+    let answer = "outcome: none — all holds.";
+
+    let got = assemble(&logged, answer, None);
+
+    assert_eq!(
+        got,
+        "note: all is well, not a finding: a.rs:1 — if not addressed: the range matches — no finding.\n\
+         note: all is well, not a finding: b.rs:2 — the row holds — Fine\n\
+         note: all is well, not a finding: c.rs:3 — if not addressed: nothing — **None**\n\
+         note: all is well, not a finding: d.rs:4 — sound!\n\
+         note: all is well, not a finding: e.rs:5 — if not addressed: x — No findings\n\
+         outcome: none — all holds.\n"
+    );
+    assert_eq!(report_check(Some(&got), Some(answer), None), None);
+}
+
+#[test]
+fn a_report_check_passes_a_left_over_all_is_well_line_by() {
+    let report = "a.rs:1 — if not addressed: the range matches — no finding.\n\
+                  outcome: none — all holds.";
+
+    assert_eq!(
+        report_check(Some(report), Some("outcome: none — all holds."), None),
+        None
+    );
+}
+
+#[test]
+fn an_all_is_well_word_inside_a_finding_or_after_a_request_is_no_note() {
+    for (text, want) in [
+        (
+            "a.rs:1 — request: add a cap — none",
+            Line::Request(Request {
+                path: "a.rs".to_owned(),
+                line: 1,
+                change: "add".to_owned(),
+                requirement: "a cap".to_owned(),
+                motivation: "none".to_owned(),
+            }),
+        ),
+        ("a.rs:1 — if not addressed: x — not fine", Line::Malformed),
+        ("a b.rs:1 — fine", Line::Prose),
+    ] {
+        let got = assemble(&texts(&[text]), ANSWER, None);
+
+        assert!(!got.starts_with(ALL_WELL), "{text:?}: {got}");
+        assert_eq!(line(text), want, "{text:?}");
+    }
+}
+
+#[test]
+fn a_report_check_names_a_finding_line_with_a_remark_after_its_ids() {
+    for text in [
+        "- `a.rs:1 — if not addressed: x — ENG-11` (provisional id; confirming against the SRS)",
+        "a.rs:1 — if not addressed: x — I2 (provisional)",
+        "a.rs:1 — if not addressed: x — ENG-04, I9 and more",
+    ] {
+        let report = format!("{text}\n{ANSWER}");
+
+        assert_eq!(
+            report_check(Some(&report), Some(ANSWER), None),
+            Some(Problem::AfterIds { line: 1 }),
+            "{text:?}"
+        );
     }
 }
 
@@ -174,7 +300,7 @@ fn a_report_check_names_a_line_at_the_template_s_place() {
 #[test]
 fn a_report_check_names_a_line_at_a_place_that_cites_no_id() {
     for text in [
-        "a.rs:1 — if not addressed: the range matches, so no reader is misled — no finding.",
+        "a.rs:1 — if not addressed: the range matches, so no reader is misled — as checked.",
         "a.rs:1 — if not addressed: the range matches",
         "a.rs:1 — the range matches the section. No finding there.",
     ] {
@@ -455,6 +581,17 @@ fn every_problem_reads_as_a_sentence_about_the_report() {
             Problem::Unlinked { line: 2 },
             "has a report whose line 2 cites no requirement or invariant id: a line saying all \
              is well is not a finding, so leave it out",
+        ),
+        (
+            Problem::Undashed { line: 6 },
+            "has a report whose line 6 names a place with no spaced dash after it: write \
+             `path:line — if not addressed: …` or `path:line — request: …`, the dash between \
+             spaces",
+        ),
+        (
+            Problem::AfterIds { line: 7 },
+            "has a report whose line 7 writes more after its ids: a finding line ends with its \
+             ids, so state a finding only once it stands, and correct it later with revised:",
         ),
         (
             Problem::TemplatePlace { line: 5 },

@@ -62,7 +62,7 @@ fn an_unknown_id_and_a_template_place_quote_their_line_too() {
 
 #[test]
 fn a_line_saying_all_is_well_quotes_its_line_and_says_to_leave_it_out() {
-    let report = "a.rs:1 — if not addressed: the range matches — no finding.\n\
+    let report = "a.rs:1 — if not addressed: the range matches — as checked.\n\
                   outcome: none — clean.\n";
 
     assert_eq!(
@@ -70,9 +70,37 @@ fn a_line_saying_all_is_well_quotes_its_line_and_says_to_leave_it_out() {
         Some(
             "has a report whose line 1 cites no requirement or invariant id: a line saying all \
              is well is not a finding, so leave it out: \
-             `a.rs:1 — if not addressed: the range matches — no finding.`"
+             `a.rs:1 — if not addressed: the range matches — as checked.`"
         )
     );
+}
+
+#[test]
+fn a_line_ending_with_no_finding_is_a_note_and_no_refusal() {
+    let report = "note: all is well, not a finding: a.rs:1 — if not addressed: x — no finding.\n\
+                  outcome: none — clean.\n";
+
+    assert_eq!(refusal(report, "outcome: none — clean.", &known()), None);
+}
+
+#[test]
+fn a_missing_dash_and_a_remark_after_the_ids_quote_their_line() {
+    for (report, want) in [
+        (
+            "a.rs:1: if not addressed: x — I2\noutcome: findings — one.\n",
+            "names a place with no spaced dash after it: write `path:line — if not addressed: …` \
+             or `path:line — request: …`, the dash between spaces: \
+             `a.rs:1: if not addressed: x — I2`",
+        ),
+        (
+            "a.rs:1 — if not addressed: x — I2 (provisional)\noutcome: findings — one.\n",
+            "correct it later with revised:: `a.rs:1 — if not addressed: x — I2 (provisional)`",
+        ),
+    ] {
+        let refused = refusal(report, "outcome: findings — one.", &known()).unwrap();
+
+        assert!(refused.ends_with(want), "{refused}");
+    }
 }
 
 #[test]
@@ -120,8 +148,8 @@ fn a_run_that_did_not_answer_is_told_why_and_to_state_as_it_goes() {
     assert!(
         note.starts_with(
             "Your previous attempt did not answer: its run ended with error_max_turns. \
-             This attempt is judged alone: state each finding line the moment you find it, \
-             read each file once, search no whole tree, and send your outcome line \
+             This attempt is judged alone: state each finding line the moment you have checked \
+             it, read each file once, search no whole tree, and send your outcome line \
              before your turns or time run out. "
         ),
         "{note}"

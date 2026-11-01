@@ -26,7 +26,8 @@ pub const FORMS: &str = "Each finding is one line, `docs/x.md:12 — if not addr
 <consequence> — <ID>[, <ID>...]` or `docs/x.md:12 — request: add|change|remove <requirement> — \
 <motivation>`; `revised: <one full finding line>` replaces the one at its place, nothing else \
 beside it, and `withdrawn: docs/x.md:12 — <reason>` removes one. A line is only for a problem: what is \
-sound gets none, never `no finding`.\nYour final answer is only the \
+sound gets none, never `no finding`. A finding line ends with its ids, bare, in no backticks and with \
+no remark after them: state one only once you have checked it.\nYour final answer is only the \
 outcome line: `outcome: findings — <sentence>` or `outcome: none — <sentence>`.";
 
 /// Why a run is tried once more.
@@ -48,6 +49,8 @@ pub fn refusal(report: &str, answer: &str, known: &BTreeSet<String>) -> Option<S
         Problem::Malformed { line }
         | Problem::TemplatePlace { line }
         | Problem::Unlinked { line }
+        | Problem::Undashed { line }
+        | Problem::AfterIds { line }
         | Problem::UnknownId { line, .. } => report.lines().nth(line - 1),
         _ => None,
     };
@@ -68,7 +71,7 @@ pub fn note(why: &Why) -> String {
         ),
         Why::Silent(failure) => format!(
             "Your previous attempt did not answer: {failure}. This attempt is judged alone: \
-             state each finding line the moment you find it, read each file once, search no \
+             state each finding line the moment you have checked it, read each file once, search no \
              whole tree, and send your outcome line before your turns or time run out. {FORMS}"
         ),
     }

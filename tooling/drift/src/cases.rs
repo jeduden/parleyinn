@@ -108,6 +108,7 @@ pub fn cases() -> Vec<Case> {
         review_retry_cases(),
         vec![review_unlinked_case()],
         vec![review_unknown_id_post_case(), review_case_severity_case()],
+        review_undashed_cases(),
         // Last: its cases edit source the later cases would run stale.
         license_text_cases(),
     ]
@@ -500,6 +501,45 @@ fn review_case_severity_case() -> Case {
         "the_checkout_s_reviewer_evaluation_cases_apply_and_dispatch",
         "case review-code/injection-in-the-diff names the severity",
     )
+}
+
+/// The drifts the gate's reading of a line at a place must not bring
+/// (ENG-28, I6), late so adding them moves no earlier case to another
+/// shard: a finding line with no dash at all, `a.rs:1 if not addressed:
+/// x`, read as prose, and a line saying all is well left out rather
+/// than kept as a note, so the assembly drops either unseen.
+fn review_undashed_cases() -> Vec<Case> {
+    const REPORT: &str = "tooling/review-gate/src/report.rs";
+    vec![
+        case(
+            "the assembly dropping a finding line with no dash after its place unseen",
+            "ENG-28",
+            Injection::replace(
+                REPORT,
+                "return if undashed(text) {",
+                "return if undashed(text) && parts.is_empty() {",
+            ),
+            cargo_lib_test(
+                "review-gate",
+                "report::tests::a_finding_line_with_a_space_or_colon_for_the_dash_after_its_place_is_malformed",
+            ),
+            "a_finding_line_with_a_space_or_colon_for_the_dash_after_its_place_is_malformed",
+        ),
+        case(
+            "the assembly dropping a line saying all is well instead of keeping its note",
+            "ENG-28",
+            Injection::replace(
+                REPORT,
+                "push_unique(&mut kept, Kept::of(format!(\"{ALL_WELL} {text}\")));",
+                "drop(text);",
+            ),
+            cargo_lib_test(
+                "review-gate",
+                "report::tests::a_finding_line_ending_with_all_is_well_is_kept_as_a_visible_note_not_refused",
+            ),
+            "a_finding_line_ending_with_all_is_well_is_kept_as_a_visible_note_not_refused",
+        ),
+    ]
 }
 
 /// The drifts ENG-30 exists to catch: a license the tool keeps no text
