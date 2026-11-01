@@ -681,9 +681,11 @@ fn gate_args(reviewed: &str, head: &str) -> Vec<String> {
 /// answered` an answer whose outcome is not the report's, `malformed
 /// finding` a logged finding that gives a severity where its
 /// consequence and requirements belong, `revised nothing` the report
-/// assembled from a log that revises a finding the specialist never
-/// stated, `withdrew nothing` the one assembled from a log that
-/// withdraws a finding it never stated, `none beside a finding` an
+/// assembled from a log whose one finding line revises a finding the
+/// specialist never stated, so only the revision standing as the finding
+/// it states keeps the report's outcome of findings, `withdrew nothing`
+/// the one assembled from a log that states a linked finding and
+/// withdraws one it never stated, `none beside a finding` an
 /// outcome of none after a finding, `findings with none` an outcome of
 /// findings after none, and `unknown id` a finding citing ENG-999, an id
 /// of the right shape that no requirement has, which the gate, holding
@@ -729,7 +731,9 @@ fn specialist(row: &BTreeMap<String, String>) -> Option<(Option<String>, &'stati
         }
         "withdrew nothing" => {
             return Some((
-                Some(assembled("withdrawn: b.rs:2 — I checked it and it holds")),
+                Some(assembled(
+                    "a.rs:1 — if not addressed: x breaks — I2\nwithdrawn: b.rs:2 — I checked it and it holds",
+                )),
                 FINDINGS,
             ));
         }
@@ -748,13 +752,10 @@ fn specialist(row: &BTreeMap<String, String>) -> Option<(Option<String>, &'stati
     Some((report.map(str::to_owned), answers))
 }
 
-/// The report review-run assembles from a run log that states a linked
-/// finding, then `line`, and answers an outcome of findings.
-fn assembled(line: &str) -> String {
-    let texts = [
-        format!("a.rs:1 — if not addressed: x breaks — I2\n{line}"),
-        "outcome: findings — fine".to_owned(),
-    ];
+/// The report review-run assembles from a run log that states `lines`
+/// and answers an outcome of findings.
+fn assembled(lines: &str) -> String {
+    let texts = [lines.to_owned(), "outcome: findings — fine".to_owned()];
     review_gate::report::assemble(&texts, "outcome: findings — fine", None)
 }
 

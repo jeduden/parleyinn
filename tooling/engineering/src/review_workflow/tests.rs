@@ -618,6 +618,18 @@ fn gate_outcome_hands_the_gate_the_specialist_s_report() {
 }
 
 #[test]
+fn a_stray_revision_is_the_only_finding_of_its_report() {
+    let row = [("specialist".to_owned(), "revised nothing".to_owned())].into();
+    let (report, _) = specialist(&row).unwrap();
+    let report = report.unwrap();
+
+    // Dropped, the revision would leave an outcome of findings beside
+    // none, which the gate refuses: only standing does it approve.
+    assert!(report.contains("b.rs:2 — request: add y — why"), "{report}");
+    assert!(!report.contains("a.rs:1"), "{report}");
+}
+
+#[test]
 fn own_check_is_a_failed_review_gate_run_from_the_reviewer_app() {
     assert_eq!(own_check("none"), Some(String::new()));
     assert_eq!(own_check("x"), None);
