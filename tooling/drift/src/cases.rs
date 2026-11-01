@@ -629,8 +629,9 @@ fn review_moved_revision_case() -> Case {
 
 /// The drifts that would let the Claude token reach an agent or leave
 /// the review's job (ENG-28, I6), late so adding them moves no earlier
-/// case to another shard: the scrub replacing nothing, a leak no longer
-/// failing the review or naming itself in its outcome, an agent started
+/// case to another shard: the scrub replacing nothing or leaving the run
+/// logs out, a leak no longer failing the review or naming itself in its
+/// outcome, an agent started
 /// with the token in its environment, let read the process files or
 /// the staged credential, and the workflow handing the token to the
 /// step that runs the agents or uploading before the scrub.
@@ -725,6 +726,20 @@ fn review_token_cases() -> Vec<Case> {
             ),
             scenario("ENG-28"),
             "agent job review uploads in step \"Keep the specialists' reports\" before a scrub",
+        ),
+        case(
+            "the agents' run logs written out unscrubbed of the token",
+            "ENG-28",
+            Injection::replace(
+                RUN_CLI,
+                "for dir in [crate::LOGS, crate::REPORTS] {",
+                "for dir in [crate::REPORTS] {",
+            ),
+            cargo_lib_test(
+                "engineering",
+                "review_leak::tests::the_checkout_s_review_run_leaves_a_leaked_token_in_nothing_it_writes_or_prints",
+            ),
+            "review-run left the token in review/logs/",
         ),
     ]
 }
