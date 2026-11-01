@@ -536,10 +536,13 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [0, 1, 2, 3, 4, 5, 6, 7]
+        shard: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]
     env:
       # Every nth case from the shard's own, n the matrix's size, so the
       # shards together hold every case once and each fits the budget.
+      # Each shard first builds every check its cases name, about two
+      # minutes whatever its size, so a shard's cases add the rest:
+      # sixteen keep the slowest near three minutes of its five.
       DRIFT_SHARD: ${{ strategy.job-index }}/${{ strategy.job-total }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
