@@ -48,6 +48,8 @@ is short, because a finding found late costs a whole round.
   last reviewed, so a fix cycle reviews only what moved. A small change
   reviews in about a minute. The agents are the head's definitions, what
   main has after the merge; `--agents base` runs main's, as CI does.
+  `--resume` reruns only what the last run left without an accepted
+  report, on the same head and definitions, so a slip costs one run.
 - CI ends within ten minutes of a push. The slowest chain of jobs sets
   that; a job that grows toward its five-minute limit is split before it
   fails.

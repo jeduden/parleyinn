@@ -255,6 +255,13 @@ repeat them, which costs tokens.
   starts 32 at once, so they take two waves and the generalists a
   third: 3 x 2 x 15 = 90 minutes at worst, and the job's cap is 120.
   Agents end in minutes in practice.
+- What a run leaves without an accepted report is said, never read as
+  clean: `review/gaps.json` and `review/not-reviewed.md` list each such
+  agent or part and why. `review-run --only <gaps> --from <dir>`, behind
+  `scripts/review-local.sh --resume`, reruns only those and what
+  changed, keyed by `review/run-id.json`: the head, an inputs hash, and
+  each definition's and diff's SHA-256. The verdict function is the
+  same; nothing is reused across a changed head, definition or diff.
 - No new third-party dependency.
 
 ## Approval
