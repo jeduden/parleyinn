@@ -12,9 +12,10 @@
 //! - a linked finding: `path:line — if not addressed: <consequence> — <ID>[, <ID>...]`,
 //!   each id an SRS requirement id or an invariant, `I1` to `I10`;
 //! - a requirement request: `path:line — request: add|change|remove <requirement> — <motivation>`;
-//! - a revision, `revised: <finding line>`, which replaces every earlier
-//!   finding at the same `path:line`, or
-//!   `revised: <old path:line> → <finding line>` when the place moved;
+//! - a revision, `revised: <finding line>`, one full finding line, which
+//!   replaces every earlier finding at the same `path:line`; a moved
+//!   finding is withdrawn, then stated, and a revision with an arrow,
+//!   `revised: <old path:line> → <finding line>`, is malformed;
 //! - a withdrawal, `withdrawn: path:line — <reason>`, which removes
 //!   every earlier finding at that place;
 //! - a note the assembly writes, never a specialist:
@@ -85,7 +86,8 @@ pub const ALL_WELL: &str = "note: all is well, not a finding:";
 /// The words a line saying all is well ends with, in any case, after
 /// its last dash: a finding line ending with one is a note, not refused.
 pub const ALL_WELL_WORDS: [&str; 5] = ["no finding", "no findings", "none", "fine", "sound"];
-/// What stands between a revision's old place and its finding line.
+/// The arrows a revision may not hold: one between an old place and a
+/// finding line would move a finding, which ENG-28 does not define.
 pub const ARROWS: [&str; 2] = [" → ", " -> "];
 /// What the first line of a report assembled from a run that did not
 /// finish starts with.
@@ -395,22 +397,18 @@ fn request(path: String, number: usize, asked: &str, rest: &[&str]) -> Option<Re
     )
 }
 
-/// A revision, `rest` after `revised:`: a finding line in one of the two
-/// forms, after the old place and an arrow when the place moved.
+/// A revision, `rest` after `revised:`: one full finding line in one of
+/// the two forms. A moved finding is withdrawn, then stated, so a line
+/// with an arrow, the old place before it or not, is in no form.
 fn revision(rest: &str) -> Option<Revision> {
-    let (old, finding) = ARROWS
-        .iter()
-        .find_map(|arrow| rest.split_once(arrow))
-        .map_or((None, rest), |(old, finding)| (Some(old), finding));
-    let finding = bare(finding);
+    if ARROWS.iter().any(|arrow| rest.contains(arrow)) {
+        return None;
+    }
+    let finding = bare(rest);
     let (path, number) = match line(finding) {
         Line::Linked(l) => (l.path, l.line),
         Line::Request(r) => (r.path, r.line),
         Line::Revised(_) | Line::Withdrawn(_) | Line::Malformed | Line::Prose => return None,
-    };
-    let (path, number) = match old {
-        Some(old) => place(old).filter(|(p, _)| !p.contains(char::is_whitespace))?,
-        None => (path, number),
     };
 
     Some(Revision {

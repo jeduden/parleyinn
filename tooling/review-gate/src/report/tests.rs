@@ -343,7 +343,7 @@ fn a_malformed_line_naming_a_real_place_is_no_template() {
 }
 
 #[test]
-fn a_revision_reads_its_place_and_finding_and_an_arrow_moves_the_place() {
+fn a_revision_reads_its_place_and_finding() {
     let finding = "a.rs:3 — if not addressed: a pin is lost — I3";
 
     assert_eq!(
@@ -354,20 +354,12 @@ fn a_revision_reads_its_place_and_finding_and_an_arrow_moves_the_place() {
             finding: finding.to_owned(),
         })
     );
-    assert_eq!(
-        line(&format!("revised: `a.rs:2` → {finding}")),
-        Line::Revised(Revision {
-            path: "a.rs".to_owned(),
-            line: 2,
-            finding: finding.to_owned(),
-        })
-    );
     let request = "b.rs:9 — request: add a rule — none says so";
     assert_eq!(
-        line(&format!("revised: a.rs:2 -> {request}")),
+        line(&format!("revised: {request}")),
         Line::Revised(Revision {
-            path: "a.rs".to_owned(),
-            line: 2,
+            path: "b.rs".to_owned(),
+            line: 9,
             finding: request.to_owned(),
         })
     );
@@ -384,6 +376,11 @@ fn a_revision_in_no_form_is_malformed() {
         "revised: a b.rs:1 → a.rs:3 — if not addressed: x — I3",
         "revised: revised: a.rs:3 — if not addressed: x — I3",
         "revised: withdrawn: a.rs:3 — x",
+        // A revision takes one full finding line: a moved finding is
+        // withdrawn, then stated, so an arrow form is in no form.
+        "revised: `a.rs:2` → a.rs:3 — if not addressed: x — I3",
+        "revised: a.rs:2 -> b.rs:9 — request: add a rule — none says so",
+        "revised: a.rs:3 — if not addressed: x → y — I3",
     ] {
         assert_eq!(line(text), Line::Malformed, "{text:?}");
     }
@@ -693,22 +690,6 @@ fn a_revision_replaces_every_earlier_finding_at_its_place_where_the_first_stood(
 }
 
 #[test]
-fn a_revision_with_an_arrow_moves_the_finding_and_never_doubles_a_line() {
-    let logged = texts(&[
-        "a.rs:1 — if not addressed: a hook panics — ENG-04",
-        "a.rs:9 — if not addressed: a hook panics — ENG-04",
-        "revised: a.rs:1 → a.rs:9 — if not addressed: a hook panics — ENG-04",
-    ]);
-
-    let got = assemble(&logged, "outcome: findings — x", None);
-
-    assert_eq!(
-        got,
-        "a.rs:9 — if not addressed: a hook panics — ENG-04\noutcome: findings — x\n"
-    );
-}
-
-#[test]
 fn a_withdrawal_removes_every_earlier_finding_at_its_place() {
     let mut logged = texts(&LOGGED);
     logged.push("withdrawn: a.rs:1 — the hook is a test's".to_owned());
@@ -729,7 +710,7 @@ fn a_withdrawal_that_finds_nothing_leaves_a_note_and_a_revision_states_its_findi
         "a.rs:1 — if not addressed: a hook panics — ENG-04",
         "withdrawn: a.rs:2 — I checked it and it holds",
         "revised: c.rs:1 — if not addressed: x — I2",
-        "revised: d.rs:9 → d.rs:4 — request: add y — why",
+        "revised: d.rs:4 — request: add y — why",
     ]);
 
     let got = assemble(&logged, "outcome: findings — x", None);

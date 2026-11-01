@@ -99,8 +99,9 @@ repeat them, which costs tokens.
   tolerated, and the findings are not repeated.
 - **A specialist changes its mind in two forms.**
   `revised: <finding line>` replaces every earlier finding at that
-  line's `path:line`; `revised: <old path:line> → <finding line>` does
-  so for a finding whose place moved. `withdrawn: path:line — <reason>`
+  line's `path:line`; a finding whose place moved is withdrawn, then
+  stated, so a revision with an arrow, `revised: <old path:line> →
+  <finding line>`, is malformed. `withdrawn: path:line — <reason>`
   removes every earlier finding at that place. One rule: the place names
   the finding. A revision naming a place no earlier line found at
   states its finding line, a whole finding in its own right. A

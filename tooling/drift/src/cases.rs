@@ -110,6 +110,7 @@ pub fn cases() -> Vec<Case> {
         vec![review_unknown_id_post_case(), review_case_severity_case()],
         review_undashed_cases(),
         review_resume_cases(),
+        vec![review_moved_revision_case()],
         // Last: its cases edit source the later cases would run stale.
         license_text_cases(),
     ]
@@ -602,6 +603,27 @@ fn review_undashed_cases() -> Vec<Case> {
             "a_finding_line_ending_with_all_is_well_is_kept_as_a_visible_note_not_refused",
         ),
     ]
+}
+
+/// The drift a revision taking one full finding line rules out (ENG-28),
+/// late so adding it moves no earlier case to another shard: a revision
+/// with an arrow, which would move a finding ENG-28 does not let move,
+/// read as a revision instead of refused.
+fn review_moved_revision_case() -> Case {
+    case(
+        "a revision with an arrow read as one instead of refused",
+        "ENG-28",
+        Injection::replace(
+            "tooling/review-gate/src/report.rs",
+            "    if ARROWS.iter().any(|arrow| rest.contains(arrow)) {\n",
+            "    if ARROWS.iter().any(|arrow| rest.contains(arrow)) && rest.is_empty() {\n",
+        ),
+        cargo_lib_test(
+            "review-gate",
+            "report::tests::a_revision_in_no_form_is_malformed",
+        ),
+        "a_revision_in_no_form_is_malformed",
+    )
 }
 
 /// The drifts ENG-30 exists to catch: a license the tool keeps no text
