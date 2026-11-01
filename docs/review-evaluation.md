@@ -114,7 +114,9 @@ the same reading tools, turn budget and prompt. Only the review runs a
 specialist that did not answer, or whose report the gate refuses, once
 more, told why; a case's run gets no second attempt. An agent left
 without an accepted report is listed in `review/gaps.json`, and a review
-resumed from that list is judged exactly as a full run. A case that fails
+resumed from that list is judged exactly as a full run. A review reuses a
+stored answer only under its unchanged answer key, held to the report
+check again; a case's run never reuses one. A case that fails
 becomes a blocking finding, which the gate weighs beside the bundle's.
 With nothing to evaluate the job ends in seconds. A change to a shared
 section reaches every component that includes it, so the plan holds one

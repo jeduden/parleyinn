@@ -49,7 +49,9 @@ is short, because a finding found late costs a whole round.
   reviews in about a minute. The agents are the head's definitions, what
   main has after the merge; `--agents base` runs main's, as CI does.
   `--resume` reruns only what the last run left without an accepted
-  report, on the same head and definitions, so a slip costs one run.
+  report and each agent whose answer key changed, so a slip costs one run.
+  `review-run --answers DIR` also reuses every stored answer whose key is
+  unchanged; only main's own CI writes the shared store.
   A review that aborts on a mass failure of its specialists says so
   apart from any finding: fix the outage or prompt, then `--resume`.
 - CI ends within ten minutes of a push. The slowest chain of jobs sets
