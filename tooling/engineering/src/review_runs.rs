@@ -198,6 +198,11 @@ pub fn prepare(checkout: &Checkout, workdir: &Path) -> Result<(), String> {
 /// it does not weigh.
 #[must_use]
 pub fn order_problems(events: &[Event]) -> Vec<String> {
+    order_problems_by(events, DISPATCH)
+}
+
+/// [`order_problems`] by the dispatch text `dispatch`.
+fn order_problems_by(events: &[Event], dispatch: &str) -> Vec<String> {
     let mut problems = Vec::new();
     let generalists: Vec<&str> = GENERALISTS.iter().map(|(g, _, _)| *g).collect();
     let at = |want: Event| -> Vec<usize> {
@@ -225,7 +230,7 @@ pub fn order_problems(events: &[Event]) -> Vec<String> {
             problems.push(format!("{name} ran but was not dispatched"));
         }
     }
-    let dispatch = match parse_dispatch(DISPATCH) {
+    let dispatch = match parse_dispatch(dispatch) {
         Ok(dispatch) => dispatch,
         Err(problem) => {
             problems.push(problem);
