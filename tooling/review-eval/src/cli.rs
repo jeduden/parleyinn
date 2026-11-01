@@ -4,6 +4,10 @@
 //! run names, and writes the scorecard, the findings the review gate
 //! weighs and the report; `compare` reads a scorecard against the
 //! published one; `publish` writes a scorecard's lines into it.
+//! `stage-credential` writes the Claude token it is handed into
+//! a credentials file no agent reads, and `scrub` replaces every form
+//! of that token in the files a job keeps, failing closed when it found
+//! one (ENG-28).
 
 use std::collections::BTreeMap;
 use std::fs;
@@ -13,11 +17,15 @@ use std::sync::Mutex;
 use std::thread;
 use std::time::{Duration, Instant};
 
+use std::sync::atomic::{AtomicUsize, Ordering};
+
 use crate::case::Case;
 use crate::component::{self, Component, file_of, hash, suite_of};
+use crate::credential::{self, Confined, TOKEN_VAR};
 use crate::host::Host;
 use crate::plan::{self, Planned};
 use crate::score::{CaseRecord, RunRecord, Scorecard, SuiteRecord, decided};
+use crate::secret::Scrubber;
 use crate::{CASES, DEADLINE_SECONDS, check, compare, grade, published, runner, world};
 
 /// Every case passed, or the command had nothing to fail on.
@@ -27,14 +35,19 @@ pub const EXIT_OK: u8 = 0;
 pub const EXIT_FAILURE: u8 = 1;
 /// The command line is wrong.
 pub const EXIT_USAGE: u8 = 2;
+/// An agent's output held the Claude token: every form of it found was
+/// replaced, and the job fails closed (ENG-28).
+pub const EXIT_LEAKED: u8 = 3;
 
 /// How to call it.
 pub const USAGE: &str = "usage: review-eval check [--checkout DIR] [--tree DIR] [--cases DIR]
        review-eval plan --base DIR --head DIR [--out FILE]
        review-eval run --out DIR (--component NAME)... | --all | --plan FILE
                        [--checkout DIR] [--tree DIR] [--cases DIR] [--base-cases DIR]
-                       [--model MODEL]
+                       [--model MODEL] [--credential DIR]
                        [--repetitions N] [--passes K] [--parallel P] [--deadline SECONDS]
+       review-eval stage-credential --dir DIR
+       review-eval scrub [--credential DIR] (--path PATH)...
        review-eval compare --published FILE --scorecard FILE
        review-eval publish --scorecard FILE --into FILE";
 
@@ -79,6 +92,19 @@ pub fn run(
     stdout: &mut dyn Write,
     stderr: &mut (dyn Write + Send),
 ) -> u8 {
+    run_with(host, args, None, stdout, stderr)
+}
+
+/// [`run`], handed `token`, the Claude token the process holds
+/// in [`TOKEN_VAR`], when it holds one: what `stage-credential` stages,
+/// and a form `scrub` and `run` replace.
+pub fn run_with(
+    host: &dyn Host,
+    args: impl IntoIterator<Item = String>,
+    token: Option<&str>,
+    stdout: &mut dyn Write,
+    stderr: &mut (dyn Write + Send),
+) -> u8 {
     let (command, flags) = match parse(args) {
         Ok(parsed) => parsed,
         Err(e) => {
@@ -89,7 +115,9 @@ pub fn run(
     let result = match command.as_str() {
         "check" => check_command(&flags, stdout),
         "plan" => plan_command(&flags, stdout),
-        "run" => run_command(host, &flags, stdout, stderr),
+        "run" => run_command(host, &flags, token, stdout, stderr),
+        "stage-credential" => stage_command(&flags, token, stdout),
+        "scrub" => scrub_command(&flags, token, stdout),
         "compare" => compare_command(&flags, stdout),
         "publish" => publish_command(&flags, stdout),
         other => Err(Usage(format!("no command {other}"))),
@@ -104,16 +132,28 @@ pub fn run(
             let _ = writeln!(stderr, "review-eval: {e}");
             EXIT_FAILURE
         }
+        Err(Leaked(n)) => {
+            let _ = writeln!(stderr, "review-eval: {}", leaked(n));
+            EXIT_LEAKED
+        }
     }
+}
+
+/// What a job that found the Claude token in an agent's output says.
+#[must_use]
+pub fn leaked(n: usize) -> String {
+    format!("an agent's output contained the Claude token: {n} redacted; revoke and rotate it")
 }
 
 /// Why a command did not run to its end.
 enum Problem {
     Usage(String),
     Failed(String),
+    /// The Claude token was found this many times, and replaced.
+    Leaked(usize),
 }
 
-use Problem::{Failed, Usage};
+use Problem::{Failed, Leaked, Usage};
 
 impl From<String> for Problem {
     fn from(e: String) -> Self {
@@ -258,9 +298,66 @@ fn estimate_line(head: &Path, components: &[String]) -> String {
     )
 }
 
+/// Stages `token` under `--dir`.
+fn stage_command(
+    flags: &Flags,
+    token: Option<&str>,
+    stdout: &mut dyn Write,
+) -> Result<u8, Problem> {
+    only(flags, &["dir"])?;
+    let dir = required(flags, "dir")?;
+    let token = token.ok_or_else(|| Failed(format!("{TOKEN_VAR} is not set")))?;
+    credential::stage(Path::new(&dir), token)?;
+    let _ = writeln!(stdout, "staged the Claude token under {dir}");
+
+    Ok(EXIT_OK)
+}
+
+/// The scrubber for the token staged under `--credential`, when given,
+/// and `token`; refused when either is too short for it to match.
+fn scrubber(flags: &Flags, token: Option<&str>) -> Result<Scrubber, Problem> {
+    let staged = one(flags, "credential")?
+        .map(|dir| credential::read(Path::new(&dir)))
+        .transpose()?;
+    let secrets: Vec<&str> = staged.as_deref().into_iter().chain(token).collect();
+
+    Ok(Scrubber::guarded(&secrets)?)
+}
+
+/// Scrubs every `--path`, a file or a directory, and fails closed when
+/// it found the token.
+fn scrub_command(
+    flags: &Flags,
+    token: Option<&str>,
+    stdout: &mut dyn Write,
+) -> Result<u8, Problem> {
+    only(flags, &["credential", "path"])?;
+    let paths = flags
+        .get("path")
+        .filter(|p| !p.is_empty())
+        .ok_or_else(|| Usage("--path is required".to_owned()))?;
+    let scrubber = scrubber(flags, token)?;
+    let mut count = 0;
+    for path in paths {
+        let path = Path::new(path);
+        count += if path.is_dir() {
+            scrubber.scrub_tree(path)?
+        } else {
+            scrubber.scrub_file(path)?
+        };
+    }
+    let _ = writeln!(stdout, "redacted={count}");
+    if count > 0 {
+        return Err(Leaked(count));
+    }
+
+    Ok(EXIT_OK)
+}
+
 fn run_command(
     host: &dyn Host,
     flags: &Flags,
+    token: Option<&str>,
     stdout: &mut dyn Write,
     stderr: &mut (dyn Write + Send),
 ) -> Result<u8, Problem> {
@@ -280,8 +377,18 @@ fn run_command(
             "passes",
             "parallel",
             "deadline",
+            "credential",
         ],
     )?;
+    let located = one(flags, "credential")?
+        .map(|dir| credential::locate(Path::new(&dir)))
+        .transpose()?;
+    let scrubber = scrubber(flags, token)?;
+    let confined = located.as_deref().map(|dir| Confined::new(host, dir));
+    let host: &dyn Host = match &confined {
+        Some(confined) => confined,
+        None => host,
+    };
     let (checkout, tree, cases) = places(flags)?;
     let out = PathBuf::from(required(flags, "out")?);
     let options = Options {
@@ -308,13 +415,23 @@ fn run_command(
     // so a long evaluation shows what it is doing.
     let started = Instant::now();
     let stderr = Mutex::new(stderr);
+    let leaks = AtomicUsize::new(0);
     let scorecard = evaluate(host, &options, &components, &|line| {
+        let (line, n) = scrubber.scrub(line);
+        leaks.fetch_add(n, Ordering::SeqCst);
         if let Ok(mut out) = stderr.lock() {
             let _ = writeln!(out, "[+{}] {line}", clock(started.elapsed()));
         }
     })?;
     write_outputs(&options.out, &scorecard)?;
-    let _ = write!(stdout, "{}", scorecard.markdown());
+    // What the runs wrote is scrubbed before anything prints or keeps it.
+    let in_files = scrubber.scrub_tree(&options.out)?;
+    let (markdown, in_card) = scrubber.scrub(&scorecard.markdown());
+    let _ = write!(stdout, "{markdown}");
+    let count = leaks.load(Ordering::SeqCst) + in_files + in_card;
+    if count > 0 {
+        return Err(Leaked(count));
+    }
 
     Ok(if scorecard.passed() {
         EXIT_OK

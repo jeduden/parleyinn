@@ -24,6 +24,7 @@ pub mod breaker;
 pub mod cli;
 pub mod controls;
 pub mod gaps;
+pub mod leak;
 pub mod live;
 pub mod outcome;
 pub mod parts;

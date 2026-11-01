@@ -295,7 +295,8 @@ fn every_agent_reads_alone_and_is_refused_every_writing_tool() {
     assert_eq!(TOOLS, "Read,Glob,Grep");
     assert_eq!(
         DISALLOWED,
-        "Bash,Edit,Write,NotebookEdit,WebFetch,WebSearch,Agent"
+        "Bash,Edit,Write,NotebookEdit,WebFetch,WebSearch,Agent,\
+         Read(//proc/**),Read(//sys/**),Read(//dev/**)"
     );
 }
 
@@ -323,4 +324,26 @@ fn every_run_is_capped_at_its_tier_s_budget() {
         assert!(has(&args_of(&c), ["--max-budget-usd", want]), "{name}");
         assert_eq!(budget_usd(kind), want, "{name}");
     }
+}
+
+#[test]
+fn every_agent_is_refused_reads_outside_its_trees_and_of_the_process_files() {
+    // Pinned as text: the process files hold every environment on the
+    // machine, the review's own among them, and nothing outside the two
+    // trees is the agent's to read (ENG-28).
+    assert_eq!(
+        SETTINGS,
+        r#"{"permissions":{"blockReadsOutsideWorkingDirectories":true}}"#
+    );
+    for root in ["//proc/**", "//sys/**", "//dev/**"] {
+        assert!(DISALLOWED.contains(&format!("Read({root})")), "{root}");
+    }
+    let c = command(
+        &component(Kind::Specialist, "lang-rust"),
+        &world("standard"),
+        None,
+        &PathBuf::from("/l"),
+        Duration::from_secs(1),
+    );
+    assert!(has(&args_of(&c), ["--settings", SETTINGS]));
 }

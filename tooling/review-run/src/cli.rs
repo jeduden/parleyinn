@@ -16,20 +16,29 @@
 //! It prints the verdict and the counts for the workflow's step
 //! outputs, and each run as it ends on standard error, then what was
 //! not reviewed.
+//! Given `--credential` the directory a staging step wrote the access
+//! token into, it points every agent there and refuses it every read of
+//! it; every text it writes or prints is first scrubbed of that token
+//! and of the one it holds itself, and a review that found one requests
+//! changes, names the leak in a blocking finding and fails (ENG-28).
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::io::Write;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::Mutex;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Duration;
 
+use review_eval::credential::{self, Confined};
 use review_eval::host::Host;
+use review_eval::secret::Scrubber;
 use serde::Serialize;
 
 use crate::breaker;
 use crate::controls::{ABORTED, OVER_BUDGET};
 use crate::gaps::{self, GAPS, Gap, NOT_REVIEWED};
+use crate::leak;
 use crate::live;
 use crate::outcome::{Decision, decide};
 use crate::plan::{self, report_file};
@@ -51,7 +60,7 @@ pub const EXIT_USAGE: u8 = 2;
 /// How to call it.
 pub const USAGE: &str = "usage: review-run --workdir DIR [--parallel N] [--deadline SECONDS] \
 [--head-sha SHA] [--only GAPS --from DIR] [--max-cost-usd USD] [--breaker-fraction F] \
-[--summary FILE]";
+[--summary FILE] [--credential DIR]";
 
 /// The command line, read.
 #[derive(Debug, Clone, PartialEq)]
@@ -65,6 +74,8 @@ pub struct Args {
     pub resume: Option<(String, String)>,
     /// The job summary the table of every run is added to, when given.
     pub summary: Option<String>,
+    /// The directory the Claude token was staged in, when given.
+    pub credential: Option<String>,
 }
 
 /// Runs the command on `args` and returns its exit code. It is `main`
@@ -73,6 +84,18 @@ pub struct Args {
 pub fn run(
     host: &dyn Host,
     args: impl IntoIterator<Item = String>,
+    stdout: &mut dyn Write,
+    stderr: &mut (dyn Write + Send),
+) -> u8 {
+    run_with(host, args, None, stdout, stderr)
+}
+
+/// [`run`], handed `token`, the Claude token the process holds, when
+/// it holds one: a form every text it writes or prints is scrubbed of.
+pub fn run_with(
+    host: &dyn Host,
+    args: impl IntoIterator<Item = String>,
+    token: Option<&str>,
     stdout: &mut dyn Write,
     stderr: &mut (dyn Write + Send),
 ) -> u8 {
@@ -89,7 +112,21 @@ pub fn run(
             let _ = writeln!(out, "review-run: {line}");
         }
     };
-    match review(host, &args, &progress) {
+    let guarded = guard(&args, token).and_then(|(scrubber, located)| {
+        let confined = located.as_deref().map(|dir| Confined::new(host, dir));
+        let host: &dyn Host = match &confined {
+            Some(confined) => confined,
+            None => host,
+        };
+        let leaks = AtomicUsize::new(0);
+        let scrubbed = |line: &str| {
+            let (line, n) = scrubber.scrub(line);
+            leaks.fetch_add(n, Ordering::SeqCst);
+            progress(&line);
+        };
+        review(host, &args, &scrubber, &leaks, &scrubbed).map_err(|msg| scrubber.scrub(&msg).0)
+    });
+    match guarded {
         // The step outputs carry the verdict to the workflow: one that
         // does not print fails the step rather than leave them empty (I6).
         Ok(printed) => match write!(stdout, "{printed}") {
@@ -109,11 +146,37 @@ pub fn run(
     }
 }
 
-/// Runs the review `args` name and writes its files; returns the step
-/// outputs to print.
+/// The scrubber for the token staged under `args`' credential and
+/// `token`, and that credential's directory, located.
+///
+/// # Errors
+///
+/// Fails when the credential does not resolve or read, or a token is
+/// too short for the scrub to match.
+fn guard(args: &Args, token: Option<&str>) -> Result<(Scrubber, Option<PathBuf>), String> {
+    let located = args
+        .credential
+        .as_deref()
+        .map(|dir| credential::locate(Path::new(dir)))
+        .transpose()?;
+    let staged = located.as_deref().map(credential::read).transpose()?;
+    let secrets: Vec<&str> = staged.as_deref().into_iter().chain(token).collect();
+
+    Ok((Scrubber::guarded(&secrets)?, located))
+}
+
+/// Runs the review `args` name and writes its files, each scrubbed by
+/// `scrubber`, counting into `leaks` every form of the token it
+/// replaced; returns the step outputs to print.
+///
+/// # Errors
+///
+/// Fails when the review could not run, or found the token.
 fn review(
     host: &dyn Host,
     args: &Args,
+    scrubber: &Scrubber,
+    leaks: &AtomicUsize,
     progress: &(dyn Fn(&str) + Sync),
 ) -> Result<String, String> {
     let workdir = Path::new(&args.workdir);
@@ -135,7 +198,7 @@ fn review(
         }
         None => None,
     };
-    let runs = run::review(
+    let mut runs = run::review(
         host,
         workdir,
         &plan,
@@ -144,27 +207,36 @@ fn review(
         resume.as_ref(),
         progress,
     )?;
-    let reports = reports(workdir, &plan, progress);
-    let decision = breaker::amend(
-        &plan,
-        decide(&plan, &runs, &reports, &known),
-        options.breaker,
-    );
+    scrub_agent_output(workdir, scrubber, leaks, &mut runs)?;
+    let written = Written {
+        workdir,
+        scrubber,
+        leaks,
+    };
+    let decision = decision(workdir, &plan, &runs, &known, options.breaker, progress);
     let held = held_back(&decision.not_reviewed);
     let Decision {
-        outcome,
+        mut outcome,
         consulted,
         answers,
         not_reviewed,
     } = decision;
     let usage = usage::usage(&runs, resume.as_ref().map(|r| r.from.as_str()));
-    write_json(workdir, OUTCOME, &outcome)?;
-    write_json(workdir, CONSULTED, &consulted)?;
-    write_json(workdir, ANSWERS, &answers)?;
-    write_json::<Vec<AgentUsage>>(workdir, USAGE_FILE, &usage)?;
-    write_json::<Vec<Gap>>(workdir, GAPS, &not_reviewed)?;
-    write_text(workdir, NOT_REVIEWED, &gaps::markdown(&not_reviewed))?;
-    write_json(workdir, RUN_ID, &id)?;
+    written.json(CONSULTED, &consulted)?;
+    written.json(ANSWERS, &answers)?;
+    written.json::<Vec<AgentUsage>>(USAGE_FILE, &usage)?;
+    written.json::<Vec<Gap>>(GAPS, &not_reviewed)?;
+    written.text(NOT_REVIEWED, &gaps::markdown(&not_reviewed))?;
+    written.json(RUN_ID, &id)?;
+    if let Some(summary) = &args.summary {
+        add_scrubbed_to_summary(Path::new(summary), &runs, scrubber, leaks, progress);
+    }
+    // The outcome goes last, so a leak any file above held is in it.
+    let leaked = leaks.load(Ordering::SeqCst);
+    if leaked > 0 {
+        leak::fail_closed(&mut outcome, leaked);
+    }
+    written.json(OUTCOME, &outcome)?;
     if let Some(resume) = &resume {
         progress(&resumed_line(resume, &runs));
     }
@@ -174,8 +246,9 @@ fn review(
         let names: Vec<String> = not_reviewed.iter().map(Gap::label).collect();
         progress(&format!("not reviewed: {}", names.join(", ")));
     }
-    if let Some(summary) = &args.summary {
-        add_to_summary(Path::new(summary), &live::table(&runs), progress);
+    let leaked = leaks.load(Ordering::SeqCst);
+    if leaked > 0 {
+        return Err(leak::reason(leaked));
     }
 
     Ok(format!(
@@ -191,8 +264,39 @@ fn review(
     ))
 }
 
-/// Each of `plan`'s specialists' report the runs wrote in `workdir`, by
-/// name.
+/// The review's decision from `runs` and the reports they wrote, less
+/// what the breaker kept back.
+fn decision(
+    workdir: &Path,
+    plan: &plan::Plan,
+    runs: &[AgentRun],
+    known: &BTreeSet<String>,
+    breaker_fraction: f64,
+    progress: &(dyn Fn(&str) + Sync),
+) -> Decision {
+    let reports = reports(workdir, plan, progress);
+    breaker::amend(plan, decide(plan, runs, &reports, known), breaker_fraction)
+}
+
+/// Scrubs every text an agent produced before anything reads it as the
+/// review's: its logs and reports on disk, its runs in memory.
+fn scrub_agent_output(
+    workdir: &Path,
+    scrubber: &Scrubber,
+    leaks: &AtomicUsize,
+    runs: &mut [AgentRun],
+) -> Result<(), String> {
+    let mut leaked = leak::scrub_runs(scrubber, runs);
+    for dir in [crate::LOGS, crate::REPORTS] {
+        leaked += scrubber.scrub_tree(&workdir.join(dir))?;
+    }
+    leaks.fetch_add(leaked, Ordering::SeqCst);
+    Ok(())
+}
+
+/// Each of `plan`'s specialists' reports under `workdir`, by name, when
+/// it wrote one; a report that is there but does not read stands as
+/// none, and `progress` is told why (I6).
 fn reports(
     workdir: &Path,
     plan: &plan::Plan,
@@ -222,6 +326,20 @@ fn reports(
 fn held_back(gaps: &[Gap]) -> (usize, usize) {
     let count = |word: &str| gaps.iter().filter(|g| g.reason.starts_with(word)).count();
     (count(OVER_BUDGET), count(ABORTED))
+}
+
+/// Adds the table of `runs` to the job summary at `path`, scrubbed of
+/// the token like every file, its leaks counted into `leaks`.
+fn add_scrubbed_to_summary(
+    path: &Path,
+    runs: &[AgentRun],
+    scrubber: &Scrubber,
+    leaks: &AtomicUsize,
+    progress: &(dyn Fn(&str) + Sync),
+) {
+    let (table, n) = scrubber.scrub(&live::table(runs));
+    leaks.fetch_add(n, Ordering::SeqCst);
+    add_to_summary(path, &table, progress);
 }
 
 /// Adds `table` to the job summary at `path`; one that cannot be added
@@ -286,18 +404,30 @@ fn resumed_line(resume: &Resume, runs: &[AgentRun]) -> String {
     )
 }
 
-/// Writes `text` to `rel` under `workdir`.
-fn write_text(workdir: &Path, rel: &str, text: &str) -> Result<(), String> {
-    let path = workdir.join(rel);
-    fs::write(&path, text).map_err(|e| format!("write {}: {e}", path.display()))
+/// Where the review writes its files, each scrubbed first, every form
+/// of the token it replaced counted into `leaks`.
+struct Written<'a> {
+    workdir: &'a Path,
+    scrubber: &'a Scrubber,
+    leaks: &'a AtomicUsize,
 }
 
-/// Writes `value` as JSON to `rel` under `workdir`.
-fn write_json<T: Serialize>(workdir: &Path, rel: &str, value: &T) -> Result<(), String> {
-    let path = workdir.join(rel);
-    let text = serde_json::to_string_pretty(value)
-        .map_err(|e| format!("encode {}: {e}", path.display()))?;
-    fs::write(&path, format!("{text}\n")).map_err(|e| format!("write {}: {e}", path.display()))
+impl Written<'_> {
+    /// Writes `text`, scrubbed, to `rel` under the work directory.
+    fn text(&self, rel: &str, text: &str) -> Result<(), String> {
+        let path = self.workdir.join(rel);
+        let (text, n) = self.scrubber.scrub(text);
+        self.leaks.fetch_add(n, Ordering::SeqCst);
+        fs::write(&path, text).map_err(|e| format!("write {}: {e}", path.display()))
+    }
+
+    /// Writes `value` as JSON, scrubbed, to `rel` under the work
+    /// directory.
+    fn json<T: Serialize>(&self, rel: &str, value: &T) -> Result<(), String> {
+        let text = serde_json::to_string_pretty(value)
+            .map_err(|e| format!("encode {}: {e}", self.workdir.join(rel).display()))?;
+        self.text(rel, &format!("{text}\n"))
+    }
 }
 
 /// Reads `--name value` and `--name=value` pairs: the work directory,
@@ -306,7 +436,8 @@ fn write_json<T: Serialize>(workdir: &Path, rel: &str, value: &T) -> Result<(), 
 fn parse(args: impl IntoIterator<Item = String>) -> Result<Args, String> {
     let mut workdir = None;
     let mut options = Options::default();
-    let (mut head, mut only, mut from, mut summary) = (None, None, None, None);
+    let (mut head, mut only, mut from, mut summary, mut credential) =
+        (None, None, None, None, None);
     let mut args = args.into_iter();
     while let Some(arg) = args.next() {
         let Some(flag) = arg.strip_prefix("--") else {
@@ -326,6 +457,7 @@ fn parse(args: impl IntoIterator<Item = String>) -> Result<Args, String> {
             "max-cost-usd",
             "breaker-fraction",
             "summary",
+            "credential",
         ]
         .contains(&name)
         {
@@ -345,6 +477,7 @@ fn parse(args: impl IntoIterator<Item = String>) -> Result<Args, String> {
             "from" => from = Some(value),
             "max-cost-usd" => options.max_cost_usd = positive(name, &value)?,
             "breaker-fraction" => options.breaker = fraction(name, &value)?,
+            "credential" => credential = Some(value),
             _ => summary = Some(value),
         }
     }
@@ -361,6 +494,7 @@ fn parse(args: impl IntoIterator<Item = String>) -> Result<Args, String> {
         head,
         resume,
         summary,
+        credential,
     })
 }
 

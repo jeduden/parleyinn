@@ -29,8 +29,8 @@ fn runs_after(w: &mut World, name: String) -> Result<(), String> {
 fn agents_unprivileged(w: &mut World, key: String) -> Result<(), String> {
     let e = eng(w);
     e.key = key;
-    // The run logs hold every tool result, the token in the agents'
-    // environment among what an agent can read: they never leave the job.
+    // The run logs hold every tool result an agent read: they never
+    // leave the job.
     let mut problems = e.flow.agents_unprivileged(&e.key);
     problems.extend(e.flow.run_logs_stay(review_workflow::RUN_LOGS));
     outcome(problems)
@@ -129,6 +129,45 @@ fn agents_write_nothing(w: &mut World) -> Result<(), String> {
             .flow
             .agents_write_nothing(&review_workflow::RUN_TOOLS),
     )
+}
+
+#[then(
+    regex = r#"^no step that runs an agent holds the "([^"]+)" token: one step in each agent job stages it where no agent reads it, review-run refuses its agents every read of the staged credential's directory by name, of the process, system and device files and outside their trees, and every file an agent job uploads waits for a scrub of that token$"#
+)]
+fn token_kept_from_agents(w: &mut World, token: String) -> Result<(), String> {
+    let mut problems = eng(w).flow.token_kept_from_agents(&token);
+    problems.extend(review_workflow::Workflow::reads_refused(
+        review_eval::runner::DISALLOWED,
+        review_eval::runner::SETTINGS,
+    ));
+    let work = testkit::TempDir::new().map_err(|e| format!("make a work directory: {e}"))?;
+    problems.extend(engineering::review_leak::review_run_refuses_the_credential(
+        eng(w).checkout()?,
+        work.path(),
+    ));
+    outcome(problems)
+}
+
+#[then(
+    regex = r"^every text the review writes, prints or uploads is scrubbed of that token: review-run, its agents' output holding the token, leaves it in no file under review/ and in no line it prints$"
+)]
+fn review_run_scrubs(w: &mut World) -> Result<(), String> {
+    let work = testkit::TempDir::new().map_err(|e| format!("make a work directory: {e}"))?;
+    outcome(engineering::review_leak::review_run_scrubs_what_it_writes(
+        eng(w).checkout()?,
+        work.path(),
+    ))
+}
+
+#[then(
+    regex = r"^a review in which an agent's output held that token requests changes, naming the leak in a blocking finding, and fails, so nothing is posted$"
+)]
+fn review_run_fails_closed(w: &mut World) -> Result<(), String> {
+    let work = testkit::TempDir::new().map_err(|e| format!("make a work directory: {e}"))?;
+    outcome(engineering::review_leak::review_run_fails_closed_on_a_leak(
+        eng(w).checkout()?,
+        work.path(),
+    ))
 }
 
 #[then(regex = r#"^only one job holds the "([^"]+)" key, and it runs no agent$"#)]
