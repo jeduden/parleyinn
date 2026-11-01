@@ -995,3 +995,54 @@ fn a_job_summary_that_cannot_be_added_to_is_told_and_the_review_still_decided() 
         "{err}"
     );
 }
+
+#[test]
+fn a_run_whose_text_holds_the_token_is_scrubbed_from_the_job_summary_and_counted() {
+    let dir = TempDir::new().unwrap();
+    let summary = dir.path().join("summary.md");
+    let mut run = crate::run::reused(
+        "lang-rust".to_owned(),
+        review_eval::component::Kind::Specialist,
+        "a",
+        Vec::new(),
+    );
+    run.reused = false;
+    run.failure = Some(format!("its run ended with {TOKEN} twice, {TOKEN}"));
+    let leaks = AtomicUsize::new(0);
+
+    add_scrubbed_to_summary(&summary, &[run], &Scrubber::new(&[TOKEN]), &leaks, &|_| {});
+
+    let text = fs::read_to_string(&summary).unwrap();
+    assert!(!text.contains(TOKEN), "{text}");
+    assert!(text.contains(review_eval::secret::REDACTED), "{text}");
+    assert_eq!(leaks.load(Ordering::SeqCst), 2);
+}
+
+#[test]
+fn a_review_whose_failed_run_stated_the_token_leaves_it_out_of_the_job_summary() {
+    let dir = workdir();
+    let summary = dir.path().join("summary.md");
+    let host = FakeHost::new(|c: &review_eval::host::Command| {
+        if fake::agent_of(c) == "lang-rust" {
+            fake::write_log(c, &fake::log_of(&[], &format!("error_{TOKEN}"), "", 0.0));
+            return Ok(review_eval::host::Output::default());
+        }
+        fake::either(c)
+    });
+
+    let (code, out, err) = run_holding(
+        &host,
+        dir.path(),
+        Some(TOKEN),
+        &["--summary", summary.to_str().unwrap()],
+    );
+
+    assert_eq!(code, EXIT_FAILURE, "{err}");
+    assert!(
+        out.starts_with("failed=an agent's output contained the Claude token: "),
+        "{out}"
+    );
+    let text = fs::read_to_string(&summary).unwrap();
+    assert!(!text.contains(TOKEN), "{text}");
+    assert!(text.contains("| lang-rust | specialist |"), "{text}");
+}
