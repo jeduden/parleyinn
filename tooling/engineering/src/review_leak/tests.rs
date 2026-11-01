@@ -90,6 +90,25 @@ fn a_token_left_in_a_file_or_printed_and_no_redaction_are_named() {
 }
 
 #[test]
+fn a_file_under_review_that_does_not_read_is_named() {
+    let work = TempDir::new().unwrap();
+    fs::create_dir_all(work.path().join("review")).unwrap();
+    fs::write(work.path().join("review/a.md"), REDACTED).unwrap();
+    // A link to nothing is a file that does not read, even for root.
+    std::os::unix::fs::symlink("/nonexistent/x", work.path().join("review/b.md")).unwrap();
+
+    let problems = scrub_problems(work.path(), "");
+
+    assert_eq!(problems.len(), 1, "{problems:?}");
+    assert!(
+        problems[0].starts_with(
+            "review-run left review/b.md unreadable, so it was never shown scrubbed: "
+        ),
+        "{problems:?}"
+    );
+}
+
+#[test]
 fn a_review_that_approves_a_leak_and_exits_as_decided_is_named() {
     let work = TempDir::new().unwrap();
     fs::create_dir_all(work.path().join("review")).unwrap();

@@ -115,8 +115,9 @@ pub fn run_leaking(checkout: &Checkout, workdir: &Path) -> Result<Ran, String> {
     })
 }
 
-/// Every file under `dir`, at any depth, by its path under `root`, read.
-fn files(root: &Path, dir: &Path) -> Vec<(String, String)> {
+/// Every file under `dir`, at any depth, by its path under `root`, read,
+/// or why it does not read.
+fn files(root: &Path, dir: &Path) -> Vec<(String, Result<String, String>)> {
     let mut all = Vec::new();
     for path in fs::read_dir(dir)
         .into_iter()
@@ -132,7 +133,9 @@ fn files(root: &Path, dir: &Path) -> Vec<(String, String)> {
                 .unwrap_or(&path)
                 .display()
                 .to_string();
-            let text = String::from_utf8_lossy(&fs::read(&path).unwrap_or_default()).into_owned();
+            let text = fs::read(&path)
+                .map(|b| String::from_utf8_lossy(&b).into_owned())
+                .map_err(|e| e.to_string());
             all.push((rel, text));
         }
     }
@@ -142,19 +145,27 @@ fn files(root: &Path, dir: &Path) -> Vec<(String, String)> {
 
 /// What is wrong with what a review that met the token left in
 /// `workdir` and `printed`: a file under `review/` or a line that holds
-/// it, and no file holding it redacted, so the leak was never scrubbed.
+/// it, a file there that does not read, so it was never shown scrubbed,
+/// and no file holding it redacted, so the leak was never scrubbed.
 #[must_use]
 pub fn scrub_problems(workdir: &Path, printed: &str) -> Vec<String> {
-    let written = files(workdir, &workdir.join(review_run::REVIEW));
-    let mut problems: Vec<String> = written
-        .iter()
-        .filter(|(_, text)| text.contains(TOKEN))
-        .map(|(rel, _)| format!("review-run left the token in {rel}"))
-        .collect();
+    let mut problems = Vec::new();
+    let mut written = Vec::new();
+    for (rel, text) in files(workdir, &workdir.join(review_run::REVIEW)) {
+        match text {
+            Ok(text) if text.contains(TOKEN) => {
+                problems.push(format!("review-run left the token in {rel}"));
+            }
+            Ok(text) => written.push(text),
+            Err(e) => problems.push(format!(
+                "review-run left {rel} unreadable, so it was never shown scrubbed: {e}"
+            )),
+        }
+    }
     if printed.contains(TOKEN) {
         problems.push("review-run printed the token".to_owned());
     }
-    if !written.iter().any(|(_, text)| text.contains(REDACTED)) {
+    if !written.iter().any(|text| text.contains(REDACTED)) {
         problems.push(
             "no file under review/ holds the token redacted, so the leak was never scrubbed"
                 .to_owned(),
