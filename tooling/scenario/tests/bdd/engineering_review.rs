@@ -78,6 +78,17 @@ fn review_run_names_refusals(w: &mut World) -> Result<(), String> {
     )
 }
 
+#[then(
+    regex = r"^review-run writes each dispatched agent left without an accepted report beside the review outcome and names it not reviewed, and a review resumed from that list runs only that agent and its generalist again and approves as a full run would, and keeps nothing across a changed head or definition$"
+)]
+fn review_run_resumes(w: &mut World) -> Result<(), String> {
+    let work = testkit::TempDir::new().map_err(|e| format!("make a work directory: {e}"))?;
+    outcome(engineering::review_resume::review_resumes(
+        eng(w).checkout()?,
+        work.path(),
+    ))
+}
+
 #[then(regex = r"^its agents can write nothing: review-run allows them Read, Glob and Grep alone$")]
 fn agents_write_nothing(w: &mut World) -> Result<(), String> {
     outcome(

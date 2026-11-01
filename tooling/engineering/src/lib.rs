@@ -31,6 +31,7 @@ pub mod review_languages;
 pub mod review_limits;
 pub mod review_parts;
 pub mod review_refusals;
+pub mod review_resume;
 pub mod review_runs;
 pub mod review_workflow;
 pub mod static_analysis;

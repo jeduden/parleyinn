@@ -296,6 +296,7 @@ Feature: Engineering quality (ENG)
     And review-run runs each specialist the review bundle dispatches as its own agent, assembles its report from its run log, runs every generalist only once every specialist has ended, and writes the review outcome from what they answered
     And review-run runs a specialist whose diff is past its split limit in parts, each on whole files of its diff, merges their reports into its one report, and fails the review naming a part that did not answer
     And review-run refuses a specialist's report that cites an id no requirement or invariant has, runs that specialist once more told why, and names the report refused again and a generalist's finding line it cannot read, each in a blocking finding, so the review requests changes and the gate posts that request rather than failing
+    And review-run writes each dispatched agent left without an accepted report beside the review outcome and names it not reviewed, and a review resumed from that list runs only that agent and its generalist again and approves as a full run would, and keeps nothing across a changed head or definition
     And its agents can write nothing: review-run allows them Read, Glob and Grep alone
     And only one job holds the "JEDUDEN_REVIEW_AGENT_KEY" key, and it runs no agent
     And that job runs only after the agents' job succeeded
