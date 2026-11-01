@@ -186,16 +186,23 @@ pub fn review_answers(checkout: &Checkout, work: &Path) -> Vec<String> {
         &all,
         "a review whose specialist's report is refused",
     );
-    match key_in(&work.join("refused"), GAP) {
-        Ok(key) if fresh.join(&key).exists() => {
-            problems.push(format!("{GAP}'s refused report was stored as {key}"));
-        }
-        Ok(_) => {}
-        Err(e) => problems.push(e),
-    }
+    problems.extend(refused_stored(&work.join("refused"), &fresh));
     problems.extend(poisoned(checkout, work, &store));
 
     problems
+}
+
+/// What is wrong with the store `store` after the review in `workdir`,
+/// whose [`GAP`] stated a line in no form: its answer stored.
+#[must_use]
+pub fn refused_stored(workdir: &Path, store: &Path) -> Vec<String> {
+    match key_in(workdir, GAP) {
+        Ok(key) if store.join(&key).exists() => {
+            vec![format!("{GAP}'s refused report was stored as {key}")]
+        }
+        Ok(_) => Vec::new(),
+        Err(e) => vec![e],
+    }
 }
 
 /// What is wrong with a review after [`GAP`]'s stored report in `store`
@@ -256,9 +263,17 @@ pub fn review_stalls(checkout: &Checkout, work: &Path) -> Vec<String> {
         }
         from = review_resume::resumed_from(&dir);
     }
-    let mut problems = started_problems(&last, &[ITS_GENERALIST], "the resume after a stall");
     let outcome =
         fs::read_to_string(work.join("run3").join(review_run::OUTCOME)).unwrap_or_default();
+    stall_problems(&last, &outcome)
+}
+
+/// What is wrong with the resume after a stall, which started `started`
+/// and wrote the outcome `outcome`: it started more than
+/// [`ITS_GENERALIST`], or its outcome does not name [`GAP`] stalled.
+#[must_use]
+pub fn stall_problems(started: &BTreeSet<String>, outcome: &str) -> Vec<String> {
+    let mut problems = started_problems(started, &[ITS_GENERALIST], "the resume after a stall");
     let stalled = format!("stalled: {GAP} failed 3 times the same way; needs a person");
     if !outcome.contains(&stalled) {
         problems.push(format!("the review after a stall does not say {stalled:?}"));

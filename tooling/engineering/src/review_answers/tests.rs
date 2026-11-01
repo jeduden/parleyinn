@@ -146,3 +146,55 @@ fn a_refusing_host_whose_log_is_gone_is_named() {
 
     assert!(err.starts_with("write "), "{err}");
 }
+
+#[test]
+fn a_refused_report_found_in_the_store_is_named() {
+    let work = TempDir::new().unwrap();
+    let store = work.path().join("answers");
+    let key = "a".repeat(64);
+    let id = work.path().join(review_run::run_id::RUN_ID);
+    fs::create_dir_all(id.parent().unwrap()).unwrap();
+    let text = format!(
+        r#"{{"head": null, "inputs": "x", "split": 1, "agents": {{"{GAP}": {{"key": "{key}"}}}}}}"#
+    );
+    fs::write(&id, text).unwrap();
+    assert!(refused_stored(work.path(), &store).is_empty());
+
+    fs::create_dir_all(store.join(&key)).unwrap();
+
+    assert_eq!(
+        refused_stored(work.path(), &store),
+        [format!("{GAP}'s refused report was stored as {key}")]
+    );
+    assert!(refused_stored(&work.path().join("none"), &store)[0].starts_with("read "));
+}
+
+#[test]
+fn a_poisoned_run_that_cannot_be_prepared_is_named() {
+    let work = TempDir::new().unwrap();
+    let store = work.path().join("answers");
+    stored(
+        &repo(),
+        &work.path().join("first"),
+        StoreHost::default(),
+        &store,
+        &|_| Ok(()),
+        &[],
+    )
+    .unwrap();
+    fs::write(work.path().join("poisoned"), "a file").unwrap();
+
+    let problems = poisoned(&repo(), work.path(), &store);
+
+    assert!(problems[0].starts_with("make "), "{problems:?}");
+}
+
+#[test]
+fn a_resume_after_a_stall_that_reruns_the_agent_or_does_not_name_it_is_named() {
+    let started: BTreeSet<String> = [GAP, ITS_GENERALIST].map(String::from).into();
+
+    let problems = stall_problems(&started, "{}");
+
+    assert_eq!(problems.len(), 2, "{problems:?}");
+    assert!(problems[1].starts_with("the review after a stall does not say"));
+}
