@@ -10,7 +10,7 @@
 //! requests changes, consents: to each owned path it names (ENG-21),
 //! and, whatever it names, to the change ENG-29 guards.
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::io::Write;
 use std::path::Path;
@@ -98,7 +98,11 @@ fn build(
     let read = |path: &Path| fs::read_to_string(path).map_err(failed("read", path));
     let consent = consents(&read(consent)?).map_err(failed("read", consent))?;
     let mut a = analyse(&base_tree, &head_tree, &diff, &consent);
-    let lines = |path: &str| tree_lines(head, path);
+    let mut sizes = BTreeMap::new();
+    for path in &a.paths {
+        sizes.insert(path.as_str(), tree_lines(head, path)?);
+    }
+    let lines = |path: &str| sizes.get(path).copied().flatten();
     a.findings
         .extend(crate::limits::findings(&a.paths, &a.scopes, &lines));
     a.findings.sort();
@@ -154,13 +158,16 @@ fn tree_file(root: &Path, path: &str) -> Option<String> {
 
 /// The lines of the regular file at `path` in the tree at `root`, read
 /// as bytes, so a file that is not UTF-8 is still held to its limit
-/// (ENG-34); `None` when it is no regular file there or does not read.
-fn tree_lines(root: &Path, path: &str) -> Option<usize> {
+/// (ENG-34); `None` when it is no regular file there. A regular file
+/// that does not read fails, so its limit is never skipped unseen (I6).
+fn tree_lines(root: &Path, path: &str) -> Result<Option<usize>, String> {
     let file = root.join(path);
-    let regular = fs::symlink_metadata(&file).is_ok_and(|m| m.is_file());
-    let bytes = regular.then(|| fs::read(&file).ok()).flatten()?;
+    if !fs::symlink_metadata(&file).is_ok_and(|m| m.is_file()) {
+        return Ok(None);
+    }
+    let bytes = fs::read(&file).map_err(failed("read", &file))?;
 
-    Some(String::from_utf8_lossy(&bytes).lines().count())
+    Ok(Some(String::from_utf8_lossy(&bytes).lines().count()))
 }
 
 /// The message for a failure to `verb` the file at `path`.

@@ -377,13 +377,25 @@ fn tree_lines_counts_a_file_that_is_not_utf_8() {
     let head = TempDir::new().unwrap();
     fs::write(head.path().join("a.rs"), b"one\n\xff two\nthree\n").unwrap();
 
-    assert_eq!(tree_lines(head.path(), "a.rs"), Some(3));
+    assert_eq!(tree_lines(head.path(), "a.rs"), Ok(Some(3)));
 }
 
 #[test]
 fn tree_lines_counts_only_a_regular_file() {
     let head = TempDir::new().unwrap();
 
-    assert_eq!(tree_lines(head.path(), "gone.rs"), None);
-    assert_eq!(tree_lines(head.path(), "."), None);
+    assert_eq!(tree_lines(head.path(), "gone.rs"), Ok(None));
+    assert_eq!(tree_lines(head.path(), "."), Ok(None));
+}
+
+#[test]
+fn tree_lines_fails_on_a_regular_file_that_does_not_read() {
+    // A regular file whose first page no process maps: reading it fails,
+    // for root too.
+    let err = tree_lines(Path::new("/proc/self"), "mem").unwrap_err();
+
+    assert!(
+        err.starts_with("review-bundle: read /proc/self/mem: "),
+        "{err}"
+    );
 }
