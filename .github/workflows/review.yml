@@ -279,12 +279,27 @@ jobs:
       # token `claude setup-token` prints, so a review has no per-model-token
       # bill; it counts against the plan's usage limits instead.
       - name: Review
+        id: review
         if: steps.pull_head.outputs.number != ''
         env:
           CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
         run: |
           cargo run --locked --quiet --offline -p review-run -- --workdir . --parallel 32 \
             > review/run.txt
+      # A review that could not run says why in the job summary, not in
+      # its log alone: review-run prints the reason as failed=<reason>.
+      - name: Say why the review could not run
+        if: failure() && steps.review.outcome == 'failure'
+        run: |
+          {
+            echo "### The review could not run"
+            echo
+            if [ -s review/run.txt ]; then
+              cat review/run.txt
+            else
+              echo "review-run printed no reason; the Review step's log holds why"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
       # The outcome review-run wrote, for the post job's gate, and the
       # agents that answered, which the gate holds to the dispatch: a
       # review that left a dispatched agent out fails (ENG-28).

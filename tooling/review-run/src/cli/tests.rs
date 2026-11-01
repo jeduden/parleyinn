@@ -148,7 +148,10 @@ fn a_review_without_its_plan_cannot_run() {
     let (code, out, err) = run_in(&host, dir.path());
 
     assert_eq!(code, EXIT_FAILURE);
-    assert_eq!(out, "");
+    // The reason goes to the output too, which the workflow puts in
+    // the job summary of a review that failed.
+    assert!(out.starts_with("failed=read "), "{out}");
+    assert_eq!(out.lines().count(), 1, "{out}");
     assert!(err.starts_with("review-run: read "), "{err}");
     assert!(host.agents().is_empty());
 }

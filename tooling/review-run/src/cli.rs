@@ -62,7 +62,8 @@ pub struct Args {
 }
 
 /// Runs the command on `args` and returns its exit code. It is `main`
-/// without the process: `host` starts the agents.
+/// without the process: `host` starts the agents. A review that could
+/// not run prints why as `failed=<reason>` in place of its outputs.
 pub fn run(
     host: &dyn Host,
     args: impl IntoIterator<Item = String>,
@@ -94,6 +95,9 @@ pub fn run(
         },
         Err(msg) => {
             progress(&msg);
+            // Printed too, for the job summary of a review that failed;
+            // the line above already holds it should this not print.
+            let _ = writeln!(stdout, "failed={}", msg.replace('\n', " "));
             EXIT_FAILURE
         }
     }
