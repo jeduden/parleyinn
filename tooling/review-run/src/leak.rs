@@ -1,4 +1,4 @@
-//! The review failing closed on a leaked access token (ENG-28, I6):
+//! The review failing closed on a leaked Claude token (ENG-28, I6):
 //! every text an agent's run produced is scrubbed of the token before
 //! the review writes or prints it, each form found counted, and a
 //! review that found one requests changes, names the leak in a
@@ -39,7 +39,7 @@ pub fn scrub_runs(scrubber: &Scrubber, runs: &mut [AgentRun]) -> usize {
 /// Why a review that found the token in `n` places fails.
 #[must_use]
 pub fn reason(n: usize) -> String {
-    format!("an agent's output contained the access token: {n} redacted; revoke and rotate it")
+    format!("an agent's output contained the Claude token: {n} redacted; revoke and rotate it")
 }
 
 /// Makes `outcome` request changes for a leak of `n` forms of the
@@ -53,7 +53,7 @@ pub fn fail_closed(outcome: &mut ReviewOutcome, n: usize) {
         line: 0,
         severity: BLOCKING.to_owned(),
         body: format!(
-            "an agent's output contained the access token: {n} redacted from what the \
+            "an agent's output contained the Claude token: {n} redacted from what the \
              review wrote; the token must be revoked and rotated, and nothing this review \
              decided is posted (ENG-28)"
         ),

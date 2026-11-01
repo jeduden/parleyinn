@@ -9,7 +9,7 @@ use std::process::ExitCode;
 use review_eval::process::ProcessHost;
 
 fn main() -> ExitCode {
-    // The access token this process holds, when it holds one: a form
+    // The Claude token this process holds, when it holds one: a form
     // every text it writes is scrubbed of. No agent it starts gets it
     // (ENG-28).
     let token = std::env::var(review_eval::credential::TOKEN_VAR).ok();

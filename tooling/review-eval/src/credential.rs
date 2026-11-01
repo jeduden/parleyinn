@@ -1,4 +1,4 @@
-//! The model access token, kept out of every agent's reach (ENG-28).
+//! The Claude token, kept out of every agent's reach (ENG-28).
 //! A step of its own stages it, from its environment, into a
 //! credentials file only its owner reads, in a directory outside the
 //! work directory; the step that runs the agents holds it in no
@@ -43,7 +43,7 @@ const SCOPE: &str = "user:inference";
 pub fn stage(dir: &Path, token: &str) -> Result<(), String> {
     let token = token.trim();
     if token.is_empty() || !token.chars().all(token_char) {
-        return Err("the access token is empty or holds a character no token has".to_owned());
+        return Err("the Claude token is empty or holds a character no token has".to_owned());
     }
     fs::create_dir_all(dir).map_err(|e| format!("make {}: {e}", dir.display()))?;
     fs::set_permissions(dir, fs::Permissions::from_mode(0o700))
@@ -92,7 +92,7 @@ pub fn read(dir: &Path) -> Result<String, String> {
     value["claudeAiOauth"]["accessToken"]
         .as_str()
         .map(str::to_owned)
-        .ok_or_else(|| format!("{} holds no access token", path.display()))
+        .ok_or_else(|| format!("{} holds no Claude token", path.display()))
 }
 
 /// `dir` as the absolute path a read rule names.
@@ -104,7 +104,7 @@ pub fn locate(dir: &Path) -> Result<PathBuf, String> {
     fs::canonicalize(dir).map_err(|e| format!("locate {}: {e}", dir.display()))
 }
 
-/// Whether `c` can be part of an access token.
+/// Whether `c` can be part of a Claude token.
 fn token_char(c: char) -> bool {
     c.is_ascii_alphanumeric() || "-_.~+/=".contains(c)
 }

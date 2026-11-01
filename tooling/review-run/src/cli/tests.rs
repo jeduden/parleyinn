@@ -668,7 +668,7 @@ fn a_value_that_does_not_encode_is_an_error_naming_its_file() {
     assert!(!dir.path().join("out.json").exists());
 }
 
-/// A stand-in for the access token; never a real one.
+/// A stand-in for the Claude token; never a real one.
 const TOKEN: &str = "dummy-access-token-0123456789";
 
 /// Runs the review in `dir` handed `token`, with `extra` after the work
@@ -776,7 +776,7 @@ fn a_review_whose_agent_leaked_the_token_scrubs_it_everywhere_and_fails_closed()
 
     assert_eq!(code, EXIT_FAILURE, "{err}");
     assert!(
-        out.starts_with("failed=an agent's output contained the access token: "),
+        out.starts_with("failed=an agent's output contained the Claude token: "),
         "{out}"
     );
     assert!(out.ends_with("redacted; revoke and rotate it\n"), "{out}");
@@ -792,7 +792,7 @@ fn a_review_whose_agent_leaked_the_token_scrubs_it_everywhere_and_fails_closed()
     assert!(
         outcome.findings.iter().any(|f| f.severity == "blocking"
             && f.body
-                .starts_with("an agent's output contained the access token: ")),
+                .starts_with("an agent's output contained the Claude token: ")),
         "{outcome:?}"
     );
 }

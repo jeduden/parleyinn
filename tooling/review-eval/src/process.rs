@@ -1,6 +1,6 @@
 //! The host on the machine: real processes, each killed at its
 //! deadline, with the variables a Claude Code harness session sets for
-//! its children cleared and the model access token withheld. The
+//! its children cleared and the Claude token withheld. The
 //! `review-eval` and `review-run` executables both start their commands
 //! through it; nothing else of either starts a program.
 
@@ -40,7 +40,7 @@ pub const NESTED_SESSION_VARS: [&str; 4] = [
 ];
 
 /// What no command the host starts finds in its environment: the
-/// model access token, which a `claude` reads from its staged
+/// Claude token, which a `claude` reads from its staged
 /// credentials file instead, so an agent's tools never find it in the
 /// environment they run in (ENG-28).
 pub const WITHHELD_VARS: [&str; 1] = [crate::credential::TOKEN_VAR];

@@ -68,7 +68,7 @@ pub struct Args {
     /// The gap list and the earlier run's review directory a resumed
     /// review runs from.
     pub resume: Option<(String, String)>,
-    /// The directory the access token was staged in, when given.
+    /// The directory the Claude token was staged in, when given.
     pub credential: Option<String>,
 }
 
@@ -84,7 +84,7 @@ pub fn run(
     run_with(host, args, None, stdout, stderr)
 }
 
-/// [`run`], handed `token`, the access token the process holds, when
+/// [`run`], handed `token`, the Claude token the process holds, when
 /// it holds one: a form every text it writes or prints is scrubbed of.
 pub fn run_with(
     host: &dyn Host,

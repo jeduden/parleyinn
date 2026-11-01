@@ -4,7 +4,7 @@
 //! run names, and writes the scorecard, the findings the review gate
 //! weighs and the report; `compare` reads a scorecard against the
 //! published one; `publish` writes a scorecard's lines into it.
-//! `stage-credential` writes the model access token it is handed into
+//! `stage-credential` writes the Claude token it is handed into
 //! a credentials file no agent reads, and `scrub` replaces every form
 //! of that token in the files a job keeps, failing closed when it found
 //! one (ENG-28).
@@ -35,7 +35,7 @@ pub const EXIT_OK: u8 = 0;
 pub const EXIT_FAILURE: u8 = 1;
 /// The command line is wrong.
 pub const EXIT_USAGE: u8 = 2;
-/// An agent's output held the access token: every form of it found was
+/// An agent's output held the Claude token: every form of it found was
 /// replaced, and the job fails closed (ENG-28).
 pub const EXIT_LEAKED: u8 = 3;
 
@@ -95,7 +95,7 @@ pub fn run(
     run_with(host, args, None, stdout, stderr)
 }
 
-/// [`run`], handed `token`, the model access token the process holds
+/// [`run`], handed `token`, the Claude token the process holds
 /// in [`TOKEN_VAR`], when it holds one: what `stage-credential` stages,
 /// and a form `scrub` and `run` replace.
 pub fn run_with(
@@ -139,17 +139,17 @@ pub fn run_with(
     }
 }
 
-/// What a job that found the access token in an agent's output says.
+/// What a job that found the Claude token in an agent's output says.
 #[must_use]
 pub fn leaked(n: usize) -> String {
-    format!("an agent's output contained the access token: {n} redacted; revoke and rotate it")
+    format!("an agent's output contained the Claude token: {n} redacted; revoke and rotate it")
 }
 
 /// Why a command did not run to its end.
 enum Problem {
     Usage(String),
     Failed(String),
-    /// The access token was found this many times, and replaced.
+    /// The Claude token was found this many times, and replaced.
     Leaked(usize),
 }
 
@@ -308,7 +308,7 @@ fn stage_command(
     let dir = required(flags, "dir")?;
     let token = token.ok_or_else(|| Failed(format!("{TOKEN_VAR} is not set")))?;
     credential::stage(Path::new(&dir), token)?;
-    let _ = writeln!(stdout, "staged the access token under {dir}");
+    let _ = writeln!(stdout, "staged the Claude token under {dir}");
 
     Ok(EXIT_OK)
 }

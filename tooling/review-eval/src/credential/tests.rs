@@ -8,7 +8,7 @@ use testkit::TempDir;
 use super::*;
 use crate::host::Output;
 
-/// A stand-in for the access token; never a real one.
+/// A stand-in for the Claude token; never a real one.
 const TOKEN: &str = "dummy-access-token-0123456789";
 
 fn mode(path: &Path) -> u32 {
@@ -46,7 +46,7 @@ fn a_token_that_is_empty_or_not_one_line_of_token_characters_is_refused_unnamed(
     for bad in ["", "  \n", "two words", "a\"quote", "line\nbreak"] {
         let err = stage(&root.path().join("x"), bad).unwrap_err();
         assert_eq!(
-            err, "the access token is empty or holds a character no token has",
+            err, "the Claude token is empty or holds a character no token has",
             "{bad:?}"
         );
     }
@@ -70,7 +70,7 @@ fn a_credential_that_cannot_be_staged_or_read_fails_naming_its_path() {
     fs::write(bad.join(FILE), "{}").unwrap();
     assert_eq!(
         read(&bad).unwrap_err(),
-        format!("{} holds no access token", bad.join(FILE).display())
+        format!("{} holds no Claude token", bad.join(FILE).display())
     );
     fs::write(bad.join(FILE), "nope").unwrap();
     assert!(read(&bad).unwrap_err().contains("is not JSON"));

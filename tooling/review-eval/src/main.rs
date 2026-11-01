@@ -11,7 +11,7 @@ use std::process::ExitCode;
 use review_eval::process::ProcessHost;
 
 fn main() -> ExitCode {
-    // The access token this process holds, when it holds one: what
+    // The Claude token this process holds, when it holds one: what
     // `stage-credential` stages and a form the scrub replaces. No
     // command it starts gets it (ENG-28).
     let token = std::env::var(review_eval::credential::TOKEN_VAR).ok();

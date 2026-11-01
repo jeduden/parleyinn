@@ -36,7 +36,7 @@ if [ -n "$CLAUDE_CODE_CHILD_SESSION" ] || [ -n "$CLAUDE_AUTO_BACKGROUND_TASKS" ]
   exit 3
 fi
 if [ -n "$CLAUDE_CODE_OAUTH_TOKEN" ]; then
-  echo "started with the access token in its environment" >&2
+  echo "started with the Claude token in its environment" >&2
   exit 4
 fi
 prompt="$2"
@@ -246,7 +246,7 @@ fn gate(home: &Path, dir: &Path) -> (u8, String, String) {
     )
 }
 
-/// A stand-in for the access token; never a real one.
+/// A stand-in for the Claude token; never a real one.
 const TOKEN: &str = "dummy-access-token-0123456789-e2e";
 
 /// Every file under `dir`, read.
@@ -305,7 +305,7 @@ fn an_agent_that_leaks_the_staged_token_fails_the_review_closed_with_every_trace
     let stderr = String::from_utf8_lossy(&out.stderr);
     assert_eq!(out.status.code(), Some(1), "{stdout}\n{stderr}");
     assert!(
-        stdout.starts_with("failed=an agent's output contained the access token: "),
+        stdout.starts_with("failed=an agent's output contained the Claude token: "),
         "{stdout}"
     );
     assert!(
@@ -321,7 +321,7 @@ fn an_agent_that_leaks_the_staged_token_fails_the_review_closed_with_every_trace
         "{outcome}"
     );
     assert!(
-        outcome.contains("an agent's output contained the access token: "),
+        outcome.contains("an agent's output contained the Claude token: "),
         "{outcome}"
     );
 }

@@ -1154,7 +1154,7 @@ fn counted_uses_the_plural_unless_one() {
     assert_eq!(counted(3, "component"), "3 components");
 }
 
-/// A stand-in for the access token; never a real one.
+/// A stand-in for the Claude token; never a real one.
 const TOKEN: &str = "dummy-access-token-0123456789";
 
 fn run_cli_with(host: &dyn Host, token: Option<&str>, args: &[&str]) -> (u8, String, String) {
@@ -1187,7 +1187,7 @@ fn stage_credential_writes_the_token_it_was_handed_and_names_none() {
     assert!(!out.contains(TOKEN) && !err.contains(TOKEN));
     assert_eq!(
         out,
-        format!("staged the access token under {}\n", dir.display())
+        format!("staged the Claude token under {}\n", dir.display())
     );
 
     let (code, _, err) = run_cli_with(&host, None, &stage);
@@ -1261,7 +1261,7 @@ fn scrub_replaces_the_token_in_every_path_and_fails_closed_when_it_found_one() {
 fn leaked_names_the_count_and_what_to_do() {
     assert_eq!(
         leaked(2),
-        "an agent's output contained the access token: 2 redacted; revoke and rotate it"
+        "an agent's output contained the Claude token: 2 redacted; revoke and rotate it"
     );
 }
 
@@ -1312,7 +1312,7 @@ fn run_confines_each_agent_to_the_staged_credential_and_fails_closed_on_a_leak()
 
     assert_eq!(code, EXIT_LEAKED, "{out}\n{err}");
     assert!(
-        err.contains("review-eval: an agent's output contained the access token: "),
+        err.contains("review-eval: an agent's output contained the Claude token: "),
         "{err}"
     );
     let seen = seen.lock().unwrap();

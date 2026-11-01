@@ -4,7 +4,7 @@ use testkit::TempDir;
 
 use super::*;
 
-/// A stand-in for the access token; never a real one.
+/// A stand-in for the Claude token; never a real one.
 const TOKEN: &str = "dummy-access-token-0123456789-ABCDEFabcdef_xyz";
 
 /// A token of the generic Claude shape, built at run time so this file

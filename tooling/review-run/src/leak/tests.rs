@@ -5,7 +5,7 @@ use review_gate::APPROVE_VERDICT;
 
 use super::*;
 
-/// A stand-in for the access token; never a real one.
+/// A stand-in for the Claude token; never a real one.
 const TOKEN: &str = "dummy-access-token-0123456789";
 
 fn leaking_run() -> AgentRun {
@@ -66,7 +66,7 @@ fn a_leak_makes_the_review_request_changes_with_a_named_blocking_finding() {
     assert_eq!(finding.path, crate::outcome::REVIEW_PATH);
     assert_eq!(
         finding.body,
-        "an agent's output contained the access token: 2 redacted from what the review \
+        "an agent's output contained the Claude token: 2 redacted from what the review \
          wrote; the token must be revoked and rotated, and nothing this review decided \
          is posted (ENG-28)"
     );
@@ -76,6 +76,6 @@ fn a_leak_makes_the_review_request_changes_with_a_named_blocking_finding() {
 fn the_reason_names_the_count_and_what_to_do() {
     assert_eq!(
         reason(1),
-        "an agent's output contained the access token: 1 redacted; revoke and rotate it"
+        "an agent's output contained the Claude token: 1 redacted; revoke and rotate it"
     );
 }
