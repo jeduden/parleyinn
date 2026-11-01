@@ -83,9 +83,14 @@ fn a_kept_part_the_report_check_refuses_runs_again() {
         "outcome: findings — part 1 kept.",
     );
 
-    let (_, _, host) = resumed_split_run(dir.path(), &resume);
+    let (_, lines, host) = resumed_split_run(dir.path(), &resume);
 
     assert_eq!(host.agents(), ["lang-rust", "lang-rust", "review-code"]);
+    let told = lines
+        .iter()
+        .find(|l| l.starts_with("lang-rust part 1 of 2 (specialist): its kept report was refused, so it runs again: "))
+        .unwrap_or_else(|| panic!("{lines:?}"));
+    assert!(told.contains("ENG-999"), "{told}");
 }
 
 #[test]

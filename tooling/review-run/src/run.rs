@@ -144,10 +144,17 @@ pub fn review(
         if let Some(log) = kept {
             let report = assemble(&log.texts, &log.answer, None);
             // A kept part is held to the report check as a fresh one.
-            if refusal(&report, &log.answer, known).is_none() {
-                let run = reused(unit.label(), unit.kind, &log.answer, log.texts.clone());
-                progress(&describe(&run));
-                return (run, Some(report));
+            match refusal(&report, &log.answer, known) {
+                None => {
+                    let run = reused(unit.label(), unit.kind, &log.answer, log.texts.clone());
+                    progress(&describe(&run));
+                    return (run, Some(report));
+                }
+                Some(why) => progress(&format!(
+                    "{} ({}): its kept report was refused, so it runs again: {why}",
+                    unit.label(),
+                    unit.kind.word()
+                )),
             }
         }
         let (run, report) = run_one(host, workdir, plan, known, unit, options.deadline, progress);
