@@ -60,10 +60,15 @@ pub fn run(
         }
     };
     match review(host, Path::new(&workdir), options, &progress) {
-        Ok(printed) => {
-            let _ = write!(stdout, "{printed}");
-            EXIT_OK
-        }
+        // The step outputs carry the verdict to the workflow: one that
+        // does not print fails the step rather than leave them empty (I6).
+        Ok(printed) => match write!(stdout, "{printed}") {
+            Ok(()) => EXIT_OK,
+            Err(e) => {
+                progress(&format!("print the step outputs: {e}"));
+                EXIT_FAILURE
+            }
+        },
         Err(msg) => {
             progress(&msg);
             EXIT_FAILURE

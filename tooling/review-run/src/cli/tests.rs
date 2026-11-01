@@ -79,6 +79,41 @@ fn a_review_writes_every_file_the_gate_reads() {
     assert!(dir.path().join("review/logs/review-code.jsonl").exists());
 }
 
+/// Standard output that takes no write.
+struct Closed;
+
+impl Write for Closed {
+    fn write(&mut self, _: &[u8]) -> std::io::Result<usize> {
+        Err(std::io::Error::other("closed"))
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        Ok(())
+    }
+}
+
+#[test]
+fn a_review_whose_step_outputs_cannot_be_printed_fails_naming_why() {
+    let dir = workdir();
+    let host = FakeHost::new(fake::either);
+    let mut err = Vec::new();
+
+    let code = run(
+        &host,
+        args(&["--workdir", dir.path().to_str().unwrap()]),
+        &mut Closed,
+        &mut err,
+    );
+
+    assert_eq!(code, EXIT_FAILURE);
+    let err = String::from_utf8(err).unwrap();
+    assert!(
+        err.ends_with("review-run: print the step outputs: closed\n"),
+        "{err}"
+    );
+    assert!(Closed.flush().is_ok());
+}
+
 #[test]
 fn a_review_whose_specialist_fails_is_still_decided() {
     let dir = workdir();
