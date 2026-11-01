@@ -50,6 +50,8 @@ is short, because a finding found late costs a whole round.
   main has after the merge; `--agents base` runs main's, as CI does.
   `--resume` reruns only what the last run left without an accepted
   report, on the same head and definitions, so a slip costs one run.
+  A review that aborts on a mass failure of its specialists says so
+  apart from any finding: fix the outage or prompt, then `--resume`.
 - CI ends within ten minutes of a push. The slowest chain of jobs sets
   that; a job that grows toward its five-minute limit is split before it
   fails.

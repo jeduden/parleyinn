@@ -57,6 +57,7 @@ records the design.
   review's reading tools and turn budget, on the component's model, or
   the evaluation's default for an agent that names none, or the one `--model`
   names. `review-run` starts each agent of a review through the same runner.
+  Each run, a case's too, has its tier's cost cap, `--max-budget-usd`.
   It refuses
   a component whose front matter names a key outside name, description, tools,
   model, effort, maxTurns and generalist, or a tool its kind may not use, so a

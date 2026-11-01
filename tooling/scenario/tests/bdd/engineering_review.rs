@@ -44,11 +44,44 @@ fn agents_run_by(w: &mut World, cmd: String) -> Result<(), String> {
 }
 
 #[then(
-    regex = r"^review-run runs each specialist the review bundle dispatches as its own agent, assembles its report from its run log, runs every generalist only once every specialist has ended, and writes the review outcome from what they answered$"
+    regex = r"^review-run runs each specialist the review bundle dispatches as its own agent, assembles its report from its run log, runs each generalist once its own specialists have ended, not waiting for the others, and writes the review outcome from what they answered$"
 )]
 fn review_runs_by_code(w: &mut World) -> Result<(), String> {
     let work = testkit::TempDir::new().map_err(|e| format!("make a work directory: {e}"))?;
     outcome(engineering::review_runs::review_runs_by_code(
+        eng(w).checkout()?,
+        work.path(),
+    ))
+}
+
+#[then(
+    regex = r"^review-run passes each agent the cost cap of its tier, starts no run once the runs that ended cost the review's cap, and names each agent it did not start over budget, so the review requests changes$"
+)]
+fn review_run_caps_cost(w: &mut World) -> Result<(), String> {
+    let work = testkit::TempDir::new().map_err(|e| format!("make a work directory: {e}"))?;
+    outcome(engineering::review_controls::caps_problems(
+        eng(w).checkout()?,
+        work.path(),
+    ))
+}
+
+#[then(
+    regex = r"^review-run starts no generalist once more than a third of the dispatched specialists failed, and opens the review outcome with a blocking finding naming the mass failure$"
+)]
+fn review_run_breaks(w: &mut World) -> Result<(), String> {
+    let work = testkit::TempDir::new().map_err(|e| format!("make a work directory: {e}"))?;
+    outcome(engineering::review_controls::breaker_problems(
+        eng(w).checkout()?,
+        work.path(),
+    ))
+}
+
+#[then(
+    regex = r"^review-run waits with backoff before it runs again an agent the API turned away as overloaded, and never runs again one a cost cap stopped or whose credential was refused$"
+)]
+fn review_run_backs_off(w: &mut World) -> Result<(), String> {
+    let work = testkit::TempDir::new().map_err(|e| format!("make a work directory: {e}"))?;
+    outcome(engineering::review_controls::retry_problems(
         eng(w).checkout()?,
         work.path(),
     ))

@@ -260,10 +260,28 @@ repeat them, which costs tokens.
 - A requirement request lands with the stakeholder as a nit; the SRS
   changes only through the stakeholder's own change.
 - A review runs in waves of agents, each up to 900 seconds and each
-  agent at most twice. The repository has 56 specialists and the job
-  starts 32 at once, so they take two waves and the generalists a
-  third: 3 x 2 x 15 = 90 minutes at worst, and the job's cap is 120.
-  Agents end in minutes in practice.
+  agent at most twice, or three times when the API turned it away as
+  overloaded. The repository has 56 specialists and the job starts 32
+  at once, so they take two waves and the generalists a third: 3 x 2 x
+  15 = 90 minutes at worst, and the job's cap is 120. Agents end in
+  minutes in practice, and a generalist starts as soon as its own
+  specialists have ended and too few specialists still run to trip the
+  breaker below, so the third wave overlaps the second.
+- What a review may spend and how it fails are bounded by code, as
+  proposed by the engine comparison of 2026-11-01 (cost caps, a mass
+  failure breaker, pipelined generalists, retry backoff, live
+  progress), not yet accepted: each run gets `--max-budget-usd`, 1.00
+  for a specialist and 5.00 for a generalist, and `review-run
+  --max-cost-usd` (40) starts no run once the runs that ended cost that
+  much; once more than `--breaker-fraction` (0.34) of the specialists
+  ended in a gap no generalist starts and the outcome opens with a
+  `review aborted:` finding. Each agent kept back is an `over budget:`
+  or `aborted:` gap, never an approval, so `--only` finishes the review
+  once fixed. A run the API turned away as overloaded waits 15 s, then
+  30 s, each with jitter, before it runs again; a run a cost cap
+  stopped or whose credential was refused is not run again. Every 20 s
+  the run prints what is running, its calls and tokens so far, and adds
+  the table of every run to the job summary.
 - What a run leaves without an accepted report is said, never read as
   clean: `review/gaps.json` and `review/not-reviewed.md` list each such
   agent or part and why. `review-run --only <gaps> --from <dir>`, behind
