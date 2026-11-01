@@ -78,6 +78,7 @@ pub fn render(runs: &AgentRuns, gaps: &[Gap]) -> String {
             let _ = writeln!(s, "<li>{}</li>", text(note));
         }
         s.push_str("</ul>\n");
+        more(&mut s, h.notes.len());
     }
     s.push_str("</body></html>\n");
 
@@ -134,11 +135,12 @@ fn timeline(s: &mut String, runs: &AgentRuns) {
     let total = end.saturating_sub(start).max(1);
     let at = |ms: u64| (ms.saturating_sub(start) as f64) * 100.0 / (total as f64);
     s.push_str("<div class=\"tl\">\n");
-    let timed = runs
+    let timed: Vec<_> = runs
         .agent_runs
         .iter()
-        .filter_map(|agent_run| Some((agent_run, agent_run.started_ms?, agent_run.ended_ms?)));
-    for (agent_run, from, to) in timed.take(MAX_ROWS) {
+        .filter_map(|agent_run| Some((agent_run, agent_run.started_ms?, agent_run.ended_ms?)))
+        .collect();
+    for &(agent_run, from, to) in timed.iter().take(MAX_ROWS) {
         let _ = writeln!(
             s,
             "<div class=\"row\"><span class=\"label\">{}</span><span class=\"track\">\
@@ -152,7 +154,7 @@ fn timeline(s: &mut String, runs: &AgentRuns) {
         );
     }
     s.push_str("</div>\n");
-    more(s, runs.agent_runs.len());
+    more(s, timed.len());
 }
 
 /// The note under a table cut at [`MAX_ROWS`].

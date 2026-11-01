@@ -642,7 +642,7 @@ fn review_stability_cases() -> Vec<Case> {
     vec![
         case(
             "the report writing a run's `<` unescaped",
-            "ENG-28",
+            "ENG-32",
             Injection::replace(
                 "tooling/review-report/src/html.rs",
                 "'<' => out.push_str(\"&lt;\"),",
@@ -668,7 +668,7 @@ fn review_stability_cases() -> Vec<Case> {
         ),
         case(
             "an agent run's cost recomputed from its models instead of its log's total",
-            "ENG-28",
+            "ENG-32",
             Injection::replace(
                 "tooling/review-report/src/agent_runs.rs",
                 "cost_usd: log.cost,",

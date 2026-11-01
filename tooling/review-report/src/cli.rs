@@ -100,7 +100,12 @@ fn stable(args: &[String], stdout: &mut dyn Write, stderr: &mut dyn Write) -> Re
             "review-report: {why}; their stability means nothing"
         );
     }
-    let _ = write!(stdout, "{}", headline(&measured));
+    // The workflow reads the headline from this output: one that does
+    // not print fails the step rather than leave it empty (I6).
+    if let Err(e) = write!(stdout, "{}", headline(&measured)) {
+        let _ = writeln!(stderr, "review-report: print the headline: {e}");
+        return Err(EXIT_FAILURE);
+    }
 
     Ok(())
 }

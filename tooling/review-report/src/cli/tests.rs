@@ -176,3 +176,39 @@ fn stability_says_why_failed_reviews_measure_nothing() {
     assert!(printed.contains("within_limits=false"), "{printed}");
     assert!(err.contains("2 of 2 reviews have no verdict"), "{err}");
 }
+
+/// Standard output that takes no write.
+struct Closed;
+
+impl Write for Closed {
+    fn write(&mut self, _: &[u8]) -> std::io::Result<usize> {
+        Err(std::io::Error::other("closed"))
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        Ok(())
+    }
+}
+
+#[test]
+fn a_headline_that_does_not_print_fails_the_step_and_says_so() {
+    let root = TempDir::new().unwrap();
+    let dirs: Vec<String> = ["one", "two", "three"]
+        .iter()
+        .map(|n| review(&root, n, "approve", "abc"))
+        .collect();
+    let out = root.path().join("stability.json").display().to_string();
+    let mut args = vec!["stability".to_owned(), "--out".to_owned(), out];
+    args.extend(dirs);
+    let mut err = Vec::new();
+
+    let code = run(args, &mut Closed, &mut err);
+
+    assert_eq!(code, EXIT_FAILURE);
+    assert!(
+        String::from_utf8(err)
+            .unwrap()
+            .contains("print the headline: closed"),
+        "named"
+    );
+}

@@ -161,7 +161,7 @@ jobs:
             echo "scrubbed=true" >> "$GITHUB_OUTPUT"
           fi
           if [ "$code" -eq 3 ]; then
-            echo "::error::what the review wrote held the Claude Code OAuth token, now redacted; revoke and rotate it, and nothing is kept"
+            echo "::error::what the review wrote held the Claude Code OAuth token, now redacted; revoke and rotate it, and the scrubbed reviews are kept for the comparison"
           fi
           exit "$code"
       # What the comparison reads, and the run list and the run report; the run

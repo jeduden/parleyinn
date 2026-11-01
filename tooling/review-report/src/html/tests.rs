@@ -196,3 +196,18 @@ fn the_report_stays_bounded_however_many_runs_and_gaps_there_are() {
     assert!(report.contains("50 more rows not shown; the runs holds them."));
     assert!(report.len() < 3 * 1024 * 1024, "{} bytes", report.len());
 }
+
+#[test]
+fn notes_past_the_cut_and_untimed_runs_are_counted_as_they_are() {
+    let mut t = runs_of(vec![
+        agent_run("a", Status::Accepted, (Some(1), Some(2))),
+        agent_run("b", Status::Accepted, (None, None)),
+    ]);
+    t.header.notes = (0..MAX_ROWS + 7).map(|n| format!("note {n}")).collect();
+
+    let report = render(&t, &[]);
+
+    assert!(report.contains("7 more rows not shown; the runs holds them."));
+    // Two runs, both shown or untimed, so the timeline cuts none.
+    assert_eq!(report.matches("more rows not shown").count(), 1, "{report}");
+}

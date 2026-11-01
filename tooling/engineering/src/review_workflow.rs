@@ -14,6 +14,14 @@ use crate::{Checkout, list};
 /// one: a build or a test of the crate runs no agent.
 const AGENT_RUN: &str = "-p review-run --";
 
+/// The other spellings of the same start: the long package flag, the
+/// binary by name and the release build.
+const AGENT_RUN_ALT: [&str; 3] = [
+    "--package review-run --",
+    "--bin review-run --",
+    "target/release/review-run",
+];
+
 /// The same, run from the binary built beforehand.
 const AGENT_BINARY: &str = "target/debug/review-run";
 
@@ -227,6 +235,7 @@ fn starts_cli(line: &str) -> bool {
 /// or installs the command line any of its steps can start one with.
 fn runs_agents(text: &str) -> bool {
     text.contains(AGENT_RUN)
+        || AGENT_RUN_ALT.iter().any(|a| text.contains(a))
         || text.contains(AGENT_BINARY)
         || text.contains(AGENT_ACTION)
         || installs_cli(text)
@@ -322,6 +331,7 @@ fn uploads_dir(paths: &[String], dir: &str) -> bool {
 fn runs_agent_step(step: &str) -> bool {
     // A build of review-run passes it no arguments, and runs nothing.
     step.contains(AGENT_RUN)
+        || AGENT_RUN_ALT.iter().any(|a| step.contains(a))
         || step.contains(AGENT_BINARY)
         || step.contains(EVAL_RUN)
         || step.lines().any(starts_cli)

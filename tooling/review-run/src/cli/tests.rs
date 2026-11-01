@@ -950,3 +950,17 @@ fn a_report_that_cannot_be_written_is_named_and_changes_no_verdict() {
         "{err}"
     );
 }
+
+#[test]
+fn a_leak_found_after_a_failed_review_is_named_beside_its_failure() {
+    assert_eq!(with_leaks(Ok("v".to_owned()), 0), Ok("v".to_owned()));
+    assert_eq!(with_leaks(Ok("v".to_owned()), 2), Err(leak::reason(2)));
+    assert_eq!(
+        with_leaks(Err("no agent".to_owned()), 0),
+        Err("no agent".to_owned())
+    );
+    assert_eq!(
+        with_leaks(Err("no agent".to_owned()), 1),
+        Err(format!("no agent; {}", leak::reason(1)))
+    );
+}

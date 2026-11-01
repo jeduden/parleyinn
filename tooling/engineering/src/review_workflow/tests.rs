@@ -1190,3 +1190,20 @@ fn an_exclusion_in_an_upload_needs_no_scrub_of_its_own() {
     );
     assert!(unscrubbed_uploads(&steps(&text)).is_empty());
 }
+
+#[test]
+fn every_spelling_of_the_review_run_start_runs_agents() {
+    for run in [
+        "cargo run -p review-run -- --workdir .",
+        "cargo run --package review-run -- --workdir .",
+        "cargo run --bin review-run -- --workdir .",
+        "target/release/review-run --workdir .",
+    ] {
+        let step = format!("      - run: {run}\n");
+        assert!(runs_agent_step(&step), "{run}");
+        assert!(runs_agents(&step), "{run}");
+    }
+    assert!(!runs_agent_step(
+        "      - run: cargo build --package review-run\n"
+    ));
+}
