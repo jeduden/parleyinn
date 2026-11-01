@@ -11,6 +11,7 @@
 
 use std::fs;
 use std::path::Path;
+use std::sync::{Mutex, PoisonError};
 
 use review_eval::credential;
 use review_eval::host::{Command, Host, Output};
@@ -30,13 +31,20 @@ pub const CREDENTIAL: &str = "credential";
 pub const NAMED: &str = "an agent's output contained the Claude token: ";
 
 /// A stand-in for the `claude` command line: each agent reads the
-/// credential it was pointed at and states the token in its text and
-/// its answer.
+/// credential it was pointed at, as one whose read was not refused
+/// would, and states the token in its text and its answer; each
+/// command it was handed is kept.
 #[derive(Debug, Default)]
-pub struct LeakHost;
+pub struct LeakHost {
+    commands: Mutex<Vec<Command>>,
+}
 
 impl Host for LeakHost {
     fn run(&self, command: &Command) -> Result<Output, String> {
+        self.commands
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .push(command.clone());
         let dir = command
             .env
             .iter()
@@ -65,11 +73,13 @@ impl Host for LeakHost {
     }
 }
 
-/// How `review-run` ended: its exit code and every line it printed.
+/// How `review-run` ended: its exit code, every line it printed and
+/// every command it started.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Ran {
     pub code: u8,
     pub printed: String,
+    pub commands: Vec<Command>,
 }
 
 /// Prepares `workdir` from `checkout`, stages [`TOKEN`] under it and
@@ -91,12 +101,17 @@ pub fn run_leaking(checkout: &Checkout, workdir: &Path) -> Result<Ran, String> {
     ];
     let mut out = Vec::new();
     let mut err = Vec::new();
-    let code = review_run::cli::run(&LeakHost, args, &mut out, &mut err);
+    let host = LeakHost::default();
+    let code = review_run::cli::run(&host, args, &mut out, &mut err);
     out.extend(err);
 
     Ok(Ran {
         code,
         printed: String::from_utf8_lossy(&out).into_owned(),
+        commands: host
+            .commands
+            .into_inner()
+            .unwrap_or_else(PoisonError::into_inner),
     })
 }
 
@@ -184,6 +199,58 @@ pub fn fail_closed_problems(workdir: &Path, ran: &Ran) -> Vec<String> {
     }
 
     problems
+}
+
+/// What is wrong with how `commands` keep their agents from the
+/// credential staged in `dir`: no agent started, or one whose
+/// `--disallowedTools` does not name the directory and all under it
+/// (ENG-28). A `Read` rule covers Grep and Glob too; Bash is refused
+/// whole.
+#[must_use]
+pub fn confinement_problems(commands: &[Command], dir: &Path) -> Vec<String> {
+    if commands.is_empty() {
+        return vec![
+            "review-run started no agent, so none was shown refused the staged credential"
+                .to_owned(),
+        ];
+    }
+    let shown = dir.display();
+    let (under, itself) = (format!("Read(/{shown}/**)"), format!("Read(/{shown})"));
+    commands
+        .iter()
+        .filter(|c| {
+            let refused: Vec<&str> = c
+                .args
+                .windows(2)
+                .filter(|w| w[0] == "--disallowedTools")
+                .flat_map(|w| w[1].split(','))
+                .collect();
+            !(refused.contains(&under.as_str()) && refused.contains(&itself.as_str()))
+        })
+        .map(|c| {
+            format!(
+                "agent {} is not refused the staged credential's directory {shown} by name: \
+                 its --disallowedTools lacks {under} or {itself}",
+                agent_of(c)
+            )
+        })
+        .collect()
+}
+
+/// Runs the review with the [`LeakHost`] in `workdir`, prepared from
+/// `checkout`, and returns how each agent it started may read the
+/// credential staged there.
+#[must_use]
+pub fn review_run_refuses_the_credential(checkout: &Checkout, workdir: &Path) -> Vec<String> {
+    match run_leaking(checkout, workdir) {
+        Ok(ran) => {
+            // Staged, it resolves: review-run names it by that path.
+            let staged = workdir.join(CREDENTIAL);
+            let dir = fs::canonicalize(&staged).unwrap_or(staged);
+            confinement_problems(&ran.commands, &dir)
+        }
+        Err(e) => vec![e],
+    }
 }
 
 /// Runs the review with the [`LeakHost`] in `workdir`, prepared from

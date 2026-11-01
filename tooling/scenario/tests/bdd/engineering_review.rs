@@ -99,13 +99,18 @@ fn agents_write_nothing(w: &mut World) -> Result<(), String> {
 }
 
 #[then(
-    regex = r#"^no step that runs an agent holds the "([^"]+)" token: one step in each agent job stages it where no agent reads it, review-run refuses its agents every read of the process, system and device files and outside their trees, and every file an agent job uploads waits for a scrub of that token$"#
+    regex = r#"^no step that runs an agent holds the "([^"]+)" token: one step in each agent job stages it where no agent reads it, review-run refuses its agents every read of the staged credential's directory by name, of the process, system and device files and outside their trees, and every file an agent job uploads waits for a scrub of that token$"#
 )]
 fn token_kept_from_agents(w: &mut World, token: String) -> Result<(), String> {
     let mut problems = eng(w).flow.token_kept_from_agents(&token);
     problems.extend(review_workflow::Workflow::reads_refused(
         review_eval::runner::DISALLOWED,
         review_eval::runner::SETTINGS,
+    ));
+    let work = testkit::TempDir::new().map_err(|e| format!("make a work directory: {e}"))?;
+    problems.extend(engineering::review_leak::review_run_refuses_the_credential(
+        eng(w).checkout()?,
+        work.path(),
     ));
     outcome(problems)
 }

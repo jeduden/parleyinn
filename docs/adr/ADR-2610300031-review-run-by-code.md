@@ -274,8 +274,9 @@ repeat them, which costs tokens.
 - The Claude Code OAuth token stays out of every agent's reach: one
   step in each agent job stages it in a credentials file under the
   runner's temporary directory, no step that runs an agent holds it,
-  each agent is refused reads of that directory, `/proc`, `/sys`, `/dev`
-  and outside its trees, and every file and line review-run writes is
+  each agent is refused reads of that directory by name in its
+  `--disallowedTools`, and of `/proc`, `/sys`, `/dev` and outside its
+  trees, and every file and line review-run writes is
   scrubbed of that OAuth token first; a review whose agent's output
   held it requests changes naming the leak and fails, so nothing is
   posted.

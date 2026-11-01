@@ -24,8 +24,10 @@ pub const DISALLOWED: &str = "Bash,Edit,Write,NotebookEdit,WebFetch,WebSearch,Ag
                               Read(//proc/**),Read(//sys/**),Read(//dev/**)";
 
 /// The settings every agent runs with: its file tools refuse any read
-/// outside the work directory and the pull request's tree, the staged
-/// credential's directory among what that leaves out (ENG-28).
+/// outside the work directory and the pull request's tree (ENG-28).
+/// The staged credential's directory does not rest on this alone:
+/// [`crate::credential::confine`] refuses it by name in each agent's
+/// `--disallowedTools`.
 pub const SETTINGS: &str = r#"{"permissions":{"blockReadsOutsideWorkingDirectories":true}}"#;
 
 /// The prompt `component` gets for `world`: for a specialist or a
