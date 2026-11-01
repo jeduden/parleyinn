@@ -339,6 +339,25 @@ jobs:
             jq -r '.[] | "| \(.agent) | \(.parts) | \(.attempts) | \(.calls) | \(.fresh) | \(.cache_write) | \(.cache_read) | \(.output) | \(.cost_usd) |"' \
               review/usage.json
           } >> "$GITHUB_STEP_SUMMARY" || exit 0
+      # The trace review-run wrote after the run, failed or not, on one
+      # screen: the verdict, the counts, the wall time and each run
+      # whose answer was not taken, by name alone. The trace and the
+      # report page, review/report.html, go with the reports below; they
+      # hold timings, tokens, costs and gap reasons, never a tool result
+      # (ENG-28). It only reports and never fails the review.
+      - name: Summarize the review's trace
+        if: always() && steps.pull_head.outputs.number != ''
+        run: |
+          [ -s review/trace.jsonl ] || exit 0
+          {
+            echo "### The review's trace"
+            echo
+            head -n 1 review/trace.jsonl | jq -r '.trace | "verdict \(.verdict): \(.findings_blocking) blocking, \(.findings_nit) nits, \(.gaps) not reviewed, \((((.finished // 0) - (.started // 0)) / 1000) | floor) s"'
+            echo
+            tail -n +2 review/trace.jsonl | jq -r 'select(.status == "gap") | "- gap: \(.name) part \(.part // "-") attempt \(.attempt)"' | head -n 30
+            echo
+            echo "The page, report.html, and the trace, trace.jsonl, are in the review-reports artifact."
+          } >> "$GITHUB_STEP_SUMMARY" || exit 0
       # The reports review-run assembled from the run logs, and the
       # answers, for the post job's gate and for the review's readers:
       # the review and its check link here. A review that failed keeps
@@ -352,6 +371,8 @@ jobs:
           path: |
             review/reports/
             review/answers.json
+            review/report.html
+            review/trace.jsonl
             review/usage.json
           if-no-files-found: error
       # The run logs under review/logs/ stay in the job: they hold every
