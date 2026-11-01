@@ -1,0 +1,36 @@
+# The stability measurement's snapshots (ENG-32): frozen pull-request snapshots,
+# each reviewed three times afresh by .github/workflows/stability.yml,
+# whose verdict flip rate and finding overlap measure how stable the
+# review is on an unchanged snapshot. Each snapshot is a merged pull request
+# of this repository: `base` is the main commit it was opened against
+# and `head` the commit it was reviewed at; the review diffs
+# `base...head`.
+#
+# To add one, pick a small, recent merged pull request, read its two
+# parents with `git log --merges --first-parent --format='%H %P' main`
+# (the first parent is the base, the second the head), and add a snapshot
+# with a name of lowercase letters, digits and dashes. Each snapshot costs
+# three reviews per measurement; keep the list short.
+
+# A Rust change with its unit tests: the code generalist and its
+# language and test-layer specialists.
+[[snapshot]]
+name = "pr-99-testkit-relative"
+pull = 99
+base = "cbf144c6e74833535424c54cbfd04a23d90b47b0"
+head = "86ec49030e8e8fe2af2bc2fd9441a64167e12ab6"
+
+# A workflow and shell change: the CI, Actions and shell specialists.
+[[snapshot]]
+name = "pr-94-ci-retry-installs"
+pull = 94
+base = "24e3cb9b57331455168484d4d09597afd713b98e"
+head = "6b418f68f8f8824d88701a123cc065f0f5135227"
+
+# A requirement and scenario change: the specification generalist and
+# its section and Gherkin specialists.
+[[snapshot]]
+name = "pr-90-phase-16-docs"
+pull = 90
+base = "ae88d60f98efdc81dee8fc4b98e50c780d5bf3d0"
+head = "a19b372928fa2243bdf63878a7ae998cc9836f73"

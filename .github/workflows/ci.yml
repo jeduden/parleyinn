@@ -151,12 +151,12 @@ jobs:
         run: |
           shards=(
             "-p adr -p calibrate -p coverage -p drift -p engineering \
-              -p review-bundle -p review-eval -p review-gate -p review-run -p srs"
+              -p review-bundle -p review-eval -p review-gate -p review-report -p review-run -p srs"
             "-p redaction -p repository -p store -p testkit"
             "--workspace --exclude scenario \
               --exclude adr --exclude calibrate --exclude coverage --exclude drift \
               --exclude engineering --exclude review-bundle --exclude review-eval \
-              --exclude review-gate --exclude review-run --exclude srs \
+              --exclude review-gate --exclude review-report --exclude review-run --exclude srs \
               --exclude redaction --exclude repository --exclude store --exclude testkit"
           )
           if [ "${#shards[@]}" -ne "$JOB_TOTAL" ]; then

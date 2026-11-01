@@ -1,0 +1,232 @@
+name: Stability measurement
+
+# ENG-32: how stable the review is on an unchanged pull-request snapshot.
+# The `claude` command line takes no seed, so a review cannot be pinned,
+# only measured by repetition: for each frozen snapshot listed in
+# tooling/review-eval/stability-snapshots.toml, main's review-run reviews
+# it three times, each in a fresh work directory with nothing reused,
+# and `review-report stability` compares the three: the share of reviews
+# whose verdict differs from the most common one (the flip rate) and,
+# per agent, the overlap of its finding sets (Jaccard). A flip rate
+# above 0.2 or an overlap below 0.7 (review-report's FLIP_RATE_LIMIT
+# and JACCARD_FLOOR) is a warning, not a failure: the measurement measures,
+# the stakeholder decides.
+#
+# It runs from the default branch's definition alone (the first job
+# refuses any other ref, so a dispatch from a branch measures nothing)
+# on the stakeholder's Claude token, as the review does: one step stages
+# the token where no agent reads it, no step that runs an agent holds it,
+# and every upload waits for a scrub of it (ENG-28). Nothing it has can
+# write. One measurement is nine
+# reviews, about $15 of model usage, so it runs on demand alone.
+on:
+  workflow_dispatch:
+  # The weekly measurement, off until the stakeholder turns it on:
+  # schedule:
+  #   - cron: "23 4 * * 1"
+
+permissions: {}
+
+# One measurement at a time: two would only double the cost.
+concurrency:
+  group: stability-measurement
+  cancel-in-progress: false
+
+jobs:
+  snapshots:
+    # A dispatch from another ref would run that ref's definition with
+    # the token; only the default branch's runs.
+    if: github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    outputs:
+      snapshots: ${{ steps.snapshots.outputs.snapshots }}
+      samples: ${{ steps.snapshots.outputs.samples }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install pinned Rust with mise
+        uses: ./.github/actions/setup-mise
+        with:
+          tools: "rust"
+          cache: false
+      - name: Read the snapshots
+        id: snapshots
+        run: |
+          cargo run --locked --quiet -p review-report -- \
+            snapshots tooling/review-eval/stability-snapshots.toml >> "$GITHUB_OUTPUT"
+
+  # One fresh review of one snapshot: main's tree as the work directory,
+  # the snapshot's head as the pull request's tree, its diff against its
+  # base, and no answer from any other review.
+  sample:
+    needs: snapshots
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      max-parallel: 3
+      matrix: ${{ fromJSON(needs.snapshots.outputs.samples) }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Install pinned Rust and mdsmith with mise
+        uses: ./.github/actions/setup-mise
+        with:
+          tools: "rust github:jeduden/mdsmith"
+          # Jobs handling review credentials never restore executable caches.
+          cache: false
+      - name: Install the pinned Claude Code command line
+        uses: ./.github/actions/claude-code
+      # Built, its crates fetched and their build scripts run, before the
+      # Claude token is in any step's environment; the steps that hold or
+      # use it run offline.
+      - name: Build the review's tools
+        run: cargo build --locked --quiet -p review-bundle -p review-run -p review-eval
+      # As the review workflow prepares its work directory, the pull
+      # request's agent instructions copied out of its tree as data.
+      - name: Prepare a fresh work directory
+        env:
+          BASE: ${{ matrix.base }}
+          HEAD_SHA: ${{ matrix.head }}
+        run: |
+          work="$RUNNER_TEMP/work"
+          mkdir -p "$work/pr-head"
+          git archive HEAD | tar -x -C "$work"
+          git archive "$HEAD_SHA" | tar -x -C "$work/pr-head"
+          git diff "$BASE...$HEAD_SHA" > "$work/pr.diff"
+          cd "$work"
+          mkdir -p review/reports
+          echo '[]' > stakeholder-comments.json
+          find pr-head \( -name .claude -o -name CLAUDE.md -o -name CLAUDE.local.md \
+            -o -name AGENTS.md -o -name .mcp.json \) -prune -print0 > instructions.list
+          while IFS= read -r -d '' f; do
+            find "$f" -type f -print0 | while IFS= read -r -d '' g; do
+              printf '\n===== %s =====\n' "${g#pr-head/}"
+              cat "$g"
+            done
+            rm -rf "$f"
+          done < instructions.list > review/pr-instructions.txt
+          mdsmith help patterns -f json > review/mdsmith-patterns.json
+          "$GITHUB_WORKSPACE/target/debug/review-bundle" --base . --head pr-head \
+            --diff pr.diff --consent stakeholder-comments.json --out review > class.txt
+      # The Claude token reaches no agent's environment and no file its
+      # tools can read (ENG-28). This step alone holds it, and writes it
+      # into a credentials file only its owner reads, under the runner's
+      # temporary directory, outside both trees the agents are given.
+      - name: Stage the Claude token where no agent reads it
+        env:
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+        run: |
+          cargo run --locked --quiet --offline -p review-eval -- stage-credential \
+            --dir "$RUNNER_TEMP/claude-credential"
+      # No step that runs an agent holds the token: review-run reads it
+      # from the staged credential only to scrub what it writes of it.
+      - name: Review
+        env:
+          HEAD_SHA: ${{ matrix.head }}
+        run: |
+          cargo run --locked --quiet --offline -p review-run -- --workdir "$RUNNER_TEMP/work" \
+            --parallel 32 --head-sha "$HEAD_SHA" \
+            --credential "$RUNNER_TEMP/claude-credential" > "$RUNNER_TEMP/work/review/run.txt"
+      # Whatever review-run wrote is scrubbed of the token once more, a
+      # run cut off before its own scrub included, before any step keeps
+      # it; a form found fails the job. Only then is the staged
+      # credential removed.
+      - name: Scrub what the review wrote of the Claude token
+        id: scrub
+        if: always()
+        run: |
+          set +e
+          work="$RUNNER_TEMP/work"
+          cargo run --locked --quiet --offline -p review-eval -- scrub \
+            --credential "$RUNNER_TEMP/claude-credential" \
+            --path "$work/review/logs" --path "$work/review/reports" \
+            --path "$work/review/answers.json" --path "$work/review/usage.json" \
+            --path "$work/review/outcome.json" --path "$work/review/consulted.json" \
+            --path "$work/review/gaps.json" --path "$work/review/run-id.json" \
+            --path "$work/review/agent-runs.jsonl" --path "$work/review/report.html" \
+            --path "$work/review/run.txt" --path "$work/class.txt"
+          code=$?
+          set -e
+          rm -rf "$RUNNER_TEMP/claude-credential"
+          if [ "$code" -eq 0 ] || [ "$code" -eq 3 ]; then
+            echo "scrubbed=true" >> "$GITHUB_OUTPUT"
+          fi
+          if [ "$code" -eq 3 ]; then
+            echo "::error::what the review wrote held the Claude Code OAuth token, now redacted; revoke and rotate it, and the scrubbed reviews are kept for the comparison"
+          fi
+          exit "$code"
+      # What the comparison reads, and the run list and the run report; the run
+      # logs stay in the job, as in the review (ENG-28). A snapshot's name
+      # holds no underscore, so the comparison's pattern takes its own
+      # three reviews alone.
+      - name: Keep the review
+        if: always() && steps.scrub.outputs.scrubbed == 'true'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: review_${{ matrix.name }}_${{ matrix.sample }}
+          path: |
+            ${{ runner.temp }}/work/class.txt
+            ${{ runner.temp }}/work/review/reports/
+            ${{ runner.temp }}/work/review/outcome.json
+            ${{ runner.temp }}/work/review/answers.json
+            ${{ runner.temp }}/work/review/usage.json
+            ${{ runner.temp }}/work/review/gaps.json
+            ${{ runner.temp }}/work/review/run-id.json
+            ${{ runner.temp }}/work/review/report.html
+            ${{ runner.temp }}/work/review/agent-runs.jsonl
+          if-no-files-found: error
+
+  # The three reviews of each snapshot, compared.
+  stability:
+    needs: [snapshots, sample]
+    if: always() && needs.snapshots.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.snapshots.outputs.snapshots) }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install pinned Rust with mise
+        uses: ./.github/actions/setup-mise
+        with:
+          tools: "rust"
+          cache: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: review_${{ matrix.name }}_*
+          path: reviews
+      - name: Measure the stability
+        id: measure
+        run: |
+          set -o pipefail
+          cargo run --locked --quiet -p review-report -- stability --out stability.json \
+            reviews/*/ | tee measured.txt
+          {
+            echo "### Stability of the review"
+            echo
+            cat measured.txt
+          } >> "$GITHUB_STEP_SUMMARY"
+          if grep -qx 'within_limits=false' measured.txt; then
+            echo "::warning::the review is unstable on this snapshot: a flip rate above 0.2 or a finding overlap below 0.7; stability.json names each agent"
+          fi
+      - name: Keep the measure
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: stability_${{ matrix.name }}
+          path: stability.json
+          if-no-files-found: error
