@@ -181,9 +181,9 @@ repeat them, which costs tokens.
   budget its front matter names; `review-run` passes no model.
 - **The workflow.** The review job installs the pinned Claude Code
   command line as the evaluate job does, builds `review-run` before the
-  Claude token is in any step's environment, and runs it offline. The
-  job keeps its read-only permissions, holds no reviewer-app key and
-  hands the agents no GitHub token.
+  Claude Code OAuth token is in any step's environment, and runs it
+  offline. The job keeps its read-only permissions, holds no
+  reviewer-app key and hands the agents no GitHub token.
 - **What stays.** The layers, the deep instances, the generalists
   reading report files, the post job's gate, the required
   `review-gate` check and the triggers stay as ADR-2610262245 has them.
@@ -283,6 +283,15 @@ repeat them, which costs tokens.
   afresh and measures the verdict flip rate and each agent's finding
   overlap (ENG-32). It runs on dispatch alone: about $15 a probe, so
   its weekly schedule waits, commented out, for the stakeholder.
+- The Claude Code OAuth token stays out of every agent's reach: one
+  step in each agent job stages it in a credentials file under the
+  runner's temporary directory, no step that runs an agent holds it,
+  each agent is refused reads of that directory by name in its
+  `--disallowedTools`, and of `/proc`, `/sys`, `/dev` and outside its
+  trees, and every file and line review-run writes is
+  scrubbed of that OAuth token first; a review whose agent's output
+  held it requests changes naming the leak and fails, so nothing is
+  posted.
 - No new third-party dependency.
 
 ## Approval

@@ -35,6 +35,10 @@ if [ -n "$CLAUDE_CODE_CHILD_SESSION" ] || [ -n "$CLAUDE_AUTO_BACKGROUND_TASKS" ]
   echo "started as a harness session's child" >&2
   exit 3
 fi
+if [ -n "$CLAUDE_CODE_OAUTH_TOKEN" ]; then
+  echo "started with the Claude token in its environment" >&2
+  exit 4
+fi
 prompt="$2"
 agent=""
 prev=""
@@ -43,6 +47,13 @@ for a in "$@"; do
   prev="$a"
 done
 if [ "$agent" = "$SILENT_AGENT" ]; then exec sleep 30; fi
+if [ -n "$LEAK_AGENT" ] && [ "$agent" = "$LEAK_AGENT" ]; then
+  token=$(sed -n 's/.*"accessToken":"\([^"]*\)".*/\1/p' "$CLAUDE_CONFIG_DIR/.credentials.json")
+  printf '{"type":"assistant","parent_tool_use_id":null,"message":{"id":"m-%s","model":"claude-haiku-5-5","usage":{"input_tokens":3,"output_tokens":2},"content":[{"type":"text","text":"my environment holds %s"}]}}\n' "$agent" "$token"
+  printf '{"type":"result","subtype":"success","is_error":false,"result":"outcome: none — %s","total_cost_usd":0.01,"num_turns":2}\n' "$token"
+  echo "stderr too: $token" >&2
+  exit 0
+fi
 part=""
 own=""
 case "$prompt" in
@@ -145,6 +156,17 @@ fn review_run_refusing(
     refuse: &str,
     args: &[&str],
 ) -> Output {
+    review_run_holding(home, dir, (silent, cut, refuse), &[], args)
+}
+
+/// [`review_run_refusing`], with `env` set for the executable too.
+fn review_run_holding(
+    home: &Path,
+    dir: &Path,
+    (silent, cut, refuse): (&str, &str, &str),
+    env: &[(&str, &str)],
+    args: &[&str],
+) -> Output {
     let (cut, cut_part) = cut.split_once(':').unwrap_or((cut, ""));
     let (refuse, always) = refuse.split_once(':').unwrap_or((refuse, ""));
     let bin = home.join("bin");
@@ -166,6 +188,7 @@ fn review_run_refusing(
         .env("BAD", BAD)
         .env("CLAUDE_CODE_CHILD_SESSION", "1")
         .env("CLAUDE_AUTO_BACKGROUND_TASKS", "1")
+        .envs(env.iter().copied())
         .arg("--workdir")
         .arg(dir)
         .args(args);
@@ -221,6 +244,86 @@ fn gate(home: &Path, dir: &Path) -> (u8, String, String) {
         String::from_utf8(out).unwrap(),
         String::from_utf8(err).unwrap(),
     )
+}
+
+/// A stand-in for the Claude token; never a real one.
+const TOKEN: &str = "dummy-access-token-0123456789-e2e";
+
+/// Every file under `dir`, read.
+fn every_file(dir: &Path) -> String {
+    let mut all = String::new();
+    for entry in fs::read_dir(dir).unwrap() {
+        let path = entry.unwrap().path();
+        if path.is_dir() {
+            all.push_str(&every_file(&path));
+        } else {
+            all.push_str(&String::from_utf8_lossy(&fs::read(&path).unwrap()));
+        }
+    }
+    all
+}
+
+#[test]
+fn an_agent_that_leaks_the_staged_token_fails_the_review_closed_with_every_trace_scrubbed() {
+    let home = TempDir::new().unwrap();
+    let dir = home.path().join("work");
+    workdir(&dir);
+    let cred = home.path().join("cred");
+    review_eval::credential::stage(&cred, TOKEN).unwrap();
+    let cred_arg = cred.display().to_string();
+
+    // The process holds the token as the workflow's old step gave it;
+    // no agent it starts may.
+    let clean = review_run_holding(
+        home.path(),
+        &dir,
+        ("", "", ""),
+        &[("CLAUDE_CODE_OAUTH_TOKEN", TOKEN)],
+        &["--credential", &cred_arg],
+    );
+    let stderr = String::from_utf8_lossy(&clean.stderr);
+    assert_eq!(clean.status.code(), Some(0), "{stderr}");
+    // A stand-in that found the token in its environment answers
+    // nothing, so a review that approves gave it to none.
+    assert!(
+        String::from_utf8_lossy(&clean.stdout).starts_with("verdict=approve\n"),
+        "{stderr}"
+    );
+
+    let out = review_run_holding(
+        home.path(),
+        &dir,
+        ("", "", ""),
+        &[
+            ("CLAUDE_CODE_OAUTH_TOKEN", TOKEN),
+            ("LEAK_AGENT", "lang-rust"),
+        ],
+        &["--credential", &cred_arg],
+    );
+
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert_eq!(out.status.code(), Some(1), "{stdout}\n{stderr}");
+    assert!(
+        stdout.starts_with("failed=an agent's output contained the Claude token: "),
+        "{stdout}"
+    );
+    assert!(
+        !stdout.contains(TOKEN) && !stderr.contains(TOKEN),
+        "{stderr}"
+    );
+    let all = every_file(&dir.join("review"));
+    assert!(!all.contains(TOKEN), "a file under review/ holds the token");
+    assert!(all.contains("[REDACTED token]"));
+    let outcome = fs::read_to_string(dir.join("review/outcome.json")).unwrap();
+    assert!(
+        outcome.contains("\"verdict\": \"request_changes\""),
+        "{outcome}"
+    );
+    assert!(
+        outcome.contains("an agent's output contained the Claude token: "),
+        "{outcome}"
+    );
 }
 
 #[test]

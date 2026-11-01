@@ -153,6 +153,19 @@ fn a_command_gets_its_own_variables_but_never_a_nested_sessions() {
     );
 }
 
+#[test]
+fn a_command_never_gets_the_claude_token_in_its_environment() {
+    let dir = TempDir::new().unwrap();
+    let var = crate::credential::TOKEN_VAR;
+    let mut command = sh(&format!("echo \"${{{var}:-unset}}\""), dir.path());
+    command.env = vec![(var.to_owned(), "dummy-token-0123456789".to_owned())];
+
+    let out = ProcessHost.run(&command).unwrap();
+
+    assert_eq!(WITHHELD_VARS, [var]);
+    assert_eq!(out.stdout, "unset\n");
+}
+
 /// A pipe that yields `ab`, then fails.
 struct FailingPipe(bool);
 
