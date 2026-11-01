@@ -225,8 +225,13 @@ pub fn order_problems(events: &[Event]) -> Vec<String> {
             problems.push(format!("{name} ran but was not dispatched"));
         }
     }
-    let dispatch: std::collections::BTreeMap<String, Vec<String>> =
-        serde_json::from_str(DISPATCH).unwrap_or_default();
+    let dispatch = match parse_dispatch(DISPATCH) {
+        Ok(dispatch) => dispatch,
+        Err(problem) => {
+            problems.push(problem);
+            return problems;
+        }
+    };
     for generalist in &generalists {
         let Some(&start) = started(generalist).first() else {
             continue;
@@ -342,3 +347,9 @@ pub fn review_runs_by_code(checkout: &Checkout, workdir: &Path) -> Vec<String> {
 
 #[cfg(test)]
 mod tests;
+
+/// The dispatch the host was given, or why it does not parse.
+fn parse_dispatch(raw: &str) -> Result<std::collections::BTreeMap<String, Vec<String>>, String> {
+    serde_json::from_str(raw)
+        .map_err(|e| format!("the dispatch the host was given does not parse: {e}"))
+}

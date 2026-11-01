@@ -44,7 +44,7 @@ fn agents_run_by(w: &mut World, cmd: String) -> Result<(), String> {
 }
 
 #[then(
-    regex = r"^review-run runs each specialist the review bundle dispatches as its own agent, assembles its report from its run log, runs each generalist once its own specialists have ended and the breaker is decided, and writes the review outcome from what they answered$"
+    regex = r"^review-run runs each specialist the review bundle dispatches as its own agent, assembles its report from its run log, runs each generalist once its own specialists have ended and the mass failure is decided, and writes the review outcome from what they answered$"
 )]
 fn review_runs_by_code(w: &mut World) -> Result<(), String> {
     let work = testkit::TempDir::new().map_err(|e| format!("make a work directory: {e}"))?;
@@ -66,7 +66,7 @@ fn review_run_caps_cost(w: &mut World) -> Result<(), String> {
 }
 
 #[then(
-    regex = r"^review-run starts no generalist once more than a third of the dispatched specialists failed, those a cost cap stopped among them, and opens the review outcome with a blocking finding naming the mass failure$"
+    regex = r"^review-run starts no generalist once more than a third of the dispatched specialists, those a cost cap stopped or kept from starting among them, ended without an accepted report, and opens the review outcome with a blocking finding naming the mass failure$"
 )]
 fn review_run_breaks(w: &mut World) -> Result<(), String> {
     let work = testkit::TempDir::new().map_err(|e| format!("make a work directory: {e}"))?;

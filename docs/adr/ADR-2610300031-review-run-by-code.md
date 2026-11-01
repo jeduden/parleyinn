@@ -265,8 +265,8 @@ repeat them, which costs tokens.
   at once, so they take two waves and the generalists a third: 3 x 2 x
   15 = 90 minutes at worst, and the job's cap is 120. Agents end in
   minutes in practice, and a generalist starts as soon as its own
-  specialists have ended and too few specialists still run to trip the
-  breaker below, so the third wave overlaps the second.
+  specialists have ended and the mass failure below is decided, so the
+  third wave overlaps the second.
 - What a review may spend and how it fails are bounded by code, as
   proposed by the engine comparison of 2026-11-01 (cost caps, a mass
   failure breaker, pipelined generalists, retry backoff, live
