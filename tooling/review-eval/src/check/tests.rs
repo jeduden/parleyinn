@@ -158,6 +158,32 @@ fn a_generalist_s_case_that_names_a_form_is_named() {
 }
 
 #[test]
+fn a_case_that_names_a_severity_other_than_blocking_or_nit_is_named() {
+    let dir = checkout();
+    let cases = dir.path().join(crate::CASES);
+    write_case(
+        dir.path(),
+        "lang-rust",
+        "severity",
+        "defect",
+        &UNWRAP.replace(
+            "outcome = \"blocking\"\n",
+            "\n[[expect.none]]\npath = \"crates/x/src/rogue.rs\"\nseverity = \"Blocking\"\n",
+        ),
+    );
+
+    let got = problems(dir.path(), dir.path(), &cases, None);
+
+    assert!(
+        got.contains(
+            &"case lang-rust/severity names the severity \"Blocking\"; a case names blocking or nit"
+                .to_owned()
+        ),
+        "{got:?}"
+    );
+}
+
+#[test]
 fn a_generalist_s_case_that_expects_a_stated_or_withdrawn_finding_is_named() {
     let dir = checkout();
     let cases = dir.path().join(crate::CASES);

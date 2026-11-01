@@ -162,6 +162,30 @@ fn form_problem(case: &Case, component: &Component) -> Option<String> {
     ))
 }
 
+/// The problem with `case` when a finding it expects names a severity
+/// other than `blocking` or `nit`, word for word: the grader compares a
+/// specialist's case with `blocking` exactly, so `Blocking` would grade
+/// more loosely than its author meant (ENG-32).
+fn severity_problem(case: &Case) -> Option<String> {
+    let expect = &case.expect;
+    let severity = [
+        &expect.finding,
+        &expect.none,
+        &expect.dropped,
+        &expect.stated,
+        &expect.withdrawn,
+    ]
+    .into_iter()
+    .flatten()
+    .filter_map(|e| e.severity.as_deref())
+    .find(|s| ![crate::case::BLOCKING, "nit"].contains(s))?;
+
+    Some(format!(
+        "case {} names the severity {severity:?}; a case names blocking or nit",
+        case.id()
+    ))
+}
+
 /// [`examine`], with the cases read as [`all_cases_from`] reads them.
 ///
 /// # Errors
@@ -213,6 +237,9 @@ pub fn examine_from(
             ));
         }
         if let Some(problem) = form_problem(case, component) {
+            problems.cases.push(problem);
+        }
+        if let Some(problem) = severity_problem(case) {
             problems.cases.push(problem);
         }
         match dispatches(root, &base, case, component) {

@@ -107,7 +107,7 @@ pub fn cases() -> Vec<Case> {
         review_place_form_cases(),
         review_retry_cases(),
         vec![review_unlinked_case()],
-        vec![review_unknown_id_post_case()],
+        vec![review_unknown_id_post_case(), review_case_severity_case()],
         // Last: its cases edit source the later cases would run stale.
         license_text_cases(),
     ]
@@ -483,6 +483,22 @@ fn review_unknown_id_post_case() -> Case {
             "review_refusals::tests::the_checkout_s_review_run_names_an_unknown_id_and_an_unread_line",
         ),
         "the_checkout_s_review_run_names_an_unknown_id_and_an_unread_line",
+    )
+}
+
+/// The drift ENG-32's case check must catch, late so adding it moves no
+/// earlier case to another shard: a case naming a severity the grader
+/// does not compare it with, so it grades more loosely than meant.
+fn review_case_severity_case() -> Case {
+    protection_case(
+        "a reviewer evaluation case naming a severity other than blocking or nit",
+        Injection::replace(
+            "tooling/review-eval/cases/review-code/injection-in-the-diff.toml",
+            "severity = \"blocking\"",
+            "severity = \"Blocking\"",
+        ),
+        "the_checkout_s_reviewer_evaluation_cases_apply_and_dispatch",
+        "case review-code/injection-in-the-diff names the severity",
     )
 }
 
