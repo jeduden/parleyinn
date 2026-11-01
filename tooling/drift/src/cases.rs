@@ -62,6 +62,9 @@ const CODEOWNERS: &str = ".github/CODEOWNERS";
 /// The workflow the ENG-28 cases drift.
 const REVIEW_WORKFLOW: &str = ".github/workflows/review.yml";
 
+/// The script the review workflow's post job decides the review with.
+const REVIEW_DECIDE_SCRIPT: &str = "scripts/review-decide.sh";
+
 /// The scheduled reviewer evaluation the ENG-32 case drifts.
 const REVIEW_EVAL_WORKFLOW: &str = ".github/workflows/review-eval.yml";
 

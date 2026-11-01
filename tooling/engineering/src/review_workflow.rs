@@ -796,8 +796,10 @@ impl Workflow {
 }
 
 mod gate;
+mod scripts;
 
 pub use gate::*;
+pub use scripts::{inline_scripts, load};
 
 #[cfg(test)]
 mod tests;

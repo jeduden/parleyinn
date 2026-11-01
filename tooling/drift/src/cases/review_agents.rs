@@ -81,7 +81,7 @@ pub(super) fn review_post_cases() -> Vec<Case> {
             "the review gate without the specialists' reports",
             "ENG-28",
             Injection::replace(
-                REVIEW_WORKFLOW,
+                REVIEW_DECIDE_SCRIPT,
                 " --reports reports --answers answers.json",
                 "",
             ),
@@ -283,7 +283,7 @@ pub(super) fn review_gate_cases() -> Vec<Case> {
             "the review posted without the review gate",
             "ENG-28",
             Injection::replace(
-                REVIEW_WORKFLOW,
+                REVIEW_DECIDE_SCRIPT,
                 "cargo run --locked --quiet -p review-gate --offline -- --outcome",
                 "cp outcome.json review.json; true --outcome",
             ),
@@ -294,9 +294,9 @@ pub(super) fn review_gate_cases() -> Vec<Case> {
             "the review posted without the deterministic findings",
             "ENG-28",
             Injection::replace(
-                REVIEW_WORKFLOW,
-                "            --checked checked.json --dispatch dispatch.json \\\n",
-                "            --dispatch dispatch.json \\\n",
+                REVIEW_DECIDE_SCRIPT,
+                "  --checked checked.json --dispatch dispatch.json \\\n",
+                "  --dispatch dispatch.json \\\n",
             ),
             scenario("ENG-28"),
             r#"job post does not run "--checked checked.json""#,
@@ -305,9 +305,9 @@ pub(super) fn review_gate_cases() -> Vec<Case> {
             "the review posted without holding it to the dispatch",
             "ENG-28",
             Injection::replace(
-                REVIEW_WORKFLOW,
-                "            --consulted consulted.json --reports",
-                "            --reports",
+                REVIEW_DECIDE_SCRIPT,
+                "  --consulted consulted.json --reports",
+                "  --reports",
             ),
             scenario("ENG-28"),
             r#"job post does not run "--consulted consulted.json""#,

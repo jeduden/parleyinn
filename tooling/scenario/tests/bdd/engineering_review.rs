@@ -11,8 +11,7 @@ use crate::engineering::eng;
 
 #[when(regex = r#"^the review workflow is read from "([^"]+)"$"#)]
 fn read_review_workflow(w: &mut World, file: String) -> Result<(), String> {
-    let body = eng(w).checkout()?.read(&file)?;
-    eng(w).flow = review_workflow::parse(&body);
+    eng(w).flow = review_workflow::load(eng(w).checkout()?, &file)?;
     Ok(())
 }
 

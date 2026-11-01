@@ -58,9 +58,7 @@ fn the_checkout_s_release_build_runs_through_the_build_workflow() {
 
 #[test]
 fn the_checkout_s_review_workflow_parses_into_its_trigger_and_jobs() {
-    let flow = checkout()
-        .read(".github/workflows/review.yml")
-        .map(|body| review_workflow::parse(&body));
+    let flow = review_workflow::load(&checkout(), ".github/workflows/review.yml");
 
     assert_eq!(
         flow.as_ref().map(|w| w.triggers.clone()),

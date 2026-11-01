@@ -48,8 +48,8 @@ fn every_case_applies_and_dispatches(w: &mut World) -> Result<(), String> {
     regex = r#"^the review workflow's evaluate job runs "([^"]+)" on the components the pull request changes, after the agents' job and before the job that holds the "([^"]+)" key$"#
 )]
 fn evaluate_job_runs(w: &mut World, cmd: String, key: String) -> Result<(), String> {
-    let body = eng(w).checkout()?.read(REVIEW_WORKFLOW)?;
-    outcome(review_workflow::parse(&body).evaluate_job_runs(&cmd, &key)?)
+    let flow = review_workflow::load(eng(w).checkout()?, REVIEW_WORKFLOW)?;
+    outcome(flow.evaluate_job_runs(&cmd, &key)?)
 }
 
 #[then(
