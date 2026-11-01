@@ -16,9 +16,19 @@ pub const PROGRAM: &str = "claude";
 
 /// The tools the review allows every agent, which reads and writes
 /// nothing, and the tools it refuses: a specialist's report is assembled
-/// from its run log, so no agent needs a writing tool.
+/// from its run log, so no agent needs a writing tool. Its reads of the
+/// process, system and device files are refused too: they hold every
+/// environment on the machine, the review's own among them (ENG-28).
 pub const TOOLS: &str = "Read,Glob,Grep";
-pub const DISALLOWED: &str = "Bash,Edit,Write,NotebookEdit,WebFetch,WebSearch,Agent";
+pub const DISALLOWED: &str = "Bash,Edit,Write,NotebookEdit,WebFetch,WebSearch,Agent,\
+                              Read(//proc/**),Read(//sys/**),Read(//dev/**)";
+
+/// The settings every agent runs with: its file tools refuse any read
+/// outside the work directory and the pull request's tree (ENG-28).
+/// The staged credential's directory does not rest on this alone:
+/// [`crate::credential::confine`] refuses it by name in each agent's
+/// `--disallowedTools`.
+pub const SETTINGS: &str = r#"{"permissions":{"blockReadsOutsideWorkingDirectories":true}}"#;
 
 /// The prompt `component` gets for `world`: for a specialist or a
 /// generalist what the review's run tells it, and for a consultant the
@@ -96,6 +106,7 @@ pub fn command(
     args.extend(["--max-turns".to_owned(), component.max_turns.to_string()]);
     args.extend(["--allowedTools".to_owned(), TOOLS.to_owned()]);
     args.extend(["--disallowedTools".to_owned(), DISALLOWED.to_owned()]);
+    args.extend(["--settings".to_owned(), SETTINGS.to_owned()]);
     match component.kind {
         Kind::Specialist | Kind::Generalist => {
             args.extend(["--agent".to_owned(), component.name.clone()]);

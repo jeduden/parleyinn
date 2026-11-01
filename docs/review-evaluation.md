@@ -127,13 +127,15 @@ judge it.
 ### What bounds the evaluate job
 
 The job runs reviewer components the pull request defines, with the
-Claude OAuth token. Four things bound it:
+Claude OAuth token. Five things bound it:
 
 - it runs from main's workflow definition, never the pull request's;
 - its token is `contents: read`, with no write permission;
 - the harness refuses a definition whose front matter key or tool is
   outside its allow-lists, so none can start a process (I4);
-- main's cases judge the components main already has.
+- main's cases judge the components main already has;
+- one step stages the token where no agent reads it, and the job
+  scrubs what it keeps of the token before it uploads (ENG-28).
 
 ### The plugins every harness session fetches
 
