@@ -287,3 +287,14 @@ fn a_consultant_runs_as_the_session_s_agent_on_the_model_it_resolved() {
     );
     assert!(has(&args_of(&c), ["--model", "claude-opus-5-5"]));
 }
+
+#[test]
+fn every_agent_reads_alone_and_is_refused_every_writing_tool() {
+    // Pinned as text, so a writing tool re-added to either list fails
+    // here rather than passing every test that compares the constants.
+    assert_eq!(TOOLS, "Read,Glob,Grep");
+    assert_eq!(
+        DISALLOWED,
+        "Bash,Edit,Write,NotebookEdit,WebFetch,WebSearch,Agent"
+    );
+}
