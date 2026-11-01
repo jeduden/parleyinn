@@ -579,13 +579,21 @@ fn one_run(
         // The report as the review would assemble it from the log, for
         // the record; a run that did not finish is headed so.
         let incomplete = (!log.answered).then(|| format!("its run ended with {}", log.subtype));
-        let _ = fs::write(
-            dir.join("report.md"),
+        let report_path = dir.join("report.md");
+        let written = fs::write(
+            &report_path,
             review_gate::report::assemble(&log.texts, &log.answer, incomplete.as_deref()),
         );
         let graded = grade::grade(component, case, &log);
         let mut record = RunRecord::new(&log, graded.failures, graded.slips);
         record.notes.clone_from(&world.notes);
+        // A record that cannot be written fails no run, but it is noted
+        // on it (I6).
+        if let Err(e) = written {
+            record
+                .notes
+                .push(format!("write {}: {e}", report_path.display()));
+        }
         let mut grade = if record.passed {
             "passed\n".to_owned()
         } else {
@@ -597,7 +605,12 @@ fn one_run(
         for note in &record.notes {
             grade.push_str(&format!("note: {note}\n"));
         }
-        let _ = fs::write(dir.join("grade.txt"), grade);
+        let grade_path = dir.join("grade.txt");
+        if let Err(e) = fs::write(&grade_path, grade) {
+            record
+                .notes
+                .push(format!("write {}: {e}", grade_path.display()));
+        }
         Ok(record)
     });
     let mut record = result.unwrap_or_else(|e| RunRecord::failed(&e));
