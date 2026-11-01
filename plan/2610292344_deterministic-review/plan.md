@@ -133,7 +133,8 @@ footer: |
 - [ ] A review of a pull request is decided by the gate on its first
       run, with no orchestrating agent
 - [x] The generalists and specialists keep their models
-- [x] The orchestrator skill, its evaluation component and its cases
-      are gone, and `docs/`, the SRS and CLAUDE.md name no orchestrator
-      as part of the review: ENG-28 names one only to rule it out, and
-      the superseded ADRs keep its text as their record
+- [x] The orchestrator skill's evaluation component and its cases are
+      gone, its file kept for a follow-up, and `docs/`, the SRS and
+      CLAUDE.md name no orchestrator as part of the review: ENG-28
+      names one only to rule it out, and the superseded ADRs keep its
+      text as their record
