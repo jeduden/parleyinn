@@ -10,6 +10,7 @@ mod release;
 mod review_agents;
 mod review_findings;
 mod review_reports;
+mod review_stability;
 
 use architecture::*;
 use boundary::*;
@@ -20,6 +21,7 @@ use release::*;
 use review_agents::*;
 use review_findings::*;
 use review_reports::*;
+use review_stability::*;
 
 use crate::{
     Case, Check, Injection, cargo_lib_test, cargo_test, clippy, mdsmith, scenario, setup_tools,
@@ -134,7 +136,9 @@ pub fn cases() -> Vec<Case> {
         review_undashed_cases(),
         review_resume_cases(),
         vec![review_moved_revision_case()],
+        review_stability_cases(),
         review_token_cases(),
+        stability_workflow_cases(),
         file_size_cases(),
         // Last: its cases edit source the later cases would run stale.
         license_text_cases(),

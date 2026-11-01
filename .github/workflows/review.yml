@@ -145,23 +145,7 @@ jobs:
       - name: Bundle what the change touches
         id: bundle
         if: steps.pull_head.outputs.number != ''
-        run: |
-          # review-run writes each specialist's report here, assembled
-          # from its run log; the generalists read it, and the gate
-          # checks its form against the agent's answer.
-          mkdir -p review/reports
-          # mdsmith's own catalog of the Markdown patterns its rules cannot
-          # see until a kind, include or catalog declares them, from main's
-          # pinned mdsmith; the Markdown specialist reviews against it.
-          mdsmith help patterns -f json > review/mdsmith-patterns.json
-          cargo run --locked --quiet -p review-bundle -- --base . --head pr-head \
-            --diff pr.diff --consent stakeholder-comments.json --out review > class.txt
-          cat class.txt >> "$GITHUB_OUTPUT"
-          {
-            echo "checked=$(jq -c . review/checked.json)"
-            echo "dispatch=$(jq -c . review/dispatch.json)"
-          } >> "$GITHUB_OUTPUT"
-          cat class.txt "review/checked.json" >> "$GITHUB_STEP_SUMMARY"
+        run: scripts/review-bundle.sh
       # The reviewer components the pull request changes, each with its
       # reason (ENG-32): the evaluate job below runs their cases. The
       # plan is computed here, from the two trees, with main's tool, and
@@ -242,7 +226,7 @@ jobs:
             --path review/logs --path review/reports --path review/answers.json \
             --path review/usage.json --path review/outcome.json --path review/consulted.json \
             --path review/gaps.json --path review/not-reviewed.md --path review/run-id.json \
-            --path review/run.txt
+            --path review/run.txt --path review/agent-runs.jsonl --path review/report.html
           code=$?
           set -e
           rm -rf "$RUNNER_TEMP/claude-credential"
@@ -277,6 +261,15 @@ jobs:
       - name: Record what the review cost
         if: always() && steps.pull_head.outputs.number != ''
         run: scripts/review-record-cost.sh
+      # The run list review-run wrote after the run, failed or not, on one
+      # screen: the verdict, the counts, the wall time and each run
+      # whose answer was not taken, by name alone. The run list and the
+      # run report, review/report.html, go with the reports below; they
+      # hold timings, tokens, costs and gap reasons, never a tool result
+      # (ENG-28). It only reports and never fails the review.
+      - name: Summarize the review's run list
+        if: always() && steps.pull_head.outputs.number != ''
+        run: scripts/review-run-list-summary.sh
       # The reports review-run assembled from the run logs, and the
       # answers, for the post job's gate and for the review's readers:
       # the review and its check link here. A review that failed keeps
@@ -290,6 +283,8 @@ jobs:
           path: |
             review/reports/
             review/answers.json
+            review/report.html
+            review/agent-runs.jsonl
             review/usage.json
           if-no-files-found: error
       # The run logs under review/logs/ stay in the job: they hold every

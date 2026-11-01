@@ -108,3 +108,27 @@ fn a_comment_ending_in_a_colon_does_not_end_the_job() {
 
     assert!(inline_scripts(body, script).is_ok());
 }
+
+#[test]
+fn the_token_sweep_still_reads_a_workflow_that_runs_a_script_with_arguments() {
+    let dir = testkit::TempDir::new().unwrap();
+    let flows = dir.path().join(".github/workflows");
+    std::fs::create_dir_all(&flows).unwrap();
+    std::fs::write(
+        flows.join("a.yml"),
+        "on:\n  push:\njobs:\n  t:\n    steps:\n      - run: scripts/a.sh x\n      - run: cargo run -p review-run -- --workdir w\n",
+    )
+    .unwrap();
+    let problems = crate::review_workflow::every_workflow_keeps_the_token(
+        &crate::Checkout::new(dir.path()),
+        "CLAUDE_CODE_OAUTH_TOKEN",
+    )
+    .unwrap();
+
+    assert!(!problems.is_empty());
+    assert!(
+        problems
+            .iter()
+            .all(|p| p.starts_with(".github/workflows/a.yml: agent job t "))
+    );
+}
