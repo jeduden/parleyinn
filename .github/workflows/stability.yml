@@ -1,42 +1,42 @@
-name: Stability probe
+name: Stability measurement
 
 # ENG-32: how stable the review is on an unchanged pull-request state.
 # The `claude` command line takes no seed, so a review cannot be pinned,
-# only measured by repetition: for each frozen state of the corpus,
-# tooling/review-eval/stability-corpus.toml, main's review-run reviews
+# only measured by repetition: for each frozen state listed in
+# tooling/review-eval/stability-states.toml, main's review-run reviews
 # it three times, each in a fresh work directory with nothing reused,
 # and `review-report stability` compares the three: the share of runs
 # whose verdict differs from the most common one (the flip rate) and,
 # per agent, the overlap of its finding sets (Jaccard). A flip rate
 # above 0.2 or an overlap below 0.7 (review-report's FLIP_RATE_LIMIT
-# and JACCARD_FLOOR) is a warning, not a failure: the probe measures,
+# and JACCARD_FLOOR) is a warning, not a failure: the measurement measures,
 # the stakeholder decides.
 #
 # It runs from main's definition on the stakeholder's Claude token, as
-# the review does, with nothing it can write with. One probe is nine
+# the review does, with nothing it can write with. One measurement is nine
 # reviews, about $15 of model usage, so it runs on demand alone.
 on:
   workflow_dispatch:
-  # The weekly probe, off until the stakeholder turns it on:
+  # The weekly measurement, off until the stakeholder turns it on:
   # schedule:
   #   - cron: "23 4 * * 1"
 
 permissions: {}
 
-# One probe at a time: two would only double the cost.
+# One measurement at a time: two would only double the cost.
 concurrency:
-  group: stability-probe
+  group: stability-measurement
   cancel-in-progress: false
 
 jobs:
-  corpus:
+  states:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
       contents: read
     outputs:
-      states: ${{ steps.corpus.outputs.states }}
-      samples: ${{ steps.corpus.outputs.samples }}
+      states: ${{ steps.states.outputs.states }}
+      samples: ${{ steps.states.outputs.samples }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -46,17 +46,17 @@ jobs:
         with:
           tools: "rust"
           cache: false
-      - name: Read the corpus
-        id: corpus
+      - name: Read the states
+        id: states
         run: |
           cargo run --locked --quiet -p review-report -- \
-            corpus tooling/review-eval/stability-corpus.toml >> "$GITHUB_OUTPUT"
+            states tooling/review-eval/stability-states.toml >> "$GITHUB_OUTPUT"
 
   # One fresh review of one state: main's tree as the work directory,
   # the state's head as the pull request's tree, its diff against its
   # base, and no answer from any other run.
   sample:
-    needs: corpus
+    needs: states
     runs-on: ubuntu-latest
     timeout-minutes: 120
     permissions:
@@ -64,7 +64,7 @@ jobs:
     strategy:
       fail-fast: false
       max-parallel: 3
-      matrix: ${{ fromJSON(needs.corpus.outputs.samples) }}
+      matrix: ${{ fromJSON(needs.states.outputs.samples) }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -115,7 +115,7 @@ jobs:
         run: |
           "$GITHUB_WORKSPACE/target/debug/review-run" --workdir "$RUNNER_TEMP/work" \
             --parallel 32 --head-sha "$HEAD_SHA" > "$RUNNER_TEMP/work/review/run.txt"
-      # What the comparison reads, and the trace and report page; the run
+      # What the comparison reads, and the run list and the report; the run
       # logs stay in the job, as in the review (ENG-28). A state's name
       # holds no underscore, so the comparison's pattern takes its own
       # three reviews alone.
@@ -133,20 +133,20 @@ jobs:
             ${{ runner.temp }}/work/review/gaps.json
             ${{ runner.temp }}/work/review/run-id.json
             ${{ runner.temp }}/work/review/report.html
-            ${{ runner.temp }}/work/review/trace.jsonl
+            ${{ runner.temp }}/work/review/agent-runs.jsonl
           if-no-files-found: error
 
   # The three reviews of each state, compared.
   stability:
-    needs: [corpus, sample]
-    if: always() && needs.corpus.result == 'success'
+    needs: [states, sample]
+    if: always() && needs.states.result == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 120
     permissions:
       contents: read
     strategy:
       fail-fast: false
-      matrix: ${{ fromJSON(needs.corpus.outputs.states) }}
+      matrix: ${{ fromJSON(needs.states.outputs.states) }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:

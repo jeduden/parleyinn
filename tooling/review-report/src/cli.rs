@@ -1,14 +1,14 @@
 //! The `review-report` command line:
 //!
-//! - `review-report trace --workdir DIR` writes the trace and the
-//!   report page of the review in `DIR`, as review-run does after every
+//! - `review-report write --workdir DIR` writes the run list and the
+//!   report of the review in `DIR`, as review-run does after every
 //!   run, so they can be written again from a kept work directory;
 //! - `review-report stability --out FILE DIR DIR...` compares the
 //!   reviews in two or more work directories of one pull-request state
 //!   and writes their stability to `FILE`, printing its headline,
 //!   `key=value` per line, for the workflow's step outputs;
-//! - `review-report corpus FILE` reads the stability probe's corpus and
-//!   prints its job matrices, for the same ([`crate::corpus`]).
+//! - `review-report states FILE` reads the stability measurement's states and
+//!   prints its job matrices, for the same ([`crate::states`]).
 
 use std::fs;
 use std::io::Write;
@@ -24,8 +24,8 @@ pub const EXIT_FAILURE: u8 = 1;
 pub const EXIT_USAGE: u8 = 2;
 
 /// How to call it.
-pub const USAGE: &str = "usage: review-report trace --workdir DIR | \
-review-report stability --out FILE DIR DIR... | review-report corpus FILE";
+pub const USAGE: &str = "usage: review-report write --workdir DIR | \
+review-report stability --out FILE DIR DIR... | review-report states FILE";
 
 /// Runs the command on `args` and returns its exit code.
 pub fn run(
@@ -35,9 +35,9 @@ pub fn run(
 ) -> u8 {
     let args: Vec<String> = args.into_iter().collect();
     let result = match args.split_first() {
-        Some((command, rest)) if command == "trace" => trace(rest, stderr),
+        Some((command, rest)) if command == "write" => write(rest, stderr),
         Some((command, rest)) if command == "stability" => stable(rest, stdout, stderr),
-        Some((command, [file])) if command == "corpus" => corpus(file, stdout, stderr),
+        Some((command, [file])) if command == "states" => states(file, stdout, stderr),
         _ => Err(EXIT_USAGE),
     };
     match result {
@@ -51,8 +51,8 @@ pub fn run(
     }
 }
 
-/// `trace --workdir DIR`.
-fn trace(args: &[String], stderr: &mut dyn Write) -> Result<(), u8> {
+/// `write --workdir DIR`.
+fn write(args: &[String], stderr: &mut dyn Write) -> Result<(), u8> {
     let [flag, workdir] = args else {
         return Err(EXIT_USAGE);
     };
@@ -105,14 +105,14 @@ fn stable(args: &[String], stdout: &mut dyn Write, stderr: &mut dyn Write) -> Re
     Ok(())
 }
 
-/// `corpus FILE`.
-fn corpus(file: &str, stdout: &mut dyn Write, stderr: &mut dyn Write) -> Result<(), u8> {
+/// `states FILE`.
+fn states(file: &str, stdout: &mut dyn Write, stderr: &mut dyn Write) -> Result<(), u8> {
     let states = fs::read_to_string(file)
         .map_err(|e| format!("read {file}: {e}"))
-        .and_then(|text| crate::corpus::parse(&text));
+        .and_then(|text| crate::states::parse(&text));
     match states {
         Ok(states) => {
-            let _ = write!(stdout, "{}", crate::corpus::matrices(&states));
+            let _ = write!(stdout, "{}", crate::states::matrices(&states));
             Ok(())
         }
         Err(e) => {

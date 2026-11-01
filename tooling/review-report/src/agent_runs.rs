@@ -1,8 +1,8 @@
-//! The trace of one review: a header and one span per agent run, built
+//! The run list of one review: a header and one entry per agent run, built
 //! from the review's files and its run logs, and written as JSON lines
 //! (the schema is in the crate's documentation).
 //!
-//! A span is one run log, `review/logs/<name>[.<part>][.first].jsonl`:
+//! An entry is one run log, `review/logs/<name>[.<part>][.first].jsonl`:
 //! a `.first` log is an attempt that was not accepted and ran once
 //! more, its retry the log without it. Its timing is the log file's: it
 //! ended when the file was last written and started its result's
@@ -11,7 +11,7 @@
 //! command line reported there, never recomputed from tokens, and
 //! nothing for an agent reused from an earlier run. An agent the review
 //! did not review and that left no log, or one reused that left none,
-//! still has a span, so no agent the review dispatched is missing.
+//! still has an entry, so no agent the review dispatched is missing.
 
 use std::fs;
 use std::io;
@@ -24,19 +24,19 @@ use serde::Serialize;
 
 use crate::inputs::{self, Gap, Outcome, RunId, Usage};
 
-/// The verdict a review that could not run is traced with.
+/// The verdict a review that could not run is listed with.
 pub const FAILED: &str = "failed";
-/// The verdict traced when the review wrote none.
+/// The verdict listed when the review wrote none.
 pub const NO_VERDICT: &str = "none";
 
-/// The trace's first line.
+/// The run list's first line.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize)]
 pub struct Header {
     /// The head commit reviewed, or `run-<inputs hash>` without one.
     pub id: String,
-    /// The first span's start, in milliseconds since the Unix epoch.
+    /// The first agent run's start, in milliseconds since the Unix epoch.
     pub started: Option<u64>,
-    /// The last span's end, in milliseconds since the Unix epoch.
+    /// The last agent run's end, in milliseconds since the Unix epoch.
     pub finished: Option<u64>,
     pub verdict: String,
     pub findings_blocking: usize,
@@ -71,7 +71,7 @@ pub struct Tokens {
 
 /// One agent run.
 #[derive(Debug, Clone, Default, PartialEq, Serialize)]
-pub struct Span {
+pub struct AgentRun {
     pub name: String,
     /// `specialist`, `generalist` or `consultant`.
     pub kind: String,
@@ -96,26 +96,27 @@ pub struct Span {
     pub reused: bool,
 }
 
-/// A review's trace.
+/// A review's run list.
 #[derive(Debug, Clone, Default, PartialEq)]
-pub struct Trace {
+pub struct AgentRuns {
     pub header: Header,
-    pub spans: Vec<Span>,
+    pub agent_runs: Vec<AgentRun>,
 }
 
-impl Trace {
-    /// The trace as JSON lines: the header, then each span.
+impl AgentRuns {
+    /// The run list as JSON lines: the header, then each entry.
     ///
     /// # Errors
     ///
     /// Fails when a line does not encode.
     pub fn jsonl(&self) -> Result<String, String> {
         let mut out = String::new();
-        let header = serde_json::json!({ "trace": self.header });
+        let header = serde_json::json!({ "review": self.header });
         out.push_str(&header.to_string());
         out.push('\n');
-        for span in &self.spans {
-            let line = serde_json::to_string(span).map_err(|e| format!("encode a span: {e}"))?;
+        for agent_run in &self.agent_runs {
+            let line = serde_json::to_string(agent_run)
+                .map_err(|e| format!("encode an agent run: {e}"))?;
             out.push_str(&line);
             out.push('\n');
         }
@@ -151,10 +152,10 @@ pub fn stem(file: &str) -> Option<(String, Option<usize>, bool)> {
     (!name.is_empty()).then(|| (name.to_owned(), part, first))
 }
 
-/// The trace of the review in `workdir`, `failure` saying why it could
+/// The run list of the review in `workdir`, `failure` saying why it could
 /// not run, when it could not.
 #[must_use]
-pub fn build(workdir: &Path, failure: Option<&str>) -> Trace {
+pub fn build(workdir: &Path, failure: Option<&str>) -> AgentRuns {
     let mut notes = Vec::new();
     let outcome = inputs::outcome(workdir, &mut notes);
     let usage = inputs::usage(workdir, &mut notes);
@@ -164,20 +165,20 @@ pub fn build(workdir: &Path, failure: Option<&str>) -> Trace {
     let definition = |name: &str| {
         component::load(workdir, name).map_or_else(|_| Default::default(), |c| (c.model, c.effort))
     };
-    let spans = spans(&logs, &gaps, &usage, &definition);
-    let header = header(&run_id, &outcome, gaps.len(), &spans, failure, notes);
+    let agent_runs = agent_runs(&logs, &gaps, &usage, &definition);
+    let header = header(&run_id, &outcome, gaps.len(), &agent_runs, failure, notes);
 
-    Trace { header, spans }
+    AgentRuns { header, agent_runs }
 }
 
-/// The trace's header, from what the review ran on, its outcome, how
-/// many gaps it left and its spans.
+/// The run list's header, from what the review ran on, its outcome, how
+/// many gaps it left and its entries.
 #[must_use]
 pub fn header(
     run_id: &RunId,
     outcome: &Outcome,
     gaps: usize,
-    spans: &[Span],
+    agent_runs: &[AgentRun],
     failure: Option<&str>,
     notes: Vec<String>,
 ) -> Header {
@@ -195,8 +196,8 @@ pub fn header(
 
     Header {
         id,
-        started: spans.iter().filter_map(|s| s.started_ms).min(),
-        finished: spans.iter().filter_map(|s| s.ended_ms).max(),
+        started: agent_runs.iter().filter_map(|s| s.started_ms).min(),
+        finished: agent_runs.iter().filter_map(|s| s.ended_ms).max(),
         verdict,
         findings_blocking: count(review_gate::BLOCKING),
         findings_nit: count(review_gate::NIT),
@@ -206,22 +207,22 @@ pub fn header(
     }
 }
 
-/// Every span: one per log in `logs`, then one for each gap and each
+/// Every agent run: one per log in `logs`, then one for each gap and each
 /// reused agent no log holds, ordered by agent, part and attempt.
 /// `definition` gives an agent's model and effort.
 #[must_use]
-pub fn spans(
+pub fn agent_runs(
     logs: &[LogFile],
     gaps: &[Gap],
     usage: &[Usage],
     definition: &dyn Fn(&str) -> (String, String),
-) -> Vec<Span> {
+) -> Vec<AgentRun> {
     let reused = |name: &str| usage.iter().any(|u| u.agent == name && u.reused);
     let stems: Vec<_> = logs
         .iter()
         .filter_map(|l| Some((stem(&l.file)?, l)))
         .collect();
-    let mut out: Vec<Span> = stems
+    let mut out: Vec<AgentRun> = stems
         .iter()
         .map(|((name, part, first), file)| {
             let retried = !first
@@ -230,31 +231,31 @@ pub fn spans(
                     .any(|((n, p, f), _)| *f && n == name && p == part);
             let attempt = if retried { 2 } else { 1 };
             let gap = gaps.iter().find(|g| covers(g, name, *part));
-            let span = of_log(name, *part, *first, attempt, file, gap, definition);
+            let agent_run = of_log(name, *part, *first, attempt, file, gap, definition);
             if reused(name) {
-                Span {
+                AgentRun {
                     reused: true,
                     cost_usd: 0.0,
-                    ..span
+                    ..agent_run
                 }
             } else {
-                span
+                agent_run
             }
         })
         .collect();
     for gap in gaps {
         if !out.iter().any(|s| covers(gap, &s.name, s.part)) {
-            let span = without_log(&gap.name, gap.part, definition);
-            out.push(Span {
+            let agent_run = without_log(&gap.name, gap.part, definition);
+            out.push(AgentRun {
                 status: Status::Gap,
                 reason: Some(gap.reason.clone()),
-                ..span
+                ..agent_run
             });
         }
     }
     for u in usage.iter().filter(|u| u.reused) {
         if !out.iter().any(|s| s.name == u.agent) {
-            out.push(Span {
+            out.push(AgentRun {
                 reused: true,
                 ..without_log(&u.agent, None, definition)
             });
@@ -271,7 +272,7 @@ fn covers(gap: &Gap, name: &str, part: Option<usize>) -> bool {
     gap.name == name && (gap.part.is_none() || gap.part == part)
 }
 
-/// The span of agent `name`'s `part`, attempt `attempt`, from its log
+/// The agent run of agent `name`'s `part`, attempt `attempt`, from its log
 /// `file`, a first attempt when `first`, not reviewed for `gap`.
 fn of_log(
     name: &str,
@@ -281,7 +282,7 @@ fn of_log(
     file: &LogFile,
     gap: Option<&Gap>,
     definition: &dyn Fn(&str) -> (String, String),
-) -> Span {
+) -> AgentRun {
     let log = log::parse(&file.text);
     let (status, reason) = if first {
         (Status::Gap, Some(retried(&log)))
@@ -292,14 +293,14 @@ fn of_log(
         }
     };
     let (started_ms, ended_ms) = times(log.duration_ms, file.modified_ms, file.created_ms);
-    let span = without_log(name, part, definition);
+    let agent_run = without_log(name, part, definition);
     let model = if log.resolved_model.is_empty() {
-        span.model.clone()
+        agent_run.model.clone()
     } else {
         log.resolved_model.clone()
     };
 
-    Span {
+    AgentRun {
         attempt,
         model,
         started_ms,
@@ -309,25 +310,25 @@ fn of_log(
         cost_usd: log.cost,
         status,
         reason,
-        ..span
+        ..agent_run
     }
 }
 
-/// The span of agent `name`'s `part` that left no log: no attempt, no
+/// The agent run of agent `name`'s `part` that left no log: no attempt, no
 /// timing, nothing spent.
 fn without_log(
     name: &str,
     part: Option<usize>,
     definition: &dyn Fn(&str) -> (String, String),
-) -> Span {
+) -> AgentRun {
     let (model, effort) = definition(name);
-    Span {
+    AgentRun {
         name: name.to_owned(),
         kind: component::kind_of(name).word().to_owned(),
         part,
         model,
         effort,
-        ..Span::default()
+        ..AgentRun::default()
     }
 }
 

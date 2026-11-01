@@ -8,7 +8,7 @@ fn state(name: &str, base: &str, head: &str) -> String {
 }
 
 #[test]
-fn a_corpus_reads_each_state() {
+fn a_states_reads_each_state() {
     let text = format!(
         "{}{}",
         state("pr-99", BASE, HEAD),
@@ -30,10 +30,10 @@ fn a_corpus_reads_each_state() {
 }
 
 #[test]
-fn a_corpus_out_of_shape_is_refused_naming_why() {
+fn a_states_out_of_shape_is_refused_naming_why() {
     let cases = [
-        ("pull = 1".to_owned(), "malformed corpus: "),
-        ("state = []".to_owned(), "the corpus holds no state"),
+        ("pull = 1".to_owned(), "malformed states: "),
+        ("state = []".to_owned(), "the states holds no state"),
         (state("PR 99", BASE, HEAD), "a name is lowercase"),
         (state("", BASE, HEAD), "a name is lowercase"),
         (

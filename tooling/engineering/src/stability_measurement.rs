@@ -1,46 +1,46 @@
-//! ENG-32: the stability probe, and the trace and page every review
-//! leaves. The probe's workflow runs on dispatch alone (a probe is nine
+//! ENG-32: the stability measurement, and the run list and the report every review
+//! leaves. The measurement's workflow runs on dispatch alone (a measurement is nine
 //! reviews, so the stakeholder turns a schedule on), reviews each state
-//! of the committed corpus afresh with review-run and compares the
+//! of the committed states afresh with review-run and compares the
 //! reviews with `review-report stability`; the review workflow keeps
-//! each review's trace and page with its reports. The check also drives
+//! each review's run list and report with its reports. The check also drives
 //! review-report itself: a verdict that flips is measured as unstable,
 //! a run's cost is the total its log reported, and a name or reason a
-//! run shaped reaches the page as escaped text, never as markup.
+//! run shaped reaches the report as escaped text, never as markup.
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use review_report::corpus;
+use review_report::agent_runs::{self, LogFile};
 use review_report::html;
 use review_report::identity::Fid;
 use review_report::inputs::Gap;
 use review_report::stability::{self, Run, Stability};
-use review_report::trace::{self, LogFile};
+use review_report::states;
 
 use crate::Checkout;
 
-/// The probe's workflow.
-pub const PROBE: &str = ".github/workflows/stability.yml";
+/// The measurement's workflow.
+pub const MEASUREMENT: &str = ".github/workflows/stability.yml";
 /// The review's workflow.
 pub const REVIEW: &str = ".github/workflows/review.yml";
 
 /// What a hostile run could make an agent's name and its reason.
 const HOSTILE: &str = "<script>alert(\"x\")</script>";
 
-/// The problems with the probe's workflow `text`.
+/// The problems with the measurement's workflow `text`.
 #[must_use]
-pub fn probe_problems(text: &str) -> Vec<String> {
+pub fn measurement_problems(text: &str) -> Vec<String> {
     let mut problems = Vec::new();
     let has = |want: &str| text.contains(want);
     if !has("  workflow_dispatch:") {
-        problems.push(format!("{PROBE} cannot be started on demand"));
+        problems.push(format!("{MEASUREMENT} cannot be started on demand"));
     }
     if text
         .lines()
         .any(|l| l.trim_start().starts_with("schedule:"))
     {
         problems.push(format!(
-            "{PROBE} runs on a schedule, which only the stakeholder turns on"
+            "{MEASUREMENT} runs on a schedule, which only the stakeholder turns on"
         ));
     }
     for (want, what) in [
@@ -53,52 +53,52 @@ pub fn probe_problems(text: &str) -> Vec<String> {
             "compares no reviews with review-report stability",
         ),
         (
-            "corpus tooling/review-eval/stability-corpus.toml",
-            "reads no corpus",
+            "states tooling/review-eval/stability-states.toml",
+            "reads no states",
         ),
         (
             "permissions: {}",
             "does not drop every permission by default",
         ),
-        ("concurrency:", "lets two probes run at once"),
+        ("concurrency:", "lets two measurements run at once"),
         ("timeout-minutes: 120", "bounds no review's job"),
     ] {
         if !has(want) {
-            problems.push(format!("{PROBE} {what}"));
+            problems.push(format!("{MEASUREMENT} {what}"));
         }
     }
     if has("review/logs") {
         problems.push(format!(
-            "{PROBE} uploads review/logs, every tool result its agents read"
+            "{MEASUREMENT} uploads review/logs, every tool result its agents read"
         ));
     }
 
     problems
 }
 
-/// The problems with the review workflow `text`: it keeps no trace or
-/// no page with the reports.
+/// The problems with the review workflow `text`: it keeps no run list or
+/// no report with the reports.
 #[must_use]
 pub fn review_problems(text: &str) -> Vec<String> {
-    ["review/report.html", "review/trace.jsonl"]
+    ["review/report.html", "review/agent-runs.jsonl"]
         .iter()
         .filter(|f| !text.contains(&format!("            {f}\n")))
         .map(|f| format!("{REVIEW} keeps no {f} with the reports"))
         .collect()
 }
 
-/// The problems with the corpus `text`, the probe reviewing each of
+/// The problems with the states `text`, the measurement reviewing each of
 /// its states `samples` times: it does not read, or holds no state; or
-/// the probe does not review each state three times.
+/// the measurement does not review each state three times.
 #[must_use]
-pub fn corpus_problems(text: &str, samples: usize) -> Vec<String> {
-    let mut problems = match corpus::parse(text) {
+pub fn states_problems(text: &str, samples: usize) -> Vec<String> {
+    let mut problems = match states::parse(text) {
         Ok(_) => Vec::new(),
-        Err(e) => vec![format!("{}: {e}", corpus::CORPUS)],
+        Err(e) => vec![format!("{}: {e}", states::STATES)],
     };
     if samples != 3 {
         problems.push(format!(
-            "the probe reviews each state {samples} times, not three"
+            "the measurement reviews each state {samples} times, not three"
         ));
     }
 
@@ -119,13 +119,13 @@ fn run(verdict: &str, path: &str) -> Run {
 /// What review-report made of a review: two identical runs measured
 /// as `same`, three whose verdict flips once as `flip`, the cost of a
 /// run whose log reported 0.25 USD and whose models' costs sum to 9, and
-/// the page of a gap whose name and reason are a script.
+/// the report of a gap whose name and reason are a script.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Made {
     pub same: Stability,
     pub flip: Stability,
     pub cost: f64,
-    pub page: String,
+    pub report: String,
 }
 
 /// What review-report makes of the reviews [`Made`] names.
@@ -142,7 +142,7 @@ pub fn made() -> Made {
         text: r#"{"type":"result","subtype":"success","result":"x","total_cost_usd":0.25,"modelUsage":{"m":{"costUSD":9.0}}}"#.to_owned(),
         ..LogFile::default()
     };
-    let cost = trace::spans(&[log], &[], &[], &|_| Default::default())
+    let cost = agent_runs::agent_runs(&[log], &[], &[], &|_| Default::default())
         .iter()
         .map(|s| s.cost_usd)
         .sum();
@@ -151,13 +151,13 @@ pub fn made() -> Made {
         reason: HOSTILE.to_owned(),
         ..Gap::default()
     };
-    let page = html::render(&trace::Trace::default(), &[gap]);
+    let report = html::render(&agent_runs::AgentRuns::default(), &[gap]);
 
     Made {
         same,
         flip,
         cost,
-        page,
+        report,
     }
 }
 
@@ -171,26 +171,30 @@ pub fn report_problems(made: &Made) -> Vec<String> {
     }
     if (made.cost - 0.25).abs() > 1e-12 {
         problems.push(format!(
-            "a span's cost is {}, not the 0.25 its run log reported",
+            "an agent run's cost is {}, not the 0.25 its run log reported",
             made.cost
         ));
     }
-    if made.page.contains("<script") {
-        problems.push("the report page holds a run's text as markup".to_owned());
+    if made.report.contains("<script") {
+        problems.push("the report holds a run's text as markup".to_owned());
     }
 
     problems
 }
 
-/// Every problem with the probe, the corpus, the review workflow and
+/// Every problem with the measurement, the states, the review workflow and
 /// review-report in `checkout`.
 ///
 /// # Errors
 ///
 /// Fails when a file cannot be read.
-pub fn problems(checkout: &Checkout, probe: &str, corpus: &str) -> Result<Vec<String>, String> {
-    let mut problems = probe_problems(&checkout.read(probe)?);
-    problems.extend(corpus_problems(&checkout.read(corpus)?, corpus::SAMPLES));
+pub fn problems(
+    checkout: &Checkout,
+    measurement: &str,
+    states: &str,
+) -> Result<Vec<String>, String> {
+    let mut problems = measurement_problems(&checkout.read(measurement)?);
+    problems.extend(states_problems(&checkout.read(states)?, states::SAMPLES));
     problems.extend(review_problems(&checkout.read(REVIEW)?));
     problems.extend(report_problems(&made()));
 

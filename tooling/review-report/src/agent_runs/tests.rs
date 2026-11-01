@@ -6,7 +6,7 @@ use testkit::TempDir;
 use super::*;
 
 /// A run that answered: its result reports a total cost unlike the sum
-/// its models' costs give, so a span that recomputed cost would differ.
+/// its models' costs give, so a agent run that recomputed cost would differ.
 const ANSWERED: &str = r#"{"type":"assistant","parent_tool_use_id":null,"message":{"id":"m1","model":"claude-haiku-5-5","usage":{"input_tokens":10,"cache_creation_input_tokens":20,"cache_read_input_tokens":30,"output_tokens":40}}}
 {"type":"result","subtype":"success","is_error":false,"result":"outcome: none — fine","total_cost_usd":0.1234,"num_turns":3,"duration_ms":4000,"modelUsage":{"claude-haiku-5-5":{"inputTokens":10,"outputTokens":40,"cacheReadInputTokens":30,"cacheCreationInputTokens":20,"costUSD":0.9}}}
 "#;
@@ -77,29 +77,33 @@ fn a_run_ends_when_its_log_was_written_and_starts_its_duration_before() {
 }
 
 #[test]
-fn the_span_cost_is_the_log_s_own_total_never_recomputed() {
-    let spans = spans(
+fn the_agent_run_cost_is_the_log_s_own_total_never_recomputed() {
+    let agent_runs = agent_runs(
         &[log("lang-rust.jsonl", ANSWERED, 10_000)],
         &[],
         &[],
         &definition,
     );
 
-    let span = &spans[0];
+    let agent_run = &agent_runs[0];
     // The result's total_cost_usd, not its models' 0.9, nor a price
     // table's sum of tokens.
-    assert!((span.cost_usd - 0.1234).abs() < 1e-12, "{}", span.cost_usd);
-    assert_eq!(span.name, "lang-rust");
-    assert_eq!(span.kind, "specialist");
-    assert_eq!((span.attempt, span.turns), (1, 3));
-    assert_eq!(span.model, "claude-haiku-5-5");
-    assert_eq!(span.effort, "low");
+    assert!(
+        (agent_run.cost_usd - 0.1234).abs() < 1e-12,
+        "{}",
+        agent_run.cost_usd
+    );
+    assert_eq!(agent_run.name, "lang-rust");
+    assert_eq!(agent_run.kind, "specialist");
+    assert_eq!((agent_run.attempt, agent_run.turns), (1, 3));
+    assert_eq!(agent_run.model, "claude-haiku-5-5");
+    assert_eq!(agent_run.effort, "low");
     assert_eq!(
-        (span.started_ms, span.ended_ms),
+        (agent_run.started_ms, agent_run.ended_ms),
         (Some(6_000), Some(10_000))
     );
     assert_eq!(
-        span.tokens,
+        agent_run.tokens,
         Tokens {
             fresh: 10,
             cache_write: 20,
@@ -108,10 +112,10 @@ fn the_span_cost_is_the_log_s_own_total_never_recomputed() {
         }
     );
     assert_eq!(
-        (span.status, span.reason.as_deref()),
+        (agent_run.status, agent_run.reason.as_deref()),
         (Status::Accepted, None)
     );
-    assert!(!span.reused);
+    assert!(!agent_run.reused);
 }
 
 #[test]
@@ -124,9 +128,9 @@ fn a_first_attempt_is_a_gap_retried_and_its_retry_attempt_two() {
     ];
     let gaps = [gap("review-code", None, "silent: its run ended with none")];
 
-    let spans = spans(&logs, &gaps, &[], &definition);
+    let agent_runs = agent_runs(&logs, &gaps, &[], &definition);
 
-    let got: Vec<_> = spans
+    let got: Vec<_> = agent_runs
         .iter()
         .map(|s| (s.name.as_str(), s.attempt, s.status, s.reason.as_deref()))
         .collect();
@@ -155,7 +159,7 @@ fn a_first_attempt_is_a_gap_retried_and_its_retry_attempt_two() {
         ]
     );
     // A run with no model in its log takes its definition's.
-    assert_eq!(spans[3].kind, "generalist");
+    assert_eq!(agent_runs[3].kind, "generalist");
 }
 
 #[test]
@@ -171,9 +175,9 @@ fn a_part_s_gap_marks_that_part_and_a_whole_agent_s_gap_every_part() {
         gap("lang-json", None, "refused: y"),
     ];
 
-    let spans = spans(&logs, &gaps, &[], &definition);
+    let agent_runs = agent_runs(&logs, &gaps, &[], &definition);
 
-    let got: Vec<_> = spans
+    let got: Vec<_> = agent_runs
         .iter()
         .map(|s| (s.name.as_str(), s.part, s.status))
         .collect();
@@ -189,7 +193,7 @@ fn a_part_s_gap_marks_that_part_and_a_whole_agent_s_gap_every_part() {
 }
 
 #[test]
-fn an_agent_with_no_log_still_has_a_span_a_gap_or_reused() {
+fn an_agent_with_no_log_still_has_a_agent_run_a_gap_or_reused() {
     let gaps = [gap(
         "lang-sql",
         None,
@@ -208,14 +212,14 @@ fn an_agent_with_no_log_still_has_a_span_a_gap_or_reused() {
         },
     ];
 
-    let spans = spans(
+    let agent_runs = agent_runs(
         &[log("lang-rust.jsonl", ANSWERED, 10_000)],
         &gaps,
         &usage,
         &definition,
     );
 
-    let got: Vec<_> = spans
+    let got: Vec<_> = agent_runs
         .iter()
         .map(|s| (s.name.as_str(), s.attempt, s.status, s.reused, s.cost_usd))
         .collect();
@@ -227,20 +231,20 @@ fn an_agent_with_no_log_still_has_a_span_a_gap_or_reused() {
             ("lang-toml", 0, Status::Accepted, true, 0.0),
         ]
     );
-    assert_eq!(spans[1].model, "model-of-lang-sql");
-    assert_eq!(spans[1].started_ms, None);
+    assert_eq!(agent_runs[1].model, "model-of-lang-sql");
+    assert_eq!(agent_runs[1].started_ms, None);
 }
 
 #[test]
 fn a_log_that_names_no_model_takes_its_definition_s() {
-    let spans = spans(&[log("lang-json.jsonl", "", 10_000)], &[], &[], &definition);
+    let agent_runs = agent_runs(&[log("lang-json.jsonl", "", 10_000)], &[], &[], &definition);
 
-    assert_eq!(spans[0].model, "model-of-lang-json");
-    assert_eq!(spans[0].cost_usd, 0.0);
+    assert_eq!(agent_runs[0].model, "model-of-lang-json");
+    assert_eq!(agent_runs[0].cost_usd, 0.0);
 }
 
 #[test]
-fn the_header_names_the_head_the_verdict_the_counts_and_the_span_bounds() {
+fn the_header_names_the_head_the_verdict_the_counts_and_the_agent_run_bounds() {
     let outcome = Outcome {
         verdict: "request_changes".to_owned(),
         findings: ["blocking", "nit", "nit"]
@@ -250,22 +254,22 @@ fn the_header_names_the_head_the_verdict_the_counts_and_the_span_bounds() {
             })
             .collect(),
     };
-    let span = |start, end| Span {
+    let agent_run = |start, end| AgentRun {
         started_ms: start,
         ended_ms: end,
-        ..Span::default()
+        ..AgentRun::default()
     };
-    let spans = [
-        span(Some(5), Some(9)),
-        span(Some(3), Some(7)),
-        span(None, None),
+    let agent_runs = [
+        agent_run(Some(5), Some(9)),
+        agent_run(Some(3), Some(7)),
+        agent_run(None, None),
     ];
     let run_id = RunId {
         head: Some("abc".to_owned()),
         inputs: String::new(),
     };
 
-    let h = header(&run_id, &outcome, 2, &spans, None, Vec::new());
+    let h = header(&run_id, &outcome, 2, &agent_runs, None, Vec::new());
 
     assert_eq!(h.id, "abc");
     assert_eq!((h.started, h.finished), (Some(3), Some(9)));
@@ -300,14 +304,14 @@ fn a_review_without_a_head_or_a_verdict_or_that_failed_says_so() {
 }
 
 #[test]
-fn the_trace_is_its_header_line_then_one_line_per_span() {
-    let trace = Trace {
+fn the_run_list_is_its_header_line_then_one_line_per_agent_run() {
+    let runs = AgentRuns {
         header: Header {
             id: "abc".to_owned(),
             verdict: "approve".to_owned(),
             ..Header::default()
         },
-        spans: spans(
+        agent_runs: agent_runs(
             &[log("lang-rust.2.jsonl", ANSWERED, 10_000)],
             &[gap("lang-sql", None, "silent: x")],
             &[],
@@ -315,16 +319,16 @@ fn the_trace_is_its_header_line_then_one_line_per_span() {
         ),
     };
 
-    let text = trace.jsonl().unwrap();
+    let text = runs.jsonl().unwrap();
     let lines: Vec<serde_json::Value> = text
         .lines()
         .map(|l| serde_json::from_str(l).unwrap())
         .collect();
 
     assert_eq!(lines.len(), 3);
-    assert_eq!(lines[0]["trace"]["id"], "abc");
-    assert_eq!(lines[0]["trace"]["verdict"], "approve");
-    assert!(lines[0]["trace"].get("failure").is_none());
+    assert_eq!(lines[0]["review"]["id"], "abc");
+    assert_eq!(lines[0]["review"]["verdict"], "approve");
+    assert!(lines[0]["review"].get("failure").is_none());
     assert_eq!(lines[1]["name"], "lang-rust");
     assert_eq!(lines[1]["part"], 2);
     assert_eq!(lines[1]["cost_usd"], 0.1234);
@@ -338,7 +342,7 @@ fn the_trace_is_its_header_line_then_one_line_per_span() {
 }
 
 #[test]
-fn a_review_s_trace_is_built_from_its_files_and_its_logs() {
+fn a_review_s_run_list_is_built_from_its_files_and_its_logs() {
     let dir = TempDir::new().unwrap();
     let logs = dir.path().join(inputs::LOGS);
     fs::create_dir_all(&logs).unwrap();
@@ -356,14 +360,14 @@ fn a_review_s_trace_is_built_from_its_files_and_its_logs() {
     .unwrap();
     fs::write(dir.path().join(inputs::GAPS), "not json").unwrap();
 
-    let trace = build(dir.path(), None);
+    let runs = build(dir.path(), None);
 
-    assert_eq!(trace.header.id, "abc");
-    assert_eq!(trace.header.verdict, "approve");
-    assert_eq!(trace.header.notes.len(), 1, "{:?}", trace.header.notes);
-    assert_eq!(trace.spans.len(), 1);
-    assert_eq!(trace.spans[0].effort, "");
-    assert!(trace.spans[0].ended_ms.is_some());
+    assert_eq!(runs.header.id, "abc");
+    assert_eq!(runs.header.verdict, "approve");
+    assert_eq!(runs.header.notes.len(), 1, "{:?}", runs.header.notes);
+    assert_eq!(runs.agent_runs.len(), 1);
+    assert_eq!(runs.agent_runs[0].effort, "");
+    assert!(runs.agent_runs[0].ended_ms.is_some());
 }
 
 #[test]

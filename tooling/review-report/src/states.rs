@@ -1,21 +1,21 @@
-//! The stability probe's corpus (ENG-32): the frozen pull-request
+//! The stability measurement's states (ENG-32): the frozen pull-request
 //! states it reviews [`SAMPLES`] times each, one `[[state]]` per state
-//! in `tooling/review-eval/stability-corpus.toml`, each with a name,
+//! in `tooling/review-eval/stability-states.toml`, each with a name,
 //! the pull request it was and the base and head commits it compared.
 //! A name is lowercase letters, digits and dashes, as it names the
-//! probe's artifacts; a commit is 40 lowercase hex digits.
+//! measurement's artifacts; a commit is 40 lowercase hex digits.
 //!
-//! `review-report corpus FILE` prints the probe's two job matrices,
+//! `review-report states FILE` prints the measurement's two job matrices,
 //! `states=` and `samples=`, for the workflow's step outputs.
 
 use serde::{Deserialize, Serialize};
 
-/// The corpus, under the repository.
-pub const CORPUS: &str = "tooling/review-eval/stability-corpus.toml";
-/// How many fresh reviews the probe runs of each state.
+/// The states, under the repository.
+pub const STATES: &str = "tooling/review-eval/stability-states.toml";
+/// How many fresh reviews the measurement runs of each state.
 pub const SAMPLES: usize = 3;
 
-/// The corpus file.
+/// The states file.
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct File {
@@ -46,7 +46,7 @@ fn is_name(name: &str) -> bool {
             .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-')
 }
 
-/// Reads the corpus `text`.
+/// Reads the states `text`.
 ///
 /// # Errors
 ///
@@ -54,9 +54,9 @@ fn is_name(name: &str) -> bool {
 /// commits are not in their shape, its name is taken, or its base is
 /// its head; naming the state.
 pub fn parse(text: &str) -> Result<Vec<State>, String> {
-    let file: File = toml::from_str(text).map_err(|e| format!("malformed corpus: {e}"))?;
+    let file: File = toml::from_str(text).map_err(|e| format!("malformed states: {e}"))?;
     if file.state.is_empty() {
-        return Err("the corpus holds no state".to_owned());
+        return Err("the states holds no state".to_owned());
     }
     for (at, s) in file.state.iter().enumerate() {
         if !is_name(&s.name) {
@@ -82,7 +82,7 @@ pub fn parse(text: &str) -> Result<Vec<State>, String> {
     Ok(file.state)
 }
 
-/// One review the probe runs: a state and its sample, from one.
+/// One review the measurement runs: a state and its sample, from one.
 #[derive(Debug, Serialize)]
 struct Sample<'a> {
     #[serde(flatten)]
@@ -90,7 +90,7 @@ struct Sample<'a> {
     sample: usize,
 }
 
-/// The probe's job matrices for `states`, as step outputs: one job per
+/// The measurement's job matrices for `states`, as step outputs: one job per
 /// state, and one per state and sample.
 #[must_use]
 pub fn matrices(states: &[State]) -> String {

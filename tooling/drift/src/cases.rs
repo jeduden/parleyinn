@@ -628,17 +628,17 @@ fn review_moved_revision_case() -> Case {
     )
 }
 
-/// The drifts the review's trace, page and stability probe rule out
+/// The drifts the review's run list, report and stability measurement rule out
 /// (ENG-28, ENG-32), late so adding them moves no earlier case to
-/// another shard: a run's text reaching the report page as markup, a
-/// verdict that flips measured as stable, a span's cost recomputed from
-/// its models instead of taken from its log, and the probe, nine
+/// another shard: a run's text reaching the report as markup, a
+/// verdict that flips measured as stable, an agent run's cost recomputed from
+/// its models instead of taken from its log, and the measurement, nine
 /// reviews, put on a schedule.
 fn review_stability_cases() -> Vec<Case> {
     let report_test = |name: &'static str| cargo_lib_test("review-report", name);
     vec![
         case(
-            "the report page writing a run's `<` unescaped",
+            "the report writing a run's `<` unescaped",
             "ENG-28",
             Injection::replace(
                 "tooling/review-report/src/html.rs",
@@ -646,9 +646,9 @@ fn review_stability_cases() -> Vec<Case> {
                 "'<' => out.push('<'),",
             ),
             report_test(
-                "html::tests::a_run_s_name_reason_and_the_failure_never_reach_the_page_as_markup",
+                "html::tests::a_run_s_name_reason_and_the_failure_never_reach_the_report_as_markup",
             ),
-            "a_run_s_name_reason_and_the_failure_never_reach_the_page_as_markup",
+            "a_run_s_name_reason_and_the_failure_never_reach_the_report_as_markup",
         ),
         case(
             "review-report stability counting no verdict that flips",
@@ -664,18 +664,20 @@ fn review_stability_cases() -> Vec<Case> {
             "one_verdict_flip_in_three_is_detected_and_past_the_limit",
         ),
         case(
-            "a span's cost recomputed from its models instead of its log's total",
+            "an agent run's cost recomputed from its models instead of its log's total",
             "ENG-28",
             Injection::replace(
-                "tooling/review-report/src/trace.rs",
+                "tooling/review-report/src/agent_runs.rs",
                 "cost_usd: log.cost,",
                 "cost_usd: log.usage.values().map(|u| u.cost).sum(),",
             ),
-            report_test("trace::tests::the_span_cost_is_the_log_s_own_total_never_recomputed"),
-            "the_span_cost_is_the_log_s_own_total_never_recomputed",
+            report_test(
+                "agent_runs::tests::the_agent_run_cost_is_the_log_s_own_total_never_recomputed",
+            ),
+            "the_agent_run_cost_is_the_log_s_own_total_never_recomputed",
         ),
         case(
-            "the stability probe put on a schedule",
+            "the stability measurement put on a schedule",
             "ENG-32",
             Injection::replace(
                 ".github/workflows/stability.yml",

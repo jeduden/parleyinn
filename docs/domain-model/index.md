@@ -144,6 +144,21 @@ name its fields. Examples are frit's plan skills and plan files, and the
 repository's own engineering tooling, such as ENG-28's review gate and the
 requirement naming its fields. The domain-model agent skips them.
 
+The review's tooling words are engineering-tooling words too, described in
+[review-evaluation.md](../review-evaluation.md):
+
+- **Reviewer component, case, scorecard**: the review's agents, the cases that
+  hold them and the published results.
+- **Stability measurement**: reviews of the same pull-request states, repeated
+  to measure how stable the review is.
+- **States**: the frozen pull-request states a stability measurement reviews.
+- **Run list**: a review's file with one entry per agent run, holding its
+  tokens, its cost and why its answer was not taken.
+- **Report**: the static HTML built from the run list.
+
+An agent run here is one run of a review's agent, never a ParleyInn run, and a
+run-list entry is no span.
+
 Build and packaging words have no ParleyInn meaning: crate, lockfile, release
 build, executable and release target. They are engineering-tooling words.
 Requirements may use them in their ordinary sense wherever they name a

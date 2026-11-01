@@ -36,13 +36,13 @@ fn a_wrong_command_line_prints_the_usage() {
     for args in [
         &[][..],
         &["other"],
-        &["trace"],
-        &["trace", "--out", "x"],
+        &["review"],
+        &["write", "--out", "x"],
         &["stability", "--out", "x", "one"],
         &["stability", "--in", "x", "one", "two"],
         &["stability"],
-        &["corpus"],
-        &["corpus", "a", "b"],
+        &["states"],
+        &["states", "a", "b"],
     ] {
         let (code, _, err) = call(args);
         assert_eq!(code, EXIT_USAGE, "{args:?}");
@@ -51,17 +51,17 @@ fn a_wrong_command_line_prints_the_usage() {
 }
 
 #[test]
-fn trace_writes_the_trace_and_the_page_of_a_work_directory() {
+fn write_writes_the_run_list_and_the_report_of_a_work_directory() {
     let root = TempDir::new().unwrap();
     let dir = review(&root, "w", "approve", "abc");
 
-    let (code, _, err) = call(&["trace", "--workdir", &dir]);
+    let (code, _, err) = call(&["write", "--workdir", &dir]);
 
     assert_eq!((code, err.as_str()), (EXIT_OK, ""));
     assert!(
-        fs::read_to_string(format!("{dir}/{}", crate::TRACE))
+        fs::read_to_string(format!("{dir}/{}", crate::AGENT_RUNS))
             .unwrap()
-            .starts_with("{\"trace\":")
+            .starts_with("{\"review\":")
     );
     assert!(
         fs::read_to_string(format!("{dir}/{}", crate::REPORT))
@@ -71,12 +71,12 @@ fn trace_writes_the_trace_and_the_page_of_a_work_directory() {
 }
 
 #[test]
-fn trace_names_each_file_it_could_not_write_and_fails() {
+fn write_names_each_file_it_could_not_write_and_fails() {
     let root = TempDir::new().unwrap();
     let dir = review(&root, "w", "approve", "abc");
     fs::create_dir_all(format!("{dir}/{}", crate::REPORT)).unwrap();
 
-    let (code, _, err) = call(&["trace", "--workdir", &dir]);
+    let (code, _, err) = call(&["write", "--workdir", &dir]);
 
     assert_eq!(code, EXIT_FAILURE);
     assert!(err.contains("review/report.html not written: "), "{err}");
@@ -131,9 +131,9 @@ fn stability_fails_naming_a_file_it_could_not_write() {
 }
 
 #[test]
-fn corpus_prints_the_probe_s_matrices_or_fails_naming_why() {
+fn states_prints_the_measurement_s_matrices_or_fails_naming_why() {
     let root = TempDir::new().unwrap();
-    let file = root.path().join("corpus.toml");
+    let file = root.path().join("states.toml");
     fs::write(
         &file,
         "[[state]]\nname = \"pr-99\"\npull = 99\n\
@@ -143,19 +143,19 @@ fn corpus_prints_the_probe_s_matrices_or_fails_naming_why() {
     .unwrap();
     let file = file.display().to_string();
 
-    let (code, out, err) = call(&["corpus", &file]);
+    let (code, out, err) = call(&["states", &file]);
     assert_eq!((code, err.as_str()), (EXIT_OK, ""));
     assert!(out.starts_with("states={\"include\":[{"), "{out}");
     assert!(out.contains("\nsamples={\"include\":[{"), "{out}");
 
     fs::write(&file, "state = []").unwrap();
-    let (code, _, err) = call(&["corpus", &file]);
+    let (code, _, err) = call(&["states", &file]);
     assert_eq!(code, EXIT_FAILURE);
-    assert!(err.contains("the corpus holds no state"), "{err}");
+    assert!(err.contains("the states holds no state"), "{err}");
 
-    let (code, _, err) = call(&["corpus", "/nonexistent/corpus.toml"]);
+    let (code, _, err) = call(&["states", "/nonexistent/states.toml"]);
     assert_eq!(code, EXIT_FAILURE);
-    assert!(err.contains("read /nonexistent/corpus.toml: "), "{err}");
+    assert!(err.contains("read /nonexistent/states.toml: "), "{err}");
 }
 
 #[test]

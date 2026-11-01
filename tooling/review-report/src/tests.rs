@@ -6,21 +6,21 @@ use testkit::TempDir;
 use super::*;
 
 #[test]
-fn a_review_that_could_not_run_still_gets_its_trace_and_page() {
+fn a_review_that_could_not_run_still_gets_its_run_list_and_report() {
     let dir = TempDir::new().unwrap();
 
     let problems = write(dir.path(), Some("plan: review/dispatch.json does not read"));
 
     assert!(problems.is_empty(), "{problems:?}");
-    let trace = fs::read_to_string(dir.path().join(TRACE)).unwrap();
-    let header: serde_json::Value = serde_json::from_str(trace.lines().next().unwrap()).unwrap();
-    assert_eq!(header["trace"]["verdict"], "failed");
+    let runs = fs::read_to_string(dir.path().join(AGENT_RUNS)).unwrap();
+    let header: serde_json::Value = serde_json::from_str(runs.lines().next().unwrap()).unwrap();
+    assert_eq!(header["review"]["verdict"], "failed");
     assert_eq!(
-        header["trace"]["failure"],
+        header["review"]["failure"],
         "plan: review/dispatch.json does not read"
     );
-    let page = fs::read_to_string(dir.path().join(REPORT)).unwrap();
-    assert!(page.contains("The review could not run: plan: review/dispatch.json does not read"));
+    let report = fs::read_to_string(dir.path().join(REPORT)).unwrap();
+    assert!(report.contains("The review could not run: plan: review/dispatch.json does not read"));
 }
 
 #[test]
@@ -36,7 +36,7 @@ fn each_file_not_written_is_named_and_counted() {
 
     let lines = lines.into_inner();
     assert_eq!(lines.len(), 3, "{lines:?}");
-    assert!(lines[0].starts_with("report: review/trace.jsonl not written: "));
+    assert!(lines[0].starts_with("report: review/agent-runs.jsonl not written: "));
     assert!(lines[1].starts_with("report: review/report.html not written: "));
     assert_eq!(lines[2], "report: 2 of 2 report files not written");
 }

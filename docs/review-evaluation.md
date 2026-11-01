@@ -165,19 +165,19 @@ definition. The Claude Code command line both start is an npm package,
 which the mise rule for released binaries refuses, so both workflows install
 it through `.github/actions/claude-code`, which pins its version (ENG-01).
 
-## The stability probe
+## The stability measurement
 
 The command line takes no seed, so a review is measured by repetition.
 [stability.yml](../.github/workflows/stability.yml), started by hand,
-reviews each state of `tooling/review-eval/stability-corpus.toml` three
+reviews each state of `tooling/review-eval/stability-states.toml` three
 times afresh. `review-report stability` then writes `stability.json`:
 the share of reviews whose verdict differs from the most common one,
 and per agent the Jaccard overlap of its finding sets. A finding is its
 path, ids and the hash of its normalised consequence, never its line.
 It warns past a flip rate of 0.2 or an overlap below 0.7. Every review
-also leaves `review/trace.jsonl`: first `{"trace": {id, started,
-finished, verdict, findings_blocking, findings_nit, gaps}}`, then one
-span per agent run, `{name, kind, part?, attempt, model, effort,
+also leaves `review/agent-runs.jsonl`, the run list: first `{"review": {id,
+started, finished, verdict, findings_blocking, findings_nit, gaps}}`, then one
+entry per agent run, `{name, kind, part?, attempt, model, effort,
 started_ms, ended_ms, turns, tokens, cost_usd, status, reason?}`. Its
 `cost_usd` is the log's `total_cost_usd`, and `review/report.html` is
 built from it.

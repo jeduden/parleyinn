@@ -24,14 +24,14 @@ fn review(root: &TempDir, name: &str, verdict: &str) -> String {
 }
 
 #[test]
-fn the_executable_writes_a_trace_and_measures_stability() {
+fn the_executable_writes_a_run_list_and_measures_stability() {
     let root = TempDir::new().unwrap();
     let one = review(&root, "one", "approve");
     let two = review(&root, "two", "approve");
     let out = root.path().join("stability.json");
 
-    let trace = Command::new(env!("CARGO_BIN_EXE_review-report"))
-        .args(["trace", "--workdir", &one])
+    let runs = Command::new(env!("CARGO_BIN_EXE_review-report"))
+        .args(["write", "--workdir", &one])
         .output()
         .unwrap();
     let stability = Command::new(env!("CARGO_BIN_EXE_review-report"))
@@ -42,7 +42,7 @@ fn the_executable_writes_a_trace_and_measures_stability() {
         .output()
         .unwrap();
 
-    assert!(trace.status.success());
+    assert!(runs.status.success());
     assert!(
         fs::read_to_string(format!("{one}/review/report.html"))
             .unwrap()

@@ -1,7 +1,7 @@
 [package]
 name = "review-report"
 version = "0.0.0"
-description = "Writes a review's trace and report page from its files, and the stability of repeated reviews of one pull-request state (ENG-28, ENG-32)"
+description = "Writes a review's run list and report from its files, and the stability of repeated reviews of one pull-request state (ENG-28, ENG-32)"
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
@@ -23,6 +23,6 @@ workspace = true
 
 # ENG-02: see crates/parinn/Cargo.toml.
 [package.metadata.parinn]
-responsibility = "Writes a review's trace and report page from its files, and the stability of repeated reviews of one pull-request state"
+responsibility = "Writes a review's run list and report from its files, and the stability of repeated reviews of one pull-request state"
 may-depend-on = ["review-eval", "review-gate"]
 may-dev-depend-on = ["testkit"]

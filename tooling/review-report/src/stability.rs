@@ -23,7 +23,7 @@
 //!   failed); empty when it is measured;
 //! - `within_limits`, whether it is measured, the flip rate is at most
 //!   [`FLIP_RATE_LIMIT`] and the overlap at least [`JACCARD_FLOOR`],
-//!   which the stability probe warns on.
+//!   which the stability measurement warns on.
 //!
 //! Every function here but [`read`] is pure, and the output is ordered,
 //! so the same runs give the same file.
@@ -35,14 +35,14 @@ use std::path::Path;
 
 use serde::Serialize;
 
+use crate::agent_runs::NO_VERDICT;
 use crate::identity::{self, Fid};
 use crate::inputs;
-use crate::trace::NO_VERDICT;
 
-/// The highest flip rate the probe passes without a warning: more than
+/// The highest flip rate the measurement passes without a warning: more than
 /// one run in five deciding otherwise than the rest.
 pub const FLIP_RATE_LIMIT: f64 = 0.2;
-/// The lowest mean finding overlap the probe passes without a warning.
+/// The lowest mean finding overlap the measurement passes without a warning.
 pub const JACCARD_FLOOR: f64 = 0.7;
 
 /// One review, as the comparison reads it.

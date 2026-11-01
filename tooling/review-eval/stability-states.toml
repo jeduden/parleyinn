@@ -1,4 +1,4 @@
-# The stability probe's corpus (ENG-32): frozen pull-request states,
+# The stability measurement's states (ENG-32): frozen pull-request states,
 # each reviewed three times afresh by .github/workflows/stability.yml,
 # whose verdict flip rate and finding overlap measure how stable the
 # review is on an unchanged state. Each state is a merged pull request
@@ -10,7 +10,7 @@
 # parents with `git log --merges --first-parent --format='%H %P' main`
 # (the first parent is the base, the second the head), and add a state
 # with a name of lowercase letters, digits and dashes. Each state costs
-# three reviews per probe; keep the corpus small.
+# three reviews per measurement; keep the list short.
 
 # A Rust change with its unit tests: the code generalist and its
 # language and test-layer specialists.

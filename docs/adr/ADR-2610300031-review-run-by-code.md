@@ -272,16 +272,16 @@ repeat them, which costs tokens.
   each definition's and diff's SHA-256. The verdict function is the
   same; nothing is reused across a changed head, definition or diff.
 - After every run, failed or not, `review-run` writes
-  `review/trace.jsonl`, one span per agent run with its tokens, the
+  `review/agent-runs.jsonl`, one entry per agent run with its tokens, the
   cost its log reported and why it was not accepted, and
-  `review/report.html`, a static page with every string a run shaped
+  `review/report.html`, a static report with every string a run shaped
   escaped; the `review-report` crate builds both from the review's
   files, best effort, so neither changes the verdict. They go with the
   reports; the run logs stay in the job. No server or socket is added.
-- A stability probe, `.github/workflows/stability.yml`, reviews each
-  state of `tooling/review-eval/stability-corpus.toml` three times
+- A stability measurement, `.github/workflows/stability.yml`, reviews each
+  state of `tooling/review-eval/stability-states.toml` three times
   afresh and measures the verdict flip rate and each agent's finding
-  overlap (ENG-32). It runs on dispatch alone: about $15 a probe, so
+  overlap (ENG-32). It runs on dispatch alone: about $15 a measurement, so
   its weekly schedule waits, commented out, for the stakeholder.
 - The Claude Code OAuth token stays out of every agent's reach: one
   step in each agent job stages it in a credentials file under the

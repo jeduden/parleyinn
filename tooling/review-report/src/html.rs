@@ -1,23 +1,23 @@
-//! The report page: one static, self-contained HTML file built from a
-//! review's trace and its gaps. It loads nothing: its style is inline,
+//! The report: one static, self-contained HTML file built from a
+//! review's run list and its gaps. It loads nothing: its style is inline,
 //! it holds no script, and its content security policy refuses any
 //! that an escaping slip would let in. Every string a run could shape
 //! (an agent's name, a model, a reason, the head) is untrusted: it is
 //! cut to [`MAX_TEXT`] characters and escaped before it reaches the
-//! page. At most [`MAX_ROWS`] rows stand in a table, so the page stays
-//! small whatever the review ran; the trace holds every span.
+//! report. At most [`MAX_ROWS`] rows stand in a table, so the report stays
+//! small whatever the review ran; the run list holds every agent run.
 
 use std::fmt::Write as _;
 
+use crate::agent_runs::{AgentRun, AgentRuns, Status};
 use crate::inputs::Gap;
-use crate::trace::{Span, Status, Trace};
 
 /// The most rows a table holds; the rest are counted below it.
 pub const MAX_ROWS: usize = 300;
-/// The most characters of one string the page shows.
+/// The most characters of one string the report shows.
 pub const MAX_TEXT: usize = 300;
 
-/// The page's style: no external load, nothing executable.
+/// The report's style: no external load, nothing executable.
 const STYLE: &str = "body{font:14px/1.4 system-ui,sans-serif;margin:2em;color:#222}\
 table{border-collapse:collapse;margin:1em 0}td,th{border:1px solid #ccc;padding:2px 6px;\
 text-align:left}td.n{text-align:right}.tl{width:100%}.row{display:flex;align-items:center;\
@@ -53,10 +53,10 @@ pub fn text(text: &str) -> String {
     }
 }
 
-/// The page for `trace`, `gaps` being what the review did not review.
+/// The report for the run list `runs`, `gaps` being what the review did not review.
 #[must_use]
-pub fn render(trace: &Trace, gaps: &[Gap]) -> String {
-    let h = &trace.header;
+pub fn render(runs: &AgentRuns, gaps: &[Gap]) -> String {
+    let h = &runs.header;
     let mut s = String::new();
     let _ = write!(
         s,
@@ -66,11 +66,11 @@ pub fn render(trace: &Trace, gaps: &[Gap]) -> String {
          </head><body>\n<h1>Review {id}</h1>\n",
         id = text(&h.id)
     );
-    summary(&mut s, trace);
-    timeline(&mut s, trace);
-    costs(&mut s, &trace.spans);
-    token_table(&mut s, &trace.spans);
-    gap_reasons(&mut s, &trace.spans);
+    summary(&mut s, runs);
+    timeline(&mut s, runs);
+    costs(&mut s, &runs.agent_runs);
+    token_table(&mut s, &runs.agent_runs);
+    gap_reasons(&mut s, &runs.agent_runs);
     not_reviewed(&mut s, gaps);
     if !h.notes.is_empty() {
         s.push_str("<h2>Files that did not read</h2>\n<ul>\n");
@@ -85,9 +85,13 @@ pub fn render(trace: &Trace, gaps: &[Gap]) -> String {
 }
 
 /// The verdict and the counts.
-fn summary(s: &mut String, trace: &Trace) {
-    let h = &trace.header;
-    let cost: f64 = trace.spans.iter().map(|span| span.cost_usd).sum();
+fn summary(s: &mut String, runs: &AgentRuns) {
+    let h = &runs.header;
+    let cost: f64 = runs
+        .agent_runs
+        .iter()
+        .map(|agent_run| agent_run.cost_usd)
+        .sum();
     let _ = writeln!(s, "<p>Verdict: <strong>{}</strong></p>", text(&h.verdict));
     if let Some(failure) = &h.failure {
         let _ = writeln!(s, "<p>The review could not run: {}</p>", text(failure));
@@ -99,17 +103,20 @@ fn summary(s: &mut String, trace: &Trace) {
         h.findings_blocking,
         h.findings_nit,
         h.gaps,
-        trace.spans.len()
+        runs.agent_runs.len()
     );
 }
 
-/// How a row names `span`: its agent, its part and its attempt.
-fn label(span: &Span) -> String {
-    let part = span.part.map(|p| format!(" part {p}")).unwrap_or_default();
-    text(&format!("{}{part} #{}", span.name, span.attempt))
+/// How a row names an agent run: its agent, its part and its attempt.
+fn label(agent_run: &AgentRun) -> String {
+    let part = agent_run
+        .part
+        .map(|p| format!(" part {p}"))
+        .unwrap_or_default();
+    text(&format!("{}{part} #{}", agent_run.name, agent_run.attempt))
 }
 
-/// The class a span's bar takes.
+/// The class an agent run's bar takes.
 fn class(status: Status) -> &'static str {
     match status {
         Status::Accepted => "accepted",
@@ -117,35 +124,35 @@ fn class(status: Status) -> &'static str {
     }
 }
 
-/// One bar per timed span, placed between the trace's start and end.
-fn timeline(s: &mut String, trace: &Trace) {
+/// One bar per timed agent run, placed between the run list's start and end.
+fn timeline(s: &mut String, runs: &AgentRuns) {
     s.push_str("<h2>Timeline</h2>\n");
-    let (Some(start), Some(end)) = (trace.header.started, trace.header.finished) else {
+    let (Some(start), Some(end)) = (runs.header.started, runs.header.finished) else {
         s.push_str("<p>No run left a timed log.</p>\n");
         return;
     };
     let total = end.saturating_sub(start).max(1);
     let at = |ms: u64| (ms.saturating_sub(start) as f64) * 100.0 / (total as f64);
     s.push_str("<div class=\"tl\">\n");
-    let timed = trace
-        .spans
+    let timed = runs
+        .agent_runs
         .iter()
-        .filter_map(|span| Some((span, span.started_ms?, span.ended_ms?)));
-    for (span, from, to) in timed.take(MAX_ROWS) {
+        .filter_map(|agent_run| Some((agent_run, agent_run.started_ms?, agent_run.ended_ms?)));
+    for (agent_run, from, to) in timed.take(MAX_ROWS) {
         let _ = writeln!(
             s,
             "<div class=\"row\"><span class=\"label\">{}</span><span class=\"track\">\
              <span class=\"bar {}\" style=\"left:{:.2}%;width:{:.2}%\"></span></span>\
              <span>{:.1} s</span></div>",
-            label(span),
-            class(span.status),
+            label(agent_run),
+            class(agent_run.status),
             at(from),
             (at(to) - at(from)).max(0.5),
             (to.saturating_sub(from) as f64) / 1000.0
         );
     }
     s.push_str("</div>\n");
-    more(s, trace.spans.len());
+    more(s, runs.agent_runs.len());
 }
 
 /// The note under a table cut at [`MAX_ROWS`].
@@ -153,57 +160,57 @@ fn more(s: &mut String, rows: usize) {
     if rows > MAX_ROWS {
         let _ = writeln!(
             s,
-            "<p>{} more rows not shown; the trace holds them.</p>",
+            "<p>{} more rows not shown; the runs holds them.</p>",
             rows - MAX_ROWS
         );
     }
 }
 
 /// The cost of each run, by agent, model, attempt and part.
-fn costs(s: &mut String, spans: &[Span]) {
+fn costs(s: &mut String, agent_runs: &[AgentRun]) {
     s.push_str(
         "<h2>Cost</h2>\n<table><tr><th>agent</th><th>kind</th><th>part</th><th>attempt</th>\
          <th>model</th><th>effort</th><th>turns</th><th>status</th><th>cost (USD)</th></tr>\n",
     );
-    for span in spans.iter().take(MAX_ROWS) {
-        let reused = if span.reused { " (reused)" } else { "" };
+    for agent_run in agent_runs.iter().take(MAX_ROWS) {
+        let reused = if agent_run.reused { " (reused)" } else { "" };
         let _ = writeln!(
             s,
             "<tr><td>{}</td><td>{}</td><td class=\"n\">{}</td><td class=\"n\">{}</td>\
              <td>{}</td><td>{}</td><td class=\"n\">{}</td><td>{}{reused}</td>\
              <td class=\"n\">{:.4}</td></tr>",
-            text(&span.name),
-            text(&span.kind),
-            span.part.map(|p| p.to_string()).unwrap_or_default(),
-            span.attempt,
-            text(&span.model),
-            text(&span.effort),
-            span.turns,
-            class(span.status),
-            span.cost_usd
+            text(&agent_run.name),
+            text(&agent_run.kind),
+            agent_run.part.map(|p| p.to_string()).unwrap_or_default(),
+            agent_run.attempt,
+            text(&agent_run.model),
+            text(&agent_run.effort),
+            agent_run.turns,
+            class(agent_run.status),
+            agent_run.cost_usd
         );
     }
-    let total: f64 = spans.iter().map(|span| span.cost_usd).sum();
+    let total: f64 = agent_runs.iter().map(|agent_run| agent_run.cost_usd).sum();
     let _ = writeln!(
         s,
         "<tr><th colspan=\"8\">total</th><td class=\"n\">{total:.4}</td></tr></table>"
     );
-    more(s, spans.len());
+    more(s, agent_runs.len());
 }
 
 /// The tokens of each run, bucket by bucket.
-fn token_table(s: &mut String, spans: &[Span]) {
+fn token_table(s: &mut String, agent_runs: &[AgentRun]) {
     s.push_str(
         "<h2>Tokens</h2>\n<table><tr><th>run</th><th>fresh</th><th>cache write</th>\
          <th>cache read</th><th>output</th></tr>\n",
     );
-    for span in spans.iter().take(MAX_ROWS) {
-        let t = span.tokens;
+    for agent_run in agent_runs.iter().take(MAX_ROWS) {
+        let t = agent_run.tokens;
         let _ = writeln!(
             s,
             "<tr><td>{}</td><td class=\"n\">{}</td><td class=\"n\">{}</td>\
              <td class=\"n\">{}</td><td class=\"n\">{}</td></tr>",
-            label(span),
+            label(agent_run),
             t.fresh,
             t.cache_write,
             t.cache_read,
@@ -211,24 +218,27 @@ fn token_table(s: &mut String, spans: &[Span]) {
         );
     }
     s.push_str("</table>\n");
-    more(s, spans.len());
+    more(s, agent_runs.len());
 }
 
 /// Why each run whose answer was not taken was not.
-fn gap_reasons(s: &mut String, spans: &[Span]) {
+fn gap_reasons(s: &mut String, agent_runs: &[AgentRun]) {
     s.push_str("<h2>Gap reasons</h2>\n");
-    let gaps: Vec<&Span> = spans.iter().filter(|x| x.status == Status::Gap).collect();
+    let gaps: Vec<&AgentRun> = agent_runs
+        .iter()
+        .filter(|x| x.status == Status::Gap)
+        .collect();
     if gaps.is_empty() {
         s.push_str("<p>Every run's answer was taken.</p>\n");
         return;
     }
     s.push_str("<table><tr><th>run</th><th>reason</th></tr>\n");
-    for span in gaps.iter().take(MAX_ROWS) {
-        let reason = span.reason.as_deref().unwrap_or_default();
+    for agent_run in gaps.iter().take(MAX_ROWS) {
+        let reason = agent_run.reason.as_deref().unwrap_or_default();
         let _ = writeln!(
             s,
             "<tr><td>{}</td><td>{}</td></tr>",
-            label(span),
+            label(agent_run),
             text(reason)
         );
     }

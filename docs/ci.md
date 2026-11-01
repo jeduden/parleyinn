@@ -38,8 +38,8 @@ and the `ci-review` skill measures them.
   and uploads them as the `ci-timings` artifact. Read those; do not
   measure again.
 - A review's timing and cost per agent run are in its `review-reports`
-  artifact, `report.html` and `trace.jsonl`; read those before timing a
-  review again.
+  artifact, `report.html` and the run list `agent-runs.jsonl`; read those
+  before timing a review again.
 
 ## Feedback time
 

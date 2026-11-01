@@ -137,7 +137,7 @@ fn runs_of_different_states_are_named_so() {
 
 #[test]
 fn runs_of_reviews_that_failed_are_unmeasured_never_stable() {
-    let failed = run(crate::trace::NO_VERDICT, &[], 0.0);
+    let failed = run(crate::agent_runs::NO_VERDICT, &[], 0.0);
 
     let s = compare(&[failed.clone(), failed.clone(), failed]);
 
@@ -201,7 +201,7 @@ fn a_review_is_read_from_its_work_directory() {
 
     let r = read(dir.path(), &mut notes);
 
-    assert_eq!(r.verdict, crate::trace::NO_VERDICT);
+    assert_eq!(r.verdict, crate::agent_runs::NO_VERDICT);
     assert_eq!(r.state, (Some("abc".to_owned()), "i".to_owned()));
     assert_eq!(r.findings["lang-rust"].len(), 1);
     assert_eq!(r.findings["review-code"].len(), 1);
