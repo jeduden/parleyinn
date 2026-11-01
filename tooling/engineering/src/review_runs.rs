@@ -57,6 +57,9 @@ pub enum Event {
     Ended(String),
 }
 
+/// What a [`Recorder`] recorded: its events and each run's agent and prompt.
+pub type Recorded = (Vec<Event>, Vec<(String, String)>);
+
 /// A stand-in for the `claude` command line: it records each run's
 /// start and end and each agent's prompt, and answers as the agent it
 /// runs as; when it holds, each run [`HOLDS`] names ends only once its
@@ -80,7 +83,7 @@ impl Recorder {
     /// # Errors
     ///
     /// Fails when a lock of the recorder is poisoned.
-    pub fn recorded(self) -> Result<(Vec<Event>, Vec<(String, String)>), String> {
+    pub fn recorded(self) -> Result<Recorded, String> {
         let events = self
             .events
             .into_inner()
