@@ -44,8 +44,9 @@ pub fn abort(plan: &Plan, decision: &Decision, fraction: f64) -> Option<Finding>
         line: 0,
         severity: BLOCKING.to_owned(),
         body: format!(
-            "{ABORTED} {}, so no generalist that had not started was started; once fixed, \
-             resume with --only <its gaps.json> --from <its review directory>",
+            "{ABORTED} {}, so no generalist was started; resume with --resume once fixed \
+             (scripts/review-local.sh --resume, or review-run --only <its gaps.json> --from <its \
+             review directory>)",
             mass_failure(failed, dispatched)
         ),
     })

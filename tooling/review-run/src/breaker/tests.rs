@@ -56,8 +56,9 @@ fn more_than_a_third_failed_opens_the_outcome_with_the_abort_and_requests_change
     let amended = amend(&plan(), decision(gaps), BREAKER_FRACTION);
 
     let want = "review aborted: 3 of 6 specialists failed (mass failure; likely an outage or a \
-                broken prompt), so no generalist that had not started was started; once fixed, \
-                resume with --only <its gaps.json> --from <its review directory>";
+                broken prompt), so no generalist was started; resume with --resume once fixed \
+                (scripts/review-local.sh --resume, or review-run --only <its gaps.json> --from <its \
+                review directory>)";
     assert_eq!(amended.outcome.verdict, REQUEST_CHANGES_VERDICT);
     assert_eq!(amended.outcome.findings[0].body, want);
     assert_eq!(amended.outcome.findings[0].path, REVIEW_PATH);
