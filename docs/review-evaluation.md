@@ -140,9 +140,10 @@ harness session started in the checkout, the review workflow's agents included,
 fetch two plugins, `mdsmith-skills` and `mdsmith-audit`, from
 github.com/jeduden/mdsmith. They are the mdsmith project's Claude Code
 plugins, at the release of the linter that `mdsmith check .` runs
-([tooling.md](tooling.md)). The fetch is a new network use by the
-harness, not by ParleyInn's core: I4 binds the core. The pin is the
-control: both plugins name release `v0.55.1` and its commit sha. `.claude/`
+([tooling.md](tooling.md)). The fetch is a network use of the harness, which
+is repository tooling and no ParleyInn component: I4 binds every component, the
+core and B1 to B3 alike, and none of them makes it. The pin is the control: both
+plugins name release `v0.55.1` and its commit sha. `.claude/`
 is a stakeholder path ([CODEOWNERS](../.github/CODEOWNERS)), so a change to
 the pin waits for the stakeholder's approval.
 
