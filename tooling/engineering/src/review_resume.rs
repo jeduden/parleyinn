@@ -3,14 +3,15 @@
 //! beside the review outcome each dispatched agent left without an
 //! accepted report or answer, and names it not reviewed; run again
 //! with that list and the earlier run, it runs that agent again with
-//! the generalist that weighs it, keeps every other answer, and decides
-//! the review as a full run would; across a changed head or input it
-//! keeps nothing, and across a changed definition or diff nothing of
-//! the agent whose it is. The check runs
-//! `review-run` six times on work directories holding the checkout's
-//! definitions, with a stand-in for the `claude` command line that
-//! fails one specialist on the first run alone, and requires each run
-//! to start exactly the agents it must.
+//! the generalist that weighs it, keeps every other answer whose answer
+//! key is unchanged, on the same head or a new one, and decides the
+//! review as a full run would; across a changed definition or diff it
+//! keeps nothing of the agent whose it is, and across a changed file
+//! every key reads nothing at all. The check runs `review-run` seven
+//! times on work directories holding the checkout's definitions, with a
+//! stand-in for the `claude` command line that fails one specialist on
+//! the first run alone, and requires each run to start exactly the
+//! agents it must.
 
 use std::collections::BTreeSet;
 use std::fs;
@@ -64,6 +65,9 @@ impl ResumeHost {
 
 impl Host for ResumeHost {
     fn run(&self, command: &Command) -> Result<Output, String> {
+        if let Some(out) = review_runs::version(command) {
+            return Ok(out);
+        }
         if self.fail == Some(agent_of(command).as_str()) {
             return Err("claude: not found".to_owned());
         }
@@ -220,12 +224,16 @@ pub fn change_file(dir: &Path, rel: &str) -> Result<(), String> {
         .map_err(|e| format!("change {}: {e}", path.display()))
 }
 
-/// Runs the six reviews under `work`, prepared from `checkout`, and
+/// A file every answer key reads, in the pull request's tree.
+pub const SALTED: &str = "pr-head/CLAUDE.md";
+
+/// Runs the seven reviews under `work`, prepared from `checkout`, and
 /// returns what is wrong with what each started and wrote: the first,
 /// which cannot start [`GAP`]; the one resumed from it on the same head;
-/// one resumed on [`MOVED`]; one resumed with the pull request's diff,
-/// an input every agent reads, changed; one resumed with [`CHANGED`]'s
-/// definition changed; and one resumed with [`DIFFED`]'s diff changed.
+/// one resumed on [`MOVED`], a new commit; one resumed with the pull
+/// request's whole diff changed, which no key holds; one resumed with
+/// [`CHANGED`]'s definition changed; one resumed with [`DIFFED`]'s diff
+/// changed; and one resumed with [`SALTED`] changed.
 #[must_use]
 pub fn review_resumes(checkout: &Checkout, work: &Path) -> Vec<String> {
     let first = work.join("first");
@@ -262,8 +270,8 @@ pub fn review_resumes(checkout: &Checkout, work: &Path) -> Vec<String> {
         Ok((_, started)) => {
             problems.extend(started_problems(
                 &started,
-                &all(),
-                "a review resumed on another head",
+                &[GAP, ITS_GENERALIST],
+                "a review resumed on a new commit",
             ));
         }
         Err(e) => problems.push(e),
@@ -271,8 +279,8 @@ pub fn review_resumes(checkout: &Checkout, work: &Path) -> Vec<String> {
     match again("inputs", HEAD, &|d| change_file(d, "pr.diff")) {
         Ok((_, started)) => problems.extend(started_problems(
             &started,
-            &all(),
-            "a review resumed with a changed input",
+            &[GAP, ITS_GENERALIST],
+            "a review resumed with the pull request's whole diff changed",
         )),
         Err(e) => problems.push(e),
     }
@@ -291,6 +299,14 @@ pub fn review_resumes(checkout: &Checkout, work: &Path) -> Vec<String> {
             &started,
             &[GAP, DIFFED, ITS_GENERALIST, DIFFED_GENERALIST],
             "a review resumed with a changed diff",
+        )),
+        Err(e) => problems.push(e),
+    }
+    match again("salted", HEAD, &|d| change_file(d, SALTED)) {
+        Ok((_, started)) => problems.extend(started_problems(
+            &started,
+            &all(),
+            "a review resumed with a file every key reads changed",
         )),
         Err(e) => problems.push(e),
     }

@@ -24,6 +24,9 @@ fn leaking_run() -> AgentRun {
         parts: 2,
         failed_parts: vec![(1, format!("part {TOKEN}"))],
         reused: false,
+        from_store: false,
+        answer_key: None,
+        store_failed: false,
     }
 }
 

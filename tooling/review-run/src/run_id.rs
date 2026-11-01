@@ -2,10 +2,12 @@
 //! tell whether an answer it would reuse came from the same inputs: the
 //! head commit reviewed, a hash of the inputs every agent reads (the
 //! review class, the dispatch, the bundle, the diff against main and the
-//! pull request's agent instructions), the split limit, and per agent a
-//! SHA-256 of its definition file and, for a specialist, of its own
-//! diff. Nothing is reused across a changed head, input, definition or
-//! diff.
+//! pull request's agent instructions), the split limit, the `claude`
+//! version, and per agent a SHA-256 of its definition file, for a
+//! specialist of its own diff, and its own answer key (`key`). A
+//! resumed review reuses an agent's answer exactly when its own key is
+//! unchanged, whatever the head; the head and the inputs hash say what
+//! was reviewed, and decide nothing.
 
 use std::collections::BTreeMap;
 use std::fs;
@@ -14,6 +16,7 @@ use std::path::Path;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
+use crate::key::Keys;
 use crate::plan::Plan;
 use crate::{CLASS, REVIEW};
 
@@ -46,6 +49,10 @@ pub struct RunId {
     /// full run.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub resumed_from: Option<String>,
+    /// The version line `claude --version` printed; absent when it could
+    /// not be read, and then no agent has a key.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub claude: Option<String>,
 }
 
 /// What one agent ran on.
@@ -58,6 +65,9 @@ pub struct AgentId {
     /// none.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub diff: Option<String>,
+    /// Its own answer key (`key::Keys::own`); absent when it has none.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub key: Option<String>,
 }
 
 /// The SHA-256 of `bytes`, in hex.
@@ -76,10 +86,16 @@ fn file_hash(path: &Path) -> Option<String> {
     fs::read(path).ok().map(|bytes| sha256(&bytes))
 }
 
-/// What the review of `plan` in `workdir` runs on, its head `head` and
-/// its split limit `split`.
+/// What the review of `plan` in `workdir` runs on, its head `head`, its
+/// split limit `split` and each agent's own key in `keys`, when known.
 #[must_use]
-pub fn compute(workdir: &Path, plan: &Plan, head: Option<String>, split: usize) -> RunId {
+pub fn compute(
+    workdir: &Path,
+    plan: &Plan,
+    head: Option<String>,
+    split: usize,
+    keys: Option<&Keys>,
+) -> RunId {
     let mut inputs = Sha256::new();
     for rel in INPUTS {
         inputs.update(rel.as_bytes());
@@ -101,7 +117,15 @@ pub fn compute(workdir: &Path, plan: &Plan, head: Option<String>, split: usize) 
                 .contains(&name)
                 .then(|| file_hash(&workdir.join(format!("{REVIEW}/diffs/{name}.diff"))))
                 .flatten();
-            (name, AgentId { definition, diff })
+            let key = keys.and_then(|k| k.own(&name)).map(str::to_owned);
+            (
+                name,
+                AgentId {
+                    definition,
+                    diff,
+                    key,
+                },
+            )
         })
         .collect();
 
@@ -111,6 +135,7 @@ pub fn compute(workdir: &Path, plan: &Plan, head: Option<String>, split: usize) 
         split,
         agents,
         resumed_from: None,
+        claude: None,
     }
 }
 

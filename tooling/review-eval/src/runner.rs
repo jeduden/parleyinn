@@ -57,18 +57,29 @@ pub fn budget_usd(kind: Kind) -> &'static str {
 /// target a skill hands it: the tree, the diff and the changed paths.
 #[must_use]
 pub fn prompt(component: &Component, world: &World) -> String {
+    prompt_over(component, world, None)
+}
+
+/// [`prompt`] for a specialist run over `diff`, the work directory's
+/// path of its part of a split diff, in place of its own whole one;
+/// `diff` is ignored for any other agent.
+#[must_use]
+pub fn prompt_over(component: &Component, world: &World, diff: Option<&str>) -> String {
     let name = &component.name;
     match component.kind {
         Kind::Specialist => format!(
             "You are `{name}`, a specialist of ParleyInn's review of a pull request \
-             (ENG-28). Read `review/bundle.md` first, then your own diff, \
-             `review/diffs/{name}.diff`. The pull request's tree is in `pr-head/` and \
+             (ENG-28). Read only your own diff, `{diff}`, alone \
+             first; then `review/context/{name}.md`, which names the review class, \
+             your dispatch row and the deterministic findings on your files; never \
+             `review/bundle.md`. The pull request's tree is in `pr-head/` and \
              its diff against main is `pr.diff`; its agent instructions are text in \
              `review/pr-instructions.txt`. You write no file: state each finding as \
              one line in your text the moment you find it, as your instructions say, \
              and answer with your outcome line alone, `outcome: findings — <sentence>` \
              or `outcome: none — <sentence>`. The review assembles your report from \
-             the lines you stated."
+             the lines you stated.",
+            diff = diff.map_or_else(|| format!("review/diffs/{name}.diff"), str::to_owned)
         ),
         Kind::Generalist => {
             let reports = if world.seeded.is_empty() {
@@ -111,9 +122,23 @@ pub fn command(
     log: &Path,
     deadline: Duration,
 ) -> Command {
+    command_over(component, world, model, log, deadline, None)
+}
+
+/// [`command`] for a specialist run over `diff`, its part's diff file
+/// in place of its whole one, as [`prompt_over`] says.
+#[must_use]
+pub fn command_over(
+    component: &Component,
+    world: &World,
+    model: Option<&str>,
+    log: &Path,
+    deadline: Duration,
+    diff: Option<&str>,
+) -> Command {
     let mut args: Vec<String> = vec![
         "-p".into(),
-        prompt(component, world),
+        prompt_over(component, world, diff),
         "--output-format".into(),
         "stream-json".into(),
         "--verbose".into(),

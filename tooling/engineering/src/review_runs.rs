@@ -2,7 +2,9 @@
 //! runs each dispatched specialist as its own agent, assembles its
 //! report from its run log, runs each dispatched generalist only once
 //! its own specialists have ended and the breaker is decided, and
-//! writes the review outcome from what they answered. The check runs
+//! writes the review outcome from what they answered, telling each
+//! specialist to read only its own diff and the context the review bundle
+//! wrote for it, never the whole bundle. The check runs
 //! `review-run` on a work directory holding the checkout's definitions
 //! of the dispatched agents, with a stand-in for the `claude` command
 //! line that records when each agent's run starts and ends, answers as
@@ -18,6 +20,7 @@ use std::path::Path;
 use std::sync::{Condvar, Mutex, PoisonError};
 use std::time::Duration;
 
+use review_bundle::cli::{BUNDLE, CONTEXTS, DIFFS};
 use review_eval::host::{Command, Host, Output};
 
 use crate::Checkout;
@@ -54,13 +57,18 @@ pub enum Event {
     Ended(String),
 }
 
+/// What a [`Recorder`] recorded: its events and each run's agent and prompt.
+pub type Recorded = (Vec<Event>, Vec<(String, String)>);
+
 /// A stand-in for the `claude` command line: it records each run's
-/// start and end, and answers as the agent it runs as; when it holds,
-/// each run [`HOLDS`] names ends only once its generalist started, or
-/// after its time.
+/// start and end and each agent's prompt, and answers as the agent it
+/// runs as; when it holds, each run [`HOLDS`] names ends only once its
+/// generalist started, or after its time.
 #[derive(Debug, Default)]
 pub struct Recorder {
     pub events: Mutex<Vec<Event>>,
+    /// Each run's agent and the prompt it was given.
+    pub prompts: Mutex<Vec<(String, String)>>,
     /// Whether it holds the runs [`HOLDS`] names.
     pub holds: bool,
     started: Mutex<BTreeSet<String>>,
@@ -68,6 +76,25 @@ pub struct Recorder {
 }
 
 impl Recorder {
+    /// The events and the prompts it recorded; an error naming the lock
+    /// a panicking run poisoned, so a check never reads a list as empty
+    /// and passes.
+    ///
+    /// # Errors
+    ///
+    /// Fails when a lock of the recorder is poisoned.
+    pub fn recorded(self) -> Result<Recorded, String> {
+        let events = self
+            .events
+            .into_inner()
+            .map_err(|_| "the stand-in's events lock is poisoned".to_owned())?;
+        let prompts = self
+            .prompts
+            .into_inner()
+            .map_err(|_| "the stand-in's prompts lock is poisoned".to_owned())?;
+        Ok((events, prompts))
+    }
+
     /// A recorder that holds the runs [`HOLDS`] names.
     #[must_use]
     pub fn holding() -> Self {
@@ -102,7 +129,13 @@ impl Recorder {
 
 impl Host for Recorder {
     fn run(&self, command: &Command) -> Result<Output, String> {
+        if let Some(out) = version(command) {
+            return Ok(out);
+        }
         let agent = agent_of(command);
+        if let Ok(mut prompts) = self.prompts.lock() {
+            prompts.push((agent.clone(), prompt_of(command)));
+        }
         self.record(Event::Started(agent.clone()));
         self.hold(&agent);
         let answered = answer(command, &agent);
@@ -116,6 +149,20 @@ impl Host for Recorder {
     }
 }
 
+/// The version line a stand-in `claude --version` prints.
+pub const VERSION: &str = "2.1.0 (Claude Code)";
+
+/// What a stand-in answers `command`, when it asks `claude --version`,
+/// the one run `review-run` starts that is no agent's.
+#[must_use]
+pub fn version(command: &Command) -> Option<Output> {
+    (command.args == ["--version"]).then(|| Output {
+        code: Some(0),
+        stdout: format!("{VERSION}\n"),
+        ..Output::default()
+    })
+}
+
 /// The agent `command` runs as.
 #[must_use]
 pub fn agent_of(command: &Command) -> String {
@@ -126,6 +173,82 @@ pub fn agent_of(command: &Command) -> String {
         .and_then(|at| command.args.get(at + 1))
         .cloned()
         .unwrap_or_default()
+}
+
+/// The prompt `command` gives its agent, the value after `-p`.
+#[must_use]
+pub fn prompt_of(command: &Command) -> String {
+    command
+        .args
+        .iter()
+        .position(|a| a == "-p")
+        .and_then(|at| command.args.get(at + 1))
+        .cloned()
+        .unwrap_or_default()
+}
+
+/// What is wrong with what each dispatched specialist among `prompts`
+/// was told: not to read its own diff, not to read its own context,
+/// or not to leave the bundle unread, which on a large change is too
+/// large for one read.
+#[must_use]
+pub fn prompt_problems(prompts: &[(String, String)]) -> Vec<String> {
+    let mut problems = Vec::new();
+    for (name, prompt) in prompts {
+        if !SPECIALISTS.contains(&name.as_str()) {
+            continue;
+        }
+        for own in [
+            format!("review/{DIFFS}/{name}.diff"),
+            format!("review/{CONTEXTS}/{name}.md"),
+        ] {
+            if !prompt.contains(&format!("`{own}`")) {
+                problems.push(format!("{name} is not told to read {own}"));
+            }
+        }
+        if !prompt.contains(&format!("never `review/{BUNDLE}`")) {
+            problems.push(format!(
+                "{name} is not told to leave review/{BUNDLE} unread"
+            ));
+        }
+    }
+
+    problems
+}
+
+/// What is wrong with what each part of specialist `name`'s split diff,
+/// `count` parts, was told among `prompts`: not to read its own part's
+/// diff alone, to read the whole diff, or not to leave the bundle
+/// unread; and a part that never ran.
+#[must_use]
+pub fn part_problems(name: &str, count: usize, prompts: &[(String, String)]) -> Vec<String> {
+    let mine: Vec<&str> = prompts
+        .iter()
+        .filter(|(agent, _)| agent == name)
+        .map(|(_, prompt)| prompt.as_str())
+        .collect();
+    let mut problems = Vec::new();
+    let whole = format!("Read only your own diff, `review/{DIFFS}/{name}.diff`");
+    for index in 1..=count {
+        let own = format!("Read only your own diff, `review/{DIFFS}/{name}.{index}.diff`");
+        if !mine.iter().any(|p| p.contains(&own)) {
+            problems.push(format!(
+                "{name} part {index} is not told to read its own part's diff review/{DIFFS}/{name}.{index}.diff"
+            ));
+        }
+    }
+    for prompt in &mine {
+        if prompt.contains(&whole) {
+            problems.push(format!("{name} is told to read the whole diff in a part"));
+        }
+        if !prompt.contains(&format!("never `review/{BUNDLE}`")) {
+            problems.push(format!(
+                "{name} is not told to leave review/{BUNDLE} unread in a part"
+            ));
+        }
+    }
+
+    problems
 }
 
 /// The finding a stand-in specialist states in its text.
@@ -343,9 +466,14 @@ pub fn review_runs_by_code(checkout: &Checkout, workdir: &Path) -> Vec<String> {
         let why = err.lines().last().unwrap_or_default();
         return vec![format!("review-run exited {code}: {why}")];
     }
-    let events = host.events.into_inner().unwrap_or_default();
-    let mut problems = order_problems(&events);
+    let mut problems = with_recorded(host, |events, prompts| {
+        let mut problems = order_problems(&events);
+        problems.extend(prompt_problems(&prompts));
+        problems
+    });
     problems.extend(outcome_problems(workdir));
+    problems.extend(split_runs_by_code(checkout, &workdir.join("split")));
+    problems.extend(context_problems(checkout, &workdir.join("bundle")));
 
     problems
 }
@@ -357,4 +485,199 @@ mod tests;
 fn parse_dispatch(raw: &str) -> Result<std::collections::BTreeMap<String, Vec<String>>, String> {
     serde_json::from_str(raw)
         .map_err(|e| format!("the dispatch the host was given does not parse: {e}"))
+}
+
+/// The specialist whose diff the split check makes too large for one
+/// run, and the files its two parts hold.
+pub const SPLIT: (&str, [&str; 2]) = ("lang-rust", ["src/a.rs", "src/b.rs"]);
+
+/// A diff of `path` too large with another for one run.
+fn section(path: &str) -> String {
+    let body = "+let x = 1;\n".repeat(2500);
+    format!("diff --git a/{path} b/{path}\n--- a/{path}\n+++ b/{path}\n@@ -0,0 +1,2500 @@\n{body}")
+}
+
+/// Runs `review-run` on a work directory `workdir` prepared from
+/// `checkout` whose specialist [`SPLIT`] names has a diff too large for
+/// one run, and returns what is wrong with what each of its parts was
+/// told.
+#[must_use]
+pub fn split_runs_by_code(checkout: &Checkout, workdir: &Path) -> Vec<String> {
+    if let Err(e) = prepare(checkout, workdir) {
+        return vec![e];
+    }
+    let (name, files) = SPLIT;
+    let dir = workdir.join("review").join(DIFFS);
+    let diff: String = files.iter().map(|f| section(f)).collect();
+    let written =
+        fs::create_dir_all(&dir).and_then(|()| fs::write(dir.join(format!("{name}.diff")), diff));
+    if let Err(e) = written {
+        return vec![format!("write {}: {e}", dir.display())];
+    }
+    let host = Recorder::default();
+    let args = [
+        "--workdir".to_owned(),
+        workdir.display().to_string(),
+        "--breaker-fraction=1".to_owned(),
+    ];
+    let code = review_run::cli::run(&host, args, &mut Vec::new(), &mut Vec::new());
+    if code != review_run::cli::EXIT_OK {
+        return vec![format!("review-run exited {code} on a split diff")];
+    }
+
+    with_recorded(host, |_, prompts| {
+        part_problems(name, files.len(), &prompts)
+    })
+}
+
+/// What `check` finds in what `host` recorded; the poisoned lock, when
+/// one is, as the only problem.
+fn with_recorded(
+    host: Recorder,
+    check: impl FnOnce(Vec<Event>, Vec<(String, String)>) -> Vec<String>,
+) -> Vec<String> {
+    match host.recorded() {
+        Ok((events, prompts)) => check(events, prompts),
+        Err(e) => vec![e],
+    }
+}
+
+/// The specialist whose context the context check reads, the file the
+/// change edits, and the requirement it names.
+pub const CONTEXT: (&str, &str, &str) = (
+    "lang-markdown",
+    "docs/srs/10-engineering-quality.md",
+    "ENG-28",
+);
+
+/// What is wrong with the context specialist [`CONTEXT`] names that the
+/// review bundle wrote, run on `checkout` as both trees with a change
+/// to the file [`CONTEXT`] names, into `out`: it lacks the review class,
+/// the touched ids, a dispatch row that names the specialist or a
+/// deterministic finding on its files.
+#[must_use]
+pub fn context_problems(checkout: &Checkout, out: &Path) -> Vec<String> {
+    let (_, path, id) = CONTEXT;
+    let files = out.join("in");
+    let diff =
+        format!("diff --git a/{path} b/{path}\n--- a/{path}\n+++ b/{path}\n@@ -1 +1 @@\n+{id}\n");
+    let written = fs::create_dir_all(&files)
+        .and_then(|()| fs::write(files.join("pr.diff"), diff))
+        .and_then(|()| fs::write(files.join("consent.json"), "[]"));
+    if let Err(e) = written {
+        return vec![format!("write {}: {e}", files.display())];
+    }
+    let args = [
+        "--base".to_owned(),
+        checkout.root.display().to_string(),
+        "--head".to_owned(),
+        checkout.root.display().to_string(),
+        "--diff".to_owned(),
+        files.join("pr.diff").display().to_string(),
+        "--out".to_owned(),
+        out.display().to_string(),
+        "--consent".to_owned(),
+        files.join("consent.json").display().to_string(),
+    ];
+    let mut printed = Vec::new();
+    let mut err = Vec::new();
+    let code = review_bundle::cli::run(args, &mut printed, &mut err);
+    if code != review_bundle::cli::EXIT_OK {
+        let err = String::from_utf8_lossy(&err);
+        return vec![format!(
+            "review-bundle exited {code}: {}",
+            err.lines().last().unwrap_or_default()
+        )];
+    }
+    context_in(out, &String::from_utf8_lossy(&printed))
+}
+
+/// What is wrong with the context [`CONTEXT`] names among the files the
+/// review bundle wrote into `out`, `printed` its step outputs; a file
+/// it did not write is named.
+#[must_use]
+pub fn context_in(out: &Path, printed: &str) -> Vec<String> {
+    let (name, path, id) = CONTEXT;
+    let read = |rel: &str| {
+        let file = out.join(rel);
+        fs::read_to_string(&file).map_err(|e| format!("read {}: {e}", file.display()))
+    };
+    match (
+        read(review_bundle::cli::DISPATCH),
+        read(review_bundle::cli::CHECKED),
+        read(&format!("{CONTEXTS}/{name}.md")),
+    ) {
+        (Ok(dispatch), Ok(checked), Ok(context)) => {
+            context_lacks(name, path, id, printed, &dispatch, &checked, &context)
+        }
+        (d, c, x) => [d, c, x].into_iter().filter_map(Result::err).collect(),
+    }
+}
+
+/// What `context`, the context for `name` the review bundle wrote for a
+/// change to `path` naming `id`, lacks of what the bundle's other
+/// outputs say: `printed` its step outputs, `dispatch` and `checked`
+/// its files.
+#[must_use]
+pub fn context_lacks(
+    name: &str,
+    path: &str,
+    id: &str,
+    printed: &str,
+    dispatch: &str,
+    checked: &str,
+    context: &str,
+) -> Vec<String> {
+    let mut problems = Vec::new();
+    let output = |key: &str| {
+        printed
+            .lines()
+            .find_map(|l| l.strip_prefix(&format!("{key}=")))
+            .unwrap_or_default()
+    };
+    let class = output("class");
+    if class.is_empty() || !context.contains(&format!("Class: **{class}**")) {
+        problems.push(format!(
+            "the context for {name} lacks the review class {class:?}"
+        ));
+    }
+    if output("touched") != "1" || !context.contains(&format!("touches 1 id: {id}")) {
+        problems.push(format!("the context for {name} lacks the touched id {id}"));
+    }
+    let rows: Vec<(String, Vec<String>)> =
+        serde_json::from_str::<std::collections::BTreeMap<String, Vec<String>>>(dispatch)
+            .unwrap_or_default()
+            .into_iter()
+            .filter(|(_, specialists)| specialists.iter().any(|s| s == name))
+            .collect();
+    if rows.is_empty() {
+        problems.push(format!("the dispatch has no row naming {name}"));
+    }
+    for (generalist, _) in rows {
+        if !context.contains(&format!("- `{generalist}`, weighing")) {
+            problems.push(format!(
+                "the context for {name} lacks its dispatch row under {generalist}"
+            ));
+        }
+    }
+    let findings = serde_json::from_str::<Vec<serde_json::Value>>(checked).unwrap_or_default();
+    let on_path: Vec<_> = findings
+        .iter()
+        .filter(|f| f["path"].as_str() == Some(path))
+        .collect();
+    if on_path.is_empty() {
+        problems.push(format!(
+            "the bundle found nothing on {path} to put in the context"
+        ));
+    }
+    for f in on_path {
+        let line = f["line"].as_u64().unwrap_or_default();
+        if !context.contains(&format!("`{path}:{line}`")) {
+            problems.push(format!(
+                "the context for {name} lacks the deterministic finding on {path}:{line}"
+            ));
+        }
+    }
+
+    problems
 }

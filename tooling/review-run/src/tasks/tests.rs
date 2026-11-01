@@ -17,6 +17,7 @@ fn part(name: &str, index: usize) -> Unit {
         part: Some(Part {
             index,
             count: 2,
+            diff: String::new(),
             note: String::new(),
         }),
     }

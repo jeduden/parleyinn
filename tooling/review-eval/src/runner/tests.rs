@@ -32,6 +32,52 @@ fn world(class: &str) -> World {
 }
 
 #[test]
+fn a_specialist_run_over_a_part_is_told_to_read_that_part_alone() {
+    let w = world("standard");
+    let c = component(Kind::Specialist, "lang-rust");
+
+    let part = prompt_over(&c, &w, Some("review/diffs/lang-rust.2.diff"));
+
+    assert!(
+        part.contains("Read only your own diff, `review/diffs/lang-rust.2.diff`, alone first;"),
+        "{part}"
+    );
+    assert!(!part.contains("`review/diffs/lang-rust.diff`"), "{part}");
+    assert_eq!(prompt(&c, &w), prompt_over(&c, &w, None));
+    let general = component(Kind::Generalist, "review-code");
+    assert_eq!(
+        prompt_over(&general, &w, Some("x.diff")),
+        prompt(&general, &w)
+    );
+}
+
+#[test]
+fn a_command_over_a_part_carries_the_part_s_prompt() {
+    let w = world("standard");
+    let c = component(Kind::Specialist, "lang-rust");
+    let log = Path::new("log.jsonl");
+    let deadline = Duration::from_secs(1);
+
+    let over = command_over(
+        &c,
+        &w,
+        None,
+        log,
+        deadline,
+        Some("review/diffs/lang-rust.1.diff"),
+    );
+
+    assert_eq!(
+        over.args[1],
+        prompt_over(&c, &w, Some("review/diffs/lang-rust.1.diff"))
+    );
+    assert_eq!(
+        command_over(&c, &w, None, log, deadline, None),
+        super::command(&c, &w, None, log, deadline)
+    );
+}
+
+#[test]
 fn each_kind_gets_its_prompt() {
     let w = world("standard");
 
@@ -57,6 +103,21 @@ fn each_kind_gets_its_prompt() {
         "{specialist}"
     );
     assert!(!specialist.contains("review/reports"), "{specialist}");
+    // The bundle is too large for one read on a large change, so a
+    // specialist reads its own diff and its own small context alone.
+    assert!(
+        specialist.contains(
+            "Read only your own diff, `review/diffs/lang-rust.diff`, alone first; \
+             then `review/context/lang-rust.md`, which names the review class, your \
+             dispatch row and the deterministic findings on your files; never \
+             `review/bundle.md`."
+        ),
+        "{specialist}"
+    );
+    assert!(
+        !specialist.contains("Read `review/bundle.md`"),
+        "{specialist}"
+    );
 
     let generalist = prompt(&component(Kind::Generalist, "review-code"), &w);
     assert!(
