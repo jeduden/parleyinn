@@ -93,9 +93,18 @@ fn review(
         .specialists()
         .into_iter()
         .filter_map(|name| {
-            fs::read_to_string(workdir.join(report_file(&name)))
-                .ok()
-                .map(|text| (name, text))
+            let path = workdir.join(report_file(&name));
+            match fs::read_to_string(&path) {
+                Ok(text) => Some((name, text)),
+                // A report that is there but does not read stands as
+                // none, and the cause is named (I6).
+                Err(e) => {
+                    if e.kind() != std::io::ErrorKind::NotFound {
+                        progress(&format!("read {}: {e}", path.display()));
+                    }
+                    None
+                }
+            }
         })
         .collect();
     let Decision {

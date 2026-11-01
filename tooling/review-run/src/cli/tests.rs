@@ -153,6 +153,26 @@ fn a_review_without_its_plan_cannot_run() {
     assert!(host.agents().is_empty());
 }
 
+#[test]
+fn a_specialist_report_that_cannot_be_read_names_why() {
+    let dir = workdir();
+    let path = dir.path().join(report_file("lang-rust"));
+    fs::create_dir_all(&path).unwrap();
+    let host = FakeHost::new(fake::either);
+
+    let (code, out, err) = run_in(&host, dir.path());
+
+    assert_eq!(code, EXIT_OK, "{err}");
+    assert!(out.starts_with("verdict=request_changes\n"), "{out}");
+    assert!(
+        err.contains(&format!(
+            "review-run: read {}: Is a directory (os error 21)",
+            path.display()
+        )),
+        "{err}"
+    );
+}
+
 /// Runs a review whose file `rel` the gate reads cannot be written, and
 /// requires it to fail naming that file.
 fn fails_writing(rel: &str) {
