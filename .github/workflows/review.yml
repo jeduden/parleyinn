@@ -449,6 +449,11 @@ jobs:
       - name: Install the pinned Claude Code command line
         if: steps.plan.outputs.empty == 'false'
         uses: ./.github/actions/claude-code
+      # Built, its crates fetched and their build scripts run, before the
+      # Claude token is in any step's environment.
+      - name: Build review-eval
+        if: steps.plan.outputs.empty == 'false'
+        run: cargo build --locked --quiet -p review-eval
       # As in the review: this step alone holds the Claude token, and
       # stages it where no agent reads it (ENG-28).
       - name: Stage the Claude token where no agent reads it
@@ -456,7 +461,7 @@ jobs:
         env:
           CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
         run: |
-          cargo run --locked --quiet -p review-eval -- stage-credential \
+          cargo run --locked --quiet --offline -p review-eval -- stage-credential \
             --dir "$RUNNER_TEMP/claude-credential"
       # Exit 1 says a case failed: its blocking finding reaches the gate
       # through findings.json, so the review requests changes and names
