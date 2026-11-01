@@ -26,8 +26,8 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::io::Write;
 use std::path::{Path, PathBuf};
-use std::sync::Mutex;
 use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::{Mutex, PoisonError};
 use std::time::Duration;
 
 use review_eval::credential::{self, Confined};
@@ -108,9 +108,8 @@ pub fn run_with(
     };
     let errors = Mutex::new(stderr);
     let progress = |line: &str| {
-        if let Ok(mut out) = errors.lock() {
-            let _ = writeln!(out, "review-run: {line}");
-        }
+        let mut out = errors.lock().unwrap_or_else(PoisonError::into_inner);
+        let _ = writeln!(out, "review-run: {line}");
     };
     let guarded = guard(&args, token).and_then(|(scrubber, located)| {
         let confined = located.as_deref().map(|dir| Confined::new(host, dir));

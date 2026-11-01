@@ -1046,3 +1046,5 @@ fn a_review_whose_failed_run_stated_the_token_leaves_it_out_of_the_job_summary()
     assert!(!text.contains(TOKEN), "{text}");
     assert!(text.contains("| lang-rust | specialist |"), "{text}");
 }
+
+mod failures;
