@@ -116,6 +116,7 @@ pub fn prepare(workdir: &Path, name: &str, limit: usize) -> Result<Vec<Part>, St
 pub fn merge(name: &str, parts: Vec<(AgentRun, String)>) -> (AgentRun, String) {
     let count = parts.len();
     let mut failures = Vec::new();
+    let mut failed_parts = Vec::new();
     let mut outcomes = Vec::new();
     let mut lines: Vec<String> = Vec::new();
     let mut log = RunLog {
@@ -128,6 +129,7 @@ pub fn merge(name: &str, parts: Vec<(AgentRun, String)>) -> (AgentRun, String) {
         let place = format!("part {} of {count}", at + 1);
         if let Some(why) = &run.failure {
             failures.push(format!("{place}: {why}"));
+            failed_parts.push((at + 1, why.clone()));
             if log.answered {
                 log.subtype.clone_from(&run.log.subtype);
             }
@@ -178,6 +180,8 @@ pub fn merge(name: &str, parts: Vec<(AgentRun, String)>) -> (AgentRun, String) {
             log,
             attempts,
             parts: u32::try_from(count).unwrap_or(u32::MAX),
+            failed_parts,
+            reused: false,
         },
         report,
     )

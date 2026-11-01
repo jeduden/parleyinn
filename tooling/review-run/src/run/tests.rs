@@ -12,6 +12,8 @@ use super::*;
 use crate::fake::{self, FakeHost, agent_of, prompt_of};
 use crate::plan::parse_dispatch;
 
+mod resume;
+
 fn plan(dispatch: &str) -> Plan {
     Plan {
         class: "standard".to_owned(),
@@ -54,7 +56,7 @@ fn arg_after<'a>(command: &'a Command, flag: &str) -> &'a str {
 }
 
 fn review_with(host: &FakeHost, dir: &Path, p: &Plan) -> Vec<AgentRun> {
-    review(host, dir, p, &known(), options(), &|_| {}).unwrap()
+    review(host, dir, p, &known(), options(), None, &|_| {}).unwrap()
 }
 
 #[test]
@@ -260,6 +262,7 @@ fn progress_names_each_run() {
         &plan(DISPATCH),
         &known(),
         options(),
+        None,
         &|l| {
             lines.lock().unwrap().push(l.to_owned());
         },
@@ -430,6 +433,7 @@ fn a_work_directory_without_room_for_logs_fails_the_review() {
         &plan(DISPATCH),
         &known(),
         options(),
+        None,
         &|_| {},
     )
     .unwrap_err();
@@ -518,6 +522,7 @@ fn one_run_told(
         &plan(r#"{"review-code": ["lang-rust"]}"#),
         &known(),
         options(),
+        None,
         &|l| lines.lock().unwrap().push(l.to_owned()),
     )
     .unwrap();
@@ -682,6 +687,7 @@ fn split_run(
             split: SPLIT,
             ..options()
         },
+        None,
         &|l| lines.lock().unwrap().push(l.to_owned()),
     )
     .unwrap();

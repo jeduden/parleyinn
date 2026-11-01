@@ -13,7 +13,10 @@
 //! in parts, each a run of its own under the same bound, and its
 //! report and run are merged from theirs; a part that did not answer
 //! leaves the specialist one that did not answer. A run is tried once
-//! more as `retry` says.
+//! more as `retry` says. A resumed review runs only what its resume
+//! plan does not keep: an agent kept whole is taken as it answered in
+//! the earlier run, and a part kept as its log there answered, held to
+//! the report check again.
 
 use std::collections::BTreeSet;
 use std::fs;
@@ -26,7 +29,7 @@ use std::time::Duration;
 
 use review_eval::component::{self, Kind};
 use review_eval::host::Host;
-use review_eval::log::RunLog;
+use review_eval::log::{RunLog, SUCCESS};
 use review_eval::runner;
 use review_eval::world::World;
 use review_gate::report::assemble;
@@ -34,7 +37,8 @@ use review_gate::report::assemble;
 use crate::LOGS;
 use crate::parts::{self, Part};
 use crate::plan::{Plan, report_file};
-use crate::retry::run_one;
+use crate::resume::{Resume, Reuse};
+use crate::retry::{refusal, run_one};
 
 /// How many agents run at once unless the run says otherwise.
 pub const PARALLEL: usize = 8;
@@ -79,9 +83,30 @@ pub struct AgentRun {
     pub attempts: u32,
     /// How many parts it ran in: one unless its diff was split.
     pub parts: u32,
+    /// For a specialist run in parts, each part that did not answer, by
+    /// its place from one, with why.
+    pub failed_parts: Vec<(usize, String)>,
+    /// Whether its answer was taken from an earlier run of the same
+    /// inputs rather than run again.
+    pub reused: bool,
 }
 
 impl AgentRun {
+    /// The run of `name`, of `kind`, in one part, run `attempts` times,
+    /// failing for `failure`, its log `log`; not reused.
+    fn of(name: String, kind: Kind, failure: Option<String>, log: RunLog, attempts: u32) -> Self {
+        Self {
+            name,
+            kind,
+            failure,
+            log,
+            attempts,
+            parts: 1,
+            failed_parts: Vec::new(),
+            reused: false,
+        }
+    }
+
     /// Whether the run answered without an error.
     #[must_use]
     pub fn answered(&self) -> bool {
@@ -92,7 +117,7 @@ impl AgentRun {
 /// Runs every agent `plan` dispatches in the work directory `workdir`:
 /// the specialists, then the generalists, telling `progress` of each;
 /// a specialist's report is held to the ids in `known` before it is
-/// taken.
+/// taken. What `resume` keeps is not run again.
 ///
 /// # Errors
 ///
@@ -103,25 +128,79 @@ pub fn review(
     plan: &Plan,
     known: &BTreeSet<String>,
     options: Options,
+    resume: Option<&Resume>,
     progress: &(dyn Fn(&str) + Sync),
 ) -> Result<Vec<AgentRun>, String> {
     for dir in [LOGS, crate::REPORTS] {
         let path = workdir.join(dir);
         fs::create_dir_all(&path).map_err(|e| format!("make {}: {e}", path.display()))?;
     }
+    let reuse = |name: &str| resume.and_then(|r| r.reuse.get(name));
     let one = |unit: &Unit| {
+        let kept = match (reuse(&unit.name), &unit.part) {
+            (Some(Reuse::Parts(kept)), Some(part)) => kept.get(&part.index),
+            _ => None,
+        };
+        if let Some(log) = kept {
+            let report = assemble(&log.texts, &log.answer, None);
+            // A kept part is held to the report check as a fresh one.
+            if refusal(&report, &log.answer, known).is_none() {
+                let run = reused(unit.label(), unit.kind, &log.answer, log.texts.clone());
+                progress(&describe(&run));
+                return (run, Some(report));
+            }
+        }
         let (run, report) = run_one(host, workdir, plan, known, unit, options.deadline, progress);
         progress(&describe(&run));
         (run, report)
     };
-    let (units, unsplit) = specialist_units(workdir, plan, options.split);
+    let whole = |name: &str| match reuse(name) {
+        Some(Reuse::Whole(answer)) => {
+            let run = reused(
+                name.to_owned(),
+                component::kind_of(name),
+                answer,
+                Vec::new(),
+            );
+            progress(&describe(&run));
+            Some(run)
+        }
+        _ => None,
+    };
+    let mut runs: Vec<AgentRun> = plan.specialists().iter().filter_map(|n| whole(n)).collect();
+    let (units, unsplit) = specialist_units(workdir, plan, options.split, &|n| {
+        matches!(reuse(n), Some(Reuse::Whole(_)))
+    });
     let done = parallel(&units, options.parallel, &one);
-    let mut runs = gather(workdir, plan, &units, done, unsplit, progress);
-    let generalists: Vec<Unit> = plan.generalists().into_iter().map(Unit::whole).collect();
+    runs.extend(gather(workdir, plan, &units, done, unsplit, progress));
+    let mut generalists = Vec::new();
+    for name in plan.generalists() {
+        match whole(&name) {
+            Some(run) => runs.push(run),
+            None => generalists.push(Unit::whole(name)),
+        }
+    }
     let done = parallel(&generalists, options.parallel, &one);
     runs.extend(done.into_iter().map(|(run, _)| run));
 
     Ok(runs)
+}
+
+/// The run of agent or part `name`, of `kind`, kept from an earlier
+/// run in which it answered `answer`, having stated `texts`: it costs
+/// nothing and was not started.
+fn reused(name: String, kind: Kind, answer: &str, texts: Vec<String>) -> AgentRun {
+    let log = RunLog {
+        answered: true,
+        subtype: SUCCESS.to_owned(),
+        answer: answer.to_owned(),
+        texts,
+        ..RunLog::default()
+    };
+    AgentRun {
+        reused: true,
+        ..AgentRun::of(name, kind, None, log, 0)
+    }
 }
 
 /// One run the review starts: an agent whole, or one part of a
@@ -158,14 +237,19 @@ impl Unit {
     }
 }
 
-/// The runs `plan`'s specialists start: each whole, or in its parts
-/// when its diff is past `split`; and, run in none, each specialist
-/// whose diff could not be split, as a run that did not answer, its
-/// report saying why.
-fn specialist_units(workdir: &Path, plan: &Plan, split: usize) -> (Vec<Unit>, Vec<AgentRun>) {
+/// The runs `plan`'s specialists start, but those `kept` names: each
+/// whole, or in its parts when its diff is past `split`; and, run in
+/// none, each specialist whose diff could not be split, as a run that
+/// did not answer, its report saying why.
+fn specialist_units(
+    workdir: &Path,
+    plan: &Plan,
+    split: usize,
+    kept: &dyn Fn(&str) -> bool,
+) -> (Vec<Unit>, Vec<AgentRun>) {
     let mut units = Vec::new();
     let mut unsplit = Vec::new();
-    for name in plan.specialists() {
+    for name in plan.specialists().into_iter().filter(|n| !kept(n)) {
         match parts::prepare(workdir, &name, split) {
             Ok(list) if list.is_empty() => units.push(Unit::whole(name)),
             Ok(list) => units.extend(list.into_iter().map(|p| Unit {
@@ -186,6 +270,8 @@ fn specialist_units(workdir: &Path, plan: &Plan, split: usize) -> (Vec<Unit>, Ve
                     log: RunLog::default(),
                     attempts: 0,
                     parts: 0,
+                    failed_parts: Vec::new(),
+                    reused: false,
                 });
             }
         }
@@ -241,6 +327,9 @@ fn gather(
 #[must_use]
 pub fn describe(run: &AgentRun) -> String {
     let kind = run.kind.word();
+    if run.reused {
+        return format!("{} ({kind}): reused from the earlier run", run.name);
+    }
     let line = match &run.failure {
         None => format!(
             "{} ({kind}): answered ({:.4} USD, {} turns)",
@@ -279,14 +368,7 @@ pub(crate) fn attempt(
                 .as_ref()
                 .map(|_| assemble(&[], "", Some(&failure)));
             return (
-                AgentRun {
-                    name: unit.label(),
-                    kind,
-                    failure: Some(failure),
-                    log: RunLog::default(),
-                    attempts: 0,
-                    parts: 1,
-                },
+                AgentRun::of(unit.label(), kind, Some(failure), RunLog::default(), 0),
                 report,
             );
         }
@@ -337,17 +419,7 @@ pub(crate) fn attempt(
         _ => (failure, None),
     };
 
-    (
-        AgentRun {
-            name: unit.label(),
-            kind,
-            failure,
-            log,
-            attempts: 1,
-            parts: 1,
-        },
-        report,
-    )
+    (AgentRun::of(unit.label(), kind, failure, log, 1), report)
 }
 
 /// Adds `note` to the prompt among `args`, the value after `-p`.

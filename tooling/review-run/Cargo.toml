@@ -13,6 +13,7 @@ review-eval.workspace = true
 review-gate.workspace = true
 serde.workspace = true
 serde_json.workspace = true
+sha2.workspace = true
 srs.workspace = true
 
 [dev-dependencies]

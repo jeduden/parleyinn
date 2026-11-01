@@ -5,20 +5,27 @@
 //! into a file, then, once every specialist has finished, runs every
 //! generalist, told those files. From what the runs produced it writes
 //! the review outcome, the agents consulted, their answers and their
-//! usage, the files the review gate reads. No model decides whether an
-//! agent is called or waited for; the generalists do the weighing.
+//! usage, the files the review gate reads, with every agent left
+//! without an accepted report or answer, never as clean, and what the
+//! review ran on. Resumed from an earlier run, it runs again only what
+//! that run left without one or whose inputs changed, and decides as a
+//! full run would. No model decides whether an agent is called or
+//! waited for; the generalists do the weighing.
 //!
 //! It starts only the `claude` command line, through the evaluation's
 //! host, and runs in CI alone. It is repository tooling and never
 //! links into a shipped executable.
 
 pub mod cli;
+pub mod gaps;
 pub mod outcome;
 pub mod parts;
 pub mod plan;
 pub mod requirements;
+pub mod resume;
 pub mod retry;
 pub mod run;
+pub mod run_id;
 pub mod usage;
 
 #[cfg(test)]

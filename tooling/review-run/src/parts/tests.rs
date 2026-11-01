@@ -140,6 +140,8 @@ fn part_run(failure: Option<&str>, answer: &str, cost: f64) -> AgentRun {
         },
         attempts: 1,
         parts: 1,
+        failed_parts: Vec::new(),
+        reused: false,
     }
 }
 
@@ -248,6 +250,10 @@ fn a_failed_part_makes_the_merged_run_incomplete_naming_it_and_keeps_every_part_
     assert_eq!(run.log.subtype, "error_max_turns");
     assert_eq!(run.log.answer, "");
     assert!((run.log.cost - 0.75).abs() < 1e-9);
+    assert_eq!(
+        run.failed_parts,
+        [(2, "its run ended with error_max_turns".to_owned())]
+    );
 }
 
 #[test]
@@ -263,6 +269,7 @@ fn every_failed_part_is_named() {
         run.failure.as_deref(),
         Some("part 1 of 2: x; part 2 of 2: y")
     );
+    assert_eq!(run.failed_parts, [(1, "x".to_owned()), (2, "y".to_owned())]);
     assert_eq!(report, "incomplete: part 1 of 2: x; part 2 of 2: y\n");
 }
 

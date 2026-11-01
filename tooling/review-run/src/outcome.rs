@@ -27,6 +27,7 @@ use review_gate::{
     APPROVE_VERDICT, BLOCKING, Finding, NIT, REQUEST_CHANGES_VERDICT, ReviewOutcome, report_check,
 };
 
+use crate::gaps::{self, Gap};
 use crate::plan::{Plan, report_file};
 use crate::run::AgentRun;
 
@@ -42,6 +43,9 @@ pub struct Decision {
     pub consulted: BTreeSet<String>,
     /// Each of their final answers, by name.
     pub answers: BTreeMap<String, String>,
+    /// Every dispatched agent, or part of one, without an accepted
+    /// report or answer, by name: never clean.
+    pub not_reviewed: Vec<Gap>,
 }
 
 /// Decides the review of `plan` from `runs` and `reports`, each
@@ -69,6 +73,7 @@ pub fn decide(
         unread,
     } = weighed(plan, &answers, reports, &mut findings);
     let consulted: BTreeSet<String> = answers.keys().cloned().collect();
+    let not_reviewed = not_reviewed(runs, &silent, &refused, &unread);
     let approves = silent.is_empty()
         && refused.is_empty()
         && unread.is_empty()
@@ -92,8 +97,9 @@ pub fn decide(
                 &counts,
                 &Named {
                     silent: &silent,
-                    refused: &refused,
-                    unread: &unread,
+                    refused: &labelled(&refused),
+                    unread: &unread.iter().map(|(n, _)| n.clone()).collect::<Vec<_>>(),
+                    not_reviewed: &not_reviewed.iter().map(Gap::label).collect::<Vec<_>>(),
                 },
                 &closings,
             ),
@@ -101,7 +107,54 @@ pub fn decide(
         },
         consulted,
         answers,
+        not_reviewed,
     }
+}
+
+/// Each refused specialist as the summary names it, with its problem.
+fn labelled(refused: &[(String, String)]) -> Vec<String> {
+    refused
+        .iter()
+        .map(|(name, problem)| format!("{name} ({problem})"))
+        .collect()
+}
+
+/// The gaps: each `silent` agent, a specialist run in parts by each
+/// part of its run in `runs` that did not answer, each `refused`
+/// specialist and each `unread` generalist, with why, sorted.
+fn not_reviewed(
+    runs: &[AgentRun],
+    silent: &[String],
+    refused: &[(String, String)],
+    unread: &[(String, String)],
+) -> Vec<Gap> {
+    let mut out = Vec::new();
+    for name in silent {
+        match runs.iter().find(|r| &r.name == name) {
+            Some(run) if !run.failed_parts.is_empty() => {
+                out.extend(
+                    run.failed_parts
+                        .iter()
+                        .map(|(part, why)| Gap::new(name, Some(*part), gaps::silent(why))),
+                );
+            }
+            run => {
+                let why = run
+                    .and_then(|r| r.failure.as_deref())
+                    .unwrap_or("it was not run");
+                out.push(Gap::new(name, None, gaps::silent(why)));
+            }
+        }
+    }
+    for (name, problem) in refused {
+        out.push(Gap::new(name, None, format!("refused: {problem}")));
+    }
+    for (name, why) in unread {
+        out.push(Gap::new(name, None, format!("unread: {why}")));
+    }
+    out.sort_by(|a, b| (&a.name, a.part).cmp(&(&b.name, b.part)));
+
+    out
 }
 
 /// Each dispatched agent's answer, when its run answered, and the
@@ -144,7 +197,7 @@ fn refused_reports(
     reports: &BTreeMap<String, String>,
     known: &BTreeSet<String>,
     findings: &mut Vec<Finding>,
-) -> Vec<String> {
+) -> Vec<(String, String)> {
     let mut refused = Vec::new();
     for name in plan.specialists() {
         let Some(answer) = answers.get(&name) else {
@@ -153,7 +206,7 @@ fn refused_reports(
         let report = reports.get(&name).map(String::as_str);
         if let Some(problem) = report_check(report, Some(answer), Some(known)) {
             findings.push(blocking(&report_file(&name), format!("{name} {problem}")));
-            refused.push(format!("{name} ({problem})"));
+            refused.push((name, problem.to_string()));
         }
     }
 
@@ -167,8 +220,8 @@ struct Weighed {
     /// Each generalist's closing sentence, named.
     closings: Vec<String>,
     /// The generalists whose answer holds no finding, no dropped one and
-    /// no `none —` line.
-    unread: Vec<String>,
+    /// no `none —` line, or a finding line it cannot read, with why.
+    unread: Vec<(String, String)>,
 }
 
 /// Adds each answering generalist's kept findings to `findings`, each
@@ -201,7 +254,10 @@ fn weighed(
                      weighing cannot be read"
                 ),
             ));
-            unread.push(name.clone());
+            unread.push((
+                name.clone(),
+                "it answered no finding, no dropped one and no `none —` line".to_owned(),
+            ));
         }
         for line in answer.lines().filter(|l| report::unread(l)) {
             findings.push(blocking(
@@ -212,8 +268,11 @@ fn weighed(
                     line.trim()
                 ),
             ));
-            if !unread.contains(&name) {
-                unread.push(name.clone());
+            if !unread.iter().any(|(n, _)| *n == name) {
+                unread.push((
+                    name.clone(),
+                    "it answered a finding line the review cannot read".to_owned(),
+                ));
             }
         }
         for mut f in kept(answer) {
@@ -350,6 +409,8 @@ struct Named<'a> {
     refused: &'a [String],
     /// The generalists whose answer the review cannot read.
     unread: &'a [String],
+    /// Every agent or part without an accepted report or answer.
+    not_reviewed: &'a [String],
 }
 
 /// The summary: who answered of whom, what the generalists kept, who
@@ -387,6 +448,7 @@ fn summary(counts: &Counts, named: &Named, closings: &[String]) -> String {
         ("Did not answer", named.silent),
         ("Reports the gate refuses", named.refused),
         ("Answers the review cannot read", named.unread),
+        ("Not reviewed", named.not_reviewed),
     ] {
         if !names.is_empty() {
             let _ = write!(s, " {label}: {}.", names.join(", "));

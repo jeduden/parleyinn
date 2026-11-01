@@ -177,7 +177,7 @@ fn review_of(
         split: SPLIT,
         ..Options::default()
     };
-    let runs = crate::run::review(&host, dir, &plan, &known(), options, &|l| {
+    let runs = crate::run::review(&host, dir, &plan, &known(), options, None, &|l| {
         lines.lock().unwrap().push(l.to_owned());
     })
     .unwrap();

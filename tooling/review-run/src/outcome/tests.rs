@@ -25,6 +25,8 @@ fn ran(name: &str, kind: Kind, answer: &str) -> AgentRun {
         },
         attempts: 1,
         parts: 1,
+        failed_parts: Vec::new(),
+        reused: false,
     }
 }
 
@@ -567,5 +569,133 @@ fn a_source_whose_report_is_missing_reads_as_no_request() {
             .findings
             .iter()
             .any(|f| f.path == "src/a.rs" && f.severity == BLOCKING)
+    );
+}
+
+fn gap(name: &str, kind: &str, part: Option<usize>, reason: &str) -> Gap {
+    Gap {
+        name: name.to_owned(),
+        kind: kind.to_owned(),
+        part,
+        reason: reason.to_owned(),
+    }
+}
+
+#[test]
+fn a_review_every_agent_reported_to_has_nothing_not_reviewed() {
+    let (runs, reports) = all_answered("none — nothing to add — review-code\nSound.");
+
+    let d = decide(&plan(DISPATCH), &runs, &reports, &known());
+
+    assert!(d.not_reviewed.is_empty());
+    assert!(
+        !d.outcome.summary.contains("Not reviewed"),
+        "{}",
+        d.outcome.summary
+    );
+}
+
+#[test]
+fn every_agent_without_an_accepted_report_is_not_reviewed_with_why() {
+    let (mut runs, reports) = all_answered("Sound.");
+    runs[1] = silent(
+        "test-engineer-unit",
+        Kind::Specialist,
+        "its run ended with error_max_turns",
+    );
+    runs.pop();
+
+    let d = decide(&plan(DISPATCH), &runs, &reports, &known());
+
+    assert_eq!(
+        d.not_reviewed,
+        [
+            gap("review-code", "generalist", None, "silent: it was not run"),
+            gap(
+                "test-engineer-unit",
+                "specialist",
+                None,
+                "incomplete: its run ended with error_max_turns"
+            ),
+        ]
+    );
+    assert!(
+        d.outcome
+            .summary
+            .contains(" Not reviewed: review-code, test-engineer-unit."),
+        "{}",
+        d.outcome.summary
+    );
+}
+
+#[test]
+fn a_part_that_did_not_answer_is_the_part_not_reviewed() {
+    let (mut runs, reports) = all_answered("none — nothing to add — review-code\nSound.");
+    runs[0].failure = Some("part 2 of 3: its run ended with deadline".to_owned());
+    runs[0].failed_parts = vec![(2, "its run ended with deadline".to_owned())];
+    runs[0].parts = 3;
+
+    let d = decide(&plan(DISPATCH), &runs, &reports, &known());
+
+    assert_eq!(
+        d.not_reviewed,
+        [gap(
+            "lang-rust",
+            "specialist",
+            Some(2),
+            "silent: its run ended with deadline"
+        )]
+    );
+    assert!(
+        d.outcome
+            .summary
+            .contains(" Not reviewed: lang-rust part 2."),
+        "{}",
+        d.outcome.summary
+    );
+}
+
+#[test]
+fn a_refused_report_and_an_unread_answer_are_not_reviewed() {
+    let (runs, mut reports) = all_answered("The code is sound.");
+    reports.remove("lang-rust");
+
+    let d = decide(&plan(DISPATCH), &runs, &reports, &known());
+
+    assert_eq!(
+        d.not_reviewed,
+        [
+            gap("lang-rust", "specialist", None, "refused: has no report"),
+            gap(
+                "review-code",
+                "generalist",
+                None,
+                "unread: it answered no finding, no dropped one and no `none —` line"
+            ),
+        ]
+    );
+    // An approval can never stand beside an agent not reviewed.
+    assert_eq!(d.outcome.verdict, "request_changes");
+    assert!(
+        d.outcome
+            .summary
+            .contains(" Not reviewed: lang-rust, review-code."),
+        "{}",
+        d.outcome.summary
+    );
+
+    let (runs, reports) = all_answered(
+        "src/b.rs:2 — nit — tidy — lang-rust\n\
+         src/a.rs:x — blocking — an unwrap — lang-rust\nDone.",
+    );
+    let d = decide(&plan(DISPATCH), &runs, &reports, &known());
+    assert_eq!(
+        d.not_reviewed,
+        [gap(
+            "review-code",
+            "generalist",
+            None,
+            "unread: it answered a finding line the review cannot read"
+        )]
     );
 }

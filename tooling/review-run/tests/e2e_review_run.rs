@@ -593,3 +593,109 @@ fn a_report_refused_on_both_attempts_blocks_the_review_and_the_gate_posts_nothin
     assert_eq!(review, "");
     assert!(err.contains("lang-rust"), "{err}");
 }
+
+const HEAD: &str = "0123456789abcdef0123456789abcdef01234567";
+
+#[test]
+fn a_resumed_run_reruns_only_the_specialist_cut_off_and_its_generalist_and_the_gate_approves() {
+    let home = TempDir::new().unwrap();
+    let first = home.path().join("first");
+    workdir(&first);
+    let out = review_run(home.path(), &first, "", "lang-rust", &["--head-sha", HEAD]);
+    assert_eq!(out.status.code(), Some(0));
+    let gaps: serde_json::Value =
+        serde_json::from_str(&fs::read_to_string(first.join("review/gaps.json")).unwrap()).unwrap();
+    assert_eq!(
+        gaps,
+        serde_json::json!([{"name": "lang-rust", "kind": "specialist",
+            "reason": "incomplete: its run ended with error_max_turns"}])
+    );
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(
+        stderr.ends_with("review-run: not reviewed: lang-rust\n"),
+        "{stderr}"
+    );
+    let earlier = first.join("review");
+    let dir = home.path().join("work");
+    workdir(&dir);
+
+    let gaps = earlier.join("gaps.json");
+    let out = review_run(
+        home.path(),
+        &dir,
+        "",
+        "",
+        &[
+            "--head-sha",
+            HEAD,
+            "--only",
+            gaps.to_str().unwrap(),
+            "--from",
+            earlier.to_str().unwrap(),
+        ],
+    );
+
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert_eq!(out.status.code(), Some(0), "{stderr}");
+    assert!(
+        String::from_utf8_lossy(&out.stdout).starts_with("verdict=approve\n"),
+        "{stderr}"
+    );
+    assert!(
+        stderr.contains(&format!(
+            "review-run: resumed from {}: reused 3 agents, re-ran 2 (lang-rust, review-code)",
+            earlier.display()
+        )),
+        "{stderr}"
+    );
+    assert_eq!(usage_of(&dir, "persona-security-officer")["reused"], true);
+    assert_eq!(usage_of(&dir, "review-security")["cost_usd"], 0.0);
+    assert!(usage_of(&dir, "lang-rust").get("reused").is_none());
+    let id: serde_json::Value =
+        serde_json::from_str(&fs::read_to_string(dir.join("review/run-id.json")).unwrap()).unwrap();
+    assert_eq!(id["resumed_from"], earlier.to_str().unwrap());
+
+    let (code, review, err) = gate(home.path(), &dir);
+
+    assert_eq!(code, review_gate::cli::EXIT_OK, "{err}");
+    let review: serde_json::Value = serde_json::from_str(&review).unwrap();
+    assert_eq!(review["event"], "APPROVE");
+    let body = review["body"].as_str().unwrap();
+    assert!(body.contains("5 of 5 dispatched agents answered"), "{body}");
+}
+
+#[test]
+fn a_resumed_run_on_another_head_reuses_nothing() {
+    let home = TempDir::new().unwrap();
+    let first = home.path().join("first");
+    workdir(&first);
+    let out = review_run(home.path(), &first, "", "lang-rust", &["--head-sha", HEAD]);
+    assert_eq!(out.status.code(), Some(0));
+    let earlier = first.join("review");
+    let dir = home.path().join("work");
+    workdir(&dir);
+
+    let gaps = earlier.join("gaps.json");
+    let out = review_run(
+        home.path(),
+        &dir,
+        "",
+        "",
+        &[
+            "--head-sha",
+            &"f".repeat(40),
+            "--only",
+            gaps.to_str().unwrap(),
+            "--from",
+            earlier.to_str().unwrap(),
+        ],
+    );
+
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert_eq!(out.status.code(), Some(0), "{stderr}");
+    assert!(
+        stderr.contains("review-run: nothing reused: the head changed from"),
+        "{stderr}"
+    );
+    assert!(stderr.contains("reused 0 agents, re-ran 5"), "{stderr}");
+}

@@ -218,6 +218,316 @@ fn a_review_whose_usage_cannot_be_written_fails() {
     fails_writing(USAGE_FILE);
 }
 
+#[test]
+fn a_review_whose_gaps_or_run_id_cannot_be_written_fails() {
+    fails_writing(GAPS);
+    fails_writing(NOT_REVIEWED);
+    fails_writing(RUN_ID);
+}
+
+const HEAD: &str = "0123456789abcdef0123456789abcdef01234567";
+const MOVED: &str = "89abcdef0123456789abcdef0123456789abcdef";
+
+/// Runs the review in `dir` with `extra` after the work directory.
+fn run_with(host: &FakeHost, dir: &Path, extra: &[&str]) -> (u8, String, String) {
+    let mut line = vec!["--workdir", dir.to_str().unwrap()];
+    line.extend(extra);
+    let mut out = Vec::new();
+    let mut err = Vec::new();
+    let code = run(host, args(&line), &mut out, &mut err);
+    (
+        code,
+        String::from_utf8(out).unwrap(),
+        String::from_utf8(err).unwrap(),
+    )
+}
+
+/// Copies the tree at `from` to `to`.
+fn copy_tree(from: &Path, to: &Path) {
+    fs::create_dir_all(to).unwrap();
+    for entry in fs::read_dir(from).unwrap() {
+        let entry = entry.unwrap();
+        let target = to.join(entry.file_name());
+        if entry.file_type().unwrap().is_dir() {
+            copy_tree(&entry.path(), &target);
+        } else {
+            fs::copy(entry.path(), target).unwrap();
+        }
+    }
+}
+
+/// A first review of [`workdir`] on [`HEAD`] in which lang-rust never
+/// starts, its review directory kept in `earlier` as the local run
+/// keeps it.
+fn first_review(earlier: &Path) {
+    let dir = workdir();
+    let host = FakeHost::new(|c| {
+        if fake::agent_of(c) == "lang-rust" {
+            Err("claude: not found".to_owned())
+        } else {
+            fake::either(c)
+        }
+    });
+    let (code, out, _) = run_with(&host, dir.path(), &["--head-sha", HEAD]);
+    assert_eq!(code, EXIT_OK);
+    assert!(out.starts_with("verdict=request_changes\n"), "{out}");
+    copy_tree(&dir.path().join("review"), earlier);
+}
+
+/// Resumes the review in a fresh [`workdir`] from `earlier` on `head`,
+/// every agent answering; `change` edits the work directory first.
+fn resume_from(earlier: &Path, head: &str, change: &dyn Fn(&Path)) -> (FakeHost, TempDir, String) {
+    let dir = workdir();
+    change(dir.path());
+    let host = FakeHost::new(fake::either);
+    let gaps = earlier.join("gaps.json");
+    let (code, _, err) = run_with(
+        &host,
+        dir.path(),
+        &[
+            "--head-sha",
+            head,
+            "--only",
+            gaps.to_str().unwrap(),
+            "--from",
+            earlier.to_str().unwrap(),
+        ],
+    );
+    assert_eq!(code, EXIT_OK, "{err}");
+    (host, dir, err)
+}
+
+#[test]
+fn a_review_writes_what_it_did_not_review_and_what_it_ran_on() {
+    let dir = workdir();
+    let host = FakeHost::new(fake::either);
+
+    let (code, _, err) = run_with(&host, dir.path(), &["--head-sha", HEAD]);
+
+    assert_eq!(code, EXIT_OK, "{err}");
+    assert_eq!(read(dir.path(), GAPS), serde_json::json!([]));
+    assert!(
+        fs::read_to_string(dir.path().join(NOT_REVIEWED))
+            .unwrap()
+            .contains("Every dispatched agent has an accepted report")
+    );
+    assert!(!err.contains("not reviewed"), "{err}");
+    let id = read(dir.path(), RUN_ID);
+    assert_eq!(id["head"], HEAD);
+    let definition = fs::read(dir.path().join(".claude/agents/lang-rust.md")).unwrap();
+    assert_eq!(
+        id["agents"]["lang-rust"]["definition"],
+        run_id::sha256(&definition)
+    );
+    assert!(id.get("resumed_from").is_none());
+}
+
+#[test]
+fn a_review_whose_head_is_not_given_reads_it_from_the_head_s_tree() {
+    let dir = workdir();
+    fs::create_dir_all(dir.path().join("pr-head/.git")).unwrap();
+    fs::write(dir.path().join("pr-head/.git/HEAD"), format!("{MOVED}\n")).unwrap();
+    let host = FakeHost::new(fake::either);
+
+    let (code, _, err) = run_with(&host, dir.path(), &[]);
+
+    assert_eq!(code, EXIT_OK, "{err}");
+    assert_eq!(read(dir.path(), RUN_ID)["head"], MOVED);
+}
+
+#[test]
+fn an_agent_that_did_not_answer_is_a_gap_and_said_not_reviewed() {
+    let earlier = TempDir::new().unwrap();
+
+    first_review(earlier.path());
+
+    assert_eq!(
+        read(earlier.path(), "gaps.json"),
+        serde_json::json!([{"name": "lang-rust", "kind": "specialist",
+                            "reason": "silent: claude: not found"}])
+    );
+    let page = fs::read_to_string(earlier.path().join("not-reviewed.md")).unwrap();
+    assert!(
+        page.contains("- `lang-rust` (specialist): silent: claude: not found"),
+        "{page}"
+    );
+    let outcome = read(earlier.path(), "outcome.json");
+    assert!(
+        outcome["summary"]
+            .as_str()
+            .unwrap()
+            .contains(" Not reviewed: lang-rust."),
+        "{outcome}"
+    );
+}
+
+#[test]
+fn a_failed_review_s_last_line_says_what_was_not_reviewed() {
+    let dir = workdir();
+    let host = FakeHost::new(|c| {
+        if fake::agent_of(c) == "lang-rust" {
+            Err("claude: not found".to_owned())
+        } else {
+            fake::either(c)
+        }
+    });
+
+    let (_, _, err) = run_with(&host, dir.path(), &[]);
+
+    assert_eq!(
+        err.lines().last(),
+        Some("review-run: not reviewed: lang-rust"),
+        "{err}"
+    );
+}
+
+#[test]
+fn a_resumed_review_runs_only_the_gap_and_its_generalist_and_approves() {
+    let earlier = TempDir::new().unwrap();
+    first_review(earlier.path());
+
+    let (host, dir, err) = resume_from(earlier.path(), HEAD, &|_| {});
+
+    assert_eq!(host.agents(), ["lang-rust", "review-code"], "{err}");
+    assert_eq!(read(dir.path(), OUTCOME)["verdict"], "approve");
+    assert_eq!(
+        read(dir.path(), CONSULTED),
+        serde_json::json!(["lang-rust", "review-code", "test-engineer-unit"])
+    );
+    assert_eq!(read(dir.path(), GAPS), serde_json::json!([]));
+    let usage = read(dir.path(), USAGE_FILE);
+    let entry = |name: &str| {
+        usage
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|e| e["agent"] == name)
+            .unwrap()
+            .clone()
+    };
+    assert_eq!(entry("test-engineer-unit")["reused"], true);
+    assert_eq!(entry("test-engineer-unit")["cost_usd"], 0.0);
+    assert_eq!(
+        entry("test-engineer-unit")["resumed_from"],
+        earlier.path().to_str().unwrap()
+    );
+    assert!(entry("lang-rust").get("reused").is_none());
+    assert_eq!(
+        read(dir.path(), RUN_ID)["resumed_from"],
+        earlier.path().to_str().unwrap()
+    );
+    // The kept specialist's report and logs are the earlier run's.
+    for rel in [
+        "review/reports/test-engineer-unit.md",
+        "review/logs/test-engineer-unit.jsonl",
+    ] {
+        let name = rel.trim_start_matches("review/");
+        assert_eq!(
+            fs::read(dir.path().join(rel)).unwrap(),
+            fs::read(earlier.path().join(name)).unwrap(),
+            "{rel}"
+        );
+    }
+    assert!(
+        err.contains("review-run: test-engineer-unit (specialist): reused from the earlier run"),
+        "{err}"
+    );
+    assert!(
+        err.contains("review-run: lang-rust: runs again: silent: claude: not found"),
+        "{err}"
+    );
+    assert!(
+        err.contains(&format!(
+            "review-run: resumed from {}: reused 1 agents, re-ran 2 (lang-rust, review-code)",
+            earlier.path().display()
+        )),
+        "{err}"
+    );
+}
+
+#[test]
+fn a_resumed_review_with_no_gap_runs_nothing_and_decides_as_the_full_run_did() {
+    let earlier = TempDir::new().unwrap();
+    let dir = workdir();
+    let host = FakeHost::new(fake::either);
+    let (code, _, _) = run_with(&host, dir.path(), &["--head-sha", HEAD]);
+    assert_eq!(code, EXIT_OK);
+    copy_tree(&dir.path().join("review"), earlier.path());
+
+    let (host, again, err) = resume_from(earlier.path(), HEAD, &|_| {});
+
+    assert!(host.agents().is_empty(), "{err}");
+    for rel in [OUTCOME, CONSULTED, ANSWERS, GAPS] {
+        assert_eq!(read(again.path(), rel), read(dir.path(), rel), "{rel}");
+    }
+}
+
+#[test]
+fn a_resumed_review_on_a_moved_head_reuses_nothing_and_says_why() {
+    let earlier = TempDir::new().unwrap();
+    first_review(earlier.path());
+
+    let (host, _, err) = resume_from(earlier.path(), MOVED, &|_| {});
+
+    assert_eq!(host.agents().len(), 3, "{err}");
+    assert!(
+        err.contains(&format!(
+            "review-run: nothing reused: the head changed from {HEAD} to {MOVED}"
+        )),
+        "{err}"
+    );
+    assert!(err.contains("reused 0 agents, re-ran 3"), "{err}");
+}
+
+#[test]
+fn a_resumed_review_runs_again_an_agent_whose_definition_changed_and_its_generalist() {
+    let earlier = TempDir::new().unwrap();
+    first_review(earlier.path());
+
+    let (host, _, err) = resume_from(earlier.path(), HEAD, &|dir| {
+        fake::define(dir, "test-engineer-unit", 19);
+    });
+
+    assert_eq!(
+        host.agents().len(),
+        3,
+        "test-engineer-unit runs again: {err}"
+    );
+    assert!(
+        err.contains("review-run: test-engineer-unit: runs again: its definition changed"),
+        "{err}"
+    );
+}
+
+#[test]
+fn a_resume_from_this_run_s_own_review_directory_or_a_missing_gap_list_fails() {
+    let dir = workdir();
+    let host = FakeHost::new(fake::either);
+    let own = dir.path().join("review");
+    let (code, _, err) = run_with(
+        &host,
+        dir.path(),
+        &["--only", "g.json", "--from", own.to_str().unwrap()],
+    );
+    assert_eq!(code, EXIT_FAILURE);
+    assert!(err.contains("is this run's own review directory"), "{err}");
+
+    let earlier = TempDir::new().unwrap();
+    let (code, _, err) = run_with(
+        &host,
+        dir.path(),
+        &[
+            "--only",
+            "missing.json",
+            "--from",
+            earlier.path().to_str().unwrap(),
+        ],
+    );
+    assert_eq!(code, EXIT_FAILURE);
+    assert!(err.contains("review-run: read missing.json"), "{err}");
+    assert!(host.agents().is_empty());
+}
+
 fn refusal(bad: &[&str]) -> String {
     parse(args(bad)).unwrap_err()
 }
@@ -226,23 +536,59 @@ fn refusal(bad: &[&str]) -> String {
 fn the_work_directory_alone_takes_the_default_options() {
     assert_eq!(
         parse(args(&["--workdir", "w"])).unwrap(),
-        ("w".to_owned(), Options::default())
+        Args {
+            workdir: "w".to_owned(),
+            options: Options::default(),
+            head: None,
+            resume: None,
+        }
     );
 }
 
 #[test]
 fn the_flags_read_inline_or_as_the_next_argument() {
     assert_eq!(
-        parse(args(&["--workdir=w", "--parallel=2", "--deadline", "30"])).unwrap(),
-        (
-            "w".to_owned(),
-            Options {
+        parse(args(&[
+            "--workdir=w",
+            "--parallel=2",
+            "--deadline",
+            "30",
+            "--head-sha",
+            HEAD,
+            "--only=g.json",
+            "--from",
+            "old",
+        ]))
+        .unwrap(),
+        Args {
+            workdir: "w".to_owned(),
+            options: Options {
                 parallel: 2,
                 deadline: Duration::from_secs(30),
                 split: crate::parts::LIMIT,
-            }
-        )
+            },
+            head: Some(HEAD.to_owned()),
+            resume: Some(("g.json".to_owned(), "old".to_owned())),
+        }
     );
+}
+
+#[test]
+fn a_head_that_is_no_commit_id_is_refused() {
+    assert_eq!(
+        refusal(&["--workdir", "w", "--head-sha", "HEAD"]),
+        "--head-sha \"HEAD\" is no commit id"
+    );
+}
+
+#[test]
+fn a_gap_list_without_its_earlier_run_is_refused() {
+    for line in [
+        &["--workdir", "w", "--only", "g.json"][..],
+        &["--workdir", "w", "--from", "old"][..],
+    ] {
+        assert_eq!(refusal(line), "--only and --from are given together");
+    }
 }
 
 #[test]
@@ -306,4 +652,17 @@ fn a_value_that_does_not_encode_is_an_error_naming_its_file() {
     assert!(err.starts_with("encode "), "{err}");
     assert!(err.contains("out.json: "), "{err}");
     assert!(!dir.path().join("out.json").exists());
+}
+
+#[test]
+fn a_review_whose_logs_directory_cannot_be_made_fails_naming_it() {
+    let dir = workdir();
+    fs::write(dir.path().join("review/logs"), "a file").unwrap();
+    let host = FakeHost::new(fake::either);
+
+    let (code, _, err) = run_in(&host, dir.path());
+
+    assert_eq!(code, EXIT_FAILURE);
+    assert!(err.starts_with("review-run: make "), "{err}");
+    assert!(host.agents().is_empty());
 }
