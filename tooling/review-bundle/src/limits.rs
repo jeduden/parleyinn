@@ -64,6 +64,13 @@ pub fn left_out(path: &str) -> bool {
     LOCK_FILES.contains(&name) || path.starts_with(BUILD_OUTPUT) || path.ends_with(COVERAGE)
 }
 
+/// The lines a file holding `bytes` has, as a file's limit counts them:
+/// a text that is not UTF-8 is still held to its limit (ENG-34).
+#[must_use]
+pub fn line_count(bytes: &[u8]) -> usize {
+    String::from_utf8_lossy(bytes).lines().count()
+}
+
 /// The nit for the file at `path` when its `lines` are past its kind's
 /// limit.
 #[must_use]

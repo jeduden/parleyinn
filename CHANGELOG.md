@@ -9,6 +9,20 @@ its upgrade notes (ENG-23). ParleyInn follows semantic versioning.
 
 ## Unreleased
 
+- CI now fails on a source, test, feature or configuration file past its
+  kind's line limit that the size list
+  (`tooling/engineering/oversize.txt`) does not list, and on a listed
+  file whose lines are not exactly those listed: a file that grew must
+  be split, and one that shrank yet stays past its limit must have its
+  listed lines lowered, so a regrowth cannot hide; a listed file that
+  fits, or is gone, must leave the size list, so it only shrinks
+  (ENG-34). The
+  review bundle's finding for a changed file past its limit stays a
+  nit. The drift registry, the review workflow check, the review
+  workflow and the reviewer evaluation's CLI tests were split under
+  their limits, with no change in behaviour; the review workflow's long
+  `run:` bodies are scripts under `scripts/`, which the ENG-28 and
+  ENG-32 checks read as the steps' own text.
 - A specialist of the review reads only its own diff, or its part's,
   and a small context the review bundle writes for it, its class,
   touched ids, dispatch row and the deterministic findings on its

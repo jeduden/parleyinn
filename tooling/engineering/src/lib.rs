@@ -18,6 +18,7 @@ pub mod confinement;
 pub mod coverage_floors;
 pub mod decisions;
 pub mod dependencies;
+pub mod file_sizes;
 pub mod fuzzing;
 pub mod isolation_guard;
 pub mod license_texts;

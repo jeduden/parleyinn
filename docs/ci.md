@@ -143,6 +143,15 @@ when a gate failed.
   uploads what a person needs to debug it.
 - The `CI` job names the jobs that failed.
 - A gate that reads the repository's records has a drift case (ENG-27).
+- A file past its kind's line limit fails CI unless the size list,
+  `tooling/engineering/oversize.txt`, lists it, and so does a listed
+  file whose lines are not exactly those listed (ENG-34). A file that
+  grew must be split; a file that shrank yet stays past its limit must
+  have its listed lines lowered, so a regrowth cannot hide behind an old
+  number. The size list only shrinks: a listed file that fits, or is
+  gone, must leave it. To fix a failure, split the file, or move a
+  workflow `run:` body into a script under `scripts/`, then lower or
+  drop the file's line in the size list.
 
 ## Checking it
 
