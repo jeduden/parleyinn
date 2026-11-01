@@ -25,9 +25,11 @@ objective procedure around them.
    persona's agent type and the target. Give no persona another's
    findings.
 4. Merge the answers into one table: finding, personas raising it,
-   severity, quote with file and line.
-5. Collapse duplicates; keep the highest severity. A finding raised by
-   several personas ranks above one raised by a single persona.
+   what happens if it is not addressed and the ids it links, or the
+   requirement it requests, and the quote with file and line.
+5. Collapse duplicates. Personas give no severity: a finding raised by
+   several personas ranks above one raised by a single persona, and
+   you weigh each one against the requirement it links.
 6. Mark each finding: a requirement to add or change (draft the MUST
    sentence), a pitch change, a design change, or no action with a
    reason.

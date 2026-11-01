@@ -27,8 +27,8 @@ fn input(outcome: &str, head: &str) -> Input {
         dispatched: parse_dispatch(r#"{"review-code":["lang-rust"]}"#).unwrap(),
         consulted: parse_consulted(r#"["lang-rust","review-code"]"#).unwrap(),
         specialists: parse_specialists(r#"{"review-code":["lang-rust"]}"#).unwrap(),
-        reports: [("lang-rust".to_owned(), "Outcome: sound.".to_owned())].into(),
-        answers: parse_answers(r#"{"lang-rust":"Outcome: sound."}"#).unwrap(),
+        reports: [("lang-rust".to_owned(), "Outcome: none.".to_owned())].into(),
+        answers: parse_answers(r#"{"lang-rust":"Outcome: none."}"#).unwrap(),
     }
 }
 

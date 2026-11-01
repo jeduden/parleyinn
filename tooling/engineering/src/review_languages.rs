@@ -13,8 +13,11 @@ use review_bundle::dispatch::{DATA_ROOTS, language_specialist, needs_a_language}
 
 use crate::Checkout;
 
-/// The directories no walk enters: git's own and the build output.
-const NOT_TRACKED: [&str; 2] = [".git", "target"];
+/// Git's own entry, which no walk reads: a directory in a clone, a
+/// file in a worktree.
+const GIT: &str = ".git";
+/// The build output, a directory no walk enters.
+const BUILD_OUTPUT: &str = "target";
 /// The agents' worktrees: other checkouts, each with its own files.
 const OTHER_CHECKOUTS: &str = ".claude/worktrees";
 
@@ -144,7 +147,8 @@ fn walk(
         } else {
             format!("{dir}/{name}")
         };
-        let skipped = (is_dir && (NOT_TRACKED.contains(&name.as_str()) || path == OTHER_CHECKOUTS))
+        let skipped = name == GIT
+            || (is_dir && (name == BUILD_OUTPUT || path == OTHER_CHECKOUTS))
             || rules.iter().any(|r| ignored(r, &path, is_dir))
             || DATA_ROOTS.iter().any(|d| format!("{path}/").starts_with(d));
         if skipped {

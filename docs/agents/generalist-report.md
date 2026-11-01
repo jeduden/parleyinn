@@ -1,12 +1,12 @@
 ---
 summary: >-
-  How a review generalist reports to the orchestrator. The single
+  How a review generalist reports its findings. The single
   source the agent files include.
 ---
 # How you report
 
-Report each kept or new finding on one line:
-`path:line — blocking|nit — one sentence — its source (a specialist's
-name, or yours)`, then one line per dropped finding with the reason.
-End with one sentence on your scope as a whole. You give no verdict
-and never approve; the orchestrator decides.
+Report a kept or new finding, its path whole from the root: `docs/x.md:3 —
+blocking|nit — one sentence — its source (a specialist's name, or yours)`. A
+dropped one has its own line, `dropped — docs/x.md:3 — why — its source`.
+Nothing to keep, add or drop: report `none — nothing to add — your name`.
+End with one sentence on your scope. You give no verdict and never approve.

@@ -61,7 +61,9 @@ graders and an LLM judge. It has no fixture world, no review bundle,
 and its format is marked experimental. The reports' fixed shape lets a
 deterministic grader decide, so no judge model is in the loop. The
 design is recorded in
-[ADR-2610290002](../../docs/adr/ADR-2610290002-reviewer-evaluation.md).
+[ADR-2610290002](../../docs/adr/ADR-2610290002-reviewer-evaluation.md),
+since superseded by
+[ADR-2610311947](../../docs/adr/ADR-2610311947-reviewer-evaluation.md).
 
 ## Tasks
 

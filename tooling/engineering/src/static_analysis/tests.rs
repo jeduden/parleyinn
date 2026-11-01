@@ -2,6 +2,9 @@ use super::*;
 use crate::review_workflow::parse;
 use testkit::TempDir;
 
+/// How each shard of the test job runs its package list.
+const SHARD: &str = "HOME=\"$decoy\" cargo test --locked \"${packages[@]}\"";
+
 /// A CI workflow whose jobs run `runs`, one job each, and whose `ci`
 /// job needs `needs` and fails unless they all passed.
 fn workflow(runs: &[(&str, &str)], needs: &str) -> Workflow {
@@ -21,7 +24,7 @@ fn workflow(runs: &[(&str, &str)], needs: &str) -> Workflow {
 fn gating() -> Workflow {
     workflow(
         &[
-            ("test", "cargo test --workspace --locked"),
+            ("test", SHARD),
             ("lint", "cargo fmt --all --check"),
             (
                 "clippy",
@@ -88,7 +91,7 @@ fn a_workflow_running_every_static_check_under_the_aggregator_gates() {
 
 #[test]
 fn a_static_check_no_job_runs_fails() {
-    let flow = workflow(&[("test", "cargo test --workspace --locked")], "test");
+    let flow = workflow(&[("test", SHARD)], "test");
 
     let problems = ci_gates(&flow);
 
@@ -413,7 +416,7 @@ fn the_core_s_reach_evidence_needs_ci_to_run_it() {
         core_reach_evidence(&c, &flow),
         [
             "no CI job runs cargo clippy: cargo clippy --workspace --all-targets --locked -- -D warnings",
-            "no CI job runs the custom checks: cargo test --workspace --locked",
+            "no CI job runs the custom checks: cargo test --locked \"${packages[@]}\"",
         ]
     );
 }

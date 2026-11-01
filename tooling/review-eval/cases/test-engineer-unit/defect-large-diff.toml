@@ -1,0 +1,23 @@
+component = "test-engineer-unit"
+kind = "defect"
+title = "two modules' unit tests deleted in a diff longer than one read, which must still leave a report"
+
+# The change deletes the unit tests of review-eval's command line and of
+# the review gate, over two thousand lines: more than one read of the
+# diff shows. The specialist must write its report from its first read
+# and answer within its turns, not search until its turns run out (a run
+# that ends at its budget gives no report and fails).
+
+[[remove]]
+file = "tooling/review-eval/src/cli/tests.rs"
+
+[[remove]]
+file = "tooling/review-gate/src/tests.rs"
+
+[expect]
+outcome = ["findings"]
+
+[[expect.finding]]
+path = "tooling/review-eval/src/cli"
+form = "linked"
+mentions_any = ["unit test", "tests.rs", "no test", "untested", "without a test", "delet", "remov"]

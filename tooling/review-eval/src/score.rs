@@ -25,7 +25,6 @@ pub struct RunRecord {
     pub duration_ms: u64,
     pub resolved_model: String,
     pub usage: BTreeMap<String, Usage>,
-    pub first_write_turn: Option<usize>,
     /// What the world could not build as the workflow does; no
     /// failure, but kept so a run's conditions are visible.
     pub notes: Vec<String>,
@@ -46,7 +45,6 @@ impl RunRecord {
             duration_ms: log.duration_ms,
             resolved_model: log.resolved_model.clone(),
             usage: log.usage.clone(),
-            first_write_turn: log.first_write_turn,
             notes: Vec::new(),
         }
     }

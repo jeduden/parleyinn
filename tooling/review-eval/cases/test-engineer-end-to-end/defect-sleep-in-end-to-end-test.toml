@@ -26,9 +26,9 @@ fn a_wrong_command_line_is_refused() {
 '''
 
 [expect]
-outcome = ["blocking"]
+outcome = ["findings"]
 
 [[expect.finding]]
 path = "tooling/review-eval/tests/e2e_sleepy.rs"
-severity = "blocking"
+form = "linked"
 mentions_any = ["sleep", "deadline", "HOME", "isolat"]

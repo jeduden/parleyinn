@@ -1,0 +1,31 @@
+component = "lang-markdown"
+kind = "clean"
+title = "a true claim about an agent instruction file the review moves out of pr-head"
+
+# The review moves the pull request's agent instruction files out of
+# `pr-head/`, so `.claude/settings.json` is missing there though main
+# has it. A run that read the missing file as a false claim reported a
+# pin that holds; the specialist must check such a claim in main's tree
+# or the instructions text, and pass it.
+
+[[create]]
+file = "docs/review-eval/plugins.md"
+content = '''
+---
+summary: >-
+  The Claude Code plugins every harness session in the checkout loads.
+---
+# The plugins a harness session loads
+
+[.claude/settings.json](../../.claude/settings.json) enables two
+plugins, `mdsmith-skills` and `mdsmith-audit`, from the mdsmith
+repository, each pinned to its `v0.55.1` tag and commit, so every
+harness session started in the checkout loads the same plugin code.
+'''
+
+[expect]
+outcome = ["none", "findings"]
+
+[[expect.none]]
+path = "docs/review-eval/plugins.md"
+form = "linked"

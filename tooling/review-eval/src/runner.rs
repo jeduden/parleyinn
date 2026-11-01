@@ -1,6 +1,6 @@
 //! The harness: one run of a component on a world, through the
 //! `claude` command line as the review workflow runs it, with the
-//! review's tools, write rule and turn budget, the component as the
+//! review's reading tools and turn budget, the component as the
 //! session's agent, and a model override for a comparison.
 
 use std::path::Path;
@@ -14,51 +14,29 @@ use crate::world::{PR_HEAD, World};
 /// The command line that runs an agent.
 pub const PROGRAM: &str = "claude";
 
-/// The tools the review workflow allows and refuses the orchestrator,
-/// and what follows for a specialist and a generalist.
-pub const ORCHESTRATOR_TOOLS: &str = "Read,Glob,Grep,Agent,Edit(./review/reports/**)";
-pub const ORCHESTRATOR_DISALLOWED: &str = "Bash,Edit,NotebookEdit,WebFetch,WebSearch";
-pub const SPECIALIST_TOOLS: &str = "Read,Glob,Grep,Edit(./review/reports/**)";
-pub const SPECIALIST_DISALLOWED: &str = "Bash,Edit,NotebookEdit,WebFetch,WebSearch,Agent";
-pub const GENERALIST_TOOLS: &str = "Read,Glob,Grep";
-pub const GENERALIST_DISALLOWED: &str = "Bash,Edit,Write,NotebookEdit,WebFetch,WebSearch,Agent";
+/// The tools the review allows every agent, which reads and writes
+/// nothing, and the tools it refuses: a specialist's report is assembled
+/// from its run log, so no agent needs a writing tool.
+pub const TOOLS: &str = "Read,Glob,Grep";
+pub const DISALLOWED: &str = "Bash,Edit,Write,NotebookEdit,WebFetch,WebSearch,Agent";
 
-/// The orchestrator's prompt, as the review workflow gives it.
-pub const ORCHESTRATOR_PROMPT: &str = "Review the pull request whose tree is in pr-head/ and whose diff\n\
-against main is in pr.diff. Read review/bundle.md first. Follow\n\
-.claude/skills/review/SKILL.md exactly, and answer with the\n\
-review outcome it describes.\n";
-
-/// The review outcome's schema, as the review workflow gives it.
-pub const OUTCOME_SCHEMA: &str = r#"{"type":"object","additionalProperties":false,"required":["verdict","summary","findings"],"properties":{"verdict":{"enum":["approve","request_changes"]},"summary":{"type":"string","minLength":1},"findings":{"type":"array","items":{"type":"object","additionalProperties":false,"required":["path","line","severity","body"],"properties":{"path":{"type":"string","minLength":1},"line":{"type":"integer","minimum":0},"severity":{"enum":["blocking","nit"]},"body":{"type":"string","minLength":1}}}}}}"#;
-
-/// The orchestrator's turn budget for a review of `class`, before the
-/// consulted agents add theirs, as the workflow sets it.
-#[must_use]
-pub fn class_turns(class: &str) -> usize {
-    match class {
-        "light" => 12,
-        "deep" => 30,
-        _ => 20,
-    }
-}
-
-/// The prompt `component` gets for `world`: the workflow's for the
-/// orchestrator, for a specialist or a generalist what the
-/// orchestrator's skill has it say, and for a consultant the target a
-/// skill hands it: the tree, the diff and the changed paths.
+/// The prompt `component` gets for `world`: for a specialist or a
+/// generalist what the review's run tells it, and for a consultant the
+/// target a skill hands it: the tree, the diff and the changed paths.
 #[must_use]
 pub fn prompt(component: &Component, world: &World) -> String {
     let name = &component.name;
     match component.kind {
-        Kind::Orchestrator => ORCHESTRATOR_PROMPT.to_owned(),
         Kind::Specialist => format!(
             "You are `{name}`, a specialist of ParleyInn's review of a pull request \
              (ENG-28). Read `review/bundle.md` first, then your own diff, \
              `review/diffs/{name}.diff`. The pull request's tree is in `pr-head/` and \
              its diff against main is `pr.diff`; its agent instructions are text in \
-             `review/pr-instructions.txt`. Write your report to \
-             `review/reports/{name}.md`, and answer with only its last line and its path."
+             `review/pr-instructions.txt`. You write no file: state each finding as \
+             one line in your text the moment you find it, as your instructions say, \
+             and answer with your outcome line alone, `outcome: findings — <sentence>` \
+             or `outcome: none — <sentence>`. The review assembles your report from \
+             the lines you stated."
         ),
         Kind::Generalist => {
             let reports = if world.seeded.is_empty() {
@@ -82,7 +60,11 @@ pub fn prompt(component: &Component, world: &World) -> String {
             )
         }
         Kind::Consultant => format!(
-            "You are `{name}`. Review this pull request as your instructions say: its              tree is in `pr-head/`, its diff against main is `pr.diff`, and              `review/bundle.md` lists the paths it changes; its agent instructions are              text in `review/pr-instructions.txt`. You may read files and write none.              Answer with your findings and your closing line, nothing else."
+            "You are `{name}`. Review this pull request as your instructions say: its \
+             tree is in `pr-head/`, its diff against main is `pr.diff`, and \
+             `review/bundle.md` lists the paths it changes; its agent instructions are \
+             text in `review/pr-instructions.txt`. You may read files and write none. \
+             Answer with your findings and your closing line, nothing else."
         ),
     }
 }
@@ -109,31 +91,10 @@ pub fn command(
         "--add-dir".into(),
         PR_HEAD.into(),
     ];
-    let (tools, disallowed, turns) = match component.kind {
-        Kind::Orchestrator => (
-            ORCHESTRATOR_TOOLS,
-            ORCHESTRATOR_DISALLOWED,
-            class_turns(&world.class) + world.consults,
-        ),
-        Kind::Specialist => (SPECIALIST_TOOLS, SPECIALIST_DISALLOWED, component.max_turns),
-        Kind::Generalist | Kind::Consultant => {
-            (GENERALIST_TOOLS, GENERALIST_DISALLOWED, component.max_turns)
-        }
-    };
-    args.extend(["--max-turns".to_owned(), turns.to_string()]);
-    args.extend(["--allowedTools".to_owned(), tools.to_owned()]);
-    args.extend(["--disallowedTools".to_owned(), disallowed.to_owned()]);
+    args.extend(["--max-turns".to_owned(), component.max_turns.to_string()]);
+    args.extend(["--allowedTools".to_owned(), TOOLS.to_owned()]);
+    args.extend(["--disallowedTools".to_owned(), DISALLOWED.to_owned()]);
     match component.kind {
-        Kind::Orchestrator => {
-            args.extend([
-                "--model".to_owned(),
-                model.unwrap_or(&component.model).to_owned(),
-                "--effort".to_owned(),
-                component.effort.clone(),
-                "--json-schema".to_owned(),
-                OUTCOME_SCHEMA.to_owned(),
-            ]);
-        }
         Kind::Specialist | Kind::Generalist => {
             args.extend(["--agent".to_owned(), component.name.clone()]);
             if let Some(model) = model {

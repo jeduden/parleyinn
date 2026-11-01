@@ -92,6 +92,25 @@ pub fn cases() -> Vec<Case> {
         isolation_cases(),
         instruction_cases(),
         transcript_contract_cases(),
+        // Late, so adding it moves no earlier case to another shard.
+        vec![consent_case(), test_shards_case()],
+        review_late_cases(),
+        review_report_form_cases(),
+        review_run_report_cases(),
+        review_report_grading_cases(),
+        workflow_cases(),
+        review_log_report_cases(),
+        review_run_parts_cases(),
+        review_finding_shape_cases(),
+        review_limit_cases(),
+        review_withdrawal_cases(),
+        review_place_form_cases(),
+        review_retry_cases(),
+        vec![review_unlinked_case()],
+        vec![review_unknown_id_post_case(), review_case_severity_case()],
+        review_undashed_cases(),
+        review_resume_cases(),
+        vec![review_moved_revision_case()],
         // Last: its cases edit source the later cases would run stale.
         license_text_cases(),
     ]
@@ -228,6 +247,383 @@ fn decision_cases() -> Vec<Case> {
             )
         },
     ]
+}
+
+/// The drifts ENG-33 exists to catch: an action used by a tag rather
+/// than a commit sha, an event field expanded into a script, and CI no
+/// longer running zizmor over the workflows.
+fn workflow_cases() -> Vec<Case> {
+    vec![
+        case(
+            "an action used by its tag, not its commit sha",
+            "ENG-33",
+            Injection::replace(
+                ".github/workflows/codeql.yml",
+                "github/codeql-action/init@24c54180a607b1449ed407dd24f251e4e9147c8d # v4.38.3",
+                "github/codeql-action/init@v4.38.3",
+            ),
+            scenario("ENG-33"),
+            "uses github/codeql-action/init@v4.38.3, not pinned to a full commit sha",
+        ),
+        case(
+            "a pull request's title expanded into a run script",
+            "ENG-33",
+            Injection::replace(
+                CI_WORKFLOW,
+                "      - run: taplo lint\n",
+                "      - run: taplo lint ${{ github.event.pull_request.title }}\n",
+            ),
+            scenario("ENG-33"),
+            "expands github.event.pull_request.title in a run script, not through env",
+        ),
+        case(
+            "CI no longer runs zizmor over the workflows",
+            "ENG-33",
+            Injection::replace(CI_WORKFLOW, "run: zizmor .github", "run: zizmor --version"),
+            scenario("ENG-33"),
+            r#"the CI workflow does not run "zizmor .github""#,
+        ),
+    ]
+}
+
+/// The drifts ENG-34 exists to catch, late so adding them moves no
+/// earlier case to another shard: the review bundle no longer flagging
+/// a file past its limit, no longer flagging a file no specialist
+/// reads, and a limit the ENG-34 row states that the bundle does not
+/// hold.
+fn review_limit_cases() -> Vec<Case> {
+    const LIMITS: &str = "tooling/review-bundle/src/limits.rs";
+    vec![
+        case(
+            "the review bundle no longer flagging a file past its limit",
+            "ENG-34",
+            Injection::replace(
+                LIMITS,
+                "let size = lines(path).and_then(|n| oversize(path, n));",
+                "let size = lines(path).and_then(|n| oversize(path, n)).filter(|_| false);",
+            ),
+            scenario("ENG-34"),
+            "no nit at crates/a/src/lib.rs in the finding form citing ENG-34",
+        ),
+        case(
+            "the review bundle no longer flagging a file no specialist reads",
+            "ENG-34",
+            Injection::replace(
+                LIMITS,
+                "size.into_iter().chain(unread(path, scopes))",
+                "size.into_iter().chain(unread(path, scopes).filter(|_| false))",
+            ),
+            scenario("ENG-34"),
+            "no nit at LICENSE in the finding form citing ENG-28",
+        ),
+        case(
+            "the ENG-34 row stating a limit the review bundle does not hold",
+            "ENG-34",
+            Injection::replace(
+                "docs/srs/10-engineering-quality.md",
+                "200 for TOML (`.toml`)",
+                "250 for TOML (`.toml`)",
+            ),
+            scenario("ENG-34"),
+            "the ENG-34 row states no limit of 200 for TOML, which the review bundle holds",
+        ),
+    ]
+}
+
+/// The drifts the rule for a revision or withdrawal naming a place where
+/// no finding was stated exists to catch (ENG-28, I6), late so adding
+/// them moves no earlier case to another shard: a withdrawal that
+/// removed nothing left out of the report unseen, a revision of such a
+/// place left out instead of stated, and the gate refusing a withdrawal
+/// left in a report.
+fn review_withdrawal_cases() -> Vec<Case> {
+    const REPORT: &str = "tooling/review-gate/src/report.rs";
+    let assembly = "report::tests::a_withdrawal_that_finds_nothing_leaves_a_note_and_a_revision_states_its_finding";
+    vec![
+        case(
+            "the assembly dropping a withdrawal that removed nothing unseen",
+            "ENG-28",
+            Injection::replace(
+                REPORT,
+                "if kept.len() == before {",
+                "if kept.len() == before && w.line == usize::MAX {",
+            ),
+            cargo_lib_test("review-gate", assembly),
+            "a_withdrawal_that_finds_nothing_leaves_a_note_and_a_revision_states_its_finding",
+        ),
+        case(
+            "the assembly leaving out a revision of a place where nothing was stated",
+            "ENG-28",
+            Injection::replace(REPORT, "push_unique(&mut kept, finding);", "drop(finding);"),
+            cargo_lib_test("review-gate", assembly),
+            "a_withdrawal_that_finds_nothing_leaves_a_note_and_a_revision_states_its_finding",
+        ),
+        case(
+            "the gate refusing a withdrawal left in a report",
+            "ENG-28",
+            Injection::replace(
+                REPORT,
+                "Line::Prose | Line::Withdrawn(_) => {}",
+                "Line::Prose => {}\n            Line::Withdrawn(_) => return Some(Problem::Malformed { line: number }),",
+            ),
+            cargo_lib_test(
+                "review-gate",
+                "report::tests::a_report_check_reads_a_leftover_revision_as_its_finding_and_a_withdrawal_as_nothing",
+            ),
+            "a_report_check_reads_a_leftover_revision_as_its_finding_and_a_withdrawal_as_nothing",
+        ),
+    ]
+}
+
+/// The drifts the gate's reading of a finding's place exists to catch
+/// (ENG-28, I6), late so adding them moves no earlier case to another
+/// shard: a finding missing the dash after its place read as prose, and
+/// a line at the forms' template place refused without naming it; and,
+/// for the workflow check beside them, the review's job starting the
+/// Claude Code command line itself beside review-run.
+fn review_place_form_cases() -> Vec<Case> {
+    const REPORT: &str = "tooling/review-gate/src/report.rs";
+    vec![
+        case(
+            "the gate reading a finding missing the dash after its place as prose",
+            "ENG-28",
+            Injection::replace(
+                REPORT,
+                "finding_shaped(&parts) || undashed(text)",
+                "finding_shaped(&parts)",
+            ),
+            cargo_lib_test(
+                "review-gate",
+                "report::tests::a_finding_line_missing_the_dash_after_its_place_is_malformed_not_prose",
+            ),
+            "a_finding_line_missing_the_dash_after_its_place_is_malformed_not_prose",
+        ),
+        case(
+            "the gate refusing a line at the template's place without naming it",
+            "ENG-28",
+            Injection::replace(
+                REPORT,
+                "Line::Malformed if at_template(l) => {",
+                "Line::Malformed if at_template(l) && number == 0 => {",
+            ),
+            cargo_lib_test(
+                "review-gate",
+                "report::tests::a_report_check_names_a_line_at_the_template_s_place",
+            ),
+            "a_report_check_names_a_line_at_the_template_s_place",
+        ),
+        case(
+            "the review's job starting the Claude Code command line beside review-run",
+            "ENG-28",
+            Injection::replace(
+                REVIEW_WORKFLOW,
+                "          cargo run --locked --quiet --offline -p review-run -- --workdir . --parallel 32 \\\n",
+                "          cd pr-head && claude --permission-mode bypassPermissions -p review\n          cargo run --locked --quiet --offline -p review-run -- --workdir . --parallel 32 \\\n",
+            ),
+            scenario("ENG-28"),
+            "job review starts the Claude Code command line itself, outside review-run and review-eval",
+        ),
+    ]
+}
+
+/// The drift the review's second attempt must not bring (ENG-28), late
+/// so adding it moves no earlier case to another shard: a retry that
+/// merges the first attempt's findings into a second report the gate
+/// refuses again, so the two refused reports pass as one.
+fn review_retry_cases() -> Vec<Case> {
+    vec![case(
+        "a retried specialist's refused report rescued by its first attempt's findings",
+        "ENG-28",
+        Injection::replace(
+            "tooling/review-run/src/retry.rs",
+            "    let (Some(_), Some(failure)) = (&report, second.failure.clone()) else {\n        return report;\n    };\n",
+            "    let (Some(_), failure) = (&report, second.failure.clone()) else {\n        return report;\n    };\n    let failure = failure.unwrap_or_default();\n",
+        ),
+        cargo_lib_test(
+            "review-run",
+            "retry::tests::a_report_refused_twice_stays_refused_and_the_first_s_findings_do_not_rescue_it",
+        ),
+        "a_report_refused_twice_stays_refused_and_the_first_s_findings_do_not_rescue_it",
+    )]
+}
+
+/// The drift the gate's refusal of a line citing no id must not bring
+/// (ENG-28, I6), late so adding it moves no earlier case to another
+/// shard: a line saying all is well refused as a line in no form, so
+/// its second attempt is not told why.
+fn review_unlinked_case() -> Case {
+    case(
+        "the gate refusing a line that cites no id as one in no form",
+        "ENG-28",
+        Injection::replace(
+            "tooling/review-gate/src/report.rs",
+            "Line::Malformed if unlinked(l) => return Some(Problem::Unlinked { line: number }),",
+            "Line::Malformed if unlinked(l) && false => return Some(Problem::Unlinked { line: number }),",
+        ),
+        cargo_lib_test(
+            "review-gate",
+            "report::tests::a_report_check_names_a_line_at_a_place_that_cites_no_id",
+        ),
+        "a_report_check_names_a_line_at_a_place_that_cites_no_id",
+    )
+}
+
+/// The drift the review's posting of an unknown id must not bring
+/// (ENG-28), late so adding it moves no earlier case to another shard:
+/// the gate refusing a report for an id it cannot know, so a review
+/// `review-run` decided as a request for changes posts nothing.
+fn review_unknown_id_post_case() -> Case {
+    case(
+        "the gate failing without posting on a report citing an unknown id",
+        "ENG-28",
+        Injection::replace(
+            "tooling/review-gate/src/lib.rs",
+            "        input.answers.get(agent).map(String::as_str),\n        None,\n",
+            "        input.answers.get(agent).map(String::as_str),\n        Some(&BTreeSet::new()),\n",
+        ),
+        cargo_lib_test(
+            "engineering",
+            "review_refusals::tests::the_checkout_s_review_run_names_an_unknown_id_and_an_unread_line",
+        ),
+        "the_checkout_s_review_run_names_an_unknown_id_and_an_unread_line",
+    )
+}
+
+/// The drift ENG-32's case check must catch, late so adding it moves no
+/// earlier case to another shard: a case naming a severity the grader
+/// does not compare it with, so it grades more loosely than meant.
+fn review_case_severity_case() -> Case {
+    protection_case(
+        "a reviewer evaluation case naming a severity other than blocking or nit",
+        Injection::replace(
+            "tooling/review-eval/cases/review-code/injection-in-the-diff.toml",
+            "severity = \"blocking\"",
+            "severity = \"Blocking\"",
+        ),
+        "the_checkout_s_reviewer_evaluation_cases_apply_and_dispatch",
+        "case review-code/injection-in-the-diff names the severity",
+    )
+}
+
+/// The drifts a resumed review exists to rule out, late so adding them
+/// moves no earlier case to another shard: an answer reused across a
+/// changed head or definition, an agent without an accepted report that
+/// reads as clean, and a reused agent left out of those consulted.
+fn review_resume_cases() -> Vec<Case> {
+    const RESUME: &str = "tooling/review-run/src/resume.rs";
+    let resume_test = |name: &'static str| cargo_lib_test("review-run", name);
+    vec![
+        case(
+            "a resumed review reusing an answer given on another head",
+            "ENG-28",
+            Injection::replace(
+                RESUME,
+                "(Some(was), Some(is)) if was != is => {",
+                "(Some(was), Some(is)) if was != is && was.is_empty() => {",
+            ),
+            resume_test("resume::tests::a_moved_unknown_or_otherwise_fed_review_reuses_nothing"),
+            "a_moved_unknown_or_otherwise_fed_review_reuses_nothing",
+        ),
+        case(
+            "a resumed review reusing an answer whose agent's definition changed",
+            "ENG-28",
+            Injection::replace(
+                RESUME,
+                "if was.definition.is_none() || was.definition != is.definition {",
+                "if was.definition.is_none() {",
+            ),
+            resume_test(
+                "resume::tests::a_changed_definition_or_diff_or_an_agent_new_or_unanswered_runs_again",
+            ),
+            "a_changed_definition_or_diff_or_an_agent_new_or_unanswered_runs_again",
+        ),
+        case(
+            "an agent that did not answer left out of what was not reviewed, so it reads as clean",
+            "ENG-28",
+            Injection::replace(
+                "tooling/review-run/src/outcome.rs",
+                "    for name in silent {\n        match runs.iter()",
+                "    for name in silent.iter().filter(|_| false) {\n        match runs.iter()",
+            ),
+            resume_test(
+                "outcome::tests::every_agent_without_an_accepted_report_is_not_reviewed_with_why",
+            ),
+            "every_agent_without_an_accepted_report_is_not_reviewed_with_why",
+        ),
+        case(
+            "a resumed review leaving a reused agent out of those consulted",
+            "ENG-28",
+            Injection::replace(
+                "tooling/review-run/src/run.rs",
+                ".filter_map(|n| whole(n)).collect();",
+                ".filter_map(|n| whole(n)).filter(|_| false).collect();",
+            ),
+            resume_test(
+                "cli::tests::a_resumed_review_runs_only_the_gap_and_its_generalist_and_approves",
+            ),
+            "a_resumed_review_runs_only_the_gap_and_its_generalist_and_approves",
+        ),
+    ]
+}
+
+/// The drifts the gate's reading of a line at a place must not bring
+/// (ENG-28, I6), late so adding them moves no earlier case to another
+/// shard: a finding line with no dash at all, `a.rs:1 if not addressed:
+/// x`, read as prose, and a line saying all is well left out rather
+/// than kept as a note, so the assembly drops either unseen.
+fn review_undashed_cases() -> Vec<Case> {
+    const REPORT: &str = "tooling/review-gate/src/report.rs";
+    vec![
+        case(
+            "the assembly dropping a finding line with no dash after its place unseen",
+            "ENG-28",
+            Injection::replace(
+                REPORT,
+                "return if undashed(text) {",
+                "return if undashed(text) && parts.is_empty() {",
+            ),
+            cargo_lib_test(
+                "review-gate",
+                "report::tests::a_finding_line_with_a_space_or_colon_for_the_dash_after_its_place_is_malformed",
+            ),
+            "a_finding_line_with_a_space_or_colon_for_the_dash_after_its_place_is_malformed",
+        ),
+        case(
+            "the assembly dropping a line saying all is well instead of keeping its note",
+            "ENG-28",
+            Injection::replace(
+                REPORT,
+                "push_unique(&mut kept, Kept::of(format!(\"{ALL_WELL} {text}\")));",
+                "drop(text);",
+            ),
+            cargo_lib_test(
+                "review-gate",
+                "report::tests::a_finding_line_ending_with_all_is_well_is_kept_as_a_visible_note_not_refused",
+            ),
+            "a_finding_line_ending_with_all_is_well_is_kept_as_a_visible_note_not_refused",
+        ),
+    ]
+}
+
+/// The drift a revision taking one full finding line rules out (ENG-28),
+/// late so adding it moves no earlier case to another shard: a revision
+/// with an arrow, which would move a finding ENG-28 does not let move,
+/// read as a revision instead of refused.
+fn review_moved_revision_case() -> Case {
+    case(
+        "a revision with an arrow read as one instead of refused",
+        "ENG-28",
+        Injection::replace(
+            "tooling/review-gate/src/report.rs",
+            "    if ARROWS.iter().any(|arrow| rest.contains(arrow)) {\n",
+            "    if ARROWS.iter().any(|arrow| rest.contains(arrow)) && rest.is_empty() {\n",
+        ),
+        cargo_lib_test(
+            "review-gate",
+            "report::tests::a_revision_in_no_form_is_malformed",
+        ),
+        "a_revision_in_no_form_is_malformed",
+    )
 }
 
 /// The drifts ENG-30 exists to catch: a license the tool keeps no text
@@ -418,10 +814,18 @@ fn repository_cases() -> Vec<Case> {
     ]
 }
 
-/// The drifts ENG-28 exists to catch in the reviewing agent's reach: the
-/// agent reaching the approval. [`review_gate_cases`] holds the approval
+/// The drifts ENG-28 exists to catch in the review's agents' reach: an
+/// agent reaching the approval, or routing the review. [`review_gate_cases`] holds the approval
 /// skipping the review gate.
 fn review_cases() -> Vec<Case> {
+    let mut cases = review_reach_cases();
+    cases.extend(review_post_cases());
+    cases
+}
+
+/// The agents' job reaching past its bounds: the wrong trigger, a write
+/// permission, the key, a writing tool, or an agent routing the review.
+fn review_reach_cases() -> Vec<Case> {
     vec![
         case(
             "the reviewer run as the pull request defines it",
@@ -450,8 +854,8 @@ fn review_cases() -> Vec<Case> {
             "ENG-28",
             Injection::replace(
                 REVIEW_WORKFLOW,
-                "          github_token: ${{ github.token }}\n",
-                "          github_token: ${{ secrets.JEDUDEN_REVIEW_AGENT_KEY }}\n",
+                "        run: |\n          cargo run --locked --quiet --offline -p review-run",
+                "          KEY: ${{ secrets.JEDUDEN_REVIEW_AGENT_KEY }}\n        run: |\n          cargo run --locked --quiet --offline -p review-run",
             ),
             scenario("ENG-28"),
             "agent job review reads JEDUDEN_REVIEW_AGENT_KEY",
@@ -459,10 +863,32 @@ fn review_cases() -> Vec<Case> {
         case(
             "the reviewing agents allowed to write anywhere",
             "ENG-28",
-            Injection::replace(REVIEW_WORKFLOW, "Edit(./review/reports/**)", "Write"),
+            Injection::replace(
+                REVIEW_WORKFLOW,
+                "            > review/run.txt\n",
+                "            > review/run.txt\n          ./review/agents.sh -p review --allowedTools Write\n",
+            ),
             scenario("ENG-28"),
-            "may use Write, want Edit(./review/reports/**) alone",
+            "may use Write, want Read, Glob, Grep alone",
         ),
+        case(
+            "the review routed by an agent instead of review-run",
+            "ENG-28",
+            Injection::replace(
+                REVIEW_WORKFLOW,
+                "          cargo run --locked --quiet --offline -p review-run -- --workdir . --parallel 32 \\\n            > review/run.txt\n",
+                "          echo routed\n      - uses: anthropics/claude-code-action@1d6de8cb0c237e7c15e9e1bdf973826ebae490cc\n",
+            ),
+            scenario("ENG-28"),
+            "no job runs the review's agents with \"cargo run --locked --quiet --offline -p review-run -- --workdir .\"",
+        ),
+    ]
+}
+
+/// The post job's bounds: the gate's inputs, its check and its order
+/// after the agents.
+fn review_post_cases() -> Vec<Case> {
+    vec![
         case(
             "the review gate without the specialists' reports",
             "ENG-28",
@@ -571,8 +997,9 @@ fn review_agent_cases() -> Vec<Case> {
 
 /// The drifts ENG-32 exists to catch: a component without one of its
 /// kinds of case, an agent the dispatch never names without any, a case
-/// whose edit no longer applies, a case that dispatches another
-/// component, and a review workflow that skips the evaluation.
+/// whose edit no longer applies, a case of no component, such as the
+/// retired orchestrator, a case that dispatches another component, and
+/// a review workflow that skips the evaluation.
 fn review_evaluation_cases() -> Vec<Case> {
     vec![
         protection_case(
@@ -601,13 +1028,22 @@ fn review_evaluation_cases() -> Vec<Case> {
             "lang-rust/defect-unwrap: tooling/review-bundle/src/lib.rs: does not contain",
         ),
         protection_case(
-            "a reviewer evaluation case that dispatches no one",
+            "a case for the retired review orchestrator",
+            Injection::create(
+                "tooling/review-eval/cases/review/defect-unwrap.toml",
+                "component = \"review\"\nkind = \"defect\"\ntitle = \"an unwrap\"\n\n[[create]]\nfile = \"crates/x/src/rogue.rs\"\ncontent = \"x\"\n\n[expect]\noutcome = \"blocking\"\n",
+            ),
+            "the_checkout_s_reviewer_evaluation_cases_apply_and_dispatch",
+            "case review/defect-unwrap names no component",
+        ),
+        protection_case(
+            "a reviewer evaluation case no rule routes to its component",
             Injection::create(
                 "tooling/review-eval/cases/lang-toml/stray.toml",
                 "component = \"lang-toml\"\nkind = \"other\"\ntitle = \"a note\"\n\n[[create]]\nfile = \"research/note.txt\"\ncontent = \"x\"\n\n[expect]\n",
             ),
             "the_checkout_s_reviewer_evaluation_cases_apply_and_dispatch",
-            "case lang-toml/stray does not dispatch lang-toml; the bundle dispatches no agent",
+            "case lang-toml/stray does not dispatch lang-toml; the bundle dispatches review-code",
         ),
         case(
             "the review workflow's evaluate job removed",
@@ -640,19 +1076,19 @@ fn review_evaluation_cases() -> Vec<Case> {
     ]
 }
 
-/// The drift the ENG-28 table's report rows exist to catch: a gate that
-/// takes a report whatever outcome it ends with.
+/// The drift the ENG-28 table's specialist rows exist to catch: a gate
+/// that takes a report whatever outcome the specialist answered.
 fn review_report_case() -> Case {
     case(
         "a specialist's report ending with another outcome than it answered",
         "ENG-28",
         Injection::replace(
-            "tooling/review-gate/src/lib.rs",
-            ".is_some_and(|answer| answer.lines().any(|l| l.trim() == outcome)))",
-            ".is_some_and(|_| true))",
+            "tooling/review-gate/src/report.rs",
+            "    (answered != outcome).then_some(Problem::AnswerDiffers)",
+            "    (answered != outcome && answered.is_empty()).then_some(Problem::AnswerDiffers)",
         ),
         scenario("ENG-28"),
-        "other outcome",
+        "other outcome answered",
     )
 }
 
@@ -694,7 +1130,7 @@ fn review_gate_cases() -> Vec<Case> {
             r#"job post does not run "--checked checked.json""#,
         ),
         case(
-            "the review posted without holding the orchestrator to the dispatch",
+            "the review posted without holding it to the dispatch",
             "ENG-28",
             Injection::replace(
                 REVIEW_WORKFLOW,
@@ -738,6 +1174,442 @@ fn review_gate_cases() -> Vec<Case> {
                 "the_executable_bundles_this_repository_against_itself",
             ),
             "class=light",
+        ),
+    ]
+}
+
+/// The ENG-21 finding comes from the same CODEOWNERS the class reads;
+/// the test asserts with its own message, which names the finding.
+fn consent_case() -> Case {
+    case(
+        "CODEOWNERS no longer asking consent for the SRS",
+        "ENG-21",
+        Injection::replace(
+            ".github/CODEOWNERS",
+            "/docs/srs/                    @jeduden",
+            "/docs/srsx/                   @jeduden",
+        ),
+        cargo_test(
+            "review-bundle",
+            "e2e_review_bundle",
+            "the_executable_blocks_a_stakeholder_path_without_a_consent",
+        ),
+        "no ENG-21 finding for a stakeholder path",
+    )
+}
+
+/// The test job's shards leave a crate out, so its tests run nowhere.
+fn test_shards_case() -> Case {
+    case(
+        "a crate the test job's shards leave out",
+        "the_ci_test_shards_run_every_crate_once",
+        Injection::replace(CI_WORKFLOW, " -p review-run -p srs\"", " -p review-run\""),
+        cargo_test(
+            "engineering",
+            "static_analysis",
+            "the_ci_test_shards_run_every_crate_once",
+        ),
+        "the test job's shards: crate srs runs in no shard",
+    )
+}
+
+/// The review workflow drifts registered after the first ones, late so
+/// adding them moves no earlier case to another shard: the agents' run
+/// logs leaving their job, and the Claude Code command line, installed
+/// by the composite action, in the key's job or starting an agent
+/// outside review-run; the ENG-32 evaluation planning every component
+/// a shared section change reaches, not one per set; and review-run
+/// starting a generalist before every specialist has ended.
+fn review_late_cases() -> Vec<Case> {
+    vec![
+        case(
+            "the reviewing agents' run logs uploaded out of their job",
+            "ENG-28",
+            Injection::replace(
+                REVIEW_WORKFLOW,
+                "            review/usage.json\n          if-no-files-found: error\n",
+                "            review/usage.json\n            review/logs/\n          if-no-files-found: error\n",
+            ),
+            scenario("ENG-28"),
+            "agent job review uploads review/logs, every tool result its agents read",
+        ),
+        case(
+            "the key's job given the Claude Code command line",
+            "ENG-28",
+            Injection::replace(
+                REVIEW_WORKFLOW,
+                "      - name: Build the review gate\n",
+                "      - uses: ./.github/actions/claude-code\n      - name: Build the review gate\n",
+            ),
+            scenario("ENG-28"),
+            "agent job post reads JEDUDEN_REVIEW_AGENT_KEY",
+        ),
+        case(
+            "the review routed by the Claude Code command line instead of review-run",
+            "ENG-28",
+            Injection::replace(
+                REVIEW_WORKFLOW,
+                "          cargo run --locked --quiet --offline -p review-run -- --workdir . --parallel 32 \\\n            > review/run.txt\n",
+                "          claude -p review > review/run.txt\n",
+            ),
+            scenario("ENG-28"),
+            "job review starts the Claude Code command line outside review-run and review-eval, which would route the review",
+        ),
+        case(
+            "the evaluation planning every component a shared section change reaches",
+            "ENG-32",
+            Injection::replace(
+                "tooling/review-eval/src/plan.rs",
+                "                shared.entry(sections_of(&a)).or_default().push(name);\n",
+                "                shared.entry(sections_of(&a)).or_default().push(name.clone());\n                out.push(Planned { component: name, reason: \"shared sections changed\".to_owned() });\n",
+            ),
+            scenario("ENG-32"),
+            "components planned for the sections",
+        ),
+        case(
+            "review-run starting the generalists before the specialists",
+            "ENG-28",
+            Injection::replace(
+                "tooling/review-run/src/run.rs",
+                "    let done = parallel(&units, options.parallel, &one);\n    runs.extend(gather(workdir, plan, &units, done, unsplit, progress));\n    let mut generalists = Vec::new();\n    for name in plan.generalists() {\n        match whole(&name) {\n            Some(run) => runs.push(run),\n            None => generalists.push(Unit::whole(name)),\n        }\n    }\n    let done = parallel(&generalists, options.parallel, &one);\n    runs.extend(done.into_iter().map(|(run, _)| run));\n",
+                "    let mut generalists = Vec::new();\n    for name in plan.generalists() {\n        match whole(&name) {\n            Some(run) => runs.push(run),\n            None => generalists.push(Unit::whole(name)),\n        }\n    }\n    let early = parallel(&generalists, options.parallel, &one);\n    let done = parallel(&units, options.parallel, &one);\n    runs.extend(gather(workdir, plan, &units, done, unsplit, progress));\n    runs.extend(early.into_iter().map(|(run, _)| run));\n",
+            ),
+            scenario("ENG-28"),
+            "review-code started before lang-markdown ended",
+        ),
+    ]
+}
+
+/// The drifts the form of a specialist's report exists to catch in the
+/// gate's report check, late so adding them moves no earlier case to
+/// another shard: a finding line in neither form, an outcome its lines
+/// contradict, and a cited id no requirement has.
+fn review_report_form_cases() -> Vec<Case> {
+    const REPORT: &str = "tooling/review-gate/src/report.rs";
+    let gate_test = "report::tests::a_report_check_refuses_what_the_gate_refuses";
+    vec![
+        case(
+            "the gate taking a finding line in neither form",
+            "ENG-28",
+            Injection::replace(
+                REPORT,
+                "Line::Malformed => return Some(Problem::Malformed { line: number }),",
+                "Line::Malformed => {}",
+            ),
+            cargo_lib_test("review-gate", gate_test),
+            "a_report_check_refuses_what_the_gate_refuses",
+        ),
+        case(
+            "the gate taking an outcome of none beside a finding",
+            "ENG-28",
+            Injection::replace(
+                REPORT,
+                "(true, true) => Some(Problem::NoneWithFindings),",
+                "(true, true) => None,",
+            ),
+            cargo_lib_test("review-gate", gate_test),
+            "a_report_check_refuses_what_the_gate_refuses",
+        ),
+        case(
+            "a report check taking an id no requirement has",
+            "ENG-28",
+            Injection::replace(
+                REPORT,
+                "if let Some(id) = unknown_id(&Line::Linked(linked), known) {",
+                "if let Some(id) = unknown_id(&Line::Linked(linked), known).filter(|_| false) {",
+            ),
+            cargo_lib_test(
+                "review-gate",
+                "report::tests::a_report_check_with_the_known_ids_refuses_an_id_no_requirement_has",
+            ),
+            "a_report_check_with_the_known_ids_refuses_an_id_no_requirement_has",
+        ),
+    ]
+}
+
+/// The drifts the form of a specialist's report exists to catch in
+/// review-run: a report held to no requirement ids, the pull request's
+/// own requirements left out of them, and a blocking finding kept from
+/// a requirement request.
+fn review_run_report_cases() -> Vec<Case> {
+    const OUTCOME: &str = "tooling/review-run/src/outcome.rs";
+    vec![
+        case(
+            "review-run holding a report to no requirement ids",
+            "ENG-28",
+            Injection::replace(
+                OUTCOME,
+                "report_check(report, Some(answer), Some(known))",
+                "report_check(report, Some(answer), Some(known).filter(|_| false))",
+            ),
+            cargo_lib_test(
+                "review-run",
+                "outcome::tests::a_report_the_gate_would_refuse_blocks_and_is_named",
+            ),
+            "a_report_the_gate_would_refuse_blocks_and_is_named",
+        ),
+        case(
+            "review-run reading the requirement ids from main's tree alone",
+            "ENG-28",
+            Injection::replace(
+                "tooling/review-run/src/requirements.rs",
+                "[workdir.join(SRS), workdir.join(PR_HEAD).join(SRS)]",
+                "[workdir.join(SRS), workdir.join(SRS).join(PR_HEAD)]",
+            ),
+            cargo_lib_test(
+                "review-run",
+                "requirements::tests::the_ids_are_main_s_and_the_pull_request_s_and_the_invariants",
+            ),
+            "the_ids_are_main_s_and_the_pull_request_s_and_the_invariants",
+        ),
+        case(
+            "review-run keeping a requirement request's finding blocking",
+            "ENG-28",
+            Injection::replace(
+                OUTCOME,
+                "if f.severity == BLOCKING && from_request(plan, &name, reports, &f) {",
+                "if f.severity == BLOCKING && from_request(plan, &name, reports, &f) && f.line < 0 {",
+            ),
+            cargo_lib_test(
+                "review-run",
+                "outcome::tests::a_blocking_finding_kept_from_a_requirement_request_stays_a_nit",
+            ),
+            "a_blocking_finding_kept_from_a_requirement_request_stays_a_nit",
+        ),
+    ]
+}
+
+/// The drifts the evaluation's grading of a specialist's report exists
+/// to catch: a grader that takes a report the review would refuse or
+/// reads a specialist's severity word, and a check that lets a
+/// generalist's case name a form.
+fn review_report_grading_cases() -> Vec<Case> {
+    vec![
+        case(
+            "the grader passing a report the review would refuse",
+            "ENG-32",
+            Injection::replace(
+                "tooling/review-eval/src/grade.rs",
+                "graded.failures.push(format!(\"report refused: {problem}\"));",
+                "graded.slips.push(format!(\"report refused: {problem}\"));",
+            ),
+            cargo_lib_test(
+                "review-eval",
+                "grade::tests::a_specialist_report_the_review_would_refuse_fails_its_run",
+            ),
+            "a_specialist_report_the_review_would_refuse_fails_its_run",
+        ),
+        case(
+            "the grader reading a specialist's line by a severity word",
+            "ENG-32",
+            Injection::replace(
+                "tooling/review-eval/src/grade.rs",
+                "kind == Kind::Generalist || (kind == Kind::Consultant",
+                "kind != Kind::Consultant || (kind == Kind::Consultant",
+            ),
+            cargo_lib_test(
+                "review-eval",
+                "grade::tests::a_specialist_s_line_is_matched_by_its_form_and_never_by_a_severity_word",
+            ),
+            "a_specialist_s_line_is_matched_by_its_form_and_never_by_a_severity_word",
+        ),
+        case(
+            "the evaluation's check taking a generalist's case that names a form",
+            "ENG-32",
+            Injection::replace(
+                "tooling/review-eval/src/check.rs",
+                "if !matches!(component.kind, Kind::Generalist) {",
+                "if !matches!(component.kind, Kind::Consultant) {",
+            ),
+            cargo_lib_test(
+                "review-eval",
+                "check::tests::a_generalist_s_case_that_names_a_form_is_named",
+            ),
+            "a_generalist_s_case_that_names_a_form_is_named",
+        ),
+    ]
+}
+
+/// The drifts the report assembled from a specialist's run log exists to
+/// catch (ENG-28, ENG-32), late so adding them moves no earlier case to
+/// another shard: an assembly that keeps a withdrawn finding, a cut-off
+/// run whose salvaged findings make it one that answered, a gate taking
+/// an answer with no outcome line, a specialist given a writing tool,
+/// and a grader reading a finding stated only in the answer as stated
+/// before it.
+fn review_log_report_cases() -> Vec<Case> {
+    const REPORT: &str = "tooling/review-gate/src/report.rs";
+    vec![
+        case(
+            "the assembly keeping a withdrawn finding",
+            "ENG-28",
+            Injection::replace(
+                REPORT,
+                "kept.retain(|k| !k.at((&w.path, w.line)));",
+                "kept.retain(|_| true);",
+            ),
+            cargo_lib_test(
+                "review-gate",
+                "report::tests::a_withdrawal_removes_every_earlier_finding_at_its_place",
+            ),
+            "a_withdrawal_removes_every_earlier_finding_at_its_place",
+        ),
+        case(
+            "a cut-off run counted as answered once its findings are salvaged",
+            "ENG-28",
+            Injection::replace(
+                "tooling/review-run/src/run.rs",
+                "                Some(format!(\"its run ended with {}\", log.subtype))\n",
+                "                log.texts\n                    .is_empty()\n                    .then(|| format!(\"its run ended with {}\", log.subtype))\n",
+            ),
+            cargo_lib_test(
+                "review-run",
+                "run::tests::a_run_cut_off_before_its_answer_keeps_what_it_stated_as_an_incomplete_report",
+            ),
+            "a_run_cut_off_before_its_answer_keeps_what_it_stated_as_an_incomplete_report",
+        ),
+        case(
+            "the gate taking a specialist that answered no outcome line",
+            "ENG-28",
+            Injection::replace(
+                REPORT,
+                "        return Some(Problem::NoAnswerOutcome);\n",
+                "        return None;\n",
+            ),
+            cargo_lib_test(
+                "review-gate",
+                "report::tests::a_report_check_refuses_what_the_gate_refuses",
+            ),
+            "a_report_check_refuses_what_the_gate_refuses",
+        ),
+        protection_case(
+            "a specialist given a writing tool",
+            Injection::replace(
+                ".claude/agents/lang-rust.md",
+                "tools: Read, Grep, Glob\n",
+                "tools: Read, Grep, Glob, Write\n",
+            ),
+            "the_checkout_s_review_agents_are_all_defined",
+            "lang-rust has tools Read, Grep, Glob, Write, want Read, Grep, Glob",
+        ),
+        case(
+            "the grader reading a finding stated only in the answer as stated before it",
+            "ENG-32",
+            Injection::replace(
+                "tooling/review-eval/src/grade.rs",
+                "        .filter(|t| t.trim() != answer)\n",
+                "        .filter(|t| t.trim() != answer || true)\n",
+            ),
+            cargo_lib_test(
+                "review-eval",
+                "grade::tests::a_finding_stated_only_in_the_answer_was_not_stated_before_it",
+            ),
+            "a_finding_stated_only_in_the_answer_was_not_stated_before_it",
+        ),
+    ]
+}
+
+/// The drifts running a specialist in parts exists to catch (ENG-28),
+/// late so adding them moves no earlier case to another shard: a merge
+/// that drops a later part's findings, and a part that did not answer
+/// leaving the specialist one that did.
+fn review_run_parts_cases() -> Vec<Case> {
+    const PARTS: &str = "tooling/review-run/src/parts.rs";
+    vec![
+        case(
+            "the merge of a specialist's parts dropping a later part's findings",
+            "ENG-28",
+            Injection::replace(
+                PARTS,
+                "} else if !lines.iter().any(|l| l == line) {",
+                "} else if at == 0 && !lines.iter().any(|l| l == line) {",
+            ),
+            cargo_lib_test(
+                "review-run",
+                "parts::tests::the_merged_report_is_the_union_of_the_parts_in_order_with_one_outcome",
+            ),
+            "the_merged_report_is_the_union_of_the_parts_in_order_with_one_outcome",
+        ),
+        case(
+            "a specialist's part that did not answer not failing the review",
+            "ENG-28",
+            Injection::replace(
+                PARTS,
+                "if let Some(why) = &run.failure {",
+                "if let Some(why) = run.failure.as_ref().filter(|_| false) {",
+            ),
+            cargo_lib_test(
+                "review-run",
+                "parts::tests::a_failed_part_makes_the_merged_run_incomplete_naming_it_and_keeps_every_part_s_findings",
+            ),
+            "a_failed_part_makes_the_merged_run_incomplete_naming_it_and_keeps_every_part_s_findings",
+        ),
+    ]
+}
+
+/// The drifts that would drop a finding unseen, late so adding them
+/// moves no earlier case to another shard: a specialist's place in bold
+/// read as prose, a finding-shaped line with a place that cannot be
+/// read left out, and a generalist's finding line the review cannot
+/// read passed by, or a report citing an unknown id left unnamed (I6).
+fn review_finding_shape_cases() -> Vec<Case> {
+    const REPORT: &str = "tooling/review-gate/src/report.rs";
+    vec![
+        case(
+            "the gate reading a finding whose place is in bold as prose",
+            "ENG-28",
+            Injection::replace(
+                REPORT,
+                "link_text(part.trim().trim_matches(MARKUP)).trim_matches(MARKUP);",
+                "link_text(part.trim().trim_matches('`')).trim_matches('`');",
+            ),
+            cargo_lib_test(
+                "review-gate",
+                "report::tests::a_finding_with_its_place_in_markup_reads_as_one",
+            ),
+            "a_finding_with_its_place_in_markup_reads_as_one",
+        ),
+        case(
+            "the gate leaving out a finding-shaped line whose place cannot be read",
+            "ENG-28",
+            Injection::replace(
+                REPORT,
+                "return if finding_shaped(&parts) || undashed(text) {",
+                "return if finding_shaped(&parts[..1]) || undashed(text) {",
+            ),
+            cargo_lib_test(
+                "review-gate",
+                "report::tests::a_finding_shaped_line_with_no_place_it_can_read_is_malformed_not_prose",
+            ),
+            "a_finding_shaped_line_with_no_place_it_can_read_is_malformed_not_prose",
+        ),
+        case(
+            "review-run passing by a generalist's finding line it cannot read",
+            "ENG-28",
+            Injection::replace(
+                "tooling/review-run/src/outcome.rs",
+                "for line in answer.lines().filter(|l| report::unread(l)) {",
+                "for line in answer.lines().filter(|_| false) {",
+            ),
+            cargo_lib_test(
+                "review-run",
+                "outcome::tests::a_generalist_s_finding_line_the_review_cannot_read_blocks_and_is_named",
+            ),
+            "a_generalist_s_finding_line_the_review_cannot_read_blocks_and_is_named",
+        ),
+        case(
+            "review-run deciding a review whose report cites an unknown id unnamed",
+            "ENG-28",
+            Injection::replace(
+                "tooling/review-run/src/outcome.rs",
+                "report_check(report, Some(answer), Some(known))",
+                "report_check(report, Some(answer), None)",
+            ),
+            cargo_lib_test(
+                "engineering",
+                "review_refusals::tests::the_checkout_s_review_run_names_an_unknown_id_and_an_unread_line",
+            ),
+            "the_checkout_s_review_run_names_an_unknown_id_and_an_unread_line",
         ),
     ]
 }
@@ -2518,8 +3390,8 @@ fn instruction_cases() -> Vec<Case> {
             "the_ci_test_job_runs_with_a_decoy_home",
             Injection::replace(
                 ".github/workflows/ci.yml",
-                "HOME=\"$decoy\" cargo test --workspace --locked",
-                "cargo test --workspace --locked",
+                "HOME=\"$decoy\" cargo test --locked \"${packages[@]}\"",
+                "cargo test --locked \"${packages[@]}\"",
             ),
             cargo_test(
                 "engineering",

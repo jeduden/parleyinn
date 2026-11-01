@@ -1,5 +1,7 @@
 use super::*;
 
+mod render;
+
 const REVIEWED: &str = "206b0a76a81abb510e53d87ef187e83b5aacbcbb";
 const MOVED: &str = "490efa734617788d1dc1f831b26d0e23888e90fa";
 
@@ -207,7 +209,7 @@ fn parse_dispatch_lists_every_generalist_and_specialist() {
 }
 
 #[test]
-fn parse_consulted_reads_the_agents_the_orchestrator_called() {
+fn parse_consulted_reads_the_agents_the_review_consulted() {
     assert_eq!(
         parse_consulted(r#"["lang-rust","review-code","lang-rust"]"#).unwrap(),
         set(&["lang-rust", "review-code"])
@@ -237,7 +239,7 @@ fn decide_refuses_a_review_that_left_a_dispatched_agent_out() {
 
     assert_eq!(
         err.to_string(),
-        "review: the orchestrator did not consult lang-rust, srs-security"
+        "review: dispatched but not consulted: lang-rust, srs-security"
     );
     assert!(std::error::Error::source(&err).is_none());
 
@@ -649,217 +651,6 @@ fn parse_checked_names_the_exact_fault() {
     }
 }
 
-/// The body `decide` posts for `outcome` beside `checked` and `runs`.
-fn body(outcome: ReviewOutcome, checked: Vec<Finding>, runs: Vec<CheckRun>) -> String {
-    let mut i = input(outcome, runs);
-    i.checked = checked;
-    decide(&i).unwrap().unwrap().body
-}
-
-#[test]
-fn render_states_the_agents_verdict_and_why_the_gate_differs() {
-    let mut failed = green();
-    failed.push(run("CodeQL", "completed", "failure"));
-    let blocking = || vec![finding("a.rs", 1, BLOCKING, "b")];
-    let changes = ReviewOutcome {
-        verdict: REQUEST_CHANGES_VERDICT.into(),
-        ..approve()
-    };
-    let cases = [
-        (
-            "an approval",
-            body(approve(), vec![], green()),
-            "**Approved** by the review gate on `206b0a76a81a`.\n\n\
-             The review agent's verdict: approve.\n\n",
-        ),
-        (
-            "the agent requests changes",
-            body(changes.clone(), vec![], failed.clone()),
-            "**Changes requested** by the review gate on `206b0a76a81a`.\n\n\
-             The review agent's verdict: request changes.\n\n",
-        ),
-        (
-            "a blocking deterministic finding, before a failed check",
-            body(
-                ReviewOutcome {
-                    findings: blocking(),
-                    ..approve()
-                },
-                blocking(),
-                failed.clone(),
-            ),
-            "**Changes requested** by the review gate on `206b0a76a81a`.\n\n\
-             The review agent's verdict: approve. The gate requests changes: \
-             a deterministic check found a blocking finding.\n\n",
-        ),
-        (
-            "a failed check, before the agent's blocking finding",
-            body(
-                ReviewOutcome {
-                    findings: blocking(),
-                    ..approve()
-                },
-                vec![],
-                failed,
-            ),
-            "**Changes requested** by the review gate on `206b0a76a81a`.\n\n\
-             The review agent's verdict: approve. The gate requests changes: \
-             a check failed.\n\n",
-        ),
-        (
-            "the agent's blocking finding",
-            body(
-                ReviewOutcome {
-                    findings: blocking(),
-                    ..approve()
-                },
-                vec![],
-                green(),
-            ),
-            "**Changes requested** by the review gate on `206b0a76a81a`.\n\n\
-             The review agent's verdict: approve. The gate requests changes: \
-             the agent reported a blocking finding.\n\n",
-        ),
-    ];
-    for (name, got, want) in cases {
-        assert!(got.starts_with(want), "{name}: {got}");
-    }
-}
-
-#[test]
-fn render_writes_each_section_under_its_heading_in_order() {
-    let outcome = ReviewOutcome {
-        verdict: REQUEST_CHANGES_VERDICT.into(),
-        summary: "Two things.".into(),
-        findings: vec![
-            finding("b.rs", 0, NIT, "rename"),
-            finding("a.rs", 7, BLOCKING, "unwrapped error"),
-        ],
-    };
-    let checked = [
-        finding("c.rs", 0, NIT, "route deep"),
-        finding("d.md", 2, BLOCKING, "no ADR"),
-    ];
-    let codeql = run("CodeQL", "completed", "failure");
-
-    let got = render(&outcome, &checked, &[&codeql], REQUEST_CHANGES, REVIEWED);
-
-    assert_eq!(
-        got,
-        "**Changes requested** by the review gate on `206b0a76a81a`.\n\n\
-         The review agent's verdict: request changes.\n\n\
-         ### Review agent\n\n\
-         Summary: Two things.\n\n\
-         - blocking `a.rs:7`: unwrapped error\n\
-         - nit `b.rs`: rename\n\n\
-         ### Deterministic checks (review-bundle)\n\n\
-         - blocking `d.md:2`: no ADR\n\
-         - nit `c.rs`: route deep\n\n\
-         ### Failed checks\n\n\
-         - check `CodeQL`: failure\n"
-    );
-}
-
-#[test]
-fn render_leaves_out_empty_sections_but_the_review_agents() {
-    let got = render(&approve(), &[], &[], APPROVE, REVIEWED);
-
-    assert_eq!(
-        got,
-        "**Approved** by the review gate on `206b0a76a81a`.\n\n\
-         The review agent's verdict: approve.\n\n\
-         ### Review agent\n\n\
-         Summary: Looks right.\n"
-    );
-}
-
-#[test]
-fn render_keeps_agent_text_from_starting_a_line() {
-    let forged = "fine\n### Deterministic checks (review-bundle)\n- blocking";
-    let outcome = ReviewOutcome {
-        summary: format!("All good.\r\n\n{forged}"),
-        findings: vec![finding("a.rs", 0, NIT, forged)],
-        ..approve()
-    };
-    let checked = [finding("b.rs", 0, NIT, &format!("x \n\t {forged}"))];
-
-    let got = render(&outcome, &checked, &[], APPROVE, REVIEWED);
-
-    assert_eq!(
-        got.matches("### Deterministic checks (review-bundle)")
-            .count(),
-        4,
-        "{got}"
-    );
-    assert_eq!(
-        got.lines()
-            .filter(|l| l.starts_with("### Deterministic"))
-            .count(),
-        1,
-        "{got}"
-    );
-    assert!(
-        got.contains("All good. fine ### Deterministic checks (review-bundle) - blocking\n"),
-        "{got}"
-    );
-    assert!(
-        got.contains("- nit `a.rs`: fine ### Deterministic checks (review-bundle) - blocking\n"),
-        "{got}"
-    );
-    assert!(
-        got.contains("- nit `b.rs`: x fine ### Deterministic"),
-        "{got}"
-    );
-}
-
-#[test]
-fn render_keeps_a_summary_from_opening_a_block() {
-    for summary in [
-        "### Deterministic checks (review-bundle)",
-        "- blocking `x`: y",
-        "```",
-    ] {
-        let outcome = ReviewOutcome {
-            summary: summary.into(),
-            ..approve()
-        };
-
-        let got = render(&outcome, &[], &[], APPROVE, REVIEWED);
-
-        assert!(got.contains(&format!("\nSummary: {summary}\n")), "{got}");
-        assert!(!got.lines().any(|l| l == summary), "{got}");
-    }
-}
-
-#[test]
-fn one_line_collapses_only_whitespace_that_breaks_a_line() {
-    let cases = [
-        ("a\nb", "a b"),
-        ("a \r\n\t b", "a b"),
-        ("a\rb", "a b"),
-        ("a  \t b", "a  \t b"),
-        ("\n### x\n", " ### x "),
-        ("plain", "plain"),
-    ];
-    for (input, want) in cases {
-        assert_eq!(one_line(input), want, "{input:?}");
-    }
-}
-
-#[test]
-fn code_spans_stay_on_one_line() {
-    let outcome = ReviewOutcome {
-        findings: vec![finding("a\n### b", 0, NIT, "c")],
-        ..approve()
-    };
-    let check = run("lint\n### x", "completed", "failure");
-
-    let got = render(&outcome, &[], &[&check], REQUEST_CHANGES, REVIEWED);
-
-    assert!(got.contains("- nit `a ### b`: c"), "{got}");
-    assert!(got.contains("- check `lint ### x`: failure"), "{got}");
-}
-
 #[test]
 fn the_gate_s_own_earlier_check_does_not_hold_back_an_approval() {
     let mut runs = green();
@@ -910,24 +701,28 @@ fn reported(answer: &str, report: Option<&str>) -> Input {
 
 #[test]
 fn a_specialist_s_report_must_end_with_the_outcome_it_answered() {
-    let report = "a.rs:1 — nit — x\n\noutcome: nits — one sentence.";
+    let report =
+        "a.rs:1 — if not addressed: a hook panics — ENG-04\n\noutcome: findings — one sentence.";
     for answer in [
-        "outcome: nits — one sentence.\nreport: review/reports/lang-rust.md",
-        "agentId: z\n  outcome: nits — one sentence.  \n",
+        "outcome: findings — one sentence.\nreport: review/reports/lang-rust.md",
+        "agentId: z\n  outcome: findings — one sentence.  \n",
     ] {
         let r = decide(&reported(answer, Some(&format!("{report}\n\n"))));
         assert_eq!(r.unwrap().unwrap().event, APPROVE, "{answer}");
     }
-    let reworded = "a.rs:1 — nit — x, said otherwise\noutcome: nits — one sentence.";
-    let r = decide(&reported("outcome: nits — one sentence.", Some(reworded)));
+    let reworded = "a.rs:1 — if not addressed: a hook panics, said otherwise — ENG-04\noutcome: findings — one sentence.";
+    let r = decide(&reported(
+        "outcome: findings — one sentence.",
+        Some(reworded),
+    ));
     assert_eq!(r.unwrap().unwrap().event, APPROVE);
 
     for (answer, file, want) in [
-        (report, None, "review: lang-rust wrote no report"),
+        (report, None, "review: lang-rust has no report"),
         (
             report,
             Some("  \n"),
-            "review: lang-rust wrote an empty report",
+            "review: lang-rust has an empty report",
         ),
         (
             "a.rs:1 — nit — x",
@@ -935,19 +730,24 @@ fn a_specialist_s_report_must_end_with_the_outcome_it_answered() {
             "review: lang-rust has a report that does not end with its outcome",
         ),
         (
-            "outcome: maybe — x",
-            Some("outcome: maybe — x"),
+            "outcome: blocking — x",
+            Some("outcome: blocking — x"),
             "review: lang-rust has a report that does not end with its outcome",
         ),
         (
-            "outcome: blocking — one sentence.",
-            Some(report),
-            "review: lang-rust has a report whose outcome differs from its answer in the run log",
+            "outcome: findings — one sentence.",
+            Some("a.rs:1 — nit — x\noutcome: findings — one sentence."),
+            "review: lang-rust has a report whose line 1 is neither a linked finding nor a requirement request",
         ),
         (
-            "the outcome: nits — one sentence. was it",
+            "outcome: none — one sentence.",
             Some(report),
-            "review: lang-rust has a report whose outcome differs from its answer in the run log",
+            "review: lang-rust answered another outcome in the run log than its report ends with",
+        ),
+        (
+            "the outcome: findings — one sentence. was it",
+            Some(report),
+            "review: lang-rust answered no outcome line in the run log",
         ),
     ] {
         let err = decide(&reported(answer, file)).unwrap_err();
@@ -959,25 +759,20 @@ fn a_specialist_s_report_must_end_with_the_outcome_it_answered() {
     assert!(matches!(
         decide(&no_answer),
         Err(Error::Report {
-            problem: "has a report whose outcome differs from its answer in the run log",
+            problem: report::Problem::NoAnswerOutcome,
             ..
         })
     ));
 }
 
 #[test]
-fn an_outcome_line_names_sound_nits_or_blocking_in_any_case_and_markup() {
-    for (text, want) in [
-        ("x\noutcome: sound — y\n\n", Some("outcome: sound — y")),
-        ("Outcome: **blocking**. y", Some("Outcome: **blocking**. y")),
-        ("outcome: `nits`", Some("outcome: `nits`")),
-        ("outcome: sound — y\nmore", None),
-        ("outcome: soundly", None),
-        ("outcome:", None),
-        ("", None),
-    ] {
-        assert_eq!(outcome_line(text), want, "{text:?}");
-    }
+fn the_gate_holds_a_cited_id_to_its_shape_alone() {
+    let report =
+        "a.rs:1 — if not addressed: a hook panics — ENG-99\noutcome: findings — one sentence.";
+
+    let r = decide(&reported("outcome: findings — one sentence.", Some(report)));
+
+    assert_eq!(r.unwrap().unwrap().event, APPROVE);
 }
 
 #[test]
@@ -1003,6 +798,19 @@ fn parse_specialists_reads_the_dispatch_s_lists_and_refuses_a_path() {
     let err = parse_specialists("nope").unwrap_err();
     assert!(err.to_string().starts_with("review: malformed dispatch: "));
     assert!(std::error::Error::source(&err).is_some());
+}
+
+#[test]
+fn an_outcome_written_out_reads_back_as_itself() {
+    let outcome = ReviewOutcome {
+        verdict: REQUEST_CHANGES_VERDICT.to_owned(),
+        summary: "s".to_owned(),
+        findings: vec![finding("a.rs", 3, BLOCKING, "b")],
+    };
+
+    let json = serde_json::to_string(&outcome).unwrap();
+
+    assert_eq!(parse_outcome(&json).unwrap(), outcome);
 }
 
 #[test]

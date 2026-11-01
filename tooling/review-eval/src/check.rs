@@ -133,6 +133,59 @@ pub fn examine(
     examine_from(root, tree, cases_dir, None, selection)
 }
 
+/// The problem with `case` when its component, a generalist, has lines
+/// with a severity and no form, and the case names a form, or a stated
+/// or withdrawn finding, which only a specialist's run log holds: it
+/// would want or forbid what no answer can hold. A consultant may write
+/// a specialist's forms, as a persona does, so its case may name one.
+fn form_problem(case: &Case, component: &Component) -> Option<String> {
+    if !matches!(component.kind, Kind::Generalist) {
+        return None;
+    }
+    let expect = &case.expect;
+    if !expect.stated.is_empty() || !expect.withdrawn.is_empty() {
+        return Some(format!(
+            "case {} expects a stated or withdrawn finding of a {}, whose run log holds none",
+            case.id(),
+            component.kind.word()
+        ));
+    }
+    let form = [&expect.finding, &expect.none, &expect.dropped]
+        .into_iter()
+        .flatten()
+        .find_map(|e| e.form.as_deref())?;
+
+    Some(format!(
+        "case {} expects a {form} line of a {}, which writes none",
+        case.id(),
+        component.kind.word()
+    ))
+}
+
+/// The problem with `case` when a finding it expects names a severity
+/// other than `blocking` or `nit`, word for word: the grader compares a
+/// specialist's case with `blocking` exactly, so `Blocking` would grade
+/// more loosely than its author meant (ENG-32).
+fn severity_problem(case: &Case) -> Option<String> {
+    let expect = &case.expect;
+    let severity = [
+        &expect.finding,
+        &expect.none,
+        &expect.dropped,
+        &expect.stated,
+        &expect.withdrawn,
+    ]
+    .into_iter()
+    .flatten()
+    .filter_map(|e| e.severity.as_deref())
+    .find(|s| ![crate::case::BLOCKING, "nit"].contains(s))?;
+
+    Some(format!(
+        "case {} names the severity {severity:?}; a case names blocking or nit",
+        case.id()
+    ))
+}
+
 /// [`examine`], with the cases read as [`all_cases_from`] reads them.
 ///
 /// # Errors
@@ -183,16 +236,20 @@ pub fn examine_from(
                 component.kind.word()
             ));
         }
+        if let Some(problem) = form_problem(case, component) {
+            problems.cases.push(problem);
+        }
+        if let Some(problem) = severity_problem(case) {
+            problems.cases.push(problem);
+        }
         match dispatches(root, &base, case, component) {
             Ok(None) => {}
             Ok(Some(dispatched)) => problems.cases.push(format!(
                 "case {id} does not dispatch {}; the bundle dispatches {}",
                 component.name,
-                if dispatched.is_empty() {
-                    "no agent".to_owned()
-                } else {
-                    dispatched.into_iter().collect::<Vec<_>>().join(", ")
-                }
+                // Never empty: the analysis hands a change no rule routes,
+                // a LICENSE-only one among them, to review-code.
+                dispatched.into_iter().collect::<Vec<_>>().join(", ")
             )),
             Err(e) => problems.cases.push(e),
         }
@@ -239,9 +296,8 @@ fn catalog(
 }
 
 /// Whether the review bundle dispatches `component` for `case`: none
-/// when it does, or when the bundle never dispatches the component,
-/// the orchestrator and a consultant; else the agents it dispatches
-/// instead.
+/// when it does, or when the bundle never dispatches the component, a
+/// consultant; else the agents it dispatches instead.
 ///
 /// # Errors
 ///
@@ -254,11 +310,12 @@ pub fn dispatches(
     component: &Component,
 ) -> Result<Option<BTreeSet<String>>, String> {
     let changes = case.changes(&|file| fs::read_to_string(root.join(file)).ok())?;
-    if matches!(component.kind, Kind::Orchestrator | Kind::Consultant) {
+    if component.kind == Kind::Consultant {
         return Ok(None);
     }
     let head = head_snapshot(base, &changes).map_err(|e| format!("case {}: {e}", case.id()))?;
-    let analysis = analyse(base, &head, &diff::all(&changes), case.consent.is_some());
+    let consents: Vec<String> = case.consent.iter().cloned().collect();
+    let analysis = analyse(base, &head, &diff::all(&changes), &consents);
     let dispatched = agents(&analysis.dispatch);
     let family: Vec<&str> = match component.kind {
         Kind::Generalist => GENERALISTS
@@ -266,7 +323,7 @@ pub fn dispatches(
             .zip(DEEP_GENERALISTS)
             .find(|(normal, deep)| **normal == component.name || *deep == component.name)
             .map_or_else(|| vec![component.name.as_str()], |(n, d)| vec![*n, d]),
-        Kind::Specialist | Kind::Orchestrator | Kind::Consultant => vec![component.name.as_str()],
+        Kind::Specialist | Kind::Consultant => vec![component.name.as_str()],
     };
     if family.iter().any(|name| dispatched.contains(*name)) {
         Ok(None)

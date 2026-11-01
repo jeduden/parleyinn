@@ -28,9 +28,9 @@ old = "pub mod account;\n"
 new = "pub mod account;\npub mod report;\n"
 
 [expect]
-outcome = ["blocking"]
+outcome = ["findings"]
 
 [[expect.finding]]
 path = "crates/redaction/src/report.rs"
-severity = "blocking"
+form = "linked"
 mentions_any = ["socket", "network", "I4", "TcpStream", "boundary", "connect", "off the machine"]

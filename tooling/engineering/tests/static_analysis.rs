@@ -24,6 +24,18 @@ fn the_ci_workflow_gates_on_the_static_checks() {
     assert!(problems.is_empty(), "{}", problems.join("\n"));
 }
 
+/// The test job's shards, each chosen by its place in the matrix, run
+/// every workspace crate's tests but the scenario crate's exactly
+/// once, so the custom checks and the decoy `HOME` cover them all.
+#[test]
+fn the_ci_test_shards_run_every_crate_once() {
+    let c = checkout();
+
+    let problems = engineering::test_shards::shards_cover_the_workspace(&c, &ci(&c));
+
+    assert!(problems.is_empty(), "{}", problems.join("\n"));
+}
+
 /// Every workspace crate keeps the workspace's unsafe ban, or its own.
 #[test]
 fn every_crate_forbids_unsafe_code() {

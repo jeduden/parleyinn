@@ -6,20 +6,22 @@
 //! two-of-three rule without a model.
 
 use std::collections::{BTreeMap, BTreeSet};
+use std::fs;
+use std::path::Path;
 
 use review_eval::case::{Case, Expect, Expected};
 use review_eval::component::{Component, Kind};
-use review_eval::grade::{Run, grade};
+use review_eval::grade::grade;
 use review_eval::log::RunLog;
+use review_eval::plan::{self, Planned};
 use review_eval::published::{self, Line};
 use review_eval::score::{CaseRecord, GateFinding, RunRecord, Scorecard, SuiteRecord, decided};
 use review_eval::{CASES, check};
 
-use crate::Checkout;
+use crate::{Checkout, list};
 
-/// The component's name and report the decision table grades.
+/// The component's name the decision table grades.
 const COMPONENT: &str = "lang-rust";
-const REPORT: &str = "review/reports/lang-rust.md";
 /// The paths the table's case expects a finding at, and forbids one at.
 const WANTED: &str = "crates/x/src/a.rs";
 const FORBIDDEN: &str = "crates/x/src/b.rs";
@@ -68,8 +70,13 @@ fn table_component() -> Component {
 }
 
 /// The decision table's case: a defect that wants an unwrap finding at
-/// one path and forbids a finding at another.
+/// one path, stated before the answer, and forbids a finding at another.
 fn table_case() -> Case {
+    let unwrap = Expected {
+        path: WANTED.to_owned(),
+        mentions: vec!["unwrap".to_owned()],
+        ..Expected::default()
+    };
     Case {
         component: COMPONENT.to_owned(),
         name: "table".to_owned(),
@@ -79,16 +86,13 @@ fn table_case() -> Case {
         edits: Vec::new(),
         seeds: Vec::new(),
         expect: Expect {
-            outcome: vec!["blocking".to_owned()],
-            finding: vec![Expected {
-                path: WANTED.to_owned(),
-                mentions: vec!["unwrap".to_owned()],
-                ..Expected::default()
-            }],
+            outcome: vec!["findings".to_owned()],
+            finding: vec![unwrap.clone()],
             none: vec![Expected {
                 path: FORBIDDEN.to_owned(),
                 ..Expected::default()
             }],
+            stated: vec![unwrap],
             ..Expect::default()
         },
         repetitions: 3,
@@ -98,29 +102,44 @@ fn table_case() -> Case {
 
 /// What the grader says of the run `row` describes: `passes`, `passes,
 /// slips on` what it slips on first, or `fails on` what it fails on
-/// first.
+/// first. The row's `finding` and `forbidden` say which lines the
+/// specialist stated in its text, `stated` whether it stated them before
+/// its answer or only in it, `answer` whether its answer is the outcome
+/// line, `more` than it or `no outcome` line, `outcome` whether that
+/// line gives the outcome the case expects, and `answered` whether the
+/// run ended with a successful result.
 fn run_outcome(row: &BTreeMap<String, String>) -> String {
     let column = |key: &str| row.get(key).map_or("", String::as_str);
     let (component, case) = (table_component(), table_case());
     let outcome_line = if column("outcome") == "as expected" {
-        "outcome: blocking — it unwraps."
+        "outcome: findings — it unwraps."
     } else {
-        "outcome: sound — it is fine."
+        "outcome: none — it is fine."
     };
-    let mut report = String::new();
+    let mut lines = Vec::new();
     if column("finding") == "found" {
-        report.push_str(&format!(
-            "{WANTED}:6 — blocking — an unwrap outside tests — ENG-16\n"
+        lines.push(format!(
+            "{WANTED}:6 — if not addressed: an unwrap outside tests panics — ENG-16"
         ));
     }
     if column("forbidden") == "found" {
-        report.push_str(&format!("{FORBIDDEN}:2 — nit — a long line — ENG-16\n"));
+        lines.push(format!(
+            "{FORBIDDEN}:2 — request: add a rule on line length — a long line"
+        ));
     }
-    report.push_str(&format!("\n{outcome_line}\n"));
-    let answer = if column("answer") == "more" {
-        format!("I read the diff.\n{outcome_line}\n{REPORT}\n")
+    let ending = match column("answer") {
+        "more" => format!("I read the diff.\n{outcome_line}\n"),
+        "no outcome" => "I read the diff and I am done.\n".to_owned(),
+        _ => format!("{outcome_line}\n"),
+    };
+    // The harness logs the answer as the last text block too.
+    let (texts, answer) = if column("stated") == "only in answer" {
+        let whole = format!("{}\n{ending}", lines.join("\n"));
+        (vec![whole.clone()], whole)
     } else {
-        format!("{outcome_line}\n{REPORT}\n")
+        let mut texts = lines;
+        texts.push(ending.clone());
+        (texts, ending)
     };
     let log = RunLog {
         answered: column("answered") == "yes",
@@ -130,19 +149,10 @@ fn run_outcome(row: &BTreeMap<String, String>) -> String {
             "error_max_turns".to_owned()
         },
         answer,
-        writes: vec![REPORT.to_owned()],
+        texts,
         ..RunLog::default()
     };
-    let dispatched = BTreeSet::new();
-    let graded = grade(
-        &component,
-        &case,
-        &Run {
-            log: &log,
-            report: (column("report") == "written").then_some(report.as_str()),
-            dispatched: &dispatched,
-        },
-    );
+    let graded = grade(&component, &case, &log);
     match (graded.failures.first(), graded.slips.first()) {
         (Some(f), _) => format!("fails on {}", failed_on(f)),
         (None, Some(s)) => format!("passes, slips on {}", failed_on(s)),
@@ -312,10 +322,7 @@ fn table_suite() -> SuiteRecord {
                 vec![
                     run(
                         true,
-                        vec![
-                            "a line that is neither a finding nor the outcome: Findings:"
-                                .to_owned(),
-                        ],
+                        vec!["answer holds more than the outcome line: Findings:".to_owned()],
                     ),
                     run(true, Vec::new()),
                 ],
@@ -328,10 +335,7 @@ fn table_suite() -> SuiteRecord {
 fn failed_on(failure: &str) -> &'static str {
     if failure.starts_with("did not answer") {
         "no answer"
-    } else if failure.starts_with("wrote no report")
-        || failure.starts_with("wrote an empty report")
-        || failure.starts_with("report does not end")
-    {
+    } else if failure.starts_with("report refused") {
         "report"
     } else if failure.starts_with("outcome ") {
         "outcome"
@@ -339,7 +343,9 @@ fn failed_on(failure: &str) -> &'static str {
         "finding"
     } else if failure.starts_with("a finding at") {
         "forbidden"
-    } else if failure.starts_with("answer ") {
+    } else if failure.starts_with("did not state") {
+        "stating"
+    } else if failure.starts_with("answer") {
         "answer"
     } else {
         "something else"
@@ -383,6 +389,159 @@ fn decide(runs: &str) -> (&'static str, usize) {
     }
 
     ("fails", runs.split(',').count())
+}
+
+/// The line a pull request adds to a shared section's text, as every
+/// component that includes it holds it expanded.
+const SHARED_EDIT: &str = "A line the pull request adds to the shared section.";
+
+/// The trees the evaluation's plan reads: the components, the sections
+/// and files that name them, and their cases.
+const PLANNED_TREES: [&str; 4] = [".claude/agents", "docs/srs", "docs/domain-model", CASES];
+
+/// Requires the evaluation's plan, for a pull request that changes only
+/// the shared `section` (ENG-32), to run one component per distinct set
+/// of sections among those that include it, standing for the rest of
+/// its set: it copies the checkout's components into `head`, adds a
+/// line to the section's text in each that includes it, and plans
+/// `head` against the checkout.
+///
+/// # Errors
+///
+/// Fails when the trees cannot be copied or planned, or no component
+/// includes `section`.
+pub fn shared_section_plans_one_per_set(
+    checkout: &Checkout,
+    section: &str,
+    head: &Path,
+) -> Result<Vec<String>, String> {
+    for tree in PLANNED_TREES {
+        copy_dir(&checkout.root.join(tree), &head.join(tree))?;
+    }
+    let agents = head.join(".claude/agents");
+    let mut sets: BTreeMap<Vec<String>, Vec<String>> = BTreeMap::new();
+    for entry in fs::read_dir(&agents).map_err(|e| format!("read {}: {e}", agents.display()))? {
+        let path = entry
+            .map_err(|e| format!("read {}: {e}", agents.display()))?
+            .path();
+        let Some(name) = path
+            .file_name()
+            .and_then(|f| f.to_str())
+            .and_then(|f| f.strip_suffix(".md"))
+        else {
+            continue;
+        };
+        let text =
+            fs::read_to_string(&path).map_err(|e| format!("read {}: {e}", path.display()))?;
+        if let Some((edited, sections)) = edit_section(&text, section) {
+            fs::write(&path, edited).map_err(|e| format!("write {}: {e}", path.display()))?;
+            sets.entry(sections).or_default().push(name.to_owned());
+        }
+    }
+    if sets.is_empty() {
+        return Err(format!("no reviewer component includes {section}"));
+    }
+
+    Ok(plan_problems(&sets, &plan::between(&checkout.root, head)?))
+}
+
+/// `text` with [`SHARED_EDIT`] added to the expanded text of its
+/// include of `section`, and every section it includes, sorted; `None`
+/// when it does not include `section`.
+fn edit_section(text: &str, section: &str) -> Option<(String, Vec<String>)> {
+    let (mut out, mut sections) = (String::new(), BTreeSet::new());
+    let (mut header, mut hit, mut edited) = (false, false, false);
+    for line in text.split_inclusive('\n') {
+        let trimmed = line.trim();
+        out.push_str(line);
+        if trimmed.starts_with("<?include") {
+            header = true;
+        } else if header && trimmed == "?>" {
+            header = false;
+            if hit {
+                out.push_str(&format!("{SHARED_EDIT}\n"));
+                (hit, edited) = (false, true);
+            }
+        } else if let Some(file) = header.then(|| trimmed.strip_prefix("file:")).flatten() {
+            let file = file.trim();
+            hit = file == section || file.ends_with(&format!("/{section}"));
+            sections.insert(file.to_owned());
+        }
+    }
+
+    edited.then(|| (out, sections.into_iter().collect()))
+}
+
+/// What is wrong with `planned` for a change to one shared section that
+/// the components of each set in `sets` include: each planned component
+/// must be planned for that change alone and include it, and each set
+/// must have exactly one planned, which covers the rest of its set.
+fn plan_problems(sets: &BTreeMap<Vec<String>, Vec<String>>, planned: &[Planned]) -> Vec<String> {
+    let mut problems = Vec::new();
+    for p in planned {
+        if !p.reason.starts_with("shared sections changed") {
+            problems.push(format!(
+                "component {} planned for {}, want the shared section's change alone",
+                p.component, p.reason
+            ));
+        }
+        if !sets.values().any(|names| names.contains(&p.component)) {
+            problems.push(format!(
+                "component {} planned, but it includes no changed section",
+                p.component
+            ));
+        }
+    }
+    for (sections, names) in sets {
+        let members: Vec<&Planned> = planned
+            .iter()
+            .filter(|p| names.contains(&p.component))
+            .collect();
+        let [one] = members.as_slice() else {
+            problems.push(format!(
+                "{} components planned for the sections {}, want one",
+                members.len(),
+                list(sections)
+            ));
+            continue;
+        };
+        let mut covered: Vec<String> = one
+            .reason
+            .split_once("; also covers ")
+            .map(|(_, rest)| rest.split(", ").map(str::to_owned).collect())
+            .unwrap_or_default();
+        covered.push(one.component.clone());
+        covered.sort();
+        let mut want = names.clone();
+        want.sort();
+        if covered != want {
+            problems.push(format!(
+                "component {} covers {}, want {}",
+                one.component,
+                list(&covered),
+                list(&want)
+            ));
+        }
+    }
+
+    problems
+}
+
+/// Copies the tree at `from` to `to`, directories included.
+fn copy_dir(from: &Path, to: &Path) -> Result<(), String> {
+    let read = |e: std::io::Error| format!("read {}: {e}", from.display());
+    fs::create_dir_all(to).map_err(|e| format!("write {}: {e}", to.display()))?;
+    for entry in fs::read_dir(from).map_err(read)? {
+        let path = entry.map_err(read)?.path();
+        let target = to.join(path.file_name().unwrap_or_default());
+        if path.is_dir() {
+            copy_dir(&path, &target)?;
+        } else {
+            fs::copy(&path, &target).map_err(|e| format!("copy {}: {e}", path.display()))?;
+        }
+    }
+
+    Ok(())
 }
 
 #[cfg(test)]

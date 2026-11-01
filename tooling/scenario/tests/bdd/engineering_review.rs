@@ -1,6 +1,6 @@
-//! The ENG-28 steps: the review workflow keeps the reviewing agent away
-//! from the reviewer app's key, and the review gate decides as the
-//! requirement says.
+//! The ENG-28 steps: the review workflow runs the review's agents by
+//! code, keeps them away from the reviewer app's key, and the review gate
+//! decides as the requirement says.
 
 use cucumber::gherkin::Step;
 use cucumber::{then, when};
@@ -24,17 +24,78 @@ fn runs_after(w: &mut World, name: String) -> Result<(), String> {
 }
 
 #[then(
-    regex = r#"^the job that runs the reviewing agent holds no write permission and not the "([^"]+)" key$"#
+    regex = r#"^the job that runs the review's agents holds no write permission and not the "([^"]+)" key$"#
 )]
 fn agents_unprivileged(w: &mut World, key: String) -> Result<(), String> {
     let e = eng(w);
     e.key = key;
-    outcome(e.flow.agents_unprivileged(&e.key))
+    // The run logs hold every tool result, the token in the agents'
+    // environment among what an agent can read: they never leave the job.
+    let mut problems = e.flow.agents_unprivileged(&e.key);
+    problems.extend(e.flow.run_logs_stay(review_workflow::RUN_LOGS));
+    outcome(problems)
 }
 
-#[then(regex = r#"^its agents may write only their reports, under "([^"]+)"$"#)]
-fn agents_write_only(w: &mut World, dir: String) -> Result<(), String> {
-    outcome(eng(w).flow.agents_write_only(&dir))
+#[then(
+    regex = r#"^that job runs every agent the review bundle dispatches with "([^"]+)", and no agent routes the review$"#
+)]
+fn agents_run_by(w: &mut World, cmd: String) -> Result<(), String> {
+    outcome(eng(w).flow.agents_run_by(&cmd))
+}
+
+#[then(
+    regex = r"^review-run runs each specialist the review bundle dispatches as its own agent, assembles its report from its run log, runs every generalist only once every specialist has ended, and writes the review outcome from what they answered$"
+)]
+fn review_runs_by_code(w: &mut World) -> Result<(), String> {
+    let work = testkit::TempDir::new().map_err(|e| format!("make a work directory: {e}"))?;
+    outcome(engineering::review_runs::review_runs_by_code(
+        eng(w).checkout()?,
+        work.path(),
+    ))
+}
+
+#[then(
+    regex = r"^review-run runs a specialist whose diff is past its split limit in parts, each on whole files of its diff, merges their reports into its one report, and fails the review naming a part that did not answer$"
+)]
+fn review_runs_in_parts(w: &mut World) -> Result<(), String> {
+    let work = testkit::TempDir::new().map_err(|e| format!("make a work directory: {e}"))?;
+    outcome(engineering::review_parts::review_runs_in_parts(
+        eng(w).checkout()?,
+        work.path(),
+    ))
+}
+
+#[then(
+    regex = r"^review-run refuses a specialist's report that cites an id no requirement or invariant has, runs that specialist once more told why, and names the report refused again and a generalist's finding line it cannot read, each in a blocking finding, so the review requests changes and the gate posts that request rather than failing$"
+)]
+fn review_run_names_refusals(w: &mut World) -> Result<(), String> {
+    let work = testkit::TempDir::new().map_err(|e| format!("make a work directory: {e}"))?;
+    outcome(
+        engineering::review_refusals::review_run_names_what_it_refuses(
+            eng(w).checkout()?,
+            work.path(),
+        ),
+    )
+}
+
+#[then(
+    regex = r"^review-run writes each dispatched agent left without an accepted report beside the review outcome and names it not reviewed, and a review resumed from that list runs again that agent, each agent whose head, inputs, definition or diff changed and each generalist whose specialist runs again, keeps nothing across a changed head, definition or diff, and approves as a full run would$"
+)]
+fn review_run_resumes(w: &mut World) -> Result<(), String> {
+    let work = testkit::TempDir::new().map_err(|e| format!("make a work directory: {e}"))?;
+    outcome(engineering::review_resume::review_resumes(
+        eng(w).checkout()?,
+        work.path(),
+    ))
+}
+
+#[then(regex = r"^its agents can write nothing: review-run allows them Read, Glob and Grep alone$")]
+fn agents_write_nothing(w: &mut World) -> Result<(), String> {
+    outcome(
+        eng(w)
+            .flow
+            .agents_write_nothing(&review_workflow::RUN_TOOLS),
+    )
 }
 
 #[then(regex = r#"^only one job holds the "([^"]+)" key, and it runs no agent$"#)]
@@ -44,7 +105,7 @@ fn key_held_apart(w: &mut World, key: String) -> Result<(), String> {
     e.flow.key_held_apart(&e.key)
 }
 
-#[then(regex = r"^that job runs only after the agent's job succeeded$")]
+#[then(regex = r"^that job runs only after the agents' job succeeded$")]
 fn key_job_after_agents(w: &mut World) -> Result<(), String> {
     let e = eng(w);
     outcome(e.flow.key_job_after_agents(e.key()?)?)

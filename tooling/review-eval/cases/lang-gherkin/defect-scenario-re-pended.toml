@@ -8,9 +8,9 @@ old = "  @ENG-24 @P0\n"
 new = "  @ENG-24 @P0 @pending\n"
 
 [expect]
-outcome = ["blocking"]
+outcome = ["findings"]
 
 [[expect.finding]]
 path = "features/engineering.feature"
-severity = "blocking"
+form = "linked"
 mentions_any = ["pending", "ENG-24"]

@@ -39,8 +39,8 @@ old = "pub mod render;\n"
 new = "pub mod render;\npub mod shape;\n"
 
 [expect]
-outcome = ["sound", "nits"]
+outcome = ["none", "findings"]
 
 [[expect.none]]
 path = "tooling/review-bundle/src/shape.rs"
-severity = "blocking"
+form = "linked"

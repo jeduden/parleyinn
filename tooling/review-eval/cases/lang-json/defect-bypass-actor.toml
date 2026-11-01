@@ -8,9 +8,9 @@ old = "\"bypass_actors\": [],"
 new = "\"bypass_actors\": [{ \"actor_id\": 5, \"actor_type\": \"RepositoryRole\", \"bypass_mode\": \"always\" }],"
 
 [expect]
-outcome = ["blocking"]
+outcome = ["findings"]
 
 [[expect.finding]]
 path = ".github/rulesets/main.json"
-severity = "blocking"
+form = "linked"
 mentions_any = ["bypass"]

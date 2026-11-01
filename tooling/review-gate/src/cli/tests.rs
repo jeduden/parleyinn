@@ -17,10 +17,10 @@ fn inputs() -> BTreeMap<String, String> {
         ("checked.json", "[]"),
         ("dispatch.json", r#"{"review-code":["lang-rust"]}"#),
         ("consulted.json", r#"["lang-rust","review-code"]"#),
-        ("reports/lang-rust.md", "Outcome: sound.\n"),
+        ("reports/lang-rust.md", "Outcome: none.\n"),
         (
             "answers.json",
-            r#"{"lang-rust":"Outcome: sound.","review-code":"r"}"#,
+            r#"{"lang-rust":"Outcome: none.","review-code":"r"}"#,
         ),
     ]
     .into_iter()
@@ -265,21 +265,24 @@ fn run_fails_closed_on_a_missing_or_malformed_dispatch_or_a_skipped_agent() {
             "a dispatched agent left out",
             args(HEAD),
             with("consulted.json", r#"["review-code"]"#),
-            "the orchestrator did not consult lang-rust",
+            "dispatched but not consulted: lang-rust",
             EXIT_FAILURE,
         ),
         (
             "a specialist with no report",
             args(HEAD),
             without("reports/lang-rust.md"),
-            "lang-rust wrote no report",
+            "lang-rust has no report",
             EXIT_FAILURE,
         ),
         (
             "a report another agent wrote",
             args(HEAD),
-            with("reports/lang-rust.md", "Outcome: blocking.\n"),
-            "lang-rust has a report whose outcome differs from its answer in the run log",
+            with(
+                "reports/lang-rust.md",
+                "a.rs:1 — if not addressed: x — I2\nOutcome: findings.\n",
+            ),
+            "lang-rust answered another outcome in the run log than its report ends with",
             EXIT_FAILURE,
         ),
         (

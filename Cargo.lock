@@ -497,6 +497,7 @@ dependencies = [
  "review-bundle",
  "review-eval",
  "review-gate",
+ "review-run",
  "scenario",
  "serde_json",
  "srs",
@@ -1261,6 +1262,7 @@ version = "0.0.0"
 dependencies = [
  "adr",
  "review-bundle",
+ "review-gate",
  "serde",
  "serde_json",
  "sha2",
@@ -1274,6 +1276,20 @@ version = "0.0.0"
 dependencies = [
  "serde",
  "serde_json",
+ "testkit",
+]
+
+[[package]]
+name = "review-run"
+version = "0.0.0"
+dependencies = [
+ "review-bundle",
+ "review-eval",
+ "review-gate",
+ "serde",
+ "serde_json",
+ "sha2",
+ "srs",
  "testkit",
 ]
 

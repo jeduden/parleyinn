@@ -41,15 +41,15 @@ new = "pub mod render;\npub mod shape;\n"
 [[report]]
 agent = "lang-rust"
 content = '''
-tooling/review-bundle/src/shape.rs:6 — blocking — `unwrap` outside tests — ENG-16
+tooling/review-bundle/src/shape.rs:6 — if not addressed: an `unwrap` outside tests panics the tool at run time — ENG-16
 
-outcome: blocking — a helper that unwraps
+outcome: findings — a helper that unwraps
 '''
 
 [[report]]
 agent = "test-engineer-unit"
 content = '''
-outcome: sound — a module with its unit tests
+outcome: none — a module with its unit tests
 '''
 
 [expect]

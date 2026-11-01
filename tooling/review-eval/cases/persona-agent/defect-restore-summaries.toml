@@ -54,5 +54,5 @@ the rows it changes and the `@pending` scenarios it takes off.
 
 [[expect.finding]]
 path = "plan/2610301001_restore_summaries.md"
-severity = "blocking"
+form = "linked"
 mentions_any = ["summar", "verbatim", "word for word", "I3", "too much"]
