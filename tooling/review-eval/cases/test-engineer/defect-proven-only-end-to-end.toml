@@ -1,0 +1,41 @@
+component = "test-engineer"
+kind = "defect"
+title = "a function proven only by an integration test"
+
+[[create]]
+file = "tooling/review-bundle/src/rogue.rs"
+content = '''
+//! The first header of a diff.
+
+/// The path the first `diff --git` header of `diff` names, without
+/// its `a/` prefix.
+#[must_use]
+pub fn first_header(diff: &str) -> Option<&str> {
+    diff.lines()
+        .find_map(|l| l.strip_prefix("diff --git a/"))
+        .and_then(|rest| rest.split(' ').next())
+}
+'''
+
+[[create]]
+file = "tooling/review-bundle/tests/rogue.rs"
+content = '''
+use review_bundle::rogue::first_header;
+
+#[test]
+fn names_the_first_header_s_path() {
+    assert_eq!(first_header("diff --git a/x.rs b/x.rs\n+1\n"), Some("x.rs"));
+}
+'''
+
+[[replace]]
+file = "tooling/review-bundle/src/lib.rs"
+old = "pub mod render;\n"
+new = "pub mod render;\npub mod rogue;\n"
+
+[expect]
+
+[[expect.finding]]
+path = "tooling/review-bundle/src/rogue.rs"
+severity = "blocking"
+mentions_any = ["unit test", "unit", "tests.rs", "lowest", "test layer"]

@@ -18,15 +18,17 @@ pub const CHECKOUT_STEP: &str = "the repository checkout";
 /// domain-model finding stays in the text, and the core executable's
 /// dependency reach (SEC-01); the three isolation gates of ENG-14: the
 /// scan for a read of real state around the guard, the decoy `HOME` CI runs
-/// the suite with, and the scan of the agent instruction files; and the
+/// the suite with, and the scan of the agent instruction files; the
+/// gate that holds the test job's shards to every crate once; and the
 /// gates that prove what a pending scenario cannot yet: the core rows
 /// of ENG-12 and ENG-16, ENG-15's benchmark gate, and ENG-21's ruleset
 /// and CODEOWNERS; and the gates behind ENG-03, ENG-20's three
 /// workflow gates, the gate that
 /// holds every crate to the complexity limits, and the gate that holds
-/// CI to the TOML checks; and the gates behind SEC-01's core row,
+/// CI to the TOML checks; the two gates of ENG-32 over the reviewer
+/// evaluation cases; and the gates behind SEC-01's core row,
 /// SEC-15, SEC-17, SEC-19 and ENG-22.
-pub const GATE_TESTS: [&str; 42] = [
+pub const GATE_TESTS: [&str; 46] = [
     "specification_parses",
     "decision_records_parse",
     "specification_and_features_agree",
@@ -38,6 +40,7 @@ pub const GATE_TESTS: [&str; 42] = [
     "only_the_isolation_guard_reads_the_home",
     "the_ci_test_job_runs_with_a_decoy_home",
     "the_agent_instructions_direct_no_destructive_command_at_real_state",
+    "the_ci_test_shards_run_every_crate_once",
     "the_core_s_tests_start_it_confined",
     "the_ci_workflow_gates_on_the_static_checks",
     "every_crate_forbids_unsafe_code",
@@ -54,7 +57,10 @@ pub const GATE_TESTS: [&str; 42] = [
     "the_checkout_s_ruleset_needs_an_approval_from_another_reviewer",
     "the_checkout_s_codeowners_name_the_stakeholder_on_the_enforcing_paths",
     "the_checkout_s_codeowners_name_no_owner_on_any_other_path",
-    "the_checkout_s_security_crates_belong_to_the_security_reviewer",
+    "the_checkout_s_codeowners_name_no_owner_on_rust_source",
+    "the_checkout_s_review_agents_are_all_defined",
+    "the_checkout_s_reviewer_components_each_have_their_cases",
+    "the_checkout_s_reviewer_evaluation_cases_apply_and_dispatch",
     "the_checkout_s_nightly_compares_every_committed_ruleset",
     "the_checkout_s_rulesets_each_name_themselves_their_target_and_refs",
     "the_product_crates_keep_their_bans",

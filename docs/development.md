@@ -63,7 +63,7 @@ own code cannot add code that runs as the process starts either. The
 
 The gate tests in the `engineering` crate's `static_analysis` target
 hold this in place. CI gates on clippy, rustfmt, cargo-deny,
-cargo-audit and `cargo test --workspace`. Each runs in a job the `CI`
+cargo-audit and `cargo test` of every crate. Each runs in a job the `CI`
 job needs, and none may fail. Every workspace crate inherits the
 workspace's lints (`[lints] workspace = true`), or forbids unsafe code
 in its own crate roots. The core's bans and reach test are in place.
@@ -119,9 +119,8 @@ log sink and clock.
 
 ## CI, nightly and release
 
-Every workflow lives in `.github/workflows`. Every action is fixed
-to a commit SHA with its version in a trailing comment. Dependabot
-proposes bumps under the policy in
+Every action is pinned by commit SHA with a version comment, and a script reads
+event fields via `env:` (ENG-33). Dependabot bumps them per
 [dependabot.yml](../.github/dependabot.yml).
 
 [ci.yml](../.github/workflows/ci.yml) runs on every push and pull request to
@@ -131,9 +130,9 @@ decoy that must stay empty (ENG-14), the core's end-to-end tests confined
 the benchmark gate, and the release build of every target (NFR-10, CON-02).
 It also runs `mdsmith check .`, [taplo](../.taplo.toml), and zizmor over the
 workflows and local actions. Every job has five minutes: the release
-core is built once and handed to the jobs that run it, the scenarios and
-the end-to-end coverage layer each run as four shards, each other coverage
-layer and each benchmark shard in jobs of their own,
+core is built once and handed to the jobs that run it, the tests run as
+three shards, the scenarios as four, the end-to-end coverage scenarios as six,
+each other coverage part and benchmark shard in jobs of their own,
 and `build.yml` builds one target per job ([ci.md](ci.md)). A final job
 named `CI` passes only when every other job passed, and names each job
 that did not. It is the one check the branch and release-tag rulesets
@@ -164,51 +163,48 @@ binary then runs once on its own platform and must report what it
 was stamped with. Each target is built once: the release build is not
 checked for reproducibility.
 
-[review.yml](../.github/workflows/review.yml) reviews each pull
-request from a branch of this repository once its CI passes (ENG-21,
-ENG-28). It skips drafts, so a pull request is reviewed when it is
-marked ready, which reruns CI. The agent runs on the stakeholder's
-Claude subscription, not an API key billed per model token. It triggers on
-`workflow_run`, so GitHub runs it as `main` defines it, never as the
-pull request does. It also triggers on `issue_comment`, which GitHub
-runs as `main` defines it too: a code owner's comment on a pull
-request whose CI passed reviews it again. Consent to a stakeholder
-path is such a comment, so the review that reads it follows at once.
-The review job first runs main's `review-bundle`
-over main's tree and the pull request's: it writes the review bundle
-the agent reads, sets the review's class and makes the deterministic
-findings
-(see Review below). The agent then runs with read-only tools on the
-pull request's tree, following
-[the review skill](../.claude/skills/review/SKILL.md). The agent only
-writes a review outcome. The post job alone has the reviewer app's
-key. It runs the `review-gate` crate's executable, which approves only an
-approving review outcome with no blocking finding, its own or a
-deterministic one, on the reviewed head, with `CI` green there;
-otherwise it requests changes.
-[ADR-2609301941](adr/ADR-2609301941-agent-review.md) records why.
+[review.yml](../.github/workflows/review.yml) reviews each pull request from a
+branch of this repository once its CI passes (ENG-21, ENG-28). It skips drafts:
+marking a pull request ready reruns CI and so reviews it. The agents run on the
+stakeholder's Claude subscription, not a per-token API key. It triggers on
+`workflow_run` and `issue_comment`, so GitHub runs it as `main` defines it,
+never as the pull request does; a code owner's comment on a pull request whose
+CI passed reviews it again. Consent to a stakeholder path is such a comment, so
+its review follows at once. The review job runs main's `review-bundle` over
+main's tree and the pull request's: it writes the review bundle the agents read,
+sets the review's class, dispatches the agents and makes the deterministic
+findings (see Review). `review-run` then runs each agent, read-only, on the pull
+request's tree and writes the review outcome from their answers. The post job
+alone has the reviewer app's key. It runs the `review-gate` crate's executable,
+which approves only an approving review outcome with no blocking finding, its
+own or a deterministic one, on the reviewed head, with `CI` green there;
+otherwise it requests changes. It posts the same decision as the `review-gate`
+check. [ADR-2609301941](adr/ADR-2609301941-agent-review.md) records why,
+[ADR-2610262245](adr/ADR-2610262245-layered-agent-review.md) the layers, and
+[ADR-2610300031](adr/ADR-2610300031-review-run-by-code.md) that code runs them;
+[review-evaluation.md](review-evaluation.md) is the `evaluate` job between the
+two (ENG-32).
 
 Main's protection is committed as a ruleset,
 [main.json](../.github/rulesets/main.json), in GitHub's export format
 (ENG-21). It allows no direct push and no bypass, and requires signed
-commits, `CI`, one approval from a reviewer other than the author, and
-a code owner's approval where [CODEOWNERS](../.github/CODEOWNERS) names
-one. The ENG-21 gate tests read it, and CODEOWNERS: the stakeholder
-owns the requirement text and every path that enforces it, and nothing
-else is owned but the decision records, the supply-chain policy and the
-security-sensitive crates. Two tag rulesets sit beside it.
-`releases-semver` keeps each `v*.*.*` tag fixed on a signed commit that
-passed `CI`. `no-other-tags-allowed` refuses every other tag. The
-stakeholder applies the rulesets on GitHub. The nightly `protection`
-job runs `protection-check` on each file under `.github/rulesets`. It
-fails when the live ruleset of that name is missing or weaker. The
-workflow's token cannot see a ruleset's bypass actors. The
-security-sensitive crates are owned by the designated security
-reviewer, so a change to one needs that reviewer's approval as a code
-owner. The stakeholder holds the role. One approval count holds for the
-whole branch, so a second approval on those crates alone would need a
-second reviewer account and a check that counts reviews; ENG-21 does
-not ask for it until one is named.
+commits, `CI`, the reviewer app's `review-gate` check (pinned to its app
+id), one approval from a reviewer other than the author, and a code owner's
+approval where [CODEOWNERS](../.github/CODEOWNERS) names one. The ENG-21
+gate tests read it, and CODEOWNERS: it names the stakeholder as code owner
+of the specification, the decision records, the scenarios and every path of
+the process that builds and checks the code, a code owner on nothing else
+but the supply-chain policy, and no code owner on Rust source. Two tag
+rulesets sit beside it. `releases-semver` keeps each `v*.*.*` tag fixed on a
+signed commit that passed `CI`. `no-other-tags-allowed` refuses every other
+tag. The stakeholder applies the rulesets on GitHub. The nightly
+`protection` job runs `protection-check` on each file under
+`.github/rulesets`. It fails when the live ruleset of that name is missing
+or weaker. The workflow's token cannot see a ruleset's bypass actors. A code
+change, the gates and the security-sensitive crates included, lands on one
+approval from a reviewer other than its author, which an agent may give; the
+review class below keeps those deep. A change to an invariant still needs a
+named human security reviewer's ADR (ENG-29).
 
 [release.yml](../.github/workflows/release.yml) runs from the Actions
 "Run workflow" button on `main`, with a version like `v0.1.0`. A pushed
@@ -256,11 +252,9 @@ What CI decides, on every pull request:
 - rustfmt and clippy, with each product crate's bans on sockets and
   program starts (I4), on clocks and hash order (I10) and on waits with
   no deadline (ENG-03), the complexity limits, and the reach test;
-- the crates' declared dependency directions and responsibilities
-  (ENG-02);
+- the crates' dependency directions and responsibilities (ENG-02);
 - no mutable global state in a product crate (ENG-03);
-- coverage per test layer (ENG-11), and every live scenario;
-- the benchmark gate (ENG-15).
+- coverage per test layer (ENG-11), live scenarios, the benchmark gate (ENG-15).
 
 What `review-bundle` decides, comparing the pull request with main:
 
@@ -272,19 +266,26 @@ What `review-bundle` decides, comparing the pull request with main:
 - a clippy ban lifted at a call site, or a diff header it cannot read:
   a nit, and an unread header makes the review deep.
 
-The review class sets the agent's model, turn budget and tools. A change
-holding only Markdown outside the stakeholder's paths, the domain model,
-plans and scenarios is light. Any path CODEOWNERS assigns makes it
-deep, and only a deep review may consult the read-only reviewer
-subagents. Anything else, an empty diff included, is standard.
-The review bundle quotes only the touched rows, their scenarios and
-the invariants, a few thousand model tokens where the SRS holds
-hundreds of thousands. A re-review starts from the diff since the reviewer app's
-last review, found by the app's own login. The pull request's agent
-instructions move out of the agent's directory, so none loads; the
-agent reads them as data. The posted review names the gate as its
-author, states the agent's verdict, and keeps the agent's findings,
-the deterministic ones and failed checks under their own headings.
+Code runs the review. The bundle dispatches, from the changed paths and touched
+rows, the low-effort specialists under [.claude/agents](../.claude/agents) and
+the medium-effort generalist each names, which weighs their findings.
+`review-run` runs every specialist, then every generalist, each on its own
+model, and approves only when every agent answered readably and none blocks.
+The gate fails a review whose consulted list lacks a dispatched agent.
+An unanswered run runs once more; an unrouted change gets one generalist.
+A deep review consults each generalist's deep instance instead: the same
+template under [docs/agents](agents/review-code.md), on Opus at high effort with
+40 turns. The class is light for Markdown outside the stakeholder's paths, deep
+for those paths, the gates and the security-sensitive code. The review bundle
+quotes only the touched rows, their scenarios and the invariants, a few thousand
+model tokens where the SRS runs to hundreds of thousands. The pull request's
+agent instructions move out of the agents' directory, so none loads; the agents
+read them as data. The posted review names the gate as its author, states the
+review's verdict, and keeps the agents' findings, the deterministic ones and
+failed checks under their own headings. A pull request
+that changes a reviewer component also runs that component's evaluation cases,
+whose failures are blocking findings (ENG-32,
+[review-evaluation.md](review-evaluation.md)).
 
 What is left to the agent is judgement: whether the code and the step
 bindings do what each touched row says, new paths to the model (I2),

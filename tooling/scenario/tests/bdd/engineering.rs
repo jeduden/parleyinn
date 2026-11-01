@@ -22,6 +22,8 @@ pub struct Engineering {
     pub flow: Workflow,
     /// The reviewer app's key, as a step last named it.
     pub key: String,
+    /// Where the reviewer evaluation cases are read from (ENG-32).
+    pub cases_dir: String,
 }
 
 impl Engineering {

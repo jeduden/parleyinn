@@ -53,7 +53,16 @@ fn approval_from_another_reviewer(w: &mut World) -> Result<(), String> {
 }
 
 #[then(
-    regex = r"^CODEOWNERS names the stakeholder on the requirement text and on every path that enforces it$"
+    regex = r#"^every pull request needs the "review-gate" check, taken from the reviewer app alone$"#
+)]
+fn review_gate_required(w: &mut World) -> Result<(), String> {
+    outcome(branch_protection::review_gate_required(
+        &protection(w).ruleset,
+    ))
+}
+
+#[then(
+    regex = r"^CODEOWNERS names the stakeholder on the specification, the decision records, the scenarios and the process that builds and checks the code$"
 )]
 fn stakeholder_owns_the_enforcing_paths(_w: &mut World) -> Result<(), String> {
     outcome(codeowners::stakeholder_owns_the_enforcing_paths(&checkout()))
@@ -64,15 +73,14 @@ fn no_owner_on_any_other_path(_w: &mut World) -> Result<(), String> {
     outcome(codeowners::no_owner_on_any_other_path(&checkout()))
 }
 
-/// CODEOWNERS gives each security-sensitive crate to the security
-/// reviewer alone, and the ruleset makes a code owner's approval
-/// count, so a change to one waits on that reviewer: the step reads
-/// both.
+/// CODEOWNERS gives no Rust source an owner, and the ruleset still
+/// asks a reviewer other than the author to approve, so a code change
+/// waits on that reviewer alone: the step reads both.
 #[then(
-    regex = r"^the security-sensitive crates are owned by the designated security reviewer, whose approval they need$"
+    regex = r"^CODEOWNERS names no code owner on Rust source, so a code change needs only a reviewer other than its author$"
 )]
-fn security_crates_need_the_security_reviewer(w: &mut World) -> Result<(), String> {
-    let mut problems = codeowners::security_crates_owned_by_the_security_reviewer(&checkout());
+fn no_owner_on_rust_source(w: &mut World) -> Result<(), String> {
+    let mut problems = codeowners::no_owner_on_rust_source(&checkout());
     problems.extend(branch_protection::approval_from_another_reviewer(
         &protection(w).ruleset,
     ));

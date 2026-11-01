@@ -1,0 +1,48 @@
+component = "test-engineer"
+kind = "clean"
+title = "a module with its unit tests beside it"
+
+[[create]]
+file = "tooling/review-bundle/src/rogue.rs"
+content = '''
+//! The first header of a diff.
+
+/// The path the first `diff --git` header of `diff` names, without
+/// its `a/` prefix.
+#[must_use]
+pub fn first_header(diff: &str) -> Option<&str> {
+    diff.lines()
+        .find_map(|l| l.strip_prefix("diff --git a/"))
+        .and_then(|rest| rest.split(' ').next())
+}
+
+#[cfg(test)]
+mod tests;
+'''
+
+[[create]]
+file = "tooling/review-bundle/src/rogue/tests.rs"
+content = '''
+use super::*;
+
+#[test]
+fn names_the_first_header_s_path() {
+    assert_eq!(first_header("diff --git a/x.rs b/x.rs\n+1\n"), Some("x.rs"));
+}
+
+#[test]
+fn a_diff_without_a_header_names_nothing() {
+    assert_eq!(first_header("+1\n"), None);
+}
+'''
+
+[[replace]]
+file = "tooling/review-bundle/src/lib.rs"
+old = "pub mod render;\n"
+new = "pub mod render;\npub mod rogue;\n"
+
+[expect]
+
+[[expect.none]]
+path = "tooling/review-bundle/src/rogue.rs"
+severity = "blocking"

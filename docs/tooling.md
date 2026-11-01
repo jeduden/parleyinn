@@ -50,16 +50,19 @@ cargo.binstall = false
 run = ["cargo build --release --locked -p parinn -p calibrate", "cargo test --workspace --locked"]
 
 [tasks.lint]
-run = ["cargo fmt --all --check", "cargo clippy --workspace --all-targets --locked -- -D warnings", "taplo fmt --check", "taplo lint", "mdsmith check .", "zizmor .github"]
+run = ["scripts/ci-gate.sh fmt", "scripts/ci-gate.sh clippy", "scripts/ci-gate.sh toml-fmt", "scripts/ci-gate.sh toml-lint", "scripts/ci-gate.sh markdown", "scripts/ci-gate.sh zizmor"]
 
 [tasks.supply-chain]
-run = ["cargo deny check licenses bans sources", "cargo audit", "cargo deny --manifest-path fuzz/Cargo.toml check licenses bans sources", "cargo audit --file fuzz/Cargo.lock"]
+run = ["scripts/ci-gate.sh deny", "scripts/ci-gate.sh audit", "scripts/ci-gate.sh deny-fuzz", "scripts/ci-gate.sh audit-fuzz"]
 
 [tasks.coverage]
 run = "cargo run --locked -p coverage"
 
 [tasks.drift]
-run = "cargo test --locked -p drift --test suite -- --ignored"
+run = "scripts/ci-gate.sh drift"
+
+[tasks.ci-local]
+run = "scripts/ci-local.sh"
 
 [tasks.core]
 run = "cargo run --locked -p parinn --"
@@ -90,11 +93,13 @@ wrap: toml
 ```toml
 # ENG-01: the exact Rust release the workspace builds with. rustup
 # reads this file, so every cargo command in the checkout runs on it.
-# mise and CI read the version and components from this file.
+# mise and CI read the version and components from this file;
+# rust-analyzer serves the rust-analyzer-lsp plugin .claude/settings.json
+# enables.
 [toolchain]
 channel = "1.99.0"
 profile = "minimal"
-components = ["clippy", "rustfmt", "llvm-tools-preview"]
+components = ["clippy", "rustfmt", "llvm-tools-preview", "rust-analyzer"]
 ```
 
 <?/include?>

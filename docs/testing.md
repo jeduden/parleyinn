@@ -9,8 +9,9 @@ summary: >-
 # Testing
 
 Every behaviour is proven at the lowest test layer that can prove it.
-[CLAUDE.md](../CLAUDE.md) states the rules; this page is how they are
-kept. Build and CI commands are in [development.md](development.md).
+[CLAUDE.md](../CLAUDE.md) states the rules and this page keeps them. Build
+and CI commands are in [development.md](development.md); the review's
+agents' own tests are in [review-evaluation.md](review-evaluation.md).
 
 ## The test pyramid
 
@@ -67,11 +68,11 @@ crate, where the unit tests reach it. Every cargo the tool starts
 carries `PARINN_COVERAGE_MEASURING`, and a run that finds it set refuses
 to start, so a test cannot set off a measurement inside a measurement.
 
-CI measures each test layer in a job of its own, the end-to-end layer in
-four shards ([ci.md](ci.md)). The `coverage` job merges them, adds the
-shards up, fails on a missing one, writes the table and the test counts
-into its summary, holds the floors, and uploads one Codecov flag per
-test layer. Codecov's [thresholds](../codecov.yml) are a soft ratchet.
+CI measures each test layer in its own job, the end-to-end scenarios in
+six shards and the layer's other targets apart ([ci.md](ci.md)). The
+`coverage` job adds the parts up, fails on a missing one, and writes the
+table and test counts to its summary. It holds the floors and uploads a Codecov
+flag per layer. Codecov's [thresholds](../codecov.yml) are a soft ratchet.
 
 ## The executable requirement matrix
 
@@ -106,8 +107,7 @@ The runner reads features with the same gherkin parser as the gate.
 That parser is stricter than godog's in two places. A description line
 that opens with a Gherkin keyword, such as "Scenarios", reads as that
 keyword. And `<name>` in a Scenario Outline must name an Examples
-column, so a literal placeholder is written another way, such as
-`{id}`.
+column, so a literal placeholder is written as `{id}`.
 
 ## Proving the checks: drift injection
 
@@ -181,11 +181,11 @@ decides from two samples files. CI's `benchmark` job runs both.
 
 The benchmark jobs (ENG-15) compare the head with its first parent:
 the `main` a pull request's merge commit sits on, or `main` before a
-push. `benchmark-suites` builds both sides' suites and cores once, in
-release mode. Ten `benchmark (shard N)` jobs each sample them on one
-runner, three of the thirty rounds of ten samples a side. A shard
-interleaves the sides and keeps the alternation of which goes first, so
-a drift in a runner's speed lands on both. The `benchmark` job pools the
+push. A `benchmark suite` job a side builds its suite and core once,
+in release mode, side by side. Ten `benchmark (shard N)` jobs each
+sample both on one runner, three of the thirty rounds of ten samples a
+side. A shard interleaves them and keeps the alternation of which goes
+first, so a drift in a runner's speed lands on both. `benchmark` pools the
 shards' samples; the head's gate writes its report into the job summary
 and fails naming each benchmark that regressed more than 10% with
 significance. Each shard is one stratum: a sample is ranked only against

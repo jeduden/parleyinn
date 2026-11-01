@@ -118,17 +118,46 @@ pub fn scenarios(dir: &Path) -> Result<Vec<Scenario>, Error> {
     for path in feature_files(dir)? {
         let feature = gherkin::Feature::parse_path(&path, gherkin::GherkinEnv::default())
             .map_err(|e| Error::Parse(Box::new(e)))?;
-        let none = Vec::new();
-        let top = feature.scenarios.iter().map(|s| (&none, s));
-        let ruled = feature
-            .rules
-            .iter()
-            .flat_map(|r| r.scenarios.iter().map(move |s| (&r.tags, s)));
-        for (rule_tags, sc) in top.chain(ruled) {
-            let tags = feature.tags.iter().chain(rule_tags).chain(&sc.tags);
-            let tags = tags.chain(sc.examples.iter().flat_map(|e| &e.tags));
-            out.push(scenario_of(&path, sc, tags)?);
-        }
+        out.extend(feature_scenarios(&path, &feature)?);
+    }
+
+    Ok(out)
+}
+
+/// The scenarios of one feature whose text is `text`, read as
+/// [`scenarios`] reads the file at `path`, so a changed feature is read
+/// without writing a tree.
+///
+/// # Errors
+///
+/// Fails as [`scenarios`] does, naming `path`.
+pub fn scenarios_in(path: &Path, text: &str) -> Result<Vec<Scenario>, Error> {
+    let feature =
+        gherkin::Feature::parse(text, gherkin::GherkinEnv::default()).map_err(|source| {
+            Error::Parse(Box::new(gherkin::ParseFileError::Parsing {
+                path: path.to_path_buf(),
+                error: None,
+                source,
+            }))
+        })?;
+
+    feature_scenarios(path, &feature)
+}
+
+/// Every scenario of `feature`, read from `path`: the top-level ones,
+/// then each rule's, with the feature's, the rule's and their own tags.
+fn feature_scenarios(path: &Path, feature: &gherkin::Feature) -> Result<Vec<Scenario>, Error> {
+    let none = Vec::new();
+    let top = feature.scenarios.iter().map(|s| (&none, s));
+    let ruled = feature
+        .rules
+        .iter()
+        .flat_map(|r| r.scenarios.iter().map(move |s| (&r.tags, s)));
+    let mut out = Vec::new();
+    for (rule_tags, sc) in top.chain(ruled) {
+        let tags = feature.tags.iter().chain(rule_tags).chain(&sc.tags);
+        let tags = tags.chain(sc.examples.iter().flat_map(|e| &e.tags));
+        out.push(scenario_of(path, sc, tags)?);
     }
 
     Ok(out)

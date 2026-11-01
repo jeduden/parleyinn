@@ -332,5 +332,19 @@ pub fn shard(cases: Vec<Case>, spec: Option<&str>) -> Result<Vec<Case>, String> 
     }
 }
 
+/// The cases whose injection edits one of `files`, one path a line: the
+/// drifts a change to those files could let through, for a run before a
+/// push. `None` holds them all.
+#[must_use]
+pub fn touching(cases: Vec<Case>, files: Option<&str>) -> Vec<Case> {
+    let Some(files) = files else {
+        return cases;
+    };
+    cases
+        .into_iter()
+        .filter(|c| files.lines().any(|f| f.trim() == c.injection.file))
+        .collect()
+}
+
 #[cfg(test)]
 mod tests;

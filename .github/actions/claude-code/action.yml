@@ -1,0 +1,23 @@
+name: Install the pinned Claude Code command line
+description: Install the Claude Code command line the review's agents and the evaluation run in, at the one version the repository pins (ENG-01)
+runs:
+  using: composite
+  steps:
+    # The command line is an npm package, which mise's released-binary
+    # rule refuses, so the version is pinned here, once, and installed
+    # with npm. A failed install is retried twice, then names the
+    # registry it could not reach.
+    - name: Install with npm
+      shell: bash
+      env:
+        CLAUDE_CODE_VERSION: "2.1.312"
+      run: | # zizmor: ignore[adhoc-packages] pinned to one version by CLAUDE_CODE_VERSION, which no mise backend the repository allows can install
+        for attempt in 1 2 3; do
+          if npm install --global --no-fund --no-audit "@anthropic-ai/claude-code@$CLAUDE_CODE_VERSION"; then
+            exit 0
+          fi
+          echo "::warning::npm install from registry.npmjs.org failed, attempt $attempt of 3"
+          sleep $((attempt * 10))
+        done
+        echo "::error::could not install @anthropic-ai/claude-code@$CLAUDE_CODE_VERSION from registry.npmjs.org after 3 attempts"
+        exit 1

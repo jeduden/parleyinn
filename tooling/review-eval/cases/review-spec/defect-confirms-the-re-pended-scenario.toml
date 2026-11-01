@@ -1,0 +1,30 @@
+component = "review-spec"
+kind = "defect"
+title = "a specialist's true finding, kept"
+
+[[replace]]
+file = "features/engineering.feature"
+old = "  @ENG-24 @P0\n"
+new = "  @ENG-24 @P0 @pending\n"
+
+[[report]]
+agent = "lang-gherkin"
+content = '''
+features/engineering.feature:249 — if not addressed: the live ENG-24 scenario is put back on @pending, which CLAUDE.md forbids, and ENG-24 goes unproven — ENG-24
+
+outcome: findings — a live scenario re-pended
+'''
+
+[[report]]
+agent = "domain-model-hub"
+content = '''
+outcome: none — no concept touched
+'''
+
+[expect]
+
+[[expect.finding]]
+path = "features/engineering.feature"
+severity = "blocking"
+source = "lang-gherkin"
+mentions_any = ["pending", "ENG-24"]

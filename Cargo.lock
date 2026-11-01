@@ -494,7 +494,11 @@ dependencies = [
  "calibrate",
  "coverage",
  "drift",
+ "review-bundle",
+ "review-eval",
  "review-gate",
+ "review-report",
+ "review-run",
  "scenario",
  "serde_json",
  "srs",
@@ -1254,11 +1258,53 @@ dependencies = [
 ]
 
 [[package]]
+name = "review-eval"
+version = "0.0.0"
+dependencies = [
+ "adr",
+ "review-bundle",
+ "review-gate",
+ "serde",
+ "serde_json",
+ "sha2",
+ "testkit",
+ "toml",
+]
+
+[[package]]
 name = "review-gate"
 version = "0.0.0"
 dependencies = [
  "serde",
  "serde_json",
+ "testkit",
+]
+
+[[package]]
+name = "review-report"
+version = "0.0.0"
+dependencies = [
+ "review-eval",
+ "review-gate",
+ "serde",
+ "serde_json",
+ "sha2",
+ "testkit",
+ "toml",
+]
+
+[[package]]
+name = "review-run"
+version = "0.0.0"
+dependencies = [
+ "review-bundle",
+ "review-eval",
+ "review-gate",
+ "review-report",
+ "serde",
+ "serde_json",
+ "sha2",
+ "srs",
  "testkit",
 ]
 
@@ -1337,6 +1383,7 @@ dependencies = [
  "key",
  "record",
  "redaction",
+ "review-eval",
  "rusqlite",
  "serde_json",
  "srs",

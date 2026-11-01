@@ -1,0 +1,127 @@
+component = "review-code"
+kind = "other"
+title = "fifteen minor findings, of which at most ten stay nits and the one restating clippy is dropped"
+
+# A run of the review kept 88 nits: each specialist's minor findings,
+# kept one by one. Here five specialists report fifteen minor findings
+# on one small module: real ones, two of one cause, style, a false
+# alarm, and two that restate a gate CI already runs (clippy, the
+# coverage floor). The generalist keeps at most ten nits, one per
+# cause, and drops the one clippy already refuses.
+
+[[create]]
+file = "tooling/review-bundle/src/tally.rs"
+content = '''
+//! A tally of the findings a review keeps, by severity.
+
+use std::collections::BTreeMap;
+
+/// How many findings of each severity `lines` hold: the second
+/// dash-separated part of each line.
+#[must_use]
+pub fn tally(lines: &[&str]) -> BTreeMap<String, usize> {
+    let mut out = BTreeMap::new();
+    for line in lines {
+        if let Some(severity) = severity(line) {
+            *out.entry(severity.to_owned()).or_insert(0) += 1;
+        }
+    }
+    out
+}
+
+/// The severity of `line`, its second part after ` — `.
+fn severity(line: &str) -> Option<&str> {
+    line.split(" — ").nth(1).map(str::trim)
+}
+
+/// `counts` as one line per severity, `nit: 3`.
+#[must_use]
+pub fn render(counts: &BTreeMap<String, usize>) -> String {
+    let mut out = String::new();
+    for (severity, n) in counts {
+        out.push_str(&format!("{severity}: {n}\n"));
+    }
+    out
+}
+
+#[cfg(test)]
+mod tests;
+'''
+
+[[create]]
+file = "tooling/review-bundle/src/tally/tests.rs"
+content = '''
+use super::*;
+
+#[test]
+fn tally_counts_each_severity_and_renders_them() {
+    let counts = tally(&["a.rs:1 — nit — x", "a.rs:2 — nit — y", "a.rs:3 — blocking — z"]);
+    assert_eq!(counts.get("nit"), Some(&2));
+    assert_eq!(counts.get("blocking"), Some(&1));
+    assert!(render(&counts).contains("nit: 2"));
+}
+
+#[test]
+fn a_line_with_no_dash_counts_nothing() {
+    assert!(tally(&["prose"]).is_empty());
+}
+'''
+
+[[replace]]
+file = "tooling/review-bundle/src/lib.rs"
+old = "pub mod render;\n"
+new = "pub mod render;\npub mod tally;\n"
+
+[[report]]
+agent = "lang-rust"
+content = '''
+tooling/review-bundle/src/tally.rs:28 — if not addressed: `push_str(&format!(..))` is what clippy's `format_push_string` lint refuses, so the build fails until it is `write!` — ENG-16
+tooling/review-bundle/src/tally.rs:20 — if not addressed: a line whose second part is blank counts under an empty severity — I6
+tooling/review-bundle/src/tally.rs:12 — if not addressed: the counter can overflow on more than `usize::MAX` lines — ENG-03
+tooling/review-bundle/src/tally.rs:8 — if not addressed: `tally` takes a slice where an iterator would spare the caller a collect — ENG-02
+tooling/review-bundle/src/tally.rs:20 — if not addressed: the severity keeps its case, so `Nit` and `nit` count apart — I6
+tooling/review-bundle/src/tally.rs:6 — if not addressed: the comment says dash-separated, though only an em dash splits, so a line cut by ` - ` counts nothing — I6
+tooling/review-bundle/src/tally.rs:8 — if not addressed: a `BTreeMap` loses the order the lines came in, where a `Vec` would keep it — ENG-02
+
+outcome: findings — a tally with a clippy refusal and two counting gaps
+'''
+
+[[report]]
+agent = "test-engineer-unit"
+content = '''
+tooling/review-bundle/src/tally/tests.rs:4 — if not addressed: one test asserts both `tally` and `render`, so a failure does not say which broke — ENG-11
+tooling/review-bundle/src/tally.rs:19 — if not addressed: `severity` has no dedicated unit test — ENG-11
+tooling/review-bundle/src/tally/tests.rs:8 — if not addressed: `render` is checked by `contains` alone, so a stray line it adds passes — ENG-11
+tooling/review-bundle/src/tally.rs:25 — if not addressed: no test renders an empty tally — ENG-11
+tooling/review-bundle/src/tally.rs:1 — if not addressed: the crate's unit coverage may fall under its 99% floor — ENG-11
+tooling/review-bundle/src/tally.rs:20 — if not addressed: no test pins that `Nit` and `nit` count apart — ENG-11
+
+outcome: findings — the tally's tests leave its edges open
+'''
+
+[[report]]
+agent = "performance"
+content = '''
+tooling/review-bundle/src/tally.rs:28 — if not addressed: each severity allocates a `String` through `format!` before it is pushed — ENG-15
+
+outcome: findings — one allocation per rendered line
+'''
+
+[[report]]
+agent = "test-engineer-integration"
+content = '''
+tooling/review-bundle/src/tally.rs:8 — if not addressed: no integration test runs `tally` over a real review's answers — ENG-27
+
+outcome: findings — the tally has no integration test
+'''
+
+[expect]
+nits = 10
+
+[[expect.dropped]]
+path = "tooling/review-bundle/src/tally.rs"
+mentions = ["clippy"]
+
+[[expect.none]]
+path = "tooling/review-bundle/src/tally.rs"
+mentions = ["clippy"]

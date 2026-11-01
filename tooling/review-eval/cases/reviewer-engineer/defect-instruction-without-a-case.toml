@@ -1,0 +1,15 @@
+component = "reviewer-engineer"
+kind = "defect"
+title = "a new check in a reviewer component, with no case that proves it"
+
+[[replace]]
+file = ".claude/agents/lang-rust.md"
+old = "7. **Logging** goes through `tracing` and redaction\n"
+new = "7. **Open work.** A `TODO`, `FIXME` or `XXX` comment in shipped code is\n   a finding; the work lands, or an issue tracks it.\n8. **Logging** goes through `tracing` and redaction\n"
+
+[expect]
+
+[[expect.finding]]
+path = ".claude/agents/lang-rust.md"
+severity = "blocking"
+mentions_any = ["case", "untested", "evaluation"]

@@ -28,8 +28,8 @@ on the missing package. GREEN sites:
   review, and `cmd/review-gate` wraps
   it for the workflow. Both sit at the 100% coverage floor.
 - [review.yml](../../.github/workflows/review.yml) runs the agent and
-  the gate, and [the review skill](../../.claude/skills/review/SKILL.md)
-  is the agent's protocol.
+  the gate, and the review skill, `.claude/skills/review/SKILL.md`
+  (retired by plan 2610292344), is the agent's protocol.
 - Five drift cases guard ENG-28 in
   `internal/drift`.
 

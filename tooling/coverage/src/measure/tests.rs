@@ -124,7 +124,7 @@ fn measure_layer_runs_one_layer_on_a_fresh_build() {
         &host,
         &plan(),
         TestLayer::Integration,
-        None,
+        Part::Whole,
         Path::new("out"),
     )
     .unwrap()
@@ -145,7 +145,7 @@ fn measure_layer_runs_one_layer_on_a_fresh_build() {
             &host,
             &Plan::default(),
             TestLayer::EndToEnd,
-            None,
+            Part::Whole,
             Path::new("out")
         )
         .unwrap()
@@ -259,35 +259,28 @@ fn test_runs_without_a_shard_are_the_layer_s_one_command() {
     let plan = plan();
 
     assert_eq!(
-        test_runs(&plan, TestLayer::EndToEnd, None).unwrap(),
+        test_runs(&plan, TestLayer::EndToEnd, Part::Whole).unwrap(),
         [test_args(&plan, TestLayer::EndToEnd).unwrap()]
     );
     assert!(
-        test_runs(&Plan::default(), TestLayer::EndToEnd, None)
+        test_runs(&Plan::default(), TestLayer::EndToEnd, Part::Whole)
             .unwrap()
             .is_empty()
     );
 }
 
 #[test]
-fn test_runs_give_the_first_shard_the_other_targets_and_the_rest_their_build() {
+fn test_runs_give_every_shard_the_other_targets_build_and_no_run_of_them() {
     let plan = plan();
     let joined = |index| {
-        test_runs(&plan, TestLayer::EndToEnd, Some(shard(index, 4)))
+        test_runs(&plan, TestLayer::EndToEnd, Part::Shard(shard(index, 4)))
             .unwrap()
             .iter()
             .map(|a| a.join(" "))
             .collect::<Vec<_>>()
     };
 
-    assert_eq!(
-        joined(1),
-        [
-            "llvm-cov --no-report --workspace --locked --test e2e_x",
-            "llvm-cov --no-report --workspace --locked --test bdd -- --shard 1/4"
-        ]
-    );
-    for index in 2..=4 {
+    for index in 1..=4 {
         assert_eq!(
             joined(index),
             [
@@ -301,20 +294,47 @@ fn test_runs_give_the_first_shard_the_other_targets_and_the_rest_their_build() {
 }
 
 #[test]
-fn test_runs_with_only_bdd_run_it_alone_in_the_first_shard() {
+fn test_runs_with_only_bdd_run_it_alone_in_a_shard() {
     let plan = Plan {
         targets: BTreeMap::from([(TestLayer::EndToEnd, vec!["bdd".to_owned()])]),
         ..Plan::default()
     };
 
-    let runs = test_runs(&plan, TestLayer::EndToEnd, Some(shard(1, 2))).unwrap();
+    let runs = test_runs(&plan, TestLayer::EndToEnd, Part::Shard(shard(1, 2))).unwrap();
 
     assert_eq!(runs.len(), 1);
 }
 
 #[test]
+fn test_runs_of_the_others_run_the_targets_beside_bdd_alone() {
+    assert_eq!(
+        test_runs(&plan(), TestLayer::EndToEnd, Part::Others).unwrap(),
+        [words(&[
+            "llvm-cov",
+            "--no-report",
+            "--workspace",
+            "--locked",
+            "--test",
+            "e2e_x"
+        ])]
+    );
+    assert_eq!(
+        test_runs(&plan(), TestLayer::Integration, Part::Others).unwrap_err(),
+        "no bdd target in the integration test layer to set apart"
+    );
+    let only_bdd = Plan {
+        targets: BTreeMap::from([(TestLayer::EndToEnd, vec!["bdd".to_owned()])]),
+        ..Plan::default()
+    };
+    assert_eq!(
+        test_runs(&only_bdd, TestLayer::EndToEnd, Part::Others).unwrap_err(),
+        "no e2e targets beside bdd to measure"
+    );
+}
+
+#[test]
 fn test_runs_refuse_a_shard_that_has_nothing_to_divide() {
-    let sharded = Some(shard(1, 2));
+    let sharded = Part::Shard(shard(1, 2));
 
     assert_eq!(
         test_runs(&plan(), TestLayer::Integration, sharded).unwrap_err(),
@@ -339,7 +359,7 @@ fn measure_layer_writes_a_shard_to_its_own_file() {
         &host,
         &plan(),
         TestLayer::EndToEnd,
-        Some(shard(2, 4)),
+        Part::Shard(shard(2, 4)),
         Path::new("out"),
     )
     .unwrap()
@@ -365,7 +385,7 @@ fn measure_layer_refuses_a_shard_of_another_layer_before_running_it() {
         &host,
         &plan(),
         TestLayer::Unit,
-        Some(shard(1, 2)),
+        Part::Shard(shard(1, 2)),
         Path::new("out"),
     )
     .unwrap_err();
@@ -374,6 +394,85 @@ fn measure_layer_refuses_a_shard_of_another_layer_before_running_it() {
     assert_eq!(*host.calls.borrow(), ["cargo llvm-cov clean --workspace"]);
 }
 
+#[test]
+fn measure_layer_writes_the_others_to_their_own_file() {
+    let host = host(&["SF:/w/a.rs\nDA:2,3\n"]);
+
+    measure_layer(
+        &host,
+        &plan(),
+        TestLayer::EndToEnd,
+        Part::Others,
+        Path::new("out"),
+    )
+    .unwrap()
+    .unwrap();
+
+    assert_eq!(
+        *host.calls.borrow(),
+        [
+            "cargo llvm-cov clean --workspace",
+            "cargo llvm-cov --no-report --workspace --locked --test e2e_x",
+            "cargo llvm-cov report --lcov --ignore-filename-regex tests.rs$",
+            "write out/e2e-others.lcov",
+        ]
+    );
+}
+
+#[test]
+fn a_part_names_its_file() {
+    let e2e = TestLayer::EndToEnd;
+
+    assert_eq!(part_file_name(e2e, Part::Whole), "e2e.lcov");
+    assert_eq!(
+        part_file_name(e2e, Part::Shard(shard(2, 4))),
+        "e2e-2-of-4.lcov"
+    );
+    assert_eq!(part_file_name(e2e, Part::Others), "e2e-others.lcov");
+}
+
+#[test]
+fn the_others_file_is_named_for_its_layer() {
+    assert_eq!(others_file_name(TestLayer::EndToEnd), "e2e-others.lcov");
+    assert_eq!(
+        others_file_name(TestLayer::Integration),
+        "integration-others.lcov"
+    );
+}
+
+#[test]
+fn the_others_are_the_end_to_end_targets_beside_bdd() {
+    assert_eq!(
+        others(&plan(), TestLayer::EndToEnd, "shard").unwrap(),
+        ["e2e_x"]
+    );
+    assert_eq!(
+        others(&plan(), TestLayer::Integration, "divide").unwrap_err(),
+        "no bdd target in the integration test layer to divide"
+    );
+}
+
+#[test]
+fn with_targets_names_each_target_after_the_base_arguments() {
+    assert_eq!(
+        with_targets(&words(&["a", "b"])),
+        words(&[
+            "llvm-cov",
+            "--no-report",
+            "--workspace",
+            "--locked",
+            "--test",
+            "a",
+            "--test",
+            "b"
+        ])
+    );
+    assert_eq!(with_targets(&[]), base_args());
+}
+
+/// A host holding the e2e shards `present` of `total`, each counting
+/// its own line and line 9 once, and the others' file, which counts
+/// line 8 eight times and line 9 once.
 fn with_shards(total: u64, present: &[u64]) -> FakeHost {
     let host = host(&[]);
     for index in present {
@@ -382,6 +481,10 @@ fn with_shards(total: u64, present: &[u64]) -> FakeHost {
             format!("SF:/w/a.rs\nDA:{index},{index}\nDA:9,1\n"),
         );
     }
+    host.files.borrow_mut().insert(
+        PathBuf::from("out/e2e-others.lcov"),
+        "SF:/w/a.rs\nDA:8,8\nDA:9,1\n".into(),
+    );
     host
 }
 
@@ -404,9 +507,9 @@ fn merge_layers_adds_the_shards_of_a_layer_up() {
         layers.iter().map(|(l, _)| *l).collect::<Vec<_>>(),
         [TestLayer::Unit, TestLayer::EndToEnd]
     );
-    let merged = "SF:/w/a.rs\nDA:1,1\nDA:2,2\nDA:3,3\nDA:9,3\nend_of_record\n";
+    let merged = "SF:/w/a.rs\nDA:1,1\nDA:2,2\nDA:3,3\nDA:8,8\nDA:9,4\nend_of_record\n";
     assert_eq!(host.files.borrow()[&PathBuf::from("out/e2e.lcov")], merged);
-    assert_eq!(layers[1].1[&PathBuf::from("/w/a.rs")][&9], 3);
+    assert_eq!(layers[1].1[&PathBuf::from("/w/a.rs")][&9], 4);
     assert_eq!(layers[1].1.len(), 1, "the stale merge is no part of it");
 }
 
@@ -429,15 +532,37 @@ fn merge_layers_refuses_shards_that_are_not_all_there() {
             .contains("disagree on their count: ")
     );
 
-    let malformed = with_shards(1, &[1]);
-    malformed
+    for bad in ["out/e2e-1-of-1.lcov", "out/e2e-others.lcov"] {
+        let malformed = with_shards(1, &[1]);
+        malformed
+            .files
+            .borrow_mut()
+            .insert(PathBuf::from(bad), "SF:a\nDA:x\n".into());
+        assert!(
+            merge_layers(&malformed, Path::new("out"))
+                .unwrap_err()
+                .starts_with("lcov line 2: "),
+            "{bad}"
+        );
+    }
+}
+
+#[test]
+fn merge_layers_refuses_shards_without_the_others_and_the_others_alone() {
+    let without_others = with_shards(2, &[1, 2]);
+    without_others
         .files
         .borrow_mut()
-        .insert(PathBuf::from("out/e2e-1-of-1.lcov"), "SF:a\nDA:x\n".into());
-    assert!(
-        merge_layers(&malformed, Path::new("out"))
-            .unwrap_err()
-            .starts_with("lcov line 2: ")
+        .remove(Path::new("out/e2e-others.lcov"));
+    assert_eq!(
+        merge_layers(&without_others, Path::new("out")).unwrap_err(),
+        "the e2e shards under out lack e2e-others.lcov, the targets beside bdd"
+    );
+
+    let others_alone = with_shards(2, &[]);
+    assert_eq!(
+        merge_layers(&others_alone, Path::new("out")).unwrap_err(),
+        "out/e2e-others.lcov has no e2e shards beside it"
     );
 }
 

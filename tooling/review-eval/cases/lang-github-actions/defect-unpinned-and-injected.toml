@@ -1,0 +1,33 @@
+component = "lang-github-actions"
+kind = "defect"
+title = "an unpinned action and untrusted context in a run step"
+
+[[create]]
+file = ".github/workflows/greet.yml"
+content = '''
+name: Greet
+
+on:
+  pull_request:
+
+permissions: {}
+
+jobs:
+  greet:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Greet the author
+        run: echo "Thanks for ${{ github.event.pull_request.title }}"
+'''
+
+[expect]
+outcome = ["findings"]
+
+# No requirement yet holds an action to a pinned sha or keeps untrusted
+# context out of a script, so each may come back as a requirement
+# request as well as a linked finding: either form must name it.
+[[expect.finding]]
+path = ".github/workflows/greet.yml"
+mentions_any = ["pin", "sha", "inject", "${{", "env:", "untrusted"]

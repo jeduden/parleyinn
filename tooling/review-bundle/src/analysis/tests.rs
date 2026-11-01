@@ -41,12 +41,16 @@ fn base() -> Snapshot {
             req("REC-02", "Link."),
             req("PRV-10", "Certify."),
             req(
+                "ENG-11",
+                "Coverage MUST be ≥ 90% for security-sensitive crates (`pin`, `search`) and more.",
+            ),
+            req(
                 "ENG-29",
                 "A change to an invariant, or to a requirement marked for I2 review (PRV-10, PRV-11), MUST land with an ADR.",
             ),
         ],
         scenarios: vec![sc("REC-01", false), sc("REC-02", true), sc("PRV-10", true)],
-        codeowners: "/docs/srs/ @owner\n/tooling/ @owner\n".into(),
+        codeowners: "/docs/srs/ @owner\n/crates/*/Cargo.toml @owner\n".into(),
         invariants: "I1".into(),
         decisions: BTreeMap::new(),
     }
@@ -78,11 +82,11 @@ fn analyse_routes_by_the_paths_that_changed() {
         ),
         (vec!["features/record.feature"], Class::Standard),
         (vec!["README.md", "docs/srs/05.md"], Class::Deep),
-        (vec!["tooling/drift/src/cases.rs"], Class::Deep),
+        (vec!["crates/pinx/Cargo.toml"], Class::Deep),
     ];
     for (paths, want) in cases {
         let diff: String = paths.iter().map(|p| header(p)).collect();
-        let got = analyse(&base(), &base(), &diff, false);
+        let got = analyse(&base(), &base(), &diff, &[]);
         assert_eq!(got.class, want, "{paths:?}");
         assert_eq!(got.class == Class::Deep, !got.owned.is_empty(), "{paths:?}");
         assert!(got.unparsed.is_empty(), "{paths:?}");
@@ -90,8 +94,76 @@ fn analyse_routes_by_the_paths_that_changed() {
 }
 
 #[test]
+fn code_with_no_code_owner_reviews_deep_when_it_gates_or_is_security_sensitive() {
+    for (path, want) in [
+        ("tooling/drift/src/cases.rs", Class::Deep),
+        ("crates/pin/src/lib.rs", Class::Deep),
+        ("crates/search/src/a/b.rs", Class::Deep),
+        ("crates/parinn/tests/reach.rs", Class::Deep),
+        ("crates/pinx/src/lib.rs", Class::Standard),
+        ("crates/parinn/tests/other.rs", Class::Standard),
+        ("x/tooling/a.rs", Class::Standard),
+    ] {
+        let got = analyse(&base(), &base(), &header(path), &[]);
+        assert_eq!(got.class, want, "{path}");
+        assert!(got.owned.is_empty(), "{path}");
+    }
+}
+
+#[test]
+fn security_crates_come_from_the_eng_11_row() {
+    assert_eq!(
+        security_crates(&base()),
+        Some(["pin", "search"].map(str::to_owned).to_vec())
+    );
+
+    for text in [
+        "No list.",
+        "security-sensitive crates (`a`",
+        "security-sensitive crates ()",
+    ] {
+        let mut snap = base();
+        snap.requirements = vec![req("ENG-11", text)];
+        assert_eq!(security_crates(&snap), None, "{text}");
+    }
+    let mut snap = base();
+    snap.requirements.clear();
+    assert_eq!(security_crates(&snap), None);
+}
+
+#[test]
+fn an_eng_11_row_that_names_no_crate_fails_closed_and_says_so() {
+    let mut main = base();
+    main.requirements.retain(|r| r.id != "ENG-11");
+    main.requirements
+        .push(req("ENG-11", "Coverage MUST be ≥ 90%."));
+
+    let got = analyse(&main, &main, &header("crates/store/src/lib.rs"), &[]);
+
+    assert_eq!(got.class, Class::Deep);
+    assert_eq!(
+        got.dispatch[dispatch::SECURITY_DEEP],
+        ["persona-security-officer"].map(str::to_owned).into()
+    );
+    assert_eq!(
+        got.findings,
+        [Finding {
+            path: "docs/srs/05.md".into(),
+            line: 0,
+            severity: NIT,
+            body: NO_SECURITY_CRATES.into(),
+        }]
+    );
+
+    main.requirements.retain(|r| r.id != "ENG-11");
+    let got = analyse(&main, &main, &header("README.md"), &[]);
+    assert_eq!(got.findings[0].path, "docs/srs");
+    assert_eq!(got.class, Class::Light);
+}
+
+#[test]
 fn analyse_finds_nothing_in_an_unchanged_tree() {
-    let got = analyse(&base(), &base(), &header("README.md"), false);
+    let got = analyse(&base(), &base(), &header("README.md"), &[]);
 
     assert!(got.requirements.is_empty());
     assert!(got.scenarios.is_empty());
@@ -108,7 +180,7 @@ fn analyse_reads_added_removed_and_changed_rows() {
     head.requirements.remove(2);
     head.requirements.push(req("REC-03", "Index."));
 
-    let got = analyse(&base(), &head, "", false);
+    let got = analyse(&base(), &head, "", &[]);
 
     assert_eq!(
         got.requirements,
@@ -129,7 +201,7 @@ fn analyse_reads_scenario_changes_and_mentions_into_the_touched_ids() {
         header("crates/parinn/src/lib.rs")
     );
 
-    let got = analyse(&base(), &head, &diff, false);
+    let got = analyse(&base(), &head, &diff, &[]);
 
     assert_eq!(
         got.scenarios,
@@ -142,9 +214,9 @@ fn analyse_reads_scenario_changes_and_mentions_into_the_touched_ids() {
 fn analyse_refuses_a_live_scenario_removed_or_pended_again() {
     let mut head = base();
     head.scenarios[0].pending = true;
-    let pended = analyse(&base(), &head, "", false);
+    let pended = analyse(&base(), &head, "", &[]);
     head.scenarios.remove(0);
-    let removed = analyse(&base(), &head, "", false);
+    let removed = analyse(&base(), &head, "", &[]);
 
     assert_eq!(
         pended.findings,
@@ -176,7 +248,7 @@ fn analyse_refuses_a_live_scenario_retagged_to_another_id() {
     head.scenarios[0].path = "features/other.feature".into();
     head.scenarios[0].line = 30;
 
-    let got = analyse(&base(), &head, "", false);
+    let got = analyse(&base(), &head, "", &[]);
 
     assert_eq!(got.findings, [removal("REC-01")]);
 }
@@ -186,7 +258,7 @@ fn analyse_reads_an_unparsed_header_as_deep_and_names_it() {
     let bad = "diff --git \"a/x\" y";
     let diff = format!("{}{bad}\n", header("README.md"));
 
-    let got = analyse(&base(), &base(), &diff, false);
+    let got = analyse(&base(), &base(), &diff, &[]);
 
     assert_eq!(got.class, Class::Deep);
     assert!(got.owned.is_empty());
@@ -212,7 +284,7 @@ fn analyse_flags_each_file_that_lifts_a_ban() {
         header("crates/parinn/src/b.rs")
     );
 
-    let got = analyse(&base(), &base(), &diff, false);
+    let got = analyse(&base(), &base(), &diff, &[]);
 
     assert_eq!(
         got.findings,
@@ -249,7 +321,7 @@ fn analyse_lets_a_pending_scenario_go_live_or_go() {
     head.scenarios[1].pending = false;
     head.scenarios.remove(2);
 
-    assert!(analyse(&base(), &head, "", false).findings.is_empty());
+    assert!(analyse(&base(), &head, "", &[]).findings.is_empty());
 }
 
 /// The findings and the ENG-29 record when `head` holds `adr` at
@@ -264,8 +336,17 @@ fn guarded(
         head.decisions.insert(ADR.into(), body);
     }
     let diff: String = paths.iter().map(|p| header(p)).collect();
-    let got = analyse(&base(), head, &diff, consent);
-    (got.findings, got.eng_29_record)
+    let comments: Vec<String> = if consent {
+        vec!["ok".into()]
+    } else {
+        Vec::new()
+    };
+    let got = analyse(&base(), head, &diff, &comments);
+    let eng_29 = got
+        .findings
+        .into_iter()
+        .filter(|f| !f.body.contains("ENG-21"));
+    (eng_29.collect(), got.eng_29_record)
 }
 
 /// The ENG-29 finding at `path` with `body`.
@@ -474,4 +555,227 @@ fn and_list_joins_with_a_final_and() {
     assert_eq!(and_list(&[]), "");
     assert_eq!(and_list(&["a"]), "a");
     assert_eq!(and_list(&["a", "b", "c"]), "a, b and c");
+}
+
+#[test]
+fn analyse_dispatches_by_path_and_by_the_rows_the_diff_names() {
+    let mut head = base();
+    let mut row = req("REC-03", "New.");
+    row.path = "docs/srs/06-security.md".into();
+    head.requirements.push(row);
+    let diff = format!("{}+REC-01 REC-03\n", header("crates/pin/src/lib.rs"));
+
+    let got = analyse(&base(), &head, &diff, &[]);
+
+    assert_eq!(
+        got.dispatch[dispatch::SPEC_DEEP],
+        ["srs-05", "srs-security"].map(str::to_owned).into()
+    );
+    assert_eq!(
+        got.dispatch[dispatch::CODE_DEEP],
+        ["lang-rust", "performance", "test-engineer-unit"]
+            .map(str::to_owned)
+            .into()
+    );
+    assert_eq!(
+        got.dispatch[dispatch::SECURITY_DEEP],
+        ["persona-security-officer"].map(str::to_owned).into()
+    );
+    let lib = BTreeSet::from(["crates/pin/src/lib.rs".to_owned()]);
+    assert_eq!(got.scopes["lang-rust"], lib);
+    assert_eq!(got.scopes["srs-security"], lib);
+    assert_eq!(got.scopes.len(), 6, "{:?}", got.scopes);
+}
+
+#[test]
+fn a_review_below_deep_keeps_the_normal_generalists() {
+    let got = analyse(&base(), &base(), &header("crates/parinn/src/main.rs"), &[]);
+
+    assert_eq!(got.class, Class::Standard);
+    assert!(
+        got.dispatch.contains_key(dispatch::CODE),
+        "{:?}",
+        got.dispatch
+    );
+    assert!(!got.dispatch.contains_key(dispatch::CODE_DEEP));
+}
+
+#[test]
+fn a_row_markdown_only_quotes_brings_no_specialist() {
+    let mut head = base();
+    let mut row = req("REC-03", "New.");
+    row.path = "docs/srs/06-security.md".into();
+    head.requirements.push(row.clone());
+    let mut main = base();
+    main.requirements.push(row);
+    let diff = format!("{}+ quotes REC-03\n", header("docs/notes.md"));
+
+    let got = analyse(&main, &main, &diff, &[]);
+
+    assert!(
+        got.touched.contains(&"REC-03".to_owned()),
+        "{:?}",
+        got.touched
+    );
+    assert!(
+        !got.dispatch.values().flatten().any(|s| s == "srs-security"),
+        "{:?}",
+        got.dispatch
+    );
+}
+
+#[test]
+fn a_change_no_rule_routes_dispatches_one_generalist() {
+    let got = analyse(&base(), &base(), "", &[]);
+
+    assert_eq!(
+        got.dispatch,
+        BTreeMap::from([(dispatch::CODE.to_owned(), BTreeSet::new())])
+    );
+}
+
+#[test]
+fn a_deep_review_no_rule_routes_dispatches_its_deep_generalist() {
+    let got = analyse(&base(), &base(), &header("crates/pin/Cargo.toml"), &[]);
+
+    assert_eq!(got.class, Class::Deep);
+    assert!(got.dispatch.contains_key(dispatch::CODE_DEEP));
+    assert!(!got.dispatch.contains_key(dispatch::CODE));
+}
+
+/// The ENG-21 finding at `path` with `severity` and `body`.
+fn eng_21_finding(severity: &'static str, path: &str, body: &str) -> Finding {
+    Finding {
+        path: path.into(),
+        line: 0,
+        severity,
+        body: body.into(),
+    }
+}
+
+#[test]
+fn a_stakeholder_path_without_consent_blocks_naming_the_paths() {
+    let diff = format!("{}{}", header("docs/srs/a.md"), header("docs/srs/b.md"));
+
+    let got = analyse(&base(), &base(), &diff, &[]);
+
+    assert!(
+        got.findings.contains(&eng_21_finding(
+            BLOCKING,
+            "docs/srs/a.md",
+            "this change touches paths CODEOWNERS assigns (ENG-21) that no stakeholder \
+             comment names, so none consents to them: docs/srs/a.md, docs/srs/b.md"
+        )),
+        "{:?}",
+        got.findings
+    );
+}
+
+#[test]
+fn a_comment_that_names_no_owned_path_consents_to_none() {
+    let got = analyse(
+        &base(),
+        &base(),
+        &header("docs/srs/a.md"),
+        &["I consent to the SRS change".into()],
+    );
+
+    assert!(
+        got.findings.contains(&eng_21_finding(
+            BLOCKING,
+            "docs/srs/a.md",
+            "this change touches paths CODEOWNERS assigns (ENG-21) that no stakeholder \
+             comment names, so none consents to them: docs/srs/a.md"
+        )),
+        "{:?}",
+        got.findings
+    );
+}
+
+#[test]
+fn a_stakeholder_path_with_consent_is_a_nit() {
+    let got = analyse(
+        &base(),
+        &base(),
+        &header("docs/srs/a.md"),
+        &["Consent for docs/srs/.".into()],
+    );
+
+    assert!(
+        got.findings.contains(&eng_21_finding(
+            NIT,
+            "docs/srs/a.md",
+            "this change touches paths CODEOWNERS assigns (docs/srs/a.md) (ENG-21), \
+             and a stakeholder comment names each of them, consenting to it"
+        )),
+        "{:?}",
+        got.findings
+    );
+}
+
+#[test]
+fn each_owned_path_needs_a_comment_that_names_it() {
+    let diff = format!(
+        "{}{}{}",
+        header("crates/pin/Cargo.toml"),
+        header("docs/srs/a.md"),
+        header("docs/srs/b.md")
+    );
+    let one = ["ok for `docs/srs/a.md`".to_owned()];
+    let both = [
+        one[0].clone(),
+        "and crates/*/Cargo.toml, docs/srs/b.md.".to_owned(),
+    ];
+
+    let partly = analyse(&base(), &base(), &diff, &one);
+    let fully = analyse(&base(), &base(), &diff, &both);
+
+    assert!(
+        partly.findings.contains(&eng_21_finding(
+            BLOCKING,
+            "crates/pin/Cargo.toml",
+            "this change touches paths CODEOWNERS assigns (ENG-21) that no stakeholder \
+             comment names, so none consents to them: crates/pin/Cargo.toml, docs/srs/b.md"
+        )),
+        "{:?}",
+        partly.findings
+    );
+    let eng_21: Vec<&Finding> = fully
+        .findings
+        .iter()
+        .filter(|f| f.body.contains("ENG-21"))
+        .collect();
+    assert_eq!(eng_21.len(), 1, "{eng_21:?}");
+    assert_eq!(eng_21[0].severity, NIT);
+}
+
+#[test]
+fn the_eng_21_finding_lists_ten_unconsented_paths_and_counts_the_rest() {
+    let diff: String = (0..12)
+        .map(|i| header(&format!("docs/srs/{i:02}.md")))
+        .collect();
+
+    let got = analyse(&base(), &base(), &diff, &[]);
+
+    let listed: Vec<String> = (0..10).map(|i| format!("docs/srs/{i:02}.md")).collect();
+    assert!(
+        got.findings.contains(&eng_21_finding(
+            BLOCKING,
+            "docs/srs/00.md",
+            &format!(
+                "this change touches paths CODEOWNERS assigns (ENG-21) that no stakeholder \
+                 comment names, so none consents to them: {} and 2 more",
+                listed.join(", ")
+            )
+        )),
+        "{:?}",
+        got.findings
+    );
+}
+
+#[test]
+fn a_change_without_a_stakeholder_path_has_no_eng_21_finding() {
+    let got = analyse(&base(), &base(), &header("crates/parinn/src/main.rs"), &[]);
+
+    assert!(got.findings.iter().all(|f| !f.body.contains("ENG-21")));
 }

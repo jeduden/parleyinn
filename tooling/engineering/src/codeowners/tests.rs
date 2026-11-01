@@ -5,29 +5,30 @@ const INDEX: &str = "| **Stakeholder** | @boss, also the security reviewer |\n";
 const ENG: &str = "\
 | ID | Pri | Requirement | Ver |
 |---|---|---|---|
-| ENG-11 | P0 | Coverage for security-sensitive crates (`pin`, `search`) and more. | A |
-| ENG-21 | P0 | Changes to `docs/srs/`, or to what enforces it (the requirement–scenario gate, CI, the lint and coverage configuration, the agent instructions and `CODEOWNERS` itself) need the stakeholder. | I |
+| ENG-21 | P0 | Changes to the specification (`docs/srs/` and the decision records), to the scenarios (`features/`), or to the process (CI, the build, lint and coverage configuration, the agent instructions and `CODEOWNERS` itself) need the stakeholder. | I |
 ";
 
 const OWNERS: &str = "\
 # a comment
 /docs/srs/        @boss
 /docs/adr/        @boss
-/tooling/         @boss
+/features/        @boss
 /crates/*/clippy.toml @boss
 /crates/*/Cargo.toml  @boss
+/tooling/*/Cargo.toml @boss
 /.github/         @boss # trailing
 /scripts/         @boss
 /Cargo.toml       @boss
 /CLAUDE.md        @boss
 /.claude/         @boss
 /SECURITY.md      @boss
-/crates/pin/      @boss
-/crates/search/   @boss
 ";
 
 const FILES: &[&str] = &[
-    "tooling/x/lib.rs",
+    "features/a.feature",
+    "tooling/x/Cargo.toml",
+    "tooling/x/src/lib.rs",
+    "crates/pin/src/lib.rs",
     "scripts/a.sh",
     "Cargo.toml",
     "CLAUDE.md",
@@ -115,52 +116,25 @@ fn patterns_anchor_name_and_glob_the_way_codeowners_does() {
 }
 
 #[test]
-fn roles_come_from_the_stakeholder_row() {
+fn the_stakeholder_comes_from_the_stakeholder_row() {
     let (_d, c) = repo(OWNERS);
-    assert_eq!(
-        roles(&c).unwrap(),
-        Roles {
-            stakeholder: "@boss".to_owned(),
-            security_reviewer: "@boss".to_owned()
-        }
-    );
+    assert_eq!(stakeholder(&c).unwrap(), "@boss");
 
     let (_d, c) = crate::tests::checkout(&[("docs/srs/index.md", "| **Stakeholder** | @boss |\n")]);
-    assert_eq!(roles(&c).unwrap().security_reviewer, "");
+    assert_eq!(stakeholder(&c).unwrap(), "@boss");
 
     let (_d, c) =
         crate::tests::checkout(&[("docs/srs/index.md", "| **Stakeholder** | nobody |\n")]);
-    assert_eq!(roles(&c).unwrap_err(), "the Stakeholder row names no user");
+    assert_eq!(
+        stakeholder(&c).unwrap_err(),
+        "the Stakeholder row names no user"
+    );
 
     let (_d, c) = crate::tests::checkout(&[("docs/srs/index.md", "x\n")]);
     assert_eq!(
-        roles(&c).unwrap_err(),
+        stakeholder(&c).unwrap_err(),
         "docs/srs/index.md has no Stakeholder row"
     );
-}
-
-#[test]
-fn the_security_crates_come_from_the_eng_11_row() {
-    let (_d, c) = repo(OWNERS);
-    assert_eq!(security_crates(&c).unwrap(), ["pin", "search"]);
-
-    for (row, want) in [
-        ("Text.", "ENG-11 names no security-sensitive crates"),
-        (
-            "security-sensitive crates (`a`",
-            "ENG-11's crate list is not closed",
-        ),
-        (
-            "security-sensitive crates ()",
-            "ENG-11 lists no security-sensitive crate",
-        ),
-    ] {
-        let md = format!(
-            "| ID | Pri | Requirement | Ver |\n|---|---|---|---|\n| ENG-11 | P0 | {row} | A |\n"
-        );
-        let (_d, c) = crate::tests::checkout(&[("docs/srs/10.md", md.as_str())]);
-        assert_eq!(security_crates(&c).unwrap_err(), want);
-    }
 }
 
 #[test]
@@ -171,7 +145,7 @@ fn a_conforming_file_has_no_problem() {
         Vec::<String>::new()
     );
     assert_eq!(
-        security_crates_owned_by_the_security_reviewer(&repo(OWNERS).1),
+        no_owner_on_rust_source(&repo(OWNERS).1),
         Vec::<String>::new()
     );
 }
@@ -195,6 +169,18 @@ fn an_enforcing_path_without_the_stakeholder_is_named_with_its_class() {
         "/crates/*/clippy.toml @other",
     );
     has(&problems(&owners), "crates/zed/clippy.toml");
+
+    let owners = OWNERS.replace("/features/        @boss\n", "");
+    has(
+        &problems(&owners),
+        "features/ (the scenarios (`features/`)) is owned by [], want @boss",
+    );
+
+    let owners = OWNERS.replace("/tooling/*/Cargo.toml @boss\n", "");
+    has(
+        &problems(&owners),
+        "tooling/x/Cargo.toml (the build, lint and coverage configuration) is owned by []",
+    );
 }
 
 #[test]
@@ -224,20 +210,18 @@ fn missing_inputs_are_named() {
         &stakeholder_owns_the_enforcing_paths(&c),
         "no requirement ENG-21 in the SRS",
     );
-    assert_eq!(
-        no_owner_on_any_other_path(&c),
-        ["no requirement ENG-11 in the SRS"]
-    );
 
     let (_d, c) = crate::tests::checkout(&[("docs/srs/10.md", ENG)]);
     assert!(no_owner_on_any_other_path(&c)[0].starts_with("read .github/CODEOWNERS"));
-    assert!(security_crates_owned_by_the_security_reviewer(&c).len() >= 2);
+    assert!(no_owner_on_rust_source(&c)[0].starts_with("read .github/CODEOWNERS"));
 }
 
 #[test]
 fn an_owner_on_any_other_path_is_named() {
     for extra in [
         "/crates/parinn/src/ @boss",
+        "/crates/pin/ @boss",
+        "/tooling/ @boss",
         "* @boss",
         "/docs/ @boss",
         "/docs/adr/x/ @boss",
@@ -277,22 +261,101 @@ fn syntax_the_reader_cannot_judge_is_reported() {
 }
 
 #[test]
-fn the_security_crates_belong_to_the_security_reviewer() {
-    let owners = OWNERS.replace("/crates/search/   @boss\n", "");
-    let (_d, c) = repo(&owners);
+fn an_owner_on_rust_source_is_named() {
+    for extra in ["/crates/pin/ @boss", "*.rs @boss", "/tooling/x/src/ @boss"] {
+        let (_d, c) = repo(&format!("{OWNERS}{extra}\n"));
+        let found = no_owner_on_rust_source(&c);
+        assert!(!found.is_empty(), "{extra}");
+        assert!(
+            found
+                .iter()
+                .all(|p| p.ends_with(".rs is Rust source owned by [@boss]")),
+            "{extra}: {found:?}"
+        );
+    }
 
+    let (_d, c) = repo(&format!("{OWNERS}/crates/pin/ @boss\n"));
     assert_eq!(
-        security_crates_owned_by_the_security_reviewer(&c),
-        ["crates/search/ is not owned by @boss"]
+        no_owner_on_rust_source(&c),
+        ["crates/pin/src/lib.rs is Rust source owned by [@boss]"]
     );
+}
 
+#[test]
+fn rust_source_under_target_and_git_is_not_read() {
     let (_d, c) = crate::tests::checkout(&[
-        ("docs/srs/index.md", "| **Stakeholder** | @boss |\n"),
-        ("docs/srs/10.md", ENG),
-        (FILE, OWNERS),
+        (FILE, "* @boss\n"),
+        ("target/debug/build/x.rs", "x"),
+        (".git/x.rs", "x"),
+        ("a.txt", "x"),
     ]);
+
+    assert_eq!(no_owner_on_rust_source(&c), Vec::<String>::new());
+}
+
+#[test]
+fn another_checkout_under_claude_worktrees_is_not_read() {
+    let (_d, c) = crate::tests::checkout(&[
+        (FILE, "/.claude/ @boss\n"),
+        (".claude/worktrees/w/crates/a/src/lib.rs", "x"),
+        ("x/.claude/worktrees/b.rs", "x"),
+    ]);
+
+    assert_eq!(no_owner_on_rust_source(&c), Vec::<String>::new());
+
+    let (_d, c) =
+        crate::tests::checkout(&[(FILE, "/.claude/ @boss\n"), (".claude/other/a.rs", "x")]);
     assert_eq!(
-        security_crates_owned_by_the_security_reviewer(&c),
-        ["the SRS index names no security reviewer"]
+        no_owner_on_rust_source(&c),
+        [".claude/other/a.rs is Rust source owned by [@boss]"]
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn a_directory_symlink_is_not_followed() {
+    let (_d, c) = crate::tests::checkout(&[(FILE, "* @boss\n"), ("a/x.txt", "x")]);
+    std::os::unix::fs::symlink(c.root.join("a"), c.root.join("a/loop")).unwrap();
+
+    assert_eq!(no_owner_on_rust_source(&c), Vec::<String>::new());
+}
+
+#[test]
+fn under_joins_a_name_to_its_directory_or_the_root() {
+    assert_eq!(under("", "a.rs"), "a.rs");
+    assert_eq!(under("a/b", "c.rs"), "a/b/c.rs");
+}
+
+#[cfg(unix)]
+#[test]
+fn a_file_name_that_is_not_utf8_is_reported() {
+    use std::os::unix::ffi::OsStrExt;
+    let (_d, c) = crate::tests::checkout(&[(FILE, "* @boss\n"), ("a/b.rs", "")]);
+    std::fs::write(
+        c.root
+            .join("a")
+            .join(std::ffi::OsStr::from_bytes(b"\xff.rs")),
+        "",
+    )
+    .unwrap();
+
+    let got = rust_sources(&c, "a");
+
+    assert_eq!(got.sources, ["a/b.rs"]);
+    assert_eq!(got.unread, ["a/\u{fffd}.rs is not UTF-8"]);
+}
+
+#[test]
+fn a_directory_that_cannot_be_read_is_reported() {
+    let (_d, c) = crate::tests::checkout(&[(FILE, "* @boss\n")]);
+
+    let got = rust_sources(&c, "missing");
+
+    assert_eq!(got.sources, Vec::<String>::new());
+    assert_eq!(got.unread.len(), 1, "{:?}", got.unread);
+    assert!(
+        got.unread[0].starts_with("read missing: "),
+        "{:?}",
+        got.unread
     );
 }

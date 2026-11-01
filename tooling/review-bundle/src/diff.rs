@@ -8,7 +8,7 @@
 //! that reads as neither is listed, never guessed at, so the analysis
 //! can fail closed on it.
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 /// The header every file's section of a diff starts with.
 const HEADER: &str = "diff --git ";
@@ -68,7 +68,7 @@ pub fn added_lines(diff: &str) -> Vec<(String, &str)> {
 
 /// The old and new path a `diff --git` header names, or `None` when
 /// either side does not read.
-fn header(line: &str) -> Option<(String, String)> {
+pub(crate) fn header(line: &str) -> Option<(String, String)> {
     let rest = line.strip_prefix(HEADER)?;
     let (a, rest) = if rest.starts_with('"') {
         let (a, rest) = quoted(rest)?;
@@ -175,9 +175,132 @@ pub fn mentioned_ids(diff: &str) -> Vec<String> {
     let changed = diff.lines().filter(|l| {
         (l.starts_with('+') || l.starts_with('-')) && !l.starts_with("+++") && !l.starts_with("---")
     });
-    let out: BTreeSet<String> = changed.flat_map(ids_in).map(str::to_owned).collect();
+    let out: BTreeSet<String> = changed
+        .flat_map(|l| ids_in(&l[1..]))
+        .map(str::to_owned)
+        .collect();
 
     out.into_iter().collect()
+}
+
+/// Every requirement id an added or removed line of a file other than
+/// Markdown or a test names, sorted and each once: code and
+/// configuration that name a row, not prose that quotes one or a test
+/// that takes one as its data. Lines before any header belong to no
+/// file and are left out.
+#[must_use]
+pub fn ids_in_code(diff: &str) -> Vec<String> {
+    let out: BTreeSet<String> = ids_by_file(diff)
+        .into_iter()
+        .filter(|(f, _)| !f.ends_with(".md") && !f.ends_with("/tests.rs") && !f.contains("/tests/"))
+        .flat_map(|(_, ids)| ids)
+        .collect();
+
+    out.into_iter().collect()
+}
+
+/// Each file of `diff` whose added or removed lines name a requirement
+/// id, with those ids: the new side of its header, or the header line
+/// itself when that does not read. Lines before any header belong to no
+/// file and are left out.
+#[must_use]
+pub fn ids_by_file(diff: &str) -> BTreeMap<String, BTreeSet<String>> {
+    let mut file: Option<String> = None;
+    let mut out: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
+    for line in diff.lines() {
+        if line.starts_with(HEADER) {
+            file = Some(header(line).map_or_else(|| line.to_owned(), |(_, b)| b));
+        } else if let Some(f) = &file
+            && (line.starts_with('+') || line.starts_with('-'))
+            && !line.starts_with("+++")
+            && !line.starts_with("---")
+        {
+            let ids: Vec<String> = ids_in(&line[1..]).map(str::to_owned).collect();
+            if !ids.is_empty() {
+                out.entry(f.clone()).or_default().extend(ids);
+            }
+        }
+    }
+
+    out
+}
+
+/// The sections of `diff` for the files in `keep`, by either side of
+/// their header, and every section whose header does not read, so a
+/// file whose paths cannot be told is never left out. What precedes
+/// the first header is left out.
+#[must_use]
+pub fn only(diff: &str, keep: &BTreeSet<String>) -> String {
+    let mut out = String::new();
+    let mut kept = false;
+    for line in diff.split_inclusive('\n') {
+        if line.starts_with(HEADER) {
+            kept = header(line.trim_end_matches('\n'))
+                .is_none_or(|(a, b)| keep.contains(&a) || keep.contains(&b));
+        }
+        if kept {
+            out.push_str(line);
+        }
+    }
+
+    out
+}
+
+/// One part of a diff split by file: the files it holds, in path
+/// order, and their sections.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Part {
+    /// Each file's path, the new side of its header, or the header
+    /// line itself when that does not read.
+    pub files: Vec<String>,
+    pub text: String,
+}
+
+/// `diff` split into parts of at most `limit` bytes each, a file's
+/// section never split: the sections sorted by path, so related files
+/// stay together, and packed in that order, each part taking the next
+/// section while it fits; a section larger than `limit` makes a part
+/// alone. What precedes the first header leads the first part. An
+/// empty diff has no part.
+#[must_use]
+pub fn split(diff: &str, limit: usize) -> Vec<Part> {
+    let mut preamble = String::new();
+    let mut sections: Vec<(String, String)> = Vec::new();
+    for line in diff.split_inclusive('\n') {
+        if line.starts_with(HEADER) {
+            let header_line = line.trim_end_matches('\n');
+            let path = header(header_line).map_or_else(|| header_line.to_owned(), |(_, b)| b);
+            sections.push((path, String::new()));
+        }
+        match sections.last_mut() {
+            Some((_, text)) => text.push_str(line),
+            None => preamble.push_str(line),
+        }
+    }
+    sections.sort_by(|a, b| a.0.cmp(&b.0));
+    let mut parts: Vec<Part> = Vec::new();
+    for (path, text) in sections {
+        match parts.last_mut() {
+            Some(part) if part.text.len() + text.len() <= limit => {
+                part.files.push(path);
+                part.text.push_str(&text);
+            }
+            _ => parts.push(Part {
+                files: vec![path],
+                text,
+            }),
+        }
+    }
+    match parts.first_mut() {
+        Some(first) => first.text.insert_str(0, &preamble),
+        None if !preamble.is_empty() => parts.push(Part {
+            files: Vec::new(),
+            text: preamble,
+        }),
+        None => {}
+    }
+
+    parts
 }
 
 #[cfg(test)]

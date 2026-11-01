@@ -1,7 +1,7 @@
 //! The `review-gate` command decides the review the reviewer app posts
 //! on a pull request (ENG-28). The review workflow runs it from main's
 //! copy of the repository, in the one job that holds the app's key,
-//! after the reviewing agent wrote its review outcome. It prints the
+//! after review-run wrote the review outcome. It prints the
 //! review as the JSON GitHub's create-review endpoint takes, prints
 //! nothing when the pull request moved past the reviewed head, and
 //! exits non-zero on anything it cannot decide, so the job fails and

@@ -1,0 +1,54 @@
+component = "test-engineer-unit"
+kind = "clean"
+title = "a private helper every branch of which its caller's unit tests take"
+
+# A private helper with no test of its own, each of its branches taken
+# by the unit tests of the function that calls it, and a test that
+# checks two results at once. Neither is a finding: no branch goes
+# untested, and test style breaks no requirement. A run of the review
+# listed "has no dedicated unit test" and "one test asserts two
+# behaviours" by the dozen, and each became a nit.
+
+[[create]]
+file = "tooling/review-bundle/src/shape.rs"
+content = '''
+//! The shape of a diff: how many files it touches.
+
+/// How many files `diff` changes: one per `diff --git` header.
+#[must_use]
+pub fn files(diff: &str) -> usize {
+    diff.lines().filter(|l| header(l)).count()
+}
+
+/// Whether `line` opens a file of a diff.
+fn header(line: &str) -> bool {
+    line.starts_with("diff --git ")
+}
+
+#[cfg(test)]
+mod tests;
+'''
+
+[[create]]
+file = "tooling/review-bundle/src/shape/tests.rs"
+content = '''
+use super::*;
+
+#[test]
+fn files_counts_each_header_and_skips_other_lines() {
+    assert_eq!(files("diff --git a/x b/x\n+1\ndiff --git a/y b/y\n"), 2);
+    assert_eq!(files("+1\n-2\n"), 0);
+}
+'''
+
+[[replace]]
+file = "tooling/review-bundle/src/lib.rs"
+old = "pub mod render;\n"
+new = "pub mod render;\npub mod shape;\n"
+
+[expect]
+outcome = ["none"]
+
+[[expect.none]]
+path = "tooling/review-bundle/src/shape"
+form = "linked"

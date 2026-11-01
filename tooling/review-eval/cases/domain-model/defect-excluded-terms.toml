@@ -1,0 +1,15 @@
+component = "domain-model"
+kind = "defect"
+title = "a sentence in terms the model excludes, in an SRS section"
+
+[[replace]]
+file = "docs/srs/02-context.md"
+old = "# 2. Context\n"
+new = "# 2. Context\n\nA bot on the lane records each attempt it makes.\n"
+
+[expect]
+
+[[expect.finding]]
+path = "docs/srs/02-context.md"
+severity = "blocking"
+mentions_any = ["lane", "bot", "attempt"]

@@ -41,7 +41,7 @@ sort: order
 header: ""
 row: "- [{title}]({filename}) — {summary}"
 ?>
-- [Principals and agents](principals-and-agents.md) — Who acts in ParleyInn: principals, persons and service accounts, managed policy, agents, runs and subagents, the facilitator, authors, members, the owner and delegates.
+- [Principals and agents](principals-and-agents.md) — Who acts in ParleyInn: principals, persons and service accounts, managed policy, harness configuration, agents, runs and subagents, the facilitator, authors, members, the owner and delegates.
 - [Harness facts](harness-facts.md) — The harness's own facts that ParleyInn records and names: the harness, harness sessions and transcripts, hooks, turns and compaction.
 - [Places](places.md) — Where ParleyInn's state lives and is shared: homes, nodes, devices and paired phones, sandboxes, rooms and their kinds, visibility, peers and blind peers.
 - [Record](record.md) — The record and what derives from it: writers, events, addresses, segments, seals, provenance and origin, spans and landmarks, quarantine and purge, receipts, backups, bundles and exports.
@@ -143,6 +143,43 @@ in that tool's meaning in files an outside tool writes and maintains, or that
 name its fields. Examples are frit's plan skills and plan files, and the
 repository's own engineering tooling, such as ENG-28's review gate and the
 requirement naming its fields. The domain-model agent skips them.
+
+The review's tooling words are engineering-tooling words too, described in
+[review-evaluation.md](../review-evaluation.md):
+
+- **Reviewer component, case, scorecard**: the review's agents, the cases that
+  hold them and the published results.
+- **Review context, review class, touched ids, dispatch row**: the file
+  `review/context/<specialist>.md` that the review bundle writes for one
+  specialist, holding the review class (light, standard or deep), the ids the
+  change touches, the dispatch row that names the specialist and the
+  deterministic findings on its files.
+- **Stability measurement**: reviews of the same pull-request snapshots,
+  repeated to measure how stable the review is.
+- **Flip rate, finding overlap**: how stable the review is: the share of a
+  snapshot's reviews whose verdict differs from the most common one, and per
+  agent the Jaccard overlap of its finding sets across those reviews.
+- **Snapshot**: a pull request's base and head commits, frozen, which a
+  stability measurement reviews. It is a head and its inputs, not the forge's
+  pull-request state.
+- **Run list**: a review's file with one entry per agent run, holding its
+  tokens, its cost and why its answer was not taken.
+- **Run report**: the static HTML built from the run list.
+- **Answer key, answer store**: a hash of everything one review agent's answer
+  depends on, and the directory of accepted answers filed under such keys. The
+  key is a content hash, not a ParleyInn key and not a seat or signing key.
+- **Stalled**: an agent whose gap came back in the tool's limit of resumes in a
+  row, or a blocking finding kept in three reviews in a row on an unchanged
+  file; a person acts on it.
+- **Specialist report**: what one of the review's specialist agents gives, its
+  findings and outcome; neither the run report nor a forge report.
+
+The run list's `verdict` and `attempt` fields are ENG-28 and ENG-32 tool
+fields, covered by the engineering-tooling carve-out above.
+
+A review here is one run of the whole review of a pull request. An agent run is
+one run of a review's agent, and a case run one run of a reviewer component on a
+case; neither is a ParleyInn run, and a run-list entry is no span.
 
 Build and packaging words have no ParleyInn meaning: crate, lockfile, release
 build, executable and release target. They are engineering-tooling words.

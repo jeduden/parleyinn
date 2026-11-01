@@ -1,7 +1,8 @@
 ---
 id: ADR-2609301941
 title: "Agent review through a reviewer app and a deterministic gate"
-status: accepted
+status: superseded
+superseded-by: ADR-2610262245
 summary: >-
   An agent reviews each pull request in a workflow main defines, with
   read-only tools and a read-only token. A separate job holding the

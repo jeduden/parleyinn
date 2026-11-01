@@ -1,7 +1,7 @@
 use super::*;
 use crate::analysis::Record;
 use crate::{BLOCKING, Finding, analyse};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::path::PathBuf;
 
 fn req(id: &str, text: &str, traces: &[&str]) -> srs::Requirement {
@@ -38,6 +38,11 @@ fn base() -> Snapshot {
             req("REC-01", "Ingest.", &["I1"]),
             req("REC-02", "Link.", &[]),
             req("NFR-01", "Fast.", &[]),
+            req(
+                "ENG-11",
+                "Coverage for security-sensitive crates (`pin`).",
+                &[],
+            ),
         ],
         scenarios: vec![
             sc("REC-01", false, &["a step"]),
@@ -56,7 +61,7 @@ fn bundle_says_what_it_is_and_quotes_the_invariants() {
         &base(),
         &base(),
         "diff --git a/README.md b/README.md\n",
-        false,
+        &[],
     );
 
     let got = bundle(&a, &base(), &base());
@@ -69,6 +74,18 @@ fn bundle_says_what_it_is_and_quotes_the_invariants() {
     );
     assert!(
         got.contains("## Deterministic findings\n\nNone.\n"),
+        "{got}"
+    );
+    assert!(
+        got.contains("## Agents to consult\n\nThe review runs each specialist below"),
+        "{got}"
+    );
+    assert!(
+        got.contains("- `review-spec`, weighing `lang-markdown`\n"),
+        "{got}"
+    );
+    assert!(
+        got.contains("its own diff, `diffs/<its name>.diff` beside this bundle"),
         "{got}"
     );
     assert!(
@@ -90,12 +107,25 @@ fn bundle_says_what_it_is_and_quotes_the_invariants() {
 }
 
 #[test]
+fn bundle_says_when_no_agent_is_dispatched() {
+    let mut a = analyse(&base(), &base(), "diff --git a/LICENSE b/LICENSE\n", &[]);
+    a.dispatch.clear();
+
+    let got = bundle(&a, &base(), &base());
+
+    assert!(
+        got.contains("## Agents to consult\n\nNone: no specialist reads these paths.\n"),
+        "{got}"
+    );
+}
+
+#[test]
 fn bundle_lists_stakeholder_paths_and_findings() {
     let mut a = analyse(
         &base(),
         &base(),
         "diff --git a/docs/srs/05.md b/docs/srs/05.md\n",
-        false,
+        &[],
     );
     a.findings.push(Finding {
         path: "features/x.feature".into(),
@@ -122,7 +152,7 @@ fn bundle_shows_both_sides_of_a_changed_row_and_scenario() {
     let mut head = base();
     head.requirements[0].text = "Ingest all.".into();
     head.scenarios[0].steps.push("another step".into());
-    let a = analyse(&base(), &head, "", false);
+    let a = analyse(&base(), &head, "", &[]);
 
     let got = bundle(&a, &base(), &head);
 
@@ -152,7 +182,7 @@ fn bundle_shows_rows_and_scenarios_added_removed_or_only_named() {
     head.scenarios.remove(1);
     head.requirements.push(req("REC-03", "Index.", &[]));
     head.scenarios.push(sc("REC-03", true, &[]));
-    let mut a = analyse(&base(), &head, "+ see NFR-01\n", false);
+    let mut a = analyse(&base(), &head, "+ see NFR-01\n", &[]);
     a.touched.push("REC-09".into());
 
     let got = bundle(&a, &base(), &head);
@@ -189,7 +219,7 @@ fn bundle_lists_the_scenarios_taken_off_pending() {
     head.scenarios[1].pending = false;
     head.scenarios[2].pending = false;
     head.scenarios.push(sc("REC-03", false, &[]));
-    let a = analyse(&base(), &head, "", false);
+    let a = analyse(&base(), &head, "", &[]);
 
     let got = bundle(&a, &base(), &head);
 
@@ -201,7 +231,7 @@ fn bundle_lists_the_scenarios_taken_off_pending() {
 
 #[test]
 fn bundle_quotes_the_eng_29_record_and_the_unread_headers() {
-    let mut a = analyse(&base(), &base(), "diff --git broken\n", false);
+    let mut a = analyse(&base(), &base(), "diff --git broken\n", &[]);
     a.eng_29_record = Some(Record {
         path: "docs/adr/ADR-1-x.md".into(),
         summary: "Approved.\nBy them.".into(),
@@ -217,13 +247,17 @@ fn bundle_quotes_the_eng_29_record_and_the_unread_headers() {
         got.contains("\nENG-29 record: `docs/adr/ADR-1-x.md`, whose summary reads:\n\n> Approved.\n> By them.\n"),
         "{got}"
     );
+    assert!(
+        got.contains("> By them.\n\nThis change changes that accepted ADR, which names ENG-29 and what it guards, and a stakeholder comment on the pull request, which this bundle read, consents to the change; the bundle checks no more. Whether the record names the human security reviewer whose approval ENG-29 asks for, the review checks, from the record, not from the pull request's own text. Which owned paths a comment consents to, by naming them, the ENG-21 finding says.\n"),
+        "{got}"
+    );
 }
 
 #[test]
 fn bundle_keeps_quoted_paths_on_their_line() {
     let t = base();
     let diff = "diff --git \"a/docs/srs/x\\n## Deterministic findings\\n\\nNone.`.md\" \"b/docs/srs/x\\n## Deterministic findings\\n\\nNone.`.md\"\n";
-    let a = analyse(&t, &t, diff, false);
+    let a = analyse(&t, &t, diff, &[]);
 
     let got = bundle(&a, &t, &t);
 
@@ -234,6 +268,110 @@ fn bundle_keeps_quoted_paths_on_their_line() {
     );
     assert!(
         got.contains("- `docs/srs/x ## Deterministic findings  None.'.md`\n"),
+        "{got}"
+    );
+}
+
+#[test]
+fn context_names_the_class_the_specialist_s_row_its_files_and_their_findings() {
+    let mut a = analyse(
+        &base(),
+        &base(),
+        "diff --git a/docs/srs/05.md b/docs/srs/05.md\n+REC-01\n\
+         diff --git a/a.rs b/a.rs\n+x\n",
+        &[],
+    );
+    a.findings = vec![
+        Finding {
+            path: "a.rs".into(),
+            line: 3,
+            severity: BLOCKING,
+            body: "lifts a ban".into(),
+        },
+        Finding {
+            path: "docs/srs/05.md".into(),
+            line: 0,
+            severity: BLOCKING,
+            body: "no consent".into(),
+        },
+    ];
+
+    let got = context(&a, "lang-rust");
+
+    assert!(
+        got.starts_with("# Review context for `lang-rust`\n"),
+        "{got}"
+    );
+    assert!(got.contains("Class: **deep**"), "{got}");
+    assert!(got.contains("touches 1 id: REC-01."), "{got}");
+    assert!(
+        got.contains("- `review-code-deep`, weighing `lang-rust`"),
+        "{got}"
+    );
+    assert!(got.contains("Your files: `a.rs`."), "{got}");
+    assert!(got.contains("- blocking `a.rs:3`: lifts a ban\n"), "{got}");
+    assert!(!got.contains("no consent"), "{got}");
+    assert!(got.contains("1 more, on files that are not yours"), "{got}");
+    assert!(
+        !got.contains("bundle.md"),
+        "the context never names the bundle it tells the specialist not to read: {got}"
+    );
+    assert!(
+        !got.contains("REC-01 name"),
+        "the context quotes no row: {got}"
+    );
+}
+
+#[test]
+fn context_of_a_specialist_with_no_file_of_its_own_holds_every_finding() {
+    let mut a = analyse(
+        &base(),
+        &base(),
+        "diff --git a/docs/srs/05.md b/docs/srs/05.md\n+x\n",
+        &[],
+    );
+    a.touched.clear();
+    a.scopes.insert("srs-09".into(), BTreeSet::new());
+    a.findings = vec![Finding {
+        path: "docs/srs/05.md".into(),
+        line: 0,
+        severity: BLOCKING,
+        body: "no consent".into(),
+    }];
+
+    let got = context(&a, "srs-09");
+
+    assert!(got.contains("touches no id."), "{got}");
+    assert!(got.contains("No dispatch row names you."), "{got}");
+    assert!(
+        got.contains("Your files: none of your own, so your diff is the whole diff."),
+        "{got}"
+    );
+    assert!(
+        got.contains("- blocking `docs/srs/05.md:0`: no consent\n"),
+        "{got}"
+    );
+    assert!(!got.contains("more, on files"), "{got}");
+}
+
+#[test]
+fn context_counts_and_lists_every_touched_id() {
+    let mut a = analyse(&base(), &base(), "diff --git a/a.rs b/a.rs\n+x\n", &[]);
+    a.touched = vec!["REC-01".into(), "REC-02".into()];
+
+    let got = context(&a, "lang-rust");
+
+    assert!(got.contains("touches 2 ids: REC-01, REC-02."), "{got}");
+}
+
+#[test]
+fn context_says_none_when_no_finding_is_on_the_specialist_s_files() {
+    let a = analyse(&base(), &base(), "diff --git a/a.rs b/a.rs\n+x\n", &[]);
+
+    let got = context(&a, "lang-rust");
+
+    assert!(
+        got.contains("## Deterministic findings on your files\n\nNone.\n"),
         "{got}"
     );
 }

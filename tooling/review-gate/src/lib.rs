@@ -1,16 +1,19 @@
-//! The review gate between a reviewing agent and the approval it may
-//! earn (ENG-21, ENG-28). The agent only writes a structured review
-//! outcome; this crate, run by the workflow step that alone holds the
-//! reviewer app's key, decides what review to post. It approves only an
-//! approving outcome with no blocking finding, on the head the agent
-//! read, once CI passed there. The deterministic checks the review
-//! workflow runs before the agent add their own findings, and a
-//! blocking one withholds approval whatever the agent says. It is
+//! The review gate between the review's agents and the approval they
+//! may earn (ENG-21, ENG-28). The agents' runs only yield a structured
+//! review outcome; this crate, run by the workflow step that alone
+//! holds the reviewer app's key, decides what review to post. It
+//! approves only an approving outcome with no blocking finding, on the
+//! head the agents read, once CI passed there. The deterministic checks
+//! the review workflow runs before the agents add their own findings,
+//! and a blocking one withholds approval whatever the agents say. It is
 //! repository tooling and never links into a shipped executable.
 
 pub mod cli;
+pub mod report;
 
-use std::collections::BTreeMap;
+pub use report::report_check;
+
+use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
 use std::fmt::Write as _;
 
@@ -30,13 +33,18 @@ pub const NIT: &str = "nit";
 pub const APPROVE: &str = "APPROVE";
 /// The review event that requests changes, as GitHub names it.
 pub const REQUEST_CHANGES: &str = "REQUEST_CHANGES";
+/// The check the post job posts with the gate's decision (ENG-28),
+/// which main's ruleset requires from the reviewer app alone (ENG-21).
+pub const OWN_CHECK: &str = "review-gate";
+/// The reviewer app, `jeduden-review-agent`, by its GitHub App id.
+pub const REVIEWER_APP_ID: i64 = 5_140_085;
 
 /// The check the branch ruleset requires: the job that passes only when
 /// every CI job passed.
 const CI_CHECK: &str = "CI";
 
-/// The reviewing agent's structured output.
-#[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize)]
+/// The review outcome: the review's structured output.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields, default)]
 pub struct ReviewOutcome {
     pub verdict: String,
@@ -47,7 +55,7 @@ pub struct ReviewOutcome {
 
 /// One problem the agent found, at a path and line of the reviewed
 /// tree; line 0 means the whole file.
-#[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields, default)]
 pub struct Finding {
     pub path: String,
@@ -72,6 +80,9 @@ pub struct CheckRun {
     pub conclusion: String,
     #[serde(deserialize_with = "null_as_default")]
     pub started_at: String,
+    /// The GitHub App that posted it, by id; 0 when unknown.
+    #[serde(deserialize_with = "null_as_default")]
+    pub app: i64,
 }
 
 /// Everything the gate decides from.
@@ -86,6 +97,21 @@ pub struct Input {
     /// The findings of the deterministic checks the workflow ran on the
     /// reviewed head, beside the agent's.
     pub checked: Vec<Finding>,
+    /// Every agent the review bundle dispatched: the generalists and
+    /// their specialists.
+    pub dispatched: BTreeSet<String>,
+    /// Every dispatched agent the review consulted: each one that
+    /// answered.
+    pub consulted: BTreeSet<String>,
+    /// The specialists the review bundle dispatched, whose reports the
+    /// generalists read.
+    pub specialists: BTreeSet<String>,
+    /// Each specialist's report, by name, as the review assembled it
+    /// from the specialist's run log; one with no file is absent.
+    pub reports: BTreeMap<String, String>,
+    /// Each agent's final answer, by name, as its run log shows it: a
+    /// specialist's is its outcome line.
+    pub answers: BTreeMap<String, String>,
 }
 
 /// The pull request review to post, in the shape GitHub's
@@ -111,6 +137,26 @@ pub enum Error {
     },
     /// The required CI check has not passed on the reviewed head.
     Ci(String),
+    /// The review bundle's dispatch does not read.
+    Dispatch(serde_json::Error),
+    /// The list of agents the review consulted does not read.
+    Consulted(serde_json::Error),
+    /// The list of agents the review consulted holds an empty name.
+    UnnamedAgent,
+    /// The review left these dispatched agents out.
+    Unconsulted(Vec<String>),
+    /// The dispatch names an agent whose name is not lowercase letters,
+    /// digits and hyphens, so it cannot name a report file.
+    AgentName(String),
+    /// The agents' answers from the run log do not read.
+    Answers(serde_json::Error),
+    /// A specialist's report is missing or empty, does not end with its
+    /// outcome, holds a finding line in none of its forms, or ends with
+    /// another outcome than the specialist answered.
+    Report {
+        agent: String,
+        problem: report::Problem,
+    },
 }
 
 impl fmt::Display for Error {
@@ -120,6 +166,19 @@ impl fmt::Display for Error {
             Self::Checked(msg) => write!(f, "review: malformed deterministic findings: {msg}"),
             Self::CheckRun { line, source } => write!(f, "review: check run line {line}: {source}"),
             Self::Ci(head) => write!(f, "review: CI has not passed on the reviewed head: {head}"),
+            Self::Dispatch(source) => write!(f, "review: malformed dispatch: {source}"),
+            Self::Consulted(source) => write!(f, "review: malformed consulted agents: {source}"),
+            Self::UnnamedAgent => {
+                write!(f, "review: malformed consulted agents: an empty agent name")
+            }
+            Self::Unconsulted(agents) => write!(
+                f,
+                "review: dispatched but not consulted: {}",
+                agents.join(", ")
+            ),
+            Self::AgentName(name) => write!(f, "review: malformed dispatch: agent name {name:?}"),
+            Self::Answers(source) => write!(f, "review: malformed agents' answers: {source}"),
+            Self::Report { agent, problem } => write!(f, "review: {agent} {problem}"),
         }
     }
 }
@@ -127,8 +186,17 @@ impl fmt::Display for Error {
 impl std::error::Error for Error {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match self {
-            Self::CheckRun { source, .. } => Some(source),
-            Self::Outcome(_) | Self::Checked(_) | Self::Ci(_) => None,
+            Self::CheckRun { source, .. }
+            | Self::Dispatch(source)
+            | Self::Consulted(source)
+            | Self::Answers(source) => Some(source),
+            Self::Outcome(_)
+            | Self::Checked(_)
+            | Self::Ci(_)
+            | Self::UnnamedAgent
+            | Self::Unconsulted(_)
+            | Self::AgentName(_)
+            | Self::Report { .. } => None,
         }
     }
 }
@@ -200,6 +268,84 @@ fn validate_findings(findings: &[Finding]) -> Result<(), String> {
     Ok(())
 }
 
+/// Reads the review bundle's dispatch, each generalist with its
+/// specialists, into the set of every agent it names.
+///
+/// # Errors
+///
+/// Fails on anything that is not such a map.
+pub fn parse_dispatch(data: &str) -> Result<BTreeSet<String>, Error> {
+    let dispatch: BTreeMap<String, BTreeSet<String>> =
+        serde_json::from_str(data).map_err(Error::Dispatch)?;
+
+    Ok(dispatch
+        .into_iter()
+        .flat_map(|(generalist, specialists)| std::iter::once(generalist).chain(specialists))
+        .collect())
+}
+
+/// Reads the specialists the review bundle's dispatch names, each
+/// generalist's list, refusing a name that could not name a file.
+///
+/// # Errors
+///
+/// Fails on anything that is not such a map, or a name that is not
+/// lowercase letters, digits and hyphens.
+pub fn parse_specialists(data: &str) -> Result<BTreeSet<String>, Error> {
+    let dispatch: BTreeMap<String, BTreeSet<String>> =
+        serde_json::from_str(data).map_err(Error::Dispatch)?;
+    let names: BTreeSet<String> = dispatch.into_values().flatten().collect();
+    if let Some(bad) = names.iter().find(|n| !agent_name(n)) {
+        return Err(Error::AgentName(bad.clone()));
+    }
+
+    Ok(names)
+}
+
+/// Whether `name` is an agent's name: lowercase letters, digits and
+/// hyphens, never empty.
+fn agent_name(name: &str) -> bool {
+    !name.is_empty()
+        && name
+            .chars()
+            .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-')
+}
+
+/// Reads each agent's final answer from the run log, a map of name to
+/// text.
+///
+/// # Errors
+///
+/// Fails on anything that is not such a map.
+pub fn parse_answers(data: &str) -> Result<BTreeMap<String, String>, Error> {
+    serde_json::from_str(data).map_err(Error::Answers)
+}
+
+/// The problem with `agent`'s report, if any, held to its form alone:
+/// the gate holds no tree to read the requirement ids from, so the
+/// review's runner, which holds both, refuses an id no requirement has.
+fn report_problem(input: &Input, agent: &str) -> Option<report::Problem> {
+    report_check(
+        input.reports.get(agent).map(String::as_str),
+        input.answers.get(agent).map(String::as_str),
+        None,
+    )
+}
+
+/// Reads the agents the review consulted, a list of names.
+///
+/// # Errors
+///
+/// Fails on anything that is not a list of names.
+pub fn parse_consulted(data: &str) -> Result<BTreeSet<String>, Error> {
+    let names: Vec<String> = serde_json::from_str(data).map_err(Error::Consulted)?;
+    if names.iter().any(String::is_empty) {
+        return Err(Error::UnnamedAgent);
+    }
+
+    Ok(names.into_iter().collect())
+}
+
 /// Reads one check run per line, as `gh api --jq` prints them; blank
 /// lines are skipped.
 ///
@@ -224,11 +370,30 @@ pub fn parse_check_runs(data: &str) -> Result<Vec<CheckRun>, Error> {
 ///
 /// # Errors
 ///
-/// A head whose CI has not passed is an error, so the step fails loudly
+/// A head whose CI has not passed, or a review that left out an agent
+/// the review bundle dispatched, is an error, so the step fails loudly
 /// rather than posting anything.
 pub fn decide(input: &Input) -> Result<Option<Review>, Error> {
     if input.head != input.reviewed {
         return Ok(None);
+    }
+    let left_out: Vec<String> = input
+        .dispatched
+        .difference(&input.consulted)
+        .cloned()
+        .collect();
+    if !left_out.is_empty() {
+        return Err(Error::Unconsulted(left_out));
+    }
+    if let Some((agent, problem)) = input
+        .specialists
+        .iter()
+        .find_map(|a| report_problem(input, a).map(|p| (a, p)))
+    {
+        return Err(Error::Report {
+            agent: agent.clone(),
+            problem,
+        });
     }
     let runs = latest(&input.check_runs);
     if !runs.iter().any(|r| passed_ci(r)) {
@@ -292,9 +457,13 @@ fn is_blocking(f: &Finding) -> bool {
 
 /// Whether `r` completed and neither passed nor was skipped. A check
 /// still running, this review among them, is not counted: the required
-/// CI check has already passed.
+/// CI check has already passed. Nor is the gate's own [`OWN_CHECK`]
+/// from an earlier review of this head, which a re-review, after the
+/// stakeholder's consent, would otherwise never get past.
 fn failed(r: &CheckRun) -> bool {
-    r.status == "completed" && !["success", "neutral", "skipped"].contains(&r.conclusion.as_str())
+    let own = r.name == OWN_CHECK && r.app == REVIEWER_APP_ID;
+    !own && r.status == "completed"
+        && !["success", "neutral", "skipped"].contains(&r.conclusion.as_str())
 }
 
 /// Writes the review body. A title names the gate's outcome and the
