@@ -91,11 +91,9 @@ scenarios (SEC-12, SEC-17, SEC-19, ENG-22, ADM-09, RCL-02, PRV-09,
 REC-24, LANE-02), the in-part rows' audit, verify's landmark row, the
 erasure residue (phase 15), and ENG-15.
 
-- [x] The two rows PR #90 adds for a pending purge are bound and pass:
-  the search index untampered (exit 0) and tampered outside its ranges
-  (exit 3)
-- [ ] The phase closing ADM-09 binds the row for an index derivation past
-  verify's deadline, the rows of a source an ingest resumes, a stale
-  ingest marker and the consumed prefix, and the landmark row (M2)
+- [x] ADM-09's two pending-purge rows (PR #90) are bound and pass
+- [ ] The phase closing ADM-09 binds the rest: the deadline row, the
+  source, ingest marker and consumed-prefix rows, and the landmark row
+  (M2)
 
 [consent]: https://github.com/jeduden/parleyinn/pull/91#issuecomment-6402652493
