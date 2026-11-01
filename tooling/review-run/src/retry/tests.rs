@@ -221,6 +221,9 @@ fn a_refused_report_is_run_once_more_told_its_problem_and_judged_alone() {
     assert!(rust.answered(), "{:?}", rust.failure);
     assert_eq!(rust.attempts, 2);
     assert!((rust.log.cost - 0.02).abs() < 1e-9, "{}", rust.log.cost);
+    assert_eq!((rust.log.turns, rust.log.duration_ms), (6, 18));
+    let model = &rust.log.usage["claude-haiku-5-5"];
+    assert_eq!((model.calls, model.fresh, model.output), (2, 20, 10));
     assert_eq!(runs[1].attempts, 1);
     let prompts = specialist_prompts(&host);
     assert_eq!(prompts.len(), 2);

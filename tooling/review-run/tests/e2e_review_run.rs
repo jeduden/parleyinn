@@ -537,7 +537,7 @@ fn a_refused_report_runs_once_more_told_why_and_the_gate_approves_the_second() {
     );
     assert!(
         stderr.contains(
-            "lang-rust (specialist): answered (0.0200 USD, 2 turns) on its second attempt"
+            "lang-rust (specialist): answered (0.0200 USD, 4 turns) on its second attempt"
         ),
         "{stderr}"
     );

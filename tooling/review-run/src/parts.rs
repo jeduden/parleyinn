@@ -209,14 +209,22 @@ fn merged_outcome(count: usize, outcomes: &[(usize, Option<(String, &str)>)]) ->
 /// Adds `part`'s cost, turns, duration, usage, texts and writes to
 /// `log`, which keeps the first model it resolved to.
 fn add(log: &mut RunLog, part: RunLog) {
-    log.cost += part.cost;
-    log.turns += part.turns;
-    log.duration_ms += part.duration_ms;
+    add_usage(log, &part);
     if log.resolved_model.is_empty() {
         log.resolved_model = part.resolved_model;
     }
-    for (model, u) in part.usage {
-        let sum = log.usage.entry(model).or_default();
+    log.texts.extend(part.texts);
+    log.writes.extend(part.writes);
+}
+
+/// Adds `other`'s cost, turns, duration and usage per model to `log`,
+/// what a run spent whether or not it is judged by its texts.
+pub(crate) fn add_usage(log: &mut RunLog, other: &RunLog) {
+    log.cost += other.cost;
+    log.turns += other.turns;
+    log.duration_ms += other.duration_ms;
+    for (model, u) in &other.usage {
+        let sum = log.usage.entry(model.clone()).or_default();
         sum.calls += u.calls;
         sum.fresh += u.fresh;
         sum.cache_write += u.cache_write;
@@ -224,8 +232,6 @@ fn add(log: &mut RunLog, part: RunLog) {
         sum.output += u.output;
         sum.cost += u.cost;
     }
-    log.texts.extend(part.texts);
-    log.writes.extend(part.writes);
 }
 
 #[cfg(test)]

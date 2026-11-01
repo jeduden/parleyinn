@@ -16,6 +16,7 @@ use review_eval::component::Kind;
 use review_eval::host::Host;
 use review_gate::report::{Problem, assemble, report_check};
 
+use crate::parts::add_usage;
 use crate::plan::Plan;
 use crate::run::{AgentRun, Unit, attempt, describe, keep_first_log, write_report};
 
@@ -118,7 +119,7 @@ pub(crate) fn run_one(
     }
     let note = (unit.kind == Kind::Specialist).then(|| note(&told));
     let (mut second, report) = attempt(host, workdir, plan, unit, deadline, note.as_deref());
-    second.log.cost += first.log.cost;
+    add_usage(&mut second.log, &first.log);
     second.attempts = 2;
     let report = salvage(workdir, unit, &first, &mut second, report);
 
