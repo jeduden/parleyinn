@@ -163,6 +163,7 @@ fn an_outcome_or_consulted_list_that_does_not_read_is_named() {
 
     let empty = TempDir::new().unwrap();
     let problems = outcome_problems(empty.path());
+    assert_eq!(problems.len(), 5, "{problems:?}");
     assert!(
         problems.iter().all(|p| p.starts_with("read ")),
         "{problems:?}"
