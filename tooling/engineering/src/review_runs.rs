@@ -102,6 +102,9 @@ impl Recorder {
 
 impl Host for Recorder {
     fn run(&self, command: &Command) -> Result<Output, String> {
+        if let Some(out) = version(command) {
+            return Ok(out);
+        }
         let agent = agent_of(command);
         self.record(Event::Started(agent.clone()));
         self.hold(&agent);
@@ -114,6 +117,20 @@ impl Host for Recorder {
             ..Output::default()
         })
     }
+}
+
+/// The version line a stand-in `claude --version` prints.
+pub const VERSION: &str = "2.1.0 (Claude Code)";
+
+/// What a stand-in answers `command`, when it asks `claude --version`,
+/// the one run `review-run` starts that is no agent's.
+#[must_use]
+pub fn version(command: &Command) -> Option<Output> {
+    (command.args == ["--version"]).then(|| Output {
+        code: Some(0),
+        stdout: format!("{VERSION}\n"),
+        ..Output::default()
+    })
 }
 
 /// The agent `command` runs as.

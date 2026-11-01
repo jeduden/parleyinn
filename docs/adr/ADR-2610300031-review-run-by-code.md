@@ -285,10 +285,20 @@ repeat them, which costs tokens.
 - What a run leaves without an accepted report is said, never read as
   clean: `review/gaps.json` and `review/not-reviewed.md` list each such
   agent or part and why. `review-run --only <gaps> --from <dir>`, behind
-  `scripts/review-local.sh --resume`, reruns only those and what
-  changed, keyed by `review/run-id.json`: the head, an inputs hash, and
-  each definition's and diff's SHA-256. The verdict function is the
-  same; nothing is reused across a changed head, definition or diff.
+  `scripts/review-local.sh --resume`, reruns only those and each agent
+  whose answer key changed, on any head; the verdict function is the
+  same. A key, proposed by the engine comparison and not yet accepted,
+  hashes the definition, model, effort, turns, `claude --version`,
+  prompt, split limit, agent instructions, own diff and a salt of the
+  invariants, `CLAUDE.md`, `AGENTS.md`, the domain model's index and
+  `.claude/agents/**`; a generalist's adds its specialists' keys and
+  reports. `--answers DIR` reuses an accepted answer stored by key once
+  it passes the report check again, and never stores a refused, cut-off,
+  silent or capped run; `answers drop <key>` removes one. Risks: an
+  injected answer frozen in the store (only the default branch's CI
+  writes it) and a key blind to files read outside it (the salt narrows
+  that). A gap recurring past `--max-resumes` resumes, or a blocking
+  finding kept three reviews on an unchanged file, is named `stalled:`.
 - No new third-party dependency.
 
 ## Approval
@@ -301,4 +311,4 @@ weighing were folded in after that comment and await the
 stakeholder's acceptance of the whole record on that pull request.
 Until then ADR-2610262245 is marked superseded by a proposed record,
 on purpose: the stakeholder accepts this one before that pull request
-merges.
+merges. The keyed answers and the store's write policy await a ruling.
