@@ -44,7 +44,7 @@ fn agents_run_by(w: &mut World, cmd: String) -> Result<(), String> {
 }
 
 #[then(
-    regex = r"^review-run runs each specialist the review bundle dispatches as its own agent, assembles its report from its run log, runs each generalist once its own specialists have ended and the breaker is decided, and writes the review outcome from what they answered$"
+    regex = r"^review-run runs each specialist the review bundle dispatches as its own agent, assembles its report from its run log, runs each generalist once its own specialists have ended and the mass failure is decided, and writes the review outcome from what they answered$"
 )]
 fn review_runs_by_code(w: &mut World) -> Result<(), String> {
     let work = testkit::TempDir::new().map_err(|e| format!("make a work directory: {e}"))?;
@@ -66,7 +66,7 @@ fn review_run_caps_cost(w: &mut World) -> Result<(), String> {
 }
 
 #[then(
-    regex = r"^review-run starts no generalist once more than a third of the dispatched specialists failed, those a cost cap stopped among them, and opens the review outcome with a blocking finding naming the mass failure$"
+    regex = r"^review-run starts no generalist once more than a third of the dispatched specialists, those a cost cap stopped or kept from starting among them, ended without an accepted report, and opens the review outcome with a blocking finding naming the mass failure$"
 )]
 fn review_run_breaks(w: &mut World) -> Result<(), String> {
     let work = testkit::TempDir::new().map_err(|e| format!("make a work directory: {e}"))?;
@@ -157,7 +157,7 @@ fn agents_write_nothing(w: &mut World) -> Result<(), String> {
     regex = r#"^no step that runs an agent holds the "([^"]+)" token: one step in each agent job stages it where no agent reads it, review-run refuses its agents every read of the staged credential's directory by name, of the process, system and device files and outside their trees, and every file an agent job uploads waits for a scrub of that token$"#
 )]
 fn token_kept_from_agents(w: &mut World, token: String) -> Result<(), String> {
-    let mut problems = eng(w).flow.token_kept_from_agents(&token);
+    let mut problems = review_workflow::every_workflow_keeps_the_token(eng(w).checkout()?, &token)?;
     problems.extend(review_workflow::Workflow::reads_refused(
         review_eval::runner::DISALLOWED,
         review_eval::runner::SETTINGS,

@@ -312,6 +312,9 @@ fn the_earlier_run_reads_with_its_parts_logs() {
     assert_eq!(was.gaps.len(), 2);
     assert_eq!(was.answers["lang-rust"], "outcome: none — a.");
     assert_eq!(was.consulted, ["lang-rust".to_owned()].into());
+    write(&old, "logs/other.1.jsonl", "");
+    let again = read(&old.join("gaps.json"), &old).unwrap();
+    assert_eq!(again.parts["lang-rust"].len(), 2);
     let parts = &was.parts["lang-rust"];
     assert_eq!(parts.keys().collect::<Vec<_>>(), [&1, &2]);
     assert!(parts[&1].answered);
@@ -338,6 +341,21 @@ fn an_earlier_run_that_does_not_read_is_named() {
     fs::remove_file(old.join("run-id.json")).unwrap();
     let err = read(&old.join("gaps.json"), &old).unwrap_err();
     assert!(err.starts_with("read "), "{err}");
+    for gone in ["answers.json", "consulted.json"] {
+        let dir = TempDir::new().unwrap();
+        let old = earlier_dir(dir.path(), "[]");
+        fs::remove_file(old.join(gone)).unwrap();
+        let err = read(&old.join("gaps.json"), &old).unwrap_err();
+        assert!(err.starts_with("read ") && err.contains(gone), "{err}");
+    }
+}
+
+#[test]
+fn a_directory_entry_that_does_not_list_is_named_with_its_directory() {
+    let entries = vec![Ok(1), Err(io::Error::other("gone")), Ok(3)];
+    let err = listed(entries.into_iter(), Path::new("logs")).unwrap_err();
+    assert_eq!(err, "read logs: gone");
+    assert_eq!(listed([Ok(1)].into_iter(), Path::new("x")).unwrap(), [1]);
 }
 
 #[test]
@@ -431,6 +449,26 @@ fn a_kept_file_that_cannot_be_copied_is_named_and_missing_logs_are_none() {
     write(dir.path(), "blocked", "a file");
     let err = copy(&dir.path().join("blocked"), &old, &plan(), &resume).unwrap_err();
     assert!(err.starts_with("make "), "{err}");
+}
+
+#[test]
+fn a_kept_log_that_cannot_be_copied_is_named() {
+    let dir = TempDir::new().unwrap();
+    let old = earlier_dir(dir.path(), "[]");
+    let work = dir.path().join("work");
+    let resume = Resume {
+        from: "old".to_owned(),
+        reuse: [("lang-rust".to_owned(), whole("lang-rust"))].into(),
+        ..Resume::default()
+    };
+    fs::create_dir_all(work.join(LOGS).join("lang-rust.jsonl")).unwrap();
+
+    let err = copy(&work, &old, &plan(), &resume).unwrap_err();
+
+    assert!(
+        err.starts_with("copy ") && err.contains("lang-rust.jsonl"),
+        "{err}"
+    );
 }
 
 #[test]

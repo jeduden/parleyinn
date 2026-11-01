@@ -348,10 +348,10 @@ fn an_agent_that_did_not_answer_is_a_gap_and_said_not_reviewed() {
         serde_json::json!([{"name": "lang-rust", "kind": "specialist",
                             "reason": "silent: claude: not found"}])
     );
-    let page = fs::read_to_string(earlier.path().join("not-reviewed.md")).unwrap();
+    let report = fs::read_to_string(earlier.path().join("not-reviewed.md")).unwrap();
     assert!(
-        page.contains("- `lang-rust` (specialist): silent: claude: not found"),
-        "{page}"
+        report.contains("- `lang-rust` (specialist): silent: claude: not found"),
+        "{report}"
     );
     let outcome = read(earlier.path(), "outcome.json");
     assert!(
@@ -1084,3 +1084,64 @@ fn a_review_whose_failed_run_stated_the_token_leaves_it_out_of_the_job_summary()
     assert!(!text.contains(TOKEN), "{text}");
     assert!(text.contains("| lang-rust | specialist |"), "{text}");
 }
+
+#[test]
+fn every_review_writes_its_run_list_and_report_a_failed_one_too() {
+    let dir = workdir();
+    let host = FakeHost::new(fake::either);
+
+    let (code, _, err) = run_in(&host, dir.path());
+
+    assert_eq!(code, EXIT_OK, "{err}");
+    let runs = fs::read_to_string(dir.path().join(review_report::AGENT_RUNS)).unwrap();
+    let lines: Vec<serde_json::Value> = runs
+        .lines()
+        .map(|l| serde_json::from_str(l).unwrap())
+        .collect();
+    assert_eq!(lines[0]["review"]["verdict"], "approve");
+    assert_eq!(lines.len(), 1 + 3, "one agent run per agent run");
+    assert!(dir.path().join(review_report::REPORT).is_file());
+
+    let failed = TempDir::new().unwrap();
+    let (code, _, _) = run_in(&host, failed.path());
+    assert_eq!(code, EXIT_FAILURE);
+    let runs = fs::read_to_string(failed.path().join(review_report::AGENT_RUNS)).unwrap();
+    assert!(runs.starts_with("{\"review\":{"), "{runs}");
+    assert!(runs.contains("\"verdict\":\"failed\""), "{runs}");
+}
+
+#[test]
+fn a_report_that_cannot_be_written_is_named_and_changes_no_verdict() {
+    let dir = workdir();
+    fs::create_dir_all(dir.path().join(review_report::REPORT)).unwrap();
+    let host = FakeHost::new(fake::either);
+
+    let (code, out, err) = run_in(&host, dir.path());
+
+    assert_eq!(code, EXIT_OK, "{err}");
+    assert!(out.starts_with("verdict=approve\n"), "{out}");
+    assert!(
+        err.contains("review-run: run report: review/report.html not written: "),
+        "{err}"
+    );
+    assert!(
+        err.contains("review-run: run report: 1 of 2 files not written"),
+        "{err}"
+    );
+}
+
+#[test]
+fn a_leak_found_after_a_failed_review_is_named_beside_its_failure() {
+    assert_eq!(with_leaks(Ok("v".to_owned()), 0), Ok("v".to_owned()));
+    assert_eq!(with_leaks(Ok("v".to_owned()), 2), Err(leak::reason(2)));
+    assert_eq!(
+        with_leaks(Err("no agent".to_owned()), 0),
+        Err("no agent".to_owned())
+    );
+    assert_eq!(
+        with_leaks(Err("no agent".to_owned()), 1),
+        Err(format!("no agent; {}", leak::reason(1)))
+    );
+}
+
+mod failures;

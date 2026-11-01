@@ -290,3 +290,15 @@ fn the_stand_in_fails_a_run_that_logs_nowhere() {
     assert!(host.run(&specialist).unwrap_err().starts_with("write "));
     assert_eq!(agent_of(&specialist), "");
 }
+
+#[test]
+fn a_dispatch_that_does_not_parse_is_a_problem_naming_why() {
+    let problem = parse_dispatch("{").unwrap_err();
+    assert!(problem.starts_with("the dispatch the host was given does not parse: "));
+    assert!(parse_dispatch(DISPATCH).is_ok());
+    assert_eq!(
+        order_problems_by(&in_order(), "{"),
+        [problem],
+        "an unparsable dispatch is the one problem"
+    );
+}

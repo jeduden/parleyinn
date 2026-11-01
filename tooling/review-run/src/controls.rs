@@ -7,7 +7,7 @@
 //! generalist. A run the cap or the breaker keeps from starting is
 //! named with why, never taken as clean (I6).
 
-use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Mutex, PoisonError};
 use std::thread;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
@@ -154,8 +154,8 @@ impl Budget {
 pub struct Breaker {
     fraction: Fraction,
     dispatched: usize,
-    failed: AtomicUsize,
-    ended: AtomicUsize,
+    /// `(failed, ended)`, kept together so every read is one snapshot.
+    counts: Mutex<(usize, usize)>,
 }
 
 impl Breaker {
@@ -166,17 +166,19 @@ impl Breaker {
         Self {
             fraction,
             dispatched,
-            failed: AtomicUsize::new(0),
-            ended: AtomicUsize::new(0),
+            counts: Mutex::new((0, 0)),
         }
+    }
+
+    fn snapshot(&self) -> (usize, usize) {
+        *self.counts.lock().unwrap_or_else(PoisonError::into_inner)
     }
 
     /// Counts one more specialist ended, in a gap when `failed`.
     pub fn end(&self, failed: bool) {
-        if failed {
-            self.failed.fetch_add(1, Ordering::SeqCst);
-        }
-        self.ended.fetch_add(1, Ordering::SeqCst);
+        let mut counts = self.counts.lock().unwrap_or_else(PoisonError::into_inner);
+        counts.0 += usize::from(failed);
+        counts.1 += 1;
     }
 
     /// Whether the breaker has tripped, or can no longer trip however
@@ -184,10 +186,8 @@ impl Breaker {
     /// starts, so whether one does never hangs on which ended first.
     #[must_use]
     pub fn decided(&self) -> bool {
-        let failed = self.failed.load(Ordering::SeqCst);
-        let running = self
-            .dispatched
-            .saturating_sub(self.ended.load(Ordering::SeqCst));
+        let (failed, ended) = self.snapshot();
+        let running = self.dispatched.saturating_sub(ended);
         trips(failed, self.dispatched, self.fraction)
             || !trips(failed + running, self.dispatched, self.fraction)
     }
@@ -196,7 +196,7 @@ impl Breaker {
     /// before.
     #[must_use]
     pub fn refusal(&self) -> Option<String> {
-        let failed = self.failed.load(Ordering::SeqCst);
+        let (failed, _) = self.snapshot();
         trips(failed, self.dispatched, self.fraction).then(|| {
             format!(
                 "{ABORTED} {}, so it was not started",

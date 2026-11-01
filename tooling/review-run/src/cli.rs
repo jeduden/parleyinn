@@ -29,8 +29,8 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::io::Write;
 use std::path::{Path, PathBuf};
-use std::sync::Mutex;
 use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::{Mutex, PoisonError};
 use std::time::Duration;
 
 use review_eval::credential::{self, Confined};
@@ -129,9 +129,8 @@ pub fn run_with(
     };
     let errors = Mutex::new(stderr);
     let progress = |line: &str| {
-        if let Ok(mut out) = errors.lock() {
-            let _ = writeln!(out, "review-run: {line}");
-        }
+        let mut out = errors.lock().unwrap_or_else(PoisonError::into_inner);
+        let _ = writeln!(out, "review-run: {line}");
     };
     let guarded = guard(&args, token).and_then(|(scrubber, located)| {
         let confined = located.as_deref().map(|dir| Confined::new(host, dir));
@@ -145,7 +144,14 @@ pub fn run_with(
             leaks.fetch_add(n, Ordering::SeqCst);
             progress(&line);
         };
-        review(host, &args, &scrubber, &leaks, &scrubbed).map_err(|msg| scrubber.scrub(&msg).0)
+        let reviewed =
+            review(host, &args, &scrubber, &leaks, &scrubbed).map_err(|msg| scrubber.scrub(&msg).0);
+        // The run list and the run report, after every run, best effort:
+        // built from the files above, already scrubbed, and scrubbed
+        // again, so a form they hold fails the review (ENG-28).
+        let failure = reviewed.as_ref().err().map(String::as_str);
+        let found = leak::report(&scrubber, Path::new(&args.workdir), failure, &scrubbed);
+        with_leaks(reviewed, found)
     });
     match guarded {
         // The step outputs carry the verdict to the workflow: one that
@@ -250,6 +256,17 @@ fn prepare(
         previous,
         max_resumes: args.max_resumes,
     })
+}
+
+/// `reviewed`, failed when `found` forms of the token turned up in what
+/// the run list and report hold; a review that failed already keeps its
+/// own message and names the leak after it, so it asks for the rotation.
+fn with_leaks(reviewed: Result<String, String>, found: usize) -> Result<String, String> {
+    match (reviewed, found) {
+        (Ok(_), n) if n > 0 => Err(leak::reason(n)),
+        (Err(msg), n) if n > 0 => Err(format!("{msg}; {}", leak::reason(n))),
+        (reviewed, _) => reviewed,
+    }
 }
 
 /// The scrubber for the token staged under `args`' credential and
