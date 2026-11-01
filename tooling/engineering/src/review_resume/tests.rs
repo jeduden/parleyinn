@@ -39,13 +39,13 @@ fn a_checkout_without_the_definitions_is_named() {
 #[test]
 fn a_resumed_run_that_cannot_be_prepared_is_named() {
     let work = TempDir::new().unwrap();
-    for dir in ["resumed", "moved", "changed"] {
+    for dir in ["resumed", "moved", "inputs", "changed", "diffed"] {
         write(work.path(), dir, "a file");
     }
 
     let problems = review_resumes(&repo(), work.path());
 
-    assert_eq!(problems.len(), 3, "{problems:?}");
+    assert_eq!(problems.len(), 5, "{problems:?}");
     assert!(
         problems.iter().all(|p| p.starts_with("make ")),
         "{problems:?}"
