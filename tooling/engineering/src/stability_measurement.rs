@@ -15,7 +15,7 @@ use review_report::html;
 use review_report::identity::Fid;
 use review_report::inputs::Gap;
 use review_report::snapshots;
-use review_report::stability::{self, Run, Stability};
+use review_report::stability::{self, Review, Stability};
 
 use crate::Checkout;
 
@@ -105,18 +105,18 @@ pub fn states_problems(text: &str, samples: usize) -> Vec<String> {
     problems
 }
 
-/// One run of a review whose verdict is `verdict`, its specialist
+/// One review whose verdict is `verdict`, its specialist
 /// finding at `path`.
-fn run(verdict: &str, path: &str) -> Run {
+fn review(verdict: &str, path: &str) -> Review {
     let fid = Fid::new(path, vec!["ENG-28".to_owned()], "the gate posts unread");
-    Run {
+    Review {
         verdict: verdict.to_owned(),
         findings: BTreeMap::from([("lang-rust".to_owned(), BTreeSet::from([fid]))]),
-        ..Run::default()
+        ..Review::default()
     }
 }
 
-/// What review-report made of a review: two identical runs measured
+/// What review-report made of a review: two identical reviews measured
 /// as `same`, three whose verdict flips once as `flip`, the cost of a
 /// run whose log reported 0.25 USD and whose models' costs sum to 9, and
 /// the report of a gap whose name and reason are a script.
@@ -131,11 +131,11 @@ pub struct Made {
 /// What review-report makes of the reviews [`Made`] names.
 #[must_use]
 pub fn made() -> Made {
-    let same = stability::compare(&[run("approve", "a.rs"), run("approve", "a.rs")]);
+    let same = stability::compare(&[review("approve", "a.rs"), review("approve", "a.rs")]);
     let flip = stability::compare(&[
-        run("approve", "a.rs"),
-        run("request_changes", "a.rs"),
-        run("approve", "a.rs"),
+        review("approve", "a.rs"),
+        review("request_changes", "a.rs"),
+        review("approve", "a.rs"),
     ]);
     let log = LogFile {
         file: "lang-rust.jsonl".to_owned(),
