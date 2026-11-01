@@ -604,7 +604,11 @@ fn a_generalist_keeping_more_nits_than_the_case_allows_fails() {
                  a.rs:4 — dropped — four — lang-rust\n\
                  a.rs:5 — nit — five — lang-rust\n";
 
-    let graded = grade(&c, &case("review-code", expect.clone()), &answered_log(three));
+    let graded = grade(
+        &c,
+        &case("review-code", expect.clone()),
+        &answered_log(three),
+    );
     assert_eq!(graded.failures, vec!["kept 3 nits, want at most 2"]);
 
     let two = three.replacen("a.rs:5 — nit", "a.rs:5 — blocking", 1);
