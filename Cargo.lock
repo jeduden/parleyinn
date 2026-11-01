@@ -1280,6 +1280,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "review-report"
+version = "0.0.0"
+dependencies = [
+ "review-eval",
+ "review-gate",
+ "serde",
+ "serde_json",
+ "sha2",
+ "testkit",
+]
+
+[[package]]
 name = "review-run"
 version = "0.0.0"
 dependencies = [

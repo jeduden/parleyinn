@@ -1,0 +1,27 @@
+[package]
+name = "review-report"
+version = "0.0.0"
+description = "Writes a review's trace and report page from its files, and the stability of repeated reviews of one pull-request state (ENG-28, ENG-32)"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+review-eval.workspace = true
+review-gate.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+
+[dev-dependencies]
+testkit.workspace = true
+
+[lints]
+workspace = true
+
+# ENG-02: see crates/parinn/Cargo.toml.
+[package.metadata.parinn]
+responsibility = "Writes a review's trace and report page from its files, and the stability of repeated reviews of one pull-request state"
+may-depend-on = ["review-eval", "review-gate"]
+may-dev-depend-on = ["testkit"]
