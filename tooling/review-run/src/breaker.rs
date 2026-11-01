@@ -1,7 +1,7 @@
 //! The mass failure, decided from the runs alone: when more than the
 //! breaker's fraction of the dispatched specialists ended in a gap, a
 //! specialist split in parts counting once and one a cost cap stopped
-//! not at all, the review was aborted. Its outcome then opens with a
+//! or kept from starting like any other, the review was aborted. Its outcome then opens with a
 //! blocking finding of its own, distinct from each agent's, saying so
 //! and how to finish it, and requests changes; what was not reviewed,
 //! the generalists the breaker kept from starting among it, stays
@@ -12,7 +12,7 @@ use std::collections::BTreeSet;
 use review_eval::component::Kind;
 use review_gate::{BLOCKING, Finding, REQUEST_CHANGES_VERDICT};
 
-use crate::controls::{Fraction, OVER_BUDGET, mass_failure, trips};
+use crate::controls::{Fraction, mass_failure, trips};
 use crate::outcome::{Decision, REVIEW_PATH};
 use crate::plan::Plan;
 
@@ -20,14 +20,14 @@ use crate::plan::Plan;
 pub const ABORTED: &str = "review aborted:";
 
 /// How many of `plan`'s specialists `decision` left without an accepted
-/// report for a reason no cost cap gave.
+/// report, whatever the reason: a cost cap's counts as any other.
 #[must_use]
 pub fn failed(plan: &Plan, decision: &Decision) -> usize {
     let specialists = plan.specialists();
     decision
         .not_reviewed
         .iter()
-        .filter(|g| g.kind == Kind::Specialist.word() && !g.reason.starts_with(OVER_BUDGET))
+        .filter(|g| g.kind == Kind::Specialist.word())
         .filter(|g| specialists.contains(&g.name))
         .map(|g| g.name.as_str())
         .collect::<BTreeSet<&str>>()

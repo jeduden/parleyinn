@@ -9,7 +9,8 @@
 //! them is the one the two waves of old gave. A specialist that ends in
 //! a gap is counted by the breaker, and once it trips no generalist
 //! starts, which, as it is decided before any starts, no order of
-//! ending changes; a run the cost cap refuses is not started. An agent
+//! ending changes; a run the cost cap refuses is not started, and ends in
+//! a gap the breaker counts as any other. An agent
 //! kept whole from an earlier run is taken as it answered there, and a
 //! part kept is held to the report check again.
 
@@ -18,8 +19,7 @@ use std::collections::BTreeMap;
 use review_eval::component;
 use review_gate::report::assemble;
 
-use crate::controls::{Controls, OVER_BUDGET};
-use crate::gaps;
+use crate::controls::Controls;
 use crate::parts;
 use crate::pipeline::pipeline;
 use crate::plan::Plan;
@@ -170,7 +170,13 @@ fn task(r: &Review, c: &Controls, task: &Task, inputs: Vec<Done>) -> Done {
             (run, Some(report))
         }
         Task::Generalist(unit) => {
-            let done = match c.breaker.refusal() {
+            // A cost cap reached is named before a mass failure: both
+            // keep it from starting, and the cap is what was set.
+            let tripped = c
+                .budget
+                .refusal()
+                .map_or_else(|| c.breaker.refusal(), |_| None);
+            let done = match tripped {
                 Some(why) => {
                     let done = not_started(r.workdir, unit, why);
                     (r.progress)(&describe(&done.0));
@@ -191,18 +197,11 @@ fn settle(c: &Controls, failed: bool) {
     c.breaker.end(failed);
 }
 
-/// Whether specialist `run`, its report `report`, ended in a gap no cost
-/// cap made: a part or the whole that did not answer, or a report the
-/// gate refuses.
+/// Whether specialist `run`, its report `report`, ended in a gap: a
+/// part or the whole that did not answer, a cost cap's included, or a
+/// report the gate refuses.
 fn ended_in_gap(run: &AgentRun, report: Option<&str>, r: &Review) -> bool {
-    let not_budget = |why: &str| !gaps::silent(why).starts_with(OVER_BUDGET);
-    match &run.failure {
-        Some(_) if !run.failed_parts.is_empty() => {
-            run.failed_parts.iter().any(|(_, why)| not_budget(why))
-        }
-        Some(why) => not_budget(why),
-        None => refusal(report.unwrap_or_default(), &run.log.answer, r.known).is_some(),
-    }
+    run.failure.is_some() || refusal(report.unwrap_or_default(), &run.log.answer, r.known).is_some()
 }
 
 /// What the resume plan keeps of `name`, when the review resumes.
