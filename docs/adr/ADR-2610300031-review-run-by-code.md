@@ -260,10 +260,17 @@ repeat them, which costs tokens.
 - A requirement request lands with the stakeholder as a nit; the SRS
   changes only through the stakeholder's own change.
 - A review runs in waves of agents, each up to 900 seconds and each
-  agent at most twice. The repository has 56 specialists and the job
-  starts 32 at once, so they take two waves and the generalists a
-  third: 3 x 2 x 15 = 90 minutes at worst, and the job's cap is 120.
-  Agents end in minutes in practice.
+  agent at most twice (three times when the API turned it away). The
+  56 specialists run in two waves of 32 and the generalists follow,
+  each once its own specialists ended and the mass failure below is
+  decided: 3 x 2 x 15 = 90 minutes at worst, and the job's cap is 120.
+- Cost and mass failure are bounded by code (proposed, not yet
+  accepted): each run gets `--max-budget-usd` (1.00 a specialist, 5.00
+  a generalist), none starts once finished runs cost `--max-cost-usd`
+  (40), and when more than a third of the specialists, capped ones too,
+  ended in a gap no generalist starts and the outcome opens with
+  `review aborted:`. Each is an `over budget:` or `aborted:` gap. An
+  overloaded run waits 15 s, then 30 s.
 - What a run leaves without an accepted report is said, never read as
   clean: `review/gaps.json` and `review/not-reviewed.md` list each such
   agent or part and why. `review-run --only <gaps> --from <dir>`, behind

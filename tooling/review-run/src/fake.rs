@@ -39,6 +39,37 @@ impl Host for FakeHost {
     }
 }
 
+/// A clock for the tests: it never sleeps, but moves on by each wait,
+/// keeps every wait, and draws the jitter it is given.
+#[derive(Debug, Default)]
+pub(crate) struct FakeClock {
+    pub now: Mutex<std::time::Duration>,
+    pub slept: Mutex<Vec<std::time::Duration>>,
+    pub jitter: f64,
+}
+
+impl crate::controls::Clock for FakeClock {
+    fn now(&self) -> std::time::Duration {
+        *self.now.lock().unwrap()
+    }
+
+    fn sleep(&self, duration: std::time::Duration) {
+        *self.now.lock().unwrap() += duration;
+        self.slept.lock().unwrap().push(duration);
+    }
+
+    fn jitter(&self) -> f64 {
+        self.jitter
+    }
+}
+
+impl FakeClock {
+    /// The waits slept, in order.
+    pub(crate) fn slept(&self) -> Vec<std::time::Duration> {
+        self.slept.lock().unwrap().clone()
+    }
+}
+
 /// The agent `command` runs as.
 pub(crate) fn agent_of(command: &Command) -> String {
     command

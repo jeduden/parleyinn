@@ -1,15 +1,22 @@
 //! ENG-28: the review is run by code. `review-run`, given a dispatch,
 //! runs each dispatched specialist as its own agent, assembles its
-//! report from its run log, runs every dispatched generalist only once
-//! every specialist has ended, and writes the review outcome from what
-//! they answered. The check runs `review-run` on a work directory
-//! holding the checkout's definitions of the dispatched agents, with a
-//! stand-in for the `claude` command line that records when each
-//! agent's run starts and ends and answers as the agent would.
+//! report from its run log, runs each dispatched generalist only once
+//! its own specialists have ended and the breaker is decided, and
+//! writes the review outcome from what they answered. The check runs
+//! `review-run` on a work directory holding the checkout's definitions
+//! of the dispatched agents, with a stand-in for the `claude` command
+//! line that records when each agent's run starts and ends, answers as
+//! the agent would, and holds two specialists' runs as [`HOLDS`] says:
+//! one a generalist does not weigh, until that generalist started, and
+//! one it does, briefly, so a generalist that would not wait for it
+//! starts first. The review's breaker never trips here, so it holds no
+//! generalist back: the breaker has a check of its own.
 
+use std::collections::BTreeSet;
 use std::fs;
 use std::path::Path;
-use std::sync::Mutex;
+use std::sync::{Condvar, Mutex, PoisonError};
+use std::time::Duration;
 
 use review_eval::host::{Command, Host, Output};
 
@@ -29,6 +36,17 @@ pub const GENERALISTS: [(&str, &str, &str); 2] = [
     ("review-spec", "docs/a.md", "lang-markdown"),
 ];
 
+/// The specialists the stand-in holds, each until the generalist named
+/// beside it started or for as long as is named: lang-markdown, which
+/// review-code does not weigh, until review-code started, which proves
+/// review-code did not wait for it; and lang-rust, which review-code
+/// weighs, briefly, so a review-code that did not wait for it would start
+/// while it still ran.
+pub const HOLDS: [(&str, &str, Duration); 2] = [
+    ("lang-markdown", "review-code", Duration::from_secs(10)),
+    ("lang-rust", "review-code", Duration::from_secs(2)),
+];
+
 /// When an agent's run started or ended, as the stand-in saw it.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Event {
@@ -37,16 +55,47 @@ pub enum Event {
 }
 
 /// A stand-in for the `claude` command line: it records each run's
-/// start and end, and answers as the agent it runs as.
+/// start and end, and answers as the agent it runs as; when it holds,
+/// each run [`HOLDS`] names ends only once its generalist started, or
+/// after its time.
 #[derive(Debug, Default)]
 pub struct Recorder {
     pub events: Mutex<Vec<Event>>,
+    /// Whether it holds the runs [`HOLDS`] names.
+    pub holds: bool,
+    started: Mutex<BTreeSet<String>>,
+    start: Condvar,
 }
 
 impl Recorder {
+    /// A recorder that holds the runs [`HOLDS`] names.
+    #[must_use]
+    pub fn holding() -> Self {
+        Self {
+            holds: true,
+            ..Self::default()
+        }
+    }
+
     fn record(&self, event: Event) {
         if let Ok(mut events) = self.events.lock() {
             events.push(event);
+        }
+    }
+
+    /// Notes that `agent` started, waking each run held for it, and
+    /// holds `agent`'s run when [`HOLDS`] names it.
+    fn hold(&self, agent: &str) {
+        if !self.holds {
+            return;
+        }
+        let mut started = self.started.lock().unwrap_or_else(PoisonError::into_inner);
+        started.insert(agent.to_owned());
+        self.start.notify_all();
+        if let Some((_, until, most)) = HOLDS.iter().find(|(held, _, _)| *held == agent) {
+            let _ = self
+                .start
+                .wait_timeout_while(started, *most, |s| !s.contains(*until));
         }
     }
 }
@@ -55,6 +104,7 @@ impl Host for Recorder {
     fn run(&self, command: &Command) -> Result<Output, String> {
         let agent = agent_of(command);
         self.record(Event::Started(agent.clone()));
+        self.hold(&agent);
         let answered = answer(command, &agent);
         self.record(Event::Ended(agent));
         answered?;
@@ -142,10 +192,17 @@ pub fn prepare(checkout: &Checkout, workdir: &Path) -> Result<(), String> {
 }
 
 /// What is wrong with the order of `events`: a dispatched agent that did
-/// not run exactly once, an agent run that was not dispatched, and a
-/// generalist that started before a specialist ended.
+/// not run exactly once, an agent run that was not dispatched, a
+/// generalist that started before one of its own specialists ended, and
+/// a generalist waiting for the specialist [`HOLDS`] first names, which
+/// it does not weigh.
 #[must_use]
 pub fn order_problems(events: &[Event]) -> Vec<String> {
+    order_problems_by(events, DISPATCH)
+}
+
+/// [`order_problems`] by the dispatch text `dispatch`.
+fn order_problems_by(events: &[Event], dispatch: &str) -> Vec<String> {
     let mut problems = Vec::new();
     let generalists: Vec<&str> = GENERALISTS.iter().map(|(g, _, _)| *g).collect();
     let at = |want: Event| -> Vec<usize> {
@@ -173,18 +230,36 @@ pub fn order_problems(events: &[Event]) -> Vec<String> {
             problems.push(format!("{name} ran but was not dispatched"));
         }
     }
+    let dispatch = match parse_dispatch(dispatch) {
+        Ok(dispatch) => dispatch,
+        Err(problem) => {
+            problems.push(problem);
+            return problems;
+        }
+    };
     for generalist in &generalists {
         let Some(&start) = started(generalist).first() else {
             continue;
         };
-        for specialist in SPECIALISTS {
-            if at(Event::Ended(specialist.to_owned()))
+        for specialist in dispatch.get(*generalist).into_iter().flatten() {
+            if at(Event::Ended(specialist.clone()))
                 .iter()
                 .any(|&end| end > start)
             {
-                problems.push(format!("{generalist} started before {specialist} ended"));
+                problems.push(format!(
+                    "{generalist} started before its specialist {specialist} ended"
+                ));
             }
         }
+    }
+    let (held, until, _) = HOLDS[0];
+    let ended = at(Event::Ended(held.to_owned()));
+    if let (Some(&start), Some(&end)) = (started(until).first(), ended.first())
+        && start > end
+    {
+        problems.push(format!(
+            "{until} did not start while {held}, a specialist it does not weigh, still ran"
+        ));
     }
 
     problems
@@ -254,10 +329,14 @@ pub fn review_runs_by_code(checkout: &Checkout, workdir: &Path) -> Vec<String> {
     if let Err(e) = prepare(checkout, workdir) {
         return vec![e];
     }
-    let host = Recorder::default();
+    let host = Recorder::holding();
     let mut out = Vec::new();
     let mut err = Vec::new();
-    let args = ["--workdir".to_owned(), workdir.display().to_string()];
+    let args = [
+        "--workdir".to_owned(),
+        workdir.display().to_string(),
+        "--breaker-fraction=1".to_owned(),
+    ];
     let code = review_run::cli::run(&host, args, &mut out, &mut err);
     if code != review_run::cli::EXIT_OK {
         let err = String::from_utf8_lossy(&err);
@@ -273,3 +352,9 @@ pub fn review_runs_by_code(checkout: &Checkout, workdir: &Path) -> Vec<String> {
 
 #[cfg(test)]
 mod tests;
+
+/// The dispatch the host was given, or why it does not parse.
+fn parse_dispatch(raw: &str) -> Result<std::collections::BTreeMap<String, Vec<String>>, String> {
+    serde_json::from_str(raw)
+        .map_err(|e| format!("the dispatch the host was given does not parse: {e}"))
+}

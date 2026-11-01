@@ -301,6 +301,32 @@ fn every_agent_reads_alone_and_is_refused_every_writing_tool() {
 }
 
 #[test]
+fn every_run_is_capped_at_its_tier_s_budget() {
+    // Pinned as text, so a cap raised or dropped fails here rather than
+    // passing every test that compares the constants.
+    assert_eq!(SPECIALIST_BUDGET_USD, "1.00");
+    assert_eq!(GENERALIST_BUDGET_USD, "5.00");
+    let w = world("standard");
+    let log = PathBuf::from("/logs/run.jsonl");
+    for (kind, name, want) in [
+        (Kind::Specialist, "lang-rust", "1.00"),
+        (Kind::Generalist, "review-code", "5.00"),
+        (Kind::Consultant, "persona-agent", "5.00"),
+    ] {
+        let c = command(
+            &component(kind, name),
+            &w,
+            None,
+            &log,
+            Duration::from_secs(9),
+        );
+
+        assert!(has(&args_of(&c), ["--max-budget-usd", want]), "{name}");
+        assert_eq!(budget_usd(kind), want, "{name}");
+    }
+}
+
+#[test]
 fn every_agent_is_refused_reads_outside_its_trees_and_of_the_process_files() {
     // Pinned as text: the process files hold every environment on the
     // machine, the review's own among them, and nothing outside the two

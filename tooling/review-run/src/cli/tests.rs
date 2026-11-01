@@ -28,20 +28,10 @@ fn workdir() -> TempDir {
     dir
 }
 
+/// Runs the review of `dir`, a breaker that never trips, so one failed
+/// specialist of the two still reaches its generalist.
 fn run_in(host: &FakeHost, dir: &Path) -> (u8, String, String) {
-    let mut out = Vec::new();
-    let mut err = Vec::new();
-    let code = run(
-        host,
-        args(&["--workdir", dir.to_str().unwrap()]),
-        &mut out,
-        &mut err,
-    );
-    (
-        code,
-        String::from_utf8(out).unwrap(),
-        String::from_utf8(err).unwrap(),
-    )
+    run_with(host, dir, &["--breaker-fraction=1"])
 }
 
 fn read(dir: &Path, rel: &str) -> serde_json::Value {
@@ -58,7 +48,8 @@ fn a_review_writes_every_file_the_gate_reads() {
     assert_eq!(code, EXIT_OK, "{err}");
     assert_eq!(
         out,
-        "verdict=approve\ndispatched=3\nconsulted=3\nfindings=1\ncost=0.0300\n"
+        "verdict=approve\ndispatched=3\nconsulted=3\nfindings=1\ncost=0.0300\nover_budget=0\n\
+         aborted=0\n"
     );
     assert_eq!(err.lines().count(), 3, "{err}");
     let outcome = fs::read_to_string(dir.path().join("review/outcome.json")).unwrap();
@@ -271,7 +262,11 @@ fn first_review(earlier: &Path) {
             fake::either(c)
         }
     });
-    let (code, out, _) = run_with(&host, dir.path(), &["--head-sha", HEAD]);
+    let (code, out, _) = run_with(
+        &host,
+        dir.path(),
+        &["--head-sha", HEAD, "--breaker-fraction=1"],
+    );
     assert_eq!(code, EXIT_OK);
     assert!(out.starts_with("verdict=request_changes\n"), "{out}");
     copy_tree(&dir.path().join("review"), earlier);
@@ -375,7 +370,7 @@ fn a_failed_review_s_last_line_says_what_was_not_reviewed() {
         }
     });
 
-    let (_, _, err) = run_with(&host, dir.path(), &[]);
+    let (_, _, err) = run_with(&host, dir.path(), &["--breaker-fraction=1"]);
 
     assert_eq!(
         err.lines().last(),
@@ -544,6 +539,7 @@ fn the_work_directory_alone_takes_the_default_options() {
             options: Options::default(),
             head: None,
             resume: None,
+            summary: None,
             credential: None,
         }
     );
@@ -562,6 +558,11 @@ fn the_flags_read_inline_or_as_the_next_argument() {
             "--only=g.json",
             "--from",
             "old",
+            "--max-cost-usd=12.5",
+            "--breaker-fraction",
+            "1/2",
+            "--summary",
+            "s.md",
             "--credential",
             "cred",
         ]))
@@ -572,9 +573,13 @@ fn the_flags_read_inline_or_as_the_next_argument() {
                 parallel: 2,
                 deadline: Duration::from_secs(30),
                 split: crate::parts::LIMIT,
+                max_cost_usd: 12.5,
+                breaker: Fraction { num: 1, den: 2 },
+                ..Options::default()
             },
             head: Some(HEAD.to_owned()),
             resume: Some(("g.json".to_owned(), "old".to_owned())),
+            summary: Some("s.md".to_owned()),
             credential: Some("cred".to_owned()),
         }
     );
@@ -907,6 +912,142 @@ fn a_review_whose_logs_directory_cannot_be_made_fails_naming_it() {
 }
 
 #[test]
+fn a_cap_or_a_fraction_out_of_range_is_refused() {
+    assert_eq!(
+        refusal(&["--workdir", "w", "--max-cost-usd", "-1"]),
+        "--max-cost-usd \"-1\" is not a number above zero"
+    );
+    for value in ["0", "1.5", "most", "2", "0/3", "4/3", "1/0", "1/x", "1/3/4"] {
+        assert_eq!(
+            refusal(&["--workdir", "w", "--breaker-fraction", value]),
+            format!("--breaker-fraction {value:?} is no ratio above zero and at most one, as 1/3")
+        );
+    }
+}
+
+#[test]
+fn a_mass_failure_opens_the_outcome_with_the_abort_and_counts_what_it_kept_from_starting() {
+    let dir = workdir();
+    let host = FakeHost::new(|c| {
+        if fake::agent_of(c) == "lang-rust" {
+            Err("claude: not found".to_owned())
+        } else {
+            fake::either(c)
+        }
+    });
+
+    let (code, out, err) = run_with(&host, dir.path(), &[]);
+
+    assert_eq!(code, EXIT_OK, "{err}");
+    assert!(out.starts_with("verdict=request_changes\n"), "{out}");
+    assert!(out.ends_with("over_budget=0\naborted=1\n"), "{out}");
+    let outcome = read(dir.path(), "review/outcome.json");
+    assert!(
+        outcome["findings"][0]["body"]
+            .as_str()
+            .unwrap()
+            .starts_with("review aborted: 1 of 2 specialists failed"),
+        "{outcome}"
+    );
+    assert_eq!(
+        read(dir.path(), "review/gaps.json")[1]["name"],
+        "review-code"
+    );
+}
+
+#[test]
+fn the_table_of_every_run_is_added_to_the_job_summary() {
+    let dir = workdir();
+    let host = FakeHost::new(fake::either);
+    let summary = dir.path().join("summary.md");
+    fs::write(&summary, "# Before\n").unwrap();
+
+    let (code, _, err) = run_with(&host, dir.path(), &["--summary", summary.to_str().unwrap()]);
+
+    assert_eq!(code, EXIT_OK, "{err}");
+    let text = fs::read_to_string(&summary).unwrap();
+    assert!(
+        text.starts_with("# Before\n\n### How each agent ran\n"),
+        "{text}"
+    );
+    assert!(
+        text.contains("| review-code | generalist | answered |"),
+        "{text}"
+    );
+}
+
+#[test]
+fn a_job_summary_that_cannot_be_added_to_is_told_and_the_review_still_decided() {
+    let dir = workdir();
+    let host = FakeHost::new(fake::either);
+    let summary = dir.path().join("summary.md");
+    fs::create_dir_all(&summary).unwrap();
+
+    let (code, out, err) = run_with(&host, dir.path(), &["--summary", summary.to_str().unwrap()]);
+
+    assert_eq!(code, EXIT_OK, "{err}");
+    assert!(out.starts_with("verdict=approve\n"), "{out}");
+    assert!(
+        err.contains(&format!(
+            "review-run: add to the job summary {}: ",
+            summary.display()
+        )),
+        "{err}"
+    );
+}
+
+#[test]
+fn a_run_whose_text_holds_the_token_is_scrubbed_from_the_job_summary_and_counted() {
+    let dir = TempDir::new().unwrap();
+    let summary = dir.path().join("summary.md");
+    let mut run = crate::run::reused(
+        "lang-rust".to_owned(),
+        review_eval::component::Kind::Specialist,
+        "a",
+        Vec::new(),
+    );
+    run.reused = false;
+    run.failure = Some(format!("its run ended with {TOKEN} twice, {TOKEN}"));
+    let leaks = AtomicUsize::new(0);
+
+    add_scrubbed_to_summary(&summary, &[run], &Scrubber::new(&[TOKEN]), &leaks, &|_| {});
+
+    let text = fs::read_to_string(&summary).unwrap();
+    assert!(!text.contains(TOKEN), "{text}");
+    assert!(text.contains(review_eval::secret::REDACTED), "{text}");
+    assert_eq!(leaks.load(Ordering::SeqCst), 2);
+}
+
+#[test]
+fn a_review_whose_failed_run_stated_the_token_leaves_it_out_of_the_job_summary() {
+    let dir = workdir();
+    let summary = dir.path().join("summary.md");
+    let host = FakeHost::new(|c: &review_eval::host::Command| {
+        if fake::agent_of(c) == "lang-rust" {
+            fake::write_log(c, &fake::log_of(&[], &format!("error_{TOKEN}"), "", 0.0));
+            return Ok(review_eval::host::Output::default());
+        }
+        fake::either(c)
+    });
+
+    let (code, out, err) = run_holding(
+        &host,
+        dir.path(),
+        Some(TOKEN),
+        &["--summary", summary.to_str().unwrap()],
+    );
+
+    assert_eq!(code, EXIT_FAILURE, "{err}");
+    assert!(
+        out.starts_with("failed=an agent's output contained the Claude token: "),
+        "{out}"
+    );
+    let text = fs::read_to_string(&summary).unwrap();
+    assert!(!text.contains(TOKEN), "{text}");
+    assert!(text.contains("| lang-rust | specialist |"), "{text}");
+}
+
+#[test]
 fn every_review_writes_its_run_list_and_report_a_failed_one_too() {
     let dir = workdir();
     let host = FakeHost::new(fake::either);
@@ -964,3 +1105,5 @@ fn a_leak_found_after_a_failed_review_is_named_beside_its_failure() {
         Err(format!("no agent; {}", leak::reason(1)))
     );
 }
+
+mod failures;

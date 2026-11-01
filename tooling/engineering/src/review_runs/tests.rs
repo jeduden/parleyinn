@@ -14,17 +14,22 @@ fn ended(name: &str) -> Event {
     Ended(name.to_owned())
 }
 
-/// Every dispatched agent run once: the specialists one after another,
-/// then the generalists.
+/// Every dispatched agent run once, each generalist once its own
+/// specialists ended: review-code while lang-markdown, which it does not
+/// weigh, still runs.
 fn in_order() -> Vec<Event> {
-    let mut events = Vec::new();
-    for name in SPECIALISTS
-        .iter()
-        .chain(GENERALISTS.iter().map(|(g, _, _)| g))
-    {
-        events.extend([started(name), ended(name)]);
-    }
-    events
+    vec![
+        started("lang-markdown"),
+        started("lang-rust"),
+        ended("lang-rust"),
+        started("test-engineer-unit"),
+        ended("test-engineer-unit"),
+        started("review-code"),
+        ended("lang-markdown"),
+        started("review-spec"),
+        ended("review-spec"),
+        ended("review-code"),
+    ]
 }
 
 #[test]
@@ -42,16 +47,27 @@ fn every_agent_run_once_and_the_generalists_last_is_in_order() {
 }
 
 #[test]
-fn a_generalist_started_before_a_specialist_ended_is_named() {
+fn a_generalist_started_before_one_of_its_own_specialists_ended_is_named() {
     let mut events = in_order();
-    let last = events.remove(5);
-    events.push(last);
+    let end = events.remove(4);
+    events.push(end);
+
+    assert_eq!(
+        order_problems(&events),
+        ["review-code started before its specialist test-engineer-unit ended"]
+    );
+}
+
+#[test]
+fn a_generalist_that_waited_for_a_specialist_it_does_not_weigh_is_named() {
+    let mut events = in_order();
+    events.swap(5, 6);
 
     assert_eq!(
         order_problems(&events),
         [
-            "review-code started before test-engineer-unit ended",
-            "review-spec started before test-engineer-unit ended"
+            "review-code did not start while lang-markdown, a specialist it does not weigh, \
+             still ran"
         ]
     );
 }
@@ -59,15 +75,13 @@ fn a_generalist_started_before_a_specialist_ended_is_named() {
 #[test]
 fn a_generalist_that_never_started_is_named_once_and_not_as_early() {
     let mut events = in_order();
-    events.retain(|e| *e != started("review-spec"));
-    let last = events.remove(5);
-    events.push(last);
+    events.retain(|e| *e != started("review-spec") && *e != started("review-code"));
 
     assert_eq!(
         order_problems(&events),
         [
-            "review-spec ran 0 times, not once as its own agent",
-            "review-code started before test-engineer-unit ended"
+            "review-code ran 0 times, not once as its own agent",
+            "review-spec ran 0 times, not once as its own agent"
         ]
     );
 }
@@ -234,6 +248,34 @@ fn the_stand_in_answers_as_the_agent_in_its_log_alone_and_records_its_run() {
 }
 
 #[test]
+fn the_holding_stand_in_ends_the_held_run_once_its_generalist_started_or_after_its_hold() {
+    let work = TempDir::new().unwrap();
+    let run = |agent: &str| {
+        Command::new("claude", &["--agent", agent], work.path())
+            .logging_to(&work.path().join(format!("{agent}.jsonl")))
+    };
+    let host = Recorder::holding();
+
+    std::thread::scope(|scope| {
+        let held = scope.spawn(|| host.run(&run("lang-markdown")));
+        while host.events.lock().unwrap().is_empty() {
+            std::thread::yield_now();
+        }
+        host.run(&run("review-code")).unwrap();
+        held.join().unwrap().unwrap();
+    });
+
+    assert!(
+        order_problems(&host.events.lock().unwrap())
+            .iter()
+            .all(|p| !p.contains("did not start while"))
+    );
+    let unheld = Recorder::default();
+    unheld.run(&run("lang-markdown")).unwrap();
+    assert_eq!(unheld.events.lock().unwrap().len(), 2);
+}
+
+#[test]
 fn the_stand_in_fails_a_run_that_logs_nowhere() {
     let work = TempDir::new().unwrap();
     let host = Recorder::default();
@@ -247,4 +289,16 @@ fn the_stand_in_fails_a_run_that_logs_nowhere() {
     let specialist = Command::new("claude", &[], work.path()).logging_to(&work.path().join("x/y"));
     assert!(host.run(&specialist).unwrap_err().starts_with("write "));
     assert_eq!(agent_of(&specialist), "");
+}
+
+#[test]
+fn a_dispatch_that_does_not_parse_is_a_problem_naming_why() {
+    let problem = parse_dispatch("{").unwrap_err();
+    assert!(problem.starts_with("the dispatch the host was given does not parse: "));
+    assert!(parse_dispatch(DISPATCH).is_ok());
+    assert_eq!(
+        order_problems_by(&in_order(), "{"),
+        [problem],
+        "an unparsable dispatch is the one problem"
+    );
 }

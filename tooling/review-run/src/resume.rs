@@ -113,8 +113,7 @@ fn part_logs(from: &Path, name: &str) -> Result<BTreeMap<usize, RunLog>, String>
     let logs = earlier_file(from, LOGS);
     let entries = fs::read_dir(&logs).map_err(|e| format!("read {}: {e}", logs.display()))?;
     let mut out = BTreeMap::new();
-    for entry in entries {
-        let entry = entry.map_err(|e| format!("read {}: {e}", logs.display()))?;
+    for entry in listed(entries, &logs)? {
         let file = entry.file_name();
         let Some(index) = file
             .to_str()
@@ -307,8 +306,7 @@ pub fn copy(
             Err(e) if e.kind() == io::ErrorKind::NotFound => continue,
             Err(e) => return Err(format!("read {}: {e}", logs.display())),
         };
-        for entry in entries {
-            let entry = entry.map_err(|e| format!("read {}: {e}", logs.display()))?;
+        for entry in listed(entries, &logs)? {
             let file = entry.file_name();
             let Some(file) = file.to_str() else {
                 let lossy = file.to_string_lossy();
@@ -326,6 +324,13 @@ pub fn copy(
     }
 
     Ok(notes)
+}
+
+/// The entries of the directory `dir`, or why one of them did not list.
+fn listed<T>(entries: impl Iterator<Item = io::Result<T>>, dir: &Path) -> Result<Vec<T>, String> {
+    entries
+        .collect::<io::Result<Vec<T>>>()
+        .map_err(|e| format!("read {}: {e}", dir.display()))
 }
 
 /// Whether the log file named `file` is one of agent `name`'s that

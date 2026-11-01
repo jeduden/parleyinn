@@ -22,12 +22,12 @@
 //! and of the one it holds itself, and a review that found one requests
 //! changes, names the leak in a blocking finding and fails (ENG-28).
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::io::Write;
 use std::path::{Path, PathBuf};
-use std::sync::Mutex;
 use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::{Mutex, PoisonError};
 use std::time::Duration;
 
 use review_eval::credential::{self, Confined};
@@ -35,8 +35,11 @@ use review_eval::host::Host;
 use review_eval::secret::Scrubber;
 use serde::Serialize;
 
+use crate::breaker;
+use crate::controls::{ABORTED, Fraction, OVER_BUDGET};
 use crate::gaps::{self, GAPS, Gap, NOT_REVIEWED};
 use crate::leak;
+use crate::live;
 use crate::outcome::{Decision, decide};
 use crate::plan::{self, report_file};
 use crate::requirements;
@@ -56,10 +59,11 @@ pub const EXIT_USAGE: u8 = 2;
 
 /// How to call it.
 pub const USAGE: &str = "usage: review-run --workdir DIR [--parallel N] [--deadline SECONDS] \
-[--head-sha SHA] [--only GAPS --from DIR] [--credential DIR]";
+[--head-sha SHA] [--only GAPS --from DIR] [--max-cost-usd USD] [--breaker-fraction N/D] \
+[--summary FILE] [--credential DIR]";
 
 /// The command line, read.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Args {
     pub workdir: String,
     pub options: Options,
@@ -68,6 +72,8 @@ pub struct Args {
     /// The gap list and the earlier run's review directory a resumed
     /// review runs from.
     pub resume: Option<(String, String)>,
+    /// The job summary the table of every run is added to, when given.
+    pub summary: Option<String>,
     /// The directory the Claude token was staged in, when given.
     pub credential: Option<String>,
 }
@@ -102,9 +108,8 @@ pub fn run_with(
     };
     let errors = Mutex::new(stderr);
     let progress = |line: &str| {
-        if let Ok(mut out) = errors.lock() {
-            let _ = writeln!(out, "review-run: {line}");
-        }
+        let mut out = errors.lock().unwrap_or_else(PoisonError::into_inner);
+        let _ = writeln!(out, "review-run: {line}");
     };
     let guarded = guard(&args, token).and_then(|(scrubber, located)| {
         let confined = located.as_deref().map(|dir| Confined::new(host, dir));
@@ -219,25 +224,20 @@ fn review(
         resume.as_ref(),
         progress,
     )?;
-    // Every text an agent produced is scrubbed before anything reads it
-    // as the review's: its logs and reports on disk, its runs in memory.
-    let mut leaked = leak::scrub_runs(scrubber, &mut runs);
-    for dir in [crate::LOGS, crate::REPORTS] {
-        leaked += scrubber.scrub_tree(&workdir.join(dir))?;
-    }
-    leaks.fetch_add(leaked, Ordering::SeqCst);
+    scrub_agent_output(workdir, scrubber, leaks, &mut runs)?;
     let written = Written {
         workdir,
         scrubber,
         leaks,
     };
-    let reports = reports(workdir, &plan, progress);
+    let decision = decision(workdir, &plan, &runs, &known, options.breaker, progress);
+    let held = held_back(&decision.not_reviewed);
     let Decision {
         mut outcome,
         consulted,
         answers,
         not_reviewed,
-    } = decide(&plan, &runs, &reports, &known);
+    } = decision;
     let usage = usage::usage(&runs, resume.as_ref().map(|r| r.from.as_str()));
     written.json(CONSULTED, &consulted)?;
     written.json(ANSWERS, &answers)?;
@@ -245,6 +245,9 @@ fn review(
     written.json::<Vec<Gap>>(GAPS, &not_reviewed)?;
     written.text(NOT_REVIEWED, &gaps::markdown(&not_reviewed))?;
     written.json(RUN_ID, &id)?;
+    if let Some(summary) = &args.summary {
+        add_scrubbed_to_summary(Path::new(summary), &runs, scrubber, leaks, progress);
+    }
     // The outcome goes last, so a leak any file above held is in it.
     let leaked = leaks.load(Ordering::SeqCst);
     if leaked > 0 {
@@ -266,13 +269,46 @@ fn review(
     }
 
     Ok(format!(
-        "verdict={}\ndispatched={}\nconsulted={}\nfindings={}\ncost={:.4}\n",
+        "verdict={}\ndispatched={}\nconsulted={}\nfindings={}\ncost={:.4}\nover_budget={}\n\
+         aborted={}\n",
         outcome.verdict,
         plan.agents().len(),
         consulted.len(),
         outcome.findings.len(),
-        usage::total(&usage)
+        usage::total(&usage),
+        held.0,
+        held.1,
     ))
+}
+
+/// The review's decision from `runs` and the reports they wrote, less
+/// what the breaker kept back.
+fn decision(
+    workdir: &Path,
+    plan: &plan::Plan,
+    runs: &[AgentRun],
+    known: &BTreeSet<String>,
+    breaker_fraction: Fraction,
+    progress: &(dyn Fn(&str) + Sync),
+) -> Decision {
+    let reports = reports(workdir, plan, progress);
+    breaker::amend(plan, decide(plan, runs, &reports, known), breaker_fraction)
+}
+
+/// Scrubs every text an agent produced before anything reads it as the
+/// review's: its logs and reports on disk, its runs in memory.
+fn scrub_agent_output(
+    workdir: &Path,
+    scrubber: &Scrubber,
+    leaks: &AtomicUsize,
+    runs: &mut [AgentRun],
+) -> Result<(), String> {
+    let mut leaked = leak::scrub_runs(scrubber, runs);
+    for dir in [crate::LOGS, crate::REPORTS] {
+        leaked += scrubber.scrub_tree(&workdir.join(dir))?;
+    }
+    leaks.fetch_add(leaked, Ordering::SeqCst);
+    Ok(())
 }
 
 /// Each of `plan`'s specialists' reports under `workdir`, by name, when
@@ -289,6 +325,8 @@ fn reports(
             let path = workdir.join(report_file(&name));
             match fs::read_to_string(&path) {
                 Ok(text) => Some((name, text)),
+                // A report that is there but does not read stands as
+                // none, and the cause is named (I6).
                 Err(e) => {
                     if e.kind() != std::io::ErrorKind::NotFound {
                         progress(&format!("read {}: {e}", path.display()));
@@ -298,6 +336,40 @@ fn reports(
             }
         })
         .collect()
+}
+
+/// How many of `gaps` a cost cap stopped or kept from starting, and how
+/// many the breaker kept from starting: each a counted failure (I6).
+fn held_back(gaps: &[Gap]) -> (usize, usize) {
+    let count = |word: &str| gaps.iter().filter(|g| g.reason.starts_with(word)).count();
+    (count(OVER_BUDGET), count(ABORTED))
+}
+
+/// Adds the table of `runs` to the job summary at `path`, scrubbed of
+/// the token like every file, its leaks counted into `leaks`.
+fn add_scrubbed_to_summary(
+    path: &Path,
+    runs: &[AgentRun],
+    scrubber: &Scrubber,
+    leaks: &AtomicUsize,
+    progress: &(dyn Fn(&str) + Sync),
+) {
+    let (table, n) = scrubber.scrub(&live::table(runs));
+    leaks.fetch_add(n, Ordering::SeqCst);
+    add_to_summary(path, &table, progress);
+}
+
+/// Adds `table` to the job summary at `path`; one that cannot be added
+/// to is told to `progress`, and the review goes on (I6).
+fn add_to_summary(path: &Path, table: &str, progress: &(dyn Fn(&str) + Sync)) {
+    let added = fs::OpenOptions::new()
+        .append(true)
+        .create(true)
+        .open(path)
+        .and_then(|mut file| file.write_all(format!("\n{table}").as_bytes()));
+    if let Err(e) = added {
+        progress(&format!("add to the job summary {}: {e}", path.display()));
+    }
 }
 
 /// Reads the earlier run in `from` for the gap list `only`, plans what
@@ -381,7 +453,8 @@ impl Written<'_> {
 fn parse(args: impl IntoIterator<Item = String>) -> Result<Args, String> {
     let mut workdir = None;
     let mut options = Options::default();
-    let (mut head, mut only, mut from, mut credential) = (None, None, None, None);
+    let (mut head, mut only, mut from, mut summary, mut credential) =
+        (None, None, None, None, None);
     let mut args = args.into_iter();
     while let Some(arg) = args.next() {
         let Some(flag) = arg.strip_prefix("--") else {
@@ -398,6 +471,9 @@ fn parse(args: impl IntoIterator<Item = String>) -> Result<Args, String> {
             "head-sha",
             "only",
             "from",
+            "max-cost-usd",
+            "breaker-fraction",
+            "summary",
             "credential",
         ]
         .contains(&name)
@@ -415,8 +491,11 @@ fn parse(args: impl IntoIterator<Item = String>) -> Result<Args, String> {
             "head-sha" if run_id::is_commit(&value) => head = Some(value),
             "head-sha" => return Err(format!("--head-sha {value:?} is no commit id")),
             "only" => only = Some(value),
+            "from" => from = Some(value),
+            "max-cost-usd" => options.max_cost_usd = positive(name, &value)?,
+            "breaker-fraction" => options.breaker = fraction(name, &value)?,
             "credential" => credential = Some(value),
-            _ => from = Some(value),
+            _ => summary = Some(value),
         }
     }
     let workdir = workdir.ok_or("--workdir is required")?;
@@ -431,8 +510,20 @@ fn parse(args: impl IntoIterator<Item = String>) -> Result<Args, String> {
         options,
         head,
         resume,
+        summary,
         credential,
     })
+}
+
+/// `value`, flag `name`'s, as a ratio above zero and at most one: `N/D`, or `N` alone for `N/1`.
+fn fraction(name: &str, value: &str) -> Result<Fraction, String> {
+    let (num, den) = value.split_once('/').unwrap_or((value, "1"));
+    match (num.parse::<u64>(), den.parse::<u64>()) {
+        (Ok(num), Ok(den)) if num > 0 && num <= den => Ok(Fraction { num, den }),
+        _ => Err(format!(
+            "--{name} {value:?} is no ratio above zero and at most one, as 1/3"
+        )),
+    }
 }
 
 /// `value`, flag `name`'s, as a number above zero.

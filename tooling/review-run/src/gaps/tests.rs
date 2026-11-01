@@ -21,6 +21,20 @@ fn a_run_cut_off_at_its_turns_is_incomplete_and_any_other_silent() {
 }
 
 #[test]
+fn a_run_a_cost_cap_stopped_or_the_breaker_kept_from_starting_says_so() {
+    assert_eq!(
+        silent("its run ended with error_max_budget_usd"),
+        "over budget: its run ended with error_max_budget_usd"
+    );
+    for why in [
+        "over budget: the review's runs cost 40.0000 USD, its cap is 40.00 USD, so it was not started",
+        "aborted: 3 of 5 specialists failed (mass failure), so it was not started",
+    ] {
+        assert_eq!(silent(why), why);
+    }
+}
+
+#[test]
 fn a_gap_list_reads_back_as_written() {
     let gaps = vec![
         Gap::new("lang-rust", Some(2), silent("x")),

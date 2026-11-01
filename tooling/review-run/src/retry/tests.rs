@@ -8,7 +8,7 @@ use testkit::TempDir;
 
 use super::*;
 use crate::fake::{self, FakeHost, agent_of, prompt_of};
-use crate::plan::parse_dispatch;
+use crate::plan::{Plan, parse_dispatch};
 use crate::run::Options;
 
 /// The ids a report may cite: the invariants and ENG-28.

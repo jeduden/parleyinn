@@ -30,6 +30,28 @@ pub const DISALLOWED: &str = "Bash,Edit,Write,NotebookEdit,WebFetch,WebSearch,Ag
 /// `--disallowedTools`.
 pub const SETTINGS: &str = r#"{"permissions":{"blockReadsOutsideWorkingDirectories":true}}"#;
 
+/// The most, in US dollars, one specialist's run may spend, passed as
+/// `--max-budget-usd`: the specialists of the reviews of pull request 98
+/// cost 0.01 to 0.30 each, so about three times the dearest leaves room
+/// for a long diff and stops a run gone round in circles. A run the cap
+/// stops ends with the result subtype [`OVER_BUDGET`].
+pub const SPECIALIST_BUDGET_USD: &str = "1.00";
+/// The same for a generalist, or a consultant, on the strongest model:
+/// those of pull request 98 cost up to 2.00, so 2.5 times that.
+pub const GENERALIST_BUDGET_USD: &str = "5.00";
+
+/// The result subtype of a run its `--max-budget-usd` cap stopped.
+pub const OVER_BUDGET: &str = "error_max_budget_usd";
+
+/// The cap of one run of an agent of `kind`.
+#[must_use]
+pub fn budget_usd(kind: Kind) -> &'static str {
+    match kind {
+        Kind::Specialist => SPECIALIST_BUDGET_USD,
+        Kind::Generalist | Kind::Consultant => GENERALIST_BUDGET_USD,
+    }
+}
+
 /// The prompt `component` gets for `world`: for a specialist or a
 /// generalist what the review's run tells it, and for a consultant the
 /// target a skill hands it: the tree, the diff and the changed paths.
@@ -105,6 +127,10 @@ pub fn command(
     args.extend(["--allowedTools".to_owned(), TOOLS.to_owned()]);
     args.extend(["--disallowedTools".to_owned(), DISALLOWED.to_owned()]);
     args.extend(["--settings".to_owned(), SETTINGS.to_owned()]);
+    args.extend([
+        "--max-budget-usd".to_owned(),
+        budget_usd(component.kind).to_owned(),
+    ]);
     match component.kind {
         Kind::Specialist | Kind::Generalist => {
             args.extend(["--agent".to_owned(), component.name.clone()]);
