@@ -744,7 +744,9 @@ fn a_review_confines_every_agent_to_the_staged_credential() {
     assert_eq!(code, EXIT_OK, "{err}");
     assert!(out.starts_with("verdict=approve\n"), "{out}");
     let shown = fs::canonicalize(&cred).unwrap().display().to_string();
-    for command in host.calls.lock().unwrap().iter() {
+    let calls = host.calls.lock().unwrap();
+    assert!(!calls.is_empty(), "no agent ran");
+    for command in calls.iter() {
         assert!(
             command.env.contains(&(
                 review_eval::credential::CONFIG_VAR.to_owned(),
@@ -832,6 +834,37 @@ fn a_review_holding_a_token_too_short_for_the_scrub_runs_no_agent() {
         )
     );
     assert!(host.agents().is_empty());
+}
+
+#[test]
+fn a_review_holding_a_staged_token_and_its_own_scrubs_both() {
+    // The process's own token differs from the staged one: each is a
+    // form, and an agent leaking either fails the review closed.
+    let own = "dummy-process-token-9876543210";
+    let dir = workdir();
+    let cred = dir.path().join("cred");
+    review_eval::credential::stage(&cred, TOKEN).unwrap();
+    let host = FakeHost::new(move |c: &review_eval::host::Command| {
+        let text = format!("{} saw {TOKEN} and {own}", fake::agent_of(c));
+        fake::answer(c, &[&text], "outcome: none — fine.")
+    });
+
+    let (code, out, err) = run_holding(
+        &host,
+        dir.path(),
+        Some(own),
+        &["--credential", cred.to_str().unwrap()],
+    );
+
+    assert_eq!(code, EXIT_FAILURE);
+    assert!(
+        out.starts_with("failed=an agent's output contained the Claude token: "),
+        "{out}"
+    );
+    let all = written(dir.path()) + &out + &err;
+    assert!(!all.contains(TOKEN) && !all.contains(own), "{all}");
+    assert!(all.contains(review_eval::secret::REDACTED));
+    assert!(!host.agents().is_empty());
 }
 
 #[test]
