@@ -27,6 +27,17 @@ pub(super) fn review_reach_cases() -> Vec<Case> {
             "triggers on [pull_request_target workflow_run issue_comment], want workflow_run and issue_comment",
         ),
         case(
+            "a job running a script of main's tree before it checks that tree out",
+            "ENG-28",
+            Injection::replace(
+                REVIEW_WORKFLOW,
+                "worktrees of.\n      - uses: actions/checkout",
+                "worktrees of.\n      - if: always()\n        uses: actions/checkout",
+            ),
+            scenario("ENG-28"),
+            "in job evaluate runs before a checkout of main's tree",
+        ),
+        case(
             "the reviewing agent granted a write permission",
             "ENG-28",
             Injection::replace(

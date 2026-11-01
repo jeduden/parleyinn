@@ -311,6 +311,11 @@ jobs:
     permissions:
       contents: read
     steps:
+      # Main's checkout comes first, for the scripts it holds and, when
+      # a component changed, the tree the fixture worlds are worktrees of.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - name: Read the plan
         id: plan
         env:
@@ -319,14 +324,9 @@ jobs:
       - name: Record that no component changed
         if: steps.plan.outputs.empty == 'true'
         run: scripts/review-eval-none.sh
-      # Main's tree is the checkout the fixture worlds are worktrees of;
-      # the pull request's tree holds the components and cases under
+      # The pull request's tree holds the components and cases under
       # evaluation, read as data: the harness runs each component inside
       # a world of its own, never from this directory.
-      - if: steps.plan.outputs.empty == 'false'
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
       - if: steps.plan.outputs.empty == 'false'
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
