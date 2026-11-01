@@ -351,6 +351,16 @@ fn context_of_a_specialist_with_no_file_of_its_own_holds_every_finding() {
 }
 
 #[test]
+fn context_counts_and_lists_every_touched_id() {
+    let mut a = analyse(&base(), &base(), "diff --git a/a.rs b/a.rs\n+x\n", &[]);
+    a.touched = vec!["REC-01".into(), "REC-02".into()];
+
+    let got = context(&a, "lang-rust");
+
+    assert!(got.contains("touches 2 ids: REC-01, REC-02."), "{got}");
+}
+
+#[test]
 fn context_says_none_when_no_finding_is_on_the_specialist_s_files() {
     let a = analyse(&base(), &base(), "diff --git a/a.rs b/a.rs\n+x\n", &[]);
 
