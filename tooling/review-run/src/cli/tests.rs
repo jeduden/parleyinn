@@ -669,3 +669,48 @@ fn a_review_whose_logs_directory_cannot_be_made_fails_naming_it() {
     assert!(err.starts_with("review-run: make "), "{err}");
     assert!(host.agents().is_empty());
 }
+
+#[test]
+fn every_review_writes_its_trace_and_report_page_a_failed_one_too() {
+    let dir = workdir();
+    let host = FakeHost::new(fake::either);
+
+    let (code, _, err) = run_in(&host, dir.path());
+
+    assert_eq!(code, EXIT_OK, "{err}");
+    let trace = fs::read_to_string(dir.path().join(review_report::TRACE)).unwrap();
+    let lines: Vec<serde_json::Value> = trace
+        .lines()
+        .map(|l| serde_json::from_str(l).unwrap())
+        .collect();
+    assert_eq!(lines[0]["trace"]["verdict"], "approve");
+    assert_eq!(lines.len(), 1 + 3, "one span per agent run");
+    assert!(dir.path().join(review_report::REPORT).is_file());
+
+    let failed = TempDir::new().unwrap();
+    let (code, _, _) = run_in(&host, failed.path());
+    assert_eq!(code, EXIT_FAILURE);
+    let trace = fs::read_to_string(failed.path().join(review_report::TRACE)).unwrap();
+    assert!(trace.starts_with("{\"trace\":{"), "{trace}");
+    assert!(trace.contains("\"verdict\":\"failed\""), "{trace}");
+}
+
+#[test]
+fn a_report_page_that_cannot_be_written_is_named_and_changes_no_verdict() {
+    let dir = workdir();
+    fs::create_dir_all(dir.path().join(review_report::REPORT)).unwrap();
+    let host = FakeHost::new(fake::either);
+
+    let (code, out, err) = run_in(&host, dir.path());
+
+    assert_eq!(code, EXIT_OK, "{err}");
+    assert!(out.starts_with("verdict=approve\n"), "{out}");
+    assert!(
+        err.contains("review-run: report: review/report.html not written: "),
+        "{err}"
+    );
+    assert!(
+        err.contains("review-run: report: 1 of 2 report files not written"),
+        "{err}"
+    );
+}

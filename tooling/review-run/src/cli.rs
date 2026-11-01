@@ -83,7 +83,12 @@ pub fn run(
             let _ = writeln!(out, "review-run: {line}");
         }
     };
-    match review(host, &args, &progress) {
+    let reviewed = review(host, &args, &progress);
+    // The trace and the report page, after every run, best effort: they
+    // never change what the review decided (ENG-28).
+    let failure = reviewed.as_ref().err().map(String::as_str);
+    review_report::write_reported(Path::new(&args.workdir), failure, &progress);
+    match reviewed {
         // The step outputs carry the verdict to the workflow: one that
         // does not print fails the step rather than leave them empty (I6).
         Ok(printed) => match write!(stdout, "{printed}") {

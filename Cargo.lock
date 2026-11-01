@@ -1298,6 +1298,7 @@ dependencies = [
  "review-bundle",
  "review-eval",
  "review-gate",
+ "review-report",
  "serde",
  "serde_json",
  "sha2",
