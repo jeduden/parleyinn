@@ -163,17 +163,17 @@ if [ "$resume" = yes ]; then
   was=$(jq -r '.head // "none"' "$prev/run-id.json" 2>/dev/null || echo none)
   if [ "$was" != "$head_sha" ]; then
     echo "review-local: a full run: the last run reviewed head $was, not $head_sha" >&2
+  elif ! command -v sha256sum > /dev/null; then
+    echo "review-local: a full run: sha256sum is not on PATH, so the agent definitions cannot be compared" >&2
   elif ! jq -r '.agents | to_entries[] | "\(.value.definition // "-")  .claude/agents/\(.key).md"' \
-    "$prev/run-id.json" | sha256sum --check --status --strict 2>/dev/null; then
+    "$prev/run-id.json" | sha256sum --check --status --strict; then
     echo "review-local: a full run: an agent definition changed since the last run" >&2
   else
     from=(--only "$prev/gaps.json" --from "$prev")
   fi
 fi
-status=0
-tool review-run -- --workdir . --parallel "$parallel" --head-sha "$head_sha" ${from[@]+"${from[@]}"} || status=$?
-mkdir -p "$repo/target/review-local"
-rm -rf "$repo/target/review-local/review"
+status=0; tool review-run -- --workdir . --parallel "$parallel" --head-sha "$head_sha" ${from[@]+"${from[@]}"} || status=$?
+rm -rf "$repo/target/review-local/review"; mkdir -p "$repo/target/review-local"
 cp -R review "$repo/target/review-local/"
 
 if [ "$status" -ne 0 ]; then
