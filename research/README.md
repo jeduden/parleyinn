@@ -52,6 +52,10 @@ from.
 - [Warp](notes/warp/warp.md): shared agent sessions, inline code review and
   Factory work from issues and pull requests; compared with ParleyInn's
   intent-centered room, forge discussion and trust boundaries.
+- [Bernstein](notes/bernstein/bernstein.md): a deterministic orchestrator for
+  CLI coding agents with worktree gates, HMAC-chained audit and offline
+  receipts; compared with ParleyInn's record, restore and closed paths to the
+  model, and what ParleyInn can learn from it.
 - [Live-PR pitch review](notes/live-pr-pitch-review/): a blind
   adversarial review of the "live pull request" pitch in three lenses:
   missing process, existing products, and inconsistencies with the
