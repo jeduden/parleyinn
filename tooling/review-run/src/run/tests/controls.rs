@@ -31,13 +31,24 @@ fn controlled(
     jitter: f64,
     script: impl Fn(&Command) -> Result<Output, String> + Sync + 'static,
 ) -> (TempDir, Ran) {
+    told_to(Arc::default(), dispatch, options, jitter, script)
+}
+
+/// [`controlled`], the lines progress is told kept in `lines`, which
+/// the script may read while the review runs.
+fn told_to(
+    lines: Arc<Mutex<Vec<String>>>,
+    dispatch: &str,
+    options: Options,
+    jitter: f64,
+    script: impl Fn(&Command) -> Result<Output, String> + Sync + 'static,
+) -> (TempDir, Ran) {
     let dir = workdir();
     let host = FakeHost::new(script);
     let clock = FakeClock {
         jitter,
         ..FakeClock::default()
     };
-    let lines = Mutex::new(Vec::new());
     let runs = review_on(&Review {
         host: &host,
         clock: &clock,
@@ -49,7 +60,7 @@ fn controlled(
         progress: &|l| lines.lock().unwrap().push(l.to_owned()),
     })
     .unwrap();
-    let lines = lines.into_inner().unwrap();
+    let lines = lines.lock().unwrap().clone();
     (
         dir,
         Ran {
@@ -508,9 +519,20 @@ fn what_is_running_is_told_every_so_often() {
         every: Duration::from_millis(1),
         ..options()
     };
-    let (_dir, ran) = controlled(ONE, options, 0.0, |c| {
-        // Long enough for a block or two to be told while it runs.
-        std::thread::sleep(Duration::from_millis(30));
+    let lines = Arc::new(Mutex::new(Vec::new()));
+    let seen = Arc::clone(&lines);
+    let (_dir, ran) = told_to(lines, ONE, options, 0.0, move |c| {
+        // The run ends once a block was told, or after half a minute.
+        let give_up = std::time::Instant::now() + Duration::from_secs(30);
+        while std::time::Instant::now() < give_up
+            && !seen
+                .lock()
+                .unwrap()
+                .iter()
+                .any(|l| l.starts_with("progress: "))
+        {
+            std::thread::sleep(Duration::from_millis(1));
+        }
         fake::either(c)
     });
 
