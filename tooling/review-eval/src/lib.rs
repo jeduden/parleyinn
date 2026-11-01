@@ -17,6 +17,7 @@ pub mod check;
 pub mod cli;
 pub mod compare;
 pub mod component;
+pub mod credential;
 pub mod derived;
 pub mod diff;
 pub mod grade;
@@ -28,6 +29,7 @@ pub mod published;
 pub mod report;
 pub mod runner;
 pub mod score;
+pub mod secret;
 pub mod world;
 
 /// Where the written cases live, relative to the checkout.
