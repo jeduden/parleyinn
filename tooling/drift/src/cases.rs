@@ -52,13 +52,13 @@ const BUILD_WORKFLOW: &str = ".github/workflows/build.yml";
 /// The CI workflow the ENG-20 cases drift.
 const CI_WORKFLOW: &str = ".github/workflows/ci.yml";
 
-/// The pinned action that attests build provenance.
-const ATTEST_PROVENANCE: &str =
-    "uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2";
+/// Where the line using the action that attests build provenance starts.
+/// The sha and version after it are the bots' to move, so no case
+/// quotes them.
+const ATTEST_PROVENANCE: &str = "uses: actions/attest-build-provenance@";
 
-/// The step the release workflow attests its SBOM with.
-const ATTEST_SBOM_STEP: &str =
-    "        uses: actions/attest-sbom@c604332985a26aa8cf1bdc465b92731239ec6b9e # v4.1.0\n";
+/// Where the line using the action that attests the release's SBOM starts.
+const ATTEST_SBOM: &str = "uses: actions/attest-sbom@";
 
 /// The ruleset for main the ENG-21 cases drift.
 const RULESET: &str = ".github/rulesets/main.json";

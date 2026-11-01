@@ -62,6 +62,41 @@ fn apply_replaces_the_first_occurrence() {
 }
 
 #[test]
+fn apply_replaces_the_rest_of_the_line_from_a_prefix() {
+    let root = tree();
+    fs::write(root.path().join("w.yml"), "a\n  uses: x/y@abc # v1\nb\n").unwrap();
+
+    let drift = Injection::replace_line("w.yml", "uses: x/y@", "uses: x/y@main");
+    validate(root.path(), &drift).unwrap();
+    apply(root.path(), &drift).unwrap();
+
+    assert_eq!(read(&root.path().join("w.yml")), "a\n  uses: x/y@main\nb\n");
+}
+
+#[test]
+fn replace_line_replaces_the_last_line_without_a_newline() {
+    let root = tree();
+    fs::write(root.path().join("w.yml"), "uses: x/y@abc").unwrap();
+
+    apply(
+        root.path(),
+        &Injection::replace_line("w.yml", "uses: ", "z"),
+    )
+    .unwrap();
+
+    assert_eq!(read(&root.path().join("w.yml")), "z");
+}
+
+#[test]
+fn replace_line_refuses_a_prefix_the_file_lacks() {
+    let root = tree();
+
+    let err = validate(root.path(), &Injection::replace_line("a.md", "gone@", "x")).unwrap_err();
+
+    assert!(matches!(err, Error::NotFound { .. }));
+}
+
+#[test]
 fn apply_removes_and_copies() {
     let root = tree();
 

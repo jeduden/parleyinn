@@ -62,10 +62,15 @@ pub(super) fn release_signer_cases() -> Vec<Case> {
         ),
         release_case(
             "build provenance attested outside the release build workflow",
-            Injection::replace(
+            Injection::replace_line(
                 RELEASE_WORKFLOW,
-                ATTEST_SBOM_STEP,
-                "        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2\n        with:\n          subject-path: \"dist/parinn-*\"\n      - name: Attest the SBOM again\n        uses: actions/attest-sbom@c604332985a26aa8cf1bdc465b92731239ec6b9e # v4.1.0\n",
+                ATTEST_SBOM,
+                concat!(
+                    "uses: actions/attest-build-provenance@0000000000000000000000000000000000000000\n",
+                    "        with:\n          subject-path: \"dist/parinn-*\"\n",
+                    "      - name: Attest the SBOM again\n",
+                    "        uses: actions/attest-sbom@0000000000000000000000000000000000000000",
+                ),
             ),
             PROVENANCE_GATE,
             "release.yml attests build provenance outside release-build.yml, in job publish",
@@ -75,7 +80,7 @@ pub(super) fn release_signer_cases() -> Vec<Case> {
             Injection::replace(
                 BUILD_WORKFLOW,
                 "        run: scripts/check-stamp.sh dist/parinn-windows-amd64.exe \"$VERSION\" \"$COMMIT\"\n",
-                "        run: scripts/check-stamp.sh dist/parinn-windows-amd64.exe \"$VERSION\" \"$COMMIT\"\n\n  attest:\n    needs: windows\n    runs-on: ubuntu-latest\n    permissions:\n      id-token: write\n      attestations: write\n    steps:\n      - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2\n        with:\n          subject-path: \"dist/parinn-*\"\n",
+                "        run: scripts/check-stamp.sh dist/parinn-windows-amd64.exe \"$VERSION\" \"$COMMIT\"\n\n  attest:\n    needs: windows\n    runs-on: ubuntu-latest\n    permissions:\n      id-token: write\n      attestations: write\n    steps:\n      - uses: actions/attest-build-provenance@0000000000000000000000000000000000000000\n        with:\n          subject-path: \"dist/parinn-*\"\n",
             ),
             PROVENANCE_GATE,
             "build.yml attests build provenance in job attest; only release-build.yml may",
@@ -100,10 +105,10 @@ pub(super) fn release_build_cases() -> Vec<Case> {
     vec![
         release_case(
             "the release build workflow no longer attesting provenance",
-            Injection::replace(
+            Injection::replace_line(
                 RELEASE_BUILD_WORKFLOW,
                 ATTEST_PROVENANCE,
-                "uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1",
+                "uses: actions/upload-artifact@0000000000000000000000000000000000000000",
             ),
             PROVENANCE_GATE,
             "release-build.yml does not attest build provenance",
@@ -113,7 +118,7 @@ pub(super) fn release_build_cases() -> Vec<Case> {
             Injection::replace(
                 RELEASE_BUILD_WORKFLOW,
                 "    steps:\n      - uses: actions/download-artifact@",
-                "    steps:\n      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1\n      - uses: actions/download-artifact@",
+                "    steps:\n      - uses: actions/checkout@0000000000000000000000000000000000000000\n      - uses: actions/download-artifact@",
             ),
             PROVENANCE_GATE,
             "release-build.yml job attest checks out the repository's code",
@@ -208,10 +213,10 @@ pub(super) fn release_verify_cases() -> Vec<Case> {
         ),
         release_case(
             "the SBOM generated but not attested",
-            Injection::replace(
+            Injection::replace_line(
                 RELEASE_WORKFLOW,
-                ATTEST_SBOM_STEP,
-                "        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1\n",
+                ATTEST_SBOM,
+                "uses: actions/checkout@0000000000000000000000000000000000000000",
             ),
             SBOM_GATE,
             "release.yml does not attest the SBOM",

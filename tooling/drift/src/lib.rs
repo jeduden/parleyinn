@@ -20,6 +20,10 @@ pub use cases::cases;
 pub enum Op {
     /// Swaps the first occurrence of `old` for `new`.
     Replace,
+    /// Swaps the first line holding `old`, from `old` to the line's end,
+    /// for `new`. `old` is the stable start of a line whose rest moves,
+    /// such as a pinned action's sha and version a bot bumps.
+    ReplaceLine,
     /// Deletes the file.
     Remove,
     /// Copies the file to `new`, which must not exist yet.
@@ -46,6 +50,18 @@ impl Injection {
             op: Op::Replace,
             file,
             old,
+            new,
+        }
+    }
+
+    /// Swaps the first `prefix` in `file`, and the rest of its line, for
+    /// `new`, so the case keeps applying when that rest changes.
+    #[must_use]
+    pub fn replace_line(file: &'static str, prefix: &'static str, new: &'static str) -> Self {
+        Self {
+            op: Op::ReplaceLine,
+            file,
+            old: prefix,
             new,
         }
     }
@@ -269,7 +285,9 @@ fn check_target(root: &Path, injection: &Injection) -> Result<String, Error> {
         source,
     })?;
     match injection.op {
-        Op::Replace if injection.old.is_empty() || !body.contains(injection.old) => {
+        Op::Replace | Op::ReplaceLine
+            if injection.old.is_empty() || !body.contains(injection.old) =>
+        {
             Err(Error::NotFound {
                 file: file.into(),
                 old: injection.old.into(),
@@ -279,7 +297,7 @@ fn check_target(root: &Path, injection: &Injection) -> Result<String, Error> {
             file: file.into(),
             new: injection.new.into(),
         }),
-        Op::Replace | Op::Remove | Op::Copy | Op::Create => Ok(body),
+        Op::Replace | Op::ReplaceLine | Op::Remove | Op::Copy | Op::Create => Ok(body),
     }
 }
 
@@ -299,12 +317,21 @@ pub fn apply(root: &Path, injection: &Injection) -> Result<(), Error> {
             .map_or(Ok(()), fs::create_dir_all)
             .and_then(|()| fs::write(&path, injection.new)),
         Op::Replace => fs::write(path, body.replacen(injection.old, injection.new, 1)),
+        Op::ReplaceLine => fs::write(path, replace_line(&body, injection)),
     };
 
     written.map_err(|source| Error::Io {
         file: injection.file.into(),
         source,
     })
+}
+
+/// `body` with the first line holding the injection's prefix cut from the
+/// prefix to the line's end and `new` put there.
+fn replace_line(body: &str, injection: &Injection) -> String {
+    let start = body.find(injection.old).unwrap_or(body.len());
+    let end = body[start..].find('\n').map_or(body.len(), |n| start + n);
+    format!("{}{}{}", &body[..start], injection.new, &body[end..])
 }
 
 /// The cases shard `spec`, of the form `i/n`, holds: every `n`th case

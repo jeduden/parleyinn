@@ -267,11 +267,7 @@ pub(super) fn repository_cases() -> Vec<Case> {
         case(
             "the Rust toolchain no longer pinned to a release",
             "ENG-01",
-            Injection::replace(
-                "rust-toolchain.toml",
-                r#"channel = "1.99.0""#,
-                r#"channel = "stable""#,
-            ),
+            Injection::replace_line("rust-toolchain.toml", "channel = ", r#"channel = "stable""#),
             scenario("ENG-01"),
             r#"rust-toolchain.toml does not pin an exact release: "stable""#,
         ),
