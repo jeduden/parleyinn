@@ -195,7 +195,7 @@ fn changed(name: &str, earlier: &Earlier, now: &RunId) -> Option<String> {
 
 /// What each of `plan`'s agents keeps from `earlier`, for a review on
 /// `now`, the earlier run's directory given as `from`; an agent whose
-/// gap recurred in more than `max_resumes` resumes in a row is not run
+/// gap recurred in `max_resumes` resumes in a row after its first run is not run
 /// again.
 #[must_use]
 pub fn plan(plan: &Plan, earlier: &Earlier, now: &RunId, from: &str, max_resumes: u32) -> Resume {

@@ -36,7 +36,8 @@ pub const FINDINGS_NOTES: &str = "review/findings.md";
 pub const RULING_REVIEWS: u32 = 3;
 /// How a finding that needs a stakeholder ruling starts.
 pub const RULING: &str = "stalled: needs a stakeholder ruling";
-/// How every finding a stall raises starts; none is itself tracked.
+/// How every finding a stall raises starts; none the review raised is
+/// itself tracked, though a generalist's finding of that text is.
 pub const STALLED: &str = "stalled:";
 
 /// One kept finding, as reviews track it.
@@ -153,7 +154,10 @@ pub fn track(
 ) -> Tracking {
     let before = previous.unwrap_or_default();
     let mut kept: Vec<Tracked> = Vec::new();
-    for (f, agent) in found.iter().filter(|(f, _)| !f.body.starts_with(STALLED)) {
+    for (f, agent) in found
+        .iter()
+        .filter(|(f, agent)| !(agent == REVIEW_RUN && f.body.starts_with(STALLED)))
+    {
         let fid = of_finding(f);
         if kept.iter().any(|t| t.fid == fid) {
             continue;

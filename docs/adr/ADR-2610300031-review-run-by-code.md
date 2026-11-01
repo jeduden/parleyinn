@@ -259,11 +259,10 @@ repeat them, which costs tokens.
   seeded reports use the new lines; the grader reads the run log alone.
 - A requirement request lands with the stakeholder as a nit; the SRS
   changes only through the stakeholder's own change.
-- A review runs in waves of agents, each up to 900 seconds and each
-  agent at most twice (three times when the API turned it away): 56
-  specialists in two waves of 32, then the generalists, each once its
-  own specialists ended and the mass failure below is decided; 90
-  minutes at worst, and the job's cap is 120.
+- A review runs its agents in one bounded pipeline, each up to 900 seconds
+  and at most twice (three times when the API turned it away): 56
+  specialists, then each generalist once its own specialists ended and
+  the mass failure below is decided; 90 minutes at worst (job cap 120).
 - Cost and failure are bounded by code (proposed): `--max-budget-usd`
   caps a run (1.00 a specialist, 5.00 a generalist), `--max-cost-usd`
   (40) starts no run once finished runs cost it, and over a third of
@@ -273,11 +272,12 @@ repeat them, which costs tokens.
   `review-run --only <gaps> --from <dir>` reruns those and each agent
   whose answer key changed, on any head. A key (proposed) hashes the
   definition, model, effort, turns, `claude --version`, command line,
-  prompt, split limit, instructions, own diff and a salt. `--answers
+  prompt, split limit, instructions, own diff and a salt; a generalist's
+  also hashes its specialists' keys and the reports it weighs. `--answers
   DIR` reuses an answer that passes the report check, and stores no
-  refused, cut-off, silent, capped or token-holding run. Risks: an
-  injected answer frozen in the store (only the default branch's CI
-  writes it), and a key blind to files read outside it.
+  refused, cut-off, silent, capped or token-holding run; `answers drop`
+  removes one. Risks: an injected answer frozen in the store (no
+  workflow writes it yet), and a key blind to files read outside it.
 - After every run, failed or not, `review-run` writes
   `review/agent-runs.jsonl`, one entry per agent run with its tokens, the
   cost its log reported and why it was not accepted, and

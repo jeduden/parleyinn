@@ -23,12 +23,17 @@ fn a_first_review_keeps_every_finding_new_once() {
         finding("a.rs", BLOCKING, "x — I2"),
         finding("a.rs", BLOCKING, "X. — I2"),
         finding("b.rs", "nit", "y"),
-        finding("review/", BLOCKING, "stalled: lang-rust failed 3 times"),
+        (
+            finding("review/", BLOCKING, "stalled: lang-rust failed 3 times").0,
+            REVIEW_RUN.to_owned(),
+        ),
+        finding("c.rs", BLOCKING, "stalled: a generalist's own finding"),
     ];
 
     let t = track(&found, None, "h1", &same("f"));
 
-    assert_eq!(t.kept.len(), 2);
+    assert_eq!(t.kept.len(), 3);
+    assert_eq!(t.kept[2].fid.path, "c.rs");
     assert!(!t.previous);
     assert!(t.resolved.is_empty());
     let a = &t.kept[0];

@@ -253,8 +253,95 @@ fn a_tampered_stored_report_is_run_again_not_trusted() {
         "{:?}",
         second.lines
     );
-    // The poisoned answer stays where it is, for a person to drop.
-    assert!(report.exists());
+    // The poisoned answer is taken out and the fresh one stored in its
+    // place, so the next review takes it.
+    assert!(
+        second.lines.iter().any(|l| l.starts_with(&format!(
+            "lang-rust (specialist): its stored answer {key} was dropped, so its new answer is stored in its place"
+        ))),
+        "{:?}",
+        second.lines
+    );
+    assert!(fs::read_to_string(&report).unwrap().contains(" — I9"));
+    assert!(review(dir.path(), &store).started.is_empty());
+}
+
+#[test]
+fn a_poisoned_answer_in_a_store_read_alone_stays_and_the_agent_runs_every_time() {
+    let dir = workdir();
+    let store = store_in(dir.path());
+    let first = review(dir.path(), &store);
+    let key = first.run("lang-rust").answer_key.clone().unwrap();
+    let report = store.dir.join(&key).join(store::REPORT);
+    let text = fs::read_to_string(&report).unwrap();
+    fs::write(&report, text.replace(" — I9", " — ENG-999")).unwrap();
+    let reader = Store {
+        read_only: true,
+        ..store
+    };
+
+    let second = review(dir.path(), &reader);
+
+    assert_eq!(second.started, ["lang-rust"]);
+    assert!(fs::read_to_string(&report).unwrap().contains("ENG-999"));
+    assert!(second.lines.iter().all(|l| !l.contains("was dropped")));
+    assert!(
+        second.lines.iter().any(|l| l
+            == "lang-rust (specialist): its answer was not stored: the answer store is read alone"),
+        "{:?}",
+        second.lines
+    );
+}
+
+#[test]
+fn a_stored_answer_that_cannot_be_dropped_is_told() {
+    let dir = workdir();
+    let store = store_in(dir.path());
+    let first = review(dir.path(), &store);
+    let key = first.run("lang-rust").answer_key.clone().unwrap();
+    // A file where its directory stands neither reads nor goes.
+    fs::remove_dir_all(store.dir.join(&key)).unwrap();
+    fs::write(store.dir.join(&key), "a file").unwrap();
+
+    let second = review(dir.path(), &store);
+
+    assert!(
+        second
+            .lines
+            .iter()
+            .any(|l| l.contains(&format!("its stored answer {key} was not dropped: drop "))),
+        "{:?}",
+        second.lines
+    );
+}
+
+#[test]
+fn an_answer_stored_by_another_run_meanwhile_is_told_and_kept() {
+    let dir = workdir();
+    let store = store_in(dir.path());
+    let key = review(dir.path(), &store)
+        .run("lang-rust")
+        .answer_key
+        .clone()
+        .unwrap();
+    let other = TempDir::new().unwrap();
+    let fresh = store_in(other.path());
+    let entry = fresh.dir.join(&key);
+
+    let ran = reviewed(dir.path(), &fresh, crate::parts::LIMIT, move |c| {
+        if c.args.iter().any(|a| a == "lang-rust") {
+            fs::create_dir_all(&entry).unwrap();
+        }
+        fake::either(c)
+    });
+
+    assert!(
+        ran.lines.iter().any(
+            |l| l == &format!("lang-rust (specialist): its answer was already stored as {key}")
+        ),
+        "{:?}",
+        ran.lines
+    );
 }
 
 #[test]

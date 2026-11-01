@@ -3,7 +3,8 @@
 //! and the way it failed (silent, incomplete, over budget, refused or
 //! unread), with how many runs in a row, the first and every resume from
 //! it, ended in that same gap and why each time. Once a gap has recurred
-//! in more than [`MAX_RESUMES`] (`--max-resumes`) resumes in a row, the
+//! in [`MAX_RESUMES`] (`--max-resumes`) resumes in a row after the run that
+//! first ended in it, the
 //! agent has stalled: no resume runs it again, the review stays failed
 //! closed with it not reviewed, and its outcome holds a distinct
 //! blocking finding, `stalled: <agent> failed <N> times the same way;
@@ -49,7 +50,8 @@ pub struct Stall {
 }
 
 impl Stall {
-    /// Whether it recurred in more than `max_resumes` resumes in a row.
+    /// Whether it recurred in `max_resumes` resumes in a row: `times` counts
+    /// the run that first ended in it too, so that is more than `max_resumes`.
     #[must_use]
     pub fn stuck(&self, max_resumes: u32) -> bool {
         self.times > max_resumes

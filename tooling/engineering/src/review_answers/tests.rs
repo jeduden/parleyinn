@@ -198,3 +198,128 @@ fn a_resume_after_a_stall_that_reruns_the_agent_or_does_not_name_it_is_named() {
     assert_eq!(problems.len(), 2, "{problems:?}");
     assert!(problems[1].starts_with("the review after a stall does not say"));
 }
+
+#[test]
+fn the_checkout_s_review_run_names_a_blocking_finding_kept_three_reviews_as_needing_a_ruling() {
+    let work = TempDir::new().unwrap();
+
+    let problems = review_rulings(&repo(), work.path());
+
+    assert!(problems.is_empty(), "{problems:?}");
+}
+
+#[test]
+fn the_checkout_s_review_run_drops_a_stored_answer_by_its_key_and_no_other() {
+    let work = TempDir::new().unwrap();
+
+    let problems = review_drops(&repo(), work.path());
+
+    assert!(problems.is_empty(), "{problems:?}");
+}
+
+#[test]
+fn a_drop_that_leaves_the_answer_or_fails_is_named() {
+    let work = TempDir::new().unwrap();
+    let key = "a".repeat(64);
+    assert!(drop_left(0, work.path(), &key).is_empty());
+
+    fs::create_dir_all(work.path().join(&key)).unwrap();
+    for code in [0, 1] {
+        let problems = drop_left(code, work.path(), &key);
+        assert_eq!(
+            problems,
+            [format!("answers drop left {GAP}'s answer stored as {key}")]
+        );
+    }
+    assert_eq!(drop_left(1, &work.path().join("none"), &key).len(), 1);
+}
+
+#[test]
+fn a_drop_check_that_cannot_run_or_review_after_is_named() {
+    let (_dir, c) = checkout(&[]);
+    let work = TempDir::new().unwrap();
+    let problems = review_drops(&c, work.path());
+    assert!(
+        problems[0].starts_with("read .claude/agents/"),
+        "{problems:?}"
+    );
+
+    let work = TempDir::new().unwrap();
+    fs::write(work.path().join("drop-after"), "a file").unwrap();
+    let problems = review_drops(&repo(), work.path());
+    assert!(problems[0].starts_with("make "), "{problems:?}");
+    assert_eq!(problems.len(), 1);
+}
+
+#[test]
+fn a_ruling_missing_from_the_third_review_or_early_in_the_second_is_named() {
+    let ruling = format!("{}: x", review_run::findings::RULING);
+    let none: Vec<String> = Vec::new();
+
+    assert!(ruling_problems(&[none.clone(), none.clone(), vec![ruling.clone()]]).is_empty());
+    let problems = ruling_problems(&[none.clone(), vec![ruling], none]);
+    assert_eq!(problems.len(), 2, "{problems:?}");
+    assert!(problems[0].contains("second"));
+    assert!(problems[1].contains("third"));
+}
+
+#[test]
+fn a_ruling_check_that_cannot_prepare_run_or_read_the_outcome_is_named() {
+    let (_dir, c) = checkout(&[]);
+    let work = TempDir::new().unwrap();
+    let problems = review_rulings(&c, work.path());
+    assert!(
+        problems[0].starts_with("read .claude/agents/"),
+        "{problems:?}"
+    );
+
+    let dir = work.path().join("run");
+    fs::create_dir_all(dir.join("pr-head")).unwrap();
+    fs::create_dir_all(dir.join("pr-head/src/a.rs")).unwrap();
+    let err = ruling_run(&repo(), &dir, None).unwrap_err();
+    assert!(err.starts_with("write "), "{err}");
+
+    let blocked = work.path().join("blocked");
+    fs::create_dir_all(&blocked).unwrap();
+    fs::write(blocked.join("pr-head"), "a file").unwrap();
+    let err = ruling_run(&repo(), &blocked, None).unwrap_err();
+    assert!(err.starts_with("make "), "{err}");
+
+    let err = outcome_bodies(&work.path().join("none")).unwrap_err();
+    assert!(err.starts_with("read "), "{err}");
+    let empty = work.path().join("empty");
+    fs::create_dir_all(empty.join("review")).unwrap();
+    fs::write(empty.join(review_run::OUTCOME), "{").unwrap();
+    assert!(outcome_bodies(&empty).unwrap_err().starts_with("parse "));
+    fs::write(empty.join(review_run::OUTCOME), "{}").unwrap();
+    assert!(outcome_bodies(&empty).unwrap().is_empty());
+}
+
+#[test]
+fn a_blocking_host_rewrites_each_generalist_s_log_and_names_a_log_that_is_gone() {
+    let work = TempDir::new().unwrap();
+    let host = StoreHost {
+        blocking: true,
+        ..StoreHost::default()
+    };
+    let log = work.path().join("g.jsonl");
+    let command = Command::new(
+        "claude",
+        &["-p", "x", "--agent", "review-code"],
+        work.path(),
+    )
+    .logging_to(&log);
+
+    host.run(&command).unwrap();
+
+    let text = fs::read_to_string(&log).unwrap();
+    assert!(text.contains(" — blocking — "), "{text}");
+    let log = work.path().join("missing").join("g.jsonl");
+    let command = Command::new(
+        "claude",
+        &["-p", "x", "--agent", "review-code"],
+        work.path(),
+    )
+    .logging_to(&log);
+    assert!(host.run(&command).is_err());
+}

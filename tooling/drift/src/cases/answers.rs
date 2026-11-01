@@ -59,5 +59,33 @@ pub(super) fn review_answer_cases() -> Vec<Case> {
             ),
             "a_blocking_finding_kept_three_reviews_in_a_row_on_an_unchanged_file_needs_a_ruling",
         ),
+        case(
+            "a drop command that leaves the stored answer in the store",
+            "ENG-28",
+            Injection::replace(
+                "tooling/review-run/src/store.rs",
+                "match fs::remove_dir_all(&at) {",
+                "match Ok::<(), io::Error>(()) {",
+            ),
+            cargo_lib_test(
+                "engineering",
+                "review_answers::tests::the_checkout_s_review_run_drops_a_stored_answer_by_its_key_and_no_other",
+            ),
+            "answers drop left lang-rust's answer stored as",
+        ),
+        case(
+            "a blocking finding kept three reviews in a row never named for a ruling",
+            "ENG-28",
+            Injection::replace(
+                "tooling/review-run/src/findings.rs",
+                ".filter(|t| t.blocking_streak >= RULING_REVIEWS)",
+                ".filter(|t| t.blocking_streak > RULING_REVIEWS)",
+            ),
+            cargo_lib_test(
+                "engineering",
+                "review_answers::tests::the_checkout_s_review_run_names_a_blocking_finding_kept_three_reviews_as_needing_a_ruling",
+            ),
+            "names no stakeholder ruling",
+        ),
     ]
 }

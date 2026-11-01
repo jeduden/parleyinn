@@ -54,7 +54,7 @@ is short, because a finding found late costs a whole round.
   `--resume` reruns only what the last run left without an accepted
   report and each agent whose answer key changed, so a slip costs one run.
   `review-run --answers DIR` also reuses every stored answer whose key is
-  unchanged; only main's own CI writes the shared store.
+  unchanged; no workflow gives it a store yet.
   A review that aborts on a mass failure of its specialists says so
   apart from any finding: fix the outage or prompt, then `--resume`.
 - CI ends within ten minutes of a push. The slowest chain of jobs sets

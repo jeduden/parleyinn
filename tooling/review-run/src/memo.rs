@@ -42,6 +42,7 @@ pub(crate) fn recall(r: &Review, store: &Store, unit: &Unit, key: &str) -> Optio
                 "{}: its stored answer {key} does not read, so it runs: {e}",
                 label()
             ));
+            retire(r, store, key, &label());
             return None;
         }
     };
@@ -50,6 +51,7 @@ pub(crate) fn recall(r: &Review, store: &Store, unit: &Unit, key: &str) -> Optio
             "{}: its stored answer {key} is not taken, so it runs: {why}",
             label()
         ));
+        retire(r, store, key, &label());
         return None;
     }
     let mut run = reused(
@@ -77,6 +79,22 @@ pub(crate) fn recall(r: &Review, store: &Store, unit: &Unit, key: &str) -> Optio
     }
 
     Some((run, stored.report))
+}
+
+/// Takes the answer under `key`, which is not taken, out of `store`, so
+/// the answer the agent gives instead is stored in its place; told to
+/// progress, whether it went or not. A store read alone keeps it.
+fn retire(r: &Review, store: &Store, key: &str, label: &str) {
+    if store.read_only {
+        return;
+    }
+    let said = store.drop(key).map_or_else(
+        |e| format!("was not dropped: {e}"),
+        |()| "was dropped".to_owned(),
+    );
+    (r.progress)(&format!(
+        "{label}: its stored answer {key} {said}, so its new answer is stored in its place"
+    ));
 }
 
 /// Stores `done`, `unit`'s run under `key`, when it is accepted: its
@@ -117,7 +135,16 @@ pub(crate) fn keep(r: &Review, store: &Store, unit: &Unit, key: &str, done: &Don
             (r.progress)(&format!("{label}: its answer was stored as {key}"));
             false
         }
-        Ok(Put::Present | Put::ReadOnly) => false,
+        Ok(Put::Present) => {
+            (r.progress)(&format!("{label}: its answer was already stored as {key}"));
+            false
+        }
+        Ok(Put::ReadOnly) => {
+            (r.progress)(&format!(
+                "{label}: its answer was not stored: the answer store is read alone"
+            ));
+            false
+        }
         Err(e) => {
             (r.progress)(&format!("{label}: its answer was not stored: {e}"));
             true
