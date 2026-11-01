@@ -22,6 +22,9 @@ use crate::live::Running;
 use crate::parts::add_usage;
 use crate::run::{AgentRun, Review, Unit, attempt, describe, keep_log, not_started, write_report};
 
+/// Why an overloaded run gets no wait and so no further run.
+const SPENT: &str = "the API was overloaded and its backoff deadline is spent";
+
 /// The forms, restated to a specialist on its second attempt, in two
 /// lines: the finding lines, then the final answer.
 pub const FORMS: &str = "Each finding is one line, `docs/x.md:12 — if not addressed: \
@@ -160,7 +163,12 @@ fn again(
     let mut waited = 0;
     loop {
         if class == Class::Overloaded {
-            pause(r, &last.0, waited, first.started);
+            if !pause(r, &last.0, waited, first.started) {
+                let (mut run, report) = last;
+                let before = run.failure.unwrap_or_default();
+                run.failure = Some(format!("{before}; {SPENT}, so it was not run again"));
+                return (run, report);
+            }
             waited += 1;
         }
         if let Some(why) = c.budget.refusal() {
@@ -214,17 +222,18 @@ fn class_of(workdir: &Path, unit: &Unit, run: &AgentRun) -> Class {
 }
 
 /// Waits before a run again after `run` was turned away as overloaded,
-/// `waited` waits so far, the agent started at `started`: not at all
-/// once its deadline is spent.
-fn pause(r: &Review, run: &AgentRun, waited: u32, started: Duration) {
+/// `waited` waits so far, the agent started at `started`; whether it
+/// waited. Once its deadline is spent there is no wait to take, and
+/// progress says it is not run again.
+fn pause(r: &Review, run: &AgentRun, waited: u32, started: Duration) -> bool {
     let ran = r.clock.now().saturating_sub(started);
     let left = r.options.deadline.saturating_sub(ran);
     let Some(wait) = backoff::wait(waited, r.clock.jitter(), left) else {
         (r.progress)(&format!(
-            "{}; the API was overloaded and its deadline is spent, so it runs once more now",
+            "{}; {SPENT}, so it is not run again",
             describe(run)
         ));
-        return;
+        return false;
     };
     (r.progress)(&format!(
         "{}; the API was overloaded, so it waits {:.1} s and runs once more",
@@ -232,6 +241,7 @@ fn pause(r: &Review, run: &AgentRun, waited: u32, started: Duration) {
         wait.as_secs_f64()
     ));
     r.clock.sleep(wait);
+    true
 }
 
 /// Keeps `unit`'s log as `which`, telling progress when it cannot.

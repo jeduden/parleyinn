@@ -319,7 +319,7 @@ fn a_run_overloaded_after_another_failure_waits_before_its_third_attempt() {
 }
 
 #[test]
-fn an_overloaded_run_past_its_deadline_runs_once_more_without_a_wait() {
+fn an_overloaded_run_past_its_deadline_is_not_run_again_and_stays_a_named_gap() {
     let options = Options {
         deadline: Duration::from_secs(5),
         ..options()
@@ -346,12 +346,26 @@ fn an_overloaded_run_past_its_deadline_runs_once_more_without_a_wait() {
     let (_dir, ran) = controlled(ONE, options, 0.0, after(1, OVERLOADED));
 
     assert!(ran.clock.slept().is_empty());
+    let agents = ran.host.agents();
+    assert_eq!(
+        agents.iter().filter(|a| *a == "lang-rust").count(),
+        1,
+        "{agents:?}"
+    );
+    assert_eq!(ran.run("lang-rust").attempts, 1);
     assert!(
         ran.lines[0].ends_with(
-            "; the API was overloaded and its deadline is spent, so it runs once more now"
+            "; the API was overloaded and its backoff deadline is spent, so it is not run again"
         ),
         "{:?}",
         ran.lines
+    );
+    let failure = ran.run("lang-rust").failure.clone().unwrap_or_default();
+    assert!(
+        failure.ends_with(
+            "; the API was overloaded and its backoff deadline is spent, so it was not run again"
+        ),
+        "{failure}"
     );
 }
 
