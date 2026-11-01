@@ -1,7 +1,7 @@
 //! ENG-33: every workflow and composite action pins each action and
 //! reusable workflow it uses from outside the repository to a full
 //! commit sha, with its version in a comment, and no `run:` script
-//! expands a value an outside contributor can set; CI runs zizmor over
+//! expands a value a pull-request author can set; CI runs zizmor over
 //! them as well.
 
 use std::fs;
@@ -21,7 +21,7 @@ pub const CI: &str = ".github/workflows/ci.yml";
 /// The command CI runs zizmor over the workflows and actions with.
 pub const ZIZMOR: &str = "zizmor .github";
 
-/// The contexts a `run:` script may not expand: an outside contributor
+/// The contexts a `run:` script may not expand: a pull-request author
 /// sets every field of the event (a pull request's title, a branch
 /// name, a comment's body), the head branch, and what a caller passes
 /// as an input.
