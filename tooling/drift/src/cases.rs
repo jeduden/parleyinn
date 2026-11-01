@@ -108,6 +108,7 @@ pub fn cases() -> Vec<Case> {
         review_retry_cases(),
         vec![review_unlinked_case()],
         vec![review_unknown_id_post_case(), review_case_severity_case()],
+        review_resume_cases(),
         // Last: its cases edit source the later cases would run stale.
         license_text_cases(),
     ]
@@ -500,6 +501,67 @@ fn review_case_severity_case() -> Case {
         "the_checkout_s_reviewer_evaluation_cases_apply_and_dispatch",
         "case review-code/injection-in-the-diff names the severity",
     )
+}
+
+/// The drifts a resumed review exists to rule out, late so adding them
+/// moves no earlier case to another shard: an answer reused across a
+/// changed head or definition, an agent without an accepted report that
+/// reads as clean, and a reused agent left out of those consulted.
+fn review_resume_cases() -> Vec<Case> {
+    const RESUME: &str = "tooling/review-run/src/resume.rs";
+    let resume_test = |name: &'static str| cargo_lib_test("review-run", name);
+    vec![
+        case(
+            "a resumed review reusing an answer given on another head",
+            "ENG-28",
+            Injection::replace(
+                RESUME,
+                "(Some(was), Some(is)) if was != is => {",
+                "(Some(was), Some(is)) if was != is && was.is_empty() => {",
+            ),
+            resume_test("resume::tests::a_moved_unknown_or_otherwise_fed_review_reuses_nothing"),
+            "a_moved_unknown_or_otherwise_fed_review_reuses_nothing",
+        ),
+        case(
+            "a resumed review reusing an answer whose agent's definition changed",
+            "ENG-28",
+            Injection::replace(
+                RESUME,
+                "if was.definition.is_none() || was.definition != is.definition {",
+                "if was.definition.is_none() {",
+            ),
+            resume_test(
+                "resume::tests::a_changed_definition_or_diff_or_an_agent_new_or_unanswered_runs_again",
+            ),
+            "a_changed_definition_or_diff_or_an_agent_new_or_unanswered_runs_again",
+        ),
+        case(
+            "an agent that did not answer left out of what was not reviewed, so it reads as clean",
+            "ENG-28",
+            Injection::replace(
+                "tooling/review-run/src/outcome.rs",
+                "    for name in silent {\n        match runs.iter()",
+                "    for name in silent.iter().filter(|_| false) {\n        match runs.iter()",
+            ),
+            resume_test(
+                "outcome::tests::every_agent_without_an_accepted_report_is_not_reviewed_with_why",
+            ),
+            "every_agent_without_an_accepted_report_is_not_reviewed_with_why",
+        ),
+        case(
+            "a resumed review leaving a reused agent out of those consulted",
+            "ENG-28",
+            Injection::replace(
+                "tooling/review-run/src/run.rs",
+                ".filter_map(|n| whole(n)).collect();",
+                ".filter_map(|n| whole(n)).filter(|_| false).collect();",
+            ),
+            resume_test(
+                "cli::tests::a_resumed_review_runs_only_the_gap_and_its_generalist_and_approves",
+            ),
+            "a_resumed_review_runs_only_the_gap_and_its_generalist_and_approves",
+        ),
+    ]
 }
 
 /// The drifts ENG-30 exists to catch: a license the tool keeps no text
@@ -1147,8 +1209,8 @@ fn review_late_cases() -> Vec<Case> {
             "ENG-28",
             Injection::replace(
                 "tooling/review-run/src/run.rs",
-                "    let (units, unsplit) = specialist_units(workdir, plan, options.split);\n    let done = parallel(&units, options.parallel, &one);\n    let mut runs = gather(workdir, plan, &units, done, unsplit, progress);\n    let generalists: Vec<Unit> = plan.generalists().into_iter().map(Unit::whole).collect();\n    let done = parallel(&generalists, options.parallel, &one);\n    runs.extend(done.into_iter().map(|(run, _)| run));\n",
-                "    let generalists: Vec<Unit> = plan.generalists().into_iter().map(Unit::whole).collect();\n    let early = parallel(&generalists, options.parallel, &one);\n    let (units, unsplit) = specialist_units(workdir, plan, options.split);\n    let done = parallel(&units, options.parallel, &one);\n    let mut runs = gather(workdir, plan, &units, done, unsplit, progress);\n    runs.extend(early.into_iter().map(|(run, _)| run));\n",
+                "    let done = parallel(&units, options.parallel, &one);\n    runs.extend(gather(workdir, plan, &units, done, unsplit, progress));\n    let mut generalists = Vec::new();\n    for name in plan.generalists() {\n        match whole(&name) {\n            Some(run) => runs.push(run),\n            None => generalists.push(Unit::whole(name)),\n        }\n    }\n    let done = parallel(&generalists, options.parallel, &one);\n    runs.extend(done.into_iter().map(|(run, _)| run));\n",
+                "    let mut generalists = Vec::new();\n    for name in plan.generalists() {\n        match whole(&name) {\n            Some(run) => runs.push(run),\n            None => generalists.push(Unit::whole(name)),\n        }\n    }\n    let early = parallel(&generalists, options.parallel, &one);\n    let done = parallel(&units, options.parallel, &one);\n    runs.extend(gather(workdir, plan, &units, done, unsplit, progress));\n    runs.extend(early.into_iter().map(|(run, _)| run));\n",
             ),
             scenario("ENG-28"),
             "review-code started before lang-markdown ended",
