@@ -45,7 +45,7 @@ summary: >-
   disabling a B1–B3 component or the launcher, though it turns no component on,
   and the two PRV-10 gives it: certifying service accounts by listing their
   principal keys, and removing a listing.
-- **Harness configuration**: The harness's settings, hooks and MCP
+- **Harness configuration**: The harness's settings, hook and MCP
   registrations, which ParleyInn changes only through explicit install and
   uninstall operations, showing the change first (I7). The harness's own managed
   settings are part of it, and ParleyInn never writes to or overrides them
