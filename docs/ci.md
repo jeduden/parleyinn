@@ -37,6 +37,9 @@ and the `ci-review` skill measures them.
 - The `CI` job records each job's duration and result in its job summary
   and uploads them as the `ci-timings` artifact. Read those; do not
   measure again.
+- A review's timing and cost per agent run are in its `review-reports`
+  artifact, `report.html` and `trace.jsonl`; read those before timing a
+  review again.
 
 ## Feedback time
 

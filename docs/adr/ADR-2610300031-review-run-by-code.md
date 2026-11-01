@@ -271,6 +271,18 @@ repeat them, which costs tokens.
   changed, keyed by `review/run-id.json`: the head, an inputs hash, and
   each definition's and diff's SHA-256. The verdict function is the
   same; nothing is reused across a changed head, definition or diff.
+- After every run, failed or not, `review-run` writes
+  `review/trace.jsonl`, one span per agent run with its tokens, the
+  cost its log reported and why it was not accepted, and
+  `review/report.html`, a static page with every string a run shaped
+  escaped; the `review-report` crate builds both from the review's
+  files, best effort, so neither changes the verdict. They go with the
+  reports; the run logs stay in the job. No server or socket is added.
+- A stability probe, `.github/workflows/stability.yml`, reviews each
+  state of `tooling/review-eval/stability-corpus.toml` three times
+  afresh and measures the verdict flip rate and each agent's finding
+  overlap (ENG-32). It runs on dispatch alone: about $15 a probe, so
+  its weekly schedule waits, commented out, for the stakeholder.
 - No new third-party dependency.
 
 ## Approval

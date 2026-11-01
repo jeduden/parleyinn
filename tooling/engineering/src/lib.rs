@@ -34,6 +34,7 @@ pub mod review_refusals;
 pub mod review_resume;
 pub mod review_runs;
 pub mod review_workflow;
+pub mod stability_probe;
 pub mod static_analysis;
 pub mod telemetry;
 pub mod test_shards;

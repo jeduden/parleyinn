@@ -5,7 +5,7 @@
 
 use cucumber::gherkin::Step;
 use cucumber::{then, when};
-use engineering::{outcome, review_evaluation, review_workflow};
+use engineering::{outcome, review_evaluation, review_workflow, stability_probe};
 
 use crate::World;
 use crate::engineering::eng;
@@ -102,4 +102,15 @@ fn a_case_is_decided(_w: &mut World, step: &Step) -> Result<(), String> {
     outcome(review_evaluation::case_decided(
         &review_workflow::table_rows(&table.rows)?,
     ))
+}
+
+#[then(
+    regex = r#"^the stability probe "([^"]+)" runs on demand alone and compares three fresh reviews of each state of "([^"]+)", and every review keeps a trace whose cost is its run logs' and a page that escapes what a run wrote$"#
+)]
+fn the_stability_probe_holds(w: &mut World, probe: String, corpus: String) -> Result<(), String> {
+    outcome(stability_probe::problems(
+        eng(w).checkout()?,
+        &probe,
+        &corpus,
+    )?)
 }

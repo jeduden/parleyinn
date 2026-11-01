@@ -111,6 +111,7 @@ pub fn cases() -> Vec<Case> {
         review_undashed_cases(),
         review_resume_cases(),
         vec![review_moved_revision_case()],
+        review_stability_cases(),
         // Last: its cases edit source the later cases would run stale.
         license_text_cases(),
     ]
@@ -624,6 +625,66 @@ fn review_moved_revision_case() -> Case {
         ),
         "a_revision_in_no_form_is_malformed",
     )
+}
+
+/// The drifts the review's trace, page and stability probe rule out
+/// (ENG-28, ENG-32), late so adding them moves no earlier case to
+/// another shard: a run's text reaching the report page as markup, a
+/// verdict that flips measured as stable, a span's cost recomputed from
+/// its models instead of taken from its log, and the probe, nine
+/// reviews, put on a schedule.
+fn review_stability_cases() -> Vec<Case> {
+    let report_test = |name: &'static str| cargo_lib_test("review-report", name);
+    vec![
+        case(
+            "the report page writing a run's `<` unescaped",
+            "ENG-28",
+            Injection::replace(
+                "tooling/review-report/src/html.rs",
+                "'<' => out.push_str(\"&lt;\"),",
+                "'<' => out.push('<'),",
+            ),
+            report_test(
+                "html::tests::a_run_s_name_reason_and_the_failure_never_reach_the_page_as_markup",
+            ),
+            "a_run_s_name_reason_and_the_failure_never_reach_the_page_as_markup",
+        ),
+        case(
+            "review-report stability counting no verdict that flips",
+            "ENG-32",
+            Injection::replace(
+                "tooling/review-report/src/stability.rs",
+                "let flipped = verdicts.iter().filter(|v| **v != mode).count();",
+                "let flipped = verdicts.iter().filter(|v| **v != mode && v.is_empty()).count();",
+            ),
+            report_test(
+                "stability::tests::one_verdict_flip_in_three_is_detected_and_past_the_limit",
+            ),
+            "one_verdict_flip_in_three_is_detected_and_past_the_limit",
+        ),
+        case(
+            "a span's cost recomputed from its models instead of its log's total",
+            "ENG-28",
+            Injection::replace(
+                "tooling/review-report/src/trace.rs",
+                "cost_usd: log.cost,",
+                "cost_usd: log.usage.values().map(|u| u.cost).sum(),",
+            ),
+            report_test("trace::tests::the_span_cost_is_the_log_s_own_total_never_recomputed"),
+            "the_span_cost_is_the_log_s_own_total_never_recomputed",
+        ),
+        case(
+            "the stability probe put on a schedule",
+            "ENG-32",
+            Injection::replace(
+                ".github/workflows/stability.yml",
+                "  # schedule:\n  #   - cron: \"23 4 * * 1\"\n",
+                "  schedule:\n    - cron: \"23 4 * * 1\"\n",
+            ),
+            scenario("ENG-32"),
+            "runs on a schedule, which only the stakeholder turns on",
+        ),
+    ]
 }
 
 /// The drifts ENG-30 exists to catch: a license the tool keeps no text

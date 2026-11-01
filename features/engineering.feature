@@ -377,6 +377,7 @@ Feature: Engineering quality (ENG)
     And a case that fails is a blocking finding at its component's file, naming the case, the model and the first failure
     And a scorecard line records a component's cases, runs, slips, cost, turns and seconds on its model
     And the scheduled run's workflow ".github/workflows/review-eval.yml" fails on a failed case, with the report that names it in its summary
+    And the stability probe ".github/workflows/stability.yml" runs on demand alone and compares three fresh reviews of each state of "tooling/review-eval/stability-corpus.toml", and every review keeps a trace whose cost is its run logs' and a page that escapes what a run wrote
 
   @ENG-34 @P0
   Scenario: the review bundle flags a file past its line limit and a file no specialist reads
