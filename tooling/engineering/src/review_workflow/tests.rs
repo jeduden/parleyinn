@@ -900,6 +900,17 @@ fn an_agent_job_in_any_workflow_is_held_to_the_token_rules_naming_its_file() {
 }
 
 #[test]
+fn a_workflow_whose_script_cannot_be_read_is_an_error_naming_it() {
+    let (_dir, checkout) = workflow_checkout(&[(
+        "c.yml",
+        "on:\n  push:\njobs:\n  t:\n    steps:\n      - run: scripts/nosuch.sh arg\n",
+    )]);
+    let err = every_workflow_keeps_the_token(&checkout, CLAUDE).unwrap_err();
+
+    assert!(err.contains("nosuch.sh"), "{err}");
+}
+
+#[test]
 fn a_build_or_test_of_review_run_is_no_agent_job_and_its_binary_is() {
     assert!(!runs_agents("run: cargo test -p review-run -p srs\n"));
     assert!(!runs_agents("run: cargo build --locked -p review-run\n"));
