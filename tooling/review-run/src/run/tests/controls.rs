@@ -46,6 +46,8 @@ fn controlled(
         known: &known(),
         options,
         resume: None,
+        keys: None,
+        store: None,
         progress: &|l| lines.lock().unwrap().push(l.to_owned()),
     })
     .unwrap();

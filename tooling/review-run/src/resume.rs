@@ -1,15 +1,17 @@
-//! A review resumed from an earlier run of the same inputs: every
-//! agent the earlier run took an answer from, and that its gap list does
-//! not name, keeps that answer, its report and its logs, copied from the
-//! earlier run, when the head, the inputs every agent reads, its
-//! definition and, for a specialist, its diff are each the same; every
-//! other agent runs again, and why is noted. A specialist named only by
-//! parts of its split diff runs just those parts again, the parts that
-//! answered keeping their logs. A generalist runs again whenever one of
-//! its specialists does, so it always weighs the reports the review
-//! decides on. The verdict is then decided as for a full run: a reused
-//! answer is judged exactly as a fresh one. A changed or unknown head,
-//! a changed input or a changed split limit reuses nothing.
+//! A review resumed from an earlier run: every agent the earlier run
+//! took an answer from, and that its gap list does not name, keeps that
+//! answer, its report and its logs, copied from the earlier run, when
+//! its own answer key (`key`) is the one the earlier run recorded for
+//! it, whatever the head; every other agent runs again, and why is
+//! noted. So a resume on a new commit reuses every specialist whose
+//! definition, diff, prompt, model, `claude` and salted files are the
+//! same. A specialist named only by parts of its split diff runs just
+//! those parts again, the parts that answered keeping their logs. A
+//! generalist runs again whenever one of its specialists does, so it
+//! always weighs the reports the review decides on. The verdict is then
+//! decided as for a full run: a reused answer is judged exactly as a
+//! fresh one. An earlier run that recorded no key, or a review whose
+//! keys are unknown, reuses nothing of that agent.
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
@@ -136,45 +138,45 @@ fn part_logs(from: &Path, name: &str) -> Result<BTreeMap<usize, RunLog>, String>
     Ok(out)
 }
 
-/// Why nothing of `earlier` can be reused for a review on `now`; none
-/// when the head, the inputs and the split limit are each the same.
-fn stale(earlier: &RunId, now: &RunId) -> Option<String> {
+/// A note on what a head that moved from `earlier`'s to `now`'s keeps;
+/// none when it did not move or one is unknown.
+fn moved(earlier: &RunId, now: &RunId) -> Option<String> {
     match (&earlier.head, &now.head) {
-        (Some(was), Some(is)) if was != is => {
-            return Some(format!("the head changed from {was} to {is}"));
-        }
-        (Some(_), Some(_)) => {}
-        _ => return Some("the head reviewed is unknown".to_owned()),
+        (Some(was), Some(is)) if was != is => Some(format!(
+            "the head changed from {was} to {is}: only agents whose answer key is unchanged \
+             keep their answer"
+        )),
+        _ => None,
     }
-    if earlier.inputs != now.inputs {
-        return Some(
-            "the inputs every agent reads changed: the class, the dispatch, the bundle, the \
-             diff or the agent instructions"
-                .to_owned(),
-        );
-    }
-    (earlier.split != now.split).then(|| {
-        format!(
-            "the split limit changed from {} to {}",
-            earlier.split, now.split
-        )
-    })
 }
 
-/// Why agent `name` cannot keep its earlier answer: its definition or
-/// its diff changed, it was not in the earlier run, or that run took no
-/// answer from it; none when it can.
+/// Why agent `name` cannot keep its earlier answer: its answer key is
+/// not the one the earlier run recorded, with the change named when its
+/// definition or diff is it, or it was not in the earlier run; none when
+/// it can.
 fn changed(name: &str, earlier: &Earlier, now: &RunId) -> Option<String> {
     let (Some(was), Some(is)) = (earlier.id.agents.get(name), now.agents.get(name)) else {
         return Some("it was not in the earlier run".to_owned());
     };
-    if was.definition.is_none() || was.definition != is.definition {
-        return Some("its definition changed".to_owned());
+    let same = matches!((&was.key, &is.key), (Some(a), Some(b)) if a == b);
+    if same {
+        return None;
     }
-    if was.diff != is.diff {
-        return Some("its diff changed".to_owned());
-    }
-    None
+    Some(
+        if was.key.is_none() {
+            "the earlier run recorded no answer key for it"
+        } else if is.key.is_none() {
+            "its answer key is unknown"
+        } else if was.definition != is.definition {
+            "its definition changed"
+        } else if was.diff != is.diff {
+            "its diff changed"
+        } else {
+            "its answer key changed: its model, effort, turns or prompt, the claude version, \
+             the split limit, the pull request's agent instructions or a file every key reads"
+        }
+        .to_owned(),
+    )
 }
 
 /// What each of `plan`'s agents keeps from `earlier`, for a review on
@@ -185,9 +187,8 @@ pub fn plan(plan: &Plan, earlier: &Earlier, now: &RunId, from: &str) -> Resume {
         from: from.to_owned(),
         ..Resume::default()
     };
-    if let Some(why) = stale(&earlier.id, now) {
-        resume.notes.push(format!("nothing reused: {why}"));
-        return resume;
+    if let Some(note) = moved(&earlier.id, now) {
+        resume.notes.push(note);
     }
     let gapped =
         |name: &str| -> Vec<&Gap> { earlier.gaps.iter().filter(|g| g.name == name).collect() };

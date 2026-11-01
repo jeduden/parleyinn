@@ -206,9 +206,11 @@ impl Keys {
         Self { own, dispatch }
     }
 
-    /// Specialist `name`'s key; none when it has none.
+    /// Agent `name`'s own key, before any report: a specialist's whole
+    /// key, a generalist's before the reports it weighs; none when it
+    /// has none.
     #[must_use]
-    pub fn specialist(&self, name: &str) -> Option<&str> {
+    pub fn own(&self, name: &str) -> Option<&str> {
         self.own.get(name).and_then(Option::as_deref)
     }
 
@@ -216,7 +218,7 @@ impl Keys {
     /// diff; none when the specialist has none.
     #[must_use]
     pub fn part(&self, name: &str, index: usize, count: usize) -> Option<String> {
-        let own = self.specialist(name)?;
+        let own = self.own(name)?;
         let mut f = Fields::new();
         f.add("specialist key", own.as_bytes());
         f.add("part", format!("{index} of {count}").as_bytes());

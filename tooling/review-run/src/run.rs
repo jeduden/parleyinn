@@ -33,10 +33,12 @@ use crate::LOGS;
 use crate::controls::{
     BREAKER_FRACTION, Breaker, Budget, Clock, Controls, MAX_COST_USD, SystemClock,
 };
+use crate::key::Keys;
 use crate::live::{self, EVERY, Live, Watch};
 use crate::parts::{self, Part};
 use crate::plan::{Plan, report_file};
 use crate::resume::Resume;
+use crate::store::Store;
 use crate::tasks;
 
 /// How many agents run at once unless the run says otherwise.
@@ -103,6 +105,8 @@ pub struct AgentRun {
     pub from_store: bool,
     /// Its answer key; none when it has none.
     pub answer_key: Option<String>,
+    /// Whether its accepted answer could not be stored.
+    pub store_failed: bool,
 }
 
 impl AgentRun {
@@ -120,6 +124,7 @@ impl AgentRun {
             reused: false,
             from_store: false,
             answer_key: None,
+            store_failed: false,
         }
     }
 
@@ -132,7 +137,8 @@ impl AgentRun {
 
 /// One review's runs: what starts them, the clock they keep, the work
 /// directory, the plan, the ids a specialist's report may cite, how
-/// they go, what a resumed review keeps, and what is told of each.
+/// they go, what a resumed review keeps, the answer keys and store, and
+/// what is told of each.
 pub struct Review<'a> {
     pub host: &'a dyn Host,
     pub clock: &'a dyn Clock,
@@ -141,6 +147,11 @@ pub struct Review<'a> {
     pub known: &'a BTreeSet<String>,
     pub options: Options,
     pub resume: Option<&'a Resume>,
+    /// Each agent's answer key; none when the keys are unknown.
+    pub keys: Option<&'a Keys>,
+    /// The answer store answers are taken from and kept in; none when
+    /// the review uses none.
+    pub store: Option<&'a Store>,
     pub progress: &'a (dyn Fn(&str) + Sync),
 }
 
@@ -167,6 +178,8 @@ pub fn review(
         known,
         options,
         resume,
+        keys: None,
+        store: None,
         progress,
     })
 }
@@ -309,6 +322,7 @@ pub(crate) fn specialist_units(
                     reused: false,
                     from_store: false,
                     answer_key: None,
+                    store_failed: false,
                 });
             }
         }
@@ -322,6 +336,9 @@ pub(crate) fn specialist_units(
 #[must_use]
 pub fn describe(run: &AgentRun) -> String {
     let kind = run.kind.word();
+    if run.from_store {
+        return format!("{} ({kind}): reused from the answer store", run.name);
+    }
     if run.reused {
         return format!("{} ({kind}): reused from the earlier run", run.name);
     }

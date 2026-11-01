@@ -10,15 +10,19 @@
 //! the review outcome, the agents consulted, their answers and their
 //! usage, the files the review gate reads, with every agent left
 //! without an accepted report or answer, never as clean, and what the
-//! review ran on. Resumed from an earlier run, it runs again only what
-//! that run left without one or whose inputs changed, and decides as a
-//! full run would. No model decides whether an agent is called or
+//! review ran on. Each agent has an answer key over what its answer is
+//! a function of; given an answer store, an agent whose key holds an
+//! accepted answer there is not run again, and an accepted answer is
+//! kept there. Resumed from an earlier run, it runs again only what that
+//! run left without one or whose key changed, and decides as a full run
+//! would. No model decides whether an agent is called or
 //! waited for; the generalists do the weighing.
 //!
 //! It starts only the `claude` command line, through the evaluation's
 //! host, and runs in CI alone. It is repository tooling and never
 //! links into a shipped executable.
 
+pub mod answers;
 pub mod backoff;
 pub mod breaker;
 pub mod cli;
@@ -26,6 +30,7 @@ pub mod controls;
 pub mod gaps;
 pub mod key;
 pub mod live;
+pub(crate) mod memo;
 pub mod outcome;
 pub mod parts;
 pub mod pipeline;

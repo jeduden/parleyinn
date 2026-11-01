@@ -29,6 +29,7 @@ fn ran(name: &str, kind: Kind, answer: &str) -> AgentRun {
         reused: false,
         from_store: false,
         answer_key: None,
+        store_failed: false,
     }
 }
 

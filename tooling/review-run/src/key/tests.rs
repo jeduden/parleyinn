@@ -54,7 +54,7 @@ const CLAUDE: &str = "2.1.0 (Claude Code)";
 fn a_key_is_a_full_sha_256_in_hex() {
     let dir = workdir();
 
-    let key = keys(dir.path()).specialist("lang-rust").unwrap().to_owned();
+    let key = keys(dir.path()).own("lang-rust").unwrap().to_owned();
 
     assert!(is_key(&key), "{key}");
     assert!(!is_key("abc"));
@@ -73,7 +73,7 @@ fn the_same_inputs_give_the_same_key() {
 fn all(keys: &Keys) -> Vec<Option<String>> {
     let mut out: Vec<Option<String>> = ["lang-rust", "lang-shell", "lang-markdown"]
         .iter()
-        .map(|n| keys.specialist(n).map(str::to_owned))
+        .map(|n| keys.own(n).map(str::to_owned))
         .collect();
     out.extend(
         ["review-code", "review-spec"]
@@ -122,12 +122,12 @@ fn a_changed_model_effort_or_turns_changes_the_key() {
         ("maxTurns: 20", "maxTurns: 21"),
     ] {
         let dir = workdir();
-        let before = keys(dir.path()).specialist("lang-rust").map(str::to_owned);
+        let before = keys(dir.path()).own("lang-rust").map(str::to_owned);
         let path = dir.path().join(".claude/agents/lang-rust.md");
         let text = fs::read_to_string(&path).unwrap();
         fs::write(&path, text.replace(from, to)).unwrap();
 
-        let after = keys(dir.path()).specialist("lang-rust").map(str::to_owned);
+        let after = keys(dir.path()).own("lang-rust").map(str::to_owned);
 
         assert_ne!(before, after, "{to}");
         assert!(after.is_some(), "{to}");
@@ -159,10 +159,7 @@ fn a_prompt_template_the_runner_changes_changes_the_key() {
     let deep = Keys::compute(dir.path(), &changed, CLAUDE, 9);
 
     // The class is in a generalist's prompt alone.
-    assert_eq!(
-        deep.specialist("lang-rust"),
-        keys(dir.path()).specialist("lang-rust")
-    );
+    assert_eq!(deep.own("lang-rust"), keys(dir.path()).own("lang-rust"));
     assert_ne!(
         deep.generalist("review-code", &|_| None),
         keys(dir.path()).generalist("review-code", &|_| None)
@@ -222,11 +219,11 @@ fn an_agent_whose_definition_does_not_load_has_no_key() {
 
     let keys = keys(dir.path());
 
-    assert_eq!(keys.specialist("lang-rust"), None);
+    assert_eq!(keys.own("lang-rust"), None);
     assert_eq!(keys.part("lang-rust", 1, 2), None);
     // Its generalist chains a missing key, so it has one of its own.
     assert!(keys.generalist("review-code", &|_| None).is_some());
-    assert_eq!(keys.specialist("lang-unknown"), None);
+    assert_eq!(keys.own("lang-unknown"), None);
     assert_eq!(keys.generalist("review-unknown", &|_| None), None);
 }
 
@@ -238,7 +235,7 @@ fn a_part_s_key_follows_its_specialist_s_and_its_place() {
     let one = keys.part("lang-rust", 1, 2).unwrap();
 
     assert!(is_key(&one));
-    assert_ne!(Some(one.as_str()), keys.specialist("lang-rust"));
+    assert_ne!(Some(one.as_str()), keys.own("lang-rust"));
     assert_ne!(Some(one.clone()), keys.part("lang-rust", 2, 2));
     assert_ne!(Some(one.clone()), keys.part("lang-rust", 1, 3));
     assert_eq!(Some(one), keys.part("lang-rust", 1, 2));

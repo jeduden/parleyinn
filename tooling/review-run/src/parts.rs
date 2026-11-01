@@ -184,6 +184,7 @@ pub fn merge(name: &str, parts: Vec<(AgentRun, String)>) -> (AgentRun, String) {
             reused: false,
             from_store: false,
             answer_key: None,
+            store_failed: false,
         },
         report,
     )

@@ -6,6 +6,8 @@ use testkit::TempDir;
 use super::*;
 use crate::fake::{self, FakeHost};
 
+mod store;
+
 fn args(list: &[&str]) -> Vec<String> {
     list.iter().map(|a| (*a).to_owned()).collect()
 }
@@ -48,8 +50,8 @@ fn a_review_writes_every_file_the_gate_reads() {
     assert_eq!(code, EXIT_OK, "{err}");
     assert_eq!(
         out,
-        "verdict=approve\ndispatched=3\nconsulted=3\nfindings=1\ncost=0.0300\nover_budget=0\n\
-         aborted=0\n"
+        "verdict=approve\ndispatched=3\nconsulted=3\nfindings=1\ncost=0.0300\nreused=0\n\
+         store_failed=0\nover_budget=0\naborted=0\n"
     );
     assert_eq!(err.lines().count(), 3, "{err}");
     let outcome = fs::read_to_string(dir.path().join("review/outcome.json")).unwrap();
@@ -461,20 +463,22 @@ fn a_resumed_review_with_no_gap_runs_nothing_and_decides_as_the_full_run_did() {
 }
 
 #[test]
-fn a_resumed_review_on_a_moved_head_reuses_nothing_and_says_why() {
+fn a_resumed_review_on_a_moved_head_keeps_every_unchanged_key_and_says_so() {
     let earlier = TempDir::new().unwrap();
     first_review(earlier.path());
 
-    let (host, _, err) = resume_from(earlier.path(), MOVED, &|_| {});
+    let (host, dir, err) = resume_from(earlier.path(), MOVED, &|_| {});
 
-    assert_eq!(host.agents().len(), 3, "{err}");
+    assert_eq!(host.agents(), ["lang-rust", "review-code"], "{err}");
     assert!(
         err.contains(&format!(
-            "review-run: nothing reused: the head changed from {HEAD} to {MOVED}"
+            "review-run: the head changed from {HEAD} to {MOVED}: only agents whose answer key \
+             is unchanged keep their answer"
         )),
         "{err}"
     );
-    assert!(err.contains("reused 0 agents, re-ran 3"), "{err}");
+    assert!(err.contains("reused 1 agents, re-ran 2"), "{err}");
+    assert_eq!(read(dir.path(), RUN_ID)["head"], MOVED);
 }
 
 #[test]
@@ -540,6 +544,7 @@ fn the_work_directory_alone_takes_the_default_options() {
             head: None,
             resume: None,
             summary: None,
+            answers: None,
         }
     );
 }
@@ -562,6 +567,8 @@ fn the_flags_read_inline_or_as_the_next_argument() {
             "0.5",
             "--summary",
             "s.md",
+            "--answers-read-only",
+            "--answers=store",
         ]))
         .unwrap(),
         Args {
@@ -577,7 +584,22 @@ fn the_flags_read_inline_or_as_the_next_argument() {
             head: Some(HEAD.to_owned()),
             resume: Some(("g.json".to_owned(), "old".to_owned())),
             summary: Some("s.md".to_owned()),
+            answers: Some(("store".to_owned(), true)),
         }
+    );
+}
+
+#[test]
+fn a_store_read_alone_needs_its_store() {
+    assert_eq!(
+        refusal(&["--workdir", "w", "--answers-read-only"]),
+        "--answers-read-only reads the store --answers names"
+    );
+    assert_eq!(
+        parse(args(&["--workdir", "w", "--answers", "a"]))
+            .unwrap()
+            .answers,
+        Some(("a".to_owned(), false))
     );
 }
 

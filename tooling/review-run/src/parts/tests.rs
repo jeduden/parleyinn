@@ -144,6 +144,7 @@ fn part_run(failure: Option<&str>, answer: &str, cost: f64) -> AgentRun {
         reused: false,
         from_store: false,
         answer_key: None,
+        store_failed: false,
     }
 }
 

@@ -11,8 +11,11 @@
 //! and `review/not-reviewed.md`, and what it ran on,
 //! `review/run-id.json`. Given `--only` a gap list and `--from` an
 //! earlier run's review directory, it runs only what that run left
-//! without an accepted answer, or whose inputs changed, and decides the
-//! review as a full run would.
+//! without an accepted answer, or whose answer key changed, and decides
+//! the review as a full run would. Given `--answers` a store, it takes
+//! from it every accepted answer stored under an unchanged key, and
+//! keeps there every accepted answer it runs for, unless
+//! `--answers-read-only`; `review-run answers drop` takes one out.
 //! It prints the verdict and the counts for the workflow's step
 //! outputs, and each run as it ends on standard error, then what was
 //! not reviewed.
@@ -27,9 +30,11 @@ use std::time::Duration;
 use review_eval::host::Host;
 use serde::Serialize;
 
+use crate::answers;
 use crate::breaker;
-use crate::controls::{ABORTED, OVER_BUDGET};
+use crate::controls::{ABORTED, OVER_BUDGET, SystemClock};
 use crate::gaps::{self, GAPS, Gap, NOT_REVIEWED};
+use crate::key::{self, Keys};
 use crate::live;
 use crate::outcome::{Decision, decide};
 use crate::plan::{self, report_file};
@@ -37,6 +42,7 @@ use crate::requirements;
 use crate::resume::{self, Resume};
 use crate::run::{self, AgentRun, Options};
 use crate::run_id::{self, RUN_ID};
+use crate::store::Store;
 use crate::usage::{self, AgentUsage};
 use crate::{ANSWERS, CONSULTED, OUTCOME, USAGE as USAGE_FILE};
 
@@ -51,7 +57,8 @@ pub const EXIT_USAGE: u8 = 2;
 /// How to call it.
 pub const USAGE: &str = "usage: review-run --workdir DIR [--parallel N] [--deadline SECONDS] \
 [--head-sha SHA] [--only GAPS --from DIR] [--max-cost-usd USD] [--breaker-fraction F] \
-[--summary FILE]";
+[--answers DIR [--answers-read-only]] [--summary FILE]\n\
+       review-run answers drop KEY --answers DIR";
 
 /// The command line, read.
 #[derive(Debug, Clone, PartialEq)]
@@ -65,6 +72,8 @@ pub struct Args {
     pub resume: Option<(String, String)>,
     /// The job summary the table of every run is added to, when given.
     pub summary: Option<String>,
+    /// The answer store, when given, and whether it is read alone.
+    pub answers: Option<(String, bool)>,
 }
 
 /// Runs the command on `args` and returns its exit code. It is `main`
@@ -76,6 +85,10 @@ pub fn run(
     stdout: &mut dyn Write,
     stderr: &mut (dyn Write + Send),
 ) -> u8 {
+    let args: Vec<String> = args.into_iter().collect();
+    if let Some(rest) = answers::subcommand(&args) {
+        return answers::run(&rest, stdout, stderr);
+    }
     let args = match parse(args) {
         Ok(parsed) => parsed,
         Err(msg) => {
@@ -109,6 +122,73 @@ pub fn run(
     }
 }
 
+/// What a review runs on, read and prepared before any agent runs.
+struct Prepared {
+    plan: plan::Plan,
+    known: std::collections::BTreeSet<String>,
+    keys: Option<Keys>,
+    store: Option<Store>,
+    id: run_id::RunId,
+    resume: Option<Resume>,
+}
+
+/// Reads the review `args` name: its plan, the ids its reports may cite,
+/// each agent's answer key, its store, what it runs on, and, resumed,
+/// what it keeps of the earlier run.
+///
+/// # Errors
+///
+/// Fails when the plan, the SRS or the earlier run does not read.
+fn prepare(
+    host: &dyn Host,
+    args: &Args,
+    progress: &(dyn Fn(&str) + Sync),
+) -> Result<Prepared, String> {
+    let workdir = Path::new(&args.workdir);
+    let split = args.options.split;
+    let plan = plan::read(workdir)?;
+    // Read before any agent runs: an SRS that does not read fails the
+    // review before it costs anything.
+    let known = requirements::ids(workdir)?;
+    let head = args
+        .head
+        .clone()
+        .or_else(|| run_id::git_head(&workdir.join("pr-head")));
+    let version = key::claude_version(host, workdir);
+    let keys = match &version {
+        Ok(v) => Some(Keys::compute(workdir, &plan, v, split)),
+        Err(e) => {
+            progress(&format!(
+                "the answer keys are unknown, so no answer is reused or stored: {e}"
+            ));
+            None
+        }
+    };
+    let store = args.answers.as_ref().map(|(dir, read_only)| Store {
+        dir: dir.into(),
+        read_only: *read_only,
+    });
+    let mut id = run_id::compute(workdir, &plan, head, split, keys.as_ref());
+    id.claude = version.ok();
+    let resume = match &args.resume {
+        Some((only, from)) => {
+            let resume = resumed(workdir, &plan, &id, only, from, progress)?;
+            id.resumed_from = Some(from.clone());
+            Some(resume)
+        }
+        None => None,
+    };
+
+    Ok(Prepared {
+        plan,
+        known,
+        keys,
+        store,
+        id,
+        resume,
+    })
+}
+
 /// Runs the review `args` name and writes its files; returns the step
 /// outputs to print.
 fn review(
@@ -118,55 +198,65 @@ fn review(
 ) -> Result<String, String> {
     let workdir = Path::new(&args.workdir);
     let options = args.options;
-    let plan = plan::read(workdir)?;
-    // Read before any agent runs: an SRS that does not read fails the
-    // review before it costs anything.
-    let known = requirements::ids(workdir)?;
-    let head = args
-        .head
-        .clone()
-        .or_else(|| run_id::git_head(&workdir.join("pr-head")));
-    let mut id = run_id::compute(workdir, &plan, head, options.split);
-    let resume = match &args.resume {
-        Some((only, from)) => {
-            let resume = resumed(workdir, &plan, &id, only, from, progress)?;
-            id.resumed_from = Some(from.clone());
-            Some(resume)
-        }
-        None => None,
-    };
-    let runs = run::review(
+    let p = prepare(host, args, progress)?;
+    let runs = run::review_on(&run::Review {
         host,
+        clock: &SystemClock::default(),
         workdir,
-        &plan,
-        &known,
+        plan: &p.plan,
+        known: &p.known,
         options,
-        resume.as_ref(),
+        resume: p.resume.as_ref(),
+        keys: p.keys.as_ref(),
+        store: p.store.as_ref(),
         progress,
-    )?;
-    let reports = reports(workdir, &plan, progress);
+    })?;
+    let reports = reports(workdir, &p.plan, progress);
     let decision = breaker::amend(
-        &plan,
-        decide(&plan, &runs, &reports, &known),
+        &p.plan,
+        decide(&p.plan, &runs, &reports, &p.known),
         options.breaker,
     );
+    let outputs = record(workdir, &p, &runs, decision, progress)?;
+    if let Some(summary) = &args.summary {
+        add_to_summary(Path::new(summary), &live::table(&runs), progress);
+    }
+
+    Ok(outputs)
+}
+
+/// Writes the review's files in `workdir` from `decision`, decided on
+/// `runs` of the review `p` prepared, and returns the step outputs;
+/// tells `progress` what was resumed and what was not reviewed.
+fn record(
+    workdir: &Path,
+    p: &Prepared,
+    runs: &[AgentRun],
+    decision: Decision,
+    progress: &(dyn Fn(&str) + Sync),
+) -> Result<String, String> {
     let held = held_back(&decision.not_reviewed);
     let Decision {
-        outcome,
+        mut outcome,
         consulted,
         answers,
         not_reviewed,
     } = decision;
-    let usage = usage::usage(&runs, resume.as_ref().map(|r| r.from.as_str()));
+    if let Some(line) = from_store_line(runs) {
+        outcome.summary.push_str(&line);
+    }
+    let usage = usage::usage(runs, p.resume.as_ref().map(|r| r.from.as_str()));
+    let reused = runs.iter().filter(|r| r.reused).count();
+    let store_failed = runs.iter().filter(|r| r.store_failed).count();
     write_json(workdir, OUTCOME, &outcome)?;
     write_json(workdir, CONSULTED, &consulted)?;
     write_json(workdir, ANSWERS, &answers)?;
     write_json::<Vec<AgentUsage>>(workdir, USAGE_FILE, &usage)?;
     write_json::<Vec<Gap>>(workdir, GAPS, &not_reviewed)?;
     write_text(workdir, NOT_REVIEWED, &gaps::markdown(&not_reviewed))?;
-    write_json(workdir, RUN_ID, &id)?;
-    if let Some(resume) = &resume {
-        progress(&resumed_line(resume, &runs));
+    write_json(workdir, RUN_ID, &p.id)?;
+    if let Some(resume) = &p.resume {
+        progress(&resumed_line(resume, runs));
     }
     // What has no accepted report is said last, never left for a
     // reader to take as clean.
@@ -174,15 +264,12 @@ fn review(
         let names: Vec<String> = not_reviewed.iter().map(Gap::label).collect();
         progress(&format!("not reviewed: {}", names.join(", ")));
     }
-    if let Some(summary) = &args.summary {
-        add_to_summary(Path::new(summary), &live::table(&runs), progress);
-    }
 
     Ok(format!(
-        "verdict={}\ndispatched={}\nconsulted={}\nfindings={}\ncost={:.4}\nover_budget={}\n\
-         aborted={}\n",
+        "verdict={}\ndispatched={}\nconsulted={}\nfindings={}\ncost={:.4}\nreused={reused}\n\
+         store_failed={store_failed}\nover_budget={}\naborted={}\n",
         outcome.verdict,
-        plan.agents().len(),
+        p.plan.agents().len(),
         consulted.len(),
         outcome.findings.len(),
         usage::total(&usage),
@@ -270,6 +357,18 @@ fn resumed(
     Ok(plan_of)
 }
 
+/// The summary's sentence naming each agent whose answer the answer
+/// store held, in plan order; none when none was.
+fn from_store_line(runs: &[AgentRun]) -> Option<String> {
+    let mut names: Vec<&str> = runs
+        .iter()
+        .filter(|r| r.from_store)
+        .map(|r| r.name.as_str())
+        .collect();
+    names.sort_unstable();
+    (!names.is_empty()).then(|| format!(" Reused from the answer store: {}.", names.join(", ")))
+}
+
 /// The line on what a resumed review kept and ran again.
 fn resumed_line(resume: &Resume, runs: &[AgentRun]) -> String {
     let reused = runs.iter().filter(|r| r.reused).count();
@@ -307,11 +406,16 @@ fn parse(args: impl IntoIterator<Item = String>) -> Result<Args, String> {
     let mut workdir = None;
     let mut options = Options::default();
     let (mut head, mut only, mut from, mut summary) = (None, None, None, None);
+    let (mut answers, mut read_only) = (None, false);
     let mut args = args.into_iter();
     while let Some(arg) = args.next() {
         let Some(flag) = arg.strip_prefix("--") else {
             return Err(format!("unexpected argument {arg:?}"));
         };
+        if flag == "answers-read-only" {
+            read_only = true;
+            continue;
+        }
         let (name, inline) = match flag.split_once('=') {
             Some((name, value)) => (name, Some(value.to_owned())),
             None => (flag, None),
@@ -326,6 +430,7 @@ fn parse(args: impl IntoIterator<Item = String>) -> Result<Args, String> {
             "max-cost-usd",
             "breaker-fraction",
             "summary",
+            "answers",
         ]
         .contains(&name)
         {
@@ -345,6 +450,7 @@ fn parse(args: impl IntoIterator<Item = String>) -> Result<Args, String> {
             "from" => from = Some(value),
             "max-cost-usd" => options.max_cost_usd = positive(name, &value)?,
             "breaker-fraction" => options.breaker = fraction(name, &value)?,
+            "answers" => answers = Some(value),
             _ => summary = Some(value),
         }
     }
@@ -355,12 +461,17 @@ fn parse(args: impl IntoIterator<Item = String>) -> Result<Args, String> {
         _ => return Err("--only and --from are given together".to_owned()),
     };
 
+    if read_only && answers.is_none() {
+        return Err("--answers-read-only reads the store --answers names".to_owned());
+    }
+
     Ok(Args {
         workdir,
         options,
         head,
         resume,
         summary,
+        answers: answers.map(|dir| (dir, read_only)),
     })
 }
 

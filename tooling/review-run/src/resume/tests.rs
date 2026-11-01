@@ -19,10 +19,12 @@ fn plan() -> Plan {
     }
 }
 
+/// An agent's identity, its key one its definition and diff give.
 fn agent(definition: &str, diff: Option<&str>) -> AgentId {
     AgentId {
         definition: Some(definition.to_owned()),
         diff: diff.map(str::to_owned),
+        key: Some(format!("k-{definition}-{diff:?}")),
     }
 }
 
@@ -39,6 +41,7 @@ fn id() -> RunId {
         ]
         .into(),
         resumed_from: None,
+        claude: None,
     }
 }
 
@@ -121,31 +124,51 @@ fn a_generalist_that_was_a_gap_runs_again_alone() {
 }
 
 #[test]
-fn a_moved_unknown_or_otherwise_fed_review_reuses_nothing() {
+fn a_moved_or_otherwise_fed_review_keeps_every_agent_whose_key_is_unchanged() {
     let mut moved = id();
     moved.head = Some("89abcdef0123456789abcdef0123456789abcdef".to_owned());
     let mut unknown = id();
     unknown.head = None;
     let mut inputs = id();
     inputs.inputs = "j".to_owned();
-    let mut split = id();
-    split.split = 10;
-    for (now, why) in [
-        (moved, "the head changed from 0123"),
-        (unknown, "the head reviewed is unknown"),
-        (inputs, "the inputs every agent reads changed"),
-        (split, "the split limit changed from 9 to 10"),
-    ] {
+    for (now, notes) in [(moved, 1), (unknown, 0), (inputs, 0)] {
         let resume = plan_of(&earlier(Vec::new()), &now);
 
-        assert!(resume.reuse.is_empty(), "{why}");
-        assert_eq!(resume.notes.len(), 1);
-        assert!(
-            resume.notes[0].starts_with(&format!("nothing reused: {why}")),
-            "{:?}",
-            resume.notes
-        );
+        assert_eq!(resume.reuse.len(), 4, "{:?}", resume.notes);
+        assert_eq!(resume.notes.len(), notes, "{:?}", resume.notes);
     }
+    let mut moved = id();
+    moved.head = Some("89abcdef0123456789abcdef0123456789abcdef".to_owned());
+    let resume = plan_of(&earlier(Vec::new()), &moved);
+    assert!(
+        resume.notes[0].starts_with(&format!("the head changed from {HEAD} to 89ab")),
+        "{:?}",
+        resume.notes
+    );
+}
+
+#[test]
+fn a_changed_key_runs_its_agent_again_with_why() {
+    let mut now = id();
+    now.agents.get_mut("lang-rust").unwrap().key = Some("other".to_owned());
+    now.agents.get_mut("review-security").unwrap().key = None;
+    let mut was = earlier(Vec::new());
+    was.id.agents.get_mut("test-engineer-unit").unwrap().key = None;
+
+    let resume = plan_of(&was, &now);
+
+    assert_eq!(
+        resume.notes,
+        [
+            "lang-rust: runs again: its answer key changed: its model, effort, turns or \
+             prompt, the claude version, the split limit, the pull request's agent \
+             instructions or a file every key reads",
+            "test-engineer-unit: runs again: the earlier run recorded no answer key for it",
+            "review-code: runs again: its specialist lang-rust runs again",
+            "review-security: runs again: its answer key is unknown",
+        ]
+    );
+    assert!(resume.reuse.is_empty());
 }
 
 #[test]
@@ -172,9 +195,10 @@ fn a_changed_definition_or_diff_or_an_agent_new_or_unanswered_runs_again() {
     );
     assert!(resume.reuse.is_empty());
 
-    // A definition that did not read in the earlier run never matches.
+    // A definition that did not read in the earlier run has no key, so
+    // it never matches.
     let mut was = earlier(Vec::new());
-    was.id.agents.get_mut("review-security").unwrap().definition = None;
+    was.id.agents.get_mut("review-security").unwrap().key = None;
     was.answers.remove("lang-rust");
     let resume = plan_of(&was, &id());
     assert_eq!(
@@ -182,7 +206,7 @@ fn a_changed_definition_or_diff_or_an_agent_new_or_unanswered_runs_again() {
         [
             "lang-rust: runs again: the earlier run took no answer from it",
             "review-code: runs again: its specialist lang-rust runs again",
-            "review-security: runs again: its definition changed",
+            "review-security: runs again: the earlier run recorded no answer key for it",
         ]
     );
 }
