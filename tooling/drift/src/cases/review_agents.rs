@@ -76,7 +76,7 @@ pub(super) fn review_reach_cases() -> Vec<Case> {
             Injection::replace(
                 REVIEW_WORKFLOW,
                 "          cargo run --locked --quiet --offline -p review-run -- --workdir . --parallel 32 \\\n            --credential \"$RUNNER_TEMP/claude-credential\" > review/run.txt\n",
-                "          echo routed\n      - uses: anthropics/claude-code-action@1d6de8cb0c237e7c15e9e1bdf973826ebae490cc\n",
+                "          echo routed\n      - uses: anthropics/claude-code-action@0000000000000000000000000000000000000000\n",
             ),
             scenario("ENG-28"),
             "no job runs the review's agents with \"cargo run --locked --quiet --offline -p review-run -- --workdir .\"",

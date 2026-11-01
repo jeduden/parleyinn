@@ -11,13 +11,13 @@ pub(super) fn workflow_cases() -> Vec<Case> {
         case(
             "an action used by its tag, not its commit sha",
             "ENG-33",
-            Injection::replace(
+            Injection::replace_line(
                 ".github/workflows/codeql.yml",
-                "github/codeql-action/init@24c54180a607b1449ed407dd24f251e4e9147c8d # v4.38.3",
-                "github/codeql-action/init@v4.38.3",
+                "github/codeql-action/init@",
+                "github/codeql-action/init@main",
             ),
             scenario("ENG-33"),
-            "uses github/codeql-action/init@v4.38.3, not pinned to a full commit sha",
+            "uses github/codeql-action/init@main, not pinned to a full commit sha",
         ),
         case(
             "a pull request's title expanded into a run script",
