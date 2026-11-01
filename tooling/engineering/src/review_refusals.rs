@@ -54,6 +54,9 @@ impl RefusalHost {
 
 impl Host for RefusalHost {
     fn run(&self, command: &Command) -> Result<Output, String> {
+        if let Some(out) = crate::review_runs::version(command) {
+            return Ok(out);
+        }
         let agent = agent_of(command);
         if agent == SPECIALIST {
             let prompt = command.args.get(1).cloned().unwrap_or_default();

@@ -68,6 +68,9 @@ impl ControlHost {
 
 impl Host for ControlHost {
     fn run(&self, command: &Command) -> Result<Output, String> {
+        if let Some(out) = crate::review_runs::version(command) {
+            return Ok(out);
+        }
         let agent = agent_of(command);
         let ran = {
             let mut commands = self.commands.lock().unwrap_or_else(PoisonError::into_inner);
@@ -319,6 +322,9 @@ pub fn retry_problems(checkout: &Checkout, workdir: &Path) -> Vec<String> {
                 ..Options::default()
             },
             resume: None,
+            keys: None,
+            store: None,
+            scrubber: None,
             progress: &|_| {},
         })
     });

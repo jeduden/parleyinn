@@ -243,10 +243,7 @@ fn weighed(
         let Some(answer) = answers.get(&name) else {
             continue;
         };
-        let says = answer
-            .lines()
-            .any(|l| report::finding(l).is_some() || report::dropped(l) || report::nothing(l));
-        if !says {
+        if unreadable(answer) == Some(SAYS_NOTHING) {
             findings.push(blocking(
                 REVIEW_PATH,
                 format!(
@@ -254,10 +251,7 @@ fn weighed(
                      weighing cannot be read"
                 ),
             ));
-            unread.push((
-                name.clone(),
-                "it answered no finding, no dropped one and no `none —` line".to_owned(),
-            ));
+            unread.push((name.clone(), SAYS_NOTHING.to_owned()));
         }
         for line in answer.lines().filter(|l| report::unread(l)) {
             findings.push(blocking(
@@ -269,10 +263,7 @@ fn weighed(
                 ),
             ));
             if !unread.iter().any(|(n, _)| *n == name) {
-                unread.push((
-                    name.clone(),
-                    "it answered a finding line the review cannot read".to_owned(),
-                ));
+                unread.push((name.clone(), UNREAD_LINE.to_owned()));
             }
         }
         for mut f in kept(answer) {
@@ -348,6 +339,25 @@ fn blocking(path: &str, body: String) -> Finding {
         body,
     }
 }
+
+/// Why the review cannot read a generalist's `answer`: it says no
+/// finding, no dropped one and no `none —` line, or holds a finding line
+/// the review cannot read; none when it reads.
+#[must_use]
+pub fn unreadable(answer: &str) -> Option<&'static str> {
+    let says = answer
+        .lines()
+        .any(|l| report::finding(l).is_some() || report::dropped(l) || report::nothing(l));
+    if !says {
+        return Some(SAYS_NOTHING);
+    }
+    answer.lines().any(report::unread).then_some(UNREAD_LINE)
+}
+
+/// Why a generalist's answer that says nothing cannot be read.
+const SAYS_NOTHING: &str = "it answered no finding, no dropped one and no `none —` line";
+/// Why one holding a finding line the review cannot read cannot.
+const UNREAD_LINE: &str = "it answered a finding line the review cannot read";
 
 /// The findings a generalist's `answer` keeps: each line that reads as
 /// a finding and is no dropped one, `nit` or `blocking` as it says. A

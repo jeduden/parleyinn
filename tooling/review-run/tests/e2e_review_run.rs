@@ -31,6 +31,7 @@ use testkit::TempDir;
 /// states a revision in no form, until its prompt tells it of its
 /// previous attempt, or always when `REFUSE_ALWAYS` is set.
 const CLAUDE: &str = r#"#!/bin/sh
+if [ "$1" = "--version" ]; then echo "2.1.0 (Claude Code)"; exit 0; fi
 if [ -n "$CLAUDE_CODE_CHILD_SESSION" ] || [ -n "$CLAUDE_AUTO_BACKGROUND_TASKS" ]; then
   echo "started as a harness session's child" >&2
   exit 3
@@ -348,8 +349,8 @@ fn the_gate_approves_what_the_run_wrote() {
     assert_eq!(out.status.code(), Some(0), "{stderr}");
     assert_eq!(
         String::from_utf8_lossy(&out.stdout),
-        "verdict=approve\ndispatched=5\nconsulted=5\nfindings=1\ncost=0.1300\nover_budget=0\n\
-         aborted=0\n"
+        "verdict=approve\ndispatched=5\nconsulted=5\nfindings=1\ncost=0.1300\nreused=0\n\
+         store_failed=0\nstalled=0\nover_budget=0\naborted=0\n"
     );
     assert_eq!(stderr.lines().count(), 5, "{stderr}");
     for name in ["lang-rust", "review-security"] {
@@ -779,7 +780,7 @@ fn a_resumed_run_reruns_only_the_specialist_cut_off_and_its_generalist_and_the_g
 }
 
 #[test]
-fn a_resumed_run_on_another_head_reuses_nothing() {
+fn a_resumed_run_on_another_head_keeps_every_agent_whose_key_is_unchanged() {
     let home = TempDir::new().unwrap();
     let first = home.path().join("first");
     workdir(&first);
@@ -808,10 +809,17 @@ fn a_resumed_run_on_another_head_reuses_nothing() {
     let stderr = String::from_utf8_lossy(&out.stderr);
     assert_eq!(out.status.code(), Some(0), "{stderr}");
     assert!(
-        stderr.contains("review-run: nothing reused: the head changed from"),
+        stderr.contains(&format!(
+            "review-run: the head changed from {HEAD} to {}: only agents whose answer key is \
+             unchanged keep their answer",
+            "f".repeat(40)
+        )),
         "{stderr}"
     );
-    assert!(stderr.contains("reused 0 agents, re-ran 5"), "{stderr}");
+    assert!(
+        stderr.contains("reused 3 agents, re-ran 2 (lang-rust, review-code)"),
+        "{stderr}"
+    );
 }
 
 #[test]

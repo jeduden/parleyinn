@@ -259,25 +259,25 @@ repeat them, which costs tokens.
   seeded reports use the new lines; the grader reads the run log alone.
 - A requirement request lands with the stakeholder as a nit; the SRS
   changes only through the stakeholder's own change.
-- A review runs in waves of agents, each up to 900 seconds and each
-  agent at most twice (three times when the API turned it away). The
-  56 specialists run in two waves of 32 and the generalists follow,
-  each once its own specialists ended and the mass failure below is
-  decided: 3 x 2 x 15 = 90 minutes at worst, and the job's cap is 120.
-- Cost and mass failure are bounded by code (proposed, not yet
-  accepted): each run gets `--max-budget-usd` (1.00 a specialist, 5.00
-  a generalist), none starts once finished runs cost `--max-cost-usd`
-  (40), and when more than a third of the specialists, capped ones too,
-  ended in a gap no generalist starts and the outcome opens with
-  `review aborted:`. Each is an `over budget:` or `aborted:` gap. An
-  overloaded run waits 15 s, then 30 s.
-- What a run leaves without an accepted report is said, never read as
-  clean: `review/gaps.json` and `review/not-reviewed.md` list each such
-  agent or part and why. `review-run --only <gaps> --from <dir>`, behind
-  `scripts/review-local.sh --resume`, reruns only those and what
-  changed, keyed by `review/run-id.json`: the head, an inputs hash, and
-  each definition's and diff's SHA-256. The verdict function is the
-  same; nothing is reused across a changed head, definition or diff.
+- A review runs its agents in one pipeline (`--parallel 32` in the workflow),
+  each up to 900 seconds and at most twice (three times when the API turned
+  it away): 56 specialists, then each generalist once its own specialists
+  ended and the mass failure below is decided; 90 minutes at worst (cap 120).
+- Cost and failure are bounded by code (proposed): `--max-budget-usd`
+  caps a run (1.00 a specialist, 5.00 a generalist), `--max-cost-usd`
+  (40) starts no run once finished runs cost it, and over a third of
+  the specialists in a gap starts no generalist: `review aborted:`.
+- A run left without an accepted report is said, never read as clean:
+  `review/gaps.json` and `review/not-reviewed.md` list it and why.
+  `review-run --only <gaps> --from <dir>` reruns those and each agent
+  whose answer key changed, on any head. A key (proposed) hashes the
+  definition, model, effort, turns, `claude --version`, command line,
+  prompt, split limit, instructions, own diff and a salt; a generalist's
+  also hashes its specialists' keys and the reports it weighs. `--answers
+  DIR` reuses an answer that passes the report check, and stores no
+  refused, cut-off, silent, capped or token-holding run; `answers drop`
+  removes one. Risks: an injected answer frozen in the store (no
+  workflow writes it yet), and a key blind to files read outside it.
 - After every run, failed or not, `review-run` writes
   `review/agent-runs.jsonl`, one entry per agent run with its tokens, the
   cost its log reported and why it was not accepted, and
@@ -311,4 +311,4 @@ weighing were folded in after that comment and await the
 stakeholder's acceptance of the whole record on that pull request.
 Until then ADR-2610262245 is marked superseded by a proposed record,
 on purpose: the stakeholder accepts this one before that pull request
-merges.
+merges. The keyed answers and the store's write policy await a ruling.

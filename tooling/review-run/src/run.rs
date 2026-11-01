@@ -33,10 +33,12 @@ use crate::LOGS;
 use crate::controls::{
     BREAKER_FRACTION, Breaker, Budget, Clock, Controls, Fraction, MAX_COST_USD, SystemClock,
 };
+use crate::key::Keys;
 use crate::live::{self, EVERY, Live, Watch};
 use crate::parts::{self, Part};
 use crate::plan::{Plan, report_file};
 use crate::resume::Resume;
+use crate::store::Store;
 use crate::tasks;
 
 /// How many agents run at once unless the run says otherwise.
@@ -99,6 +101,12 @@ pub struct AgentRun {
     /// Whether its answer was taken from an earlier run of the same
     /// inputs rather than run again.
     pub reused: bool,
+    /// Whether that answer came from the answer store.
+    pub from_store: bool,
+    /// Its answer key; none when it has none.
+    pub answer_key: Option<String>,
+    /// Whether its accepted answer could not be stored.
+    pub store_failed: bool,
 }
 
 impl AgentRun {
@@ -114,6 +122,9 @@ impl AgentRun {
             parts: 1,
             failed_parts: Vec::new(),
             reused: false,
+            from_store: false,
+            answer_key: None,
+            store_failed: false,
         }
     }
 
@@ -126,7 +137,8 @@ impl AgentRun {
 
 /// One review's runs: what starts them, the clock they keep, the work
 /// directory, the plan, the ids a specialist's report may cite, how
-/// they go, what a resumed review keeps, and what is told of each.
+/// they go, what a resumed review keeps, the answer keys and store, and
+/// what is told of each.
 pub struct Review<'a> {
     pub host: &'a dyn Host,
     pub clock: &'a dyn Clock,
@@ -135,6 +147,14 @@ pub struct Review<'a> {
     pub known: &'a BTreeSet<String>,
     pub options: Options,
     pub resume: Option<&'a Resume>,
+    /// Each agent's answer key; none when the keys are unknown.
+    pub keys: Option<&'a Keys>,
+    /// The answer store answers are taken from and kept in; none when
+    /// the review uses none.
+    pub store: Option<&'a Store>,
+    /// The scrubber of the Claude token; an answer it finds the token
+    /// in is never stored (ENG-28). None without a token to scrub.
+    pub scrubber: Option<&'a review_eval::secret::Scrubber>,
     pub progress: &'a (dyn Fn(&str) + Sync),
 }
 
@@ -161,6 +181,9 @@ pub fn review(
         known,
         options,
         resume,
+        keys: None,
+        store: None,
+        scrubber: None,
         progress,
     })
 }
@@ -301,6 +324,9 @@ pub(crate) fn specialist_units(
                     parts: 0,
                     failed_parts: Vec::new(),
                     reused: false,
+                    from_store: false,
+                    answer_key: None,
+                    store_failed: false,
                 });
             }
         }
@@ -314,6 +340,9 @@ pub(crate) fn specialist_units(
 #[must_use]
 pub fn describe(run: &AgentRun) -> String {
     let kind = run.kind.word();
+    if run.from_store {
+        return format!("{} ({kind}): reused from the answer store", run.name);
+    }
     if run.reused {
         return format!("{} ({kind}): reused from the earlier run", run.name);
     }
@@ -375,13 +404,7 @@ pub(crate) fn attempt(
             );
         }
     };
-    let world = World {
-        main: workdir.to_path_buf(),
-        class: plan.class.clone(),
-        touched: plan.touched,
-        seeded: plan.reports_of(name),
-        notes: Vec::new(),
-    };
+    let world = world_of(workdir, plan, name);
     let log_path = workdir.join(LOGS).join(format!("{}.jsonl", unit.stem()));
     let mut command = runner::command(&component, &world, None, &log_path, deadline);
     if let Some(part) = &unit.part {
@@ -422,6 +445,19 @@ pub(crate) fn attempt(
     };
 
     (AgentRun::of(unit.label(), kind, failure, log, 1), report)
+}
+
+/// The world agent `name` of `plan` runs on in `workdir`: the review's
+/// class and touched count, and for a generalist its specialists'
+/// report files.
+pub(crate) fn world_of(workdir: &Path, plan: &Plan, name: &str) -> World {
+    World {
+        main: workdir.to_path_buf(),
+        class: plan.class.clone(),
+        touched: plan.touched,
+        seeded: plan.reports_of(name),
+        notes: Vec::new(),
+    }
 }
 
 /// Adds `note` to the prompt among `args`, the value after `-p`.

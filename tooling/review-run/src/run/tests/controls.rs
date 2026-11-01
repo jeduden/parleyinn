@@ -57,6 +57,9 @@ fn told_to(
         known: &known(),
         options,
         resume: None,
+        keys: None,
+        store: None,
+        scrubber: None,
         progress: &|l| lines.lock().unwrap().push(l.to_owned()),
     })
     .unwrap();

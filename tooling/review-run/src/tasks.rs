@@ -20,6 +20,7 @@ use review_eval::component;
 use review_gate::report::assemble;
 
 use crate::controls::Controls;
+use crate::memo;
 use crate::parts;
 use crate::pipeline::pipeline;
 use crate::plan::Plan;
@@ -103,14 +104,20 @@ pub(crate) fn run_all(r: &Review, c: &Controls) -> Vec<AgentRun> {
         .filter_map(|n| whole(r, c, n))
         .collect();
     runs.iter().for_each(|_| c.breaker.end(false));
+    for name in r.plan.specialists() {
+        if let Some(run) = stalled(r, c, &name) {
+            c.breaker.end(true);
+            runs.push(run);
+        }
+    }
     let (units, mut unsplit) = specialist_units(r.workdir, r.plan, r.options.split, &|n| {
-        matches!(reuse(r, n), Some(Reuse::Whole(_)))
+        matches!(reuse(r, n), Some(Reuse::Whole(_))) || stalled_why(r, n).is_some()
     });
     unsplit.iter().for_each(|_| settle(c, true));
     let mut kept = BTreeMap::new();
     let mut generalists = Vec::new();
     for name in r.plan.generalists() {
-        match whole(r, c, &name) {
+        match stalled(r, c, &name).or_else(|| whole(r, c, &name)) {
             Some(run) => {
                 kept.insert(name, run);
             }
@@ -165,6 +172,7 @@ fn task(r: &Review, c: &Controls, task: &Task, inputs: Vec<Done>) -> Done {
             if let Err(e) = crate::run::write_report(r.workdir, name, &report) {
                 run.failure = Some(run.failure.map_or(e.clone(), |f| format!("{f}; {e}")));
             }
+            run.answer_key = r.keys.and_then(|k| k.own(name)).map(str::to_owned);
             (r.progress)(&describe(&run));
             settle(c, ended_in_gap(&run, Some(&report), r));
             (run, Some(report))
@@ -204,6 +212,23 @@ fn ended_in_gap(run: &AgentRun, report: Option<&str>, r: &Review) -> bool {
     run.failure.is_some() || refusal(report.unwrap_or_default(), &run.log.answer, r.known).is_some()
 }
 
+/// Why the resume plan does not run `name` again, when it stalled.
+fn stalled_why<'a>(r: &'a Review, name: &str) -> Option<&'a str> {
+    r.resume
+        .and_then(|resume| resume.stalled.get(name))
+        .map(String::as_str)
+}
+
+/// Agent `name`'s run, not started because it stalled, told to
+/// progress; none when it did not stall.
+fn stalled(r: &Review, c: &Controls, name: &str) -> Option<AgentRun> {
+    let why = stalled_why(r, name)?;
+    let (run, _) = not_started(r.workdir, &Unit::whole(name.to_owned()), why.to_owned());
+    (r.progress)(&describe(&run));
+    c.live.finish();
+    Some(run)
+}
+
 /// What the resume plan keeps of `name`, when the review resumes.
 fn reuse<'a>(r: &'a Review, name: &str) -> Option<&'a Reuse> {
     r.resume.and_then(|resume| resume.reuse.get(name))
@@ -215,30 +240,35 @@ fn whole(r: &Review, c: &Controls, name: &str) -> Option<AgentRun> {
     let Some(Reuse::Whole(answer)) = reuse(r, name) else {
         return None;
     };
-    let run = reused(
+    let mut run = reused(
         name.to_owned(),
         component::kind_of(name),
         answer,
         Vec::new(),
     );
+    run.answer_key = memo::key_of(r, &Unit::whole(name.to_owned()));
     (r.progress)(&describe(&run));
     c.live.finish();
     Some(run)
 }
 
 /// `unit`'s run: the part the earlier run kept, when its report still
-/// passes the check, else a run of its own, told to progress.
+/// passes the check, else the answer the store holds under its key, when
+/// it is accepted again, else a run of its own, kept in the store once
+/// accepted; told to progress.
 fn one(r: &Review, c: &Controls, unit: &Unit) -> Done {
     let kept = match (reuse(r, &unit.name), &unit.part) {
         (Some(Reuse::Parts(kept)), Some(part)) => kept.get(&part.index),
         _ => None,
     };
+    let key = memo::key_of(r, unit);
     if let Some(log) = kept {
         let report = assemble(&log.texts, &log.answer, None);
         // A kept part is held to the report check as a fresh one.
         match refusal(&report, &log.answer, r.known) {
             None => {
-                let run = reused(unit.label(), unit.kind, &log.answer, log.texts.clone());
+                let mut run = reused(unit.label(), unit.kind, &log.answer, log.texts.clone());
+                run.answer_key = key;
                 (r.progress)(&describe(&run));
                 return (run, Some(report));
             }
@@ -249,7 +279,17 @@ fn one(r: &Review, c: &Controls, unit: &Unit) -> Done {
             )),
         }
     }
-    let done = run_one(r, c, unit);
+    if let (Some(store), Some(key)) = (r.store, &key)
+        && let Some(done) = memo::recall(r, store, unit, key)
+    {
+        (r.progress)(&describe(&done.0));
+        return done;
+    }
+    let mut done = run_one(r, c, unit);
+    if let (Some(store), Some(key)) = (r.store, &key) {
+        done.0.store_failed = memo::keep(r, store, unit, key, &done);
+    }
+    done.0.answer_key = key;
     (r.progress)(&describe(&done.0));
     done
 }

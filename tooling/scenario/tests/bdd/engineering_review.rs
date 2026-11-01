@@ -112,11 +112,55 @@ fn review_run_names_refusals(w: &mut World) -> Result<(), String> {
 }
 
 #[then(
-    regex = r"^review-run writes each dispatched agent left without an accepted report beside the review outcome and names it not reviewed, and a review resumed from that list runs again that agent, each agent whose head, inputs, definition or diff changed and each generalist whose specialist runs again, keeps nothing across a changed head, definition or diff, and approves as a full run would$"
+    regex = r"^review-run writes each dispatched agent left without an accepted report beside the review outcome and names it not reviewed, and a review resumed from that list runs again that agent, each agent whose answer key changed and each generalist whose specialist runs again, keeps every agent whose key is unchanged on a new commit, keeps nothing across a changed file every key reads, and approves as a full run would$"
 )]
 fn review_run_resumes(w: &mut World) -> Result<(), String> {
     let work = testkit::TempDir::new().map_err(|e| format!("make a work directory: {e}"))?;
     outcome(engineering::review_resume::review_resumes(
+        eng(w).checkout()?,
+        work.path(),
+    ))
+}
+
+#[then(
+    regex = r"^review-run given an answer store takes every accepted answer stored under an unchanged key, runs on a new commit only the specialist whose diff changed and its generalist, never stores a refused report, and runs again an agent whose stored report fails the report check$"
+)]
+fn review_run_answer_store(w: &mut World) -> Result<(), String> {
+    let work = testkit::TempDir::new().map_err(|e| format!("make a work directory: {e}"))?;
+    outcome(engineering::review_answers::review_answers(
+        eng(w).checkout()?,
+        work.path(),
+    ))
+}
+
+#[then(
+    regex = r"^review-run removes the answer stored under a key on request and no other, so a review given the store runs that agent again and nothing else$"
+)]
+fn review_run_drops_an_answer(w: &mut World) -> Result<(), String> {
+    let work = testkit::TempDir::new().map_err(|e| format!("make a work directory: {e}"))?;
+    outcome(engineering::review_answers::review_drops(
+        eng(w).checkout()?,
+        work.path(),
+    ))
+}
+
+#[then(
+    regex = r"^review-run names a blocking finding kept in three reviews in a row with its cited file unchanged in a blocking finding of its own, as needing a stakeholder ruling$"
+)]
+fn review_run_names_rulings(w: &mut World) -> Result<(), String> {
+    let work = testkit::TempDir::new().map_err(|e| format!("make a work directory: {e}"))?;
+    outcome(engineering::review_answers::review_rulings(
+        eng(w).checkout()?,
+        work.path(),
+    ))
+}
+
+#[then(
+    regex = r"^review-run runs no more an agent whose gap recurred the same way in two resumes in a row, and names it stalled in a blocking finding so a person acts$"
+)]
+fn review_run_stalls(w: &mut World) -> Result<(), String> {
+    let work = testkit::TempDir::new().map_err(|e| format!("make a work directory: {e}"))?;
+    outcome(engineering::review_answers::review_stalls(
         eng(w).checkout()?,
         work.path(),
     ))
