@@ -466,12 +466,11 @@ pub fn review_runs_by_code(checkout: &Checkout, workdir: &Path) -> Vec<String> {
         let why = err.lines().last().unwrap_or_default();
         return vec![format!("review-run exited {code}: {why}")];
     }
-    let (events, prompts) = match host.recorded() {
-        Ok(recorded) => recorded,
-        Err(e) => return vec![e],
-    };
-    let mut problems = order_problems(&events);
-    problems.extend(prompt_problems(&prompts));
+    let mut problems = with_recorded(host, |events, prompts| {
+        let mut problems = order_problems(&events);
+        problems.extend(prompt_problems(&prompts));
+        problems
+    });
     problems.extend(outcome_problems(workdir));
     problems.extend(split_runs_by_code(checkout, &workdir.join("split")));
     problems.extend(context_problems(checkout, &workdir.join("bundle")));
@@ -526,8 +525,19 @@ pub fn split_runs_by_code(checkout: &Checkout, workdir: &Path) -> Vec<String> {
         return vec![format!("review-run exited {code} on a split diff")];
     }
 
+    with_recorded(host, |_, prompts| {
+        part_problems(name, files.len(), &prompts)
+    })
+}
+
+/// What `check` finds in what `host` recorded; the poisoned lock, when
+/// one is, as the only problem.
+fn with_recorded(
+    host: Recorder,
+    check: impl FnOnce(Vec<Event>, Vec<(String, String)>) -> Vec<String>,
+) -> Vec<String> {
     match host.recorded() {
-        Ok((_, prompts)) => part_problems(name, files.len(), &prompts),
+        Ok((events, prompts)) => check(events, prompts),
         Err(e) => vec![e],
     }
 }

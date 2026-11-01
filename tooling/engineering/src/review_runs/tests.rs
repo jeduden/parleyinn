@@ -535,3 +535,21 @@ fn a_recorder_with_a_poisoned_lock_is_an_error_not_an_empty_list() {
         );
     }
 }
+
+#[test]
+fn what_a_recorder_with_a_poisoned_lock_recorded_is_checked_by_naming_the_lock() {
+    let host = std::sync::Arc::new(Recorder::default());
+    let h = host.clone();
+    let _ = std::thread::spawn(move || {
+        let _prompts = h.prompts.lock().unwrap();
+        panic!("poison");
+    })
+    .join();
+    let host = std::sync::Arc::try_unwrap(host).unwrap();
+
+    let problems = with_recorded(host, |_, _| vec!["checked".to_owned()]);
+
+    assert_eq!(problems, ["the stand-in's prompts lock is poisoned"]);
+    let ok = with_recorded(Recorder::default(), |_, _| vec!["checked".to_owned()]);
+    assert_eq!(ok, ["checked"]);
+}
