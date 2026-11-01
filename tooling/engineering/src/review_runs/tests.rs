@@ -36,6 +36,53 @@ fn a_review_run_on_the_checkout_s_definitions_has_no_problem() {
     assert!(problems.is_empty(), "{problems:?}");
 }
 
+/// The prompt a specialist is told to read only its own diff and its
+/// own context in.
+fn own_prompt(name: &str) -> String {
+    format!(
+        "You are `{name}`. Read only your own diff, `review/diffs/{name}.diff`, and \
+         `review/context/{name}.md`; never `review/bundle.md`."
+    )
+}
+
+#[test]
+fn a_specialist_told_to_read_its_own_diff_and_context_alone_has_no_problem() {
+    let prompts: Vec<(String, String)> = SPECIALISTS
+        .iter()
+        .map(|n| ((*n).to_owned(), own_prompt(n)))
+        .collect();
+
+    assert!(prompt_problems(&prompts).is_empty());
+}
+
+#[test]
+fn a_specialist_told_to_read_the_bundle_or_not_its_own_files_is_named() {
+    let prompts = vec![
+        (
+            "lang-rust".to_owned(),
+            "Read `review/bundle.md` first, then `review/diffs/lang-rust.diff`.".to_owned(),
+        ),
+        ("lang-markdown".to_owned(), own_prompt("lang-rust")),
+    ];
+
+    assert_eq!(
+        prompt_problems(&prompts),
+        [
+            "lang-rust is not told to read review/context/lang-rust.md",
+            "lang-rust is not told to leave review/bundle.md unread",
+            "lang-markdown is not told to read review/diffs/lang-markdown.diff",
+            "lang-markdown is not told to read review/context/lang-markdown.md",
+        ]
+    );
+}
+
+#[test]
+fn a_generalist_s_prompt_is_not_held_to_the_specialist_s_reads() {
+    let prompts = vec![("review-code".to_owned(), "Read the bundle.".to_owned())];
+
+    assert!(prompt_problems(&prompts).is_empty());
+}
+
 #[test]
 fn every_agent_run_once_and_the_generalists_last_is_in_order() {
     assert!(order_problems(&in_order()).is_empty());

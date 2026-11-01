@@ -9,6 +9,11 @@ its upgrade notes (ENG-23). ParleyInn follows semantic versioning.
 
 ## Unreleased
 
+- A specialist of the review reads only its own diff, or its part's,
+  and a small context the review bundle writes for it, its class,
+  touched ids, dispatch row and the deterministic findings on its
+  files, never the whole bundle, which on a large change is too large
+  for one read (ENG-28).
 - A stakeholder comment consents only to the stakeholder paths it names,
   by path, owning pattern or directory (ENG-21).
 - Every reviewer component of the layered review, and every other agent

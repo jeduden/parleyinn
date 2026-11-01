@@ -2,15 +2,18 @@
 //! runs each dispatched specialist as its own agent, assembles its
 //! report from its run log, runs every dispatched generalist only once
 //! every specialist has ended, and writes the review outcome from what
-//! they answered. The check runs `review-run` on a work directory
-//! holding the checkout's definitions of the dispatched agents, with a
-//! stand-in for the `claude` command line that records when each
-//! agent's run starts and ends and answers as the agent would.
+//! they answered, telling each specialist to read only its own diff and
+//! the context the review bundle wrote for it, never the whole bundle.
+//! The check runs `review-run` on a work directory holding the
+//! checkout's definitions of the dispatched agents, with a stand-in for
+//! the `claude` command line that records when each agent's run starts
+//! and ends and what it was told, and answers as the agent would.
 
 use std::fs;
 use std::path::Path;
 use std::sync::Mutex;
 
+use review_bundle::cli::{BUNDLE, CONTEXTS, DIFFS};
 use review_eval::host::{Command, Host, Output};
 
 use crate::Checkout;
@@ -37,10 +40,13 @@ pub enum Event {
 }
 
 /// A stand-in for the `claude` command line: it records each run's
-/// start and end, and answers as the agent it runs as.
+/// start and end and each agent's prompt, and answers as the agent it
+/// runs as.
 #[derive(Debug, Default)]
 pub struct Recorder {
     pub events: Mutex<Vec<Event>>,
+    /// Each run's agent and the prompt it was given.
+    pub prompts: Mutex<Vec<(String, String)>>,
 }
 
 impl Recorder {
@@ -54,6 +60,9 @@ impl Recorder {
 impl Host for Recorder {
     fn run(&self, command: &Command) -> Result<Output, String> {
         let agent = agent_of(command);
+        if let Ok(mut prompts) = self.prompts.lock() {
+            prompts.push((agent.clone(), prompt_of(command)));
+        }
         self.record(Event::Started(agent.clone()));
         let answered = answer(command, &agent);
         self.record(Event::Ended(agent));
@@ -76,6 +85,47 @@ pub fn agent_of(command: &Command) -> String {
         .and_then(|at| command.args.get(at + 1))
         .cloned()
         .unwrap_or_default()
+}
+
+/// The prompt `command` gives its agent, the value after `-p`.
+#[must_use]
+pub fn prompt_of(command: &Command) -> String {
+    command
+        .args
+        .iter()
+        .position(|a| a == "-p")
+        .and_then(|at| command.args.get(at + 1))
+        .cloned()
+        .unwrap_or_default()
+}
+
+/// What is wrong with what each dispatched specialist among `prompts`
+/// was told: not to read its own diff, not to read its own context,
+/// or not to leave the bundle unread, which on a large change is too
+/// large for one read.
+#[must_use]
+pub fn prompt_problems(prompts: &[(String, String)]) -> Vec<String> {
+    let mut problems = Vec::new();
+    for (name, prompt) in prompts {
+        if !SPECIALISTS.contains(&name.as_str()) {
+            continue;
+        }
+        for own in [
+            format!("review/{DIFFS}/{name}.diff"),
+            format!("review/{CONTEXTS}/{name}.md"),
+        ] {
+            if !prompt.contains(&format!("`{own}`")) {
+                problems.push(format!("{name} is not told to read {own}"));
+            }
+        }
+        if !prompt.contains(&format!("never `review/{BUNDLE}`")) {
+            problems.push(format!(
+                "{name} is not told to leave review/{BUNDLE} unread"
+            ));
+        }
+    }
+
+    problems
 }
 
 /// The finding a stand-in specialist states in its text.
@@ -266,6 +316,9 @@ pub fn review_runs_by_code(checkout: &Checkout, workdir: &Path) -> Vec<String> {
     }
     let events = host.events.into_inner().unwrap_or_default();
     let mut problems = order_problems(&events);
+    problems.extend(prompt_problems(
+        &host.prompts.into_inner().unwrap_or_default(),
+    ));
     problems.extend(outcome_problems(workdir));
 
     problems

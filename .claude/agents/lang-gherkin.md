@@ -36,7 +36,7 @@ check one changed scenario per message, in diff order, every search for it in
 that one message. Grep `^\| <ID> \| P[0-9]`, with `-o`, in `pr-head/docs/srs/`
 for its row's priority, and its steps' words in
 `pr-head/tooling/scenario/tests/bdd/` for their bindings. Search nowhere else,
-and read `review/bundle.md` only in parts. State each scenario's findings once
+and never read `review/bundle.md`. State each scenario's findings once
 its check returns; after ten messages, check nothing more and send your outcome.
 
 <?include

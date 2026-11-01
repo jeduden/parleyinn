@@ -1,7 +1,7 @@
 use super::*;
 use crate::analysis::Record;
 use crate::{BLOCKING, Finding, analyse};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::path::PathBuf;
 
 fn req(id: &str, text: &str, traces: &[&str]) -> srs::Requirement {
@@ -268,6 +268,96 @@ fn bundle_keeps_quoted_paths_on_their_line() {
     );
     assert!(
         got.contains("- `docs/srs/x ## Deterministic findings  None.'.md`\n"),
+        "{got}"
+    );
+}
+
+#[test]
+fn context_names_the_class_the_specialist_s_row_its_files_and_their_findings() {
+    let mut a = analyse(
+        &base(),
+        &base(),
+        "diff --git a/docs/srs/05.md b/docs/srs/05.md\n+REC-01\n\
+         diff --git a/a.rs b/a.rs\n+x\n",
+        &[],
+    );
+    a.findings = vec![
+        Finding {
+            path: "a.rs".into(),
+            line: 3,
+            severity: BLOCKING,
+            body: "lifts a ban".into(),
+        },
+        Finding {
+            path: "docs/srs/05.md".into(),
+            line: 0,
+            severity: BLOCKING,
+            body: "no consent".into(),
+        },
+    ];
+
+    let got = context(&a, "lang-rust");
+
+    assert!(
+        got.starts_with("# Review context for `lang-rust`\n"),
+        "{got}"
+    );
+    assert!(got.contains("Class: **deep**"), "{got}");
+    assert!(got.contains("touches 1 id: REC-01."), "{got}");
+    assert!(
+        got.contains("- `review-code-deep`, weighing `lang-rust`"),
+        "{got}"
+    );
+    assert!(got.contains("Your files: `a.rs`."), "{got}");
+    assert!(got.contains("- blocking `a.rs:3`: lifts a ban\n"), "{got}");
+    assert!(!got.contains("no consent"), "{got}");
+    assert!(got.contains("1 more, on files that are not yours"), "{got}");
+    assert!(
+        !got.contains("REC-01 name"),
+        "the context quotes no row: {got}"
+    );
+}
+
+#[test]
+fn context_of_a_specialist_with_no_file_of_its_own_holds_every_finding() {
+    let mut a = analyse(
+        &base(),
+        &base(),
+        "diff --git a/docs/srs/05.md b/docs/srs/05.md\n+x\n",
+        &[],
+    );
+    a.touched.clear();
+    a.scopes.insert("srs-09".into(), BTreeSet::new());
+    a.findings = vec![Finding {
+        path: "docs/srs/05.md".into(),
+        line: 0,
+        severity: BLOCKING,
+        body: "no consent".into(),
+    }];
+
+    let got = context(&a, "srs-09");
+
+    assert!(got.contains("touches no id."), "{got}");
+    assert!(got.contains("No dispatch row names you."), "{got}");
+    assert!(
+        got.contains("Your files: none of your own, so your diff is the whole diff."),
+        "{got}"
+    );
+    assert!(
+        got.contains("- blocking `docs/srs/05.md:0`: no consent\n"),
+        "{got}"
+    );
+    assert!(!got.contains("more, on files"), "{got}");
+}
+
+#[test]
+fn context_says_none_when_no_finding_is_on_the_specialist_s_files() {
+    let a = analyse(&base(), &base(), "diff --git a/a.rs b/a.rs\n+x\n", &[]);
+
+    let got = context(&a, "lang-rust");
+
+    assert!(
+        got.contains("## Deterministic findings on your files\n\nNone.\n"),
         "{got}"
     );
 }

@@ -57,6 +57,20 @@ fn each_kind_gets_its_prompt() {
         "{specialist}"
     );
     assert!(!specialist.contains("review/reports"), "{specialist}");
+    // The bundle is too large for one read on a large change, so a
+    // specialist reads its own diff and its own small context alone.
+    assert!(
+        specialist.contains(
+            "Read only your own diff, `review/diffs/lang-rust.diff`, and, for the \
+             review class, your dispatch row and the deterministic findings on your \
+             files, `review/context/lang-rust.md`; never `review/bundle.md`."
+        ),
+        "{specialist}"
+    );
+    assert!(
+        !specialist.contains("Read `review/bundle.md`"),
+        "{specialist}"
+    );
 
     let generalist = prompt(&component(Kind::Generalist, "review-code"), &w);
     assert!(
