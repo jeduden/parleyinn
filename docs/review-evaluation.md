@@ -169,7 +169,7 @@ it through `.github/actions/claude-code`, which pins its version (ENG-01).
 
 The command line takes no seed, so a review is measured by repetition.
 [stability.yml](../.github/workflows/stability.yml), started by hand,
-reviews each state of `tooling/review-eval/stability-states.toml` three
+reviews each snapshot of `tooling/review-eval/stability-snapshots.toml` three
 times afresh. `review-report stability` then writes `stability.json`:
 the share of reviews whose verdict differs from the most common one,
 and per agent the Jaccard overlap of its finding sets. A finding is its

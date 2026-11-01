@@ -12,7 +12,7 @@ fn run(verdict: &str, findings: &[(&str, &[&str])], cost: f64) -> Run {
     Run {
         dir: format!("run-{verdict}"),
         verdict: verdict.to_owned(),
-        state: (Some("abc".to_owned()), "inputs".to_owned()),
+        snapshot: (Some("abc".to_owned()), "inputs".to_owned()),
         findings: findings
             .iter()
             .map(|(agent, paths)| ((*agent).to_owned(), paths.iter().map(|p| fid(p)).collect()))
@@ -37,7 +37,7 @@ fn identical_runs_are_stable() {
     let s = compare(&runs);
 
     assert_eq!(s.runs, 3);
-    assert!(s.same_state);
+    assert!(s.same_snapshot);
     assert_eq!(s.mode, "approve");
     assert_eq!((s.flip_rate, s.jaccard), (0.0, 1.0));
     assert!(s.stable && s.within_limits);
@@ -119,18 +119,18 @@ fn runs_with_no_findings_are_stable_and_no_runs_measure_nothing() {
         (0, 0.0, "")
     );
     assert!(!none.stable && !none.within_limits);
-    assert!(none.same_state);
+    assert!(none.same_snapshot);
     assert_eq!(none.unmeasured, vec!["there are no runs".to_owned()]);
 }
 
 #[test]
 fn runs_of_different_states_are_named_so() {
     let mut other = run("approve", &[], 0.0);
-    other.state.0 = Some("def".to_owned());
+    other.snapshot.0 = Some("def".to_owned());
 
     let s = compare(&[run("approve", &[], 0.0), other]);
 
-    assert!(!s.same_state);
+    assert!(!s.same_snapshot);
     assert!(!s.stable && !s.within_limits);
     assert_eq!(s.unmeasured.len(), 1, "{:?}", s.unmeasured);
 }
@@ -202,7 +202,7 @@ fn a_review_is_read_from_its_work_directory() {
     let r = read(dir.path(), &mut notes);
 
     assert_eq!(r.verdict, crate::agent_runs::NO_VERDICT);
-    assert_eq!(r.state, (Some("abc".to_owned()), "i".to_owned()));
+    assert_eq!(r.snapshot, (Some("abc".to_owned()), "i".to_owned()));
     assert_eq!(r.findings["lang-rust"].len(), 1);
     assert_eq!(r.findings["review-code"].len(), 1);
     assert_eq!(r.costs["review-code"], 0.3);

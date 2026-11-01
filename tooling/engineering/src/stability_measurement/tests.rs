@@ -1,6 +1,6 @@
 use super::*;
 
-const STATES: &str = "[[state]]\nname = \"pr-99\"\npull = 99\n\
+const SNAPSHOTS: &str = "[[snapshot]]\nname = \"pr-99\"\npull = 99\n\
     base = \"cbf144c6e74833535424c54cbfd04a23d90b47b0\"\n\
     head = \"86ec49030e8e8fe2af2bc2fd9441a64167e12ab6\"\n";
 
@@ -10,14 +10,14 @@ fn checkout() -> Checkout {
 
 #[test]
 fn the_checkout_s_measurement_states_review_workflow_and_report_hold() {
-    let problems = problems(&checkout(), MEASUREMENT, states::STATES).unwrap();
+    let problems = problems(&checkout(), MEASUREMENT, snapshots::SNAPSHOTS).unwrap();
 
     assert!(problems.is_empty(), "{problems:?}");
 }
 
 #[test]
 fn a_file_that_does_not_read_fails_the_check() {
-    let err = problems(&checkout(), "no/such.yml", states::STATES).unwrap_err();
+    let err = problems(&checkout(), "no/such.yml", snapshots::SNAPSHOTS).unwrap_err();
 
     assert!(err.starts_with("read no/such.yml: "), "{err}");
 }
@@ -55,16 +55,16 @@ fn a_review_workflow_that_keeps_no_run_list_or_report_is_named() {
 
 #[test]
 fn a_states_that_does_not_read_is_named() {
-    assert!(states_problems(STATES, 3).is_empty());
+    assert!(states_problems(SNAPSHOTS, 3).is_empty());
     assert_eq!(
-        states_problems(STATES, 2),
-        vec!["the measurement reviews each state 2 times, not three"]
+        states_problems(SNAPSHOTS, 2),
+        vec!["the measurement reviews each snapshot 2 times, not three"]
     );
 
-    let problems = states_problems("state = []", 3);
+    let problems = states_problems("snapshot = []", 3);
     assert_eq!(problems.len(), 1);
     assert!(
-        problems[0].ends_with("the states holds no state"),
+        problems[0].ends_with("the snapshots file holds no snapshot"),
         "{problems:?}"
     );
 }

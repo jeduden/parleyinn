@@ -4,11 +4,11 @@
 //!   report of the review in `DIR`, as review-run does after every
 //!   run, so they can be written again from a kept work directory;
 //! - `review-report stability --out FILE DIR DIR...` compares the
-//!   reviews in two or more work directories of one pull-request state
+//!   reviews in two or more work directories of one pull-request snapshot
 //!   and writes their stability to `FILE`, printing its headline,
 //!   `key=value` per line, for the workflow's step outputs;
-//! - `review-report states FILE` reads the stability measurement's states and
-//!   prints its job matrices, for the same ([`crate::states`]).
+//! - `review-report snapshots FILE` reads the stability measurement's snapshots and
+//!   prints its job matrices, for the same ([`crate::snapshots`]).
 
 use std::fs;
 use std::io::Write;
@@ -25,7 +25,7 @@ pub const EXIT_USAGE: u8 = 2;
 
 /// How to call it.
 pub const USAGE: &str = "usage: review-report write --workdir DIR | \
-review-report stability --out FILE DIR DIR... | review-report states FILE";
+review-report stability --out FILE DIR DIR... | review-report snapshots FILE";
 
 /// Runs the command on `args` and returns its exit code.
 pub fn run(
@@ -37,7 +37,7 @@ pub fn run(
     let result = match args.split_first() {
         Some((command, rest)) if command == "write" => write(rest, stderr),
         Some((command, rest)) if command == "stability" => stable(rest, stdout, stderr),
-        Some((command, [file])) if command == "states" => states(file, stdout, stderr),
+        Some((command, [file])) if command == "snapshots" => snapshots(file, stdout, stderr),
         _ => Err(EXIT_USAGE),
     };
     match result {
@@ -105,14 +105,14 @@ fn stable(args: &[String], stdout: &mut dyn Write, stderr: &mut dyn Write) -> Re
     Ok(())
 }
 
-/// `states FILE`.
-fn states(file: &str, stdout: &mut dyn Write, stderr: &mut dyn Write) -> Result<(), u8> {
-    let states = fs::read_to_string(file)
+/// `snapshots FILE`.
+fn snapshots(file: &str, stdout: &mut dyn Write, stderr: &mut dyn Write) -> Result<(), u8> {
+    let snapshots = fs::read_to_string(file)
         .map_err(|e| format!("read {file}: {e}"))
-        .and_then(|text| crate::states::parse(&text));
-    match states {
-        Ok(states) => {
-            let _ = write!(stdout, "{}", crate::states::matrices(&states));
+        .and_then(|text| crate::snapshots::parse(&text));
+    match snapshots {
+        Ok(snapshots) => {
+            let _ = write!(stdout, "{}", crate::snapshots::matrices(&snapshots));
             Ok(())
         }
         Err(e) => {
@@ -126,8 +126,8 @@ fn states(file: &str, stdout: &mut dyn Write, stderr: &mut dyn Write) -> Result<
 #[must_use]
 pub fn headline(s: &Stability) -> String {
     format!(
-        "runs={}\nflip_rate={}\njaccard={}\nstable={}\nsame_state={}\nwithin_limits={}\n",
-        s.runs, s.flip_rate, s.jaccard, s.stable, s.same_state, s.within_limits
+        "runs={}\nflip_rate={}\njaccard={}\nstable={}\nsame_snapshot={}\nwithin_limits={}\n",
+        s.runs, s.flip_rate, s.jaccard, s.stable, s.same_snapshot, s.within_limits
     )
 }
 

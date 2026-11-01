@@ -1,7 +1,7 @@
 //! ENG-32: the stability measurement, and the run list and the report every review
 //! leaves. The measurement's workflow runs on dispatch alone (a measurement is nine
-//! reviews, so the stakeholder turns a schedule on), reviews each state
-//! of the committed states afresh with review-run and compares the
+//! reviews, so the stakeholder turns a schedule on), reviews each snapshot
+//! of the committed snapshots afresh with review-run and compares the
 //! reviews with `review-report stability`; the review workflow keeps
 //! each review's run list and report with its reports. The check also drives
 //! review-report itself: a verdict that flips is measured as unstable,
@@ -14,8 +14,8 @@ use review_report::agent_runs::{self, LogFile};
 use review_report::html;
 use review_report::identity::Fid;
 use review_report::inputs::Gap;
+use review_report::snapshots;
 use review_report::stability::{self, Run, Stability};
-use review_report::states;
 
 use crate::Checkout;
 
@@ -46,15 +46,15 @@ pub fn measurement_problems(text: &str) -> Vec<String> {
     for (want, what) in [
         (
             "target/debug/review-run\" --workdir \"$RUNNER_TEMP/work\"",
-            "reviews no state with review-run in a fresh work directory",
+            "reviews no snapshot with review-run in a fresh work directory",
         ),
         (
             "-p review-report -- stability --out stability.json",
             "compares no reviews with review-report stability",
         ),
         (
-            "states tooling/review-eval/stability-states.toml",
-            "reads no states",
+            "snapshots tooling/review-eval/stability-snapshots.toml",
+            "reads no snapshots",
         ),
         (
             "permissions: {}",
@@ -87,18 +87,18 @@ pub fn review_problems(text: &str) -> Vec<String> {
         .collect()
 }
 
-/// The problems with the states `text`, the measurement reviewing each of
-/// its states `samples` times: it does not read, or holds no state; or
-/// the measurement does not review each state three times.
+/// The problems with the snapshots `text`, the measurement reviewing each of
+/// its snapshots `samples` times: it does not read, or holds no snapshot; or
+/// the measurement does not review each snapshot three times.
 #[must_use]
 pub fn states_problems(text: &str, samples: usize) -> Vec<String> {
-    let mut problems = match states::parse(text) {
+    let mut problems = match snapshots::parse(text) {
         Ok(_) => Vec::new(),
-        Err(e) => vec![format!("{}: {e}", states::STATES)],
+        Err(e) => vec![format!("{}: {e}", snapshots::SNAPSHOTS)],
     };
     if samples != 3 {
         problems.push(format!(
-            "the measurement reviews each state {samples} times, not three"
+            "the measurement reviews each snapshot {samples} times, not three"
         ));
     }
 
@@ -182,7 +182,7 @@ pub fn report_problems(made: &Made) -> Vec<String> {
     problems
 }
 
-/// Every problem with the measurement, the states, the review workflow and
+/// Every problem with the measurement, the snapshots, the review workflow and
 /// review-report in `checkout`.
 ///
 /// # Errors
@@ -191,10 +191,13 @@ pub fn report_problems(made: &Made) -> Vec<String> {
 pub fn problems(
     checkout: &Checkout,
     measurement: &str,
-    states: &str,
+    snapshots: &str,
 ) -> Result<Vec<String>, String> {
     let mut problems = measurement_problems(&checkout.read(measurement)?);
-    problems.extend(states_problems(&checkout.read(states)?, states::SAMPLES));
+    problems.extend(states_problems(
+        &checkout.read(snapshots)?,
+        snapshots::SAMPLES,
+    ));
     problems.extend(review_problems(&checkout.read(REVIEW)?));
     problems.extend(report_problems(&made()));
 

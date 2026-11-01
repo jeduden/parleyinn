@@ -149,9 +149,11 @@ The review's tooling words are engineering-tooling words too, described in
 
 - **Reviewer component, case, scorecard**: the review's agents, the cases that
   hold them and the published results.
-- **Stability measurement**: reviews of the same pull-request states, repeated
-  to measure how stable the review is.
-- **States**: the frozen pull-request states a stability measurement reviews.
+- **Stability measurement**: reviews of the same pull-request snapshots,
+  repeated to measure how stable the review is.
+- **Snapshot**: a pull request's base and head commits, frozen, which a
+  stability measurement reviews. It is a head and its inputs, not the forge's
+  pull-request state.
 - **Run list**: a review's file with one entry per agent run, holding its
   tokens, its cost and why its answer was not taken.
 - **Report**: the static HTML built from the run list.

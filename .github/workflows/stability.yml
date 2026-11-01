@@ -1,9 +1,9 @@
 name: Stability measurement
 
-# ENG-32: how stable the review is on an unchanged pull-request state.
+# ENG-32: how stable the review is on an unchanged pull-request snapshot.
 # The `claude` command line takes no seed, so a review cannot be pinned,
-# only measured by repetition: for each frozen state listed in
-# tooling/review-eval/stability-states.toml, main's review-run reviews
+# only measured by repetition: for each frozen snapshot listed in
+# tooling/review-eval/stability-snapshots.toml, main's review-run reviews
 # it three times, each in a fresh work directory with nothing reused,
 # and `review-report stability` compares the three: the share of runs
 # whose verdict differs from the most common one (the flip rate) and,
@@ -29,14 +29,14 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  states:
+  snapshots:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
       contents: read
     outputs:
-      states: ${{ steps.states.outputs.states }}
-      samples: ${{ steps.states.outputs.samples }}
+      snapshots: ${{ steps.snapshots.outputs.snapshots }}
+      samples: ${{ steps.snapshots.outputs.samples }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -46,17 +46,17 @@ jobs:
         with:
           tools: "rust"
           cache: false
-      - name: Read the states
-        id: states
+      - name: Read the snapshots
+        id: snapshots
         run: |
           cargo run --locked --quiet -p review-report -- \
-            states tooling/review-eval/stability-states.toml >> "$GITHUB_OUTPUT"
+            snapshots tooling/review-eval/stability-snapshots.toml >> "$GITHUB_OUTPUT"
 
-  # One fresh review of one state: main's tree as the work directory,
-  # the state's head as the pull request's tree, its diff against its
+  # One fresh review of one snapshot: main's tree as the work directory,
+  # the snapshot's head as the pull request's tree, its diff against its
   # base, and no answer from any other run.
   sample:
-    needs: states
+    needs: snapshots
     runs-on: ubuntu-latest
     timeout-minutes: 120
     permissions:
@@ -64,7 +64,7 @@ jobs:
     strategy:
       fail-fast: false
       max-parallel: 3
-      matrix: ${{ fromJSON(needs.states.outputs.samples) }}
+      matrix: ${{ fromJSON(needs.snapshots.outputs.samples) }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -116,7 +116,7 @@ jobs:
           "$GITHUB_WORKSPACE/target/debug/review-run" --workdir "$RUNNER_TEMP/work" \
             --parallel 32 --head-sha "$HEAD_SHA" > "$RUNNER_TEMP/work/review/run.txt"
       # What the comparison reads, and the run list and the report; the run
-      # logs stay in the job, as in the review (ENG-28). A state's name
+      # logs stay in the job, as in the review (ENG-28). A snapshot's name
       # holds no underscore, so the comparison's pattern takes its own
       # three reviews alone.
       - name: Keep the review
@@ -136,17 +136,17 @@ jobs:
             ${{ runner.temp }}/work/review/agent-runs.jsonl
           if-no-files-found: error
 
-  # The three reviews of each state, compared.
+  # The three reviews of each snapshot, compared.
   stability:
-    needs: [states, sample]
-    if: always() && needs.states.result == 'success'
+    needs: [snapshots, sample]
+    if: always() && needs.snapshots.result == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 120
     permissions:
       contents: read
     strategy:
       fail-fast: false
-      matrix: ${{ fromJSON(needs.states.outputs.states) }}
+      matrix: ${{ fromJSON(needs.snapshots.outputs.snapshots) }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -172,7 +172,7 @@ jobs:
             cat measured.txt
           } >> "$GITHUB_STEP_SUMMARY"
           if grep -qx 'within_limits=false' measured.txt; then
-            echo "::warning::the review is unstable on this state: a flip rate above 0.2 or a finding overlap below 0.7; stability.json names each agent"
+            echo "::warning::the review is unstable on this snapshot: a flip rate above 0.2 or a finding overlap below 0.7; stability.json names each agent"
           fi
       - name: Keep the measure
         if: always()

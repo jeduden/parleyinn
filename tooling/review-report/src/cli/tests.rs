@@ -42,8 +42,8 @@ fn a_wrong_command_line_prints_the_usage() {
         &["stability", "--out", "x", "one"],
         &["stability", "--in", "x", "one", "two"],
         &["stability"],
-        &["states"],
-        &["states", "a", "b"],
+        &["snapshots"],
+        &["snapshots", "a", "b"],
     ] {
         let (code, _, err) = call(args);
         assert_eq!(code, EXIT_USAGE, "{args:?}");
@@ -96,7 +96,7 @@ fn stability_writes_its_file_and_prints_its_headline() {
     assert_eq!((code, err.as_str()), (EXIT_OK, ""));
     assert_eq!(
         printed,
-        "runs=3\nflip_rate=0.333333\njaccard=1\nstable=false\nsame_state=true\nwithin_limits=false\n"
+        "runs=3\nflip_rate=0.333333\njaccard=1\nstable=false\nsame_snapshot=true\nwithin_limits=false\n"
     );
     let file: serde_json::Value = serde_json::from_str(&fs::read_to_string(&out).unwrap()).unwrap();
     assert_eq!(file["flip_rate"], 0.333_333);
@@ -114,7 +114,7 @@ fn stability_warns_on_runs_of_different_states_and_names_what_did_not_read() {
     let (code, printed, err) = call(&["stability", "--out", &out, &one, &two]);
 
     assert_eq!(code, EXIT_OK);
-    assert!(printed.contains("same_state=false"));
+    assert!(printed.contains("same_snapshot=false"));
     assert!(err.contains("review/usage.json does not read"), "{err}");
     assert!(err.contains("their stability means nothing"), "{err}");
 }
@@ -134,29 +134,32 @@ fn stability_fails_naming_a_file_it_could_not_write() {
 #[test]
 fn states_prints_the_measurement_s_matrices_or_fails_naming_why() {
     let root = TempDir::new().unwrap();
-    let file = root.path().join("states.toml");
+    let file = root.path().join("snapshots.toml");
     fs::write(
         &file,
-        "[[state]]\nname = \"pr-99\"\npull = 99\n\
+        "[[snapshot]]\nname = \"pr-99\"\npull = 99\n\
          base = \"cbf144c6e74833535424c54cbfd04a23d90b47b0\"\n\
          head = \"86ec49030e8e8fe2af2bc2fd9441a64167e12ab6\"\n",
     )
     .unwrap();
     let file = file.display().to_string();
 
-    let (code, out, err) = call(&["states", &file]);
+    let (code, out, err) = call(&["snapshots", &file]);
     assert_eq!((code, err.as_str()), (EXIT_OK, ""));
-    assert!(out.starts_with("states={\"include\":[{"), "{out}");
+    assert!(out.starts_with("snapshots={\"include\":[{"), "{out}");
     assert!(out.contains("\nsamples={\"include\":[{"), "{out}");
 
-    fs::write(&file, "state = []").unwrap();
-    let (code, _, err) = call(&["states", &file]);
+    fs::write(&file, "snapshot = []").unwrap();
+    let (code, _, err) = call(&["snapshots", &file]);
     assert_eq!(code, EXIT_FAILURE);
-    assert!(err.contains("the states holds no state"), "{err}");
+    assert!(
+        err.contains("the snapshots file holds no snapshot"),
+        "{err}"
+    );
 
-    let (code, _, err) = call(&["states", "/nonexistent/states.toml"]);
+    let (code, _, err) = call(&["snapshots", "/nonexistent/snapshots.toml"]);
     assert_eq!(code, EXIT_FAILURE);
-    assert!(err.contains("read /nonexistent/states.toml: "), "{err}");
+    assert!(err.contains("read /nonexistent/snapshots.toml: "), "{err}");
 }
 
 #[test]

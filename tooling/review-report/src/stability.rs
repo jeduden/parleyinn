@@ -1,4 +1,4 @@
-//! How stable N reviews of one pull-request state are (ENG-32): the
+//! How stable N reviews of one pull-request snapshot are (ENG-32): the
 //! `claude` command line takes no seed, so an agent's answer cannot be
 //! pinned, only measured by repetition. From each review's work
 //! directory it reads the verdict, each agent's finding identities
@@ -16,10 +16,10 @@
 //!   agent, dispatched or reported, reported in every run with the same
 //!   finding set and no verdict flipped; an agent left in a gap counts
 //!   as one that did not report;
-//! - `same_state`, whether every run reviewed the same head and inputs,
+//! - `same_snapshot`, whether every run reviewed the same head and inputs,
 //!   without which the comparison means nothing;
 //! - `unmeasured`, why the comparison measures nothing: no runs, runs
-//!   of different states, or a run with no verdict (a review that
+//!   of different snapshots, or a run with no verdict (a review that
 //!   failed); empty when it is measured;
 //! - `within_limits`, whether it is measured, the flip rate is at most
 //!   [`FLIP_RATE_LIMIT`] and the overlap at least [`JACCARD_FLOOR`],
@@ -52,7 +52,7 @@ pub struct Run {
     pub dir: String,
     pub verdict: String,
     /// The head it reviewed and its inputs' hash.
-    pub state: (Option<String>, String),
+    pub snapshot: (Option<String>, String),
     /// Each agent's finding identities, by name.
     pub findings: BTreeMap<String, BTreeSet<Fid>>,
     /// Each agent's cost, by name.
@@ -81,7 +81,7 @@ pub struct Agent {
 pub struct Stability {
     pub runs: usize,
     pub dirs: Vec<String>,
-    pub same_state: bool,
+    pub same_snapshot: bool,
     pub verdicts: Vec<String>,
     pub mode: String,
     pub flip_rate: f64,
@@ -168,14 +168,14 @@ fn agent(name: &str, runs: &[Run]) -> Agent {
     }
 }
 
-/// Why `runs` measure nothing: none, different states, or a run with
+/// Why `runs` measure nothing: none, different snapshots, or a run with
 /// no verdict, which is a review that failed and is no sample.
-fn unmeasured(runs: &[Run], same_state: bool) -> Vec<String> {
+fn unmeasured(runs: &[Run], same_snapshot: bool) -> Vec<String> {
     let mut why = Vec::new();
     if runs.is_empty() {
         why.push("there are no runs".to_owned());
     }
-    if !same_state {
+    if !same_snapshot {
         why.push("the runs reviewed different heads or inputs".to_owned());
     }
     let failed: Vec<&str> = runs
@@ -214,14 +214,14 @@ pub fn compare(runs: &[Run]) -> Stability {
     let identical = agents
         .iter()
         .all(|a| a.reported == runs.len() && a.jaccard >= 1.0);
-    let same_state = runs.windows(2).all(|w| w[0].state == w[1].state);
-    let unmeasured = unmeasured(runs, same_state);
+    let same_snapshot = runs.windows(2).all(|w| w[0].snapshot == w[1].snapshot);
+    let unmeasured = unmeasured(runs, same_snapshot);
     let measured = unmeasured.is_empty();
 
     Stability {
         runs: runs.len(),
         dirs: runs.iter().map(|r| r.dir.clone()).collect(),
-        same_state,
+        same_snapshot,
         mode: mode(&verdicts),
         verdicts,
         flip_rate,
@@ -312,7 +312,7 @@ pub fn read(dir: &Path, notes: &mut Vec<String>) -> Run {
         } else {
             outcome.verdict
         },
-        state: (run_id.head, run_id.inputs),
+        snapshot: (run_id.head, run_id.inputs),
         findings: identity::of_review(&reports, &answers),
         costs,
         gaps,

@@ -279,7 +279,7 @@ repeat them, which costs tokens.
   files, best effort, so neither changes the verdict. They go with the
   reports; the run logs stay in the job. No server or socket is added.
 - A stability measurement, `.github/workflows/stability.yml`, reviews each
-  state of `tooling/review-eval/stability-states.toml` three times
+  snapshot of `tooling/review-eval/stability-snapshots.toml` three times
   afresh and measures the verdict flip rate and each agent's finding
   overlap (ENG-32). It runs on dispatch alone: about $15 a measurement, so
   its weekly schedule waits, commented out, for the stakeholder.

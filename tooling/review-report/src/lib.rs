@@ -1,5 +1,5 @@
 //! `review-report`: what one review did, and how stable repeated
-//! reviews of one pull-request state are, from the files the review
+//! reviews of one pull-request snapshot are, from the files the review
 //! wrote and nothing else: no server, no socket, no clock read beyond
 //! the logs' own file times (ENG-28, ENG-32).
 //!
@@ -25,9 +25,9 @@
 //!   could shape is escaped, and the report is size-bounded.
 //!
 //! `review-report stability` compares the work directories of N
-//! reviews of one pull-request state and writes `stability.json`
-//! ([`stability`]); `review-report states` reads the stability measurement's
-//! such states ([`states`]).
+//! reviews of one pull-request snapshot and writes `stability.json`
+//! ([`stability`]); `review-report snapshots` reads the stability measurement's
+//! such snapshots ([`snapshots`]).
 //!
 //! It is repository tooling and never links into a shipped executable.
 
@@ -39,8 +39,8 @@ pub mod cli;
 pub mod html;
 pub mod identity;
 pub mod inputs;
+pub mod snapshots;
 pub mod stability;
-pub mod states;
 
 /// The review's directory, under the work directory, where both go.
 const REVIEW: &str = "review";

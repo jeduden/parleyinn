@@ -1,4 +1,4 @@
-//! A finding's identity across reviews of one pull-request state: its
+//! A finding's identity across reviews of one pull-request snapshot: its
 //! path, the requirement ids and invariants it links, and the SHA-256
 //! of its consequence normalised, never its line number, which moves
 //! with any edit and says nothing about whether two runs found the same
