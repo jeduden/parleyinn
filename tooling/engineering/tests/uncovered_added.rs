@@ -3,6 +3,11 @@
 //! zero-context diff and an lcov report and prints `path:line` for
 //! each added line with no unit hits.
 
+#![allow(
+    clippy::expect_used,
+    reason = "a test's helpers expect: a failure is the assertion"
+)]
+
 use std::fs;
 use std::path::Path;
 use std::process::Command;
