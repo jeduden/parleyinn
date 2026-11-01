@@ -369,7 +369,20 @@ pub(crate) fn attempt(
     let component = match component::load(workdir, name) {
         Ok(component) => component,
         Err(e) => {
-            let failure = format!("its definition does not read: {e}");
+            let mut failure = format!("its definition does not read: {e}");
+            // A whole specialist writes no report, so none from an
+            // earlier run in this work directory is left for its
+            // generalist to read.
+            if let (Kind::Specialist, None) = (kind, &unit.part) {
+                let path = workdir.join(report_file(name));
+                match fs::remove_file(&path) {
+                    Err(e) if e.kind() != io::ErrorKind::NotFound => failure.push_str(&format!(
+                        "; its report from before could not be removed: {}: {e}",
+                        path.display()
+                    )),
+                    _ => {}
+                }
+            }
             let report = unit
                 .part
                 .as_ref()

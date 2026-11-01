@@ -405,6 +405,28 @@ fn an_agent_without_a_definition_does_not_run() {
 }
 
 #[test]
+fn an_agent_without_a_definition_leaves_no_report_from_before() {
+    let dir = TempDir::new().unwrap();
+    let report = dir.path().join(report_file("lang-rust"));
+    fs::create_dir_all(report.parent().unwrap()).unwrap();
+    fs::write(&report, "outcome: none — stale.\n").unwrap();
+
+    let run = one_run(dir.path(), fake::either);
+
+    assert!(!report.exists());
+    assert!(!run.failure.unwrap().contains("could not be removed"));
+
+    fs::create_dir_all(report.join("held")).unwrap();
+    let run = one_run(dir.path(), fake::either);
+    let failure = run.failure.unwrap();
+    assert!(
+        failure.starts_with("its definition does not read: ")
+            && failure.contains("; its report from before could not be removed: "),
+        "{failure}"
+    );
+}
+
+#[test]
 fn a_report_from_before_the_run_is_written_over() {
     let dir = workdir();
     let report = dir.path().join("review/reports/lang-rust.md");
