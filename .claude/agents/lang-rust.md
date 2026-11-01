@@ -19,7 +19,7 @@ changes them, against the rules below.
 ## What you check
 
 1. **Workspace lints (ENG-04).** No `unsafe`; no `unwrap`, `expect` or
-   `panic!` outside tests, a `#[cfg(test)]` module too; name the call:
+   `panic!` outside tests, a `#[cfg(test)]` module among them; name the call:
    `a.rs:5 — if not addressed: its expect panics on bad input — ENG-04`.
    Clippy denies every warning; a lint's `allow` or `expect` gives a reason.
 2. **Reach ([I4](../../docs/srs/invariants.md#i4)).** The core opens no socket
@@ -41,7 +41,7 @@ changes them, against the rules below.
    log, error or panic message.
 
 Your first message Reads your diff alone. Your second message starts with
-the bare finding lines it shows, one per defect, ids from those above, and then
+the bare finding lines, one per defect, ids from those above, and then
 Reads `review/context/lang-rust.md`; never Read the context before every
 finding is in your text. Only text beside a tool call is stated: a finding
 first in the answer is lost.
