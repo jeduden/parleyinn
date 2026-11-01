@@ -118,14 +118,14 @@ fn review(
     Ok(String::from_utf8_lossy(&out).into_owned())
 }
 
-/// The reasons of the gaps `review-run` wrote in `workdir`, by name.
-fn gaps(workdir: &Path) -> BTreeMap<String, String> {
-    let text = fs::read_to_string(workdir.join("review/gaps.json")).unwrap_or_default();
-    review_run::gaps::parse(&text)
-        .unwrap_or_default()
-        .into_iter()
-        .map(|g| (g.name, g.reason))
-        .collect()
+/// The reasons of the gaps `review-run` wrote in `workdir`, by name;
+/// the error of a list that does not read or parse.
+fn gaps(workdir: &Path) -> Result<BTreeMap<String, String>, String> {
+    let path = workdir.join("review/gaps.json");
+    let text = fs::read_to_string(&path).map_err(|e| format!("read {}: {e}", path.display()))?;
+    let gaps = review_run::gaps::parse(&text).map_err(|e| format!("{}: {e}", path.display()))?;
+
+    Ok(gaps.into_iter().map(|g| (g.name, g.reason)).collect())
 }
 
 /// Each of `commands` run without the cost cap of its agent's tier.
@@ -189,7 +189,11 @@ pub fn caps_problems(checkout: &Checkout, workdir: &Path) -> Vec<String> {
     match out {
         Ok(out) => {
             let mut problems = tier_problems(&full.commands());
-            problems.extend(capped_problems(capped.commands().len(), &out, &gaps(&dir)));
+            problems.extend(
+                gaps(&dir)
+                    .map(|gaps| capped_problems(capped.commands().len(), &out, &gaps))
+                    .unwrap_or_else(|e| vec![e]),
+            );
             problems
         }
         Err(e) => vec![e],
@@ -249,9 +253,13 @@ pub fn breaker_problems(checkout: &Checkout, workdir: &Path) -> Vec<String> {
                 .map(|(g, _, _)| *g)
                 .filter(|g| host.runs_of(g) > 0)
                 .collect();
-            let outcome =
-                fs::read_to_string(workdir.join("review/outcome.json")).unwrap_or_default();
-            aborted_problems(&started, &out, &outcome, &gaps(workdir))
+            let outcome = workdir.join("review/outcome.json");
+            fs::read_to_string(&outcome)
+                .map_err(|e| format!("read {}: {e}", outcome.display()))
+                .and_then(|outcome| {
+                    gaps(workdir).map(|gaps| aborted_problems(&started, &out, &outcome, &gaps))
+                })
+                .unwrap_or_else(|e| vec![e])
         }
         Err(e) => vec![e],
     }

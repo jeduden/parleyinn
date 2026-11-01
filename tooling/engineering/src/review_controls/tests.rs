@@ -234,3 +234,26 @@ fn an_overloaded_run_is_named_when_its_runs_or_its_waits_alone_are_wrong() {
         assert!(problems[0].starts_with("lang-rust, turned away as overloaded"));
     }
 }
+
+#[test]
+fn a_gap_list_that_is_missing_or_does_not_parse_is_an_error_not_no_gaps() {
+    let dir = TempDir::new().unwrap();
+    let path = dir.path().join("review/gaps.json");
+
+    let missing = gaps(dir.path()).unwrap_err();
+    assert!(
+        missing.starts_with(&format!("read {}: ", path.display())),
+        "{missing}"
+    );
+
+    fs::create_dir_all(path.parent().unwrap()).unwrap();
+    fs::write(&path, "{").unwrap();
+    let malformed = gaps(dir.path()).unwrap_err();
+    assert!(
+        malformed.starts_with(&format!("{}: ", path.display())),
+        "{malformed}"
+    );
+
+    fs::write(&path, "[]").unwrap();
+    assert_eq!(gaps(dir.path()), Ok(BTreeMap::new()));
+}
