@@ -95,9 +95,9 @@ pub(crate) fn run_one(
         (Some(text), true) => refusal(text, &first.log.answer, known),
         _ => None,
     };
+    // A run whose definition did not read keeps its count of none.
     if first.attempts == 0 || (first.answered() && refused.is_none()) {
-        let attempts = first.attempts.max(1);
-        return (AgentRun { attempts, ..first }, report);
+        return (first, report);
     }
     let (why, told) = match (&refused, &first.failure) {
         (Some(problem), _) => (

@@ -393,6 +393,7 @@ fn an_agent_without_a_definition_does_not_run() {
 
     let run = one_run(dir.path(), fake::either);
 
+    assert_eq!(run.attempts, 0);
     assert!(
         run.failure
             .unwrap()
@@ -499,7 +500,7 @@ fn a_definition_that_does_not_read_is_not_tried_again() {
         &plan(r#"{"review-code": ["lang-rust"]}"#),
     );
 
-    assert!(runs.iter().all(|r| r.attempts == 1));
+    assert!(runs.iter().all(|r| r.attempts == 0));
     assert!(host.agents().is_empty());
 }
 
@@ -889,6 +890,7 @@ fn a_part_without_a_definition_fails_its_specialist() {
     let (runs, _, host) = split_run(dir.path(), fake::either);
 
     assert_eq!(host.agents(), ["review-code"]);
+    assert_eq!((runs[0].parts, runs[0].attempts), (2, 0));
     let failure = runs[0].failure.clone().unwrap();
     assert!(
         failure.starts_with("part 1 of 2: its definition does not read: "),
