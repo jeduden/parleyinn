@@ -1013,6 +1013,21 @@ fn agents_without_the_staged_credential_or_a_job_that_stages_none_are_named() {
 }
 
 #[test]
+fn an_upload_a_failed_step_before_it_skips_is_named() {
+    let skipped = KEPT.replace(
+        "        if: always() && steps.scrub.outputs.scrubbed == 'true'\n",
+        "        if: steps.scrub.outputs.scrubbed == 'true'\n",
+    );
+
+    assert_eq!(
+        parse(&skipped).token_kept_from_agents(TOKEN),
+        [
+            "agent job review uploads in step \"Keep\" only when every step before it succeeded, so a failed run keeps nothing for its author: its if: needs always()"
+        ]
+    );
+}
+
+#[test]
 fn an_upload_no_scrub_after_the_agents_gates_is_named() {
     let want = [
         "agent job review uploads in step \"Keep\" before a scrub of MODEL_TOKEN after its agents gates it",

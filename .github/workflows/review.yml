@@ -321,6 +321,9 @@ jobs:
           if [ "$code" -eq 0 ] || [ "$code" -eq 3 ]; then
             echo "scrubbed=true" >> "$GITHUB_OUTPUT"
           fi
+          if [ "$code" -eq 3 ]; then
+            echo "::error::what the review wrote held the Claude Code OAuth token, now redacted; revoke and rotate it, and nothing is posted"
+          fi
           exit "$code"
       # A review that could not run says why in the job summary, not in
       # its log alone: review-run prints the reason as failed=<reason>.
@@ -510,7 +513,7 @@ jobs:
       # The findings for the gate, the report, the scorecard and each
       # run's grade and report; the run logs stay in the job.
       - name: Keep the evaluation
-        if: steps.plan.outputs.empty == 'true' || steps.scrub.outputs.scrubbed == 'true'
+        if: always() && (steps.plan.outputs.empty == 'true' || steps.scrub.outputs.scrubbed == 'true')
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: review-evaluation

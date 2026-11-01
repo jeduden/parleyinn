@@ -356,6 +356,21 @@ fn unscrubbed_uploads(steps: &[String]) -> Vec<String> {
         .collect()
 }
 
+/// The names of the upload steps among `steps` whose `if:` lacks
+/// `always()`, so a failed step before them skips them.
+fn uploads_skipped_on_failure(steps: &[String]) -> Vec<String> {
+    steps
+        .iter()
+        .filter(|s| s.contains(UPLOAD_ACTION))
+        .filter(|s| {
+            !s.lines().any(|l| {
+                l.trim_start().trim_start_matches("- ").starts_with("if:") && l.contains("always()")
+            })
+        })
+        .map(|s| step_name(s))
+        .collect()
+}
+
 /// The tools of the comma-separated `tools` other than reading:
 /// anything that writes, runs a command, reaches the web or starts an
 /// agent, a scoped `Edit(...)` or `Write(...)` rule included.
@@ -752,6 +767,12 @@ impl Workflow {
                 format!(
                     "agent job {} uploads in step {:?} before a scrub of {token} after its agents gates it",
                     j.name, s
+                )
+            }));
+            problems.extend(uploads_skipped_on_failure(&steps).into_iter().map(|s| {
+                format!(
+                    "agent job {} uploads in step {s:?} only when every step before it succeeded, so a failed run keeps nothing for its author: its if: needs always()",
+                    j.name
                 )
             }));
         }
