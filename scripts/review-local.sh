@@ -132,12 +132,12 @@ if [ "$stage" = yes ]; then
   credential=(--credential "$iso/claude")
 fi
 
-# The head's agent definitions run in place of the base's, copied before
-# the head's instruction files leave the tree below.
-# A linked definition could copy in any file the link names: refused.
+# The head's agent definitions replace the base's, copied before its instruction
+# files leave the tree below; a link, which could copy in any file, is refused.
 if [ "$agents" = head ]; then
   links=$(find pr-head/.claude/agents -maxdepth 1 -name '*.md' -type l)
-  if [ -n "$links" ]; then echo "review-local: refusing a linked agent definition: $links" >&2; exit 2; fi
+  if [ -L pr-head/.claude ] || [ -L pr-head/.claude/agents ] || [ -n "$links" ]; then
+    echo "review-local: refusing a linked agent definition: ${links:-pr-head/.claude/agents}" >&2; exit 2; fi
   mkdir -p .claude/agents
   rm -f .claude/agents/*.md
   cp pr-head/.claude/agents/*.md .claude/agents/
