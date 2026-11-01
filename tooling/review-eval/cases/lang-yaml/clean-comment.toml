@@ -8,8 +8,8 @@ old = "# frit settings for this repository.\n"
 new = "# frit settings for this repository.\n# Plans live under plan/, indexed by PLAN.md.\n"
 
 [expect]
-outcome = ["sound", "nits"]
+outcome = ["none", "findings"]
 
 [[expect.none]]
 path = ".frit.yml"
-severity = "blocking"
+form = "linked"

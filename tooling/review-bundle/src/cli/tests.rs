@@ -73,9 +73,11 @@ fn run_writes_the_bundle_and_findings_and_prints_the_route() {
     let (code, out, err) = w.run();
 
     assert_eq!(code, EXIT_OK, "{err}");
-    assert_eq!(out, "class=deep\ntouched=1\nfindings=0\nconsults=4\n");
+    assert_eq!(out, "class=deep\ntouched=1\nfindings=1\nconsults=4\n");
     assert!(w.output(BUNDLE).contains("### REC-01"));
-    assert_eq!(w.output(CHECKED), "[]\n");
+    let checked: serde_json::Value = serde_json::from_str(&w.output(CHECKED)).unwrap();
+    assert_eq!(checked[0]["severity"], "blocking");
+    assert!(checked[0]["body"].as_str().unwrap().contains("ENG-21"));
     let dispatch: serde_json::Value = serde_json::from_str(&w.output(DISPATCH)).unwrap();
     assert_eq!(
         dispatch,
@@ -148,8 +150,54 @@ fn run_reads_a_diff_that_holds_bytes_that_are_not_text() {
     let (code, out, err) = w.run();
 
     assert_eq!(code, EXIT_OK, "{err}");
-    assert_eq!(out, "class=deep\ntouched=1\nfindings=0\nconsults=4\n");
+    // The ENG-21 finding, and the seed no specialist reads (ENG-34).
+    assert_eq!(out, "class=deep\ntouched=1\nfindings=2\nconsults=4\n");
     assert!(w.output(BUNDLE).contains("### REC-01"));
+}
+
+#[test]
+fn run_lists_a_file_past_its_limit_and_a_file_no_specialist_reads() {
+    let w = World::new(
+        "diff --git a/a.rs b/a.rs\n+x\n\
+         diff --git a/small.rs b/small.rs\n+x\n\
+         diff --git a/gone.rs b/gone.rs\n-x\n\
+         diff --git a/LICENSE b/LICENSE\n+x\n",
+    );
+    let big = "x\n".repeat(crate::limits::RUST_LINES + 1);
+    fs::write(w.head.path().join("a.rs"), big).unwrap();
+    fs::write(w.head.path().join("small.rs"), "x\n").unwrap();
+    fs::write(w.head.path().join("LICENSE"), "x\n").unwrap();
+
+    let (code, out, err) = w.run();
+
+    assert_eq!(code, EXIT_OK, "{err}");
+    assert!(out.contains("findings=2"), "{out}");
+    let checked: serde_json::Value = serde_json::from_str(&w.output(CHECKED)).unwrap();
+    let found: Vec<(&str, &str, bool)> = checked
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|f| {
+            (
+                f["path"].as_str().unwrap(),
+                f["severity"].as_str().unwrap(),
+                f["body"]
+                    .as_str()
+                    .unwrap()
+                    .contains(" — if not addressed: "),
+            )
+        })
+        .collect();
+    assert_eq!(found, vec![("LICENSE", "nit", true), ("a.rs", "nit", true)]);
+    let bundle = w.output(BUNDLE);
+    assert!(
+        bundle.contains("- nit `a.rs:0`: a.rs — if not addressed: "),
+        "{bundle}"
+    );
+    assert!(
+        bundle.contains("- nit `LICENSE:0`: LICENSE — if not"),
+        "{bundle}"
+    );
 }
 
 /// A change that breaks one input.
@@ -238,12 +286,12 @@ fn run_takes_an_eng_29_record_with_the_stakeholder_s_consent() {
     .unwrap();
 
     let (_, refused, _) = w.run();
-    w.consent(r#"[{"author": "owner", "at": "2026-10-11T12:00:00Z", "body": "ok"}]"#);
+    w.consent(r#"[{"author": "owner", "at": "2026-10-11T12:00:00Z", "body": "ok for docs/srs/ and docs/adr/"}]"#);
     let (code, out, err) = w.run();
 
-    assert!(refused.contains("findings=1"), "{refused}");
+    assert!(refused.contains("findings=2"), "{refused}");
     assert_eq!(code, EXIT_OK, "{err}");
-    assert!(out.contains("findings=0"), "{out}");
+    assert!(out.contains("findings=1"), "{out}");
     assert!(
         w.output(BUNDLE)
             .contains("ENG-29 record: `docs/adr/ADR-2610111300-guard.md`, whose summary reads:\n\n> An invariant changes under ENG-29.\n"),
@@ -253,16 +301,26 @@ fn run_takes_an_eng_29_record_with_the_stakeholder_s_consent() {
 }
 
 #[test]
-fn consents_holds_on_one_comment_with_a_body() {
+fn consents_returns_each_comment_with_a_body() {
     let comment = |body: &str| format!(r#"[{{"author": "o", "at": "t", "body": "{body}"}}]"#);
+    let none: Vec<String> = Vec::new();
 
-    assert_eq!(consents("[]"), Ok(false));
-    assert_eq!(consents(&comment(" \\n\\t")), Ok(false));
-    assert_eq!(consents(&comment("I consent")), Ok(true));
+    assert_eq!(consents("[]"), Ok(none.clone()));
+    assert_eq!(consents(&comment(" \\n\\t")), Ok(none.clone()));
+    assert_eq!(
+        consents(&comment("I consent")),
+        Ok(vec!["I consent".into()])
+    );
     let review =
         |state: &str| format!(r#"[{{"author": "o", "at": "t", "body": "b", "state": "{state}"}}]"#);
-    assert_eq!(consents(&review("CHANGES_REQUESTED")), Ok(false));
-    assert_eq!(consents(&review("APPROVED")), Ok(true));
+    assert_eq!(consents(&review("CHANGES_REQUESTED")), Ok(none));
+    assert_eq!(consents(&review("APPROVED")), Ok(vec!["b".into()]));
+    assert_eq!(
+        consents(
+            r#"[{"author": "o", "at": "t", "body": "a"}, {"author": "o", "at": "t", "body": "b"}]"#
+        ),
+        Ok(vec!["a".into(), "b".into()])
+    );
     for bad in ["", "{}", "[1]", r#"[{"author": "o", "body": "x"}]"#] {
         assert!(consents(bad).is_err(), "{bad}");
     }
@@ -272,9 +330,72 @@ fn consents_holds_on_one_comment_with_a_body() {
 fn a_specialist_with_no_file_of_its_own_reads_the_whole_diff() {
     let diff = "diff --git a/a.rs b/a.rs\n+x\ndiff --git a/b.md b/b.md\n+y\n";
 
-    assert_eq!(diff_for(diff, &BTreeSet::new()), diff);
+    let none = |_: &str| None;
+
+    assert_eq!(diff_for(diff, &BTreeSet::new(), &none), diff);
     assert_eq!(
-        diff_for(diff, &["b.md".to_owned()].into()),
+        diff_for(diff, &["b.md".to_owned()].into(), &none),
         "diff --git a/b.md b/b.md\n+y\n"
+    );
+}
+
+#[test]
+fn a_specialist_s_diff_leaves_out_a_copy_that_matches_its_source() {
+    let head = TempDir::new().unwrap();
+    fs::create_dir_all(head.path().join("docs")).unwrap();
+    fs::write(head.path().join("docs/rule.md"), "# Rule\nNew.\n").unwrap();
+    fs::write(
+        head.path().join("a.md"),
+        "<?include\nfile: docs/rule.md\n?>\n## Rule\nNew.\n<?/include?>\n",
+    )
+    .unwrap();
+    let diff = "diff --git a/a.md b/a.md\n@@ -5 +5 @@\n-Old.\n+New.\n";
+    let tree = |p: &str| tree_file(head.path(), p);
+
+    assert_eq!(
+        diff_for(diff, &BTreeSet::new(), &tree),
+        format!(
+            "{}\n{}`a.md`\n",
+            crate::copies::NOTE,
+            crate::copies::LEFT_OUT
+        )
+    );
+}
+
+#[test]
+fn tree_file_reads_only_a_regular_file() {
+    let head = TempDir::new().unwrap();
+    fs::write(head.path().join("a.md"), "text").unwrap();
+
+    assert_eq!(tree_file(head.path(), "a.md").as_deref(), Some("text"));
+    assert_eq!(tree_file(head.path(), "gone.md"), None);
+    assert_eq!(tree_file(head.path(), "."), None);
+}
+
+#[test]
+fn tree_lines_counts_a_file_that_is_not_utf_8() {
+    let head = TempDir::new().unwrap();
+    fs::write(head.path().join("a.rs"), b"one\n\xff two\nthree\n").unwrap();
+
+    assert_eq!(tree_lines(head.path(), "a.rs"), Ok(Some(3)));
+}
+
+#[test]
+fn tree_lines_counts_only_a_regular_file() {
+    let head = TempDir::new().unwrap();
+
+    assert_eq!(tree_lines(head.path(), "gone.rs"), Ok(None));
+    assert_eq!(tree_lines(head.path(), "."), Ok(None));
+}
+
+#[test]
+fn tree_lines_fails_on_a_regular_file_that_does_not_read() {
+    // A regular file whose first page no process maps: reading it fails,
+    // for root too.
+    let err = tree_lines(Path::new("/proc/self"), "mem").unwrap_err();
+
+    assert!(
+        err.starts_with("review-bundle: read /proc/self/mem: "),
+        "{err}"
     );
 }

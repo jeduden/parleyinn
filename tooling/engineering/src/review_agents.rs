@@ -1,5 +1,5 @@
 //! ENG-28: every agent the review bundle can dispatch is defined under
-//! `.claude/agents`, so the orchestrator can consult it: each SRS
+//! `.claude/agents`, so `review-run` can run it: each SRS
 //! section's specialist, each domain-model file's, the language and
 //! test-layer specialists, and the generalists. Specialists run at low
 //! effort and generalists at medium, as their front matter says; each
@@ -19,16 +19,15 @@ use crate::Checkout;
 /// Where the agent definitions live, relative to the checkout.
 pub const AGENTS: &str = ".claude/agents";
 
-/// The tools a specialist has: it reads, and writes its own report
-/// under `review/reports`, the one path the review workflow allows.
-const SPECIALIST_TOOLS: &str = "Read, Grep, Glob, Write";
-/// The tools a generalist has: it reads its specialists' reports and
-/// writes nothing.
-const GENERALIST_TOOLS: &str = "Read, Grep, Glob";
+/// The tools every agent has: it reads and writes nothing. A
+/// specialist's report is assembled from its run log; a generalist reads
+/// those reports.
+const TOOLS: &str = "Read, Grep, Glob";
 /// The effort a specialist runs at.
 const SPECIALIST_EFFORT: &str = "low";
-/// A specialist's turn budget, which its report instructions name, so
-/// it writes its report early and stops before the cap.
+/// A specialist's turn budget. A run the budget cuts off before its
+/// answer keeps what it stated in its log, headed incomplete, and blocks
+/// the review.
 const SPECIALIST_TURNS: &str = "20";
 /// The effort a generalist runs at.
 const GENERALIST_EFFORT: &str = "medium";
@@ -106,14 +105,9 @@ fn check(checkout: &Checkout, name: &str, effort: &str, names: Option<&str>) -> 
     if own != name {
         return Some(format!("{name} names itself {own}"));
     }
-    let tools = if generalist_of(name).is_some() {
-        SPECIALIST_TOOLS
-    } else {
-        GENERALIST_TOOLS
-    };
     let has_tools = field("tools");
-    if has_tools != tools {
-        return Some(format!("{name} has tools {has_tools}, want {tools}"));
+    if has_tools != TOOLS {
+        return Some(format!("{name} has tools {has_tools}, want {TOOLS}"));
     }
     let has = field("effort");
     if has != effort {

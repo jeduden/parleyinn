@@ -1,4 +1,3 @@
-use std::collections::BTreeSet;
 use std::fs;
 use std::path::PathBuf;
 
@@ -14,11 +13,7 @@ fn component(kind: Kind, name: &str) -> Component {
         kind,
         file: String::new(),
         text: String::new(),
-        model: if kind == Kind::Orchestrator {
-            "claude-sonnet-5-5".to_owned()
-        } else {
-            "haiku".to_owned()
-        },
+        model: "haiku".to_owned(),
         effort: "low".to_owned(),
         max_turns: 20,
         tools: Vec::new(),
@@ -26,13 +21,11 @@ fn component(kind: Kind, name: &str) -> Component {
     }
 }
 
-fn world(class: &str, consults: usize) -> World {
+fn world(class: &str) -> World {
     World {
         main: PathBuf::from("/work/main"),
         class: class.to_owned(),
         touched: 1,
-        consults,
-        dispatched: BTreeSet::new(),
         seeded: vec!["review/reports/lang-rust.md".to_owned()],
         notes: Vec::new(),
     }
@@ -40,7 +33,7 @@ fn world(class: &str, consults: usize) -> World {
 
 #[test]
 fn each_kind_gets_its_prompt() {
-    let w = world("standard", 2);
+    let w = world("standard");
 
     let specialist = prompt(&component(Kind::Specialist, "lang-rust"), &w);
     assert!(
@@ -52,9 +45,18 @@ fn each_kind_gets_its_prompt() {
         "{specialist}"
     );
     assert!(
-        specialist.contains("`review/reports/lang-rust.md`"),
+        specialist.contains("You write no file: state each finding as one line in your text"),
         "{specialist}"
     );
+    assert!(
+        specialist.ends_with(
+            "and answer with your outcome line alone, `outcome: findings — <sentence>` \
+             or `outcome: none — <sentence>`. The review assembles your report from \
+             the lines you stated."
+        ),
+        "{specialist}"
+    );
+    assert!(!specialist.contains("review/reports"), "{specialist}");
 
     let generalist = prompt(&component(Kind::Generalist, "review-code"), &w);
     assert!(
@@ -71,7 +73,7 @@ fn each_kind_gets_its_prompt() {
         "{generalist}"
     );
 
-    let mut bare = world("light", 0);
+    let mut bare = world("light");
     bare.touched = 0;
     bare.seeded.clear();
     let generalist = prompt(&component(Kind::Generalist, "review-code"), &bare);
@@ -80,11 +82,6 @@ fn each_kind_gets_its_prompt() {
         "{generalist}"
     );
     assert!(generalist.contains("reports are none."), "{generalist}");
-
-    assert_eq!(
-        prompt(&component(Kind::Orchestrator, "review"), &w),
-        ORCHESTRATOR_PROMPT
-    );
 }
 
 fn args_of(c: &Command) -> Vec<&str> {
@@ -97,7 +94,7 @@ fn has(args: &[&str], pair: [&str; 2]) -> bool {
 
 #[test]
 fn a_specialist_runs_as_the_session_s_agent_with_the_review_s_tools() {
-    let w = world("standard", 2);
+    let w = world("standard");
     let log = PathBuf::from("/logs/run.jsonl");
 
     let c = command(
@@ -116,16 +113,16 @@ fn a_specialist_runs_as_the_session_s_agent_with_the_review_s_tools() {
     assert_eq!(args[0], "-p");
     assert!(args[1].starts_with("You are `lang-rust`"));
     assert!(has(&args, ["--max-turns", "20"]));
-    assert!(has(&args, ["--allowedTools", SPECIALIST_TOOLS]));
-    assert!(has(&args, ["--disallowedTools", SPECIALIST_DISALLOWED]));
+    assert!(has(&args, ["--allowedTools", TOOLS]));
+    assert!(has(&args, ["--disallowedTools", DISALLOWED]));
     assert!(has(&args, ["--agent", "lang-rust"]));
     assert!(!args.contains(&"--model"));
-    assert!(!args.contains(&"--json-schema"));
+    assert!(!args.contains(&"--effort"));
 }
 
 #[test]
 fn every_run_logs_stream_json_without_a_session_from_the_project_s_settings() {
-    let w = world("standard", 2);
+    let w = world("standard");
     let log = PathBuf::from("/logs/run.jsonl");
 
     let c = command(
@@ -146,7 +143,7 @@ fn every_run_logs_stream_json_without_a_session_from_the_project_s_settings() {
 
 #[test]
 fn a_model_override_and_a_generalist_s_tools_are_passed() {
-    let w = world("standard", 2);
+    let w = world("standard");
     let log = PathBuf::from("/logs/run.jsonl");
     let mut generalist = component(Kind::Generalist, "review-code");
     generalist.max_turns = 40;
@@ -163,49 +160,8 @@ fn a_model_override_and_a_generalist_s_tools_are_passed() {
     assert!(has(&args, ["--agent", "review-code"]));
     assert!(has(&args, ["--model", "claude-opus-5-5"]));
     assert!(has(&args, ["--max-turns", "40"]));
-    assert!(has(&args, ["--allowedTools", GENERALIST_TOOLS]));
-    assert!(has(&args, ["--disallowedTools", GENERALIST_DISALLOWED]));
-}
-
-#[test]
-fn the_orchestrator_runs_as_the_workflow_runs_it() {
-    let w = world("deep", 4);
-    let log = PathBuf::from("/logs/run.jsonl");
-
-    let c = command(
-        &component(Kind::Orchestrator, "review"),
-        &w,
-        None,
-        &log,
-        Duration::from_secs(9),
-    );
-
-    let args = args_of(&c);
-    assert_eq!(args[1], ORCHESTRATOR_PROMPT);
-    assert!(has(&args, ["--max-turns", "34"]));
-    assert!(has(&args, ["--allowedTools", ORCHESTRATOR_TOOLS]));
-    assert!(has(&args, ["--disallowedTools", ORCHESTRATOR_DISALLOWED]));
-    assert!(has(&args, ["--model", "claude-sonnet-5-5"]));
-    assert!(has(&args, ["--effort", "low"]));
-    assert!(has(&args, ["--json-schema", OUTCOME_SCHEMA]));
-    assert!(!args.contains(&"--agent"));
-
-    let c = command(
-        &component(Kind::Orchestrator, "review"),
-        &w,
-        Some("claude-opus-5-5"),
-        &log,
-        Duration::from_secs(9),
-    );
-    assert!(has(&args_of(&c), ["--model", "claude-opus-5-5"]));
-}
-
-#[test]
-fn the_class_sets_the_orchestrator_s_turns() {
-    assert_eq!(class_turns("light"), 12);
-    assert_eq!(class_turns("standard"), 20);
-    assert_eq!(class_turns("deep"), 30);
-    assert_eq!(class_turns("other"), 20);
+    assert!(has(&args, ["--allowedTools", TOOLS]));
+    assert!(has(&args, ["--disallowedTools", DISALLOWED]));
 }
 
 #[test]
@@ -289,7 +245,7 @@ fn run_names_what_it_cannot_do() {
 
 #[test]
 fn a_consultant_gets_the_target_a_skill_hands_it() {
-    let w = world("standard", 2);
+    let w = world("standard");
 
     let consultant = prompt(&component(Kind::Consultant, "persona-agent"), &w);
 
@@ -302,11 +258,12 @@ fn a_consultant_gets_the_target_a_skill_hands_it() {
     assert!(consultant.contains("`review/bundle.md`"), "{consultant}");
     assert!(consultant.contains("write none"), "{consultant}");
     assert!(!consultant.contains("review/reports"), "{consultant}");
+    assert!(!consultant.contains("  "), "{consultant}");
 }
 
 #[test]
 fn a_consultant_runs_as_the_session_s_agent_on_the_model_it_resolved() {
-    let w = world("standard", 2);
+    let w = world("standard");
     let log = PathBuf::from("/logs/run.jsonl");
     let mut consultant = component(Kind::Consultant, "persona-agent");
     consultant.model = "claude-sonnet-5-5".to_owned();
@@ -317,9 +274,9 @@ fn a_consultant_runs_as_the_session_s_agent_on_the_model_it_resolved() {
     assert!(has(&args, ["--agent", "persona-agent"]));
     assert!(has(&args, ["--model", "claude-sonnet-5-5"]));
     assert!(has(&args, ["--max-turns", "40"]));
-    assert!(has(&args, ["--allowedTools", GENERALIST_TOOLS]));
-    assert!(has(&args, ["--disallowedTools", GENERALIST_DISALLOWED]));
-    assert!(!args.contains(&"--json-schema"));
+    assert!(has(&args, ["--allowedTools", TOOLS]));
+    assert!(has(&args, ["--disallowedTools", DISALLOWED]));
+    assert!(!args.contains(&"--effort"));
 
     let c = command(
         &consultant,
@@ -329,4 +286,38 @@ fn a_consultant_runs_as_the_session_s_agent_on_the_model_it_resolved() {
         Duration::from_secs(9),
     );
     assert!(has(&args_of(&c), ["--model", "claude-opus-5-5"]));
+}
+
+#[test]
+fn every_agent_reads_alone_and_is_refused_every_writing_tool() {
+    // Pinned as text, so a writing tool re-added to either list fails
+    // here rather than passing every test that compares the constants.
+    assert_eq!(TOOLS, "Read,Glob,Grep");
+    assert_eq!(
+        DISALLOWED,
+        "Bash,Edit,Write,NotebookEdit,WebFetch,WebSearch,Agent,\
+         Read(//proc/**),Read(//sys/**),Read(//dev/**)"
+    );
+}
+
+#[test]
+fn every_agent_is_refused_reads_outside_its_trees_and_of_the_process_files() {
+    // Pinned as text: the process files hold every environment on the
+    // machine, the review's own among them, and nothing outside the two
+    // trees is the agent's to read (ENG-28).
+    assert_eq!(
+        SETTINGS,
+        r#"{"permissions":{"blockReadsOutsideWorkingDirectories":true}}"#
+    );
+    for root in ["//proc/**", "//sys/**", "//dev/**"] {
+        assert!(DISALLOWED.contains(&format!("Read({root})")), "{root}");
+    }
+    let c = command(
+        &component(Kind::Specialist, "lang-rust"),
+        &world("standard"),
+        None,
+        &PathBuf::from("/l"),
+        Duration::from_secs(1),
+    );
+    assert!(has(&args_of(&c), ["--settings", SETTINGS]));
 }

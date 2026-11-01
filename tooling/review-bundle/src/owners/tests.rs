@@ -76,3 +76,87 @@ fn glob_matches_several_stars() {
     assert!(!glob("a*b*c", "axc"));
     assert!(glob("**", ""));
 }
+
+/// The repository's own CODEOWNERS patterns the consent tests read.
+fn repository_patterns() -> Vec<String> {
+    patterns(
+        "/docs/srs/ @a\n/docs/agents/ @a\n/.github/ @a\n/.claude/ @a\n/scripts/ @a\n\
+         /Cargo.toml @a\n/tooling/*/Cargo.toml @a\n/CLAUDE.md @a\n/AGENTS.md @a\n",
+    )
+}
+
+#[test]
+fn tokens_split_on_whitespace_and_punctuation_and_drop_trailing_dots() {
+    let got = tokens("`a/b`, c;d:e (f) [g] \"h\" 'i' j/. k... .\n\tl");
+
+    assert_eq!(
+        got,
+        ["a/b", "c", "d", "e", "f", "g", "h", "i", "j/", "k", "l"]
+            .into_iter()
+            .collect()
+    );
+}
+
+#[test]
+fn a_comment_names_the_path_itself() {
+    let p = repository_patterns();
+
+    assert!(names(&p, "Consent for CLAUDE.md.", "CLAUDE.md"));
+    assert!(!names(&p, "Consent for claude.md", "CLAUDE.md"));
+    assert!(!names(&p, "Consent for CLAUDE.mdx", "CLAUDE.md"));
+}
+
+#[test]
+fn a_comment_names_the_pattern_that_owns_the_path() {
+    let p = repository_patterns();
+    let path = "tooling/review-run/Cargo.toml";
+
+    assert!(names(&p, "ok: `tooling/*/Cargo.toml`", path));
+    assert!(!names(&p, "ok: /tooling/*/Cargo.toml", path));
+    assert!(!names(
+        &p,
+        "ok: tooling/*/Cargo.toml",
+        "crates/x/Cargo.toml"
+    ));
+}
+
+#[test]
+fn a_comment_names_an_ancestor_directory() {
+    let p = repository_patterns();
+    let workflow = ".github/workflows/review.yml";
+
+    assert!(names(&p, "ok .github/", workflow));
+    assert!(names(&p, "ok .github/workflows/", workflow));
+    assert!(names(&p, "ok .github/workflows", workflow));
+    assert!(names(&p, "ok docs/agents", "docs/agents/a/b.md"));
+    assert!(names(&p, "ok docs/agents/a", "docs/agents/a/b.md"));
+    assert!(!names(&p, "ok docs", "docs/agents/a/b.md"));
+    assert!(!names(&p, "ok scripts", "scripts/review-local.sh"));
+    assert!(!names(&p, "ok docs/agent", "docs/agents/a/b.md"));
+    assert!(!names(&p, "ok / and ./", "Cargo.toml"));
+}
+
+#[test]
+fn the_stakeholder_s_comment_consents_only_to_the_paths_it_names() {
+    let p = repository_patterns();
+    let comment = "Consent for the SRS, scenarios, ADRs, .github/, docs/agents, .claude/ and \
+                   evaluation-case changes, and a ruling on ADR-2610300031.";
+
+    for path in [
+        ".github/workflows/review.yml",
+        "docs/agents/generalist-report.md",
+        ".claude/agents/x.md",
+    ] {
+        assert!(names(&p, comment, path), "{path}");
+    }
+    for path in [
+        "CLAUDE.md",
+        "AGENTS.md",
+        "Cargo.toml",
+        "tooling/review-run/Cargo.toml",
+        "scripts/review-local.sh",
+        "docs/srs/x.md",
+    ] {
+        assert!(!names(&p, comment, path), "{path}");
+    }
+}

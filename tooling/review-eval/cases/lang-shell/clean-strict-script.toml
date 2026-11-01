@@ -15,8 +15,8 @@ find "$cases" -name '*.toml' | wc -l
 '''
 
 [expect]
-outcome = ["sound", "nits"]
+outcome = ["none", "findings"]
 
 [[expect.none]]
 path = "scripts/count-cases.sh"
-severity = "blocking"
+form = "linked"

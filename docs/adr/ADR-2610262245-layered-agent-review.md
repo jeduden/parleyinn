@@ -1,7 +1,8 @@
 ---
 id: ADR-2610262245
 title: "Layered agent review with a required review-gate check"
-status: accepted
+status: superseded
+superseded-by: ADR-2610300031
 summary: >-
   One orchestrating agent consults the specialists and generalists the
   review bundle dispatches, the deep review weighs on Opus, and the

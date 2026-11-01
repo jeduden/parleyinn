@@ -1,7 +1,8 @@
 ---
 id: ADR-2610290002
 title: "Reviewer evaluation: cases as edits, graded from the report, gated in the review"
-status: accepted
+status: superseded
+superseded-by: ADR-2610311947
 summary: >-
   Each reviewer component of the layered review has cases, each an
   edit to main's tree with the report it must give. The cases run

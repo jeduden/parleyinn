@@ -18,8 +18,14 @@ use testkit::TempDir;
 /// Runs the executable in `home` with `args`, after `--consent` naming
 /// a file that holds no comment.
 fn review_bundle(home: &Path, args: &[&Path]) -> Output {
+    review_bundle_with(home, args, "[]")
+}
+
+/// Runs the executable in `home` with `args`, after `--consent` naming
+/// a file that holds `comments`.
+fn review_bundle_with(home: &Path, args: &[&Path], comments: &str) -> Output {
     let consent = home.join("consent.json");
-    fs::write(&consent, "[]").unwrap();
+    fs::write(&consent, comments).unwrap();
     let mut command = Command::new(env!("CARGO_BIN_EXE_review-bundle"));
     command
         .env_clear()
@@ -70,6 +76,75 @@ fn the_executable_bundles_this_repository_against_itself() {
     assert!(stdout.contains("class=deep"), "{stdout}");
     assert!(out.path().join("bundle.md").is_file());
     assert!(out.path().join("checked.json").is_file());
+}
+
+#[test]
+fn the_executable_blocks_a_stakeholder_path_without_a_consent() {
+    let out = TempDir::new().unwrap();
+    let diff = out.path().join("pr.diff");
+    fs::write(
+        &diff,
+        "diff --git a/docs/srs/10-engineering-quality.md b/docs/srs/10-engineering-quality.md\n+ENG-28\n",
+    )
+    .unwrap();
+    let root = testkit::repo_root();
+
+    let run = review_bundle(out.path(), &flags(&root, &root, &diff, out.path()));
+
+    assert_eq!(run.status.code(), Some(0));
+    let checked: serde_json::Value =
+        serde_json::from_str(&fs::read_to_string(out.path().join("checked.json")).unwrap())
+            .unwrap();
+    let blocked =
+        checked.as_array().unwrap().iter().any(|f| {
+            f["severity"] == "blocking" && f["body"].as_str().unwrap().contains("(ENG-21)")
+        });
+    assert!(
+        blocked,
+        "no ENG-21 finding for a stakeholder path: {checked}"
+    );
+}
+
+/// The ENG-21 finding's severity when the stakeholder's one comment on
+/// a change to the SRS reads `body`.
+fn eng_21_severity(body: &str) -> String {
+    let out = TempDir::new().unwrap();
+    let diff = out.path().join("pr.diff");
+    fs::write(
+        &diff,
+        "diff --git a/docs/srs/10-engineering-quality.md b/docs/srs/10-engineering-quality.md\n+ENG-28\n",
+    )
+    .unwrap();
+    let root = testkit::repo_root();
+    let comments = serde_json::json!([{"author": "owner", "at": "t", "body": body}]);
+
+    let run = review_bundle_with(
+        out.path(),
+        &flags(&root, &root, &diff, out.path()),
+        &comments.to_string(),
+    );
+
+    assert_eq!(run.status.code(), Some(0));
+    let checked: serde_json::Value =
+        serde_json::from_str(&fs::read_to_string(out.path().join("checked.json")).unwrap())
+            .unwrap();
+    let eng_21: Vec<&serde_json::Value> = checked
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|f| f["body"].as_str().unwrap().contains("(ENG-21)"))
+        .collect();
+    assert_eq!(eng_21.len(), 1, "{checked}");
+    eng_21[0]["severity"].as_str().unwrap().to_owned()
+}
+
+#[test]
+fn the_executable_takes_consent_only_for_the_paths_a_comment_names() {
+    assert_eq!(eng_21_severity("Consent for `docs/srs/`."), "nit");
+    assert_eq!(
+        eng_21_severity("Consent for .github/ and the SRS."),
+        "blocking"
+    );
 }
 
 #[test]
@@ -144,14 +219,23 @@ fn the_executable_refuses_a_live_scenario_put_back_on_pending() {
         "{}",
         String::from_utf8_lossy(&run.stderr)
     );
-    let stdout = String::from_utf8(run.stdout).unwrap();
-    assert!(stdout.contains("findings=1"), "{stdout}");
     let checked: serde_json::Value =
         serde_json::from_str(&fs::read_to_string(home.path().join("checked.json")).unwrap())
             .unwrap();
-    assert_eq!(checked[0]["severity"], "blocking", "{checked}");
+    // The scenario's finding, and ENG-21's: `features/` has a code owner.
     assert!(
-        checked[0]["body"].as_str().unwrap().contains("ENG-28"),
+        checked
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|f| f["body"].as_str().unwrap().contains("(ENG-21)")),
         "{checked}"
     );
+    let scenario = checked
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|f| f["body"].as_str().unwrap().contains("ENG-28"))
+        .expect("a finding on ENG-28");
+    assert_eq!(scenario["severity"], "blocking", "{checked}");
 }

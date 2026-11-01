@@ -54,5 +54,5 @@ the rows it changes and the `@pending` scenarios it takes off.
 
 [[expect.finding]]
 path = "plan/2610301013_catch_up_digest.md"
-severity = "blocking"
+form = "linked"
 mentions_any = ["point", "link", "event", "record", "silent", "gap", "digest", "replace", "search"]

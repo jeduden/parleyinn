@@ -1,13 +1,21 @@
-//! A report as data: the findings a reviewer component wrote, one per
-//! line in the shape the shared report section asks for,
-//! `path:line — blocking|nit — what it breaks — the ids it touches`,
-//! and the outcome line the report ends with, as the review gate reads
-//! it.
+//! A report as data. A specialist's report, as the review assembles it
+//! from the specialist's run log, holds its linked findings,
+//! `path:line — if not addressed: <consequence> — <ID>[, <ID>...]`,
+//! and its requirement requests,
+//! `path:line — request: add|change|remove <requirement> — <motivation>`,
+//! read by the review gate's own rule (`review_gate::report`), and ends
+//! with the outcome line, `outcome: findings|none — <sentence>`. A
+//! generalist's answer holds its kept findings,
+//! `path:line — blocking|nit — what it breaks — its source`, and its
+//! dropped ones, `dropped — path:line — why — source`: severity is the
+//! generalists' alone.
+
+pub use review_gate::report::{bare, split_dashes};
 
 /// The outcomes a report may end with.
-pub const OUTCOMES: [&str; 3] = ["sound", "nits", "blocking"];
+pub const OUTCOMES: [&str; 2] = review_gate::report::OUTCOMES;
 
-/// One finding line, read.
+/// One finding line of a generalist's answer, read.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Finding {
     pub path: String,
@@ -19,100 +27,60 @@ pub struct Finding {
     pub raw: String,
 }
 
-/// A report, read.
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct Report {
-    pub findings: Vec<Finding>,
-    /// The outcome the last line names.
-    pub outcome: Option<String>,
-    /// The last line as written, when it is an outcome line.
-    pub outcome_line: Option<String>,
-    /// Non-blank lines that are neither a finding, a heading nor the
-    /// outcome line.
-    pub other: Vec<String>,
-}
+/// The word a generalist's dropped-finding line starts with, or gives
+/// as its severity.
+pub const DROPPED: &str = "dropped";
 
-/// Reads `text`.
+/// Whether `line` reports a dropped finding: its first word is
+/// [`DROPPED`], in any case, after any list marker or emphasis, as
+/// `dropped — path:line — why — source`, or it reads as a finding whose
+/// severity is [`DROPPED`]. A path that merely starts with the letters,
+/// `dropped_events.rs:12`, is a finding on that path. The one rule the
+/// evaluation's grader and the review's run both read a generalist's
+/// answer by.
 #[must_use]
-pub fn parse(text: &str) -> Report {
-    let mut report = Report::default();
-    let lines: Vec<&str> = text.lines().filter(|l| !l.trim().is_empty()).collect();
-    let last = lines.len().saturating_sub(1);
-    for (at, line) in lines.iter().enumerate() {
-        if at == last
-            && let Some(outcome) = outcome_word(line)
-        {
-            report.outcome = Some(outcome.to_owned());
-            report.outcome_line = Some(line.trim().to_owned());
-        } else if let Some(finding) = finding(line) {
-            report.findings.push(finding);
-        } else if !line.trim_start().starts_with('#') {
-            report.other.push(line.trim().to_owned());
-        }
-    }
-
-    report
+pub fn dropped(line: &str) -> bool {
+    bare(line).split_whitespace().next().is_some_and(|word| {
+        word.trim_end_matches(['*', '_', '`', ':', ',', '.'])
+            .eq_ignore_ascii_case(DROPPED)
+    }) || finding(line).is_some_and(|f| f.severity == DROPPED)
 }
 
-/// The outcome `line` names, when it is an outcome line: `outcome:`
-/// and one of [`OUTCOMES`], after any emphasis or list marker.
+/// The word a generalist's line starts with when it keeps, adds and
+/// drops nothing.
+pub const NONE: &str = "none";
+
+/// Whether `line` says a generalist has nothing to add, in the shape
+/// `none — nothing to add — source`: a first part of [`NONE`] alone,
+/// in any case, after any list marker or emphasis, and a dash after it.
 #[must_use]
-pub fn outcome_word(line: &str) -> Option<&'static str> {
-    let rest = bare(line).strip_prefix("outcome:")?;
-    let word = rest
-        .split_whitespace()
-        .next()?
-        .trim_matches(|c: char| !c.is_ascii_alphanumeric());
-
-    OUTCOMES.iter().find(|o| **o == word).copied()
-}
-
-/// `line` without a leading list marker, emphasis or quote.
-fn bare(line: &str) -> &str {
-    let line = line.trim();
-    let line = line
-        .strip_prefix("- ")
-        .or_else(|| line.strip_prefix("* "))
-        .unwrap_or(line);
-    let line = strip_number(line);
-    line.trim_start_matches(['*', '_', '`', '>', ' '])
-}
-
-/// `line` without a leading `N. `.
-fn strip_number(line: &str) -> &str {
-    let digits = line.chars().take_while(char::is_ascii_digit).count();
-    match line[digits..].strip_prefix(". ") {
-        Some(rest) if digits > 0 => rest,
-        _ => line,
+pub fn nothing(line: &str) -> bool {
+    match split_dashes(bare(line)).as_slice() {
+        [first, _, ..] => first
+            .trim()
+            .trim_end_matches(['*', '_', '`'])
+            .eq_ignore_ascii_case(NONE),
+        _ => false,
     }
 }
 
-/// `line` as a finding, when it reads as one: `path:line`, a dash, a
-/// severity word, a dash and the rest. A line range, `path:12-20`,
-/// reads as its first line.
+/// `line` as a generalist's finding, when it reads as one:
+/// `path:line`, a dash, a severity word, a dash and the rest. A line
+/// range, `path:12-20`, reads as its first line.
 #[must_use]
 pub fn finding(line: &str) -> Option<Finding> {
     let parts = split_dashes(bare(line));
     let [place, severity, rest @ ..] = parts.as_slice() else {
         return None;
     };
-    let place = place.trim().trim_matches('`');
-    let (path, number) = place.rsplit_once(':')?;
-    let path = path.trim_matches('`').trim();
-    let number: usize = number
-        .trim()
-        .split(['-', '–'])
-        .next()?
-        .trim()
-        .parse()
-        .ok()?;
+    let (path, number) = review_gate::report::place(place)?;
     let severity = severity.trim().trim_matches(['`', '*', '_']);
-    if path.is_empty() || severity.is_empty() || severity.contains(' ') {
+    if severity.is_empty() || severity.contains(' ') {
         return None;
     }
 
     Some(Finding {
-        path: path.to_owned(),
+        path,
         line: number,
         severity: severity.to_lowercase(),
         text: rest.join(" — ").trim().to_owned(),
@@ -120,27 +88,21 @@ pub fn finding(line: &str) -> Option<Finding> {
     })
 }
 
-/// `text` split at each dash that stands between spaces: an em dash,
-/// an en dash, or one or two hyphens.
-fn split_dashes(text: &str) -> Vec<&str> {
-    let mut out = Vec::new();
-    let mut rest = text;
-    loop {
-        let cut = [" — ", " – ", " -- ", " - "]
-            .iter()
-            .filter_map(|sep| rest.find(sep).map(|at| (at, sep.len())))
-            .min();
-        match cut {
-            Some((at, len)) => {
-                out.push(&rest[..at]);
-                rest = &rest[at + len..];
-            }
-            None => {
-                out.push(rest);
-                return out;
-            }
-        }
-    }
+/// The severities a generalist's finding gives.
+pub const SEVERITIES: [&str; 2] = ["blocking", "nit"];
+
+/// Whether `line` is a generalist's finding the review cannot read: a
+/// part after its first is a severity of [`SEVERITIES`] alone, markup
+/// aside, yet the line reads as no finding and no dropped one, its
+/// place unreadable. Such a line is never left out as prose.
+#[must_use]
+pub fn unread(line: &str) -> bool {
+    let shaped = split_dashes(bare(line)).iter().skip(1).any(|part| {
+        let word = part.trim().trim_matches(['`', '*', '_']);
+        SEVERITIES.iter().any(|s| s.eq_ignore_ascii_case(word))
+    });
+
+    shaped && finding(line).is_none() && !dropped(line)
 }
 
 #[cfg(test)]

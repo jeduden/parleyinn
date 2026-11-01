@@ -37,27 +37,27 @@ new = "pub mod account;\npub mod count;\n"
 [[report]]
 agent = "persona-security-officer"
 content = '''
-crates/redaction/src/count.rs:5 — blocking — opens a socket to a metrics host — I4
+crates/redaction/src/count.rs:5 — if not addressed: the core opens a socket to a metrics host — I4
 
-outcome: blocking — a socket in the core
+outcome: findings — a socket in the core
 '''
 
 [[report]]
 agent = "lang-rust"
 content = '''
-outcome: sound — a reporting helper
+outcome: none — a reporting helper
 '''
 
 [[report]]
 agent = "test-engineer-unit"
 content = '''
-outcome: sound — no test yet
+outcome: none — no test yet
 '''
 
 [[report]]
 agent = "performance"
 content = '''
-outcome: sound — off the hot path
+outcome: none — off the hot path
 '''
 
 [expect]

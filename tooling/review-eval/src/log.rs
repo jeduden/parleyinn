@@ -1,8 +1,9 @@
 //! The run log: what `claude --output-format stream-json` wrote, read
-//! as the review workflow reads the orchestrator's log. Each model call
-//! once (a call's blocks share one message id), its usage by model, the
-//! files written, the agents called and answered, the result's answer,
-//! cost, turns and duration, and the model the run resolved to.
+//! as the review's run reads an agent's log. Each model call once (a
+//! call's blocks share one message id), its usage by model, the main
+//! thread's text blocks in order, which hold a specialist's findings as
+//! it stated them, the files written, the result's answer, cost, turns
+//! and duration, and the model the run resolved to.
 
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -32,24 +33,17 @@ pub struct RunLog {
     pub subtype: String,
     /// The final answer's text.
     pub answer: String,
-    /// The structured output, when a schema asked for one.
-    pub structured: Option<Value>,
     pub cost: f64,
     pub turns: usize,
     pub duration_ms: u64,
     /// The model the main thread's first call ran on.
     pub resolved_model: String,
     pub usage: BTreeMap<String, Usage>,
+    /// Every text block the main thread wrote, in order: what a
+    /// specialist stated as it went, its report's lines among them.
+    pub texts: Vec<String>,
     /// Every path a `Write` or `Edit` call named, in order.
     pub writes: Vec<String>,
-    /// Those of them the main thread wrote, not an agent it called.
-    pub main_writes: Vec<String>,
-    /// The turn, counting the main thread's model calls from 1, of the
-    /// first write.
-    pub first_write_turn: Option<usize>,
-    /// The agents called through the Agent tool whose call came back
-    /// without an error.
-    pub consulted: BTreeSet<String>,
 }
 
 /// What the reader carries between lines.
@@ -58,12 +52,6 @@ struct Reading {
     log: RunLog,
     /// The message ids seen, so a call's blocks count once.
     seen: BTreeSet<String>,
-    /// The main thread's model calls so far.
-    main_calls: usize,
-    /// Each Agent call's id with the agent it named.
-    agent_calls: BTreeMap<String, String>,
-    /// The tool calls that came back without an error.
-    answered_calls: BTreeSet<String>,
 }
 
 /// Reads a log of one JSON object per line; lines that are not JSON
@@ -83,28 +71,17 @@ pub fn parse(text: &str) -> RunLog {
     {
         match value["type"].as_str() {
             Some("assistant") => reading.assistant(&value),
-            Some("user") => reading.user(&value),
             Some("result") => reading.result(&value),
             _ => {}
         }
     }
-    let Reading {
-        mut log,
-        agent_calls,
-        answered_calls,
-        ..
-    } = reading;
-    log.consulted = agent_calls
-        .into_iter()
-        .filter(|(id, _)| answered_calls.contains(id))
-        .map(|(_, agent)| agent)
-        .collect();
 
-    log
+    reading.log
 }
 
 impl Reading {
-    /// One model call: its usage once, and the tools it used.
+    /// One model call: its usage once, the main thread's text, and the
+    /// tools it used.
     fn assistant(&mut self, value: &Value) {
         let main = value["parent_tool_use_id"].is_null();
         let message = &value["message"];
@@ -112,11 +89,8 @@ impl Reading {
             && self.seen.insert(id.to_owned())
         {
             let model = message["model"].as_str().unwrap_or("unknown");
-            if main {
-                self.main_calls += 1;
-                if self.log.resolved_model.is_empty() {
-                    self.log.resolved_model = model.to_owned();
-                }
+            if main && self.log.resolved_model.is_empty() {
+                self.log.resolved_model = model.to_owned();
             }
             add_usage(
                 self.log.usage.entry(model.to_owned()).or_default(),
@@ -124,47 +98,24 @@ impl Reading {
             );
         }
         for block in message["content"].as_array().into_iter().flatten() {
-            if block["type"].as_str() == Some("tool_use") {
-                self.tool_use(block, main);
+            match block["type"].as_str() {
+                Some("tool_use") => self.tool_use(block),
+                Some("text") if main => {
+                    if let Some(text) = block["text"].as_str() {
+                        self.log.texts.push(text.to_owned());
+                    }
+                }
+                _ => {}
             }
         }
     }
 
-    /// One tool call: a write's path, or an agent's name.
-    fn tool_use(&mut self, block: &Value, main: bool) {
-        match block["name"].as_str() {
-            Some("Write" | "Edit") => {
-                let Some(path) = block["input"]["file_path"].as_str() else {
-                    return;
-                };
-                self.log.writes.push(path.to_owned());
-                if main {
-                    self.log.main_writes.push(path.to_owned());
-                    self.log.first_write_turn.get_or_insert(self.main_calls);
-                }
-            }
-            Some("Agent" | "Task") => {
-                if let (Some(id), Some(agent)) = (
-                    block["id"].as_str(),
-                    block["input"]["subagent_type"].as_str(),
-                ) {
-                    self.agent_calls.insert(id.to_owned(), agent.to_owned());
-                }
-            }
-            _ => {}
-        }
-    }
-
-    /// The tool results a turn carried: those that came back without
-    /// an error answered their call.
-    fn user(&mut self, value: &Value) {
-        for block in value["message"]["content"].as_array().into_iter().flatten() {
-            if block["type"].as_str() == Some("tool_result")
-                && block["is_error"].as_bool() != Some(true)
-                && let Some(id) = block["tool_use_id"].as_str()
-            {
-                self.answered_calls.insert(id.to_owned());
-            }
+    /// One tool call: a write's path.
+    fn tool_use(&mut self, block: &Value) {
+        if matches!(block["name"].as_str(), Some("Write" | "Edit"))
+            && let Some(path) = block["input"]["file_path"].as_str()
+        {
+            self.log.writes.push(path.to_owned());
         }
     }
 
@@ -184,8 +135,6 @@ impl Reading {
             None => "unknown".to_owned(),
         };
         log.answered = log.subtype == SUCCESS;
-        log.structured =
-            (!value["structured_output"].is_null()).then(|| value["structured_output"].clone());
         log.cost = value["total_cost_usd"].as_f64().unwrap_or_default();
         log.turns =
             usize::try_from(value["num_turns"].as_u64().unwrap_or_default()).unwrap_or(usize::MAX);

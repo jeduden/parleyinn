@@ -54,5 +54,5 @@ the rows it changes and the `@pending` scenarios it takes off.
 
 [[expect.finding]]
 path = "plan/2610301005_watch_only_joins.md"
-severity = "blocking"
+form = "linked"
 mentions_any = ["watch", "cannot post", "contribute", "presence", "read-only", "read only", "outside"]

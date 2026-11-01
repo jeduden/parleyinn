@@ -1,3 +1,7 @@
+use std::fs;
+
+use testkit::TempDir;
+
 use super::*;
 
 fn row(pairs: &[(&str, &str)]) -> BTreeMap<String, String> {
@@ -12,7 +16,7 @@ fn graded(
     finding: &str,
     forbidden: &str,
     answer: &str,
-    report: &str,
+    stated: &str,
     answered: &str,
     run: &str,
 ) -> BTreeMap<String, String> {
@@ -21,7 +25,7 @@ fn graded(
         ("finding", finding),
         ("forbidden", forbidden),
         ("answer", answer),
-        ("report", report),
+        ("stated", stated),
         ("answered", answered),
         ("run", run),
     ])
@@ -37,6 +41,7 @@ fn the_table_s_component_is_a_strict_lined_specialist_and_its_case_a_defect() {
     assert_eq!(case.kind, "defect");
     assert_eq!(case.expect.finding[0].path, WANTED);
     assert_eq!(case.expect.none[0].path, FORBIDDEN);
+    assert_eq!(case.expect.stated[0].path, WANTED);
     assert_eq!((case.repetitions, case.passes), (3, 2));
 }
 
@@ -47,8 +52,8 @@ fn the_grading_table_of_the_scenario_holds() {
             "as expected",
             "found",
             "none",
-            "last line and path",
-            "written",
+            "outcome line",
+            "before answer",
             "yes",
             "passes",
         ),
@@ -56,8 +61,8 @@ fn the_grading_table_of_the_scenario_holds() {
             "other",
             "found",
             "none",
-            "last line and path",
-            "written",
+            "outcome line",
+            "before answer",
             "yes",
             "fails on outcome",
         ),
@@ -65,8 +70,8 @@ fn the_grading_table_of_the_scenario_holds() {
             "as expected",
             "missing",
             "none",
-            "last line and path",
-            "written",
+            "outcome line",
+            "before answer",
             "yes",
             "fails on finding",
         ),
@@ -74,8 +79,8 @@ fn the_grading_table_of_the_scenario_holds() {
             "as expected",
             "found",
             "found",
-            "last line and path",
-            "written",
+            "outcome line",
+            "before answer",
             "yes",
             "fails on forbidden",
         ),
@@ -84,7 +89,7 @@ fn the_grading_table_of_the_scenario_holds() {
             "found",
             "none",
             "more",
-            "written",
+            "before answer",
             "yes",
             "passes, slips on answer",
         ),
@@ -92,17 +97,26 @@ fn the_grading_table_of_the_scenario_holds() {
             "as expected",
             "found",
             "none",
-            "last line and path",
-            "missing",
+            "no outcome",
+            "before answer",
             "yes",
-            "fails on report",
+            "fails on answer",
         ),
         graded(
             "as expected",
             "found",
             "none",
-            "last line and path",
-            "written",
+            "outcome line",
+            "only in answer",
+            "yes",
+            "fails on stating",
+        ),
+        graded(
+            "as expected",
+            "found",
+            "none",
+            "outcome line",
+            "before answer",
             "no",
             "fails on no answer",
         ),
@@ -118,8 +132,8 @@ fn a_wrong_grading_row_is_named() {
             "other",
             "found",
             "none",
-            "last line and path",
-            "written",
+            "outcome line",
+            "before answer",
             "yes",
             "passes",
         ),
@@ -128,7 +142,7 @@ fn a_wrong_grading_row_is_named() {
             "found",
             "none",
             "more",
-            "written",
+            "before answer",
             "yes",
             "fails on answer",
         ),
@@ -153,16 +167,24 @@ fn a_wrong_grading_row_is_named() {
 #[test]
 fn every_failure_is_named_by_its_first_words() {
     assert_eq!(failed_on("did not answer: deadline"), "no answer");
-    assert_eq!(failed_on("wrote no report"), "report");
-    assert_eq!(failed_on("wrote an empty report"), "report");
-    assert_eq!(failed_on("report does not end with its outcome"), "report");
-    assert_eq!(failed_on("outcome sound, want blocking"), "outcome");
+    assert_eq!(
+        failed_on(
+            "report refused: has a report whose line 1 is neither a linked finding nor a requirement request"
+        ),
+        "report"
+    );
+    assert_eq!(failed_on("outcome none, want findings"), "outcome");
     assert_eq!(failed_on("no finding at a.rs"), "finding");
     assert_eq!(failed_on("a finding at b.rs: x"), "forbidden");
     assert_eq!(
-        failed_on("answer holds more than the last line and the path: x"),
+        failed_on("did not state before its answer at a.rs"),
+        "stating"
+    );
+    assert_eq!(
+        failed_on("answer holds more than the outcome line: x"),
         "answer"
     );
+    assert_eq!(failed_on("answered no outcome line"), "answer");
     assert_eq!(failed_on("wrote review/reports/other.md"), "something else");
 }
 
@@ -218,7 +240,6 @@ fn a_wrong_decision_row_is_named_and_an_undecided_list_fails() {
     assert_eq!(decide("pass"), ("fails", 1));
     assert_eq!(decide("pass, pass, pass"), ("passes", 2));
 }
-
 #[test]
 fn a_failed_case_is_one_blocking_finding_and_the_scorecard_line_reads_back() {
     assert_eq!(failed_case_is_a_blocking_finding(), Vec::<String>::new());
@@ -302,4 +323,183 @@ fn the_checkout_s_cases_are_checked_through_the_crate() {
 
     assert_eq!(components_have_their_cases(&checkout), Vec::<String>::new());
     assert_eq!(cases_apply_and_dispatch(&checkout), Vec::<String>::new());
+}
+
+/// An agent's text with its own line and an include of each section,
+/// `body` expanded inside.
+fn agent(own: &str, sections: &[&str], body: &str) -> String {
+    let mut text = format!("{own}\n");
+    for s in sections {
+        text.push_str(&format!(
+            "<?include\nfile: ../../{s}\n?>\n{body}\n<?/include?>\n"
+        ));
+    }
+    text
+}
+
+#[test]
+fn edit_section_changes_only_the_named_section_s_body() {
+    let text = agent("own", &["docs/agents/s.md", "docs/agents/t.md"], "b");
+
+    let (edited, sections) = edit_section(&text, "docs/agents/t.md").unwrap();
+
+    assert_eq!(
+        sections,
+        ["../../docs/agents/s.md", "../../docs/agents/t.md"]
+    );
+    assert_eq!(
+        edited,
+        text.replace("t.md\n?>\n", &format!("t.md\n?>\n{SHARED_EDIT}\n"))
+    );
+    assert_eq!(edit_section(&text, "docs/agents/u.md"), None);
+    assert_eq!(edit_section("own\n", "docs/agents/s.md"), None);
+}
+
+fn planned(component: &str, reason: &str) -> Planned {
+    Planned {
+        component: component.to_owned(),
+        reason: reason.to_owned(),
+    }
+}
+
+#[test]
+fn plan_problems_wants_one_component_per_set_covering_the_rest() {
+    let sets = BTreeMap::from([
+        (vec!["s".to_owned()], vec!["a".to_owned(), "b".to_owned()]),
+        (vec!["s".to_owned(), "t".to_owned()], vec!["c".to_owned()]),
+    ]);
+    let good = [
+        planned("a", "shared sections changed; also covers b"),
+        planned("c", "shared sections changed"),
+    ];
+    assert_eq!(plan_problems(&sets, &good), Vec::<String>::new());
+
+    let every = [
+        planned("a", "shared sections changed"),
+        planned("b", "shared sections changed"),
+        planned("c", "instructions changed"),
+        planned("x", "shared sections changed"),
+    ];
+    assert_eq!(
+        plan_problems(&sets, &every),
+        [
+            "component c planned for instructions changed, want the shared section's change alone",
+            "component x planned, but it includes no changed section",
+            "2 components planned for the sections [s], want one",
+        ]
+    );
+    let short = [
+        planned("a", "shared sections changed"),
+        planned("c", "shared sections changed"),
+    ];
+    assert_eq!(
+        plan_problems(&sets, &short),
+        ["component a covers [a], want [a b]"]
+    );
+    assert_eq!(
+        plan_problems(&sets, &[]),
+        [
+            "0 components planned for the sections [s], want one",
+            "0 components planned for the sections [s t], want one",
+        ]
+    );
+}
+
+/// A checkout of four components over the shared sections `s` and `t`:
+/// `lang-a` and `lang-b` include `s`, `lang-c` both, `lang-d` `t`.
+fn sectioned_checkout() -> (TempDir, Checkout) {
+    let checkout = TempDir::new().unwrap();
+    let write = |rel: &str, body: &str| {
+        let path = checkout.path().join(rel);
+        fs::create_dir_all(path.parent().unwrap()).unwrap();
+        fs::write(path, body).unwrap();
+    };
+    write("docs/srs/06-security.md", "# 6\n");
+    write("docs/domain-model/index.md", "# hub\n");
+    write("tooling/review-eval/cases/lang-a/x.toml", "case\n");
+    // No component: only a .md file under .claude/agents is one.
+    write(".claude/agents/notes.txt", "file: ../../docs/agents/s.md\n");
+    for (name, sections) in [
+        ("lang-a", &["docs/agents/s.md"][..]),
+        ("lang-b", &["docs/agents/s.md"][..]),
+        ("lang-c", &["docs/agents/s.md", "docs/agents/t.md"][..]),
+        ("lang-d", &["docs/agents/t.md"][..]),
+    ] {
+        write(
+            &format!(".claude/agents/{name}.md"),
+            &agent(name, sections, "body"),
+        );
+    }
+    let root = Checkout::new(checkout.path());
+
+    (checkout, root)
+}
+
+#[test]
+fn a_shared_section_change_to_a_tree_plans_one_component_per_set() {
+    let (_dir, checkout) = sectioned_checkout();
+    let head = TempDir::new().unwrap();
+
+    assert_eq!(
+        shared_section_plans_one_per_set(&checkout, "docs/agents/s.md", head.path()),
+        Ok(Vec::new())
+    );
+}
+
+#[test]
+fn a_shared_section_no_component_includes_is_named() {
+    let (_dir, checkout) = sectioned_checkout();
+    let head = TempDir::new().unwrap();
+
+    assert_eq!(
+        shared_section_plans_one_per_set(&checkout, "docs/agents/u.md", head.path()),
+        Err("no reviewer component includes docs/agents/u.md".to_owned())
+    );
+}
+
+#[test]
+fn a_shared_section_plan_names_a_checkout_it_cannot_read() {
+    let (_dir, checkout) = sectioned_checkout();
+    let none = checkout.root.join("none");
+    let head = TempDir::new().unwrap();
+
+    assert_eq!(
+        shared_section_plans_one_per_set(&Checkout::new(&none), "docs/agents/s.md", head.path()),
+        Err(format!(
+            "read {}: No such file or directory (os error 2)",
+            none.join(PLANNED_TREES[0]).display()
+        ))
+    );
+}
+
+#[test]
+fn copy_dir_copies_a_tree_and_fails_on_a_missing_one() {
+    let from = TempDir::new().unwrap();
+    fs::create_dir_all(from.path().join("a/b")).unwrap();
+    fs::write(from.path().join("a/b/c.md"), "c").unwrap();
+    let to = TempDir::new().unwrap();
+
+    copy_dir(from.path(), &to.path().join("x")).unwrap();
+
+    assert_eq!(
+        fs::read_to_string(to.path().join("x/a/b/c.md")).unwrap(),
+        "c"
+    );
+    let err = copy_dir(&from.path().join("none"), to.path()).unwrap_err();
+    assert!(err.starts_with("read "), "{err}");
+}
+
+#[test]
+fn the_checkout_s_shared_report_section_plans_one_component_per_set() {
+    let checkout = Checkout::new(&testkit::repo_root());
+    let head = TempDir::new().unwrap();
+
+    assert_eq!(
+        shared_section_plans_one_per_set(
+            &checkout,
+            "docs/agents/specialist-report.md",
+            head.path()
+        ),
+        Ok(Vec::new())
+    );
 }

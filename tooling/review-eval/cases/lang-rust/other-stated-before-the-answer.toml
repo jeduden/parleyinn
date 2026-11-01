@@ -1,0 +1,56 @@
+component = "lang-rust"
+kind = "other"
+title = "two defects in two modules, each stated in the specialist's text as it is found, before the answer"
+
+# The specialist writes no file: its run log is its report, so each
+# finding must appear in its text before its final answer, not only in
+# the answer. Two modules, so a run that reads both before stating
+# anything shows up as one that holds its findings back.
+
+[[create]]
+file = "tooling/review-bundle/src/head.rs"
+content = '''
+//! The first byte of a payload.
+
+/// The first byte of `payload`.
+#[must_use]
+pub fn first(payload: &[u8]) -> u8 {
+    *payload.first().unwrap()
+}
+'''
+
+[[create]]
+file = "tooling/review-bundle/src/foot.rs"
+content = '''
+//! The last byte of a payload.
+
+/// The last byte of `payload`.
+#[must_use]
+pub fn last(payload: &[u8]) -> u8 {
+    *payload.last().expect("a payload holds a byte")
+}
+'''
+
+[[replace]]
+file = "tooling/review-bundle/src/lib.rs"
+old = "pub mod render;\n"
+new = "pub mod render;\npub mod head;\npub mod foot;\n"
+
+[expect]
+outcome = ["findings"]
+
+[[expect.finding]]
+path = "tooling/review-bundle/src/head.rs"
+form = "linked"
+mentions_any = ["unwrap", "panic"]
+
+[[expect.finding]]
+path = "tooling/review-bundle/src/foot.rs"
+form = "linked"
+mentions_any = ["expect", "panic"]
+
+[[expect.stated]]
+path = "tooling/review-bundle/src/head.rs"
+
+[[expect.stated]]
+path = "tooling/review-bundle/src/foot.rs"

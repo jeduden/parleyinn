@@ -54,5 +54,5 @@ the rows it changes and the `@pending` scenarios it takes off.
 
 [[expect.finding]]
 path = "plan/2610301015_self_approval.md"
-severity = "blocking"
+form = "linked"
 mentions_any = ["approv", "own branch", "author", "verified", "witness", "attested", "evidence", "trace", "landed", "gate"]

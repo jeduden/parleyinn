@@ -19,7 +19,7 @@ matter names, and writes the scorecard under `DIR`.
 '''
 
 [expect]
-outcome = ["nits", "blocking"]
+outcome = ["findings"]
 
 [[expect.finding]]
 path = "docs/review-eval/running.md"

@@ -47,8 +47,8 @@ old = "pub mod event;\n"
 new = "pub mod event;\npub mod tally;\n"
 
 [expect]
-outcome = ["sound", "nits"]
+outcome = ["none", "findings"]
 
 [[expect.none]]
 path = "crates/record/src/tally.rs"
-severity = "blocking"
+form = "linked"

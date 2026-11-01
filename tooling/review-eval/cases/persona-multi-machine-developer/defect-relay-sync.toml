@@ -54,5 +54,5 @@ the rows it changes and the `@pending` scenarios it takes off.
 
 [[expect.finding]]
 path = "plan/2610301007_relay_sync.md"
-severity = "blocking"
+form = "linked"
 mentions_any = ["relay", "central", "account", "vendor", "drop", "lose", "loses", "lost", "I4", "B2", "partition"]

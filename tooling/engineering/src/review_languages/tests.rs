@@ -54,6 +54,14 @@ fn what_git_does_not_track_is_left_out() {
 }
 
 #[test]
+fn a_git_file_of_a_worktree_is_left_out() {
+    assert_eq!(
+        problems(&[(".git", "gitdir: /elsewhere\n"), ("a/b.rs", "")]),
+        Vec::<String>::new()
+    );
+}
+
+#[test]
 fn an_ignore_in_a_subdirectory_applies_below_it_alone() {
     assert_eq!(
         problems(&[("sub/.gitignore", "a.py\n"), ("sub/a.py", ""), ("a.py", "")]),

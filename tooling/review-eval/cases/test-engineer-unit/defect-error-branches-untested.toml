@@ -1,0 +1,70 @@
+component = "test-engineer-unit"
+kind = "defect"
+title = "three error branches of one function with no unit test, a finding that names many places"
+
+# One function with three reachable error branches, each on its own
+# line, and a unit test of its success path alone. A finding that names
+# every untested line must still end with its ids after a last dash:
+# a run that wrote `..., lines 14, 17 and 21, ENG-11` gave a line in no
+# form, and the review refused its whole report.
+
+[[create]]
+file = "tooling/review-bundle/src/sizes.rs"
+content = '''
+//! The sizes of the files a diff touches, read through a closure.
+
+/// The size in lines of each of `paths`, read by `read`: an error names
+/// the path that could not be read, an empty path or an empty file.
+///
+/// # Errors
+///
+/// Fails on an empty path, a read that fails or a file with no line.
+pub fn sizes(
+    paths: &[&str],
+    read: &dyn Fn(&str) -> std::io::Result<String>,
+) -> Result<Vec<usize>, String> {
+    let mut out = Vec::with_capacity(paths.len());
+    for path in paths {
+        if path.is_empty() {
+            return Err("an empty path".to_owned());
+        }
+        let text = read(path).map_err(|e| format!("read {path}: {e}"))?;
+        let lines = text.lines().count();
+        if lines == 0 {
+            return Err(format!("{path} is empty"));
+        }
+        out.push(lines);
+    }
+
+    Ok(out)
+}
+
+#[cfg(test)]
+mod tests;
+'''
+
+[[create]]
+file = "tooling/review-bundle/src/sizes/tests.rs"
+content = '''
+use super::*;
+
+#[test]
+fn sizes_counts_the_lines_of_each_path() {
+    let read = |_: &str| Ok("a\nb\n".to_owned());
+
+    assert_eq!(sizes(&["a.rs", "b.rs"], &read), Ok(vec![2, 2]));
+}
+'''
+
+[[replace]]
+file = "tooling/review-bundle/src/lib.rs"
+old = "pub mod render;\n"
+new = "pub mod render;\npub mod sizes;\n"
+
+[expect]
+outcome = ["findings"]
+
+[[expect.finding]]
+path = "tooling/review-bundle/src/sizes"
+form = "linked"
+mentions_any = ["error", "branch", "empty", "fail", "untested", "no test", "no unit test"]

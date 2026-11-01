@@ -31,12 +31,15 @@ fn the_agent_instructions_scan_reads_the_repository_s_files() {
 /// CI runs the suite with `HOME` pointed at a decoy, and fails when a
 /// test left anything under it (ENG-14): the guard stops a test that
 /// resolves real state, and the decoy catches a test that writes under
-/// the user's `HOME` without going through the guard.
+/// the user's `HOME` without going through the guard. Every shard of
+/// the job runs its package list behind it, and
+/// `the_ci_test_shards_run_every_crate_once` holds the lists to every
+/// crate.
 #[test]
 fn the_ci_test_job_runs_with_a_decoy_home() {
     let c = checkout();
     let wants = [
-        r#"HOME="$decoy" cargo test --workspace --locked"#,
+        r#"HOME="$decoy" cargo test --locked "${packages[@]}""#,
         r#"[ -n "$(ls -A "$decoy")" ]"#,
     ];
 

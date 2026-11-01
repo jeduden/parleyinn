@@ -4,6 +4,10 @@
 //! run names, and writes the scorecard, the findings the review gate
 //! weighs and the report; `compare` reads a scorecard against the
 //! published one; `publish` writes a scorecard's lines into it.
+//! `stage-credential` writes the Claude token it is handed into
+//! a credentials file no agent reads, and `scrub` replaces every form
+//! of that token in the files a job keeps, failing closed when it found
+//! one (ENG-28).
 
 use std::collections::BTreeMap;
 use std::fs;
@@ -11,13 +15,17 @@ use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 use std::thread;
-use std::time::Duration;
+use std::time::{Duration, Instant};
+
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 use crate::case::Case;
 use crate::component::{self, Component, file_of, hash, suite_of};
+use crate::credential::{self, Confined, TOKEN_VAR};
 use crate::host::Host;
 use crate::plan::{self, Planned};
 use crate::score::{CaseRecord, RunRecord, Scorecard, SuiteRecord, decided};
+use crate::secret::Scrubber;
 use crate::{CASES, DEADLINE_SECONDS, check, compare, grade, published, runner, world};
 
 /// Every case passed, or the command had nothing to fail on.
@@ -27,14 +35,19 @@ pub const EXIT_OK: u8 = 0;
 pub const EXIT_FAILURE: u8 = 1;
 /// The command line is wrong.
 pub const EXIT_USAGE: u8 = 2;
+/// An agent's output held the Claude token: every form of it found was
+/// replaced, and the job fails closed (ENG-28).
+pub const EXIT_LEAKED: u8 = 3;
 
 /// How to call it.
 pub const USAGE: &str = "usage: review-eval check [--checkout DIR] [--tree DIR] [--cases DIR]
        review-eval plan --base DIR --head DIR [--out FILE]
        review-eval run --out DIR (--component NAME)... | --all | --plan FILE
                        [--checkout DIR] [--tree DIR] [--cases DIR] [--base-cases DIR]
-                       [--model MODEL]
+                       [--model MODEL] [--credential DIR]
                        [--repetitions N] [--passes K] [--parallel P] [--deadline SECONDS]
+       review-eval stage-credential --dir DIR
+       review-eval scrub [--credential DIR] (--path PATH)...
        review-eval compare --published FILE --scorecard FILE
        review-eval publish --scorecard FILE --into FILE";
 
@@ -47,7 +60,7 @@ pub const REPORT_MD: &str = "report.md";
 pub const RUNS: &str = "runs";
 
 /// How many cases run at once unless the run says otherwise.
-const PARALLEL: usize = 4;
+const PARALLEL: usize = 12;
 
 /// What `run` evaluates with.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -77,7 +90,20 @@ pub fn run(
     host: &dyn Host,
     args: impl IntoIterator<Item = String>,
     stdout: &mut dyn Write,
-    stderr: &mut dyn Write,
+    stderr: &mut (dyn Write + Send),
+) -> u8 {
+    run_with(host, args, None, stdout, stderr)
+}
+
+/// [`run`], handed `token`, the Claude token the process holds
+/// in [`TOKEN_VAR`], when it holds one: what `stage-credential` stages,
+/// and a form `scrub` and `run` replace.
+pub fn run_with(
+    host: &dyn Host,
+    args: impl IntoIterator<Item = String>,
+    token: Option<&str>,
+    stdout: &mut dyn Write,
+    stderr: &mut (dyn Write + Send),
 ) -> u8 {
     let (command, flags) = match parse(args) {
         Ok(parsed) => parsed,
@@ -89,7 +115,9 @@ pub fn run(
     let result = match command.as_str() {
         "check" => check_command(&flags, stdout),
         "plan" => plan_command(&flags, stdout),
-        "run" => run_command(host, &flags, stdout, stderr),
+        "run" => run_command(host, &flags, token, stdout, stderr),
+        "stage-credential" => stage_command(&flags, token, stdout),
+        "scrub" => scrub_command(&flags, token, stdout),
         "compare" => compare_command(&flags, stdout),
         "publish" => publish_command(&flags, stdout),
         other => Err(Usage(format!("no command {other}"))),
@@ -104,16 +132,28 @@ pub fn run(
             let _ = writeln!(stderr, "review-eval: {e}");
             EXIT_FAILURE
         }
+        Err(Leaked(n)) => {
+            let _ = writeln!(stderr, "review-eval: {}", leaked(n));
+            EXIT_LEAKED
+        }
     }
+}
+
+/// What a job that found the Claude token in an agent's output says.
+#[must_use]
+pub fn leaked(n: usize) -> String {
+    format!("an agent's output contained the Claude token: {n} redacted; revoke and rotate it")
 }
 
 /// Why a command did not run to its end.
 enum Problem {
     Usage(String),
     Failed(String),
+    /// The Claude token was found this many times, and replaced.
+    Leaked(usize),
 }
 
-use Problem::{Failed, Usage};
+use Problem::{Failed, Leaked, Usage};
 
 impl From<String> for Problem {
     fn from(e: String) -> Self {
@@ -229,6 +269,87 @@ fn plan_command(flags: &Flags, stdout: &mut dyn Write) -> Result<u8, Problem> {
     for p in &planned {
         let _ = writeln!(stdout, "{}: {}", p.component, p.reason);
     }
+    if !planned.is_empty() {
+        let names: Vec<String> = planned.iter().map(|p| p.component.clone()).collect();
+        let _ = writeln!(stdout, "{}", estimate_line(Path::new(&head), &names));
+    }
+
+    Ok(EXIT_OK)
+}
+
+/// What evaluating `components` of the tree `head` is expected to take
+/// at the run's own bound, so a plan too big to wait for shows before the
+/// evaluation starts; cases that do not load are named, never counted as
+/// none (I6).
+fn estimate_line(head: &Path, components: &[String]) -> String {
+    let all = match check::all_cases_from(head, &head.join(CASES), None) {
+        Ok(all) => all,
+        Err(why) => return format!("estimate: none, the cases do not load: {why}"),
+    };
+    let cases = all
+        .iter()
+        .filter(|c| components.iter().any(|n| suite_of(n) == c.component))
+        .count();
+
+    format!(
+        "estimate: {} cases, {}, {PARALLEL} at a time",
+        cases,
+        plan::estimate(cases, PARALLEL)
+    )
+}
+
+/// Stages `token` under `--dir`.
+fn stage_command(
+    flags: &Flags,
+    token: Option<&str>,
+    stdout: &mut dyn Write,
+) -> Result<u8, Problem> {
+    only(flags, &["dir"])?;
+    let dir = required(flags, "dir")?;
+    let token = token.ok_or_else(|| Failed(format!("{TOKEN_VAR} is not set")))?;
+    credential::stage(Path::new(&dir), token)?;
+    let _ = writeln!(stdout, "staged the Claude token under {dir}");
+
+    Ok(EXIT_OK)
+}
+
+/// The scrubber for the token staged under `--credential`, when given,
+/// and `token`; refused when either is too short for it to match.
+fn scrubber(flags: &Flags, token: Option<&str>) -> Result<Scrubber, Problem> {
+    let staged = one(flags, "credential")?
+        .map(|dir| credential::read(Path::new(&dir)))
+        .transpose()?;
+    let secrets: Vec<&str> = staged.as_deref().into_iter().chain(token).collect();
+
+    Ok(Scrubber::guarded(&secrets)?)
+}
+
+/// Scrubs every `--path`, a file or a directory, and fails closed when
+/// it found the token.
+fn scrub_command(
+    flags: &Flags,
+    token: Option<&str>,
+    stdout: &mut dyn Write,
+) -> Result<u8, Problem> {
+    only(flags, &["credential", "path"])?;
+    let paths = flags
+        .get("path")
+        .filter(|p| !p.is_empty())
+        .ok_or_else(|| Usage("--path is required".to_owned()))?;
+    let scrubber = scrubber(flags, token)?;
+    let mut count = 0;
+    for path in paths {
+        let path = Path::new(path);
+        count += if path.is_dir() {
+            scrubber.scrub_tree(path)?
+        } else {
+            scrubber.scrub_file(path)?
+        };
+    }
+    let _ = writeln!(stdout, "redacted={count}");
+    if count > 0 {
+        return Err(Leaked(count));
+    }
 
     Ok(EXIT_OK)
 }
@@ -236,8 +357,9 @@ fn plan_command(flags: &Flags, stdout: &mut dyn Write) -> Result<u8, Problem> {
 fn run_command(
     host: &dyn Host,
     flags: &Flags,
+    token: Option<&str>,
     stdout: &mut dyn Write,
-    stderr: &mut dyn Write,
+    stderr: &mut (dyn Write + Send),
 ) -> Result<u8, Problem> {
     only(
         flags,
@@ -255,8 +377,18 @@ fn run_command(
             "passes",
             "parallel",
             "deadline",
+            "credential",
         ],
     )?;
+    let located = one(flags, "credential")?
+        .map(|dir| credential::locate(Path::new(&dir)))
+        .transpose()?;
+    let scrubber = scrubber(flags, token)?;
+    let confined = located.as_deref().map(|dir| Confined::new(host, dir));
+    let host: &dyn Host = match &confined {
+        Some(confined) => confined,
+        None => host,
+    };
     let (checkout, tree, cases) = places(flags)?;
     let out = PathBuf::from(required(flags, "out")?);
     let options = Options {
@@ -279,17 +411,27 @@ fn run_command(
         write_outputs(&options.out, &Scorecard::default())?;
         return Ok(EXIT_OK);
     }
-    let progress = Mutex::new(Vec::new());
+    // Each line goes out as it happens, with the time since the run began,
+    // so a long evaluation shows what it is doing.
+    let started = Instant::now();
+    let stderr = Mutex::new(stderr);
+    let leaks = AtomicUsize::new(0);
     let scorecard = evaluate(host, &options, &components, &|line| {
-        if let Ok(mut lines) = progress.lock() {
-            lines.push(line.to_owned());
+        let (line, n) = scrubber.scrub(line);
+        leaks.fetch_add(n, Ordering::SeqCst);
+        if let Ok(mut out) = stderr.lock() {
+            let _ = writeln!(out, "[+{}] {line}", clock(started.elapsed()));
         }
     })?;
-    for line in progress.lock().map(|l| l.clone()).unwrap_or_default() {
-        let _ = writeln!(stderr, "{line}");
-    }
     write_outputs(&options.out, &scorecard)?;
-    let _ = write!(stdout, "{}", scorecard.markdown());
+    // What the runs wrote is scrubbed before anything prints or keeps it.
+    let in_files = scrubber.scrub_tree(&options.out)?;
+    let (markdown, in_card) = scrubber.scrub(&scorecard.markdown());
+    let _ = write!(stdout, "{markdown}");
+    let count = leaks.load(Ordering::SeqCst) + in_files + in_card;
+    if count > 0 {
+        return Err(Leaked(count));
+    }
 
     Ok(if scorecard.passed() {
         EXIT_OK
@@ -326,6 +468,22 @@ fn selected(flags: &Flags, checkout: &Path) -> Result<Vec<String>, Problem> {
     out.dedup();
 
     Ok(out)
+}
+
+/// `elapsed` as minutes and seconds, `04:05`; with hours, `1:04:05`.
+fn clock(elapsed: Duration) -> String {
+    let secs = elapsed.as_secs();
+    let (h, m, s) = (secs / 3600, secs % 3600 / 60, secs % 60);
+    if h > 0 {
+        format!("{h}:{m:02}:{s:02}")
+    } else {
+        format!("{m:02}:{s:02}")
+    }
+}
+
+/// `n` of `noun`, in the plural unless it is one.
+fn counted(n: usize, noun: &str) -> String {
+    format!("{n} {noun}{}", if n == 1 { "" } else { "s" })
 }
 
 /// Evaluates `components` as `options` say, each case of each up to
@@ -378,12 +536,19 @@ pub fn evaluate(
     }
     fs::create_dir_all(options.out.join(RUNS))
         .map_err(|e| format!("make {}: {e}", options.out.join(RUNS).display()))?;
+    let total = jobs.len();
+    progress(&format!(
+        "evaluating {} of {}, {} at a time",
+        counted(total, "case"),
+        counted(components.len(), "component"),
+        options.parallel
+    ));
     let queue = Mutex::new(jobs);
     let records: Mutex<Vec<CaseRecord>> = Mutex::new(Vec::new());
     let worktrees = Mutex::new(());
     thread::scope(|scope| {
         for _ in 0..options.parallel {
-            scope.spawn(|| worker(host, options, &queue, &records, &worktrees, progress));
+            scope.spawn(|| worker(host, options, &queue, &records, &worktrees, total, progress));
         }
     });
     let mut records = records.into_inner().unwrap_or_default();
@@ -400,13 +565,14 @@ pub fn evaluate(
 }
 
 /// Takes cases off `queue` until it is empty, running each and
-/// keeping its record.
+/// keeping its record; `total` is how many cases the evaluation holds.
 fn worker(
     host: &dyn Host,
     options: &Options,
     queue: &Mutex<Vec<(Component, Case)>>,
     records: &Mutex<Vec<CaseRecord>>,
     worktrees: &Mutex<()>,
+    total: usize,
     progress: &(dyn Fn(&str) + Sync),
 ) {
     loop {
@@ -415,9 +581,11 @@ fn worker(
             return;
         };
         let record = run_case(host, options, &component, &case, worktrees, progress);
-        if let Ok(mut records) = records.lock() {
+        let decided = records.lock().map_or(0, |mut records| {
             records.push(record);
-        }
+            records.len()
+        });
+        progress(&format!("{decided}/{total} cases decided"));
     }
 }
 
@@ -454,6 +622,10 @@ fn run_case(
             .join(&component.name)
             .join(&case.name)
             .join(n.to_string());
+        progress(&format!(
+            "{}/{} run {n}: started",
+            component.name, case.name
+        ));
         let run = one_run(host, options, component, case, &dir, worktrees);
         progress(&format!(
             "{}/{} run {n}: {} ({:.4} USD, {} turns){}{}",
@@ -488,8 +660,8 @@ fn run_case(
 }
 
 /// One run of `case` for `component` under `dir`: the world built, the
-/// component run, its report and log kept, the grade written, the
-/// world torn down.
+/// component run, its log and the report assembled from it kept, the
+/// grade written, the world torn down.
 fn one_run(
     host: &dyn Host,
     options: &Options,
@@ -521,21 +693,24 @@ fn one_run(
             options.deadline,
         );
         let log = runner::run(host, &command)?;
-        let report = world.report(&component.name);
-        if let Some(report) = &report {
-            let _ = fs::write(dir.join("report.md"), report);
-        }
-        let graded = grade::grade(
-            component,
-            case,
-            &grade::Run {
-                log: &log,
-                report: report.as_deref(),
-                dispatched: &world.dispatched,
-            },
+        // The report as the review would assemble it from the log, for
+        // the record; a run that did not finish is headed so.
+        let incomplete = (!log.answered).then(|| format!("its run ended with {}", log.subtype));
+        let report_path = dir.join("report.md");
+        let written = fs::write(
+            &report_path,
+            review_gate::report::assemble(&log.texts, &log.answer, incomplete.as_deref()),
         );
+        let graded = grade::grade(component, case, &log);
         let mut record = RunRecord::new(&log, graded.failures, graded.slips);
         record.notes.clone_from(&world.notes);
+        // A record that cannot be written fails no run, but it is noted
+        // on it (I6).
+        if let Err(e) = written {
+            record
+                .notes
+                .push(format!("write {}: {e}", report_path.display()));
+        }
         let mut grade = if record.passed {
             "passed\n".to_owned()
         } else {
@@ -547,13 +722,28 @@ fn one_run(
         for note in &record.notes {
             grade.push_str(&format!("note: {note}\n"));
         }
-        let _ = fs::write(dir.join("grade.txt"), grade);
+        let grade_path = dir.join("grade.txt");
+        if let Err(e) = fs::write(&grade_path, grade) {
+            record
+                .notes
+                .push(format!("write {}: {e}", grade_path.display()));
+        }
         Ok(record)
     });
-    let _ = world::teardown(host, &options.checkout, &world_dir);
-    let _ = fs::remove_dir_all(&world_dir);
+    let mut record = result.unwrap_or_else(|e| RunRecord::failed(&e));
+    // A world left behind fails no run, but it is noted on it (I6).
+    if let Err(e) = world::teardown(host, &options.checkout, &world_dir, worktrees) {
+        record.notes.push(format!("tear down: {e}"));
+    }
+    if let Err(e) = fs::remove_dir_all(&world_dir)
+        && e.kind() != std::io::ErrorKind::NotFound
+    {
+        record
+            .notes
+            .push(format!("remove {}: {e}", world_dir.display()));
+    }
 
-    result.unwrap_or_else(|e| RunRecord::failed(&e))
+    record
 }
 
 /// Writes the scorecard, its published lines, the gate's findings and

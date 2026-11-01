@@ -22,17 +22,17 @@ new = "pub mod render;\npub mod rogue;\n"
 [[report]]
 agent = "lang-rust"
 content = '''
-tooling/review-bundle/src/rogue.rs:6 — blocking — `unwrap` outside tests, which the workspace lints forbid — ENG-16
+tooling/review-bundle/src/rogue.rs:6 — if not addressed: an `unwrap` outside tests, which the workspace lints forbid, panics on an empty slice — ENG-16
 
-outcome: blocking — a helper that unwraps a possibly empty slice
+outcome: findings — a helper that unwraps a possibly empty slice
 '''
 
 [[report]]
 agent = "test-engineer-unit"
 content = '''
-tooling/review-bundle/src/rogue.rs:5 — blocking — `first` has no unit test in a tests.rs beside it — ENG-11
+tooling/review-bundle/src/rogue.rs:5 — if not addressed: `first` lands with no unit test in a tests.rs beside it — ENG-11
 
-outcome: blocking — a function with no unit test
+outcome: findings — a function with no unit test
 '''
 
 [expect]

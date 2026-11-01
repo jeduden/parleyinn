@@ -8,9 +8,9 @@ old = "        threshold: 0%\n"
 new = "        threshold: 20%\n"
 
 [expect]
-outcome = ["blocking"]
+outcome = ["findings"]
 
 [[expect.finding]]
 path = "codecov.yml"
-severity = "blocking"
+form = "linked"
 mentions_any = ["threshold", "floor", "20%", "patch", "coverage"]

@@ -21,9 +21,9 @@ fn every_case_directory_is_a_component_name() {
 '''
 
 [expect]
-outcome = ["blocking"]
+outcome = ["findings"]
 
 [[expect.finding]]
 path = "tooling/engineering/tests/case_names.rs"
-severity = "blocking"
+form = "linked"
 mentions_any = ["drift", "ENG-27"]

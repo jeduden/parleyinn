@@ -386,3 +386,11 @@ fn scopes_name_each_specialist_s_files_by_path_and_by_the_rows_they_name() {
         dispatch(&paths, &[&row, &quiet], &["pin".to_owned()])
     );
 }
+
+#[test]
+fn an_agent_name_is_lowercase_letters_digits_and_hyphens() {
+    assert!(is_agent_name("srs-05b-room"));
+    for bad in ["", "Srs", "a b", "a/b", "a_b", "../x"] {
+        assert!(!is_agent_name(bad), "{bad:?}");
+    }
+}

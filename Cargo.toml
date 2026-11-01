@@ -73,6 +73,7 @@ harness-contract = { path = "tooling/harness-contract" }
 review-bundle = { path = "tooling/review-bundle" }
 review-eval = { path = "tooling/review-eval" }
 review-gate = { path = "tooling/review-gate" }
+review-run = { path = "tooling/review-run" }
 scenario = { path = "tooling/scenario" }
 srs = { path = "tooling/srs" }
 testkit = { path = "tooling/testkit" }

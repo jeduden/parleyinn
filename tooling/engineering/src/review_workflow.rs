@@ -1,13 +1,56 @@
-//! ENG-28: the review workflow keeps the reviewing agent away from the
-//! reviewer app's key, and the review gate that posts the review
-//! decides as the requirement says.
+//! ENG-28: the review workflow runs the review's agents by code, keeps
+//! them away from the reviewer app's key, and the review gate that
+//! posts the review decides as the requirement says.
 
 use std::collections::BTreeMap;
 
-use crate::list;
+use review_eval::runner::TOOLS;
 
-/// The action that runs the reviewing agent.
+use crate::list;
+use crate::static_analysis::without_assignments;
+
+/// What a job runs the review's agents with: review-run, which starts
+/// every dispatched agent.
+const AGENT_RUN: &str = "-p review-run";
+
+/// An action that runs one harness session, which would route the review
+/// itself; a job that uses one is held to the agents' rules too.
 const AGENT_ACTION: &str = "anthropics/claude-code-action@";
+
+/// The ways a job installs the Claude Code command line, which starts
+/// an agent from any later step: the repository's composite action and
+/// the npm package it installs.
+const AGENT_CLI: [&str; 2] = ["./.github/actions/claude-code", "@anthropic-ai/claude-code"];
+
+/// The run of review-eval, which may start the command line beside
+/// review-run: it runs the reviewer evaluation's cases (ENG-32) and
+/// routes no review. Its `plan` starts no agent, so it grants none.
+const EVAL_RUN: &str = "cargo run --locked --quiet -p review-eval -- run";
+
+/// Where review-run writes each agent's run log, which holds every tool
+/// result the agent read: it stays in the agents' job.
+pub const RUN_LOGS: &str = "review/logs";
+
+/// What stages the Claude token where no agent reads it.
+pub const STAGE: &str = "-p review-eval -- stage-credential";
+
+/// What scrubs the files a job keeps of that token.
+pub const SCRUB: &str = "-p review-eval -- scrub";
+
+/// The roots that hold every process's environment and open files, no
+/// agent's to read.
+pub const PROCESS_FILES: [&str; 3] = ["/proc", "/sys", "/dev"];
+
+/// The action that uploads an artifact out of the job.
+const UPLOAD_ACTION: &str = "actions/upload-artifact@";
+
+/// The tools review-run gives its agents, by kind, as the evaluation's
+/// runner sets them: reading tools alone, a specialist's report being
+/// assembled from its run log.
+pub const RUN_TOOLS: [(&str, &str); 2] = [("specialist", TOOLS), ("generalist", TOOLS)];
+
+/// The tools that read and nothing more, which every agent may use.
+pub const READING: [&str; 3] = ["Read", "Glob", "Grep"];
 
 /// A GitHub Actions workflow split the way the ENG-28 steps read it:
 /// its triggers and its jobs, comments left out.
@@ -124,6 +167,227 @@ fn is_word(c: char) -> bool {
     c.is_ascii_alphanumeric() || c == '_'
 }
 
+/// Whether a job's `text` installs the Claude Code command line.
+fn installs_cli(text: &str) -> bool {
+    AGENT_CLI.iter().any(|cli| text.contains(cli))
+}
+
+/// The commands that start the command after them, as `npx` and `env`
+/// do, each skipped with its flags to find what a script line starts;
+/// `timeout` with its duration too, and a shell with the `-c` command it
+/// is given.
+const WRAPPERS: [&str; 10] = [
+    "env", "npx", "exec", "command", "nohup", "time", "sudo", "timeout", "bash", "sh",
+];
+
+/// Whether `line` of a job starts the Claude Code command line itself:
+/// `claude`, a path to it or the npm package the first word of any
+/// command on a script line, in a subshell or a command substitution
+/// too, after its assignments and any wrapper such as `env`, `npx` or
+/// `bash -c`, so whatever tools and permission mode it passes go past
+/// review-run's and review-eval's.
+fn starts_cli(line: &str) -> bool {
+    let line = line.trim_start();
+    let line = line.strip_prefix("- ").unwrap_or(line).trim_start();
+    let line = line.strip_prefix("run:").unwrap_or(line).trim_start();
+    if line.starts_with('#') {
+        return false;
+    }
+
+    line.split(['&', '|', ';', '(', ')', '`']).any(|command| {
+        let mut rest = without_assignments(command.trim());
+        loop {
+            let (word, after) = rest.split_once(' ').unwrap_or((rest, ""));
+            let word = word.trim_matches(['"', '\'']);
+            if !WRAPPERS.contains(&word) {
+                return word == "claude"
+                    || word.ends_with("/claude")
+                    || word
+                        .strip_prefix(AGENT_CLI[1])
+                        .is_some_and(|v| v.is_empty() || v.starts_with('@'));
+            }
+            rest = after.trim_start();
+            let skipped = |r: &str| {
+                r.starts_with('-')
+                    || (word == "timeout" && r.starts_with(|c: char| c.is_ascii_digit()))
+            };
+            while skipped(rest) {
+                rest = rest.split_once(' ').map_or("", |(_, r)| r.trim_start());
+            }
+            rest = without_assignments(rest);
+        }
+    })
+}
+
+/// Whether a job's `text` runs the review's agents, a harness session,
+/// or installs the command line any of its steps can start one with.
+fn runs_agents(text: &str) -> bool {
+    text.contains(AGENT_RUN) || text.contains(AGENT_ACTION) || installs_cli(text)
+}
+
+/// A job's steps, each from its `- ` line at the steps' indent.
+fn steps(text: &str) -> Vec<String> {
+    let mut out: Vec<String> = Vec::new();
+    for line in text.split_inclusive('\n') {
+        if line.starts_with("      - ") {
+            out.push(line.to_owned());
+        } else if let Some(step) = out.last_mut() {
+            step.push_str(line);
+        }
+    }
+
+    out
+}
+
+/// The paths an upload step names, one inline or one a line in its
+/// block; none for a step that uploads nothing.
+fn upload_paths(step: &str) -> Vec<String> {
+    if !step.contains(UPLOAD_ACTION) {
+        return Vec::new();
+    }
+    let mut lines = step.lines();
+    let Some(line) = lines.find(|l| l.trim_start().starts_with("path:")) else {
+        return Vec::new();
+    };
+    let indent = line.len() - line.trim_start().len();
+    let value = line.trim_start()["path:".len()..].trim();
+    if !value.is_empty() && !value.starts_with(['|', '>']) {
+        return vec![value.trim_matches(['"', '\'']).to_owned()];
+    }
+
+    lines
+        .take_while(|l| l.len() - l.trim_start().len() > indent)
+        .map(|l| l.trim().trim_matches(['"', '\'']).to_owned())
+        .filter(|l| !l.is_empty())
+        .collect()
+}
+
+/// Whether the upload `paths` carry `dir` out of the job: a path at or
+/// under it, or one above it, or a glob that can match it, that no `!`
+/// path excludes it from. Only a
+/// `!` path at `dir` or above it excludes it: one under it, a single
+/// log, leaves the rest uploaded.
+fn uploads_dir(paths: &[String], dir: &str) -> bool {
+    let bare = |p: &str| {
+        p.trim_start_matches("./")
+            .trim_end_matches(['*', '/'])
+            .to_owned()
+    };
+    let above = |p: &str| {
+        p.is_empty()
+            || p == "."
+            || dir
+                .strip_prefix(p)
+                .is_some_and(|rest| rest.starts_with('/'))
+    };
+    let excluded = paths
+        .iter()
+        .filter_map(|p| p.strip_prefix('!'))
+        .map(&bare)
+        .any(|p| p == dir || above(&p));
+
+    // A glob can match anything under what comes before its first
+    // wildcard, `dir` included when that is a prefix of it.
+    paths
+        .iter()
+        .filter(|p| !p.starts_with('!'))
+        .any(|p| match p.find(['*', '?', '[']) {
+            Some(at) if !excluded && dir.starts_with(&bare(&p[..at])) => true,
+            _ => {
+                let p = bare(p);
+                p.starts_with(dir) || (!excluded && above(&p))
+            }
+        })
+}
+
+/// Whether a `step` runs the review's agents: review-run, review-eval's
+/// `run`, or the command line itself.
+fn runs_agent_step(step: &str) -> bool {
+    // A build of review-run passes it no arguments, and runs nothing.
+    step.contains(&format!("{AGENT_RUN} --"))
+        || step.contains(EVAL_RUN)
+        || step.lines().any(starts_cli)
+}
+
+/// A step's name, or its first line when it has none.
+fn step_name(step: &str) -> String {
+    step.lines()
+        .find_map(|l| {
+            l.trim_start()
+                .trim_start_matches("- ")
+                .strip_prefix("name:")
+        })
+        .unwrap_or_else(|| step.lines().next().unwrap_or_default().trim())
+        .trim()
+        .to_owned()
+}
+
+/// The `id:` a step gives itself, when it gives one.
+fn step_id(step: &str) -> Option<&str> {
+    step.lines().find_map(|l| {
+        l.trim_start()
+            .trim_start_matches("- ")
+            .strip_prefix("id:")
+            .map(str::trim)
+    })
+}
+
+/// The names of the upload steps among `steps` that no scrub gates: a
+/// step that runs [`SCRUB`] after the last step that runs an agent,
+/// whose `scrubbed` output the upload's `if:` requires.
+fn unscrubbed_uploads(steps: &[String]) -> Vec<String> {
+    let last_agent = steps.iter().rposition(|s| runs_agent_step(s));
+    let gates: Vec<String> = steps
+        .iter()
+        .enumerate()
+        .filter(|(at, s)| s.contains(SCRUB) && last_agent.is_none_or(|last| *at > last))
+        .filter_map(|(_, s)| step_id(s))
+        .map(|id| format!("steps.{id}.outputs.scrubbed == 'true'"))
+        .collect();
+    steps
+        .iter()
+        .filter(|s| s.contains(UPLOAD_ACTION))
+        .filter(|s| {
+            !s.lines()
+                .any(|l| is_condition(l) && gates.iter().any(|g| l.contains(g.as_str())))
+        })
+        .map(|s| step_name(s))
+        .collect()
+}
+
+/// Whether `line` is a step's `if:`, its first line or not.
+fn is_condition(line: &str) -> bool {
+    line.trim_start()
+        .trim_start_matches("- ")
+        .starts_with("if:")
+}
+
+/// The names of the upload steps among `steps` whose `if:` lacks
+/// `always()`, so a failed step before them skips them.
+fn uploads_skipped_on_failure(steps: &[String]) -> Vec<String> {
+    steps
+        .iter()
+        .filter(|s| s.contains(UPLOAD_ACTION))
+        .filter(|s| !s.lines().any(|l| is_condition(l) && l.contains("always()")))
+        .map(|s| step_name(s))
+        .collect()
+}
+
+/// The tools of the comma-separated `tools` other than reading:
+/// anything that writes, runs a command, reaches the web or starts an
+/// agent, a scoped `Edit(...)` or `Write(...)` rule included.
+fn beyond_reading(tools: &str) -> impl Iterator<Item = &str> {
+    tools
+        .split(',')
+        .map(str::trim)
+        .filter(|t| !t.is_empty())
+        .filter(|t| {
+            !READING
+                .iter()
+                .any(|r| t == r || t.starts_with(&format!("{r}(")))
+        })
+}
+
 impl Workflow {
     /// Requires exactly two triggers: `workflow_run` on the named
     /// workflow's completion, and `issue_comment` on a new comment, so
@@ -174,9 +438,46 @@ impl Workflow {
         out
     }
 
-    /// The jobs that run the reviewing agent.
+    /// The jobs that run the review's agents, or a harness session.
     fn agent_jobs(&self) -> impl Iterator<Item = &Job> {
-        self.jobs.iter().filter(|j| j.text.contains(AGENT_ACTION))
+        self.jobs.iter().filter(|j| runs_agents(&j.text))
+    }
+
+    /// Requires a job to run the review's agents with `cmd`, and no job
+    /// to run a harness session, or the command line outside review-run
+    /// and review-eval, that would route the review instead.
+    #[must_use]
+    pub fn agents_run_by(&self, cmd: &str) -> Vec<String> {
+        let mut problems: Vec<String> = self
+            .jobs
+            .iter()
+            .filter(|j| j.text.contains(AGENT_ACTION))
+            .map(|j| {
+                format!(
+                    "job {} runs a harness session, {AGENT_ACTION}, which would route the review",
+                    j.name
+                )
+            })
+            .collect();
+        for j in &self.jobs {
+            let runner = j.text.contains(cmd) || j.text.contains(EVAL_RUN);
+            if installs_cli(&j.text) && !runner {
+                problems.push(format!(
+                    "job {} starts the Claude Code command line outside review-run and review-eval, which would route the review",
+                    j.name
+                ));
+            } else if j.text.lines().any(starts_cli) {
+                problems.push(format!(
+                    "job {} starts the Claude Code command line itself, outside review-run and review-eval, which would route the review",
+                    j.name
+                ));
+            }
+        }
+        if !self.jobs.iter().any(|j| j.text.contains(cmd)) {
+            problems.insert(0, format!("no job runs the review's agents with {cmd:?}"));
+        }
+
+        problems
     }
 
     /// Requires an agent job, and that none of them is granted a write
@@ -196,46 +497,85 @@ impl Workflow {
             }
         }
         if self.agent_jobs().next().is_none() {
-            problems.push("no job runs the reviewing agent".to_owned());
+            problems.push("no job runs the review's agents".to_owned());
         }
 
         problems
     }
 
-    /// Requires every agent job to list its allowed tools and to allow
-    /// writing only under `dir`: `Edit(./<dir>/**)` and no other
-    /// writing tool. An `Edit` rule governs every tool that changes a
-    /// file, `Write` included; a `Write(path)` rule grants nothing, so
-    /// an agent job that lists one cannot write its reports.
+    /// Requires the agents to write nothing: `run`, the tools review-run
+    /// gives each kind of agent, and every `--allowedTools` an agent job
+    /// passes, allow the reading tools and no other, a scoped writing
+    /// rule included. A specialist's report is assembled from its run
+    /// log, so no agent needs to write.
     #[must_use]
-    pub fn agents_write_only(&self, dir: &str) -> Vec<String> {
-        let scoped = format!("Edit(./{dir}/**)");
+    pub fn agents_write_nothing(&self, run: &[(&str, &str)]) -> Vec<String> {
+        let want = format!("{} alone", READING.join(", "));
         let mut problems = Vec::new();
-        for j in self.agent_jobs() {
-            let Some(line) = j.text.lines().find(|l| l.contains("--allowedTools")) else {
-                problems.push(format!("agent job {} lists no --allowedTools", j.name));
-                continue;
-            };
-            let tools = line
-                .split_once("--allowedTools")
-                .map_or("", |(_, rest)| rest)
-                .trim()
-                .trim_matches('"');
+        for (kind, tools) in run {
             problems.extend(
-                tools
-                    .split(',')
-                    .map(str::trim)
-                    .filter(|t| {
-                        ["Write", "Edit", "NotebookEdit", "Bash"]
-                            .iter()
-                            .any(|w| t.starts_with(w))
-                    })
-                    .filter(|t| *t != scoped)
-                    .map(|t| format!("agent job {} may use {t}, want {scoped} alone", j.name)),
+                beyond_reading(tools)
+                    .map(|t| format!("review-run's {kind} may use {t}, want {want}")),
             );
+        }
+        for j in self.agent_jobs() {
+            for line in j.text.lines().filter(|l| l.contains("--allowedTools")) {
+                let tools = line
+                    .split_once("--allowedTools")
+                    .map_or("", |(_, rest)| rest)
+                    .trim()
+                    .trim_matches('"');
+                problems.extend(
+                    beyond_reading(tools)
+                        .map(|t| format!("agent job {} may use {t}, want {want}", j.name)),
+                );
+            }
         }
 
         problems
+    }
+
+    /// Requires review-run's agents, by `disallowed`, the rules it
+    /// refuses them, and `settings`, the settings it runs them with, to
+    /// be refused every read of [`PROCESS_FILES`] and outside their
+    /// trees, where the environment of every process on the machine
+    /// and the staged credential lie (ENG-28).
+    #[must_use]
+    pub fn reads_refused(disallowed: &str, settings: &str) -> Vec<String> {
+        let rules: Vec<&str> = disallowed.split(',').map(str::trim).collect();
+        let mut problems: Vec<String> = PROCESS_FILES
+            .iter()
+            .map(|root| format!("Read(/{root}/**)"))
+            .filter(|rule| !rules.contains(&rule.as_str()))
+            .map(|rule| format!("review-run does not refuse its agents {rule}"))
+            .collect();
+        if !settings.contains(r#""blockReadsOutsideWorkingDirectories":true"#) {
+            problems
+                .push("review-run does not refuse its agents reads outside their trees".to_owned());
+        }
+
+        problems
+    }
+
+    /// Requires every agent job to keep `logs`, its agents' run logs,
+    /// inside the job: no step of one uploads them as an artifact, which
+    /// would carry whatever an agent read, its environment included, out
+    /// of the job.
+    #[must_use]
+    pub fn run_logs_stay(&self, logs: &str) -> Vec<String> {
+        self.agent_jobs()
+            .filter(|j| {
+                steps(&j.text)
+                    .iter()
+                    .any(|s| uploads_dir(&upload_paths(s), logs))
+            })
+            .map(|j| {
+                format!(
+                    "agent job {} uploads {logs}, every tool result its agents read",
+                    j.name
+                )
+            })
+            .collect()
     }
 
     /// The one job that reads `key`.
@@ -262,8 +602,8 @@ impl Workflow {
     /// agent.
     pub fn key_held_apart(&self, key: &str) -> Result<(), String> {
         let j = self.key_job(key)?;
-        if j.text.contains(AGENT_ACTION) {
-            return Err(format!("job {} holds {key} and runs the agent", j.name));
+        if runs_agents(&j.text) {
+            return Err(format!("job {} holds {key} and runs the agents", j.name));
         }
 
         Ok(())
@@ -355,7 +695,7 @@ impl Workflow {
         let own_needs = needs(j);
         problems.extend(
             self.agent_jobs()
-                .filter(|a| !has_word(&own_needs, &a.name))
+                .filter(|a| a.name != j.name && !has_word(&own_needs, &a.name))
                 .map(|a| format!("job {} does not need agent job {}", j.name, a.name)),
         );
         // The key's job among the others: an evaluate job that reads the
@@ -376,6 +716,70 @@ impl Workflow {
         }
 
         Ok(problems)
+    }
+
+    /// Requires every agent job to keep the Claude token `token`
+    /// from its agents (ENG-28): one step alone holds it, and that step
+    /// only stages it with [`STAGE`]; no step that runs an agent, and no
+    /// job-wide variable, holds it; every step that runs agents passes
+    /// them the staged credential with `--credential`; and every upload
+    /// waits for a step that ran [`SCRUB`] after the last of them.
+    #[must_use]
+    pub fn token_kept_from_agents(&self, token: &str) -> Vec<String> {
+        let held = format!("secrets.{token}");
+        let mut problems = Vec::new();
+        for j in self.agent_jobs() {
+            let steps = steps(&j.text);
+            let in_steps: usize = steps.iter().map(|s| s.matches(&held).count()).sum();
+            if j.text.matches(&held).count() > in_steps {
+                problems.push(format!("agent job {} sets {token} for every step", j.name));
+            }
+            let holders: Vec<&String> = steps.iter().filter(|s| s.contains(&held)).collect();
+            if holders.is_empty() {
+                problems.push(format!(
+                    "agent job {} stages no {token} with {STAGE:?}",
+                    j.name
+                ));
+            }
+            problems.extend(
+                holders
+                    .iter()
+                    .filter(|s| !s.contains(STAGE) || runs_agent_step(s))
+                    .map(|s| {
+                        format!(
+                            "agent job {} hands {token} to step {:?}, which does more than stage it",
+                            j.name,
+                            step_name(s)
+                        )
+                    }),
+            );
+            problems.extend(
+                steps
+                    .iter()
+                    .filter(|s| runs_agent_step(s) && !s.contains("--credential"))
+                    .map(|s| {
+                        format!(
+                            "agent job {} runs agents in step {:?} without --credential",
+                            j.name,
+                            step_name(s)
+                        )
+                    }),
+            );
+            problems.extend(unscrubbed_uploads(&steps).into_iter().map(|s| {
+                format!(
+                    "agent job {} uploads in step {:?} before a scrub of {token} after its agents gates it",
+                    j.name, s
+                )
+            }));
+            problems.extend(uploads_skipped_on_failure(&steps).into_iter().map(|s| {
+                format!(
+                    "agent job {} uploads in step {s:?} only when every step before it succeeded, so a failed run keeps nothing for its author: its if: needs always()",
+                    j.name
+                )
+            }));
+        }
+
+        problems
     }
 
     /// Requires the key's job to run `cmd`.
@@ -453,24 +857,93 @@ fn gate_args(reviewed: &str, head: &str) -> Vec<String> {
     .to_vec()
 }
 
-/// The report and run-log answer of the row's one specialist: a
-/// `report` cell of `given`, or none, hands the gate a report that ends
-/// with the outcome its answer gives, `missing` no report, `empty` a
-/// blank one, `no outcome` one that ends with a finding, and `other
-/// outcome` one that ends with another outcome; `None` for any other
-/// value.
-fn report(row: &BTreeMap<String, String>) -> Option<(Option<&'static str>, &'static str)> {
-    const ANSWERS: &str = r#"{"lang-rust":"outcome: sound — fine\nreport: review/reports/lang-rust.md","review-code":"r"}"#;
-    let report = match row.get("report").map_or("given", String::as_str) {
-        "given" => Some("a.rs:1 — nit — x\noutcome: sound — fine\n"),
-        "missing" => None,
-        "empty" => Some("  \n"),
-        "no outcome" => Some("a.rs:1 — nit — x\n"),
-        "other outcome" => Some("outcome: blocking — not fine\n"),
+/// The report review-run assembled from the row's one specialist's run
+/// log, and the answers file holding its final answer: a `specialist`
+/// cell of `reported`, or none, hands the gate a report with a linked
+/// finding that ends with the outcome line the specialist answered,
+/// `requested` one with a requirement request instead, `no report` no
+/// report, `empty report` a blank one, `incomplete` the report of a run
+/// cut off before its answer, headed so and ending with no outcome, `no
+/// outcome answered` an answer with no outcome line, `other outcome
+/// answered` an answer whose outcome is not the report's, `malformed
+/// finding` a logged finding that gives a severity where its
+/// consequence and requirements belong, `revised nothing` the report
+/// assembled from a log whose one finding line revises a finding the
+/// specialist never stated, so only the revision standing as the finding
+/// it states keeps the report's outcome of findings, `withdrew nothing`
+/// the one assembled from a log that states a linked finding and
+/// withdraws one it never stated, `none beside a finding` an
+/// outcome of none after a finding, `findings with none` an outcome of
+/// findings after none, and `unknown id` a finding citing ENG-999, an id
+/// of the right shape that no requirement has, which the gate, holding
+/// no tree, takes; `None` for any other value.
+fn specialist(row: &BTreeMap<String, String>) -> Option<(Option<String>, &'static str)> {
+    const FINDINGS: &str = r#"{"lang-rust":"outcome: findings — fine","review-code":"r"}"#;
+    const NONE: &str = r#"{"lang-rust":"outcome: none — fine","review-code":"r"}"#;
+    const NO_OUTCOME: &str = r#"{"lang-rust":"I am done.","review-code":"r"}"#;
+    let (report, answers) = match row.get("specialist").map_or("reported", String::as_str) {
+        "reported" => (
+            Some("a.rs:1 — if not addressed: x breaks — I2\noutcome: findings — fine\n"),
+            FINDINGS,
+        ),
+        "requested" => (
+            Some("a.rs:1 — request: add a rule on x — none says so\noutcome: findings — fine\n"),
+            FINDINGS,
+        ),
+        "no report" => (None, FINDINGS),
+        "empty report" => (Some("  \n"), FINDINGS),
+        "incomplete" => (
+            Some(
+                "incomplete: its run ended with error_max_turns\na.rs:1 — if not addressed: x breaks — I2\n",
+            ),
+            NO_OUTCOME,
+        ),
+        "no outcome answered" => (
+            Some("a.rs:1 — if not addressed: x breaks — I2\noutcome: findings — fine\n"),
+            NO_OUTCOME,
+        ),
+        "other outcome answered" => (
+            Some("a.rs:1 — if not addressed: x breaks — I2\noutcome: findings — fine\n"),
+            NONE,
+        ),
+        "malformed finding" => (
+            Some("a.rs:1 — nit — x\noutcome: findings — fine\n"),
+            FINDINGS,
+        ),
+        "revised nothing" => {
+            return Some((
+                Some(assembled("revised: b.rs:2 — request: add y — why")),
+                FINDINGS,
+            ));
+        }
+        "withdrew nothing" => {
+            return Some((
+                Some(assembled(
+                    "a.rs:1 — if not addressed: x breaks — I2\nwithdrawn: b.rs:2 — I checked it and it holds",
+                )),
+                FINDINGS,
+            ));
+        }
+        "none beside a finding" => (
+            Some("a.rs:1 — if not addressed: x breaks — I2\noutcome: none — fine\n"),
+            NONE,
+        ),
+        "findings with none" => (Some("outcome: findings — fine\n"), FINDINGS),
+        "unknown id" => (
+            Some("a.rs:1 — if not addressed: x breaks — ENG-999\noutcome: findings — fine\n"),
+            FINDINGS,
+        ),
         _ => return None,
     };
 
-    Some((report, ANSWERS))
+    Some((report.map(str::to_owned), answers))
+}
+
+/// The report review-run assembles from a run log that states `lines`
+/// and answers an outcome of findings.
+fn assembled(lines: &str) -> String {
+    let texts = [lines.to_owned(), "outcome: findings — fine".to_owned()];
+    review_gate::report::assemble(&texts, "outcome: findings — fine", None)
 }
 
 /// The dispatch a table row hands the gate by default: one generalist
@@ -478,7 +951,7 @@ fn report(row: &BTreeMap<String, String>) -> Option<(Option<&'static str>, &'sta
 const DISPATCH: &str = r#"{"review-code":["lang-rust"]}"#;
 
 /// What [`gate_outcome`] names for a row whose `dispatch`, `consulted`,
-/// `report` or `own check` cell holds a value it does not define, so a
+/// `specialist` or `own check` cell holds a value it does not define, so a
 /// mistyped row fails rather than reads as the default.
 pub const UNKNOWN_CELL: &str = "a cell value the table does not define";
 
@@ -494,7 +967,7 @@ fn dispatch(row: &BTreeMap<String, String>) -> Option<Option<&'static str>> {
     }
 }
 
-/// The agents a row says the orchestrator consulted: both of
+/// The agents a row says the review consulted: both of
 /// [`DISPATCH`] for `all` or no `consulted` column, the generalist alone
 /// for `not all`, and a file that is no list for `malformed`; `None` for
 /// any other value.
@@ -531,7 +1004,7 @@ fn own_check(cell: &str) -> Option<String> {
 /// list, `nit` or `blocking` one deterministic finding of that
 /// severity, `malformed` a file that is no list, and `missing` no file.
 /// It always gets `--dispatch`, `--consulted`, `--reports` and
-/// `--answers` (see [`dispatch`], [`consulted`] and [`report`]), and a
+/// `--answers` (see [`dispatch`], [`consulted`] and [`specialist`]), and a
 /// row whose cell for any of them, or for `own check`, it does not
 /// define gives [`UNKNOWN_CELL`].
 #[must_use]
@@ -542,7 +1015,7 @@ pub fn gate_outcome(row: &BTreeMap<String, String>) -> &'static str {
     let (Some(dispatched), Some(consulted), Some((report, answers)), Some(own)) = (
         dispatch(row),
         consulted(row),
-        report(row),
+        specialist(row),
         own_check(cell("own check")),
     ) else {
         return UNKNOWN_CELL;
@@ -595,7 +1068,7 @@ pub fn gate_outcome(row: &BTreeMap<String, String>) -> &'static str {
     }
     files.insert("consulted.json", consulted.to_owned());
     if let Some(body) = report {
-        files.insert("reports/lang-rust.md", body.to_owned());
+        files.insert("reports/lang-rust.md", body);
     }
     files.insert("answers.json", answers.to_owned());
     if let Some(body) = check {

@@ -15,7 +15,6 @@ fn run(passed: bool, cost: f64, turns: usize, model: &str) -> RunRecord {
         duration_ms: 2000,
         resolved_model: model.to_owned(),
         usage: BTreeMap::new(),
-        first_write_turn: Some(2),
         notes: Vec::new(),
     }
 }
@@ -72,7 +71,6 @@ fn a_run_record_takes_its_grade_and_usage_from_the_log() {
         turns: 4,
         duration_ms: 10,
         resolved_model: "m".to_owned(),
-        first_write_turn: Some(1),
         ..RunLog::default()
     };
 

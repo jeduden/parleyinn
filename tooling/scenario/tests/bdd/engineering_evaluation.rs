@@ -19,7 +19,7 @@ fn read_cases(w: &mut World, dir: String) {
 }
 
 #[then(
-    regex = r"^every reviewer component, the agents the review bundle can dispatch, the orchestrator, each deep instance and every other agent under \.claude/agents among them, has a case that plants a defect, a case that is clean and a case that addresses the reviewer$"
+    regex = r"^every reviewer component, the agents the review bundle can dispatch, each deep instance and every other agent under \.claude/agents among them, has a case that plants a defect, a case that is clean and a case that addresses the reviewer$"
 )]
 fn every_component_has_its_cases(w: &mut World) -> Result<(), String> {
     let e = eng(w);
@@ -45,11 +45,23 @@ fn every_case_applies_and_dispatches(w: &mut World) -> Result<(), String> {
 }
 
 #[then(
-    regex = r#"^the review workflow's evaluate job runs "([^"]+)" on the components the pull request changes, after the agent's job and before the job that holds the "([^"]+)" key$"#
+    regex = r#"^the review workflow's evaluate job runs "([^"]+)" on the components the pull request changes, after the agents' job and before the job that holds the "([^"]+)" key$"#
 )]
 fn evaluate_job_runs(w: &mut World, cmd: String, key: String) -> Result<(), String> {
     let body = eng(w).checkout()?.read(REVIEW_WORKFLOW)?;
     outcome(review_workflow::parse(&body).evaluate_job_runs(&cmd, &key)?)
+}
+
+#[then(
+    regex = r#"^a pull request that changes only the shared section "([^"]+)" runs the cases of one component per distinct set of such sections instead of every component's$"#
+)]
+fn a_shared_section_change_plans_one_per_set(w: &mut World, section: String) -> Result<(), String> {
+    let head = testkit::TempDir::new().map_err(|e| e.to_string())?;
+    outcome(review_evaluation::shared_section_plans_one_per_set(
+        eng(w).checkout()?,
+        &section,
+        head.path(),
+    )?)
 }
 
 #[then(regex = r"^a run of a case is graded:$")]

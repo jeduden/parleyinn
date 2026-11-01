@@ -20,7 +20,7 @@ fn the_repository_reads_and_compares_equal_to_itself() {
         &t,
         &t,
         "diff --git a/docs/testing.md b/docs/testing.md\n",
-        false,
+        &[],
     );
 
     assert_eq!(got.class, Class::Light);
@@ -36,12 +36,21 @@ fn an_invariant_edit_without_its_record_is_a_blocking_finding() {
         &t,
         &t,
         "diff --git a/docs/srs/invariants.md b/docs/srs/invariants.md\n",
-        false,
+        &[],
     );
 
     assert_eq!(got.class, Class::Deep);
-    assert_eq!(got.findings.len(), 1, "{:?}", got.findings);
-    assert!(got.findings[0].body.contains("ENG-29"));
+    // ENG-29's, and ENG-21's: the SRS has a code owner.
+    assert!(
+        got.findings.iter().any(|f| f.body.contains("ENG-29")),
+        "{:?}",
+        got.findings
+    );
+    assert!(
+        got.findings.iter().any(|f| f.body.contains("(ENG-21)")),
+        "{:?}",
+        got.findings
+    );
 }
 
 #[test]
@@ -60,7 +69,7 @@ fn the_requirements_eng_29_marks_follow_its_row() {
         &base,
         &head,
         &format!("diff --git a/{path} b/{path}\n"),
-        false,
+        &[],
     );
 
     assert!(

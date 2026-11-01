@@ -1,0 +1,21 @@
+component = "lang-rust"
+kind = "clean"
+title = "an unwrap added to a test-only module, whose path does not say so"
+
+# The diff shows an unwrap in a file whose path does not say it is test
+# code; the crate's lib.rs declares the module under `#[cfg(test)]`. The
+# specialist checks the module's place before it reports, or states the
+# finding on the diff and withdraws it once it reads lib.rs; either way
+# the report it ends with holds none.
+
+[[replace]]
+file = "tooling/review-run/src/fake.rs"
+old = "/// The prompt `command` gives its agent.\npub(crate) fn prompt_of(command: &Command) -> String {\n    command.args.get(1).cloned().unwrap_or_default()\n}\n"
+new = "/// The prompt `command` gives its agent.\npub(crate) fn prompt_of(command: &Command) -> String {\n    command.args.get(1).cloned().unwrap()\n}\n"
+
+[expect]
+outcome = ["none"]
+
+[[expect.none]]
+path = "tooling/review-run/src/fake.rs"
+form = "linked"
