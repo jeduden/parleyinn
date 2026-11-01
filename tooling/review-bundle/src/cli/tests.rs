@@ -118,6 +118,34 @@ fn run_hands_each_specialist_only_its_files() {
 }
 
 #[test]
+fn run_writes_each_specialist_its_own_context() {
+    let w = World::new(
+        "diff --git a/docs/srs/05.md b/docs/srs/05.md\n+x\n\
+         diff --git a/a.rs b/a.rs\n+// REC-01\n",
+    );
+
+    let (code, _, err) = w.run();
+
+    assert_eq!(code, EXIT_OK, "{err}");
+    let dispatch: serde_json::Value = serde_json::from_str(&w.output(DISPATCH)).unwrap();
+    for specialist in dispatch
+        .as_object()
+        .unwrap()
+        .values()
+        .flat_map(|s| s.as_array().unwrap())
+    {
+        let name = specialist.as_str().unwrap();
+        let got = w.output(&format!("{CONTEXTS}/{name}.md"));
+        assert!(
+            got.starts_with(&format!("# Review context for `{name}`\n")),
+            "{got}"
+        );
+    }
+    let rust = w.output(&format!("{CONTEXTS}/lang-rust.md"));
+    assert!(rust.contains("Your files: `a.rs`."), "{rust}");
+}
+
+#[test]
 fn run_writes_the_ratchet_finding() {
     let w = World::new("diff --git a/features/record.feature b/features/record.feature\n");
     let feature = w.head.path().join("features/record.feature");

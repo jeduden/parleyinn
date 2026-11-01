@@ -149,6 +149,11 @@ The review's tooling words are engineering-tooling words too, described in
 
 - **Reviewer component, case, scorecard**: the review's agents, the cases that
   hold them and the published results.
+- **Review context, review class, touched ids, dispatch row**: the file
+  `review/context/<specialist>.md` that the review bundle writes for one
+  specialist, holding the review class (light, standard or deep), the ids the
+  change touches, the dispatch row that names the specialist and the
+  deterministic findings on its files.
 - **Stability measurement**: reviews of the same pull-request snapshots,
   repeated to measure how stable the review is.
 - **Flip rate, finding overlap**: how stable the review is: the share of a

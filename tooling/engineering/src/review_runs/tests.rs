@@ -41,6 +41,53 @@ fn a_review_run_on_the_checkout_s_definitions_has_no_problem() {
     assert!(problems.is_empty(), "{problems:?}");
 }
 
+/// The prompt a specialist is told to read only its own diff and its
+/// own context in.
+fn own_prompt(name: &str) -> String {
+    format!(
+        "You are `{name}`. Read only your own diff, `review/diffs/{name}.diff`, and \
+         `review/context/{name}.md`; never `review/bundle.md`."
+    )
+}
+
+#[test]
+fn a_specialist_told_to_read_its_own_diff_and_context_alone_has_no_problem() {
+    let prompts: Vec<(String, String)> = SPECIALISTS
+        .iter()
+        .map(|n| ((*n).to_owned(), own_prompt(n)))
+        .collect();
+
+    assert!(prompt_problems(&prompts).is_empty());
+}
+
+#[test]
+fn a_specialist_told_to_read_the_bundle_or_not_its_own_files_is_named() {
+    let prompts = vec![
+        (
+            "lang-rust".to_owned(),
+            "Read `review/bundle.md` first, then `review/diffs/lang-rust.diff`.".to_owned(),
+        ),
+        ("lang-markdown".to_owned(), own_prompt("lang-rust")),
+    ];
+
+    assert_eq!(
+        prompt_problems(&prompts),
+        [
+            "lang-rust is not told to read review/context/lang-rust.md",
+            "lang-rust is not told to leave review/bundle.md unread",
+            "lang-markdown is not told to read review/diffs/lang-markdown.diff",
+            "lang-markdown is not told to read review/context/lang-markdown.md",
+        ]
+    );
+}
+
+#[test]
+fn a_generalist_s_prompt_is_not_held_to_the_specialist_s_reads() {
+    let prompts = vec![("review-code".to_owned(), "Read the bundle.".to_owned())];
+
+    assert!(prompt_problems(&prompts).is_empty());
+}
+
 #[test]
 fn every_agent_run_once_and_the_generalists_last_is_in_order() {
     assert!(order_problems(&in_order()).is_empty());
@@ -300,5 +347,220 @@ fn a_dispatch_that_does_not_parse_is_a_problem_naming_why() {
         order_problems_by(&in_order(), "{"),
         [problem],
         "an unparsable dispatch is the one problem"
+    );
+}
+
+/// The prompt of part `index` of `name`'s split diff, told to read
+/// `diff`.
+fn part_prompt(name: &str, diff: &str) -> (String, String) {
+    (
+        name.to_owned(),
+        format!("Read only your own diff, `{diff}`, alone first; never `review/bundle.md`."),
+    )
+}
+
+#[test]
+fn each_part_told_to_read_its_own_part_alone_has_no_problem() {
+    let prompts = vec![
+        part_prompt("lang-rust", "review/diffs/lang-rust.1.diff"),
+        part_prompt("lang-rust", "review/diffs/lang-rust.2.diff"),
+        part_prompt("lang-markdown", "review/diffs/lang-markdown.diff"),
+    ];
+
+    assert!(part_problems("lang-rust", 2, &prompts).is_empty());
+}
+
+#[test]
+fn a_part_told_to_read_the_whole_diff_or_the_bundle_or_missing_is_named() {
+    let prompts = vec![
+        part_prompt("lang-rust", "review/diffs/lang-rust.diff"),
+        (
+            "lang-rust".to_owned(),
+            "Read only your own diff, `review/diffs/lang-rust.2.diff`.".to_owned(),
+        ),
+    ];
+
+    assert_eq!(
+        part_problems("lang-rust", 2, &prompts),
+        [
+            "lang-rust part 1 is not told to read its own part's diff review/diffs/lang-rust.1.diff",
+            "lang-rust is told to read the whole diff in a part",
+            "lang-rust is not told to leave review/bundle.md unread in a part",
+        ]
+    );
+}
+
+#[test]
+fn a_split_run_on_the_checkout_s_definitions_has_no_problem() {
+    let work = TempDir::new().unwrap();
+
+    let problems = split_runs_by_code(&Checkout::new(&testkit::repo_root()), work.path());
+
+    assert!(problems.is_empty(), "{problems:?}");
+}
+
+#[test]
+fn a_split_run_that_cannot_be_prepared_written_or_run_is_named() {
+    let (_dir, c) = checkout(&[]);
+    let work = TempDir::new().unwrap();
+    assert!(split_runs_by_code(&c, work.path())[0].starts_with("read "));
+
+    let work = TempDir::new().unwrap();
+    fs::create_dir_all(work.path().join("review")).unwrap();
+    fs::write(work.path().join("review/diffs"), "a file").unwrap();
+    let problems = split_runs_by_code(&Checkout::new(&testkit::repo_root()), work.path());
+    assert!(problems[0].starts_with("write "), "{problems:?}");
+
+    let work = TempDir::new().unwrap();
+    fs::create_dir_all(work.path().join("review/outcome.json")).unwrap();
+    let problems = split_runs_by_code(&Checkout::new(&testkit::repo_root()), work.path());
+    assert_eq!(problems, ["review-run exited 1 on a split diff"]);
+}
+
+/// The outputs of a review bundle run on a change to the file
+/// [`CONTEXT`] names, and the context it wrote.
+fn bundle_outputs() -> (String, String, String, String) {
+    (
+        "class=standard\ntouched=1\nfindings=1\nconsults=2\n".to_owned(),
+        r#"{"review-spec": ["lang-markdown"]}"#.to_owned(),
+        r#"[{"path": "docs/srs/10-engineering-quality.md", "line": 0, "severity": "blocking", "body": "x"}]"#.to_owned(),
+        "Class: **standard**. The change touches 1 id: ENG-28.\n\n- `review-spec`, weighing `lang-markdown`\n\n- blocking `docs/srs/10-engineering-quality.md:0`: x\n".to_owned(),
+    )
+}
+
+fn lacks(outputs: &(String, String, String, String), context: &str) -> Vec<String> {
+    let (name, path, id) = CONTEXT;
+    context_lacks(name, path, id, &outputs.0, &outputs.1, &outputs.2, context)
+}
+
+#[test]
+fn a_context_with_the_class_ids_row_and_findings_has_no_problem() {
+    let o = bundle_outputs();
+
+    assert!(lacks(&o, &o.3).is_empty());
+}
+
+#[test]
+fn a_context_that_lacks_a_part_of_what_the_bundle_says_is_named() {
+    let o = bundle_outputs();
+
+    assert_eq!(
+        lacks(&o, "nothing"),
+        [
+            "the context for lang-markdown lacks the review class \"standard\"",
+            "the context for lang-markdown lacks the touched id ENG-28",
+            "the context for lang-markdown lacks its dispatch row under review-spec",
+            "the context for lang-markdown lacks the deterministic finding on docs/srs/10-engineering-quality.md:0",
+        ]
+    );
+}
+
+#[test]
+fn a_bundle_that_names_no_class_row_or_finding_is_named() {
+    let (name, path, id) = CONTEXT;
+
+    let got = context_lacks(name, path, id, "", "not json", "not json", "");
+
+    assert_eq!(
+        got,
+        [
+            "the context for lang-markdown lacks the review class \"\"",
+            "the context for lang-markdown lacks the touched id ENG-28",
+            "the dispatch has no row naming lang-markdown",
+            "the bundle found nothing on docs/srs/10-engineering-quality.md to put in the context",
+        ]
+    );
+}
+
+#[test]
+fn a_bundle_context_on_the_checkout_has_no_problem() {
+    let work = TempDir::new().unwrap();
+
+    let problems = context_problems(&Checkout::new(&testkit::repo_root()), work.path());
+
+    assert!(problems.is_empty(), "{problems:?}");
+}
+
+#[test]
+fn a_bundle_that_cannot_be_written_or_run_is_named() {
+    let work = TempDir::new().unwrap();
+    let file = work.path().join("a file");
+    fs::write(&file, "x").unwrap();
+    let problems = context_problems(&Checkout::new(&testkit::repo_root()), &file);
+    assert!(problems[0].starts_with("write "), "{problems:?}");
+
+    let problems = context_problems(
+        &Checkout::new(&work.path().join("none")),
+        &work.path().join("out"),
+    );
+    assert!(
+        problems[0].starts_with("review-bundle exited "),
+        "{problems:?}"
+    );
+}
+
+#[test]
+fn a_file_the_bundle_did_not_write_is_named() {
+    let work = TempDir::new().unwrap();
+
+    let problems = context_in(work.path(), "");
+
+    assert_eq!(problems.len(), 3, "{problems:?}");
+    assert!(
+        problems.iter().all(|p| p.starts_with("read ")),
+        "{problems:?}"
+    );
+}
+
+#[test]
+fn a_recorder_with_a_poisoned_lock_is_an_error_not_an_empty_list() {
+    let host = Recorder::default();
+    host.record(started("lang-rust"));
+    assert_eq!(host.recorded().unwrap().0, [started("lang-rust")]);
+
+    for poisoned in ["events", "prompts"] {
+        let host = std::sync::Arc::new(Recorder::default());
+        let h = host.clone();
+        let _ = std::thread::spawn(move || {
+            let _events = (poisoned == "events").then(|| h.events.lock().unwrap());
+            let _prompts = (poisoned == "prompts").then(|| h.prompts.lock().unwrap());
+            panic!("poison");
+        })
+        .join();
+        let host = std::sync::Arc::try_unwrap(host).unwrap();
+
+        assert_eq!(
+            host.recorded().unwrap_err(),
+            format!("the stand-in's {poisoned} lock is poisoned")
+        );
+    }
+}
+
+#[test]
+fn what_a_recorder_with_a_poisoned_lock_recorded_is_checked_by_naming_the_lock() {
+    let host = std::sync::Arc::new(Recorder::default());
+    let h = host.clone();
+    let _ = std::thread::spawn(move || {
+        let _prompts = h.prompts.lock().unwrap();
+        panic!("poison");
+    })
+    .join();
+    let host = std::sync::Arc::try_unwrap(host).unwrap();
+
+    let problems = with_recorded(host, |_, _| vec!["checked".to_owned()]);
+
+    assert_eq!(problems, ["the stand-in's prompts lock is poisoned"]);
+    let ok = with_recorded(Recorder::default(), |_, _| vec!["checked".to_owned()]);
+    assert_eq!(ok, ["checked"]);
+}
+
+#[test]
+fn a_context_naming_fewer_touched_ids_than_the_bundle_counted_is_named() {
+    let mut o = bundle_outputs();
+    o.0 = o.0.replace("touched=1", "touched=2");
+
+    assert_eq!(
+        lacks(&o, &o.3),
+        ["the context for lang-markdown lacks the touched id ENG-28"]
     );
 }

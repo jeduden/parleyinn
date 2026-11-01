@@ -10,7 +10,8 @@
 //! refused tools, turn and cost caps among it; the split limit; the
 //! pull request's agent instructions as text,
 //! `review/pr-instructions.txt`; its own diff,
-//! `review/diffs/<name>.diff`; and the [`salt`]. A part of a split
+//! `review/diffs/<name>.diff`; the context the bundle wrote for it,
+//! `review/context/<name>.md`; and the [`salt`]. A part of a split
 //! diff is keyed by its specialist's key and its place. A generalist's
 //! key is over the same fields but a diff, then each of its
 //! specialists' keys, so a changed specialist changes its generalists'
@@ -19,8 +20,9 @@
 //! weighed.
 //!
 //! The key under-approximates what an agent reads: it may Read or Grep
-//! any file of `pr-head/`, `pr.diff` or `review/bundle.md`, which no key
-//! holds whole, so a change there that its own diff does not show is
+//! any file of `pr-head/` or `pr.diff`, and a generalist the whole
+//! `review/bundle.md`, which no key holds whole (a specialist reads only
+//! its diff and its context, both in its key), so a change there that its own diff does not show is
 //! not seen. The salt narrows that: it hashes the files of the pull
 //! request most agents read whatever their diff, [`INVALIDATE_ON`], and
 //! those main's checkout hands every session, [`SESSION`], so a change
@@ -44,7 +46,7 @@ use crate::run::world_of;
 
 /// The key's own version: a change to what a key holds changes it, so
 /// no answer keyed the old way is read as keyed the new.
-pub const SCHEMA: &str = "review-run answer key 1";
+pub const SCHEMA: &str = "review-run answer key 2";
 
 /// The files of the pull request's tree, under `pr-head/`, whose change
 /// changes every key: the invariants, the agent instructions, the
@@ -184,6 +186,10 @@ impl Keys {
         for name in plan.specialists() {
             let key = agent(workdir, plan, &name, claude, split, &salt).map(|mut f| {
                 f.file("diff", &workdir.join(format!("{REVIEW}/diffs/{name}.diff")));
+                f.file(
+                    "context",
+                    &workdir.join(format!("{REVIEW}/context/{name}.md")),
+                );
                 f.finish()
             });
             own.insert(name, key);

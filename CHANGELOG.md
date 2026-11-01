@@ -9,6 +9,13 @@ its upgrade notes (ENG-23). ParleyInn follows semantic versioning.
 
 ## Unreleased
 
+- A specialist of the review reads only its own diff, or its part's,
+  and a small context the review bundle writes for it, its class,
+  touched ids, dispatch row and the deterministic findings on its
+  files, never the whole bundle, which on a large change is too large
+  for one read (ENG-28). It reads its diff alone first, then its
+  context, and the Rust specialist sends its diff's findings beside that
+  second read, so each is stated before its answer (ENG-32).
 - A stakeholder comment consents only to the stakeholder paths it names,
   by path, owning pattern or directory (ENG-21).
 - Every reviewer component of the layered review, and every other agent
@@ -21,8 +28,7 @@ its upgrade notes (ENG-23). ParleyInn follows semantic versioning.
   agent (ENG-28): the `review-run` tooling crate runs every specialist
   the review bundle dispatches, then every dispatched generalist, each
   as its own agent, and writes the review outcome from what they
-  answered. No review runs the review skill or its evaluation cases
-  any more; the skill's file goes in a follow-up.
+  answered. The review skill and its evaluation cases are removed.
   A change no rule routes gets one generalist, an agent that did not
   answer runs once more, a change to a stakeholder path blocks until a
   stakeholder comment consents (ENG-21), and every review reads the whole

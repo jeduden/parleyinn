@@ -96,6 +96,19 @@ fn a_changed_diff_changes_its_specialist_s_key_and_its_generalist_s_alone() {
 }
 
 #[test]
+fn a_changed_context_changes_its_specialist_s_key_and_its_generalist_s_alone() {
+    let dir = workdir();
+    write(dir.path(), "review/context/lang-rust.md", "one\n");
+    let before = all(&keys(dir.path()));
+
+    write(dir.path(), "review/context/lang-rust.md", "two\n");
+    let after = all(&keys(dir.path()));
+
+    let changed: Vec<bool> = before.iter().zip(&after).map(|(a, b)| a != b).collect();
+    assert_eq!(changed, [true, false, false, true, false]);
+}
+
+#[test]
 fn a_changed_definition_changes_its_agent_s_key_and_its_generalist_s_alone() {
     let dir = workdir();
     let before = all(&keys(dir.path()));

@@ -406,7 +406,8 @@ pub(crate) fn attempt(
     };
     let world = world_of(workdir, plan, name);
     let log_path = workdir.join(LOGS).join(format!("{}.jsonl", unit.stem()));
-    let mut command = runner::command(&component, &world, None, &log_path, deadline);
+    let diff = unit.part.as_ref().map(|part| part.diff.as_str());
+    let mut command = runner::command_over(&component, &world, None, &log_path, deadline, diff);
     if let Some(part) = &unit.part {
         told(&mut command.args, &part.note);
     }

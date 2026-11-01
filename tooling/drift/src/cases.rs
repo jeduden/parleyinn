@@ -116,6 +116,9 @@ pub fn cases() -> Vec<Case> {
         review_stability_cases(),
         review_token_cases(),
         stability_workflow_cases(),
+        context::review_context_cases(),
+        context::review_context_file_cases(),
+        context::review_identity_cases(),
         // Last: its cases edit source the later cases would run stale.
         license_text_cases(),
     ]
@@ -3863,6 +3866,7 @@ fn transcript_contract_cases() -> Vec<Case> {
 }
 
 mod answers;
+mod context;
 
 #[cfg(test)]
 mod tests;
