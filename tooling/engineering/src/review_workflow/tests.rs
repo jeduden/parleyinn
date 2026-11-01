@@ -964,7 +964,40 @@ const KEPT: &str = "jobs:
 #[test]
 fn a_job_that_stages_the_token_and_scrubs_before_it_uploads_keeps_it_from_its_agents() {
     assert!(parse(KEPT).token_kept_from_agents(TOKEN).is_empty());
-    assert!(parse(REVIEW_FLOW).token_kept_from_agents(KEY).len() == 2);
+    assert_eq!(
+        parse(REVIEW_FLOW).token_kept_from_agents(KEY),
+        [
+            "agent job review stages no APP_KEY with \"-p review-eval -- stage-credential\"",
+            "agent job review runs agents in step \"- run: cargo run --locked --quiet --offline -p review-run -- --workdir .\" without --credential",
+        ]
+    );
+}
+
+#[test]
+fn the_evaluation_s_run_is_a_step_that_runs_agents_and_its_scrub_is_not() {
+    assert!(runs_agent_step(
+        "      - run: cargo run --locked --quiet -p review-eval -- run --out o\n"
+    ));
+    assert!(!runs_agent_step(
+        "      - run: cargo run --locked --quiet -p review-eval -- scrub --path o\n"
+    ));
+    // An evaluation run after the scrub leaves the upload ungated.
+    let late = KEPT.replace(
+        "      - name: Keep\n",
+        "      - name: Evaluate\n        run: cargo run --locked --quiet -p review-eval -- run --out o\n      - name: Keep\n",
+    );
+    assert_eq!(unscrubbed_uploads(&steps(&late)), ["Keep"]);
+}
+
+#[test]
+fn a_scrub_gates_an_upload_in_steps_that_run_no_agent() {
+    let steps = steps(&KEPT.replace(
+        "      - name: Review\n        run: cargo run --locked --quiet --offline -p review-run -- --workdir . --credential d\n",
+        "",
+    ));
+
+    assert_eq!(steps.len(), 3);
+    assert!(unscrubbed_uploads(&steps).is_empty(), "{steps:?}");
 }
 
 #[test]
