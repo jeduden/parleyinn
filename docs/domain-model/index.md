@@ -151,6 +151,9 @@ The review's tooling words are engineering-tooling words too, described in
   hold them and the published results.
 - **Stability measurement**: reviews of the same pull-request snapshots,
   repeated to measure how stable the review is.
+- **Flip rate, finding overlap**: how stable the review is: the share of a
+  snapshot's reviews whose verdict differs from the most common one, and per
+  agent the Jaccard overlap of its finding sets across those reviews.
 - **Snapshot**: a pull request's base and head commits, frozen, which a
   stability measurement reviews. It is a head and its inputs, not the forge's
   pull-request state.
@@ -159,6 +162,9 @@ The review's tooling words are engineering-tooling words too, described in
 - **Run report**: the static HTML built from the run list.
 - **Specialist report**: what one of the review's specialist agents gives, its
   findings and outcome; neither the run report nor a forge report.
+
+The run list's `verdict` and `attempt` fields are ENG-28 and ENG-32 tool
+fields, covered by the engineering-tooling carve-out above.
 
 A review here is one run of the whole review of a pull request. An agent run is
 one run of a review's agent, and a case run one run of a reviewer component on a
