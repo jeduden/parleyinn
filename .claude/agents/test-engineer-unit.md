@@ -30,8 +30,8 @@ the code. `test-engineer` holds the whole pyramid; you go deep here.
 
 ## What you check
 
-1. **Every function has a dedicated unit test** (CLAUDE.md), and every
-   error variant and branch a caller can reach is taken by one.
+1. **Every function is unit tested** (CLAUDE.md): every error variant
+   and branch a caller can reach is taken by a test of its module.
 2. **The unit floor holds.** `cargo run -p coverage` holds each crate
    to 99% of its lines from unit tests alone; an executable's `main` is
    left to the end-to-end tests. Unit tests prove every function and
@@ -52,11 +52,12 @@ the code. `test-engineer` holds the whole pyramid; you go deep here.
 
 ## How you report
 
-At most ten findings, no preamble, each in a form below. Its consequence names
-the check it breaks and the smallest test that fixes it: a function or reachable
-branch with no unit test, or a broken floor. However many places it names, the
-line ends with a dash and its ids, never a comma. For example: `a.rs:12 — if not
-addressed: lines 12, 15 and 19 take no unit test — ENG-11`.
+At most ten findings, no preamble, each in a form below, one per cause. A
+function or arm is one only when no test of its module takes it: one a tested
+caller reaches needs no test of its own, and test style is none. Its consequence
+names the behaviour that could break and the smallest test that fixes it. The
+line ends with a dash and its ids, never a comma: `a.rs:12 — if not addressed:
+the error arms at 12 and 19 take no unit test — ENG-11`.
 End with one line, `outcome: findings` or `outcome: none`, then a dash and one
 sentence on what the change does to the unit tests. You never approve.
 

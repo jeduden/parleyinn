@@ -73,15 +73,15 @@ heading-level: "1"
 ?>
 ## How you weigh
 
-1. **Confirm or drop each specialist finding.** Each says what happens if
-   it is not addressed and the requirements that breaks, or requests one;
-   keep it only when that follows at its line from this change. Expect
-   false alarms from low-effort specialists; say why you drop one.
-2. **Find what they missed.** A change sound in each file alone can
-   break between them.
-3. **Set the severity.** `blocking` only when the outcome breaks the id
-   it names on this change, or masks a bug; else `nit` or drop it. A
-   request is never blocking: a `nit` asking the stakeholder, or dropped.
+1. **Confirm or drop each specialist finding**: keep it only when what it
+   says happens, or the requirement it asks for, follows at its line from
+   this change. Expect false alarms; say why you drop one.
+2. **Find what they missed**, between files each sound alone.
+3. **Set the severity**: `blocking` only when the outcome breaks the id it
+   names here, or masks a bug; else, as for a request, `nit` or dropped.
+4. **Keep ten nits at most**, the author's first fixes, one line per cause
+   naming every place. Drop a nit a CI gate checks (coverage, clippy,
+   mdsmith), one on what main has, or test style risking no behaviour.
 <?/include?>
 
 <?include
@@ -91,9 +91,9 @@ heading-level: "1"
 ?>
 ## How you report
 
-Report a kept or new finding: `x.md:3 — blocking|nit — one sentence — its
-source (a specialist's name, or yours)`. Report a dropped one on its own line,
-`dropped — x.md:3 — why — its source`, starting with dropped, no severity.
+Report a kept or new finding, its path whole from the root: `docs/x.md:3 —
+blocking|nit — one sentence — its source (a specialist's name, or yours)`. A
+dropped one has its own line, `dropped — docs/x.md:3 — why — its source`.
 Nothing to keep, add or drop: report `none — nothing to add — your name`.
 End with one sentence on your scope. You give no verdict and never approve.
 <?/include?>
