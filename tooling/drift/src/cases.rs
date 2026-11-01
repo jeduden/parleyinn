@@ -6,6 +6,8 @@ use crate::{
     taplo_fmt, taplo_lint,
 };
 
+mod ci_gates;
+
 /// The dependency decision the ENG-18 and ENG-26 cases drift.
 const TEST_STACK: &str = "docs/adr/ADR-2610142221-json-serde-json.md";
 
@@ -119,6 +121,7 @@ pub fn cases() -> Vec<Case> {
         context::review_context_cases(),
         context::review_context_file_cases(),
         context::review_identity_cases(),
+        ci_gates::cases(),
         // Last: its cases edit source the later cases would run stale.
         license_text_cases(),
     ]
@@ -278,8 +281,8 @@ fn workflow_cases() -> Vec<Case> {
             "ENG-33",
             Injection::replace(
                 CI_WORKFLOW,
-                "      - run: taplo lint\n",
-                "      - run: taplo lint ${{ github.event.pull_request.title }}\n",
+                "      - run: scripts/ci-gate.sh toml-lint\n",
+                "      - run: scripts/ci-gate.sh toml-lint ${{ github.event.pull_request.title }}\n",
             ),
             scenario("ENG-33"),
             "expands github.event.pull_request.title in a run script, not through env",
@@ -287,7 +290,11 @@ fn workflow_cases() -> Vec<Case> {
         case(
             "CI no longer runs zizmor over the workflows",
             "ENG-33",
-            Injection::replace(CI_WORKFLOW, "run: zizmor .github", "run: zizmor --version"),
+            Injection::replace(
+                CI_WORKFLOW,
+                "run: scripts/ci-gate.sh zizmor",
+                "run: zizmor --version",
+            ),
             scenario("ENG-33"),
             r#"the CI workflow does not run "zizmor .github""#,
         ),
@@ -1019,7 +1026,11 @@ fn license_check_cases() -> Vec<Case> {
         case(
             "CI no longer runs the license check",
             "ENG-30",
-            Injection::replace(CI_WORKFLOW, "--bin license-check", "--bin protection-check"),
+            Injection::replace(
+                "scripts/ci-gates.txt",
+                "--bin license-check",
+                "--bin protection-check",
+            ),
             scenario("ENG-30"),
             "the CI workflow does not run license-check with --locked",
         ),
@@ -1167,7 +1178,7 @@ fn repository_cases() -> Vec<Case> {
             "ENG-27",
             Injection::replace(
                 ".github/workflows/ci.yml",
-                "cargo test --locked -p drift --test suite -- --ignored",
+                "scripts/ci-gate.sh drift",
                 "true",
             ),
             scenario("ENG-27"),
@@ -2471,7 +2482,7 @@ fn ci_gate_cases() -> Vec<Case> {
             "the_ci_workflow_gates_on_the_static_checks",
             Injection::replace(
                 CI,
-                "      - run: cargo audit\n      - run: cargo audit --file fuzz/Cargo.lock\n",
+                "      - run: scripts/ci-gate.sh audit\n      - run: scripts/ci-gate.sh audit-fuzz\n",
                 "",
             ),
             gates(),
@@ -2856,8 +2867,8 @@ fn coverage_floor_cases() -> Vec<Case> {
             "ENG-11",
             Injection::replace(
                 CI_WORKFLOW,
-                "cargo run --locked -p coverage -- --merge",
-                "cargo run --locked -p coverage -- --layer unit",
+                "scripts/ci-gate.sh coverage-merge",
+                "scripts/ci-gate.sh coverage-unit",
             ),
             scenario("ENG-11"),
             "job coverage does not run \"-p coverage -- --merge\"",
@@ -2923,7 +2934,7 @@ fn toml_cases() -> Vec<Case> {
         case(
             "CI no longer running taplo lint",
             GATE,
-            Injection::replace(CI, "      - run: taplo lint\n", ""),
+            Injection::replace(CI, "      - run: scripts/ci-gate.sh toml-lint\n", ""),
             gate(),
             "no CI job runs taplo lint: taplo lint",
         ),

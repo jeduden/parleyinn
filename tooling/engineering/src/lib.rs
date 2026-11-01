@@ -11,6 +11,7 @@ pub mod benchmarks;
 pub mod boundary;
 pub mod branch_protection;
 pub mod calibration;
+pub mod ci_gates;
 pub mod codeowners;
 pub mod complexity;
 pub mod confinement;
@@ -65,13 +66,34 @@ impl Checkout {
         }
     }
 
-    /// Reads `file`, a path relative to the checkout.
+    /// Reads `file`, a path relative to the checkout, as written.
+    ///
+    /// # Errors
+    ///
+    /// Fails when the file cannot be read.
+    pub fn read_raw(&self, file: &str) -> Result<String, String> {
+        fs::read_to_string(self.root.join(file)).map_err(|e| format!("read {file}: {e}"))
+    }
+
+    /// Reads `file`, a path relative to the checkout. The CI workflow
+    /// reads as the commands it runs, each call of a gate replaced by
+    /// the gate's command from `scripts/ci-gates.txt` (ENG-27), so a
+    /// check of what CI runs does not care where the command is
+    /// written; [`Checkout::read_raw`] returns it as written.
     ///
     /// # Errors
     ///
     /// Fails when the file cannot be read.
     pub fn read(&self, file: &str) -> Result<String, String> {
-        fs::read_to_string(self.root.join(file)).map_err(|e| format!("read {file}: {e}"))
+        let text = self.read_raw(file)?;
+        if file != ci_gates::CI {
+            return Ok(text);
+        }
+        Ok(self
+            .read_raw(ci_gates::GATES)
+            .map_or(text.clone(), |gates| {
+                ci_gates::expand(&text, &ci_gates::parse(&gates).0)
+            }))
     }
 
     /// Checks that `file` contains `want`.

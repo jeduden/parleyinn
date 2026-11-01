@@ -37,6 +37,22 @@ fn shard_takes_every_nth_case_or_all() {
 }
 
 #[test]
+fn touching_keeps_the_cases_that_inject_a_touched_file_or_all() {
+    let names = |files| {
+        touching(cases(), files)
+            .into_iter()
+            .map(|c| c.injection.file)
+            .collect::<Vec<_>>()
+    };
+
+    assert_eq!(names(None).len(), cases().len());
+    assert_eq!(names(Some("")), Vec::<&str>::new());
+    let ci = names(Some("README.md\n .github/workflows/ci.yml \n"));
+    assert!(ci.len() > 3, "the CI workflow is injected by several cases");
+    assert!(ci.iter().all(|f| *f == ".github/workflows/ci.yml"));
+}
+
+#[test]
 fn apply_replaces_the_first_occurrence() {
     let root = tree();
 
