@@ -15,7 +15,7 @@
 use std::collections::BTreeSet;
 use std::fs;
 use std::path::Path;
-use std::sync::{Condvar, Mutex};
+use std::sync::{Condvar, Mutex, PoisonError};
 use std::time::Duration;
 
 use review_eval::host::{Command, Host, Output};
@@ -89,14 +89,13 @@ impl Recorder {
         if !self.holds {
             return;
         }
-        if let Ok(mut started) = self.started.lock() {
-            started.insert(agent.to_owned());
-            self.start.notify_all();
-            if let Some((_, until, most)) = HOLDS.iter().find(|(held, _, _)| *held == agent) {
-                let _ = self
-                    .start
-                    .wait_timeout_while(started, *most, |s| !s.contains(*until));
-            }
+        let mut started = self.started.lock().unwrap_or_else(PoisonError::into_inner);
+        started.insert(agent.to_owned());
+        self.start.notify_all();
+        if let Some((_, until, most)) = HOLDS.iter().find(|(held, _, _)| *held == agent) {
+            let _ = self
+                .start
+                .wait_timeout_while(started, *most, |s| !s.contains(*until));
         }
     }
 }
