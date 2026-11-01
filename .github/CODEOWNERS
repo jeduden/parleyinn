@@ -39,7 +39,7 @@
 
 # The gate data the stakeholder accepts: the benchmark regressions
 # ADR-2610142300 lets through, the recall evaluation's baseline, the
-# recorded sizes of the files past their line limit (ENG-34), and the
+# size list of the files past their line limit (ENG-34), and the
 # reviewer evaluation's cases and published scorecard (ENG-32).
 /tooling/benchmark/accepted.txt @jeduden
 /tooling/eval/recall-v1.txt   @jeduden

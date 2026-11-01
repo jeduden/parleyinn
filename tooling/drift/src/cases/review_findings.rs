@@ -468,6 +468,20 @@ pub(super) fn review_token_cases() -> Vec<Case> {
             scenario("ENG-28"),
             "is not refused the staged credential's directory",
         ),
+        case(
+            "the token sweep reading a script that takes arguments as an error, not as the step's text",
+            "ENG-28",
+            Injection::replace(
+                "tooling/engineering/src/review_workflow.rs",
+                "Err(_) => parse(&scripts::inline_scripts_lenient(",
+                "Err(_) => parse(&scripts::inline_scripts(",
+            ),
+            cargo_lib_test(
+                "engineering",
+                "review_workflow::scripts::tests::the_token_sweep_still_reads_a_workflow_that_runs_a_script_with_arguments",
+            ),
+            "the_token_sweep_still_reads_a_workflow_that_runs_a_script_with_arguments",
+        ),
     ]
 }
 

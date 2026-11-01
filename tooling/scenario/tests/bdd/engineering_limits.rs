@@ -86,19 +86,21 @@ fn no_nit(w: &mut World) -> Result<(), String> {
 }
 
 #[then(
-    regex = r"^no file of the checkout is past its kind's line limit unless the recorded sizes list it at no fewer lines than it holds$"
+    regex = r"^no file of the checkout is past its kind's line limit unless the size list gives it at no fewer lines than it holds$"
 )]
 fn no_file_past_its_limit(w: &mut World) -> Result<(), String> {
     outcome(file_sizes::check_parts(eng(w).checkout()?).0)
 }
 
-#[then(regex = r"^the recorded sizes list no file that fits its limit and no file that is gone$")]
+#[then(
+    regex = r"^the size list gives no file that fits its limit, no file that is gone and no file more lines than it holds$"
+)]
 fn the_record_lists_no_stale_file(w: &mut World) -> Result<(), String> {
     outcome(file_sizes::check_parts(eng(w).checkout()?).1)
 }
 
 #[when(
-    regex = r"^the size check reads a tree with a listed file grown, a file past its limit that is not listed, a listed file that fits and a listed file that is gone$"
+    regex = r"^the size check reads a tree with a listed file grown, a listed file shrunk but still past its limit, a file past its limit that is not listed, a listed file that fits and a listed file that is gone$"
 )]
 fn size_check_reads_a_drifted_tree(w: &mut World) -> Result<(), String> {
     let work = testkit::TempDir::new().map_err(|e| format!("make a work directory: {e}"))?;
@@ -107,13 +109,13 @@ fn size_check_reads_a_drifted_tree(w: &mut World) -> Result<(), String> {
 }
 
 #[then(
-    regex = r"^it names the grown file, the unlisted file, the file that fits and the file that is gone$"
+    regex = r"^it names the grown file, the shrunk file, the unlisted file, the file that fits and the file that is gone$"
 )]
 fn it_names_each_drift(w: &mut World) -> Result<(), String> {
     outcome(file_sizes::names_each_drift(&w.section::<Read>().sizes))
 }
 
-#[then(regex = r"^it names no file held at its recorded size or within its limit$")]
+#[then(regex = r"^it names no file held at its listed size or within its limit$")]
 fn it_names_no_held_file(w: &mut World) -> Result<(), String> {
     outcome(file_sizes::names_no_held_file(&w.section::<Read>().sizes))
 }

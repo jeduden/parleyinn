@@ -120,10 +120,12 @@ fn checks_out_main(indent: usize, first: &str, rest: &[&str]) -> bool {
     let (mut action, mut other) = (false, false);
     for line in step {
         action |= line.starts_with("uses: actions/checkout@");
-        other |= line.starts_with("if:")
+        // A quoted key or a space before its colon is the same key.
+        let flat = line.replace(['"', '\'', ' '], "");
+        other |= flat.starts_with("if:")
             || ["path:", "ref:", "repository:"]
                 .iter()
-                .any(|key| line.contains(key));
+                .any(|key| flat.contains(key));
     }
 
     action && !other

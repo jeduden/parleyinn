@@ -5,31 +5,31 @@ fn sizes(list: &[(&str, usize)]) -> Sizes {
 }
 
 #[test]
-fn parse_record_reads_a_path_and_its_lines_a_line() {
-    let (got, problems) = parse_record("# why\n\n  a.rs 1200  \nb.yml 600\n");
+fn parse_size_list_reads_a_path_and_its_lines_a_line() {
+    let (got, problems) = parse_size_list("# why\n\n  a.rs 1200  \nb.yml 600\n");
 
     assert_eq!(got, sizes(&[("a.rs", 1200), ("b.yml", 600)]));
     assert!(problems.is_empty(), "{problems:?}");
 }
 
 #[test]
-fn parse_record_names_a_line_it_cannot_read_and_a_path_listed_twice() {
-    let (got, problems) = parse_record("a.rs\nb.rs many\nc.rs 1\nc.rs 2\nd.rs 1 2\n");
+fn parse_size_list_names_a_line_it_cannot_read_and_a_path_listed_twice() {
+    let (got, problems) = parse_size_list("a.rs\nb.rs many\nc.rs 1\nc.rs 2\nd.rs 1 2\n");
 
     assert_eq!(got, sizes(&[("c.rs", 2)]));
     assert_eq!(
         problems,
         [
-            format!("{RECORD}:1: want `<path> <lines>`, got \"a.rs\""),
-            format!("{RECORD}:2: \"many\" is no line count"),
-            format!("{RECORD}:4: c.rs is listed twice"),
-            format!("{RECORD}:5: want `<path> <lines>`, got \"d.rs 1 2\""),
+            format!("{SIZE_LIST}:1: want `<path> <lines>`, got \"a.rs\""),
+            format!("{SIZE_LIST}:2: \"many\" is no line count"),
+            format!("{SIZE_LIST}:4: c.rs is listed twice"),
+            format!("{SIZE_LIST}:5: want `<path> <lines>`, got \"d.rs 1 2\""),
         ]
     );
 }
 
 #[test]
-fn compare_names_a_file_past_its_limit_that_the_record_does_not_list() {
+fn compare_names_a_file_past_its_limit_that_the_size_list_does_not_list() {
     let got = compare(&sizes(&[("a.rs", 1001), ("b.rs", 1000)]), &Sizes::new());
 
     assert_eq!(got.len(), 1, "{got:?}");
@@ -38,30 +38,44 @@ fn compare_names_a_file_past_its_limit_that_the_record_does_not_list() {
 }
 
 #[test]
-fn compare_names_a_listed_file_that_grew_but_not_one_held_or_shrunk() {
-    let record = sizes(&[("a.rs", 1100), ("b.rs", 1100), ("c.rs", 1100)]);
+fn compare_names_a_listed_file_that_grew_but_not_one_held() {
+    let listed = sizes(&[("a.rs", 1100), ("b.rs", 1100)]);
 
-    let got = compare(
-        &sizes(&[("a.rs", 1101), ("b.rs", 1100), ("c.rs", 1050)]),
-        &record,
-    );
+    let got = compare(&sizes(&[("a.rs", 1101), ("b.rs", 1100)]), &listed);
 
     assert_eq!(got.len(), 1, "{got:?}");
-    assert!(got[0].starts_with("a.rs grew from its recorded 1100 lines to 1101"));
+    assert!(got[0].starts_with("a.rs grew from its listed 1100 lines to 1101"));
 }
 
 #[test]
-fn compare_asks_for_a_listed_file_that_fits_or_is_gone_to_leave_the_record() {
-    let record = sizes(&[("a.rs", 1100), ("b.rs", 1100), ("README.md", 9)]);
+fn compare_asks_for_the_listed_lines_of_a_file_that_shrank_yet_stays_past_its_limit_to_be_lowered()
+{
+    let listed = sizes(&[("c.rs", 1100)]);
 
-    let got = compare(&sizes(&[("a.rs", 1000), ("README.md", 9)]), &record);
+    let (past, stale) = compare_parts(&sizes(&[("c.rs", 1050)]), &listed);
+
+    assert!(past.is_empty(), "{past:?}");
+    assert_eq!(
+        stale,
+        [format!(
+            "c.rs holds 1050 lines, fewer than its listed 1100, and is still past its limit: lower its line in {SIZE_LIST} to 1050 — ENG-34"
+        )]
+    );
+    assert_eq!(compare(&sizes(&[("c.rs", 1050)]), &listed), stale);
+}
+
+#[test]
+fn compare_asks_for_a_listed_file_that_fits_or_is_gone_to_leave_the_size_list() {
+    let listed = sizes(&[("a.rs", 1100), ("b.rs", 1100), ("README.md", 9)]);
+
+    let got = compare(&sizes(&[("a.rs", 1000), ("README.md", 9)]), &listed);
 
     assert_eq!(got.len(), 3, "{got:?}");
     assert!(got.contains(&format!(
-        "a.rs now fits its limit with 1000 lines: remove it from {RECORD} — ENG-34"
+        "a.rs now fits its limit with 1000 lines: remove it from {SIZE_LIST} — ENG-34"
     )));
     assert!(got.contains(&format!(
-        "b.rs is listed in {RECORD} but is gone or has no limit: remove it — ENG-34"
+        "b.rs is listed in {SIZE_LIST} but is gone or has no limit: remove it — ENG-34"
     )));
     assert!(got[0].starts_with("README.md now fits"), "{got:?}");
 }
@@ -80,6 +94,8 @@ fn measure_reads_the_lines_of_each_file_with_a_limit_outside_what_is_not_searche
         ("notes.md", "no limit\n"),
         ("target/c.rs", "build output\n"),
         ("fuzz/target/d.rs", "build output\n"),
+        (".tmp/g.rs", "local state\n"),
+        ("sub/target/h.rs", "a source, not build output\n"),
         (".git/e.rs", "git\n"),
         (".claude/worktrees/w/f.rs", "another checkout\n"),
         ("Cargo.lock", "left out\n"),
@@ -91,7 +107,7 @@ fn measure_reads_the_lines_of_each_file_with_a_limit_outside_what_is_not_searche
 
     assert_eq!(
         measure(root.path()).unwrap(),
-        sizes(&[("a.rs", 2), ("sub/b.sh", 1)])
+        sizes(&[("a.rs", 2), ("sub/b.sh", 1), ("sub/target/h.rs", 1)])
     );
 }
 
@@ -104,7 +120,7 @@ fn measure_fails_on_a_tree_it_cannot_read() {
 }
 
 #[test]
-fn check_reads_the_record_against_the_files() {
+fn check_reads_the_size_list_against_the_files() {
     let root = testkit::TempDir::new().unwrap();
     let write = |rel: &str, body: &str| {
         let path = root.path().join(rel);
@@ -112,17 +128,20 @@ fn check_reads_the_record_against_the_files() {
         fs::write(path, body).unwrap();
     };
     let checkout = Checkout::new(root.path());
-    assert!(check(&checkout)[0].starts_with(&format!("read {RECORD}")));
+    assert!(check(&checkout)[0].starts_with(&format!("read {SIZE_LIST}")));
 
-    write(RECORD, "bad\n");
+    write(SIZE_LIST, "bad\n");
     write("a.rs", &"x\n".repeat(1001));
     let got = check(&checkout);
     assert_eq!(got.len(), 2, "{got:?}");
     assert!(got[0].contains("want `<path> <lines>`"));
     assert!(got[1].starts_with("a.rs holds 1001 lines"));
 
-    write(RECORD, "a.rs 1001\n");
+    write(SIZE_LIST, "a.rs 1001\n");
     assert!(check(&checkout).is_empty());
+
+    write(SIZE_LIST, "a.rs 1002\n");
+    assert!(check(&checkout)[0].contains("fewer than its listed 1002"));
 }
 
 #[test]
@@ -131,7 +150,7 @@ fn the_fixture_gives_each_drift_its_problem_and_the_held_files_none() {
 
     let found = fixture_problems(work.path()).unwrap();
 
-    assert_eq!(found.len(), 4, "{found:?}");
+    assert_eq!(found.len(), 5, "{found:?}");
     assert!(names_each_drift(&found).is_empty());
     assert!(names_no_held_file(&found).is_empty());
 }
@@ -143,23 +162,23 @@ fn the_fixture_s_checks_name_what_the_check_missed_and_what_it_wrongly_named() {
     let missed = names_each_drift(&found);
     let wrong = names_no_held_file(&found);
 
-    assert_eq!(missed.len(), 3, "{missed:?}");
-    assert!(missed[0].starts_with(&format!("the size check does not name {UNLISTED}")));
+    assert_eq!(missed.len(), 4, "{missed:?}");
+    assert!(missed[0].starts_with(&format!("the size check does not name {SHRUNK}")));
     assert_eq!(
         wrong,
         [format!(
-            "the size check names {HELD}, which is within its record"
+            "the size check names {HELD}, which is within its size list"
         )]
     );
 }
 
 #[test]
-fn check_parts_keep_a_stale_record_apart_from_a_file_past_its_limit() {
+fn check_parts_keep_a_stale_size_list_apart_from_a_file_past_its_limit() {
     let root = testkit::TempDir::new().unwrap();
-    let record = root.path().join(RECORD);
-    fs::create_dir_all(record.parent().unwrap()).unwrap();
+    let list = root.path().join(SIZE_LIST);
+    fs::create_dir_all(list.parent().unwrap()).unwrap();
     fs::write(root.path().join("a.rs"), "x\n".repeat(1001)).unwrap();
-    fs::write(record, "b.rs 1100\n").unwrap();
+    fs::write(list, "b.rs 1100\n").unwrap();
 
     let (past, stale) = check_parts(&Checkout::new(root.path()));
 
@@ -170,9 +189,9 @@ fn check_parts_keep_a_stale_record_apart_from_a_file_past_its_limit() {
 #[test]
 fn a_tree_that_cannot_be_measured_is_a_problem_of_the_check() {
     let root = testkit::TempDir::new().unwrap();
-    let record = root.path().join(RECORD);
-    fs::create_dir_all(record.parent().unwrap()).unwrap();
-    fs::write(record, "").unwrap();
+    let list = root.path().join(SIZE_LIST);
+    fs::create_dir_all(list.parent().unwrap()).unwrap();
+    fs::write(list, "").unwrap();
 
     let (past, stale) = check_with(&Checkout::new(root.path()), |_| Err("no tree".to_owned()));
 

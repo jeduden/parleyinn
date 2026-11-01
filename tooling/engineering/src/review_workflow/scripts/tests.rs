@@ -81,6 +81,9 @@ fn a_checkout_that_is_conditional_or_of_another_path_does_not_count() {
         "        with:\n          repository: other/repo\n",
         "        with: {ref: abc}\n",
         "        with: {path: pr-head}\n",
+        "        with: {\"ref\": abc}\n",
+        "        with: {'path' : pr-head}\n",
+        "        \"if\": x == 'y'\n",
     ] {
         let body = format!(
             "jobs:\n  j:\n    steps:\n      - uses: actions/checkout@v7\n{extra}      - run: scripts/a.sh\n"

@@ -392,8 +392,8 @@ Feature: Engineering quality (ENG)
     And the review bundle lists both nits
     When the review bundle is built for a change within its limits that review specialists read
     Then its deterministic findings hold no nit citing ENG-34 or ENG-28
-    And no file of the checkout is past its kind's line limit unless the recorded sizes list it at no fewer lines than it holds
-    And the recorded sizes list no file that fits its limit and no file that is gone
-    When the size check reads a tree with a listed file grown, a file past its limit that is not listed, a listed file that fits and a listed file that is gone
-    Then it names the grown file, the unlisted file, the file that fits and the file that is gone
-    And it names no file held at its recorded size or within its limit
+    And no file of the checkout is past its kind's line limit unless the size list gives it at no fewer lines than it holds
+    And the size list gives no file that fits its limit, no file that is gone and no file more lines than it holds
+    When the size check reads a tree with a listed file grown, a listed file shrunk but still past its limit, a file past its limit that is not listed, a listed file that fits and a listed file that is gone
+    Then it names the grown file, the shrunk file, the unlisted file, the file that fits and the file that is gone
+    And it names no file held at its listed size or within its limit

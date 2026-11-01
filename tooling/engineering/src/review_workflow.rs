@@ -393,10 +393,11 @@ fn unscrubbed_uploads(steps: &[String]) -> Vec<String> {
 /// directory a staged job puts before it and without a trailing slash.
 fn tree_path(path: &str) -> String {
     let path = path.trim_matches(['"', '\'']);
-    let path = ["$work/", "}}/work/"]
-        .iter()
-        .find_map(|prefix| path.split_once(prefix).map(|(_, rest)| rest))
-        .unwrap_or(path);
+    let path = path.strip_prefix("$work/").unwrap_or_else(|| {
+        path.strip_prefix("${{")
+            .and_then(|rest| rest.split_once("}}/work/"))
+            .map_or(path, |(_, rest)| rest)
+    });
     path.trim_end_matches('/').to_owned()
 }
 

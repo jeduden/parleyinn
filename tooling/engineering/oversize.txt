@@ -1,9 +1,11 @@
-# The recorded sizes of the files past their kind's line limit (ENG-34),
-# one a line: <path> <lines>. CI fails on a file past its limit that is
-# not listed here and on a listed file that grows past its recorded
-# lines; a listed file that fits its limit, or is gone, must be removed.
-# The record only shrinks: split a file, then drop its line. Never add a
-# line, and never raise a number, without the stakeholder's acceptance.
+# The size list: the files past their kind's line limit (ENG-34), one a
+# line: <path> <lines>. CI fails on a file past its limit that is not
+# listed here, and on a listed file whose lines are not exactly the
+# number listed: split a file that grew, and lower the number of a file
+# that shrank but is still past its limit, so a regrowth cannot hide.
+# A listed file that fits its limit, or is gone, must be removed. The
+# list only shrinks: never add a line, and never raise a number,
+# without the stakeholder's acceptance.
 # The limits are the review bundle's (tooling/review-bundle/src/limits.rs);
 # see tooling/engineering/src/file_sizes.rs and docs/ci.md.
 .github/workflows/ci.yml 937
