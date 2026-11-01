@@ -293,7 +293,7 @@ Feature: Engineering quality (ENG)
     Then it runs only when the "CI" workflow completes or a pull request gets a comment, as the default branch defines it
     And the job that runs the review's agents holds no write permission and not the "JEDUDEN_REVIEW_AGENT_KEY" key
     And that job runs every agent the review bundle dispatches with "cargo run --locked --quiet --offline -p review-run -- --workdir .", and no agent routes the review
-    And review-run runs each specialist the review bundle dispatches as its own agent, assembles its report from its run log, runs each generalist once its own specialists have ended, not waiting for the others, and writes the review outcome from what they answered
+    And review-run runs each specialist the review bundle dispatches as its own agent, assembles its report from its run log, runs each generalist once its own specialists have ended and the breaker is decided, and writes the review outcome from what they answered
     And review-run passes each agent the cost cap of its tier, starts no run once the runs that ended cost the review's cap, and names each agent it did not start over budget, so the review requests changes
     And review-run starts no generalist once more than a third of the dispatched specialists failed, and opens the review outcome with a blocking finding naming the mass failure
     And review-run waits with backoff before it runs again an agent the API turned away as overloaded, and never runs again one a cost cap stopped or whose credential was refused

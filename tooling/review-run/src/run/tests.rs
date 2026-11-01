@@ -49,7 +49,7 @@ fn options() -> Options {
         deadline: Duration::from_secs(77),
         split: crate::parts::LIMIT,
         // Each of these runs tests one run, so no failure trips the breaker.
-        breaker: 1.0,
+        breaker: Fraction::WHOLE,
         ..Options::default()
     }
 }

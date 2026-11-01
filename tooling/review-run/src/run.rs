@@ -31,7 +31,7 @@ use review_gate::report::assemble;
 
 use crate::LOGS;
 use crate::controls::{
-    BREAKER_FRACTION, Breaker, Budget, Clock, Controls, MAX_COST_USD, SystemClock,
+    BREAKER_FRACTION, Breaker, Budget, Clock, Controls, Fraction, MAX_COST_USD, SystemClock,
 };
 use crate::live::{self, EVERY, Live, Watch};
 use crate::parts::{self, Part};
@@ -59,7 +59,7 @@ pub struct Options {
     pub max_cost_usd: f64,
     /// The fraction of the dispatched specialists that may end in a gap
     /// before no generalist starts.
-    pub breaker: f64,
+    pub breaker: Fraction,
     /// How often what is running is told.
     pub every: Duration,
 }

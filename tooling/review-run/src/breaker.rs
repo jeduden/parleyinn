@@ -12,7 +12,7 @@ use std::collections::BTreeSet;
 use review_eval::component::Kind;
 use review_gate::{BLOCKING, Finding, REQUEST_CHANGES_VERDICT};
 
-use crate::controls::{OVER_BUDGET, mass_failure, trips};
+use crate::controls::{Fraction, OVER_BUDGET, mass_failure, trips};
 use crate::outcome::{Decision, REVIEW_PATH};
 use crate::plan::Plan;
 
@@ -37,7 +37,7 @@ pub fn failed(plan: &Plan, decision: &Decision) -> usize {
 /// The abort's finding, when more than `fraction` of `plan`'s
 /// specialists failed in `decision`; none otherwise.
 #[must_use]
-pub fn abort(plan: &Plan, decision: &Decision, fraction: f64) -> Option<Finding> {
+pub fn abort(plan: &Plan, decision: &Decision, fraction: Fraction) -> Option<Finding> {
     let (failed, dispatched) = (failed(plan, decision), plan.specialists().len());
     trips(failed, dispatched, fraction).then(|| Finding {
         path: REVIEW_PATH.to_owned(),
@@ -55,7 +55,7 @@ pub fn abort(plan: &Plan, decision: &Decision, fraction: f64) -> Option<Finding>
 /// `decision`, opened with the abort's finding and requesting changes,
 /// when more than `fraction` of `plan`'s specialists failed.
 #[must_use]
-pub fn amend(plan: &Plan, mut decision: Decision, fraction: f64) -> Decision {
+pub fn amend(plan: &Plan, mut decision: Decision, fraction: Fraction) -> Decision {
     if let Some(finding) = abort(plan, &decision, fraction) {
         let outcome = &mut decision.outcome;
         outcome.summary = format!("{} {}", finding.body, outcome.summary);

@@ -21,7 +21,7 @@ use std::time::Duration;
 use review_eval::component::kind_of;
 use review_eval::host::{Command, Host, Output};
 use review_eval::runner::budget_usd;
-use review_run::controls::Clock;
+use review_run::controls::{Clock, Fraction};
 use review_run::run::{Options, Review, review_on};
 
 use crate::Checkout;
@@ -307,7 +307,7 @@ pub fn retry_problems(checkout: &Checkout, workdir: &Path) -> Vec<String> {
             plan: &plan,
             known: &review_gate::report::invariants(),
             options: Options {
-                breaker: 1.0,
+                breaker: Fraction::WHOLE,
                 ..Options::default()
             },
             resume: None,

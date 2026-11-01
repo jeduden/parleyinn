@@ -560,7 +560,7 @@ fn the_flags_read_inline_or_as_the_next_argument() {
             "old",
             "--max-cost-usd=12.5",
             "--breaker-fraction",
-            "0.5",
+            "1/2",
             "--summary",
             "s.md",
             "--credential",
@@ -574,7 +574,7 @@ fn the_flags_read_inline_or_as_the_next_argument() {
                 deadline: Duration::from_secs(30),
                 split: crate::parts::LIMIT,
                 max_cost_usd: 12.5,
-                breaker: 0.5,
+                breaker: Fraction { num: 1, den: 2 },
                 ..Options::default()
             },
             head: Some(HEAD.to_owned()),
@@ -917,10 +917,10 @@ fn a_cap_or_a_fraction_out_of_range_is_refused() {
         refusal(&["--workdir", "w", "--max-cost-usd", "-1"]),
         "--max-cost-usd \"-1\" is not a number above zero"
     );
-    for value in ["0", "1.5", "most"] {
+    for value in ["0", "1.5", "most", "2", "0/3", "4/3", "1/0", "1/x", "1/3/4"] {
         assert_eq!(
             refusal(&["--workdir", "w", "--breaker-fraction", value]),
-            format!("--breaker-fraction {value:?} is no fraction above zero and at most one")
+            format!("--breaker-fraction {value:?} is no ratio above zero and at most one, as 1/3")
         );
     }
 }

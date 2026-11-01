@@ -44,7 +44,7 @@ fn agents_run_by(w: &mut World, cmd: String) -> Result<(), String> {
 }
 
 #[then(
-    regex = r"^review-run runs each specialist the review bundle dispatches as its own agent, assembles its report from its run log, runs each generalist once its own specialists have ended, not waiting for the others, and writes the review outcome from what they answered$"
+    regex = r"^review-run runs each specialist the review bundle dispatches as its own agent, assembles its report from its run log, runs each generalist once its own specialists have ended and the breaker is decided, and writes the review outcome from what they answered$"
 )]
 fn review_runs_by_code(w: &mut World) -> Result<(), String> {
     let work = testkit::TempDir::new().map_err(|e| format!("make a work directory: {e}"))?;
