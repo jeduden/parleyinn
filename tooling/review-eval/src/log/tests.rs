@@ -117,6 +117,15 @@ fn a_write_without_a_path_is_no_write() {
 }
 
 #[test]
+fn an_edit_is_a_write_and_a_read_is_none() {
+    let log = parse(
+        r#"{"type":"assistant","message":{"id":"m1","model":"m","content":[{"type":"tool_use","id":"t1","name":"Edit","input":{"file_path":"src/a.rs"}},{"type":"tool_use","id":"t2","name":"Read","input":{"file_path":"src/b.rs"}}]}}"#,
+    );
+
+    assert_eq!(log.writes, vec!["src/a.rs"]);
+}
+
+#[test]
 fn a_call_without_a_model_or_usage_counts_as_unknown() {
     let log = parse(r#"{"type":"assistant","message":{"id":"m1","content":[]}}"#);
 
