@@ -30,6 +30,7 @@ pub mod controls;
 pub mod findings;
 pub mod gaps;
 pub mod key;
+pub mod leak;
 pub mod live;
 pub(crate) mod memo;
 pub mod outcome;

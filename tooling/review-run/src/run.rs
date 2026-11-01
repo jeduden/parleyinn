@@ -152,6 +152,9 @@ pub struct Review<'a> {
     /// The answer store answers are taken from and kept in; none when
     /// the review uses none.
     pub store: Option<&'a Store>,
+    /// The scrubber of the Claude token; an answer it finds the token
+    /// in is never stored (ENG-28). None without a token to scrub.
+    pub scrubber: Option<&'a review_eval::secret::Scrubber>,
     pub progress: &'a (dyn Fn(&str) + Sync),
 }
 
@@ -180,6 +183,7 @@ pub fn review(
         resume,
         keys: None,
         store: None,
+        scrubber: None,
         progress,
     })
 }

@@ -181,9 +181,9 @@ repeat them, which costs tokens.
   budget its front matter names; `review-run` passes no model.
 - **The workflow.** The review job installs the pinned Claude Code
   command line as the evaluate job does, builds `review-run` before the
-  Claude token is in any step's environment, and runs it offline. The
-  job keeps its read-only permissions, holds no reviewer-app key and
-  hands the agents no GitHub token.
+  Claude Code OAuth token is in any step's environment, and runs it
+  offline. The job keeps its read-only permissions, holds no
+  reviewer-app key and hands the agents no GitHub token.
 - **What stays.** The layers, the deep instances, the generalists
   reading report files, the post job's gate, the required
   `review-gate` check and the triggers stay as ADR-2610262245 has them.
@@ -287,18 +287,18 @@ repeat them, which costs tokens.
   agent or part and why. `review-run --only <gaps> --from <dir>`, behind
   `scripts/review-local.sh --resume`, reruns only those and each agent
   whose answer key changed, on any head; the verdict function is the
-  same. A key, proposed by the engine comparison and not yet accepted,
-  hashes the definition, model, effort, turns, `claude --version`,
-  prompt, split limit, agent instructions, own diff and a salt of the
-  invariants, `CLAUDE.md`, `AGENTS.md`, the domain model's index and
-  `.claude/agents/**`; a generalist's adds its specialists' keys and
-  reports. `--answers DIR` reuses an accepted answer stored by key once
-  it passes the report check again, and never stores a refused, cut-off,
-  silent or capped run; `answers drop <key>` removes one. Risks: an
-  injected answer frozen in the store (only the default branch's CI
-  writes it) and a key blind to files read outside it (the salt narrows
-  that). A gap recurring past `--max-resumes` resumes, or a blocking
-  finding kept three reviews on an unchanged file, is named `stalled:`.
+  same. A key, proposed and not yet accepted, hashes the definition,
+  model, effort, turns, `claude --version`, the whole command line
+  (refused tools included), prompt, split limit, instructions, own diff
+  and a salt. `--answers DIR`
+  reuses an accepted answer once it passes the report check, and never
+  stores a refused, cut-off, silent, capped or token-holding run.
+  Risks: an injected answer frozen in the store (only the default
+  branch's CI writes it) and a key blind to files read outside it.
+- The OAuth token stays out of every agent's reach: one step stages it
+  in a file the agents are refused, and review-run scrubs every file
+  and line it writes; a review whose agent's output held it fails, so
+  nothing is posted.
 - No new third-party dependency.
 
 ## Approval

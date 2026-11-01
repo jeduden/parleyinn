@@ -95,6 +95,7 @@ fn reviewed(
         resume: None,
         keys: Some(&keys),
         store: Some(store),
+        scrubber: None,
         progress: &|l| lines.lock().unwrap().push(l.to_owned()),
     })
     .unwrap();
@@ -351,6 +352,7 @@ fn an_answer_whose_log_is_gone_is_told_and_counted() {
         resume: None,
         keys: None,
         store: None,
+        scrubber: None,
         progress: &progress,
     };
     let unit = crate::run::Unit::whole("review-code".to_owned());
@@ -394,4 +396,45 @@ fn a_reused_specialist_whose_report_cannot_be_written_did_not_answer() {
         "{:?}",
         second.lines
     );
+}
+
+#[test]
+fn an_answer_that_held_the_token_is_never_stored_and_is_counted() {
+    const TOKEN: &str = "dummy-access-token-0123456789";
+    let dir = workdir();
+    let store = store_in(dir.path());
+    let host = FakeHost::new(fake::either);
+    let plan = plan();
+    let lines = Mutex::new(Vec::new());
+    let progress = |l: &str| lines.lock().unwrap().push(l.to_owned());
+    let known = review_gate::report::invariants();
+    let scrubber = review_eval::secret::Scrubber::new(&[TOKEN]);
+    let review = Review {
+        host: &host,
+        clock: &SystemClock::default(),
+        workdir: dir.path(),
+        plan: &plan,
+        known: &known,
+        options: Options::default(),
+        resume: None,
+        keys: None,
+        store: None,
+        scrubber: Some(&scrubber),
+        progress: &progress,
+    };
+    let unit = crate::run::Unit::whole("review-code".to_owned());
+    write(
+        dir.path(),
+        &format!("review/logs/{}.jsonl", unit.stem()),
+        &format!("{{\"note\":\"{TOKEN}\"}}\n"),
+    );
+    let run = crate::run::reused("review-code".to_owned(), unit.kind, "x", Vec::new());
+    let key = "a".repeat(64);
+
+    let failed = super::keep(&review, &store, &unit, &key, &(run, None));
+
+    assert!(failed);
+    assert!(!dir.path().join("answers").join(&key).exists());
+    let lines = lines.lock().unwrap().clone();
+    assert!(lines[0].ends_with("it held the Claude token"), "{lines:?}");
 }

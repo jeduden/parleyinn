@@ -40,7 +40,8 @@ impl FakeHost {
 
 impl Host for FakeHost {
     fn run(&self, command: &Command) -> Result<Output, String> {
-        if command.args == ["--version"] {
+        // A confined probe carries the refused tools after it (ENG-28).
+        if command.args.first().is_some_and(|a| a == "--version") {
             self.versions.lock().unwrap().push(command.clone());
             return Ok(Output {
                 code: Some(0),

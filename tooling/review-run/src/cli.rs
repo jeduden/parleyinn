@@ -19,15 +19,23 @@
 //! It prints the verdict and the counts for the workflow's step
 //! outputs, and each run as it ends on standard error, then what was
 //! not reviewed.
+//! Given `--credential` the directory a staging step wrote the access
+//! token into, it points every agent there and refuses it every read of
+//! it; every text it writes or prints is first scrubbed of that token
+//! and of the one it holds itself, and a review that found one requests
+//! changes, names the leak in a blocking finding and fails (ENG-28).
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::io::Write;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::Mutex;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Duration;
 
+use review_eval::credential::{self, Confined};
 use review_eval::host::Host;
+use review_eval::secret::Scrubber;
 use serde::Serialize;
 
 use crate::answers;
@@ -36,6 +44,7 @@ use crate::controls::{ABORTED, OVER_BUDGET, SystemClock};
 use crate::findings::{self, Tracked};
 use crate::gaps::{self, GAPS, Gap, NOT_REVIEWED};
 use crate::key::{self, Keys};
+use crate::leak;
 use crate::live;
 use crate::outcome::{Decision, decide};
 use crate::plan::{self, report_file};
@@ -59,7 +68,8 @@ pub const EXIT_USAGE: u8 = 2;
 /// How to call it.
 pub const USAGE: &str = "usage: review-run --workdir DIR [--parallel N] [--deadline SECONDS] \
 [--head-sha SHA] [--only GAPS --from DIR] [--max-cost-usd USD] [--breaker-fraction F] \
-[--answers DIR [--answers-read-only]] [--previous FINDINGS] [--max-resumes N] [--summary FILE]\n\
+[--answers DIR [--answers-read-only]] [--previous FINDINGS] [--max-resumes N] [--summary FILE] \
+[--credential DIR]\n\
        review-run answers drop KEY --answers DIR";
 
 /// The command line, read.
@@ -81,6 +91,8 @@ pub struct Args {
     /// How many resumes in a row may end in the same gap before its
     /// agent is not run again.
     pub max_resumes: u32,
+    /// The directory the Claude token was staged in, when given.
+    pub credential: Option<String>,
 }
 
 /// Runs the command on `args` and returns its exit code. It is `main`
@@ -89,6 +101,18 @@ pub struct Args {
 pub fn run(
     host: &dyn Host,
     args: impl IntoIterator<Item = String>,
+    stdout: &mut dyn Write,
+    stderr: &mut (dyn Write + Send),
+) -> u8 {
+    run_with(host, args, None, stdout, stderr)
+}
+
+/// [`run`], handed `token`, the Claude token the process holds, when
+/// it holds one: a form every text it writes or prints is scrubbed of.
+pub fn run_with(
+    host: &dyn Host,
+    args: impl IntoIterator<Item = String>,
+    token: Option<&str>,
     stdout: &mut dyn Write,
     stderr: &mut (dyn Write + Send),
 ) -> u8 {
@@ -109,7 +133,21 @@ pub fn run(
             let _ = writeln!(out, "review-run: {line}");
         }
     };
-    match review(host, &args, &progress) {
+    let guarded = guard(&args, token).and_then(|(scrubber, located)| {
+        let confined = located.as_deref().map(|dir| Confined::new(host, dir));
+        let host: &dyn Host = match &confined {
+            Some(confined) => confined,
+            None => host,
+        };
+        let leaks = AtomicUsize::new(0);
+        let scrubbed = |line: &str| {
+            let (line, n) = scrubber.scrub(line);
+            leaks.fetch_add(n, Ordering::SeqCst);
+            progress(&line);
+        };
+        review(host, &args, &scrubber, &leaks, &scrubbed).map_err(|msg| scrubber.scrub(&msg).0)
+    });
+    match guarded {
         // The step outputs carry the verdict to the workflow: one that
         // does not print fails the step rather than leave them empty (I6).
         Ok(printed) => match write!(stdout, "{printed}") {
@@ -214,17 +252,43 @@ fn prepare(
     })
 }
 
-/// Runs the review `args` name and writes its files; returns the step
-/// outputs to print.
+/// The scrubber for the token staged under `args`' credential and
+/// `token`, and that credential's directory, located.
+///
+/// # Errors
+///
+/// Fails when the credential does not resolve or read, or a token is
+/// too short for the scrub to match.
+fn guard(args: &Args, token: Option<&str>) -> Result<(Scrubber, Option<PathBuf>), String> {
+    let located = args
+        .credential
+        .as_deref()
+        .map(|dir| credential::locate(Path::new(dir)))
+        .transpose()?;
+    let staged = located.as_deref().map(credential::read).transpose()?;
+    let secrets: Vec<&str> = staged.as_deref().into_iter().chain(token).collect();
+
+    Ok((Scrubber::guarded(&secrets)?, located))
+}
+
+/// Runs the review `args` name and writes its files, each scrubbed by
+/// `scrubber`, counting into `leaks` every form of the token it
+/// replaced; returns the step outputs to print.
+///
+/// # Errors
+///
+/// Fails when the review could not run, or found the token.
 fn review(
     host: &dyn Host,
     args: &Args,
+    scrubber: &Scrubber,
+    leaks: &AtomicUsize,
     progress: &(dyn Fn(&str) + Sync),
 ) -> Result<String, String> {
     let workdir = Path::new(&args.workdir);
     let options = args.options;
     let p = prepare(host, args, progress)?;
-    let runs = run::review_on(&run::Review {
+    let mut runs = run::review_on(&run::Review {
         host,
         clock: &SystemClock::default(),
         workdir,
@@ -234,30 +298,31 @@ fn review(
         resume: p.resume.as_ref(),
         keys: p.keys.as_ref(),
         store: p.store.as_ref(),
+        scrubber: Some(scrubber),
         progress,
     })?;
-    let reports = reports(workdir, &p.plan, progress);
-    let decision = breaker::amend(
-        &p.plan,
-        decide(&p.plan, &runs, &reports, &p.known),
-        options.breaker,
-    );
-    let outputs = record(workdir, &p, &runs, decision, progress)?;
-    if let Some(summary) = &args.summary {
-        add_to_summary(Path::new(summary), &live::table(&runs), progress);
-    }
+    scrub_agent_output(workdir, scrubber, leaks, &mut runs)?;
+    let written = Written {
+        workdir,
+        scrubber,
+        leaks,
+    };
+    let decision = decision(workdir, &p.plan, &runs, &p.known, options.breaker, progress);
+    let summary = args.summary.as_deref().map(Path::new);
 
-    Ok(outputs)
+    record(&written, &p, (&runs, decision), summary, progress)
 }
 
-/// Writes the review's files in `workdir` from `decision`, decided on
-/// `runs` of the review `p` prepared, and returns the step outputs;
-/// tells `progress` what was resumed and what was not reviewed.
+/// Writes the review's files from `decision`, decided on `runs` of the
+/// review `p` prepared, and returns the step outputs; tells `progress`
+/// what was resumed and what was not reviewed, adds the table of the
+/// runs to the job summary `summary` names, and fails closed on a
+/// leaked token.
 fn record(
-    workdir: &Path,
+    written: &Written,
     p: &Prepared,
-    runs: &[AgentRun],
-    decision: Decision,
+    (runs, decision): (&[AgentRun], Decision),
+    summary: Option<&Path>,
     progress: &(dyn Fn(&str) + Sync),
 ) -> Result<String, String> {
     let held = held_back(&decision.not_reviewed);
@@ -275,18 +340,26 @@ fn record(
         p.resume.as_ref().map_or(&[][..], |r| r.stalls.as_slice()),
     );
     let stalled = stall::amend(&mut outcome, &stalls, p.max_resumes)
-        + follow(workdir, p, &mut outcome, &answers)?;
-    write_json::<Vec<stall::Stall>>(workdir, stall::STALLS, &stalls)?;
+        + follow(written, p, &mut outcome, &answers)?;
+    written.json::<Vec<stall::Stall>>(stall::STALLS, &stalls)?;
     let usage = usage::usage(runs, p.resume.as_ref().map(|r| r.from.as_str()));
     let reused = runs.iter().filter(|r| r.reused).count();
     let store_failed = runs.iter().filter(|r| r.store_failed).count();
-    write_json(workdir, OUTCOME, &outcome)?;
-    write_json(workdir, CONSULTED, &consulted)?;
-    write_json(workdir, ANSWERS, &answers)?;
-    write_json::<Vec<AgentUsage>>(workdir, USAGE_FILE, &usage)?;
-    write_json::<Vec<Gap>>(workdir, GAPS, &not_reviewed)?;
-    write_text(workdir, NOT_REVIEWED, &gaps::markdown(&not_reviewed))?;
-    write_json(workdir, RUN_ID, &p.id)?;
+    written.json(CONSULTED, &consulted)?;
+    written.json(ANSWERS, &answers)?;
+    written.json::<Vec<AgentUsage>>(USAGE_FILE, &usage)?;
+    written.json::<Vec<Gap>>(GAPS, &not_reviewed)?;
+    written.text(NOT_REVIEWED, &gaps::markdown(&not_reviewed))?;
+    written.json(RUN_ID, &p.id)?;
+    if let Some(path) = summary {
+        add_scrubbed_to_summary(path, runs, written, progress);
+    }
+    // The outcome goes last, so a leak any file above held is in it.
+    let leaked = written.leaks.load(Ordering::SeqCst);
+    if leaked > 0 {
+        leak::fail_closed(&mut outcome, leaked);
+    }
+    written.json(OUTCOME, &outcome)?;
     if let Some(resume) = &p.resume {
         progress(&resumed_line(resume, runs));
     }
@@ -295,6 +368,10 @@ fn record(
     if !not_reviewed.is_empty() {
         let names: Vec<String> = not_reviewed.iter().map(Gap::label).collect();
         progress(&format!("not reviewed: {}", names.join(", ")));
+    }
+    let leaked = written.leaks.load(Ordering::SeqCst);
+    if leaked > 0 {
+        return Err(leak::reason(leaked));
     }
 
     Ok(format!(
@@ -310,8 +387,39 @@ fn record(
     ))
 }
 
-/// Each of `plan`'s specialists' report the runs wrote in `workdir`, by
-/// name.
+/// The review's decision from `runs` and the reports they wrote, less
+/// what the breaker kept back.
+fn decision(
+    workdir: &Path,
+    plan: &plan::Plan,
+    runs: &[AgentRun],
+    known: &BTreeSet<String>,
+    breaker_fraction: f64,
+    progress: &(dyn Fn(&str) + Sync),
+) -> Decision {
+    let reports = reports(workdir, plan, progress);
+    breaker::amend(plan, decide(plan, runs, &reports, known), breaker_fraction)
+}
+
+/// Scrubs every text an agent produced before anything reads it as the
+/// review's: its logs and reports on disk, its runs in memory.
+fn scrub_agent_output(
+    workdir: &Path,
+    scrubber: &Scrubber,
+    leaks: &AtomicUsize,
+    runs: &mut [AgentRun],
+) -> Result<(), String> {
+    let mut leaked = leak::scrub_runs(scrubber, runs);
+    for dir in [crate::LOGS, crate::REPORTS] {
+        leaked += scrubber.scrub_tree(&workdir.join(dir))?;
+    }
+    leaks.fetch_add(leaked, Ordering::SeqCst);
+    Ok(())
+}
+
+/// Each of `plan`'s specialists' reports under `workdir`, by name, when
+/// it wrote one; a report that is there but does not read stands as
+/// none, and `progress` is told why (I6).
 fn reports(
     workdir: &Path,
     plan: &plan::Plan,
@@ -341,6 +449,19 @@ fn reports(
 fn held_back(gaps: &[Gap]) -> (usize, usize) {
     let count = |word: &str| gaps.iter().filter(|g| g.reason.starts_with(word)).count();
     (count(OVER_BUDGET), count(ABORTED))
+}
+
+/// Adds the table of `runs` to the job summary at `path`, scrubbed of
+/// the token like every file, its leaks counted into `leaks`.
+fn add_scrubbed_to_summary(
+    path: &Path,
+    runs: &[AgentRun],
+    written: &Written,
+    progress: &(dyn Fn(&str) + Sync),
+) {
+    let (table, n) = written.scrubber.scrub(&live::table(runs));
+    written.leaks.fetch_add(n, Ordering::SeqCst);
+    add_to_summary(path, &table, progress);
 }
 
 /// Adds `table` to the job summary at `path`; one that cannot be added
@@ -399,7 +520,7 @@ fn resumed(
 ///
 /// Fails when the findings cannot be written.
 fn follow(
-    workdir: &Path,
+    written: &Written,
     p: &Prepared,
     outcome: &mut review_gate::ReviewOutcome,
     answers: &std::collections::BTreeMap<String, String>,
@@ -407,7 +528,7 @@ fn follow(
     let found = findings::attributed(&outcome.findings, answers, &p.plan);
     let run = p.id.head.as_deref().unwrap_or("unknown head");
     let tracking = findings::track(&found, p.previous.as_deref(), run, &|path| {
-        findings::cited(workdir, path)
+        findings::cited(written.workdir, path)
     });
     let rulings = findings::rulings(&tracking);
     outcome.summary.push_str(&findings::summary(&tracking));
@@ -415,12 +536,8 @@ fn follow(
         outcome.verdict = review_gate::REQUEST_CHANGES_VERDICT.to_owned();
         outcome.findings.extend(rulings.iter().cloned());
     }
-    write_json(workdir, findings::FINDINGS, &tracking.kept)?;
-    write_text(
-        workdir,
-        findings::FINDINGS_NOTES,
-        &findings::markdown(&tracking),
-    )?;
+    written.json(findings::FINDINGS, &tracking.kept)?;
+    written.text(findings::FINDINGS_NOTES, &findings::markdown(&tracking))?;
 
     Ok(rulings.len())
 }
@@ -453,18 +570,30 @@ fn resumed_line(resume: &Resume, runs: &[AgentRun]) -> String {
     )
 }
 
-/// Writes `text` to `rel` under `workdir`.
-fn write_text(workdir: &Path, rel: &str, text: &str) -> Result<(), String> {
-    let path = workdir.join(rel);
-    fs::write(&path, text).map_err(|e| format!("write {}: {e}", path.display()))
+/// Where the review writes its files, each scrubbed first, every form
+/// of the token it replaced counted into `leaks`.
+struct Written<'a> {
+    workdir: &'a Path,
+    scrubber: &'a Scrubber,
+    leaks: &'a AtomicUsize,
 }
 
-/// Writes `value` as JSON to `rel` under `workdir`.
-fn write_json<T: Serialize>(workdir: &Path, rel: &str, value: &T) -> Result<(), String> {
-    let path = workdir.join(rel);
-    let text = serde_json::to_string_pretty(value)
-        .map_err(|e| format!("encode {}: {e}", path.display()))?;
-    fs::write(&path, format!("{text}\n")).map_err(|e| format!("write {}: {e}", path.display()))
+impl Written<'_> {
+    /// Writes `text`, scrubbed, to `rel` under the work directory.
+    fn text(&self, rel: &str, text: &str) -> Result<(), String> {
+        let path = self.workdir.join(rel);
+        let (text, n) = self.scrubber.scrub(text);
+        self.leaks.fetch_add(n, Ordering::SeqCst);
+        fs::write(&path, text).map_err(|e| format!("write {}: {e}", path.display()))
+    }
+
+    /// Writes `value` as JSON, scrubbed, to `rel` under the work
+    /// directory.
+    fn json<T: Serialize>(&self, rel: &str, value: &T) -> Result<(), String> {
+        let text = serde_json::to_string_pretty(value)
+            .map_err(|e| format!("encode {}: {e}", self.workdir.join(rel).display()))?;
+        self.text(rel, &format!("{text}\n"))
+    }
 }
 
 /// Reads `--name value` and `--name=value` pairs: the work directory,
@@ -473,7 +602,8 @@ fn write_json<T: Serialize>(workdir: &Path, rel: &str, value: &T) -> Result<(), 
 fn parse(args: impl IntoIterator<Item = String>) -> Result<Args, String> {
     let mut workdir = None;
     let mut options = Options::default();
-    let (mut head, mut only, mut from, mut summary) = (None, None, None, None);
+    let (mut head, mut only, mut from, mut summary, mut credential) =
+        (None, None, None, None, None);
     let (mut answers, mut read_only, mut previous) = (None, false, None);
     let mut max_resumes = stall::MAX_RESUMES;
     let mut args = args.into_iter();
@@ -502,6 +632,7 @@ fn parse(args: impl IntoIterator<Item = String>) -> Result<Args, String> {
             "answers",
             "previous",
             "max-resumes",
+            "credential",
         ]
         .contains(&name)
         {
@@ -524,6 +655,7 @@ fn parse(args: impl IntoIterator<Item = String>) -> Result<Args, String> {
             "answers" => answers = Some(value),
             "previous" => previous = Some(value),
             "max-resumes" => max_resumes = positive(name, &value)?,
+            "credential" => credential = Some(value),
             _ => summary = Some(value),
         }
     }
@@ -547,6 +679,7 @@ fn parse(args: impl IntoIterator<Item = String>) -> Result<Args, String> {
         answers: answers.map(|dir| (dir, read_only)),
         previous,
         max_resumes,
+        credential,
     })
 }
 

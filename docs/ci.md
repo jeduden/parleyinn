@@ -76,6 +76,9 @@ is short, because a finding found late costs a whole round.
 - No job touches the real `HOME`, `PARINN_HOME` or Claude Code
   configuration (ENG-14), and each workflow holds the least `permissions:`
   it needs, and zizmor stays green.
+- No step that runs an agent holds the Claude Code OAuth token: one step
+  in each agent job stages it outside the agents' reach, and what an
+  agent job keeps is scrubbed of it before any upload (ENG-28).
 
 ## Actionable
 

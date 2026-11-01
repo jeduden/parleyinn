@@ -100,6 +100,12 @@ pub(crate) fn keep(r: &Review, store: &Store, unit: &Unit, key: &str, done: &Don
             return true;
         }
     };
+    if leaks(r, &text, report.as_deref()) {
+        (r.progress)(&format!(
+            "{label}: its answer was not stored: it held the Claude token"
+        ));
+        return true;
+    }
     let log = review_eval::log::parse(&text);
     if let Err(why) = store::accepted(unit.kind, &log, report.as_deref(), r.known) {
         (r.progress)(&format!("{label}: its answer was not stored: {why}"));
@@ -117,6 +123,13 @@ pub(crate) fn keep(r: &Review, store: &Store, unit: &Unit, key: &str, done: &Don
             true
         }
     }
+}
+
+/// Whether the log `text` or the `report` holds a form of the Claude
+/// token the review scrubs: such an answer is never stored (ENG-28, I6).
+fn leaks(r: &Review, text: &str, report: Option<&str>) -> bool {
+    r.scrubber
+        .is_some_and(|s| s.scrub(text).1 + report.map_or(0, |t| s.scrub(t).1) > 0)
 }
 
 #[cfg(test)]

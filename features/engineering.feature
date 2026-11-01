@@ -303,6 +303,9 @@ Feature: Engineering quality (ENG)
     And review-run given an answer store takes every accepted answer stored under an unchanged key, runs on a new commit only the specialist whose diff changed and its generalist, never stores a refused report, and runs again an agent whose stored report fails the report check
     And review-run runs no more an agent whose gap recurred the same way in two resumes in a row, and names it stalled in a blocking finding so a person acts
     And its agents can write nothing: review-run allows them Read, Glob and Grep alone
+    And no step that runs an agent holds the "CLAUDE_CODE_OAUTH_TOKEN" token: one step in each agent job stages it where no agent reads it, review-run refuses its agents every read of the staged credential's directory by name, of the process, system and device files and outside their trees, and every file an agent job uploads waits for a scrub of that token
+    And every text the review writes, prints or uploads is scrubbed of that token: review-run, its agents' output holding the token, leaves it in no file under review/ and in no line it prints
+    And a review in which an agent's output held that token requests changes, naming the leak in a blocking finding, and fails, so nothing is posted
     And only one job holds the "JEDUDEN_REVIEW_AGENT_KEY" key, and it runs no agent
     And that job runs only after the agents' job succeeded
     And that job decides the review with "cargo run --locked --quiet -p review-gate"

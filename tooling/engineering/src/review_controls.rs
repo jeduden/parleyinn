@@ -316,6 +316,7 @@ pub fn retry_problems(checkout: &Checkout, workdir: &Path) -> Vec<String> {
             resume: None,
             keys: None,
             store: None,
+            scrubber: None,
             progress: &|_| {},
         })
     });

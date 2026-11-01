@@ -549,6 +549,7 @@ fn the_work_directory_alone_takes_the_default_options() {
             answers: None,
             previous: None,
             max_resumes: crate::stall::MAX_RESUMES,
+            credential: None,
         }
     );
 }
@@ -576,6 +577,8 @@ fn the_flags_read_inline_or_as_the_next_argument() {
             "--previous",
             "f.json",
             "--max-resumes=4",
+            "--credential",
+            "cred",
         ]))
         .unwrap(),
         Args {
@@ -594,6 +597,7 @@ fn the_flags_read_inline_or_as_the_next_argument() {
             answers: Some(("store".to_owned(), true)),
             previous: Some("f.json".to_owned()),
             max_resumes: 4,
+            credential: Some("cred".to_owned()),
         }
     );
 }
@@ -686,11 +690,243 @@ fn a_value_that_does_not_encode_is_an_error_naming_its_file() {
     let dir = TempDir::new().unwrap();
     let value: BTreeMap<(u8, u8), u8> = BTreeMap::from([((1, 2), 3)]);
 
-    let err = write_json(dir.path(), "out.json", &value).unwrap_err();
+    let leaks = AtomicUsize::new(0);
+    let written = Written {
+        workdir: dir.path(),
+        scrubber: &Scrubber::default(),
+        leaks: &leaks,
+    };
+
+    let err = written.json("out.json", &value).unwrap_err();
 
     assert!(err.starts_with("encode "), "{err}");
     assert!(err.contains("out.json: "), "{err}");
     assert!(!dir.path().join("out.json").exists());
+}
+
+/// A stand-in for the Claude token; never a real one.
+const TOKEN: &str = "dummy-access-token-0123456789";
+
+/// Runs the review in `dir` handed `token`, with `extra` after the work
+/// directory.
+fn run_holding(
+    host: &FakeHost,
+    dir: &Path,
+    token: Option<&str>,
+    extra: &[&str],
+) -> (u8, String, String) {
+    let mut line = vec!["--workdir", dir.to_str().unwrap()];
+    line.extend(extra);
+    let mut out = Vec::new();
+    let mut err = Vec::new();
+    let code = super::run_with(host, args(&line), token, &mut out, &mut err);
+    (
+        code,
+        String::from_utf8(out).unwrap(),
+        String::from_utf8(err).unwrap(),
+    )
+}
+
+/// Every file under `dir`'s review directory, read.
+fn written(dir: &Path) -> String {
+    fn walk(at: &Path, all: &mut String) {
+        for entry in fs::read_dir(at).unwrap() {
+            let path = entry.unwrap().path();
+            if path.is_dir() {
+                walk(&path, all);
+            } else {
+                all.push_str(&String::from_utf8_lossy(&fs::read(&path).unwrap()));
+            }
+        }
+    }
+    let mut all = String::new();
+    walk(&dir.join("review"), &mut all);
+    all
+}
+
+/// A specialist that reads the staged credential, as an agent whose
+/// Read was not refused would, and states the token it found; every
+/// other agent answers as it does.
+fn leaking(command: &review_eval::host::Command) -> Result<review_eval::host::Output, String> {
+    if fake::agent_of(command) != "lang-rust" {
+        return fake::either(command);
+    }
+    let dir = command
+        .env
+        .iter()
+        .find(|(k, _)| k == review_eval::credential::CONFIG_VAR)
+        .map(|(_, v)| v.clone())
+        .unwrap();
+    let token = review_eval::credential::read(Path::new(&dir)).unwrap();
+    let text = format!("my environment holds {token}");
+    let outcome = format!("outcome: none — {token}");
+    fake::answer(command, &[&text], &outcome)
+}
+
+#[test]
+fn a_review_confines_every_agent_to_the_staged_credential() {
+    let dir = workdir();
+    let cred = dir.path().join("cred");
+    review_eval::credential::stage(&cred, TOKEN).unwrap();
+    let host = FakeHost::new(fake::either);
+
+    let (code, out, err) = run_holding(
+        &host,
+        dir.path(),
+        None,
+        &["--credential", cred.to_str().unwrap()],
+    );
+
+    assert_eq!(code, EXIT_OK, "{err}");
+    assert!(out.starts_with("verdict=approve\n"), "{out}");
+    let shown = fs::canonicalize(&cred).unwrap().display().to_string();
+    let calls = host.calls.lock().unwrap();
+    assert!(!calls.is_empty(), "no agent ran");
+    for command in calls.iter() {
+        assert!(
+            command.env.contains(&(
+                review_eval::credential::CONFIG_VAR.to_owned(),
+                shown.clone()
+            )),
+            "{command:?}"
+        );
+        let rule = format!(",Read(/{shown}/**),Read(/{shown})");
+        assert!(
+            command.args.iter().any(|a| a.ends_with(&rule)),
+            "{command:?}"
+        );
+    }
+}
+
+#[test]
+fn a_review_whose_agent_leaked_the_token_scrubs_it_everywhere_and_fails_closed() {
+    let dir = workdir();
+    let cred = dir.path().join("cred");
+    review_eval::credential::stage(&cred, TOKEN).unwrap();
+    let host = FakeHost::new(leaking);
+
+    let (code, out, err) = run_holding(
+        &host,
+        dir.path(),
+        None,
+        &["--credential", cred.to_str().unwrap()],
+    );
+
+    assert_eq!(code, EXIT_FAILURE, "{err}");
+    assert!(
+        out.starts_with("failed=an agent's output contained the Claude token: "),
+        "{out}"
+    );
+    assert!(out.ends_with("redacted; revoke and rotate it\n"), "{out}");
+    assert!(!out.contains(TOKEN) && !err.contains(TOKEN), "{err}");
+    let all = written(dir.path());
+    assert!(!all.contains(TOKEN), "{all}");
+    assert!(all.contains(review_eval::secret::REDACTED));
+    let outcome = review_gate::parse_outcome(
+        &fs::read_to_string(dir.path().join("review/outcome.json")).unwrap(),
+    )
+    .unwrap();
+    assert_eq!(outcome.verdict, "request_changes");
+    assert!(
+        outcome.findings.iter().any(|f| f.severity == "blocking"
+            && f.body
+                .starts_with("an agent's output contained the Claude token: ")),
+        "{outcome:?}"
+    );
+}
+
+#[test]
+fn a_token_the_process_holds_is_scrubbed_without_a_staged_credential() {
+    let dir = workdir();
+    let host = FakeHost::new(|c: &review_eval::host::Command| {
+        let text = format!("{} saw {TOKEN}", fake::agent_of(c));
+        fake::answer(c, &[&text], "outcome: none — fine.")
+    });
+
+    let (code, out, _) = run_holding(&host, dir.path(), Some(TOKEN), &[]);
+
+    assert_eq!(code, EXIT_FAILURE);
+    assert!(
+        out.starts_with("failed=an agent's output contained"),
+        "{out}"
+    );
+    assert!(!written(dir.path()).contains(TOKEN));
+}
+
+#[test]
+fn a_review_holding_a_token_too_short_for_the_scrub_runs_no_agent() {
+    let dir = workdir();
+    let host = FakeHost::new(fake::either);
+
+    let (code, out, _) = run_holding(&host, dir.path(), Some("dummy-short"), &[]);
+
+    assert_eq!(code, EXIT_FAILURE);
+    assert_eq!(
+        out,
+        format!(
+            "failed=the Claude token is shorter than the {} characters the scrub can match; \
+             refusing to use it\n",
+            review_eval::secret::SHORTEST
+        )
+    );
+    assert!(host.agents().is_empty());
+}
+
+#[test]
+fn a_review_holding_a_staged_token_and_its_own_scrubs_both() {
+    // The process's own token differs from the staged one: each is a
+    // form, and an agent leaking either fails the review closed.
+    let own = "dummy-process-token-9876543210";
+    let dir = workdir();
+    let cred = dir.path().join("cred");
+    review_eval::credential::stage(&cred, TOKEN).unwrap();
+    let host = FakeHost::new(move |c: &review_eval::host::Command| {
+        let text = format!("{} saw {TOKEN} and {own}", fake::agent_of(c));
+        fake::answer(c, &[&text], "outcome: none — fine.")
+    });
+
+    let (code, out, err) = run_holding(
+        &host,
+        dir.path(),
+        Some(own),
+        &["--credential", cred.to_str().unwrap()],
+    );
+
+    assert_eq!(code, EXIT_FAILURE);
+    assert!(
+        out.starts_with("failed=an agent's output contained the Claude token: "),
+        "{out}"
+    );
+    let all = written(dir.path()) + &out + &err;
+    assert!(!all.contains(TOKEN) && !all.contains(own), "{all}");
+    assert!(all.contains(review_eval::secret::REDACTED));
+    assert!(!host.agents().is_empty());
+}
+
+#[test]
+fn a_review_whose_credential_does_not_read_runs_no_agent() {
+    let dir = workdir();
+    let host = FakeHost::new(fake::either);
+    let missing = dir.path().join("missing");
+
+    let (code, out, _) = run_holding(
+        &host,
+        dir.path(),
+        None,
+        &["--credential", missing.to_str().unwrap()],
+    );
+    assert_eq!(code, EXIT_FAILURE);
+    assert!(out.starts_with("failed=locate "), "{out}");
+    fs::create_dir(&missing).unwrap();
+    let (code, out, _) = run_holding(
+        &host,
+        dir.path(),
+        None,
+        &["--credential", missing.to_str().unwrap()],
+    );
+    assert_eq!(code, EXIT_FAILURE);
+    assert!(out.starts_with("failed=read "), "{out}");
+    assert!(host.agents().is_empty());
 }
 
 #[test]
