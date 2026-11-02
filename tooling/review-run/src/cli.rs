@@ -48,6 +48,7 @@ use crate::leak;
 use crate::live;
 use crate::outcome::{Decision, decide};
 use crate::plan::{self, report_file};
+use crate::previous;
 use crate::requirements;
 use crate::resume::{self, Resume};
 use crate::run::{self, AgentRun, Options};
@@ -119,6 +120,9 @@ pub fn run_with(
     let args: Vec<String> = args.into_iter().collect();
     if let Some(rest) = answers::subcommand(&args) {
         return answers::run(&rest, stdout, stderr);
+    }
+    if let Some(rest) = previous::subcommand(&args) {
+        return previous::run(&rest, stdout, stderr);
     }
     let args = match parse(args) {
         Ok(parsed) => parsed,

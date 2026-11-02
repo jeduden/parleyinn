@@ -310,3 +310,41 @@ fn a_command_line_that_is_wrong_is_a_usage_error() {
         assert!(err.contains("usage: review-run previous"), "{err}");
     }
 }
+
+/// A writer that refuses everything.
+struct Refuses;
+
+impl Write for Refuses {
+    fn write(&mut self, _: &[u8]) -> std::io::Result<usize> {
+        Err(std::io::Error::other("no room"))
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        Ok(())
+    }
+}
+
+#[test]
+fn an_output_that_cannot_be_written_is_a_failure_that_says_so() {
+    let dir = TempDir::new().unwrap();
+    let a = dir.path().join("a.json");
+    let r = dir.path().join("r.json");
+    fs::write(&a, listing(&[])).unwrap();
+    fs::write(&r, "[]").unwrap();
+    let mut err = Vec::new();
+    let code = run(
+        &args(&[
+            "select",
+            "--pull",
+            "7",
+            "--artifacts",
+            a.to_str().unwrap(),
+            "--runs",
+            r.to_str().unwrap(),
+        ]),
+        &mut Refuses,
+        &mut err,
+    );
+    assert_eq!(code, EXIT_FAILURE);
+    assert!(String::from_utf8(err).unwrap().contains("no room"));
+}
