@@ -229,14 +229,31 @@ fn starts_cli(line: &str) -> bool {
     })
 }
 
+/// The command of `review-run` that only picks and checks the findings
+/// a review carries: it returns before the command line reads an
+/// agent, so it starts none.
+const NO_AGENT_COMMAND: &str = "previous";
+
+/// Whether `text` starts `review-run` in any spelling of it, other than
+/// as its [`NO_AGENT_COMMAND`]: the word after the marker is that
+/// command and nothing longer, never a flag such as `--previous`.
+fn starts_review_run(text: &str) -> bool {
+    std::iter::once(AGENT_RUN)
+        .chain(AGENT_RUN_ALT)
+        .chain(std::iter::once(AGENT_BINARY))
+        .any(|marker| {
+            text.match_indices(marker).any(|(at, _)| {
+                let rest = text[at + marker.len()..].trim_start();
+                let word = rest.split(char::is_whitespace).next().unwrap_or_default();
+                word != NO_AGENT_COMMAND
+            })
+        })
+}
+
 /// Whether a job's `text` runs the review's agents, a harness session,
 /// or installs the command line any of its steps can start one with.
 fn runs_agents(text: &str) -> bool {
-    text.contains(AGENT_RUN)
-        || AGENT_RUN_ALT.iter().any(|a| text.contains(a))
-        || text.contains(AGENT_BINARY)
-        || text.contains(AGENT_ACTION)
-        || installs_cli(text)
+    starts_review_run(text) || text.contains(AGENT_ACTION) || installs_cli(text)
 }
 
 /// A job's steps, each from its `- ` line at the steps' indent.
@@ -328,11 +345,7 @@ fn uploads_dir(paths: &[String], dir: &str) -> bool {
 /// `run`, or the command line itself.
 fn runs_agent_step(step: &str) -> bool {
     // A build of review-run passes it no arguments, and runs nothing.
-    step.contains(AGENT_RUN)
-        || AGENT_RUN_ALT.iter().any(|a| step.contains(a))
-        || step.contains(AGENT_BINARY)
-        || step.contains(EVAL_RUN)
-        || step.lines().any(starts_cli)
+    starts_review_run(step) || step.contains(EVAL_RUN) || step.lines().any(starts_cli)
 }
 
 /// A step's name, or its first line when it has none.

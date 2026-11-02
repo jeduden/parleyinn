@@ -1020,6 +1020,8 @@ fn every_other_use_of_review_run_still_starts_agents() {
         "cargo run --locked --quiet --offline -p review-run -- --workdir . previous",
         "cargo run -p review-run -- previously",
         "cargo run -p review-run -- previousx select",
+        "cargo run -p review-run -- --previous f --workdir .",
+        "target/debug/review-run --previous f",
         "cargo run -p review-run -- answers drop K",
         "cargo run -p review-run --",
         "target/debug/review-run",

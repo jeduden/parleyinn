@@ -68,6 +68,7 @@ jobs:
     # setup before them.
     timeout-minutes: 120
     permissions:
+      actions: read
       contents: read
       pull-requests: read
     outputs:
@@ -172,6 +173,21 @@ jobs:
       - name: Build review-run
         if: steps.pull_head.outputs.number != ''
         run: cargo build --locked --quiet -p review-run
+      # The findings the previous review of this pull request kept, so
+      # review-run marks each one new, still open or resolved (ENG-28).
+      # The artifact is the newest one of the pull request's name that a
+      # run of main's review workflow uploaded; one of that name from any
+      # other run is refused, as any workflow a pull request defines may
+      # upload one. This step holds the job's read-only token and not the
+      # Claude token, which is staged below.
+      - name: Fetch the previous review's findings
+        id: previous
+        if: steps.pull_head.outputs.number != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PULL: ${{ steps.pull_head.outputs.number }}
+        run: scripts/review-previous.sh
       # The Claude token reaches no agent's environment and no file its
       # tools can read (ENG-28). This step alone holds it, and writes it
       # into a credentials file only its owner reads, under the runner's
@@ -213,9 +229,12 @@ jobs:
       - name: Review
         id: review
         if: steps.pull_head.outputs.number != ''
+        env:
+          PREVIOUS: ${{ steps.previous.outputs.file }}
         run: |
           cargo run --locked --quiet --offline -p review-run -- --workdir . --parallel 32 \
-            --credential "$RUNNER_TEMP/claude-credential" > review/run.txt
+            --credential "$RUNNER_TEMP/claude-credential" \
+            ${PREVIOUS:+--previous "$PREVIOUS"} > review/run.txt
       # Whatever review-run wrote is scrubbed of the token once more, a
       # run cut off before its own scrub included, before any step reads
       # it into the job summary or uploads it; a form found fails the
@@ -230,6 +249,7 @@ jobs:
             --path review/logs --path review/reports --path review/answers.json \
             --path review/usage.json --path review/outcome.json --path review/consulted.json \
             --path review/gaps.json --path review/not-reviewed.md --path review/run-id.json \
+            --path review/findings.json --path review/findings.md \
             --path review/run.txt --path review/agent-runs.jsonl --path review/report.html
           code=$?
           set -e
@@ -290,6 +310,20 @@ jobs:
             review/report.html
             review/agent-runs.jsonl
             review/usage.json
+          if-no-files-found: error
+      # The findings this review kept, under the pull request's own
+      # name, for its next review to fetch: kept 90 days, a review the
+      # job's steps all passed. Only a run of main's review workflow
+      # may be trusted for one (scripts/review-previous.sh).
+      - name: Keep the tracked findings for the next review
+        if: always() && steps.review.outcome == 'success' && steps.scrub.outputs.scrubbed == 'true'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: review-findings-pr-${{ steps.pull_head.outputs.number }}
+          path: |
+            review/findings.json
+            review/findings.md
+          retention-days: 90
           if-no-files-found: error
       # The run logs under review/logs/ stay in the job: they hold every
       # tool result an agent read, scrubbed of the token but whatever
