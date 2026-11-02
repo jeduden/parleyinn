@@ -247,6 +247,12 @@ fn served_under(w: &mut World, index: usize, run: &str) -> Result<Value, String>
         return Err(format!("the call was not served: {}", reply_text(&reply)));
     }
     let id = id.ok_or("the call carries no tool-use id")?;
+    // The log is written as the call is served, so its line may trail
+    // the reply a moment: wait for it, bounded.
+    wait_until("the log to hold the call", || {
+        Ok(!logged(w, &id)?.is_empty())
+    })
+    .ok();
     let log = logged(w, &id)?;
     match log.as_slice() {
         [one] if one["run"] == run => Ok(one.clone()),
