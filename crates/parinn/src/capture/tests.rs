@@ -174,6 +174,32 @@ fn a_finder_returns_the_runs_read_or_none_once_its_wait_passes() {
 }
 
 #[test]
+fn a_finder_waits_out_a_binding_being_taken_before_it_says_it_is_not_serving() {
+    let shared = Arc::new(Shared::default());
+    shared.taking.store(true, Ordering::SeqCst);
+    let finder = Finder(shared.clone());
+    let later = shared.clone();
+    let taker = std::thread::spawn(move || {
+        std::thread::sleep(Duration::from_millis(60));
+        later.serving.store(true, Ordering::SeqCst);
+        later.taking.store(false, Ordering::SeqCst);
+    });
+
+    assert!(
+        finder.serving(),
+        "a binding taken as the call arrives holds"
+    );
+    drop(taker);
+
+    shared.serving.store(false, Ordering::SeqCst);
+    shared.taking.store(true, Ordering::SeqCst);
+    assert!(
+        !finder.serving(),
+        "a take that outlasts the wait is not waited on"
+    );
+}
+
+#[test]
 fn a_finder_waits_out_a_read_in_progress_before_it_returns_the_runs_it_knows() {
     let shared = Arc::new(Shared::default());
     shared.read("toolu_1".to_owned(), "s".to_owned());

@@ -53,6 +53,9 @@ pub(crate) const SEGMENT_EVERY: Duration = Duration::from_secs(30);
 /// How often a call waiting for its tool-use id looks again.
 const LOOK: Duration = Duration::from_millis(10);
 
+/// How long a call waits for a binding being taken to be recorded.
+const TAKE_WAIT: Duration = Duration::from_millis(500);
+
 /// The directory of the MCP servers' start markers, in the home.
 const MARKERS: &str = "mcp";
 
@@ -77,6 +80,9 @@ pub(crate) struct Shared {
     /// Whether a read of the transcripts is in progress: a line it
     /// committed may not have given its tool-use id yet.
     polling: AtomicBool,
+    /// Whether session bindings are being taken: one it commits does not
+    /// make the server serve until it has been recorded here.
+    taking: AtomicBool,
 }
 
 impl Shared {
@@ -108,7 +114,16 @@ impl Shared {
 pub(crate) struct Finder(pub(crate) Arc<Shared>);
 
 impl mcp::tool_call::Runs for Finder {
+    #[expect(
+        clippy::disallowed_methods,
+        reason = "a call waits for a binding being taken at most its bound in wall-clock \
+                  time (PRV-14); no derived artifact reads it (I10)"
+    )]
     fn serving(&self) -> bool {
+        let started = Instant::now();
+        while self.0.taking.load(Ordering::SeqCst) && started.elapsed() < TAKE_WAIT {
+            std::thread::sleep(LOOK);
+        }
         self.0.serving.load(Ordering::SeqCst)
     }
 
@@ -253,10 +268,21 @@ impl Running {
         left.unwrap_or_else(|| (self.capture.clock)())
     }
 
+    /// Takes the session bindings, marking the take in progress.
+    fn bind(&mut self) {
+        // The store commits a binding taken before `serving` says so: a
+        // call arriving between the two must wait, not be served under no
+        // run (PRV-14).
+        let shared = self.capture.shared.clone();
+        shared.taking.store(true, Ordering::SeqCst);
+        self.take();
+        shared.taking.store(false, Ordering::SeqCst);
+    }
+
     /// Takes every session binding of its harness process no MCP server
     /// took, each transcript path resolved within the transcript roots or
     /// the run's worktree.
-    fn bind(&mut self) {
+    fn take(&mut self) {
         let Some(harness) = self.capture.harness else {
             return;
         };
