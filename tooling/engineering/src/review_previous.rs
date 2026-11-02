@@ -8,6 +8,8 @@
 //! run of main's review workflow uploaded, never one a workflow the pull
 //! request defines uploaded under the same name.
 
+use review_run::previous::Selection;
+
 use crate::Checkout;
 use crate::review_workflow::load;
 
@@ -141,8 +143,15 @@ pub fn workflow_problems(job: &str) -> Vec<String> {
 /// none qualifies.
 #[must_use]
 pub fn selection_problems() -> Vec<String> {
-    use review_run::previous::{Selection, select};
+    selection_problems_with(&review_run::previous::select)
+}
 
+/// `previous select`, or what stands in for it: the pull request, the
+/// artifacts' listing and the runs' list in, the pick out.
+type Select<'a> = &'a dyn Fn(&str, &str, &str) -> Result<Selection, String>;
+
+/// [`selection_problems`] of `select`.
+fn selection_problems_with(select: Select) -> Vec<String> {
     const NAME: &str = "review-findings-pr-7";
     let artifact = |id: u64, at: &str, run: u64| {
         format!(
@@ -192,7 +201,7 @@ pub fn selection_problems() -> Vec<String> {
             "previous select took or missed an artifact whose run is unknown: {other:?}, want none with 1 refused"
         )),
     }
-    problems.extend(trigger_problems());
+    problems.extend(trigger_problems(select));
     let forged = format!(
         "[{},{},{}]",
         run(30, ".github/workflows/ci.yml", "workflow_run"),
@@ -215,9 +224,7 @@ pub fn selection_problems() -> Vec<String> {
 /// What is wrong with `previous select` for one artifact: each trigger
 /// that runs main's definition is trusted, and an expired artifact is
 /// taken from no one.
-fn trigger_problems() -> Vec<String> {
-    use review_run::previous::select;
-
+fn trigger_problems(select: Select) -> Vec<String> {
     let run = |event: &str| {
         format!(r#"[{{"id":40,"path":".github/workflows/review.yml","event":"{event}"}}]"#)
     };

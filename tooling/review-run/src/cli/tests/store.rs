@@ -133,3 +133,23 @@ fn the_answers_command_runs_in_place_of_a_review() {
     );
     assert!(host.agents().is_empty());
 }
+
+#[test]
+fn the_previous_command_runs_in_place_of_a_review() {
+    let host = FakeHost::new(fake::either);
+    let dir = TempDir::new().unwrap();
+    let file = dir.path().join("findings.json");
+    fs::write(&file, "[]").unwrap();
+    let mut out = Vec::new();
+    let mut err = Vec::new();
+
+    let code = run(
+        &host,
+        args(&["previous", "check", file.to_str().unwrap()]),
+        &mut out,
+        &mut err,
+    );
+
+    assert_eq!(code, EXIT_OK, "{}", String::from_utf8(err).unwrap());
+    assert!(host.agents().is_empty());
+}

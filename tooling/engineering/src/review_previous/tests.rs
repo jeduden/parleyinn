@@ -176,3 +176,76 @@ fn a_fetch_without_the_size_cap_or_the_summary_line_is_named() {
     assert_eq!(silent.len(), 1, "{silent:?}");
     assert!(silent[0].contains("job summary"), "{silent:?}");
 }
+
+/// A `select` that gives `got` whatever it is asked.
+fn gives(got: Result<Selection, String>) -> impl Fn(&str, &str, &str) -> Result<Selection, String> {
+    move |_, _, _| got.clone()
+}
+
+#[test]
+fn a_selection_that_takes_the_wrong_artifact_is_named_at_every_check() {
+    let wrong = gives(Ok(Selection {
+        artifact: Some(2),
+        skipped: 0,
+    }));
+
+    let problems = selection_problems_with(&wrong);
+
+    // The newest-trusted pick, the unknown run, the issue_comment and
+    // expired cases, and the forged runs each say what they got.
+    assert!(
+        problems
+            .iter()
+            .any(|p| p.contains("not Selection { artifact: Some(1)")),
+        "{problems:?}"
+    );
+    assert!(
+        problems.iter().any(|p| p.contains("whose run is unknown")),
+        "{problems:?}"
+    );
+    assert!(
+        problems
+            .iter()
+            .any(|p| p.contains("from a issue_comment run")),
+        "{problems:?}"
+    );
+    assert!(
+        problems.iter().any(|p| p.contains("expired true")),
+        "{problems:?}"
+    );
+    assert!(
+        problems
+            .iter()
+            .any(|p| p.contains("not none with 3 refused")),
+        "{problems:?}"
+    );
+}
+
+#[test]
+fn a_selection_that_fails_is_named() {
+    let broken = gives(Err("boom".to_owned()));
+
+    let problems = selection_problems_with(&broken);
+
+    assert!(
+        problems.iter().any(|p| p == "previous select failed: boom"),
+        "{problems:?}"
+    );
+}
+
+#[test]
+fn a_selection_that_takes_none_of_main_s_artifacts_is_named_at_the_trigger_check() {
+    let none = gives(Ok(Selection {
+        artifact: None,
+        skipped: 0,
+    }));
+
+    let problems = selection_problems_with(&none);
+
+    assert!(
+        problems
+            .iter()
+            .any(|p| p.contains("from a workflow_run run, expired false")),
+        "{problems:?}"
+    );
+}
