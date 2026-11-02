@@ -4,13 +4,14 @@ title: "Review convergence: rulings settle, contests are checkable, a fresh read
 status: "🔲"
 summary: >-
   Three ideas from google/elephant-goldfish-model, fitted to a review
-  run by code (ENG-28). A stakeholder ruling on a tracked finding
-  settles it, so later reviews of the pull request keep it as a nit and
-  never stall on it again. An author may contest a finding only by a
-  citation code can check, which the generalist weighs on re-review.
-  A comprehension specialist paraphrases a changed SRS section, ADR or
-  domain-model file and reports what a fresh reader could not follow.
-  Opus designs and implements.
+  run by code (ENG-28). Each review keeps its tracked findings for the
+  next review of the pull request. A stakeholder ruling on a tracked
+  finding settles it, so later reviews keep it as a nit and never stall
+  on it again. An author may contest a finding only by a citation code
+  can check, which the generalist weighs on re-review. A comprehension
+  specialist paraphrases a changed SRS section, ADR or domain-model
+  file and reports what a fresh reader could not follow. Opus designs
+  and implements.
 model: opus
 depends-on: [2610292344, 2610282358]
 ---
@@ -39,9 +40,10 @@ What was searched, and what is reused:
   already tracks each kept finding by identity across reviews of one
   pull request, marks it new, still open or resolved, and after three
   reviews in a row, its file unchanged, raises `stalled: needs a
-  stakeholder ruling`. It has no input for that ruling: the stall says
-  "which no further run gives". Phase 1 adds the input; the tracking is
-  reused unchanged.
+  stakeholder ruling`. The workflow never passes it `--previous`, so in
+  CI none of this runs: phase 1 keeps the file per pull request. It has
+  no input for a ruling either: phase 2 adds it. The tracking is reused
+  unchanged.
 - The finding identity
   ([identity.rs](../../tooling/review-run/src/findings/identity.rs))
   is path, sorted ids and the hash of the normalised consequence. It is
@@ -68,31 +70,37 @@ generalists weigh. Nor a human gate between stages.
 
 ## Tasks
 
-1. A stakeholder ruling settles a finding (phase 1): a comment by the
+1. Keep tracked findings between reviews (phase 1): each review
+   uploads `review/findings.json` as `review-findings-pr-<number>`;
+   the next review fetches the newest one a run of main's review
+   workflow uploaded and passes it as `--previous`. An artifact of
+   that name from any other run is skipped and counted.
+2. A stakeholder ruling settles a finding (phase 2): a comment by the
    stakeholder, `ruling: <handle> accepted|rejected — <reason>`, read
    by code; `findings.md` shows each finding's handle; a later review
    that keeps a ruled finding lists it as settled, a nit, and raises no
    stall on it. A fixed finding that returns is reopened, as today.
-2. An author's checkable contest (phase 2): a comment by the author,
+3. An author's checkable contest (phase 3): a comment by the author,
    `contest: <handle> — <path>#<symbol>|<ADR id>|<requirement id>`,
    read by code, which checks the citation exists on the head and
    passes the generalist only the handle and the citation, never the
    author's prose. A contest code cannot check is escalated to the
    stakeholder as a nit asking for a ruling.
-3. A comprehension specialist (phase 3): dispatched for a change to
+4. A comprehension specialist (phase 4): dispatched for a change to
    `docs/srs/`, `docs/adr/` or `docs/domain-model/`; it restates the
    changed text in its run log and states as requests what a fresh
    reader could not follow. It lands with its ENG-32 cases.
-4. ENG-28 is reworded for tasks 1 to 3 with its scenario and gate
-   table in the same change; an ADR records the decision.
+5. ENG-28 is reworded for tasks 1 to 4 with its scenario and gate
+   table in the same change as each; an ADR records the decision.
 
 ## Execution
 
-| Phase | Model | Gate                                                                                                                                                       |
-| ----- | ----- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1     | opus  | `review-run` unit and integration tests settle a ruled finding and skip its stall; the ENG-28 scenario's new row passes                                    |
-| 2     | opus  | A contest with a missing citation is escalated and one with a present citation reaches the generalist as handle and citation alone; ENG-28 scenario passes |
-| 3     | opus  | The comprehension specialist's ENG-32 cases pass on its model; the bundle dispatches it for an SRS, ADR or model change                                    |
+| Phase | Model | Gate                                                                                                                            |
+| ----- | ----- | ------------------------------------------------------------------------------------------------------------------------------- |
+| 1     | opus  | The trusted lookup's tests skip a same-named artifact from another run; the ENG-28 scenario passes and its drift case fails it  |
+| 2     | opus  | `review-run` tests settle a ruled finding and skip its stall; the ENG-28 scenario's new gate rows pass                          |
+| 3     | opus  | A contest with a missing citation is escalated; one with a present citation reaches the generalist as handle and citation alone |
+| 4     | opus  | The comprehension specialist's ENG-32 cases pass on its model; the bundle dispatches it for an SRS, ADR or model change         |
 
 ## Phases
 
@@ -115,13 +123,16 @@ footer: |
 
 ?>
 
-| #   | Status | Phase                                                        |
-| --- | ------ | ------------------------------------------------------------ |
-| 1   | 🔲     | [A stakeholder ruling settles a tracked finding](phase-1.md) |
+| #   | Status | Phase                                                                   |
+| --- | ------ | ----------------------------------------------------------------------- |
+| 1   | 🔲     | [Keep each pull request's tracked findings between reviews](phase-1.md) |
 <?/catalog?>
 
 ## Acceptance Criteria
 
+- [ ] A second review of a pull request in CI reports its findings as
+      still open or resolved, read only from an artifact main's review
+      workflow uploaded
 - [ ] A finding the stakeholder ruled on is listed as settled in every
       later review of that pull request and raises no stall
 - [ ] A finding fixed and then raised again at the same identity is

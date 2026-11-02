@@ -1,55 +1,68 @@
 ---
 n: 1
-title: "A stakeholder ruling settles a tracked finding"
+title: "Keep each pull request's tracked findings between reviews"
 status: "🔲"
 result: false
 ---
-# Phase 1: a stakeholder ruling settles a tracked finding
+# Phase 1: keep each pull request's tracked findings between reviews
 
-Requirements. This phase changes ENG-28: the findings tracked across
-reviews of one pull request gain a settled state, set only by a
-stakeholder ruling that code reads. ENG-28's row, its scenario and its
-gate table change in this phase, so the scenario stays green; the row
-and the scenario are paths CODEOWNERS assigns, so the change waits for
-the stakeholder's approval (ENG-21).
+Why first. `review-run` tracks findings across reviews of a pull
+request only when given `--previous`, and the review workflow never
+gives it. So in CI every finding is new, none is resolved, and ENG-28's
+stall after three reviews in a row never fires. Rulings and contests
+(phases 2 and 3) build on that tracking, so it must work in CI first.
 
-BDD coverage. No new scenario id: ENG-28 keeps its one scenario. Its
-gate table gains two rows, a ruled finding kept again (approves when it
-is the only finding) and a ruling from someone other than the
-stakeholder (ignored, counted, the stall still fires). The binding in
-`tooling/scenario/tests/bdd/engineering_review.rs` drives
-`review-run` with a previous `findings.json` and a comments file.
+Requirements. This phase changes ENG-28. The review MUST keep the
+tracked findings of each review of a pull request and pass the latest
+earlier ones to the next review of it. It MUST read them only from an
+artifact a run of main's review workflow uploaded, never from one
+another workflow or a pull request's definition uploaded. A review
+that finds no earlier findings MUST say so in its summary, never imply
+a clean history (I6). ENG-28's row, scenario and drift cases change in
+this phase. Those paths are code-owned, so the change waits for the
+stakeholder's approval (ENG-21).
+
+BDD coverage. No new scenario id. The ENG-28 scenario gains steps: the
+review workflow passes `--previous` from the trusted lookup, and keeps
+`review/findings.json` as a per-pull-request artifact. A drift case in
+`tooling/drift/src/cases.rs` removes the lookup's origin check and
+proves the scenario fails (ENG-27).
+
+Storage. GitHub keeps artifacts per run, not per pull request. Each
+review uploads `review/findings.json` and `review/findings.md` as
+`review-findings-pr-<number>`, with `retention-days: 90`. The next
+review lists artifacts by that name, newest first. It takes the first
+one whose run is `.github/workflows/review.yml` on the default branch,
+started by `workflow_run`. It downloads it with `actions:read` alone.
+Anyone can upload an artifact of that name from a workflow the pull
+request defines. An artifact from any other run is skipped and counted
+(I6), never read. `actions/cache` is not used: entries are evicted
+after a week unused, and the review's jobs restore no caches.
 
 RED. Write tests for each of these, in order:
 
-- A handle for a finding identity: short, stable for the same identity,
-  different for a different one, shown beside each finding in
-  `review/findings.md`.
-- Reading a ruling from a comment: `ruling: <handle> accepted —
-  <reason>` and `ruling: <handle> rejected — <reason>`; a line in no
-  form, an unknown handle or an empty reason is no ruling and is
-  counted as ignored (I6).
-- Only a comment by the stakeholder rules, checked by the same identity
-  the ENG-21 consent check uses; any other author's ruling is ignored
-  and counted.
-- A ruled finding keeps its ruling in `findings.json` across reviews.
-- A later review that keeps a finding ruled `accepted` lists it as
-  `settled (accepted)`, a nit, never blocking, whatever its generalist
-  weighed.
-- A finding ruled `rejected` (the finding is wrong) is left out of the
-  outcome and listed as `settled (rejected)` in `findings.md`.
-- A settled finding raises no stall, however many reviews keep it.
-- A finding marked resolved and then kept again is reopened as today,
-  ruled or not only by its own later ruling.
+- The lookup picks the newest artifact of the pull request's name whose
+  run is main's review workflow, started by `workflow_run`.
+- It skips an artifact of that name from another workflow, from a run
+  of the pull request's own definition, or from another event, and
+  counts each one skipped.
+- It returns none when no artifact qualifies, an expired one among
+  them, and the review's summary then says no earlier review was found.
+- A malformed or oversized `findings.json` is refused with a named
+  error, never read as an empty history.
+- The workflow passes `--previous` with the file the lookup returned,
+  and uploads the new `findings.json` under the pull request's name.
 
-GREEN. In `tooling/review-run`: a handle in the identity module, a
-rulings reader beside the findings module, the settled state in its
-tracked record, and the outcome step that applies it before the stall
-check. The workflow passes the pull request's comments to `review-run`
-as a file, read by code; no agent sees a ruling. No new third-party
-dependency.
+GREEN. The lookup lives in tooling, a subcommand of `review-run` or a
+small `mdsmith-release`-style tool, called from one workflow step. No
+inline shell logic: the step calls the tool. It reads the GitHub API
+through a token with `actions:read` alone. It holds no Claude token and
+runs before that token is staged. The tool takes the HTTP transport as
+an injected trait, so its tests need no network. No new third-party
+dependency. If a dependency proves unavoidable, it lands with an ADR
+and its line in DEPENDENCIES.md (ENG-18, ENG-26).
 
-Gate. `cargo test -p review-run` at the crate's coverage floor, and the
-ENG-28 scenario with its two new gate table rows. The live check
-follows on main: a stalled finding on a real pull request, ruled once,
-is settled in the next review.
+Gate. The lookup's unit tests at the crate's coverage floor. The ENG-28
+scenario passes with its new steps, and the drift case fails it. Once
+on main, a second review of a real pull request reports its findings
+as still open or resolved, not all new.
