@@ -15,9 +15,6 @@ set -e
 dir="$RUNNER_TEMP/previous"
 mkdir -p "$dir"
 file=""
-run_tool() {
-  cargo run --locked --quiet --offline -p review-run -- previous "$@"
-}
 
 gh api "repos/$REPO/actions/artifacts?name=review-findings-pr-$PULL&per_page=100" \
   > "$dir/artifacts.json"
@@ -27,7 +24,8 @@ for id in $(jq -r '[.artifacts[].workflow_run.id | select(. != null)] | unique |
     || echo "::warning::run $id of an earlier review's findings could not be read; its artifact is refused"
 done | jq -s . > "$dir/runs.json"
 
-picked=$(run_tool select --pull "$PULL" --artifacts "$dir/artifacts.json" --runs "$dir/runs.json")
+picked=$(cargo run --locked --quiet --offline -p review-run -- previous select \
+  --pull "$PULL" --artifacts "$dir/artifacts.json" --runs "$dir/runs.json")
 id=$(sed -n 's/^previous_artifact=//p' <<< "$picked")
 skipped=$(sed -n 's/^previous_skipped=//p' <<< "$picked")
 
@@ -35,7 +33,7 @@ note="No earlier review of this pull request was found, so every finding is new.
 if [ -n "$id" ]; then
   if gh api "repos/$REPO/actions/artifacts/$id/zip" > "$dir/findings.zip" \
     && unzip -p "$dir/findings.zip" findings.json > "$dir/findings.json" \
-    && run_tool check "$dir/findings.json"; then
+    && cargo run --locked --quiet --offline -p review-run -- previous check "$dir/findings.json"; then
     file="$dir/findings.json"
     note="Earlier review: the findings of artifact $id."
   else

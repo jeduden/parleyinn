@@ -1,0 +1,192 @@
+//! ENG-28: a review carries the findings of the previous review of its
+//! pull request, and trusts them only from a run of main's review
+//! workflow. The review job fetches them with `scripts/review-previous.sh`
+//! before the Claude token is staged, passes `review-run` the file as
+//! `--previous`, scrubs and uploads the findings it kept under the pull
+//! request's own artifact name for 90 days; and `review-run previous
+//! select`, the checkout's, takes the newest artifact of that name a
+//! run of main's review workflow uploaded, never one a workflow the pull
+//! request defines uploaded under the same name.
+
+use crate::Checkout;
+use crate::review_workflow::load;
+
+/// The workflow the check reads.
+pub const WORKFLOW: &str = ".github/workflows/review.yml";
+/// The job that runs the agents.
+const JOB: &str = "review";
+/// The artifact name a pull request's findings are kept under, as the
+/// upload step writes it.
+const UPLOAD_NAME: &str = "name: review-findings-pr-${{ steps.pull_head.outputs.number }}";
+
+/// What is wrong with how the checkout's review carries findings from
+/// one review of a pull request to the next.
+///
+/// # Errors
+///
+/// Fails when the workflow, or a script it runs, cannot be read.
+pub fn review_carries_findings(checkout: &Checkout) -> Result<Vec<String>, String> {
+    let flow = load(checkout, WORKFLOW)?;
+    let Some(job) = flow.jobs.iter().find(|j| j.name == JOB) else {
+        return Ok(vec![format!("{WORKFLOW} has no job {JOB}")]);
+    };
+    let mut problems = workflow_problems(&job.text);
+    problems.extend(selection_problems());
+
+    Ok(problems)
+}
+
+/// A job's steps, each from its `- ` line at the steps' indent.
+fn steps(text: &str) -> Vec<&str> {
+    let mut starts: Vec<usize> = text
+        .match_indices("\n      - ")
+        .map(|(at, _)| at + 1)
+        .collect();
+    if text.starts_with("      - ") {
+        starts.insert(0, 0);
+    }
+    starts
+        .iter()
+        .enumerate()
+        .map(|(n, &from)| &text[from..starts.get(n + 1).copied().unwrap_or(text.len())])
+        .collect()
+}
+
+/// What is wrong with the review job's text `job`, the scripts its steps
+/// run inlined.
+#[must_use]
+pub fn workflow_problems(job: &str) -> Vec<String> {
+    let mut problems = Vec::new();
+    if !job.contains("actions: read") {
+        problems.push(format!(
+            "the {JOB} job cannot read the artifacts of earlier runs: its permissions lack actions: read"
+        ));
+    }
+    let steps = steps(job);
+    let at = |needle: &str| steps.iter().position(|s| s.contains(needle));
+    match at("previous select") {
+        None => problems.push(
+            "no step picks the previous review's findings with review-run previous select"
+                .to_owned(),
+        ),
+        Some(fetch) => {
+            let step = steps[fetch];
+            for (needle, why) in [
+                (
+                    "previous check",
+                    "checks the file it fetched with review-run previous check",
+                ),
+                (
+                    "review-findings-pr-",
+                    "looks for the artifact of the pull request's own name",
+                ),
+            ] {
+                if !step.contains(needle) {
+                    problems.push(format!("the step that fetches the previous findings does not read it: it never {why}"));
+                }
+            }
+            if at("stage-credential").is_some_and(|stage| stage < fetch) {
+                problems.push(
+                    "the previous findings are fetched after the Claude token is staged".to_owned(),
+                );
+            }
+        }
+    }
+    if !steps
+        .iter()
+        .any(|s| s.contains("-p review-run -- --workdir") && s.contains("--previous"))
+    {
+        problems.push("review-run is not given the fetched findings as --previous".to_owned());
+    }
+    if !steps.iter().any(|s| {
+        s.contains("review-eval -- scrub")
+            && s.contains("--path review/findings.json")
+            && s.contains("--path review/findings.md")
+    }) {
+        problems.push("the tracked findings are not scrubbed of the Claude token".to_owned());
+    }
+    let upload = steps
+        .iter()
+        .find(|s| s.contains("upload-artifact") && s.contains(UPLOAD_NAME));
+    match upload {
+        None => problems.push(format!(
+            "no step uploads the tracked findings as {UPLOAD_NAME:?}, one artifact name per pull request"
+        )),
+        Some(step) => {
+            for needle in ["review/findings.json", "retention-days: 90", "scrubbed == 'true'"] {
+                if !step.contains(needle) {
+                    problems.push(format!(
+                        "the step that uploads the tracked findings lacks {needle:?}"
+                    ));
+                }
+            }
+        }
+    }
+
+    problems
+}
+
+/// What is wrong with the checkout's `review-run previous select`: it
+/// must take the newest artifact a run of main's review workflow
+/// uploaded, over a newer one another workflow or the pull request's
+/// own definition uploaded, count each it refused, and take none when
+/// none qualifies.
+#[must_use]
+pub fn selection_problems() -> Vec<String> {
+    use review_run::previous::{Selection, select};
+
+    const NAME: &str = "review-findings-pr-7";
+    let artifact = |id: u64, at: &str, run: u64| {
+        format!(
+            r#"{{"id":{id},"name":"{NAME}","expired":false,"created_at":"{at}","workflow_run":{{"id":{run}}}}}"#
+        )
+    };
+    let run = |id: u64, path: &str, event: &str| {
+        format!(r#"{{"id":{id},"path":"{path}","event":"{event}"}}"#)
+    };
+    let review = ".github/workflows/review.yml";
+    let artifacts = format!(
+        r#"{{"artifacts":[{},{},{}]}}"#,
+        artifact(3, "2026-11-01T12:00:00Z", 30),
+        artifact(2, "2026-11-01T11:00:00Z", 20),
+        artifact(1, "2026-11-01T10:00:00Z", 10),
+    );
+    let runs = format!(
+        "[{},{},{}]",
+        run(30, ".github/workflows/ci.yml", "workflow_run"),
+        run(20, review, "pull_request"),
+        run(10, review, "workflow_run"),
+    );
+    let mut problems = Vec::new();
+    let want = Selection {
+        artifact: Some(1),
+        skipped: 2,
+    };
+    match select("7", &artifacts, &runs) {
+        Ok(got) if got == want => {}
+        Ok(got) => problems.push(format!(
+            "previous select took {got:?} over two newer artifacts of the name from other runs, not {want:?}"
+        )),
+        Err(e) => problems.push(format!("previous select failed: {e}")),
+    }
+    let forged = format!(
+        "[{},{},{}]",
+        run(30, ".github/workflows/ci.yml", "workflow_run"),
+        run(20, review, "pull_request"),
+        run(10, review, "push"),
+    );
+    match select("7", &artifacts, &forged) {
+        Ok(Selection {
+            artifact: None,
+            skipped: 3,
+        }) => {}
+        other => problems.push(format!(
+            "previous select with no artifact from main's review workflow gave {other:?}, not none with 3 refused"
+        )),
+    }
+
+    problems
+}
+
+#[cfg(test)]
+mod tests;
