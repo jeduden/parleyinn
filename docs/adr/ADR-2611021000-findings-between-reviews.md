@@ -35,8 +35,8 @@ review that marks its own blocking findings resolved (I2, I8).
   Claude token first, as `review-findings-pr-<number>`, for 90 days.
 - **Fetched by origin.** `scripts/review-previous.sh` lists every page
   of the artifacts of that name and the runs that uploaded them,
-  through the job's read-only token. `review-run previous select` takes the newest
-  unexpired one whose run is `.github/workflows/review.yml` on
+  through the job's read-only token. `review-run previous select`
+  takes the newest unexpired one whose run is `.github/workflows/review.yml` on
   `workflow_run` or `issue_comment`, the two triggers that run main's
   definition. Each other artifact of the name is refused and counted,
   and so is one whose run is unknown. `review-run previous check`
