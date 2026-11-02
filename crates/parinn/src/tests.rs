@@ -2799,7 +2799,7 @@ fn ingest_says_when_it_cannot_audit_a_path_outside_the_roots() {
 }
 
 /// Every audit entry the home at `p` holds, as text.
-fn audit_text(p: &Process) -> String {
+pub(crate) fn audit_text(p: &Process) -> String {
     let dir = p.parinn_home().join("audit");
     let mut text = String::new();
     let Ok(entries) = std::fs::read_dir(dir) else {

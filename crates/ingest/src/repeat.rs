@@ -8,7 +8,8 @@
 //! its own event, a conflict. A fork's repeated line read before its
 //! owner's is held at an ingest marker until the owner's transcript is
 //! ingested, up to [`HOLD_MS`], or released once that transcript is
-//! gone.
+//! gone. A line whose `uuid` names a purged event is refused, never
+//! recorded again.
 
 use record::event::Provenance;
 use record::id::Address;
@@ -40,6 +41,8 @@ pub struct Owner {
     pub text: String,
     /// Whether a fork observation names its run's harness session.
     pub fork: bool,
+    /// Whether a purge erased its content: only its `uuid` is left.
+    pub purged: bool,
 }
 
 /// What is known of one line with a `uuid` when it is read.
@@ -74,6 +77,9 @@ pub enum Decision {
     Hold,
     /// Its own event, released from a hold: audited.
     Released,
+    /// Not recorded: its `uuid` names a purged event, so a repeat could
+    /// not be told from the erased content (REC-04, REC-17).
+    Refused,
 }
 
 /// What becomes of a line whose redacted text is `redacted`, given
@@ -81,6 +87,7 @@ pub enum Decision {
 #[must_use]
 pub fn decide(facts: &Facts, redacted: &str) -> Decision {
     match &facts.owner {
+        Some(owner) if owner.purged => Decision::Refused,
         // A hold released the owner's line into the fork's own writer;
         // this run keeps its own copy, never a reference to the fork.
         Some(owner) if owner.fork && !facts.fork => Decision::Own,

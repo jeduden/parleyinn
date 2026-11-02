@@ -1,4 +1,6 @@
 use super::*;
+use key::random::OsEntropy;
+use testkit::TempDir;
 
 fn writer(n: u8) -> WriterId {
     WriterId::derive(&[n; 32])
@@ -85,27 +87,121 @@ fn a_source_continues_while_its_consumed_prefix_stands() {
 }
 
 #[test]
-fn the_directory_s_other_transcripts_give_their_uuids() {
-    let dir = testkit::TempDir::new().unwrap();
-    let own = dir.path().join("own.jsonl");
-    std::fs::write(&own, "{\"uuid\":\"mine\"}\n").unwrap();
-    std::fs::write(
-        dir.path().join("other.jsonl"),
-        "{\"uuid\":\"u1\"}\nnot json\n",
-    )
-    .unwrap();
-    std::fs::write(dir.path().join("notes.txt"), "{\"uuid\":\"u2\"}\n").unwrap();
-    std::fs::create_dir(dir.path().join("sub.jsonl")).unwrap();
-
-    let found = sibling_uuids(&dir.path().to_string_lossy(), &own.to_string_lossy());
-
-    assert_eq!(found, BTreeSet::from(["u1".to_owned()]));
-    assert!(sibling_uuids(&dir.path().join("none").to_string_lossy(), "").is_empty());
-}
-
-#[test]
 fn a_run_whose_writer_has_no_seat_is_corrupt() {
     let err = no_seat(writer(1));
 
     assert!(err.to_string().contains("has no seat"), "{err}");
+}
+
+fn home(dir: &testkit::TempDir) -> Home {
+    Home::locate(Some(dir.path().join(".parinn").as_os_str()), None).unwrap()
+}
+
+fn redactor() -> Redactor {
+    Redactor::new(&[]).unwrap().0
+}
+
+fn transcript(dir: &testkit::TempDir, text: &str) -> std::path::PathBuf {
+    let path = dir.path().join("t.jsonl");
+    std::fs::write(&path, text).unwrap();
+    path
+}
+
+fn numbered(session: &str, from: u64, to: u64) -> String {
+    (from..=to)
+        .map(|n| {
+            format!(
+                "{}\n",
+                serde_json::json!({"type": "x", "uuid": format!("u{n}"), "sessionId": session, "n": n})
+            )
+        })
+        .collect()
+}
+
+/// Erases the content of the first `count` events of `writer`, as a
+/// purge does: the rows and their places stay.
+fn purged(home: &Home, writer: record::id::WriterId, count: u64) {
+    let mut store = Store::open(&home.store()).unwrap();
+    let device = administration::node::Node::find(home, &store)
+        .unwrap()
+        .device_writer();
+    let erase = store::Erase {
+        writer,
+        first: record::id::Seq::FIRST,
+        last: record::id::Seq::new(count).unwrap(),
+    };
+    store.purge(device, &[], &[erase]).unwrap();
+}
+
+#[test]
+fn a_line_whose_uuid_names_a_purged_event_is_refused_and_ingest_moves_past_it() {
+    let dir = TempDir::new().unwrap();
+    let home = home(&dir);
+    let parent = transcript(&dir, &numbered("p", 1, 5));
+    let fork = dir.path().join("fork.jsonl");
+    let mut text = numbered("f", 1, 3);
+    text.push_str(&numbered("f", 100, 101));
+    std::fs::write(&fork, text).unwrap();
+    let owner = crate::ingest_path(&home, &parent, &redactor(), &mut OsEntropy).unwrap();
+    purged(&home, owner.writer, 3);
+
+    let late = crate::ingest_path(&home, &fork, &redactor(), &mut OsEntropy).unwrap();
+
+    assert_eq!((late.refused, late.events, late.references), (3, 2, 0));
+    assert_eq!(late.conflicts, 0, "no other content named the uuid");
+    let store = Store::open(&home.store()).unwrap();
+    assert_eq!(store.log(late.writer).unwrap().len(), 2);
+    let again = crate::ingest_path(&home, &fork, &redactor(), &mut OsEntropy).unwrap();
+    assert_eq!((again.refused, again.events), (0, 0));
+}
+
+#[test]
+fn a_refusal_no_recorded_line_follows_still_moves_the_ingest_position() {
+    let dir = TempDir::new().unwrap();
+    let home = home(&dir);
+    let parent = transcript(&dir, &numbered("p", 1, 3));
+    let fork = dir.path().join("fork.jsonl");
+    std::fs::write(&fork, numbered("f", 1, 3)).unwrap();
+    let owner = crate::ingest_path(&home, &parent, &redactor(), &mut OsEntropy).unwrap();
+    purged(&home, owner.writer, 3);
+
+    let late = crate::ingest_path(&home, &fork, &redactor(), &mut OsEntropy).unwrap();
+    let again = crate::ingest_path(&home, &fork, &redactor(), &mut OsEntropy).unwrap();
+    std::fs::write(
+        &fork,
+        format!("{}{}", numbered("f", 1, 3), numbered("f", 7, 7)),
+    )
+    .unwrap();
+    let grown = crate::ingest_path(&home, &fork, &redactor(), &mut OsEntropy).unwrap();
+
+    assert_eq!((late.refused, late.events), (3, 0));
+    assert_eq!((again.refused, again.events), (0, 0));
+    assert_eq!((grown.refused, grown.events), (0, 1));
+    assert_eq!(grown.generation, late.generation, "a growth, not a rewrite");
+}
+
+#[test]
+fn a_refusal_between_recorded_lines_keeps_the_prefix_the_position_digests() {
+    let dir = TempDir::new().unwrap();
+    let home = home(&dir);
+    let parent = transcript(&dir, &numbered("p", 1, 3));
+    let fork = dir.path().join("fork.jsonl");
+    let mut text = numbered("f", 100, 100);
+    text.push_str(&numbered("f", 2, 2));
+    text.push_str(&numbered("f", 101, 101));
+    std::fs::write(&fork, &text).unwrap();
+    let owner = crate::ingest_path(&home, &parent, &redactor(), &mut OsEntropy).unwrap();
+    purged(&home, owner.writer, 3);
+
+    let late = crate::ingest_path(&home, &fork, &redactor(), &mut OsEntropy).unwrap();
+    text.push_str(&numbered("f", 102, 102));
+    std::fs::write(&fork, &text).unwrap();
+    let grown = crate::ingest_path(&home, &fork, &redactor(), &mut OsEntropy).unwrap();
+
+    assert_eq!((late.refused, late.events), (1, 2));
+    assert_eq!(
+        grown.generation, late.generation,
+        "the prefix still matches"
+    );
+    assert_eq!((grown.refused, grown.events), (0, 1));
 }

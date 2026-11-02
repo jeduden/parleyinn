@@ -305,3 +305,104 @@ fn a_transcript_rewritten_shorter_starts_a_new_generation() {
     assert!(rewritten.new_generation);
     assert_eq!((rewritten.generation, rewritten.events), (2, 1));
 }
+
+/// Inputs naming the harness session of `fork.jsonl` a fork, with
+/// `served` held by another MCP server, at `now_ms`.
+fn held_for(served: &[&Path], now_ms: u64) -> Inputs {
+    Inputs {
+        forks: [SESSION.to_owned()].into(),
+        served: served.iter().map(|p| p.to_path_buf()).collect(),
+        now_ms,
+        ..Inputs::default()
+    }
+}
+
+fn live(home: &Home, path: &Path, inputs: &Inputs, seats: &mut RunSeats) -> Option<Ingested> {
+    ingest_live(home, path, &redactor(), inputs, seats, None, &mut OsEntropy).unwrap()
+}
+
+#[test]
+fn a_witnessed_fork_line_is_held_for_a_transcript_another_server_holds_a_binding_for() {
+    let dir = TempDir::new().unwrap();
+    let home = home(&dir);
+    let parent = dir.path().join("parent.jsonl");
+    std::fs::write(&parent, format!("{}{}", line(1), line(2))).unwrap();
+    let path = main_transcript(&dir, &format!("{}{}{}", line(1), line(2), line(3)));
+    let mut seats = RunSeats::default();
+    let at = |ms| held_for(&[parent.as_path()], ms);
+
+    let held = live(&home, &path, &at(1_000), &mut seats).unwrap();
+    let still = live(&home, &path, &at(30_999), &mut seats).unwrap();
+    let released = live(&home, &path, &at(31_000), &mut seats).unwrap();
+
+    assert!(held.held && held.hold_started);
+    assert_eq!((held.events, held.witnessed_repeats), (0, 0));
+    assert!(still.held && !still.hold_started);
+    assert!(!released.held);
+    assert_eq!((released.events, released.references), (3, 0));
+    assert_eq!(released.released, 3);
+}
+
+#[test]
+fn a_witnessed_fork_line_is_never_held_for_a_transcript_no_server_holds_a_binding_for() {
+    let dir = TempDir::new().unwrap();
+    let home = home(&dir);
+    let parent = dir.path().join("parent.jsonl");
+    std::fs::write(&parent, format!("{}{}", line(1), line(2))).unwrap();
+    let path = main_transcript(&dir, &format!("{}{}", line(1), line(3)));
+    let mut seats = RunSeats::default();
+
+    let ingested = live(&home, &path, &held_for(&[], 1_000), &mut seats).unwrap();
+
+    assert!(!ingested.held);
+    assert_eq!((ingested.events, ingested.released), (2, 0));
+    assert_eq!(ingested.witnessed_repeats, 1, "line 1 repeats a line");
+}
+
+#[test]
+fn a_witnessed_fork_line_held_is_its_own_event_once_the_owner_ingested_it() {
+    let dir = TempDir::new().unwrap();
+    let home = home(&dir);
+    let parent = dir.path().join("parent.jsonl");
+    std::fs::write(&parent, line(1)).unwrap();
+    let path = main_transcript(&dir, &line(1));
+    let mut seats = RunSeats::default();
+    let at = |ms| held_for(&[parent.as_path()], ms);
+    let held = live(&home, &path, &at(1_000), &mut seats).unwrap();
+    crate::ingest_path(&home, &parent, &redactor(), &mut OsEntropy).unwrap();
+
+    let owned = live(&home, &path, &at(2_000), &mut seats).unwrap();
+
+    assert!(held.held);
+    assert_eq!(
+        (owned.events, owned.references, owned.witnessed_repeats),
+        (1, 0, 1)
+    );
+    assert!(!owned.held);
+}
+
+#[test]
+fn a_witnessed_line_whose_uuid_names_a_purged_event_is_refused() {
+    let dir = TempDir::new().unwrap();
+    let home = home(&dir);
+    let parent = dir.path().join("parent.jsonl");
+    std::fs::write(&parent, line(1)).unwrap();
+    let owner = crate::ingest_path(&home, &parent, &redactor(), &mut OsEntropy).unwrap();
+    let mut store = Store::open(&home.store()).unwrap();
+    let device = administration::node::Node::find(&home, &store)
+        .unwrap()
+        .device_writer();
+    let erase = store::Erase {
+        writer: owner.writer,
+        first: record::id::Seq::FIRST,
+        last: record::id::Seq::FIRST,
+    };
+    store.purge(device, &[], &[erase]).unwrap();
+    let path = main_transcript(&dir, &format!("{}{}", line(1), line(2)));
+    let mut seats = RunSeats::default();
+
+    let ingested = ingest(&home, &path, &mut seats, None).unwrap();
+
+    assert_eq!((ingested.refused, ingested.events), (1, 1));
+    assert_eq!(ingested.witnessed_repeats, 0);
+}

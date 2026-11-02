@@ -8,7 +8,7 @@ use serde_json::Value;
 use store::{Position, Store};
 
 use super::*;
-use crate::tests::{DEV, Process, audited};
+use crate::tests::{DEV, Process, audit_text, audited, transcript_in};
 use crate::{EXIT_FAILURE, EXIT_OK, EXIT_USAGE};
 
 /// Four lines the parser leaves unread, so each is an unparsed line.
@@ -693,4 +693,36 @@ fn a_full_address_of_the_writer_s_own_room_is_purged_and_each_kind_kept_is_audit
         audit_refusals(ctx, &[kept(1), kept(2), kept(3)])
     });
     assert_eq!(counted(&p, "purge_refused").len(), 1);
+}
+
+#[test]
+fn ingest_refuses_a_repeated_line_naming_a_purged_event_and_audits_each_refusal() {
+    let p = Process::new();
+    let line = |n: u32| format!("{{\"type\":\"x\",\"uuid\":\"u{n}\",\"t\":\"secret {n}\"}}\n");
+    let parent: String = (1..=3).map(line).collect();
+    transcript_in(&p, "-w-a", "parent.jsonl", parent.as_bytes());
+    assert_eq!(p.invoke(&["ingest", "--all"], &DEV).0, EXIT_OK);
+    assert_eq!(p.invoke(&["risk-acceptance", "record"], &DEV).0, EXIT_OK);
+    let home = Home::locate(Some(p.parinn_home().as_os_str()), None).unwrap();
+    let writer = Store::open(&home.store()).unwrap().ingested_runs().unwrap()[0].writer;
+    let (code, _, err) = p.invoke(&["purge", "--range", &format!("{writer}:1-3")], &DEV);
+    assert_eq!(code, EXIT_OK, "{err}");
+    let late = format!("{}{}", parent, line(9));
+    transcript_in(&p, "-w-a", "late-fork.jsonl", late.as_bytes());
+
+    let (code, _, err) = p.invoke(&["ingest", "--all"], &DEV);
+
+    assert_eq!((code, err.as_str()), (EXIT_OK, ""));
+    let audit = audit_text(&p);
+    assert_eq!(
+        audit
+            .matches("refused a repeated line whose uuid names a purged event, in late-fork")
+            .count(),
+        3,
+        "{audit}"
+    );
+    let (_, out, _) = p.invoke(&["status", "--json"], &DEV);
+    let v: serde_json::Value = serde_json::from_str(&out).unwrap();
+    assert_eq!(v["counters"]["repeat_of_purged_refused"]["total"], 3);
+    assert!(!audit.contains("secret"), "{audit}");
 }

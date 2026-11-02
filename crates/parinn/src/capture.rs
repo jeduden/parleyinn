@@ -56,6 +56,16 @@ const LOOK: Duration = Duration::from_millis(10);
 /// The directory of the MCP servers' start markers, in the home.
 const MARKERS: &str = "mcp";
 
+/// The file in the home whose seconds a development build's live ingest
+/// reads as the time, when a test leaves one: its way to move the clock
+/// past REC-04's 30 s without waiting. A release build never reads it.
+pub(crate) const TEST_CLOCK: &str = "test-clock";
+
+/// The seconds the file `path` holds, if it holds them.
+fn left_by_test(path: &Path) -> Option<u64> {
+    fs::read_to_string(path).ok()?.trim().parse().ok()
+}
+
 /// What live ingest shares with the server: the runs of each tool-use
 /// id its ingest read, whether it holds a session binding, and whether
 /// it should stop.
@@ -225,8 +235,18 @@ impl Running {
     /// Whether the audit log took `occurrence`.
     fn audited(&self, occurrence: &Occurrence) -> bool {
         Log::new(self.capture.home.audit())
-            .append(occurrence, (self.capture.clock)())
+            .append(occurrence, self.now())
             .is_ok()
+    }
+
+    /// Now, in seconds since the Unix epoch: the clock, or, in a
+    /// development build, the seconds a test left in the home's
+    /// [`TEST_CLOCK`] file.
+    fn now(&self) -> u64 {
+        let left = cfg!(debug_assertions)
+            .then(|| left_by_test(&self.capture.home.root().join(TEST_CLOCK)))
+            .flatten();
+        left.unwrap_or_else(|| (self.capture.clock)())
     }
 
     /// Takes every session binding of its harness process no MCP server
@@ -349,9 +369,12 @@ impl Running {
         if new {
             self.marker = StartMarker::leave(&self.capture.home, &transcripts, self.marker.take());
         }
-        // Each read leaves its ingest marker at the time it reads (ADM-09).
+        // Each read leaves its ingest marker at the time it reads (ADM-09),
+        // and holds a fork's line only for a transcript another server
+        // holds a session binding for (REC-04).
         let inputs = ingest::Inputs {
-            now_ms: (self.capture.clock)().saturating_mul(1000),
+            now_ms: self.now().saturating_mul(1000),
+            served: served_elsewhere(&self.capture.home, &transcripts),
             ..self.capture.inputs.clone()
         };
         for path in transcripts {
@@ -408,7 +431,8 @@ impl Running {
     }
 
     /// Audits what one live ingest found: each redaction, unparsed line,
-    /// format drift, new generation and witnessed repeat (I6).
+    /// format drift, new generation, witnessed repeat, refused repeat, hold
+    /// begun and line released (I6).
     fn audit_ingested(&self, ingested: &Ingested) {
         for rule in &ingested.redactions {
             self.audit(&keyed(
@@ -450,6 +474,30 @@ impl Running {
                 Kind::Coalesced,
                 Counter::WitnessedRepeatRecorded,
                 "witnessed line repeating another transcript recorded as its own event in",
+                &ingested.name,
+            ));
+        }
+        for _ in 0..ingested.refused {
+            self.audit(&keyed(
+                Kind::Rejected,
+                Counter::RepeatOfPurgedRefused,
+                "refused a repeated line whose uuid names a purged event, in",
+                &ingested.name,
+            ));
+        }
+        if ingested.hold_started {
+            self.audit(&keyed(
+                Kind::Truncated,
+                Counter::RepeatHeld,
+                "repeated lines held at an ingest marker in",
+                &ingested.name,
+            ));
+        }
+        for _ in 0..ingested.released {
+            self.audit(&keyed(
+                Kind::TimedOut,
+                Counter::RepeatReleased,
+                "repeated line released into its own run in",
                 &ingested.name,
             ));
         }
@@ -697,6 +745,15 @@ pub(crate) fn count_stopped(
     }
 
     audited
+}
+
+/// The transcripts a running MCP server other than the one that reads
+/// `own` holds a session binding for.
+fn served_elsewhere(home: &Home, own: &[PathBuf]) -> BTreeSet<PathBuf> {
+    served(home)
+        .into_iter()
+        .filter(|path| !own.contains(path))
+        .collect()
 }
 
 /// The start markers of the MCP servers, as `parinn verify` reads them:

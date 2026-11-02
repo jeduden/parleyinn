@@ -504,10 +504,10 @@ fn ingest(
     let inputs = ingest::Inputs {
         payload: payload_settings(settings),
         // Ingest reads the fork observations the hook handlers held from
-        // the store itself (REC-04).
-        forks: std::collections::BTreeSet::new(),
+        // the store itself, and holds no line for a server (REC-04).
         now_ms: (ctx.clock)().saturating_mul(1000),
         interactive: settings.deployment_mode() == "interactive",
+        ..ingest::Inputs::default()
     };
     let paths: Vec<&Path> = allowed.iter().map(AllowedPath::path).collect();
     let (reports, failed_ingests) = ingest_all(ctx, &home, &paths, &redactor, &inputs, stderr);
@@ -719,7 +719,7 @@ fn record_ingested(ctx: &Context, ingested: &ingest::Ingested, stderr: &mut dyn 
     audit_redactions(ctx, &ingested.redactions, stderr);
     audit_scan_limited(ctx, ingested.scan_limited, stderr);
     audit_parsing(ctx, ingested, stderr);
-    audit_sourcing(ctx, ingested, stderr);
+    sourcing::audit(ctx, ingested, stderr);
     audit_prompts(ctx, ingested, stderr);
     audit_index_gaps(ctx, ingested, stderr);
     tracing::info!(
@@ -787,70 +787,6 @@ fn runs_json(runs: &[ingest::RunReport]) -> Value {
             })
         })
         .collect()
-}
-
-/// Audits what an ingest found of its transcript source, one entry
-/// each, naming the source by its redacted name: a new transcript
-/// generation (REC-07); each line repeating a `uuid` with other
-/// content, each repeat owner no fork observation chose, a hold begun
-/// and each line released from one (REC-04).
-fn audit_sourcing(ctx: &Context, ingested: &ingest::Ingested, stderr: &mut dyn Write) {
-    let keyed = |kind, counter, detail| Occurrence::Keyed {
-        kind,
-        counter,
-        operation: "ingest",
-        detail,
-        key: &ingested.name,
-    };
-    let occurrences = [
-        (
-            usize::from(ingested.new_generation),
-            keyed(
-                Kind::Truncated,
-                Counter::NewTranscriptGeneration,
-                "new transcript generation of",
-            ),
-        ),
-        (
-            ingested.conflicts,
-            keyed(
-                Kind::Rejected,
-                Counter::RepeatConflicts,
-                "repeated uuid with other content, recorded as its own event, in",
-            ),
-        ),
-        (
-            ingested.owners_chosen,
-            keyed(
-                Kind::Coalesced,
-                Counter::RepeatOwnerChosen,
-                "repeated lines owned by the run that first recorded them, repeated in",
-            ),
-        ),
-        (
-            usize::from(ingested.hold_started),
-            keyed(
-                Kind::Truncated,
-                Counter::RepeatHeld,
-                "repeated lines held at an ingest marker in",
-            ),
-        ),
-        (
-            ingested.released,
-            keyed(
-                Kind::TimedOut,
-                Counter::RepeatReleased,
-                "repeated line released into its own run in",
-            ),
-        ),
-    ];
-    for (times, occurrence) in &occurrences {
-        for _ in 0..*times {
-            if let Err(e) = ctx.audit(occurrence) {
-                let _ = writeln!(stderr, "parinn ingest: audit the transcript source: {e}");
-            }
-        }
-    }
 }
 
 /// Audits each prompt line an ingest found carrying a `prompt_id`
@@ -1257,9 +1193,9 @@ fn live_capture(
         redactor,
         inputs: ingest::Inputs {
             payload: payload_settings(settings),
-            forks: std::collections::BTreeSet::new(),
             now_ms: base.saturating_mul(1000),
             interactive: settings.deployment_mode() == "interactive",
+            ..ingest::Inputs::default()
         },
         harness: (ctx.ancestry)().and_then(|a| a.harness),
         limit: ctx.live_limit,
@@ -2251,6 +2187,7 @@ mod retention;
 mod segments;
 mod settings;
 mod sources;
+mod sourcing;
 
 pub use hook_handlers::budget_override;
 pub use settings::managed_policy;

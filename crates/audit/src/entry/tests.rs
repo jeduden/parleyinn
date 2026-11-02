@@ -71,6 +71,7 @@ fn each_kind_and_counter_has_its_name() {
         (Counter::RepeatOwnerChosen, "repeat_owner_chosen"),
         (Counter::RepeatHeld, "repeat_held"),
         (Counter::RepeatReleased, "repeat_released"),
+        (Counter::RepeatOfPurgedRefused, "repeat_of_purged_refused"),
         (Counter::TranscriptSourceLost, "transcript_source_lost"),
         (Counter::HookInputRejected, "hook_input_rejected"),
         (Counter::HookBudgetExceeded, "hook_budget_exceeded"),
