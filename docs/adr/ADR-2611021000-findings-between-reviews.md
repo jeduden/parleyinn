@@ -33,14 +33,15 @@ review that marks its own blocking findings resolved (I2, I8).
 - **Kept per pull request.** A review that decided uploads
   `review/findings.json` and `review/findings.md`, scrubbed of the
   Claude token first, as `review-findings-pr-<number>`, for 90 days.
-- **Fetched by origin.** `scripts/review-previous.sh` lists the
-  artifacts of that name and the runs that uploaded them, through the
-  job's read-only token. `review-run previous select` takes the newest
+- **Fetched by origin.** `scripts/review-previous.sh` lists every page
+  of the artifacts of that name and the runs that uploaded them,
+  through the job's read-only token. `review-run previous select` takes the newest
   unexpired one whose run is `.github/workflows/review.yml` on
   `workflow_run` or `issue_comment`, the two triggers that run main's
   definition. Each other artifact of the name is refused and counted,
   and so is one whose run is unknown. `review-run previous check`
-  refuses a file past 1 MiB or one that does not read.
+  refuses a file past 1 MiB or one that does not read; the script cuts
+  the unzipped file one byte past that, so none fills the runner's disk.
 - **Said, never silent.** The job summary names the artifact carried,
   or says no earlier review was found, or that one did not read, so
   every finding is new (I6). A missing history never fails the review.

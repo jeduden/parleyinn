@@ -169,6 +169,21 @@ pub fn selection_problems() -> Vec<String> {
         )),
         Err(e) => problems.push(format!("previous select failed: {e}")),
     }
+    // An artifact whose run is in no list of runs has an origin no one
+    // checked.
+    let unknown = format!(
+        r#"{{"artifacts":[{}]}}"#,
+        artifact(9, "2026-11-01T13:00:00Z", 90)
+    );
+    match select("7", &unknown, "[]") {
+        Ok(Selection {
+            artifact: None,
+            skipped: 1,
+        }) => {}
+        other => problems.push(format!(
+            "previous select took or missed an artifact whose run is unknown: {other:?}, want none with 1 refused"
+        )),
+    }
     let forged = format!(
         "[{},{},{}]",
         run(30, ".github/workflows/ci.yml", "workflow_run"),

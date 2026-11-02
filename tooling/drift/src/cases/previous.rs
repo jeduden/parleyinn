@@ -49,6 +49,17 @@ pub(super) fn review_previous_cases() -> Vec<Case> {
             "previous select took",
         ),
         case(
+            "a previous review taken from an artifact whose run is unknown",
+            "ENG-28",
+            Injection::replace(
+                PREVIOUS,
+                ".is_some_and(Run::is_main_review);",
+                ".is_none_or(Run::is_main_review);",
+            ),
+            carried("selection"),
+            "an artifact whose run is unknown",
+        ),
+        case(
             "a review never given the findings of the previous one",
             "ENG-28",
             Injection::replace(WORKFLOW, "${PREVIOUS:+--previous \"$PREVIOUS\"}", ""),

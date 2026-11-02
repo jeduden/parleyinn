@@ -1029,6 +1029,10 @@ fn every_other_use_of_review_run_still_starts_agents() {
         // One start among many: the exemption is for the one command.
         "cargo run -p review-run -- previous check f && cargo run -p review-run -- --workdir .",
         "target/debug/review-run previous check f\ntarget/debug/review-run --workdir .",
+        // The word must follow on the same line: a bare start with its
+        // arguments on the next line is a start with none.
+        "cargo run -p review-run --\nprevious check f",
+        "target/debug/review-run\nprevious check f",
     ] {
         assert!(runs_agent_step(text), "{text}");
         assert!(runs_agents(text), "{text}");

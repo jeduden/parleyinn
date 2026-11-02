@@ -64,7 +64,10 @@ struct Artifact {
     name: String,
     #[serde(default)]
     expired: bool,
-    created_at: String,
+    /// Absent or null for an artifact GitHub gives no time, which then
+    /// ranks after every one that has one.
+    #[serde(default)]
+    created_at: Option<String>,
     workflow_run: Option<RunRef>,
 }
 

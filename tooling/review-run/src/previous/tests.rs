@@ -348,3 +348,12 @@ fn an_output_that_cannot_be_written_is_a_failure_that_says_so() {
     assert_eq!(code, EXIT_FAILURE);
     assert!(String::from_utf8(err).unwrap().contains("no room"));
 }
+
+#[test]
+fn an_artifact_with_no_time_is_read_and_ranks_last() {
+    let a = r#"{"artifacts":[
+        {"id":5,"name":"review-findings-pr-7","created_at":null,"workflow_run":{"id":50}},
+        {"id":4,"name":"review-findings-pr-7","created_at":"2026-11-01T09:00:00Z","workflow_run":{"id":40}}]}"#;
+    let r = runs(&[(50, REVIEW, "workflow_run"), (40, REVIEW, "workflow_run")]);
+    assert_eq!(select("7", a, &r).unwrap().artifact, Some(4));
+}

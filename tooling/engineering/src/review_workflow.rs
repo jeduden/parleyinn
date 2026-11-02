@@ -235,15 +235,17 @@ fn starts_cli(line: &str) -> bool {
 const NO_AGENT_COMMAND: &str = "previous";
 
 /// Whether `text` starts `review-run` in any spelling of it, other than
-/// as its [`NO_AGENT_COMMAND`]: the word after the marker is that
-/// command and nothing longer, never a flag such as `--previous`.
+/// as its [`NO_AGENT_COMMAND`]: the word after the marker, on the same
+/// line, is that command and nothing longer, never a flag such as
+/// `--previous`. A marker ending its line starts `review-run` with no
+/// command at all.
 fn starts_review_run(text: &str) -> bool {
     std::iter::once(AGENT_RUN)
         .chain(AGENT_RUN_ALT)
         .chain(std::iter::once(AGENT_BINARY))
         .any(|marker| {
             text.match_indices(marker).any(|(at, _)| {
-                let rest = text[at + marker.len()..].trim_start();
+                let rest = text[at + marker.len()..].trim_start_matches([' ', '\t']);
                 let word = rest.split(char::is_whitespace).next().unwrap_or_default();
                 word != NO_AGENT_COMMAND
             })
