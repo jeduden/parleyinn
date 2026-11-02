@@ -382,8 +382,60 @@ fn provenance_and_kind_filters_keep_the_events_they_name() {
 
     assert_eq!(with(&["web".to_owned()], &[]), [1]);
     assert_eq!(got, [2, 3]);
-    assert_eq!(with(&[], &["transcript_line".to_owned()]).len(), 3);
-    assert!(with(&[], &["unparsed_line".to_owned()]).is_empty());
+    assert!(with(&[], &["transcript_line".to_owned()]).is_empty());
+}
+
+#[test]
+fn the_kind_filter_matches_the_provenance_class_family() {
+    let dir = TempDir::new().unwrap();
+    let mut store = open(&dir);
+    seat(&mut store, writer(1), room());
+    let class = |n, tool: &str| {
+        line(
+            n,
+            "deploy result",
+            Provenance::parse(&format!("tool_result:{tool}")).unwrap(),
+            None,
+        )
+    };
+    store
+        .append(
+            writer(1),
+            &[
+                class(1, "Bash"),
+                class(2, "WebFetch"),
+                line(3, "deploy web", Provenance::Web, None),
+                line(
+                    4,
+                    "deploy lookalike",
+                    Provenance::parse("tool_resultx").unwrap_or(Provenance::File),
+                    None,
+                ),
+            ],
+        )
+        .unwrap();
+    let query = compiled("deploy");
+    let with = |kinds: &[String]| {
+        let mut found = seqs(
+            &store
+                .search(&Search {
+                    kinds,
+                    ..base(&query)
+                })
+                .unwrap(),
+        );
+        found.sort_unstable();
+        found
+    };
+
+    assert_eq!(with(&["tool_result".to_owned()]), [1, 2]);
+    assert_eq!(with(&["tool_result:Bash".to_owned()]), [1]);
+    assert_eq!(with(&["web".to_owned()]), [3]);
+    assert_eq!(
+        with(&["web".to_owned(), "tool_result".to_owned()]),
+        [1, 2, 3]
+    );
+    assert!(with(&["tool".to_owned()]).is_empty());
 }
 
 #[test]
