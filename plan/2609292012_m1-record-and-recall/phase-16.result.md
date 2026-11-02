@@ -69,10 +69,12 @@ Open in M1 (rulings of 2 November 2026 in plan.md's list):
 - LANE-02 stays `@pending`: its scenario has the first hook bind, its row
   needs an MCP server holding the session binding (SEC-18); no ruling.
 - REC-24 in part (chain head, origin `peer`); the confirm is M7's.
-- SEC-05 in part: `read::bounded` (4 MiB line, 64 MiB window, high-water),
-  `transcript_line_too_large`, verify's refused-line report (ADM-09 row
-  bound, 16 of 17). Rows 1-3 pass; row 4 (ingest refuses) and row 5
-  (windowed ingest, high-water seam) wait for reading.rs; `@pending` stays.
+- SEC-05 passes (5 of 5 rows, `@pending` off): `parinn ingest` and live
+  ingest read a 64 MiB window at the ingest marker (`read::bounded`,
+  `read::open`), stream the prefix hash and purged-line zeroing, refuse a
+  line over 4 MiB (`transcript_line_too_large`, audited once live) and
+  report `read_window_high_water`. ADM-09's refused-line row is bound, 16
+  of 17. `act.rs` and `capture.rs` hook reads still read a transcript whole.
   ENG-09's split: code to follow. Purge residue
   closed (REC-17), `uuid` aside; SEC-31, ADM-07 stay `@pending`.
 - SEC-18 passes (`ingest_path`). REC-22 stays `@pending`: no freshness

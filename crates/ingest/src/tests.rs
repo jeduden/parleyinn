@@ -1329,7 +1329,7 @@ fn a_read_from_before_another_ingest_moved_the_position_is_refused_and_starts_no
     let stale = reading::ingest(
         &home,
         &path,
-        &numbered_lines(1, 3),
+        &crate::windowed_tests::whole(&numbered_lines(1, 3)),
         &redactor(),
         &Inputs::default(),
         &mut reading::Recorder::Cli,
@@ -1366,7 +1366,7 @@ fn a_source_read_shorter_than_its_position_and_found_shorter_still_starts_a_new_
     let rewritten = reading::ingest(
         &home,
         &path,
-        &numbered_lines(7, 8),
+        &crate::windowed_tests::whole(&numbered_lines(7, 8)),
         &redactor(),
         &Inputs::default(),
         &mut reading::Recorder::Cli,
@@ -1379,7 +1379,7 @@ fn a_source_read_shorter_than_its_position_and_found_shorter_still_starts_a_new_
     let gone = reading::ingest(
         &home,
         &path,
-        &numbered_lines(9, 9),
+        &crate::windowed_tests::whole(&numbered_lines(9, 9)),
         &redactor(),
         &Inputs::default(),
         &mut reading::Recorder::Cli,

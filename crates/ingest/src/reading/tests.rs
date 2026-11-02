@@ -225,3 +225,87 @@ fn a_refusal_between_recorded_lines_keeps_the_prefix_the_position_digests() {
     );
     assert_eq!((grown.refused, grown.events), (0, 1));
 }
+
+/// A source whose ingest consumed the first `offset` bytes of `bytes`.
+fn consumed_source(bytes: &[u8], offset: u64) -> Source {
+    Source {
+        id: 7,
+        path: "/t/a.jsonl".to_owned(),
+        generation: 1,
+        directory: "/t".to_owned(),
+        position: Position {
+            offset,
+            prefix: Digest::of(&[&bytes[..offset as usize]]),
+            lines: 1,
+            seen: bytes.len() as u64,
+        },
+        purged: Vec::new(),
+        held_since: None,
+        lost: false,
+        marked_at: 0,
+    }
+}
+
+fn resumed(source: Source) -> Resume {
+    Resume {
+        position: source.position.clone(),
+        source,
+        index: 0,
+        first_line: 1,
+        new_generation: false,
+    }
+}
+
+#[test]
+fn the_consumed_prefix_is_hashed_from_the_source_when_the_window_is_past_its_start() {
+    let dir = TempDir::new().unwrap();
+    let path = transcript(&dir, "ab\ncd\n");
+    let resume = resumed(consumed_source(b"ab\ncd\n", 3));
+
+    let mut from_file = consumed(&resume, b"cd\n", &path, 3).unwrap();
+    from_file.update(b"cd\n");
+    let from_bytes = consumed(&resume, b"ab\ncd\n", &path, 0).unwrap();
+
+    assert_eq!(from_file.digest(), Digest::of(&[b"ab\ncd\n"]));
+    assert_eq!(from_bytes.digest(), Digest::of(&[b"ab\n"]));
+}
+
+#[test]
+fn a_file_shorter_than_the_marker_is_another_ingests_and_one_unreadable_fails() {
+    let dir = TempDir::new().unwrap();
+    let short = transcript(&dir, "a\n");
+    let resume = resumed(consumed_source(b"ab\ncd\n", 3));
+
+    let moved = consumed(&resume, b"", &short, 3).err().unwrap();
+    let gone = consumed(&resume, b"", &dir.path().join("none"), 3)
+        .err()
+        .unwrap();
+
+    assert!(moved.position_moved(), "{moved}");
+    assert!(matches!(gone, IngestError::Read { .. }), "{gone}");
+}
+
+#[test]
+fn a_store_without_a_schema_holds_no_marker() {
+    let dir = TempDir::new().unwrap();
+    let home = home(&dir);
+    home.create().unwrap();
+    std::fs::write(home.store(), b"").unwrap();
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::set_permissions(home.store(), std::fs::Permissions::from_mode(0o600)).unwrap();
+    }
+
+    assert!(peek(&home, Path::new("/t/a.jsonl")).unwrap().is_none());
+}
+
+#[test]
+fn a_failed_read_of_a_transcript_names_it_and_keeps_its_cause() {
+    let path = Path::new("/t/a.jsonl");
+
+    let err = IngestError::read(path)(std::io::Error::other("no"));
+
+    assert!(matches!(&err, IngestError::Read { path: p, .. } if p == path));
+    assert!(std::error::Error::source(&err).is_some());
+}

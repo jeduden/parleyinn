@@ -33,6 +33,11 @@ pub(super) struct Read<'r, 'a> {
     pub(super) parsed: &'r [Value],
     /// The index of the first line to read.
     pub(super) from: usize,
+    /// How many lines of the source lie before the first of `lines`, when
+    /// it is a window past the source's start (SEC-05).
+    pub(super) first_line: u64,
+    /// The source, whose lines before the window are replayed from it.
+    pub(super) path: &'r Path,
     pub(super) defaults: &'r Defaults,
     pub(super) redactor: &'r Redactor,
 }
@@ -152,6 +157,12 @@ impl<'a> Planner<'a> {
         for line in &read.lines[..read.from] {
             classifier.line(line.text);
         }
+        if let (true, Some(first)) = (read.first_line > 0, read.lines.first()) {
+            read::open::for_each_line(read.path, first.offset, |text| {
+                classifier.line(text);
+            })
+            .map_err(IngestError::read(read.path))?;
+        }
         let mut plan = Plan::default();
         for (i, line) in read.lines.iter().enumerate().skip(read.from) {
             let key = read.defaults.key(&read.parsed[i]);
@@ -167,14 +178,14 @@ impl<'a> Planner<'a> {
             }
             if decision == Decision::Refused {
                 plan.refused += 1;
-                plan.refused_to = Some((i as u64 + 1, line.end));
+                plan.refused_to = Some((read.first_line + i as u64 + 1, line.end));
                 continue;
             }
             let user = matches!(classified, Classified::Line(Provenance::User, _));
             let prompt = self.prompt(store, &read.parsed[i], &key, user, &decision, &read)?;
             let at = Planned {
                 writer,
-                number: i as u64 + 1,
+                number: read.first_line + i as u64 + 1,
                 line,
                 parsed: &read.parsed[i],
             };
@@ -359,20 +370,17 @@ fn sibling_uuids(directory: &str, path: &str, served: &BTreeSet<PathBuf>) -> Sib
         if other.to_string_lossy() == path || other.extension().is_none_or(|e| e != "jsonl") {
             continue;
         }
-        let Ok(bytes) = read::transcript(&other) else {
-            continue;
-        };
-        let text = String::from_utf8_lossy(&bytes);
         let bound = served.contains(&canonical(&other));
-        for line in read::lines(&text) {
-            let parsed: Value = serde_json::from_str(line.text).unwrap_or(Value::Null);
+        // A line at a time, so a long transcript is never held (SEC-05).
+        let _ = read::open::for_each_line(&other, u64::MAX, |text| {
+            let parsed: Value = serde_json::from_str(text).unwrap_or(Value::Null);
             if let Some(uuid) = parsed["uuid"].as_str() {
                 found.all.insert(uuid.to_owned());
                 if bound {
                     found.served.insert(uuid.to_owned());
                 }
             }
-        }
+        });
     }
 
     found

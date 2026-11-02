@@ -11,7 +11,7 @@ use std::path::PathBuf;
 use audit::log::Log;
 use cucumber::{then, when};
 use rusqlite::Connection;
-use serde_json::{Value, json};
+use serde_json::Value;
 
 use crate::World;
 use crate::record::{home, last_run, run_core};
@@ -102,10 +102,7 @@ fn runs_with(w: &mut World, hook: String, input: String) -> Result<(), String> {
             let lines: Vec<String> = (0..66).map(|_| line_of(MIB, "bulk")).collect();
             let path = write_transcript(w, &lines)?;
             w.section::<Limits>().lines = lines.len();
-            for _ in 0..4 {
-                ingest(w, &path)?;
-            }
-            Ok(())
+            ingest(w, &path)
         }
     }
 }
@@ -208,13 +205,29 @@ fn bounded_and_resumed(w: &mut World) -> Result<(), String> {
     if recorded as u64 != lines {
         return Err(format!("{recorded} of {lines} lines are ingested"));
     }
+    // One report a window, each resumed at the ingest marker.
     let out = last_run(w)?;
-    let report: Value = serde_json::from_slice(&out.stdout).map_err(|e| e.to_string())?;
-    let held = report["read_window_high_water"].as_u64().ok_or_else(|| {
-        json!({"finding": "the ingest report names no read-window high-water mark"}).to_string()
-    })?;
-    if held > (64 * MIB) as u64 {
-        return Err(format!("ingest held {held} bytes at once"));
+    let reports: Vec<Value> = String::from_utf8_lossy(&out.stdout)
+        .lines()
+        .map(|l| serde_json::from_str(l).map_err(|e| e.to_string()))
+        .collect::<Result<_, _>>()?;
+    if reports.len() < 2 {
+        return Err(format!("{} reads of a source over 64 MiB", reports.len()));
+    }
+    let events: u64 = reports
+        .iter()
+        .map(|r| r["events"].as_u64().unwrap_or(0))
+        .sum();
+    if events != lines {
+        return Err(format!("the reads recorded {events} of {lines} lines"));
+    }
+    for report in &reports {
+        let held = report["read_window_high_water"]
+            .as_u64()
+            .ok_or("the ingest report names no read-window high-water mark")?;
+        if held == 0 || held > (64 * MIB) as u64 {
+            return Err(format!("ingest held {held} bytes at once"));
+        }
     }
     Ok(())
 }

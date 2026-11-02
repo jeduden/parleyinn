@@ -55,7 +55,7 @@ Feature: Security (SEC)
       | *prefix                   | rejected: leading wildcard                         |
       | a query running past 2 s  | cancelled at the 2 s deadline and audited          |
 
-  @SEC-05 @P0 @I9 @pending
+  @SEC-05 @P0 @I9
   Scenario Outline: oversized or deeply nested hook input is refused and transcript lines are redacted whole and held to a ceiling
     Given an isolated ParleyInn home
     When the hook "UserPromptSubmit" runs, or "parinn ingest" reads a transcript, with <input>

@@ -8,6 +8,7 @@ use std::io::{self, Read};
 use std::path::Path;
 
 pub mod bounded;
+pub mod open;
 
 /// One line ingest may consume: its text without the newline, and the
 /// bytes it spans with the newline.
@@ -136,6 +137,13 @@ fn same_file(looked: &fs::Metadata, opened: &fs::Metadata) -> io::Result<()> {
 /// JSON, as the harness may still be writing it.
 #[must_use]
 pub fn lines(text: &str) -> Vec<Line<'_>> {
+    lines_at(text, 0)
+}
+
+/// [`lines`] of `text` that begins at byte offset `base` of its source:
+/// each line's offsets are the source's.
+#[must_use]
+pub fn lines_at(text: &str, base: u64) -> Vec<Line<'_>> {
     let mut out = Vec::new();
     let mut offset = 0;
     for piece in text.split_inclusive('\n') {
@@ -149,8 +157,8 @@ pub fn lines(text: &str) -> Vec<Line<'_>> {
         match consumable {
             Some(text) => out.push(Line {
                 text,
-                offset: offset as u64,
-                end: end as u64,
+                offset: base + offset as u64,
+                end: base + end as u64,
             }),
             None => break,
         }

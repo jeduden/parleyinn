@@ -131,8 +131,8 @@ Rulings of 2 November 2026, now in the SRS and scenarios:
   limit; ingest position stays before the line (SEC-05, REC-03)"), counted
   as `transcript_line_too_large`, the source left short.
 - **ADM-09:** `parinn verify` reports a source short at a refused line
-  (offset, `transcript_line_too_large`), exits 0; bound. SEC-05 stays
-  `@pending`: ingest's windowed read and refusal follow.
+  (offset, `transcript_line_too_large`), exits 0; bound. SEC-05 passes:
+  ingest reads windows (`read::bounded`, `read::open`).
 - **REC-22, SEC-18:** `parinn ingest --path` at a terminal is a widening
   principal act (`ingest_path`), allowed once resolved. SEC-18 passes;
   REC-22 in part (freshness is VIEW-04's); a resume past a marker is `ingested`.

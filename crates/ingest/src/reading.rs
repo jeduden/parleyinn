@@ -23,7 +23,8 @@ use store::{Held, IngestedRun, NewEvent, Place, Placed, Position, Source, Store}
 use crate::live::RunSeats;
 use crate::observed::{self, Observed};
 use crate::prompt::Outcome;
-use crate::read::{self, Line};
+use crate::read::bounded::Refused;
+use crate::read::{self, Line, open};
 use crate::repeat;
 use crate::run::{Defaults, RunKey};
 
@@ -40,27 +41,93 @@ pub(crate) enum Recorder<'r> {
     Live(&'r mut RunSeats),
 }
 
-/// Ingests the transcript at `path`, whose text is `text`, as
+/// The window of a transcript source one ingest reads (SEC-05, REC-13).
+pub(crate) struct View<'t> {
+    /// Its lines, whole.
+    pub(crate) text: &'t str,
+    /// The byte offset of the source it starts at: past 0 only when a
+    /// longer source resumes at its ingest marker.
+    pub(crate) base: u64,
+    /// The bytes the source held when read.
+    pub(crate) seen: u64,
+    /// The line over the line ceiling the window ends before.
+    pub(crate) refused: Option<Refused>,
+    /// Whether the source holds more lines past the window to resume at.
+    pub(crate) resumable: bool,
+    /// The most bytes of the source the read held at once.
+    pub(crate) high_water: usize,
+}
+
+/// Each of `lines` parsed as JSON, null where it is none.
+fn parse(lines: &[Line<'_>]) -> Vec<Value> {
+    lines
+        .iter()
+        .map(|l| serde_json::from_str(l.text).unwrap_or(Value::Null))
+        .collect()
+}
+
+/// `redactor` with the harness account identifiers the transcript names
+/// among its rules (SEC-08).
+fn redacting(
+    redactor: &Redactor,
+    path: &Path,
+    view: &View<'_>,
+    lines: &[Line<'_>],
+) -> Result<Redactor, IngestError> {
+    let ids = learned(path, view, lines)?;
+
+    redactor
+        .with_identifiers(&ids)
+        .map_err(IngestError::Redaction)
+}
+
+/// The harness account identifiers the transcript's lines name: those
+/// of `lines`, or, for a source read in windows, of every line of it, a
+/// line at a time (SEC-08, SEC-05).
+fn learned(
+    path: &Path,
+    view: &View<'_>,
+    lines: &[Line<'_>],
+) -> Result<HarnessAccountIdentifiers, IngestError> {
+    let mut ids = HarnessAccountIdentifiers::default();
+    if view.base == 0 && !view.resumable && view.refused.is_none() {
+        lines.iter().for_each(|l| ids.learn(l.text));
+        return Ok(ids);
+    }
+    open::for_each_line(path, u64::MAX, |text| ids.learn(text)).map_err(IngestError::read(path))?;
+
+    Ok(ids)
+}
+
+/// The ingest marker row of the source at `path`, read without changing
+/// the store; none while there is no store or no row.
+pub(crate) fn peek(home: &Home, path: &Path) -> Result<Option<Source>, IngestError> {
+    let file = home.store();
+    if !file.exists() {
+        return Ok(None);
+    }
+    let Some(store) = Store::open_read_only_made(&file)? else {
+        return Ok(None);
+    };
+
+    Ok(store.source(&path.to_string_lossy())?)
+}
+
+/// Ingests the transcript at `path`, whose window is `view`, as
 /// [`crate::ingest_with`] describes, `recorder` recording it.
 pub(crate) fn ingest(
     home: &Home,
     path: &Path,
-    text: &str,
+    view: &View<'_>,
     redactor: &Redactor,
     inputs: &Inputs,
     recorder: &mut Recorder<'_>,
     entropy: &mut dyn Entropy,
 ) -> Result<Ingested, IngestError> {
-    let lines = read::lines(text);
-    let parsed: Vec<Value> = lines
-        .iter()
-        .map(|l| serde_json::from_str(l.text).unwrap_or(Value::Null))
-        .collect();
-    let mut ids = HarnessAccountIdentifiers::default();
-    lines.iter().for_each(|l| ids.learn(l.text));
-    let redactor = redactor
-        .with_identifiers(&ids)
-        .map_err(IngestError::Redaction)?;
+    let text = view.text;
+    let lines = read::lines_at(text, view.base);
+    let parsed = parse(&lines);
+    let redactor = redacting(redactor, path, view, &lines)?;
     home.create().map_err(IngestError::Admin)?;
     let mut store = open_store(home, inputs)?;
     let node = Node::open(home, &mut store, entropy).map_err(IngestError::Admin)?;
@@ -69,7 +136,7 @@ pub(crate) fn ingest(
     inputs.forks.extend(observed.forks());
     let inputs = &inputs;
     let named = Named::of(path, &redactor);
-    let resume = Resume::find(&mut store, &named, text.as_bytes(), &lines, &redactor)?;
+    let resume = Resume::find(&mut store, &named, view, &lines, &redactor)?;
     let defaults = Defaults::of(path);
     let mut runs = Runs::load(&store, &named.path, recorder)?;
     let own = runs.ensure(&mut store, &node, home, &defaults.own(), entropy)?;
@@ -84,6 +151,8 @@ pub(crate) fn ingest(
             lines: &lines,
             parsed: &parsed,
             from: resume.index,
+            first_line: resume.first_line,
+            path,
             defaults: &defaults,
             redactor: &redactor,
         },
@@ -97,7 +166,7 @@ pub(crate) fn ingest(
         interactive: inputs.interactive,
         live: live_observations(&observed, &defaults, main, runs.live()),
     };
-    let land = append(&mut store, &resume, text.as_bytes(), &plan, &seen, entropy)?;
+    let land = append(&mut store, &resume, view, path, &plan, &seen, entropy)?;
     let hold_started = hold(&mut store, &resume.source, plan.hold, inputs.now_ms)?;
     let owners_chosen = choose_owners(&mut store, &node, &plan.chosen, entropy)?;
     let observations = record_observed(&mut store, &node, &seen, &plan, &land.addresses, entropy)?;
@@ -109,6 +178,9 @@ pub(crate) fn ingest(
         index_gaps_unread,
         witnessed_repeats: plan.witnessed_repeats,
         refused: plan.refused,
+        too_large: view.refused,
+        resumable: view.resumable,
+        read_window_high_water: view.high_water,
         matched: observations.matched,
         prompt_conflicts: observations.conflicts,
         not_attended: observations.not_attended,
@@ -206,6 +278,8 @@ struct Resume {
     index: usize,
     /// The position before that line.
     position: Position,
+    /// How many lines of the source lie before the window it reads.
+    first_line: u64,
     new_generation: bool,
 }
 
@@ -217,10 +291,14 @@ impl Resume {
     fn find(
         store: &mut Store,
         named: &Named,
-        bytes: &[u8],
+        view: &View<'_>,
         lines: &[Line<'_>],
         redactor: &Redactor,
     ) -> Result<Self, IngestError> {
+        let bytes = view.text.as_bytes();
+        if view.base > 0 {
+            return Self::at_marker(store, named, view.base);
+        }
         let Some(source) = store.source(&named.path)? else {
             let source = store.start_generation(&named.path, &named.directory)?;
             return Ok(Self::at(source, 0, lines, bytes, false));
@@ -236,6 +314,7 @@ impl Resume {
                 source,
                 index,
                 position,
+                first_line: 0,
                 new_generation: false,
             });
         }
@@ -259,6 +338,26 @@ impl Resume {
         Ok(Self::at(source, same, lines, bytes, true))
     }
 
+    /// Resuming the source `named` at its ingest marker, `offset`, which
+    /// the window read vouches for; another ingest moved it when it is
+    /// elsewhere now.
+    fn at_marker(store: &Store, named: &Named, offset: u64) -> Result<Self, IngestError> {
+        let moved = |source| IngestError::Store(store::StoreError::PositionMoved { source });
+        let source = store.source(&named.path)?.ok_or_else(|| moved(0))?;
+        if source.position.offset != offset {
+            return Err(moved(source.id));
+        }
+        let position = source.position.clone();
+
+        Ok(Self {
+            source,
+            index: 0,
+            first_line: position.lines,
+            position,
+            new_generation: false,
+        })
+    }
+
     /// Resuming `source` at the line `index` of `lines`.
     fn at(
         source: Source,
@@ -276,6 +375,7 @@ impl Resume {
         Self {
             source,
             index,
+            first_line: 0,
             position: Position {
                 offset,
                 prefix: Digest::of(&[consumed]),
@@ -304,8 +404,7 @@ fn continues(source: &Source, bytes: &[u8]) -> bool {
 /// from the prefix its position consumed. A source that cannot be read
 /// again, or that no longer holds that prefix, was rewritten: REC-07's.
 fn behind(source: &Source, bytes: &[u8], path: &Path) -> bool {
-    bytes.len() < as_index(source.position.offset)
-        && read::transcript(path).is_ok_and(|now| continues(source, &now))
+    bytes.len() < as_index(source.position.offset) && open::continues(path, source)
 }
 
 /// The redacted lines the newest generation of the source at `path`
@@ -494,18 +593,14 @@ struct Landed {
 fn append(
     store: &mut Store,
     resume: &Resume,
-    bytes: &[u8],
+    view: &View<'_>,
+    path: &Path,
     plan: &Plan,
     hooks: &Seen<'_>,
     entropy: &mut dyn Entropy,
 ) -> Result<Landed, IngestError> {
-    let seen = bytes.len() as u64;
-    let mut running = Zeroed::new(&resume.source.purged);
-    running.update(
-        bytes
-            .get(..as_index(resume.position.offset))
-            .unwrap_or_default(),
-    );
+    let (bytes, base, seen) = (view.text.as_bytes(), view.base, view.seen);
+    let mut running = consumed(resume, bytes, path, base)?;
     let mut position = Position {
         seen,
         ..resume.position.clone()
@@ -531,7 +626,7 @@ fn append(
         // of the prefix.
         running.update(
             bytes
-                .get(as_index(position.offset)..as_index(end))
+                .get(as_index(position.offset - base)..as_index(end - base))
                 .unwrap_or_default(),
         );
         position = Position {
@@ -561,7 +656,7 @@ fn append(
     if let Some((line, end)) = plan.refused_to.filter(|(_, end)| *end > position.offset) {
         running.update(
             bytes
-                .get(as_index(position.offset)..as_index(end))
+                .get(as_index(position.offset - base)..as_index(end - base))
                 .unwrap_or_default(),
         );
         position = Position {
@@ -579,6 +674,35 @@ fn append(
         addresses,
         observations: observing.appended,
     })
+}
+
+/// The running hash of what `resume` consumed of the source, its purged
+/// lines zeroed: of `bytes` when they begin the source, else of the
+/// source at `path`, a chunk at a time (SEC-31, SEC-05).
+fn consumed<'s>(
+    resume: &'s Resume,
+    bytes: &[u8],
+    path: &Path,
+    base: u64,
+) -> Result<Zeroed<'s>, IngestError> {
+    let purged = &resume.source.purged;
+    if base == 0 {
+        let mut running = Zeroed::new(purged);
+        running.update(
+            bytes
+                .get(..as_index(resume.position.offset))
+                .unwrap_or_default(),
+        );
+        return Ok(running);
+    }
+    let file = read::regular_file(path).map_err(IngestError::read(path))?;
+    let prefix =
+        open::zeroed(file, resume.position.offset, purged).map_err(IngestError::read(path))?;
+    let moved = store::StoreError::PositionMoved {
+        source: resume.source.id,
+    };
+
+    prefix.ok_or(IngestError::Store(moved))
 }
 
 /// The hook observations a live ingest appends to the main run's run

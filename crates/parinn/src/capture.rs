@@ -185,6 +185,9 @@ pub(crate) struct Running {
     transcripts: BTreeMap<PathBuf, u64>,
     /// The paths refused, each audited once.
     refused: BTreeSet<PathBuf>,
+    /// Each line over the 4 MiB limit audited, by transcript path and
+    /// offset: a live read refuses it again each poll (SEC-05).
+    too_large: BTreeSet<(PathBuf, u64)>,
     marker: Option<StartMarker>,
     /// When its run seats' open segments last closed, and how often
     /// they close while it appends (REC-19).
@@ -203,6 +206,7 @@ impl Capture {
             sessions: Vec::new(),
             transcripts: BTreeMap::new(),
             refused: BTreeSet::new(),
+            too_large: BTreeSet::new(),
             marker: None,
             closed: now_instant(),
             close_every: SEGMENT_EVERY,
@@ -387,17 +391,41 @@ impl Running {
                 self.capture.limit,
                 &mut OsEntropy,
             );
+            let stopped = match &read {
+                Ok(Some(ingested)) => ingested.too_large,
+                Ok(None) => ingest::live::refused_line(&self.capture.home, &path),
+                Err(_) => None,
+            };
             match read {
                 Ok(Some(ingested)) => self.audit_ingested(&ingested),
                 Ok(None) => {}
                 Err(e) => self.failed(&path, &e),
             }
+            self.audit_too_large(&path, stopped);
             self.read_tool_uses(&path);
         }
         if self.closed.elapsed() >= self.close_every {
             self.close_segments();
             self.closed = now_instant();
         }
+    }
+
+    /// Audits, once, a line over the 4 MiB limit a live read refused:
+    /// the source stays short at it (SEC-05, REC-03, I6).
+    fn audit_too_large(&mut self, path: &Path, line: Option<ingest::read::bounded::Refused>) {
+        let Some(line) = line else {
+            return;
+        };
+        if !self.too_large.insert((path.to_path_buf(), line.offset)) {
+            return;
+        }
+        let stem = path.file_stem().map(|s| s.to_string_lossy().into_owned());
+        let name = self.capture.redactor.redact_text(&stem.unwrap_or_default());
+        self.audit(&Occurrence::TranscriptLineTooLarge {
+            source: &name.text,
+            offset: line.offset,
+            length: line.length,
+        });
     }
 
     /// Closes each run seat's open segment (REC-19).

@@ -12,7 +12,7 @@ use crate::Context;
 /// generation (REC-07); each line repeating a `uuid` with other
 /// content, each repeat owner no fork observation chose, a hold begun,
 /// each line released from one and each refused for naming a purged
-/// event (REC-04).
+/// event (REC-04); a line over the 4 MiB limit refused (SEC-05).
 pub(super) fn audit(ctx: &Context, ingested: &ingest::Ingested, stderr: &mut dyn Write) {
     let keyed = |kind, counter, detail| Occurrence::Keyed {
         kind,
@@ -21,7 +21,21 @@ pub(super) fn audit(ctx: &Context, ingested: &ingest::Ingested, stderr: &mut dyn
         detail,
         key: &ingested.name,
     };
+    let line = ingested
+        .too_large
+        .unwrap_or(ingest::read::bounded::Refused {
+            offset: 0,
+            length: 0,
+        });
     let occurrences = [
+        (
+            usize::from(ingested.too_large.is_some()),
+            Occurrence::TranscriptLineTooLarge {
+                source: &ingested.name,
+                offset: line.offset,
+                length: line.length,
+            },
+        ),
         (
             usize::from(ingested.new_generation),
             keyed(
@@ -79,3 +93,6 @@ pub(super) fn audit(ctx: &Context, ingested: &ingest::Ingested, stderr: &mut dyn
         }
     }
 }
+
+#[cfg(test)]
+mod tests;

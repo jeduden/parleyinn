@@ -62,6 +62,7 @@ impl Fixture {
             sessions: Vec::new(),
             transcripts: BTreeMap::new(),
             refused: BTreeSet::new(),
+            too_large: BTreeSet::new(),
             marker: None,
             closed: now_instant(),
             close_every: SEGMENT_EVERY,
@@ -874,4 +875,40 @@ fn a_marker_link_or_fifo_is_neither_followed_nor_waited_on() {
 
     assert_eq!(answer.expect("served waited on a FIFO marker"), [f.main()]);
     drop(marker);
+}
+
+/// How many audit entries count a line over the 4 MiB limit.
+fn too_large_counted(f: &Fixture) -> usize {
+    f.counted()
+        .iter()
+        .filter(|c| *c == "transcript_line_too_large")
+        .count()
+}
+
+#[test]
+fn a_line_over_4_mib_a_live_read_refuses_is_audited_once_however_often_it_is_read() {
+    let over = "z".repeat((4 << 20) + 1);
+    let after_lines = format!("{}{over}\n{}", line(1, None), line(2, None));
+    let only_the_line = format!("{over}\n");
+    for text in [after_lines, only_the_line] {
+        let f = Fixture::new();
+        std::fs::write(f.main(), text).unwrap();
+        f.bind(SESSION, &f.main(), HARNESS);
+        let mut running = f.running(Some(HARNESS), None);
+        running.bind();
+
+        running.poll();
+        running.poll();
+        running.poll();
+
+        assert_eq!(too_large_counted(&f), 1);
+        let entries = Log::new(f.home.audit()).entries().unwrap();
+        let entry = entries
+            .iter()
+            .find(|e| e.counter.as_deref() == Some("transcript_line_too_large"))
+            .unwrap();
+        assert_eq!(entry.kind, "rejected");
+        assert!(entry.detail.contains(SESSION), "{}", entry.detail);
+        assert!(entry.detail.contains("4194305 bytes"), "{}", entry.detail);
+    }
 }

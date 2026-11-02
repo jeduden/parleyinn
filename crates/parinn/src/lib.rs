@@ -510,7 +510,7 @@ fn ingest(
     if target == IngestTarget::All {
         audit_lost(ctx, &home, stderr);
     }
-    let shown = ingest_report(&target, &reports, failures, as_json);
+    let shown = ingest_report::ingest_report(&target, &reports, failures, as_json);
     let code = written(write!(stdout, "{shown}"), stderr);
 
     if failures > 0 { EXIT_FAILURE } else { code }
@@ -548,18 +548,17 @@ fn ingest_all(
     let mut reports = Vec::new();
     let mut failures = 0;
     for path in paths {
-        let ingested = redactor.as_ref().map_err(Clone::clone).and_then(|r| {
-            ingest::ingest_with(home, path, r, inputs, &mut OsEntropy).map_err(|e| e.to_string())
-        });
-        match ingested {
-            Ok(i) => {
-                record_ingested(ctx, &i, stderr);
-                reports.push(i);
-            }
-            Err(e) => {
-                failed("ingest", &e, stderr);
-                failures += 1;
-            }
+        let (done, error) = match redactor {
+            Ok(r) => ingest_windows::ingest(home, path, r, inputs),
+            Err(e) => (Vec::new(), Some(e.clone())),
+        };
+        for i in done {
+            record_ingested(ctx, &i, stderr);
+            reports.push(i);
+        }
+        if let Some(e) = error {
+            failed("ingest", &e, stderr);
+            failures += 1;
         }
     }
 
@@ -721,61 +720,6 @@ fn record_ingested(ctx: &Context, ingested: &ingest::Ingested, stderr: &mut dyn 
         format_drift = ingested.drifts.len() as u64,
         "ingested"
     );
-}
-
-/// What `parinn ingest` prints of the transcripts it recorded: for
-/// `--path`, the one; for `--all`, each, or that there was none.
-fn ingest_report(
-    target: &IngestTarget,
-    reports: &[ingest::Ingested],
-    failures: usize,
-    as_json: bool,
-) -> String {
-    let one = |i: &ingest::Ingested| {
-        json!({
-            "writer": i.writer.to_string(),
-            "seat": i.seat.to_string(),
-            "room": i.room.to_string(),
-            "events": i.events,
-            "generation": i.generation,
-            "held": i.held,
-            "runs": runs_json(&i.runs),
-        })
-    };
-    if as_json && *target == IngestTarget::All {
-        let all: Vec<Value> = reports.iter().map(one).collect();
-        return format!("{}\n", json!({"transcripts": all}));
-    }
-    if reports.is_empty() && failures == 0 && *target == IngestTarget::All {
-        return "ingested no transcript\n".to_owned();
-    }
-    reports
-        .iter()
-        .map(|i| {
-            if as_json {
-                format!("{}\n", one(i))
-            } else {
-                format!("ingested {} lines into writer {}\n", i.events, i.writer)
-            }
-        })
-        .collect()
-}
-
-/// Each run an ingest appended to, as `parinn ingest --json` shows it:
-/// its writer and seat, the harness's agent id, the run its parent link
-/// ties it to, and how many events it gained (REC-02).
-fn runs_json(runs: &[ingest::RunReport]) -> Value {
-    runs.iter()
-        .map(|r| {
-            json!({
-                "writer": r.writer.to_string(),
-                "seat": r.seat.to_string(),
-                "agent_id": r.agent_id,
-                "parent": r.parent.map(|p| p.to_string()),
-                "events": r.events,
-            })
-        })
-        .collect()
 }
 
 /// Audits each prompt line an ingest found carrying a `prompt_id`
@@ -2132,6 +2076,8 @@ mod hook_handlers;
 mod identity_status;
 mod index_gaps;
 mod ingest_path;
+mod ingest_report;
+mod ingest_windows;
 mod licenses;
 mod purge;
 mod quarantine;
