@@ -91,8 +91,8 @@ A scenario of a row that lands in part stays `@pending`, its M1 part
 proven by bound steps or named tests, as ENG-12 in plan 2609292011. One
 that cannot pass as written is raised, never re-pended.
 
-The "rest" column and §12.2 give each item its milestone; PRV-09 went to
-M3 (a restore's events) and M8 (a peer's).
+§12.2 gives each item its milestone; PRV-09 went to M3 (a restore's events)
+and M8 (a peer's), v1.0 ending before M8; RCL-02's `kind` is a provenance class.
 
 Each test kind lands with its code: ENG-07's fuzz targets, ENG-08's
 properties, ENG-06, ENG-17 and NFR-01 to NFR-05's benchmarks (ENG-15).

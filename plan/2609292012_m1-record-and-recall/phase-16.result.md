@@ -23,21 +23,19 @@ Outcome:
   marker through ingest's guarded open: a link swapped in is not
   followed and a FIFO is not waited on; verify reports such a source as
   failed, unreadable (ADM-09, SEC-18, ENG-03).
-- Store schema: `transcript_sources` gained `marked_at`, no version
-  bump; acceptable before the first release.
+- Store schema: `transcript_sources` gained `marked_at`, no version bump.
 - parinn-eval: seeded runs in the 2.1.296 line shapes; a scripted agent
   asks event_search then event_get. Within ten hits, 72/72 at each depth
   (Wilson 95% from 94.9%). Within five, depth 3 falls to 87.5%. Without
   recall, 0/216. CI's `eval` job holds `tooling/eval/recall-v1.txt`.
-- S12: `crates/store/tests/s12_rebuild.rs` covers either order, row ids
-  from addresses, secure-delete and truncated logs.
+- S12: `crates/store/tests/s12_rebuild.rs` covers either order and
+  truncated logs.
 - ENG-06: kills of purge and of rebuild. After a kill between a purge's
   transaction and its finishing, verify stays read-only: it names the
   unfinished purge (`pending_purges`), leaves the index unchecked and
   exits 0; the next purge, ingest or rebuild finishes it.
 - ENG-09: a soak of 50 writers; at 1M events, 4,293 of 10,000 appends
   passed the 5 s busy deadline and were retried. It runs nightly.
-- NFR-05: a floor benchmark; a run costs ingest about 12 ms.
 - Gates run: scenario gate, fmt, clippy, `mdsmith check .`,
   `cargo test --workspace`, `cargo run -p coverage` (unit 99% or more).
 
@@ -95,7 +93,9 @@ Last P0 sweep (cucumber):
   tasks; its other 16 steps pass.
 - REC-04 is off `@pending` and passes (cucumber). A purged event keeps
   its `uuid`, byte offset and prefix hash: the residue finding.
-- RCL-02 stays `@pending`: its `kind ["tool_result"]` row matches no
-  event kind (SRS 9.3 shows `tool_result` as `kind`); a ruling is wanted.
+- RCL-02 stays `@pending` until bound. Ruled 2 November 2026: `kind`
+  is the provenance class family (SRS 9.2, RCL-02); the scenario agrees.
+- Ruled: v1.0 ends before M8, so PRV-09's and PRV-02's peer rows stay in
+  M8 (SRS 11.2, 12.2; OQ-30 narrowed). REC-02 is in part in M1's row.
 
 [consent]: https://github.com/jeduden/parleyinn/pull/91#issuecomment-6402652493
