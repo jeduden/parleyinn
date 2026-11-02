@@ -91,7 +91,7 @@ proven by bound steps or named tests, as ENG-12 in plan 2609292011. One
 that cannot pass as written is a finding to raise, never re-pended.
 
 The "rest" column and §12.2 give each item the milestone that can do it.
-PRV-09 went whole to M8. phase-16.result.md lists what M1 still owes.
+PRV-09 went to M3 (a restore's events) and M8 (a peer's).
 
 Each test kind lands with its code: ENG-07's fuzz targets, ENG-08's
 properties, ENG-06, ENG-17 and NFR-01 to NFR-05's benchmarks (ENG-15).

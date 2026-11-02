@@ -24,7 +24,8 @@ Its rows are P2, and the ENG-29 review gates it. REC-18 rises to P0.
 
 Scope, by requirement family:
 
-- PRV-09 and PRV-02's rows that need another node's key, which M1 left
+- PRV-09's refusal of a peer's events and PRV-02's rows that need
+  another node's key, which M1 left
 - PEER-01 to PEER-07, PEER-09 to PEER-11, PEER-13
 - PIN-11, OWN-08, OWN-17, RCL-10, RCL-11
 - LANE-09, LANE-10, LANE-12
@@ -34,7 +35,7 @@ Scope, by requirement family:
 ## Tasks
 
 1. Enrollment, sync and convergence after a partition: PEER-01 to
-   PEER-04, SEC-24, SEC-25, PRV-09
+   PEER-04, SEC-24, SEC-25, PRV-09 for a peer's events
 2. Ephemeral and token-key-only nodes: PEER-05, PEER-06
 3. Invites, the contributor role, directed posts and endorsement:
    LANE-10, LANE-12, OWN-08
