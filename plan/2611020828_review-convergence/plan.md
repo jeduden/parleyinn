@@ -1,7 +1,7 @@
 ---
 id: 2611020828
 title: "Review convergence: rulings settle, contests are checkable, a fresh reader paraphrases"
-status: "🔲"
+status: "🔳"
 summary: >-
   Three ideas from google/elephant-goldfish-model, fitted to a review
   run by code (ENG-28). Each review keeps its tracked findings for the
@@ -123,9 +123,10 @@ footer: |
 
 ?>
 
-| #   | Status | Phase                                                                   |
-| --- | ------ | ----------------------------------------------------------------------- |
-| 1   | 🔲     | [Keep each pull request's tracked findings between reviews](phase-1.md) |
+| #   | Status | Phase                                                                                                                                                                                                                                                                                                                                                                                                                |
+| --- | ------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | ✅     | [Keep each pull request's tracked findings between reviews](phase-1.md)                                                                                                                                                                                                                                                                                                                                              |
+|     | ↳      | ENG-28 now has the review carry the previous review's findings: each review uploads them as review-findings-pr-NUMBER, the next one fetches the newest that a run of main's review workflow uploaded and passes it as --previous, and an artifact of that name from any other run is refused and counted. The ENG-28 scenario step, five drift cases and ADR-2611021000 land with it; the live check waits for main. |
 <?/catalog?>
 
 ## Acceptance Criteria

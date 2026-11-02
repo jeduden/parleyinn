@@ -1,16 +1,14 @@
 ---
 n: 1
 title: "Keep each pull request's tracked findings between reviews"
-status: "🔲"
+status: "✅"
 result: false
 ---
 # Phase 1: keep each pull request's tracked findings between reviews
 
-Why first. `review-run` tracks findings across reviews of a pull
-request only when given `--previous`, and the review workflow never
-gives it. So in CI every finding is new, none is resolved, and ENG-28's
-stall after three reviews in a row never fires. Rulings and contests
-(phases 2 and 3) build on that tracking, so it must work in CI first.
+Why first. `review-run` tracks findings across reviews only when given
+`--previous`, which the workflow never did, so in CI every finding was
+new and the stall never fired. Later phases build on it.
 
 Requirements. This phase changes ENG-28. The review MUST keep the
 tracked findings of each review of a pull request and pass the latest
@@ -53,14 +51,18 @@ RED. Write tests for each of these, in order:
 - The workflow passes `--previous` with the file the lookup returned,
   and uploads the new `findings.json` under the pull request's name.
 
-GREEN. The lookup lives in tooling, a subcommand of `review-run` or a
-small `mdsmith-release`-style tool, called from one workflow step. No
-inline shell logic: the step calls the tool. It reads the GitHub API
-through a token with `actions:read` alone. It holds no Claude token and
-runs before that token is staged. The tool takes the HTTP transport as
-an injected trait, so its tests need no network. No new third-party
-dependency. If a dependency proves unavoidable, it lands with an ADR
-and its line in DEPENDENCIES.md (ENG-18, ENG-26).
+GREEN. The lookup is `review-run previous select` and `previous check`,
+subcommands of the crate that already reads the tracked findings. The
+transport stays a thin script, `scripts/review-previous.sh`, which only
+fetches through `gh` as its siblings do: it lists the artifacts and the
+runs that uploaded them, and the tool decides which artifact to trust.
+The step holds the job's read-only token and not the Claude token, and
+runs before that token is staged. The tool takes files in place of an
+HTTP client, so its tests need no network and no new third-party
+dependency is added. The engineering sweep counted `review-run previous`
+as an agent start, since it inlines scripts so none can hide one; it now
+exempts that one command, which returns before the command line reads an
+agent, and nothing longer or flag-like (`--previous`).
 
 Gate. The lookup's unit tests at the crate's coverage floor. The ENG-28
 scenario passes with its new steps, and the drift case fails it. Once

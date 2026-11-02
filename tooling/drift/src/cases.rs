@@ -8,6 +8,7 @@ mod ci;
 mod ci_gates;
 mod context;
 mod file_sizes;
+mod previous;
 mod records;
 mod release;
 mod review_agents;
@@ -149,6 +150,7 @@ pub fn cases() -> Vec<Case> {
         context::review_identity_cases(),
         ci_gates::cases(),
         file_size_cases(),
+        previous::review_previous_cases(),
         // Last: its cases edit source the later cases would run stale.
         license_text_cases(),
     ]

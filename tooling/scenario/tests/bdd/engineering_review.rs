@@ -155,6 +155,15 @@ fn review_run_names_rulings(w: &mut World) -> Result<(), String> {
 }
 
 #[then(
+    regex = r"^review-run carries the findings of the previous review of a pull request from the newest artifact under the pull request's own name that a run of main's review workflow uploaded, refuses and counts an artifact of that name from any other run, and the review job fetches them before the Claude token is staged, passes them as --previous, scrubs and keeps the findings it kept for the next review$"
+)]
+fn review_carries_findings(w: &mut World) -> Result<(), String> {
+    outcome(engineering::review_previous::review_carries_findings(
+        eng(w).checkout()?,
+    )?)
+}
+
+#[then(
     regex = r"^review-run runs no more an agent whose gap recurred the same way in two resumes in a row, and names it stalled in a blocking finding so a person acts$"
 )]
 fn review_run_stalls(w: &mut World) -> Result<(), String> {
