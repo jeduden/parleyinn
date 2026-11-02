@@ -37,6 +37,7 @@ pub mod outcome;
 pub mod parts;
 pub mod pipeline;
 pub mod plan;
+pub mod previous;
 pub mod requirements;
 pub mod resume;
 pub mod retry;
