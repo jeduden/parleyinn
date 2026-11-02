@@ -7,11 +7,8 @@
 //! as `event_get` takes until the session binding names a run (phase 9)
 //! and RCL-05 builds the recall scopes (phase 13).
 //!
-//! `@RCL-02` stays pending, so its steps are unbound: its calls run in
-//! a run the live ingest records (REC-13, phase 10), its `trust` filter
-//! needs trust levels (PRV-02, phase 11), its `rooms` scope is RCL-05's,
-//! and its transcript "mixed-provenance" has no steps. Its M1 part is
-//! proven by named tests in the `mcp` and `store` crates.
+//! `@RCL-02`'s steps are in `recall_search`: its `rooms` row calls as a
+//! bound run, the others as `room` calls.
 //!
 //! The 1M events of SEC-04's store are written to `store.db` by one SQL
 //! statement beside three real appends, so the scenario need not append
@@ -183,9 +180,12 @@ fn calls_event_search(w: &mut World, args: String) -> Result<(), String> {
     if crate::recall_scope::serves_a_run(w) {
         return crate::recall_scope::call(w, "event_search", &args);
     }
+    let arguments = arguments_of(w, &args)?;
+    if arguments["scope"] == "rooms" {
+        return crate::recall_search::call_rooms(w, arguments);
+    }
     crate::recall::record_runs(w)?;
     crate::recall::note_recalls_stat(w)?;
-    let arguments = arguments_of(w, &args)?;
     crate::recall::asked(w, "event_search", &arguments);
     call_search(w, arguments).map(drop)
 }

@@ -85,7 +85,7 @@ pub(crate) fn pair(n: u64, output: &str) -> Result<Vec<Value>, String> {
 }
 
 /// The lines the fixture run `name` holds.
-fn fixture(name: &str) -> Result<Vec<Value>, String> {
+pub fn fixture(name: &str) -> Result<Vec<Value>, String> {
     let mut lines = Vec::new();
     match name {
         "short-run" => {
@@ -112,6 +112,14 @@ fn fixture(name: &str) -> Result<Vec<Value>, String> {
             for n in 1..=12 {
                 lines.extend(pair(n, &format!("deploy step {n}: ok"))?);
             }
+            // A page the agent fetched, early in the year: the web
+            // class, and a time before the summer.
+            let mut page = pair(13, "deploy checklist: the staging page")?;
+            page[0]["message"]["content"][0]["name"] = json!("WebFetch");
+            for line in &mut page {
+                line["timestamp"] = json!("2026-03-01T10:00:00Z");
+            }
+            lines.extend(page);
         }
         "run-a" => {
             // Forty results of about 2,000 characters: a range of them
@@ -374,10 +382,16 @@ fn wrapped_in_envelope(w: &mut World) -> Result<(), String> {
     // An envelope wrapping nothing wraps nothing to check: the call must
     // have returned what it was asked for.
     let items = envelope["items"].as_array().cloned().unwrap_or_default();
-    if items.is_empty() {
+    let asked = recall(w).asked.clone();
+    // No event is trusted yet that a search can find (PRV-02, OQ-40), so
+    // a search for the trusted wraps nothing; its steps prove why.
+    let trusted_search = asked
+        .as_ref()
+        .is_some_and(|(tool, a)| tool == "event_search" && a["trust"] == "trusted");
+    if items.is_empty() && !trusted_search {
         return Err("the envelope wraps no item".to_owned());
     }
-    if let Some((tool, arguments)) = recall(w).asked.clone() {
+    if let Some((tool, arguments)) = asked {
         let mixed = recall(w).recorded.contains("mixed-provenance");
         let marked = marked_seqs(&envelope)?;
         asked_items(
@@ -405,6 +419,17 @@ fn marked_seqs(envelope: &Value) -> Result<BTreeSet<u64>, String> {
     }
 
     Ok(out)
+}
+
+/// Counts the transcript `name` as recorded, so that no step gives it
+/// its fixture's lines and ingests it: the step that serves it live does.
+pub fn keep_recorded(w: &mut World, name: &str) {
+    recall(w).recorded.insert(name.to_owned());
+}
+
+/// The tool and arguments of the last call a step made.
+pub fn last_asked(w: &mut World) -> Option<(String, Value)> {
+    recall(w).asked.clone()
 }
 
 /// Keeps the tool and arguments of the call the next step makes.

@@ -19,7 +19,7 @@ Feature: Recall (RCL)
     Then it returns "session_binding" as "held" or "not_held", "search_index" as "readable" or "unreadable", "searches_timed_out" as a count and "version", and no recalled content or envelope, whether or not a run is found for the call
     And the call is recorded as no recall event
 
-  @RCL-02 @P0 @pending
+  @RCL-02 @P0
   Scenario Outline: event search honours its filters and caps hits at k
     Given an isolated ParleyInn home
     And an agent run with a Claude Code transcript "mixed-provenance"
