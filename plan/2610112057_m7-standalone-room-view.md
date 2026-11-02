@@ -31,7 +31,9 @@ Scope, by requirement family:
   OWN-29
 - LANE-03 to LANE-06, LANE-13, LANE-14, LANE-17, LANE-19, LANE-21,
   LANE-24 to LANE-33, the rest of LANE-16 and LANE-23
-- PRV-10, REC-18, REC-20, the rest of REC-19, RCL-09, INJ-10
+- PRV-10, REC-18, REC-20, the rest of REC-19, RCL-09, INJ-10, the rest of
+  REC-24 (the confirm a managed-policy confirmation key signs, naming a
+  node identity change's inception; until then origin stays `peer`)
 - SEC-20, SEC-21, SEC-23, SEC-27, SEC-29, SEC-32
 - ADM-15, ADM-16, OPS-06, NFR-01, NFR-09, NFR-15
 - ENG-12 and ENG-16, as changed

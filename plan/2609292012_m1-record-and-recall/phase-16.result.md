@@ -36,14 +36,14 @@ Outcome:
   exits 0; the next purge, ingest or rebuild finishes it.
 - ENG-09: a soak of 50 writers; at 1M events, 4,293 of 10,000 appends
   passed the 5 s busy deadline and were retried. It runs nightly.
-- Gates run: scenario gate, fmt, clippy, `mdsmith check .`,
-  `cargo test --workspace`, `cargo run -p coverage` (unit 99% or more).
+- Gates run: scenario gate, fmt, clippy, mdsmith, tests, coverage.
 
 Raised (scenarios stay `@pending`):
 
 - ENG-06: no migration before M3 (ruling 3).
-- ENG-09: 1M events cannot run in a pull request's scenario budget; a
-  ruling on splitting nightly from PR steps is wanted.
+- ENG-09: ruled A (2 November 2026): the scenario runs 50 writers and
+  10,000 events in every PR; the 1M run stays nightly, its setting read
+  from `nightly.yml`. Stays `@pending` until code binds the steps.
 - ENG-15: NFR-01 needs the room view (M7); NFR-05's target needs the
   reference hardware.
 - ENG-23: no release and no migration yet.
@@ -53,48 +53,49 @@ For the stakeholder:
 
 - Names (no domain-model agent): `parinn-eval`, `ingest_fifty_runs`,
   `run_killed_at_terminal`.
-- Counters, domain-model agent verdict: `verify_unfinished` did not fit
-  (the cause is a deadline); renamed here to `verify_timed_out`, and the
-  `parinn verify` report key `unfinished_purges` to `pending_purges`
-  (purges awaiting the next rebuild). `purge_unfinished` does not fit
-  either: the model says `purge_failed` or `purge_timed_out`, and the
-  report key's analogue likewise; both kept for now on main, stakeholder
-  to rule. `recall_refused` fits; `recall_rejected` is the strict-literal
-  alternative.
-- Verify's derived-index recheck is bounded at 60 s
-  (`INDEX_CHECK_SECS`). On a store whose derivation always takes longer,
-  ADM-09's derived artifact check never runs (NFR-05). A ruling on the
-  bound is wanted.
+- Counters (domain-model agent): `verify_unfinished` became
+  `verify_timed_out`, report key `unfinished_purges` `pending_purges`.
+  `purge_unfinished` does not fit (`purge_failed` or `purge_timed_out`
+  do); kept on main, stakeholder to rule. `recall_refused` fits.
 - Verify no longer writes (ruled).
 - §11.1 measurement wording on claude/m1-phase-16-docs (PR #90).
-- Stakeholder paths: `.github/workflows/ci.yml` and `nightly.yml`,
-  `tooling/`, `Cargo.toml`, `tooling/*/Cargo.toml`.
-- Inherited items untouched: S2 `integrity`, phase 14/15 counters and
-  renames, `tombstones`.
+- Stakeholder paths: `ci.yml`, `nightly.yml`, `tooling/`.
 
-Plan close (stays 🔳): met are recall, S12 and the checks. The raised
-items moved (plan.md, §12.2). To M3: ADM-09's landmark row, ENG-06's
-migration, SEC-08's `purge --run`. To M5: SEC-12's flag row, SEC-17,
-ENG-22, ENG-23, NFR-05's target. To M7: SEC-19, ENG-29, NFR-01, the PRV
-remainders. To M8: PRV-09. Open in M1: RCL-02, below; rulings
-on LANE-02, REC-24, ENG-09, the residue.
+Plan close (stays 🔳): met are recall, S12 and the checks. Raised items
+moved (plan.md, §12.2). To M3: ADM-09's landmark row, ENG-06's migration,
+`purge --run`. To M5: SEC-12's flag row, SEC-17, ENG-22, ENG-23, NFR-05's
+target. To M7: SEC-19, ENG-29, NFR-01, PRV remainders, REC-24's confirm.
+To M8: PRV-09.
+
+Open in M1 (rulings of 2 November 2026 in plan.md's list):
+
+- LANE-02 stays `@pending`: its scenario has the first hook bind, its row
+  needs an MCP server holding the session binding (SEC-18); no ruling.
+- REC-24 in part (chain head, origin `peer`); the confirm is M7's.
+- SEC-05's ceiling, REC-22's `--path` carve-out, the purge residue's
+  zeroed prefix hash and ENG-09's split: SRS and scenarios amended,
+  code to follow.
+- Verify's 60 s bound (`INDEX_CHECK_SECS`): postponed by the stakeholder.
+- Open question: should the envelope item's `kind` show the provenance
+  class family, as SRS 9.3's example shows `kind: tool_result` beside
+  `provenance: web`?
+- Open question: a `trust "trusted"` search returns no hit in M1, as no
+  trusted event is searchable yet.
 
 - [x] ADM-09's other rows pass with `@pending` lifted, all but the
   landmark row, M3's
 
 Last P0 sweep (cucumber):
 
-- REC-08, REC-12, PRV-14 and REC-26 are off `@pending` and pass. REC-26's
-  run is served by a live MCP server; a harness process below another is
-  nested (PRV-08), so under an agent harness its typed rows need
-  `unshare -p -f --mount-proc`.
+- REC-08, REC-12, PRV-14 and REC-26 are off `@pending` and pass; under
+  an agent harness REC-26's typed rows need `unshare -p -f --mount-proc`.
 - REC-02 stays `@pending`: its last step needs restore blocks and a join
   (M2's own-principal join, LANE-23). It is in plan.md's table and M2's
   tasks; its other 16 steps pass.
 - REC-04 is off `@pending` and passes (cucumber). A purged event keeps
   its `uuid`, byte offset and prefix hash: the residue finding.
-- RCL-02 stays `@pending` until bound. Ruled 2 November 2026: `kind`
-  is the provenance class family (SRS 9.2, RCL-02); the scenario agrees.
+- RCL-02 is off `@pending` and passes (cucumber, 9 of 9 rows). Ruled A
+  (2 November 2026): `kind` is the provenance class family (SRS 9.2).
 - Ruled: v1.0 ends before M8, so PRV-09's and PRV-02's peer rows stay in
   M8 (SRS 11.2, 12.2; OQ-30 narrowed). REC-02 is in part in M1's row.
 

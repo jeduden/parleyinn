@@ -334,6 +334,7 @@ Feature: Record (REC)
     Then every event of "pre-install" carries the "ingested" origin, freshness mark and trust mark with its transcript source and ingest position, shown on every surface, and none is shown as witnessed
     And the "user" event and the "harness_meta" event from "pre-install" have trust "untrusted"
     And this node records "elsewhere" as an ingested run in the principal's personal room, shown as "ingested", and every event of it has trust "untrusted"
+    And ingesting "elsewhere" is recorded as the person's widening principal act at the controlling terminal (OWN-11, OWN-12), and the same path named in a hook input or a transcript line is rejected as outside the allowed roots (SEC-18)
     And every event "parinn ingest" read past the ingest marker of "cut-short" carries the "ingested" origin and has trust "untrusted"
 
   @REC-23 @P2 @I2 @I4 @I6 @pending
@@ -370,7 +371,7 @@ Feature: Record (REC)
     And that quarantine stays in force on the node until a release there
     And that configuration acceptance takes no effect on the node: the deployment mode stays "automation" until the person accepts the configuration there
     And an audit entry records the node identity change
-    And a structural node identity change event in the new device seat in the personal room carries only the fingerprints of the replaced and new device key or token key, followed by the new key's inception, which starts a new key event log
+    And a structural node identity change event in the new device seat in the personal room carries only the fingerprints of the replaced and new device key or token key and the chain head of the key event log it leaves (PRV-12), followed by the new key's inception, which starts a new key event log
     And the new seat's writer reads origin "peer" until a confirm signed by a managed-policy confirmation key names that inception, then "witnessed"
     And no event is appended under the old device key or the old seat key
     And an unavailable node identity value read again within the hook budgets and found unchanged counts as no change

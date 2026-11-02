@@ -56,17 +56,19 @@ Feature: Security (SEC)
       | a query running past 2 s  | cancelled at the 2 s deadline and audited          |
 
   @SEC-05 @P0 @I9 @pending
-  Scenario Outline: oversized or deeply nested hook input is refused and large transcript lines stream
+  Scenario Outline: oversized or deeply nested hook input is refused and transcript lines are redacted whole and held to a ceiling
     Given an isolated ParleyInn home
-    When the hook "UserPromptSubmit" runs with <input>
-    Then the hook handler exits 0 with no injection
+    When the hook "UserPromptSubmit" runs, or "parinn ingest" reads a transcript, with <input>
+    Then no injection is written, and a hook handler exits 0
     And <expected>
 
     Examples:
       | input                                               | expected                                                                     |
       | stdin of 1 MiB plus one byte                        | an audit entry records "hook input exceeds 1 MiB"                            |
       | a JSON object nested 65 levels deep                 | an audit entry records "hook input nesting exceeds depth 64"                 |
-      | a transcript line larger than the payload threshold | the line is streamed to the payload store without being kept whole in memory |
+      | a transcript line larger than the payload threshold | the line is redacted whole, then stored in the payload store, and nothing of it is written unredacted |
+      | a transcript line of 4 MiB plus one byte            | the line is refused, an audit entry records it, a counter of its own counts it, and the source is left short at that line, resumable |
+      | a transcript source of more than 64 MiB             | ingest holds at most 64 MiB of it in memory at once and ingests every line of it across passes |
 
   @SEC-06 @P0 @I2
   Scenario: recalled content cannot alter the envelope structure
@@ -222,20 +224,24 @@ Feature: Security (SEC)
     And it compares ParleyInn with Zed Delta control by control on record signing, trust in other principals, central-service dependence and key custody
 
   @SEC-18 @P0 @I8 @pending
-  Scenario Outline: paths outside the allowed roots are rejected and audited, and the run's worktree and its repository's git directory are read-only
+  Scenario Outline: paths outside the allowed roots are rejected and audited unless the person names them at the terminal, and the run's worktree and its repository's git directory are read-only
     Given an isolated ParleyInn home
     And the transcript roots are "~/.claude/projects"
     And a run whose hook "cwd" is "~/src/app/pkg", inside a repository whose top level is "~/src/app"
-    When the hook "SessionStart" runs, or the run's MCP server ingests a transcript line, naming the path "<path>"
+    When <named by> names the path "<path>"
     Then <expected>
 
     Examples:
-      | path                                                     | expected                                                                                               |
-      | /etc/passwd                                              | the path is rejected, nothing is read from it, and an audit entry records "path outside allowed roots" |
-      | ~/.claude/projects/../../.ssh/id_ed25519                 | the path is rejected, nothing is read from it, and an audit entry records "path outside allowed roots" |
-      | ~/.claude/projects/p/link-to-root.jsonl (a symlink to /) | the path is rejected, nothing is read from it, and an audit entry records "path outside allowed roots" |
-      | ~/src/app/.git/HEAD                                      | the file is read, and nothing in the repository is written                                             |
-      | ~/src/app/docs/key (a symlink to ~/.ssh/id_ed25519)      | the path is rejected, nothing is read from it, and an audit entry records "path outside allowed roots" |
+      | named by                                                                         | path                                                                                  | expected                                                                                                                                                              |
+      | the hook "SessionStart" input, or a transcript line the run's MCP server ingests | /etc/passwd                                                                           | the path is rejected, nothing is read from it, and an audit entry records "path outside allowed roots"                                                                |
+      | the hook "SessionStart" input, or a transcript line the run's MCP server ingests | ~/.claude/projects/../../.ssh/id_ed25519                                              | the path is rejected, nothing is read from it, and an audit entry records "path outside allowed roots"                                                                |
+      | the hook "SessionStart" input, or a transcript line the run's MCP server ingests | ~/.claude/projects/p/link-to-root.jsonl (a symlink to /)                              | the path is rejected, nothing is read from it, and an audit entry records "path outside allowed roots"                                                                |
+      | the hook "SessionStart" input, or a transcript line the run's MCP server ingests | ~/src/app/.git/HEAD                                                                   | the file is read, and nothing in the repository is written                                                                                                            |
+      | the hook "SessionStart" input, or a transcript line the run's MCP server ingests | ~/src/app/docs/key (a symlink to ~/.ssh/id_ed25519)                                   | the path is rejected, nothing is read from it, and an audit entry records "path outside allowed roots"                                                                |
+      | the hook "SessionStart" input, or a transcript line the run's MCP server ingests | /tmp/elsewhere.jsonl (a regular file the person also names on "parinn ingest --path") | the path is rejected, nothing is read from it, and an audit entry records "path outside allowed roots"                                                                |
+      | the person, on "parinn ingest --path" at the controlling terminal                | /tmp/elsewhere.jsonl (a regular file)                                                 | the path is resolved and read as the person's widening principal act, its lines are redacted and untrusted with origin "ingested", and nothing is written to the file |
+      | the person, on "parinn ingest --path" at the controlling terminal                | /tmp/link.jsonl (a symlink to /tmp/elsewhere.jsonl)                                   | the path is resolved to its target and read as the person's widening principal act, its lines are redacted and untrusted with origin "ingested"                       |
+      | the person, on "parinn ingest --path" at the controlling terminal                | /tmp/dir (a directory)                                                                | the path is refused as not a regular file, nothing is read from it, and an audit entry records it                                                                     |
 
   @SEC-19 @P0 @I4 @pending
   Scenario: every component, process and protocol sits in exactly one boundary of the register
@@ -405,6 +411,7 @@ Feature: Security (SEC)
     When the person purges the event
     Then every copy in any writer's log, found by address or commitment, is erased or tombstoned, and the backup is erased or listed
     And ingesting its transcript positions again from the harness transcript is refused with an audit entry
+    And the transcript source's consumed-prefix hash is recomputed over the prefix with each erased byte span zeroed, so it confirms no guess at the erased bytes, only each erased line's position and length remain, and "parinn ingest" resumes the source and "parinn verify" exits 0
     And a signed purge receipt names the scope, the ranges, the copies erased and every known copy ParleyInn cannot erase
     And every prompt commitment whose prompt_id a purged event's line carries, matched or not, is erased with its key, and the receipt counts them
     And after a retention purge, and after a backup restore that reapplies the purge, no file in the home, decrypted, holds the purged events' canary token, their commitment keys or a search index entry naming them

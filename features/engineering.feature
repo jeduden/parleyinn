@@ -87,12 +87,13 @@ Feature: Engineering quality (ENG)
       | sanitized fields never contain restore delimiters                                                                                                             |
 
   @ENG-09 @P0 @pending
-  Scenario: data races are excluded and the store survives a concurrency soak
+  Scenario: data races are excluded and the store survives a concurrency soak, in every pull request at 10000 events and nightly at 1000000
     Given an isolated ParleyInn home
-    When 50 concurrent writers append 1000000 events
+    When 50 concurrent writers append 10000 events in all
     Then no two events share an address (writer, seq), and no seq is duplicated or skipped within any writer's log
     And "parinn verify" exits 0
-    And every unsafe block that shares memory between threads passes under Miri or ThreadSanitizer
+    And the nightly workflow ".github/workflows/nightly.yml" runs the same soak test with 50 writers and the setting "1000000" events, and its result is the evidence for the 1000000-event claim
+    And the pull request workflow ".github/workflows/ci.yml" runs Miri over the tests of the "platform" crate, the one crate holding unsafe code
 
   @ENG-10 @P0 @pending
   Scenario: golden files fix the exact bytes of restore blocks and envelopes

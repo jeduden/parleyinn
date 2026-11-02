@@ -52,7 +52,7 @@ how the components ship.
   with RCL-08
 - MEM-01, SEC-02 to SEC-07, SEC-15, SEC-16, SEC-18 and SEC-22
 - OPS-01 to OPS-03, ADM-04 and ADM-11
-- LANE-02 and OWN-01
+- OWN-01
 
 These land in part, as §12.2 bounds them or as their scenarios reach past M1:
 
@@ -69,6 +69,8 @@ These land in part, as §12.2 bounds them or as their scenarios reach past M1:
 | OWN-22                          | the precondition: every run counts as unsandboxed                       | sandbox state, M7                                                       |
 | PRV-12                          | the key event log, rotation and recovery                                | M3, M7, M8, PRV-10                                                      |
 | PRV-13                          | origin from the record and the key set                                  | arrival, M3, M8, M9                                                     |
+| REC-24                          | the node identity change event with its chain head, origin `peer`       | the confirm a managed-policy key signs, M7                              |
+| ENG-09                          | the soak at 10,000 events in every PR, the Miri job                     | the 1,000,000-event run is nightly's evidence                           |
 | ENG-08                          | every property but the restore delimiters'                              | restore delimiters, M2                                                  |
 | ENG-10                          | the envelope's golden files                                             | the restore block's, M2                                                 |
 | ENG-17                          | the contract replay, drift and residual-identifier checks               | the nightly run through restore, M2                                     |
@@ -101,13 +103,10 @@ and release build prove CON-02 to CON-04; REC-06, REC-10 and ENG-08, CON-05.
 
 ### What the spikes left
 
-S2 ([ADR-2610110553]): `rusqlite`, no extension loading, BM25 over the
-newest 2,000 matches in 172 ms p95 (NFR-03). S7 ([ADR-2610102211]): an
-in-house stdio MCP server. S1, S3 and S13: Claude Code 2.1.296's hook
-inputs and transcripts in `testdata/claude-code`, which seed the
-parser's fuzz target (ENG-07). S8: the §8.4 estimator; six §12.3
-targets freeze when M1 builds what uses them. S12 (plan 2610012322):
-row ids from addresses, secure delete and a WAL checkpoint on purge.
+S2 ([ADR-2610110553]): `rusqlite`, BM25 over the newest 2,000 matches in
+172 ms p95. S7 ([ADR-2610102211]): an in-house stdio MCP server. S1, S3,
+S13: Claude Code 2.1.296's inputs in `testdata/claude-code`. S8: the §8.4
+estimator. S12: row ids from addresses, secure delete, a WAL checkpoint.
 
 ### The stakeholder's rulings of 14 October 2026
 
@@ -115,29 +114,34 @@ The stakeholder ruled on these in the session that re-planned M1, and
 consents to them on [pull request #46][pr46]. Rulings 3 and 4 also
 changed M1's row in §12.2.
 
-1. **The dependency budget (ENG-18).** ENG-18's ten counts only direct
-   dependencies linked into a shipped executable; test, fuzz and
-   tooling crates need an ADR and an allowed license but do not count.
-   Its rewording landed as its own pull request before phases 4, 5 and 7.
-2. **Key stores (SEC-10).** macOS keeps keys in its Keychain through
-   `security-framework`, whose `unsafe` stays inside that crate. Windows
-   keeps them in a file DPAPI protects, through `windows-sys` in one
-   listed `unsafe` shim that Miri checks (ENG-09). Linux's Secret
-   Service needs D-Bus, a socket the core may not open (I4), and its
-   kernel keyring does not survive a reboot. Linux therefore keeps
-   keys in `0600` files, and `parinn status` says so. Phase 5 records
-   this in an ADR. `@SEC-10`'s scenario also needs a backup (M3), the
-   at-rest key (SEC-09, M5) and keys handed over at launch (M7), so
-   SEC-10 lands in part.
-3. **Migrations (ADM-05).** M1 ships format version 1 and refuses,
-   naming it, anything newer; `parinn migrate` and its ADM-06 backup
-   come with the first format change, in M3. ADM-05 lands in part.
-4. **Purge (ADM-07).** M1 ships `parinn purge --range` as a widening
-   principal act. Phase 14 builds the tombstone, the erasure of each
-   purged event's commitment key and payload, SQLite's and FTS5's secure
-   delete with a WAL checkpoint, the audit entry, the refusal of a range
-   holding a pending ingest marker and SEC-22's retention purge. Other
-   scopes, SEC-31's copies and seal rewrites stay in M3.
+1. **ENG-18:** only dependencies linked into a shipped executable count.
+2. **Key stores (SEC-10):** Keychain on macOS, a DPAPI file through one
+   Miri-checked shim on Windows, `0600` files on Linux (D-Bus is a
+   socket, I4); SEC-10 lands in part.
+3. **ADM-05:** M1 ships format version 1 and refuses a newer one; M3
+   brings `parinn migrate`.
+4. **ADM-07:** M1 ships `parinn purge --range` as a widening act; other
+   scopes, SEC-31's copies and seal rewrites are M3's.
+
+### What code must now follow
+
+Stakeholder rulings of 2 November 2026, now in the SRS and scenarios:
+
+- **SEC-05:** a line is redacted whole, then stored in the payload store
+  above the threshold; 4 MiB per line, 64 MiB of a source in memory; past
+  4 MiB it is refused, audited, counted apart, the source left short.
+- **REC-22, SEC-18:** a path named on `parinn ingest --path` at the
+  terminal is a widening principal act, allowed once resolved (regular
+  file, redacted, untrusted, `ingested`); hook and transcript paths stay
+  confined.
+- **Purge residue (SEC-31, ADM-07, REC-07, ADM-09):** the consumed-prefix
+  hash is taken with erased spans zeroed, by purge, verify and resume.
+- **ENG-09:** a PR scenario runs 50 writers and 10,000 events; the 1M
+  run stays nightly; Miri covers `platform`.
+- **REC-24:** the identity change event carries the chain head.
+- **LANE-02:** stays `@pending`. Its scenario has the first hook bind;
+  its row needs an MCP server holding the session binding (SEC-18).
+- **RCL-02:** passes (9 of 9); `kind` is the provenance class family.
 
 ## Tasks
 
@@ -207,13 +211,13 @@ and 7. Tracks 2-3; 4; 5-6; 7 ran in parallel; 8 to 16 run in order.
 | 2     | sonnet | `@SEC-02`, `@SEC-03`, `@OPS-02`, `@OPS-03` and `@ENG-04` pass                                                                          |
 | 3     | opus   | Its end-to-end tests pass; so do ADM-04's rows 1 to 4 and the M1 steps of OWN-11, -12 and -22                                          |
 | 4     | sonnet | `@SEC-05`, `@SEC-08`, `@SEC-18` and `@ENG-05` pass; no fixture secret reaches the store or a log                                       |
-| 5     | opus   | `@PRV-11` passes; REC-24 awaits a ruling; PRV-12, SEC-10, SEC-27, LANE-16 and LANE-23's M1 steps pass                                  |
+| 5     | opus   | `@PRV-11` passes; REC-24's M1 part; PRV-12, SEC-10, SEC-27, LANE-16 and LANE-23's M1 steps pass                                        |
 | 6     | opus   | `@REC-09` and `@REC-12` pass; REC-19's segment steps pass; a newer segment or store is refused; the crash-consistency job runs nightly |
 | 7     | opus   | `@PRV-03`, `@REC-05` and `@REC-26` pass; PRV-01 and PRV-08's M1 rows pass; the parser's fuzz target runs                               |
 | 8     | opus   | `@REC-01` to `@REC-04`, `@REC-07`, `@REC-08`, `@REC-22` and PRV-05's transcript rows pass; both properties hold; NFR-04 benchmarked    |
 | 9     | opus   | `@SEC-16`, `@NFR-02` and `@PRV-04`'s rows 1-3 pass; REC-19's holding steps bound; NFR-01 and NFR-02 benchmarked                        |
 | 10    | opus   | `@REC-06`, `@REC-13` and `@PRV-14` pass against a live MCP server                                                                      |
-| 11    | opus   | `@OWN-01` and `@MEM-01` pass; LANE-02 awaits a ruling; PRV-02, PRV-06, PRV-13, LANE-01, LANE-31 and ADM-13's M1 steps pass             |
+| 11    | opus   | `@OWN-01` and `@MEM-01` pass; LANE-02 stays `@pending`; PRV-02, PRV-06, PRV-13, LANE-01, LANE-31 and ADM-13's M1 steps pass            |
 | 12    | sonnet | `@REC-11`, `@SEC-04` and `@RCL-02` pass; NFR-03 benchmarked                                                                            |
 | 13    | opus   | `@RCL-01`, `@RCL-03` to `@RCL-05`, `@RCL-07`, `@RCL-08`, `@SEC-06` and `@SEC-07` pass; the envelope's golden files match               |
 | 14    | opus   | `@RCL-06`, `@REC-17` and `@SEC-22` pass; SEC-12's seven rows pass; a purged event leaves nothing confirming a guess                    |
@@ -282,24 +286,20 @@ footer: |
 - [ ] Every scenario of a row M1 lands in full passes, off `@pending`
 - [ ] Each row M1 lands in part has its M1 part proven, and its
   scenario names what keeps it pending
-- [x] Recall of at least 95% after 1 to 3 compactions on the §11.1
-  evaluation
+- [x] Recall of at least 95% after 1 to 3 compactions (§11.1)
 - [ ] `parinn verify` proves completeness, and quarantine is effective
-- [x] Two writers' logs rebuild one search index identical in content
-  in either order (S12)
-- [ ] A purged event leaves no value that confirms a guess at it
-  (awaiting ruling: phase-15.result.md's erasure residue finding)
+- [x] Two writers' logs rebuild one identical search index (S12)
+- [ ] A purged event leaves no value that confirms a guess at it (ruled
+  C: the prefix hash is taken with erased spans zeroed)
 - [x] Every dependency M1 adds has an accepted ADR (ENG-18, ENG-26),
   within the budget the stakeholder rules
 - [x] ENG-11's coverage floors hold for every security-sensitive crate
 - [x] The fuzz targets of ENG-07 run nightly from committed corpora
-- [x] The six targets §12.3 assigns to M1 are frozen, each with its
-  evidence
+- [x] The six §12.3 targets of M1 are frozen, each with evidence
 - [ ] @ENG-03 passes and closes plan 2609292011's 3; its 4 (@ENG-15)
   closes with NFR-01 in M7 and NFR-05's target in M5
 - [x] All tests pass: `cargo test --workspace`
-- [x] `cargo clippy --workspace --all-targets --locked -- -D warnings`
-  and `cargo fmt --all --check` are clean
+- [x] `cargo clippy ... -D warnings` and `cargo fmt --all --check` are clean
 - [x] `mdsmith check .` is clean
 
 [ADR-2610112209]: ../../docs/adr/ADR-2610112209-invariants-after-s1-s3.md
