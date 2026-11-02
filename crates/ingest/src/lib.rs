@@ -351,7 +351,11 @@ fn ingest_once(
     inputs: &Inputs,
     entropy: &mut dyn Entropy,
 ) -> Result<Ingested, IngestError> {
-    let known = reading::peek(home, path)?;
+    let known = if read::open::needs_marker(path) {
+        reading::peek(home, path)?
+    } else {
+        None
+    };
     let opened = read::open::open(path, known.as_ref()).map_err(|source| IngestError::Read {
         path: path.to_path_buf(),
         source,

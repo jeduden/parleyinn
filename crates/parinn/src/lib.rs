@@ -548,10 +548,7 @@ fn ingest_all(
     let mut reports = Vec::new();
     let mut failures = 0;
     for path in paths {
-        let (done, error) = match redactor {
-            Ok(r) => ingest_windows::ingest(home, path, r, inputs),
-            Err(e) => (Vec::new(), Some(e.clone())),
-        };
+        let (done, error) = ingest_windows::ingest(home, path, redactor, inputs);
         for i in done {
             record_ingested(ctx, &i, stderr);
             reports.push(i);

@@ -24,6 +24,16 @@ pub struct Opened {
     pub seen: u64,
 }
 
+/// Whether the transcript at `path` is longer than one window, so an
+/// ingest of it needs its ingest marker to choose where to read from; a
+/// source that fits one window is read whole, and its marker is not
+/// looked up. A path that cannot be measured needs none: opening it
+/// fails.
+#[must_use]
+pub fn needs_marker(path: &Path) -> bool {
+    std::fs::metadata(path).is_ok_and(|m| m.len() > SOURCE_LIMIT as u64)
+}
+
 /// The transcript at `path`, opened for an ingest of the source `known`,
 /// the row its ingest marker is in when it has one. A source that fits
 /// one window is read whole, from its first byte. A longer one is read

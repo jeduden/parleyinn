@@ -22,7 +22,12 @@ fn a_source_over_64_mib_is_read_window_by_window_until_it_is_caught_up() {
     let text: String = (1..=65).map(|n| line(n, 1 << 20)).collect();
     std::fs::write(&path, &text).unwrap();
 
-    let (reports, error) = ingest(&home(&dir), &path, &redactor(), &ingest::Inputs::default());
+    let (reports, error) = ingest(
+        &home(&dir),
+        &path,
+        &Ok(redactor()),
+        &ingest::Inputs::default(),
+    );
 
     assert_eq!(error, None);
     let events: Vec<usize> = reports.iter().map(|r| r.events).collect();
@@ -46,7 +51,12 @@ fn a_refused_line_stops_the_reads_at_the_one_report_that_names_it() {
     )
     .unwrap();
 
-    let (reports, error) = ingest(&home(&dir), &path, &redactor(), &ingest::Inputs::default());
+    let (reports, error) = ingest(
+        &home(&dir),
+        &path,
+        &Ok(redactor()),
+        &ingest::Inputs::default(),
+    );
 
     assert_eq!(error, None);
     assert_eq!(reports.len(), 1);
@@ -61,10 +71,26 @@ fn a_source_that_cannot_be_read_is_the_error_of_its_reads() {
     let (reports, error) = ingest(
         &home(&dir),
         &dir.path().join("none.jsonl"),
-        &redactor(),
+        &Ok(redactor()),
         &ingest::Inputs::default(),
     );
 
     assert!(reports.is_empty());
     assert!(error.unwrap().contains("read the transcript"));
+}
+
+#[test]
+fn a_redactor_that_could_not_be_made_is_the_error_of_every_source() {
+    let dir = TempDir::new().unwrap();
+    let path = dir.path().join("t.jsonl");
+
+    let (reports, error) = ingest(
+        &home(&dir),
+        &path,
+        &Err("bad pattern".to_owned()),
+        &ingest::Inputs::default(),
+    );
+
+    assert!(reports.is_empty());
+    assert_eq!(error.as_deref(), Some("bad pattern"));
 }

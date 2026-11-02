@@ -234,3 +234,15 @@ fn a_refused_line_at_an_offset_is_measured_by_seeking_to_it() {
     assert_eq!((fits, ends), (None, None));
     assert!(refused_at(dir.path(), 0).is_err());
 }
+
+#[test]
+fn only_a_source_longer_than_one_window_needs_its_marker() {
+    let dir = TempDir::new().unwrap();
+    let small = written(&dir, &lines_of(2, 20));
+    let big = dir.path().join("big.jsonl");
+    std::fs::write(&big, lines_of(65, MIB)).unwrap();
+
+    assert!(!needs_marker(&small));
+    assert!(needs_marker(&big));
+    assert!(!needs_marker(&dir.path().join("none")));
+}

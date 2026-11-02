@@ -14,9 +14,13 @@ use redaction::Redactor;
 pub(crate) fn ingest(
     home: &administration::home::Home,
     path: &Path,
-    redactor: &Redactor,
+    redactor: &Result<Redactor, String>,
     inputs: &ingest::Inputs,
 ) -> (Vec<ingest::Ingested>, Option<String>) {
+    let redactor = match redactor {
+        Ok(redactor) => redactor,
+        Err(why) => return (Vec::new(), Some(why.clone())),
+    };
     let mut done = Vec::new();
     loop {
         match ingest::ingest_with(home, path, redactor, inputs, &mut OsEntropy) {

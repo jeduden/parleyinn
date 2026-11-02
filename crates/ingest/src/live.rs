@@ -120,7 +120,11 @@ pub fn ingest_live(
     limit: Option<usize>,
     entropy: &mut dyn Entropy,
 ) -> Result<Option<Ingested>, IngestError> {
-    let known = reading::peek(home, path)?;
+    let known = if read::open::needs_marker(path) {
+        reading::peek(home, path)?
+    } else {
+        None
+    };
     let opened = read::open::open(path, known.as_ref()).map_err(|source| IngestError::Read {
         path: path.to_path_buf(),
         source,
