@@ -6,10 +6,12 @@
 //! 2.1.296 lines taken from the recordings, an ingest of a transcript,
 //! and the recall of one event through `event_get`.
 //!
-//! `@REC-26` stays pending: its harness session's MCP server ingests
-//! live (REC-13, phase 10). Until then its drift steps ingest with
-//! `parinn ingest`, its typed lines matching a prompt the hook handlers
-//! got (phase 9).
+//! `@REC-26`'s run is served by its harness session's MCP server
+//! ([`crate::live`]), which ingests each drifting line live; its typed
+//! lines match a prompt the harness's own hook handler got. A harness
+//! process below another one is nested and none of its lines is `user`
+//! (PRV-08), so under an agent harness the typed rows need a process
+//! tree of their own: `unshare -p -f --mount-proc`.
 
 use std::collections::BTreeMap;
 use std::fs;
@@ -26,6 +28,7 @@ use store::{Store, Stored};
 
 use crate::World;
 use crate::record::{home, last_run, run_core};
+use crate::record_live::harness;
 use crate::security_redaction::{append, transcript};
 
 /// An Anthropic API key in its documented shape, which the rule set
@@ -198,6 +201,35 @@ pub fn ingest(w: &mut World, path: &Path) -> Result<(), String> {
     Ok(())
 }
 
+/// Waits until the harness session's MCP server ingested every line of
+/// the transcript at `path`, and keeps the last event of its run as the
+/// scenario's item.
+fn read_live(w: &mut World, path: &Path) -> Result<(), String> {
+    let held = fs::read_to_string(path)
+        .map_err(|e| e.to_string())?
+        .lines()
+        .count() as u64;
+    crate::live::wait_until("the MCP server to ingest the transcript", || {
+        Ok(crate::live::lines_read(w, path)? >= held)
+    })?;
+    let store = Store::open(&home(w)?.store()).map_err(|e| e.to_string())?;
+    let key = crate::live::source_key(path);
+    let run = store
+        .ingested_runs()
+        .map_err(|e| e.to_string())?
+        .into_iter()
+        .find(|r| r.path == key || Path::new(&r.path) == path)
+        .ok_or("the MCP server recorded no run of the transcript")?;
+    let last = store
+        .log(run.writer)
+        .map_err(|e| e.to_string())?
+        .last()
+        .map(|s| s.link.header.address.seq.get())
+        .ok_or("the run holds no event")?;
+    steps(w).item = Some((run.writer.to_string(), last));
+    Ok(())
+}
+
 /// Keeps the event at (`writer`, `seq`) as the scenario's item.
 pub fn set_item(w: &mut World, writer: String, seq: u64) {
     steps(w).item = Some((writer, seq));
@@ -364,12 +396,12 @@ fn recorded_shapes(_w: &mut World) -> Result<(), String> {
 /// session recorded its process ancestry and its prompt commitment, so
 /// only the drift keeps it from `user`.
 fn typed_drift(w: &mut World, drift: &str) -> Result<Value, String> {
-    use crate::record_hooks::{prompt_submit, run_hook, session_start, typed_line};
+    use crate::record_hooks::{prompt_submit, typed_line};
     let prompt = format!("deploy with {AWS_ACCESS_KEY}");
-    let start = session_start(w, "main-run", "startup")?;
-    run_hook(w, "SessionStart", &start, &[])?;
     let submit = prompt_submit(w, "main-run", "p-drift", &prompt)?;
-    run_hook(w, "UserPromptSubmit", &submit, &[])?;
+    // The harness process's own hook handlers observed its process
+    // ancestry when its MCP server took the session binding.
+    harness(w)?.hook("UserPromptSubmit", &submit)?;
     let mut line = typed_line(&prompt, "p-drift", "typed", "main-run")?;
     if drift.contains("\"version\"") {
         line["version"] = json!("9.9.9");
@@ -432,7 +464,7 @@ fn harness_drifts(w: &mut World, drift: String) -> Result<(), String> {
         &recorded("a mode line", |l| l["type"] == "mode")?,
     )?;
     let path = transcript(w, "main-run")?;
-    ingest(w, &path)?;
+    read_live(w, &path)?;
     // The drifting line is the one before the transcript's last.
     item_back(w, 1)
 }

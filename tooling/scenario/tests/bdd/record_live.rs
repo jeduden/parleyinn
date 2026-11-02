@@ -151,6 +151,16 @@ fn witnessed(w: &World, writer: ::record::id::WriterId) -> Result<bool, String> 
 }
 
 #[given(
+    regex = r#"^an agent run with a Claude Code transcript "([^"]+)", served by its harness session's MCP server$"#
+)]
+fn served_run(w: &mut World, name: String) -> Result<(), String> {
+    crate::security_redaction::agent_run_with_transcript(w, name.clone())?;
+    let path = crate::security_redaction::transcript(w, &name)?;
+    live(w).transcripts.insert(name.clone(), path);
+    serve(w, &name, "startup", &[])
+}
+
+#[given(
     regex = r#"^an agent run with a Claude Code transcript "([^"]+)" and a subagent transcript "([^"]+)"$"#
 )]
 fn run_with_subagent(w: &mut World, main: String, subagent: String) -> Result<(), String> {

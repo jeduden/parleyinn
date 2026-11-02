@@ -361,7 +361,7 @@ Feature: Provenance and trust (PRV)
     And a quarantine and its release change no origin
     And a recorded I2 security review of this requirement exists before it ships
 
-  @PRV-14 @P0 @I2 @I6 @pending
+  @PRV-14 @P0 @I2 @I6
   Scenario Outline: the MCP server finds the run that made a tool call only by the transcript line carrying its tool-use id
     Given an isolated ParleyInn home
     And a harness session whose main run and one subagent's run each call "event_search", served by its harness session's MCP server

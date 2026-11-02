@@ -59,6 +59,7 @@ These land in part, as §12.2 bounds them or as their scenarios reach past M1:
 | Row                             | M1's part                                                               | The rest                                                                |
 | ------------------------------- | ----------------------------------------------------------------------- | ----------------------------------------------------------------------- |
 | REC-19                          | ingest seats, holding a run's events, closing segments, verify's report | sealing, M7                                                             |
+| REC-02                          | runs, parent links, resumes, forks, clears and agent ids                | restore blocks reach an agent's rooms, joins, M2 and M7                 |
 | LANE-16                         | the owner's device seat, a run seat's contributor role                  | other roles, M7                                                         |
 | LANE-23                         | how a seat id derives                                                   | joins, M2 and M7                                                        |
 | LANE-31                         | the rule for two branch links naming one branch                         | room state, M7                                                          |
@@ -88,16 +89,15 @@ These land in part, as §12.2 bounds them or as their scenarios reach past M1:
 
 A scenario of a row that lands in part stays `@pending`, its M1 part
 proven by bound steps or named tests, as ENG-12 in plan 2609292011. One
-that cannot pass as written is a finding to raise, never re-pended.
+that cannot pass as written is raised, never re-pended.
 
-The "rest" column and §12.2 give each item the milestone that can do it.
-PRV-09 went to M3 (a restore's events) and M8 (a peer's).
+The "rest" column and §12.2 give each item its milestone; PRV-09 went to
+M3 (a restore's events) and M8 (a peer's).
 
 Each test kind lands with its code: ENG-07's fuzz targets, ENG-08's
 properties, ENG-06, ENG-17 and NFR-01 to NFR-05's benchmarks (ENG-15).
-M1's last phase closes plan 2609292011's ENG-03 and ENG-15. The reach
-test and release build prove CON-02 to CON-04; REC-06, REC-10 and
-ENG-08 prove CON-05.
+M1's last phase closes plan 2609292011's ENG-03 and ENG-15. The reach test
+and release build prove CON-02 to CON-04; REC-06, REC-10 and ENG-08, CON-05.
 
 ### What the spikes left
 

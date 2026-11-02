@@ -5,9 +5,8 @@
 //! ingest at most 2 s, and refuses, counts and logs every call whose run
 //! it cannot find.
 //!
-//! `@PRV-14`'s calls name `event_search`, which phase 12 serves; until
-//! it lands, a call found under its run is answered "no such tool", so
-//! the scenario stays pending and its rows pass narrowed to `event_get`.
+//! `@PRV-14`'s calls name `event_search`; the row whose arguments name
+//! the other run names it by its writer, which is how a run is named.
 
 use std::fs;
 use std::io::Write;
@@ -174,7 +173,23 @@ fn both_runs(w: &mut World) -> Result<(), String> {
 fn arguments_name_other(w: &mut World) -> Result<(), String> {
     append_call(w, MAIN, "toolu_args")?;
     read_all(w, MAIN)?;
-    call(w, Some("toolu_args"), &json!({"run": subagent_run()}))
+    // The subagent's run exists once ingest read a line of it.
+    append_call(w, SUBAGENT, "toolu_subagent_args")?;
+    read_all(w, SUBAGENT)?;
+    let writer = subagent_writer(w)?;
+    call(w, Some("toolu_args"), &json!({"run": writer}))
+}
+
+/// The writer of the subagent's run, which is how a call names a run.
+fn subagent_writer(w: &mut World) -> Result<String, String> {
+    let path = named(w, SUBAGENT)?.display().to_string();
+    let runs = crate::live::store(w)?
+        .ingested_runs()
+        .map_err(|e| e.to_string())?;
+    runs.iter()
+        .find(|r| r.path == path)
+        .map(|r| r.writer.to_string())
+        .ok_or_else(|| format!("no run was ingested from {path}"))
 }
 
 #[when(regex = r"^the subagent runs in the background$")]

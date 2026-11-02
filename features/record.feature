@@ -129,7 +129,7 @@ Feature: Record (REC)
       | truncated to 10 lines                 |
       | rewritten with a different first line |
 
-  @REC-08 @P0 @I1 @I6 @pending
+  @REC-08 @P0 @I1 @I6
   Scenario: the record outlives its transcript sources and verify reports transcript sources lost before full ingestion
     Given an isolated ParleyInn home
     And an agent run with a Claude Code transcript "main-run"
@@ -173,7 +173,7 @@ Feature: Record (REC)
     When the agent calls the MCP tool "event_search" with query "wombat"
     Then the hits are ranked by score, the "user" event naming "wombat" five times above the one naming it once
 
-  @REC-12 @P0 @I10 @pending
+  @REC-12 @P0 @I10
   Scenario: events are appended in transcript order and seq alone defines order
     Given an isolated ParleyInn home
     And an agent run with a Claude Code transcript "main-run"
@@ -395,7 +395,7 @@ Feature: Record (REC)
     And every address, commitment and chain head is unchanged
     And "parinn verify" exits 0
 
-  @REC-26 @P0 @I1 @I2 @I6 @pending
+  @REC-26 @P0 @I1 @I2 @I6
   Scenario Outline: a transcript line or hook input whose shape differs from its harness version's is kept, counted and audited as format drift
     Given an isolated ParleyInn home
     And deployment mode "interactive"

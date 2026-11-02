@@ -320,10 +320,19 @@ fn cut_short(w: &mut World, name: String, _lines: u64, landed: u64) -> Result<()
 fn names_lost(w: &mut World, name: String) -> Result<(), String> {
     let out = last_run(w)?;
     let report: Value = serde_json::from_slice(&out.stdout).map_err(|e| e.to_string())?;
-    let lost: Vec<&str> = report["lost_sources"]
-        .as_array()
-        .map(|a| a.iter().filter_map(Value::as_str).collect())
-        .unwrap_or_default();
+    let broken = &report["broken"];
+    if broken["check"] != "transcript source completeness" {
+        return Err(format!("verify found no incomplete source: {report}"));
+    }
+    // "transcript sources fall short: <path> <why>; <path> <why>"
+    const WHY: &str = " disappeared before it was fully ingested";
+    let message = broken["message"].as_str().unwrap_or_default();
+    let lost: Vec<&str> = message
+        .strip_prefix("transcript sources fall short: ")
+        .unwrap_or_default()
+        .split("; ")
+        .filter_map(|each| each.strip_suffix(WHY))
+        .collect();
     let named = |p: &&str| Path::new(p).file_stem().is_some_and(|s| s == name.as_str());
     if lost.len() == 1 && lost.iter().all(named) {
         return Ok(());
@@ -620,4 +629,34 @@ fn conflict(w: &mut World, name: String) -> Result<(), String> {
     Err(format!(
         "{name:?} holds {events:?}; {conflicts} audit entries count a conflict"
     ))
+}
+
+#[then(regex = r#"^"parinn event expand" still returns all (\d+) events of "main-run"$"#)]
+fn expand_returns_all(w: &mut World, n: usize) -> Result<(), String> {
+    const CONTINUE: &str = "continue with --cursor ";
+    let mut items = 0;
+    let mut args = vec!["event".to_owned(), "expand".to_owned(), format!("A1:1-{n}")];
+    // The answer is capped per page; each page names the cursor to go on.
+    for _ in 0..n {
+        let refs: Vec<&str> = args.iter().map(String::as_str).collect();
+        crate::record::run_core_at_terminal(w, &refs)?;
+        let text = String::from_utf8_lossy(&last_run(w)?.stdout).into_owned();
+        items += text
+            .lines()
+            .filter(|l| l.starts_with("parinn:room/"))
+            .count();
+        let Some(cursor) = text.lines().find_map(|l| l.split(CONTINUE).nth(1)) else {
+            break;
+        };
+        args = vec![
+            "event".to_owned(),
+            "expand".to_owned(),
+            "--cursor".to_owned(),
+            cursor.trim().to_owned(),
+        ];
+    }
+    if items == n {
+        return Ok(());
+    }
+    Err(format!("event expand returned {items} of {n} events"))
 }
