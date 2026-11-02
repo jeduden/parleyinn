@@ -481,7 +481,7 @@ impl Running {
             self.audit(&keyed(
                 Kind::Rejected,
                 Counter::RepeatOfPurgedRefused,
-                "refused a repeated line whose uuid names a purged event, in",
+                "refused a repeated line whose `uuid` names a purged event, in",
                 &ingested.name,
             ));
         }

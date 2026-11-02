@@ -716,7 +716,7 @@ fn ingest_refuses_a_repeated_line_naming_a_purged_event_and_audits_each_refusal(
     let audit = audit_text(&p);
     assert_eq!(
         audit
-            .matches("refused a repeated line whose uuid names a purged event, in late-fork")
+            .matches("refused a repeated line whose `uuid` names a purged event, in late-fork")
             .count(),
         3,
         "{audit}"

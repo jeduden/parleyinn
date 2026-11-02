@@ -67,7 +67,7 @@ pub(super) fn audit(ctx: &Context, ingested: &ingest::Ingested, stderr: &mut dyn
             keyed(
                 Kind::Rejected,
                 Counter::RepeatOfPurgedRefused,
-                "refused a repeated line whose uuid names a purged event, in",
+                "refused a repeated line whose `uuid` names a purged event, in",
             ),
         ),
     ];

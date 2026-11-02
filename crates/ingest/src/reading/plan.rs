@@ -241,11 +241,11 @@ impl<'a> Planner<'a> {
         }
         let owner = self.owner(store, uuid)?;
         let fork = self.inputs.forks.contains(&key.harness_session);
-        let in_sibling = fork && owner.is_none() && self.siblings().all.contains(uuid);
+        let in_other_transcript = fork && owner.is_none() && self.siblings().all.contains(uuid);
         let facts = Facts {
             owner,
-            fork,
-            in_sibling,
+            harness_fork: fork,
+            in_other_transcript,
             held_since: self.held_since,
             now: self.inputs.now_ms,
         };
@@ -285,8 +285,8 @@ impl<'a> Planner<'a> {
         let repeated = fork && self.siblings().all.contains(uuid);
         let facts = Facts {
             owner: None,
-            fork,
-            in_sibling: repeated && self.siblings().served.contains(uuid),
+            harness_fork: fork,
+            in_other_transcript: repeated && self.siblings().served.contains(uuid),
             held_since: self.held_since,
             now: self.inputs.now_ms,
         };
@@ -323,7 +323,7 @@ impl<'a> Planner<'a> {
                 .and_then(|c| c["text"].as_str())
                 .unwrap_or_default()
                 .to_owned(),
-            fork,
+            harness_fork: fork,
         }))
     }
 
