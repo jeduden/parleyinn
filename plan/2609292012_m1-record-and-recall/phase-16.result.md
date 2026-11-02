@@ -64,38 +64,31 @@ moved (plan.md, §12.2). To M3: ADM-09's landmark row, ENG-06's migration,
 target. To M7: SEC-19, ENG-29, NFR-01, PRV remainders, REC-24's confirm.
 To M8: PRV-09.
 
-Open in M1 (rulings of 2 November 2026 in plan.md's list):
+Open in M1, the M1 ids still `@pending` (cucumber, 2 November 2026):
 
-- LANE-02 stays `@pending`: its scenario has the first hook bind, its row
-  needs an MCP server holding the session binding (SEC-18); no ruling.
-- REC-24 in part (chain head, origin `peer`); the confirm is M7's.
-- SEC-05 passes (5 of 5 rows, `@pending` off): `parinn ingest` and live
-  ingest read a 64 MiB window at the ingest marker (`read::bounded`,
-  `read::open`), stream the prefix hash and purged-line zeroing, refuse a
-  line over 4 MiB (`transcript_line_too_large`, audited once live) and
-  report `read_window_high_water`. ADM-09's refused-line row is bound, 16
-  of 17. `act.rs` and `capture.rs` hook reads still read a transcript whole.
-  ENG-09's split: code to follow. Purge residue
-  closed (REC-17), `uuid` aside; SEC-31, ADM-07 stay `@pending`.
-- SEC-18 passes (`ingest_path`). REC-22 stays `@pending`: no freshness
-  mark (VIEW-04). Resume past a marker: ingest seat, `ingested`.
-- Verify's 60 s bound (`INDEX_CHECK_SECS`): postponed by the stakeholder.
+- SEC-31, ADM-07: steps being bound; nothing claimed yet. Purge residue
+  is closed in code (REC-17): only each purged line's position and length
+  remain, its `uuid` stays in the place row (REC-04). Open for the
+  stakeholder: SEC-31 says only position and length remain.
+- ADM-09: 16 of 17 rows pass; the landmark row is M3's.
+- REC-22: all steps pass but the first Then, a freshness mark with
+  source and ingest position on every surface (VIEW-04, M7).
+- REC-02: its last step needs restore blocks and a join (M2).
+- REC-24: its confirm step is M7's.
+- LANE-02: the stakeholder said leave it (SEC-18).
+- In part by §12.2: SEC-12 (flag row, M5), ENG-06, -15, -23, -29, SEC-17,
+  -19, PRV rows (above).
+
+Passing and off `@pending`: ENG-09, SEC-18, SEC-05 (64 MiB windows, a
+line over 4 MiB refused, `transcript_line_too_large`), REC-04, REC-08,
+REC-12, REC-26, PRV-14, RCL-02 (9 of 9, `kind` ruled A), REC-17. Under an
+agent harness REC-26's typed rows need `unshare -p -f --mount-proc`.
+Resume past a marker: ingest seat, `ingested`.
 
 - [x] ADM-09's other rows pass with `@pending` lifted, all but the
   landmark row, M3's
 
-Last P0 sweep (cucumber):
-
-- REC-08, REC-12, PRV-14 and REC-26 are off `@pending` and pass; under
-  an agent harness REC-26's typed rows need `unshare -p -f --mount-proc`.
-- REC-02 stays `@pending`: its last step needs restore blocks and a join
-  (M2's own-principal join, LANE-23). It is in plan.md's table and M2's
-  tasks; its other 16 steps pass.
-- REC-04 is off `@pending` and passes (cucumber). A purged event keeps
-  its `uuid`, byte offset and length; its prefix hash zeroes its bytes.
-- RCL-02 is off `@pending` and passes (cucumber, 9 of 9 rows). Ruled A
-  (2 November 2026): `kind` is the provenance class family (SRS 9.2).
-- Ruled: v1.0 ends before M8, so PRV-09's and PRV-02's peer rows stay in
-  M8 (SRS 11.2, 12.2; OQ-30 narrowed). REC-02 is in part in M1's row.
+Ruled: v1.0 ends before M8; PRV-09 and PRV-02's peer rows stay in M8
+(§11.2 option C). Verify's 60 s bound (`INDEX_CHECK_SECS`) is postponed.
 
 [consent]: https://github.com/jeduden/parleyinn/pull/91#issuecomment-6402652493

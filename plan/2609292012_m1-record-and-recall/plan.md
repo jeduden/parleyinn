@@ -25,15 +25,13 @@ Milestone M1 of [§12.2](../../docs/srs/12-delivery-plan.md). It replaces
 a plan from before SRS 2.0, which keyed events by a local sequence. SRS
 2.0 to 3.0 put the record on the seats, writers and keys of the
 [domain model](../../docs/domain-model/index.md),
-under the invariants [ADR-2610112209] and [ADR-2610112004] approved
-and the key event log of [ADR-2610122234]:
+under [ADR-2610112209], [ADR-2610112004] and [ADR-2610122234]:
 
-- A node's device key starts its genesis log, a key event log
-  (PRV-12), and certifies every seat key with a seat certificate
-  (PRV-11).
-- Each seat has its own writer. Each event's address is (writer,
-  `seq`), on a hash chain over a header that carries a commitment
-  instead of content (REC-06, REC-10, REC-17).
+- A node's device key starts its genesis log, a key event log (PRV-12),
+  and certifies every seat key (PRV-11).
+- Each seat has its own writer; an event's address is (writer, `seq`),
+  on a hash chain over a header carrying a commitment (REC-06, REC-10,
+  REC-17).
 - The personal room exists from the first start. A witnessed run's MCP
   server records it in its run seat's writer. An ingest seat records what
   `parinn ingest` reads, with origin `ingested` (REC-19, REC-22).
@@ -69,7 +67,7 @@ These land in part, as §12.2 bounds them or as their scenarios reach past M1:
 | OWN-22                          | the precondition: every run counts as unsandboxed                       | sandbox state, M7                                                       |
 | PRV-12                          | the key event log, rotation and recovery                                | M3, M7, M8, PRV-10                                                      |
 | PRV-13                          | origin from the record and the key set                                  | arrival, M3, M8, M9                                                     |
-| REC-24                          | the node identity change event with its chain head, origin `peer`       | the confirm a managed-policy key signs, M7                              |
+| REC-22, REC-24                  | REC-22: all but its freshness step; REC-24: chain head, origin `peer`   | freshness, VIEW-04, M7; the confirm a managed-policy key signs, M7      |
 | ENG-09                          | the soak at 10,000 events in every PR, the Miri job                     | the 1,000,000-event run is nightly's evidence                           |
 | ENG-08                          | every property but the restore delimiters'                              | restore delimiters, M2                                                  |
 | ENG-10                          | the envelope's golden files                                             | the restore block's, M2                                                 |
@@ -93,55 +91,50 @@ A scenario of a row that lands in part stays `@pending`, its M1 part
 proven by bound steps or named tests, as ENG-12 in plan 2609292011. One
 that cannot pass as written is raised, never re-pended.
 
-§12.2 gives each item its milestone; PRV-09 went to M3 (a restore's events)
-and M8 (a peer's), v1.0 ending before M8; RCL-02's `kind` is a provenance class.
+The reach test and release build prove CON-02 to CON-05; M1's last phase
+closes plan 2609292011's ENG-03 and ENG-15.
 
-Each test kind lands with its code: ENG-07's fuzz targets, ENG-08's
-properties, ENG-06, ENG-17 and NFR-01 to NFR-05's benchmarks (ENG-15).
-M1's last phase closes plan 2609292011's ENG-03 and ENG-15. The reach test
-and release build prove CON-02 to CON-04; REC-06, REC-10 and ENG-08, CON-05.
-
-### What the spikes left
-
-S2 ([ADR-2610110553]): `rusqlite`, BM25 over the newest 2,000 matches in
-172 ms p95. S7 ([ADR-2610102211]): an in-house stdio MCP server. S1, S3,
-S13: Claude Code 2.1.296's inputs in `testdata/claude-code`. S8: the §8.4
-estimator. S12: row ids from addresses, secure delete, a WAL checkpoint.
+S2 ([ADR-2610110553]): `rusqlite`, BM25 over 2,000 matches in 172 ms p95.
+S7 ([ADR-2610102211]): an in-house stdio MCP server. S1, S3, S13: Claude
+Code 2.1.296's inputs in `testdata/claude-code`. S8: the §8.4 estimator.
+S12: row ids from addresses, secure delete, a WAL checkpoint.
 
 ### The stakeholder's rulings of 14 October 2026
 
 The stakeholder ruled on these when M1 was re-planned and consents on
-[pull request #46][pr46]. Rulings 3 and 4 also changed M1's row in §12.2.
+[pull request #46][pr46]; rulings 3 and 4 changed M1's row in §12.2.
 
 1. **ENG-18:** only dependencies linked into a shipped executable count.
-2. **Key stores (SEC-10):** Keychain on macOS, a DPAPI file through a
-   Miri-checked shim on Windows, `0600` files on Linux; in part.
+2. **SEC-10:** Keychain on macOS, a Miri-checked DPAPI file on Windows,
+   `0600` files on Linux; in part.
 3. **ADM-05:** M1 ships format version 1, refusing a newer; M3 brings
    `parinn migrate`.
 4. **ADM-07:** M1 ships `parinn purge --range` as a widening act; the
    other scopes, SEC-31's copies and seal rewrites are M3's.
 
-### What code must now follow
+### Where M1 stands
 
-Rulings of 2 November 2026, now in the SRS and scenarios:
+Rulings of 2 November 2026, now in the SRS and scenarios; passing means
+cucumber:
 
-- **SEC-05:** lines are redacted whole; 4 MiB per line, 64 MiB of a
-  source in memory, resumed at its ingest marker (REC-13). Past 4 MiB:
-  refused, audited (kind rejected, "transcript line refused over the 4 MiB
-  limit; ingest position stays before the line (SEC-05, REC-03)"), counted
-  as `transcript_line_too_large`, the source left short.
-- **ADM-09:** `parinn verify` reports a source short at a refused line
-  (offset, `transcript_line_too_large`), exits 0; bound. SEC-05 passes:
-  ingest reads windows (`read::bounded`, `read::open`).
-- **REC-22, SEC-18:** `parinn ingest --path` at a terminal is a widening
-  principal act (`ingest_path`), allowed once resolved. SEC-18 passes;
-  REC-22 in part (freshness is VIEW-04's); a resume past a marker is `ingested`.
-- **Purge residue (SEC-31, ADM-07, REC-07, ADM-09):** purge, verify, resume
-  zero each purged line in the prefix hash (REC-17); its `uuid` stays;
-  SEC-31, ADM-07 stay `@pending`.
-- **ENG-09:** passes: a PR soaks 10,000 events, then verifies; 1M is nightly.
-  **REC-24:** the identity change event carries the chain head.
-  **LANE-02:** stays `@pending` (SEC-18). **RCL-02:** passes (9 of 9).
+- **Off `@pending` and passing:** ENG-09 (a PR soaks 10,000 events then
+  verifies; 1M is nightly), SEC-18 (`ingest_path`, a widening act),
+  SEC-05 (4 MiB per line, 64 MiB of a source, a longer line refused and
+  counted `transcript_line_too_large`), REC-04, REC-08, REC-12, REC-26,
+  PRV-14, RCL-02 (9 of 9), REC-17 extended.
+- **ADM-09** passes 16 of 17 rows, verify's refused-line report included;
+  the landmark row is M3's.
+- **Purge residue:** only each purged line's position and length remain
+  in the prefix hash; its `uuid` stays in the place row (REC-04). For
+  the stakeholder: SEC-31 says only position and length remain.
+  SEC-31 and ADM-07: steps being bound, `@pending` until then.
+- **REC-22 in part:** all steps pass but the first Then, a freshness mark
+  with source and ingest position on every surface: none shows one before
+  VIEW-04 (M7). **REC-24 in part:** its confirm step is M7's.
+- **LANE-02** stays `@pending` (stakeholder). Verify's 60 s bound:
+  postponed. PRV-09, PRV-02's peer rows: §11.2 option C.
+- Stakeholder consent still needed on `docs/srs/**`,
+  `docs/domain-model/record.md` and `features/**`, as the PR lists.
 
 ## Tasks
 
@@ -284,13 +277,20 @@ footer: |
 ## Acceptance Criteria
 
 - [ ] Every scenario of a row M1 lands in full passes, off `@pending`
-- [ ] Each row M1 lands in part has its M1 part proven, and its
-  scenario names what keeps it pending
-- [x] Recall of at least 95% after 1 to 3 compactions (§11.1)
-- [ ] `parinn verify` proves completeness, and quarantine is effective
-- [x] Two writers' logs rebuild one identical search index (S12)
-- [x] A purged event leaves no value that confirms a guess at it (ruled
-  C: the prefix hash is taken with erased spans zeroed; REC-17 checks it)
+  (open: LANE-02, ruled to stay; SEC-31 and ADM-07, steps being bound)
+- [ ] Each row M1 lands in part has its M1 part proven, and its scenario
+  names what keeps it pending (REC-22 VIEW-04, REC-02 and REC-24 as
+  above; SEC-31 and ADM-07 not yet bound)
+- [x] Recall of at least 95% after 1 to 3 compactions (§11.1): CI's
+  `eval` job, 216 of 216
+- [x] `parinn verify` proves completeness (@ADM-09, 16 of 17 rows) and
+  quarantine is effective (@RCL-06; @SEC-12's seven rows); the landmark
+  row is M3's, the flag row M5's
+- [x] Two writers' logs rebuild one identical search index (S12): the
+  `s12_rebuild` test
+- [ ] A purged event leaves no value that confirms a guess at it: @REC-17
+  passes (prefix hash zeroed over erased spans), but the `uuid` stays in
+  the place row; the stakeholder rules whether SEC-31 allows it
 - [x] Every dependency M1 adds has an accepted ADR (ENG-18, ENG-26),
   within the budget the stakeholder rules
 - [x] ENG-11's coverage floors hold for every security-sensitive crate

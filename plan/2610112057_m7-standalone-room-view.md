@@ -32,8 +32,10 @@ Scope, by requirement family:
 - LANE-03 to LANE-06, LANE-13, LANE-14, LANE-17, LANE-19, LANE-21,
   LANE-24 to LANE-33, the rest of LANE-16 and LANE-23
 - PRV-10, REC-18, REC-20, the rest of REC-19, RCL-09, INJ-10, the rest of
-  REC-24 (the confirm a managed-policy confirmation key signs, naming a
-  node identity change's inception; until then origin stays `peer`)
+  REC-22 (its freshness mark and surfaced ingest position, with VIEW-04),
+  the rest of REC-24 (the confirm a managed-policy confirmation key
+  signs, naming a node identity change's inception; until then origin
+  stays `peer`)
 - SEC-20, SEC-21, SEC-23, SEC-27, SEC-29, SEC-32
 - ADM-15, ADM-16, OPS-06, NFR-01, NFR-09, NFR-15
 - ENG-12 and ENG-16, as changed
@@ -49,7 +51,9 @@ Scope, by requirement family:
 1. Spikes S9, S10 and S11: transcript flush, an answerable harness
    prompt, input interfaces, git inside the core
 2. The room view and its surfaces: VIEW rows, with the CLI and TUI as
-   reduced clients
+   reduced clients; VIEW-04's freshness mark on every surface, with the
+   transcript source and ingest position REC-22's first step asks for,
+   the envelope item included (M1 left that step)
 3. Principal surfaces, presence proofs and the launcher: OWN rows,
    SEC-29
 4. The room model: LANE rows, PRV-10, overlaps and range links
