@@ -66,10 +66,11 @@ To M8: PRV-09.
 
 Open in M1, the M1 ids still `@pending` (cucumber, 2 November 2026):
 
-- SEC-31, ADM-07: steps being bound; nothing claimed yet. Purge residue
-  is closed in code (REC-17): only each purged line's position and length
-  remain, its `uuid` stays in the place row (REC-04). Open for the
-  stakeholder: SEC-31 says only position and length remain.
+- SEC-31, ADM-07: M3's; steps not bound. Ruled: only each purged line's
+  position, length and the harness's own `uuid` remain (REC-17, REC-04).
+  Ruled too: NFR-03..05 in part in M1 (NFR-04 met, NFR-05's target and
+  MEM-02 in M5); `parinn ingest --path` keeps its OWN-22 gate, a path
+  inside `PARINN_HOME` stays refused (safe default).
 - ADM-09: 16 of 17 rows pass; the landmark row is M3's.
 - REC-22: all steps pass but the first Then, a freshness mark with
   source and ingest position on every surface (VIEW-04, M7).

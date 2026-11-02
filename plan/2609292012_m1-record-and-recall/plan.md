@@ -119,20 +119,20 @@ cucumber:
 
 - **Off `@pending` and passing:** ENG-09 (a PR soaks 10,000 events then
   verifies; 1M is nightly), SEC-18 (`ingest_path`, a widening act),
-  SEC-05 (4 MiB per line, 64 MiB of a source, a longer line refused and
-  counted `transcript_line_too_large`), REC-04, REC-08, REC-12, REC-26,
+  SEC-05 (4 MiB per line, 64 MiB of a source), REC-04, REC-08, REC-12, REC-26,
   PRV-14, RCL-02 (9 of 9), REC-17 extended.
-- **ADM-09** passes 16 of 17 rows, verify's refused-line report included;
-  the landmark row is M3's.
-- **Purge residue:** only each purged line's position and length remain
-  in the prefix hash; its `uuid` stays in the place row (REC-04). For
-  the stakeholder: SEC-31 says only position and length remain.
-  SEC-31 and ADM-07: steps being bound, `@pending` until then.
+- **ADM-09** passes 16 of 17 rows; the landmark row is M3's.
+- **Purge residue (ruled):** only each purged line's position, length and
+  the harness's own `uuid` remain (beside the tombstone, REC-04); SEC-31
+  and ADM-07 stay `@pending` (M3). NFR-03..05 land in part (benchmarks,
+  ENG-15 gate); NFR-04 met, NFR-05's target and MEM-02 wait for M5.
+  `parinn ingest --path` keeps its OWN-22 gate; a path inside
+  `PARINN_HOME` stays refused (safe default, not changed).
 - **REC-22 in part:** all steps pass but the first Then, a freshness mark
   with source and ingest position on every surface: none shows one before
   VIEW-04 (M7). **REC-24 in part:** its confirm step is M7's.
-- **LANE-02** stays `@pending` (stakeholder). Verify's 60 s bound:
-  postponed. PRV-09, PRV-02's peer rows: §11.2 option C.
+- **LANE-02** stays `@pending`. Verify's 60 s bound: postponed. PRV-09,
+  PRV-02's peer rows: §11.2 option C.
 - Stakeholder consent still needed on `docs/srs/**`,
   `docs/domain-model/record.md` and `features/**`, as the PR lists.
 
@@ -288,9 +288,10 @@ footer: |
   row is M3's, the flag row M5's
 - [x] Two writers' logs rebuild one identical search index (S12): the
   `s12_rebuild` test
-- [ ] A purged event leaves no value that confirms a guess at it: @REC-17
-  passes (prefix hash zeroed over erased spans), but the `uuid` stays in
-  the place row; the stakeholder rules whether SEC-31 allows it
+- [x] A purged event leaves no value that confirms a guess at it: @REC-17
+  compares the stored hash with the zeroed-prefix digest and requires it
+  differs from the original; only position, length and the harness's own
+  `uuid` remain (stakeholder ruling)
 - [x] Every dependency M1 adds has an accepted ADR (ENG-18, ENG-26),
   within the budget the stakeholder rules
 - [x] ENG-11's coverage floors hold for every security-sensitive crate
