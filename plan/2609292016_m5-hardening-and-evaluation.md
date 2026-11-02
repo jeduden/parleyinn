@@ -18,13 +18,14 @@ signed off, the evaluation published and the pilot clean.
 
 ## Context
 
-Milestone M5. Scope: PRV-07, PIN-05, PIN-09, REC-14 and REC-15,
-SEC-09, SEC-13, OPS-04, OPS-05, ADM-12, ENG-13, ENG-25, the §11
-evaluation, the external review and the pilot.
+Milestone M5. Scope: PRV-07 with SEC-12's flag row, PIN-05, PIN-09,
+REC-14 and REC-15, SEC-09, SEC-13, OPS-04, OPS-05, ADM-12, ENG-13,
+ENG-25, the §11 evaluation, the external review and the pilot.
 
 ## Tasks
 
-1. Instruction-like flagging: PRV-07
+1. Instruction-like flagging: PRV-07, and SEC-12's flag row, which M1
+   left because no event carried a flag
 2. Pin candidates and the CLAUDE.md duplicate warning: PIN-05, PIN-09. PIN-05
    finds no candidates while any run on the node leaves R3 or R8 open, which
    holds until OQ-40 gives sandbox states a signature (OQ-51)
@@ -35,8 +36,12 @@ evaluation, the external review and the pilot.
    jeduden/parleyinn#48 until this task closes it
 5. Canary, structured logs, trusted-only export: OPS-04, OPS-05, ADM-12
 6. Mutation testing and the maintainer runbook: ENG-13, ENG-25
-7. Run the §11.1 evaluation and publish it
-8. External security review and the two-week pilot
+7. Run the §11.1 evaluation and publish it, with ENG-15's NFR-05
+   benchmark against its target on the reference hardware
+8. External security review and the two-week pilot; SEC-17's recorded
+   review and release gate, the rest of ENG-22 (every statement cites a
+   passing test) and ENG-23's migration tests from every previous minor version,
+   which M1 left
 9. M5's initial targets (§12.3): freeze §11's evaluation targets from
    the evaluation's results, removing their † and their §12.3 row
 

@@ -6,7 +6,7 @@ result: true
 summary: >-
   @ADM-11, @OPS-01 and @SEC-15 off @pending and passing; SEC-01's core
   row passes as gate tests. @ADM-09 passes seven rows of eight and
-  stays @pending (landmarks, M2). @SEC-17, @SEC-19 and @ENG-22 are
+  stays @pending (landmarks, M3). @SEC-17, @SEC-19 and @ENG-22 are
   bound in part and stay @pending, their findings raised below.
 ---
 # Phase 15 result
@@ -16,7 +16,7 @@ summary: >-
 Outcome:
 
 - ADM-11, OPS-01, SEC-15: off `@pending`, passing (cucumber). ADM-09:
-  seven rows pass with the tag lifted; the landmark row waits for M2.
+  seven rows pass with the tag lifted; the landmark row waits for M3.
   SEC-01's core row: gate tests in `tooling/engineering/tests/boundary.rs`.
 - SEC-17, SEC-19, ENG-22: bound in part, back to `@pending` as phase
   15's rule asks; their checks, gate tests and drift cases stay.

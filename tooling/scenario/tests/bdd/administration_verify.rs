@@ -9,7 +9,9 @@
 //! recorded before M2 (LMK-01), so there is none to alter. Its step
 //! fails with that finding, and the scenario stays `@pending`. The rows
 //! of a source an ingest resumes, of a stale ingest marker and of the
-//! consumed prefix have no steps yet: they wait with it.
+//! consumed prefix, and of an index derivation past verify's deadline,
+//! have no steps yet: they wait with it. The two rows of a purge a kill
+//! stopped after its erasure was recorded run here.
 
 use std::fs;
 
@@ -19,6 +21,7 @@ use rusqlite::Connection;
 use serde_json::json;
 
 use crate::World;
+use crate::erasure::purge_run_events;
 use crate::record::{home, last_run, run_core};
 use crate::record_transcript::{ingest, transcript_events};
 use crate::security_redaction::{append, transcript};
@@ -155,4 +158,90 @@ fn names_the_check(w: &mut World, check: String) -> Result<(), String> {
     Err(format!(
         "parinn verify does not name the check {check:?}: {shown}"
     ))
+}
+
+/// The range of the run's event 2, which a purge erases.
+fn purged_range(writer: &WriterId) -> String {
+    format!("{writer}:2-2")
+}
+
+/// A purge of event 2 the person ran, then cut short as a kill would
+/// after its erasure was recorded: the posting back in the search
+/// index and the finishing steps back in the journal.
+fn cut_short_purge(w: &mut World) -> Result<(Connection, WriterId), String> {
+    crate::recall::record_runs(w)?;
+    purge_run_events(w, "run-a", 2, 2)?;
+    let (conn, writer) = damaged(w)?;
+    let seq = Seq::new(2).ok_or("seq 2")?;
+    let row = ::store::search_index::row_id_of(Address::new(writer, seq))
+        .ok_or("the event has no index row")?;
+    conn.execute(
+        "INSERT INTO idx.events_fts (rowid, text) VALUES (?1, 'residue')",
+        [row],
+    )
+    .map_err(|e| e.to_string())?;
+    conn.execute(
+        "INSERT INTO purge_journal (kind, target) VALUES ('index', ?1), ('vacuum', '')",
+        [purged_range(&writer)],
+    )
+    .map_err(|e| e.to_string())?;
+    Ok((conn, writer))
+}
+
+#[given(regex = r"^a kill stopped a purge after its erasure was recorded$")]
+fn purge_cut_short(w: &mut World) -> Result<(), String> {
+    cut_short_purge(w).map(|_| ())
+}
+
+#[given(
+    regex = r"^a kill stopped a purge after its erasure was recorded, and a search index entry for an event outside its ranges names an event whose text lacks the term$"
+)]
+fn purge_cut_short_and_entry_altered(w: &mut World) -> Result<(), String> {
+    let (conn, writer) = cut_short_purge(w)?;
+    let seq = Seq::new(5).ok_or("seq 5")?;
+    let row = ::store::search_index::row_id_of(Address::new(writer, seq))
+        .ok_or("the event has no index row")?;
+    conn.execute("DELETE FROM idx.events_fts WHERE rowid = ?1", [row])
+        .map_err(|e| e.to_string())?;
+    conn.execute(
+        "INSERT INTO idx.events_fts (rowid, text) VALUES (?1, 'zebra')",
+        [row],
+    )
+    .map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+#[then(
+    regex = r"^the output reports the purge pending, naming the ranges whose search index entries it has still to remove, and names no failed check; verify audits it and counts it once as a failed operation, and repairs nothing$"
+)]
+fn purge_pending_reported(w: &mut World) -> Result<(), String> {
+    let (conn, writer) = damaged(w)?;
+    let out = last_run(w)?;
+    let shown = format!(
+        "{}{}",
+        String::from_utf8_lossy(&out.stdout),
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let range = purged_range(&writer);
+    if !shown.contains(&format!("pending purges: {range}")) {
+        return Err(format!("verify does not name the range {range}: {shown}"));
+    }
+    if shown.contains("parinn verify: ") {
+        return Err(format!("verify names a failed check: {shown}"));
+    }
+    let audited = crate::record_search::audited(w, "purge_unfinished")?;
+    if audited != 1 {
+        return Err(format!("{audited} audit entries count purge_unfinished"));
+    }
+    let kept: i64 = conn
+        .query_row(
+            "SELECT count(*) FROM purge_journal WHERE target = ?1",
+            [range],
+            |r| r.get(0),
+        )
+        .map_err(|e| e.to_string())?;
+    if kept != 1 {
+        return Err(format!("verify repaired: the journal holds {kept} steps"));
+    }
+    Ok(())
 }

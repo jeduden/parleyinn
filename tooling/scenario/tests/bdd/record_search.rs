@@ -388,7 +388,7 @@ fn bulk_insert(path: &Path, writer: &str, last: u64, row_of_last: i64) -> Result
 }
 
 /// How many entries of the audit log count `counter`.
-fn audited(w: &World, counter: &str) -> Result<usize, String> {
+pub fn audited(w: &World, counter: &str) -> Result<usize, String> {
     let audit = home(w)?.audit();
     if !audit.exists() {
         return Ok(0);
