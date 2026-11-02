@@ -179,6 +179,11 @@ pub enum Act {
         ranges: Vec<String>,
         reason: Option<String>,
     },
+    /// Ingest the transcript the principal named on `parinn ingest
+    /// --path` from outside the transcript roots (REC-22, SEC-18);
+    /// widening. It names the resolved path by its digest, never the
+    /// path: the act replicates.
+    IngestPath { path_digest: Digest },
 }
 
 impl Act {
@@ -194,6 +199,7 @@ impl Act {
             Self::QuarantineAdd { .. } => quarantine::ADD,
             Self::QuarantineRelease { .. } => quarantine::RELEASE,
             Self::Purge { .. } => "purge",
+            Self::IngestPath { .. } => "ingest_path",
         }
     }
 
@@ -245,6 +251,9 @@ impl Act {
                 if let Some(reason) = reason {
                     content.insert("reason".into(), json!(reason));
                 }
+            }
+            Self::IngestPath { path_digest } => {
+                content.insert("path_digest".into(), json!(path_digest.to_hex()));
             }
         }
 

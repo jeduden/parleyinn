@@ -27,7 +27,7 @@ use store::{IngestedRun, Placed, Source, Store};
 
 use crate::World;
 use crate::administration::configure;
-use crate::record::{home, last_run, run_core};
+use crate::record::{home, last_run, run_core, run_core_at_terminal};
 use crate::record_transcript::recorded;
 use crate::security_redaction::{append, name_transcript, transcript};
 
@@ -665,4 +665,213 @@ fn expand_returns_all(w: &mut World, n: usize) -> Result<(), String> {
         return Ok(());
     }
     Err(format!("event expand returned {items} of {n} events"))
+}
+
+// REC-22: events `parinn ingest` appends are `ingested` and untrusted,
+// and a transcript from outside the roots is ingested only when the
+// person names it on `parinn ingest --path` at a terminal. The scenario
+// stays pending: no surface shows a freshness mark yet (VIEW-04), and
+// its first step says so.
+
+/// The line `parinn ingest` found past the ingest marker of "cut-short":
+/// the server read this many lines of it.
+const CUT_AT: u64 = 3;
+
+#[given(
+    regex = r#"^a transcript "([^"]+)" under the configured transcript roots, written before ParleyInn's hook handlers were installed, containing a user turn and lifecycle metadata$"#
+)]
+fn pre_install(w: &mut World, name: String) -> Result<(), String> {
+    let dir = w.home.join(".claude").join("projects").join("-w-app");
+    fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    let path = dir.join(format!("{name}.jsonl"));
+    let lines = [
+        crate::provenance::typed()?,
+        recorded("a mode line", |l| l["type"] == "mode")?,
+    ];
+    let body: String = lines.iter().map(|l| format!("{l}\n")).collect();
+    fs::write(&path, body).map_err(|e| e.to_string())?;
+    name_transcript(w, &name, path);
+    Ok(())
+}
+
+#[given(regex = r#"^a transcript "([^"]+)" from outside the configured transcript roots$"#)]
+fn outside_roots(w: &mut World, name: String) -> Result<(), String> {
+    let dir = w.home.join("elsewhere");
+    fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    let path = dir.join(format!("{name}.jsonl"));
+    let body: String = [crate::provenance::typed()?, crate::provenance::typed()?]
+        .iter()
+        .map(|l| format!("{l}\n"))
+        .collect();
+    fs::write(&path, body).map_err(|e| e.to_string())?;
+    name_transcript(w, &name, path);
+    Ok(())
+}
+
+#[given(regex = r#"^a watched transcript "([^"]+)" whose hook handler left an ingest marker$"#)]
+fn watched_cut_short(w: &mut World, name: String) -> Result<(), String> {
+    crate::record_live::make_run(w, &name, 7, None)?;
+    let path = crate::record_live::named(w, &name)?;
+    name_transcript(w, &name, path.clone());
+    let limit = CUT_AT.to_string();
+    crate::record_live::serve(w, &name, "startup", &[("PARINN_TEST_INGEST_LIMIT", &limit)])?;
+    crate::live::wait_until("the MCP server to read its lines", || {
+        Ok(crate::live::lines_read(w, &path)? >= CUT_AT)
+    })?;
+    let harness = crate::record_live::live(w)
+        .harness
+        .take()
+        .ok_or("no MCP server is running")?;
+    harness.stop()
+}
+
+#[when(
+    regex = r#"^the person runs "parinn ingest --path" on "([^"]+)", on "([^"]+)" and on "([^"]+)"$"#
+)]
+fn ingest_three(w: &mut World, a: String, b: String, c: String) -> Result<(), String> {
+    // A widening act on a node with runs needs the standing risk
+    // acceptance (OWN-22).
+    run_core_at_terminal(w, &["risk-acceptance", "record"])?;
+    for name in [a, b, c] {
+        let shown = transcript(w, &name)?.display().to_string();
+        run_core_at_terminal(w, &["ingest", "--path", &shown])?;
+        let out = last_run(w)?;
+        if !out.status.success() {
+            return Err(format!(
+                "parinn ingest of {name:?} exited {}: {}",
+                out.status,
+                String::from_utf8_lossy(&out.stdout).trim()
+            ));
+        }
+    }
+    Ok(())
+}
+
+/// Every event of the transcript `name`, recalled through `event_get`,
+/// as (line, item).
+fn recalled_events(w: &mut World, name: &str) -> Result<Vec<(u64, Value)>, String> {
+    let mut out = Vec::new();
+    for p in placed(w, name)? {
+        crate::record_transcript::set_item(w, p.address.writer.to_string(), p.address.seq.get());
+        out.push((p.place.line, crate::record_transcript::recalled_item(w)?));
+    }
+    if out.is_empty() {
+        return Err(format!("no event was read from {name:?}"));
+    }
+    Ok(out)
+}
+
+#[then(
+    regex = r#"^every event of "([^"]+)" carries the "ingested" origin, freshness mark and trust mark with its transcript source and ingest position, shown on every surface, and none is shown as witnessed$"#
+)]
+fn carries_origin(w: &mut World, name: String) -> Result<(), String> {
+    let source = kept(&transcript(w, &name)?)?;
+    let store = open(w)?;
+    let recorded_source = store
+        .source(&source)
+        .map_err(|e| e.to_string())?
+        .ok_or("no transcript source is recorded")?;
+    if recorded_source.position.lines == 0 {
+        return Err("the ingest position is not recorded".to_owned());
+    }
+    for (line, item) in recalled_events(w, &name)? {
+        if item["origin"] != "ingested" || item["trust"] != "untrusted" {
+            return Err(format!("line {line} is recalled as {item}"));
+        }
+        if item.get("freshness").is_none() {
+            return Err(format!(
+                "line {line} shows no freshness mark: no surface shows one before VIEW-04"
+            ));
+        }
+    }
+    Ok(())
+}
+
+#[then(
+    regex = r#"^the "user" event and the "harness_meta" event from "([^"]+)" have trust "untrusted"$"#
+)]
+fn user_and_meta_untrusted(w: &mut World, name: String) -> Result<(), String> {
+    // The user turn is the transcript's "user" line; no hook handler saw
+    // its prompt, so it is not a "user" provenance (PRV-08).
+    let line_type = |item: &Value| {
+        let line: Value = serde_json::from_str(item["content"].as_str().unwrap_or_default())
+            .unwrap_or(Value::Null);
+        line["type"].as_str().map(str::to_owned)
+    };
+    let events = recalled_events(w, &name)?;
+    for (what, is) in [
+        (
+            "user",
+            &(|i: &Value| line_type(i).as_deref() == Some("user")) as &dyn Fn(&Value) -> bool,
+        ),
+        ("harness_meta", &|i: &Value| {
+            i["provenance"] == "harness_meta"
+        }),
+    ] {
+        let mut found = false;
+        for (line, item) in events.iter().filter(|(_, i)| is(i)) {
+            found = true;
+            if item["trust"] != "untrusted" {
+                return Err(format!("line {line} is recalled as {item}"));
+            }
+        }
+        if !found {
+            return Err(format!("{name:?} holds no {what} event"));
+        }
+    }
+    Ok(())
+}
+
+#[then(
+    regex = r#"^this node records "([^"]+)" as an ingested run in the principal's personal room, shown as "ingested", and every event of it has trust "untrusted"$"#
+)]
+fn personal_room_run(w: &mut World, name: String) -> Result<(), String> {
+    let runs = runs_of(w, &name)?;
+    let run = runs.first().ok_or("no run was ingested from the path")?;
+    let store = open(w)?;
+    let node = administration::node::Node::find(&home(w)?, &store).map_err(|e| e.to_string())?;
+    let seat = store
+        .seat(run.writer)
+        .map_err(|e| e.to_string())?
+        .ok_or("the run has no seat")?;
+    if seat.room != node.personal_room() {
+        return Err("the run is not in the personal room".to_owned());
+    }
+    for (line, item) in recalled_events(w, &name)? {
+        if item["origin"] != "ingested" || item["trust"] != "untrusted" {
+            return Err(format!("line {line} is recalled as {item}"));
+        }
+    }
+    Ok(())
+}
+
+#[then(
+    regex = r#"^ingesting "([^"]+)" is recorded as the person's widening principal act at a terminal \(OWN-11, OWN-12\), and the same path named in a hook input or a transcript line is rejected as outside the allowed roots \(SEC-18\)$"#
+)]
+fn recorded_as_act(w: &mut World, name: String) -> Result<(), String> {
+    let path = transcript(w, &name)?;
+    crate::security_hooks::names_act(w, &fs::canonicalize(&path).map_err(|e| e.to_string())?)?;
+    crate::security_hooks::hook_names(w, &path.display().to_string(), &w.home.clone())?;
+    crate::security_hooks::wait_refused(w)
+}
+
+#[then(
+    regex = r#"^every event "parinn ingest" read past the ingest marker of "([^"]+)" carries the "ingested" origin and has trust "untrusted"$"#
+)]
+fn past_the_marker(w: &mut World, name: String) -> Result<(), String> {
+    let mut past = 0;
+    for (line, item) in recalled_events(w, &name)? {
+        if line > CUT_AT {
+            past += 1;
+            if item["origin"] != "ingested" || item["trust"] != "untrusted" {
+                return Err(format!("line {line} is recalled as {item}"));
+            }
+        } else if item["origin"] != "witnessed" {
+            return Err(format!("line {line} was read by the server: {item}"));
+        }
+    }
+    if past == 0 {
+        return Err("parinn ingest read nothing past the marker".to_owned());
+    }
+    Ok(())
 }

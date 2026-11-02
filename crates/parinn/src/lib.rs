@@ -26,7 +26,7 @@ use administration::home::Home;
 use administration::node::Node;
 use administration::node_identity::IdentitySource;
 use administration::verify::{Report, Shape, VerifyError, verify};
-use allowed_root::{Access, AllowedPath, AllowedRoots};
+use allowed_root::{Access, AllowedRoots};
 use audit::AuditError;
 use audit::counters::{Counts, counts};
 use audit::entry::{Counter, Entry, Kind, Occurrence};
@@ -472,17 +472,8 @@ fn ingest(
             Err(e) => return failed("ingest", &e, stderr),
         },
     };
-    let mut failures = 0;
-    let mut allowed = Vec::new();
-    for path in &candidates {
-        match allowed_transcript(ctx, settings, path, stderr) {
-            Ok(transcript) => allowed.push(transcript),
-            Err(e) => {
-                failed("ingest", &e, stderr);
-                failures += 1;
-            }
-        }
-    }
+    let named = matches!(target, IngestTarget::Path(_));
+    let (allowed, mut failures) = ingest_path::allowed(ctx, settings, &candidates, named, stderr);
     if allowed.is_empty() && failures > 0 {
         return EXIT_FAILURE;
     }
@@ -509,11 +500,11 @@ fn ingest(
         interactive: settings.deployment_mode() == "interactive",
         ..ingest::Inputs::default()
     };
-    let paths: Vec<&Path> = allowed.iter().map(AllowedPath::path).collect();
+    let paths: Vec<&Path> = allowed.iter().map(PathBuf::as_path).collect();
     let (reports, failed_ingests) = ingest_all(ctx, &home, &paths, &redactor, &inputs, stderr);
     failures += failed_ingests;
     let held = held_sources(ctx, settings, &home, stderr);
-    let held: Vec<&Path> = held.iter().map(AllowedPath::path).collect();
+    let held: Vec<&Path> = held.iter().map(PathBuf::as_path).collect();
     failures += ingest_all(ctx, &home, &held, &redactor, &inputs, stderr).1;
     apply_retention(ctx, &home, settings, stderr);
     if target == IngestTarget::All {
@@ -592,7 +583,7 @@ fn held_sources(
     settings: &configuration::resolve::Settings,
     home: &Home,
     stderr: &mut dyn Write,
-) -> Vec<AllowedPath> {
+) -> Vec<PathBuf> {
     let held: Vec<PathBuf> = Store::open(&home.store())
         .and_then(|store| store.sources())
         .map(|sources| {
@@ -604,9 +595,7 @@ fn held_sources(
         })
         .unwrap_or_default();
 
-    held.iter()
-        .filter_map(|path| allowed_transcript(ctx, settings, path, stderr).ok())
-        .collect()
+    ingest_path::within(ctx, settings, &held, stderr)
 }
 
 /// Audits and counts, once each, every transcript source `parinn ingest
@@ -927,41 +916,6 @@ fn refuse_ingest(ctx: &Context, stderr: &mut dyn Write) -> String {
 
     "a settings layer failed, so its redaction patterns are unknown; fix it and ingest again"
         .to_owned()
-}
-
-/// The transcript at `path` resolved within the transcript roots, the
-/// only allowed roots `parinn ingest` reads from (SEC-18): nothing in
-/// the home, its keys and store among it, is a transcript. A path
-/// outside them is refused, audited and counted, and nothing is read
-/// from it.
-fn allowed_transcript(
-    ctx: &Context,
-    settings: &configuration::resolve::Settings,
-    path: &Path,
-    stderr: &mut dyn Write,
-) -> Result<AllowedPath, String> {
-    let os_home = ctx.home.as_deref().map(Path::new);
-    let allowed = settings
-        .texts("transcript.roots")
-        .iter()
-        .fold(AllowedRoots::default(), |allowed, root| {
-            allowed.with(&allowed_root::expand_home(root, os_home), Access::Read)
-        });
-    allowed.resolve(path, Access::Read).map_err(|refused| {
-        let occurrence = Occurrence::Degraded {
-            kind: Kind::Rejected,
-            counter: Counter::PathOutsideAllowedRoots,
-            operation: "ingest",
-            detail: "path outside allowed roots",
-        };
-        if let Err(e) = ctx.audit(&occurrence) {
-            let _ = writeln!(
-                stderr,
-                "parinn ingest: audit a path outside allowed roots: {e}"
-            );
-        }
-        refused.to_string()
-    })
 }
 
 /// The redactor for the settings in force: the rule set and the
@@ -2177,6 +2131,7 @@ pub mod forks;
 mod hook_handlers;
 mod identity_status;
 mod index_gaps;
+mod ingest_path;
 mod licenses;
 mod purge;
 mod quarantine;

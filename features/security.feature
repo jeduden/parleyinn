@@ -223,7 +223,7 @@ Feature: Security (SEC)
     And it covers every row of the boundary register and the threat sources acting across each boundary
     And it compares ParleyInn with Zed Delta control by control on record signing, trust in other principals, central-service dependence and key custody
 
-  @SEC-18 @P0 @I8 @pending
+  @SEC-18 @P0 @I8
   Scenario Outline: paths outside the allowed roots are rejected and audited unless the person names them at the terminal, and the run's worktree and its repository's git directory are read-only
     Given an isolated ParleyInn home
     And the transcript roots are "~/.claude/projects"
