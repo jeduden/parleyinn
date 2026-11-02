@@ -456,6 +456,7 @@ impl Plan {
         self.places.push(Place {
             line: at.number,
             offset: at.line.offset,
+            length: at.line.end - at.line.offset,
             uuid: at.parsed["uuid"].as_str().map(str::to_owned),
         });
         self.ends.push((at.writer, end, at.line.end));

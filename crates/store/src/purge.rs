@@ -25,7 +25,7 @@ use record::id::{Address, Seq, WriterId};
 use rusqlite::{Connection, TransactionBehavior, params};
 use serde_json::Value;
 
-use crate::{NewEvent, Out, Store, StoreError, search_index, seq_of, sql};
+use crate::{NewEvent, Out, Store, StoreError, search_index, seq_of, source, sql};
 
 /// The journal of what a purge still has to finish.
 pub(crate) const SCHEMA: &str = "
@@ -99,6 +99,7 @@ impl Store {
             threshold: self.threshold,
         };
         secure_delete(&self.conn)?;
+        let rehashes = source::purged::plan(&self.conn, ranges, self.transcripts)?;
         let tx = self
             .conn
             .transaction_with_behavior(TransactionBehavior::Immediate)?;
@@ -106,7 +107,9 @@ impl Store {
         let mut events = 0;
         for range in ranges {
             events += erase(&tx, range)?;
+            source::purged::mark(&tx, range)?;
         }
+        source::purged::apply(&tx, &rehashes)?;
         let appended = if record.is_empty() {
             Vec::new()
         } else {

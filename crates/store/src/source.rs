@@ -10,13 +10,32 @@
 //!
 //! The position moves in the same transaction as the events it covers,
 //! so a kill neither drops nor repeats a line.
+//!
+//! A purge keeps each purged line's position and length, and recomputes
+//! the consumed-prefix hash with those bytes zeroed (SEC-31, ADM-07):
+//! ingest, resume and `parinn verify` zero the same spans, so the hash
+//! confirms no guess at the purged bytes and the source still resumes.
 
-use record::digest::Digest;
+use record::digest::{Digest, Running};
 use record::event::EventKind;
 use record::id::{Address, WriterId};
 use rusqlite::{Connection, OptionalExtension, Transaction, params};
 
-use crate::{StoreError, seq_of, sql};
+use crate::{Store, StoreError, seq_of, sql};
+
+pub(crate) mod purged;
+pub use purged::Transcripts;
+
+impl Store {
+    /// This store, each ingest marker it leaves, as a generation starts
+    /// or a position moves, recorded as left at `ms`, in milliseconds on
+    /// ingest's clock (ADM-09). The store reads no clock itself.
+    #[must_use]
+    pub fn with_marker_time(mut self, ms: u64) -> Self {
+        self.marker_time = ms;
+        self
+    }
+}
 
 /// The tables of transcript sources, their places and ingested runs,
 /// part of the store's schema.
@@ -40,6 +59,8 @@ CREATE TABLE transcript_places (
     source INTEGER NOT NULL,
     line INTEGER NOT NULL,
     byte_offset INTEGER NOT NULL,
+    byte_length INTEGER NOT NULL,
+    purged INTEGER NOT NULL DEFAULT 0,
     uuid TEXT,
     UNIQUE (source, line)
 ) STRICT;
@@ -89,6 +110,85 @@ impl Position {
     }
 }
 
+/// The bytes one transcript line takes: where it starts and its length.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Span {
+    pub offset: u64,
+    pub length: u64,
+}
+
+/// A prefix hash that no bytes produce: what a purge leaves of a source
+/// whose file it could not read, or no longer begins with what ingest
+/// consumed, so the hash confirms nothing of the purged bytes (SEC-31).
+/// The source then reads as rewritten.
+#[must_use]
+pub fn unconfirmable() -> Digest {
+    Digest::from_bytes([0; 32])
+}
+
+/// A running SHA-256 of a transcript's bytes, in order from the first,
+/// that takes the bytes of each purged line as zeros: the consumed-prefix
+/// hash as ingest, resume and `parinn verify` compute it (SEC-31).
+pub struct Zeroed<'a> {
+    running: Running,
+    spans: &'a [Span],
+    at: u64,
+}
+
+impl<'a> Zeroed<'a> {
+    /// A hash of nothing yet, zeroing `spans`.
+    #[must_use]
+    pub fn new(spans: &'a [Span]) -> Self {
+        Self {
+            running: Running::default(),
+            spans,
+            at: 0,
+        }
+    }
+
+    /// Takes the next `bytes` of the transcript.
+    pub fn update(&mut self, bytes: &[u8]) {
+        let end = self.at + bytes.len() as u64;
+        let mut from = 0;
+        for span in self.spans {
+            let (start, stop) = (
+                span.offset.max(self.at),
+                (span.offset + span.length).min(end),
+            );
+            if start >= stop {
+                continue;
+            }
+            let (start, stop) = (as_index(start - self.at), as_index(stop - self.at));
+            self.running.update(&bytes[from..start]);
+            self.running.update(&vec![0; stop - start]);
+            from = stop;
+        }
+        self.running.update(&bytes[from..]);
+        self.at = end;
+    }
+
+    /// The SHA-256 of the bytes taken.
+    #[must_use]
+    pub fn digest(&self) -> Digest {
+        self.running.digest()
+    }
+}
+
+/// A byte count as an index.
+fn as_index(n: u64) -> usize {
+    usize::try_from(n).unwrap_or(usize::MAX)
+}
+
+/// The consumed-prefix hash of `bytes`'s first `offset`, `spans` zeroed;
+/// none when `bytes` hold fewer (SEC-31, REC-07).
+#[must_use]
+pub fn prefix_digest(bytes: &[u8], offset: u64, spans: &[Span]) -> Option<Digest> {
+    let mut hash = Zeroed::new(spans);
+    hash.update(bytes.get(..as_index(offset))?);
+
+    Some(hash.digest())
+}
+
 /// One generation of a transcript source.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Source {
@@ -100,6 +200,9 @@ pub struct Source {
     /// repeats lines (REC-04).
     pub directory: String,
     pub position: Position,
+    /// The bytes of each purged line, which the prefix hash takes as
+    /// zeros (SEC-31), in offset order.
+    pub purged: Vec<Span>,
     /// When an ingest marker began to hold its repeated lines, in
     /// milliseconds on ingest's clock (REC-04).
     pub held_since: Option<u64>,
@@ -120,6 +223,8 @@ pub struct Place {
     pub line: u64,
     /// The byte offset its line starts at.
     pub offset: u64,
+    /// How many bytes its line takes, its line break included.
+    pub length: u64,
     /// The line's `uuid`, when it carries one.
     pub uuid: Option<String>,
 }
@@ -199,10 +304,30 @@ fn source(row: SourceRow) -> Result<Source, StoreError> {
             lines: count(lines),
             seen: count(seen),
         },
+        purged: Vec::new(),
         held_since: held.map(count),
         lost,
         marked_at: count(marked),
     })
+}
+
+/// The bytes of each purged line of source `id`, in offset order.
+fn spans(conn: &Connection, id: i64) -> Result<Vec<Span>, StoreError> {
+    let mut statement = conn.prepare(
+        "SELECT byte_offset, byte_length FROM transcript_places
+         WHERE source = ?1 AND purged = 1 ORDER BY byte_offset",
+    )?;
+    let rows = statement.query_map([id], |r| Ok((r.get::<_, i64>(0)?, r.get::<_, i64>(1)?)))?;
+    let mut spans = Vec::new();
+    for row in rows {
+        let (offset, length) = row?;
+        spans.push(Span {
+            offset: count(offset),
+            length: count(length),
+        });
+    }
+
+    Ok(spans)
 }
 
 /// The sources `filter` selects, `?1` being `arg`.
@@ -229,7 +354,15 @@ pub(crate) fn select(
     })?;
     let rows: Vec<SourceRow> = rows.collect::<Result<_, _>>()?;
 
-    rows.into_iter().map(source).collect()
+    let mut sources = rows
+        .into_iter()
+        .map(source)
+        .collect::<Result<Vec<_>, _>>()?;
+    for source in &mut sources {
+        source.purged = spans(conn, source.id)?;
+    }
+
+    Ok(sources)
 }
 
 /// The newest generation of each source `filter` selects.
@@ -269,6 +402,7 @@ pub(crate) fn start(
         generation: count(generation),
         directory: directory.to_owned(),
         position,
+        purged: Vec::new(),
         held_since: None,
         lost: false,
         marked_at: at,
@@ -339,8 +473,8 @@ pub(crate) fn place(
     places: &[Place],
 ) -> Result<(), StoreError> {
     let mut insert = tx.prepare(
-        "INSERT INTO transcript_places (event, source, line, byte_offset, uuid)
-         VALUES ((SELECT rowid FROM events WHERE writer = ?1 AND seq = ?2), ?3, ?4, ?5, ?6)",
+        "INSERT INTO transcript_places (event, source, line, byte_offset, byte_length, uuid)
+         VALUES ((SELECT rowid FROM events WHERE writer = ?1 AND seq = ?2), ?3, ?4, ?5, ?6, ?7)",
     )?;
     for (address, place) in addresses.iter().zip(places) {
         let inserted = insert.execute(params![
@@ -349,6 +483,7 @@ pub(crate) fn place(
             id,
             sql_count(place.line),
             sql_count(place.offset),
+            sql_count(place.length),
             place.uuid
         ]);
         inserted?;
@@ -360,7 +495,7 @@ pub(crate) fn place(
 /// The events of source `id`, in line order.
 pub(crate) fn placed(conn: &Connection, id: i64) -> Result<Vec<Placed>, StoreError> {
     let statement = conn.prepare(
-        "SELECT p.line, p.byte_offset, p.uuid, e.writer, e.seq, e.kind
+        "SELECT p.line, p.byte_offset, p.byte_length, p.uuid, e.writer, e.seq, e.kind
          FROM transcript_places p JOIN events e ON e.rowid = p.event
          WHERE p.source = ?1 ORDER BY p.line",
     );
@@ -369,18 +504,20 @@ pub(crate) fn placed(conn: &Connection, id: i64) -> Result<Vec<Placed>, StoreErr
         Ok((
             r.get::<_, i64>(0)?,
             r.get::<_, i64>(1)?,
-            r.get::<_, Option<String>>(2)?,
-            r.get::<_, String>(3)?,
-            r.get::<_, i64>(4)?,
-            r.get::<_, String>(5)?,
+            r.get::<_, i64>(2)?,
+            r.get::<_, Option<String>>(3)?,
+            r.get::<_, String>(4)?,
+            r.get::<_, i64>(5)?,
+            r.get::<_, String>(6)?,
         ))
     })?;
     rows.map(|row| {
-        let (line, offset, uuid, writer, seq, kind) = row?;
+        let (line, offset, length, uuid, writer, seq, kind) = row?;
         Ok(Placed {
             place: Place {
                 line: count(line),
                 offset: count(offset),
+                length: count(length),
                 uuid,
             },
             address: address(&writer, seq)?,

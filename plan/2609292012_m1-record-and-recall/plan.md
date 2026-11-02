@@ -134,11 +134,11 @@ Rulings of 2 November 2026, now in the SRS and scenarios:
   (source, offset, `transcript_line_too_large`), exits 0, fails no check,
   until the line is ingested or the source replaced; the new row is to bind.
 - **REC-22, SEC-18:** `parinn ingest --path` at a terminal is a widening
-  principal act, allowed once resolved (regular file, redacted,
-  untrusted, `ingested`); hook and transcript paths stay confined.
-- **Purge residue (SEC-31, ADM-07, REC-07, ADM-09):** the consumed-prefix
-  hash zeroes the bytes of each purged transcript line, in purge, verify
-  and resume; the harness's transcript file never changes.
+  principal act (`ingest_path`), allowed once resolved. SEC-18 passes;
+  REC-22 stays `@pending`: freshness mark, and a resume writes `witnessed`.
+- **Purge residue (SEC-31, ADM-07, REC-07, ADM-09):** purge, verify, resume
+  zero each purged line in the prefix hash (REC-17); its `uuid` stays;
+  SEC-31, ADM-07 stay `@pending`.
 - **ENG-09:** passes: a PR soaks 10,000 events, then verifies; 1M is nightly.
   **REC-24:** the identity change event carries the chain head.
   **LANE-02:** stays `@pending` (SEC-18). **RCL-02:** passes (9 of 9).
@@ -289,8 +289,8 @@ footer: |
 - [x] Recall of at least 95% after 1 to 3 compactions (§11.1)
 - [ ] `parinn verify` proves completeness, and quarantine is effective
 - [x] Two writers' logs rebuild one identical search index (S12)
-- [ ] A purged event leaves no value that confirms a guess at it (ruled
-  C: the prefix hash is taken with erased spans zeroed)
+- [x] A purged event leaves no value that confirms a guess at it (ruled
+  C: the prefix hash is taken with erased spans zeroed; REC-17 checks it)
 - [x] Every dependency M1 adds has an accepted ADR (ENG-18, ENG-26),
   within the budget the stakeholder rules
 - [x] ENG-11's coverage floors hold for every security-sensitive crate

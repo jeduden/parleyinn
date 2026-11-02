@@ -72,18 +72,38 @@ fn a_transaction_holds_at_most_a_batch() {
 }
 
 #[test]
-fn a_source_continues_while_its_consumed_prefix_stands() {
-    let position = Position {
-        offset: 2,
-        prefix: Digest::of(&[b"ab"]),
-        lines: 1,
-        seen: 2,
+fn a_source_continues_while_its_consumed_prefix_stands_its_purged_lines_zeroed() {
+    let mut source = Source {
+        id: 1,
+        path: "/t/a.jsonl".to_owned(),
+        generation: 1,
+        directory: "/t".to_owned(),
+        position: Position {
+            offset: 2,
+            prefix: Digest::of(&[b"ab"]),
+            lines: 1,
+            seen: 2,
+        },
+        purged: Vec::new(),
+        held_since: None,
+        lost: false,
+        marked_at: 0,
     };
 
-    assert!(continues(&position, b"abc"));
-    assert!(!continues(&position, b"xbc"));
-    assert!(!continues(&position, b"a"));
+    assert!(continues(&source, b"abc"));
+    assert!(!continues(&source, b"xbc"));
+    assert!(!continues(&source, b"a"));
     assert_eq!(as_index(3), 3);
+
+    // A purge zeroed the bytes of the second line: the file still holds
+    // them, and they count as zeros.
+    source.purged = vec![store::source::Span {
+        offset: 1,
+        length: 1,
+    }];
+    source.position.prefix = Digest::of(&[b"a\0"]);
+    assert!(continues(&source, b"abc"));
+    assert!(!continues(&source, b"xbc"));
 }
 
 #[test]

@@ -11,12 +11,13 @@ use administration::node::Node;
 use key::certificate::SeatCertificate;
 use key::random::{Entropy, draw};
 use record::commitment::CommitmentKey;
-use record::digest::{Digest, Running};
+use record::digest::Digest;
 use record::event::{EventKind, Provenance};
 use record::id::{Address, WriterId};
 use redaction::Redactor;
 use redaction::account::HarnessAccountIdentifiers;
 use serde_json::{Value, json};
+use store::source::{Zeroed, prefix_digest};
 use store::{Held, IngestedRun, NewEvent, Place, Placed, Position, Source, Store};
 
 use crate::live::RunSeats;
@@ -224,7 +225,7 @@ impl Resume {
             let source = store.start_generation(&named.path, &named.directory)?;
             return Ok(Self::at(source, 0, lines, bytes, false));
         };
-        if continues(&source.position, bytes) {
+        if continues(&source, bytes) {
             let offset = source.position.offset;
             let index = lines
                 .iter()
@@ -240,7 +241,7 @@ impl Resume {
         }
         // Bytes read before another ingest moved the position past their
         // end are no rewrite: the source only grew since (REC-06).
-        if behind(&source.position, bytes, Path::new(&named.path)) {
+        if behind(&source, bytes, Path::new(&named.path)) {
             return Err(IngestError::Store(store::StoreError::PositionMoved {
                 source: source.id,
             }));
@@ -291,20 +292,20 @@ fn as_index(offset: u64) -> usize {
     usize::try_from(offset).unwrap_or(usize::MAX)
 }
 
-/// Whether `bytes` still begin with the prefix `position` consumed.
-fn continues(position: &Position, bytes: &[u8]) -> bool {
-    bytes
-        .get(..as_index(position.offset))
-        .is_some_and(|prefix| Digest::of(&[prefix]) == position.prefix)
+/// Whether `bytes` still begin with the prefix `source`'s position
+/// consumed, the bytes of each purged line zeroed (SEC-31, REC-07).
+fn continues(source: &Source, bytes: &[u8]) -> bool {
+    prefix_digest(bytes, source.position.offset, &source.purged)
+        .is_some_and(|digest| digest == source.position.prefix)
 }
 
-/// Whether `bytes`, which end before `position`, were read before another
-/// ingest moved it: the source at `path` now reads on from the prefix
-/// `position` consumed. A source that cannot be read again, or that no
-/// longer holds that prefix, was rewritten: REC-07's.
-fn behind(position: &Position, bytes: &[u8], path: &Path) -> bool {
-    bytes.len() < as_index(position.offset)
-        && read::transcript(path).is_ok_and(|now| continues(position, &now))
+/// Whether `bytes`, which end before `source`'s position, were read
+/// before another ingest moved it: the source at `path` now reads on
+/// from the prefix its position consumed. A source that cannot be read
+/// again, or that no longer holds that prefix, was rewritten: REC-07's.
+fn behind(source: &Source, bytes: &[u8], path: &Path) -> bool {
+    bytes.len() < as_index(source.position.offset)
+        && read::transcript(path).is_ok_and(|now| continues(source, &now))
 }
 
 /// The redacted lines the newest generation of the source at `path`
@@ -490,7 +491,7 @@ fn append(
     entropy: &mut dyn Entropy,
 ) -> Result<Landed, IngestError> {
     let seen = bytes.len() as u64;
-    let mut running = Running::default();
+    let mut running = Zeroed::new(&resume.source.purged);
     running.update(
         bytes
             .get(..as_index(resume.position.offset))

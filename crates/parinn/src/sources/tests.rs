@@ -20,6 +20,7 @@ fn source(path: &Path, offset: u64, seen: u64) -> Source {
             lines: 1,
             seen,
         },
+        purged: Vec::new(),
         held_since: None,
         lost: false,
         marked_at: NOW,
@@ -117,13 +118,15 @@ fn a_store_holding_no_schema_yet_has_no_sources() {
 
 /// What `parinn verify` finds of each of `files` now, by its bytes; any
 /// other path is gone.
-fn files(files: &[(&Path, &[u8])]) -> impl Fn(&Path, u64) -> Found + use<> {
+fn files(files: &[(&Path, &[u8])]) -> impl Fn(&Path, u64, &[Span]) -> Found + use<> {
     let files: Vec<(PathBuf, Vec<u8>)> = files
         .iter()
         .map(|(p, b)| (p.to_path_buf(), b.to_vec()))
         .collect();
-    move |path, offset| match files.iter().find(|(p, _)| p == path) {
-        Some((_, bytes)) => scan(bytes.as_slice(), offset).map_or(Found::Unreadable, Found::File),
+    move |path, offset, purged| match files.iter().find(|(p, _)| p == path) {
+        Some((_, bytes)) => {
+            scan(bytes.as_slice(), offset, purged).map_or(Found::Unreadable, Found::File)
+        }
         None => Found::Gone,
     }
 }
@@ -267,10 +270,10 @@ fn a_source_cut_below_its_position_or_no_longer_beginning_with_what_was_ingested
     ];
     let mut other = BODY.to_vec();
     other[0] = b'z';
-    let look = |path: &Path, offset| match path.to_str() {
+    let look = |path: &Path, offset, _: &[Span]| match path.to_str() {
         Some("/t/unread.jsonl") => Found::Unreadable,
-        Some("/t/cut.jsonl") => files(&[(cut, &BODY[..7])])(path, offset),
-        _ => files(&[(rewritten, &other)])(path, offset),
+        Some("/t/cut.jsonl") => files(&[(cut, &BODY[..7])])(path, offset, &[]),
+        _ => files(&[(rewritten, &other)])(path, offset, &[]),
     };
 
     let found = completeness(&sources, &[], &look, NOW);
@@ -291,15 +294,15 @@ fn a_source_cut_below_its_position_or_no_longer_beginning_with_what_was_ingested
 
 #[test]
 fn a_scan_hashes_only_the_consumed_prefix_and_finds_a_line_past_it() {
-    let at = scan(BODY, 10).unwrap();
+    let at = scan(BODY, 10, &[]).unwrap();
     assert_eq!(at.prefix, Some(Digest::of(&[&BODY[..10]])));
     assert!(at.unread_line);
 
-    let end = scan(BODY, 20).unwrap();
+    let end = scan(BODY, 20, &[]).unwrap();
     assert_eq!(end.prefix, Some(Digest::of(&[BODY])));
     assert!(!end.unread_line);
 
-    let short = scan(&BODY[..4], 10).unwrap();
+    let short = scan(&BODY[..4], 10, &[]).unwrap();
     assert_eq!(short.prefix, None);
     assert!(!short.unread_line);
 
@@ -307,6 +310,7 @@ fn a_scan_hashes_only_the_consumed_prefix_and_finds_a_line_past_it() {
     let past = scan(
         [long.as_slice(), b"\n"].concat().as_slice(),
         2 * CHUNK as u64 + 1,
+        &[],
     )
     .unwrap();
     assert_eq!(past.prefix, Some(Digest::of(&[&long[..2 * CHUNK + 1]])));
@@ -322,7 +326,7 @@ fn a_failing_read_fails_the_scan() {
         }
     }
 
-    assert!(scan(Failing, 1).is_err());
+    assert!(scan(Failing, 1, &[]).is_err());
 }
 
 #[test]
@@ -331,13 +335,19 @@ fn a_file_is_looked_at_by_its_bytes_and_a_missing_one_is_gone() {
     let path = dir.path().join("a.jsonl");
     std::fs::write(&path, BODY).unwrap();
 
-    match look(&path, 5) {
-        Found::File(at) => assert_eq!(at, scan(BODY, 5).unwrap()),
+    match look(&path, 5, &[]) {
+        Found::File(at) => assert_eq!(at, scan(BODY, 5, &[]).unwrap()),
         other => panic!("{other:?}"),
     }
-    assert!(matches!(look(&dir.path().join("none"), 5), Found::Gone));
-    assert!(matches!(look(dir.path(), 5), Found::Unreadable));
-    assert!(matches!(look(&path.join("below"), 5), Found::Unreadable));
+    assert!(matches!(
+        look(&dir.path().join("none"), 5, &[]),
+        Found::Gone
+    ));
+    assert!(matches!(look(dir.path(), 5, &[]), Found::Unreadable));
+    assert!(matches!(
+        look(&path.join("below"), 5, &[]),
+        Found::Unreadable
+    ));
 }
 
 #[test]
@@ -427,5 +437,5 @@ fn a_link_swapped_in_at_a_recorded_path_is_not_followed() {
     let path = dir.path().join("a.jsonl");
     std::os::unix::fs::symlink(&outside, &path).unwrap();
 
-    assert_eq!(look(&path, 5), Found::Unreadable);
+    assert_eq!(look(&path, 5, &[]), Found::Unreadable);
 }

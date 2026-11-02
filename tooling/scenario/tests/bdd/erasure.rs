@@ -1063,8 +1063,8 @@ fn no_guess_confirmed(w: &mut World) -> Result<(), String> {
             needles.push(Digest::of(&[guess]).to_hex().into_bytes());
         }
     }
-    match found_in_home(w, &needles)? {
-        Some(found) => Err(format!("a retained value confirms a guess: {found}")),
-        None => Ok(()),
+    if let Some(found) = found_in_home(w, &needles)? {
+        return Err(format!("a retained value confirms a guess: {found}"));
     }
+    crate::erasure_prefix::hash_confirms_nothing(w)
 }

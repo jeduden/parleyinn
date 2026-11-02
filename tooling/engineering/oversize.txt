@@ -14,7 +14,7 @@ crates/ingest/src/tests.rs 1475
 crates/mcp/src/tests/recall_calls.rs 1007
 crates/parinn/src/lib.rs 2196
 crates/parinn/src/tests.rs 3647
-crates/store/src/lib.rs 2123
+crates/store/src/lib.rs 2116
 crates/store/src/search_index/tests.rs 1032
 crates/store/src/tests.rs 1568
 features/lane.feature 594

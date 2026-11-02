@@ -27,6 +27,7 @@ fn place(line: u64, uuid: Option<&str>) -> Place {
     Place {
         line,
         offset: (line - 1) * 10,
+        length: 10,
         uuid: uuid.map(str::to_owned),
     }
 }

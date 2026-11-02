@@ -294,6 +294,7 @@ pub struct Store {
     /// When, in milliseconds on ingest's clock, an ingest marker this
     /// store leaves is left (ADM-09).
     marker_time: u64,
+    transcripts: Option<source::Transcripts>,
 }
 
 impl fmt::Debug for Store {
@@ -408,6 +409,7 @@ impl Store {
             payloads: Payloads::new(dir.join("payloads"), Box::new(OsDisk)),
             threshold: DEFAULT_PAYLOAD_THRESHOLD,
             marker_time: 0,
+            transcripts: None,
         })
     }
 
@@ -416,15 +418,6 @@ impl Store {
     #[must_use]
     pub fn with_payload_threshold(mut self, threshold: usize) -> Self {
         self.threshold = threshold;
-        self
-    }
-
-    /// This store, each ingest marker it leaves, as a generation starts
-    /// or a position moves, recorded as left at `ms`, in milliseconds on
-    /// ingest's clock (ADM-09). The store reads no clock itself.
-    #[must_use]
-    pub fn with_marker_time(mut self, ms: u64) -> Self {
-        self.marker_time = ms;
         self
     }
 

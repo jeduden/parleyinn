@@ -158,33 +158,148 @@ fn a_purge_erases_the_range_records_its_act_and_tombstone_and_the_record_still_v
     assert!(!shown.contains("two") && !shown.contains("three"));
 }
 
-/// A finding, raised in the threat model (T-erasure residue) and to the
-/// stakeholder: a purge leaves its transcript source's ingest position,
-/// whose prefix hash is an unkeyed SHA-256 of the transcript's bytes,
-/// erased lines among them, so it confirms a guess of those bytes; and
-/// each erased line's place, its byte offset and `uuid`. When a purge
-/// clears or keys them, this test changes with it.
-#[test]
-fn a_purge_leaves_the_prefix_hash_and_places_of_its_transcript_source() {
-    let (p, writer) = with_a_run();
+/// `LINES` with the bytes of each line in `purged` (1-based) zeroed.
+fn zeroed(text: &str, purged: &[usize]) -> Vec<u8> {
+    let mut bytes = text.as_bytes().to_vec();
+    let mut at = 0;
+    for (n, line) in text.split_inclusive('\n').enumerate() {
+        if purged.contains(&(n + 1)) {
+            bytes[at..at + line.len()].fill(0);
+        }
+        at += line.len();
+    }
 
-    let (code, _, err) = p.invoke(&["purge", "--range", &format!("{writer}:2-3")], &DEV);
+    bytes
+}
 
+fn digest(bytes: &[u8]) -> record::digest::Digest {
+    record::digest::Digest::of(&[bytes])
+}
+
+/// A process whose node ingested `LINES` from the file at the returned
+/// path, and accepted the open risks.
+fn with_a_file() -> (Process, WriterId, std::path::PathBuf) {
+    let p = Process::new();
+    let path = p.transcript(LINES);
+    let (code, _, err) = p.invoke(&["ingest", "--path", &path], &DEV);
+    assert_eq!(code, EXIT_OK, "{err}");
+    let (code, _, err) = p.invoke(&["risk-acceptance", "record"], &DEV);
+    assert_eq!(code, EXIT_OK, "{err}");
+    let writer = writer_of(&p);
+
+    (p, writer, path.into())
+}
+
+fn purge_of(p: &Process, range: &str) {
+    let (code, _, err) = p.invoke(&["purge", "--range", range], &DEV);
     assert_eq!((code, err.as_str()), (EXIT_OK, ""));
-    let (_, store) = open(&p);
+}
+
+fn only_source(p: &Process) -> (Store, store::Source) {
+    let (_, store) = open(p);
     let source = store.sources().unwrap().remove(0);
-    assert_eq!(
-        source.position.prefix,
-        record::digest::Digest::of(&[LINES.as_bytes()]),
-        "confirms a guess of every byte ingested, the erased lines' too"
-    );
-    let offsets: Vec<u64> = store
+
+    (store, source)
+}
+
+/// SEC-31, ADM-07, REC-17: a purge recomputes its transcript source's
+/// consumed-prefix hash with each purged line's bytes zeroed, so the
+/// hash confirms no guess at them; only each line's position and length
+/// remain, and the harness's file is untouched.
+#[test]
+fn a_purge_recomputes_the_prefix_hash_with_each_purged_line_zeroed() {
+    let (p, writer, path) = with_a_file();
+
+    purge_of(&p, &format!("{writer}:2-3"));
+
+    let (store, source) = only_source(&p);
+    assert_eq!(source.position.prefix, digest(&zeroed(LINES, &[2, 3])));
+    assert_ne!(source.position.prefix, digest(LINES.as_bytes()));
+    let places: Vec<(u64, u64)> = store
         .placed(source.id)
         .unwrap()
         .iter()
-        .map(|p| p.place.offset)
+        .map(|p| (p.place.offset, p.place.length))
         .collect();
-    assert_eq!(offsets, [0, 4, 8, 14], "the erased lines' lengths");
+    assert_eq!(places, [(0, 4), (4, 4), (8, 6), (14, 5)]);
+    assert_eq!(
+        source.purged,
+        [
+            store::source::Span {
+                offset: 4,
+                length: 4
+            },
+            store::source::Span {
+                offset: 8,
+                length: 6
+            }
+        ]
+    );
+    assert_eq!(std::fs::read_to_string(path).unwrap(), LINES);
+    assert_eq!(p.invoke(&["verify"], &DEV).0, EXIT_OK);
+}
+
+#[test]
+fn a_purged_source_resumes_in_its_generation_and_ingests_what_is_appended() {
+    let (p, writer, path) = with_a_file();
+    purge_of(&p, &format!("{writer}:2-3"));
+    let more = format!("{LINES}five\nsix\n");
+    std::fs::write(&path, &more).unwrap();
+
+    let (code, _, err) = p.invoke(&["ingest", "--path", path.to_str().unwrap()], &DEV);
+
+    assert_eq!((code, err.as_str()), (EXIT_OK, ""));
+    let (store, source) = only_source(&p);
+    assert_eq!(store.generations(&source.path).unwrap().len(), 1);
+    assert_eq!(source.position.lines, 6);
+    assert_eq!(source.position.prefix, digest(&zeroed(&more, &[2, 3])));
+    assert_eq!(p.invoke(&["verify"], &DEV).0, EXIT_OK);
+
+    purge_of(&p, &format!("{writer}:6-6"));
+    purge_of(&p, &format!("{writer}:1-1"));
+
+    let (_, source) = only_source(&p);
+    assert_eq!(
+        source.position.prefix,
+        digest(&zeroed(&more, &[1, 2, 3, 6]))
+    );
+    assert_eq!(source.purged.len(), 4);
+    assert_eq!(p.invoke(&["verify"], &DEV).0, EXIT_OK);
+}
+
+#[test]
+fn a_purge_of_the_last_lines_zeroes_them_to_the_end_of_the_prefix() {
+    let (p, writer, _) = with_a_file();
+
+    purge_of(&p, &format!("{writer}:4-4"));
+
+    let (_, source) = only_source(&p);
+    assert_eq!(source.position.prefix, digest(&zeroed(LINES, &[4])));
+    assert_eq!(p.invoke(&["verify"], &DEV).0, EXIT_OK);
+}
+
+#[test]
+fn a_purge_whose_transcript_is_gone_leaves_a_hash_that_confirms_nothing() {
+    let (p, writer, path) = with_a_file();
+    std::fs::remove_file(path).unwrap();
+
+    purge_of(&p, &format!("{writer}:2-3"));
+
+    let (_, source) = only_source(&p);
+    assert_eq!(source.position.prefix, store::source::unconfirmable());
+    assert_ne!(source.position.prefix, digest(LINES.as_bytes()));
+    assert_eq!(p.invoke(&["verify"], &DEV).0, EXIT_OK);
+}
+
+#[test]
+fn a_purge_whose_transcript_was_rewritten_leaves_a_hash_that_confirms_nothing() {
+    let (p, writer, path) = with_a_file();
+    std::fs::write(path, "uno\ndos\ntres\ncuatro\n").unwrap();
+
+    purge_of(&p, &format!("{writer}:2-3"));
+
+    let (_, source) = only_source(&p);
+    assert_eq!(source.position.prefix, store::source::unconfirmable());
 }
 
 #[test]

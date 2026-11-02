@@ -71,9 +71,10 @@ Open in M1 (rulings of 2 November 2026 in plan.md's list):
 - LANE-02 stays `@pending`: its scenario has the first hook bind, its row
   needs an MCP server holding the session binding (SEC-18); no ruling.
 - REC-24 in part (chain head, origin `peer`); the confirm is M7's.
-- SEC-05's ceiling, REC-22's `--path` carve-out, the purge residue's
-  zeroed prefix hash and ENG-09's split: SRS and scenarios amended,
-  code to follow.
+- SEC-05's ceiling and ENG-09's split: code to follow. Purge residue
+  closed (REC-17), `uuid` aside; SEC-31, ADM-07 stay `@pending`.
+- SEC-18 passes (`ingest_path`). REC-22 stays `@pending`: no freshness
+  mark; a resume writes `witnessed`.
 - Verify's 60 s bound (`INDEX_CHECK_SECS`): postponed by the stakeholder.
 - Open question: should the envelope item's `kind` show the provenance
   class family, as SRS 9.3's example shows `kind: tool_result` beside
@@ -92,7 +93,7 @@ Last P0 sweep (cucumber):
   (M2's own-principal join, LANE-23). It is in plan.md's table and M2's
   tasks; its other 16 steps pass.
 - REC-04 is off `@pending` and passes (cucumber). A purged event keeps
-  its `uuid`, byte offset and prefix hash: the residue finding.
+  its `uuid`, byte offset and length; its prefix hash zeroes its bytes.
 - RCL-02 is off `@pending` and passes (cucumber, 9 of 9 rows). Ruled A
   (2 November 2026): `kind` is the provenance class family (SRS 9.2).
 - Ruled: v1.0 ends before M8, so PRV-09's and PRV-02's peer rows stay in

@@ -41,6 +41,7 @@ mod engineering_soak;
 mod engineering_third_party;
 mod engineering_workflows;
 mod erasure;
+mod erasure_prefix;
 mod lane;
 mod live;
 mod memory_boundary;
