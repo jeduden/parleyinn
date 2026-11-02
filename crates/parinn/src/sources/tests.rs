@@ -355,6 +355,7 @@ fn a_path_with_control_characters_is_shown_escaped() {
     let found = Completeness {
         short: vec!["/t/a\nb.jsonl".to_owned()],
         failed: vec![("/t/c\u{1b}[2J.jsonl".to_owned(), "x")],
+        ..Completeness::default()
     };
 
     assert_eq!(
@@ -438,4 +439,125 @@ fn a_link_swapped_in_at_a_recorded_path_is_not_followed() {
     std::os::unix::fs::symlink(&outside, &path).unwrap();
 
     assert_eq!(look(&path, 5, &[]), Found::Unreadable);
+}
+
+/// [`BODY`] then a line of `len` bytes, with or without its line break.
+fn body_then_line(len: usize, ended: bool) -> Vec<u8> {
+    let mut bytes = BODY.to_vec();
+    bytes.extend(vec![b'x'; len]);
+    if ended {
+        bytes.push(b'\n');
+    }
+    bytes
+}
+
+#[test]
+fn a_scan_finds_the_line_at_the_position_past_the_4_mib_limit() {
+    let over = LINE_LIMIT + 1;
+    for ended in [true, false] {
+        let at = scan(body_then_line(over, ended).as_slice(), 20, &[]).unwrap();
+
+        assert_eq!(
+            at.refused,
+            Some(Refused {
+                offset: 20,
+                length: over as u64
+            })
+        );
+        assert_eq!(at.unread_line, ended);
+    }
+    let exact = scan(body_then_line(LINE_LIMIT, true).as_slice(), 20, &[]).unwrap();
+    assert_eq!(exact.refused, None);
+    let before = scan(body_then_line(over, true).as_slice(), 25, &[]).unwrap();
+    assert_eq!(before.refused, None);
+    let short = scan(&BODY[..4], 20, &[]).unwrap();
+    assert_eq!((short.prefix, short.refused), (None, None));
+}
+
+#[test]
+fn a_source_short_at_a_refused_line_is_reported_never_failed() {
+    let dir = TempDir::new().unwrap();
+    let path = on_disk(&dir, "run-a.jsonl", &body_then_line(LINE_LIMIT + 1, true));
+    let name = path.to_string_lossy().into_owned();
+    let mut stale = source(&path, 20, 20);
+    stale.marked_at = 0;
+
+    for (source, served) in [
+        (source(&path, 20, 20), vec![]),
+        (stale, vec![]),
+        (source(&path, 20, 20), vec![path.clone()]),
+    ] {
+        let found = completeness(&[source], &served, &look, NOW);
+
+        assert_eq!(found.failed, []);
+        assert_eq!(found.failure(), None);
+        assert_eq!(found.short, Vec::<String>::new());
+        assert_eq!(
+            found.refused,
+            [(
+                name.clone(),
+                Refused {
+                    offset: 20,
+                    length: LINE_LIMIT as u64 + 1
+                }
+            )]
+        );
+    }
+}
+
+#[test]
+fn a_source_short_at_a_refused_line_fails_once_it_no_longer_begins_with_what_was_ingested() {
+    let dir = TempDir::new().unwrap();
+    let path = on_disk(&dir, "run-a.jsonl", &body_then_line(LINE_LIMIT + 1, true));
+    let mut replaced = source(&path, 20, 20);
+    replaced.position.prefix = Digest::of(&[b"other"]);
+
+    let found = completeness(&[replaced], &[], &look, NOW);
+
+    assert_eq!(found.refused, []);
+    assert_eq!(
+        found.failed,
+        [(path.to_string_lossy().into_owned(), REPLACED)]
+    );
+}
+
+#[test]
+fn a_source_whose_limit_line_was_replaced_by_a_short_one_is_short_again() {
+    let dir = TempDir::new().unwrap();
+    let path = on_disk(&dir, "run-a.jsonl", &[BODY, b"eeee\n"].concat());
+
+    let found = completeness(&[source(&path, 20, 26)], &[], &look, NOW);
+
+    assert_eq!(found.refused, []);
+    assert_eq!(found.short, [path.to_string_lossy().into_owned()]);
+}
+
+#[test]
+fn the_report_names_the_refused_line_its_offset_and_the_counter() {
+    let found = Completeness {
+        refused: vec![(
+            "/t/run\na.jsonl".to_owned(),
+            Refused {
+                offset: 20,
+                length: 4_194_305,
+            },
+        )],
+        ..Completeness::default()
+    };
+    let both = Completeness {
+        short: vec!["/t/b.jsonl".to_owned()],
+        ..found.clone()
+    };
+
+    assert_eq!(found.failure(), None);
+    assert_eq!(
+        found.short_text(),
+        "; transcript sources short at a refused line over the 4 MiB limit, counted as \
+         `transcript_line_too_large`, which ingest refuses again until the limit is raised or \
+         the source is replaced: /t/run<U+000A>a.jsonl at offset 20 (4194305 bytes)"
+    );
+    assert!(both.short_text().starts_with(
+        "; transcript sources short of their end, which ingest resumes: /t/b.jsonl; transcript \
+         sources short at a refused line"
+    ));
 }

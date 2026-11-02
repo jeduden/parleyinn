@@ -24,10 +24,10 @@ Outcome:
   followed and a FIFO is not waited on; verify reports such a source as
   failed, unreadable (ADM-09, SEC-18, ENG-03).
 - Store schema: `transcript_sources` gained `marked_at`, no version bump.
-- parinn-eval: seeded runs in the 2.1.296 line shapes; a scripted agent
-  asks event_search then event_get. Within ten hits, 72/72 at each depth
-  (Wilson 95% from 94.9%). Within five, depth 3 falls to 87.5%. Without
-  recall, 0/216. CI's `eval` job holds `tooling/eval/recall-v1.txt`.
+- parinn-eval: seeded runs, a scripted agent asking event_search then
+  event_get. Within ten hits, 72/72 at each depth; within five, depth 3
+  falls to 87.5%; without recall, 0/216. CI's `eval` job holds
+  `tooling/eval/recall-v1.txt`.
 - S12: `crates/store/tests/s12_rebuild.rs` covers either order and
   truncated logs.
 - ENG-06: kills of purge and of rebuild. After a kill between a purge's
@@ -50,8 +50,6 @@ Raised (scenarios stay `@pending`):
 
 For the stakeholder:
 
-- Names (no domain-model agent): `parinn-eval`, `ingest_fifty_runs`,
-  `run_killed_at_terminal`.
 - Counters (domain-model agent): `verify_unfinished` became
   `verify_timed_out`, report key `unfinished_purges` `pending_purges`.
   `purge_unfinished` does not fit (`purge_failed` or `purge_timed_out`
@@ -71,16 +69,15 @@ Open in M1 (rulings of 2 November 2026 in plan.md's list):
 - LANE-02 stays `@pending`: its scenario has the first hook bind, its row
   needs an MCP server holding the session binding (SEC-18); no ruling.
 - REC-24 in part (chain head, origin `peer`); the confirm is M7's.
-- SEC-05's ceiling and ENG-09's split: code to follow. Purge residue
+- SEC-05 in part: `read::bounded` (4 MiB line, 64 MiB window, high-water),
+  `transcript_line_too_large`, verify's refused-line report (ADM-09 row
+  bound, 16 of 17). Rows 1-3 pass; row 4 (ingest refuses) and row 5
+  (windowed ingest, high-water seam) wait for reading.rs; `@pending` stays.
+  ENG-09's split: code to follow. Purge residue
   closed (REC-17), `uuid` aside; SEC-31, ADM-07 stay `@pending`.
 - SEC-18 passes (`ingest_path`). REC-22 stays `@pending`: no freshness
   mark (VIEW-04). Resume past a marker: ingest seat, `ingested`.
 - Verify's 60 s bound (`INDEX_CHECK_SECS`): postponed by the stakeholder.
-- Open question: should the envelope item's `kind` show the provenance
-  class family, as SRS 9.3's example shows `kind: tool_result` beside
-  `provenance: web`?
-- Open question: a `trust "trusted"` search returns no hit in M1, as no
-  trusted event is searchable yet.
 
 - [x] ADM-09's other rows pass with `@pending` lifted, all but the
   landmark row, M3's

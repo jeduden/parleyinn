@@ -74,6 +74,7 @@ mod security_boundary;
 mod security_envelope;
 mod security_hooks;
 mod security_keys;
+mod security_limits;
 mod security_policy;
 mod security_redaction;
 

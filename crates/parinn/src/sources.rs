@@ -8,6 +8,7 @@ use std::io::{self, Read};
 use std::path::{Path, PathBuf};
 
 use administration::home::Home;
+use ingest::read::bounded::{LINE_LIMIT, Measure, Refused};
 use record::digest::Digest;
 use serde_json::{Value, json};
 use store::source::{Span, Zeroed};
@@ -103,11 +104,14 @@ const CHUNK: usize = 64 * 1024;
 /// What `parinn verify` reads of a transcript source's file: the
 /// SHA-256 of its bytes up to the ingest position, the bytes of each
 /// purged line zeroed (SEC-31), none when it holds fewer, and whether a
-/// whole line lies past them.
+/// whole line lies past them, and the line at the position when it is
+/// past the 4 MiB limit: ingest refuses it, so the source stays short at
+/// it, recomputed here from the file, never recorded (SEC-05, I10).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct Scanned {
     pub(crate) prefix: Option<Digest>,
     pub(crate) unread_line: bool,
+    pub(crate) refused: Option<Refused>,
 }
 
 /// What `parinn verify` finds at a transcript source's path.
@@ -119,9 +123,10 @@ pub(crate) enum Found {
 }
 
 /// Reads `bytes` once: hashes the first `offset`, `purged` zeroed, then
-/// looks for a line break past them. Only the consumed prefix is hashed,
-/// a chunk at a time, so a large transcript costs one read and a chunk
-/// of memory.
+/// looks for a line break past them, counting the line's bytes to find
+/// one past the 4 MiB limit. Only the consumed prefix is hashed, a chunk
+/// at a time, and the line is counted, never held, so a large transcript
+/// costs one read and a chunk of memory.
 ///
 /// # Errors
 ///
@@ -131,6 +136,7 @@ pub(crate) fn scan(mut bytes: impl Read, offset: u64, purged: &[Span]) -> io::Re
     let mut buffer = vec![0; CHUNK];
     let mut left = offset;
     let mut unread_line = false;
+    let mut line = Measure::default();
     loop {
         let n = bytes.read(&mut buffer)?;
         if n == 0 {
@@ -139,15 +145,20 @@ pub(crate) fn scan(mut bytes: impl Read, offset: u64, purged: &[Span]) -> io::Re
         let taken = usize::try_from(left).map_or(n, |l| l.min(n));
         hash.update(&buffer[..taken]);
         left -= taken as u64;
-        if buffer[taken..n].contains(&b'\n') {
+        if line.feed(&buffer[taken..n]) {
             unread_line = true;
             break;
         }
     }
+    let refused = (left == 0 && line.over(LINE_LIMIT)).then(|| Refused {
+        offset,
+        length: line.length(),
+    });
 
     Ok(Scanned {
         prefix: (left == 0).then(|| hash.digest()),
         unread_line,
+        refused,
     })
 }
 
@@ -173,6 +184,10 @@ pub(crate) struct Completeness {
     /// server holds the session binding of each, or an ingest left its
     /// ingest marker at its position within [`MARKER_CEILING_MS`].
     pub(crate) short: Vec<String>,
+    /// Sources short at a line over the 4 MiB limit, which ingest
+    /// refused and refuses again until the limit is raised or the source
+    /// is replaced: the path and the line.
+    pub(crate) refused: Vec<(String, Refused)>,
     /// Sources short of their end that nothing will finish, or that no
     /// longer hold what was ingested from them: the path and why.
     pub(crate) failed: Vec<(String, &'static str)>,
@@ -182,6 +197,7 @@ pub(crate) struct Completeness {
 enum Outcome {
     Holds,
     Short,
+    Refused(Refused),
     Fails(&'static str),
 }
 
@@ -224,6 +240,7 @@ pub(crate) fn completeness(
         match outcome {
             Outcome::Holds => {}
             Outcome::Short => found.short.push(source.path.clone()),
+            Outcome::Refused(line) => found.refused.push((source.path.clone(), line)),
             Outcome::Fails(why) => found.failed.push((source.path.clone(), why)),
         }
     }
@@ -241,6 +258,9 @@ fn outcome(source: &Source, at: Found, served: &[PathBuf], now_ms: u64) -> Outco
     };
     if at.prefix.as_ref() != Some(&source.position.prefix) {
         return Outcome::Fails(REPLACED);
+    }
+    if let Some(line) = at.refused {
+        return Outcome::Refused(line);
     }
     if !at.unread_line {
         return Outcome::Holds;
@@ -282,13 +302,44 @@ impl Completeness {
     /// What `parinn verify` adds for sources short of their end: nothing
     /// when none is.
     pub(crate) fn short_text(&self) -> String {
-        if self.short.is_empty() {
-            return String::new();
+        let mut text = String::new();
+        if !self.short.is_empty() {
+            text = format!(
+                "; transcript sources short of their end, which ingest resumes: {}",
+                shown(&self.short)
+            );
+        }
+        if !self.refused.is_empty() {
+            text.push_str(&self.refused_text());
         }
 
+        text
+    }
+
+    /// What `parinn verify` adds for sources short at a refused line: the
+    /// source, the line's offset and length, and the counter that counts
+    /// the refusal (SEC-05, ADM-09). Not a failure: the record holds
+    /// every line before it, and ingest stays before it until the limit is
+    /// raised or the source is replaced.
+    fn refused_text(&self) -> String {
+        let each: Vec<String> = self
+            .refused
+            .iter()
+            .map(|(path, line)| {
+                format!(
+                    "{} at offset {} ({} bytes)",
+                    inline(path),
+                    line.offset,
+                    line.length
+                )
+            })
+            .collect();
+
         format!(
-            "; transcript sources short of their end, which ingest resumes: {}",
-            shown(&self.short)
+            "; transcript sources short at a refused line over the 4 MiB limit, counted as \
+             `transcript_line_too_large`, which ingest refuses again until the limit is \
+             raised or the source is replaced: {}",
+            each.join(", ")
         )
     }
 }

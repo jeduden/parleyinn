@@ -49,6 +49,7 @@ fn each_kind_and_counter_has_its_name() {
         (Counter::RedactionScanLimited, "redaction_scan_limited"),
         (Counter::HookInputTooLarge, "hook_input_too_large"),
         (Counter::HookInputTooDeep, "hook_input_too_deep"),
+        (Counter::TranscriptLineTooLarge, "transcript_line_too_large"),
         (
             Counter::PathOutsideAllowedRoots,
             "path_outside_allowed_roots",
@@ -376,4 +377,31 @@ fn a_purge_entry_never_holds_text_no_range_or_policy_could_spell() {
         e.detail,
         "purge of a key no settings key spells (purged) by principal act a key no settings key spells"
     );
+}
+
+#[test]
+fn a_refused_transcript_line_names_its_source_offset_and_length_never_its_text() {
+    let line = |source| Occurrence::TranscriptLineTooLarge {
+        source,
+        offset: 12,
+        length: 4_194_305,
+    };
+
+    let entry = Entry::next(&line("run-a"), 1, 5, Digest::ZERO).unwrap();
+    let hostile = Entry::next(&line("a b\nsecret"), 2, 5, Digest::ZERO).unwrap();
+
+    assert_eq!(entry.kind, "rejected");
+    assert_eq!(entry.counter.as_deref(), Some("transcript_line_too_large"));
+    assert_eq!(entry.operation, "ingest");
+    assert_eq!(
+        entry.detail,
+        format!("{LINE_TOO_LARGE} in run-a at offset 12, 4194305 bytes")
+    );
+    assert!(
+        entry.detail.starts_with(
+            "transcript line refused over the 4 MiB limit; ingest position stays before the line (SEC-05, REC-03)"
+        )
+    );
+    assert!(hostile.detail.contains("a key no settings key spells"));
+    assert!(!hostile.detail.contains("secret"));
 }

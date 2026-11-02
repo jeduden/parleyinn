@@ -127,12 +127,12 @@ Rulings of 2 November 2026, now in the SRS and scenarios:
 
 - **SEC-05:** lines are redacted whole; 4 MiB per line, 64 MiB of a
   source in memory, resumed at its ingest marker (REC-13). Past 4 MiB:
-  refused, audited (kind rejected; "transcript line refused over the 4 MiB
+  refused, audited (kind rejected, "transcript line refused over the 4 MiB
   limit; ingest position stays before the line (SEC-05, REC-03)"), counted
   as `transcript_line_too_large`, the source left short.
 - **ADM-09:** `parinn verify` reports a source short at a refused line
-  (source, offset, `transcript_line_too_large`), exits 0, fails no check,
-  until the line is ingested or the source replaced; the new row is to bind.
+  (offset, `transcript_line_too_large`), exits 0; bound. SEC-05 stays
+  `@pending`: ingest's windowed read and refusal follow.
 - **REC-22, SEC-18:** `parinn ingest --path` at a terminal is a widening
   principal act (`ingest_path`), allowed once resolved. SEC-18 passes;
   REC-22 in part (freshness is VIEW-04's); a resume past a marker is `ingested`.

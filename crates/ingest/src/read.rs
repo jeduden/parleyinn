@@ -7,6 +7,8 @@ use std::fs::{self, File, OpenOptions};
 use std::io::{self, Read};
 use std::path::Path;
 
+pub mod bounded;
+
 /// One line ingest may consume: its text without the newline, and the
 /// bytes it spans with the newline.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -34,6 +36,17 @@ pub fn transcript(path: &Path) -> io::Result<Vec<u8>> {
     file.read_to_end(&mut bytes)?;
 
     Ok(bytes)
+}
+
+/// The window of the transcript at `path` from byte offset `from`: whole
+/// lines within the ceilings of SEC-05, ending before a line past the
+/// line ceiling. The file is opened as [`regular_file`] opens it.
+///
+/// # Errors
+///
+/// Fails as [`regular_file`] does, or when a read does.
+pub fn transcript_window(path: &Path, from: u64) -> io::Result<bounded::Window> {
+    bounded::window(regular_file(path)?, from, bounded::Limits::default())
 }
 
 /// The regular file at `path`, opened for reading: refused unless it is
