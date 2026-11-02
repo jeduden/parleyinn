@@ -46,7 +46,7 @@ Findings for the stakeholder:
   doc directories; claims elsewhere, such as key custody, cite no
   test; a cited test is only shown to exist and not be ignored.
 - Erasure residue: a purge leaves the source's unkeyed prefix hash and
-  the erased lines' offsets (test
+  the purged lines' offsets (test
   `a_purge_leaves_the_prefix_hash_and_places_of_its_transcript_source`);
   clearing it breaks REC-07's resume.
 - Does ADM-09 list a `store` check? The served marker is forgeable by

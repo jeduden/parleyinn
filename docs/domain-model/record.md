@@ -127,18 +127,19 @@ from
   or MCP server leaves as it starts and clears as it finishes; one left behind
   is counted and audited (NFR-02), an MCP server's with each transcript it left
   short (REC-13). **Ingest** reads a transcript into the record: the MCP
-  server's **live ingest** as it grows (REC-13), or `parinn ingest` (REC-22). A
+  server's **live ingest** (REC-13), or `parinn ingest` (REC-22). A
   line a harness fork repeats is recorded once, in the writer of the run it
   belongs to; every other run that repeats it records a **repeat reference**
   to that event's address, never a copy (REC-04). The
   run it belongs to is the one no **fork observation**, a `SessionStart` hook
   observation with `source` = `fork`, names; with none, the run that first
   recorded it, as a structural **repeat owner** event in the device seat
-  records. A fork's line read before its owner's is **held** at an ingest
+  records. A fork's line read early is **held** at an ingest
   marker until its owner's transcript is ingested or gone, or 30 s pass. A
   repeated line whose `uuid` names a purged event is **refused**,
-  never recorded again, and counted (REC-04, REC-17). An
-  **ingest position** is how far ingest read a transcript source (REC-03).
+  never recorded again, counted (REC-04, REC-17). An
+  **ingest position** is how far ingest read a transcript source: its byte
+  length and the hash of those bytes, its consumed prefix (REC-03).
 - **Worktree checkpoint**: An event recording a worktree's commit, branch and
   redacted diff since the previous worktree checkpoint (REC-20).
 - **Derived artifact**: Anything computed from the record and the node's key

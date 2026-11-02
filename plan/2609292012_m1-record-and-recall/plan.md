@@ -110,38 +110,38 @@ estimator. S12: row ids from addresses, secure delete, a WAL checkpoint.
 
 ### The stakeholder's rulings of 14 October 2026
 
-The stakeholder ruled on these in the session that re-planned M1, and
-consents to them on [pull request #46][pr46]. Rulings 3 and 4 also
-changed M1's row in §12.2.
+The stakeholder ruled on these when M1 was re-planned and consents on
+[pull request #46][pr46]. Rulings 3 and 4 also changed M1's row in §12.2.
 
 1. **ENG-18:** only dependencies linked into a shipped executable count.
-2. **Key stores (SEC-10):** Keychain on macOS, a DPAPI file through one
-   Miri-checked shim on Windows, `0600` files on Linux (D-Bus is a
-   socket, I4); SEC-10 lands in part.
-3. **ADM-05:** M1 ships format version 1 and refuses a newer one; M3
-   brings `parinn migrate`.
-4. **ADM-07:** M1 ships `parinn purge --range` as a widening act; other
-   scopes, SEC-31's copies and seal rewrites are M3's.
+2. **Key stores (SEC-10):** Keychain on macOS, a DPAPI file through a
+   Miri-checked shim on Windows, `0600` files on Linux; in part.
+3. **ADM-05:** M1 ships format version 1, refusing a newer; M3 brings
+   `parinn migrate`.
+4. **ADM-07:** M1 ships `parinn purge --range` as a widening act; the
+   other scopes, SEC-31's copies and seal rewrites are M3's.
 
 ### What code must now follow
 
-Stakeholder rulings of 2 November 2026, now in the SRS and scenarios:
+Rulings of 2 November 2026, now in the SRS and scenarios:
 
-- **SEC-05:** a line is redacted whole, then stored in the payload store
-  above the threshold; 4 MiB per line, 64 MiB of a source in memory; past
-  4 MiB it is refused, audited, counted apart, the source left short.
-- **REC-22, SEC-18:** a path named on `parinn ingest --path` at the
-  terminal is a widening principal act, allowed once resolved (regular
-  file, redacted, untrusted, `ingested`); hook and transcript paths stay
-  confined.
+- **SEC-05:** lines are redacted whole; 4 MiB per line, 64 MiB of a
+  source in memory, resumed at its ingest marker (REC-13). Past 4 MiB:
+  refused, audited (kind rejected; "transcript line refused over the 4 MiB
+  limit; ingest position stays before the line (SEC-05, REC-03)"), counted
+  as `transcript_line_too_large`, the source left short.
+- **ADM-09:** `parinn verify` reports a source short at a refused line
+  (source, offset, `transcript_line_too_large`), exits 0, fails no check,
+  until the line is ingested or the source replaced; the new row is to bind.
+- **REC-22, SEC-18:** `parinn ingest --path` at a terminal is a widening
+  principal act, allowed once resolved (regular file, redacted,
+  untrusted, `ingested`); hook and transcript paths stay confined.
 - **Purge residue (SEC-31, ADM-07, REC-07, ADM-09):** the consumed-prefix
-  hash is taken with erased spans zeroed, by purge, verify and resume.
-- **ENG-09:** a PR scenario runs 50 writers and 10,000 events; the 1M
-  run stays nightly; Miri covers `platform`.
-- **REC-24:** the identity change event carries the chain head.
-- **LANE-02:** stays `@pending`. Its scenario has the first hook bind;
-  its row needs an MCP server holding the session binding (SEC-18).
-- **RCL-02:** passes (9 of 9); `kind` is the provenance class family.
+  hash zeroes the bytes of each purged transcript line, in purge, verify
+  and resume; the harness's transcript file never changes.
+- **ENG-09:** a PR runs 50 writers, 10,000 events; 1M stays nightly.
+  **REC-24:** the identity change event carries the chain head.
+  **LANE-02:** stays `@pending` (SEC-18). **RCL-02:** passes (9 of 9).
 
 ## Tasks
 

@@ -67,8 +67,8 @@ Feature: Security (SEC)
       | stdin of 1 MiB plus one byte                        | an audit entry records "hook input exceeds 1 MiB"                            |
       | a JSON object nested 65 levels deep                 | an audit entry records "hook input nesting exceeds depth 64"                 |
       | a transcript line larger than the payload threshold | the line is redacted whole, then stored in the payload store, and nothing of it is written unredacted |
-      | a transcript line of 4 MiB plus one byte            | the line is refused, an audit entry records it, a counter of its own counts it, and the source is left short at that line, resumable |
-      | a transcript source of more than 64 MiB             | ingest holds at most 64 MiB of it in memory at once and ingests every line of it across passes |
+      | a transcript line of 4 MiB plus one byte            | the line is refused, an audit entry of kind rejected records "transcript line refused over the 4 MiB limit; ingest position stays before the line (SEC-05, REC-03)", the counter `transcript_line_too_large` counts it, and the source is left short at that line, resumable |
+      | a transcript source of more than 64 MiB             | ingest holds at most 64 MiB of it in memory at once and ingests every line of it across resumes at its ingest marker (REC-13) |
 
   @SEC-06 @P0 @I2
   Scenario: recalled content cannot alter the envelope structure
@@ -239,9 +239,9 @@ Feature: Security (SEC)
       | the hook "SessionStart" input, or a transcript line the run's MCP server ingests | ~/src/app/.git/HEAD                                                                   | the file is read, and nothing in the repository is written                                                                                                            |
       | the hook "SessionStart" input, or a transcript line the run's MCP server ingests | ~/src/app/docs/key (a symlink to ~/.ssh/id_ed25519)                                   | the path is rejected, nothing is read from it, and an audit entry records "path outside allowed roots"                                                                |
       | the hook "SessionStart" input, or a transcript line the run's MCP server ingests | /tmp/elsewhere.jsonl (a regular file the person also names on "parinn ingest --path") | the path is rejected, nothing is read from it, and an audit entry records "path outside allowed roots"                                                                |
-      | the person, on "parinn ingest --path" at the controlling terminal                | /tmp/elsewhere.jsonl (a regular file)                                                 | the path is resolved and read as the person's widening principal act, its lines are redacted and untrusted with origin "ingested", and nothing is written to the file |
-      | the person, on "parinn ingest --path" at the controlling terminal                | /tmp/link.jsonl (a symlink to /tmp/elsewhere.jsonl)                                   | the path is resolved to its target and read as the person's widening principal act, its lines are redacted and untrusted with origin "ingested"                       |
-      | the person, on "parinn ingest --path" at the controlling terminal                | /tmp/dir (a directory)                                                                | the path is refused as not a regular file, nothing is read from it, and an audit entry records it                                                                     |
+      | the person, on "parinn ingest --path" at a terminal                | /tmp/elsewhere.jsonl (a regular file)                                                 | the path is resolved and read as the person's widening principal act, its lines are redacted and untrusted with origin "ingested", and nothing is written to the file |
+      | the person, on "parinn ingest --path" at a terminal                | /tmp/link.jsonl (a symlink to /tmp/elsewhere.jsonl)                                   | the path is resolved to its target and read as the person's widening principal act, its lines are redacted and untrusted with origin "ingested"                       |
+      | the person, on "parinn ingest --path" at a terminal                | /tmp/dir (a directory)                                                                | the path is refused as not a regular file, nothing is read from it, and an audit entry records it                                                                     |
 
   @SEC-19 @P0 @I4 @pending
   Scenario: every component, process and protocol sits in exactly one boundary of the register
@@ -411,7 +411,7 @@ Feature: Security (SEC)
     When the person purges the event
     Then every copy in any writer's log, found by address or commitment, is erased or tombstoned, and the backup is erased or listed
     And ingesting its transcript positions again from the harness transcript is refused with an audit entry
-    And the transcript source's consumed-prefix hash is recomputed over the prefix with each erased byte span zeroed, so it confirms no guess at the erased bytes, only each erased line's position and length remain, and "parinn ingest" resumes the source and "parinn verify" exits 0
+    And the transcript source's consumed-prefix hash is recomputed over the prefix with the bytes of each purged transcript line zeroed, so it confirms no guess at the purged bytes, only each purged line's position and length remain, only ParleyInn's own record of the source changes, never the harness's transcript file, and "parinn ingest" resumes the source and "parinn verify" exits 0
     And a signed purge receipt names the scope, the ranges, the copies erased and every known copy ParleyInn cannot erase
     And every prompt commitment whose prompt_id a purged event's line carries, matched or not, is erased with its key, and the receipt counts them
     And after a retention purge, and after a backup restore that reapplies the purge, no file in the home, decrypted, holds the purged events' canary token, their commitment keys or a search index entry naming them
