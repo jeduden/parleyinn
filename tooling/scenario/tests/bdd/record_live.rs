@@ -143,7 +143,7 @@ fn audited(
 
 /// Whether the writer `writer`'s seat is a run seat of this node and
 /// no ingest seat: one whose events are witnessed.
-fn witnessed(w: &World, writer: ::record::id::WriterId) -> Result<bool, String> {
+pub fn witnessed(w: &World, writer: ::record::id::WriterId) -> Result<bool, String> {
     let seat = store(w)?.seat(writer).map_err(|e| e.to_string())?;
     Ok(seat
         .and_then(|s| SeatCertificate::from_value(&s.certificate).ok())

@@ -603,6 +603,9 @@ fn not_attributed(w: &mut World, name: String, parent: String) -> Result<(), Str
     regex = r#"^a transcript "([^"]+)" in the transcript directory of "([^"]+)" that repeats the uuid of a line of "([^"]+)" with other text$"#
 )]
 fn planted(w: &mut World, name: String, parent: String, _same: String) -> Result<(), String> {
+    if crate::record_homes::in_homes(w) {
+        return crate::record_homes::plant(w);
+    }
     fill(w, &parent, 6)?;
     let mut copy = line(&parent, 1);
     copy["n"] = json!("other text");
@@ -613,6 +616,9 @@ fn planted(w: &mut World, name: String, parent: String, _same: String) -> Result
     regex = r#"^that line of "([^"]+)" is recorded as its own event, the counter "repeat_conflicts" increases by 1 and an audit entry records the conflict$"#
 )]
 fn conflict(w: &mut World, name: String) -> Result<(), String> {
+    if crate::record_homes::in_homes(w) {
+        return crate::record_homes::planted_conflicts(w);
+    }
     let events = placed(w, &name)?;
     let own = events.len() == 1 && events[0].kind != EventKind::RepeatReference;
     let audit = home(w)?.audit();

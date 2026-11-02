@@ -78,7 +78,7 @@ Plan close (stays 🔳): met are recall, S12 and the checks. The raised
 items moved (plan.md, §12.2). To M3: ADM-09's landmark row, ENG-06's
 migration, SEC-08's `purge --run`. To M5: SEC-12's flag row, SEC-17,
 ENG-22, ENG-23, NFR-05's target. To M7: SEC-19, ENG-29, NFR-01, the PRV
-remainders. To M8: PRV-09. Open in M1: REC-04 and RCL-02, below; rulings
+remainders. To M8: PRV-09. Open in M1: RCL-02, below; rulings
 on LANE-02, REC-24, ENG-09, the residue.
 
 - [x] ADM-09's other rows pass with `@pending` lifted, all but the
@@ -93,9 +93,8 @@ Last P0 sweep (cucumber):
 - REC-02 stays `@pending`: its last step needs restore blocks and a join
   (M2's own-principal join, LANE-23). It is in plan.md's table and M2's
   tasks; its other 16 steps pass.
-- REC-04 stays `@pending`: homes C to G and I need two live servers and
-  a clock; its last clause (a purged event's `uuid` refuses a repeated
-  line, counted, audited, kept beside the tombstone) has no code.
+- REC-04 is off `@pending` and passes (cucumber). A purged event keeps
+  its `uuid`, byte offset and prefix hash: the residue finding.
 - RCL-02 stays `@pending`: its `kind ["tool_result"]` row matches no
   event kind (SRS 9.3 shows `tool_result` as `kind`); a ruling is wanted.
 

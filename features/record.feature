@@ -50,7 +50,7 @@ Feature: Record (REC)
     Then the record contains exactly 50 events, one per line of "main-run"
     And the ingest position of "main-run" stores its byte length and the SHA-256 of its consumed prefix
 
-  @REC-04 @P0 @I1 @I10 @pending
+  @REC-04 @P0 @I1 @I10
   Scenario: events are attributed to the run of their transcript, not the hook input, and a line a harness fork repeats is recorded once, in its owning run's writer, whichever transcript is ingested first
     Given an isolated ParleyInn home
     And an agent run with a Claude Code transcript "parent-run"
