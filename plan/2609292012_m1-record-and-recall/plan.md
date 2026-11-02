@@ -135,7 +135,7 @@ Rulings of 2 November 2026, now in the SRS and scenarios:
   until the line is ingested or the source replaced; the new row is to bind.
 - **REC-22, SEC-18:** `parinn ingest --path` at a terminal is a widening
   principal act (`ingest_path`), allowed once resolved. SEC-18 passes;
-  REC-22 stays `@pending`: freshness mark, and a resume writes `witnessed`.
+  REC-22 in part (freshness is VIEW-04's); a resume past a marker is `ingested`.
 - **Purge residue (SEC-31, ADM-07, REC-07, ADM-09):** purge, verify, resume
   zero each purged line in the prefix hash (REC-17); its `uuid` stays;
   SEC-31, ADM-07 stay `@pending`.

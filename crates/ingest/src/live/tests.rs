@@ -150,6 +150,44 @@ fn a_restarted_server_goes_on_in_a_new_run_seat_from_the_ingest_marker() {
 }
 
 #[test]
+fn parinn_ingest_past_a_servers_marker_goes_to_its_own_ingest_seat_never_the_run_seat() {
+    let dir = TempDir::new().unwrap();
+    let home = home(&dir);
+    let path = main_transcript(&dir, &(1..=5).map(line).collect::<String>());
+    let stopped = ingest(&home, &path, &mut RunSeats::default(), Some(3)).unwrap();
+
+    let cli = |at: &Path| {
+        crate::ingest_with(&home, at, &redactor(), &Inputs::default(), &mut OsEntropy).unwrap()
+    };
+    let resumed = cli(&path);
+
+    assert_eq!(resumed.events, 2);
+    assert_ne!(resumed.writer, stopped.writer, "the run seat's key is gone");
+    let store = Store::open(&home.store()).unwrap();
+    let cert =
+        SeatCertificate::from_value(&store.seat(resumed.writer).unwrap().unwrap().certificate)
+            .unwrap();
+    assert!(cert.ingest_seat, "so its events are ingested");
+    assert_eq!(contents(&home, stopped.writer).len(), 3, "still witnessed");
+    let numbers: Vec<Value> = contents(&home, resumed.writer)
+        .iter()
+        .map(|c| c["line"].clone())
+        .collect();
+    assert_eq!(numbers, [json!(4), json!(5)]);
+
+    // Every later `parinn ingest` extends that ingest seat.
+    std::fs::write(&path, (1..=6).map(line).collect::<String>()).unwrap();
+    let later = cli(&path);
+    assert_eq!((later.writer, later.events), (resumed.writer, 1));
+
+    // A restarted server takes its own run seat past the marker.
+    std::fs::write(&path, (1..=7).map(line).collect::<String>()).unwrap();
+    let next = ingest(&home, &path, &mut RunSeats::default(), None).unwrap();
+    assert_eq!(next.events, 1);
+    assert!(![stopped.writer, resumed.writer].contains(&next.writer));
+}
+
+#[test]
 fn a_held_hook_observation_lands_in_the_main_run_seat_where_its_hook_fired() {
     let dir = TempDir::new().unwrap();
     let home = home(&dir);

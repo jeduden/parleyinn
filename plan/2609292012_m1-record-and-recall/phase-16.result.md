@@ -74,7 +74,7 @@ Open in M1 (rulings of 2 November 2026 in plan.md's list):
 - SEC-05's ceiling and ENG-09's split: code to follow. Purge residue
   closed (REC-17), `uuid` aside; SEC-31, ADM-07 stay `@pending`.
 - SEC-18 passes (`ingest_path`). REC-22 stays `@pending`: no freshness
-  mark; a resume writes `witnessed`.
+  mark (VIEW-04). Resume past a marker: ingest seat, `ingested`.
 - Verify's 60 s bound (`INDEX_CHECK_SECS`): postponed by the stakeholder.
 - Open question: should the envelope item's `kind` show the provenance
   class family, as SRS 9.3's example shows `kind: tool_result` beside
