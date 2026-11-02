@@ -86,7 +86,7 @@ Feature: Engineering quality (ENG)
       | envelope encoding round-trips any byte sequence                                                                                                               |
       | sanitized fields never contain restore delimiters                                                                                                             |
 
-  @ENG-09 @P0 @pending
+  @ENG-09 @P0
   Scenario: data races are excluded and the store survives a concurrency soak, in every pull request at 10000 events and nightly at 1000000
     Given an isolated ParleyInn home
     When 50 concurrent writers append 10000 events in all

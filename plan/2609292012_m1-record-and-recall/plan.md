@@ -139,7 +139,7 @@ Rulings of 2 November 2026, now in the SRS and scenarios:
 - **Purge residue (SEC-31, ADM-07, REC-07, ADM-09):** the consumed-prefix
   hash zeroes the bytes of each purged transcript line, in purge, verify
   and resume; the harness's transcript file never changes.
-- **ENG-09:** a PR runs 50 writers, 10,000 events; 1M stays nightly.
+- **ENG-09:** passes: a PR soaks 10,000 events, then verifies; 1M is nightly.
   **REC-24:** the identity change event carries the chain head.
   **LANE-02:** stays `@pending` (SEC-18). **RCL-02:** passes (9 of 9).
 
@@ -278,7 +278,7 @@ footer: |
 | 15  | ✅     | [Operations: verify, status, audit, the boundary and the threat model](phase-15.md)                                                                                                                                                                                                                                                                                                                                    |
 |     | ↳      | @ADM-11, @OPS-01 and @SEC-15 off @pending and passing; SEC-01's core row passes as gate tests. @ADM-09 passes seven rows of eight and stays @pending (landmarks, M3). @SEC-17, @SEC-19 and @ENG-22 are bound in part and stay @pending, their findings raised below.                                                                                                                                                   |
 | 16  | ✅     | [Exit: the engineering gates, the recall evaluation and the S12 rebuild test](phase-16.md)                                                                                                                                                                                                                                                                                                                             |
-|     | ↳      | @ENG-03, @ENG-07 and @ENG-11 off @pending and passing. parinn-eval recalls 216 of 216 planted values after one to three compactions within ten hits; the S12 rebuild test passes. @ENG-06, @ENG-09, @ENG-15, @ENG-23 and @ENG-29 stay @pending, each raised.                                                                                                                                                           |
+|     | ↳      | @ENG-03, @ENG-07, @ENG-09 and @ENG-11 off @pending and passing. parinn-eval recalls 216 of 216 planted values after one to three compactions within ten hits; the S12 rebuild test passes. @ENG-06, @ENG-15, @ENG-23 and @ENG-29 stay @pending, each raised.                                                                                                                                                           |
 <?/catalog?>
 
 ## Acceptance Criteria

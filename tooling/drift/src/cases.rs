@@ -149,6 +149,7 @@ pub fn cases() -> Vec<Case> {
         context::review_identity_cases(),
         ci_gates::cases(),
         file_size_cases(),
+        soak_cases(),
         // Last: its cases edit source the later cases would run stale.
         license_text_cases(),
     ]

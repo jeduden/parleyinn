@@ -618,3 +618,43 @@ pub(super) fn benchmark_cases() -> Vec<Case> {
     ]
     .concat()
 }
+
+/// ENG-09: the nightly soak runs at 1,000,000 events and CI runs Miri
+/// over the `platform` crate; the scenario also runs the soak itself.
+pub(super) fn soak_cases() -> Vec<Case> {
+    vec![
+        case(
+            "the nightly soak set to fewer events than the 1000000 claimed",
+            "ENG-09",
+            Injection::replace(
+                ".github/workflows/nightly.yml",
+                "PARINN_SOAK_EVENTS: \"1000000\"",
+                "PARINN_SOAK_EVENTS: \"100000\"",
+            ),
+            scenario("ENG-09"),
+            "does not set PARINN_SOAK_EVENTS to \"1000000\"",
+        ),
+        case(
+            "the nightly soak job no longer running the soak test",
+            "ENG-09",
+            Injection::replace(
+                ".github/workflows/nightly.yml",
+                "-p store --test soak",
+                "-p store --test s12_rebuild",
+            ),
+            scenario("ENG-09"),
+            "does not run \"cargo test -p store --test soak\"",
+        ),
+        case(
+            "CI's Miri job run over a crate other than platform",
+            "ENG-09",
+            Injection::replace(
+                ".github/workflows/ci.yml",
+                "miri test -p platform",
+                "miri test -p key",
+            ),
+            scenario("ENG-09"),
+            "does not run \"cargo miri test -p platform\"",
+        ),
+    ]
+}

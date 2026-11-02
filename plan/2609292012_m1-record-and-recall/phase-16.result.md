@@ -4,9 +4,9 @@ title: "Exit: the engineering gates, the recall evaluation and the S12 rebuild t
 status: "✅"
 result: true
 summary: >-
-  @ENG-03, @ENG-07 and @ENG-11 off @pending and passing. parinn-eval
+  @ENG-03, @ENG-07, @ENG-09 and @ENG-11 off @pending and passing. parinn-eval
   recalls 216 of 216 planted values after one to three compactions
-  within ten hits; the S12 rebuild test passes. @ENG-06, @ENG-09,
+  within ten hits; the S12 rebuild test passes. @ENG-06,
   @ENG-15, @ENG-23 and @ENG-29 stay @pending, each raised.
 ---
 # Phase 16 result
@@ -35,15 +35,14 @@ Outcome:
   unfinished purge (`pending_purges`), leaves the index unchecked and
   exits 0; the next purge, ingest or rebuild finishes it.
 - ENG-09: a soak of 50 writers; at 1M events, 4,293 of 10,000 appends
-  passed the 5 s busy deadline and were retried. It runs nightly.
+  passed the 5 s busy deadline and were retried. @ENG-09 passes (ruled
+  2 November 2026): 50 certified writers, 10,000 events, then
+  `parinn verify` exits 0; nightly runs 1M, read from `nightly.yml`.
 - Gates run: scenario gate, fmt, clippy, mdsmith, tests, coverage.
 
 Raised (scenarios stay `@pending`):
 
 - ENG-06: no migration before M3 (ruling 3).
-- ENG-09: ruled A (2 November 2026): the scenario runs 50 writers and
-  10,000 events in every PR; the 1M run stays nightly, its setting read
-  from `nightly.yml`. Stays `@pending` until code binds the steps.
 - ENG-15: NFR-01 needs the room view (M7); NFR-05's target needs the
   reference hardware.
 - ENG-23: no release and no migration yet.
