@@ -297,6 +297,7 @@ fn check_exits_ok_on_findings_and_names_a_broken_file() {
     assert_eq!(run_with(&["check", good.to_str().unwrap()]).0, EXIT_OK);
     let (code, _, err) = run_with(&["check", bad.to_str().unwrap()]);
     assert_eq!(code, EXIT_FAILURE);
+    assert!(err.contains(bad.to_str().unwrap()), "{err}");
     assert!(err.contains("malformed findings"), "{err}");
     let (code, _, err) = run_with(&["check", "/nonexistent/f"]);
     assert_eq!(code, EXIT_FAILURE);

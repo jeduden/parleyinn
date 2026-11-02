@@ -40,10 +40,10 @@ What was searched, and what is reused:
   already tracks each kept finding by identity across reviews of one
   pull request, marks it new, still open or resolved, and after three
   reviews in a row, its file unchanged, raises `stalled: needs a
-  stakeholder ruling`. The workflow never passes it `--previous`, so in
-  CI none of this runs: phase 1 keeps the file per pull request. It has
-  no input for a ruling either: phase 2 adds it. The tracking is reused
-  unchanged.
+  stakeholder ruling`. Until phase 1 the workflow never passed it
+  `--previous`, so in CI none of this ran: phase 1 keeps the file per
+  pull request. It has no input for a ruling either: phase 2 adds it.
+  The tracking is reused unchanged.
 - The finding identity
   ([identity.rs](../../tooling/review-run/src/findings/identity.rs))
   is path, sorted ids and the hash of the normalised consequence. It is

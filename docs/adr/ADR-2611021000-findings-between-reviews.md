@@ -48,7 +48,7 @@ review that marks its own blocking findings resolved (I2, I8).
 - **The step.** It runs after `review-run` is built and before the
   Claude Code OAuth token is staged, holds no such token, and the job
   gains `actions: read` and no write permission. Only a review whose
-  scrub exited 0 and whose steps all succeeded uploads its findings.
+  scrub exited 0 and whose review step succeeded uploads its findings.
 - **The sweep.** The ENG-28 check treats a step that runs `review-run`
   as an agent start. It exempts the one command `previous`, which
   returns before the command line reads an agent, and nothing longer

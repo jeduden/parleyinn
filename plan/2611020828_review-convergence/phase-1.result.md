@@ -24,8 +24,9 @@ summary: >-
 - `scripts/review-previous.sh` only fetches, through `gh`, and fails open; the
   review job gained `actions: read`, fetches before the Claude token is staged,
   passes `--previous`, scrubs `review/findings.*` and uploads them under
-  the pull request's name for 90 days, only when the review job's steps
-  all succeeded: a review that fails, a token leak included, keeps none.
+  the pull request's name for 90 days, only when the review step and the
+  scrub step succeeded: a review that fails, a token leak included,
+  keeps none.
 - The ENG-28 sweep treated `review-run previous` as an agent start,
   since it inlines scripts. It now exempts that one command, never a
   longer word or a flag (`--previous`); a test pins that.
