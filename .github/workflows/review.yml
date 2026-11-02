@@ -1,27 +1,20 @@
 name: Review
 
 # ENG-21 and ENG-28: agents review each pull request once its CI
-# passes, and the reviewer app posts the outcome. Before the agents
-# run, main's review-bundle tool reads main's tree and the pull
-# request's: it writes the review bundle of touched requirement rows,
-# scenarios and invariants the agents read first, sets the review's
-# class by what changed, dispatches the specialists and generalists the
-# change needs, and makes the findings no agent is needed for (a live
-# scenario put back on @pending, ENG-29's record). Main's review-run
-# tool then runs every dispatched specialist, then every generalist,
-# each as its own agent, and writes the review outcome from what they
-# answered: code routes the review, no agent does. A separate job, the
-# only one that holds the app's key, decides with the review-gate crate
-# what review to post: an approval only for an approving verdict with
-# no blocking finding, on the head the agents read, with CI green there.
+# passes, and the reviewer app posts the outcome. Main's review-bundle
+# tool reads main's tree and the pull request's, writes the bundle the
+# agents read first, sets the review's class and dispatches the
+# specialists and generalists the change needs; main's review-run then
+# runs each as its own agent and writes the review outcome: code routes
+# the review, no agent does. A separate job, the only one that holds the
+# app's key, decides with the review-gate crate what review to post.
 #
 # `workflow_run` and `issue_comment` both run this file as main
 # defines it, never as the pull request under review does, so no
 # branch can rewrite its own reviewer. The pull request's tree is
-# checked out beside main's as data the agent reads; nothing from it
-# runs. A comment brings a review because consent is a comment: a
-# CODEOWNERS owner's comment on a pull request whose CI passed reviews
-# it again, now that the consent is there to read.
+# checked out beside main's as data; nothing from it runs. A comment
+# brings a review because consent is a comment: a CODEOWNERS owner's
+# comment on a pull request whose CI passed reviews it again.
 on: # zizmor: ignore[dangerous-triggers] main's definition runs by design; the pull request's tree is only read
   workflow_run:
     workflows: [CI]
@@ -127,8 +120,7 @@ jobs:
           PULL: ${{ steps.pull_head.outputs.number }}
         run: scripts/review-collect-comments.sh
       # The release rust-toolchain.toml names, so the tool builds as CI
-      # tested it. It is main's tool, built from main's tree; the pull
-      # request's tree is only its input.
+      # tested it: main's tool, from main's tree; the pull request is input.
       - name: Install pinned Rust and mdsmith with mise
         if: steps.pull_head.outputs.number != ''
         uses: ./.github/actions/setup-mise
@@ -173,13 +165,7 @@ jobs:
       - name: Build review-run
         if: steps.pull_head.outputs.number != ''
         run: cargo build --locked --quiet -p review-run
-      # The findings the previous review of this pull request kept, so
-      # review-run marks each one new, still open or resolved (ENG-28).
-      # The artifact is the newest one of the pull request's name that a
-      # run of main's review workflow uploaded; one of that name from any
-      # other run is refused, as any workflow a pull request defines may
-      # upload one. This step holds the job's read-only token and not the
-      # Claude token, which is staged below.
+      # The previous review's findings: only main's review workflow's artifacts.
       - name: Fetch the previous review's findings
         id: previous
         if: steps.pull_head.outputs.number != ''
@@ -189,11 +175,10 @@ jobs:
           PULL: ${{ steps.pull_head.outputs.number }}
         run: scripts/review-previous.sh
       # The Claude token reaches no agent's environment and no file its
-      # tools can read (ENG-28). This step alone holds it, and writes it
-      # into a credentials file only its owner reads, under the runner's
-      # temporary directory, outside both trees the agents are given;
-      # review-run points each agent there and refuses it every read of
-      # that directory, of /proc, /sys and /dev, and outside its trees.
+      # tools can read (ENG-28). This step alone holds it, in a credentials
+      # file only its owner reads, under the runner's temporary directory,
+      # outside both trees the agents are given; review-run refuses each
+      # agent every read there, of /proc, /sys and /dev, and outside its trees.
       - name: Stage the Claude token where no agent reads it
         if: steps.pull_head.outputs.number != ''
         env:
@@ -201,31 +186,20 @@ jobs:
         run: |
           cargo run --locked --quiet --offline -p review-eval -- stage-credential \
             --dir "$RUNNER_TEMP/claude-credential"
-      # review-run starts each dispatched specialist, and each
-      # generalist once its own specialists ended, as `claude --agent` from
-      # main's definition of it: read tools alone, no Write and no Bash
-      # (a specialist's report is assembled from its run log), the
-      # pull request's tree added as data, each with a 900-second
-      # deadline. A specialist whose diff is past 48 KiB runs in parts,
-      # each on a part of its diff split by file, and its report is
-      # merged from theirs; a part that does not answer leaves the
-      # specialist one that did not answer (ENG-28). Each run has its
-      # tier's cost cap and the review its own (40 USD): past it
-      # review-run starts no further agent, and once more than a third
-      # of the specialists failed no generalist, naming each it kept
-      # back. It adds a table of every run to this job's summary itself.
-      # No agent gets a GitHub token, and no step that runs one holds
-      # the Claude token: review-run reads it from the staged
-      # credential only to scrub every file it writes and every line it
-      # prints of it, and a review whose agent's output held it requests
-      # changes naming the leak and fails, so nothing is posted. It writes
-      # review/outcome.json, review/consulted.json (every agent that
-      # answered), review/answers.json and review/usage.json, with each
-      # run's log under review/logs/. An exit other than 0 says it could
-      # not run, and the job fails, so nothing is posted.
-      # It runs on the stakeholder's Claude subscription, through the
-      # token `claude setup-token` prints, so a review has no per-model-token
-      # bill; it counts against the plan's usage limits instead.
+      # review-run starts each dispatched specialist, and each generalist
+      # once its own specialists ended, as `claude --agent` from main's
+      # definition of it: read tools alone, the pull request's tree added
+      # as data, each with a 900-second deadline (ENG-28; ADR-2610300031
+      # has the parts, the cost caps and the mass-failure breaker). No
+      # agent gets a GitHub token, and no step that runs one holds the
+      # Claude token: review-run reads it from the staged credential only
+      # to scrub every file it writes and line it prints, and a review
+      # whose agent's output held it requests changes and fails, so
+      # nothing is posted. It writes review/outcome.json, consulted.json,
+      # answers.json and usage.json, each run's log under review/logs/;
+      # an exit other than 0 says it could not run. It runs on the
+      # stakeholder's Claude subscription (`claude setup-token`), so a
+      # review counts against the plan's usage limits.
       - name: Review
         id: review
         if: steps.pull_head.outputs.number != ''
@@ -237,8 +211,7 @@ jobs:
             ${PREVIOUS:+--previous "$PREVIOUS"} > review/run.txt
       # Whatever review-run wrote is scrubbed of the token once more, a
       # run cut off before its own scrub included, before any step reads
-      # it into the job summary or uploads it; a form found fails the
-      # job. Only then is the staged credential removed.
+      # or uploads it; a form found fails the job. Then the credential goes.
       - name: Scrub what the review wrote of the Claude token
         id: scrub
         if: always() && steps.pull_head.outputs.number != ''
@@ -311,10 +284,7 @@ jobs:
             review/agent-runs.jsonl
             review/usage.json
           if-no-files-found: error
-      # The findings this review kept, under the pull request's own
-      # name, for its next review to fetch: kept 90 days, a review the
-      # job's steps all passed. Only a run of main's review workflow
-      # may be trusted for one (scripts/review-previous.sh).
+      # This review's findings, per pull request, for its next review.
       - name: Keep the tracked findings for the next review
         if: always() && steps.review.outcome == 'success' && steps.scrub.outputs.scrubbed == 'true'
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
