@@ -173,6 +173,34 @@ fn a_finder_returns_the_runs_read_or_none_once_its_wait_passes() {
 }
 
 #[test]
+fn a_finder_waits_out_a_read_in_progress_before_it_returns_the_runs_it_knows() {
+    let shared = Arc::new(Shared::default());
+    shared.read("toolu_1".to_owned(), "s".to_owned());
+    shared.polling.store(true, Ordering::SeqCst);
+    let finder = Finder(shared.clone());
+    let later = shared.clone();
+    let reader = std::thread::spawn(move || {
+        std::thread::sleep(Duration::from_millis(60));
+        later.read("toolu_1".to_owned(), "t".to_owned());
+        later.polling.store(false, Ordering::SeqCst);
+    });
+
+    let (runs, waited) = finder.find("toolu_1", Duration::from_secs(5));
+    drop(reader);
+    assert_eq!(runs, ["s", "t"], "the run read last is found too");
+    assert!(waited >= Duration::from_millis(50), "{waited:?}");
+
+    shared.polling.store(true, Ordering::SeqCst);
+    let (runs, waited) = finder.find("toolu_1", Duration::from_millis(30));
+    assert_eq!(
+        runs,
+        ["s", "t"],
+        "a read that outlasts the wait is not waited on"
+    );
+    assert!(waited >= Duration::from_millis(30));
+}
+
+#[test]
 fn live_ingest_takes_only_its_own_harness_process_s_binding_and_reads_its_tool_uses() {
     let f = Fixture::new();
     std::fs::write(

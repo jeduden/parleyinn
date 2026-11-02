@@ -64,6 +64,9 @@ pub(crate) struct Shared {
     tool_uses: Mutex<BTreeMap<String, BTreeSet<String>>>,
     serving: AtomicBool,
     stop: AtomicBool,
+    /// Whether a read of the transcripts is in progress: a line it
+    /// committed may not have given its tool-use id yet.
+    polling: AtomicBool,
 }
 
 impl Shared {
@@ -107,9 +110,10 @@ impl mcp::tool_call::Runs for Finder {
     fn find(&self, tool_use_id: &str, wait: Duration) -> (Vec<String>, Duration) {
         let started = Instant::now();
         loop {
+            let polling = self.0.polling.load(Ordering::SeqCst);
             let runs = self.0.runs_of(tool_use_id);
             let waited = started.elapsed();
-            if !runs.is_empty() || waited >= wait {
+            if (!runs.is_empty() && !polling) || waited >= wait {
                 return (runs, waited);
             }
             std::thread::sleep(LOOK);
@@ -329,6 +333,12 @@ impl Running {
     /// Ingests what each transcript gained, and reads the tool-use ids
     /// of the lines it read.
     fn poll(&mut self) {
+        self.capture.shared.polling.store(true, Ordering::SeqCst);
+        self.read_transcripts();
+        self.capture.shared.polling.store(false, Ordering::SeqCst);
+    }
+
+    fn read_transcripts(&mut self) {
         let transcripts = self.transcripts();
         let new = transcripts
             .iter()
