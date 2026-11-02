@@ -67,6 +67,6 @@ exempts that one command, which returns before the command line reads an
 agent, and nothing longer or flag-like (`--previous`).
 
 Gate. The lookup's unit tests at the crate's coverage floor. The ENG-28
-scenario passes with its new steps, and the drift case fails it. Once
-on main, a second review of a real pull request reports its findings
-as still open or resolved, not all new.
+scenario passes with its new steps, and the drift case fails it. The
+live check, a second review on main reporting findings as still open
+or resolved, is the first task of phase 2.

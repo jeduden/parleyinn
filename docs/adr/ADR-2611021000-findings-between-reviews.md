@@ -32,7 +32,7 @@ review that marks its own blocking findings resolved (I2, I8).
 
 - **Kept per pull request.** A review that decided uploads
   `review/findings.json` and `review/findings.md`, scrubbed of the
-  Claude token first, as `review-findings-pr-<number>`, for 90 days.
+  Claude Code OAuth token first, as `review-findings-pr-<number>`, for 90 days.
 - **Fetched by origin.** `scripts/review-previous.sh` lists every page
   of the artifacts of that name and the runs that uploaded them,
   through the job's read-only token. `review-run previous select`
@@ -46,8 +46,9 @@ review that marks its own blocking findings resolved (I2, I8).
   or says no earlier review was found, or that one did not read, so
   every finding is new (I6). A missing history never fails the review.
 - **The step.** It runs after `review-run` is built and before the
-  Claude token is staged, holds no Claude token, and the job gains
-  `actions: read` and no write permission.
+  Claude Code OAuth token is staged, holds no such token, and the job
+  gains `actions: read` and no write permission. Only a review whose
+  scrub exited 0 and whose steps all succeeded uploads its findings.
 - **The sweep.** The ENG-28 check treats a step that runs `review-run`
   as an agent start. It exempts the one command `previous`, which
   returns before the command line reads an agent, and nothing longer

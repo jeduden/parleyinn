@@ -249,3 +249,64 @@ fn a_selection_that_takes_none_of_main_s_artifacts_is_named_at_the_trigger_check
         "{problems:?}"
     );
 }
+
+#[test]
+fn the_checkout_s_check_refuses_a_file_past_the_limit_and_one_that_does_not_read() {
+    assert_eq!(
+        file_problems(&review_run::previous::check),
+        Vec::<String>::new()
+    );
+}
+
+#[test]
+fn a_check_that_takes_what_it_should_refuse_or_refuses_what_it_should_take_is_named() {
+    let takes_all = file_problems(&|_| Ok(()));
+    assert_eq!(takes_all.len(), 2, "{takes_all:?}");
+    assert!(
+        takes_all[0].contains("past the size limit"),
+        "{takes_all:?}"
+    );
+    assert!(takes_all[1].contains("that do not read"), "{takes_all:?}");
+
+    let refuses_all = file_problems(&|_| Err("no".to_owned()));
+    assert_eq!(
+        refuses_all,
+        vec!["previous check refused findings that read: no".to_owned()]
+    );
+}
+
+#[test]
+fn a_workflow_whose_findings_are_kept_after_a_leaking_scrub_is_named() {
+    let got = workflow_problems(&mutated(" && steps.scrub.outcome == 'success'", ""));
+    assert_eq!(got.len(), 1, "{got:?}");
+    assert!(
+        got[0].contains("steps.scrub.outcome == 'success'"),
+        "{got:?}"
+    );
+}
+
+#[test]
+fn a_scrub_or_an_upload_that_leaves_out_the_findings_files_is_named() {
+    let no_scrub = workflow_problems(&mutated("review-eval -- scrub", "review-eval -- stage"));
+    assert!(
+        no_scrub.iter().any(|p| p.contains("not scrubbed")),
+        "{no_scrub:?}"
+    );
+
+    let no_md = workflow_problems(&mutated("--path review/findings.md", "--path review/x.md"));
+    assert!(
+        no_md.iter().any(|p| p.contains("not scrubbed")),
+        "{no_md:?}"
+    );
+
+    let no_json = workflow_problems(&mutated(
+        "            review/findings.json\n            review/findings.md\n",
+        "            review/other.json\n            review/findings.md\n",
+    ));
+    assert!(
+        no_json
+            .iter()
+            .any(|p| p.contains("lacks \"review/findings.json\"")),
+        "{no_json:?}"
+    );
+}

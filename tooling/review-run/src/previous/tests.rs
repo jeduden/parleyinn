@@ -228,6 +228,16 @@ fn a_findings_file_that_reads_passes_and_one_that_does_not_is_named() {
 }
 
 #[test]
+fn a_findings_file_of_exactly_the_size_limit_passes() {
+    let at = format!("[{}]", " ".repeat(MAX_BYTES - 2));
+    assert_eq!(at.len(), MAX_BYTES);
+    check(&at).unwrap();
+    let past = format!("[{}]", " ".repeat(MAX_BYTES - 1));
+    assert_eq!(past.len(), MAX_BYTES + 1);
+    assert!(check(&past).unwrap_err().contains("past"));
+}
+
+#[test]
 fn the_previous_command_is_found_past_the_summary_flag() {
     assert_eq!(
         subcommand(&args(&["--summary=s", "previous", "check", "f"])),

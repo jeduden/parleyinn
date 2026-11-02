@@ -34,6 +34,7 @@ pub fn review_carries_findings(checkout: &Checkout) -> Result<Vec<String>, Strin
     };
     let mut problems = workflow_problems(&job.text);
     problems.extend(selection_problems());
+    problems.extend(file_problems(&review_run::previous::check));
 
     Ok(problems)
 }
@@ -123,7 +124,12 @@ pub fn workflow_problems(job: &str) -> Vec<String> {
             "no step uploads the tracked findings as {UPLOAD_NAME:?}, one artifact name per pull request"
         )),
         Some(step) => {
-            for needle in ["review/findings.json", "retention-days: 90", "scrubbed == 'true'"] {
+            for needle in [
+                "review/findings.json",
+                "retention-days: 90",
+                "scrubbed == 'true'",
+                "steps.scrub.outcome == 'success'",
+            ] {
                 if !step.contains(needle) {
                     problems.push(format!(
                         "the step that uploads the tracked findings lacks {needle:?}"
@@ -245,6 +251,32 @@ fn trigger_problems(select: Select) -> Vec<String> {
             other => problems.push(format!(
                 "previous select of an artifact from a {event} run, expired {expired}, gave {other:?}, want {want:?}"
             )),
+        }
+    }
+
+    problems
+}
+
+/// `previous check`, or what stands in for it: a findings file's text in,
+/// whether it reads out.
+type Check<'a> = &'a dyn Fn(&str) -> Result<(), String>;
+
+/// What is wrong with `previous check`: it must take findings that read
+/// and refuse a file past the size limit and one that does not read, each
+/// by name, never as an empty history.
+#[must_use]
+pub fn file_problems(check: Check) -> Vec<String> {
+    let mut problems = Vec::new();
+    if let Err(e) = check("[]") {
+        problems.push(format!("previous check refused findings that read: {e}"));
+    }
+    let big = format!("[{}]", " ".repeat(review_run::previous::MAX_BYTES));
+    for (what, text) in [
+        ("past the size limit", big.as_str()),
+        ("that do not read", "{"),
+    ] {
+        if check(text).is_ok() {
+            problems.push(format!("previous check took findings {what}"));
         }
     }
 
