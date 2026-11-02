@@ -305,3 +305,16 @@ fn a_purge_that_races_an_ingest_that_moved_the_position_fails_whole() {
         "{err}"
     );
 }
+
+#[test]
+fn a_store_that_cannot_mark_or_read_its_places_fails_each_step() {
+    let dir = TempDir::new().unwrap();
+    let (store, source, _) = ingested(&dir, writer(1), "a.jsonl");
+    store
+        .conn
+        .execute_batch("DROP TABLE transcript_places")
+        .unwrap();
+
+    assert!(mark(&store.conn, &range(writer(1), 1, 1)).is_err());
+    assert!(crate::source::spans(&store.conn, source.id).is_err());
+}
