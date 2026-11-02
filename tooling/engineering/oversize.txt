@@ -15,11 +15,11 @@ crates/mcp/src/tests/recall_calls.rs 1007
 crates/parinn/src/lib.rs 2196
 crates/parinn/src/tests.rs 3647
 crates/store/src/lib.rs 2123
-crates/store/src/search_index/tests.rs 1128
+crates/store/src/search_index/tests.rs 1032
 crates/store/src/tests.rs 1568
 features/lane.feature 594
 tooling/engineering/src/trusted_text.rs 1038
 tooling/scenario/tests/bdd/assumptions.rs 1297
 tooling/scenario/tests/bdd/erasure.rs 1070
-tooling/scenario/tests/bdd/recall.rs 1150
+tooling/scenario/tests/bdd/recall.rs 1062
 tooling/testkit/src/boundary/tests.rs 1015
