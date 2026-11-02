@@ -8,7 +8,7 @@ summary: >-
   review uploads them as review-findings-pr-NUMBER, the next one fetches
   the newest that a run of main's review workflow uploaded and passes it
   as --previous, and an artifact of that name from any other run is
-  refused and counted. The ENG-28 scenario step, six drift cases and
+  refused and counted. The ENG-28 scenario step, seven drift cases and
   ADR-2611021000 land with it; the live check waits for main.
 ---
 # Phase 1 handoff
@@ -30,7 +30,7 @@ summary: >-
   since it inlines scripts. It now exempts that one command, never a
   longer word or a flag (`--previous`); a test pins that.
 - ENG-28's row and scenario carry the new step, bound to
-  `engineering::review_previous`; six drift cases guard it. The three
+  `engineering::review_previous`; seven drift cases guard it. The three
   older drift cases that inject into the Review step's text follow its
   new shape. ADR-2611021000 records the decision; the existing ADR
   stays under its 300-line limit.
@@ -40,7 +40,7 @@ summary: >-
 - Cucumber scenarios `@ENG-18 @ENG-26 @ENG-27 @ENG-28 @ENG-32` pass;
   `cargo test` for `review-run`, `engineering`, `drift` and `srs`,
   and clippy on the workspace, are clean; `mdsmith check .` passes.
-- Each of the six drift cases was applied by hand and caught with its
+- Each of the seven drift cases was applied by hand and caught with its
   message. The drift suite itself did not run: it needs `taplo`, absent
   here. The fetch script ran against a stub `gh` serving a forged and a
   genuine artifact, and when its listing fails.

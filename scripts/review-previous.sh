@@ -27,7 +27,7 @@ else
   for id in $(jq -r '[.artifacts[].workflow_run.id | select(. != null)] | unique | .[]' \
     "$dir/artifacts.json"); do
     gh api "repos/$REPO/actions/runs/$id" --jq '{id, path, event}' \
-      || echo "::warning::run $id of an earlier review's findings could not be read; its artifact is refused"
+      || echo "::warning::run $id of an earlier review's findings could not be read; its artifact is refused" >&2
   done | jq -s . > "$dir/runs.json"
   if picked=$(cargo run --locked --quiet --offline -p review-run -- previous select \
     --pull "$PULL" --artifacts "$dir/artifacts.json" --runs "$dir/runs.json"); then

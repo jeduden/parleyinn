@@ -55,6 +55,51 @@ fn steps(text: &str) -> Vec<&str> {
         .collect()
 }
 
+/// What is wrong with the `step` that fetches the previous findings: it
+/// must check the file it fetched, look for the pull request's own name,
+/// cut the unzipped file at the size cap, say in the job summary what it
+/// carried, and keep its warnings out of the runs' lines for `jq`.
+fn fetch_problems(step: &str) -> Vec<String> {
+    let mut problems = Vec::new();
+    for (needle, why) in [
+        (
+            "previous check",
+            "checks the file it fetched with review-run previous check",
+        ),
+        (
+            "review-findings-pr-",
+            "looks for the artifact of the pull request's own name",
+        ),
+        (
+            "head -c 1048577",
+            "cuts the unzipped file one byte past the size cap",
+        ),
+        (
+            "GITHUB_STEP_SUMMARY",
+            "says in the job summary which earlier review it carried",
+        ),
+    ] {
+        if !step.contains(needle) {
+            problems.push(format!(
+                "the step that fetches the previous findings does not read it: it never {why}"
+            ));
+        }
+    }
+    // The runs' lines go to `jq -s`: a warning among them on stdout
+    // is no JSON, and ends the step before it says anything.
+    if step
+        .lines()
+        .any(|l| l.contains("::warning::") && !l.contains(">&2"))
+    {
+        problems.push(
+            "a warning of the step that fetches the previous findings goes to stdout, into jq"
+                .to_owned(),
+        );
+    }
+
+    problems
+}
+
 /// What is wrong with the review job's text `job`, the scripts its steps
 /// run inlined.
 #[must_use]
@@ -73,29 +118,7 @@ pub fn workflow_problems(job: &str) -> Vec<String> {
                 .to_owned(),
         ),
         Some(fetch) => {
-            let step = steps[fetch];
-            for (needle, why) in [
-                (
-                    "previous check",
-                    "checks the file it fetched with review-run previous check",
-                ),
-                (
-                    "review-findings-pr-",
-                    "looks for the artifact of the pull request's own name",
-                ),
-                (
-                    "head -c 1048577",
-                    "cuts the unzipped file one byte past the size cap",
-                ),
-                (
-                    "GITHUB_STEP_SUMMARY",
-                    "says in the job summary which earlier review it carried",
-                ),
-            ] {
-                if !step.contains(needle) {
-                    problems.push(format!("the step that fetches the previous findings does not read it: it never {why}"));
-                }
-            }
+            problems.extend(fetch_problems(steps[fetch]));
             if at("stage-credential").is_some_and(|stage| stage < fetch) {
                 problems.push(
                     "the previous findings are fetched after the Claude token is staged".to_owned(),

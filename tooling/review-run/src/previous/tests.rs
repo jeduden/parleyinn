@@ -367,3 +367,16 @@ fn an_artifact_with_no_time_is_read_and_ranks_last() {
     let r = runs(&[(50, REVIEW, "workflow_run"), (40, REVIEW, "workflow_run")]);
     assert_eq!(select("7", a, &r).unwrap().artifact, Some(4));
 }
+
+#[test]
+fn an_artifact_from_an_issue_comment_run_is_taken_when_it_alone_qualifies() {
+    let a = listing(&[artifact(7, NAME, "2026-11-01T10:00:00Z", 70, false)]);
+    let r = runs(&[(70, REVIEW, "issue_comment")]);
+    assert_eq!(
+        select("7", &a, &r).unwrap(),
+        Selection {
+            artifact: Some(7),
+            skipped: 0
+        }
+    );
+}

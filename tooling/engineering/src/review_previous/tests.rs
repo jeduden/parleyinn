@@ -310,3 +310,14 @@ fn a_scrub_or_an_upload_that_leaves_out_the_findings_files_is_named() {
         "{no_json:?}"
     );
 }
+
+#[test]
+fn a_warning_that_goes_into_the_runs_for_jq_is_named() {
+    let got = workflow_problems(&mutated(
+        "its artifact is refused\" >&2",
+        "its artifact is refused\"",
+    ));
+
+    assert_eq!(got.len(), 1, "{got:?}");
+    assert!(got[0].contains("stdout, into jq"), "{got:?}");
+}

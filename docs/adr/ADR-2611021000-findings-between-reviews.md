@@ -67,7 +67,7 @@ review that marks its own blocking findings resolved (I2, I8).
 
 ## Consequences
 
-- ENG-28 asks for it, with its scenario step and six drift cases.
+- ENG-28 asks for it, with its scenario step and seven drift cases.
 - A pull request open past 90 days loses its history; the next review
   says so and counts every finding new.
 - Rulings (a stakeholder settling a tracked finding) build on this and

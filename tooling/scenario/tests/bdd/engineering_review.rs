@@ -155,7 +155,7 @@ fn review_run_names_rulings(w: &mut World) -> Result<(), String> {
 }
 
 #[then(
-    regex = r"^review-run carries the findings of the previous review of a pull request from the newest artifact under the pull request's own name that a run of main's review workflow uploaded, refuses and counts an artifact of that name from any other run, names a findings file past 1 MiB or one that does not read, and the review job fetches them before the Claude Code OAuth token is staged, passes them as --previous, scrubs and keeps the findings it kept for the next review$"
+    regex = r"^review-run carries the findings of the previous review of a pull request from the newest artifact under the pull request's own name that a run of main's review workflow uploaded, refuses and counts an artifact of that name from any other run, names a findings file past 1 MiB or one that does not read, and the review job fetches them before the Claude Code OAuth token is staged, passes them as --previous, scrubs the findings it kept and keeps them for 90 days for the next review, and says in the job summary which earlier review it carried or that it found none$"
 )]
 fn review_carries_findings(w: &mut World) -> Result<(), String> {
     outcome(engineering::review_previous::review_carries_findings(
