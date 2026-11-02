@@ -162,3 +162,17 @@ fn an_upload_that_is_not_per_pull_request_or_kept_short_is_named() {
 fn the_checkout_s_selection_trusts_main_s_review_workflow_alone() {
     assert_eq!(selection_problems(), Vec::<String>::new());
 }
+
+#[test]
+fn a_fetch_without_the_size_cap_or_the_summary_line_is_named() {
+    let uncapped = workflow_problems(&mutated("head -c 1048577", "head -c 99"));
+    assert_eq!(uncapped.len(), 1, "{uncapped:?}");
+    assert!(uncapped[0].contains("size cap"), "{uncapped:?}");
+
+    let silent = workflow_problems(&mutated(
+        "echo \"$note\" >> \"$GITHUB_STEP_SUMMARY\"",
+        "echo \"$note\" >> /dev/null",
+    ));
+    assert_eq!(silent.len(), 1, "{silent:?}");
+    assert!(silent[0].contains("job summary"), "{silent:?}");
+}

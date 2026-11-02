@@ -30,8 +30,9 @@ Storage. GitHub keeps artifacts per run, not per pull request. Each
 review uploads `review/findings.json` and `review/findings.md` as
 `review-findings-pr-<number>`, with `retention-days: 90`. The next
 review lists artifacts by that name, newest first. It takes the first
-one whose run is `.github/workflows/review.yml` on the default branch,
-started by `workflow_run`. It downloads it with `actions:read` alone.
+one whose run is `.github/workflows/review.yml`, started by
+`workflow_run` or `issue_comment`, the two triggers that run main's
+definition. It downloads it with `actions:read` alone.
 Anyone can upload an artifact of that name from a workflow the pull
 request defines. An artifact from any other run is skipped and counted
 (I6), never read. `actions/cache` is not used: entries are evicted
@@ -40,7 +41,8 @@ after a week unused, and the review's jobs restore no caches.
 RED. Write tests for each of these, in order:
 
 - The lookup picks the newest artifact of the pull request's name whose
-  run is main's review workflow, started by `workflow_run`.
+  run is main's review workflow, started by `workflow_run` or
+  `issue_comment`.
 - It skips an artifact of that name from another workflow, from a run
   of the pull request's own definition, or from another event, and
   counts each one skipped.

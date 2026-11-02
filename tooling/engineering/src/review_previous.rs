@@ -80,6 +80,14 @@ pub fn workflow_problems(job: &str) -> Vec<String> {
                     "review-findings-pr-",
                     "looks for the artifact of the pull request's own name",
                 ),
+                (
+                    "head -c 1048577",
+                    "cuts the unzipped file one byte past the size cap",
+                ),
+                (
+                    "GITHUB_STEP_SUMMARY",
+                    "says in the job summary which earlier review it carried",
+                ),
             ] {
                 if !step.contains(needle) {
                     problems.push(format!("the step that fetches the previous findings does not read it: it never {why}"));
@@ -184,6 +192,7 @@ pub fn selection_problems() -> Vec<String> {
             "previous select took or missed an artifact whose run is unknown: {other:?}, want none with 1 refused"
         )),
     }
+    problems.extend(trigger_problems());
     let forged = format!(
         "[{},{},{}]",
         run(30, ".github/workflows/ci.yml", "workflow_run"),
@@ -198,6 +207,38 @@ pub fn selection_problems() -> Vec<String> {
         other => problems.push(format!(
             "previous select with no artifact from main's review workflow gave {other:?}, not none with 3 refused"
         )),
+    }
+
+    problems
+}
+
+/// What is wrong with `previous select` for one artifact: each trigger
+/// that runs main's definition is trusted, and an expired artifact is
+/// taken from no one.
+fn trigger_problems() -> Vec<String> {
+    use review_run::previous::select;
+
+    let run = |event: &str| {
+        format!(r#"[{{"id":40,"path":".github/workflows/review.yml","event":"{event}"}}]"#)
+    };
+    let mut problems = Vec::new();
+    let one = |event: &str, expired: bool| {
+        let listing = format!(
+            r#"{{"artifacts":[{{"id":4,"name":"review-findings-pr-7","expired":{expired},"created_at":"2026-11-01T12:00:00Z","workflow_run":{{"id":40}}}}]}}"#
+        );
+        select("7", &listing, &run(event))
+    };
+    for (event, expired, want) in [
+        ("issue_comment", false, Some(4)),
+        ("workflow_run", false, Some(4)),
+        ("workflow_run", true, None),
+    ] {
+        match one(event, expired) {
+            Ok(got) if got.artifact == want => {}
+            other => problems.push(format!(
+                "previous select of an artifact from a {event} run, expired {expired}, gave {other:?}, want {want:?}"
+            )),
+        }
     }
 
     problems
