@@ -27,6 +27,7 @@ use serde_json::{Value, json};
 use store::{Store, Stored};
 
 use crate::World;
+use crate::live::wait_until;
 use crate::record::{home, last_run, run_core};
 use crate::record_live::harness;
 use crate::security_redaction::{append, transcript};
@@ -480,6 +481,12 @@ fn stored_unparsed_and_drift(w: &mut World) -> Result<(), String> {
             stored.link.header.provenance.name()
         ));
     }
+    // The counters are audited as the event commits, so the audit log
+    // may trail the event a moment: wait for the drift counter, bounded.
+    wait_until("the audit log to count the format drift", || {
+        Ok(risen(w, "format_drift")? >= 1)
+    })
+    .ok();
     match (risen(w, "format_drift")?, risen(w, "events_unparsed")?) {
         (1, 1) => Ok(()),
         (drift, unparsed) => Err(format!(
