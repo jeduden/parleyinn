@@ -289,6 +289,136 @@ fn a_store_from_before_purged_copies_still_reads_its_sources() {
 }
 
 #[test]
+fn no_refused_copy_moves_a_legacy_source_without_making_the_copies_table() {
+    let dir = TempDir::new().unwrap();
+    let mut store = open(&dir);
+    let source = store.start_generation("/t/a.jsonl", "/t").unwrap();
+    store
+        .conn
+        .execute_batch(
+            "DROP INDEX transcript_purged_copies_uuid;
+             DROP TABLE transcript_purged_copies;",
+        )
+        .unwrap();
+
+    store
+        .advance_refusing(source.id, &position(10, 1), &[])
+        .unwrap();
+
+    assert_eq!(
+        store.source("/t/a.jsonl").unwrap().unwrap().position,
+        position(10, 1)
+    );
+    let copies: bool = store
+        .conn
+        .query_row(
+            "SELECT count(*) FROM sqlite_master WHERE name = 'transcript_purged_copies'",
+            [],
+            |row| row.get(0),
+        )
+        .unwrap();
+    assert!(!copies);
+}
+
+#[test]
+fn a_refused_copy_behind_a_position_another_ingest_moved_is_refused_whole() {
+    let dir = TempDir::new().unwrap();
+    let mut store = open(&dir);
+    let source = store.start_generation("/t/a.jsonl", "/t").unwrap();
+    store.advance(source.id, &position(10, 1)).unwrap();
+
+    let err = store
+        .advance_refusing(source.id, &position(20, 2), &[place(1, Some("u1"))])
+        .unwrap_err();
+
+    assert!(
+        matches!(err, StoreError::PositionMoved { source: id } if id == source.id),
+        "{err}"
+    );
+    assert_eq!(
+        store.source("/t/a.jsonl").unwrap().unwrap().position,
+        position(10, 1)
+    );
+}
+
+#[test]
+fn malformed_purged_copy_tables_fail_without_moving_the_source() {
+    for table in [
+        "CREATE TABLE transcript_purged_copies (
+             source INTEGER PRIMARY KEY
+         ) STRICT, WITHOUT ROWID;",
+        "CREATE TABLE transcript_purged_copies (
+             source INTEGER NOT NULL,
+             line INTEGER NOT NULL,
+             uuid TEXT NOT NULL,
+             PRIMARY KEY (source, line)
+         ) STRICT, WITHOUT ROWID;",
+    ] {
+        let dir = TempDir::new().unwrap();
+        let mut store = open(&dir);
+        let source = store.start_generation("/t/a.jsonl", "/t").unwrap();
+        store
+            .conn
+            .execute_batch(
+                "DROP INDEX transcript_purged_copies_uuid;
+                 DROP TABLE transcript_purged_copies;",
+            )
+            .unwrap();
+        store.conn.execute_batch(table).unwrap();
+
+        assert!(
+            store
+                .advance_refusing(source.id, &position(10, 1), &[place(1, Some("u1"))])
+                .is_err()
+        );
+        assert_eq!(offset(&store.conn, source.id).unwrap(), 0);
+    }
+}
+
+#[test]
+fn a_refused_copy_that_cannot_be_inserted_fails_without_moving_the_source() {
+    let dir = TempDir::new().unwrap();
+    let mut store = open(&dir);
+    let source = store.start_generation("/t/a.jsonl", "/t").unwrap();
+    store
+        .conn
+        .execute_batch(
+            "CREATE TRIGGER refuse_copy BEFORE INSERT ON transcript_purged_copies
+             BEGIN SELECT RAISE(FAIL, 'refused'); END;",
+        )
+        .unwrap();
+
+    assert!(
+        store
+            .advance_refusing(source.id, &position(10, 1), &[place(1, Some("u1"))])
+            .is_err()
+    );
+    assert_eq!(offset(&store.conn, source.id).unwrap(), 0);
+}
+
+#[test]
+fn a_purged_copy_table_without_spans_makes_a_source_unreadable() {
+    let dir = TempDir::new().unwrap();
+    let mut store = open(&dir);
+    store.start_generation("/t/a.jsonl", "/t").unwrap();
+    store
+        .conn
+        .execute_batch(
+            "DROP INDEX transcript_purged_copies_uuid;
+             DROP TABLE transcript_purged_copies;
+             CREATE TABLE transcript_purged_copies (
+                 source INTEGER NOT NULL,
+                 line INTEGER NOT NULL,
+                 uuid TEXT NOT NULL,
+                 PRIMARY KEY (source, line)
+             ) STRICT, WITHOUT ROWID;",
+        )
+        .unwrap();
+
+    assert!(store.source("/t/a.jsonl").is_err());
+}
+
+#[test]
 fn advance_hold_and_lose_change_only_the_state() {
     let dir = TempDir::new().unwrap();
     let mut store = open(&dir);
