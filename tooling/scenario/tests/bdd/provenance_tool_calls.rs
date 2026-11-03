@@ -17,7 +17,7 @@ use serde_json::{Value, json};
 
 use crate::World;
 use crate::live::{lines_read, wait_until};
-use crate::record::home;
+use crate::record::{home, last_run, run_core};
 use crate::record_hooks::counted;
 use crate::record_live::{harness, live, make_run, named, reply_text, serve};
 use crate::record_transcript::recorded_call;
@@ -301,6 +301,40 @@ fn refused(w: &mut World, counter: String) -> Result<(), String> {
         1 => Ok(()),
         n => Err(format!("{counter} increased by {n}")),
     }
+}
+
+#[then(
+    regex = r#"^\"parinn status\" shows (no tool-call refusal|the counter \"[a-z_]+\" increased by 1)$"#
+)]
+fn status_shows_refusals(w: &mut World, shown: String) -> Result<(), String> {
+    run_core(w, &["status", "--json"], None)?;
+    let output = last_run(w)?;
+    let status: Value = serde_json::from_slice(&output.stdout).map_err(|e| {
+        format!(
+            "parinn status --json printed no JSON: {e}: {}",
+            String::from_utf8_lossy(&output.stdout)
+        )
+    })?;
+    let named = shown
+        .strip_prefix("the counter \"")
+        .and_then(|rest| rest.strip_suffix("\" increased by 1"));
+    for counter in REFUSALS {
+        let before = steps(w)
+            .before
+            .iter()
+            .find(|(name, _)| name == counter)
+            .map_or(0, |(_, count)| *count);
+        let expected = before + usize::from(named == Some(counter));
+        let got = status["counters"][counter]["total"]
+            .as_u64()
+            .unwrap_or_default() as usize;
+        if got != expected {
+            return Err(format!(
+                "parinn status shows {counter} as {got}, not {expected}: {status}"
+            ));
+        }
+    }
+    Ok(())
 }
 
 #[then(

@@ -34,6 +34,7 @@ Feature: Recall (RCL)
       | query "deploy", k 50                 | 50   |
       | query "deploy", k 500                | 50   |
       | query "deploy", scope "rooms"        | 10   |
+      | query "deploy", run "mixed-provenance" | 10   |
       | query "deploy", provenance ["web"]   | 10   |
       | query "deploy", kind ["tool_result"] | 10   |
       | query "deploy", trust "trusted"      | 10   |

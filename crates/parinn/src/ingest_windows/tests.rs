@@ -1,3 +1,5 @@
+use record::id::Seq;
+use store::{Erase, Store};
 use testkit::TempDir;
 
 use super::*;
@@ -29,11 +31,11 @@ fn a_source_over_64_mib_is_read_window_by_window_until_it_is_caught_up() {
         &ingest::Inputs::default(),
     );
 
-    assert_eq!(error, None);
+    assert!(error.is_none());
     let events: Vec<usize> = reports.iter().map(|r| r.events).collect();
     assert!(events.len() > 1, "the source is read in bounded windows");
     assert_eq!(events.iter().sum::<usize>(), 65);
-    assert!(reports[0].resumable && !reports[1].resumable);
+    assert!(reports[0].resumable && !reports.last().unwrap().resumable);
     assert!(reports.iter().all(|r| r.read_window_high_water <= 64 << 20));
 }
 
@@ -59,7 +61,7 @@ fn a_refused_line_stops_the_reads_at_the_one_report_that_names_it() {
         &ingest::Inputs::default(),
     );
 
-    assert_eq!(error, None);
+    assert!(error.is_none());
     assert_eq!(reports.len(), 1);
     assert_eq!(reports[0].too_large.map(|r| r.offset), Some(100));
     assert_eq!(reports[0].events, 1);
@@ -77,7 +79,7 @@ fn a_source_that_cannot_be_read_is_the_error_of_its_reads() {
     );
 
     assert!(reports.is_empty());
-    assert!(error.unwrap().contains("read the transcript"));
+    assert!(error.unwrap().message.contains("read the transcript"));
 }
 
 #[test]
@@ -93,5 +95,49 @@ fn a_redactor_that_could_not_be_made_is_the_error_of_every_source() {
     );
 
     assert!(reports.is_empty());
-    assert_eq!(error.as_deref(), Some("bad pattern"));
+    assert_eq!(error.unwrap().message, "bad pattern");
+}
+
+#[test]
+fn a_refused_only_window_resumes_to_valid_later_lines() {
+    let dir = TempDir::new().unwrap();
+    let home = home(&dir);
+    let parent = dir.path().join("parent.jsonl");
+    let fork = dir.path().join("fork.jsonl");
+    let repeated: String = (1..=20_000)
+        .map(|n| format!("{{\"uuid\":\"u{n}\",\"sessionId\":\"parent\"}}\n"))
+        .collect();
+    std::fs::write(&parent, &repeated).unwrap();
+    let (owners, failed) = ingest(&home, &parent, &Ok(redactor()), &ingest::Inputs::default());
+    assert!(failed.is_none());
+    let writer = owners[0].writer;
+    let mut store = Store::open(&home.store()).unwrap();
+    let device = administration::node::Node::find(&home, &store)
+        .unwrap()
+        .device_writer();
+    store
+        .purge(
+            device,
+            &[],
+            &[Erase {
+                writer,
+                first: Seq::FIRST,
+                last: Seq::new(20_000).unwrap(),
+            }],
+        )
+        .unwrap();
+    std::fs::write(
+        &fork,
+        format!("{repeated}{{\"uuid\":\"valid\",\"sessionId\":\"fork\"}}\n"),
+    )
+    .unwrap();
+
+    let (reports, failed) = ingest(&home, &fork, &Ok(redactor()), &ingest::Inputs::default());
+
+    assert!(failed.is_none());
+    assert!(reports.len() > 1);
+    assert_eq!(reports[0].events, 0);
+    assert!(reports[0].refused > 0 && reports[0].resumable);
+    assert_eq!(reports.iter().map(|r| r.refused).sum::<usize>(), 20_000);
+    assert_eq!(reports.iter().map(|r| r.events).sum::<usize>(), 1);
 }

@@ -171,6 +171,9 @@ pub enum IngestError {
     /// Harness account identifiers would take the source over its
     /// in-memory ceiling.
     IdentifierLimit(PathBuf),
+    /// A transcript line's parsed structure would take the source over
+    /// its in-memory ceiling.
+    SourceMemoryLimit(PathBuf),
     /// The random source failed.
     Key(KeyError),
     /// The home or the node failed.
@@ -205,6 +208,11 @@ impl fmt::Display for IngestError {
                 "the transcript {} names too many harness account identifiers",
                 path.display()
             ),
+            Self::SourceMemoryLimit(path) => write!(
+                f,
+                "the transcript {} has a line whose parsed structure exceeds the source-memory ceiling",
+                path.display()
+            ),
             Self::Key(e) => write!(f, "{e}"),
             Self::Admin(e) => write!(f, "{e}"),
             Self::Store(e) => write!(f, "{e}"),
@@ -229,7 +237,10 @@ impl std::error::Error for IngestError {
             Self::Key(e) => Some(e),
             Self::Admin(e) => Some(e),
             Self::Store(e) | Self::Partial { source: e, .. } => Some(e),
-            Self::NotUtf8(_) | Self::Empty(_) | Self::IdentifierLimit(_) => None,
+            Self::NotUtf8(_)
+            | Self::Empty(_)
+            | Self::IdentifierLimit(_)
+            | Self::SourceMemoryLimit(_) => None,
         }
     }
 }

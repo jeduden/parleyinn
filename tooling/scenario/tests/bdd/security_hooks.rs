@@ -21,6 +21,7 @@ use serde_json::json;
 use crate::World;
 use crate::administration::configure;
 use crate::live::{Harness, lines_read, source_key, store, wait_until};
+use crate::provenance::typed;
 use crate::record::{home, last_run, run_core, run_core_at_terminal};
 use crate::record_hooks::{SESSION, answered_empty, session_start};
 use crate::record_live::taken_bindings;
@@ -53,6 +54,8 @@ pub struct PathSteps {
     cwd: Option<PathBuf>,
     path: Option<PathBuf>,
     by_person: bool,
+    by_configuration: bool,
+    configuration_transcript: Option<PathBuf>,
     /// The bytes of the file the path resolves to, before it was named.
     before: Option<Vec<u8>>,
     /// Every file of the repository, with its bytes, before it was named.
@@ -134,23 +137,57 @@ fn fixture(w: &mut World, shown: &str) -> Result<PathBuf, String> {
 }
 
 #[when(
-    regex = r#"^(the hook "SessionStart" input, or a transcript line the run's MCP server ingests|the person, on "parinn ingest --path" at a terminal) names the path "(.+)"$"#
+    regex = r#"^(the hook "SessionStart" input|a transcript line the run's MCP server ingests|the accepted configuration setting "transcript.roots"|the person, on "parinn ingest --path" at a terminal) names the path "(.+)"$"#
 )]
 fn names_the_path(w: &mut World, by: String, shown: String) -> Result<(), String> {
     let path = fixture(w, &shown)?;
     let by_person = by.starts_with("the person");
+    let by_transcript = by.starts_with("a transcript line");
+    let by_configuration = by.starts_with("the accepted configuration");
     let target = fs::canonicalize(&path).ok();
     let before = target.as_ref().and_then(|t| fs::read(t).ok());
     let steps = paths(w);
     steps.path = Some(path.clone());
     steps.by_person = by_person;
+    steps.by_configuration = by_configuration;
     steps.before = before;
     let shown = path.display().to_string();
     if by_person {
         return run_core_at_terminal(w, &["ingest", "--path", &shown]);
     }
     let cwd = paths(w).cwd.clone().ok_or("no step named the run's cwd")?;
+    if by_configuration {
+        let target = fs::canonicalize(&path).map_err(|e| e.to_string())?;
+        let transcript = target.join("configuration-source.jsonl");
+        write_transcript(&transcript)?;
+        paths(w).configuration_transcript = Some(transcript);
+        configure(w, &format!("[transcript]\nroots = [{shown:?}]\n"))?;
+        run_core_at_terminal(w, &["configuration", "accept"])?;
+        return run_core(w, &["ingest", "--all"], None);
+    }
+    if by_transcript {
+        return transcript_names(w, &shown, &cwd);
+    }
     hook_names(w, &shown, &cwd)
+}
+
+/// Starts a run from a transcript inside the configured root whose line
+/// names `path` in its harness `cwd` field. The line, rather than the
+/// `SessionStart` hook input, is the path's source.
+fn transcript_names(w: &mut World, path: &str, cwd: &Path) -> Result<(), String> {
+    let transcript = w
+        .home
+        .join(".claude")
+        .join("projects")
+        .join("path-from-line.jsonl");
+    let mut line = typed()?;
+    line["cwd"] = json!(path);
+    line["sessionId"] = json!(SESSION);
+    fs::write(&transcript, format!("{line}\n")).map_err(|e| e.to_string())?;
+    hook_names(w, &transcript.display().to_string(), cwd)?;
+    wait_until("the MCP server to ingest the transcript line", || {
+        Ok(lines_read(w, &transcript)? >= 1)
+    })
 }
 
 /// Runs the `SessionStart` hook handler of a new harness, its input
@@ -252,6 +289,37 @@ fn read_not_written(w: &mut World) -> Result<(), String> {
         return Ok(());
     }
     Err("a file of the repository changed, or appeared".to_owned())
+}
+
+#[then(
+    regex = r"^the configured transcript root is resolved to its target before its JSONL files are read$"
+)]
+fn configured_root_is_resolved(w: &mut World) -> Result<(), String> {
+    if !paths(w).by_configuration {
+        return Err("the path did not come from configuration".to_owned());
+    }
+    let output = last_run(w)?;
+    if !output.status.success() {
+        return Err(format!(
+            "parinn ingest --all exited {}: {}",
+            output.status,
+            String::from_utf8_lossy(&output.stderr).trim()
+        ));
+    }
+    let transcript = paths(w)
+        .configuration_transcript
+        .clone()
+        .ok_or("no configured transcript was written")?;
+    let source = store(w)?
+        .source(&source_key(&transcript))
+        .map_err(|e| e.to_string())?;
+    if source.is_some() {
+        return Ok(());
+    }
+    Err(format!(
+        "no source was recorded for the configured transcript {}",
+        transcript.display()
+    ))
 }
 
 /// Fails unless a widening principal act names the resolved `target`.

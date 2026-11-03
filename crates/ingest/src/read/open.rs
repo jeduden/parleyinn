@@ -16,13 +16,21 @@ use super::{lines_at, regular_file};
 /// How many bytes one read takes.
 const CHUNK: usize = 64 * 1024;
 
-/// Capacity reserved while an ingest window is resident: one maximum
-/// line for the identifier-learning pass, one for parsing that line,
-/// and at least one MiB of distinct harness identifiers (SEC-05).
+/// Capacity reserved while an ingest window is resident: the larger of
+/// one identifier-learning window, or a bounded parsed line plus its
+/// whole-line redaction (SEC-05).
 pub(crate) const LEARNING_WINDOW_LIMIT: usize = LINE_LIMIT + 1;
-pub(crate) const LEARNING_RESERVE: usize = 2 * LEARNING_WINDOW_LIMIT;
-const IDENTIFIER_RESERVE: usize = 1 << 20;
-pub(crate) const INGEST_WINDOW_LIMIT: usize = SOURCE_LIMIT - LEARNING_RESERVE - IDENTIFIER_RESERVE;
+pub(crate) const LEARNING_RESERVE: usize = 3 * LEARNING_WINDOW_LIMIT;
+/// Distinct harness identifiers retained while a source is ingested.
+pub(crate) const IDENTIFIER_LIMIT: usize = 2 << 20;
+/// Both the learned identifiers and the redactor compiled from them can
+/// be resident while the redactor is built.
+const IDENTIFIER_RESERVE: usize = 2 * IDENTIFIER_LIMIT;
+/// Space for redacted event content and its planning metadata. Planning
+/// stops at this budget and the source resumes at its ingest marker.
+pub(crate) const PLANNING_RESERVE: usize = 32 << 20;
+pub(crate) const INGEST_WINDOW_LIMIT: usize =
+    SOURCE_LIMIT - LEARNING_RESERVE - IDENTIFIER_RESERVE - PLANNING_RESERVE;
 
 /// A transcript source opened: the window to read, and how many bytes
 /// the source held.

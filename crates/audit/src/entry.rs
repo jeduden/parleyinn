@@ -90,6 +90,11 @@ pub enum Counter {
     /// A transcript line over 4 MiB was refused whole, the source left
     /// short at it (SEC-05, REC-03).
     TranscriptLineTooLarge,
+    /// A transcript source's parsed structure or harness account
+    /// identifiers could not fit under its source-memory ceiling, so
+    /// ingest refused it before anything was recorded (SEC-05, SEC-08,
+    /// I6).
+    TranscriptSourceMemoryLimit,
     /// A path outside every allowed root was refused (SEC-18).
     PathOutsideAllowedRoots,
     /// A structured log line could not be written (ENG-05, I6).
@@ -258,6 +263,7 @@ impl Counter {
             Self::HookInputTooLarge => "hook_input_too_large",
             Self::HookInputTooDeep => "hook_input_too_deep",
             Self::TranscriptLineTooLarge => "transcript_line_too_large",
+            Self::TranscriptSourceMemoryLimit => "transcript_source_memory_limit",
             Self::PathOutsideAllowedRoots => "path_outside_allowed_roots",
             Self::LogLineDropped => "log_line_dropped",
             Self::IngestRefusedSettingsInvalid => "ingest_refused_settings_invalid",

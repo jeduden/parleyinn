@@ -22,7 +22,7 @@ use crate::World;
 use crate::recall::{fixture, keep_recorded, last_asked, record_runs};
 use crate::record::home;
 use crate::record_search::{Reply, call_tool, last_reply, set_reply};
-use crate::security_redaction::agent_run_with_transcript;
+use crate::security_redaction::{agent_run_with_transcript, transcripts};
 
 /// The run `rooms` is asked of.
 const RUN: &str = "mixed-provenance";
@@ -91,6 +91,14 @@ fn in_range(store: &Store, item: &Value, arguments: &Value) -> Result<(), String
 
 /// Fails unless `item` matches each filter of `arguments`.
 fn matches(store: &Store, item: &Value, arguments: &Value) -> Result<(), String> {
+    if let Some(run) = arguments["run"].as_str()
+        && item["writer"] != run
+    {
+        return Err(format!(
+            "a hit is from writer {}, not {run}",
+            item["writer"]
+        ));
+    }
     let provenance = item["provenance"].as_str().unwrap_or_default();
     let classes = listed(arguments, "provenance");
     if !classes.is_empty() && !classes.iter().any(|c| c == provenance) {
@@ -106,6 +114,31 @@ fn matches(store: &Store, item: &Value, arguments: &Value) -> Result<(), String>
         return Err(format!("a hit is {}, not {trust}", item["trust"]));
     }
     in_range(store, item, arguments)
+}
+
+/// Replaces the fixture name used by the feature with the writer id the
+/// `run` filter accepts. A run is named by its writer until runs derive
+/// from seats.
+pub fn resolve_run(w: &mut World, arguments: &mut Value) -> Result<(), String> {
+    let Some(name) = arguments["run"].as_str().map(str::to_owned) else {
+        return Ok(());
+    };
+    let path = transcripts(w)
+        .into_iter()
+        .find(|(fixture, _)| fixture == &name)
+        .map(|(_, path)| path)
+        .ok_or_else(|| format!("no transcript fixture is named {name:?}"))?;
+    let path = path.display().to_string();
+    let writer = Store::open(&home(w)?.store())
+        .map_err(|e| e.to_string())?
+        .ingested_runs()
+        .map_err(|e| e.to_string())?
+        .into_iter()
+        .find(|run| run.path == path)
+        .map(|run| run.writer.to_string())
+        .ok_or_else(|| format!("no run was ingested from {path}"))?;
+    arguments["run"] = json!(writer);
+    Ok(())
 }
 
 /// The items of `answer`.

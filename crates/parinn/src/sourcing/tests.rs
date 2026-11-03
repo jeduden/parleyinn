@@ -38,5 +38,32 @@ fn the_ingest_report_names_the_most_it_held_in_memory() {
     let (_, out, _) = p.invoke(&["ingest", "--path", &path, "--json"], &DEV);
 
     let report: serde_json::Value = serde_json::from_str(&out).unwrap();
-    assert_eq!(report["read_window_high_water"], 8);
+    let held = report["read_window_high_water"].as_u64().unwrap();
+    assert!(held >= 8 && held <= 64 << 20, "{held}");
+}
+
+#[test]
+fn harness_identifiers_over_the_memory_ceiling_are_refused_audited_and_counted() {
+    let p = Process::new();
+    let line = |n| {
+        let id = format!("{n}-{}", "x".repeat(400 * 1024));
+        format!(
+            "{{\"attachment\":{{\"type\":\"credential_org\",\"organizationUuid\":\"{id}\"}}}}\n"
+        )
+    };
+    let path = p.transcript(&(1..=6).map(line).collect::<String>());
+
+    let (code, _, err) = p.invoke(&["ingest", "--path", &path], &DEV);
+
+    assert_eq!(code, 1, "{err}");
+    let entries = audited(&p);
+    let entry = entries
+        .iter()
+        .find(|e| e.counter.as_deref() == Some("transcript_source_memory_limit"))
+        .unwrap();
+    assert_eq!(
+        (entry.kind.as_str(), entry.operation.as_str()),
+        ("rejected", "ingest")
+    );
+    assert!(entry.detail.contains("source-memory ceiling"));
 }

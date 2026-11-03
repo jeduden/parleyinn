@@ -117,16 +117,21 @@ fn a_source_over_64_mib_is_ingested_across_resumes_at_its_marker() {
     let text: String = (1..=65).map(|n| line(n, MIB)).collect();
     let path = written(&dir, &text);
 
-    let first = ingest_path(&home, &path, &redactor(), &mut OsEntropy).unwrap();
-    let marker = source(&home);
-    let second = ingest_path(&home, &path, &redactor(), &mut OsEntropy).unwrap();
-    let third = ingest_path(&home, &path, &redactor(), &mut OsEntropy).unwrap();
+    let mut reports = Vec::new();
+    loop {
+        let report = ingest_path(&home, &path, &redactor(), &mut OsEntropy).unwrap();
+        let more = report.resumable;
+        reports.push(report);
+        if !more {
+            break;
+        }
+    }
+    let again = ingest_path(&home, &path, &redactor(), &mut OsEntropy).unwrap();
 
-    assert_eq!((first.events, first.resumable), (54, true));
-    assert!(first.read_window_high_water <= 64 * MIB);
-    assert_eq!(marker.position.lines, 54);
-    assert_eq!((second.events, second.resumable), (11, false));
-    assert_eq!(third.events, 0);
+    assert!(reports.len() > 1);
+    assert_eq!(reports.iter().map(|r| r.events).sum::<usize>(), 65);
+    assert!(reports.iter().all(|r| r.read_window_high_water <= 64 * MIB));
+    assert_eq!(again.events, 0);
     let done = source(&home);
     assert_eq!(done.position.lines, 65);
     assert_eq!(done.position.offset, text.len() as u64);
@@ -135,8 +140,12 @@ fn a_source_over_64_mib_is_ingested_across_resumes_at_its_marker() {
     let placed = store.placed(done.id).unwrap();
     let numbers: Vec<u64> = placed.iter().map(|p| p.place.line).collect();
     assert_eq!(numbers, (1..=65).collect::<Vec<_>>());
-    assert_eq!(second.generation, first.generation);
-    assert!(!second.new_generation);
+    assert!(
+        reports
+            .windows(2)
+            .all(|pair| pair[0].generation == pair[1].generation)
+    );
+    assert!(reports.iter().skip(1).all(|r| !r.new_generation));
 }
 
 #[test]
@@ -154,6 +163,19 @@ fn identifiers_from_a_long_source_cannot_grow_past_its_memory_ceiling() {
         !home.store().exists(),
         "no source was recorded over the ceiling"
     );
+}
+
+#[test]
+fn structurally_dense_json_is_refused_before_it_can_exceed_the_parse_reserve() {
+    let dir = TempDir::new().unwrap();
+    let home = home(&dir);
+    let dense = format!("{{\"items\":[{}]}}\n", "0,".repeat(40_000) + "0");
+    let path = written(&dir, &dense);
+
+    let error = ingest_path(&home, &path, &redactor(), &mut OsEntropy).unwrap_err();
+
+    assert!(matches!(error, IngestError::SourceMemoryLimit(p) if p == path));
+    assert!(!home.store().exists());
 }
 
 #[test]
@@ -244,21 +266,26 @@ fn a_live_ingest_reads_a_big_source_a_window_at_a_time_and_stops_at_a_refused_li
         &redactor(),
         &Inputs::default(),
         &mut seats,
-        Some(54),
+        Some(first.events),
         &mut OsEntropy,
     )
     .unwrap();
-    let last = ingest_live(
-        &home,
-        &path,
-        &redactor(),
-        &Inputs::default(),
-        &mut seats,
-        Some(65),
-        &mut OsEntropy,
-    )
-    .unwrap()
-    .unwrap();
+    let mut reports = vec![first];
+    while source(&home).position.lines < 65 {
+        reports.push(
+            ingest_live(
+                &home,
+                &path,
+                &redactor(),
+                &Inputs::default(),
+                &mut seats,
+                Some(65),
+                &mut OsEntropy,
+            )
+            .unwrap()
+            .unwrap(),
+        );
+    }
     let done = ingest_live(
         &home,
         &path,
@@ -270,9 +297,9 @@ fn a_live_ingest_reads_a_big_source_a_window_at_a_time_and_stops_at_a_refused_li
     )
     .unwrap();
 
-    assert_eq!((first.events, last.events), (54, 11));
     assert!(limited.is_none());
-    assert!(first.resumable && !last.resumable);
+    assert_eq!(reports.iter().map(|r| r.events).sum::<usize>(), 65);
+    assert!(reports[0].resumable && !reports.last().unwrap().resumable);
     assert!(done.is_none());
     assert_eq!(source(&home).position.lines, 65);
 }

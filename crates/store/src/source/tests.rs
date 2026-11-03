@@ -273,18 +273,37 @@ fn refused_copies_of_purged_lines_keep_only_their_zeroed_spans_and_uuids() {
 }
 
 #[test]
-fn a_purged_line_is_known_by_its_uuid_without_an_event_association() {
+fn purged_line_uuids_are_loaded_together_without_event_associations() {
     let dir = TempDir::new().unwrap();
     let mut store = open(&dir);
-    let source = store.start_generation("/t/a.jsonl", "/t").unwrap();
+    let a = store.start_generation("/t/a.jsonl", "/t").unwrap();
+    let other = store.start_generation("/other/a.jsonl", "/other").unwrap();
 
     store
-        .advance_refusing(source.id, &position(10, 1), &[place(1, Some("u1"))])
+        .advance_refusing(
+            a.id,
+            &position(20, 2),
+            &[place(1, Some("u1")), place(2, Some("u2"))],
+        )
+        .unwrap();
+    store
+        .advance_refusing(other.id, &position(10, 1), &[place(1, Some("u3"))])
         .unwrap();
 
-    assert!(store.line_was_purged("/t", "u1", "/t/b.jsonl").unwrap());
-    assert!(!store.line_was_purged("/t", "u1", "/t/a.jsonl").unwrap());
-    assert!(!store.line_was_purged("/other", "u1", "/t/b.jsonl").unwrap());
+    assert_eq!(
+        store.purged_line_uuids("/t", "/t/b.jsonl").unwrap(),
+        BTreeSet::from(["u1".to_owned(), "u2".to_owned()])
+    );
+    assert!(
+        store
+            .purged_line_uuids("/t", "/t/a.jsonl")
+            .unwrap()
+            .is_empty()
+    );
+    assert_eq!(
+        store.purged_line_uuids("/other", "/other/b.jsonl").unwrap(),
+        BTreeSet::from(["u3".to_owned()])
+    );
 }
 
 #[test]
@@ -301,6 +320,12 @@ fn a_store_from_before_purged_copies_still_reads_its_sources() {
         .unwrap();
 
     assert_eq!(store.source("/t/a.jsonl").unwrap(), Some(source));
+    assert!(
+        store
+            .purged_line_uuids("/t", "/t/b.jsonl")
+            .unwrap()
+            .is_empty()
+    );
 }
 
 #[test]

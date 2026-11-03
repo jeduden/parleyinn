@@ -1461,23 +1461,13 @@ impl Store {
         Ok(out)
     }
 
-    /// The events of the transcript source generation `id`, in line
-    /// order.
-    ///
-    /// # Errors
-    ///
-    /// Fails when SQLite does or a row does not parse.
-    pub fn placed(&self, id: i64) -> Result<Vec<Placed>, StoreError> {
-        source::placed(&self.conn, id)
-    }
-
     /// The event that first recorded the line `uuid` names in the
     /// transcript directory `directory`, read from a transcript source
     /// other than `path`; never a repeat reference (REC-04).
     ///
     /// # Errors
     ///
-    /// Fails when SQLite does or a row does not parse.
+    /// Fails when SQLite does or the stored address does not parse.
     pub fn line_owner(
         &self,
         directory: &str,
@@ -1487,20 +1477,14 @@ impl Store {
         source::owner(&self.conn, directory, uuid, path)
     }
 
-    /// Whether a purged line in another transcript source of
-    /// `directory` left the harness `uuid` as allowed residue (REC-04,
-    /// SEC-31).
+    /// The events of the transcript source generation `id`, in line
+    /// order.
     ///
     /// # Errors
     ///
-    /// Fails when SQLite does.
-    pub fn line_was_purged(
-        &self,
-        directory: &str,
-        uuid: &str,
-        path: &str,
-    ) -> Result<bool, StoreError> {
-        source::was_purged(&self.conn, directory, uuid, path)
+    /// Fails when SQLite does or a row does not parse.
+    pub fn placed(&self, id: i64) -> Result<Vec<Placed>, StoreError> {
+        source::placed(&self.conn, id)
     }
 
     /// Keeps `run`, an ingested run (REC-02): for its transcript source

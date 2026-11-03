@@ -51,6 +51,10 @@ fn each_kind_and_counter_has_its_name() {
         (Counter::HookInputTooDeep, "hook_input_too_deep"),
         (Counter::TranscriptLineTooLarge, "transcript_line_too_large"),
         (
+            Counter::TranscriptSourceMemoryLimit,
+            "transcript_source_memory_limit",
+        ),
+        (
             Counter::PathOutsideAllowedRoots,
             "path_outside_allowed_roots",
         ),

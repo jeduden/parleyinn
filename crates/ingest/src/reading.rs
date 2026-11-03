@@ -28,7 +28,7 @@ use crate::run::{Defaults, RunKey};
 
 use self::plan::{Plan, Planner, Read};
 pub(crate) use self::window::{View, peek};
-use self::window::{consumed, parse, redacting};
+use self::window::{consumed, redacting};
 use crate::{IngestError, Ingested, Inputs, RunReport};
 
 /// Who records what an ingest reads, and in which seats.
@@ -54,8 +54,7 @@ pub(crate) fn ingest(
 ) -> Result<Ingested, IngestError> {
     let text = view.text;
     let lines = read::lines_at(text, view.base);
-    let (redactor, high_water) = redacting(redactor, path, view, &lines)?;
-    let parsed = parse(&lines);
+    let (redactor, reading_high_water) = redacting(redactor, path, view, &lines)?;
     home.create().map_err(IngestError::Admin)?;
     let mut store = open_store(home, inputs)?;
     let node = Node::open(home, &mut store, entropy).map_err(IngestError::Admin)?;
@@ -77,12 +76,13 @@ pub(crate) fn ingest(
             node: &node,
             home,
             lines: &lines,
-            parsed: &parsed,
             from: resume.index,
             first_line: resume.first_line,
             path,
             defaults: &defaults,
             redactor: &redactor,
+            memory_limit: read::open::PLANNING_RESERVE
+                .min(read::bounded::SOURCE_LIMIT.saturating_sub(reading_high_water)),
         },
         entropy,
     )?;
@@ -107,8 +107,8 @@ pub(crate) fn ingest(
         witnessed_repeats: plan.witnessed_repeats,
         refused: plan.refused,
         too_large: view.refused,
-        resumable: view.resumable,
-        read_window_high_water: high_water,
+        resumable: view.resumable || plan.resumable,
+        read_window_high_water: reading_high_water.saturating_add(plan.memory),
         matched: observations.matched,
         prompt_conflicts: observations.conflicts,
         not_attended: observations.not_attended,

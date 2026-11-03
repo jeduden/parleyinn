@@ -559,20 +559,23 @@ fn refused_and_uuids_kept(w: &mut World) -> Result<(), String> {
         return Err(format!("{refusals} refusals counted, not {REPEATED}"));
     }
     let store = store(w)?;
-    let source = session_path(w, session("parent-run")?)?;
+    for address in homes(w).purged.clone() {
+        let event = store.event(address).map_err(|e| e.to_string())?;
+        if event.is_none_or(|e| e.content.is_some()) {
+            return Err(format!("{address} keeps its content"));
+        }
+    }
+    let source = session_path(w, LATE_FORK)?;
     let mut uuids = Vec::new();
     for generation in store
         .generations(&source_key(&source))
         .map_err(|e| e.to_string())?
     {
-        for p in store.placed(generation.id).map_err(|e| e.to_string())? {
-            if homes(w).purged.contains(&p.address) {
-                uuids.push(p.place.uuid.clone().unwrap_or_default());
-                let event = store.event(p.address).map_err(|e| e.to_string())?;
-                if event.is_none_or(|e| e.content.is_some()) {
-                    return Err(format!("{} keeps its content", p.address));
-                }
-            }
+        for place in store
+            .purged_places(generation.id)
+            .map_err(|e| e.to_string())?
+        {
+            uuids.push(place.uuid.unwrap_or_default());
         }
     }
     let wanted: Vec<String> = (1..=REPEATED).map(|n| format!("u-{n}")).collect();

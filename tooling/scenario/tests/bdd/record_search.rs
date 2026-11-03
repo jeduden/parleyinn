@@ -180,11 +180,12 @@ fn calls_event_search(w: &mut World, args: String) -> Result<(), String> {
     if crate::recall_scope::serves_a_run(w) {
         return crate::recall_scope::call(w, "event_search", &args);
     }
-    let arguments = arguments_of(w, &args)?;
+    let mut arguments = arguments_of(w, &args)?;
     if arguments["scope"] == "rooms" {
         return crate::recall_search::call_rooms(w, arguments);
     }
     crate::recall::record_runs(w)?;
+    crate::recall_search::resolve_run(w, &mut arguments)?;
     crate::recall::note_recalls_stat(w)?;
     crate::recall::asked(w, "event_search", &arguments);
     call_search(w, arguments).map(drop)

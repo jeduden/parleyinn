@@ -16,6 +16,8 @@
 //! ingest, resume and `parinn verify` zero the same spans, so the hash
 //! confirms no guess at the purged bytes and the source still resumes.
 
+use std::collections::BTreeSet;
+
 use record::digest::{Digest, Running};
 use record::event::EventKind;
 use record::id::{Address, WriterId};
@@ -575,6 +577,17 @@ impl Store {
         purged_places(&self.conn, id)
     }
 
+    /// The harness UUIDs left by purged lines in other transcript
+    /// sources of `directory`, ready for an ingest of `path` to test in
+    /// memory (REC-04, SEC-31).
+    pub fn purged_line_uuids(
+        &self,
+        directory: &str,
+        path: &str,
+    ) -> Result<BTreeSet<String>, StoreError> {
+        purged_line_uuids(&self.conn, directory, path)
+    }
+
     /// Appends transcript lines and atomically keeps the positions of
     /// refused copies of purged lines which the new position crosses.
     /// The copies' bytes are zeroed in the position's hash (REC-04,
@@ -745,31 +758,26 @@ pub(crate) fn owner(
     found.map(|(w, s)| address(&w, s)).transpose()
 }
 
-/// Whether the allowed residue of a purged line in another transcript
-/// source of `directory` keeps `uuid` (REC-04, SEC-31).
-pub(crate) fn was_purged(
+/// The allowed residue UUIDs of purged lines in other transcript sources
+/// of `directory`. An older store without the residue table holds none.
+fn purged_line_uuids(
     conn: &Connection,
     directory: &str,
-    uuid: &str,
     path: &str,
-) -> Result<bool, StoreError> {
+) -> Result<BTreeSet<String>, StoreError> {
     let query = "SELECT count(*) FROM sqlite_master WHERE name = 'transcript_purged_copies'";
     if !conn.query_row(query, [], |row| row.get::<_, bool>(0))? {
-        return Ok(false);
+        return Ok(BTreeSet::new());
     }
-    let found = conn
-        .query_row(
-            "SELECT 1 FROM transcript_purged_copies p
-             JOIN transcript_sources s ON s.id = p.source
-             WHERE p.uuid = ?1 AND s.directory = ?2 AND s.path != ?3
-             LIMIT 1",
-            params![uuid, directory, path],
-            |_| Ok(()),
-        )
-        .optional()?
-        .is_some();
+    let mut statement = conn.prepare(
+        "SELECT DISTINCT p.uuid FROM transcript_purged_copies p
+         JOIN transcript_sources s ON s.id = p.source
+         WHERE p.uuid IS NOT NULL AND s.directory = ?1 AND s.path != ?2
+         ORDER BY p.uuid",
+    )?;
+    let rows = statement.query_map(params![directory, path], |row| row.get(0))?;
 
-    Ok(found)
+    Ok(rows.collect::<Result<_, _>>()?)
 }
 
 /// The ingested runs `filter` selects, `?1` and `?2` being `a` and `b`.

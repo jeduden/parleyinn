@@ -47,3 +47,15 @@ fn a_path_is_compared_with_its_links_resolved_when_they_can_be() {
     let missing = dir.path().join("missing.jsonl");
     assert_eq!(canonical(&missing), missing);
 }
+
+#[test]
+fn dense_json_is_refused_before_value_allocation_but_a_maximum_string_fits() {
+    let dense = format!("{{\"items\":[{}]}}", "0,".repeat(40_000) + "0");
+    let plain = format!(
+        "{{\"text\":\"{}\"}}",
+        "x".repeat(read::bounded::LINE_LIMIT - 12)
+    );
+
+    assert!(json_heap_bound(&dense) > PARSED_LINE_LIMIT);
+    assert!(json_heap_bound(&plain) <= PARSED_LINE_LIMIT);
+}

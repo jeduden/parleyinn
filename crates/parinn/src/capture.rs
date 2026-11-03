@@ -428,7 +428,7 @@ impl Running {
                 Err(e) => self.failed(&path, &e),
             }
             self.audit_too_large(&path, stopped);
-            self.read_tool_uses(&path);
+            self.read_line_fields(&path);
         }
         if self.closed.elapsed() >= self.close_every {
             self.close_segments();
@@ -577,9 +577,11 @@ impl Running {
         }
     }
 
-    /// Reads the tool-use ids of the lines of the transcript at `path`
-    /// that ingest read since the last time, each with its run.
-    fn read_tool_uses(&mut self, path: &Path) {
+    /// Reads the tool-use ids and checks the path fields of the lines of
+    /// the transcript at `path` that ingest read since the last time.
+    /// A transcript line's `cwd` never becomes an allowed root; an
+    /// outside one is rejected and audited (SEC-18).
+    fn read_line_fields(&mut self, path: &Path) {
         let Some(from) = self.transcripts.get(path).copied() else {
             return;
         };
@@ -595,6 +597,9 @@ impl Running {
         let shared = self.capture.shared.clone();
         let scanned = ingest::read::open::for_each_line_between(path, from, read, |line| {
             let parsed: Value = serde_json::from_str(line).unwrap_or(Value::Null);
+            if let Some(cwd) = parsed["cwd"].as_str() {
+                self.resolve(Path::new(cwd));
+            }
             let run = run_name(&defaults.key(&parsed));
             for id in tool_use_ids(&parsed) {
                 shared.read(id, run.clone());

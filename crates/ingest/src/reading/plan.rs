@@ -25,12 +25,17 @@ use crate::repeat::{self, Decision, Facts, Owner, Rule};
 use crate::run::{Defaults, RunKey};
 use crate::{IngestError, Inputs, content, turn_end, well_formed};
 
+/// Parsed JSON is transient but can be much larger than its source
+/// syntax. Preflight keeps its conservative heap bound to two maximum
+/// lines; `read::open` reserves that plus one whole-line redaction.
+pub(super) const PARSED_LINE_LIMIT: usize = 2 * read::bounded::LINE_LIMIT;
+const JSON_TOKEN_BYTES: usize = 256;
+
 /// What one ingest reads.
 pub(super) struct Read<'r, 'a> {
     pub(super) node: &'r Node,
     pub(super) home: &'r Home,
     pub(super) lines: &'r [Line<'a>],
-    pub(super) parsed: &'r [Value],
     /// The index of the first line to read.
     pub(super) from: usize,
     /// How many lines of the source lie before the first of `lines`, when
@@ -40,6 +45,9 @@ pub(super) struct Read<'r, 'a> {
     pub(super) path: &'r Path,
     pub(super) defaults: &'r Defaults,
     pub(super) redactor: &'r Redactor,
+    /// Bytes left under SEC-05's source-memory ceiling for planned
+    /// event content and its metadata.
+    pub(super) memory_limit: usize,
 }
 
 /// What an ingest will append, line by line, with what reading found.
@@ -78,6 +86,12 @@ pub(super) struct Plan {
     /// How many witnessed lines repeating another transcript's event
     /// were recorded as their own (REC-04).
     pub(super) witnessed_repeats: usize,
+    /// A conservative upper bound for source-derived bytes retained by
+    /// this plan.
+    pub(super) memory: usize,
+    /// Whether planning stopped at its memory budget before the window
+    /// ended, so the next read resumes at the ingest marker.
+    pub(super) resumable: bool,
 }
 
 impl Plan {
@@ -99,6 +113,9 @@ pub(super) struct Planner<'a> {
     /// The `uuid`s the directory's other transcripts hold, read once a
     /// fork's line needs them.
     siblings: Option<Siblings>,
+    /// Harness UUIDs whose event content was purged from another
+    /// transcript in this directory, loaded once for this plan.
+    purged: BTreeSet<String>,
     /// Whether a fork observation names each ingested run's harness
     /// session, by writer.
     forked: BTreeMap<WriterId, bool>,
@@ -131,12 +148,18 @@ impl<'a> Planner<'a> {
             .iter()
             .map(|(w, s)| (*w, inputs.forks.contains(s)))
             .collect();
+        let purged = if others {
+            store.purged_line_uuids(&named.directory, &named.path)?
+        } else {
+            BTreeSet::new()
+        };
 
         Ok(Self {
             named,
             inputs,
             held_since: source.held_since,
             siblings: None,
+            purged,
             forked,
             others,
             used: BTreeSet::new(),
@@ -158,23 +181,42 @@ impl<'a> Planner<'a> {
         let mut classifier = Classifier::new(&shapes, *session, read.redactor);
         // The lines read before, replayed, so a result finds its call.
         for line in &read.lines[..read.from] {
-            classifier.line(line.text);
+            if json_heap_bound(line.text) <= PARSED_LINE_LIMIT {
+                classifier.line(line.text);
+            }
         }
         if let (true, Some(first)) = (read.first_line > 0, read.lines.first()) {
             read::open::for_each_line(read.path, first.offset, |text| {
-                classifier.line(text);
+                if json_heap_bound(text) <= PARSED_LINE_LIMIT {
+                    classifier.line(text);
+                }
             })
             .map_err(IngestError::read(read.path))?;
         }
         let mut plan = Plan::default();
         for (i, line) in read.lines.iter().enumerate().skip(read.from) {
-            let key = read.defaults.key(&read.parsed[i]);
+            let charge = plan_charge(line.text.len());
+            if plan.memory.saturating_add(charge) > read.memory_limit {
+                plan.resumable = true;
+                break;
+            }
+            let parse = json_heap_bound(line.text) <= PARSED_LINE_LIMIT;
+            let parsed: Value = if parse {
+                serde_json::from_str(line.text).unwrap_or(Value::Null)
+            } else {
+                Value::Null
+            };
+            let key = read.defaults.key(&parsed);
             let writer = runs.ensure(store, read.node, read.home, &key, entropy)?;
             self.forked
                 .insert(writer, self.inputs.forks.contains(&key.harness_session));
-            let classified = classifier.line(line.text);
+            let classified = if parse {
+                classifier.line(line.text)
+            } else {
+                Classified::Unparsed(None)
+            };
             let redacted = read.redactor.redact_line(line.text);
-            let decision = self.decide(store, &read.parsed[i], &key, &redacted.text)?;
+            let decision = self.decide(store, &parsed, &key, &redacted.text)?;
             if decision == Decision::Hold {
                 plan.hold = true;
                 break;
@@ -185,20 +227,22 @@ impl<'a> Planner<'a> {
                     line: read.first_line + i as u64 + 1,
                     offset: line.offset,
                     length: line.end - line.offset,
-                    uuid: read.parsed[i]["uuid"].as_str().map(str::to_owned),
+                    uuid: parsed["uuid"].as_str().map(str::to_owned),
                 });
                 plan.refused_to = Some((read.first_line + i as u64 + 1, line.end));
+                plan.memory = plan.memory.saturating_add(charge);
                 continue;
             }
             let user = matches!(classified, Classified::Line(Provenance::User, _));
-            let prompt = self.prompt(store, &read.parsed[i], &key, user, &decision, &read)?;
+            let prompt = self.prompt(store, &parsed, &key, user, &decision, &read)?;
             let at = Planned {
                 writer,
                 number: read.first_line + i as u64 + 1,
                 line,
-                parsed: &read.parsed[i],
+                parsed: &parsed,
             };
             plan.add(at, classified, redacted, decision, read.redactor, entropy)?;
+            plan.memory = plan.memory.saturating_add(charge);
             if let Some((prompt_id, outcome)) = prompt {
                 plan.prompts
                     .push((plan.events.len() - 1, prompt_id, outcome));
@@ -256,8 +300,7 @@ impl<'a> Planner<'a> {
         let Some(uuid) = line["uuid"].as_str() else {
             return Ok(Decision::Own);
         };
-        let named = self.named;
-        if self.others && store.line_was_purged(&named.directory, uuid, &named.path)? {
+        if self.purged.contains(uuid) {
             return Ok(Decision::Refused);
         }
         if self.live {
@@ -359,6 +402,58 @@ impl<'a> Planner<'a> {
     }
 }
 
+/// A conservative bound for the source-derived memory one planned line
+/// can retain: redacted content, UUID/timestamp copies and container
+/// metadata. The parsed JSON is transient and has a separate one-line
+/// reserve in `read::open` (SEC-05).
+fn plan_charge(line: usize) -> usize {
+    line.saturating_mul(3).saturating_add(2 * 1024)
+}
+
+/// A conservative bound on the heap `serde_json::Value` may retain for
+/// `text`, found without allocating: every string's source bytes plus a
+/// generous node/container allowance for each JSON token. Large plain
+/// strings stay parseable; dense arrays and objects become unparsed
+/// lines before serde can allocate past SEC-05's transient budget.
+pub(super) fn json_heap_bound(text: &str) -> usize {
+    let bytes = text.as_bytes();
+    let (mut at, mut tokens, mut strings) = (0, 0_usize, 0_usize);
+    while at < bytes.len() {
+        match bytes[at] {
+            b'"' => {
+                tokens = tokens.saturating_add(1);
+                at += 1;
+                let start = at;
+                while at < bytes.len() {
+                    match bytes[at] {
+                        b'\\' => at = at.saturating_add(2),
+                        b'"' => break,
+                        _ => at += 1,
+                    }
+                }
+                strings = strings.saturating_add(at.saturating_sub(start));
+                at = at.saturating_add(1);
+            }
+            b'{' | b'[' => {
+                tokens = tokens.saturating_add(1);
+                at += 1;
+            }
+            b'}' | b']' | b':' | b',' | b' ' | b'\t' | b'\r' | b'\n' => at += 1,
+            _ => {
+                tokens = tokens.saturating_add(1);
+                at += 1;
+                while at < bytes.len()
+                    && !matches!(bytes[at], b'}' | b']' | b',' | b' ' | b'\t' | b'\r' | b'\n')
+                {
+                    at += 1;
+                }
+            }
+        }
+    }
+
+    strings.saturating_add(tokens.saturating_mul(JSON_TOKEN_BYTES))
+}
+
 /// The `uuid`s the transcripts of a directory but one hold.
 #[derive(Debug, Default)]
 struct Siblings {
@@ -386,6 +481,9 @@ fn sibling_uuids(directory: &str, path: &str, served: &BTreeSet<PathBuf>) -> Sib
         let bound = served.contains(&canonical(&other));
         // A line at a time, so a long transcript is never held (SEC-05).
         let _ = read::open::for_each_line(&other, u64::MAX, |text| {
+            if json_heap_bound(text) > PARSED_LINE_LIMIT {
+                return;
+            }
             let parsed: Value = serde_json::from_str(text).unwrap_or(Value::Null);
             if let Some(uuid) = parsed["uuid"].as_str() {
                 found.all.insert(uuid.to_owned());

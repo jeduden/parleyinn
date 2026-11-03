@@ -443,6 +443,42 @@ fn a_transcript_outside_the_roots_or_a_link_swapped_in_is_refused_once() {
 }
 
 #[test]
+fn a_path_named_by_a_transcript_line_is_checked_but_never_becomes_a_root() {
+    let f = Fixture::new();
+    let outside = f.dir.path().join("elsewhere");
+    std::fs::create_dir_all(&outside).unwrap();
+    let value = json!({
+        "type": "atis-latch",
+        "atis": "x",
+        "sessionId": SESSION,
+        "cwd": outside,
+    });
+    std::fs::write(f.main(), format!("{value}\n")).unwrap();
+    f.bind(SESSION, &f.main(), HARNESS);
+    let mut running = f.running(Some(HARNESS), None);
+
+    running.bind();
+    running.poll();
+    running.poll();
+
+    assert_eq!(
+        f.counted()
+            .iter()
+            .filter(|counter| counter.as_str() == "path_outside_allowed_roots")
+            .count(),
+        1
+    );
+    assert!(
+        Store::open(&f.home.store())
+            .unwrap()
+            .source(&outside.to_string_lossy())
+            .unwrap()
+            .is_none(),
+        "a path named only by a transcript line was never read as a source"
+    );
+}
+
+#[test]
 fn a_transcript_not_written_yet_waits_and_one_that_fails_is_audited() {
     let f = Fixture::new();
     f.bind(SESSION, &f.main(), HARNESS);
@@ -659,7 +695,7 @@ fn a_transcript_gone_after_its_ingest_gives_no_tool_uses_and_is_read_again_later
     let mut running = f.running(Some(HARNESS), None);
     running.transcripts.insert(f.main(), 0);
 
-    running.read_tool_uses(&f.main());
+    running.read_line_fields(&f.main());
 
     assert!(f.shared.runs_of("toolu_m").is_empty());
     assert_eq!(running.transcripts.get(&f.main()), Some(&0));

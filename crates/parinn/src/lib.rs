@@ -554,12 +554,30 @@ fn ingest_all(
             reports.push(i);
         }
         if let Some(e) = error {
-            failed("ingest", &e, stderr);
+            if e.source_memory_limit {
+                audit_source_memory_limit(ctx, stderr);
+            }
+            failed("ingest", &e.message, stderr);
             failures += 1;
         }
     }
 
     (reports, failures)
+}
+
+/// Audits and counts a source refused before recording because its
+/// parsed structure or harness account identifiers cannot fit under
+/// SEC-05's source-memory ceiling (SEC-08, I6).
+fn audit_source_memory_limit(ctx: &Context, stderr: &mut dyn Write) {
+    let occurrence = Occurrence::Degraded {
+        kind: Kind::Rejected,
+        counter: Counter::TranscriptSourceMemoryLimit,
+        operation: "ingest",
+        detail: "transcript source refused because its parsed structure or harness account identifiers exceed the source-memory ceiling",
+    };
+    if let Err(e) = ctx.audit(&occurrence) {
+        let _ = writeln!(stderr, "parinn ingest: audit a source-memory refusal: {e}");
+    }
 }
 
 /// Counts, once each, every session binding no MCP server took within

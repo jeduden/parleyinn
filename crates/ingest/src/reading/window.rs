@@ -8,14 +8,14 @@ use std::path::Path;
 use administration::home::Home;
 use redaction::Redactor;
 use redaction::account::HarnessAccountIdentifiers;
-use serde_json::Value;
 use store::source::Zeroed;
 use store::{Source, Store};
 
+use super::plan::{PARSED_LINE_LIMIT, json_heap_bound};
 use super::{Resume, as_index};
 use crate::IngestError;
 use crate::read::bounded::Refused;
-use crate::read::bounded::{LINE_LIMIT, Limits, SOURCE_LIMIT};
+use crate::read::bounded::{LINE_LIMIT, Limits};
 use crate::read::{self, Line, open};
 
 /// The window of a transcript source one ingest reads (SEC-05, REC-13).
@@ -33,14 +33,6 @@ pub(crate) struct View<'t> {
     pub(crate) resumable: bool,
     /// The most bytes of the source the read held at once.
     pub(crate) high_water: usize,
-}
-
-/// Each of `lines` parsed as JSON, null where it is none.
-pub(super) fn parse(lines: &[Line<'_>]) -> Vec<Value> {
-    lines
-        .iter()
-        .map(|l| serde_json::from_str(l.text).unwrap_or(Value::Null))
-        .collect()
 }
 
 /// `redactor` with the harness account identifiers the transcript names
@@ -69,33 +61,49 @@ struct Learned {
 /// line at a time (SEC-08, SEC-05).
 fn learned(path: &Path, view: &View<'_>, lines: &[Line<'_>]) -> Result<Learned, IngestError> {
     let mut ids = HarnessAccountIdentifiers::default();
-    if view.base == 0 && !view.resumable && view.refused.is_none() {
-        let limit = SOURCE_LIMIT.saturating_sub(view.high_water);
-        for line in lines {
-            if !ids.learn_within(line.text, limit) {
-                return Err(IngestError::IdentifierLimit(path.to_path_buf()));
-            }
+    let limit = open::IDENTIFIER_LIMIT;
+    // The buffered window is the source this ingest will actually
+    // record. Learn it before reopening the pathname: if the path was
+    // replaced after the guarded read, a later scan must not make its
+    // identifiers disappear (SEC-08).
+    for line in lines {
+        if json_heap_bound(line.text) > PARSED_LINE_LIMIT {
+            return Err(IngestError::SourceMemoryLimit(path.to_path_buf()));
         }
+        if !learn_within(&mut ids, line.text, limit) {
+            return Err(IngestError::IdentifierLimit(path.to_path_buf()));
+        }
+    }
+    if view.base == 0 && !view.resumable && view.refused.is_none() {
         return Ok(Learned {
-            high_water: view.high_water.saturating_add(ids.byte_len()),
+            high_water: view
+                .high_water
+                .saturating_add(open::LEARNING_RESERVE)
+                .saturating_add(ids.byte_len().saturating_mul(2)),
             ids,
         });
     }
     let learning = open::LEARNING_WINDOW_LIMIT;
     let reserve = open::LEARNING_RESERVE;
-    let limit = SOURCE_LIMIT.saturating_sub(view.high_water.saturating_add(reserve));
-    let mut exceeded = false;
+    let (mut identifiers_exceeded, mut structure_exceeded) = (false, false);
     let limits = Limits {
         line: LINE_LIMIT,
         source: learning,
     };
     open::for_each_line_with_limits(path, 0, u64::MAX, limits, |text| {
-        if !exceeded && !ids.learn_within(text, limit) {
-            exceeded = true;
+        if !identifiers_exceeded && !structure_exceeded {
+            if json_heap_bound(text) > PARSED_LINE_LIMIT {
+                structure_exceeded = true;
+            } else if !learn_within(&mut ids, text, limit) {
+                identifiers_exceeded = true;
+            }
         }
     })
     .map_err(IngestError::read(path))?;
-    if exceeded {
+    if structure_exceeded {
+        return Err(IngestError::SourceMemoryLimit(path.to_path_buf()));
+    }
+    if identifiers_exceeded {
         return Err(IngestError::IdentifierLimit(path.to_path_buf()));
     }
 
@@ -103,9 +111,20 @@ fn learned(path: &Path, view: &View<'_>, lines: &[Line<'_>]) -> Result<Learned, 
         high_water: view
             .high_water
             .saturating_add(reserve)
-            .saturating_add(ids.byte_len()),
+            .saturating_add(ids.byte_len().saturating_mul(2)),
         ids,
     })
+}
+
+/// Learns only a line that can hold one of the two harness fields. Most
+/// transcript lines carry neither; avoiding a general JSON tree for
+/// them keeps the whole-source SEC-08 pass linear and bounded.
+fn learn_within(ids: &mut HarnessAccountIdentifiers, text: &str, limit: usize) -> bool {
+    if !text.contains("\"userEmail\"") && !text.contains("\"organizationUuid\"") {
+        return true;
+    }
+
+    ids.learn_within(text, limit)
 }
 
 /// The ingest marker row of the source at `path`, read without changing
@@ -149,4 +168,35 @@ pub(super) fn consumed<'s>(
     };
 
     prefix.ok_or(IngestError::Store(moved))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use testkit::TempDir;
+
+    #[test]
+    fn a_window_s_identifiers_are_learned_before_the_path_is_reopened() {
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("changed.jsonl");
+        std::fs::write(&path, "{\"type\":\"other\"}\n").unwrap();
+        let id = "0f0e0d0c-0000-0000-0000-000000000001";
+        let text = format!(
+            "{{\"attachment\":{{\"type\":\"credential_org\",\"organizationUuid\":\"{id}\"}}}}\n"
+        );
+        let view = View {
+            text: &text,
+            base: 7,
+            seen: text.len() as u64 + 7,
+            refused: None,
+            resumable: true,
+            high_water: text.len(),
+        };
+        let lines = read::lines_at(&text, view.base);
+        let base = Redactor::new(&[]).unwrap().0;
+
+        let (redactor, _) = redacting(&base, &path, &view, &lines).unwrap();
+
+        assert_eq!(redactor.redact_text(id).text, "[REDACTED:organization_id]");
+    }
 }

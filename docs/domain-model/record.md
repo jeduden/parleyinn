@@ -138,8 +138,8 @@ from
   marker until its owner's transcript is ingested or gone, or 30 s pass. A
   repeated line whose `uuid` names a purged event is **refused**,
   never recorded again, counted (REC-04, REC-17). An
-  **ingest position** is how far ingest read a transcript source: its byte
-  length and the hash of those bytes, its consumed prefix (REC-03).
+  **ingest position** is the byte length ingest read and its consumed-prefix
+  hash, with purged transcript-line spans zeroed (REC-03, SEC-31).
 - **Worktree checkpoint**: An event recording a worktree's commit, branch and
   redacted diff since the previous worktree checkpoint (REC-20).
 - **Derived artifact**: Anything computed from the record and the node's key
