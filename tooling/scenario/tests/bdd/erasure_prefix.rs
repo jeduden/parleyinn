@@ -49,10 +49,17 @@ fn confirms_nothing(store: &store::Store, source: &Source) -> Result<(), String>
         return Err(format!("{name}: the hash confirms a guess at the prefix"));
     }
     let placed = store.placed(source.id).map_err(|e| e.to_string())?;
+    let purged = store.purged_places(source.id).map_err(|e| e.to_string())?;
     for span in &source.purged {
-        let place = placed
+        if placed
             .iter()
-            .find(|p| p.place.offset == span.offset && p.place.length == span.length)
+            .any(|p| p.place.offset == span.offset && p.place.length == span.length)
+        {
+            return Err(format!("{name}: a purged line still names its event"));
+        }
+        let place = purged
+            .iter()
+            .find(|p| p.offset == span.offset && p.length == span.length)
             .ok_or_else(|| format!("{name}: a purged line's position or length is gone"))?;
         let end = usize::try_from(span.offset + span.length).unwrap_or(usize::MAX);
         let line = bytes
@@ -63,7 +70,7 @@ fn confirms_nothing(store: &store::Store, source: &Source) -> Result<(), String>
         let uuid = harness["uuid"]
             .as_str()
             .ok_or_else(|| format!("{name}: a purged transcript line has no harness uuid"))?;
-        if place.place.uuid.as_deref() != Some(uuid) {
+        if place.uuid.as_deref() != Some(uuid) {
             return Err(format!(
                 "{name}: the retained uuid is not the harness's own uuid"
             ));

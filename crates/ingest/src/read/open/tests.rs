@@ -76,7 +76,7 @@ fn a_source_past_64_mib_resumes_at_its_marker_while_the_prefix_holds() {
     let rewritten = open(&path, Some(&changed)).unwrap();
     let at_start = open(&path, Some(&source(&bytes, 0, Vec::new()))).unwrap();
 
-    assert_eq!(first.window.bytes.len(), (MIB + 1) * 63);
+    assert_eq!(first.window.bytes.len(), (MIB + 1) * 54);
     assert!(first.window.more);
     assert_eq!(first.seen, bytes.len() as u64);
     assert_eq!(rest.window.start, at);

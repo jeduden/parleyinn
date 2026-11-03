@@ -221,7 +221,14 @@ fn a_purge_recomputes_the_prefix_hash_with_each_purged_line_zeroed() {
         .iter()
         .map(|p| (p.place.offset, p.place.length))
         .collect();
-    assert_eq!(places, [(0, 4), (4, 4), (8, 6), (14, 5)]);
+    assert_eq!(places, [(0, 4), (14, 5)]);
+    let residue: Vec<(u64, u64)> = store
+        .purged_places(source.id)
+        .unwrap()
+        .iter()
+        .map(|p| (p.offset, p.length))
+        .collect();
+    assert_eq!(residue, [(4, 4), (8, 6)]);
     assert_eq!(
         source.purged,
         [

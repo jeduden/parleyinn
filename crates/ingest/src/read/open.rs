@@ -16,6 +16,14 @@ use super::{lines_at, regular_file};
 /// How many bytes one read takes.
 const CHUNK: usize = 64 * 1024;
 
+/// Capacity reserved while an ingest window is resident: one maximum
+/// line for the identifier-learning pass, one for parsing that line,
+/// and at least one MiB of distinct harness identifiers (SEC-05).
+pub(crate) const LEARNING_WINDOW_LIMIT: usize = LINE_LIMIT + 1;
+pub(crate) const LEARNING_RESERVE: usize = 2 * LEARNING_WINDOW_LIMIT;
+const IDENTIFIER_RESERVE: usize = 1 << 20;
+pub(crate) const INGEST_WINDOW_LIMIT: usize = SOURCE_LIMIT - LEARNING_RESERVE - IDENTIFIER_RESERVE;
+
 /// A transcript source opened: the window to read, and how many bytes
 /// the source held.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -32,7 +40,7 @@ pub struct Opened {
 /// fails.
 #[must_use]
 pub fn needs_marker(path: &Path) -> bool {
-    std::fs::metadata(path).is_ok_and(|m| m.len() > SOURCE_LIMIT as u64)
+    std::fs::metadata(path).is_ok_and(|m| m.len() > INGEST_WINDOW_LIMIT as u64)
 }
 
 /// The transcript at `path`, opened for an ingest of the source `known`,
@@ -49,13 +57,19 @@ pub fn open(path: &Path, known: Option<&Source>) -> io::Result<Opened> {
     let mut file = regular_file(path)?;
     let len = file.metadata()?.len();
     let mut from = 0;
-    if let Some(source) = known.filter(|s| len > SOURCE_LIMIT as u64 && s.position.offset > 0) {
+    if let Some(source) =
+        known.filter(|s| len > INGEST_WINDOW_LIMIT as u64 && s.position.offset > 0)
+    {
         if holds(&mut file, source)? {
             from = source.position.offset;
         }
         file.seek(SeekFrom::Start(0))?;
     }
-    let window = window(&mut file, from, Limits::default())?;
+    let limits = Limits {
+        line: LINE_LIMIT,
+        source: INGEST_WINDOW_LIMIT,
+    };
+    let window = window(&mut file, from, limits)?;
     let seen = if window.more {
         len.max(window.end() + 1)
     } else {
@@ -159,26 +173,41 @@ pub fn for_each_line(path: &Path, until: u64, mut each: impl FnMut(&str)) -> io:
 /// boundaries written by ingest (SEC-05, PRV-14).
 pub fn for_each_line_between(
     path: &Path,
-    mut from: u64,
+    from: u64,
     until: u64,
     mut each: impl FnMut(&str),
 ) -> io::Result<()> {
+    for_each_line_with_limits(path, from, until, Limits::default(), &mut each).map(drop)
+}
+
+/// Calls `each` as [`for_each_line_between`] does while each read keeps
+/// `limits`; returns the largest such read. Identifier learning uses a
+/// one-line window while the ingest window is resident (SEC-05).
+pub(crate) fn for_each_line_with_limits(
+    path: &Path,
+    mut from: u64,
+    until: u64,
+    limits: Limits,
+    mut each: impl FnMut(&str),
+) -> io::Result<usize> {
+    let mut high_water = 0;
     loop {
         if from >= until {
-            return regular_file(path).map(drop);
+            return regular_file(path).map(|_| high_water);
         }
-        let got = window(regular_file(path)?, from, Limits::default())?;
+        let got = window(regular_file(path)?, from, limits)?;
+        high_water = high_water.max(got.high_water);
         let text = String::from_utf8_lossy(&got.bytes);
         for line in lines_at(&text, from) {
             if line.end > until {
-                return Ok(());
+                return Ok(high_water);
             }
             each(line.text);
         }
         from = match got.refused {
             Some(r) => r.offset + r.length + 1,
             None if got.more => got.end(),
-            None => return Ok(()),
+            None => return Ok(high_water),
         };
     }
 }

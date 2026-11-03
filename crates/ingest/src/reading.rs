@@ -54,8 +54,8 @@ pub(crate) fn ingest(
 ) -> Result<Ingested, IngestError> {
     let text = view.text;
     let lines = read::lines_at(text, view.base);
+    let (redactor, high_water) = redacting(redactor, path, view, &lines)?;
     let parsed = parse(&lines);
-    let redactor = redacting(redactor, path, view, &lines)?;
     home.create().map_err(IngestError::Admin)?;
     let mut store = open_store(home, inputs)?;
     let node = Node::open(home, &mut store, entropy).map_err(IngestError::Admin)?;
@@ -108,7 +108,7 @@ pub(crate) fn ingest(
         refused: plan.refused,
         too_large: view.refused,
         resumable: view.resumable,
-        read_window_high_water: view.high_water,
+        read_window_high_water: high_water,
         matched: observations.matched,
         prompt_conflicts: observations.conflicts,
         not_attended: observations.not_attended,

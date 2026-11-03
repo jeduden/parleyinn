@@ -1487,6 +1487,22 @@ impl Store {
         source::owner(&self.conn, directory, uuid, path)
     }
 
+    /// Whether a purged line in another transcript source of
+    /// `directory` left the harness `uuid` as allowed residue (REC-04,
+    /// SEC-31).
+    ///
+    /// # Errors
+    ///
+    /// Fails when SQLite does.
+    pub fn line_was_purged(
+        &self,
+        directory: &str,
+        uuid: &str,
+        path: &str,
+    ) -> Result<bool, StoreError> {
+        source::was_purged(&self.conn, directory, uuid, path)
+    }
+
     /// Keeps `run`, an ingested run (REC-02): for its transcript source
     /// and agent id, it takes over from any kept before, whose writer
     /// gets nothing more (REC-19).

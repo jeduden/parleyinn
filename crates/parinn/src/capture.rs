@@ -442,16 +442,20 @@ impl Running {
         let Some(line) = line else {
             return;
         };
-        if !self.too_large.insert((path.to_path_buf(), line.offset)) {
+        let key = (path.to_path_buf(), line.offset);
+        if self.too_large.contains(&key) {
             return;
         }
         let stem = path.file_stem().map(|s| s.to_string_lossy().into_owned());
         let name = self.capture.redactor.redact_text(&stem.unwrap_or_default());
-        self.audit(&Occurrence::TranscriptLineTooLarge {
+        let occurrence = Occurrence::TranscriptLineTooLarge {
             source: &name.text,
             offset: line.offset,
             length: line.length,
-        });
+        };
+        if self.audited(&occurrence) {
+            self.too_large.insert(key);
+        }
     }
 
     /// Closes each run seat's open segment (REC-19).

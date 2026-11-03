@@ -938,3 +938,22 @@ fn a_line_over_4_mib_a_live_read_refuses_is_audited_once_however_often_it_is_rea
         assert!(entry.detail.contains("4194305 bytes"), "{}", entry.detail);
     }
 }
+
+#[test]
+fn a_line_over_4_mib_is_tried_again_when_its_audit_entry_was_refused() {
+    let f = Fixture::new();
+    let mut running = f.running(Some(HARNESS), None);
+    let refused = ingest::read::bounded::Refused {
+        offset: 7,
+        length: (4 << 20) + 1,
+    };
+    std::fs::write(f.home.audit(), "not a directory").unwrap();
+
+    running.audit_too_large(&f.main(), Some(refused));
+
+    assert!(running.too_large.is_empty());
+    std::fs::remove_file(f.home.audit()).unwrap();
+    running.audit_too_large(&f.main(), Some(refused));
+    running.audit_too_large(&f.main(), Some(refused));
+    assert_eq!(too_large_counted(&f), 1);
+}

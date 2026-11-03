@@ -256,6 +256,10 @@ impl<'a> Planner<'a> {
         let Some(uuid) = line["uuid"].as_str() else {
             return Ok(Decision::Own);
         };
+        let named = self.named;
+        if self.others && store.line_was_purged(&named.directory, uuid, &named.path)? {
+            return Ok(Decision::Refused);
+        }
         if self.live {
             return self.decide_witnessed(store, uuid, key, redacted);
         }

@@ -15,6 +15,7 @@ use store::{Source, Store};
 use super::{Resume, as_index};
 use crate::IngestError;
 use crate::read::bounded::Refused;
+use crate::read::bounded::{LINE_LIMIT, Limits, SOURCE_LIMIT};
 use crate::read::{self, Line, open};
 
 /// The window of a transcript source one ingest reads (SEC-05, REC-13).
@@ -49,30 +50,62 @@ pub(super) fn redacting(
     path: &Path,
     view: &View<'_>,
     lines: &[Line<'_>],
-) -> Result<Redactor, IngestError> {
-    let ids = learned(path, view, lines)?;
+) -> Result<(Redactor, usize), IngestError> {
+    let learned = learned(path, view, lines)?;
 
     redactor
-        .with_identifiers(&ids)
+        .with_identifiers(&learned.ids)
         .map_err(IngestError::Redaction)
+        .map(|redactor| (redactor, learned.high_water))
+}
+
+struct Learned {
+    ids: HarnessAccountIdentifiers,
+    high_water: usize,
 }
 
 /// The harness account identifiers the transcript's lines name: those
 /// of `lines`, or, for a source read in windows, of every line of it, a
 /// line at a time (SEC-08, SEC-05).
-fn learned(
-    path: &Path,
-    view: &View<'_>,
-    lines: &[Line<'_>],
-) -> Result<HarnessAccountIdentifiers, IngestError> {
+fn learned(path: &Path, view: &View<'_>, lines: &[Line<'_>]) -> Result<Learned, IngestError> {
     let mut ids = HarnessAccountIdentifiers::default();
     if view.base == 0 && !view.resumable && view.refused.is_none() {
-        lines.iter().for_each(|l| ids.learn(l.text));
-        return Ok(ids);
+        let limit = SOURCE_LIMIT.saturating_sub(view.high_water);
+        for line in lines {
+            if !ids.learn_within(line.text, limit) {
+                return Err(IngestError::IdentifierLimit(path.to_path_buf()));
+            }
+        }
+        return Ok(Learned {
+            high_water: view.high_water.saturating_add(ids.byte_len()),
+            ids,
+        });
     }
-    open::for_each_line(path, u64::MAX, |text| ids.learn(text)).map_err(IngestError::read(path))?;
+    let learning = open::LEARNING_WINDOW_LIMIT;
+    let reserve = open::LEARNING_RESERVE;
+    let limit = SOURCE_LIMIT.saturating_sub(view.high_water.saturating_add(reserve));
+    let mut exceeded = false;
+    let limits = Limits {
+        line: LINE_LIMIT,
+        source: learning,
+    };
+    open::for_each_line_with_limits(path, 0, u64::MAX, limits, |text| {
+        if !exceeded && !ids.learn_within(text, limit) {
+            exceeded = true;
+        }
+    })
+    .map_err(IngestError::read(path))?;
+    if exceeded {
+        return Err(IngestError::IdentifierLimit(path.to_path_buf()));
+    }
 
-    Ok(ids)
+    Ok(Learned {
+        high_water: view
+            .high_water
+            .saturating_add(reserve)
+            .saturating_add(ids.byte_len()),
+        ids,
+    })
 }
 
 /// The ingest marker row of the source at `path`, read without changing

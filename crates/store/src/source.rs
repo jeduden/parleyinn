@@ -70,7 +70,7 @@ CREATE TABLE IF NOT EXISTS transcript_purged_copies (
     line INTEGER NOT NULL,
     byte_offset INTEGER NOT NULL,
     byte_length INTEGER NOT NULL,
-    uuid TEXT NOT NULL,
+    uuid TEXT,
     PRIMARY KEY (source, line)
 ) STRICT, WITHOUT ROWID;
 CREATE INDEX IF NOT EXISTS transcript_purged_copies_uuid
@@ -544,7 +544,7 @@ pub(crate) fn refuse_copies(
              line INTEGER NOT NULL,
              byte_offset INTEGER NOT NULL,
              byte_length INTEGER NOT NULL,
-             uuid TEXT NOT NULL,
+             uuid TEXT,
              PRIMARY KEY (source, line)
          ) STRICT, WITHOUT ROWID;
          CREATE INDEX IF NOT EXISTS transcript_purged_copies_uuid
@@ -569,6 +569,12 @@ pub(crate) fn refuse_copies(
 }
 
 impl Store {
+    /// The position, length and harness UUID left for each purged line
+    /// of source `id`, with no event association (SEC-31).
+    pub fn purged_places(&self, id: i64) -> Result<Vec<Place>, StoreError> {
+        purged_places(&self.conn, id)
+    }
+
     /// Appends transcript lines and atomically keeps the positions of
     /// refused copies of purged lines which the new position crosses.
     /// The copies' bytes are zeroed in the position's hash (REC-04,
@@ -644,6 +650,29 @@ impl Store {
     }
 }
 
+/// The allowed residue of each purged line of source `id`, in line
+/// order. An older store without the residue table holds none.
+fn purged_places(conn: &Connection, id: i64) -> Result<Vec<Place>, StoreError> {
+    let query = "SELECT count(*) FROM sqlite_master WHERE name = 'transcript_purged_copies'";
+    if !conn.query_row(query, [], |row| row.get::<_, bool>(0))? {
+        return Ok(Vec::new());
+    }
+    let mut statement = conn.prepare(
+        "SELECT line, byte_offset, byte_length, uuid FROM transcript_purged_copies
+         WHERE source = ?1 ORDER BY line",
+    )?;
+    let rows = statement.query_map([id], |row| {
+        Ok(Place {
+            line: count(row.get::<_, i64>(0)?),
+            offset: count(row.get::<_, i64>(1)?),
+            length: count(row.get::<_, i64>(2)?),
+            uuid: row.get(3)?,
+        })
+    })?;
+
+    Ok(rows.collect::<Result<_, _>>()?)
+}
+
 /// The events of source `id`, in line order.
 pub(crate) fn placed(conn: &Connection, id: i64) -> Result<Vec<Placed>, StoreError> {
     let statement = conn.prepare(
@@ -714,6 +743,33 @@ pub(crate) fn owner(
         .optional()?;
 
     found.map(|(w, s)| address(&w, s)).transpose()
+}
+
+/// Whether the allowed residue of a purged line in another transcript
+/// source of `directory` keeps `uuid` (REC-04, SEC-31).
+pub(crate) fn was_purged(
+    conn: &Connection,
+    directory: &str,
+    uuid: &str,
+    path: &str,
+) -> Result<bool, StoreError> {
+    let query = "SELECT count(*) FROM sqlite_master WHERE name = 'transcript_purged_copies'";
+    if !conn.query_row(query, [], |row| row.get::<_, bool>(0))? {
+        return Ok(false);
+    }
+    let found = conn
+        .query_row(
+            "SELECT 1 FROM transcript_purged_copies p
+             JOIN transcript_sources s ON s.id = p.source
+             WHERE p.uuid = ?1 AND s.directory = ?2 AND s.path != ?3
+             LIMIT 1",
+            params![uuid, directory, path],
+            |_| Ok(()),
+        )
+        .optional()?
+        .is_some();
+
+    Ok(found)
 }
 
 /// The ingested runs `filter` selects, `?1` and `?2` being `a` and `b`.

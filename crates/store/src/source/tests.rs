@@ -273,6 +273,21 @@ fn refused_copies_of_purged_lines_keep_only_their_zeroed_spans_and_uuids() {
 }
 
 #[test]
+fn a_purged_line_is_known_by_its_uuid_without_an_event_association() {
+    let dir = TempDir::new().unwrap();
+    let mut store = open(&dir);
+    let source = store.start_generation("/t/a.jsonl", "/t").unwrap();
+
+    store
+        .advance_refusing(source.id, &position(10, 1), &[place(1, Some("u1"))])
+        .unwrap();
+
+    assert!(store.line_was_purged("/t", "u1", "/t/b.jsonl").unwrap());
+    assert!(!store.line_was_purged("/t", "u1", "/t/a.jsonl").unwrap());
+    assert!(!store.line_was_purged("/other", "u1", "/t/b.jsonl").unwrap());
+}
+
+#[test]
 fn a_store_from_before_purged_copies_still_reads_its_sources() {
     let dir = TempDir::new().unwrap();
     let mut store = open(&dir);

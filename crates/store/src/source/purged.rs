@@ -125,10 +125,31 @@ pub(crate) fn plan(
     Ok(out)
 }
 
-/// Marks the places of the events in `range` purged.
+/// Moves the allowed residue of the events in `range` away from their
+/// event-linked places, then removes those associations (SEC-31).
 pub(crate) fn mark(conn: &Connection, range: &Erase) -> Result<(), StoreError> {
+    conn.execute_batch(
+        "CREATE TABLE IF NOT EXISTS transcript_purged_copies (
+             source INTEGER NOT NULL,
+             line INTEGER NOT NULL,
+             byte_offset INTEGER NOT NULL,
+             byte_length INTEGER NOT NULL,
+             uuid TEXT,
+             PRIMARY KEY (source, line)
+         ) STRICT, WITHOUT ROWID;
+         CREATE INDEX IF NOT EXISTS transcript_purged_copies_uuid
+             ON transcript_purged_copies (uuid);",
+    )?;
     conn.execute(
-        "UPDATE transcript_places SET purged = 1 WHERE event IN
+        "INSERT OR IGNORE INTO transcript_purged_copies
+             (source, line, byte_offset, byte_length, uuid)
+         SELECT p.source, p.line, p.byte_offset, p.byte_length, p.uuid
+         FROM transcript_places p JOIN events e ON e.rowid = p.event
+         WHERE e.writer = ?1 AND e.seq BETWEEN ?2 AND ?3",
+        params![range.writer.to_string(), sql(range.first), sql(range.last)],
+    )?;
+    conn.execute(
+        "DELETE FROM transcript_places WHERE event IN
          (SELECT rowid FROM events WHERE writer = ?1 AND seq BETWEEN ?2 AND ?3)",
         params![range.writer.to_string(), sql(range.first), sql(range.last)],
     )?;

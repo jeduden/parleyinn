@@ -25,6 +25,13 @@ fn line(n: usize, len: usize) -> String {
     format!("{head}{}\"}}\n", "y".repeat(len - head.len() - 3))
 }
 
+/// A harness organization attachment line of exactly `len` bytes.
+fn organization_line(n: usize, len: usize) -> String {
+    let head =
+        format!("{{\"attachment\":{{\"type\":\"credential_org\",\"organizationUuid\":\"{n}-");
+    format!("{head}{}\"}}}}\n", "o".repeat(len - head.len() - 4))
+}
+
 /// The line count and position of the one source in the store.
 fn source(home: &Home) -> store::Source {
     let store = Store::open(&home.store()).unwrap();
@@ -115,10 +122,10 @@ fn a_source_over_64_mib_is_ingested_across_resumes_at_its_marker() {
     let second = ingest_path(&home, &path, &redactor(), &mut OsEntropy).unwrap();
     let third = ingest_path(&home, &path, &redactor(), &mut OsEntropy).unwrap();
 
-    assert_eq!((first.events, first.resumable), (64, true));
+    assert_eq!((first.events, first.resumable), (54, true));
     assert!(first.read_window_high_water <= 64 * MIB);
-    assert_eq!(marker.position.lines, 64);
-    assert_eq!((second.events, second.resumable), (1, false));
+    assert_eq!(marker.position.lines, 54);
+    assert_eq!((second.events, second.resumable), (11, false));
     assert_eq!(third.events, 0);
     let done = source(&home);
     assert_eq!(done.position.lines, 65);
@@ -130,6 +137,23 @@ fn a_source_over_64_mib_is_ingested_across_resumes_at_its_marker() {
     assert_eq!(numbers, (1..=65).collect::<Vec<_>>());
     assert_eq!(second.generation, first.generation);
     assert!(!second.new_generation);
+}
+
+#[test]
+fn identifiers_from_a_long_source_cannot_grow_past_its_memory_ceiling() {
+    let dir = TempDir::new().unwrap();
+    let home = home(&dir);
+    let mut text: String = (1..=10).map(|n| organization_line(n, 400 * 1024)).collect();
+    text.extend((1..=64).map(|n| line(n, MIB)));
+    let path = written(&dir, &text);
+
+    let error = ingest_path(&home, &path, &redactor(), &mut OsEntropy).unwrap_err();
+
+    assert!(matches!(error, IngestError::IdentifierLimit(p) if p == path));
+    assert!(
+        !home.store().exists(),
+        "no source was recorded over the ceiling"
+    );
 }
 
 #[test]
@@ -220,7 +244,7 @@ fn a_live_ingest_reads_a_big_source_a_window_at_a_time_and_stops_at_a_refused_li
         &redactor(),
         &Inputs::default(),
         &mut seats,
-        Some(64),
+        Some(54),
         &mut OsEntropy,
     )
     .unwrap();
@@ -246,7 +270,7 @@ fn a_live_ingest_reads_a_big_source_a_window_at_a_time_and_stops_at_a_refused_li
     )
     .unwrap();
 
-    assert_eq!((first.events, last.events), (64, 1));
+    assert_eq!((first.events, last.events), (54, 11));
     assert!(limited.is_none());
     assert!(first.resumable && !last.resumable);
     assert!(done.is_none());

@@ -77,7 +77,7 @@ fn ingested(dir: &TempDir, writer: WriterId, name: &str) -> (Store, Source, Stri
             line: n,
             offset: (n - 1) * 4,
             length: 4,
-            uuid: None,
+            uuid: Some(format!("u{n}")),
         })
         .collect();
     let position = Position {
@@ -143,7 +143,7 @@ fn a_prefix_digest_wants_the_bytes_it_covers() {
 }
 
 #[test]
-fn a_purge_zeroes_its_lines_in_the_hash_and_keeps_their_place_and_length() {
+fn a_purge_zeroes_its_lines_and_keeps_only_their_place_length_and_harness_uuid() {
     let dir = TempDir::new().unwrap();
     let (mut store, source, path) = ingested(&dir, writer(1), "a.jsonl");
     store = store.with_transcripts(read);
@@ -174,7 +174,27 @@ fn a_purge_zeroes_its_lines_in_the_hash_and_keeps_their_place_and_length() {
         .iter()
         .map(|p| (p.place.offset, p.place.length))
         .collect();
-    assert_eq!(kept, [(0, 4), (4, 4), (8, 4), (12, 4), (16, 4)]);
+    assert_eq!(kept, [(0, 4), (12, 4), (16, 4)]);
+    let residue: Vec<(u64, u64, Option<String>)> = store
+        .purged_places(source.id)
+        .unwrap()
+        .into_iter()
+        .map(|p| (p.offset, p.length, p.uuid))
+        .collect();
+    assert_eq!(
+        residue,
+        [(4, 4, Some("u2".to_owned())), (8, 4, Some("u3".to_owned()))]
+    );
+    let associations: i64 = store
+        .conn
+        .query_row(
+            "SELECT count(*) FROM transcript_places p JOIN events e ON e.rowid = p.event
+             WHERE e.writer = ?1 AND e.seq BETWEEN 2 AND 3",
+            [writer(1).to_string()],
+            |row| row.get(0),
+        )
+        .unwrap();
+    assert_eq!(associations, 0, "purged residue names no event row");
     assert_eq!(std::fs::read(&path).unwrap(), BODY);
 }
 

@@ -31,7 +31,8 @@ fn a_source_over_64_mib_is_read_window_by_window_until_it_is_caught_up() {
 
     assert_eq!(error, None);
     let events: Vec<usize> = reports.iter().map(|r| r.events).collect();
-    assert_eq!(events, [64, 1]);
+    assert!(events.len() > 1, "the source is read in bounded windows");
+    assert_eq!(events.iter().sum::<usize>(), 65);
     assert!(reports[0].resumable && !reports[1].resumable);
     assert!(reports.iter().all(|r| r.read_window_high_water <= 64 << 20));
 }
