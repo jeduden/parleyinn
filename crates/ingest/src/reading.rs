@@ -528,7 +528,14 @@ fn append(
     entropy: &mut dyn Entropy,
 ) -> Result<Landed, IngestError> {
     let (bytes, base, seen) = (view.text.as_bytes(), view.base, view.seen);
-    let mut running = consumed(resume, bytes, path, base)?;
+    let mut purged = resume.source.purged.clone();
+    purged.extend(plan.refused_places.iter().map(|place| store::source::Span {
+        offset: place.offset,
+        length: place.length,
+    }));
+    purged.sort_by_key(|span| (span.offset, span.length));
+    purged.dedup();
+    let mut running = consumed(resume, bytes, path, base, &purged)?;
     let mut position = Position {
         seen,
         ..resume.position.clone()
@@ -563,13 +570,14 @@ fn append(
             lines: plan.places[range.end - 1].line,
             seen,
         };
-        let appended = store.append_lines(
+        let appended = store.append_lines_refusing(
             writer,
             &plan.events[range.clone()],
             &plan.places[range.clone()],
             &closes[range.clone()],
             resume.source.id,
             &position,
+            &plan.refused_places,
         );
         addresses.extend(appended.map_err(|source| IngestError::Partial {
             writer,
@@ -594,7 +602,11 @@ fn append(
             seen,
         };
     }
-    store.advance(resume.source.id, &position)?;
+    if plan.events.is_empty() && !plan.refused_places.is_empty() {
+        store.advance_refusing(resume.source.id, &position, &plan.refused_places)?;
+    } else {
+        store.advance(resume.source.id, &position)?;
+    }
     observing.flush(store, Some(position.offset), entropy)?;
 
     Ok(Landed {

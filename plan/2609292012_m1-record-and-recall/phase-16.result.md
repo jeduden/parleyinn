@@ -58,25 +58,30 @@ For the stakeholder:
 - §11.1 measurement wording on claude/m1-phase-16-docs (PR #90).
 - Stakeholder paths: `ci.yml`, `nightly.yml`, `tooling/`.
 
-Plan close (stays 🔳): met are recall, S12 and the checks. Raised items
-moved (plan.md, §12.2). To M3: ADM-09's landmark row, ENG-06's migration,
-`purge --run`. To M5: SEC-12's flag row, SEC-17, ENG-22, ENG-23, NFR-05's
-target. To M7: SEC-19, ENG-29, NFR-01, PRV remainders, REC-24's confirm.
-To M8: PRV-09.
+Plan close (✅): recall, S12 and the checks are met. ENG-03's mechanical
+clauses pass; the accepted stakeholder inspection on PR #91 is its
+injectable-I/O evidence, which cucumber does not claim to inspect. Raised
+items moved (plan.md, §12.2). To M3: ADM-09's landmark row, ENG-06's
+migration, `purge --run`. To M5: SEC-12's flag row, SEC-17, ENG-22,
+ENG-23, and the NFR-04 and NFR-05 targets. To M7: SEC-19, ENG-29, NFR-01,
+PRV remainders, REC-24's confirm and LANE-02's remainder. To M8: PRV-09.
 
-Open in M1, the M1 ids still `@pending` (cucumber, 2 November 2026):
+Rows that stay `@pending` after M1, with their remaining milestone
+(cucumber, 2 November 2026):
 
 - SEC-31, ADM-07: M3's; steps not bound. Ruled: only each purged line's
   position, length and the harness's own `uuid` remain (REC-17, REC-04).
-  Ruled too: NFR-03..05 in part in M1 (NFR-04 met, NFR-05's target and
-  MEM-02 in M5); `parinn ingest --path` keeps its OWN-22 gate, a path
-  inside `PARINN_HOME` stays refused (safe default).
+  Ruled too: NFR-03..05 in part in M1 (NFR-04 was benchmarked but did
+  not meet its target; the NFR-04 and NFR-05 targets and MEM-02 are in
+  M5); `parinn ingest --path` keeps its OWN-22 gate, a path inside
+  `PARINN_HOME` stays refused (safe default).
 - ADM-09: 16 of 17 rows pass; the landmark row is M3's.
 - REC-22: all steps pass but the first Then, a freshness mark with
   source and ingest position on every surface (VIEW-04, M7).
 - REC-02: its last step needs restore blocks and a join (M2).
 - REC-24: its confirm step is M7's.
-- LANE-02: the stakeholder said leave it (SEC-18).
+- LANE-02: M1's repository-identity and local-worktree-bind part holds;
+  its branch-link, room-state and complete rebinding remainder is M7.
 - In part by §12.2: SEC-12 (flag row, M5), ENG-06, -15, -23, -29, SEC-17,
   -19, PRV rows (above).
 

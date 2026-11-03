@@ -30,7 +30,7 @@ Scope, by requirement family:
 - the OWN P1 rows but OWN-01: the rest of OWN-11 and OWN-12, OWN-21,
   OWN-29
 - LANE-03 to LANE-06, LANE-13, LANE-14, LANE-17, LANE-19, LANE-21,
-  LANE-24 to LANE-33, the rest of LANE-16 and LANE-23
+  LANE-24 to LANE-33, the rest of LANE-02, LANE-16 and LANE-23
 - PRV-10, REC-18, REC-20, the rest of REC-19, RCL-09, INJ-10, the rest of
   REC-22 (its freshness mark and surfaced ingest position, with VIEW-04),
   the rest of REC-24 (the confirm a managed-policy confirmation key
@@ -57,6 +57,9 @@ Scope, by requirement family:
 3. Principal surfaces, presence proofs and the launcher: OWN rows,
    SEC-29
 4. The room model: LANE rows, PRV-10, overlaps and range links
+   including LANE-02's branch-link and room-state effects and its complete
+   rebinding scenario, whose repository-identity and local-worktree-bind part
+   M1 proved
 5. Seals, head receipts and integrity: REC-18, SEC-27, VIEW-10
 6. Quotas, budgets and the B1 boundary: ADM-15, ADM-16, NFR rows,
    SEC-20, SEC-21, ENG-12, ENG-16

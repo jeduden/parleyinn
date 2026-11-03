@@ -40,7 +40,7 @@ impl Taking {
         let home = ctx.home().map_err(|e| e.to_string())?;
         home.create().map_err(|e| e.to_string())?;
         let mut store = Store::open(&home.store())
-            .map(|store| store.with_transcripts(ingest::read::transcript))
+            .map(|store| store.with_transcripts(ingest::read::open::prefixes))
             .map_err(|e| e.to_string())?;
         let node = crate::open_node(ctx, &home, &mut store, &mut std::io::sink())?;
         let acts = act::acts(&store, &node).map_err(|e| e.to_string())?;

@@ -2,8 +2,8 @@
 //! (SEC-31, ADM-07, REC-17): the hash is recomputed with the bytes of
 //! each purged transcript line zeroed, so it confirms no guess at the
 //! purged bytes while the source still resumes; only each purged line's
-//! position and length remain, and the harness's transcript file stays
-//! as it was.
+//! position, length and harness `uuid` remain, and the harness's
+//! transcript file stays as it was.
 
 use std::fs;
 
@@ -50,15 +50,23 @@ fn confirms_nothing(store: &store::Store, source: &Source) -> Result<(), String>
     }
     let placed = store.placed(source.id).map_err(|e| e.to_string())?;
     for span in &source.purged {
-        let there = placed
+        let place = placed
             .iter()
-            .any(|p| p.place.offset == span.offset && p.place.length == span.length);
+            .find(|p| p.place.offset == span.offset && p.place.length == span.length)
+            .ok_or_else(|| format!("{name}: a purged line's position or length is gone"))?;
         let end = usize::try_from(span.offset + span.length).unwrap_or(usize::MAX);
-        let kept = bytes
+        let line = bytes
             .get(span.offset as usize..end)
-            .is_some_and(|b| b.iter().any(|byte| *byte != 0));
-        if !(there && kept) {
-            return Err(format!("{name}: a purged line's place or bytes changed"));
+            .ok_or_else(|| format!("{name}: a purged line's bytes are gone"))?;
+        let harness: serde_json::Value = serde_json::from_slice(line)
+            .map_err(|e| format!("{name}: a purged transcript line is not JSON: {e}"))?;
+        let uuid = harness["uuid"]
+            .as_str()
+            .ok_or_else(|| format!("{name}: a purged transcript line has no harness uuid"))?;
+        if place.place.uuid.as_deref() != Some(uuid) {
+            return Err(format!(
+                "{name}: the retained uuid is not the harness's own uuid"
+            ));
         }
     }
 
@@ -78,11 +86,11 @@ pub fn hash_confirms_nothing(w: &mut World) -> Result<(), String> {
 
 /// Each purged source's hash confirms nothing, `parinn ingest` resumes
 /// it in its own generation and `parinn verify` exits 0.
-fn closed(w: &mut World) -> Result<(), String> {
+pub fn closed(w: &mut World) -> Result<(), String> {
     hash_confirms_nothing(w)?;
     for source in &purged_sources(w)? {
         let before = generations(w, &source.path)?;
-        run_core(w, &["ingest", "--path", &source.path], None)?;
+        run_core(w, &["ingest", "--all"], None)?;
         succeeded(w, "parinn ingest")?;
         if generations(w, &source.path)? != before {
             return Err(format!("{} did not resume: a new generation", source.path));
@@ -114,14 +122,14 @@ fn succeeded(w: &mut World, what: &str) -> Result<(), String> {
 }
 
 #[then(
-    regex = r#"^the transcript source's consumed-prefix hash is recomputed over the prefix with the bytes of each purged transcript line zeroed, so it confirms no guess at the purged bytes, only each purged line's position and length remain, only ParleyInn's own record of the source changes, never the harness's transcript file, and "parinn ingest" resumes the source and "parinn verify" exits 0$"#
+    regex = r#"^the transcript source's consumed-prefix hash is recomputed over the prefix with the bytes of each purged transcript line zeroed, so it confirms no guess at the purged bytes, only each purged line's position, length and the harness's own `uuid` remain, only ParleyInn's own record of the source changes, never the harness's transcript file, and "parinn ingest" resumes the source and "parinn verify" exits 0$"#
 )]
 fn security_residue_closed(w: &mut World) -> Result<(), String> {
     closed(w)
 }
 
 #[then(
-    regex = r#"^the consumed-prefix hash of each transcript source with a purged line is recomputed with the bytes of each purged transcript line zeroed, so it confirms no guess at the purged bytes, only ParleyInn's own record of the source changes, never the harness's transcript file, and "parinn ingest" resumes that source$"#
+    regex = r#"^the consumed-prefix hash of each transcript source with a purged line is recomputed with the bytes of each purged transcript line zeroed, so it confirms no guess at the purged bytes, only each purged line's position, length and the harness's own `uuid` remain, only ParleyInn's own record of the source changes, never the harness's transcript file, and "parinn ingest" resumes that source$"#
 )]
 fn administration_residue_closed(w: &mut World) -> Result<(), String> {
     closed(w)

@@ -54,9 +54,10 @@ form the [domain model](../domain-model/record.md) lists under Address
 and MUST be logged as extending recall (RCL-05, RCL-10). No recall tool but
 `room_summary_get` returns a `summary` event: `event_search`, `event_expand`,
 `event_get` and `room_get` with `id` MUST return only its address (LANE-33).
-The `kind` filter of `event_search` matches the provenance class family, as the
-envelope's `kind` shows: `tool_result` matches every `tool_result:<tool>`
-(RCL-02).
+The versioned `kind` filter of `event_search` is the provenance class family
+selector, not an event-kind selector: `tool_result` matches every
+`tool_result:<tool>` (RCL-02). An envelope item's `kind` remains its event kind,
+recorded apart from provenance.
 
 | Tool                    | Pri | Parameters                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         | Returns                                                                                                                                                                                                                                                                                                                                                       | Limits                                           |
 | ----------------------- | --- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------ |

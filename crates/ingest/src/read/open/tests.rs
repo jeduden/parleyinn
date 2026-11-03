@@ -189,12 +189,37 @@ fn each_line_up_to_an_offset_is_given_a_window_at_a_time() {
 
     for_each_line(&path, u64::MAX, |_| all += 1).unwrap();
     for_each_line(&path, 12, |t| early.push(t.to_owned())).unwrap();
+    let mut middle = Vec::new();
+    for_each_line_between(&path, (MIB + 1) as u64, 3 * (MIB + 1) as u64, |t| {
+        middle.push(t.len())
+    })
+    .unwrap();
     let lined = written(&dir, b"a\nbb\nccc\n");
     for_each_line(&lined, 5, |t| early.push(t.to_owned())).unwrap();
 
     assert_eq!(all, 66);
     assert_eq!(early, ["a", "bb"]);
+    assert_eq!(middle, [MIB, MIB]);
     assert!(for_each_line(dir.path(), 0, |_| ()).is_err());
+}
+
+#[test]
+fn a_file_prefix_is_hashed_a_chunk_at_a_time_with_purged_spans_zeroed() {
+    let dir = TempDir::new().unwrap();
+    let bytes = lines_of(2, 20);
+    let path = written(&dir, &bytes);
+    let spans = [Span {
+        offset: 4,
+        length: 8,
+    }];
+    let mut expected = Zeroed::new(&spans);
+    expected.update(&bytes);
+
+    assert_eq!(
+        prefix(&path, bytes.len() as u64, &spans).unwrap(),
+        Some(expected.digest())
+    );
+    assert_eq!(prefix(&path, bytes.len() as u64 + 1, &spans).unwrap(), None);
 }
 
 #[test]

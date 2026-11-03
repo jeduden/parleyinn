@@ -12,14 +12,14 @@ use std::path::Path;
 use record::digest::Digest;
 use rusqlite::{Connection, Transaction, params};
 
-use super::{Source, Span, count, prefix_digest, select, unconfirmable};
+use super::{Source, Span, count, select, unconfirmable};
 use crate::purge::Erase;
 use crate::{Store, StoreError, sql};
 
 /// How a purge reads a transcript's bytes: the guarded read the harness's
 /// transcripts get (SEC-18, ENG-03), injected by the program that links
 /// it.
-pub type Transcripts = fn(&Path) -> io::Result<Vec<u8>>;
+pub type Transcripts = fn(&Path, u64, &[Span], &[Span]) -> io::Result<Option<(Digest, Digest)>>;
 
 impl Store {
     /// This store, a purge reading the transcripts it recomputes the
@@ -88,13 +88,16 @@ fn merged(old: &[Span], new: &[Span]) -> Vec<Span> {
 /// its transcript; none-confirming when the transcript cannot be read or
 /// no longer begins with the bytes the stored hash covers.
 fn recomputed(source: &Source, spans: &[Span], read: Option<Transcripts>) -> Digest {
-    let bytes = read.and_then(|read| read(Path::new(&source.path)).ok());
+    let Some(read) = read else {
+        return unconfirmable();
+    };
+    let path = Path::new(&source.path);
     let offset = source.position.offset;
-    bytes
-        .and_then(|bytes| {
-            let held = prefix_digest(&bytes, offset, &source.purged)?;
-            (held == source.position.prefix).then(|| prefix_digest(&bytes, offset, spans))?
-        })
+    read(path, offset, &source.purged, spans)
+        .ok()
+        .flatten()
+        .filter(|(held, _)| *held == source.position.prefix)
+        .map(|(_, recomputed)| recomputed)
         .unwrap_or_else(unconfirmable)
 }
 

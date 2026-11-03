@@ -93,12 +93,12 @@ pub(crate) fn peek(home: &Home, path: &Path) -> Result<Option<Source>, IngestErr
 /// lines zeroed: of `bytes` when they begin the source, else of the
 /// source at `path`, a chunk at a time (SEC-31, SEC-05).
 pub(super) fn consumed<'s>(
-    resume: &'s Resume,
+    resume: &Resume,
     bytes: &[u8],
     path: &Path,
     base: u64,
+    purged: &'s [store::source::Span],
 ) -> Result<Zeroed<'s>, IngestError> {
-    let purged = &resume.source.purged;
     if base == 0 {
         let mut running = Zeroed::new(purged);
         running.update(

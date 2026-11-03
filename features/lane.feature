@@ -29,6 +29,8 @@ Feature: Room (LANE)
 
   @LANE-02 @P0 @I1 @I6 @I8 @pending
   Scenario Outline: a repository's identity is independent of the local path
+    M1 proves repository identity and local worktree binds. M7 completes the
+    branch-link, room-state and rebinding steps.
     Given an isolated ParleyInn home
     And a repository clone that <clone>
     When the first hook event for the clone arrives

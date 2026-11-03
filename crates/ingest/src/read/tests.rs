@@ -38,14 +38,14 @@ fn a_last_line_without_its_newline_waits_unless_it_parses() {
 }
 
 #[test]
-fn a_regular_file_is_read_whole() {
+fn a_regular_file_is_scanned_for_its_last_complete_line() {
     let dir = TempDir::new().unwrap();
     let path = dir.path().join("t.jsonl");
-    std::fs::write(&path, "x\n").unwrap();
+    std::fs::write(&path, "x\ny").unwrap();
 
-    assert_eq!(transcript(&path).unwrap(), b"x\n");
+    assert_eq!(complete(&path).unwrap(), 2);
     assert_eq!(
-        transcript(&dir.path().join("none")).unwrap_err().kind(),
+        complete(&dir.path().join("none")).unwrap_err().kind(),
         io::ErrorKind::NotFound
     );
 }
@@ -54,7 +54,7 @@ fn a_regular_file_is_read_whole() {
 fn a_directory_or_link_is_refused_before_it_is_opened() {
     let dir = TempDir::new().unwrap();
 
-    let err = transcript(dir.path()).unwrap_err();
+    let err = complete(dir.path()).unwrap_err();
     assert_eq!(err.to_string(), "not a regular file");
 
     #[cfg(unix)]
@@ -64,7 +64,7 @@ fn a_directory_or_link_is_refused_before_it_is_opened() {
         let link = dir.path().join("link.jsonl");
         std::os::unix::fs::symlink(&target, &link).unwrap();
         assert_eq!(
-            transcript(&link).unwrap_err().to_string(),
+            complete(&link).unwrap_err().to_string(),
             "not a regular file"
         );
     }
@@ -100,7 +100,7 @@ fn a_fifo_is_refused_without_blocking() {
     mkfifo(&fifo);
 
     assert_eq!(
-        transcript(&fifo).unwrap_err().to_string(),
+        complete(&fifo).unwrap_err().to_string(),
         "not a regular file"
     );
     // Opened anyway, as a swap after the look would open it, it does not

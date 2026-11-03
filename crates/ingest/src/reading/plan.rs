@@ -58,6 +58,9 @@ pub(super) struct Plan {
     /// How many lines were refused: their `uuid` names a purged event
     /// (REC-04).
     pub(super) refused: usize,
+    /// The positions, lengths and harness UUIDs of those refused copies,
+    /// whose bytes the consumed-prefix hash takes as zeros (SEC-31).
+    pub(super) refused_places: Vec<Place>,
     /// The line number and end offset of the last line refused, so the
     /// ingest position moves past a refusal no recorded line follows.
     pub(super) refused_to: Option<(u64, u64)>,
@@ -178,6 +181,12 @@ impl<'a> Planner<'a> {
             }
             if decision == Decision::Refused {
                 plan.refused += 1;
+                plan.refused_places.push(Place {
+                    line: read.first_line + i as u64 + 1,
+                    offset: line.offset,
+                    length: line.end - line.offset,
+                    uuid: read.parsed[i]["uuid"].as_str().map(str::to_owned),
+                });
                 plan.refused_to = Some((read.first_line + i as u64 + 1, line.end));
                 continue;
             }

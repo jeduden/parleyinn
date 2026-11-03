@@ -1,7 +1,7 @@
 ---
 id: 2609292012
 title: "M1: record and recall"
-status: "🔳"
+status: "✅"
 summary: >-
   The append-only record of writer logs under seat keys a node's
   device key certifies, provenance, trust and origin, pull-only recall
@@ -21,23 +21,21 @@ counted.
 
 ## Context
 
-Milestone M1 of [§12.2](../../docs/srs/12-delivery-plan.md). It replaces
-a plan from before SRS 2.0, which keyed events by a local sequence. SRS
-2.0 to 3.0 put the record on the seats, writers and keys of the
-[domain model](../../docs/domain-model/index.md),
-under [ADR-2610112209], [ADR-2610112004] and [ADR-2610122234]:
+M1 is [§12.2](../../docs/srs/12-delivery-plan.md)'s record and recall
+milestone. It replaces a pre-SRS 2.0 plan keyed by local sequence. SRS
+2.0 to 3.0 put the record on the
+[domain model](../../docs/domain-model/index.md) under [ADR-2610112209],
+[ADR-2610112004] and [ADR-2610122234]:
 
 - A node's device key starts its genesis log, a key event log (PRV-12),
   and certifies every seat key (PRV-11).
-- Each seat has its own writer; an event's address is (writer, `seq`),
-  on a hash chain over a header carrying a commitment (REC-06, REC-10,
-  REC-17).
-- The personal room exists from the first start. A witnessed run's MCP
-  server records it in its run seat's writer. An ingest seat records what
-  `parinn ingest` reads, with origin `ingested` (REC-19, REC-22).
-- Origin and trust derive from the record and the node's key set
-  alone (PRV-02, PRV-13). The search index rebuilds identical in content in
-  any arrival order (I10, [ADR-2610112004]).
+- Each seat has a writer. Events use (writer, `seq`) addresses on a
+  commitment-bearing hash chain (REC-06, REC-10, REC-17).
+- The personal room exists from first start. MCP records witnessed runs;
+  an ingest seat records `parinn ingest`, origin `ingested` (REC-19, REC-22).
+- Origin and trust derive from the record and key set (PRV-02, PRV-13).
+  Its search index rebuilds identically in any arrival order
+  (I10, ADR-2610112004).
 
 [ADR-2610050528] and [ADR-2610042341] settle language and shell; OQ-32 is
 how the components ship.
@@ -87,6 +85,9 @@ These land in part, as §12.2 bounds them or as their scenarios reach past M1:
 | ENG-23, ENG-29                  | semantic versions, a changelog, the ADR gate                            | migration tests, M5; B1 to B3 past a prototype, M7                      |
 | PRV-01, -02, -04, -05, -06, -08 | rows a transcript, hook input or the key set prove                      | a signed sandbox state, rooms, the launcher, M7; another node's key, M8 |
 
+LANE-02 is partial. M1 records repository identity and local worktree binds.
+M7 completes its branch-link, room-state and rebinding steps.
+
 A scenario of a row that lands in part stays `@pending`, its M1 part
 proven by bound steps or named tests, as ENG-12 in plan 2609292011. One
 that cannot pass as written is raised, never re-pended.
@@ -95,9 +96,8 @@ The reach test and release build prove CON-02 to CON-05; M1's last phase
 closes plan 2609292011's ENG-03 and ENG-15.
 
 S2 ([ADR-2610110553]): `rusqlite`, BM25 over 2,000 matches in 172 ms p95.
-S7 ([ADR-2610102211]): an in-house stdio MCP server. S1, S3, S13: Claude
-Code 2.1.296's inputs in `testdata/claude-code`. S8: the §8.4 estimator.
-S12: row ids from addresses, secure delete, a WAL checkpoint.
+S7: an in-house MCP server ([ADR-2610102211]). S1, S3 and S13 use Claude
+Code 2.1.296 fixtures; S8 is the estimator; S12 covers purge storage.
 
 ### The stakeholder's rulings of 14 October 2026
 
@@ -124,13 +124,15 @@ cucumber:
 - **Purge residue (ruled):** only each purged line's position, length and
   the harness's own `uuid` remain (beside the tombstone, REC-04); SEC-31
   and ADM-07 stay `@pending` (M3). NFR-03..05 land in part (benchmarks,
-  ENG-15 gate); NFR-04 met, NFR-05's target and MEM-02 wait for M5.
+  ENG-15 gate); NFR-04 was benchmarked but its target, NFR-05's target and
+  MEM-02 wait for M5.
   `parinn ingest --path` keeps its OWN-22 gate; a path inside
   `PARINN_HOME` stays refused (safe default, not changed).
 - **REC-22 in part:** all steps pass but the first Then, a freshness mark
   with source and ingest position on every surface: none shows one before
   VIEW-04 (M7). **REC-24 in part:** its confirm step is M7's.
-- **LANE-02** stays `@pending`. Verify's 60 s bound: postponed. PRV-09,
+- **LANE-02** stays `@pending` for its M7 remainder. Verify's 60 s bound:
+  postponed. PRV-09,
   PRV-02's peer rows: §11.2 option C.
 - Stakeholder consent still needed on `docs/srs/**`,
   `docs/domain-model/record.md` and `features/**`, as the PR lists.
@@ -275,29 +277,23 @@ footer: |
 
 ## Acceptance Criteria
 
-- [ ] Every scenario of a row M1 lands in full passes, off `@pending`
-  (open: LANE-02, ruled to stay; SEC-31 and ADM-07, steps being bound)
-- [ ] Each row M1 lands in part has its M1 part proven, and its scenario
-  names what keeps it pending (REC-22 VIEW-04, REC-02 and REC-24 as
-  above; SEC-31 and ADM-07 not yet bound)
-- [x] Recall of at least 95% after 1 to 3 compactions (§11.1): CI's
-  `eval` job, 216 of 216
-- [x] `parinn verify` proves completeness (@ADM-09, 16 of 17 rows) and
-  quarantine is effective (@RCL-06; @SEC-12's seven rows); the landmark
-  row is M3's, the flag row M5's
-- [x] Two writers' logs rebuild one identical search index (S12): the
-  `s12_rebuild` test
-- [x] A purged event leaves no value that confirms a guess at it: @REC-17
-  compares the stored hash with the zeroed-prefix digest and requires it
-  differs from the original; only position, length and the harness's own
-  `uuid` remain (stakeholder ruling)
-- [x] Every dependency M1 adds has an accepted ADR (ENG-18, ENG-26),
-  within the budget the stakeholder rules
+- [x] Every scenario of a row M1 lands in full passes, off `@pending`
+- [x] Every M1 part is proven. Remainders: REC-02 → M2; ADM-07, ADM-09
+  and SEC-31 → M3; SEC-12 and NFR-04/05 → M5; REC-22/24 and LANE-02 →
+  M7; PRV-09's peer rows → M8
+- [x] CI `eval` recalls 216/216 at one to three compactions (§11.1)
+- [x] `parinn verify` proves completeness (16/17 ADM-09 rows), and
+  quarantine works (RCL-06; seven SEC-12 rows); remainders are assigned
+- [x] S12's `s12_rebuild` makes one identical index from two writer logs
+- [x] REC-17 leaves no value that confirms a purged event: only position,
+  length and the harness's own `uuid` remain (stakeholder ruling)
+- [x] M1's dependencies have accepted ADRs and meet ENG-18/ENG-26
 - [x] ENG-11's coverage floors hold for every security-sensitive crate
 - [x] The fuzz targets of ENG-07 run nightly from committed corpora
 - [x] The six §12.3 targets of M1 are frozen, each with evidence
-- [ ] @ENG-03 passes and closes plan 2609292011's 3; its 4 (@ENG-15)
-  closes with NFR-01 in M7 and NFR-05's target in M5
+- [x] ENG-03's mechanical clauses pass. [PR #91][consent] proves injectable
+  I/O; cucumber does not claim it. ENG-15 closes
+  with NFR-01 in M7 and NFR-05 in M5
 - [x] All tests pass: `cargo test --workspace`
 - [x] `cargo clippy ... -D warnings` and `cargo fmt --all --check` are clean
 - [x] `mdsmith check .` is clean
@@ -310,3 +306,4 @@ footer: |
 [ADR-2610110553]: ../../docs/adr/ADR-2610110553-sqlite-rusqlite.md
 [ADR-2610102211]: ../../docs/adr/ADR-2610102211-mcp-server-in-house.md
 [pr46]: https://github.com/jeduden/parleyinn/pull/46
+[consent]: https://github.com/jeduden/parleyinn/pull/91#issuecomment-6402652493

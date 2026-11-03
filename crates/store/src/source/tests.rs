@@ -237,6 +237,58 @@ fn a_position_moves_only_forward() {
 }
 
 #[test]
+fn refused_copies_of_purged_lines_keep_only_their_zeroed_spans_and_uuids() {
+    let dir = TempDir::new().unwrap();
+    let mut store = open(&dir);
+    let source = store.start_generation("/t/a.jsonl", "/t").unwrap();
+    let refused = [place(1, Some("u1")), place(2, Some("u2"))];
+
+    store
+        .advance_refusing(source.id, &position(20, 2), &refused)
+        .unwrap();
+
+    let source = store.source("/t/a.jsonl").unwrap().unwrap();
+    assert_eq!(
+        source.purged,
+        [
+            Span {
+                offset: 0,
+                length: 10
+            },
+            Span {
+                offset: 10,
+                length: 10
+            }
+        ]
+    );
+    let uuids: Vec<String> = store
+        .conn
+        .prepare("SELECT uuid FROM transcript_purged_copies ORDER BY line")
+        .unwrap()
+        .query_map([], |row| row.get(0))
+        .unwrap()
+        .collect::<Result<_, _>>()
+        .unwrap();
+    assert_eq!(uuids, ["u1", "u2"]);
+}
+
+#[test]
+fn a_store_from_before_purged_copies_still_reads_its_sources() {
+    let dir = TempDir::new().unwrap();
+    let mut store = open(&dir);
+    let source = store.start_generation("/t/a.jsonl", "/t").unwrap();
+    store
+        .conn
+        .execute_batch(
+            "DROP INDEX transcript_purged_copies_uuid;
+             DROP TABLE transcript_purged_copies;",
+        )
+        .unwrap();
+
+    assert_eq!(store.source("/t/a.jsonl").unwrap(), Some(source));
+}
+
+#[test]
 fn advance_hold_and_lose_change_only_the_state() {
     let dir = TempDir::new().unwrap();
     let mut store = open(&dir);

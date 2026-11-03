@@ -38,8 +38,8 @@ ENG-25, the §11 evaluation, the external review and the pilot.
 6. Mutation testing and the maintainer runbook: ENG-13, ENG-25
 7. Run the §11.1 evaluation and publish it, with ENG-15's NFR-05
    benchmark against its target on the reference hardware
-   and NFR-04's target (met), which M1 benchmarked but did not meet, by
-   the stakeholder's ruling; MEM-02 (P1) lands here with the remaining P1
+   and meet NFR-04's target, which M1 benchmarked but did not meet;
+   MEM-02 (P1) lands here with the remaining P1
 8. External security review and the two-week pilot; SEC-17's recorded
    review and release gate, the rest of ENG-22 (every statement cites a
    passing test) and ENG-23's migration tests from every previous minor version,

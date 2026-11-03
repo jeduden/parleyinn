@@ -90,7 +90,7 @@ pub(crate) fn apply_opened(
         Ok((store, node)) => {
             // A purge recomputes each source's prefix hash over its
             // transcript (SEC-31).
-            let mut store = store.with_transcripts(ingest::read::transcript);
+            let mut store = store.with_transcripts(ingest::read::open::prefixes);
             apply(ctx, &mut store, &node, settings, entropy);
         }
         Err(e) => failed(ctx, &e),

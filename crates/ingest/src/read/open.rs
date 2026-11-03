@@ -6,6 +6,7 @@
 use std::io::{self, Read, Seek, SeekFrom};
 use std::path::Path;
 
+use record::digest::Digest;
 use store::source::Zeroed;
 use store::{Source, source::Span};
 
@@ -107,6 +108,41 @@ pub fn zeroed(mut file: impl Read, offset: u64, purged: &[Span]) -> io::Result<O
     Ok(Some(hash))
 }
 
+/// The digest of the first `offset` bytes of the transcript at `path`,
+/// `purged` zeroed, read a chunk at a time; none when it holds fewer
+/// (SEC-05, SEC-31).
+pub fn prefix(path: &Path, offset: u64, purged: &[Span]) -> io::Result<Option<Digest>> {
+    prefixes(path, offset, purged, purged).map(|pair| pair.map(|(digest, _)| digest))
+}
+
+/// Two digests of the first `offset` bytes of one guarded read of the
+/// transcript at `path`, each zeroing its own spans. Purge uses the pair
+/// to validate the old prefix and replace it without a second read racing
+/// a changed source (SEC-05, SEC-31).
+pub fn prefixes(
+    path: &Path,
+    offset: u64,
+    first: &[Span],
+    second: &[Span],
+) -> io::Result<Option<(Digest, Digest)>> {
+    let mut file = regular_file(path)?;
+    let (mut one, mut two) = (Zeroed::new(first), Zeroed::new(second));
+    let mut buffer = vec![0; CHUNK];
+    let mut left = offset;
+    while left > 0 {
+        let want = usize::try_from(left).map_or(CHUNK, |l| l.min(CHUNK));
+        let n = file.read(&mut buffer[..want])?;
+        if n == 0 {
+            return Ok(None);
+        }
+        one.update(&buffer[..n]);
+        two.update(&buffer[..n]);
+        left -= n as u64;
+    }
+
+    Ok(Some((one.digest(), two.digest())))
+}
+
 /// Calls `each` with every line of the transcript at `path` that ends at
 /// or before byte offset `until`, one window at a time; a line past the
 /// line ceiling is stepped over, a line not UTF-8 read lossily.
@@ -115,8 +151,22 @@ pub fn zeroed(mut file: impl Read, offset: u64, purged: &[Span]) -> io::Result<O
 ///
 /// Fails as [`regular_file`] does, or when a read does.
 pub fn for_each_line(path: &Path, until: u64, mut each: impl FnMut(&str)) -> io::Result<()> {
-    let mut from = 0;
+    for_each_line_between(path, 0, until, &mut each)
+}
+
+/// Calls `each` with every line beginning at `from` and ending at or
+/// before `until`, one bounded window at a time. Both offsets are line
+/// boundaries written by ingest (SEC-05, PRV-14).
+pub fn for_each_line_between(
+    path: &Path,
+    mut from: u64,
+    until: u64,
+    mut each: impl FnMut(&str),
+) -> io::Result<()> {
     loop {
+        if from >= until {
+            return regular_file(path).map(drop);
+        }
         let got = window(regular_file(path)?, from, Limits::default())?;
         let text = String::from_utf8_lossy(&got.bytes);
         for line in lines_at(&text, from) {

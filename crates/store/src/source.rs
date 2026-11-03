@@ -19,9 +19,9 @@
 use record::digest::{Digest, Running};
 use record::event::EventKind;
 use record::id::{Address, WriterId};
-use rusqlite::{Connection, OptionalExtension, Transaction, params};
+use rusqlite::{Connection, OptionalExtension, Transaction, TransactionBehavior, params};
 
-use crate::{Store, StoreError, seq_of, sql};
+use crate::{NewEvent, Out, Store, StoreError, seq_of, sql};
 
 pub(crate) mod purged;
 pub use purged::Transcripts;
@@ -65,6 +65,16 @@ CREATE TABLE transcript_places (
     UNIQUE (source, line)
 ) STRICT;
 CREATE INDEX transcript_places_uuid ON transcript_places (uuid) WHERE uuid IS NOT NULL;
+CREATE TABLE IF NOT EXISTS transcript_purged_copies (
+    source INTEGER NOT NULL,
+    line INTEGER NOT NULL,
+    byte_offset INTEGER NOT NULL,
+    byte_length INTEGER NOT NULL,
+    uuid TEXT NOT NULL,
+    PRIMARY KEY (source, line)
+) STRICT, WITHOUT ROWID;
+CREATE INDEX IF NOT EXISTS transcript_purged_copies_uuid
+    ON transcript_purged_copies (uuid);
 CREATE TABLE ingested_runs (
     writer TEXT PRIMARY KEY,
     path TEXT NOT NULL,
@@ -160,7 +170,13 @@ impl<'a> Zeroed<'a> {
             }
             let (start, stop) = (as_index(start - self.at), as_index(stop - self.at));
             self.running.update(&bytes[from..start]);
-            self.running.update(&vec![0; stop - start]);
+            let mut zeroes = stop - start;
+            const ZEROES: [u8; 4096] = [0; 4096];
+            while zeroes > 0 {
+                let take = zeroes.min(ZEROES.len());
+                self.running.update(&ZEROES[..take]);
+                zeroes -= take;
+            }
             from = stop;
         }
         self.running.update(&bytes[from..]);
@@ -326,6 +342,27 @@ fn spans(conn: &Connection, id: i64) -> Result<Vec<Span>, StoreError> {
             length: count(length),
         });
     }
+    let has_copies = conn.query_row(
+        "SELECT count(*) FROM sqlite_master WHERE name = 'transcript_purged_copies'",
+        [],
+        |r| r.get::<_, bool>(0),
+    )?;
+    if has_copies {
+        let mut statement = conn.prepare(
+            "SELECT byte_offset, byte_length FROM transcript_purged_copies
+             WHERE source = ?1 ORDER BY byte_offset",
+        )?;
+        let rows = statement.query_map([id], |r| Ok((r.get::<_, i64>(0)?, r.get::<_, i64>(1)?)))?;
+        for row in rows {
+            let (offset, length) = row?;
+            spans.push(Span {
+                offset: count(offset),
+                length: count(length),
+            });
+        }
+        spans.sort_by_key(|span| (span.offset, span.length));
+        spans.dedup();
+    }
 
     Ok(spans)
 }
@@ -490,6 +527,124 @@ pub(crate) fn place(
     }
 
     Ok(())
+}
+
+/// Keeps the positions, lengths and harness UUIDs of refused copies of
+/// purged lines. Their bytes are zeroed in the source's consumed-prefix
+/// hash, so the record keeps nothing derived from their content (REC-04,
+/// SEC-31).
+pub(crate) fn refuse_copies(
+    conn: &Connection,
+    id: i64,
+    places: &[Place],
+) -> Result<(), StoreError> {
+    if places.is_empty() {
+        return Ok(());
+    }
+    conn.execute_batch(
+        "CREATE TABLE IF NOT EXISTS transcript_purged_copies (
+             source INTEGER NOT NULL,
+             line INTEGER NOT NULL,
+             byte_offset INTEGER NOT NULL,
+             byte_length INTEGER NOT NULL,
+             uuid TEXT NOT NULL,
+             PRIMARY KEY (source, line)
+         ) STRICT, WITHOUT ROWID;
+         CREATE INDEX IF NOT EXISTS transcript_purged_copies_uuid
+             ON transcript_purged_copies (uuid);",
+    )?;
+    let mut insert = conn.prepare(
+        "INSERT OR IGNORE INTO transcript_purged_copies
+             (source, line, byte_offset, byte_length, uuid)
+         VALUES (?1, ?2, ?3, ?4, ?5)",
+    )?;
+    for place in places {
+        insert.execute(params![
+            id,
+            sql_count(place.line),
+            sql_count(place.offset),
+            sql_count(place.length),
+            place.uuid
+        ])?;
+    }
+
+    Ok(())
+}
+
+impl Store {
+    /// Appends transcript lines and atomically keeps the positions of
+    /// refused copies of purged lines which the new position crosses.
+    /// The copies' bytes are zeroed in the position's hash (REC-04,
+    /// SEC-31).
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "the appended lines and refused copies share one source position transaction"
+    )]
+    pub fn append_lines_refusing(
+        &mut self,
+        writer: WriterId,
+        new_events: &[NewEvent],
+        places: &[Place],
+        closes: &[bool],
+        id: i64,
+        position: &Position,
+        refused: &[Place],
+    ) -> Result<Vec<Address>, StoreError> {
+        let to = Out {
+            payloads: &self.payloads,
+            threshold: self.threshold,
+        };
+        let tx = self
+            .conn
+            .transaction_with_behavior(TransactionBehavior::Immediate)?;
+        let first = places
+            .first()
+            .into_iter()
+            .chain(refused.first())
+            .map(|p| p.offset)
+            .min()
+            .unwrap_or(position.offset);
+        if offset(&tx, id)? > first {
+            return Err(StoreError::PositionMoved { source: id });
+        }
+        let mut out = Vec::with_capacity(new_events.len());
+        let mut start = 0;
+        for i in 0..new_events.len() {
+            let close = closes.get(i).copied().unwrap_or(false);
+            if close || i + 1 == new_events.len() {
+                out.extend(to.append_chunk(&tx, writer, &new_events[start..=i], close)?);
+                start = i + 1;
+            }
+        }
+        refuse_copies(&tx, id, refused)?;
+        place(&tx, id, &out, places)?;
+        advance(&tx, id, position, self.marker_time)?;
+        tx.commit()?;
+
+        Ok(out)
+    }
+
+    /// Moves a source past refused copies of purged lines, keeping their
+    /// positions and zeroed hash in one transaction (REC-04, SEC-31).
+    pub fn advance_refusing(
+        &mut self,
+        id: i64,
+        position: &Position,
+        refused: &[Place],
+    ) -> Result<(), StoreError> {
+        let tx = self
+            .conn
+            .transaction_with_behavior(TransactionBehavior::Immediate)?;
+        let first = refused.first().map_or(position.offset, |p| p.offset);
+        if offset(&tx, id)? > first {
+            return Err(StoreError::PositionMoved { source: id });
+        }
+        refuse_copies(&tx, id, refused)?;
+        advance(&tx, id, position, self.marker_time)?;
+        tx.commit()?;
+
+        Ok(())
+    }
 }
 
 /// The events of source `id`, in line order.

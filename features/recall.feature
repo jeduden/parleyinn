@@ -20,7 +20,7 @@ Feature: Recall (RCL)
     And the call is recorded as no recall event
 
   @RCL-02 @P0
-  Scenario Outline: event search honours its filters and caps hits at k
+  Scenario Outline: event search filters exact provenance and provenance families and caps hits at k
     Given an isolated ParleyInn home
     And an agent run with a Claude Code transcript "mixed-provenance"
     When the agent calls the MCP tool "event_search" with <args>

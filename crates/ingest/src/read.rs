@@ -21,22 +21,29 @@ pub struct Line<'a> {
     pub end: u64,
 }
 
-/// The bytes of the transcript at `path`, a path already resolved
-/// within the allowed roots. It is opened only when it is a regular
-/// file, without blocking should it become a FIFO, and read only when
-/// the file opened is the one looked at: a link or other file swapped in
-/// between is refused.
+/// The byte offset just past the last complete line of the transcript at
+/// `path`, found a chunk at a time without holding the source (SEC-05).
 ///
 /// # Errors
 ///
 /// Fails when the path is not a regular file, cannot be opened or read,
 /// or changed between the look and the open.
-pub fn transcript(path: &Path) -> io::Result<Vec<u8>> {
+pub fn complete(path: &Path) -> io::Result<u64> {
     let mut file = regular_file(path)?;
-    let mut bytes = Vec::new();
-    file.read_to_end(&mut bytes)?;
+    let mut buffer = [0; 64 * 1024];
+    let (mut at, mut complete) = (0_u64, 0_u64);
+    loop {
+        let n = file.read(&mut buffer)?;
+        if n == 0 {
+            break;
+        }
+        if let Some(i) = buffer[..n].iter().rposition(|byte| *byte == b'\n') {
+            complete = at + i as u64 + 1;
+        }
+        at += n as u64;
+    }
 
-    Ok(bytes)
+    Ok(complete)
 }
 
 /// The window of the transcript at `path` from byte offset `from`: whole

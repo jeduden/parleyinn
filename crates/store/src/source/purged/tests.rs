@@ -27,11 +27,18 @@ fn range(writer: WriterId, first: u64, last: u64) -> Erase {
     }
 }
 
-fn read(path: &Path) -> io::Result<Vec<u8>> {
-    std::fs::read(path)
+fn read(
+    path: &Path,
+    offset: u64,
+    first: &[Span],
+    second: &[Span],
+) -> io::Result<Option<(Digest, Digest)>> {
+    let bytes = std::fs::read(path)?;
+    Ok(crate::source::prefix_digest(&bytes, offset, first)
+        .zip(crate::source::prefix_digest(&bytes, offset, second)))
 }
 
-fn unreadable(_: &Path) -> io::Result<Vec<u8>> {
+fn unreadable(_: &Path, _: u64, _: &[Span], _: &[Span]) -> io::Result<Option<(Digest, Digest)>> {
     Err(io::Error::other("unreadable"))
 }
 
@@ -124,11 +131,14 @@ fn a_prefix_digest_wants_the_bytes_it_covers() {
     }];
 
     assert_eq!(
-        prefix_digest(BODY, 8, &span),
+        crate::source::prefix_digest(BODY, 8, &span),
         Some(digest(&zeroed(&[2])[..8]))
     );
-    assert_eq!(prefix_digest(BODY, 0, &[]), Some(digest(&[])));
-    assert_eq!(prefix_digest(BODY, 21, &[]), None);
+    assert_eq!(
+        crate::source::prefix_digest(BODY, 0, &[]),
+        Some(digest(&[]))
+    );
+    assert_eq!(crate::source::prefix_digest(BODY, 21, &[]), None);
     assert_ne!(unconfirmable(), digest(&[]));
 }
 

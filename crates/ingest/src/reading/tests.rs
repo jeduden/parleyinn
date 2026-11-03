@@ -161,7 +161,7 @@ fn a_line_whose_uuid_names_a_purged_event_is_refused_and_ingest_moves_past_it() 
     let fork = dir.path().join("fork.jsonl");
     let mut text = numbered("f", 1, 3);
     text.push_str(&numbered("f", 100, 101));
-    std::fs::write(&fork, text).unwrap();
+    std::fs::write(&fork, &text).unwrap();
     let owner = crate::ingest_path(&home, &parent, &redactor(), &mut OsEntropy).unwrap();
     purged(&home, owner.writer, 3);
 
@@ -171,6 +171,17 @@ fn a_line_whose_uuid_names_a_purged_event_is_refused_and_ingest_moves_past_it() 
     assert_eq!(late.conflicts, 0, "no other content named the uuid");
     let store = Store::open(&home.store()).unwrap();
     assert_eq!(store.log(late.writer).unwrap().len(), 2);
+    let source = store.source(&fork.to_string_lossy()).unwrap().unwrap();
+    assert_eq!(source.purged.len(), 3, "each refused copy is zeroed");
+    assert_eq!(
+        store::source::prefix_digest(text.as_bytes(), source.position.offset, &source.purged),
+        Some(source.position.prefix),
+    );
+    assert_ne!(
+        record::digest::Digest::of(&[&text.as_bytes()[..source.position.offset as usize]]),
+        source.position.prefix,
+        "the stored hash must not confirm the refused content",
+    );
     let again = crate::ingest_path(&home, &fork, &redactor(), &mut OsEntropy).unwrap();
     assert_eq!((again.refused, again.events), (0, 0));
 }
@@ -262,9 +273,9 @@ fn the_consumed_prefix_is_hashed_from_the_source_when_the_window_is_past_its_sta
     let path = transcript(&dir, "ab\ncd\n");
     let resume = resumed(consumed_source(b"ab\ncd\n", 3));
 
-    let mut from_file = consumed(&resume, b"cd\n", &path, 3).unwrap();
+    let mut from_file = consumed(&resume, b"cd\n", &path, 3, &resume.source.purged).unwrap();
     from_file.update(b"cd\n");
-    let from_bytes = consumed(&resume, b"ab\ncd\n", &path, 0).unwrap();
+    let from_bytes = consumed(&resume, b"ab\ncd\n", &path, 0, &resume.source.purged).unwrap();
 
     assert_eq!(from_file.digest(), Digest::of(&[b"ab\ncd\n"]));
     assert_eq!(from_bytes.digest(), Digest::of(&[b"ab\n"]));
@@ -276,10 +287,18 @@ fn a_file_shorter_than_the_marker_is_another_ingests_and_one_unreadable_fails() 
     let short = transcript(&dir, "a\n");
     let resume = resumed(consumed_source(b"ab\ncd\n", 3));
 
-    let moved = consumed(&resume, b"", &short, 3).err().unwrap();
-    let gone = consumed(&resume, b"", &dir.path().join("none"), 3)
+    let moved = consumed(&resume, b"", &short, 3, &resume.source.purged)
         .err()
         .unwrap();
+    let gone = consumed(
+        &resume,
+        b"",
+        &dir.path().join("none"),
+        3,
+        &resume.source.purged,
+    )
+    .err()
+    .unwrap();
 
     assert!(moved.position_moved(), "{moved}");
     assert!(matches!(gone, IngestError::Read { .. }), "{gone}");

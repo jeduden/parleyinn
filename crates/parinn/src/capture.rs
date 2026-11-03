@@ -587,19 +587,17 @@ impl Running {
         if read <= from {
             return;
         }
-        let Ok(bytes) = ingest::read::transcript(path) else {
-            return;
-        };
-        let range = bytes
-            .get(as_index(from)..as_index(read))
-            .unwrap_or_default();
         let defaults = Defaults::of(path);
-        for line in String::from_utf8_lossy(range).lines() {
+        let shared = self.capture.shared.clone();
+        let scanned = ingest::read::open::for_each_line_between(path, from, read, |line| {
             let parsed: Value = serde_json::from_str(line).unwrap_or(Value::Null);
             let run = run_name(&defaults.key(&parsed));
             for id in tool_use_ids(&parsed) {
-                self.capture.shared.read(id, run.clone());
+                shared.read(id, run.clone());
             }
+        });
+        if scanned.is_err() {
+            return;
         }
         self.transcripts.insert(path.to_path_buf(), read);
     }
@@ -654,10 +652,8 @@ fn remainders<'p>(home: &Home, paths: impl Iterator<Item = &'p PathBuf>) -> Vec<
                 .ok()
                 .flatten()
                 .map_or(0, |s| s.position.offset);
-            let complete = ingest::read::transcript(path)
-                .map(|b| b.iter().rposition(|c| *c == b'\n').map_or(0, |i| i + 1))
-                .unwrap_or(0);
-            read < complete as u64
+            let complete = ingest::read::complete(path).unwrap_or(0);
+            read < complete
         })
         .map(|path| {
             path.file_stem()
@@ -680,10 +676,6 @@ fn tool_use_ids(line: &Value) -> Vec<String> {
         .filter(|block| block["type"] == "tool_use")
         .filter_map(|block| block["id"].as_str().map(str::to_owned))
         .collect()
-}
-
-fn as_index(offset: u64) -> usize {
-    usize::try_from(offset).unwrap_or(usize::MAX)
 }
 
 /// Now, for the segments' 30 s close.

@@ -2,7 +2,12 @@
 title: "Trust and flow"
 order: "09"
 summary: >-
-  Trust and how content reaches an agent: trust levels and sources, recall, endorsement, trust grants, delegation, rule levels, away policies, fixed templates, sandbox state and risk acceptance, quotas and spend, counters, canary and stats, run status and room status, the Needs you queue and focus set, overlap, forks, presence hints and petnames.
+  Trust and how content reaches an agent: trust levels and sources,
+  provenance class families, recall, endorsement, trust grants, delegation,
+  rule levels, away policies, fixed templates, sandbox state and risk
+  acceptance, quotas and spend, counters, canary and stats, run status and room
+  status, the Needs you queue and focus set, overlap, forks, presence hints and
+  petnames.
 ---
 # Trust and flow
 
@@ -16,6 +21,9 @@ summary: >-
   classifies as `trusted` (PRV-02), narrowed in a foreign room (RCL-10) and by a
   missing attended mark (PRV-04);
   everything else is untrusted.
+- **Provenance class family**: A class's text before its first colon, or the
+  whole class when it has none. RCL-02's versioned `kind` field selects it,
+  never an event kind.
 - **Deployment mode**: `interactive` (a person types at the harness) or
   `automation` (a pipeline does, the default), set per node by managed policy
   or accepted configuration (PRV-02, PRV-04, ADM-04, `node.deployment_mode`).
