@@ -342,11 +342,8 @@ fn spans(conn: &Connection, id: i64) -> Result<Vec<Span>, StoreError> {
             length: count(length),
         });
     }
-    let has_copies = conn.query_row(
-        "SELECT count(*) FROM sqlite_master WHERE name = 'transcript_purged_copies'",
-        [],
-        |r| r.get::<_, bool>(0),
-    )?;
+    let query = "SELECT count(*) FROM sqlite_master WHERE name = 'transcript_purged_copies'";
+    let has_copies: bool = conn.query_row(query, [], |r| r.get(0))?;
     if has_copies {
         let mut statement = conn.prepare(
             "SELECT byte_offset, byte_length FROM transcript_purged_copies
