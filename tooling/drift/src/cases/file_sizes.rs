@@ -37,7 +37,7 @@ fn size_list_cases() -> Vec<Case> {
                 "features/lane.feature 590",
             ),
             scenario("ENG-34"),
-            "features/lane.feature grew from its listed 590 lines to 594",
+            "features/lane.feature grew from its listed 590 lines to 596",
         ),
         case(
             "a listed file shrunk whose listed lines were not lowered",
@@ -48,7 +48,7 @@ fn size_list_cases() -> Vec<Case> {
                 "features/lane.feature 598",
             ),
             scenario("ENG-34"),
-            "features/lane.feature holds 594 lines, fewer than its listed 598",
+            "features/lane.feature holds 596 lines, fewer than its listed 598",
         ),
         case(
             "a file that fits its limit left in the size list",
@@ -116,7 +116,7 @@ fn check_cases() -> Vec<Case> {
             "ENG-34",
             Injection::replace(
                 CHECK,
-                "Some(&lines) if !past_limit(path, lins) =>",
+                "Some(&lines) if !past_limit(path, lines) =>",
                 "Some(&lines) if lines == usize::MAX =>",
             ),
             scenario("ENG-34"),
@@ -127,8 +127,8 @@ fn check_cases() -> Vec<Case> {
             "ENG-34",
             Injection::replace(
                 CHECK,
-                "for (path, 'was) in listed {",
-                "for (path, 'was) in listed.iter().filter(|(p, _)| sizes.contains_key(*p)) {",
+                "for (path, &was) in listed {",
+                "for (path, &was) in listed.iter().filter(|(p, _)| sizes.contains_key(*p)) {",
             ),
             scenario("ENG-34"),
             "the size check does not name crates/gone/src/lib.rs",
