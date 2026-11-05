@@ -432,11 +432,7 @@ impl<'r> Runs<'r> {
             // recall scoped to the run reaches this seat (RCL-05).
             // A `parinn ingest` may have started an ingest seat past
             // this one since, so any row of this seat counts as kept.
-            let kept = store
-                .ingested_runs()?
-                .iter()
-                .any(|run| run.writer == writer);
-            if !kept {
+            if store.ingested_run_of(writer)?.is_none() {
                 store.add_run(&IngestedRun {
                     writer,
                     path: self.path.clone(),

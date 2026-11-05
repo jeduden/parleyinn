@@ -516,6 +516,22 @@ fn a_line_owner_is_the_first_event_of_another_source_in_the_directory() {
 }
 
 #[test]
+fn the_ingested_run_of_a_writer_is_read_by_the_writer() {
+    let dir = TempDir::new().unwrap();
+    let mut store = open(&dir);
+    let kept = IngestedRun {
+        writer: writer(1),
+        path: "/t/s.jsonl".into(),
+        harness_session: "s".into(),
+        agent_id: Some("a1".into()),
+    };
+    store.add_run(&kept).unwrap();
+
+    assert_eq!(store.ingested_run_of(writer(1)).unwrap(), Some(kept));
+    assert_eq!(store.ingested_run_of(writer(2)).unwrap(), None);
+}
+
+#[test]
 fn the_ingested_run_of_a_source_and_agent_id_is_the_one_kept_last() {
     let dir = TempDir::new().unwrap();
     let mut store = open(&dir);
