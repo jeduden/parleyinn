@@ -46,16 +46,31 @@ ENG-25, the §11 evaluation, the external review and the pilot.
    which M1 left
 9. M5's initial targets (§12.3): freeze §11's evaluation targets from
    the evaluation's results, removing their † and their §12.3 row
-10. Ingest of a resumed multi-window source re-hashes the consumed prefix,
-    replays the classifier from byte 0 and re-learns identifiers on each call
-    (cost about size^2/window across calls; windows already seek and
-    `Runs::ensure` is cached): persist hasher, classifier and identifier state
-    in the store, against NFR-01 and NFR-05 (deferred from M1 by ruling)
+10. Windowed ingest and SEC-05's transcript rows (4 MiB line, 64 MiB window
+    and the source-memory ceilings), deferred from M1 by the user's final
+    ruling after the review gate's blockers: I1 against an oversize line,
+    quadratic cost, capture poll latency. Requirements:
+
+  - no event lost (I1): store an oversize line, for example streamed to the
+      payload store, with the whole line redacted before storage
+  - recall latency (NFR-03, I9) never waits on a transcript poll
+  - an ingest of a resumed source costs linear in what is new: persist the
+      hasher, classifier and identifier state in the store (today it re-hashes
+      the consumed prefix, replays the classifier from byte 0 and re-learns
+      identifiers on each call), against NFR-01 and NFR-05
+
+11. Close PRV-14's ambiguous-run race in code: the M1 binding adds a 300 ms
+    settle in `both_runs` of
+    `tooling/scenario/tests/bdd/provenance_tool_calls.rs` to hide it; remove
+    the settle once the race is closed
 
 ## Acceptance Criteria
 
 - [ ] The §11.2 definition of done holds
-- [ ] Ingest of a resumed multi-window source costs no more than the bytes
-  it adds, within NFR-01 and NFR-05
+- [ ] `@SEC-05` is off `@pending` and passing: no event lost to an oversize
+  line (I1), recall never waits on a transcript poll, and the ingest of a
+  resumed source costs no more than the bytes it adds, within NFR-01 and
+  NFR-05
+- [ ] PRV-14 passes with no settle in its binding
 - [ ] No scenario tagged P0 or P1 is still @pending, or each remaining
   one is deferred with signed-off rationale

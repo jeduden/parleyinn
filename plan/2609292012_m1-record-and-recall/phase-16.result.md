@@ -19,25 +19,20 @@ Outcome:
   drift cases each.
 - ENG-03's hold on injectable I/O: ruled met by the stakeholder's
   [consent on PR #91][consent]; no step checks that clause.
-- Verify and the start markers' readers open a transcript source or a
-  marker through ingest's guarded open: a link swapped in is not
-  followed and a FIFO is not waited on; verify reports such a source as
-  failed, unreadable (ADM-09, SEC-18, ENG-03).
+- Verify and the start markers' readers open a source through ingest's
+  guarded open: a swapped link is not followed, a FIFO not waited on (ADM-09,
+  SEC-18, ENG-03).
 - Store schema: `transcript_sources` gained `marked_at`, no version bump.
-- parinn-eval: seeded runs, a scripted agent asking event_search then
-  event_get. Within ten hits, 72/72 at each depth; within five, depth 3
-  falls to 87.5%; without recall, 0/216. CI's `eval` job holds
-  `tooling/eval/recall-v1.txt`.
+- parinn-eval: a scripted agent asking event_search then event_get: 72/72
+  within ten hits; CI's `eval` job holds `tooling/eval/recall-v1.txt`.
 - S12: `crates/store/tests/s12_rebuild.rs` covers either order and
   truncated logs.
 - ENG-06: kills of purge and of rebuild. After a kill between a purge's
   transaction and its finishing, verify stays read-only: it names the
   unfinished purge (`pending_purges`), leaves the index unchecked and
   exits 0; the next purge, ingest or rebuild finishes it.
-- ENG-09: a soak of 50 writers; at 1M events, 4,293 of 10,000 appends
-  passed the 5 s busy deadline and were retried. @ENG-09 passes (ruled
-  2 November 2026): 50 certified writers, 10,000 events, then
-  `parinn verify` exits 0; nightly runs 1M, read from `nightly.yml`.
+- ENG-09: @ENG-09 passes (ruled 2 November 2026): 50 certified writers,
+  10,000 events, then `parinn verify` exits 0; nightly runs 1M.
 - Gates run: scenario gate, fmt, clippy, mdsmith, tests, coverage.
 
 Raised (scenarios stay `@pending`):
@@ -85,14 +80,17 @@ Rows that stay `@pending` after M1, with their remaining milestone
 - In part by §12.2: SEC-12 (flag row, M5), ENG-06, -15, -23, -29, SEC-17,
   -19, PRV rows (above).
 
-Passing and off `@pending`: ENG-09, SEC-18, SEC-05 (64 MiB windows, a
-line over 4 MiB stored unparsed and redacted whole (a recorded redaction, I1),
-its place recorded, ingest going on,
-`transcript_line_too_large`; whole-source
-`transcript_source_memory_limit`), REC-04, REC-08, REC-12, REC-26, PRV-14,
-RCL-02 (9 of 9), REC-17. REC-26's typed rows need `unshare -p -f --mount-proc`.
-Resume past a marker: ingest seat, `ingested`. Resumed-source ingest cost
-(size^2/window) is M5's.
+Passing and off `@pending`: ENG-09, SEC-18, REC-04, REC-08, REC-12, REC-26,
+PRV-14, RCL-02 (9 of 9), REC-17. REC-26's typed rows need
+`unshare -p -f --mount-proc`. Resume past a marker: ingest seat, `ingested`.
+An unconfirmed purge never re-records a purged line that carries a `uuid`;
+known limit: a purged line with no `uuid` can still be re-recorded. PRV-14's
+race fix is not kept (the binding settles 300 ms, M5's task 11).
+
+By the user's final ruling SEC-05 (its transcript rows) and windowed ingest are
+M5's; ingest and live capture read a transcript whole, as on main. The review
+gate's blockers: I1 against an oversize line, quadratic cost of a resumed
+source, capture poll latency. SEC-05 is `@pending` again by that ruling.
 
 - [x] ADM-09's other rows pass with `@pending` lifted, all but the
   landmark row, M3's

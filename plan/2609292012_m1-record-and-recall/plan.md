@@ -107,8 +107,7 @@ The stakeholder ruled on these when M1 was re-planned and consents on
 1. **ENG-18:** only dependencies linked into a shipped executable count.
 2. **SEC-10:** Keychain on macOS, a Miri-checked DPAPI file on Windows,
    `0600` files on Linux; in part.
-3. **ADM-05:** M1 ships format version 1, refusing a newer; M3 brings
-   `parinn migrate`.
+3. **ADM-05:** M1 ships format version 1, refusing a newer; M3 migrates.
 4. **ADM-07:** M1 ships `parinn purge --range` as a widening act; the
    other scopes, SEC-31's copies and seal rewrites are M3's.
 
@@ -119,10 +118,12 @@ cucumber:
 
 - **ADM-09:** 16 of 17 rows pass, the landmark row is M3's.
 - **Off `@pending` and passing:** ENG-09 (10,000 events per PR, 1M
-  nightly), SEC-18, SEC-05 (a line over 4 MiB stored unparsed, redacted whole,
-  its place recorded, I1 by recorded redaction; 64 MiB per source), REC-04,
-  REC-08, REC-12, REC-26, PRV-14, RCL-02 (9 of 9), REC-17 extended. Ingest of
-  a resumed multi-window source costs about size^2/window: M5's, by ruling.
+  nightly), SEC-18, REC-04, REC-08, REC-12, REC-26, PRV-14 (its race fix is not
+  kept; the binding settles 300 ms, M5's task 11), RCL-02 (9 of 9), REC-17
+  extended.
+- **SEC-05 and windowed ingest are M5's (user's final ruling):** ingest and
+  live capture read a transcript whole; only SEC-05's hook rows pass.
+  Blockers: I1 and an oversize line, quadratic cost, poll latency.
 - **Purge residue (ruled):** only each purged line's position, length and
   the harness's own `uuid` remain (beside the tombstone, REC-04); SEC-31
   and ADM-07 stay `@pending` (M3). NFR-03..05 land in part (benchmarks,
@@ -206,7 +207,7 @@ and 7. Tracks 2-3; 4; 5-6; 7 ran in parallel; 8 to 16 run in order.
 | 1     | opus   | The slice's end-to-end test in an isolated home; `@REC-10` passes                                                                      |
 | 2     | sonnet | `@SEC-02`, `@SEC-03`, `@OPS-02`, `@OPS-03` and `@ENG-04` pass                                                                          |
 | 3     | opus   | Its end-to-end tests pass; so do ADM-04's rows 1 to 4 and the M1 steps of OWN-11, -12 and -22                                          |
-| 4     | sonnet | `@SEC-05`, `@SEC-08`, `@SEC-18` and `@ENG-05` pass; no fixture secret reaches the store or a log                                       |
+| 4     | sonnet | SEC-05 rows 1-2, `@SEC-08`, `@SEC-18` and `@ENG-05` pass; no fixture secret reaches the store or a log                                 |
 | 5     | opus   | `@PRV-11` passes; REC-24's M1 part; PRV-12, SEC-10, SEC-27, LANE-16 and LANE-23's M1 steps pass                                        |
 | 6     | opus   | `@REC-09` and `@REC-12` pass; REC-19's segment steps pass; a newer segment or store is refused; the crash-consistency job runs nightly |
 | 7     | opus   | `@PRV-03`, `@REC-05` and `@REC-26` pass; PRV-01 and PRV-08's M1 rows pass; the parser's fuzz target runs                               |
