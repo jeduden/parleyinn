@@ -84,13 +84,7 @@ pub(crate) fn ingest(
         },
         entropy,
     )?;
-    refusal::pass_over(
-        &mut plan,
-        view,
-        resume.first_line + lines.len() as u64 + 1,
-        own,
-        entropy,
-    )?;
+    refusal::pass_over(&mut plan, view, (&resume, lines.len()), own, entropy)?;
     let main = defaults.own().agent_id.is_none().then_some(own);
     let seen = Seen {
         observed: &observed,

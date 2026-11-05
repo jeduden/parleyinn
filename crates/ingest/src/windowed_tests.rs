@@ -111,16 +111,21 @@ fn a_line_over_4_mib_is_stored_unparsed_redacted_whole_its_place_is_recorded_and
     );
     assert!(read::open::continues(&path, &row));
     assert_eq!(refused_line(&home, &path).unwrap(), None);
-    let texts = placed_texts(&home);
+    assert_stored_redacted_whole(&home, row.id, at);
+}
+
+/// The line over the limit at offset `at` is an event of its own: an
+/// unparsed line holding the whole-line redaction marker, recoverable by
+/// its address where the line stood.
+fn assert_stored_redacted_whole(home: &Home, id: i64, at: u64) {
+    let texts = placed_texts(home);
     assert!(
         texts.iter().all(|t| !t.contains("zzzz")),
         "its content is redacted whole"
     );
     assert_eq!(texts.len(), 4);
     assert_eq!(texts[2], "[REDACTED:transcript_line_too_large]");
-    // Its event is recoverable by its address, where the line stood.
-    let store = Store::open(&home.store()).unwrap();
-    let placed = store.placed(row.id).unwrap();
+    let placed = Store::open(&home.store()).unwrap().placed(id).unwrap();
     assert_eq!(placed[2].place.line, 3);
     assert_eq!(placed[2].place.offset, at);
     assert_eq!(placed[2].kind, record::event::EventKind::UnparsedLine);

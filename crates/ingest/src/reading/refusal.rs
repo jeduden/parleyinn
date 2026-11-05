@@ -12,15 +12,16 @@ use record::id::WriterId;
 use store::Position;
 use store::source::Zeroed;
 
+use super::Resume;
 use super::View;
 use super::as_index;
 use super::plan::Plan;
 
 /// Records `plan`'s place and event, in `writer`'s run, for the line
-/// over the line ceiling `view` ends before, `line` being its line
-/// number, when its line break is written and every line before it is
-/// planned: not held, and not left for the next read by the planning
-/// budget.
+/// over the line ceiling `view` ends before, when its line break is
+/// written and every line before it is planned: not held, and not left
+/// for the next read by the planning budget. Its line number follows the
+/// `lines` lines of the window `resume` starts at.
 ///
 /// # Errors
 ///
@@ -28,10 +29,11 @@ use super::plan::Plan;
 pub(super) fn pass_over(
     plan: &mut Plan,
     view: &View<'_>,
-    line: u64,
+    (resume, lines): (&Resume, usize),
     writer: WriterId,
     entropy: &mut dyn Entropy,
 ) -> Result<(), crate::IngestError> {
+    let line = resume.first_line + lines as u64 + 1;
     if let Some(over) = view
         .refused
         .filter(|_| view.refused_ended && !plan.hold && !plan.resumable)

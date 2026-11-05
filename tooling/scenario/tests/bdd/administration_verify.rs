@@ -346,12 +346,12 @@ fn refused_line_offset(w: &mut World) -> Result<u64, String> {
 }
 
 #[given(
-    regex = r"^a transcript line over the 4 MiB limit was not stored and ingest went on past it, recording its place$"
+    regex = r"^a transcript line over the 4 MiB limit was stored unparsed and ingest went on past it, recording its place$"
 )]
 fn line_refused(w: &mut World) -> Result<(), String> {
     crate::recall::record_runs(w)?;
-    // Ingest passes the line, records its place and moves the position
-    // past it (SEC-05, REC-03).
+    // Ingest stores the line unparsed, records its place and moves the
+    // position past it (SEC-05, REC-03).
     let path = transcript(w, "run-a")?;
     let mut text = fs::read(&path).map_err(|e| e.to_string())?;
     text.extend(vec![b'x'; (4 << 20) + 1]);
@@ -361,7 +361,7 @@ fn line_refused(w: &mut World) -> Result<(), String> {
 }
 
 #[then(
-    regex = r#"^the output reports the transcript "([^"]+)" holds a line over the limit, naming its offset and the counter `transcript_line_too_large`, and names no failed check$"#
+    regex = r#"^the output reports the transcript "([^"]+)" holds a line over the limit stored unparsed, naming its offset and the counter `transcript_line_too_large`, and names no failed check$"#
 )]
 fn reports_refused(w: &mut World, name: String) -> Result<(), String> {
     let offset = refused_line_offset(w)? - ((4 << 20) + 2);
@@ -372,7 +372,7 @@ fn reports_refused(w: &mut World, name: String) -> Result<(), String> {
         String::from_utf8_lossy(&out.stderr)
     );
     let (_, after) = shown
-        .split_once("holding a line over the 4 MiB limit")
+        .split_once("holding a line over the 4 MiB limit, stored unparsed and redacted whole")
         .ok_or_else(|| {
             format!("verify reports no transcript holding a line over the limit: {shown}")
         })?;

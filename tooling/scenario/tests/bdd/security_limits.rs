@@ -149,28 +149,34 @@ fn redacted_whole_then_stored(w: &mut World) -> Result<(), String> {
     Ok(())
 }
 
+/// What the audit entry of a line over the limit says (SEC-05).
+const LINE_TOO_LARGE_ENTRY: &str = "transcript line over the 4 MiB limit stored unparsed and redacted whole without being held in memory; its place is recorded (SEC-05)";
+
 #[then(
-    regex = r#"^the line's content is not stored, an audit entry of kind rejected records "transcript line over the 4 MiB limit not stored; its place is recorded and ingest continues past it \(SEC-05\)", the counter `transcript_line_too_large` counts it, its place is recorded, and every later line of the source is recorded$"#
+    regex = r#"^the line is stored unparsed and redacted whole without being held in memory, an audit entry of kind redacted records "transcript line over the 4 MiB limit stored unparsed and redacted whole without being held in memory; its place is recorded \(SEC-05\)", the counter `transcript_line_too_large` counts it, its place is recorded, and every later line of the source is recorded$"#
 )]
-fn line_not_stored(w: &mut World) -> Result<(), String> {
+fn line_stored_unparsed(w: &mut World) -> Result<(), String> {
     let entries = Log::new(home(w)?.audit())
         .entries()
         .map_err(|e| e.to_string())?;
     let counted = entries
         .iter()
         .filter(|e| {
-            e.kind == "rejected"
+            e.kind == "redacted"
                 && e.counter.as_deref() == Some("transcript_line_too_large")
-                && e.detail.starts_with(
-                    "transcript line over the 4 MiB limit not stored; its place is recorded and ingest continues past it (SEC-05)",
-                )
+                && e.detail.starts_with(LINE_TOO_LARGE_ENTRY)
         })
         .count();
     if counted == 0 {
         return Err(format!(
-            "no rejected entry counts the line among {}",
+            "no redacted entry counts the line among {}",
             entries.len()
         ));
+    }
+    // Nothing of the line's bytes is in the home: it was never held, and
+    // its event holds a whole-line redaction marker.
+    if let Some(found) = found_in_home(w, &[vec![b'x'; 1000]])? {
+        return Err(format!("the line's bytes are stored: {found}"));
     }
     let at = w.section::<Limits>().refused_at.ok_or("no refused line")?;
     let conn = Connection::open(home(w)?.store()).map_err(|e| e.to_string())?;
@@ -196,9 +202,23 @@ fn line_not_stored(w: &mut World) -> Result<(), String> {
     let stored: i64 = conn
         .query_row("SELECT count(*) FROM transcript_places", [], |r| r.get(0))
         .map_err(|e| e.to_string())?;
-    if recorded != lines || stored != lines - 1 {
+    if recorded != lines || stored != lines {
         return Err(format!(
             "{recorded} lines are ingested and {stored} places hold an event, of {lines} lines"
+        ));
+    }
+    // The line's event is an unparsed line holding the redaction marker,
+    // recoverable by its address where the line stood.
+    let (kind, content): (String, String) = conn
+        .query_row(
+            "SELECT e.kind, e.content FROM transcript_places p JOIN events e ON e.rowid = p.event WHERE p.byte_offset = ?1",
+            [at as i64],
+            |r| Ok((r.get(0)?, r.get(1)?)),
+        )
+        .map_err(|e| e.to_string())?;
+    if kind != "unparsed_line" || !content.contains("[REDACTED:transcript_line_too_large]") {
+        return Err(format!(
+            "the line's event is {kind} holding no redaction marker"
         ));
     }
     if position <= at as i64 + LINE_LIMIT as i64 {
