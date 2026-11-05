@@ -561,3 +561,24 @@ fn the_report_names_the_refused_line_its_offset_and_the_counter() {
          sources short at a refused line"
     ));
 }
+
+#[test]
+fn a_source_memory_refusal_says_on_stderr_when_it_cannot_be_audited() {
+    let p = crate::tests::Process::new();
+    p.invoke(&["counter", "ack"], &crate::tests::DEV);
+    let audit_dir = p.parinn_home().join("audit");
+    std::fs::remove_dir_all(&audit_dir).unwrap();
+    std::fs::write(&audit_dir, "").unwrap();
+    crate::tests::set_mode(&audit_dir, 0o600);
+    let mut stderr = Vec::new();
+
+    p.with_context(&crate::tests::DEV, |ctx| {
+        audit_source_memory_limit(ctx, &mut stderr);
+    });
+
+    let text = String::from_utf8(stderr).unwrap();
+    assert!(
+        text.starts_with("parinn ingest: audit a source-memory refusal: "),
+        "{text}"
+    );
+}

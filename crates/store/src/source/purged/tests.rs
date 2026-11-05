@@ -348,3 +348,37 @@ fn a_store_that_cannot_mark_or_read_its_places_fails_each_step() {
     assert!(mark(&store.conn, &range(writer(1), 1, 1)).is_err());
     assert!(crate::source::spans(&store.conn, source.id).is_err());
 }
+
+#[test]
+fn a_purge_whose_residue_cannot_be_copied_fails_whole() {
+    let dir = TempDir::new().unwrap();
+    let (store, _, _) = ingested(&dir, writer(1), "a.jsonl");
+    mark(&store.conn, &range(writer(1), 1, 1)).unwrap();
+    store
+        .conn
+        .execute_batch(
+            "CREATE TRIGGER refuse_copy BEFORE INSERT ON transcript_purged_copies
+             BEGIN SELECT RAISE(FAIL, 'refused'); END;",
+        )
+        .unwrap();
+
+    assert!(mark(&store.conn, &range(writer(1), 2, 3)).is_err());
+}
+
+#[test]
+fn a_purge_whose_residue_table_cannot_be_made_fails_whole() {
+    let dir = TempDir::new().unwrap();
+    let (store, _, _) = ingested(&dir, writer(1), "a.jsonl");
+    store
+        .conn
+        .execute_batch(
+            "DROP INDEX transcript_purged_copies_uuid;
+             DROP TABLE transcript_purged_copies;
+             CREATE TABLE transcript_purged_copies (
+                 source INTEGER PRIMARY KEY
+             ) STRICT, WITHOUT ROWID;",
+        )
+        .unwrap();
+
+    assert!(mark(&store.conn, &range(writer(1), 1, 1)).is_err());
+}

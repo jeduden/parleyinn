@@ -643,3 +643,118 @@ fn a_run_is_named_by_its_harness_session_and_a_subagent_by_its_agent_id_too() {
     assert_eq!(run(None).run_name(), "s1");
     assert_eq!(run(Some("a7")).run_name(), "s1/a7");
 }
+
+#[test]
+fn a_store_from_before_purged_copies_holds_no_residue_of_purged_lines() {
+    let dir = TempDir::new().unwrap();
+    let mut store = open(&dir);
+    let source = store.start_generation("/t/a.jsonl", "/t").unwrap();
+    store
+        .conn
+        .execute_batch(
+            "DROP INDEX transcript_purged_copies_uuid;
+             DROP TABLE transcript_purged_copies;",
+        )
+        .unwrap();
+
+    assert!(store.purged_places(source.id).unwrap().is_empty());
+}
+
+#[test]
+fn a_line_an_older_store_marked_purged_reads_as_a_zeroed_span() {
+    let dir = TempDir::new().unwrap();
+    let mut store = open(&dir);
+    let source = store.start_generation("/t/a.jsonl", "/t").unwrap();
+    store
+        .conn
+        .execute(
+            "INSERT INTO transcript_places (event, source, line, byte_offset, byte_length, purged)
+             VALUES (1, ?1, 1, 4, 6, 1), (2, ?1, 2, 0, 3, 0)",
+            [source.id],
+        )
+        .unwrap();
+
+    let now = store.source("/t/a.jsonl").unwrap().unwrap();
+
+    assert_eq!(
+        now.purged,
+        [Span {
+            offset: 4,
+            length: 6
+        }]
+    );
+}
+
+#[test]
+fn two_sources_of_one_directory_that_share_a_purged_uuid_name_it_once() {
+    let dir = TempDir::new().unwrap();
+    let mut store = open(&dir);
+    let a = store.start_generation("/t/a.jsonl", "/t").unwrap();
+    let b = store.start_generation("/t/b.jsonl", "/t").unwrap();
+    store
+        .advance_refusing(a.id, &position(10, 1), &[place(1, Some("shared"))])
+        .unwrap();
+    store
+        .advance_refusing(b.id, &position(10, 1), &[place(1, Some("shared"))])
+        .unwrap();
+
+    assert_eq!(
+        store.purged_line_uuids("/t", "/t/c.jsonl").unwrap(),
+        BTreeSet::from(["shared".to_owned()])
+    );
+}
+
+/// A store whose residue table lacks the columns the reads name.
+fn without_residue_columns(store: &Store) {
+    store
+        .conn
+        .execute_batch(
+            "DROP INDEX transcript_purged_copies_uuid;
+             DROP TABLE transcript_purged_copies;
+             CREATE TABLE transcript_purged_copies (
+                 source INTEGER PRIMARY KEY
+             ) STRICT, WITHOUT ROWID;",
+        )
+        .unwrap();
+}
+
+#[test]
+fn a_residue_table_without_places_makes_the_residue_unreadable() {
+    let dir = TempDir::new().unwrap();
+    let mut store = open(&dir);
+    let source = store.start_generation("/t/a.jsonl", "/t").unwrap();
+    without_residue_columns(&store);
+
+    assert!(store.purged_places(source.id).is_err());
+}
+
+#[test]
+fn a_residue_table_without_uuids_makes_the_directory_uuids_unreadable() {
+    let dir = TempDir::new().unwrap();
+    let mut store = open(&dir);
+    store.start_generation("/t/a.jsonl", "/t").unwrap();
+    without_residue_columns(&store);
+
+    assert!(store.purged_line_uuids("/t", "/t/b.jsonl").is_err());
+}
+
+#[test]
+fn a_purged_line_whose_place_cannot_be_read_makes_the_source_unreadable() {
+    let dir = TempDir::new().unwrap();
+    let mut store = open(&dir);
+    store.start_generation("/t/a.jsonl", "/t").unwrap();
+    store
+        .conn
+        .execute_batch(
+            "DROP INDEX transcript_places_uuid;
+             DROP TABLE transcript_places;
+             CREATE TABLE transcript_places (
+                 event INTEGER PRIMARY KEY, source INTEGER, line INTEGER,
+                 byte_offset, byte_length, purged INTEGER, uuid TEXT
+             );
+             INSERT INTO transcript_places VALUES (1, 1, 1, 'x', 4, 1, NULL);",
+        )
+        .unwrap();
+
+    assert!(store.source("/t/a.jsonl").is_err());
+}
