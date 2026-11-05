@@ -109,6 +109,7 @@ fn audit(ctx: &Context, applied: &Applied) {
             counter: Some(Counter::RetentionPurged),
         };
         crate::logged("audit a retention purge", ctx.audit(&occurrence));
+        crate::purge::audit_unconfirmed(ctx, &done.finished);
         if !done.finished.vacuumed {
             crate::purge::audit_residue(ctx);
         }

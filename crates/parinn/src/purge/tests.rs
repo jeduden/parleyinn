@@ -440,6 +440,19 @@ fn a_residue_the_purge_could_not_clear_is_audited_counted_and_said() {
 }
 
 #[test]
+fn each_source_a_purge_could_not_read_is_audited_and_counted() {
+    let p = Process::new();
+    let done = store::Finished {
+        unconfirmed: 2,
+        ..store::Finished::default()
+    };
+
+    p.with_context(&DEV, |ctx| audit_unconfirmed(ctx, &done));
+
+    assert_eq!(counted(&p, "transcript_prefix_unconfirmed").len(), 2);
+}
+
+#[test]
 fn a_purge_that_failed_before_erasing_reports_its_cause_and_no_residue() {
     let (p, _) = with_a_run();
     let mut err = Vec::new();

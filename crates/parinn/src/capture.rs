@@ -203,6 +203,9 @@ pub(crate) struct Running {
     /// Each line over the 4 MiB limit audited, by transcript path and
     /// offset: a live read refuses it again each poll (SEC-05).
     too_large: BTreeSet<(PathBuf, u64)>,
+    /// The paths whose tool-use ids failed to scan, each audited once
+    /// until a scan succeeds.
+    unscanned: BTreeSet<PathBuf>,
     marker: Option<StartMarker>,
     /// When its run seats' open segments last closed, and how often
     /// they close while it appends (REC-19).
@@ -222,6 +225,7 @@ impl Capture {
             transcripts: BTreeMap::new(),
             refused: BTreeSet::new(),
             too_large: BTreeSet::new(),
+            unscanned: BTreeSet::new(),
             marker: None,
             closed: now_instant(),
             close_every: SEGMENT_EVERY,
@@ -419,7 +423,7 @@ impl Running {
             );
             let stopped = match &read {
                 Ok(Some(ingested)) => ingested.too_large,
-                Ok(None) => ingest::live::refused_line(&self.capture.home, &path),
+                Ok(None) => self.refused_line(&path),
                 Err(_) => None,
             };
             match read {
@@ -434,6 +438,15 @@ impl Running {
             self.close_segments();
             self.closed = now_instant();
         }
+    }
+
+    /// The refused line the source at `path` stands at; a failure to look
+    /// is audited like any failed read, and the line goes unnamed (I6).
+    fn refused_line(&mut self, path: &Path) -> Option<ingest::read::bounded::Refused> {
+        ingest::live::refused_line(&self.capture.home, path).unwrap_or_else(|e| {
+            self.failed(path, &e);
+            None
+        })
     }
 
     /// Audits, once, a line over the 4 MiB limit a live read refused:
@@ -605,10 +618,31 @@ impl Running {
                 shared.read(id, run.clone());
             }
         });
-        if scanned.is_err() {
+        if let Err(e) = scanned {
+            self.audit_unscanned(path, &e);
             return;
         }
+        self.unscanned.remove(path);
         self.transcripts.insert(path.to_path_buf(), read);
+    }
+
+    /// Audits, once until it reads again, a transcript whose tool-use ids
+    /// could not be scanned; the next poll tries again. One gone gives
+    /// none: its loss is counted where it is found (REC-08, I6).
+    fn audit_unscanned(&mut self, path: &Path, e: &io::Error) {
+        if e.kind() == io::ErrorKind::NotFound || !self.unscanned.insert(path.to_path_buf()) {
+            return;
+        }
+        tracing::warn!(
+            error = e.to_string().as_str(),
+            "scan a transcript's tool uses"
+        );
+        self.audit(&Occurrence::Degraded {
+            kind: Kind::Failed,
+            counter: Counter::LiveIngestFailed,
+            operation: "mcp",
+            detail: "a transcript's tool-use ids could not be read; the next read tries again",
+        });
     }
 
     /// Audits each transcript left short of its end, closes the run
@@ -661,8 +695,11 @@ fn remainders<'p>(home: &Home, paths: impl Iterator<Item = &'p PathBuf>) -> Vec<
                 .ok()
                 .flatten()
                 .map_or(0, |s| s.position.offset);
-            let complete = ingest::read::complete(path).unwrap_or(0);
-            read < complete
+            // One that cannot be read may hold more than was ingested.
+            match ingest::read::complete(path) {
+                Ok(complete) => read < complete,
+                Err(e) => e.kind() != io::ErrorKind::NotFound,
+            }
         })
         .map(|path| {
             path.file_stem()

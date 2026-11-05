@@ -552,13 +552,12 @@ fn the_report_names_the_refused_line_its_offset_and_the_counter() {
     assert_eq!(found.failure(), None);
     assert_eq!(
         found.short_text(),
-        "; transcript sources short at a refused line over the 4 MiB limit, counted as \
-         `transcript_line_too_large`, which ingest refuses again until the limit is raised or \
-         the source is replaced: /t/run<U+000A>a.jsonl at offset 20 (4194305 bytes)"
+        "; transcripts holding a line over the 4 MiB limit, not stored, counted as \
+         `transcript_line_too_large`: /t/run<U+000A>a.jsonl at offset 20 (4194305 bytes)"
     );
     assert!(both.short_text().starts_with(
-        "; transcript sources short of their end, which ingest resumes: /t/b.jsonl; transcript \
-         sources short at a refused line"
+        "; transcript sources short of their end, which ingest resumes: /t/b.jsonl; transcripts \
+         holding a line over the 4 MiB limit"
     ));
 }
 
@@ -579,6 +578,97 @@ fn a_source_memory_refusal_says_on_stderr_when_it_cannot_be_audited() {
     let text = String::from_utf8(stderr).unwrap();
     assert!(
         text.starts_with("parinn ingest: audit a source-memory refusal: "),
+        "{text}"
+    );
+}
+
+/// A home whose only source was cut short and is now gone.
+fn with_a_lost_source() -> crate::tests::Process {
+    let p = crate::tests::Process::new();
+    let cut = crate::tests::transcript_in(&p, "-w-a", "cut-short.jsonl", b"{\"a\":1}\n{\"b\":");
+    assert_eq!(p.invoke(&["ingest", "--all"], &crate::tests::DEV).0, 0);
+    std::fs::remove_file(cut).unwrap();
+    p
+}
+
+fn lost_flags(p: &crate::tests::Process) -> Vec<bool> {
+    let store = Store::open(&p.parinn_home().join("store.db")).unwrap();
+    store.sources().unwrap().iter().map(|s| s.lost).collect()
+}
+
+#[test]
+fn a_lost_source_is_marked_only_once_its_audit_entry_is_written() {
+    let p = with_a_lost_source();
+    let home = Home::locate(Some(p.parinn_home().as_os_str()), None).unwrap();
+    let audit_dir = p.parinn_home().join("audit");
+    let moved = p.parinn_home().join("audit.moved");
+    std::fs::rename(&audit_dir, &moved).unwrap();
+    std::fs::write(&audit_dir, "").unwrap();
+    crate::tests::set_mode(&audit_dir, 0o600);
+    let mut stderr = Vec::new();
+    let redactor = Err("no rules".to_owned());
+
+    p.with_context(&crate::tests::DEV, |ctx| {
+        audit_lost(ctx, &home, &redactor, &mut stderr);
+    });
+
+    assert_eq!(lost_flags(&p), [false], "found again next time");
+    std::fs::remove_file(&audit_dir).unwrap();
+    std::fs::rename(&moved, &audit_dir).unwrap();
+    p.with_context(&crate::tests::DEV, |ctx| {
+        audit_lost(ctx, &home, &redactor, &mut stderr);
+    });
+    assert_eq!(lost_flags(&p), [true]);
+    let audit = crate::tests::audit_text(&p);
+    assert_eq!(
+        audit.matches("transcript_source_lost").count(),
+        1,
+        "{audit}"
+    );
+    assert!(!audit.contains("cut-short"), "{audit}");
+}
+
+#[test]
+fn a_lost_source_is_named_through_the_redactor() {
+    let p = with_a_lost_source();
+    let home = Home::locate(Some(p.parinn_home().as_os_str()), None).unwrap();
+    let redactor = Redactor::new(&["cut-[a-z]+".to_owned()])
+        .map(|r| r.0)
+        .map_err(|e| e.to_string());
+
+    p.with_context(&crate::tests::DEV, |ctx| {
+        audit_lost(ctx, &home, &redactor, &mut Vec::new());
+    });
+
+    let audit = crate::tests::audit_text(&p);
+    assert_eq!(
+        audit.matches("transcript_source_lost").count(),
+        1,
+        "{audit}"
+    );
+    assert!(!audit.contains("cut-short"), "{audit}");
+}
+
+#[test]
+fn a_source_that_cannot_be_marked_lost_says_so_on_stderr() {
+    let p = with_a_lost_source();
+    let home = Home::locate(Some(p.parinn_home().as_os_str()), None).unwrap();
+    rusqlite::Connection::open(p.parinn_home().join("store.db"))
+        .unwrap()
+        .execute_batch(
+            "CREATE TRIGGER no_loss BEFORE UPDATE ON transcript_sources
+             BEGIN SELECT RAISE(ABORT, 'refused'); END",
+        )
+        .unwrap();
+    let mut stderr = Vec::new();
+
+    p.with_context(&crate::tests::DEV, |ctx| {
+        audit_lost(ctx, &home, &Err(String::new()), &mut stderr);
+    });
+
+    let text = String::from_utf8(stderr).unwrap();
+    assert!(
+        text.starts_with("parinn ingest: mark a transcript source lost: "),
         "{text}"
     );
 }

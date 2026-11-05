@@ -508,7 +508,7 @@ fn ingest(
     failures += ingest_all(ctx, &home, &held, &redactor, &inputs, stderr).1;
     apply_retention(ctx, &home, settings, stderr);
     if target == IngestTarget::All {
-        sources::audit_lost(ctx, &home, stderr);
+        sources::audit_lost(ctx, &home, &redactor, stderr);
     }
     let shown = ingest_report::ingest_report(&target, &reports, failures, as_json);
     let code = written(write!(stdout, "{shown}"), stderr);

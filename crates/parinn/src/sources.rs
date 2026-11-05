@@ -11,6 +11,7 @@ use administration::home::Home;
 use audit::entry::{Counter, Kind, Occurrence};
 use ingest::read::bounded::{LINE_LIMIT, Measure, Refused};
 use record::digest::Digest;
+use redaction::Redactor;
 use serde_json::{Value, json};
 use store::source::{Span, Zeroed};
 use store::{Source, Store, StoreError};
@@ -186,9 +187,8 @@ pub(crate) struct Completeness {
     /// server holds the session binding of each, or an ingest left its
     /// ingest marker at its position within [`MARKER_CEILING_MS`].
     pub(crate) short: Vec<String>,
-    /// Sources short at a line over the 4 MiB limit, which ingest
-    /// refused and refuses again until the limit is raised or the source
-    /// is replaced: the path and the line.
+    /// Sources holding a line over the 4 MiB limit that was not stored:
+    /// the path and the line.
     pub(crate) refused: Vec<(String, Refused)>,
     /// Sources short of their end that nothing will finish, or that no
     /// longer hold what was ingested from them: the path and why.
@@ -318,11 +318,10 @@ impl Completeness {
         text
     }
 
-    /// What `parinn verify` adds for sources short at a refused line: the
+    /// What `parinn verify` adds for sources holding a line over the limit: the
     /// source, the line's offset and length, and the counter that counts
-    /// the refusal (SEC-05, ADM-09). Not a failure: the record holds
-    /// every line before it, and ingest stays before it until the limit is
-    /// raised or the source is replaced.
+    /// the refusal (SEC-05, ADM-09). Not a failure: ingest
+    /// recorded the line's place and went on past it.
     fn refused_text(&self) -> String {
         let each: Vec<String> = self
             .refused
@@ -338,9 +337,8 @@ impl Completeness {
             .collect();
 
         format!(
-            "; transcript sources short at a refused line over the 4 MiB limit, counted as \
-             `transcript_line_too_large`, which ingest refuses again until the limit is \
-             raised or the source is replaced: {}",
+            "; transcripts holding a line over the 4 MiB limit, not stored, counted as \
+             `transcript_line_too_large`: {}",
             each.join(", ")
         )
     }
@@ -403,32 +401,40 @@ pub(crate) fn audit_source_memory_limit(ctx: &Context, stderr: &mut dyn Write) {
 }
 
 /// Audits and counts, once each, every transcript source `parinn ingest
-/// --all` finds gone before it was fully ingested (REC-08, I6).
-pub(crate) fn audit_lost(ctx: &Context, home: &Home, stderr: &mut dyn Write) {
-    let found = Store::open(&home.store()).and_then(|mut store| {
+/// --all` finds gone before it was fully ingested (REC-08, I6). A source
+/// is marked lost only after its audit entry is written, so one whose
+/// audit failed is found, and audited, again next time.
+pub(crate) fn audit_lost(
+    ctx: &Context,
+    home: &Home,
+    redactor: &Result<Redactor, String>,
+    stderr: &mut dyn Write,
+) {
+    let found = Store::open(&home.store()).and_then(|store| {
         let sources = store.sources()?;
         let fresh: Vec<store::Source> = lost(&sources)
             .into_iter()
             .filter(|s| !s.lost)
             .cloned()
             .collect();
-        for source in &fresh {
-            store.lose(source.id)?;
-        }
-        Ok(fresh)
+        Ok((store, fresh))
     });
-    let fresh = match found {
-        Ok(fresh) => fresh,
+    let (mut store, fresh) = match found {
+        Ok(found) => found,
         Err(e) => {
             let _ = writeln!(stderr, "parinn ingest: find lost transcript sources: {e}");
             return;
         }
     };
     for source in fresh {
-        let name = Path::new(&source.path)
+        let stem = Path::new(&source.path)
             .file_stem()
             .map(|s| s.to_string_lossy().into_owned())
             .unwrap_or_default();
+        let name = match redactor {
+            Ok(redactor) => redactor.redact_text(&stem).text,
+            Err(_) => "[unnamed]".to_owned(),
+        };
         let occurrence = Occurrence::Keyed {
             kind: Kind::Dropped,
             counter: Counter::TranscriptSourceLost,
@@ -438,6 +444,10 @@ pub(crate) fn audit_lost(ctx: &Context, home: &Home, stderr: &mut dyn Write) {
         };
         if let Err(e) = ctx.audit(&occurrence) {
             let _ = writeln!(stderr, "parinn ingest: audit a lost transcript source: {e}");
+            continue;
+        }
+        if let Err(e) = store.lose(source.id) {
+            let _ = writeln!(stderr, "parinn ingest: mark a transcript source lost: {e}");
         }
     }
 }
