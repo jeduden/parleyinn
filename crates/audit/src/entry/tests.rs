@@ -25,6 +25,10 @@ fn each_kind_and_counter_has_its_name() {
     for (kind, name) in kinds {
         assert_eq!(kind.as_str(), name);
     }
+}
+
+#[test]
+fn each_counter_of_the_hooks_and_settings_has_its_name() {
     let counters = [
         (Counter::HookRejected, "hook_rejected"),
         (Counter::HookPanicked, "hook_panicked"),
@@ -59,6 +63,15 @@ fn each_kind_and_counter_has_its_name() {
             "path_outside_allowed_roots",
         ),
         (Counter::LogLineDropped, "log_line_dropped"),
+    ];
+    for (counter, name) in counters {
+        assert_eq!(counter.as_str(), name);
+    }
+}
+
+#[test]
+fn each_counter_of_ingest_and_repeats_has_its_name() {
+    let counters = [
         (
             Counter::IngestRefusedSettingsInvalid,
             "ingest_refused_settings_invalid",
@@ -78,6 +91,15 @@ fn each_kind_and_counter_has_its_name() {
         (Counter::RepeatReleased, "repeat_released"),
         (Counter::RepeatOfPurgedRefused, "repeat_of_purged_refused"),
         (Counter::TranscriptSourceLost, "transcript_source_lost"),
+    ];
+    for (counter, name) in counters {
+        assert_eq!(counter.as_str(), name);
+    }
+}
+
+#[test]
+fn each_counter_of_hook_runs_and_prompts_has_its_name() {
+    let counters = [
         (Counter::HookInputRejected, "hook_input_rejected"),
         (Counter::HookBudgetExceeded, "hook_budget_exceeded"),
         (Counter::HookFailed, "hook_failed"),
