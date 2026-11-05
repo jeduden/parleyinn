@@ -86,12 +86,13 @@ Rows that stay `@pending` after M1, with their remaining milestone
   -19, PRV rows (above).
 
 Passing and off `@pending`: ENG-09, SEC-18, SEC-05 (64 MiB windows, a
-line over 4 MiB not stored, its place recorded and ingest continuing past it,
+line over 4 MiB stored unparsed and redacted whole (a recorded redaction, I1),
+its place recorded, ingest going on,
 `transcript_line_too_large`; whole-source
 `transcript_source_memory_limit`), REC-04, REC-08, REC-12, REC-26, PRV-14,
-RCL-02 (9 of 9, `kind` ruled A), REC-17. Under an
-agent harness REC-26's typed rows need `unshare -p -f --mount-proc`.
-Resume past a marker: ingest seat, `ingested`.
+RCL-02 (9 of 9), REC-17. REC-26's typed rows need `unshare -p -f --mount-proc`.
+Resume past a marker: ingest seat, `ingested`. Resumed-source ingest cost
+(size^2/window) is M5's.
 
 - [x] ADM-09's other rows pass with `@pending` lifted, all but the
   landmark row, M3's

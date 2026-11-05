@@ -119,9 +119,10 @@ cucumber:
 
 - **ADM-09:** 16 of 17 rows pass, the landmark row is M3's.
 - **Off `@pending` and passing:** ENG-09 (10,000 events per PR, 1M
-  nightly), SEC-18, SEC-05 (4 MiB per line, its place recorded, 64 MiB per
-  source), REC-04, REC-08, REC-12, REC-26, PRV-14, RCL-02 (9 of 9), REC-17
-  extended.
+  nightly), SEC-18, SEC-05 (a line over 4 MiB stored unparsed, redacted whole, its
+  place recorded, I1 by recorded redaction; 64 MiB per source), REC-04,
+  REC-08, REC-12, REC-26, PRV-14, RCL-02 (9 of 9), REC-17 extended. Ingest of
+  a resumed multi-window source costs about size^2/window: M5's, by ruling.
 - **Purge residue (ruled):** only each purged line's position, length and
   the harness's own `uuid` remain (beside the tombstone, REC-04); SEC-31
   and ADM-07 stay `@pending` (M3). NFR-03..05 land in part (benchmarks,

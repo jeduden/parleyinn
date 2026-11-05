@@ -67,7 +67,7 @@ Feature: Security (SEC)
       | stdin of 1 MiB plus one byte                        | an audit entry records "hook input exceeds 1 MiB"                            |
       | a JSON object nested 65 levels deep                 | an audit entry records "hook input nesting exceeds depth 64"                 |
       | a transcript line larger than the payload threshold | the line is redacted whole, then stored in the payload store, and nothing of it is written unredacted |
-      | a transcript line of 4 MiB plus one byte            | the line's content is not stored, an audit entry of kind rejected records "transcript line over the 4 MiB limit not stored; its place is recorded and ingest continues past it (SEC-05)", the counter `transcript_line_too_large` counts it, its place is recorded, and every later line of the source is recorded |
+      | a transcript line of 4 MiB plus one byte            | the line is stored unparsed and redacted whole without being held in memory, an audit entry of kind redacted records "transcript line over the 4 MiB limit stored unparsed and redacted whole without being held in memory; its place is recorded (SEC-05)", the counter `transcript_line_too_large` counts it, its place is recorded, and every later line of the source is recorded |
       | a transcript source of more than 64 MiB             | ingest holds at most 64 MiB of it in memory at once and ingests every line of it across resumes at its ingest marker (REC-13) |
 
   @SEC-06 @P0 @I2
