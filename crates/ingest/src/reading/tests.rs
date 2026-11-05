@@ -225,3 +225,29 @@ fn a_refusal_between_recorded_lines_keeps_the_prefix_the_position_digests() {
     );
     assert_eq!((grown.refused, grown.events), (0, 1));
 }
+
+#[test]
+fn a_purged_line_is_never_recorded_again_by_the_generation_an_unconfirmed_purge_starts() {
+    let dir = TempDir::new().unwrap();
+    let home = home(&dir);
+    let path = transcript(&dir, &numbered("p", 1, 3));
+    let first = crate::ingest_path(&home, &path, &redactor(), &mut OsEntropy).unwrap();
+    // The purge reads no transcript, so the source's prefix hash confirms
+    // nothing and the next read starts a new generation of the source.
+    purged(&home, first.writer, 1);
+
+    let again = crate::ingest_path(&home, &path, &redactor(), &mut OsEntropy).unwrap();
+
+    assert!(again.new_generation, "the hash confirms nothing");
+    assert_eq!(again.refused, 1, "the purged line is refused, not recorded");
+    assert_eq!(again.events, 2);
+    let store = Store::open(&home.store()).unwrap();
+    let recorded: Vec<String> = store
+        .log(again.writer)
+        .unwrap()
+        .iter()
+        .filter_map(|e| e.content.as_ref()?["text"].as_str().map(str::to_owned))
+        .collect();
+    assert_eq!(recorded.len(), 4, "u2 and u3 of each generation");
+    assert!(recorded.iter().all(|text| !text.contains("\"u1\"")));
+}
