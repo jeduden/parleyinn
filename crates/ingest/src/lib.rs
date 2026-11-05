@@ -67,6 +67,18 @@ pub struct RunReport {
     pub events: usize,
 }
 
+/// A transcript of the directory an ingest could not read while it
+/// learned which `uuid`s the directory's other transcripts hold, so a
+/// repeated line may have been recorded as its own (I6, I9).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct UnreadSource {
+    /// Its file name without the extension, redacted as a line is; the
+    /// directory's own name when the directory could not be listed.
+    pub name: String,
+    /// Why, with each cause behind it.
+    pub why: String,
+}
+
 /// What one ingest recorded.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Ingested {
@@ -129,16 +141,27 @@ pub struct Ingested {
     /// How many lines were refused, their `uuid` naming a purged event
     /// (REC-04).
     pub refused: usize,
-    /// The line over the 4 MiB limit it refused, which the ingest
-    /// position stays before: the caller audits and counts it as
+    /// The line over the 4 MiB limit this read came to: its content is
+    /// never stored. The caller audits and counts it as
     /// `transcript_line_too_large` (SEC-05, REC-03).
     pub too_large: Option<read::bounded::Refused>,
+    /// The number of that line when this ingest recorded its place and
+    /// moved the ingest position past it, so every later line is
+    /// recorded; none while the position stays before it, a line whose
+    /// line break the harness has not written yet. The place is kept
+    /// with the source's refused lines: its line, offset, and length with
+    /// its line break (one more than `too_large`'s).
+    pub too_large_line: Option<u64>,
     /// Whether the source holds lines past this read that the next read
     /// resumes at its ingest marker: the read took 64 MiB, the most it
     /// holds at once (SEC-05, REC-13). False while a refused line stops it.
     pub resumable: bool,
     /// The most bytes of the source it held in memory at once (SEC-05).
     pub read_window_high_water: usize,
+    /// The transcripts of the directory it could not read to learn their
+    /// `uuid`s (I6): the caller counts and audits each; the ingest went
+    /// on without them.
+    pub unread_sources: Vec<UnreadSource>,
     /// The events the search index leaves out that no ingest has
     /// reported yet (REC-11, I6): the caller audits each, then notes it
     /// with `Store::mark_search_index_gaps_reported`.
@@ -370,18 +393,11 @@ fn ingest_once(
     inputs: &Inputs,
     entropy: &mut dyn Entropy,
 ) -> Result<Ingested, IngestError> {
-    let known = if read::open::needs_marker(path) {
-        reading::peek(home, path)?
-    } else {
-        None
-    };
-    let opened = read::open::open(path, known.as_ref()).map_err(|source| IngestError::Read {
-        path: path.to_path_buf(),
-        source,
-    })?;
+    let (opened, _) = reading::open_source(home, path)?;
     let window = opened.window;
     let (base, more, refused, high_water) =
         (window.start, window.more, window.refused, window.high_water);
+    let ended = window.refused_ended;
     let text =
         String::from_utf8(window.bytes).map_err(|_| IngestError::NotUtf8(path.to_path_buf()))?;
     if text.is_empty() && refused.is_none() && base == 0 {
@@ -392,7 +408,8 @@ fn ingest_once(
         base,
         seen: opened.seen,
         refused,
-        resumable: more && refused.is_none(),
+        refused_ended: ended,
+        resumable: reading::resumable(more, refused, ended, opened.seen),
         high_water,
     };
 

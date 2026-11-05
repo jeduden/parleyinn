@@ -6,7 +6,7 @@
 //! that line and resumable (REC-03); the line is counted over, never
 //! buffered.
 
-use std::io::{self, Read};
+use std::io::{self, Read, Seek, SeekFrom};
 
 /// The most bytes of one line, without its line break, ingest takes
 /// (SEC-05).
@@ -61,6 +61,10 @@ pub struct Window {
     /// Whether the source holds bytes past the window: a line that
     /// would not fit with the lines before it, or a refused line.
     pub more: bool,
+    /// Whether the refused line's line break is in the source, so a read
+    /// can go on past it; false while the harness may still be writing
+    /// it, and when no line is refused.
+    pub refused_ended: bool,
     /// The most bytes the read held at once: at most the source
     /// ceiling.
     pub high_water: usize,
@@ -87,19 +91,21 @@ struct Reading {
 
 /// The window of `source` from byte offset `from`: whole lines up to
 /// `limits.source` bytes, ending before a line past `limits.line`. The
-/// bytes before `from` are read past, never held.
+/// source is moved to `from` by a seek: the bytes before it are never
+/// read, so reading a source window by window reads each byte once.
 ///
 /// # Errors
 ///
 /// Fails when a read does.
-pub fn window(mut source: impl Read, from: u64, limits: Limits) -> io::Result<Window> {
-    skip(&mut source, from)?;
+pub fn window(mut source: impl Read + Seek, from: u64, limits: Limits) -> io::Result<Window> {
+    source.seek(SeekFrom::Start(from))?;
     let mut reading = Reading {
         window: Window {
             start: from,
             bytes: Vec::new(),
             refused: None,
             more: false,
+            refused_ended: false,
             high_water: 0,
         },
         line_start: 0,
@@ -174,24 +180,9 @@ impl Reading {
                 length,
             });
             self.window.more = true;
+            self.window.refused_ended = self.done;
         }
     }
-}
-
-/// Reads past the first `count` bytes of `source`, holding none.
-fn skip(source: &mut impl Read, count: u64) -> io::Result<()> {
-    let mut left = count;
-    let mut scratch = vec![0; CHUNK];
-    while left > 0 {
-        let want = usize::try_from(left).map_or(CHUNK, |l| l.min(CHUNK));
-        let n = source.read(&mut scratch[..want])?;
-        if n == 0 {
-            break;
-        }
-        left -= n as u64;
-    }
-
-    Ok(())
 }
 
 /// Counts the bytes of the first line of a source, a piece at a time,

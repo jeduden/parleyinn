@@ -29,10 +29,50 @@ pub(crate) struct View<'t> {
     pub(crate) seen: u64,
     /// The line over the line ceiling the window ends before.
     pub(crate) refused: Option<Refused>,
+    /// Whether that line's line break is in the source, so the ingest
+    /// records its place and goes on past it (SEC-05).
+    pub(crate) refused_ended: bool,
     /// Whether the source holds more lines past the window to resume at.
     pub(crate) resumable: bool,
     /// The most bytes of the source the read held at once.
     pub(crate) high_water: usize,
+}
+
+/// Whether the source holds lines past a window to resume at: those after
+/// the line over the line ceiling the window ends before, once the read
+/// goes on past it; else those a full window left (SEC-05, REC-13).
+pub(crate) fn resumable(more: bool, refused: Option<Refused>, ended: bool, seen: u64) -> bool {
+    match refused {
+        None => more,
+        Some(line) => ended && seen > line.offset + line.length + 1,
+    }
+}
+
+/// The transcript at `path` opened at its ingest marker, and the marker
+/// row it was opened by. The marker is looked up for a source longer than
+/// one window, and for one whose first window ends at a line over the line
+/// ceiling, since the position may lie past that line (SEC-05, REC-13).
+pub(crate) fn open_source(
+    home: &Home,
+    path: &Path,
+) -> Result<(open::Opened, Option<Source>), IngestError> {
+    let looked = open::needs_marker(path);
+    let mut known = if looked { peek(home, path)? } else { None };
+    let mut opened = open::open(path, known.as_ref()).map_err(IngestError::read(path))?;
+    if !looked && opened.window.refused.is_some() {
+        known = peek(home, path)?;
+        if known.as_ref().is_some_and(open::passed) {
+            opened = open::open(path, known.as_ref()).map_err(IngestError::read(path))?;
+        }
+    }
+
+    Ok((opened, known))
+}
+
+/// The bytes left under SEC-05's source-memory ceiling for planned event
+/// content, once a read held `high_water` bytes of the source.
+pub(super) fn planning_memory(high_water: usize) -> usize {
+    open::PLANNING_RESERVE.min(read::bounded::SOURCE_LIMIT.saturating_sub(high_water))
 }
 
 /// `redactor` with the harness account identifiers the transcript names
@@ -176,6 +216,44 @@ mod tests {
     use testkit::TempDir;
 
     #[test]
+    fn a_read_goes_on_past_a_refused_line_only_once_its_line_break_is_written_and_bytes_follow() {
+        let line = Refused {
+            offset: 10,
+            length: 5,
+        };
+
+        assert!(resumable(true, None, false, 0));
+        assert!(!resumable(false, None, false, 0));
+        assert!(resumable(true, Some(line), true, 17));
+        assert!(!resumable(true, Some(line), true, 16), "nothing follows it");
+        assert!(
+            !resumable(true, Some(line), false, 99),
+            "still being written"
+        );
+    }
+
+    #[test]
+    fn the_marker_of_a_small_source_is_looked_up_only_when_its_first_window_is_refused() {
+        let dir = TempDir::new().unwrap();
+        let home = Home::locate(Some(dir.path().join(".parinn").as_os_str()), None).unwrap();
+        let plain = dir.path().join("plain.jsonl");
+        std::fs::write(&plain, "{\"a\":1}\n").unwrap();
+        let mut over = "{\"a\":1}\n".to_owned();
+        over.push_str(&"z".repeat(crate::read::bounded::LINE_LIMIT + 1));
+        over.push('\n');
+        let big = dir.path().join("big.jsonl");
+        std::fs::write(&big, &over).unwrap();
+
+        let (whole, known) = open_source(&home, &plain).unwrap();
+        let (stopped, none) = open_source(&home, &big).unwrap();
+
+        assert_eq!((whole.window.refused, known), (None, None));
+        assert_eq!(stopped.window.refused.map(|r| r.offset), Some(8));
+        assert_eq!(none, None, "no marker row yet");
+        assert!(open_source(&home, dir.path()).is_err());
+    }
+
+    #[test]
     fn a_window_s_identifiers_are_learned_before_the_path_is_reopened() {
         let dir = TempDir::new().unwrap();
         let path = dir.path().join("changed.jsonl");
@@ -189,6 +267,7 @@ mod tests {
             base: 7,
             seen: text.len() as u64 + 7,
             refused: None,
+            refused_ended: false,
             resumable: true,
             high_water: text.len(),
         };

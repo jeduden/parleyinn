@@ -56,7 +56,8 @@ pub fn needs_marker(path: &Path) -> bool {
 /// one window is read whole, from its first byte. A longer one is read
 /// from the marker when the bytes before it still hash to `known`'s
 /// consumed prefix, else from its first byte, as a new generation
-/// (REC-07).
+/// (REC-07). So is a source whose position lies past a line over the
+/// line ceiling, whatever its length.
 ///
 /// # Errors
 ///
@@ -66,12 +67,10 @@ pub fn open(path: &Path, known: Option<&Source>) -> io::Result<Opened> {
     let len = file.metadata()?.len();
     let mut from = 0;
     if let Some(source) =
-        known.filter(|s| len > INGEST_WINDOW_LIMIT as u64 && s.position.offset > 0)
+        known.filter(|s| s.position.offset > 0 && (len > INGEST_WINDOW_LIMIT as u64 || passed(s)))
+        && holds(&mut file, source)?
     {
-        if holds(&mut file, source)? {
-            from = source.position.offset;
-        }
-        file.seek(SeekFrom::Start(0))?;
+        from = source.position.offset;
     }
     let limits = Limits {
         line: LINE_LIMIT,
@@ -85,6 +84,14 @@ pub fn open(path: &Path, known: Option<&Source>) -> io::Result<Opened> {
     };
 
     Ok(Opened { window, seen })
+}
+
+/// Whether `source`'s ingest position lies past a line over the line
+/// ceiling: a window read from the first byte would end at that line, so
+/// the source is read from its marker whatever its length (SEC-05).
+#[must_use]
+pub fn passed(source: &Source) -> bool {
+    source.purged.iter().any(|s| s.length > LINE_LIMIT as u64)
 }
 
 /// Whether the first bytes of `file` still hash to the consumed prefix

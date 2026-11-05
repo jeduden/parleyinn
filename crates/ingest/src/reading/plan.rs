@@ -18,7 +18,7 @@ use serde_json::{Value, json};
 use store::{NewEvent, Place, Source, Store};
 use transcript::shape::Shapes;
 
-use super::{Named, Runs};
+use super::{Named, Runs, with_causes};
 use crate::prompt::{self, Outcome, PromptLine};
 use crate::read::{self, Line};
 use crate::repeat::{self, Decision, Facts, Owner, Rule};
@@ -72,6 +72,11 @@ pub(super) struct Plan {
     /// The line number and end offset of the last line refused, so the
     /// ingest position moves past a refusal no recorded line follows.
     pub(super) refused_to: Option<(u64, u64)>,
+    /// The place of the line over the line ceiling the window ends
+    /// before, once the ingest goes on past it: its content is never
+    /// read, its bytes are zeros in the consumed-prefix hash (SEC-05,
+    /// SEC-31).
+    pub(super) over: Option<Place>,
     /// Each (owner, repeating) pair of writers whose repeat owner no
     /// fork observation chose.
     pub(super) chosen: BTreeSet<(WriterId, WriterId)>,
@@ -92,9 +97,26 @@ pub(super) struct Plan {
     /// Whether planning stopped at its memory budget before the window
     /// ended, so the next read resumes at the ingest marker.
     pub(super) resumable: bool,
+    /// The transcripts of the directory that could not be read to learn
+    /// the `uuid`s they hold, by redacted name, with why (I6).
+    pub(super) unread: Vec<crate::UnreadSource>,
 }
 
 impl Plan {
+    /// Records the place of `line`, the line number of the line over the
+    /// line ceiling `over`, so the ingest goes on past it. Its length
+    /// takes its line break, as every place's does.
+    pub(super) fn pass_over(&mut self, over: crate::read::bounded::Refused, line: u64) {
+        let place = Place {
+            line,
+            offset: over.offset,
+            length: over.length + 1,
+            uuid: None,
+        };
+        self.refused_places.push(place.clone());
+        self.over = Some(place);
+    }
+
     /// How many events it appends to each writer.
     pub(super) fn events_by_writer(&self) -> BTreeMap<WriterId, usize> {
         let mut out = BTreeMap::new();
@@ -249,6 +271,7 @@ impl<'a> Planner<'a> {
             }
         }
         plan.witnessed_repeats = self.witnessed_repeats;
+        plan.unread = self.unread(read.redactor);
 
         Ok(plan)
     }
@@ -394,6 +417,24 @@ impl<'a> Planner<'a> {
         }))
     }
 
+    /// What the planner could not read of the directory's other
+    /// transcripts, named as the redactor shows them.
+    fn unread(&self, redactor: &Redactor) -> Vec<crate::UnreadSource> {
+        let Some(siblings) = &self.siblings else {
+            return Vec::new();
+        };
+        siblings
+            .unread
+            .iter()
+            .map(|(path, why)| crate::UnreadSource {
+                name: redactor
+                    .redact_text(&path.file_stem().unwrap_or_default().to_string_lossy())
+                    .text,
+                why: why.clone(),
+            })
+            .collect()
+    }
+
     /// The `uuid`s the directory's other transcripts hold.
     fn siblings(&mut self) -> &Siblings {
         let (named, inputs) = (self.named, self.inputs);
@@ -462,25 +503,54 @@ struct Siblings {
     /// Those of transcripts another MCP server holds a session binding
     /// for.
     served: BTreeSet<String>,
+    /// Each directory or transcript that could not be read, with why:
+    /// the lines read before a failure stay in the sets above.
+    unread: Vec<(PathBuf, String)>,
 }
 
 /// Every `uuid` the transcripts in `directory` but `path` hold, and
-/// those of the transcripts in `served`; a transcript that cannot be
-/// read holds none.
+/// those of the transcripts in `served`. What cannot be read holds none,
+/// and is kept in [`Siblings::unread`] for the caller to count (I6, I9).
 fn sibling_uuids(directory: &str, path: &str, served: &BTreeSet<PathBuf>) -> Siblings {
+    let listing = std::fs::read_dir(directory).map(|e| e.map(|entry| entry.map(|e| e.path())));
+
+    sibling_uuids_of(listing, directory, path, served)
+}
+
+/// [`sibling_uuids`] of the entries `listing` gives for `directory`.
+fn sibling_uuids_of(
+    listing: std::io::Result<impl Iterator<Item = std::io::Result<PathBuf>>>,
+    directory: &str,
+    path: &str,
+    served: &BTreeSet<PathBuf>,
+) -> Siblings {
     let mut found = Siblings::default();
-    let Ok(entries) = std::fs::read_dir(directory) else {
-        return found;
+    let entries = match listing {
+        Ok(entries) => entries,
+        Err(e) => {
+            found
+                .unread
+                .push((PathBuf::from(directory), with_causes(&e)));
+            return found;
+        }
     };
     let served: BTreeSet<PathBuf> = served.iter().map(|p| canonical(p)).collect();
-    for entry in entries.flatten() {
-        let other = entry.path();
+    for entry in entries {
+        let other = match entry {
+            Ok(other) => other,
+            Err(e) => {
+                found
+                    .unread
+                    .push((PathBuf::from(directory), with_causes(&e)));
+                continue;
+            }
+        };
         if other.to_string_lossy() == path || other.extension().is_none_or(|e| e != "jsonl") {
             continue;
         }
         let bound = served.contains(&canonical(&other));
         // A line at a time, so a long transcript is never held (SEC-05).
-        let _ = read::open::for_each_line(&other, u64::MAX, |text| {
+        let read = read::open::for_each_line(&other, u64::MAX, |text| {
             if json_heap_bound(text) > PARSED_LINE_LIMIT {
                 return;
             }
@@ -492,6 +562,9 @@ fn sibling_uuids(directory: &str, path: &str, served: &BTreeSet<PathBuf>) -> Sib
                 }
             }
         });
+        if let Err(e) = read {
+            found.unread.push((other, with_causes(&e)));
+        }
     }
 
     found

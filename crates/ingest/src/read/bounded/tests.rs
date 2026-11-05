@@ -1,4 +1,4 @@
-use std::io::Cursor;
+use std::io::{self, Cursor, Read, Seek, SeekFrom};
 
 use super::*;
 
@@ -90,6 +90,7 @@ fn a_refused_line_ends_the_window_before_it_and_the_lines_after_it_stay_unread()
     );
     assert_eq!(got.end(), 8);
     assert!(got.more);
+    assert!(got.refused_ended, "its line break is in the source");
 }
 
 #[test]
@@ -126,6 +127,8 @@ fn a_refused_line_the_source_ends_in_is_counted_to_its_end() {
         })
     );
     assert_eq!(got.bytes, b"a\n");
+    assert!(!got.refused_ended, "the harness may still be writing it");
+    assert!(!cut(b"a\n", 0, Limits::default()).refused_ended);
 }
 
 #[test]
@@ -223,16 +226,48 @@ fn a_source_of_more_than_64_mib_is_held_at_most_64_mib_at_once() {
 }
 
 #[test]
-fn a_failing_read_fails_the_window_and_the_skip() {
-    struct Failing;
+fn a_failing_read_or_seek_fails_the_window() {
+    struct Failing(bool);
     impl Read for Failing {
         fn read(&mut self, _: &mut [u8]) -> io::Result<usize> {
             Err(io::Error::other("read failed"))
         }
     }
+    impl Seek for Failing {
+        fn seek(&mut self, _: SeekFrom) -> io::Result<u64> {
+            if self.0 {
+                Err(io::Error::other("seek failed"))
+            } else {
+                Ok(0)
+            }
+        }
+    }
 
-    assert!(window(Failing, 0, Limits::default()).is_err());
-    assert!(window(Failing, 5, Limits::default()).is_err());
+    assert!(window(Failing(false), 0, Limits::default()).is_err());
+    assert!(window(Failing(true), 5, Limits::default()).is_err());
+}
+
+#[test]
+fn a_window_moves_to_its_start_by_a_seek_and_never_reads_the_bytes_before_it() {
+    struct Counting(Cursor<Vec<u8>>, usize);
+    impl Read for Counting {
+        fn read(&mut self, buffer: &mut [u8]) -> io::Result<usize> {
+            let n = self.0.read(buffer)?;
+            self.1 += n;
+            Ok(n)
+        }
+    }
+    impl Seek for Counting {
+        fn seek(&mut self, to: SeekFrom) -> io::Result<u64> {
+            self.0.seek(to)
+        }
+    }
+    let mut source = Counting(Cursor::new(lines_of(4, 99)), 0);
+
+    let got = window(&mut source, 300, Limits::default()).unwrap();
+
+    assert_eq!((got.start, got.bytes.len()), (300, 100));
+    assert_eq!(source.1, 100);
 }
 
 #[test]

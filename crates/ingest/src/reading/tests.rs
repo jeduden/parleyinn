@@ -328,3 +328,35 @@ fn a_failed_read_of_a_transcript_names_it_and_keeps_its_cause() {
     assert!(matches!(&err, IngestError::Read { path: p, .. } if p == path));
     assert!(std::error::Error::source(&err).is_some());
 }
+
+#[test]
+fn a_run_row_another_ingest_added_after_the_runs_loaded_counts_as_kept() {
+    let dir = TempDir::new().unwrap();
+    let home = home(&dir);
+    let mut entropy = OsEntropy;
+    home.create().unwrap();
+    let mut store = Store::open(&home.store()).unwrap();
+    let node = Node::open(&home, &mut store, &mut entropy).unwrap();
+    let key = RunKey {
+        agent_id: None,
+        harness_session: "s".to_owned(),
+    };
+    let mut seats = RunSeats::default();
+    let writer = seats.ensure(&mut store, &node, &key, &mut entropy).unwrap();
+    let mut recorder = Recorder::Live(&mut seats);
+    let mut runs = Runs::load(&store, "p", &mut recorder).unwrap();
+    store
+        .add_run(&IngestedRun {
+            writer,
+            path: "other".to_owned(),
+            harness_session: "s".to_owned(),
+            agent_id: None,
+        })
+        .unwrap();
+
+    let first = runs.ensure(&mut store, &node, &home, &key, &mut entropy);
+    let again = runs.ensure(&mut store, &node, &home, &key, &mut entropy);
+
+    assert_eq!((first.unwrap(), again.unwrap()), (writer, writer));
+    assert_eq!(store.ingested_runs().unwrap().len(), 1);
+}

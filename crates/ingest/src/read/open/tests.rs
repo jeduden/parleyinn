@@ -123,6 +123,37 @@ fn a_window_that_ends_at_a_refused_line_is_seen_past_it() {
 }
 
 #[test]
+fn a_small_source_whose_position_lies_past_a_refused_line_resumes_at_its_marker() {
+    let dir = TempDir::new().unwrap();
+    let mut bytes = lines_of(1, 20);
+    let big = (4 << 20) + 2;
+    bytes.extend(vec![b'z'; big - 1]);
+    bytes.push(b'\n');
+    bytes.extend(lines_of(1, 20));
+    let path = written(&dir, &bytes);
+    let span = Span {
+        offset: 21,
+        length: big as u64,
+    };
+    let past = source(&bytes, 21 + big as u64, vec![span]);
+    let before = source(&bytes, 21, Vec::new());
+
+    let resumed = open(&path, Some(&past)).unwrap();
+    let short = open(&path, Some(&before)).unwrap();
+
+    assert!(passed(&past) && !passed(&before));
+    assert_eq!(
+        (resumed.window.start, resumed.window.refused),
+        (21 + big as u64, None)
+    );
+    assert_eq!(resumed.window.bytes.len(), 21);
+    assert_eq!(
+        short.window.start, 0,
+        "a small source is read whole before it"
+    );
+}
+
+#[test]
 fn a_transcript_that_is_no_regular_file_is_not_opened() {
     let dir = TempDir::new().unwrap();
 

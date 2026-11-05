@@ -27,8 +27,8 @@ use crate::repeat;
 use crate::run::{Defaults, RunKey};
 
 use self::plan::{Plan, Planner, Read};
-pub(crate) use self::window::{View, peek};
-use self::window::{consumed, redacting};
+pub(crate) use self::window::{View, open_source, peek, resumable};
+use self::window::{consumed, planning_memory, redacting};
 use crate::{IngestError, Ingested, Inputs, RunReport};
 
 /// Who records what an ingest reads, and in which seats.
@@ -52,8 +52,7 @@ pub(crate) fn ingest(
     recorder: &mut Recorder<'_>,
     entropy: &mut dyn Entropy,
 ) -> Result<Ingested, IngestError> {
-    let text = view.text;
-    let lines = read::lines_at(text, view.base);
+    let lines = read::lines_at(view.text, view.base);
     let (redactor, reading_high_water) = redacting(redactor, path, view, &lines)?;
     home.create().map_err(IngestError::Admin)?;
     let mut store = open_store(home, inputs)?;
@@ -68,7 +67,7 @@ pub(crate) fn ingest(
     let mut runs = Runs::load(&store, &named.path, recorder)?;
     let own = runs.ensure(&mut store, &node, home, &defaults.own(), entropy)?;
     let mut planner = Planner::new(&store, &named, inputs, &resume.source, &runs)?;
-    let plan = planner.plan(
+    let mut plan = planner.plan(
         &mut store,
         &mut runs,
         &observed.session(&defaults.own().harness_session),
@@ -81,11 +80,11 @@ pub(crate) fn ingest(
             path,
             defaults: &defaults,
             redactor: &redactor,
-            memory_limit: read::open::PLANNING_RESERVE
-                .min(read::bounded::SOURCE_LIMIT.saturating_sub(reading_high_water)),
+            memory_limit: planning_memory(reading_high_water),
         },
         entropy,
     )?;
+    refusal::pass_over(&mut plan, view, resume.first_line + lines.len() as u64 + 1);
     let main = defaults.own().agent_id.is_none().then_some(own);
     let seen = Seen {
         observed: &observed,
@@ -105,8 +104,10 @@ pub(crate) fn ingest(
         index_gaps,
         index_gaps_unread,
         witnessed_repeats: plan.witnessed_repeats,
+        unread_sources: plan.unread.clone(),
         refused: plan.refused,
         too_large: view.refused,
+        too_large_line: plan.over.as_ref().map(|place| place.line),
         resumable: view.resumable || plan.resumable,
         read_window_high_water: reading_high_water.saturating_add(plan.memory),
         matched: observations.matched,
@@ -388,6 +389,9 @@ struct Runs<'r> {
     sessions: BTreeMap<WriterId, String>,
     /// The writers whose seat this node's device key is known to certify.
     certified: BTreeSet<WriterId>,
+    /// The writers an ingested-run row is known to exist for, so a live
+    /// ingest asks the store once for each writer, not for each line.
+    kept: BTreeSet<WriterId>,
     /// The run seats of the MCP server ingesting live, when one is.
     live: Option<&'r mut RunSeats>,
 }
@@ -407,6 +411,7 @@ impl<'r> Runs<'r> {
             of_source: BTreeMap::new(),
             sessions: BTreeMap::new(),
             certified: BTreeSet::new(),
+            kept: BTreeSet::new(),
             live,
         };
         for run in store.ingested_runs()? {
@@ -429,6 +434,7 @@ impl<'r> Runs<'r> {
         }
         self.sessions
             .insert(run.writer, run.harness_session.clone());
+        self.kept.insert(run.writer);
     }
 
     /// The writer of the run `key` names in this source, its ingest seat
@@ -448,17 +454,20 @@ impl<'r> Runs<'r> {
             // recall scoped to the run reaches this seat (RCL-05).
             // A `parinn ingest` may have started an ingest seat past
             // this one since, so any row of this seat counts as kept.
-            let kept = store
-                .ingested_runs()?
-                .iter()
-                .any(|run| run.writer == writer);
-            if !kept {
-                store.add_run(&IngestedRun {
-                    writer,
-                    path: self.path.clone(),
-                    harness_session: key.harness_session.clone(),
-                    agent_id: key.agent_id.clone(),
-                })?;
+            if !self.kept.contains(&writer) {
+                let kept = store
+                    .ingested_runs()?
+                    .iter()
+                    .any(|run| run.writer == writer);
+                if !kept {
+                    store.add_run(&IngestedRun {
+                        writer,
+                        path: self.path.clone(),
+                        harness_session: key.harness_session.clone(),
+                        agent_id: key.agent_id.clone(),
+                    })?;
+                }
+                self.kept.insert(writer);
             }
             return Ok(writer);
         }
@@ -587,21 +596,7 @@ fn append(
         })?);
         landed += range.len();
     }
-    // A refusal no recorded line follows still moves the position, or
-    // the next read would refuse it again.
-    if let Some((line, end)) = plan.refused_to.filter(|(_, end)| *end > position.offset) {
-        running.update(
-            bytes
-                .get(as_index(position.offset - base)..as_index(end - base))
-                .unwrap_or_default(),
-        );
-        position = Position {
-            offset: end,
-            prefix: running.digest(),
-            lines: line,
-            seen,
-        };
-    }
+    let position = refusal::move_past(&mut running, bytes, base, position, plan, seen);
     if plan.events.is_empty() && !plan.refused_places.is_empty() {
         store.advance_refusing(resume.source.id, &position, &plan.refused_places)?;
     } else {
@@ -922,6 +917,7 @@ fn reports(
 }
 
 mod plan;
+mod refusal;
 mod window;
 
 #[cfg(test)]

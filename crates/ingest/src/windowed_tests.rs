@@ -51,6 +51,7 @@ pub(crate) fn whole(text: &str) -> reading::View<'_> {
         base: 0,
         seen: text.len() as u64,
         refused: None,
+        refused_ended: false,
         resumable: false,
         high_water: text.len(),
     }
@@ -74,40 +75,142 @@ fn refused_text() -> (String, u64) {
 }
 
 #[test]
-fn a_line_over_4_mib_is_refused_and_the_source_left_short_at_it() {
+fn a_line_over_4_mib_is_not_stored_its_place_is_recorded_and_ingest_goes_on_past_it() {
     let dir = TempDir::new().unwrap();
     let (home, (text, at)) = (home(&dir), refused_text());
     let path = written(&dir, &text);
 
     let first = ingest_path(&home, &path, &redactor(), &mut OsEntropy).unwrap();
+    let second = ingest_path(&home, &path, &redactor(), &mut OsEntropy).unwrap();
     let again = ingest_path(&home, &path, &redactor(), &mut OsEntropy).unwrap();
 
     let refused = first.too_large.unwrap();
     assert_eq!((refused.offset, refused.length), (at, (4 << 20) + 1));
-    assert_eq!((first.events, again.events), (2, 0));
-    assert_eq!(again.too_large, first.too_large);
-    assert!(!first.resumable);
+    assert_eq!(first.too_large_line, Some(3));
+    assert_eq!((first.events, second.events, again.events), (2, 1, 0));
+    assert!(first.resumable && !second.resumable);
+    assert_eq!(second.too_large, None);
     let row = source(&home);
-    assert_eq!((row.position.offset, row.position.lines), (at, 2));
-    assert_eq!(row.position.seen, text.len() as u64);
-    assert!(!row.position.complete());
-    assert_eq!(refused_line(&home, &path), first.too_large);
+    assert_eq!(row.position.offset, text.len() as u64);
+    assert_eq!(row.position.lines, 4);
+    assert!(row.position.complete());
+    // The place is kept with its line break, its bytes zeros in the hash.
+    let place = Store::open(&home.store())
+        .unwrap()
+        .purged_places(row.id)
+        .unwrap();
+    assert_eq!(
+        place
+            .iter()
+            .map(|p| (p.line, p.offset, p.length))
+            .collect::<Vec<_>>(),
+        [(3, at, (4 << 20) + 2)]
+    );
+    assert!(read::open::continues(&path, &row));
+    assert_eq!(refused_line(&home, &path).unwrap(), None);
+    let texts = placed_texts(&home);
+    assert!(
+        texts.iter().all(|t| !t.contains("zzzz")),
+        "its content is not stored"
+    );
+    assert_eq!(texts.len(), 3);
+}
+
+/// The redacted text of each line event of the one source, in order.
+fn placed_texts(home: &Home) -> Vec<String> {
+    let store = Store::open(&home.store()).unwrap();
+    let id = store.sources().unwrap()[0].id;
+    store
+        .placed(id)
+        .unwrap()
+        .iter()
+        .map(|p| {
+            let content = store.event(p.address).unwrap().unwrap().content.unwrap();
+            content["text"].as_str().unwrap().to_owned()
+        })
+        .collect()
 }
 
 #[test]
-fn a_source_whose_first_line_is_over_the_limit_records_nothing_and_is_no_empty_one() {
+fn a_source_whose_first_line_is_over_the_limit_records_its_place_and_the_lines_after_it() {
     let dir = TempDir::new().unwrap();
     let home = home(&dir);
-    let path = written(
-        &dir,
-        &format!("{}\n{}", "z".repeat((4 << 20) + 1), line(1, 50)),
+    let big = "z".repeat((4 << 20) + 1);
+    let path = written(&dir, &format!("{big}\n{}", line(1, 50)));
+
+    let first = ingest_path(&home, &path, &redactor(), &mut OsEntropy).unwrap();
+
+    assert_eq!(first.events, 0);
+    assert_eq!(first.too_large.map(|r| r.offset), Some(0));
+    assert_eq!(first.too_large_line, Some(1));
+    assert!(first.resumable);
+    assert_eq!(source(&home).position.offset, (4 << 20) + 2);
+    let second = ingest_path(&home, &path, &redactor(), &mut OsEntropy).unwrap();
+    assert_eq!((second.events, second.too_large), (1, None));
+    assert_eq!(source(&home).position.lines, 2);
+}
+
+#[test]
+fn a_refused_line_no_line_follows_ends_the_source_and_asks_for_no_more_read() {
+    let dir = TempDir::new().unwrap();
+    let home = home(&dir);
+    let text = line(1, 50) + &"z".repeat((4 << 20) + 1) + "\n";
+    let path = written(&dir, &text);
+
+    let first = ingest_path(&home, &path, &redactor(), &mut OsEntropy).unwrap();
+
+    assert_eq!((first.events, first.too_large_line), (1, Some(2)));
+    assert!(!first.resumable);
+    assert!(source(&home).position.complete());
+}
+
+#[test]
+fn every_refused_line_of_a_source_is_passed_in_its_own_read() {
+    let dir = TempDir::new().unwrap();
+    let home = home(&dir);
+    let big = "z".repeat((4 << 20) + 1) + "\n";
+    let path = written(&dir, &(big.clone() + &line(1, 50) + &big + &line(2, 50)));
+
+    let mut reads = Vec::new();
+    loop {
+        let read = ingest_path(&home, &path, &redactor(), &mut OsEntropy).unwrap();
+        let more = read.resumable;
+        reads.push((read.events, read.too_large_line));
+        if !more {
+            break;
+        }
+    }
+
+    assert_eq!(reads, [(0, Some(1)), (1, Some(3)), (1, None)]);
+    let row = source(&home);
+    assert_eq!((row.position.lines, row.purged.len()), (4, 2));
+    assert!(read::open::continues(&path, &row));
+}
+
+#[test]
+fn a_refused_line_still_being_written_stays_before_the_position_until_its_line_break() {
+    let dir = TempDir::new().unwrap();
+    let home = home(&dir);
+    let head = line(1, 50);
+    let big = "z".repeat((4 << 20) + 1);
+    let path = written(&dir, &(head.clone() + &big));
+
+    let waiting = ingest_path(&home, &path, &redactor(), &mut OsEntropy).unwrap();
+
+    assert_eq!((waiting.events, waiting.too_large_line), (1, None));
+    assert_eq!(waiting.too_large.map(|r| r.offset), Some(head.len() as u64));
+    assert!(!waiting.resumable);
+    assert_eq!(source(&home).position.offset, head.len() as u64);
+    assert_eq!(
+        refused_line(&home, &path).unwrap().map(|r| r.length),
+        Some((4 << 20) + 1)
     );
-
-    let got = ingest_path(&home, &path, &redactor(), &mut OsEntropy).unwrap();
-
-    assert_eq!(got.events, 0);
-    assert_eq!(got.too_large.map(|r| r.offset), Some(0));
-    assert_eq!(source(&home).position.offset, 0);
+    std::fs::write(&path, head + &big + "\n" + &line(2, 50)).unwrap();
+    let done = ingest_path(&home, &path, &redactor(), &mut OsEntropy).unwrap();
+    assert_eq!((done.events, done.too_large_line), (0, Some(2)));
+    assert!(done.resumable);
+    let last = ingest_path(&home, &path, &redactor(), &mut OsEntropy).unwrap();
+    assert_eq!(last.events, 1);
 }
 
 #[test]
@@ -211,6 +314,7 @@ fn a_window_whose_marker_another_ingest_moved_is_refused() {
         base: opened.window.start,
         seen: opened.seen,
         refused: None,
+        refused_ended: false,
         resumable: false,
         high_water: body.len(),
     };
@@ -242,7 +346,7 @@ fn a_window_whose_marker_another_ingest_moved_is_refused() {
 }
 
 #[test]
-fn a_live_ingest_reads_a_big_source_a_window_at_a_time_and_stops_at_a_refused_line() {
+fn a_live_ingest_reads_a_big_source_a_window_at_a_time() {
     let dir = TempDir::new().unwrap();
     let home = home(&dir);
     let mut seats = RunSeats::default();
@@ -305,38 +409,55 @@ fn a_live_ingest_reads_a_big_source_a_window_at_a_time_and_stops_at_a_refused_li
 }
 
 #[test]
-fn a_live_ingest_stops_at_a_refused_line_and_names_it_each_read() {
+fn a_live_ingest_names_a_refused_line_records_its_place_and_goes_on_past_it() {
     let dir = TempDir::new().unwrap();
     let home = home(&dir);
     let (text, at) = refused_text();
     let path = written(&dir, &text);
     let mut seats = RunSeats::default();
-    let some = ingest_live(
-        &home,
-        &path,
-        &redactor(),
-        &Inputs::default(),
-        &mut seats,
-        None,
-        &mut OsEntropy,
-    )
-    .unwrap()
-    .unwrap();
-    let none = ingest_live(
-        &home,
-        &path,
-        &redactor(),
-        &Inputs::default(),
-        &mut seats,
-        None,
-        &mut OsEntropy,
-    )
-    .unwrap();
+    let mut live = |limit| {
+        ingest_live(
+            &home,
+            &path,
+            &redactor(),
+            &Inputs::default(),
+            &mut seats,
+            limit,
+            &mut OsEntropy,
+        )
+        .unwrap()
+    };
 
-    assert_eq!(some.too_large.map(|r| r.offset), Some(at));
+    // Held short of the refused line by the limit, it is not yet passed.
+    let short = live(Some(2)).unwrap();
+    let level = live(None).unwrap();
+    let rest = live(None).unwrap();
+    let none = live(None);
+
+    assert_eq!((short.events, short.too_large_line), (2, None));
+    assert_eq!(short.too_large.map(|r| r.offset), Some(at));
+    assert_eq!((level.events, level.too_large_line), (0, Some(3)));
+    assert_eq!(rest.events, 1);
     assert!(none.is_none());
-    assert_eq!(refused_line(&home, &path).map(|r| r.offset), Some(at));
-    assert_eq!(refused_line(&home, &dir.path().join("none.jsonl")), None);
+    assert_eq!(refused_line(&home, &path).unwrap(), None);
+    assert_eq!(
+        refused_line(&home, &dir.path().join("none.jsonl")).unwrap(),
+        None
+    );
+}
+
+#[test]
+fn a_refused_line_of_a_live_source_that_cannot_be_read_is_a_failure_not_none() {
+    let dir = TempDir::new().unwrap();
+    let home = home(&dir);
+    let (text, _) = refused_text();
+    let path = written(&dir, &text);
+    ingest_path(&home, &path, &redactor(), &mut OsEntropy).unwrap();
+    std::fs::remove_file(&path).unwrap();
+
+    let failed = refused_line(&home, &path).unwrap_err();
+
+    assert!(matches!(failed, IngestError::Read { .. }), "{failed}");
 }
 
 /// Sixty-five 1 MiB lines, so a source read in more than one window.
