@@ -171,6 +171,11 @@ impl<'a> Zeroed<'a> {
                 continue;
             }
             let (start, stop) = (as_index(start - self.at), as_index(stop - self.at));
+            // A span another overlaps zeroes only what it adds.
+            let start = start.max(from);
+            if start >= stop {
+                continue;
+            }
             self.running.update(&bytes[from..start]);
             let mut zeroes = stop - start;
             const ZEROES: [u8; 4096] = [0; 4096];

@@ -231,6 +231,9 @@ pub enum Counter {
     /// transaction could not finish: the residue stays journalled for the
     /// next attempt (ADM-07, SEC-14, I6).
     PurgeUnfinished,
+    /// A purge could not read a transcript to recompute its source's
+    /// consumed-prefix hash, which then confirms nothing (SEC-31, I6).
+    TranscriptPrefixUnconfirmed,
     /// A retention policy aged a range out and the node purged it
     /// (REC-15, SEC-22).
     RetentionPurged,
@@ -308,6 +311,7 @@ impl Counter {
             Self::RecallRefused => "recall_refused",
             Self::PurgeRefused => "purge_refused",
             Self::PurgeUnfinished => "purge_unfinished",
+            Self::TranscriptPrefixUnconfirmed => "transcript_prefix_unconfirmed",
             Self::RetentionPurged => "retention_purged",
             Self::RetentionFailed => "retention_failed",
             Self::VerifyTimedOut => "verify_timed_out",

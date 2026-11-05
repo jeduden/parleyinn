@@ -95,6 +95,32 @@ fn ingested(dir: &TempDir, writer: WriterId, name: &str) -> (Store, Source, Stri
 }
 
 #[test]
+fn overlapping_spans_zero_their_union_and_never_panic() {
+    let spans = [
+        Span {
+            offset: 2,
+            length: 8,
+        },
+        Span {
+            offset: 4,
+            length: 3,
+        },
+        Span {
+            offset: 8,
+            length: 4,
+        },
+    ];
+    let mut expected = BODY.to_vec();
+    expected[2..12].fill(0);
+    for cut in 0..=BODY.len() {
+        let mut hash = Zeroed::new(&spans);
+        hash.update(&BODY[..cut]);
+        hash.update(&BODY[cut..]);
+        assert_eq!(hash.digest(), digest(&expected), "cut at {cut}");
+    }
+}
+
+#[test]
 fn zeroing_hashes_the_bytes_of_each_span_as_zeros_whichever_way_they_arrive() {
     let spans = [
         Span {
@@ -287,13 +313,14 @@ fn a_purge_that_cannot_read_the_transcript_leaves_a_hash_that_confirms_nothing()
             None => store,
         };
 
-        store
+        let purged = store
             .purge(writer(2), &[], &[range(writer(1), 2, 2)])
             .unwrap();
 
         let now = store.source(&path).unwrap().unwrap();
         assert_eq!(now.position.prefix, unconfirmable());
         assert_eq!(now.purged.len(), 1);
+        assert_eq!(purged.finished.unconfirmed, u64::from(reader.is_some()));
     }
 }
 
@@ -328,7 +355,7 @@ fn a_purge_that_races_an_ingest_that_moved_the_position_fails_whole() {
         .unwrap();
 
     let tx = store.conn.transaction().unwrap();
-    let err = apply(&tx, &rehashes).unwrap_err();
+    let err = apply(&tx, &rehashes.0).unwrap_err();
 
     assert!(
         matches!(err, StoreError::PositionMoved { source: id } if id == source.id),

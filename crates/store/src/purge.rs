@@ -73,6 +73,9 @@ pub struct Finished {
     pub vacuumed: bool,
     /// Whether anything was left to finish.
     pub nothing: bool,
+    /// Transcript sources the purge could not read to recompute their
+    /// consumed-prefix hash, which then confirms nothing (SEC-31, I6).
+    pub unconfirmed: u64,
 }
 
 impl Store {
@@ -99,7 +102,7 @@ impl Store {
             threshold: self.threshold,
         };
         secure_delete(&self.conn)?;
-        let rehashes = source::purged::plan(&self.conn, ranges, self.transcripts)?;
+        let (rehashes, unconfirmed) = source::purged::plan(&self.conn, ranges, self.transcripts)?;
         let tx = self
             .conn
             .transaction_with_behavior(TransactionBehavior::Immediate)?;
@@ -117,7 +120,10 @@ impl Store {
         };
         journal(&tx, VACUUM, "")?;
         tx.commit()?;
-        let finished = self.finish_purge()?;
+        let finished = Finished {
+            unconfirmed,
+            ..self.finish_purge()?
+        };
 
         Ok(Purged {
             appended,

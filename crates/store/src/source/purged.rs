@@ -85,44 +85,52 @@ fn merged(old: &[Span], new: &[Span]) -> Vec<Span> {
 }
 
 /// The hash of `source`'s consumed prefix with `spans` zeroed, read from
-/// its transcript; none-confirming when the transcript cannot be read or
-/// no longer begins with the bytes the stored hash covers.
-fn recomputed(source: &Source, spans: &[Span], read: Option<Transcripts>) -> Digest {
+/// its transcript; none-confirming when no reader is injected or the
+/// transcript no longer begins with the bytes the stored hash covers.
+///
+/// # Errors
+///
+/// Fails when the reader cannot read the transcript.
+fn recomputed(source: &Source, spans: &[Span], read: Option<Transcripts>) -> io::Result<Digest> {
     let Some(read) = read else {
-        return unconfirmable();
+        return Ok(unconfirmable());
     };
     let path = Path::new(&source.path);
     let offset = source.position.offset;
-    read(path, offset, &source.purged, spans)
-        .ok()
-        .flatten()
+    Ok(read(path, offset, &source.purged, spans)?
         .filter(|(held, _)| *held == source.position.prefix)
-        .map(|(_, recomputed)| recomputed)
-        .unwrap_or_else(unconfirmable)
+        .map_or_else(unconfirmable, |(_, recomputed)| recomputed))
 }
 
 /// The recomputed hash of each source the purge of `ranges` takes lines
-/// out of, from the transcript files as they are now.
+/// out of, from the transcript files as they are now, and how many
+/// sources' transcripts could not be read: their hash confirms nothing
+/// (I6).
 pub(crate) fn plan(
     conn: &Connection,
     ranges: &[Erase],
     read: Option<Transcripts>,
-) -> Result<Vec<Rehash>, StoreError> {
+) -> Result<(Vec<Rehash>, u64), StoreError> {
     let mut out = Vec::new();
+    let mut unreadable = 0;
     for (id, erased) in erasing(conn, ranges)? {
         let found = select(conn, "WHERE id = CAST(?1 AS INTEGER)", &id.to_string())?;
         for source in found {
             let spans = merged(&source.purged, &erased);
+            let new = recomputed(&source, &spans, read).unwrap_or_else(|_| {
+                unreadable += 1;
+                unconfirmable()
+            });
             out.push(Rehash {
                 id,
                 offset: source.position.offset,
                 old: source.position.prefix,
-                new: recomputed(&source, &spans, read),
+                new,
             });
         }
     }
 
-    Ok(out)
+    Ok((out, unreadable))
 }
 
 /// Moves the allowed residue of the events in `range` away from their
