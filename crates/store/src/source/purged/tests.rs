@@ -366,6 +366,23 @@ fn a_purge_whose_residue_cannot_be_copied_fails_whole() {
 }
 
 #[test]
+fn a_purge_whose_places_cannot_be_released_fails_whole() {
+    let dir = TempDir::new().unwrap();
+    let (store, _, _) = ingested(&dir, writer(1), "a.jsonl");
+    store
+        .conn
+        .execute_batch(
+            "CREATE TRIGGER refuse_release BEFORE DELETE ON transcript_places
+             BEGIN SELECT RAISE(ABORT, 'refused'); END;",
+        )
+        .unwrap();
+
+    let failed = mark(&store.conn, &range(writer(1), 1, 3));
+
+    assert!(matches!(failed, Err(crate::StoreError::Sqlite(_))));
+}
+
+#[test]
 fn a_purge_whose_residue_table_cannot_be_made_fails_whole() {
     let dir = TempDir::new().unwrap();
     let (store, _, _) = ingested(&dir, writer(1), "a.jsonl");
