@@ -85,26 +85,31 @@ fn merged(old: &[Span], new: &[Span]) -> Vec<Span> {
 }
 
 /// The hash of `source`'s consumed prefix with `spans` zeroed, read from
-/// its transcript; none-confirming when no reader is injected or the
-/// transcript no longer begins with the bytes the stored hash covers.
+/// its transcript; none-confirming when no reader is injected, or when the
+/// transcript no longer begins with the bytes the stored hash covers, which
+/// the flag marks as a failure to confirm (I6).
 ///
 /// # Errors
 ///
 /// Fails when the reader cannot read the transcript.
-fn recomputed(source: &Source, spans: &[Span], read: Option<Transcripts>) -> io::Result<Digest> {
+fn recomputed(
+    source: &Source,
+    spans: &[Span],
+    read: Option<Transcripts>,
+) -> io::Result<(Digest, bool)> {
     let Some(read) = read else {
-        return Ok(unconfirmable());
+        return Ok((unconfirmable(), false));
     };
     let path = Path::new(&source.path);
     let offset = source.position.offset;
     Ok(read(path, offset, &source.purged, spans)?
         .filter(|(held, _)| *held == source.position.prefix)
-        .map_or_else(unconfirmable, |(_, recomputed)| recomputed))
+        .map_or_else(|| (unconfirmable(), true), |(_, new)| (new, false)))
 }
 
 /// The recomputed hash of each source the purge of `ranges` takes lines
 /// out of, from the transcript files as they are now, and how many
-/// sources' transcripts could not be read: their hash confirms nothing
+/// sources' transcripts could not be read or no longer hold what was consumed: their hash confirms nothing
 /// (I6).
 pub(crate) fn plan(
     conn: &Connection,
@@ -117,10 +122,11 @@ pub(crate) fn plan(
         let found = select(conn, "WHERE id = CAST(?1 AS INTEGER)", &id.to_string())?;
         for source in found {
             let spans = merged(&source.purged, &erased);
-            let new = recomputed(&source, &spans, read).unwrap_or_else(|_| {
+            let (new, failed) = recomputed(&source, &spans, read).unwrap_or_else(|_| {
                 unreadable += 1;
-                unconfirmable()
+                (unconfirmable(), false)
             });
+            unreadable += u64::from(failed);
             out.push(Rehash {
                 id,
                 offset: source.position.offset,

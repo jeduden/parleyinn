@@ -326,17 +326,19 @@ fn a_purge_that_cannot_read_the_transcript_leaves_a_hash_that_confirms_nothing()
 
 #[test]
 fn a_transcript_that_no_longer_holds_what_was_consumed_confirms_nothing() {
-    let dir = TempDir::new().unwrap();
-    let (store, _, path) = ingested(&dir, writer(1), "a.jsonl");
-    let mut store = store.with_transcripts(read);
     for rewritten in [&BODY[..10], b"zzz\nbbb\nccc\nddd\neee\n"] {
+        let dir = TempDir::new().unwrap();
+        let (store, _, path) = ingested(&dir, writer(1), "a.jsonl");
+        let mut store = store.with_transcripts(read);
         std::fs::write(&path, rewritten).unwrap();
-        store
+        let purged = store
             .purge(writer(2), &[], &[range(writer(1), 2, 2)])
             .unwrap();
 
         let now = store.source(&path).unwrap().unwrap();
         assert_eq!(now.position.prefix, unconfirmable());
+        assert_eq!(now.purged.len(), 1);
+        assert_eq!(purged.finished.unconfirmed, 1);
     }
 }
 
