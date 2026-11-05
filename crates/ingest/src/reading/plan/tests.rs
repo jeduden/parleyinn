@@ -59,3 +59,17 @@ fn dense_json_is_refused_before_value_allocation_but_a_maximum_string_fits() {
     assert!(json_heap_bound(&dense) > PARSED_LINE_LIMIT);
     assert!(json_heap_bound(&plain) <= PARSED_LINE_LIMIT);
 }
+
+#[test]
+fn a_sibling_line_of_dense_json_gives_no_uuid() {
+    let dir = testkit::TempDir::new().unwrap();
+    let dense = format!(
+        "{{\"uuid\":\"dense\",\"items\":[{}]}}\n{{\"uuid\":\"u1\"}}\n",
+        "0,".repeat(40_000) + "0"
+    );
+    std::fs::write(dir.path().join("other.jsonl"), dense).unwrap();
+
+    let found = sibling_uuids(&dir.path().to_string_lossy(), "", &BTreeSet::new());
+
+    assert_eq!(found.all, BTreeSet::from(["u1".to_owned()]));
+}

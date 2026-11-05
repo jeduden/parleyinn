@@ -338,3 +338,48 @@ fn a_live_ingest_stops_at_a_refused_line_and_names_it_each_read() {
     assert_eq!(refused_line(&home, &path).map(|r| r.offset), Some(at));
     assert_eq!(refused_line(&home, &dir.path().join("none.jsonl")), None);
 }
+
+/// Sixty-five 1 MiB lines, so a source read in more than one window.
+fn filler() -> String {
+    (1..=65).map(|n| line(n, MIB)).collect()
+}
+
+#[test]
+fn identifiers_past_the_first_window_of_a_long_source_are_refused_at_the_ceiling() {
+    let dir = TempDir::new().unwrap();
+    let home = home(&dir);
+    let mut text = filler();
+    text.extend((1..=10).map(|n| organization_line(n, 400 * 1024)));
+    let path = written(&dir, &text);
+
+    let error = ingest_path(&home, &path, &redactor(), &mut OsEntropy).unwrap_err();
+
+    assert!(matches!(error, IngestError::IdentifierLimit(p) if p == path));
+}
+
+#[test]
+fn dense_json_past_the_first_window_of_a_long_source_is_refused() {
+    let dir = TempDir::new().unwrap();
+    let home = home(&dir);
+    let mut text = filler();
+    text.push_str(&format!("{{\"items\":[{}]}}\n", "0,".repeat(40_000) + "0"));
+    let path = written(&dir, &text);
+
+    let error = ingest_path(&home, &path, &redactor(), &mut OsEntropy).unwrap_err();
+
+    assert!(matches!(error, IngestError::SourceMemoryLimit(p) if p == path));
+}
+
+#[test]
+fn the_ceiling_errors_say_which_ceiling_the_transcript_passed() {
+    let path = std::path::PathBuf::from("t.jsonl");
+
+    assert_eq!(
+        IngestError::IdentifierLimit(path.clone()).to_string(),
+        "the transcript t.jsonl names too many harness account identifiers"
+    );
+    assert_eq!(
+        IngestError::SourceMemoryLimit(path).to_string(),
+        "the transcript t.jsonl has a line whose parsed structure exceeds the source-memory ceiling"
+    );
+}
