@@ -355,7 +355,6 @@ fn a_path_with_control_characters_is_shown_escaped() {
     let found = Completeness {
         short: vec!["/t/a\nb.jsonl".to_owned()],
         failed: vec![("/t/c\u{1b}[2J.jsonl".to_owned(), "x")],
-        ..Completeness::default()
     };
 
     assert_eq!(

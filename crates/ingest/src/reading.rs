@@ -30,6 +30,20 @@ use crate::run::{Defaults, RunKey};
 use self::plan::{Plan, Planner, Read};
 use crate::{IngestError, Ingested, Inputs, RunReport};
 
+/// `redactor`, also redacting the harness account identifiers `lines`
+/// name.
+fn with_account_identifiers(
+    redactor: &Redactor,
+    lines: &[Line<'_>],
+) -> Result<Redactor, IngestError> {
+    let mut ids = HarnessAccountIdentifiers::default();
+    lines.iter().for_each(|l| ids.learn(l.text));
+
+    redactor
+        .with_identifiers(&ids)
+        .map_err(IngestError::Redaction)
+}
+
 /// Who records what an ingest reads, and in which seats.
 pub(crate) enum Recorder<'r> {
     /// `parinn ingest`: each run in an ingest seat whose key the core
@@ -56,11 +70,7 @@ pub(crate) fn ingest(
         .iter()
         .map(|l| serde_json::from_str(l.text).unwrap_or(Value::Null))
         .collect();
-    let mut ids = HarnessAccountIdentifiers::default();
-    lines.iter().for_each(|l| ids.learn(l.text));
-    let redactor = redactor
-        .with_identifiers(&ids)
-        .map_err(IngestError::Redaction)?;
+    let redactor = with_account_identifiers(redactor, &lines)?;
     home.create().map_err(IngestError::Admin)?;
     let mut store = open_store(home, inputs)?;
     let node = Node::open(home, &mut store, entropy).map_err(IngestError::Admin)?;
@@ -501,15 +511,7 @@ fn append(
     entropy: &mut dyn Entropy,
 ) -> Result<Landed, IngestError> {
     let seen = bytes.len() as u64;
-    // The bytes of each refused copy of a purged line are zeros in the
-    // hash, as a purged line's are (SEC-31).
-    let mut purged = resume.source.purged.clone();
-    purged.extend(plan.refused_places.iter().map(|place| store::source::Span {
-        offset: place.offset,
-        length: place.length,
-    }));
-    purged.sort_by_key(|span| (span.offset, span.length));
-    purged.dedup();
+    let purged = zeroed_spans(resume, plan);
     let mut running = Zeroed::new(&purged);
     running.update(
         bytes
@@ -582,11 +584,7 @@ fn append(
             seen,
         };
     }
-    if plan.events.is_empty() && !plan.refused_places.is_empty() {
-        store.advance_refusing(resume.source.id, &position, &plan.refused_places)?;
-    } else {
-        store.advance(resume.source.id, &position)?;
-    }
+    advance(store, resume.source.id, &position, plan)?;
     observing.flush(store, Some(position.offset), entropy)?;
 
     Ok(Landed {
@@ -594,6 +592,38 @@ fn append(
         addresses,
         observations: observing.appended,
     })
+}
+
+/// The spans of the source whose bytes are zeros in the consumed-prefix
+/// hash: each purged line's, and each refused copy of a purged line's,
+/// which the hash takes as zeros too (SEC-31).
+fn zeroed_spans(resume: &Resume, plan: &Plan) -> Vec<store::source::Span> {
+    let mut spans = resume.source.purged.clone();
+    spans.extend(plan.refused_places.iter().map(|place| store::source::Span {
+        offset: place.offset,
+        length: place.length,
+    }));
+    spans.sort_by_key(|span| (span.offset, span.length));
+    spans.dedup();
+
+    spans
+}
+
+/// Moves the source `id` to `position`, keeping the places of the refused
+/// copies of purged lines `plan` holds when no recorded line did.
+fn advance(
+    store: &mut Store,
+    id: i64,
+    position: &Position,
+    plan: &Plan,
+) -> Result<(), IngestError> {
+    if plan.events.is_empty() && !plan.refused_places.is_empty() {
+        store.advance_refusing(id, position, &plan.refused_places)?;
+    } else {
+        store.advance(id, position)?;
+    }
+
+    Ok(())
 }
 
 /// The hook observations a live ingest appends to the main run's run
