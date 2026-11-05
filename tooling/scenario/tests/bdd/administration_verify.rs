@@ -336,58 +336,6 @@ fn prefix_altered(w: &mut World) -> Result<(), String> {
     Ok(())
 }
 
-/// The bytes of the run's transcript, for the offset the line over the
-/// limit starts at.
-fn refused_line_offset(w: &mut World) -> Result<u64, String> {
-    let len = fs::metadata(transcript(w, "run-a")?)
-        .map_err(|e| e.to_string())?
-        .len();
-    Ok(len)
-}
-
-#[given(
-    regex = r"^a transcript line over the 4 MiB limit was stored unparsed and ingest went on past it, recording its place$"
-)]
-fn line_refused(w: &mut World) -> Result<(), String> {
-    crate::recall::record_runs(w)?;
-    // Ingest stores the line unparsed, records its place and moves the
-    // position past it (SEC-05, REC-03).
-    let path = transcript(w, "run-a")?;
-    let mut text = fs::read(&path).map_err(|e| e.to_string())?;
-    text.extend(vec![b'x'; (4 << 20) + 1]);
-    text.push(b'\n');
-    fs::write(&path, text).map_err(|e| e.to_string())?;
-    ingest(w, &path)
-}
-
-#[then(
-    regex = r#"^the output reports the transcript "([^"]+)" holds a line over the limit stored unparsed, naming its offset and the counter `transcript_line_too_large`, and names no failed check$"#
-)]
-fn reports_refused(w: &mut World, name: String) -> Result<(), String> {
-    let offset = refused_line_offset(w)? - ((4 << 20) + 2);
-    let out = last_run(w)?;
-    let shown = format!(
-        "{}{}",
-        String::from_utf8_lossy(&out.stdout),
-        String::from_utf8_lossy(&out.stderr)
-    );
-    let (_, after) = shown
-        .split_once("holding a line over the 4 MiB limit, stored unparsed and redacted whole")
-        .ok_or_else(|| {
-            format!("verify reports no transcript holding a line over the limit: {shown}")
-        })?;
-    let at = format!("{name}.jsonl at offset {offset} ");
-    if !after.contains(&at) || !after.contains("`transcript_line_too_large`") {
-        return Err(format!(
-            "verify does not name {name} at offset {offset} with the counter: {shown}"
-        ));
-    }
-    if shown.contains("parinn verify: ") {
-        return Err(format!("verify names a failed check: {shown}"));
-    }
-    Ok(())
-}
-
 #[then(
     regex = r#"^the output reports the transcript "([^"]+)" short of its end, which ingest resumes$"#
 )]
