@@ -904,6 +904,7 @@ pub(crate) fn served_by(markers: &dyn Markers) -> Vec<PathBuf> {
 }
 
 #[cfg(test)]
+#[path = "capture/failure/tests.rs"]
 mod failure_tests;
 #[cfg(test)]
 mod tests;

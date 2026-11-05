@@ -527,4 +527,5 @@ fn content(line: u64, text: &str, redactions: usize) -> Value {
 #[cfg(test)]
 mod tests;
 #[cfg(test)]
+#[path = "windowed/tests.rs"]
 mod windowed_tests;
