@@ -29,6 +29,11 @@ const IDENTIFIER_RESERVE: usize = 2 * IDENTIFIER_LIMIT;
 /// Space for redacted event content and its planning metadata. Planning
 /// stops at this budget and the source resumes at its ingest marker.
 pub(crate) const PLANNING_RESERVE: usize = 32 << 20;
+/// Capacity held back from planning for the one window a replay of
+/// earlier lines or a scan of a sibling transcript reads while the ingest
+/// window and planned content are resident: a whole line and its break
+/// (SEC-05).
+pub(crate) const SCAN_RESERVE: usize = LINE_LIMIT + 1;
 pub(crate) const INGEST_WINDOW_LIMIT: usize =
     SOURCE_LIMIT - LEARNING_RESERVE - IDENTIFIER_RESERVE - PLANNING_RESERVE;
 
@@ -181,6 +186,23 @@ pub fn prefixes(
 /// Fails as [`regular_file`] does, or when a read does.
 pub fn for_each_line(path: &Path, until: u64, mut each: impl FnMut(&str)) -> io::Result<()> {
     for_each_line_between(path, 0, until, &mut each)
+}
+
+/// Calls `each` with every line of the transcript at `path` that ends at
+/// or before byte offset `until`, one window of at most `window` bytes at
+/// a time: what a read does while an ingest window is resident (SEC-05).
+/// Returns the largest such read.
+pub(crate) fn for_each_line_within(
+    path: &Path,
+    until: u64,
+    window: usize,
+    mut each: impl FnMut(&str),
+) -> io::Result<usize> {
+    let limits = Limits {
+        line: LINE_LIMIT,
+        source: window,
+    };
+    for_each_line_with_limits(path, 0, until, limits, &mut each)
 }
 
 /// Calls `each` with every line beginning at `from` and ending at or

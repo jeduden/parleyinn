@@ -1,5 +1,7 @@
 use super::*;
 
+const WINDOW: usize = crate::read::bounded::SOURCE_LIMIT;
+
 #[test]
 fn the_directory_s_other_transcripts_give_their_uuids() {
     let dir = testkit::TempDir::new().unwrap();
@@ -19,11 +21,13 @@ fn the_directory_s_other_transcripts_give_their_uuids() {
         &dir.path().to_string_lossy(),
         &own.to_string_lossy(),
         &served,
+        WINDOW,
     );
     let unserved = sibling_uuids(
         &dir.path().to_string_lossy(),
         &own.to_string_lossy(),
         &BTreeSet::new(),
+        WINDOW,
     );
 
     assert_eq!(found.all, BTreeSet::from(["u1".to_owned()]));
@@ -33,6 +37,7 @@ fn the_directory_s_other_transcripts_give_their_uuids() {
         &dir.path().join("none").to_string_lossy(),
         "",
         &BTreeSet::new(),
+        WINDOW,
     );
     assert!(none.all.is_empty());
 }
@@ -44,8 +49,8 @@ fn a_transcript_or_directory_that_cannot_be_read_is_kept_unread_with_why() {
     std::fs::create_dir(dir.path().join("sub.jsonl")).unwrap();
     let directory = dir.path().to_string_lossy().into_owned();
 
-    let found = sibling_uuids(&directory, "", &BTreeSet::new());
-    let missing = sibling_uuids(&format!("{directory}/none"), "", &BTreeSet::new());
+    let found = sibling_uuids(&directory, "", &BTreeSet::new(), WINDOW);
+    let missing = sibling_uuids(&format!("{directory}/none"), "", &BTreeSet::new(), WINDOW);
 
     assert_eq!(found.all, BTreeSet::from(["u1".to_owned()]));
     assert_eq!(found.unread.len(), 1);
@@ -66,7 +71,13 @@ fn an_entry_of_the_listing_that_failed_is_kept_unread_beside_the_ones_that_read(
         Ok(PathBuf::from("/nowhere/x.txt")),
     ];
 
-    let found = sibling_uuids_of(Ok(listing.into_iter()), "/nowhere", "", &BTreeSet::new());
+    let found = sibling_uuids_of(
+        Ok(listing.into_iter()),
+        "/nowhere",
+        "",
+        &BTreeSet::new(),
+        WINDOW,
+    );
 
     assert_eq!(
         found.unread,
@@ -161,9 +172,25 @@ fn a_sibling_line_of_dense_json_gives_no_uuid() {
     );
     std::fs::write(dir.path().join("other.jsonl"), dense).unwrap();
 
-    let found = sibling_uuids(&dir.path().to_string_lossy(), "", &BTreeSet::new());
+    let found = sibling_uuids(&dir.path().to_string_lossy(), "", &BTreeSet::new(), WINDOW);
 
     assert_eq!(found.all, BTreeSet::from(["u1".to_owned()]));
+}
+
+#[test]
+fn a_sibling_scan_reads_in_the_window_it_is_given_and_still_finds_every_uuid() {
+    let dir = testkit::TempDir::new().unwrap();
+    let pad = "x".repeat(900);
+    let text: String = (0..50)
+        .map(|i| format!("{{\"uuid\":\"u{i}\",\"pad\":\"{pad}\"}}\n"))
+        .collect();
+    std::fs::write(dir.path().join("other.jsonl"), text).unwrap();
+    let small = read::open::SCAN_RESERVE.min(2_000);
+
+    let found = sibling_uuids(&dir.path().to_string_lossy(), "", &BTreeSet::new(), small);
+
+    assert_eq!(found.all.len(), 50);
+    assert!(found.unread.is_empty());
 }
 
 fn home(dir: &testkit::TempDir) -> Home {
@@ -208,7 +235,10 @@ fn planned(home: &Home, path: &Path, text: &str) -> Plan {
                 path,
                 defaults: &defaults,
                 redactor: &redactor,
-                memory_limit: usize::MAX,
+                budget: Budget {
+                    memory: usize::MAX,
+                    scan: WINDOW,
+                },
             },
             &mut entropy,
         )

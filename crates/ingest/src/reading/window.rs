@@ -71,8 +71,51 @@ pub(crate) fn open_source(
 
 /// The bytes left under SEC-05's source-memory ceiling for planned event
 /// content, once a read held `high_water` bytes of the source.
-pub(super) fn planning_memory(high_water: usize) -> usize {
-    open::PLANNING_RESERVE.min(read::bounded::SOURCE_LIMIT.saturating_sub(high_water))
+/// The scan window stays out of it (SEC-05).
+fn planning_memory(high_water: usize) -> usize {
+    open::PLANNING_RESERVE.min(
+        read::bounded::SOURCE_LIMIT
+            .saturating_sub(high_water)
+            .saturating_sub(open::SCAN_RESERVE),
+    )
+}
+
+/// How a read that held some of SEC-05's source-memory ceiling shares
+/// what is left: planned content, and one replay or sibling-scan window.
+pub(super) struct Budget {
+    /// Bytes for planned event content and its metadata.
+    pub(super) memory: usize,
+    /// Bytes one replay or sibling-scan window may hold beside the
+    /// ingest window and `memory`.
+    pub(super) scan: usize,
+}
+
+impl Budget {
+    /// The budget left once the read held `high_water` bytes of the
+    /// source at `path`; a source with no line's window left is refused.
+    pub(super) fn of(path: &Path, high_water: usize) -> Result<Self, IngestError> {
+        let memory = planning_memory(high_water);
+
+        Ok(Self {
+            memory,
+            scan: scan_window(path, high_water, memory)?,
+        })
+    }
+}
+
+/// The bytes one replay or sibling-scan window may hold beside a read
+/// that held `high_water` bytes and `memory` bytes of planned content:
+/// what is left under SEC-05's source-memory ceiling. A source with less
+/// than a line's window left is refused.
+fn scan_window(path: &Path, high_water: usize, memory: usize) -> Result<usize, IngestError> {
+    let left = read::bounded::SOURCE_LIMIT
+        .saturating_sub(high_water)
+        .saturating_sub(memory);
+    if left < open::SCAN_RESERVE {
+        return Err(IngestError::SourceMemoryLimit(path.to_path_buf()));
+    }
+
+    Ok(left)
 }
 
 /// `redactor` with the harness account identifiers the transcript names
@@ -230,6 +273,39 @@ mod tests {
             !resumable(true, Some(line), false, 99),
             "still being written"
         );
+    }
+
+    #[test]
+    fn the_ingest_window_planned_content_and_a_scan_window_never_pass_the_ceiling() {
+        let path = Path::new("t.jsonl");
+        let ceiling = read::bounded::SOURCE_LIMIT;
+        // From nothing held to the most a window, its reserves and the
+        // learned identifiers hold (open::INGEST_WINDOW_LIMIT).
+        let most = open::INGEST_WINDOW_LIMIT + open::LEARNING_RESERVE + 2 * open::IDENTIFIER_LIMIT;
+        for held in [0, 1 << 20, ceiling / 2, most] {
+            let planning = planning_memory(held);
+            let scan = scan_window(path, held, planning).unwrap();
+
+            assert!(held + planning + scan <= ceiling, "{held}");
+            assert!(scan >= open::SCAN_RESERVE, "{held}");
+        }
+        assert!(planning_memory(most) > 0, "planning keeps room");
+        let budget = Budget::of(path, most).unwrap();
+        assert_eq!(budget.memory, planning_memory(most));
+        assert!(Budget::of(path, ceiling).is_err());
+    }
+
+    #[test]
+    fn a_source_with_no_line_s_window_left_beside_what_it_holds_is_refused() {
+        let ceiling = read::bounded::SOURCE_LIMIT;
+        let path = Path::new("t.jsonl");
+
+        let refused = scan_window(path, ceiling - open::SCAN_RESERVE + 1, 0);
+        let fits = scan_window(path, ceiling - open::SCAN_RESERVE, 0);
+
+        assert!(matches!(refused, Err(IngestError::SourceMemoryLimit(p)) if p == path));
+        assert_eq!(fits.unwrap(), open::SCAN_RESERVE);
+        assert_eq!(planning_memory(ceiling), 0);
     }
 
     #[test]

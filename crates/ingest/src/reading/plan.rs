@@ -18,6 +18,7 @@ use serde_json::{Value, json};
 use store::{NewEvent, Place, Source, Store};
 use transcript::shape::Shapes;
 
+use super::window::Budget;
 use super::{Named, Runs, with_causes};
 use crate::prompt::{self, Outcome, PromptLine};
 use crate::read::{self, Line};
@@ -45,9 +46,10 @@ pub(super) struct Read<'r, 'a> {
     pub(super) path: &'r Path,
     pub(super) defaults: &'r Defaults,
     pub(super) redactor: &'r Redactor,
-    /// Bytes left under SEC-05's source-memory ceiling for planned
-    /// event content and its metadata.
-    pub(super) memory_limit: usize,
+    /// What is left under SEC-05's source-memory ceiling for planned
+    /// event content and its metadata, and for one replay or
+    /// sibling-scan window.
+    pub(super) budget: Budget,
 }
 
 /// What an ingest will append, line by line, with what reading found.
@@ -135,6 +137,8 @@ pub(super) struct Planner<'a> {
     /// The `uuid`s the directory's other transcripts hold, read once a
     /// fork's line needs them.
     siblings: Option<Siblings>,
+    /// The window a sibling scan reads in, as [`Budget::scan`].
+    scan_window: usize,
     /// Harness UUIDs whose event content was purged from another
     /// transcript in this directory, loaded once for this plan.
     purged: BTreeSet<String>,
@@ -181,6 +185,7 @@ impl<'a> Planner<'a> {
             inputs,
             held_since: source.held_since,
             siblings: None,
+            scan_window: 0,
             purged,
             forked,
             others,
@@ -199,6 +204,7 @@ impl<'a> Planner<'a> {
         read: Read<'_, '_>,
         entropy: &mut dyn Entropy,
     ) -> Result<Plan, IngestError> {
+        self.scan_window = read.budget.scan;
         let shapes = Shapes::supported();
         let mut classifier = Classifier::new(&shapes, *session, read.redactor);
         // The lines read before, replayed, so a result finds its call.
@@ -208,7 +214,7 @@ impl<'a> Planner<'a> {
             }
         }
         if let (true, Some(first)) = (read.first_line > 0, read.lines.first()) {
-            read::open::for_each_line(read.path, first.offset, |text| {
+            read::open::for_each_line_within(read.path, first.offset, read.budget.scan, |text| {
                 if json_heap_bound(text) <= PARSED_LINE_LIMIT {
                     classifier.line(text);
                 }
@@ -218,7 +224,7 @@ impl<'a> Planner<'a> {
         let mut plan = Plan::default();
         for (i, line) in read.lines.iter().enumerate().skip(read.from) {
             let charge = plan_charge(line.text.len());
-            if plan.memory.saturating_add(charge) > read.memory_limit {
+            if plan.memory.saturating_add(charge) > read.budget.memory {
                 plan.resumable = true;
                 break;
             }
@@ -437,9 +443,10 @@ impl<'a> Planner<'a> {
 
     /// The `uuid`s the directory's other transcripts hold.
     fn siblings(&mut self) -> &Siblings {
-        let (named, inputs) = (self.named, self.inputs);
-        self.siblings
-            .get_or_insert_with(|| sibling_uuids(&named.directory, &named.path, &inputs.served))
+        let (named, inputs, window) = (self.named, self.inputs, self.scan_window);
+        self.siblings.get_or_insert_with(|| {
+            sibling_uuids(&named.directory, &named.path, &inputs.served, window)
+        })
     }
 }
 
@@ -511,10 +518,15 @@ struct Siblings {
 /// Every `uuid` the transcripts in `directory` but `path` hold, and
 /// those of the transcripts in `served`. What cannot be read holds none,
 /// and is kept in [`Siblings::unread`] for the caller to count (I6, I9).
-fn sibling_uuids(directory: &str, path: &str, served: &BTreeSet<PathBuf>) -> Siblings {
+fn sibling_uuids(
+    directory: &str,
+    path: &str,
+    served: &BTreeSet<PathBuf>,
+    window: usize,
+) -> Siblings {
     let listing = std::fs::read_dir(directory).map(|e| e.map(|entry| entry.map(|e| e.path())));
 
-    sibling_uuids_of(listing, directory, path, served)
+    sibling_uuids_of(listing, directory, path, served, window)
 }
 
 /// [`sibling_uuids`] of the entries `listing` gives for `directory`.
@@ -523,6 +535,7 @@ fn sibling_uuids_of(
     directory: &str,
     path: &str,
     served: &BTreeSet<PathBuf>,
+    window: usize,
 ) -> Siblings {
     let mut found = Siblings::default();
     let entries = match listing {
@@ -550,7 +563,7 @@ fn sibling_uuids_of(
         }
         let bound = served.contains(&canonical(&other));
         // A line at a time, so a long transcript is never held (SEC-05).
-        let read = read::open::for_each_line(&other, u64::MAX, |text| {
+        let read = read::open::for_each_line_within(&other, u64::MAX, window, |text| {
             if json_heap_bound(text) > PARSED_LINE_LIMIT {
                 return;
             }

@@ -27,8 +27,8 @@ use crate::repeat;
 use crate::run::{Defaults, RunKey};
 
 use self::plan::{Plan, Planner, Read};
+use self::window::{Budget, consumed, redacting};
 pub(crate) use self::window::{View, open_source, peek, resumable};
-use self::window::{consumed, planning_memory, redacting};
 use crate::{IngestError, Ingested, Inputs, RunReport};
 
 /// Who records what an ingest reads, and in which seats.
@@ -80,7 +80,7 @@ pub(crate) fn ingest(
             path,
             defaults: &defaults,
             redactor: &redactor,
-            memory_limit: planning_memory(reading_high_water),
+            budget: Budget::of(path, reading_high_water)?,
         },
         entropy,
     )?;

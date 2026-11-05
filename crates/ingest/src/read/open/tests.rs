@@ -303,3 +303,22 @@ fn only_a_source_longer_than_one_window_needs_its_marker() {
     assert!(needs_marker(&big));
     assert!(!needs_marker(&dir.path().join("none")));
 }
+
+#[test]
+fn a_read_within_a_window_holds_no_more_than_it_and_still_gives_every_line() {
+    let dir = TempDir::new().unwrap();
+    let bytes = lines_of(40, 99);
+    let path = written(&dir, &bytes);
+    let window = 3 * 100 + 10;
+    let mut seen = 0;
+
+    let held = for_each_line_within(&path, u64::MAX, window, |t| {
+        assert_eq!(t.len(), 99);
+        seen += 1;
+    })
+    .unwrap();
+
+    assert_eq!(seen, 40);
+    assert!(held > 0 && held <= window, "{held}");
+    assert!(for_each_line_within(dir.path(), 0, window, |_| ()).is_err());
+}
