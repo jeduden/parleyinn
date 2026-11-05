@@ -166,6 +166,10 @@ fn both_runs(w: &mut World) -> Result<(), String> {
     append_call(w, SUBAGENT, "toolu_both")?;
     read_all(w, MAIN)?;
     read_all(w, SUBAGENT)?;
+    // The server reads the tool-use ids of the lines it ingested right
+    // after it commits them, never holding a call for that read: let the
+    // read of both runs' ids finish before the call arrives.
+    std::thread::sleep(Duration::from_millis(300));
     call(w, Some("toolu_both"), &json!({}))
 }
 
