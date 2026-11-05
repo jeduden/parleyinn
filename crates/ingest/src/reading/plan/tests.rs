@@ -139,3 +139,48 @@ fn a_path_is_compared_with_its_links_resolved_when_they_can_be() {
     let missing = dir.path().join("missing.jsonl");
     assert_eq!(canonical(&missing), missing);
 }
+
+fn home(dir: &testkit::TempDir) -> Home {
+    Home::locate(Some(dir.path().join(".parinn").as_os_str()), None).unwrap()
+}
+
+fn redactor() -> Redactor {
+    Redactor::new(&[]).unwrap().0
+}
+
+#[test]
+fn a_witnessed_line_repeating_an_event_whose_content_was_erased_is_refused() {
+    let dir = testkit::TempDir::new().unwrap();
+    let home = home(&dir);
+    let parent = dir.path().join("parent.jsonl");
+    std::fs::write(&parent, "{\"uuid\":\"u1\"}\n").unwrap();
+    crate::ingest_path(&home, &parent, &redactor(), &mut key::random::OsEntropy).unwrap();
+    // The content gone while its place stays: no refused copy names it.
+    rusqlite::Connection::open(home.store())
+        .unwrap()
+        .execute(
+            "UPDATE events SET content = NULL
+             WHERE rowid IN (SELECT event FROM transcript_places)",
+            [],
+        )
+        .unwrap();
+    let path = dir
+        .path()
+        .join("5e55a0de-0000-4000-8000-00000000000a.jsonl");
+    std::fs::write(&path, "{\"uuid\":\"u1\"}\n{\"uuid\":\"u2\"}\n").unwrap();
+
+    let ingested = crate::live::ingest_live(
+        &home,
+        &path,
+        &redactor(),
+        &Inputs::default(),
+        &mut crate::live::RunSeats::default(),
+        None,
+        &mut key::random::OsEntropy,
+    )
+    .unwrap()
+    .unwrap();
+
+    assert_eq!((ingested.refused, ingested.events), (1, 1));
+    assert_eq!(ingested.witnessed_repeats, 0);
+}
