@@ -75,7 +75,8 @@ fn refused_text() -> (String, u64) {
 }
 
 #[test]
-fn a_line_over_4_mib_is_not_stored_its_place_is_recorded_and_ingest_goes_on_past_it() {
+fn a_line_over_4_mib_is_stored_unparsed_redacted_whole_its_place_is_recorded_and_ingest_goes_on_past_it()
+ {
     let dir = TempDir::new().unwrap();
     let (home, (text, at)) = (home(&dir), refused_text());
     let path = written(&dir, &text);
@@ -87,7 +88,9 @@ fn a_line_over_4_mib_is_not_stored_its_place_is_recorded_and_ingest_goes_on_past
     let refused = first.too_large.unwrap();
     assert_eq!((refused.offset, refused.length), (at, (4 << 20) + 1));
     assert_eq!(first.too_large_line, Some(3));
-    assert_eq!((first.events, second.events, again.events), (2, 1, 0));
+    assert_eq!((first.events, second.events, again.events), (3, 1, 0));
+    assert_eq!(first.redactions, ["transcript_line_too_large"]);
+    assert_eq!((first.unparsed, first.scan_limited), (3, 0));
     assert!(first.resumable && !second.resumable);
     assert_eq!(second.too_large, None);
     let row = source(&home);
@@ -111,9 +114,16 @@ fn a_line_over_4_mib_is_not_stored_its_place_is_recorded_and_ingest_goes_on_past
     let texts = placed_texts(&home);
     assert!(
         texts.iter().all(|t| !t.contains("zzzz")),
-        "its content is not stored"
+        "its content is redacted whole"
     );
-    assert_eq!(texts.len(), 3);
+    assert_eq!(texts.len(), 4);
+    assert_eq!(texts[2], "[REDACTED:transcript_line_too_large]");
+    // Its event is recoverable by its address, where the line stood.
+    let store = Store::open(&home.store()).unwrap();
+    let placed = store.placed(row.id).unwrap();
+    assert_eq!(placed[2].place.line, 3);
+    assert_eq!(placed[2].place.offset, at);
+    assert_eq!(placed[2].kind, record::event::EventKind::UnparsedLine);
 }
 
 /// The redacted text of each line event of the one source, in order.
@@ -140,7 +150,7 @@ fn a_source_whose_first_line_is_over_the_limit_records_its_place_and_the_lines_a
 
     let first = ingest_path(&home, &path, &redactor(), &mut OsEntropy).unwrap();
 
-    assert_eq!(first.events, 0);
+    assert_eq!(first.events, 1);
     assert_eq!(first.too_large.map(|r| r.offset), Some(0));
     assert_eq!(first.too_large_line, Some(1));
     assert!(first.resumable);
@@ -159,7 +169,7 @@ fn a_refused_line_no_line_follows_ends_the_source_and_asks_for_no_more_read() {
 
     let first = ingest_path(&home, &path, &redactor(), &mut OsEntropy).unwrap();
 
-    assert_eq!((first.events, first.too_large_line), (1, Some(2)));
+    assert_eq!((first.events, first.too_large_line), (2, Some(2)));
     assert!(!first.resumable);
     assert!(source(&home).position.complete());
 }
@@ -181,7 +191,7 @@ fn every_refused_line_of_a_source_is_passed_in_its_own_read() {
         }
     }
 
-    assert_eq!(reads, [(0, Some(1)), (1, Some(3)), (1, None)]);
+    assert_eq!(reads, [(1, Some(1)), (2, Some(3)), (1, None)]);
     let row = source(&home);
     assert_eq!((row.position.lines, row.purged.len()), (4, 2));
     assert!(read::open::continues(&path, &row));
@@ -207,7 +217,7 @@ fn a_refused_line_still_being_written_stays_before_the_position_until_its_line_b
     );
     std::fs::write(&path, head + &big + "\n" + &line(2, 50)).unwrap();
     let done = ingest_path(&home, &path, &redactor(), &mut OsEntropy).unwrap();
-    assert_eq!((done.events, done.too_large_line), (0, Some(2)));
+    assert_eq!((done.events, done.too_large_line), (1, Some(2)));
     assert!(done.resumable);
     let last = ingest_path(&home, &path, &redactor(), &mut OsEntropy).unwrap();
     assert_eq!(last.events, 1);
@@ -436,7 +446,7 @@ fn a_live_ingest_names_a_refused_line_records_its_place_and_goes_on_past_it() {
 
     assert_eq!((short.events, short.too_large_line), (2, None));
     assert_eq!(short.too_large.map(|r| r.offset), Some(at));
-    assert_eq!((level.events, level.too_large_line), (0, Some(3)));
+    assert_eq!((level.events, level.too_large_line), (1, Some(3)));
     assert_eq!(rest.events, 1);
     assert!(none.is_none());
     assert_eq!(refused_line(&home, &path).unwrap(), None);

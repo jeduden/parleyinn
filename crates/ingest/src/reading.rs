@@ -84,7 +84,13 @@ pub(crate) fn ingest(
         },
         entropy,
     )?;
-    refusal::pass_over(&mut plan, view, resume.first_line + lines.len() as u64 + 1);
+    refusal::pass_over(
+        &mut plan,
+        view,
+        resume.first_line + lines.len() as u64 + 1,
+        own,
+        entropy,
+    )?;
     let main = defaults.own().agent_id.is_none().then_some(own);
     let seen = Seen {
         observed: &observed,
@@ -568,11 +574,7 @@ fn append(
         observing.flush(store, Some(first), entropy)?;
         // From the position, so a line refused before this one is part
         // of the prefix.
-        running.update(
-            bytes
-                .get(as_index(position.offset - base)..as_index(end - base))
-                .unwrap_or_default(),
-        );
+        refusal::hash_through(&mut running, bytes, base, &position, end, plan);
         position = Position {
             offset: end,
             prefix: running.digest(),

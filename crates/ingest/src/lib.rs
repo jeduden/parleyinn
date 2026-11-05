@@ -142,14 +142,15 @@ pub struct Ingested {
     /// (REC-04).
     pub refused: usize,
     /// The line over the 4 MiB limit this read came to: its content is
-    /// never stored. The caller audits and counts it as
+    /// never held or scanned, so once passed an unparsed line event
+    /// redacted whole stands for it. The caller audits and counts it as
     /// `transcript_line_too_large` (SEC-05, REC-03).
     pub too_large: Option<read::bounded::Refused>,
     /// The number of that line when this ingest recorded its place and
     /// moved the ingest position past it, so every later line is
     /// recorded; none while the position stays before it, a line whose
     /// line break the harness has not written yet. The place is kept
-    /// with the source's refused lines: its line, offset, and length with
+    /// with the source's passed lines: its line, offset, and length with
     /// its line break (one more than `too_large`'s).
     pub too_large_line: Option<u64>,
     /// Whether the source holds lines past this read that the next read

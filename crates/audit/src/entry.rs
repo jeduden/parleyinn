@@ -87,8 +87,8 @@ pub enum Counter {
     /// A hook input nested deeper than 64 levels and was refused
     /// (SEC-05).
     HookInputTooDeep,
-    /// A transcript line over 4 MiB was not stored, its place recorded
-    /// and ingest continued past it (SEC-05, REC-03).
+    /// A transcript line over 4 MiB was stored unparsed and redacted
+    /// whole, its place recorded and ingest continued past it (SEC-05, REC-03).
     TranscriptLineTooLarge,
     /// A transcript source's parsed structure or harness account
     /// identifiers could not fit under its source-memory ceiling, so
@@ -381,8 +381,8 @@ pub enum Occurrence<'a> {
     },
 }
 
-/// What an entry says of a transcript line refused over the 4 MiB limit.
-pub const LINE_TOO_LARGE: &str = "transcript line over the 4 MiB limit not stored; its place is recorded and ingest continues past it (SEC-05)";
+/// What an entry says of a transcript line over the 4 MiB limit.
+pub const LINE_TOO_LARGE: &str = "transcript line over the 4 MiB limit stored unparsed and redacted whole without being held in memory; its place is recorded (SEC-05)";
 
 /// The kind of an entry noting a principal act.
 pub const PRINCIPAL_ACT: &str = "principal_act";
@@ -467,7 +467,7 @@ impl Entry {
                 offset,
                 length,
             } => (
-                Kind::Rejected.as_str(),
+                Kind::Redacted.as_str(),
                 Some(Counter::TranscriptLineTooLarge.as_str()),
                 "ingest",
                 format!(

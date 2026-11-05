@@ -32,6 +32,12 @@ use crate::{IngestError, Inputs, content, turn_end, well_formed};
 pub(super) const PARSED_LINE_LIMIT: usize = 2 * read::bounded::LINE_LIMIT;
 const JSON_TOKEN_BYTES: usize = 256;
 
+/// The redaction rule a line over the line ceiling is recorded under:
+/// it is redacted whole, since it is never held to be scanned (SEC-05).
+pub(super) const LINE_TOO_LARGE_RULE: &str = "transcript_line_too_large";
+/// What stands for a line over the line ceiling in its event.
+pub(super) const LINE_TOO_LARGE_MARKER: &str = "[REDACTED:transcript_line_too_large]";
+
 /// What one ingest reads.
 pub(super) struct Read<'r, 'a> {
     pub(super) node: &'r Node,
@@ -106,17 +112,39 @@ pub(super) struct Plan {
 
 impl Plan {
     /// Records the place of `line`, the line number of the line over the
-    /// line ceiling `over`, so the ingest goes on past it. Its length
-    /// takes its line break, as every place's does.
-    pub(super) fn pass_over(&mut self, over: crate::read::bounded::Refused, line: u64) {
+    /// line ceiling `over`, so the ingest goes on past it, and its event
+    /// in `writer`'s run: an unparsed line holding a whole-line
+    /// redaction marker, since the line is neither held nor scanned
+    /// (SEC-05, I1). Its length takes its line break, as every place's
+    /// does.
+    pub(super) fn pass_over(
+        &mut self,
+        over: crate::read::bounded::Refused,
+        line: u64,
+        writer: WriterId,
+        entropy: &mut dyn Entropy,
+    ) -> Result<(), IngestError> {
         let place = Place {
             line,
             offset: over.offset,
             length: over.length + 1,
             uuid: None,
         };
+        self.events.push(NewEvent {
+            kind: EventKind::UnparsedLine,
+            provenance: Provenance::Unparsed,
+            content: crate::content(line, LINE_TOO_LARGE_MARKER, 1),
+            commitment_key: CommitmentKey::from_bytes(draw(entropy).map_err(IngestError::Key)?),
+            transcript_timestamp: None,
+        });
+        self.places.push(place.clone());
+        self.ends.push((writer, true, over.offset + place.length));
+        self.unparsed += 1;
+        self.redactions.push(LINE_TOO_LARGE_RULE.to_owned());
         self.refused_places.push(place.clone());
         self.over = Some(place);
+
+        Ok(())
     }
 
     /// How many events it appends to each writer.

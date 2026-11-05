@@ -64,7 +64,8 @@ fn a_line_over_the_limit_is_passed_with_its_place_recorded_and_later_lines_are_i
         assert_eq!(named.len(), 1);
         assert_eq!(named[0].offset, if first { 0 } else { 100 });
         let events: usize = reports.iter().map(|r| r.events).sum();
-        assert_eq!(events, if first { 1 } else { 2 });
+        // The line over the limit is an event of its own, redacted whole.
+        assert_eq!(events, if first { 2 } else { 3 });
     }
 }
 

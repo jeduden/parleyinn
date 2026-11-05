@@ -20,7 +20,7 @@ fn a_refused_line_is_audited_and_counted_with_its_source_offset_and_length() {
         .unwrap();
     assert_eq!(
         (entry.kind.as_str(), entry.operation.as_str()),
-        ("rejected", "ingest")
+        ("redacted", "ingest")
     );
     assert!(entry.detail.starts_with(audit::entry::LINE_TOO_LARGE));
     assert!(
@@ -28,6 +28,11 @@ fn a_refused_line_is_audited_and_counted_with_its_source_offset_and_length() {
         "{}",
         entry.detail
     );
+    let rule = entries
+        .iter()
+        .find(|e| e.detail.ends_with("transcript_line_too_large") && e.kind == "redacted")
+        .expect("the whole-line redaction is audited by its rule");
+    assert_eq!(rule.counter.as_deref(), Some("redactions"));
 }
 
 #[test]

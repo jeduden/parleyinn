@@ -178,7 +178,8 @@ pub(crate) struct Completeness {
     /// server holds the session binding of each, or an ingest left its
     /// ingest marker at its position within [`MARKER_CEILING_MS`].
     pub(crate) short: Vec<String>,
-    /// Sources holding a line over the 4 MiB limit that was not stored:
+    /// Sources holding a line over the 4 MiB limit, stored unparsed and
+    /// redacted whole:
     /// the path and the line.
     pub(crate) refused: Vec<(String, Refused)>,
     /// Sources short of their end that nothing will finish, or that no
@@ -240,8 +241,9 @@ pub(crate) fn completeness(
     found
 }
 
-/// The lines over the 4 MiB limit `source` holds: ingest stored none of
-/// them, recorded each one's place and went on past it (SEC-05). A place's
+/// The lines over the 4 MiB limit `source` holds: ingest stored each as an
+/// unparsed line redacted whole, recorded its place and went on past it
+/// (SEC-05). A place's
 /// length counts its line break.
 fn refused_lines(source: &Source) -> impl Iterator<Item = (String, Refused)> + '_ {
     source
@@ -327,7 +329,7 @@ impl Completeness {
     /// What `parinn verify` adds for sources holding a line over the limit: the
     /// source, the line's offset and length, and the counter that counts
     /// the refusal (SEC-05, ADM-09). Not a failure: ingest
-    /// recorded the line's place and went on past it.
+    /// stored the line, recorded its place and went on past it.
     fn refused_text(&self) -> String {
         let each: Vec<String> = self
             .refused
@@ -343,7 +345,7 @@ impl Completeness {
             .collect();
 
         format!(
-            "; transcripts holding a line over the 4 MiB limit, not stored, counted as \
+            "; transcripts holding a line over the 4 MiB limit, stored unparsed and redacted whole, counted as \
              `transcript_line_too_large`: {}",
             each.join(", ")
         )

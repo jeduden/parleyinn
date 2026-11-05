@@ -1,9 +1,14 @@
 //! The line over the line ceiling a window ends before: once every line
-//! before it is planned, its place is recorded and the ingest position
-//! moves past it, so every later line of the source is recorded. Its
-//! content is never read: its bytes are zeros in the consumed-prefix
-//! hash, as its recorded place says (SEC-05, SEC-31, I1).
+//! before it is planned, its place is recorded, an unparsed line event
+//! stands for it and the ingest position moves past it, so every later
+//! line of the source is recorded. Its content is never read, held or
+//! scanned, so the event holds a whole-line redaction marker, the
+//! recorded redaction being I1's exception: its bytes are zeros in the
+//! consumed-prefix hash, as its recorded place says (SEC-05, SEC-31,
+//! I1).
 
+use key::random::Entropy;
+use record::id::WriterId;
 use store::Position;
 use store::source::Zeroed;
 
@@ -11,23 +16,63 @@ use super::View;
 use super::as_index;
 use super::plan::Plan;
 
-/// Records `plan`'s place for the line over the line ceiling `view` ends
-/// before, `line` being its line number, when its line break is written
-/// and every line before it is planned: not held, and not left for the
-/// next read by the planning budget.
-pub(super) fn pass_over(plan: &mut Plan, view: &View<'_>, line: u64) {
+/// Records `plan`'s place and event, in `writer`'s run, for the line
+/// over the line ceiling `view` ends before, `line` being its line
+/// number, when its line break is written and every line before it is
+/// planned: not held, and not left for the next read by the planning
+/// budget.
+///
+/// # Errors
+///
+/// Fails when the event's commitment key cannot be drawn.
+pub(super) fn pass_over(
+    plan: &mut Plan,
+    view: &View<'_>,
+    line: u64,
+    writer: WriterId,
+    entropy: &mut dyn Entropy,
+) -> Result<(), crate::IngestError> {
     if let Some(over) = view
         .refused
         .filter(|_| view.refused_ended && !plan.hold && !plan.resumable)
     {
-        plan.pass_over(over, line);
+        plan.pass_over(over, line, writer, entropy)?;
+    }
+
+    Ok(())
+}
+
+/// Hashes into `running` what a transaction ending at `end` consumes
+/// after `position`: the window's `bytes` through `end`, and, when the
+/// transaction ends past them with the line over the line ceiling, that
+/// line's bytes as the zeros its span zeroes.
+pub(super) fn hash_through(
+    running: &mut Zeroed<'_>,
+    bytes: &[u8],
+    base: u64,
+    position: &Position,
+    end: u64,
+    plan: &Plan,
+) {
+    let held = base + bytes.len() as u64;
+    running.update(
+        bytes
+            .get(as_index(position.offset - base)..as_index(end.min(held) - base))
+            .unwrap_or_default(),
+    );
+    if let Some(over) = plan
+        .over
+        .as_ref()
+        .filter(|over| end == over.offset + over.length)
+    {
+        feed_zeroes(running, over.length);
     }
 }
 
 /// `position` moved past what `plan` refused after its last recorded
 /// line, `running` hashing the bytes it passes: a refusal no recorded
 /// line follows still moves the position, or the next read would refuse
-/// it again; the line over the line ceiling is passed as zeros.
+/// it again.
 pub(super) fn move_past(
     running: &mut Zeroed<'_>,
     bytes: &[u8],
@@ -49,16 +94,6 @@ pub(super) fn move_past(
             seen,
         };
     }
-    if let Some(over) = &plan.over {
-        feed_zeroes(running, over.length);
-        position = Position {
-            offset: over.offset + over.length,
-            prefix: running.digest(),
-            lines: over.line,
-            seen,
-        };
-    }
-
     position
 }
 

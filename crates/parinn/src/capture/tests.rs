@@ -970,7 +970,7 @@ fn a_line_over_4_mib_a_live_read_refuses_is_audited_once_however_often_it_is_rea
             .iter()
             .find(|e| e.counter.as_deref() == Some("transcript_line_too_large"))
             .unwrap();
-        assert_eq!(entry.kind, "rejected");
+        assert_eq!(entry.kind, "redacted");
         assert!(entry.detail.contains(SESSION), "{}", entry.detail);
         assert!(entry.detail.contains("4194305 bytes"), "{}", entry.detail);
     }

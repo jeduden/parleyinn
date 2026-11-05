@@ -523,7 +523,7 @@ fn the_report_names_the_refused_line_its_offset_and_the_counter() {
     assert_eq!(found.failure(), None);
     assert_eq!(
         found.short_text(),
-        "; transcripts holding a line over the 4 MiB limit, not stored, counted as \
+        "; transcripts holding a line over the 4 MiB limit, stored unparsed and redacted whole, counted as \
          `transcript_line_too_large`: /t/run<U+000A>a.jsonl at offset 20 (4194305 bytes)"
     );
     assert!(both.short_text().starts_with(

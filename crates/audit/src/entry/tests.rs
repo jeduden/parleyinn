@@ -421,7 +421,7 @@ fn a_refused_transcript_line_names_its_source_offset_and_length_never_its_text()
     let entry = Entry::next(&line("run-a"), 1, 5, Digest::ZERO).unwrap();
     let hostile = Entry::next(&line("a b\nsecret"), 2, 5, Digest::ZERO).unwrap();
 
-    assert_eq!(entry.kind, "rejected");
+    assert_eq!(entry.kind, "redacted");
     assert_eq!(entry.counter.as_deref(), Some("transcript_line_too_large"));
     assert_eq!(entry.operation, "ingest");
     assert_eq!(
@@ -430,7 +430,7 @@ fn a_refused_transcript_line_names_its_source_offset_and_length_never_its_text()
     );
     assert!(
         entry.detail.starts_with(
-            "transcript line over the 4 MiB limit not stored; its place is recorded and ingest continues past it (SEC-05)"
+            "transcript line over the 4 MiB limit stored unparsed and redacted whole without being held in memory; its place is recorded (SEC-05)"
         )
     );
     assert!(hostile.detail.contains("a key no settings key spells"));
