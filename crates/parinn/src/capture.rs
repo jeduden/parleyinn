@@ -53,9 +53,6 @@ pub(crate) const SEGMENT_EVERY: Duration = Duration::from_secs(30);
 /// How often a call waiting for its tool-use id looks again.
 const LOOK: Duration = Duration::from_millis(10);
 
-/// How long a call waits for a binding being taken to be recorded.
-const TAKE_WAIT: Duration = Duration::from_millis(500);
-
 /// The directory of the MCP servers' start markers, in the home.
 const MARKERS: &str = "mcp";
 
@@ -77,12 +74,6 @@ pub(crate) struct Shared {
     tool_uses: Mutex<BTreeMap<String, BTreeSet<String>>>,
     serving: AtomicBool,
     stop: AtomicBool,
-    /// Whether a read of the transcripts is in progress: a line it
-    /// committed may not have given its tool-use id yet.
-    polling: AtomicBool,
-    /// Whether session bindings are being taken: one it commits does not
-    /// make the server serve until it has been recorded here.
-    taking: AtomicBool,
 }
 
 impl Shared {
@@ -114,16 +105,7 @@ impl Shared {
 pub(crate) struct Finder(pub(crate) Arc<Shared>);
 
 impl mcp::tool_call::Runs for Finder {
-    #[expect(
-        clippy::disallowed_methods,
-        reason = "a call waits for a binding being taken at most its bound in wall-clock \
-                  time (PRV-14); no derived artifact reads it (I10)"
-    )]
     fn serving(&self) -> bool {
-        let started = Instant::now();
-        while self.0.taking.load(Ordering::SeqCst) && started.elapsed() < TAKE_WAIT {
-            std::thread::sleep(LOOK);
-        }
         self.0.serving.load(Ordering::SeqCst)
     }
 
@@ -135,10 +117,9 @@ impl mcp::tool_call::Runs for Finder {
     fn find(&self, tool_use_id: &str, wait: Duration) -> (Vec<String>, Duration) {
         let started = Instant::now();
         loop {
-            let polling = self.0.polling.load(Ordering::SeqCst);
             let runs = self.0.runs_of(tool_use_id);
             let waited = started.elapsed();
-            if (!runs.is_empty() && !polling) || waited >= wait {
+            if !runs.is_empty() || waited >= wait {
                 return (runs, waited);
             }
             std::thread::sleep(LOOK);
@@ -200,9 +181,6 @@ pub(crate) struct Running {
     transcripts: BTreeMap<PathBuf, u64>,
     /// The paths refused, each audited once.
     refused: BTreeSet<PathBuf>,
-    /// Each line over the 4 MiB limit audited, by transcript path and
-    /// offset: a live read refuses it again each poll (SEC-05).
-    too_large: BTreeSet<(PathBuf, u64)>,
     /// The paths whose tool-use ids failed to scan, each audited once
     /// until a scan succeeds.
     unscanned: BTreeSet<PathBuf>,
@@ -224,7 +202,6 @@ impl Capture {
             sessions: Vec::new(),
             transcripts: BTreeMap::new(),
             refused: BTreeSet::new(),
-            too_large: BTreeSet::new(),
             unscanned: BTreeSet::new(),
             marker: None,
             closed: now_instant(),
@@ -272,21 +249,10 @@ impl Running {
         left.unwrap_or_else(|| (self.capture.clock)())
     }
 
-    /// Takes the session bindings, marking the take in progress.
-    fn bind(&mut self) {
-        // The store commits a binding taken before `serving` says so: a
-        // call arriving between the two must wait, not be served under no
-        // run (PRV-14).
-        let shared = self.capture.shared.clone();
-        shared.taking.store(true, Ordering::SeqCst);
-        self.take();
-        shared.taking.store(false, Ordering::SeqCst);
-    }
-
     /// Takes every session binding of its harness process no MCP server
     /// took, each transcript path resolved within the transcript roots or
     /// the run's worktree.
-    fn take(&mut self) {
+    fn bind(&mut self) {
         let Some(harness) = self.capture.harness else {
             return;
         };
@@ -387,12 +353,6 @@ impl Running {
     /// Ingests what each transcript gained, and reads the tool-use ids
     /// of the lines it read.
     fn poll(&mut self) {
-        self.capture.shared.polling.store(true, Ordering::SeqCst);
-        self.read_transcripts();
-        self.capture.shared.polling.store(false, Ordering::SeqCst);
-    }
-
-    fn read_transcripts(&mut self) {
         let transcripts = self.transcripts();
         let new = transcripts
             .iter()
@@ -421,53 +381,16 @@ impl Running {
                 self.capture.limit,
                 &mut OsEntropy,
             );
-            let stopped = match &read {
-                Ok(Some(ingested)) => ingested.too_large,
-                Ok(None) => self.refused_line(&path),
-                Err(_) => None,
-            };
             match read {
                 Ok(Some(ingested)) => self.audit_ingested(&ingested),
                 Ok(None) => {}
                 Err(e) => self.failed(&path, &e),
             }
-            self.audit_too_large(&path, stopped);
             self.read_line_fields(&path);
         }
         if self.closed.elapsed() >= self.close_every {
             self.close_segments();
             self.closed = now_instant();
-        }
-    }
-
-    /// The refused line the source at `path` stands at; a failure to look
-    /// is audited like any failed read, and the line goes unnamed (I6).
-    fn refused_line(&mut self, path: &Path) -> Option<ingest::read::bounded::Refused> {
-        ingest::live::refused_line(&self.capture.home, path).unwrap_or_else(|e| {
-            self.failed(path, &e);
-            None
-        })
-    }
-
-    /// Audits, once, a line over the 4 MiB limit a live read refused:
-    /// the source stays short at it (SEC-05, REC-03, I6).
-    fn audit_too_large(&mut self, path: &Path, line: Option<ingest::read::bounded::Refused>) {
-        let Some(line) = line else {
-            return;
-        };
-        let key = (path.to_path_buf(), line.offset);
-        if self.too_large.contains(&key) {
-            return;
-        }
-        let stem = path.file_stem().map(|s| s.to_string_lossy().into_owned());
-        let name = self.capture.redactor.redact_text(&stem.unwrap_or_default());
-        let occurrence = Occurrence::TranscriptLineTooLarge {
-            source: &name.text,
-            offset: line.offset,
-            length: line.length,
-        };
-        if self.audited(&occurrence) {
-            self.too_large.insert(key);
         }
     }
 
@@ -611,21 +534,26 @@ impl Running {
         if read <= from {
             return;
         }
+        let bytes = match ingest::read::transcript(path) {
+            Ok(bytes) => bytes,
+            Err(e) => {
+                self.audit_unscanned(path, &e);
+                return;
+            }
+        };
+        let range = bytes
+            .get(as_index(from)..as_index(read))
+            .unwrap_or_default();
         let defaults = Defaults::of(path);
-        let shared = self.capture.shared.clone();
-        let scanned = ingest::read::open::for_each_line_between(path, from, read, |line| {
+        for line in String::from_utf8_lossy(range).lines() {
             let parsed: Value = serde_json::from_str(line).unwrap_or(Value::Null);
             if let Some(cwd) = parsed["cwd"].as_str() {
                 self.resolve(Path::new(cwd));
             }
             let run = run_name(&defaults.key(&parsed));
             for id in tool_use_ids(&parsed) {
-                shared.read(id, run.clone());
+                self.capture.shared.read(id, run.clone());
             }
-        });
-        if let Err(e) = scanned {
-            self.audit_unscanned(path, &e);
-            return;
         }
         self.unscanned.remove(path);
         self.transcripts.insert(path.to_path_buf(), read);
@@ -699,8 +627,11 @@ fn remainders<'p>(home: &Home, paths: impl Iterator<Item = &'p PathBuf>) -> Vec<
                 .flatten()
                 .map_or(0, |s| s.position.offset);
             // One that cannot be read may hold more than was ingested.
-            match ingest::read::complete(path) {
-                Ok(complete) => read < complete,
+            match ingest::read::transcript(path) {
+                Ok(bytes) => {
+                    let complete = bytes.iter().rposition(|c| *c == b'\n').map_or(0, |i| i + 1);
+                    read < complete as u64
+                }
                 Err(e) => e.kind() != io::ErrorKind::NotFound,
             }
         })
@@ -725,6 +656,10 @@ fn tool_use_ids(line: &Value) -> Vec<String> {
         .filter(|block| block["type"] == "tool_use")
         .filter_map(|block| block["id"].as_str().map(str::to_owned))
         .collect()
+}
+
+fn as_index(offset: u64) -> usize {
+    usize::try_from(offset).unwrap_or(usize::MAX)
 }
 
 /// Now, for the segments' 30 s close.

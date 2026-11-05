@@ -18,7 +18,6 @@ use serde_json::{Value, json};
 use store::{NewEvent, Place, Source, Store};
 use transcript::shape::Shapes;
 
-use super::window::Budget;
 use super::{Named, Runs, with_causes};
 use crate::prompt::{self, Outcome, PromptLine};
 use crate::read::{self, Line};
@@ -26,36 +25,16 @@ use crate::repeat::{self, Decision, Facts, Owner, Rule};
 use crate::run::{Defaults, RunKey};
 use crate::{IngestError, Inputs, content, turn_end, well_formed};
 
-/// Parsed JSON is transient but can be much larger than its source
-/// syntax. Preflight keeps its conservative heap bound to two maximum
-/// lines; `read::open` reserves that plus one whole-line redaction.
-pub(super) const PARSED_LINE_LIMIT: usize = 2 * read::bounded::LINE_LIMIT;
-const JSON_TOKEN_BYTES: usize = 256;
-
-/// The redaction rule a line over the line ceiling is recorded under:
-/// it is redacted whole, since it is never held to be scanned (SEC-05).
-pub(super) const LINE_TOO_LARGE_RULE: &str = "transcript_line_too_large";
-/// What stands for a line over the line ceiling in its event.
-pub(super) const LINE_TOO_LARGE_MARKER: &str = "[REDACTED:transcript_line_too_large]";
-
 /// What one ingest reads.
 pub(super) struct Read<'r, 'a> {
     pub(super) node: &'r Node,
     pub(super) home: &'r Home,
     pub(super) lines: &'r [Line<'a>],
+    pub(super) parsed: &'r [Value],
     /// The index of the first line to read.
     pub(super) from: usize,
-    /// How many lines of the source lie before the first of `lines`, when
-    /// it is a window past the source's start (SEC-05).
-    pub(super) first_line: u64,
-    /// The source, whose lines before the window are replayed from it.
-    pub(super) path: &'r Path,
     pub(super) defaults: &'r Defaults,
     pub(super) redactor: &'r Redactor,
-    /// What is left under SEC-05's source-memory ceiling for planned
-    /// event content and its metadata, and for one replay or
-    /// sibling-scan window.
-    pub(super) budget: Budget,
 }
 
 /// What an ingest will append, line by line, with what reading found.
@@ -80,11 +59,6 @@ pub(super) struct Plan {
     /// The line number and end offset of the last line refused, so the
     /// ingest position moves past a refusal no recorded line follows.
     pub(super) refused_to: Option<(u64, u64)>,
-    /// The place of the line over the line ceiling the window ends
-    /// before, once the ingest goes on past it: its content is never
-    /// read, its bytes are zeros in the consumed-prefix hash (SEC-05,
-    /// SEC-31).
-    pub(super) over: Option<Place>,
     /// Each (owner, repeating) pair of writers whose repeat owner no
     /// fork observation chose.
     pub(super) chosen: BTreeSet<(WriterId, WriterId)>,
@@ -99,54 +73,12 @@ pub(super) struct Plan {
     /// How many witnessed lines repeating another transcript's event
     /// were recorded as their own (REC-04).
     pub(super) witnessed_repeats: usize,
-    /// A conservative upper bound for source-derived bytes retained by
-    /// this plan.
-    pub(super) memory: usize,
-    /// Whether planning stopped at its memory budget before the window
-    /// ended, so the next read resumes at the ingest marker.
-    pub(super) resumable: bool,
     /// The transcripts of the directory that could not be read to learn
     /// the `uuid`s they hold, by redacted name, with why (I6).
     pub(super) unread: Vec<crate::UnreadSource>,
 }
 
 impl Plan {
-    /// Records the place of `line`, the line number of the line over the
-    /// line ceiling `over`, so the ingest goes on past it, and its event
-    /// in `writer`'s run: an unparsed line holding a whole-line
-    /// redaction marker, since the line is neither held nor scanned
-    /// (SEC-05, I1). Its length takes its line break, as every place's
-    /// does.
-    pub(super) fn pass_over(
-        &mut self,
-        over: crate::read::bounded::Refused,
-        line: u64,
-        writer: WriterId,
-        entropy: &mut dyn Entropy,
-    ) -> Result<(), IngestError> {
-        let place = Place {
-            line,
-            offset: over.offset,
-            length: over.length + 1,
-            uuid: None,
-        };
-        self.events.push(NewEvent {
-            kind: EventKind::UnparsedLine,
-            provenance: Provenance::Unparsed,
-            content: crate::content(line, LINE_TOO_LARGE_MARKER, 1),
-            commitment_key: CommitmentKey::from_bytes(draw(entropy).map_err(IngestError::Key)?),
-            transcript_timestamp: None,
-        });
-        self.places.push(place.clone());
-        self.ends.push((writer, true, over.offset + place.length));
-        self.unparsed += 1;
-        self.redactions.push(LINE_TOO_LARGE_RULE.to_owned());
-        self.refused_places.push(place.clone());
-        self.over = Some(place);
-
-        Ok(())
-    }
-
     /// How many events it appends to each writer.
     pub(super) fn events_by_writer(&self) -> BTreeMap<WriterId, usize> {
         let mut out = BTreeMap::new();
@@ -165,10 +97,8 @@ pub(super) struct Planner<'a> {
     /// The `uuid`s the directory's other transcripts hold, read once a
     /// fork's line needs them.
     siblings: Option<Siblings>,
-    /// The window a sibling scan reads in, as [`Budget::scan`].
-    scan_window: usize,
-    /// Harness UUIDs whose event content was purged from another
-    /// transcript in this directory, loaded once for this plan.
+    /// Harness UUIDs whose event content a purge erased, in any
+    /// transcript source of this directory, loaded once for this plan.
     purged: BTreeSet<String>,
     /// Whether a fork observation names each ingested run's harness
     /// session, by writer.
@@ -197,23 +127,18 @@ impl<'a> Planner<'a> {
             .sources()?
             .iter()
             .any(|s| s.directory == named.directory && s.path != named.path);
+        let purged = store.purged_line_uuids(&named.directory)?;
         let forked = runs
             .sessions
             .iter()
             .map(|(w, s)| (*w, inputs.forks.contains(s)))
             .collect();
-        let purged = if others {
-            store.purged_line_uuids(&named.directory, &named.path)?
-        } else {
-            BTreeSet::new()
-        };
 
         Ok(Self {
             named,
             inputs,
             held_since: source.held_since,
             siblings: None,
-            scan_window: 0,
             purged,
             forked,
             others,
@@ -232,47 +157,21 @@ impl<'a> Planner<'a> {
         read: Read<'_, '_>,
         entropy: &mut dyn Entropy,
     ) -> Result<Plan, IngestError> {
-        self.scan_window = read.budget.scan;
         let shapes = Shapes::supported();
         let mut classifier = Classifier::new(&shapes, *session, read.redactor);
         // The lines read before, replayed, so a result finds its call.
         for line in &read.lines[..read.from] {
-            if json_heap_bound(line.text) <= PARSED_LINE_LIMIT {
-                classifier.line(line.text);
-            }
-        }
-        if let (true, Some(first)) = (read.first_line > 0, read.lines.first()) {
-            read::open::for_each_line_within(read.path, first.offset, read.budget.scan, |text| {
-                if json_heap_bound(text) <= PARSED_LINE_LIMIT {
-                    classifier.line(text);
-                }
-            })
-            .map_err(IngestError::read(read.path))?;
+            classifier.line(line.text);
         }
         let mut plan = Plan::default();
         for (i, line) in read.lines.iter().enumerate().skip(read.from) {
-            let charge = plan_charge(line.text.len());
-            if plan.memory.saturating_add(charge) > read.budget.memory {
-                plan.resumable = true;
-                break;
-            }
-            let parse = json_heap_bound(line.text) <= PARSED_LINE_LIMIT;
-            let parsed: Value = if parse {
-                serde_json::from_str(line.text).unwrap_or(Value::Null)
-            } else {
-                Value::Null
-            };
-            let key = read.defaults.key(&parsed);
+            let key = read.defaults.key(&read.parsed[i]);
             let writer = runs.ensure(store, read.node, read.home, &key, entropy)?;
             self.forked
                 .insert(writer, self.inputs.forks.contains(&key.harness_session));
-            let classified = if parse {
-                classifier.line(line.text)
-            } else {
-                Classified::Unparsed(None)
-            };
+            let classified = classifier.line(line.text);
             let redacted = read.redactor.redact_line(line.text);
-            let decision = self.decide(store, &parsed, &key, &redacted.text)?;
+            let decision = self.decide(store, &read.parsed[i], &key, &redacted.text)?;
             if decision == Decision::Hold {
                 plan.hold = true;
                 break;
@@ -280,25 +179,23 @@ impl<'a> Planner<'a> {
             if decision == Decision::Refused {
                 plan.refused += 1;
                 plan.refused_places.push(Place {
-                    line: read.first_line + i as u64 + 1,
+                    line: i as u64 + 1,
                     offset: line.offset,
                     length: line.end - line.offset,
-                    uuid: parsed["uuid"].as_str().map(str::to_owned),
+                    uuid: read.parsed[i]["uuid"].as_str().map(str::to_owned),
                 });
-                plan.refused_to = Some((read.first_line + i as u64 + 1, line.end));
-                plan.memory = plan.memory.saturating_add(charge);
+                plan.refused_to = Some((i as u64 + 1, line.end));
                 continue;
             }
             let user = matches!(classified, Classified::Line(Provenance::User, _));
-            let prompt = self.prompt(store, &parsed, &key, user, &decision, &read)?;
+            let prompt = self.prompt(store, &read.parsed[i], &key, user, &decision, &read)?;
             let at = Planned {
                 writer,
-                number: read.first_line + i as u64 + 1,
+                number: i as u64 + 1,
                 line,
-                parsed: &parsed,
+                parsed: &read.parsed[i],
             };
             plan.add(at, classified, redacted, decision, read.redactor, entropy)?;
-            plan.memory = plan.memory.saturating_add(charge);
             if let Some((prompt_id, outcome)) = prompt {
                 plan.prompts
                     .push((plan.events.len() - 1, prompt_id, outcome));
@@ -471,63 +368,10 @@ impl<'a> Planner<'a> {
 
     /// The `uuid`s the directory's other transcripts hold.
     fn siblings(&mut self) -> &Siblings {
-        let (named, inputs, window) = (self.named, self.inputs, self.scan_window);
-        self.siblings.get_or_insert_with(|| {
-            sibling_uuids(&named.directory, &named.path, &inputs.served, window)
-        })
+        let (named, inputs) = (self.named, self.inputs);
+        self.siblings
+            .get_or_insert_with(|| sibling_uuids(&named.directory, &named.path, &inputs.served))
     }
-}
-
-/// A conservative bound for the source-derived memory one planned line
-/// can retain: redacted content, UUID/timestamp copies and container
-/// metadata. The parsed JSON is transient and has a separate one-line
-/// reserve in `read::open` (SEC-05).
-fn plan_charge(line: usize) -> usize {
-    line.saturating_mul(3).saturating_add(2 * 1024)
-}
-
-/// A conservative bound on the heap `serde_json::Value` may retain for
-/// `text`, found without allocating: every string's source bytes plus a
-/// generous node/container allowance for each JSON token. Large plain
-/// strings stay parseable; dense arrays and objects become unparsed
-/// lines before serde can allocate past SEC-05's transient budget.
-pub(super) fn json_heap_bound(text: &str) -> usize {
-    let bytes = text.as_bytes();
-    let (mut at, mut tokens, mut strings) = (0, 0_usize, 0_usize);
-    while at < bytes.len() {
-        match bytes[at] {
-            b'"' => {
-                tokens = tokens.saturating_add(1);
-                at += 1;
-                let start = at;
-                while at < bytes.len() {
-                    match bytes[at] {
-                        b'\\' => at = at.saturating_add(2),
-                        b'"' => break,
-                        _ => at += 1,
-                    }
-                }
-                strings = strings.saturating_add(at.saturating_sub(start));
-                at = at.saturating_add(1);
-            }
-            b'{' | b'[' => {
-                tokens = tokens.saturating_add(1);
-                at += 1;
-            }
-            b'}' | b']' | b':' | b',' | b' ' | b'\t' | b'\r' | b'\n' => at += 1,
-            _ => {
-                tokens = tokens.saturating_add(1);
-                at += 1;
-                while at < bytes.len()
-                    && !matches!(bytes[at], b'}' | b']' | b',' | b' ' | b'\t' | b'\r' | b'\n')
-                {
-                    at += 1;
-                }
-            }
-        }
-    }
-
-    strings.saturating_add(tokens.saturating_mul(JSON_TOKEN_BYTES))
 }
 
 /// The `uuid`s the transcripts of a directory but one hold.
@@ -546,15 +390,10 @@ struct Siblings {
 /// Every `uuid` the transcripts in `directory` but `path` hold, and
 /// those of the transcripts in `served`. What cannot be read holds none,
 /// and is kept in [`Siblings::unread`] for the caller to count (I6, I9).
-fn sibling_uuids(
-    directory: &str,
-    path: &str,
-    served: &BTreeSet<PathBuf>,
-    window: usize,
-) -> Siblings {
+fn sibling_uuids(directory: &str, path: &str, served: &BTreeSet<PathBuf>) -> Siblings {
     let listing = std::fs::read_dir(directory).map(|e| e.map(|entry| entry.map(|e| e.path())));
 
-    sibling_uuids_of(listing, directory, path, served, window)
+    sibling_uuids_of(listing, directory, path, served)
 }
 
 /// [`sibling_uuids`] of the entries `listing` gives for `directory`.
@@ -563,7 +402,6 @@ fn sibling_uuids_of(
     directory: &str,
     path: &str,
     served: &BTreeSet<PathBuf>,
-    window: usize,
 ) -> Siblings {
     let mut found = Siblings::default();
     let entries = match listing {
@@ -589,22 +427,23 @@ fn sibling_uuids_of(
         if other.to_string_lossy() == path || other.extension().is_none_or(|e| e != "jsonl") {
             continue;
         }
-        let bound = served.contains(&canonical(&other));
-        // A line at a time, so a long transcript is never held (SEC-05).
-        let read = read::open::for_each_line_within(&other, u64::MAX, window, |text| {
-            if json_heap_bound(text) > PARSED_LINE_LIMIT {
-                return;
+        let bytes = match read::transcript(&other) {
+            Ok(bytes) => bytes,
+            Err(e) => {
+                found.unread.push((other, with_causes(&e)));
+                continue;
             }
-            let parsed: Value = serde_json::from_str(text).unwrap_or(Value::Null);
+        };
+        let text = String::from_utf8_lossy(&bytes);
+        let bound = served.contains(&canonical(&other));
+        for line in read::lines(&text) {
+            let parsed: Value = serde_json::from_str(line.text).unwrap_or(Value::Null);
             if let Some(uuid) = parsed["uuid"].as_str() {
                 found.all.insert(uuid.to_owned());
                 if bound {
                     found.served.insert(uuid.to_owned());
                 }
             }
-        });
-        if let Err(e) = read {
-            found.unread.push((other, with_causes(&e)));
         }
     }
 

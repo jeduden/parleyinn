@@ -7,9 +7,6 @@ use std::fs::{self, File, OpenOptions};
 use std::io::{self, Read};
 use std::path::Path;
 
-pub mod bounded;
-pub mod open;
-
 /// One line ingest may consume: its text without the newline, and the
 /// bytes it spans with the newline.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -21,40 +18,22 @@ pub struct Line<'a> {
     pub end: u64,
 }
 
-/// The byte offset just past the last complete line of the transcript at
-/// `path`, found a chunk at a time without holding the source (SEC-05).
+/// The bytes of the transcript at `path`, a path already resolved
+/// within the allowed roots. It is opened only when it is a regular
+/// file, without blocking should it become a FIFO, and read only when
+/// the file opened is the one looked at: a link or other file swapped in
+/// between is refused.
 ///
 /// # Errors
 ///
 /// Fails when the path is not a regular file, cannot be opened or read,
 /// or changed between the look and the open.
-pub fn complete(path: &Path) -> io::Result<u64> {
+pub fn transcript(path: &Path) -> io::Result<Vec<u8>> {
     let mut file = regular_file(path)?;
-    let mut buffer = [0; 64 * 1024];
-    let (mut at, mut complete) = (0_u64, 0_u64);
-    loop {
-        let n = file.read(&mut buffer)?;
-        if n == 0 {
-            break;
-        }
-        if let Some(i) = buffer[..n].iter().rposition(|byte| *byte == b'\n') {
-            complete = at + i as u64 + 1;
-        }
-        at += n as u64;
-    }
+    let mut bytes = Vec::new();
+    file.read_to_end(&mut bytes)?;
 
-    Ok(complete)
-}
-
-/// The window of the transcript at `path` from byte offset `from`: whole
-/// lines within the ceilings of SEC-05, ending before a line past the
-/// line ceiling. The file is opened as [`regular_file`] opens it.
-///
-/// # Errors
-///
-/// Fails as [`regular_file`] does, or when a read does.
-pub fn transcript_window(path: &Path, from: u64) -> io::Result<bounded::Window> {
-    bounded::window(regular_file(path)?, from, bounded::Limits::default())
+    Ok(bytes)
 }
 
 /// The regular file at `path`, opened for reading: refused unless it is
@@ -144,13 +123,6 @@ fn same_file(looked: &fs::Metadata, opened: &fs::Metadata) -> io::Result<()> {
 /// JSON, as the harness may still be writing it.
 #[must_use]
 pub fn lines(text: &str) -> Vec<Line<'_>> {
-    lines_at(text, 0)
-}
-
-/// [`lines`] of `text` that begins at byte offset `base` of its source:
-/// each line's offsets are the source's.
-#[must_use]
-pub fn lines_at(text: &str, base: u64) -> Vec<Line<'_>> {
     let mut out = Vec::new();
     let mut offset = 0;
     for piece in text.split_inclusive('\n') {
@@ -164,8 +136,8 @@ pub fn lines_at(text: &str, base: u64) -> Vec<Line<'_>> {
         match consumable {
             Some(text) => out.push(Line {
                 text,
-                offset: base + offset as u64,
-                end: base + end as u64,
+                offset: offset as u64,
+                end: end as u64,
             }),
             None => break,
         }

@@ -62,7 +62,6 @@ impl Fixture {
             sessions: Vec::new(),
             transcripts: BTreeMap::new(),
             refused: BTreeSet::new(),
-            too_large: BTreeSet::new(),
             unscanned: BTreeSet::new(),
             marker: None,
             closed: now_instant(),
@@ -172,60 +171,6 @@ fn a_finder_returns_the_runs_read_or_none_once_its_wait_passes() {
     assert!(waited >= Duration::from_millis(30));
     shared.stop();
     assert!(shared.stopping());
-}
-
-#[test]
-fn a_finder_waits_out_a_binding_being_taken_before_it_says_it_is_not_serving() {
-    let shared = Arc::new(Shared::default());
-    shared.taking.store(true, Ordering::SeqCst);
-    let finder = Finder(shared.clone());
-    let later = shared.clone();
-    let taker = std::thread::spawn(move || {
-        std::thread::sleep(Duration::from_millis(60));
-        later.serving.store(true, Ordering::SeqCst);
-        later.taking.store(false, Ordering::SeqCst);
-    });
-
-    assert!(
-        finder.serving(),
-        "a binding taken as the call arrives holds"
-    );
-    drop(taker);
-
-    shared.serving.store(false, Ordering::SeqCst);
-    shared.taking.store(true, Ordering::SeqCst);
-    assert!(
-        !finder.serving(),
-        "a take that outlasts the wait is not waited on"
-    );
-}
-
-#[test]
-fn a_finder_waits_out_a_read_in_progress_before_it_returns_the_runs_it_knows() {
-    let shared = Arc::new(Shared::default());
-    shared.read("toolu_1".to_owned(), "s".to_owned());
-    shared.polling.store(true, Ordering::SeqCst);
-    let finder = Finder(shared.clone());
-    let later = shared.clone();
-    let reader = std::thread::spawn(move || {
-        std::thread::sleep(Duration::from_millis(60));
-        later.read("toolu_1".to_owned(), "t".to_owned());
-        later.polling.store(false, Ordering::SeqCst);
-    });
-
-    let (runs, waited) = finder.find("toolu_1", Duration::from_secs(5));
-    drop(reader);
-    assert_eq!(runs, ["s", "t"], "the run read last is found too");
-    assert!(waited >= Duration::from_millis(50), "{waited:?}");
-
-    shared.polling.store(true, Ordering::SeqCst);
-    let (runs, waited) = finder.find("toolu_1", Duration::from_millis(30));
-    assert_eq!(
-        runs,
-        ["s", "t"],
-        "a read that outlasts the wait is not waited on"
-    );
-    assert!(waited >= Duration::from_millis(30));
 }
 
 #[test]
@@ -938,59 +883,4 @@ fn a_marker_link_or_fifo_is_neither_followed_nor_waited_on() {
 
     assert_eq!(answer.expect("served waited on a FIFO marker"), [f.main()]);
     drop(marker);
-}
-
-/// How many audit entries count a line over the 4 MiB limit.
-fn too_large_counted(f: &Fixture) -> usize {
-    f.counted()
-        .iter()
-        .filter(|c| *c == "transcript_line_too_large")
-        .count()
-}
-
-#[test]
-fn a_line_over_4_mib_a_live_read_refuses_is_audited_once_however_often_it_is_read() {
-    let over = "z".repeat((4 << 20) + 1);
-    let after_lines = format!("{}{over}\n{}", line(1, None), line(2, None));
-    let only_the_line = format!("{over}\n");
-    for text in [after_lines, only_the_line] {
-        let f = Fixture::new();
-        std::fs::write(f.main(), text).unwrap();
-        f.bind(SESSION, &f.main(), HARNESS);
-        let mut running = f.running(Some(HARNESS), None);
-        running.bind();
-
-        running.poll();
-        running.poll();
-        running.poll();
-
-        assert_eq!(too_large_counted(&f), 1);
-        let entries = Log::new(f.home.audit()).entries().unwrap();
-        let entry = entries
-            .iter()
-            .find(|e| e.counter.as_deref() == Some("transcript_line_too_large"))
-            .unwrap();
-        assert_eq!(entry.kind, "redacted");
-        assert!(entry.detail.contains(SESSION), "{}", entry.detail);
-        assert!(entry.detail.contains("4194305 bytes"), "{}", entry.detail);
-    }
-}
-
-#[test]
-fn a_line_over_4_mib_is_tried_again_when_its_audit_entry_was_refused() {
-    let f = Fixture::new();
-    let mut running = f.running(Some(HARNESS), None);
-    let refused = ingest::read::bounded::Refused {
-        offset: 7,
-        length: (4 << 20) + 1,
-    };
-    std::fs::write(f.home.audit(), "not a directory").unwrap();
-
-    running.audit_too_large(&f.main(), Some(refused));
-
-    assert!(running.too_large.is_empty());
-    std::fs::remove_file(f.home.audit()).unwrap();
-    running.audit_too_large(&f.main(), Some(refused));
-    running.audit_too_large(&f.main(), Some(refused));
-    assert_eq!(too_large_counted(&f), 1);
 }

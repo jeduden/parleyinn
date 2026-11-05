@@ -1,5 +1,5 @@
 //! The capture failures an MCP server counts instead of passing over
-//! (REC-13, SEC-05, I6).
+//! (REC-13, I6).
 
 use key::random::OsEntropy;
 use redaction::Redactor;
@@ -27,22 +27,6 @@ fn a_sibling_transcript_a_live_ingest_could_not_read_is_counted() {
     f.running(None, None).audit_ingested(&ingested);
 
     assert_eq!(f.counted(), ["ingest_source_unread"]);
-}
-
-#[test]
-fn a_refused_line_that_cannot_be_looked_up_is_audited_and_unnamed() {
-    let f = Fixture::new();
-    std::fs::write(f.main(), line(1, None)).unwrap();
-    let redactor = Redactor::new(&[]).unwrap().0;
-    ingest::ingest_path(&f.home, &f.main(), &redactor, &mut OsEntropy).unwrap();
-    std::fs::remove_file(f.main()).unwrap();
-    std::fs::create_dir(f.main()).unwrap();
-    let mut running = f.running(Some(HARNESS), None);
-
-    assert!(running.refused_line(&f.main()).is_none());
-
-    assert!(running.refused.contains(&f.main()), "refused, audited once");
-    assert_eq!(f.counted().len(), 1);
 }
 
 #[test]

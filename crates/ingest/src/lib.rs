@@ -138,31 +138,13 @@ pub struct Ingested {
     /// How many witnessed lines repeating another transcript's event
     /// were recorded as their own, never repeat references (REC-04).
     pub witnessed_repeats: usize,
-    /// How many lines were refused, their `uuid` naming a purged event
-    /// (REC-04).
-    pub refused: usize,
-    /// The line over the 4 MiB limit this read came to: its content is
-    /// never held or scanned, so once passed an unparsed line event
-    /// redacted whole stands for it. The caller audits and counts it as
-    /// `transcript_line_too_large` (SEC-05, REC-03).
-    pub too_large: Option<read::bounded::Refused>,
-    /// The number of that line when this ingest recorded its place and
-    /// moved the ingest position past it, so every later line is
-    /// recorded; none while the position stays before it, a line whose
-    /// line break the harness has not written yet. The place is kept
-    /// with the source's passed lines: its line, offset, and length with
-    /// its line break (one more than `too_large`'s).
-    pub too_large_line: Option<u64>,
-    /// Whether the source holds lines past this read that the next read
-    /// resumes at its ingest marker: the read took 64 MiB, the most it
-    /// holds at once (SEC-05, REC-13). False while a refused line stops it.
-    pub resumable: bool,
-    /// The most bytes of the source it held in memory at once (SEC-05).
-    pub read_window_high_water: usize,
     /// The transcripts of the directory it could not read to learn their
     /// `uuid`s (I6): the caller counts and audits each; the ingest went
     /// on without them.
     pub unread_sources: Vec<UnreadSource>,
+    /// How many lines were refused, their `uuid` naming a purged event
+    /// (REC-04).
+    pub refused: usize,
     /// The events the search index leaves out that no ingest has
     /// reported yet (REC-11, I6): the caller audits each, then notes it
     /// with `Store::mark_search_index_gaps_reported`.
@@ -192,12 +174,6 @@ pub enum IngestError {
     Empty(PathBuf),
     /// A harness account identifier is too long to redact.
     Redaction(redaction::PatternError),
-    /// Harness account identifiers would take the source over its
-    /// in-memory ceiling.
-    IdentifierLimit(PathBuf),
-    /// A transcript line's parsed structure would take the source over
-    /// its in-memory ceiling.
-    SourceMemoryLimit(PathBuf),
     /// The random source failed.
     Key(KeyError),
     /// The home or the node failed.
@@ -227,16 +203,6 @@ impl fmt::Display for IngestError {
             Self::NotUtf8(path) => write!(f, "the transcript {} is not UTF-8", path.display()),
             Self::Empty(path) => write!(f, "the transcript {} holds no line", path.display()),
             Self::Redaction(e) => write!(f, "redact the transcript: {e}"),
-            Self::IdentifierLimit(path) => write!(
-                f,
-                "the transcript {} names too many harness account identifiers",
-                path.display()
-            ),
-            Self::SourceMemoryLimit(path) => write!(
-                f,
-                "the transcript {} has a line whose parsed structure exceeds the source-memory ceiling",
-                path.display()
-            ),
             Self::Key(e) => write!(f, "{e}"),
             Self::Admin(e) => write!(f, "{e}"),
             Self::Store(e) => write!(f, "{e}"),
@@ -261,10 +227,7 @@ impl std::error::Error for IngestError {
             Self::Key(e) => Some(e),
             Self::Admin(e) => Some(e),
             Self::Store(e) | Self::Partial { source: e, .. } => Some(e),
-            Self::NotUtf8(_)
-            | Self::Empty(_)
-            | Self::IdentifierLimit(_)
-            | Self::SourceMemoryLimit(_) => None,
+            Self::NotUtf8(_) | Self::Empty(_) => None,
         }
     }
 }
@@ -363,15 +326,6 @@ pub fn ingest_with(
 pub const ATTEMPTS: usize = 8;
 
 impl IngestError {
-    /// How a failed read of the transcript at `path` is an ingest's
-    /// failure.
-    pub(crate) fn read(path: &Path) -> impl FnOnce(std::io::Error) -> Self + '_ {
-        move |source| Self::Read {
-            path: path.to_path_buf(),
-            source,
-        }
-    }
-
     /// Whether another ingest moved the ingest position first.
     #[must_use]
     pub fn position_moved(&self) -> bool {
@@ -394,30 +348,19 @@ fn ingest_once(
     inputs: &Inputs,
     entropy: &mut dyn Entropy,
 ) -> Result<Ingested, IngestError> {
-    let (opened, _) = reading::open_source(home, path)?;
-    let window = opened.window;
-    let (base, more, refused, high_water) =
-        (window.start, window.more, window.refused, window.high_water);
-    let ended = window.refused_ended;
-    let text =
-        String::from_utf8(window.bytes).map_err(|_| IngestError::NotUtf8(path.to_path_buf()))?;
-    if text.is_empty() && refused.is_none() && base == 0 {
+    let bytes = read::transcript(path).map_err(|source| IngestError::Read {
+        path: path.to_path_buf(),
+        source,
+    })?;
+    let text = String::from_utf8(bytes).map_err(|_| IngestError::NotUtf8(path.to_path_buf()))?;
+    if text.is_empty() {
         return Err(IngestError::Empty(path.to_path_buf()));
     }
-    let view = reading::View {
-        text: &text,
-        base,
-        seen: opened.seen,
-        refused,
-        refused_ended: ended,
-        resumable: reading::resumable(more, refused, ended, opened.seen),
-        high_water,
-    };
 
     reading::ingest(
         home,
         path,
-        &view,
+        &text,
         redactor,
         inputs,
         &mut reading::Recorder::Cli,
@@ -526,6 +469,3 @@ fn content(line: u64, text: &str, redactions: usize) -> Value {
 
 #[cfg(test)]
 mod tests;
-#[cfg(test)]
-#[path = "windowed/tests.rs"]
-mod windowed_tests;

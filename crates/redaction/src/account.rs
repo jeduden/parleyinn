@@ -50,42 +50,6 @@ impl HarnessAccountIdentifiers {
         }
     }
 
-    /// Learns a line only when the distinct identifier bytes held after
-    /// it fit `limit`. False leaves the set unchanged.
-    pub fn learn_within(&mut self, line: &str, limit: usize) -> bool {
-        let mut found = Self::default();
-        found.learn(line);
-        let added = found
-            .emails
-            .iter()
-            .filter(|id| !self.emails.contains(*id))
-            .chain(
-                found
-                    .organizations
-                    .iter()
-                    .filter(|id| !self.organizations.contains(*id)),
-            )
-            .map(String::len)
-            .sum::<usize>();
-        if self.byte_len().saturating_add(added) > limit {
-            return false;
-        }
-        self.emails.extend(found.emails);
-        self.organizations.extend(found.organizations);
-
-        true
-    }
-
-    /// Bytes of distinct identifier text held by this set.
-    #[must_use]
-    pub fn byte_len(&self) -> usize {
-        self.emails
-            .iter()
-            .chain(&self.organizations)
-            .map(String::len)
-            .sum()
-    }
-
     /// Whether none is learnt.
     #[must_use]
     pub fn is_empty(&self) -> bool {

@@ -548,17 +548,18 @@ fn ingest_all(
     let mut reports = Vec::new();
     let mut failures = 0;
     for path in paths {
-        let (done, error) = ingest_windows::ingest(home, path, redactor, inputs);
-        for i in done {
-            record_ingested(ctx, &i, stderr);
-            reports.push(i);
-        }
-        if let Some(e) = error {
-            if e.source_memory_limit {
-                sources::audit_source_memory_limit(ctx, stderr);
+        let ingested = redactor.as_ref().map_err(Clone::clone).and_then(|r| {
+            ingest::ingest_with(home, path, r, inputs, &mut OsEntropy).map_err(|e| e.to_string())
+        });
+        match ingested {
+            Ok(i) => {
+                record_ingested(ctx, &i, stderr);
+                reports.push(i);
             }
-            failed("ingest", &e.message, stderr);
-            failures += 1;
+            Err(e) => {
+                failed("ingest", &e, stderr);
+                failures += 1;
+            }
         }
     }
 
@@ -2037,7 +2038,6 @@ mod identity_status;
 mod index_gaps;
 mod ingest_path;
 mod ingest_report;
-mod ingest_windows;
 mod licenses;
 mod purge;
 mod quarantine;

@@ -120,41 +120,21 @@ pub fn ingest_live(
     limit: Option<usize>,
     entropy: &mut dyn Entropy,
 ) -> Result<Option<Ingested>, IngestError> {
-    let (opened, known) = reading::open_source(home, path)?;
-    let (base, seen) = (opened.window.start, opened.seen);
-    let (more, refused, high_water) = (
-        opened.window.more,
-        opened.window.refused,
-        opened.window.high_water,
-    );
-    let ended = opened.window.refused_ended;
-    let before = known
-        .as_ref()
-        .filter(|_| base > 0)
-        .map_or(0, |s| s.position.lines);
-    let mut bytes = opened.window.bytes;
-    let complete = complete_lines(&bytes, limit.map(|n| n.saturating_sub(before as usize)));
-    // A limit on the lines read stops the read before the refused line.
-    let ended = ended && limit.is_none();
-    if !gained(home, path, &bytes, (base, base + complete as u64), ended)? {
+    let bytes = read::transcript(path).map_err(|source| IngestError::Read {
+        path: path.to_path_buf(),
+        source,
+    })?;
+    let complete = complete_lines(&bytes, limit);
+    if !gained(home, path, &bytes, complete as u64)? {
         return Ok(None);
     }
-    bytes.truncate(complete);
-    let text = String::from_utf8(bytes).map_err(|_| IngestError::NotUtf8(path.to_path_buf()))?;
-    let view = reading::View {
-        text: &text,
-        base,
-        seen,
-        refused,
-        refused_ended: ended,
-        resumable: reading::resumable(more, refused, ended, seen),
-        high_water,
-    };
+    let text = String::from_utf8(bytes[..complete].to_vec())
+        .map_err(|_| IngestError::NotUtf8(path.to_path_buf()))?;
 
     reading::ingest(
         home,
         path,
-        &view,
+        &text,
         redactor,
         inputs,
         &mut reading::Recorder::Live(seats),
@@ -163,41 +143,11 @@ pub fn ingest_live(
     .map(Some)
 }
 
-/// The line over the line ceiling the transcript source at `path` stops
-/// at, when its ingest position lies before one: a live ingest leaves it
-/// while its line break is not written, and its caller audits it once
-/// (SEC-05, REC-03). None when there is no marker or no such line.
-///
-/// # Errors
-///
-/// Fails when the marker or the transcript cannot be read: the caller
-/// counts and audits it, as the line goes unnamed (I6).
-pub fn refused_line(
-    home: &Home,
-    path: &Path,
-) -> Result<Option<read::bounded::Refused>, IngestError> {
-    let Some(source) = reading::peek(home, path)? else {
-        return Ok(None);
-    };
-
-    read::open::refused_at(path, source.position.offset).map_err(IngestError::read(path))
-}
-
-/// Whether the transcript source at `path`, whose window from byte
-/// offset `base` is `bytes` and whose complete lines end at byte offset
-/// `complete`, gained a line past its ingest position, was rewritten, or
-/// holds a hook observation not yet in the record, or whether the line
-/// over the line ceiling its complete lines end before, whose line break
-/// is written (`refused_ended`), is next to be passed. `window` is the
-/// byte offset the bytes start at and that its complete lines end at.
-fn gained(
-    home: &Home,
-    path: &Path,
-    bytes: &[u8],
-    window: (u64, u64),
-    refused_ended: bool,
-) -> Result<bool, IngestError> {
-    let (base, complete) = window;
+/// Whether the transcript source at `path`, whose bytes are `bytes` and
+/// whose complete lines take `complete` of them, gained a line past its
+/// ingest position, was rewritten, or holds a hook observation not yet
+/// in the record.
+fn gained(home: &Home, path: &Path, bytes: &[u8], complete: u64) -> Result<bool, IngestError> {
     home.create().map_err(IngestError::Admin)?;
     let store = Store::open(&home.store())?;
     let source = store.source(&path.to_string_lossy())?;
@@ -215,13 +165,9 @@ fn gained(
     // unless what it consumed changed: a new transcript generation.
     // The bytes of each purged line count as zeros (SEC-31).
     let purged = source.as_ref().map_or(&[][..], |s| &s.purged[..]);
-    // A window past the start began at the marker its prefix vouched for.
-    let rewritten =
-        base == 0 && prefix_digest(bytes, position.offset, purged) != Some(position.prefix);
+    let rewritten = prefix_digest(bytes, position.offset, purged) != Some(position.prefix);
 
-    let level = position.offset == complete;
-
-    Ok(position.offset < complete || rewritten || (level && (held || refused_ended)))
+    Ok(position.offset < complete || rewritten || (held && position.offset == complete))
 }
 
 /// How many of `bytes` its complete lines take: up to the last line

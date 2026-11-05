@@ -26,18 +26,6 @@ fn learn_reads_the_harness_fields_only() {
 }
 
 #[test]
-fn learning_within_a_limit_never_partly_grows_the_identifier_set() {
-    let mut ids = HarnessAccountIdentifiers::default();
-
-    assert!(!ids.learn_within(CONTEXT, 4));
-    assert!(ids.is_empty());
-    assert!(ids.learn_within(CONTEXT, "user@example.com".len()));
-    assert_eq!(ids.byte_len(), "user@example.com".len());
-    assert!(ids.learn_within(CONTEXT, "user@example.com".len()));
-    assert_eq!(ids.byte_len(), "user@example.com".len());
-}
-
-#[test]
 fn emails_in_finds_addresses_with_their_punctuation_trimmed() {
     let found: Vec<String> = emails_in("mail <a@b.co>, then c@d.org. not @x.y or e@f").collect();
     assert_eq!(found, ["a@b.co", "c@d.org"]);

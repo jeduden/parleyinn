@@ -161,7 +161,7 @@ fn a_line_whose_uuid_names_a_purged_event_is_refused_and_ingest_moves_past_it() 
     let fork = dir.path().join("fork.jsonl");
     let mut text = numbered("f", 1, 3);
     text.push_str(&numbered("f", 100, 101));
-    std::fs::write(&fork, &text).unwrap();
+    std::fs::write(&fork, text).unwrap();
     let owner = crate::ingest_path(&home, &parent, &redactor(), &mut OsEntropy).unwrap();
     purged(&home, owner.writer, 3);
 
@@ -171,17 +171,6 @@ fn a_line_whose_uuid_names_a_purged_event_is_refused_and_ingest_moves_past_it() 
     assert_eq!(late.conflicts, 0, "no other content named the uuid");
     let store = Store::open(&home.store()).unwrap();
     assert_eq!(store.log(late.writer).unwrap().len(), 2);
-    let source = store.source(&fork.to_string_lossy()).unwrap().unwrap();
-    assert_eq!(source.purged.len(), 3, "each refused copy is zeroed");
-    assert_eq!(
-        store::source::prefix_digest(text.as_bytes(), source.position.offset, &source.purged),
-        Some(source.position.prefix),
-    );
-    assert_ne!(
-        record::digest::Digest::of(&[&text.as_bytes()[..source.position.offset as usize]]),
-        source.position.prefix,
-        "the stored hash must not confirm the refused content",
-    );
     let again = crate::ingest_path(&home, &fork, &redactor(), &mut OsEntropy).unwrap();
     assert_eq!((again.refused, again.events), (0, 0));
 }
@@ -235,128 +224,4 @@ fn a_refusal_between_recorded_lines_keeps_the_prefix_the_position_digests() {
         "the prefix still matches"
     );
     assert_eq!((grown.refused, grown.events), (0, 1));
-}
-
-/// A source whose ingest consumed the first `offset` bytes of `bytes`.
-fn consumed_source(bytes: &[u8], offset: u64) -> Source {
-    Source {
-        id: 7,
-        path: "/t/a.jsonl".to_owned(),
-        generation: 1,
-        directory: "/t".to_owned(),
-        position: Position {
-            offset,
-            prefix: Digest::of(&[&bytes[..offset as usize]]),
-            lines: 1,
-            seen: bytes.len() as u64,
-        },
-        purged: Vec::new(),
-        held_since: None,
-        lost: false,
-        marked_at: 0,
-    }
-}
-
-fn resumed(source: Source) -> Resume {
-    Resume {
-        position: source.position.clone(),
-        source,
-        index: 0,
-        first_line: 1,
-        new_generation: false,
-    }
-}
-
-#[test]
-fn the_consumed_prefix_is_hashed_from_the_source_when_the_window_is_past_its_start() {
-    let dir = TempDir::new().unwrap();
-    let path = transcript(&dir, "ab\ncd\n");
-    let resume = resumed(consumed_source(b"ab\ncd\n", 3));
-
-    let mut from_file = consumed(&resume, b"cd\n", &path, 3, &resume.source.purged).unwrap();
-    from_file.update(b"cd\n");
-    let from_bytes = consumed(&resume, b"ab\ncd\n", &path, 0, &resume.source.purged).unwrap();
-
-    assert_eq!(from_file.digest(), Digest::of(&[b"ab\ncd\n"]));
-    assert_eq!(from_bytes.digest(), Digest::of(&[b"ab\n"]));
-}
-
-#[test]
-fn a_file_shorter_than_the_marker_is_another_ingests_and_one_unreadable_fails() {
-    let dir = TempDir::new().unwrap();
-    let short = transcript(&dir, "a\n");
-    let resume = resumed(consumed_source(b"ab\ncd\n", 3));
-
-    let moved = consumed(&resume, b"", &short, 3, &resume.source.purged)
-        .err()
-        .unwrap();
-    let gone = consumed(
-        &resume,
-        b"",
-        &dir.path().join("none"),
-        3,
-        &resume.source.purged,
-    )
-    .err()
-    .unwrap();
-
-    assert!(moved.position_moved(), "{moved}");
-    assert!(matches!(gone, IngestError::Read { .. }), "{gone}");
-}
-
-#[test]
-fn a_store_without_a_schema_holds_no_marker() {
-    let dir = TempDir::new().unwrap();
-    let home = home(&dir);
-    home.create().unwrap();
-    std::fs::write(home.store(), b"").unwrap();
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        std::fs::set_permissions(home.store(), std::fs::Permissions::from_mode(0o600)).unwrap();
-    }
-
-    assert!(peek(&home, Path::new("/t/a.jsonl")).unwrap().is_none());
-}
-
-#[test]
-fn a_failed_read_of_a_transcript_names_it_and_keeps_its_cause() {
-    let path = Path::new("/t/a.jsonl");
-
-    let err = IngestError::read(path)(std::io::Error::other("no"));
-
-    assert!(matches!(&err, IngestError::Read { path: p, .. } if p == path));
-    assert!(std::error::Error::source(&err).is_some());
-}
-
-#[test]
-fn a_run_row_another_ingest_added_after_the_runs_loaded_counts_as_kept() {
-    let dir = TempDir::new().unwrap();
-    let home = home(&dir);
-    let mut entropy = OsEntropy;
-    home.create().unwrap();
-    let mut store = Store::open(&home.store()).unwrap();
-    let node = Node::open(&home, &mut store, &mut entropy).unwrap();
-    let key = RunKey {
-        agent_id: None,
-        harness_session: "s".to_owned(),
-    };
-    let mut seats = RunSeats::default();
-    let writer = seats.ensure(&mut store, &node, &key, &mut entropy).unwrap();
-    let mut recorder = Recorder::Live(&mut seats);
-    let mut runs = Runs::load(&store, "p", &mut recorder).unwrap();
-    store
-        .add_run(&IngestedRun {
-            writer,
-            path: "other".to_owned(),
-            harness_session: "s".to_owned(),
-            agent_id: None,
-        })
-        .unwrap();
-
-    let first = runs.ensure(&mut store, &node, &home, &key, &mut entropy);
-    let again = runs.ensure(&mut store, &node, &home, &key, &mut entropy);
-
-    assert_eq!((first.unwrap(), again.unwrap()), (writer, writer));
-    assert_eq!(store.ingested_runs().unwrap().len(), 1);
 }

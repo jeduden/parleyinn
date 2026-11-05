@@ -291,17 +291,12 @@ fn purged_line_uuids_are_loaded_together_without_event_associations() {
         .unwrap();
 
     assert_eq!(
-        store.purged_line_uuids("/t", "/t/b.jsonl").unwrap(),
-        BTreeSet::from(["u1".to_owned(), "u2".to_owned()])
-    );
-    assert!(
-        store
-            .purged_line_uuids("/t", "/t/a.jsonl")
-            .unwrap()
-            .is_empty()
+        store.purged_line_uuids("/t").unwrap(),
+        BTreeSet::from(["u1".to_owned(), "u2".to_owned()]),
+        "the source's own residue counts: a rewritten transcript is a new generation"
     );
     assert_eq!(
-        store.purged_line_uuids("/other", "/other/b.jsonl").unwrap(),
+        store.purged_line_uuids("/other").unwrap(),
         BTreeSet::from(["u3".to_owned()])
     );
 }
@@ -320,12 +315,7 @@ fn a_store_from_before_purged_copies_still_reads_its_sources() {
         .unwrap();
 
     assert_eq!(store.source("/t/a.jsonl").unwrap(), Some(source));
-    assert!(
-        store
-            .purged_line_uuids("/t", "/t/b.jsonl")
-            .unwrap()
-            .is_empty()
-    );
+    assert!(store.purged_line_uuids("/t").unwrap().is_empty());
 }
 
 #[test]
@@ -699,7 +689,7 @@ fn two_sources_of_one_directory_that_share_a_purged_uuid_name_it_once() {
         .unwrap();
 
     assert_eq!(
-        store.purged_line_uuids("/t", "/t/c.jsonl").unwrap(),
+        store.purged_line_uuids("/t").unwrap(),
         BTreeSet::from(["shared".to_owned()])
     );
 }
@@ -735,7 +725,7 @@ fn a_residue_table_without_uuids_makes_the_directory_uuids_unreadable() {
     store.start_generation("/t/a.jsonl", "/t").unwrap();
     without_residue_columns(&store);
 
-    assert!(store.purged_line_uuids("/t", "/t/b.jsonl").is_err());
+    assert!(store.purged_line_uuids("/t").is_err());
 }
 
 #[test]

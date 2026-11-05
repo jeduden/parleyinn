@@ -582,15 +582,12 @@ impl Store {
         purged_places(&self.conn, id)
     }
 
-    /// The harness UUIDs left by purged lines in other transcript
-    /// sources of `directory`, ready for an ingest of `path` to test in
-    /// memory (REC-04, SEC-31).
-    pub fn purged_line_uuids(
-        &self,
-        directory: &str,
-        path: &str,
-    ) -> Result<BTreeSet<String>, StoreError> {
-        purged_line_uuids(&self.conn, directory, path)
+    /// The harness UUIDs left by purged lines in any transcript source
+    /// of `directory`, an earlier generation of a rewritten transcript
+    /// included, ready for an ingest to test in memory (REC-04, REC-07,
+    /// SEC-31).
+    pub fn purged_line_uuids(&self, directory: &str) -> Result<BTreeSet<String>, StoreError> {
+        purged_line_uuids(&self.conn, directory)
     }
 
     /// Appends transcript lines and atomically keeps the positions of
@@ -763,13 +760,9 @@ pub(crate) fn owner(
     found.map(|(w, s)| address(&w, s)).transpose()
 }
 
-/// The allowed residue UUIDs of purged lines in other transcript sources
-/// of `directory`. An older store without the residue table holds none.
-fn purged_line_uuids(
-    conn: &Connection,
-    directory: &str,
-    path: &str,
-) -> Result<BTreeSet<String>, StoreError> {
+/// The allowed residue UUIDs of purged lines in the transcript sources of
+/// `directory`. An older store without the residue table holds none.
+fn purged_line_uuids(conn: &Connection, directory: &str) -> Result<BTreeSet<String>, StoreError> {
     let query = "SELECT count(*) FROM sqlite_master WHERE name = 'transcript_purged_copies'";
     if !conn.query_row(query, [], |row| row.get::<_, bool>(0))? {
         return Ok(BTreeSet::new());
@@ -777,10 +770,10 @@ fn purged_line_uuids(
     let mut statement = conn.prepare(
         "SELECT DISTINCT p.uuid FROM transcript_purged_copies p
          JOIN transcript_sources s ON s.id = p.source
-         WHERE p.uuid IS NOT NULL AND s.directory = ?1 AND s.path != ?2
+         WHERE p.uuid IS NOT NULL AND s.directory = ?1
          ORDER BY p.uuid",
     )?;
-    let rows = statement.query_map(params![directory, path], |row| row.get(0))?;
+    let rows = statement.query_map([directory], |row| row.get(0))?;
 
     Ok(rows.collect::<Result<_, _>>()?)
 }

@@ -87,14 +87,6 @@ pub enum Counter {
     /// A hook input nested deeper than 64 levels and was refused
     /// (SEC-05).
     HookInputTooDeep,
-    /// A transcript line over 4 MiB was stored unparsed and redacted
-    /// whole, its place recorded and ingest continued past it (SEC-05, REC-03).
-    TranscriptLineTooLarge,
-    /// A transcript source's parsed structure or harness account
-    /// identifiers could not fit under its source-memory ceiling, so
-    /// ingest refused it before anything was recorded (SEC-05, SEC-08,
-    /// I6).
-    TranscriptSourceMemoryLimit,
     /// A path outside every allowed root was refused (SEC-18).
     PathOutsideAllowedRoots,
     /// A structured log line could not be written (ENG-05, I6).
@@ -269,8 +261,6 @@ impl Counter {
             Self::RedactionScanLimited => "redaction_scan_limited",
             Self::HookInputTooLarge => "hook_input_too_large",
             Self::HookInputTooDeep => "hook_input_too_deep",
-            Self::TranscriptLineTooLarge => "transcript_line_too_large",
-            Self::TranscriptSourceMemoryLimit => "transcript_source_memory_limit",
             Self::PathOutsideAllowedRoots => "path_outside_allowed_roots",
             Self::LogLineDropped => "log_line_dropped",
             Self::IngestRefusedSettingsInvalid => "ingest_refused_settings_invalid",
@@ -346,16 +336,6 @@ pub enum Occurrence<'a> {
         detail: &'static str,
         key: &'a str,
     },
-    /// An ingest did not store a transcript line over its 4 MiB limit,
-    /// recorded its place and went on past it (SEC-05, REC-03): the entry names the
-    /// source by `source` (shown only when it holds nothing but the
-    /// characters a name can), the line's byte `offset` and its `length`,
-    /// never its text.
-    TranscriptLineTooLarge {
-        source: &'a str,
-        offset: u64,
-        length: u64,
-    },
     /// A principal act was taken, such as acknowledging the counters;
     /// it feeds no counter.
     PrincipalAct {
@@ -380,9 +360,6 @@ pub enum Occurrence<'a> {
         counter: Option<Counter>,
     },
 }
-
-/// What an entry says of a transcript line over the 4 MiB limit.
-pub const LINE_TOO_LARGE: &str = "transcript line over the 4 MiB limit stored unparsed and redacted whole without being held in memory; its place is recorded (SEC-05)";
 
 /// The kind of an entry noting a principal act.
 pub const PRINCIPAL_ACT: &str = "principal_act";
@@ -461,19 +438,6 @@ impl Entry {
                 Some(counter.as_str()),
                 operation,
                 format!("{detail} {}", shown(key)),
-            ),
-            Occurrence::TranscriptLineTooLarge {
-                source,
-                offset,
-                length,
-            } => (
-                Kind::Redacted.as_str(),
-                Some(Counter::TranscriptLineTooLarge.as_str()),
-                "ingest",
-                format!(
-                    "{LINE_TOO_LARGE} in {} at offset {offset}, {length} bytes",
-                    shown(source)
-                ),
             ),
             Occurrence::PrincipalAct { operation, detail } => {
                 (PRINCIPAL_ACT, None, operation, detail.to_owned())

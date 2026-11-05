@@ -9,7 +9,6 @@ use std::path::{Path, PathBuf};
 
 use administration::home::Home;
 use audit::entry::{Counter, Kind, Occurrence};
-use ingest::read::bounded::{LINE_LIMIT, Measure, Refused};
 use record::digest::Digest;
 use redaction::Redactor;
 use serde_json::{Value, json};
@@ -123,10 +122,9 @@ pub(crate) enum Found {
 }
 
 /// Reads `bytes` once: hashes the first `offset`, `purged` zeroed, then
-/// looks for a line break past them, counting the line's bytes to find
-/// one past the 4 MiB limit. Only the consumed prefix is hashed, a chunk
-/// at a time, and the line is counted, never held, so a large transcript
-/// costs one read and a chunk of memory.
+/// looks for a line break past them. Only the consumed prefix is hashed,
+/// a chunk at a time, so a large transcript costs one read and a chunk
+/// of memory.
 ///
 /// # Errors
 ///
@@ -136,7 +134,6 @@ pub(crate) fn scan(mut bytes: impl Read, offset: u64, purged: &[Span]) -> io::Re
     let mut buffer = vec![0; CHUNK];
     let mut left = offset;
     let mut unread_line = false;
-    let mut line = Measure::default();
     loop {
         let n = bytes.read(&mut buffer)?;
         if n == 0 {
@@ -145,7 +142,7 @@ pub(crate) fn scan(mut bytes: impl Read, offset: u64, purged: &[Span]) -> io::Re
         let taken = usize::try_from(left).map_or(n, |l| l.min(n));
         hash.update(&buffer[..taken]);
         left -= taken as u64;
-        if line.feed(&buffer[taken..n]) {
+        if buffer[taken..n].contains(&b'\n') {
             unread_line = true;
             break;
         }
@@ -178,10 +175,6 @@ pub(crate) struct Completeness {
     /// server holds the session binding of each, or an ingest left its
     /// ingest marker at its position within [`MARKER_CEILING_MS`].
     pub(crate) short: Vec<String>,
-    /// Sources holding a line over the 4 MiB limit, stored unparsed and
-    /// redacted whole:
-    /// the path and the line.
-    pub(crate) refused: Vec<(String, Refused)>,
     /// Sources short of their end that nothing will finish, or that no
     /// longer hold what was ingested from them: the path and why.
     pub(crate) failed: Vec<(String, &'static str)>,
@@ -230,7 +223,6 @@ pub(crate) fn completeness(
                 now_ms,
             )
         };
-        found.refused.extend(refused_lines(source));
         match outcome {
             Outcome::Holds => {}
             Outcome::Short => found.short.push(source.path.clone()),
@@ -239,26 +231,6 @@ pub(crate) fn completeness(
     }
 
     found
-}
-
-/// The lines over the 4 MiB limit `source` holds: ingest stored each as an
-/// unparsed line redacted whole, recorded its place and went on past it
-/// (SEC-05). A place's
-/// length counts its line break.
-fn refused_lines(source: &Source) -> impl Iterator<Item = (String, Refused)> + '_ {
-    source
-        .purged
-        .iter()
-        .filter(|span| span.length.saturating_sub(1) > LINE_LIMIT as u64)
-        .map(|span| {
-            (
-                source.path.clone(),
-                Refused {
-                    offset: span.offset,
-                    length: span.length - 1,
-                },
-            )
-        })
 }
 
 /// What `parinn verify` finds of `source`, given what is at its path.
@@ -312,42 +284,13 @@ impl Completeness {
     /// What `parinn verify` adds for sources short of their end: nothing
     /// when none is.
     pub(crate) fn short_text(&self) -> String {
-        let mut text = String::new();
-        if !self.short.is_empty() {
-            text = format!(
-                "; transcript sources short of their end, which ingest resumes: {}",
-                shown(&self.short)
-            );
+        if self.short.is_empty() {
+            return String::new();
         }
-        if !self.refused.is_empty() {
-            text.push_str(&self.refused_text());
-        }
-
-        text
-    }
-
-    /// What `parinn verify` adds for sources holding a line over the limit: the
-    /// source, the line's offset and length, and the counter that counts
-    /// the refusal (SEC-05, ADM-09). Not a failure: ingest
-    /// stored the line, recorded its place and went on past it.
-    fn refused_text(&self) -> String {
-        let each: Vec<String> = self
-            .refused
-            .iter()
-            .map(|(path, line)| {
-                format!(
-                    "{} at offset {} ({} bytes)",
-                    inline(path),
-                    line.offset,
-                    line.length
-                )
-            })
-            .collect();
 
         format!(
-            "; transcripts holding a line over the 4 MiB limit, stored unparsed and redacted whole, counted as \
-             `transcript_line_too_large`: {}",
-            each.join(", ")
+            "; transcript sources short of their end, which ingest resumes: {}",
+            shown(&self.short)
         )
     }
 }
@@ -391,21 +334,6 @@ pub(crate) fn lost_text(lost: &[String]) -> String {
         "transcript sources gone before they were fully ingested: {}",
         shown(lost)
     )
-}
-
-/// Audits and counts a source refused before recording because its
-/// parsed structure or harness account identifiers cannot fit under
-/// SEC-05's source-memory ceiling (SEC-08, I6).
-pub(crate) fn audit_source_memory_limit(ctx: &Context, stderr: &mut dyn Write) {
-    let occurrence = Occurrence::Degraded {
-        kind: Kind::Rejected,
-        counter: Counter::TranscriptSourceMemoryLimit,
-        operation: "ingest",
-        detail: "transcript source refused because its parsed structure or harness account identifiers exceed the source-memory ceiling",
-    };
-    if let Err(e) = ctx.audit(&occurrence) {
-        let _ = writeln!(stderr, "parinn ingest: audit a source-memory refusal: {e}");
-    }
 }
 
 /// Audits and counts, once each, every transcript source `parinn ingest

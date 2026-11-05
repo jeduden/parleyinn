@@ -27,18 +27,11 @@ fn range(writer: WriterId, first: u64, last: u64) -> Erase {
     }
 }
 
-fn read(
-    path: &Path,
-    offset: u64,
-    first: &[Span],
-    second: &[Span],
-) -> io::Result<Option<(Digest, Digest)>> {
-    let bytes = std::fs::read(path)?;
-    Ok(crate::source::prefix_digest(&bytes, offset, first)
-        .zip(crate::source::prefix_digest(&bytes, offset, second)))
+fn read(path: &Path) -> io::Result<Vec<u8>> {
+    std::fs::read(path)
 }
 
-fn unreadable(_: &Path, _: u64, _: &[Span], _: &[Span]) -> io::Result<Option<(Digest, Digest)>> {
+fn unreadable(_: &Path) -> io::Result<Vec<u8>> {
     Err(io::Error::other("unreadable"))
 }
 

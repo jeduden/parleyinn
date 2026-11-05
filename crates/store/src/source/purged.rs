@@ -12,14 +12,14 @@ use std::path::Path;
 use record::digest::Digest;
 use rusqlite::{Connection, Transaction, params};
 
-use super::{Source, Span, count, select, unconfirmable};
+use super::{Source, Span, count, prefix_digest, select, unconfirmable};
 use crate::purge::Erase;
 use crate::{Store, StoreError, sql};
 
 /// How a purge reads a transcript's bytes: the guarded read the harness's
 /// transcripts get (SEC-18, ENG-03), injected by the program that links
 /// it.
-pub type Transcripts = fn(&Path, u64, &[Span], &[Span]) -> io::Result<Option<(Digest, Digest)>>;
+pub type Transcripts = fn(&Path) -> io::Result<Vec<u8>>;
 
 impl Store {
     /// This store, a purge reading the transcripts it recomputes the
@@ -102,9 +102,12 @@ fn recomputed(
     };
     let path = Path::new(&source.path);
     let offset = source.position.offset;
-    Ok(read(path, offset, &source.purged, spans)?
-        .filter(|(held, _)| *held == source.position.prefix)
-        .map_or_else(|| (unconfirmable(), true), |(_, new)| (new, false)))
+    let bytes = read(path)?;
+
+    Ok(prefix_digest(&bytes, offset, &source.purged)
+        .filter(|held| *held == source.position.prefix)
+        .and_then(|_| prefix_digest(&bytes, offset, spans))
+        .map_or_else(|| (unconfirmable(), true), |new| (new, false)))
 }
 
 /// The recomputed hash of each source the purge of `ranges` takes lines

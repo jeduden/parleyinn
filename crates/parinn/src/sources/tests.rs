@@ -454,44 +454,11 @@ fn body_then_line(len: usize, ended: bool) -> Vec<u8> {
 #[test]
 fn a_scan_finds_whether_a_whole_line_lies_past_the_position() {
     for ended in [true, false] {
-        let at = scan(body_then_line(LINE_LIMIT + 1, ended).as_slice(), 20, &[]).unwrap();
+        let at = scan(body_then_line(10, ended).as_slice(), 20, &[]).unwrap();
         assert_eq!(at.unread_line, ended);
     }
     assert_eq!(scan(&BODY[..4], 20, &[]).unwrap().prefix, None);
 }
-
-#[test]
-fn a_line_over_the_limit_ingest_passed_is_reported_never_failed() {
-    let dir = TempDir::new().unwrap();
-    let path = on_disk(&dir, "run-a.jsonl", BODY);
-    let name = path.to_string_lossy().into_owned();
-    let place = |length| Span { offset: 20, length };
-    let mut holds = source(&path, 20, 20);
-    holds.purged = vec![
-        place(5),
-        place(LIMIT_PLUS_BREAK - 1),
-        place(LIMIT_PLUS_BREAK),
-    ];
-
-    let found = completeness(&[holds], &[], &look, NOW);
-
-    assert_eq!(found.failed, []);
-    assert_eq!(found.failure(), None);
-    assert_eq!(found.short, Vec::<String>::new());
-    assert_eq!(
-        found.refused,
-        [(
-            name,
-            Refused {
-                offset: 20,
-                length: LINE_LIMIT as u64 + 1
-            }
-        )]
-    );
-}
-
-/// The length of a place of a line one over the limit: with its break.
-const LIMIT_PLUS_BREAK: u64 = LINE_LIMIT as u64 + 2;
 
 #[test]
 fn a_source_whose_limit_line_was_replaced_by_a_short_one_is_short_again() {
@@ -501,56 +468,6 @@ fn a_source_whose_limit_line_was_replaced_by_a_short_one_is_short_again() {
     let found = completeness(&[source(&path, 20, 26)], &[], &look, NOW);
 
     assert_eq!(found.short, [path.to_string_lossy().into_owned()]);
-}
-
-#[test]
-fn the_report_names_the_refused_line_its_offset_and_the_counter() {
-    let found = Completeness {
-        refused: vec![(
-            "/t/run\na.jsonl".to_owned(),
-            Refused {
-                offset: 20,
-                length: 4_194_305,
-            },
-        )],
-        ..Completeness::default()
-    };
-    let both = Completeness {
-        short: vec!["/t/b.jsonl".to_owned()],
-        ..found.clone()
-    };
-
-    assert_eq!(found.failure(), None);
-    assert_eq!(
-        found.short_text(),
-        "; transcripts holding a line over the 4 MiB limit, stored unparsed and redacted whole, counted as \
-         `transcript_line_too_large`: /t/run<U+000A>a.jsonl at offset 20 (4194305 bytes)"
-    );
-    assert!(both.short_text().starts_with(
-        "; transcript sources short of their end, which ingest resumes: /t/b.jsonl; transcripts \
-         holding a line over the 4 MiB limit"
-    ));
-}
-
-#[test]
-fn a_source_memory_refusal_says_on_stderr_when_it_cannot_be_audited() {
-    let p = crate::tests::Process::new();
-    p.invoke(&["counter", "ack"], &crate::tests::DEV);
-    let audit_dir = p.parinn_home().join("audit");
-    std::fs::remove_dir_all(&audit_dir).unwrap();
-    std::fs::write(&audit_dir, "").unwrap();
-    crate::tests::set_mode(&audit_dir, 0o600);
-    let mut stderr = Vec::new();
-
-    p.with_context(&crate::tests::DEV, |ctx| {
-        audit_source_memory_limit(ctx, &mut stderr);
-    });
-
-    let text = String::from_utf8(stderr).unwrap();
-    assert!(
-        text.starts_with("parinn ingest: audit a source-memory refusal: "),
-        "{text}"
-    );
 }
 
 /// A home whose only source was cut short and is now gone.

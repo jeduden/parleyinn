@@ -1,5 +1,4 @@
-//! What `parinn ingest` prints of the transcripts it recorded, and how it
-//! reads a source of more than one window (SEC-05, REC-13).
+//! What `parinn ingest` prints of the transcripts it recorded.
 
 use serde_json::{Value, json};
 
@@ -17,7 +16,6 @@ pub(crate) fn ingest_report(
             "seat": i.seat.to_string(),
             "room": i.room.to_string(),
             "events": i.events,
-            "read_window_high_water": i.read_window_high_water,
             "generation": i.generation,
             "held": i.held,
             "runs": runs_json(&i.runs),
