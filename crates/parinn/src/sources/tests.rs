@@ -452,74 +452,46 @@ fn body_then_line(len: usize, ended: bool) -> Vec<u8> {
 }
 
 #[test]
-fn a_scan_finds_the_line_at_the_position_past_the_4_mib_limit() {
-    let over = LINE_LIMIT + 1;
+fn a_scan_finds_whether_a_whole_line_lies_past_the_position() {
     for ended in [true, false] {
-        let at = scan(body_then_line(over, ended).as_slice(), 20, &[]).unwrap();
-
-        assert_eq!(
-            at.refused,
-            Some(Refused {
-                offset: 20,
-                length: over as u64
-            })
-        );
+        let at = scan(body_then_line(LINE_LIMIT + 1, ended).as_slice(), 20, &[]).unwrap();
         assert_eq!(at.unread_line, ended);
     }
-    let exact = scan(body_then_line(LINE_LIMIT, true).as_slice(), 20, &[]).unwrap();
-    assert_eq!(exact.refused, None);
-    let before = scan(body_then_line(over, true).as_slice(), 25, &[]).unwrap();
-    assert_eq!(before.refused, None);
-    let short = scan(&BODY[..4], 20, &[]).unwrap();
-    assert_eq!((short.prefix, short.refused), (None, None));
+    assert_eq!(scan(&BODY[..4], 20, &[]).unwrap().prefix, None);
 }
 
 #[test]
-fn a_source_short_at_a_refused_line_is_reported_never_failed() {
+fn a_line_over_the_limit_ingest_passed_is_reported_never_failed() {
     let dir = TempDir::new().unwrap();
-    let path = on_disk(&dir, "run-a.jsonl", &body_then_line(LINE_LIMIT + 1, true));
+    let path = on_disk(&dir, "run-a.jsonl", BODY);
     let name = path.to_string_lossy().into_owned();
-    let mut stale = source(&path, 20, 20);
-    stale.marked_at = 0;
+    let place = |length| Span { offset: 20, length };
+    let mut holds = source(&path, 20, 20);
+    holds.purged = vec![
+        place(5),
+        place(LIMIT_PLUS_BREAK - 1),
+        place(LIMIT_PLUS_BREAK),
+    ];
 
-    for (source, served) in [
-        (source(&path, 20, 20), vec![]),
-        (stale, vec![]),
-        (source(&path, 20, 20), vec![path.clone()]),
-    ] {
-        let found = completeness(&[source], &served, &look, NOW);
+    let found = completeness(&[holds], &[], &look, NOW);
 
-        assert_eq!(found.failed, []);
-        assert_eq!(found.failure(), None);
-        assert_eq!(found.short, Vec::<String>::new());
-        assert_eq!(
-            found.refused,
-            [(
-                name.clone(),
-                Refused {
-                    offset: 20,
-                    length: LINE_LIMIT as u64 + 1
-                }
-            )]
-        );
-    }
-}
-
-#[test]
-fn a_source_short_at_a_refused_line_fails_once_it_no_longer_begins_with_what_was_ingested() {
-    let dir = TempDir::new().unwrap();
-    let path = on_disk(&dir, "run-a.jsonl", &body_then_line(LINE_LIMIT + 1, true));
-    let mut replaced = source(&path, 20, 20);
-    replaced.position.prefix = Digest::of(&[b"other"]);
-
-    let found = completeness(&[replaced], &[], &look, NOW);
-
-    assert_eq!(found.refused, []);
+    assert_eq!(found.failed, []);
+    assert_eq!(found.failure(), None);
+    assert_eq!(found.short, Vec::<String>::new());
     assert_eq!(
-        found.failed,
-        [(path.to_string_lossy().into_owned(), REPLACED)]
+        found.refused,
+        [(
+            name,
+            Refused {
+                offset: 20,
+                length: LINE_LIMIT as u64 + 1
+            }
+        )]
     );
 }
+
+/// The length of a place of a line one over the limit: with its break.
+const LIMIT_PLUS_BREAK: u64 = LINE_LIMIT as u64 + 2;
 
 #[test]
 fn a_source_whose_limit_line_was_replaced_by_a_short_one_is_short_again() {
@@ -528,7 +500,6 @@ fn a_source_whose_limit_line_was_replaced_by_a_short_one_is_short_again() {
 
     let found = completeness(&[source(&path, 20, 26)], &[], &look, NOW);
 
-    assert_eq!(found.refused, []);
     assert_eq!(found.short, [path.to_string_lossy().into_owned()]);
 }
 

@@ -572,6 +572,11 @@ impl Running {
                 &ingested.name,
             ));
         }
+        for unread in &ingested.unread_sources {
+            let why = unread.why.as_str();
+            tracing::warn!(error = why, "read a sibling transcript");
+            self.audit(&crate::sourcing::unread_occurrence("mcp", &unread.name));
+        }
         self.audit_index_gaps(ingested);
     }
 
@@ -633,10 +638,8 @@ impl Running {
         if e.kind() == io::ErrorKind::NotFound || !self.unscanned.insert(path.to_path_buf()) {
             return;
         }
-        tracing::warn!(
-            error = e.to_string().as_str(),
-            "scan a transcript's tool uses"
-        );
+        let why = e.to_string();
+        tracing::warn!(error = why.as_str(), "scan a transcript's tool uses");
         self.audit(&Occurrence::Degraded {
             kind: Kind::Failed,
             counter: Counter::LiveIngestFailed,
@@ -900,5 +903,7 @@ pub(crate) fn served_by(markers: &dyn Markers) -> Vec<PathBuf> {
         .collect()
 }
 
+#[cfg(test)]
+mod failure_tests;
 #[cfg(test)]
 mod tests;

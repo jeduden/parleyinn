@@ -107,14 +107,11 @@ const CHUNK: usize = 64 * 1024;
 /// What `parinn verify` reads of a transcript source's file: the
 /// SHA-256 of its bytes up to the ingest position, the bytes of each
 /// purged line zeroed (SEC-31), none when it holds fewer, and whether a
-/// whole line lies past them, and the line at the position when it is
-/// past the 4 MiB limit: ingest refuses it, so the source stays short at
-/// it, recomputed here from the file, never recorded (SEC-05, I10).
+/// whole line lies past them.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct Scanned {
     pub(crate) prefix: Option<Digest>,
     pub(crate) unread_line: bool,
-    pub(crate) refused: Option<Refused>,
 }
 
 /// What `parinn verify` finds at a transcript source's path.
@@ -153,15 +150,9 @@ pub(crate) fn scan(mut bytes: impl Read, offset: u64, purged: &[Span]) -> io::Re
             break;
         }
     }
-    let refused = (left == 0 && line.over(LINE_LIMIT)).then(|| Refused {
-        offset,
-        length: line.length(),
-    });
-
     Ok(Scanned {
         prefix: (left == 0).then(|| hash.digest()),
         unread_line,
-        refused,
     })
 }
 
@@ -199,7 +190,6 @@ pub(crate) struct Completeness {
 enum Outcome {
     Holds,
     Short,
-    Refused(Refused),
     Fails(&'static str),
 }
 
@@ -239,15 +229,34 @@ pub(crate) fn completeness(
                 now_ms,
             )
         };
+        found.refused.extend(refused_lines(source));
         match outcome {
             Outcome::Holds => {}
             Outcome::Short => found.short.push(source.path.clone()),
-            Outcome::Refused(line) => found.refused.push((source.path.clone(), line)),
             Outcome::Fails(why) => found.failed.push((source.path.clone(), why)),
         }
     }
 
     found
+}
+
+/// The lines over the 4 MiB limit `source` holds: ingest stored none of
+/// them, recorded each one's place and went on past it (SEC-05). A place's
+/// length counts its line break.
+fn refused_lines(source: &Source) -> impl Iterator<Item = (String, Refused)> + '_ {
+    source
+        .purged
+        .iter()
+        .filter(|span| span.length.saturating_sub(1) > LINE_LIMIT as u64)
+        .map(|span| {
+            (
+                source.path.clone(),
+                Refused {
+                    offset: span.offset,
+                    length: span.length - 1,
+                },
+            )
+        })
 }
 
 /// What `parinn verify` finds of `source`, given what is at its path.
@@ -260,9 +269,6 @@ fn outcome(source: &Source, at: Found, served: &[PathBuf], now_ms: u64) -> Outco
     };
     if at.prefix.as_ref() != Some(&source.position.prefix) {
         return Outcome::Fails(REPLACED);
-    }
-    if let Some(line) = at.refused {
-        return Outcome::Refused(line);
     }
     if !at.unread_line {
         return Outcome::Holds;

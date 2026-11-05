@@ -141,6 +141,7 @@ fn each_counter_of_the_mcp_server_has_its_name() {
         (Counter::RecallRefused, "recall_refused"),
         (Counter::PurgeRefused, "purge_refused"),
         (Counter::PurgeUnfinished, "purge_unfinished"),
+        (Counter::IngestSourceUnread, "ingest_source_unread"),
         (
             Counter::TranscriptPrefixUnconfirmed,
             "transcript_prefix_unconfirmed",
@@ -429,7 +430,7 @@ fn a_refused_transcript_line_names_its_source_offset_and_length_never_its_text()
     );
     assert!(
         entry.detail.starts_with(
-            "transcript line refused over the 4 MiB limit; ingest position stays before the line (SEC-05, REC-03)"
+            "transcript line over the 4 MiB limit not stored; its place is recorded and ingest continues past it (SEC-05)"
         )
     );
     assert!(hostile.detail.contains("a key no settings key spells"));

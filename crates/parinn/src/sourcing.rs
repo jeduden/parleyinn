@@ -7,6 +7,29 @@ use audit::entry::{Counter, Kind, Occurrence};
 
 use crate::Context;
 
+/// The entry counting a transcript beside the source that an ingest of
+/// `operation` could not read to learn its `uuid`s (REC-04, I6).
+pub(crate) fn unread_occurrence<'a>(operation: &'static str, name: &'a str) -> Occurrence<'a> {
+    Occurrence::Keyed {
+        kind: Kind::Failed,
+        counter: Counter::IngestSourceUnread,
+        operation,
+        detail: "a transcript beside the source could not be read for its `uuid`s, so a repeated line may be recorded as its own event; unread:",
+        key: name,
+    }
+}
+
+/// Audits, once each, the sibling transcripts an ingest could not read.
+fn audit_unread(ctx: &Context, ingested: &ingest::Ingested, stderr: &mut dyn Write) {
+    for unread in &ingested.unread_sources {
+        let why = unread.why.as_str();
+        tracing::warn!(error = why, "read a sibling transcript");
+        if let Err(e) = ctx.audit(&unread_occurrence("ingest", &unread.name)) {
+            let _ = writeln!(stderr, "parinn ingest: audit the transcript source: {e}");
+        }
+    }
+}
+
 /// Audits what an ingest found of its transcript source, one entry
 /// each, naming the source by its redacted name: a new transcript
 /// generation (REC-07); each line repeating a `uuid` with other
@@ -85,6 +108,7 @@ pub(super) fn audit(ctx: &Context, ingested: &ingest::Ingested, stderr: &mut dyn
             ),
         ),
     ];
+    audit_unread(ctx, ingested, stderr);
     for (times, occurrence) in &occurrences {
         for _ in 0..*times {
             if let Err(e) = ctx.audit(occurrence) {

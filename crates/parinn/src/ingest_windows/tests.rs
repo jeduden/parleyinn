@@ -40,31 +40,32 @@ fn a_source_over_64_mib_is_read_window_by_window_until_it_is_caught_up() {
 }
 
 #[test]
-fn a_refused_line_stops_the_reads_at_the_one_report_that_names_it() {
-    let dir = TempDir::new().unwrap();
-    let path = dir.path().join("t.jsonl");
-    std::fs::write(
-        &path,
-        format!(
-            "{}{}\n{}",
-            line(1, 100),
-            "z".repeat((4 << 20) + 1),
-            line(2, 100)
-        ),
-    )
-    .unwrap();
+fn a_line_over_the_limit_is_passed_with_its_place_recorded_and_later_lines_are_ingested() {
+    for first in [true, false] {
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("t.jsonl");
+        let big = format!("{}\n", "z".repeat((4 << 20) + 1));
+        let text = if first {
+            format!("{big}{}", line(2, 100))
+        } else {
+            format!("{}{big}{}", line(1, 100), line(2, 100))
+        };
+        std::fs::write(&path, text).unwrap();
 
-    let (reports, error) = ingest(
-        &home(&dir),
-        &path,
-        &Ok(redactor()),
-        &ingest::Inputs::default(),
-    );
+        let (reports, error) = ingest(
+            &home(&dir),
+            &path,
+            &Ok(redactor()),
+            &ingest::Inputs::default(),
+        );
 
-    assert!(error.is_none());
-    assert_eq!(reports.len(), 1);
-    assert_eq!(reports[0].too_large.map(|r| r.offset), Some(100));
-    assert_eq!(reports[0].events, 1);
+        assert!(error.is_none());
+        let named: Vec<_> = reports.iter().filter_map(|r| r.too_large).collect();
+        assert_eq!(named.len(), 1);
+        assert_eq!(named[0].offset, if first { 0 } else { 100 });
+        let events: usize = reports.iter().map(|r| r.events).sum();
+        assert_eq!(events, if first { 1 } else { 2 });
+    }
 }
 
 #[test]

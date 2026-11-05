@@ -149,19 +149,10 @@ fn redacted_whole_then_stored(w: &mut World) -> Result<(), String> {
     Ok(())
 }
 
-/// The transcript source's recorded ingest position, in bytes.
-fn position(w: &mut World) -> Result<i64, String> {
-    let conn = Connection::open(home(w)?.store()).map_err(|e| e.to_string())?;
-    conn.query_row("SELECT byte_offset FROM transcript_sources", [], |r| {
-        r.get(0)
-    })
-    .map_err(|e| e.to_string())
-}
-
 #[then(
-    regex = r#"^the line is refused, an audit entry of kind rejected records "transcript line refused over the 4 MiB limit; ingest position stays before the line \(SEC-05, REC-03\)", the counter `transcript_line_too_large` counts it, and the source is left short at that line, resumable$"#
+    regex = r#"^the line's content is not stored, an audit entry of kind rejected records "transcript line over the 4 MiB limit not stored; its place is recorded and ingest continues past it \(SEC-05\)", the counter `transcript_line_too_large` counts it, its place is recorded, and every later line of the source is recorded$"#
 )]
-fn line_refused(w: &mut World) -> Result<(), String> {
+fn line_not_stored(w: &mut World) -> Result<(), String> {
     let entries = Log::new(home(w)?.audit())
         .entries()
         .map_err(|e| e.to_string())?;
@@ -171,7 +162,7 @@ fn line_refused(w: &mut World) -> Result<(), String> {
             e.kind == "rejected"
                 && e.counter.as_deref() == Some("transcript_line_too_large")
                 && e.detail.starts_with(
-                    "transcript line refused over the 4 MiB limit; ingest position stays before the line (SEC-05, REC-03)",
+                    "transcript line over the 4 MiB limit not stored; its place is recorded and ingest continues past it (SEC-05)",
                 )
         })
         .count();
@@ -182,8 +173,36 @@ fn line_refused(w: &mut World) -> Result<(), String> {
         ));
     }
     let at = w.section::<Limits>().refused_at.ok_or("no refused line")?;
-    if position(w)? != at as i64 {
-        return Err(format!("the source is not short at offset {at}"));
+    let conn = Connection::open(home(w)?.store()).map_err(|e| e.to_string())?;
+    let placed: i64 = conn
+        .query_row(
+            "SELECT count(*) FROM transcript_purged_copies WHERE byte_offset = ?1 AND byte_length = ?2",
+            [at as i64, (LINE_LIMIT + 2) as i64],
+            |r| r.get(0),
+        )
+        .map_err(|e| e.to_string())?;
+    if placed != 1 {
+        return Err(format!("no place is recorded for the line at offset {at}"));
+    }
+    // Every line but the refused one is recorded, the one after it too.
+    let lines = w.section::<Limits>().lines as i64;
+    let (recorded, position): (i64, i64) = conn
+        .query_row(
+            "SELECT lines, byte_offset FROM transcript_sources",
+            [],
+            |r| Ok((r.get(0)?, r.get(1)?)),
+        )
+        .map_err(|e| e.to_string())?;
+    let stored: i64 = conn
+        .query_row("SELECT count(*) FROM transcript_places", [], |r| r.get(0))
+        .map_err(|e| e.to_string())?;
+    if recorded != lines || stored != lines - 1 {
+        return Err(format!(
+            "{recorded} lines are ingested and {stored} places hold an event, of {lines} lines"
+        ));
+    }
+    if position <= at as i64 + LINE_LIMIT as i64 {
+        return Err(format!("the source stays at offset {position}"));
     }
     run_core(w, &["status", "--json"], None)?;
     let out = last_run(w)?;

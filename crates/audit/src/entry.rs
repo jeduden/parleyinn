@@ -87,8 +87,8 @@ pub enum Counter {
     /// A hook input nested deeper than 64 levels and was refused
     /// (SEC-05).
     HookInputTooDeep,
-    /// A transcript line over 4 MiB was refused whole, the source left
-    /// short at it (SEC-05, REC-03).
+    /// A transcript line over 4 MiB was not stored, its place recorded
+    /// and ingest continued past it (SEC-05, REC-03).
     TranscriptLineTooLarge,
     /// A transcript source's parsed structure or harness account
     /// identifiers could not fit under its source-memory ceiling, so
@@ -234,6 +234,10 @@ pub enum Counter {
     /// A purge could not read a transcript to recompute its source's
     /// consumed-prefix hash, which then confirms nothing (SEC-31, I6).
     TranscriptPrefixUnconfirmed,
+    /// A transcript beside the one an ingest read could not be read to
+    /// learn its `uuid`s, so a repeated line may have been recorded as its
+    /// own event; the ingest went on without it (REC-04, I6).
+    IngestSourceUnread,
     /// A retention policy aged a range out and the node purged it
     /// (REC-15, SEC-22).
     RetentionPurged,
@@ -312,6 +316,7 @@ impl Counter {
             Self::PurgeRefused => "purge_refused",
             Self::PurgeUnfinished => "purge_unfinished",
             Self::TranscriptPrefixUnconfirmed => "transcript_prefix_unconfirmed",
+            Self::IngestSourceUnread => "ingest_source_unread",
             Self::RetentionPurged => "retention_purged",
             Self::RetentionFailed => "retention_failed",
             Self::VerifyTimedOut => "verify_timed_out",
@@ -341,8 +346,8 @@ pub enum Occurrence<'a> {
         detail: &'static str,
         key: &'a str,
     },
-    /// An ingest refused a transcript line over its 4 MiB limit and left
-    /// the source short at it (SEC-05, REC-03): the entry names the
+    /// An ingest did not store a transcript line over its 4 MiB limit,
+    /// recorded its place and went on past it (SEC-05, REC-03): the entry names the
     /// source by `source` (shown only when it holds nothing but the
     /// characters a name can), the line's byte `offset` and its `length`,
     /// never its text.
@@ -377,7 +382,7 @@ pub enum Occurrence<'a> {
 }
 
 /// What an entry says of a transcript line refused over the 4 MiB limit.
-pub const LINE_TOO_LARGE: &str = "transcript line refused over the 4 MiB limit; ingest position stays before the line (SEC-05, REC-03)";
+pub const LINE_TOO_LARGE: &str = "transcript line over the 4 MiB limit not stored; its place is recorded and ingest continues past it (SEC-05)";
 
 /// The kind of an entry noting a principal act.
 pub const PRINCIPAL_ACT: &str = "principal_act";

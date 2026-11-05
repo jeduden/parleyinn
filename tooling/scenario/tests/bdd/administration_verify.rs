@@ -346,20 +346,22 @@ fn refused_line_offset(w: &mut World) -> Result<u64, String> {
 }
 
 #[given(
-    regex = r"^a transcript line over the 4 MiB limit was refused and the transcript is short at that line, until the limit is raised or the source is replaced$"
+    regex = r"^a transcript line over the 4 MiB limit was not stored and ingest went on past it, recording its place$"
 )]
 fn line_refused(w: &mut World) -> Result<(), String> {
     crate::recall::record_runs(w)?;
-    // Ingest consumed every line before it and stopped at its start: the
-    // position stands there, as a refusal leaves it (SEC-05, REC-03).
-    let mut text = fs::read(transcript(w, "run-a")?).map_err(|e| e.to_string())?;
+    // Ingest passes the line, records its place and moves the position
+    // past it (SEC-05, REC-03).
+    let path = transcript(w, "run-a")?;
+    let mut text = fs::read(&path).map_err(|e| e.to_string())?;
     text.extend(vec![b'x'; (4 << 20) + 1]);
     text.push(b'\n');
-    fs::write(transcript(w, "run-a")?, text).map_err(|e| e.to_string())
+    fs::write(&path, text).map_err(|e| e.to_string())?;
+    ingest(w, &path)
 }
 
 #[then(
-    regex = r#"^the output reports the transcript "([^"]+)" short at a refused line, naming its offset and the counter `transcript_line_too_large`, and names no failed check$"#
+    regex = r#"^the output reports the transcript "([^"]+)" holds a line over the limit, naming its offset and the counter `transcript_line_too_large`, and names no failed check$"#
 )]
 fn reports_refused(w: &mut World, name: String) -> Result<(), String> {
     let offset = refused_line_offset(w)? - ((4 << 20) + 2);
@@ -370,8 +372,10 @@ fn reports_refused(w: &mut World, name: String) -> Result<(), String> {
         String::from_utf8_lossy(&out.stderr)
     );
     let (_, after) = shown
-        .split_once("short at a refused line")
-        .ok_or_else(|| format!("verify reports no transcript short at a refused line: {shown}"))?;
+        .split_once("holding a line over the 4 MiB limit")
+        .ok_or_else(|| {
+            format!("verify reports no transcript holding a line over the limit: {shown}")
+        })?;
     let at = format!("{name}.jsonl at offset {offset} ");
     if !after.contains(&at) || !after.contains("`transcript_line_too_large`") {
         return Err(format!(
