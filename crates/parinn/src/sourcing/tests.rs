@@ -39,7 +39,7 @@ fn the_ingest_report_names_the_most_it_held_in_memory() {
 
     let report: serde_json::Value = serde_json::from_str(&out).unwrap();
     let held = report["read_window_high_water"].as_u64().unwrap();
-    assert!(held >= 8 && held <= 64 << 20, "{held}");
+    assert!((8..=64 << 20).contains(&held), "{held}");
 }
 
 #[test]
