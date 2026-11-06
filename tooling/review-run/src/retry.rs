@@ -13,6 +13,7 @@ use std::path::Path;
 use std::time::Duration;
 
 use review_eval::component::Kind;
+use review_eval::log::RunLog;
 use review_gate::report::{Problem, assemble, report_check};
 
 use crate::LOGS;
@@ -105,11 +106,10 @@ pub(crate) fn run_one(r: &Review, c: &Controls, unit: &Unit) -> (AgentRun, Optio
     // A run that cost money is paid for: a second run would start from
     // scratch, pay again and meet the same limit. What it stated is its
     // report, and the review names it as it is.
-    if class == Class::Again && paid(&first) {
+    if let (Class::Again, Some(why)) = (class, charged(&first.log)) {
         (r.progress)(&format!(
-            "{}; not run again: it cost {:.4} USD, so what it stated stands",
-            describe(&first),
-            first.log.cost
+            "{}; not run again: {why}, so what it stated stands",
+            describe(&first)
         ));
         return (first, report);
     }
@@ -128,9 +128,26 @@ pub(crate) fn run_one(r: &Review, c: &Controls, unit: &Unit) -> (AgentRun, Optio
     again(r, c, unit, first, note.as_deref())
 }
 
-/// Whether `run` was charged: it made model calls or reported a cost.
-fn paid(run: &AgentRun) -> bool {
-    run.log.cost > 0.0 || run.log.turns > 0
+/// Why the run `log` reads was charged: it reported a cost, or, with
+/// no cost in it, as a run killed at its deadline or crashed before its
+/// result has none, it made model calls that used tokens; none when it
+/// cost nothing. The turns a result counts are no charge: a call the
+/// API refused counts one and costs nothing.
+fn charged(log: &RunLog) -> Option<String> {
+    if log.cost > 0.0 {
+        return Some(format!("it cost {:.4} USD", log.cost));
+    }
+    let calls: u64 = log
+        .usage
+        .values()
+        .filter(|u| u.fresh + u.cache_write + u.cache_read + u.output > 0)
+        .map(|u| u.calls)
+        .sum();
+    match calls {
+        0 => None,
+        1 => Some("it made 1 model call".to_owned()),
+        n => Some(format!("it made {n} model calls")),
+    }
 }
 
 /// The first attempt, as the attempts after it need it.

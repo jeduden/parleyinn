@@ -367,3 +367,74 @@ fn a_part_s_refused_report_stands_and_the_merge_names_it() {
     assert!(report.contains(MALFORMED), "{report}");
     assert!(refusal(&report, &rust.log.answer, &known()).is_some());
 }
+
+/// One model call that used tokens, and no result: a run killed at its
+/// deadline or crashed after the model was called.
+const CALLED: &str = r#"{"type":"assistant","parent_tool_use_id":null,"message":{"id":"m1","model":"claude-haiku-5-5","usage":{"input_tokens":10,"output_tokens":5},"content":[{"type":"text","text":"src/a.rs:3 — if not addressed: a long line hides a bug — I9"}]}}"#;
+
+/// A result that failed before any model call: no cost, one turn
+/// counted, no usage.
+const FREE: &str = r#"{"type":"result","subtype":"error_during_execution","is_error":true,"result":"","total_cost_usd":0,"num_turns":1}"#;
+
+#[test]
+fn a_run_is_charged_by_its_model_usage_or_its_cost_never_by_its_turns() {
+    let parse = review_eval::log::parse;
+
+    assert_eq!(
+        charged(&parse(CALLED)).as_deref(),
+        Some("it made 1 model call")
+    );
+    assert_eq!(charged(&parse(FREE)), None);
+    assert_eq!(charged(&review_eval::log::RunLog::default()), None);
+    let costly = parse(&fake::log("x", 0.25));
+    assert_eq!(charged(&costly).as_deref(), Some("it cost 0.2500 USD"));
+    let two = parse(&format!("{CALLED}\n{}", CALLED.replace("\"m1\"", "\"m2\"")));
+    assert_eq!(charged(&two).as_deref(), Some("it made 2 model calls"));
+}
+
+#[test]
+fn a_run_with_model_calls_and_no_result_is_charged_and_not_run_again() {
+    let dir = workdir(false);
+
+    let (runs, lines, host) = review_of(dir.path(), |c| {
+        if !prompt_of(c).contains("a specialist") {
+            return fake::generalist(c);
+        }
+        fake::write_log(c, &format!("{CALLED}\n"));
+        Ok(Output {
+            timed_out: true,
+            ..Output::default()
+        })
+    });
+
+    let rust = &runs[0];
+    assert_eq!(rust.failure.as_deref(), Some("its run ended with deadline"));
+    assert_eq!(rust.attempts, 1);
+    assert_eq!(specialist_prompts(&host).len(), 1);
+    assert!(
+        lines
+            .iter()
+            .any(|l| l.contains("not run again: it made 1 model call")),
+        "{lines:?}"
+    );
+}
+
+#[test]
+fn a_failure_that_cost_nothing_runs_once_more_whatever_turns_it_counts() {
+    let dir = workdir(false);
+
+    let (runs, _, host) = review_of(dir.path(), |c| {
+        if !prompt_of(c).contains("a specialist") {
+            return fake::generalist(c);
+        }
+        if prompt_of(c).contains("previous attempt") {
+            return fake::specialist(c);
+        }
+        fake::write_log(c, &format!("{FREE}\n"));
+        Ok(Output::default())
+    });
+
+    assert!(runs[0].answered(), "{:?}", runs[0].failure);
+    assert_eq!(runs[0].attempts, 2);
+    assert_eq!(specialist_prompts(&host).len(), 2);
+}
