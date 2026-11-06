@@ -24,31 +24,31 @@ fn size_list_cases() -> Vec<Case> {
         case(
             "a file past its limit dropped from the size list",
             "ENG-34",
-            Injection::replace(SIZE_LIST, "crates/store/src/lib.rs 2123\n", ""),
+            Injection::replace(SIZE_LIST, "crates/store/src/lib.rs 2116\n", ""),
             scenario("ENG-34"),
-            "crates/store/src/lib.rs holds 2123 lines, past the limit of 1000 for Rust",
+            "crates/store/src/lib.rs holds 2116 lines, past the limit of 1000 for Rust",
         ),
         case(
             "a listed file grown past its listed size",
             "ENG-34",
             Injection::replace(
                 SIZE_LIST,
-                "features/lane.feature 594",
+                "features/lane.feature 596",
                 "features/lane.feature 590",
             ),
             scenario("ENG-34"),
-            "features/lane.feature grew from its listed 590 lines to 594",
+            "features/lane.feature grew from its listed 590 lines to 596",
         ),
         case(
             "a listed file shrunk whose listed lines were not lowered",
             "ENG-34",
             Injection::replace(
                 SIZE_LIST,
-                "features/lane.feature 594",
+                "features/lane.feature 596",
                 "features/lane.feature 598",
             ),
             scenario("ENG-34"),
-            "features/lane.feature holds 594 lines, fewer than its listed 598",
+            "features/lane.feature holds 596 lines, fewer than its listed 598",
         ),
         case(
             "a file that fits its limit left in the size list",

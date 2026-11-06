@@ -87,7 +87,12 @@ pub(crate) fn apply_opened(
     entropy: &mut dyn Entropy,
 ) {
     match opened {
-        Ok((mut store, node)) => apply(ctx, &mut store, &node, settings, entropy),
+        Ok((store, node)) => {
+            // A purge recomputes each source's prefix hash over its
+            // transcript (SEC-31).
+            let mut store = store.with_transcripts(ingest::read::transcript);
+            apply(ctx, &mut store, &node, settings, entropy);
+        }
         Err(e) => failed(ctx, &e),
     }
 }
@@ -104,6 +109,7 @@ fn audit(ctx: &Context, applied: &Applied) {
             counter: Some(Counter::RetentionPurged),
         };
         crate::logged("audit a retention purge", ctx.audit(&occurrence));
+        crate::purge::audit_unconfirmed(ctx, &done.finished);
         if !done.finished.vacuumed {
             crate::purge::audit_residue(ctx);
         }

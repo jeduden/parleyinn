@@ -19,8 +19,8 @@ Feature: Recall (RCL)
     Then it returns "session_binding" as "held" or "not_held", "search_index" as "readable" or "unreadable", "searches_timed_out" as a count and "version", and no recalled content or envelope, whether or not a run is found for the call
     And the call is recorded as no recall event
 
-  @RCL-02 @P0 @pending
-  Scenario Outline: event search honours its filters and caps hits at k
+  @RCL-02 @P0
+  Scenario Outline: event search filters exact provenance and provenance families and caps hits at k
     Given an isolated ParleyInn home
     And an agent run with a Claude Code transcript "mixed-provenance"
     When the agent calls the MCP tool "event_search" with <args>
@@ -34,6 +34,7 @@ Feature: Recall (RCL)
       | query "deploy", k 50                 | 50   |
       | query "deploy", k 500                | 50   |
       | query "deploy", scope "rooms"        | 10   |
+      | query "deploy", run "mixed-provenance" | 10   |
       | query "deploy", provenance ["web"]   | 10   |
       | query "deploy", kind ["tool_result"] | 10   |
       | query "deploy", trust "trusted"      | 10   |

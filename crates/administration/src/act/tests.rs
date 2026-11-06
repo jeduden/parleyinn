@@ -476,3 +476,21 @@ fn a_cut_quarantine_needs_a_terminal_alone_and_a_purge_the_risk_acceptance_too()
         Err(Refusal::OpenRisks { .. })
     ));
 }
+
+#[test]
+fn an_ingest_of_a_named_path_is_a_widening_act_that_names_the_path_by_digest() {
+    let digest = Digest::of(&[b"/tmp/elsewhere.jsonl"]);
+    let act = Act::IngestPath {
+        path_digest: digest,
+    };
+
+    assert_eq!(act.name(), "ingest_path");
+    assert_eq!(act.class(), Class::Widening);
+    assert_eq!(
+        act.content(),
+        json!({
+            "act": "ingest_path", "class": "widening", "principal_surface": "cli",
+            "path_digest": digest.to_hex(),
+        })
+    );
+}

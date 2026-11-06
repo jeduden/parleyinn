@@ -50,7 +50,7 @@ Feature: Record (REC)
     Then the record contains exactly 50 events, one per line of "main-run"
     And the ingest position of "main-run" stores its byte length and the SHA-256 of its consumed prefix
 
-  @REC-04 @P0 @I1 @I10 @pending
+  @REC-04 @P0 @I1 @I10
   Scenario: events are attributed to the run of their transcript, not the hook input, and a line a harness fork repeats is recorded once, in its owning run's writer, whichever transcript is ingested first
     Given an isolated ParleyInn home
     And an agent run with a Claude Code transcript "parent-run"
@@ -129,7 +129,7 @@ Feature: Record (REC)
       | truncated to 10 lines                 |
       | rewritten with a different first line |
 
-  @REC-08 @P0 @I1 @I6 @pending
+  @REC-08 @P0 @I1 @I6
   Scenario: the record outlives its transcript sources and verify reports transcript sources lost before full ingestion
     Given an isolated ParleyInn home
     And an agent run with a Claude Code transcript "main-run"
@@ -173,7 +173,7 @@ Feature: Record (REC)
     When the agent calls the MCP tool "event_search" with query "wombat"
     Then the hits are ranked by score, the "user" event naming "wombat" five times above the one naming it once
 
-  @REC-12 @P0 @I10 @pending
+  @REC-12 @P0 @I10
   Scenario: events are appended in transcript order and seq alone defines order
     Given an isolated ParleyInn home
     And an agent run with a Claude Code transcript "main-run"
@@ -334,6 +334,7 @@ Feature: Record (REC)
     Then every event of "pre-install" carries the "ingested" origin, freshness mark and trust mark with its transcript source and ingest position, shown on every surface, and none is shown as witnessed
     And the "user" event and the "harness_meta" event from "pre-install" have trust "untrusted"
     And this node records "elsewhere" as an ingested run in the principal's personal room, shown as "ingested", and every event of it has trust "untrusted"
+    And ingesting "elsewhere" is recorded as the person's widening principal act at a terminal (OWN-11, OWN-12), and the same path named in a hook input or a transcript line is rejected as outside the allowed roots (SEC-18)
     And every event "parinn ingest" read past the ingest marker of "cut-short" carries the "ingested" origin and has trust "untrusted"
 
   @REC-23 @P2 @I2 @I4 @I6 @pending
@@ -370,7 +371,7 @@ Feature: Record (REC)
     And that quarantine stays in force on the node until a release there
     And that configuration acceptance takes no effect on the node: the deployment mode stays "automation" until the person accepts the configuration there
     And an audit entry records the node identity change
-    And a structural node identity change event in the new device seat in the personal room carries only the fingerprints of the replaced and new device key or token key, followed by the new key's inception, which starts a new key event log
+    And a structural node identity change event in the new device seat in the personal room carries only the fingerprints of the replaced and new device key or token key and the chain head of the key event log it leaves (PRV-12), followed by the new key's inception, which starts a new key event log
     And the new seat's writer reads origin "peer" until a confirm signed by a managed-policy confirmation key names that inception, then "witnessed"
     And no event is appended under the old device key or the old seat key
     And an unavailable node identity value read again within the hook budgets and found unchanged counts as no change
@@ -395,7 +396,7 @@ Feature: Record (REC)
     And every address, commitment and chain head is unchanged
     And "parinn verify" exits 0
 
-  @REC-26 @P0 @I1 @I2 @I6 @pending
+  @REC-26 @P0 @I1 @I2 @I6
   Scenario Outline: a transcript line or hook input whose shape differs from its harness version's is kept, counted and audited as format drift
     Given an isolated ParleyInn home
     And deployment mode "interactive"

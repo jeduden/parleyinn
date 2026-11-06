@@ -5,6 +5,12 @@
 //! its writer holds. CI runs `PARINN_SOAK_EVENTS` events, 10,000 by
 //! default; the nightly job runs 1,000,000 in a release build.
 //!
+//! `PARINN_SOAK_STORE` names a store to fill instead of a temporary
+//! one, and `PARINN_SOAK_WRITERS` a file of 50 writer ids, one per line,
+//! whose seats the node certified: the ENG-09 scenario points them at
+//! an isolated home's store, then runs `parinn verify` over what the
+//! writers recorded.
+//!
 //! An append that waits past the store's busy deadline fails whole and
 //! appends nothing. The MCP server counts it as `live_ingest_failed`
 //! and reads the transcript again on its next pass; each writer here
@@ -39,8 +45,17 @@ const EVENTS: usize = 10_000;
 /// Events per append.
 const BATCH: usize = 100;
 
-fn writer(n: u8) -> WriterId {
-    WriterId::derive(&[n; 32])
+/// The 50 writers: the ids `PARINN_SOAK_WRITERS` lists, or ones derived
+/// from a key each.
+fn writers() -> Vec<WriterId> {
+    match std::env::var_os("PARINN_SOAK_WRITERS") {
+        Some(file) => std::fs::read_to_string(file)
+            .unwrap()
+            .lines()
+            .map(|l| WriterId::parse(l).unwrap())
+            .collect(),
+        None => (0..WRITERS).map(|n| WriterId::derive(&[n; 32])).collect(),
+    }
 }
 
 fn events(from: usize, n: usize) -> Vec<NewEvent> {
@@ -79,12 +94,12 @@ fn opened(path: &Path, w: u8) -> (Store, usize) {
 /// Appends `per` events to writer `w`'s log through a connection of its
 /// own, retrying an append the busy deadline failed: how many it
 /// retried.
-fn append_all(path: &Path, w: u8, per: usize) -> usize {
+fn append_all(path: &Path, w: u8, id: WriterId, per: usize) -> usize {
     let (mut store, mut retried) = opened(path, w);
     let mut done = 0;
     while done < per {
         let n = BATCH.min(per - done);
-        match store.append(writer(w), &events(done, n)) {
+        match store.append(id, &events(done, n)) {
             Ok(_) => done += n,
             Err(e) => {
                 assert!(busy(&e), "writer {w}: {e}");
@@ -98,12 +113,12 @@ fn append_all(path: &Path, w: u8, per: usize) -> usize {
 
 /// Has every writer append `per` events on a thread of its own, all at
 /// once: how many appends they retried.
-fn soak(path: &Path, per: usize) -> usize {
+fn soak(path: &Path, ids: &[WriterId], per: usize) -> usize {
     let retried = AtomicUsize::new(0);
     std::thread::scope(|scope| {
-        for w in 0..WRITERS {
+        for (w, id) in (0..WRITERS).zip(ids.iter().copied()) {
             let retried = &retried;
-            scope.spawn(move || retried.fetch_add(append_all(path, w, per), Ordering::Relaxed));
+            scope.spawn(move || retried.fetch_add(append_all(path, w, id, per), Ordering::Relaxed));
         }
     });
     retried.into_inner()
@@ -117,10 +132,13 @@ fn fifty_writers_appending_at_once_keep_every_log_gap_free_and_every_address_uni
         .unwrap_or(EVENTS);
     let per = total / usize::from(WRITERS);
     let dir = TempDir::new().unwrap();
-    let path = dir.path().join("store.db");
+    let path = std::env::var_os("PARINN_SOAK_STORE")
+        .map_or_else(|| dir.path().join("store.db"), std::path::PathBuf::from);
     Store::open(&path).unwrap();
 
-    let retried = soak(&path, per);
+    let ids = writers();
+    assert_eq!(ids.len(), usize::from(WRITERS), "writers");
+    let retried = soak(&path, &ids, per);
     println!(
         "{total} events by {WRITERS} writers, {retried} opens and appends retried past the busy deadline"
     );
@@ -128,7 +146,7 @@ fn fifty_writers_appending_at_once_keep_every_log_gap_free_and_every_address_uni
     let store = Store::open(&path).unwrap();
     let mut addresses: BTreeSet<Address> = BTreeSet::new();
     let mut record = BTreeMap::new();
-    for w in store.writers().unwrap() {
+    for &w in &ids {
         let links: Vec<_> = store.log(w).unwrap().into_iter().map(|s| s.link).collect();
         let seqs: Vec<u64> = links.iter().map(|l| l.header.address.seq.get()).collect();
         assert_eq!(seqs, (1..=per as u64).collect::<Vec<_>>(), "{w}");
@@ -144,5 +162,11 @@ fn fifty_writers_appending_at_once_keep_every_log_gap_free_and_every_address_uni
     }
     assert_eq!(record.len(), usize::from(WRITERS));
     assert_eq!(addresses.len(), per * usize::from(WRITERS));
+    // A store a node certified the writers in holds its device's log
+    // too, which the appends' cited heads may name.
+    for w in store.writers().unwrap() {
+        let links = store.log(w).unwrap().into_iter().map(|s| s.link);
+        record.entry(w).or_insert_with(|| links.collect());
+    }
     assert_eq!(chain::check_heads(&record), Ok(()));
 }

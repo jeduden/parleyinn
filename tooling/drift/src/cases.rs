@@ -151,6 +151,7 @@ pub fn cases() -> Vec<Case> {
         ci_gates::cases(),
         file_size_cases(),
         previous::review_previous_cases(),
+        soak_cases(),
         // Last: its cases edit source the later cases would run stale.
         license_text_cases(),
     ]

@@ -116,15 +116,18 @@ Every other verb that records an act takes a principal act, signed at the
 principal surface by its device's device key once PRV-10 ships, and recorded on
 that device's device seat in the room it acts on, which the node first joins
 without admission when its principal has a member seat there (OWN-02, LANE-31);
-`parinn ingest`, `import`, `rebuild`, `migrate`, `canary`, `doctor`,
+`import`, `rebuild`, `migrate`, `canary`, `doctor`,
 `backup create`, `head-receipt make`, `ui`, but `ui --phone`, and `launch`
-record no principal act, and `install` and `uninstall` only the acts their rows
-name. One that acts on no room or on a room its principal has no member seat
-in, or that a paired phone signs, goes to that device seat in the personal room,
-naming the room, which shows it by address (LANE-29). Each passes OWN-12 in its
-OWN-11 class, the same on every principal surface. A verb marked widening also
-needs the controlling terminal and, where required, a presence proof (OWN-11).
-No verb takes an expire act: a node records it with its device key (LANE-25).
+record no principal act (but `parinn ingest --path` to a path outside the
+transcript roots records a widening principal act, OWN-11, OWN-12, REC-22,
+SEC-18; `parinn ingest` without it records none), and `install` and `uninstall`
+only the acts their rows name. One that acts on no room or on a room its
+principal has no member seat in, or that a paired phone signs, goes to that
+device seat in the personal room, naming the room, which shows it by address
+(LANE-29). Each passes OWN-12 in its OWN-11 class, the same on every principal
+surface. A verb marked widening also needs the controlling terminal and, where
+required, a presence proof (OWN-11). No verb takes an expire act: a node records
+it with its device key (LANE-25).
 
 `held-request answer` is the verb for held requests, `verdict record` for
 verdicts, and `witness-check start` for confirming a command taken from an

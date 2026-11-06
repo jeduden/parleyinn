@@ -6,7 +6,7 @@
 //! its entries.
 //!
 //! The row that alters a landmark row cannot run in M1: no landmark is
-//! recorded before M2 (LMK-01), so there is none to alter. Its step
+//! recorded before M3 (LMK-01), so there is none to alter. Its step
 //! fails with that finding, and the scenario stays `@pending`. The rows
 //! of a source an ingest resumes, of a stale ingest marker and of the
 //! consumed prefix, and of an index derivation past verify's deadline,
@@ -14,7 +14,9 @@
 //! stopped after its erasure was recorded run here.
 
 use std::fs;
+use std::os::unix::fs::PermissionsExt;
 
+use ::record::digest::Digest;
 use ::record::id::{Address, Seq, WriterId};
 use cucumber::{given, then};
 use rusqlite::Connection;
@@ -22,7 +24,7 @@ use serde_json::json;
 
 use crate::World;
 use crate::erasure::purge_run_events;
-use crate::record::{home, last_run, run_core};
+use crate::record::{home, last_run, run_core, set_env};
 use crate::record_transcript::{ingest, transcript_events};
 use crate::security_redaction::{append, transcript};
 
@@ -91,7 +93,7 @@ fn payload_altered(w: &mut World) -> Result<(), String> {
 
 #[given(regex = r"^a landmark row has been altered$")]
 fn landmark_altered(_w: &mut World) -> Result<(), String> {
-    Err("no landmark is recorded before M2 (LMK-01): the store holds none to alter".to_owned())
+    Err("no landmark is recorded before M3 (LMK-01): the store holds none to alter".to_owned())
 }
 
 #[given(regex = r"^a trust level has been altered in place$")]
@@ -242,6 +244,175 @@ fn purge_pending_reported(w: &mut World) -> Result<(), String> {
         .map_err(|e| e.to_string())?;
     if kept != 1 {
         return Err(format!("verify repaired: the journal holds {kept} steps"));
+    }
+    let vacuum: i64 = conn
+        .query_row(
+            "SELECT count(*) FROM purge_journal WHERE kind = 'vacuum'",
+            [],
+            |r| r.get(0),
+        )
+        .map_err(|e| e.to_string())?;
+    let residue: i64 = conn
+        .query_row(
+            "SELECT count(*) FROM idx.events_fts WHERE events_fts MATCH 'residue'",
+            [],
+            |r| r.get(0),
+        )
+        .map_err(|e| e.to_string())?;
+    if vacuum != 1 || residue != 1 {
+        return Err(format!(
+            "verify repaired: {vacuum} vacuum steps and {residue} residue entries remain"
+        ));
+    }
+    Ok(())
+}
+
+/// The ten-minute bound on an ingest marker, in milliseconds (ADM-09).
+const MARKER_CEILING_MS: u64 = 10 * 60 * 1000;
+
+/// The wall clock `parinn verify` reads, in milliseconds.
+fn now_ms() -> Result<u64, String> {
+    let since = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_err(|e| e.to_string())?;
+    u64::try_from(since.as_millis()).map_err(|e| e.to_string())
+}
+
+/// The run's first line consumed and its ingest marker left there at
+/// `marked_at`, as an ingest stopped after its first line leaves it,
+/// with the transcript holding more lines past it.
+fn marker_after_first_line(w: &mut World, marked_at: u64) -> Result<(), String> {
+    crate::recall::record_runs(w)?;
+    let line = json!({"type": "atis-latch", "atis": "a line past the marker", "sessionId": "s"});
+    append(w, "run-a", &line)?;
+    let bytes = fs::read(transcript(w, "run-a")?).map_err(|e| e.to_string())?;
+    let first = bytes
+        .iter()
+        .position(|b| *b == b'\n')
+        .ok_or("the transcript holds no whole line")?
+        + 1;
+    let prefix = Digest::of(&[&bytes[..first]]).to_hex();
+    let conn = Connection::open(home(w)?.store()).map_err(|e| e.to_string())?;
+    conn.execute(
+        "UPDATE transcript_sources SET byte_offset = ?1, prefix_hash = ?2, lines = 1, seen = ?4,
+             marked_at = ?3",
+        rusqlite::params![first as i64, prefix, marked_at as i64, bytes.len() as i64],
+    )
+    .map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+#[given(
+    regex = r"^an ingest killed during ingestion left an ingest marker short of the transcript's end$"
+)]
+fn marker_fresh(w: &mut World) -> Result<(), String> {
+    let now = now_ms()?;
+    marker_after_first_line(w, now)
+}
+
+#[given(
+    regex = r"^an ingest left an ingest marker short of the transcript's end over 10 minutes ago on the node's wall clock and no running MCP server holds the transcript$"
+)]
+fn marker_stale(w: &mut World) -> Result<(), String> {
+    let then = now_ms()?.saturating_sub(MARKER_CEILING_MS + 60_000);
+    marker_after_first_line(w, then)
+}
+
+#[given(regex = r"^the transcript holds fewer bytes than its ingest position$")]
+fn transcript_shorter(w: &mut World) -> Result<(), String> {
+    crate::recall::record_runs(w)?;
+    let path = transcript(w, "run-a")?;
+    let bytes = fs::read(&path).map_err(|e| e.to_string())?;
+    fs::write(&path, &bytes[..bytes.len() / 2]).map_err(|e| e.to_string())
+}
+
+#[given(
+    regex = r"^the transcript's bytes up to its ingest position differ from its consumed-prefix hash$"
+)]
+fn prefix_altered(w: &mut World) -> Result<(), String> {
+    let (conn, _) = damaged(w)?;
+    conn.execute("UPDATE transcript_sources SET prefix_hash = ?1", [ZEROS])
+        .map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+#[then(
+    regex = r#"^the output reports the transcript "([^"]+)" short of its end, which ingest resumes$"#
+)]
+fn reports_short(w: &mut World, name: String) -> Result<(), String> {
+    let out = last_run(w)?;
+    let shown = format!(
+        "{}{}",
+        String::from_utf8_lossy(&out.stdout),
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let (_, after) = shown
+        .split_once("short of their end, which ingest resumes: ")
+        .ok_or_else(|| format!("verify reports no transcript short of its end: {shown}"))?;
+    if after.contains(&format!("{name}.jsonl")) {
+        return Ok(());
+    }
+    Err(format!(
+        "verify does not name {name} short of its end: {shown}"
+    ))
+}
+
+/// The start markers the scenario's running MCP servers hold, locked as
+/// a server locks its own, until the process ends.
+static HELD_MARKERS: std::sync::Mutex<Vec<fs::File>> = std::sync::Mutex::new(Vec::new());
+
+#[given(
+    regex = r"^a running MCP server's live ingest is short of the transcript's end and left no ingest marker yet$"
+)]
+fn server_holds_transcript(w: &mut World) -> Result<(), String> {
+    crate::recall::record_runs(w)?;
+    let line = json!({"type": "atis-latch", "atis": "a line the server has yet to ingest", "sessionId": "s"});
+    append(w, "run-a", &line)?;
+    let conn = Connection::open(home(w)?.store()).map_err(|e| e.to_string())?;
+    let path: String = conn
+        .query_row("SELECT path FROM transcript_sources", [], |r| r.get(0))
+        .map_err(|e| e.to_string())?;
+    let dir = home(w)?.root().join("mcp");
+    fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    fs::set_permissions(&dir, fs::Permissions::from_mode(0o700)).map_err(|e| e.to_string())?;
+    let marker = dir.join("running.marker");
+    fs::write(&marker, path.as_bytes()).map_err(|e| e.to_string())?;
+    fs::set_permissions(&marker, fs::Permissions::from_mode(0o600)).map_err(|e| e.to_string())?;
+    let file = fs::File::open(&marker).map_err(|e| e.to_string())?;
+    file.lock().map_err(|e| e.to_string())?;
+    HELD_MARKERS.lock().map_err(|e| e.to_string())?.push(file);
+    Ok(())
+}
+
+#[given(regex = r"^deriving the search index again outlasts verify's deadline$")]
+fn derivation_outlasts_deadline(w: &mut World) -> Result<(), String> {
+    crate::recall::record_runs(w)?;
+    set_env(w, "PARINN_TEST_CLOCK", "1000000");
+    set_env(w, "PARINN_TEST_CLOCK_STEP", "61");
+    Ok(())
+}
+
+#[then(
+    regex = r"^the output says the search index was not derived again in time and is unchecked, names no failed check and does not report the search index passed; verify audits it and counts it once as timed out$"
+)]
+fn index_unchecked(w: &mut World) -> Result<(), String> {
+    let out = last_run(w)?;
+    let shown = format!(
+        "{}{}",
+        String::from_utf8_lossy(&out.stdout),
+        String::from_utf8_lossy(&out.stderr)
+    );
+    if !shown.contains("the search index was not derived again in time, so it is unchecked") {
+        return Err(format!(
+            "verify does not say the index is unchecked: {shown}"
+        ));
+    }
+    if shown.contains("parinn verify: ") || shown.contains("search index passed") {
+        return Err(format!("verify names a failed or passed check: {shown}"));
+    }
+    let timed_out = crate::record_search::audited(w, "verify_timed_out")?;
+    if timed_out != 1 {
+        return Err(format!("{timed_out} audit entries count verify_timed_out"));
     }
     Ok(())
 }

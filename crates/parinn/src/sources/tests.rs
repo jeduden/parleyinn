@@ -20,6 +20,7 @@ fn source(path: &Path, offset: u64, seen: u64) -> Source {
             lines: 1,
             seen,
         },
+        purged: Vec::new(),
         held_since: None,
         lost: false,
         marked_at: NOW,
@@ -117,13 +118,15 @@ fn a_store_holding_no_schema_yet_has_no_sources() {
 
 /// What `parinn verify` finds of each of `files` now, by its bytes; any
 /// other path is gone.
-fn files(files: &[(&Path, &[u8])]) -> impl Fn(&Path, u64) -> Found + use<> {
+fn files(files: &[(&Path, &[u8])]) -> impl Fn(&Path, u64, &[Span]) -> Found + use<> {
     let files: Vec<(PathBuf, Vec<u8>)> = files
         .iter()
         .map(|(p, b)| (p.to_path_buf(), b.to_vec()))
         .collect();
-    move |path, offset| match files.iter().find(|(p, _)| p == path) {
-        Some((_, bytes)) => scan(bytes.as_slice(), offset).map_or(Found::Unreadable, Found::File),
+    move |path, offset, purged| match files.iter().find(|(p, _)| p == path) {
+        Some((_, bytes)) => {
+            scan(bytes.as_slice(), offset, purged).map_or(Found::Unreadable, Found::File)
+        }
         None => Found::Gone,
     }
 }
@@ -267,10 +270,10 @@ fn a_source_cut_below_its_position_or_no_longer_beginning_with_what_was_ingested
     ];
     let mut other = BODY.to_vec();
     other[0] = b'z';
-    let look = |path: &Path, offset| match path.to_str() {
+    let look = |path: &Path, offset, _: &[Span]| match path.to_str() {
         Some("/t/unread.jsonl") => Found::Unreadable,
-        Some("/t/cut.jsonl") => files(&[(cut, &BODY[..7])])(path, offset),
-        _ => files(&[(rewritten, &other)])(path, offset),
+        Some("/t/cut.jsonl") => files(&[(cut, &BODY[..7])])(path, offset, &[]),
+        _ => files(&[(rewritten, &other)])(path, offset, &[]),
     };
 
     let found = completeness(&sources, &[], &look, NOW);
@@ -291,15 +294,15 @@ fn a_source_cut_below_its_position_or_no_longer_beginning_with_what_was_ingested
 
 #[test]
 fn a_scan_hashes_only_the_consumed_prefix_and_finds_a_line_past_it() {
-    let at = scan(BODY, 10).unwrap();
+    let at = scan(BODY, 10, &[]).unwrap();
     assert_eq!(at.prefix, Some(Digest::of(&[&BODY[..10]])));
     assert!(at.unread_line);
 
-    let end = scan(BODY, 20).unwrap();
+    let end = scan(BODY, 20, &[]).unwrap();
     assert_eq!(end.prefix, Some(Digest::of(&[BODY])));
     assert!(!end.unread_line);
 
-    let short = scan(&BODY[..4], 10).unwrap();
+    let short = scan(&BODY[..4], 10, &[]).unwrap();
     assert_eq!(short.prefix, None);
     assert!(!short.unread_line);
 
@@ -307,6 +310,7 @@ fn a_scan_hashes_only_the_consumed_prefix_and_finds_a_line_past_it() {
     let past = scan(
         [long.as_slice(), b"\n"].concat().as_slice(),
         2 * CHUNK as u64 + 1,
+        &[],
     )
     .unwrap();
     assert_eq!(past.prefix, Some(Digest::of(&[&long[..2 * CHUNK + 1]])));
@@ -322,7 +326,7 @@ fn a_failing_read_fails_the_scan() {
         }
     }
 
-    assert!(scan(Failing, 1).is_err());
+    assert!(scan(Failing, 1, &[]).is_err());
 }
 
 #[test]
@@ -331,13 +335,19 @@ fn a_file_is_looked_at_by_its_bytes_and_a_missing_one_is_gone() {
     let path = dir.path().join("a.jsonl");
     std::fs::write(&path, BODY).unwrap();
 
-    match look(&path, 5) {
-        Found::File(at) => assert_eq!(at, scan(BODY, 5).unwrap()),
+    match look(&path, 5, &[]) {
+        Found::File(at) => assert_eq!(at, scan(BODY, 5, &[]).unwrap()),
         other => panic!("{other:?}"),
     }
-    assert!(matches!(look(&dir.path().join("none"), 5), Found::Gone));
-    assert!(matches!(look(dir.path(), 5), Found::Unreadable));
-    assert!(matches!(look(&path.join("below"), 5), Found::Unreadable));
+    assert!(matches!(
+        look(&dir.path().join("none"), 5, &[]),
+        Found::Gone
+    ));
+    assert!(matches!(look(dir.path(), 5, &[]), Found::Unreadable));
+    assert!(matches!(
+        look(&path.join("below"), 5, &[]),
+        Found::Unreadable
+    ));
 }
 
 #[test]
@@ -427,5 +437,125 @@ fn a_link_swapped_in_at_a_recorded_path_is_not_followed() {
     let path = dir.path().join("a.jsonl");
     std::os::unix::fs::symlink(&outside, &path).unwrap();
 
-    assert_eq!(look(&path, 5), Found::Unreadable);
+    assert_eq!(look(&path, 5, &[]), Found::Unreadable);
+}
+
+/// [`BODY`] then a line of `len` bytes, with or without its line break.
+fn body_then_line(len: usize, ended: bool) -> Vec<u8> {
+    let mut bytes = BODY.to_vec();
+    bytes.extend(vec![b'x'; len]);
+    if ended {
+        bytes.push(b'\n');
+    }
+    bytes
+}
+
+#[test]
+fn a_scan_finds_whether_a_whole_line_lies_past_the_position() {
+    for ended in [true, false] {
+        let at = scan(body_then_line(10, ended).as_slice(), 20, &[]).unwrap();
+        assert_eq!(at.unread_line, ended);
+    }
+    assert_eq!(scan(&BODY[..4], 20, &[]).unwrap().prefix, None);
+}
+
+#[test]
+fn a_source_whose_limit_line_was_replaced_by_a_short_one_is_short_again() {
+    let dir = TempDir::new().unwrap();
+    let path = on_disk(&dir, "run-a.jsonl", &[BODY, b"eeee\n"].concat());
+
+    let found = completeness(&[source(&path, 20, 26)], &[], &look, NOW);
+
+    assert_eq!(found.short, [path.to_string_lossy().into_owned()]);
+}
+
+/// A home whose only source was cut short and is now gone.
+fn with_a_lost_source() -> crate::tests::Process {
+    let p = crate::tests::Process::new();
+    let cut = crate::tests::transcript_in(&p, "-w-a", "cut-short.jsonl", b"{\"a\":1}\n{\"b\":");
+    assert_eq!(p.invoke(&["ingest", "--all"], &crate::tests::DEV).0, 0);
+    std::fs::remove_file(cut).unwrap();
+    p
+}
+
+fn lost_flags(p: &crate::tests::Process) -> Vec<bool> {
+    let store = Store::open(&p.parinn_home().join("store.db")).unwrap();
+    store.sources().unwrap().iter().map(|s| s.lost).collect()
+}
+
+#[test]
+fn a_lost_source_is_marked_only_once_its_audit_entry_is_written() {
+    let p = with_a_lost_source();
+    let home = Home::locate(Some(p.parinn_home().as_os_str()), None).unwrap();
+    let audit_dir = p.parinn_home().join("audit");
+    let moved = p.parinn_home().join("audit.moved");
+    std::fs::rename(&audit_dir, &moved).unwrap();
+    std::fs::write(&audit_dir, "").unwrap();
+    crate::tests::set_mode(&audit_dir, 0o600);
+    let mut stderr = Vec::new();
+    let redactor = Err("no rules".to_owned());
+
+    p.with_context(&crate::tests::DEV, |ctx| {
+        audit_lost(ctx, &home, &redactor, &mut stderr);
+    });
+
+    assert_eq!(lost_flags(&p), [false], "found again next time");
+    std::fs::remove_file(&audit_dir).unwrap();
+    std::fs::rename(&moved, &audit_dir).unwrap();
+    p.with_context(&crate::tests::DEV, |ctx| {
+        audit_lost(ctx, &home, &redactor, &mut stderr);
+    });
+    assert_eq!(lost_flags(&p), [true]);
+    let audit = crate::tests::audit_text(&p);
+    assert_eq!(
+        audit.matches("transcript_source_lost").count(),
+        1,
+        "{audit}"
+    );
+    assert!(!audit.contains("cut-short"), "{audit}");
+}
+
+#[test]
+fn a_lost_source_is_named_through_the_redactor() {
+    let p = with_a_lost_source();
+    let home = Home::locate(Some(p.parinn_home().as_os_str()), None).unwrap();
+    let redactor = Redactor::new(&["cut-[a-z]+".to_owned()])
+        .map(|r| r.0)
+        .map_err(|e| e.to_string());
+
+    p.with_context(&crate::tests::DEV, |ctx| {
+        audit_lost(ctx, &home, &redactor, &mut Vec::new());
+    });
+
+    let audit = crate::tests::audit_text(&p);
+    assert_eq!(
+        audit.matches("transcript_source_lost").count(),
+        1,
+        "{audit}"
+    );
+    assert!(!audit.contains("cut-short"), "{audit}");
+}
+
+#[test]
+fn a_source_that_cannot_be_marked_lost_says_so_on_stderr() {
+    let p = with_a_lost_source();
+    let home = Home::locate(Some(p.parinn_home().as_os_str()), None).unwrap();
+    rusqlite::Connection::open(p.parinn_home().join("store.db"))
+        .unwrap()
+        .execute_batch(
+            "CREATE TRIGGER no_loss BEFORE UPDATE ON transcript_sources
+             BEGIN SELECT RAISE(ABORT, 'refused'); END",
+        )
+        .unwrap();
+    let mut stderr = Vec::new();
+
+    p.with_context(&crate::tests::DEV, |ctx| {
+        audit_lost(ctx, &home, &Err(String::new()), &mut stderr);
+    });
+
+    let text = String::from_utf8(stderr).unwrap();
+    assert!(
+        text.starts_with("parinn ingest: mark a transcript source lost: "),
+        "{text}"
+    );
 }

@@ -161,8 +161,9 @@ fn the_filters_narrow_the_hits() {
 
     assert_eq!(count(&mut server, json!({"provenance": ["unparsed"]})), 1);
     assert_eq!(count(&mut server, json!({"provenance": ["web"]})), 0);
-    assert_eq!(count(&mut server, json!({"kind": ["unparsed_line"]})), 1);
-    assert_eq!(count(&mut server, json!({"kind": ["transcript_line"]})), 0);
+    assert_eq!(count(&mut server, json!({"kind": ["unparsed"]})), 1);
+    assert_eq!(count(&mut server, json!({"kind": ["web"]})), 0);
+    assert_eq!(count(&mut server, json!({"kind": ["unparsed_line"]})), 0);
     let run = f.ingested.writer.to_string();
     assert_eq!(count(&mut server, json!({"run": run})), 1);
     assert_eq!(count(&mut server, json!({"run": "ab".repeat(32)})), 0);

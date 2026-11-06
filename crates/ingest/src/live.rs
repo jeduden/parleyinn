@@ -8,9 +8,12 @@
 //!   next read.
 //! - A held hook observation of the transcript's harness session goes to
 //!   the main run's run seat at the offset where its hook fired (REC-19).
-//! - A witnessed line is never a repeat reference, and never held: one
-//!   whose `uuid` another transcript's event recorded is its own event,
-//!   counted for the caller to audit (REC-04).
+//! - A witnessed line is never a repeat reference: one whose `uuid`
+//!   another transcript's event recorded is its own event, counted for
+//!   the caller to audit, and refused when that event was purged. A
+//!   fork's line no event holds yet is held for a transcript another
+//!   MCP server holds a session binding for, and goes at once, counted,
+//!   into its own run's run seat when none does (REC-04).
 //! - An append another ingest got ahead of is refused in its transaction
 //!   ([`store::StoreError::PositionMoved`]); the next read goes on from
 //!   where that one left off (REC-06).
@@ -22,9 +25,9 @@ use administration::home::Home;
 use administration::node::Node;
 use key::random::Entropy;
 use key::signing::SeatKey;
-use record::digest::Digest;
 use record::id::WriterId;
 use redaction::Redactor;
+use store::source::prefix_digest;
 use store::{Position, Store};
 
 use crate::observed::Observed;
@@ -147,9 +150,10 @@ pub fn ingest_live(
 fn gained(home: &Home, path: &Path, bytes: &[u8], complete: u64) -> Result<bool, IngestError> {
     home.create().map_err(IngestError::Admin)?;
     let store = Store::open(&home.store())?;
-    let position = store
-        .source(&path.to_string_lossy())?
-        .map_or_else(Position::start, |s| s.position);
+    let source = store.source(&path.to_string_lossy())?;
+    let position = source
+        .as_ref()
+        .map_or_else(Position::start, |s| s.position.clone());
     let session = Defaults::of(path).own();
     // An observation whose hook fired past the complete lines waits.
     let held = session.agent_id.is_none()
@@ -159,10 +163,9 @@ fn gained(home: &Home, path: &Path, bytes: &[u8], complete: u64) -> Result<bool,
             .any(|h| h.observation.offset.is_none_or(|o| o <= complete));
     // A position past the complete lines is another ingest's, ahead,
     // unless what it consumed changed: a new transcript generation.
-    let consumed = bytes
-        .get(..usize::try_from(position.offset).unwrap_or(usize::MAX))
-        .map(|prefix| Digest::of(&[prefix]));
-    let rewritten = consumed != Some(position.prefix);
+    // The bytes of each purged line count as zeros (SEC-31).
+    let purged = source.as_ref().map_or(&[][..], |s| &s.purged[..]);
+    let rewritten = prefix_digest(bytes, position.offset, purged) != Some(position.prefix);
 
     Ok(position.offset < complete || rewritten || (held && position.offset == complete))
 }
