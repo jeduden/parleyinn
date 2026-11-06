@@ -272,7 +272,7 @@ the medium-effort generalist each names, which weighs their findings.
 `review-run` runs every specialist, then every generalist, each on its own
 model, and approves only when every agent answered readably and none blocks.
 The gate fails a review whose consulted list lacks a dispatched agent.
-An unanswered run runs once more; an unrouted change gets one generalist.
+A charged run is not rerun; an unrouted change gets one generalist.
 A deep review consults each generalist's deep instance instead: the same
 template under [docs/agents](agents/review-code.md), on Opus at high effort. The
 class is light for Markdown outside the stakeholder's paths, deep for those

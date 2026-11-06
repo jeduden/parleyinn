@@ -35,15 +35,6 @@ sound gets none, never `no finding`. A finding line ends with its ids, bare, in 
 no remark after them: state one only once you have checked it.\nYour final answer is only the \
 outcome line: `outcome: findings — <sentence>` or `outcome: none — <sentence>`.";
 
-/// Why a run is tried once more.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum Why<'a> {
-    /// Its report was refused: the gate's problem, with the line.
-    Refused(&'a str),
-    /// It did not answer: why.
-    Silent(&'a str),
-}
-
 /// What the gate refuses `report`, assembled beside `answer`, for,
 /// holding its ids to `known`: its problem, and the line it names
 /// quoted; none when the gate takes it.
@@ -66,20 +57,15 @@ pub fn refusal(report: &str, answer: &str, known: &BTreeSet<String>) -> Option<S
     })
 }
 
-/// What a specialist's second attempt is told, after its prompt.
+/// What a specialist's second attempt is told, after its prompt, when
+/// its first run did not answer for `failure` and cost nothing.
 #[must_use]
-pub fn note(why: &Why) -> String {
-    match why {
-        Why::Refused(problem) => format!(
-            "The review refused your previous attempt's report: it {problem}. This attempt is \
-             judged alone, so state every finding again. {FORMS}"
-        ),
-        Why::Silent(failure) => format!(
-            "Your previous attempt did not answer: {failure}. This attempt is judged alone: \
-             state each finding line the moment you have checked it, read each file once, search no \
-             whole tree, and send your outcome line before your turns or time run out. {FORMS}"
-        ),
-    }
+pub fn note(failure: &str) -> String {
+    format!(
+        "Your previous attempt did not answer: {failure}. This attempt is judged alone: \
+         state each finding line the moment you have checked it, read each file once, search no \
+         whole tree, and send your outcome line before your turns or time run out. {FORMS}"
+    )
 }
 
 /// Runs `unit`, and once more when its run did not answer, or, for a
@@ -107,28 +93,32 @@ pub(crate) fn run_one(r: &Review, c: &Controls, unit: &Unit) -> (AgentRun, Optio
         return (first, report);
     }
     let class = match &refused {
-        Some(_) => Class::Again,
+        // A report the gate refuses came from a run that was paid for,
+        // so what it stated stands and the review names the refusal.
+        Some(_) => Class::Never("its report is refused and the run was paid for"),
         None => class_of(r, unit, &first),
     };
     if let Class::Never(why) = class {
         (r.progress)(&format!("{}; not run again: {why}", describe(&first)));
         return (first, report);
     }
-    let (why, told) = match (&refused, &first.failure) {
-        (Some(problem), _) => (
-            format!("{} ({}) {problem}", unit.label(), unit.kind.word()),
-            Why::Refused(problem),
-        ),
-        (None, failure) => (
+    // A run that cost money is paid for: a second run would start from
+    // scratch, pay again and meet the same limit. What it stated is its
+    // report, and the review names it as it is.
+    if class == Class::Again && paid(&first) {
+        (r.progress)(&format!(
+            "{}; not run again: it cost {:.4} USD, so what it stated stands",
             describe(&first),
-            Why::Silent(failure.as_deref().unwrap_or("")),
-        ),
-    };
+            first.log.cost
+        ));
+        return (first, report);
+    }
     if class == Class::Again {
-        (r.progress)(&format!("{why}; running it once more"));
+        (r.progress)(&format!("{}; running it once more", describe(&first)));
     }
     keep(r, unit, "first");
-    let note = (unit.kind == Kind::Specialist).then(|| note(&told));
+    let note =
+        (unit.kind == Kind::Specialist).then(|| note(first.failure.as_deref().unwrap_or("")));
     let first = Attempt {
         run: &first,
         report,
@@ -136,6 +126,11 @@ pub(crate) fn run_one(r: &Review, c: &Controls, unit: &Unit) -> (AgentRun, Optio
         started,
     };
     again(r, c, unit, first, note.as_deref())
+}
+
+/// Whether `run` was charged: it made model calls or reported a cost.
+fn paid(run: &AgentRun) -> bool {
+    run.log.cost > 0.0 || run.log.turns > 0
 }
 
 /// The first attempt, as the attempts after it need it.

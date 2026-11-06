@@ -439,7 +439,7 @@ fn a_specialist_cut_off_at_its_turn_budget_blocks_the_review_but_keeps_what_it_s
     );
     assert!(
         stderr.contains(
-            "review-run: lang-rust (specialist): did not answer: its run ended with error_max_turns; running it once more"
+            "review-run: lang-rust (specialist): did not answer: its run ended with error_max_turns; not run again: it cost 0.0300 USD, so what it stated stands"
         ),
         "{stderr}"
     );
@@ -587,7 +587,7 @@ fn a_part_cut_off_at_its_turn_budget_blocks_the_review_naming_it_and_keeps_every
     assert!(
         stderr.contains(
             "review-run: test-engineer-unit part 2 of 3 (specialist): did not answer: its run \
-             ended with error_max_turns; running it once more"
+             ended with error_max_turns; not run again: it cost 0.0300 USD, so what it stated stands"
         ),
         "{stderr}"
     );
@@ -613,7 +613,7 @@ fn a_part_cut_off_at_its_turn_budget_blocks_the_review_naming_it_and_keeps_every
     let unit = usage_of(&dir, "test-engineer-unit");
     assert_eq!(
         (unit["parts"].as_u64(), unit["attempts"].as_u64()),
-        (Some(3), Some(4))
+        (Some(3), Some(3))
     );
     let consulted = fs::read_to_string(dir.join("review/consulted.json")).unwrap();
     assert!(!consulted.contains("test-engineer-unit"), "{consulted}");
@@ -629,56 +629,12 @@ fn a_part_cut_off_at_its_turn_budget_blocks_the_review_naming_it_and_keeps_every
 }
 
 #[test]
-fn a_refused_report_runs_once_more_told_why_and_the_gate_approves_the_second() {
+fn a_refused_report_is_not_run_again_blocks_the_review_and_the_gate_posts_nothing() {
     let home = TempDir::new().unwrap();
     let dir = home.path().join("work");
     workdir(&dir);
 
     let out = review_run_refusing(home.path(), &dir, "", "", "lang-rust", &[]);
-
-    let stderr = String::from_utf8_lossy(&out.stderr);
-    assert_eq!(out.status.code(), Some(0), "{stderr}");
-    assert!(
-        String::from_utf8_lossy(&out.stdout).starts_with("verdict=approve\n"),
-        "{stderr}"
-    );
-    assert!(
-        stderr.contains(
-            "review-run: lang-rust (specialist) has a report whose line 2 is neither a linked \
-             finding nor a requirement request: `revised: `src/a.rs:3 — old` → `src/a.rs:3 — \
-             new``; running it once more"
-        ),
-        "{stderr}"
-    );
-    assert!(
-        stderr.contains(
-            "lang-rust (specialist): answered (0.0200 USD, 4 turns) on its second attempt"
-        ),
-        "{stderr}"
-    );
-    // The second run is judged alone: its report is its own.
-    assert_eq!(
-        fs::read_to_string(dir.join("review/reports/lang-rust.md")).unwrap(),
-        "src/a.rs:3 — if not addressed: a long line hides a bug — I9\n\
-         outcome: findings — lang-rust saw one finding.\n"
-    );
-    assert!(dir.join("review/logs/lang-rust.first.jsonl").is_file());
-    assert_eq!(usage_of(&dir, "lang-rust")["attempts"].as_u64(), Some(2));
-
-    let (code, review, err) = gate(home.path(), &dir);
-
-    assert_eq!(code, review_gate::cli::EXIT_OK, "{err}");
-    let review: serde_json::Value = serde_json::from_str(&review).unwrap();
-    assert_eq!(review["event"], "APPROVE");
-}
-
-#[test]
-fn a_report_refused_on_both_attempts_blocks_the_review_and_the_gate_posts_nothing() {
-    let home = TempDir::new().unwrap();
-    let dir = home.path().join("work");
-    workdir(&dir);
-
-    let out = review_run_refusing(home.path(), &dir, "", "", "lang-rust:always", &[]);
 
     let stderr = String::from_utf8_lossy(&out.stderr);
     assert_eq!(out.status.code(), Some(0), "{stderr}");
@@ -700,7 +656,11 @@ fn a_report_refused_on_both_attempts_blocks_the_review_and_the_gate_posts_nothin
         "{:?}",
         outcome.findings
     );
-    assert_eq!(usage_of(&dir, "lang-rust")["attempts"].as_u64(), Some(2));
+    assert!(
+        stderr.contains("not run again: its report is refused and the run was paid for"),
+        "{stderr}"
+    );
+    assert_eq!(usage_of(&dir, "lang-rust")["attempts"].as_u64(), Some(1));
 
     let (code, review, err) = gate(home.path(), &dir);
 

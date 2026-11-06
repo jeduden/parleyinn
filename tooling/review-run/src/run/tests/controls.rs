@@ -186,7 +186,7 @@ fn no_run_starts_once_the_finished_runs_cost_the_review_s_cap() {
 }
 
 #[test]
-fn a_cap_reached_before_a_retry_keeps_the_first_attempt_and_says_why() {
+fn a_run_that_cost_money_is_not_run_again_whether_or_not_a_cap_is_reached() {
     let options = Options {
         max_cost_usd: 0.03,
         ..options()
@@ -198,10 +198,7 @@ fn a_cap_reached_before_a_retry_keeps_the_first_attempt_and_says_why() {
     let run = ran.run("lang-rust");
     assert_eq!(
         run.failure.as_deref(),
-        Some(
-            "over budget: the review's runs cost 0.0500 USD, its cap is 0.03 USD, so it was not \
-             started again; before that its run ended with error_max_turns"
-        )
+        Some("its run ended with error_max_turns")
     );
     assert_eq!(run.attempts, 1);
     assert_eq!(ran.host.agents(), ["lang-rust"]);

@@ -3,13 +3,13 @@
 //! runner, which reads the SRS, names a specialist's report that cites
 //! an id no requirement or invariant has in a blocking finding. A
 //! generalist's finding line the runner cannot read is named the same
-//! way, never dropped as prose. A refused report first runs its
-//! specialist once more, told the refusal and the forms, and is judged
-//! by that run alone. The check runs `review-run` on a work directory
+//! way, never dropped as prose. A refused report came from a run that
+//! was paid for, so its specialist is not run again and what it stated
+//! stands. The check runs `review-run` on a work directory
 //! with a stand-in for the `claude` command line whose specialist cites
 //! such an id on every run and whose generalist answers such a line, and
-//! requires the specialist run twice, its second run told why, a review
-//! that requests changes naming both, and the gate, run on what
+//! requires the specialist run once, a review that requests changes
+//! naming both, and the gate, run on what
 //! `review-run` wrote, posting that request rather than failing: an
 //! unknown id is the one refusal the gate cannot read from the report
 //! alone.
@@ -161,30 +161,17 @@ pub fn outcome_problems(workdir: &Path) -> Vec<String> {
 }
 
 /// What is wrong with the specialist's runs, by `prompts`, each one's
-/// prompt: not run exactly once more, or its second run not told that
-/// its report cites [`UNKNOWN_ID`] and the forms again.
+/// prompt: run more than once. Its first run was paid for and its report
+/// refused, so what it stated stands and it is not paid for again.
 #[must_use]
 pub fn retry_problems(prompts: &[String]) -> Vec<String> {
-    let [_, second] = prompts else {
-        return vec![format!(
-            "review-run ran {SPECIALIST} {} time{}, not once more after its report was refused",
-            prompts.len(),
-            if prompts.len() == 1 { "" } else { "s" }
-        )];
-    };
-    let mut problems = Vec::new();
-    if !second.contains(&format!("cites {UNKNOWN_ID}")) {
-        problems.push(format!(
-            "{SPECIALIST}'s second run was not told its report cites {UNKNOWN_ID}"
-        ));
+    match prompts.len() {
+        1 => Vec::new(),
+        n => vec![format!(
+            "review-run ran {SPECIALIST} {n} time{}, not once after its report was refused",
+            if n == 1 { "" } else { "s" }
+        )],
     }
-    if !second.contains(review_run::retry::FORMS) {
-        problems.push(format!(
-            "{SPECIALIST}'s second run was not told the forms again"
-        ));
-    }
-
-    problems
 }
 
 /// The check runs the gate reads, written beside what `review-run`

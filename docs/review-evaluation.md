@@ -115,8 +115,9 @@ permission, and ends before the job that holds the reviewer app's key.
 The review job's `review-run` starts each dispatched agent through the
 harness's own runner, so an agent in the review and in its cases gets
 the same reading tools, turn budget and prompt. Only the review runs a
-specialist that did not answer, or whose report the gate refuses, once
-more, told why; a case's run gets no second attempt. An agent left
+specialist again, and only one whose first run cost nothing, once, told
+why; a run that was charged is not paid for twice, and a case's run gets
+no second attempt. An agent left
 without an accepted report is listed in `review/gaps.json`, and a review
 resumed from that list is judged exactly as a full run. A review reuses a
 stored answer only under its unchanged answer key, held to the report
