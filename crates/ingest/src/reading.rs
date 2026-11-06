@@ -534,6 +534,7 @@ fn append(
     for range in transactions(&plan.ends, &starts) {
         let (writer, _, end) = plan.ends[range.end - 1];
         let first = plan.places[range.start].offset;
+        let from = position.offset;
         observing.flush(store, Some(first), entropy)?;
         // From the position, so a line refused before this one is part
         // of the prefix.
@@ -555,7 +556,7 @@ fn append(
             &closes[range.clone()],
             resume.source.id,
             &position,
-            &plan.refused_places,
+            refused_from(&plan.refused_places, from, end),
         );
         addresses.extend(appended.map_err(|source| IngestError::Partial {
             writer,
@@ -567,6 +568,7 @@ fn append(
     }
     // A refusal no recorded line follows still moves the position, or
     // the next read would refuse it again.
+    let tail = position.offset;
     if let Some((line, end)) = plan.refused_to.filter(|(_, end)| *end > position.offset) {
         running.update(
             bytes
@@ -580,7 +582,8 @@ fn append(
             seen,
         };
     }
-    advance(store, resume.source.id, &position, plan)?;
+    let refused = refused_from(&plan.refused_places, tail, u64::MAX);
+    advance(store, resume.source.id, &position, refused)?;
     observing.flush(store, Some(position.offset), entropy)?;
 
     Ok(Landed {
@@ -588,6 +591,15 @@ fn append(
         addresses,
         observations: observing.appended,
     })
+}
+
+/// The refused copies, in offset order, that start in `from..to`: the
+/// ones a transaction ending at `to` takes, so none is passed to a
+/// transaction past the position that moved beyond it (REC-04).
+fn refused_from(refused: &[Place], from: u64, to: u64) -> &[Place] {
+    let start = refused.partition_point(|p| p.offset < from);
+    let end = refused.partition_point(|p| p.offset < to);
+    refused.get(start..end).unwrap_or_default()
 }
 
 /// The spans of the source whose bytes are zeros in the consumed-prefix
@@ -611,10 +623,10 @@ fn advance(
     store: &mut Store,
     id: i64,
     position: &Position,
-    plan: &Plan,
+    refused: &[Place],
 ) -> Result<(), IngestError> {
-    if plan.events.is_empty() && !plan.refused_places.is_empty() {
-        store.advance_refusing(id, position, &plan.refused_places)?;
+    if !refused.is_empty() {
+        store.advance_refusing(id, position, refused)?;
     } else {
         store.advance(id, position)?;
     }

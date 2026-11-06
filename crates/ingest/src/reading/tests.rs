@@ -251,3 +251,35 @@ fn a_purged_line_is_never_recorded_again_by_the_generation_an_unconfirmed_purge_
     assert_eq!(recorded.len(), 4, "u2 and u3 of each generation");
     assert!(recorded.iter().all(|text| !text.contains("\"u1\"")));
 }
+
+#[test]
+fn a_refused_copy_is_passed_only_to_the_transaction_its_bytes_fall_in() {
+    let dir = TempDir::new().unwrap();
+    let home = home(&dir);
+    let path = transcript(&dir, &numbered("p", 1, 3));
+    let first = crate::ingest_path(&home, &path, &redactor(), &mut OsEntropy).unwrap();
+    purged(&home, first.writer, 1);
+    // More lines than one transaction takes follow the refused copy.
+    let more = store::BATCH as u64 * 2 + 3;
+    std::fs::write(&path, numbered("p", 1, more)).unwrap();
+
+    let again = crate::ingest_path(&home, &path, &redactor(), &mut OsEntropy).unwrap();
+
+    assert_eq!(again.refused, 1);
+    assert_eq!(again.events as u64, more - 1);
+}
+
+#[test]
+fn refused_copies_are_cut_to_the_offsets_a_transaction_covers() {
+    let place = |offset| store::Place {
+        line: offset + 1,
+        offset,
+        length: 1,
+        uuid: None,
+    };
+    let refused = [place(0), place(10), place(20)];
+
+    assert_eq!(super::refused_from(&refused, 0, 10), &refused[..1]);
+    assert_eq!(super::refused_from(&refused, 10, 30), &refused[1..]);
+    assert!(super::refused_from(&refused, 21, u64::MAX).is_empty());
+}
