@@ -88,6 +88,31 @@ pub fn finding(line: &str) -> Option<Finding> {
     })
 }
 
+/// A generalist's weighing as its run log gives it: each weighing line
+/// it stated in a message before its last, a finding, a dropped one or
+/// its `none —`, or a line shaped as a finding the review cannot read,
+/// each once and in order, then its final answer as it stands. A run
+/// that was cut off before its final answer has the lines it stated
+/// and no more, so the review reads what was paid for.
+#[must_use]
+pub fn weighing(texts: &[String], answer: &str) -> String {
+    let said: Vec<&str> = answer.lines().map(str::trim).collect();
+    let mut stated: Vec<&str> = Vec::new();
+    for line in texts.iter().flat_map(|t| t.lines()).map(str::trim) {
+        let weighs = finding(line).is_some() || dropped(line) || nothing(line) || unread(line);
+        if weighs && !said.contains(&line) && !stated.contains(&line) {
+            stated.push(line);
+        }
+    }
+    let mut out = stated.join("\n");
+    if !out.is_empty() && !answer.is_empty() {
+        out.push('\n');
+    }
+    out.push_str(answer);
+
+    out
+}
+
 /// The severities a generalist's finding gives.
 pub const SEVERITIES: [&str; 2] = ["blocking", "nit"];
 

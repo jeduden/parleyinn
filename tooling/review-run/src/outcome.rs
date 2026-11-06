@@ -71,7 +71,7 @@ pub fn decide(
         kept: kept_counts,
         closings,
         unread,
-    } = weighed(plan, &answers, reports, &mut findings);
+    } = weighed(plan, runs, (&answers, &refused), reports, &mut findings);
     let consulted: BTreeSet<String> = answers.keys().cloned().collect();
     let not_reviewed = not_reviewed(runs, &silent, &refused, &unread);
     let approves = silent.is_empty()
@@ -170,7 +170,11 @@ fn answers(
     for name in plan.agents() {
         match runs.iter().find(|r| r.name == name) {
             Some(run) if run.answered() => {
-                answers.insert(name, run.log.answer.clone());
+                let text = match run.kind {
+                    Kind::Generalist => report::weighing(&run.log.texts, &run.log.answer),
+                    _ => run.log.answer.clone(),
+                };
+                answers.insert(name, text);
             }
             other => {
                 let why = other
@@ -232,7 +236,8 @@ struct Weighed {
 /// specialist's requirement request, in `reports`, is kept as a nit.
 fn weighed(
     plan: &Plan,
-    answers: &BTreeMap<String, String>,
+    runs: &[AgentRun],
+    (answers, refused): (&BTreeMap<String, String>, &[(String, String)]),
     reports: &BTreeMap<String, String>,
     findings: &mut Vec<Finding>,
 ) -> Weighed {
@@ -240,32 +245,27 @@ fn weighed(
     let mut closings = Vec::new();
     let mut unread = Vec::new();
     for name in plan.generalists() {
-        let Some(answer) = answers.get(&name) else {
-            continue;
+        let answered = answers.contains_key(&name);
+        // A run cut off before its answer still has what it stated, and
+        // that is weighed as it stands: the run is named as one that did
+        // not answer, and nothing it kept is lost.
+        let stated;
+        let answer = match answers.get(&name) {
+            Some(answer) => answer,
+            None => match runs.iter().find(|r| r.name == name) {
+                Some(run) => {
+                    stated = report::weighing(&run.log.texts, "");
+                    &stated
+                }
+                None => continue,
+            },
         };
-        if unreadable(answer) == Some(SAYS_NOTHING) {
-            findings.push(blocking(
-                REVIEW_PATH,
-                format!(
-                    "{name} answered no finding, no dropped one and no `none —` line, so its \
-                     weighing cannot be read"
-                ),
-            ));
-            unread.push((name.clone(), SAYS_NOTHING.to_owned()));
-        }
-        for line in answer.lines().filter(|l| report::unread(l)) {
-            findings.push(blocking(
-                REVIEW_PATH,
-                format!(
-                    "{name} answered a finding line the review cannot read, so its weighing \
-                     cannot be read: {}",
-                    line.trim()
-                ),
-            ));
-            if !unread.iter().any(|(n, _)| *n == name) {
-                unread.push((name.clone(), UNREAD_LINE.to_owned()));
-            }
-        }
+        let heard = Heard {
+            reports,
+            answers,
+            refused,
+        };
+        unread.extend(unread_by(plan, &name, answer, answered, heard, findings));
         for mut f in kept(answer) {
             if f.severity == BLOCKING && from_request(plan, &name, reports, &f) {
                 f.severity = NIT.to_owned();
@@ -291,6 +291,121 @@ fn weighed(
         closings,
         unread,
     }
+}
+
+/// Why the review cannot take generalist `name`'s `answer` as a whole
+/// weighing, each with a blocking finding added to `findings`: it says
+/// nothing, it weighs none of the specialists' findings, or holds a
+/// finding line it cannot read. A run that did not answer is named
+/// already, and gives none of these.
+fn unread_by(
+    plan: &Plan,
+    name: &str,
+    answer: &str,
+    answered: bool,
+    heard: Heard,
+    findings: &mut Vec<Finding>,
+) -> Vec<(String, String)> {
+    let mut unread = Vec::new();
+    if !answered {
+        return unread;
+    }
+    if unreadable(answer) == Some(SAYS_NOTHING) {
+        findings.push(blocking(
+            REVIEW_PATH,
+            format!(
+                "{name} answered no finding, no dropped one and no `none —` line, so its \
+                 weighing cannot be read"
+            ),
+        ));
+        unread.push((name.to_owned(), SAYS_NOTHING.to_owned()));
+    } else if unreadable(answer).is_none() {
+        let missed = unweighed(plan, name, answer, heard);
+        if !missed.is_empty() {
+            findings.push(blocking(
+                REVIEW_PATH,
+                format!(
+                    "{name} weighed no finding at {}, which its specialists reported, so its \
+                     weighing is partial",
+                    missed.join(", ")
+                ),
+            ));
+            unread.push((
+                name.to_owned(),
+                format!("it weighed no finding at {}", missed.join(", ")),
+            ));
+        }
+    }
+    for line in answer.lines().filter(|l| report::unread(l)) {
+        findings.push(blocking(
+            REVIEW_PATH,
+            format!(
+                "{name} answered a finding line the review cannot read, so its weighing \
+                 cannot be read: {}",
+                line.trim()
+            ),
+        ));
+        if !unread.iter().any(|(n, _)| n == name) {
+            unread.push((name.to_owned(), UNREAD_LINE.to_owned()));
+        }
+    }
+
+    unread
+}
+
+/// What the specialists gave: the answers, the reports and the
+/// refused ones.
+#[derive(Clone, Copy)]
+struct Heard<'a> {
+    reports: &'a BTreeMap<String, String>,
+    answers: &'a BTreeMap<String, String>,
+    refused: &'a [(String, String)],
+}
+
+/// The places of `generalist`'s specialists' findings and requests that
+/// its `answer` weighs nowhere: no finding or dropped line of it is at
+/// the place's path, and none names the place. Decided from the reports
+/// and the answer alone, never by what the generalist says of its own
+/// scope; empty when it weighed every one, sorted.
+fn unweighed(plan: &Plan, generalist: &str, answer: &str, heard: Heard) -> Vec<String> {
+    let Heard {
+        reports,
+        answers,
+        refused,
+    } = heard;
+    let weighing: Vec<&str> = answer
+        .lines()
+        .filter(|l| report::finding(l).is_some() || report::dropped(l))
+        .collect();
+    let paths: BTreeSet<String> = weighing
+        .iter()
+        .filter_map(|l| report::finding(l))
+        .map(|f| f.path)
+        .collect();
+    let mut missed = BTreeSet::new();
+    for specialist in plan.dispatch.get(generalist).into_iter().flatten() {
+        // A report the gate refuses is named as refused, not as unweighed.
+        let Some(report) = reports
+            .get(specialist)
+            .filter(|_| answers.contains_key(specialist))
+            .filter(|_| !refused.iter().any(|(name, _)| name == specialist))
+        else {
+            continue;
+        };
+        for line in report.lines().map(review_gate::report::line) {
+            let (path, number) = match &line {
+                Line::Linked(k) => (&k.path, k.line),
+                Line::Request(r) => (&r.path, r.line),
+                _ => continue,
+            };
+            let place = format!("{path}:{number}");
+            if !paths.contains(path) && !weighing.iter().any(|l| l.contains(&place)) {
+                missed.insert(place);
+            }
+        }
+    }
+
+    missed.into_iter().collect()
 }
 
 /// Whether `f`, a finding `generalist` kept, came from a requirement

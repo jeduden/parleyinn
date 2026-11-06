@@ -80,7 +80,7 @@ case "$prompt" in
     ;;
   *)
     printf '{"type":"assistant","parent_tool_use_id":null,"message":{"id":"m-%s","model":"claude-haiku-5-5","usage":{"input_tokens":3,"cache_read_input_tokens":7,"output_tokens":2},"content":[]}}\n' "$agent"
-    printf '{"type":"result","subtype":"success","is_error":false,"result":"src/a.rs:3 — nit — a long line — lang-rust\\n%s finds its scope sound.","total_cost_usd":0.05,"num_turns":4}\n' "$agent"
+    printf '{"type":"result","subtype":"success","is_error":false,"result":"src/a.rs:3 — nit — a long line — lang-rust\\ndropped — src/part1.rs:1 — fine — lang-rust\\ndropped — src/part2.rs:1 — fine — lang-rust\\ndropped — src/part3.rs:1 — fine — lang-rust\\n%s finds its scope sound.","total_cost_usd":0.05,"num_turns":4}\n' "$agent"
     ;;
 esac
 "#;

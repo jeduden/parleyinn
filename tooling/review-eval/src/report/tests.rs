@@ -128,3 +128,39 @@ fn split_dashes_cuts_at_each_spaced_dash_only() {
     assert_eq!(bare("12. x"), "x");
     assert_eq!(bare(". x"), ". x");
 }
+
+#[test]
+fn a_weighing_keeps_each_line_stated_before_the_final_answer_once() {
+    let texts = vec![
+        "reading the diff".to_owned(),
+        "a/b.md:3 — blocking — breaks I2 — lang-markdown\ndropped — a/c.md:1 — sound — x"
+            .to_owned(),
+        "a/b.md:3 — blocking — breaks I2 — lang-markdown".to_owned(),
+    ];
+
+    let got = weighing(
+        &texts,
+        "a/d.md:2 — nit — long line — review-code\nScope: all.",
+    );
+
+    assert_eq!(
+        got,
+        "a/b.md:3 — blocking — breaks I2 — lang-markdown\ndropped — a/c.md:1 — sound — x\n\
+         a/d.md:2 — nit — long line — review-code\nScope: all."
+    );
+}
+
+#[test]
+fn a_weighing_of_a_run_cut_off_before_its_answer_is_what_it_stated() {
+    let texts = vec!["a/b.md:3 — nit — x — y\nsome prose".to_owned()];
+
+    assert_eq!(weighing(&texts, ""), "a/b.md:3 — nit — x — y");
+    assert_eq!(weighing(&[], ""), "");
+}
+
+#[test]
+fn a_weighing_does_not_repeat_a_line_the_final_answer_states_again() {
+    let line = "a/b.md:3 — nit — x — y";
+
+    assert_eq!(weighing(&[line.to_owned()], line), line);
+}
