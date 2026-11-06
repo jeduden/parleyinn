@@ -27,13 +27,11 @@ const TOOLS: &str = "Read, Grep, Glob";
 const SPECIALIST_EFFORT: &str = "low";
 /// The effort a generalist runs at.
 const GENERALIST_EFFORT: &str = "medium";
-/// The effort and model of a generalist's deep instance: the depth a
-/// deep review had when one agent ran it alone. A turn budget is each
-/// definition's own `maxTurns`, named nowhere else: a run it cuts off
-/// before its answer keeps what it stated in its log, headed incomplete,
-/// and blocks the review.
-const DEEP_EFFORT: &str = "high";
-const DEEP_MODEL: &str = "opus";
+/// The efforts an agent may name. A generalist's deep instance names its
+/// own effort, model and turn budget in its definition, and no other
+/// text states them: a run its budget cuts off before its answer keeps
+/// what it stated in its log, headed incomplete, and blocks the review.
+const EFFORTS: [&str; 3] = ["low", "medium", "high"];
 
 /// Problems with the agents the review bundle can dispatch: one that is
 /// not defined, names itself otherwise, runs at the wrong effort, names
@@ -50,11 +48,7 @@ pub fn every_dispatched_agent_is_defined(checkout: &Checkout) -> Vec<String> {
             .iter()
             .map(|n| ((*n).to_owned(), GENERALIST_EFFORT, None)),
     );
-    want.extend(
-        DEEP_GENERALISTS
-            .iter()
-            .map(|n| ((*n).to_owned(), DEEP_EFFORT, None)),
-    );
+    want.extend(DEEP_GENERALISTS.iter().map(|n| ((*n).to_owned(), "", None)));
     want.extend(
         FIXED_SPECIALISTS
             .iter()
@@ -108,7 +102,13 @@ fn check(checkout: &Checkout, name: &str, effort: &str, names: Option<&str>) -> 
         return Some(format!("{name} has tools {has_tools}, want {TOOLS}"));
     }
     let has = field("effort");
-    if has != effort {
+    if DEEP_GENERALISTS.contains(&name) {
+        if !EFFORTS.contains(&has) {
+            return Some(format!(
+                "{name} runs at effort {has}, want low, medium or high"
+            ));
+        }
+    } else if has != effort {
         return Some(format!("{name} runs at effort {has}, want {effort}"));
     }
     if DEEP_GENERALISTS.contains(&name)
@@ -135,13 +135,13 @@ fn check(checkout: &Checkout, name: &str, effort: &str, names: Option<&str>) -> 
         .map(|file| format!("{name} does not name {file}"))
 }
 
-/// The problem with deep instance `name`'s model or turn budget, as
+/// The problem with deep instance `name`'s model or turn budget, if it names
+/// none, as
 /// its front matter `fields` read, if any.
 fn deep_settings(name: &str, fields: &BTreeMap<String, String>) -> Option<String> {
     let field = |key: &str| fields.get(key).map_or("", String::as_str);
-    let model = field("model");
-    if model != DEEP_MODEL {
-        return Some(format!("{name} runs on model {model}, want {DEEP_MODEL}"));
+    if field("model").is_empty() {
+        return Some(format!("{name} names no model"));
     }
     turns(name, field("maxTurns"))
 }

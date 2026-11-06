@@ -1,14 +1,14 @@
 ---
 name: review-security-deep
 description: >-
-  High-effort generalist of ParleyInn's deep review for invariants and
-  security, on Opus: weighs the findings of the low-effort
+  Generalist of ParleyInn's deep review for invariants and
+  security: weighs the findings of the low-effort
   specialists the review's orchestrator ran, confirms or drops each,
   adds what they missed and reports to the orchestrator. Never approves.
 tools: Read, Grep, Glob
 model: opus
 effort: high
-maxTurns: 12
+maxTurns: 60
 ---
 # Deep review generalist: security
 

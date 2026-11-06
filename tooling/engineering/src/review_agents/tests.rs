@@ -208,17 +208,26 @@ fn a_deep_generalist_on_another_model_or_turn_budget_is_named() {
         problems(&f)
     };
 
-    assert_eq!(
-        deep("model: sonnet\nmaxTurns: 40\n"),
-        ["review-spec-deep runs on model sonnet, want opus"]
-    );
+    // Which model is the definition's own to say.
+    for model in ["opus", "sonnet"] {
+        assert_eq!(
+            deep(&format!("model: {model}\nmaxTurns: 40\n")),
+            Vec::<String>::new(),
+            "{model}"
+        );
+    }
+    assert_eq!(deep("maxTurns: 40\n"), ["review-spec-deep names no model"]);
     assert_eq!(
         deep("model: opus\n"),
         ["review-spec-deep names no maxTurns"]
     );
     assert_eq!(
+        problems(&replaced("review-spec-deep", "turbo", "x")),
+        ["review-spec-deep runs at effort turbo, want low, medium or high"]
+    );
+    assert_eq!(
         problems(&replaced("review-spec-deep", "medium", "x")),
-        ["review-spec-deep runs at effort medium, want high"]
+        Vec::<String>::new()
     );
 }
 

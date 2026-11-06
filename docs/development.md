@@ -274,18 +274,18 @@ model, and approves only when every agent answered readably and none blocks.
 The gate fails a review whose consulted list lacks a dispatched agent.
 A charged run is not rerun; an unrouted change gets one generalist.
 A deep review consults each generalist's deep instance instead: the same
-template under [docs/agents](agents/review-code.md), on Opus at high effort. The
-class is light for Markdown outside the stakeholder's paths, deep for those
-paths, the gates and the security-sensitive code. The review bundle quotes only
-the touched rows, their scenarios and the invariants, a few thousand
-model tokens where the SRS runs to hundreds of thousands. The pull request's
-agent instructions move out of the agents' directory, so none loads; the agents
-read them as data. The posted review names the gate as its author, states the
-review's verdict, and keeps the agents' findings, the deterministic ones and
-failed checks under their own headings. A pull request
-that changes a reviewer component also runs that component's evaluation cases,
-whose failures are blocking findings (ENG-32,
-[review-evaluation.md](review-evaluation.md)).
+template under [docs/agents](agents/review-code.md), on the model, effort and
+turns its definition names. The class is light for Markdown outside the
+stakeholder's paths, deep for those paths, the gates and the security-sensitive
+code. The review bundle quotes only the touched rows, their scenarios and the
+invariants, a few thousand model tokens where the SRS runs to hundreds of
+thousands. The pull request's agent instructions move out of the agents'
+directory, so none loads; the agents read them as data. The posted review names
+the gate as its author, states the review's verdict, and keeps the agents'
+findings, the deterministic ones and failed checks under their own headings. A
+pull request that changes a reviewer component also runs that component's
+evaluation cases, whose failures are blocking findings (ENG-32, [review-
+evaluation.md](review-evaluation.md)).
 
 What is left to the agent is judgement: whether the code and the step
 bindings do what each touched row says, new paths to the model (I2),

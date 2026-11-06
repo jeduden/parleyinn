@@ -166,20 +166,30 @@ pub(super) fn review_agent_cases() -> Vec<Case> {
             "review-security has tools Read, Grep, Glob, Write, want Read, Grep, Glob",
         ),
         protection_case(
-            "a deep review's generalist run on a weaker model",
+            "a deep review's generalist naming no model",
             Injection::replace(
-                ".claude/agents/review-code-deep.md",
+                ".claude/agents/review-security-deep.md",
                 "model: opus\n",
-                "model: sonnet\n",
+                "",
             ),
             "the_checkout_s_review_agents_are_all_defined",
-            "review-code-deep runs on model sonnet, want opus",
+            "review-security-deep names no model",
         ),
         protection_case(
             "a specialist run without its turn cap",
             Injection::replace(".claude/agents/lang-rust.md", "maxTurns: 20\n", ""),
             "the_checkout_s_review_agents_are_all_defined",
-            "lang-rust names no maxTurns, want 20",
+            "lang-rust names no maxTurns",
+        ),
+        protection_case(
+            "a deep generalist whose turn budget is no number",
+            Injection::replace(
+                ".claude/agents/review-security-deep.md",
+                "maxTurns: 12\n",
+                "maxTurns: many\n",
+            ),
+            "the_checkout_s_review_agents_are_all_defined",
+            "review-security-deep has maxTurns many, want a whole number of turns above zero",
         ),
         protection_case(
             "a specialist naming another generalist than the dispatch",
