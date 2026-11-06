@@ -2,13 +2,13 @@
 name: review-code-deep
 description: >-
   High-effort generalist of ParleyInn's deep review for code and tests,
-  on Opus with 40 turns: weighs the findings of the low-effort
+  on Opus: weighs the findings of the low-effort
   specialists the review's orchestrator ran, confirms or drops each,
   adds what they missed and reports to the orchestrator. Never approves.
 tools: Read, Grep, Glob
 model: opus
 effort: high
-maxTurns: 40
+maxTurns: 12
 ---
 # Deep review generalist: code and tests
 

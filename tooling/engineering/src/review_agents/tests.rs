@@ -214,7 +214,7 @@ fn a_deep_generalist_on_another_model_or_turn_budget_is_named() {
     );
     assert_eq!(
         deep("model: opus\n"),
-        ["review-spec-deep names no maxTurns, want 40"]
+        ["review-spec-deep names no maxTurns"]
     );
     assert_eq!(
         problems(&replaced("review-spec-deep", "medium", "x")),
@@ -235,12 +235,19 @@ fn a_specialist_without_its_turn_cap_is_named() {
         problems(&f)
     };
 
-    assert_eq!(capped("maxTurns: 20\n"), Vec::<String>::new());
-    assert_eq!(
-        capped("maxTurns: 60\n"),
-        ["lang-shell runs for maxTurns 60, want 20"]
-    );
-    assert_eq!(capped(""), ["lang-shell names no maxTurns, want 20"]);
+    // Which number is the definition's own: the check names none.
+    for turns in ["maxTurns: 20\n", "maxTurns: 60\n", "maxTurns: 12\n"] {
+        assert_eq!(capped(turns), Vec::<String>::new(), "{turns}");
+    }
+    assert_eq!(capped(""), ["lang-shell names no maxTurns"]);
+    for bad in ["many", "0", "-3", "2.5"] {
+        assert_eq!(
+            capped(&format!("maxTurns: {bad}\n")),
+            [format!(
+                "lang-shell has maxTurns {bad}, want a whole number of turns above zero"
+            )]
+        );
+    }
 }
 
 #[test]

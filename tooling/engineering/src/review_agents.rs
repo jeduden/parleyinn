@@ -25,17 +25,15 @@ pub const AGENTS: &str = ".claude/agents";
 const TOOLS: &str = "Read, Grep, Glob";
 /// The effort a specialist runs at.
 const SPECIALIST_EFFORT: &str = "low";
-/// A specialist's turn budget. A run the budget cuts off before its
-/// answer keeps what it stated in its log, headed incomplete, and blocks
-/// the review.
-const SPECIALIST_TURNS: &str = "20";
 /// The effort a generalist runs at.
 const GENERALIST_EFFORT: &str = "medium";
-/// The effort, model and turn budget of a generalist's deep instance:
-/// the depth a deep review had when one agent ran it alone.
+/// The effort and model of a generalist's deep instance: the depth a
+/// deep review had when one agent ran it alone. A turn budget is each
+/// definition's own `maxTurns`, named nowhere else: a run it cuts off
+/// before its answer keeps what it stated in its log, headed incomplete,
+/// and blocks the review.
 const DEEP_EFFORT: &str = "high";
 const DEEP_MODEL: &str = "opus";
-const DEEP_TURNS: &str = "40";
 
 /// Problems with the agents the review bundle can dispatch: one that is
 /// not defined, names itself otherwise, runs at the wrong effort, names
@@ -119,7 +117,7 @@ fn check(checkout: &Checkout, name: &str, effort: &str, names: Option<&str>) -> 
         return Some(problem);
     }
     if generalist_of(name).is_some()
-        && let Some(problem) = turns(name, field("maxTurns"), SPECIALIST_TURNS)
+        && let Some(problem) = turns(name, field("maxTurns"))
     {
         return Some(problem);
     }
@@ -145,15 +143,18 @@ fn deep_settings(name: &str, fields: &BTreeMap<String, String>) -> Option<String
     if model != DEEP_MODEL {
         return Some(format!("{name} runs on model {model}, want {DEEP_MODEL}"));
     }
-    turns(name, field("maxTurns"), DEEP_TURNS)
+    turns(name, field("maxTurns"))
 }
 
-/// The problem with agent `name`'s turn budget `has`, if it is not
-/// `want`.
-fn turns(name: &str, has: &str, want: &str) -> Option<String> {
+/// The problem with agent `name`'s turn budget `has`, if it is not a
+/// whole number of turns above zero. Which number is the definition's
+/// own to say.
+fn turns(name: &str, has: &str) -> Option<String> {
     match has {
-        "" => Some(format!("{name} names no maxTurns, want {want}")),
-        has if has != want => Some(format!("{name} runs for maxTurns {has}, want {want}")),
+        "" => Some(format!("{name} names no maxTurns")),
+        has if !has.parse::<u32>().is_ok_and(|n| n > 0) => Some(format!(
+            "{name} has maxTurns {has}, want a whole number of turns above zero"
+        )),
         _ => None,
     }
 }
