@@ -118,8 +118,7 @@ cucumber:
 
 - **ADM-09:** 16 of 17 rows pass, the landmark row is M3's.
 - **Off `@pending` and passing:** ENG-09 (10,000 events per PR, 1M
-  nightly), SEC-18, REC-04, REC-08, REC-12, REC-26, PRV-14 (its race fix is not
-  kept; the binding settles 300 ms, M5's task 11), RCL-02 (9 of 9), REC-17
+  nightly), SEC-18, REC-04, REC-08, REC-12, REC-26, RCL-02 (9 of 9), REC-17
   extended.
 - **SEC-05 and windowed ingest are M5's (user's final ruling):** ingest and
   live capture read a transcript whole; only SEC-05's hook rows pass.

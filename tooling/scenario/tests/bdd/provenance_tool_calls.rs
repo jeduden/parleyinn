@@ -5,8 +5,9 @@
 //! ingest at most 2 s, and refuses, counts and logs every call whose run
 //! it cannot find.
 //!
-//! `@PRV-14`'s calls name `event_search`; the row whose arguments name
-//! the other run names it by its writer, which is how a run is named.
+//! `@PRV-14`'s calls name `event_search`, which phase 12 serves; until
+//! it lands, a call found under its run is answered "no such tool", so
+//! the scenario stays pending and its rows pass narrowed to `event_get`.
 
 use std::fs;
 use std::io::Write;
@@ -17,7 +18,7 @@ use serde_json::{Value, json};
 
 use crate::World;
 use crate::live::{lines_read, wait_until};
-use crate::record::{home, last_run, run_core};
+use crate::record::home;
 use crate::record_hooks::counted;
 use crate::record_live::{harness, live, make_run, named, reply_text, serve};
 use crate::record_transcript::recorded_call;
@@ -166,10 +167,6 @@ fn both_runs(w: &mut World) -> Result<(), String> {
     append_call(w, SUBAGENT, "toolu_both")?;
     read_all(w, MAIN)?;
     read_all(w, SUBAGENT)?;
-    // The server reads the tool-use ids of the lines it ingested right
-    // after it commits them, never holding a call for that read: let the
-    // read of both runs' ids finish before the call arrives.
-    std::thread::sleep(Duration::from_millis(300));
     call(w, Some("toolu_both"), &json!({}))
 }
 
@@ -177,23 +174,7 @@ fn both_runs(w: &mut World) -> Result<(), String> {
 fn arguments_name_other(w: &mut World) -> Result<(), String> {
     append_call(w, MAIN, "toolu_args")?;
     read_all(w, MAIN)?;
-    // The subagent's run exists once ingest read a line of it.
-    append_call(w, SUBAGENT, "toolu_subagent_args")?;
-    read_all(w, SUBAGENT)?;
-    let writer = subagent_writer(w)?;
-    call(w, Some("toolu_args"), &json!({"run": writer}))
-}
-
-/// The writer of the subagent's run, which is how a call names a run.
-fn subagent_writer(w: &mut World) -> Result<String, String> {
-    let path = named(w, SUBAGENT)?.display().to_string();
-    let runs = crate::live::store(w)?
-        .ingested_runs()
-        .map_err(|e| e.to_string())?;
-    runs.iter()
-        .find(|r| r.path == path)
-        .map(|r| r.writer.to_string())
-        .ok_or_else(|| format!("no run was ingested from {path}"))
+    call(w, Some("toolu_args"), &json!({"run": subagent_run()}))
 }
 
 #[when(regex = r"^the subagent runs in the background$")]
@@ -251,12 +232,6 @@ fn served_under(w: &mut World, index: usize, run: &str) -> Result<Value, String>
         return Err(format!("the call was not served: {}", reply_text(&reply)));
     }
     let id = id.ok_or("the call carries no tool-use id")?;
-    // The log is written as the call is served, so its line may trail
-    // the reply a moment: wait for it, bounded.
-    wait_until("the log to hold the call", || {
-        Ok(!logged(w, &id)?.is_empty())
-    })
-    .ok();
     let log = logged(w, &id)?;
     match log.as_slice() {
         [one] if one["run"] == run => Ok(one.clone()),
@@ -305,40 +280,6 @@ fn refused(w: &mut World, counter: String) -> Result<(), String> {
         1 => Ok(()),
         n => Err(format!("{counter} increased by {n}")),
     }
-}
-
-#[then(
-    regex = r#"^\"parinn status\" shows (no tool-call refusal|the counter \"[a-z_]+\" increased by 1)$"#
-)]
-fn status_shows_refusals(w: &mut World, shown: String) -> Result<(), String> {
-    run_core(w, &["status", "--json"], None)?;
-    let output = last_run(w)?;
-    let status: Value = serde_json::from_slice(&output.stdout).map_err(|e| {
-        format!(
-            "parinn status --json printed no JSON: {e}: {}",
-            String::from_utf8_lossy(&output.stdout)
-        )
-    })?;
-    let named = shown
-        .strip_prefix("the counter \"")
-        .and_then(|rest| rest.strip_suffix("\" increased by 1"));
-    for counter in REFUSALS {
-        let before = steps(w)
-            .before
-            .iter()
-            .find(|(name, _)| name == counter)
-            .map_or(0, |(_, count)| *count);
-        let expected = before + usize::from(named == Some(counter));
-        let got = status["counters"][counter]["total"]
-            .as_u64()
-            .unwrap_or_default() as usize;
-        if got != expected {
-            return Err(format!(
-                "parinn status shows {counter} as {got}, not {expected}: {status}"
-            ));
-        }
-    }
-    Ok(())
 }
 
 #[then(

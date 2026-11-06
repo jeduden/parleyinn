@@ -81,11 +81,11 @@ Rows that stay `@pending` after M1, with their remaining milestone
   -19, PRV rows (above).
 
 Passing and off `@pending`: ENG-09, SEC-18, REC-04, REC-08, REC-12, REC-26,
-PRV-14, RCL-02 (9 of 9), REC-17. REC-26's typed rows need
+RCL-02 (9 of 9), REC-17. REC-26's typed rows need
 `unshare -p -f --mount-proc`. Resume past a marker: ingest seat, `ingested`.
 An unconfirmed purge never re-records a purged line that carries a `uuid`;
-known limit: a purged line with no `uuid` can still be re-recorded. PRV-14's
-race fix is not kept (the binding settles 300 ms, M5's task 11).
+known limit: a purged line with no `uuid` can still be re-recorded. PRV-14 stays
+`@pending` (user's ruling): its ambiguous-run race closes in M5's task 11.
 
 By the user's final ruling SEC-05 (its transcript rows) and windowed ingest are
 M5's; ingest and live capture read a transcript whole, as on main. The review

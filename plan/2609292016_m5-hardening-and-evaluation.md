@@ -59,10 +59,10 @@ ENG-25, the §11 evaluation, the external review and the pilot.
       the consumed prefix, replays the classifier from byte 0 and re-learns
       identifiers on each call), against NFR-01 and NFR-05
 
-11. Close PRV-14's ambiguous-run race in code: the M1 binding adds a 300 ms
-    settle in `both_runs` of
-    `tooling/scenario/tests/bdd/provenance_tool_calls.rs` to hide it; remove
-    the settle once the race is closed
+11. PRV-14 stays `@pending` (user's ruling, M1): close its ambiguous-run
+    race in code, so a call that arrives before the server read both runs'
+    tool-use ids waits for that read and is refused as ambiguous, then take
+    it off `@pending` with a binding that needs no settle
 
 ## Acceptance Criteria
 
@@ -71,6 +71,6 @@ ENG-25, the §11 evaluation, the external review and the pilot.
   line (I1), recall never waits on a transcript poll, and the ingest of a
   resumed source costs no more than the bytes it adds, within NFR-01 and
   NFR-05
-- [ ] PRV-14 passes with no settle in its binding
+- [ ] `@PRV-14` is off `@pending` and passing with no settle in its binding
 - [ ] No scenario tagged P0 or P1 is still @pending, or each remaining
   one is deferred with signed-off rationale

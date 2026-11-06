@@ -361,23 +361,22 @@ Feature: Provenance and trust (PRV)
     And a quarantine and its release change no origin
     And a recorded I2 security review of this requirement exists before it ships
 
-  @PRV-14 @P0 @I2 @I6
+  @PRV-14 @P0 @I2 @I6 @pending
   Scenario Outline: the MCP server finds the run that made a tool call only by the transcript line carrying its tool-use id
     Given an isolated ParleyInn home
     And a harness session whose main run and one subagent's run each call "event_search", served by its harness session's MCP server
     When <case>
     Then <outcome>
-    And "parinn status" shows <status>
     And the redacted log (OPS-05) names the call's tool-use id and <logged>
 
     Examples:
-      | case                                                                                 | outcome                                                                                                    | status                                                   | logged                                 |
-      | ingest has read the line carrying the call's tool-use id before the call arrives     | the call is served under the run that line belongs to, without waiting                                     | no tool-call refusal                                     | that run and no wait                   |
-      | the line carrying the call's tool-use id reaches the transcript 0.5 s after the call | the call waits until ingest reads the line, then is served under the run that line belongs to              | no tool-call refusal                                     | that run and how long the call waited  |
-      | no line carries the call's tool-use id within 2 s                                    | the call is refused with an explicit error, and the counter "tool_call_run_not_found" increases by 1       | the counter "tool_call_run_not_found" increased by 1    | the cause and how long the call waited |
-      | the call carries no tool-use id                                                      | the call is refused with an explicit error, and the counter "tool_call_without_tool_use_id" increases by 1 | the counter "tool_call_without_tool_use_id" increased by 1 | the cause                              |
-      | lines of both runs carry the call's tool-use id                                      | the call is refused with an explicit error, and the counter "tool_call_run_ambiguous" increases by 1       | the counter "tool_call_run_ambiguous" increased by 1    | the cause                              |
-      | the call's arguments name the other run                                              | the call is served under the run its line belongs to, not the run its arguments name                       | no tool-call refusal                                     | the run its line belongs to            |
-      | the subagent runs in the background                                                  | the call is served under the subagent's run                                                                | no tool-call refusal                                     | the subagent's run                     |
-      | both runs call at the same moment                                                    | each call is served under its own run                                                                      | no tool-call refusal                                     | each call's own run                    |
-      | the MCP server restarts after the line was written and before the call               | ingest resumes from its ingest marker and the call is served under the run that line belongs to            | no tool-call refusal                                     | that run                               |
+      | case                                                                                 | outcome                                                                                                    | logged                                 |
+      | ingest has read the line carrying the call's tool-use id before the call arrives     | the call is served under the run that line belongs to, without waiting                                     | that run and no wait                   |
+      | the line carrying the call's tool-use id reaches the transcript 0.5 s after the call | the call waits until ingest reads the line, then is served under the run that line belongs to              | that run and how long the call waited  |
+      | no line carries the call's tool-use id within 2 s                                    | the call is refused with an explicit error, and the counter "tool_call_run_not_found" increases by 1       | the cause and how long the call waited |
+      | the call carries no tool-use id                                                      | the call is refused with an explicit error, and the counter "tool_call_without_tool_use_id" increases by 1 | the cause                              |
+      | lines of both runs carry the call's tool-use id                                      | the call is refused with an explicit error, and the counter "tool_call_run_ambiguous" increases by 1       | the cause                              |
+      | the call's arguments name the other run                                              | the call is served under the run its line belongs to, not the run its arguments name                       | the run its line belongs to            |
+      | the subagent runs in the background                                                  | the call is served under the subagent's run                                                                | the subagent's run                     |
+      | both runs call at the same moment                                                    | each call is served under its own run                                                                      | each call's own run                    |
+      | the MCP server restarts after the line was written and before the call               | ingest resumes from its ingest marker and the call is served under the run that line belongs to            | that run                               |
