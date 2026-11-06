@@ -1520,22 +1520,6 @@ impl Store {
         found.map(|mut r| r.pop())
     }
 
-    /// The ingested run `writer` keeps, none when it keeps none: a
-    /// read by the table's primary key.
-    ///
-    /// # Errors
-    ///
-    /// Fails when SQLite does or a row does not parse.
-    pub fn ingested_run_of(&self, writer: WriterId) -> Result<Option<IngestedRun>, StoreError> {
-        source::runs(
-            &self.conn,
-            "WHERE writer = ?1 AND ?2 = ?2",
-            &writer.to_string(),
-            "",
-        )
-        .map(|mut r| r.pop())
-    }
-
     /// Every ingested run, in the order they were kept.
     ///
     /// # Errors

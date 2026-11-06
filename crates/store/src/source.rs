@@ -576,6 +576,22 @@ pub(crate) fn refuse_copies(
 }
 
 impl Store {
+    /// The ingested run `writer` keeps, none when it keeps none: a
+    /// read by the table's primary key.
+    ///
+    /// # Errors
+    ///
+    /// Fails when SQLite does or a row does not parse.
+    pub fn ingested_run_of(&self, writer: WriterId) -> Result<Option<IngestedRun>, StoreError> {
+        runs(
+            &self.conn,
+            "WHERE writer = ?1 AND ?2 = ?2",
+            &writer.to_string(),
+            "",
+        )
+        .map(|mut r| r.pop())
+    }
+
     /// The position, length and harness UUID left for each purged line
     /// of source `id`, with no event association (SEC-31).
     pub fn purged_places(&self, id: i64) -> Result<Vec<Place>, StoreError> {
