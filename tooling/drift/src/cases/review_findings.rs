@@ -143,24 +143,23 @@ pub(super) fn review_place_form_cases() -> Vec<Case> {
     ]
 }
 
-/// The drift the review's second attempt must not bring (ENG-28), late
-/// so adding it moves no earlier case to another shard: a retry that
-/// merges the first attempt's findings into a second report the gate
-/// refuses again, so the two refused reports pass as one.
+/// The drift the review's rerun rule must not bring (ENG-28), late so
+/// adding it moves no earlier case to another shard: a run that cost
+/// money and was cut off, run again from scratch and paid for twice.
 pub(super) fn review_retry_cases() -> Vec<Case> {
     vec![case(
-        "a retried specialist's refused report rescued by its first attempt's findings",
+        "a charged run that did not answer is run again",
         "ENG-28",
         Injection::replace(
             "tooling/review-run/src/retry.rs",
-            "    let (Some(_), Some(failure)) = (&report, second.failure.clone()) else {\n        return report;\n    };\n",
-            "    let (Some(_), failure) = (&report, second.failure.clone()) else {\n        return report;\n    };\n    let failure = failure.unwrap_or_default();\n",
+            "    if class == Class::Again && paid(&first) {\n",
+            "    if class == Class::Again && paid(&first) && false {\n",
         ),
         cargo_lib_test(
             "review-run",
-            "retry::tests::a_report_refused_twice_stays_refused_and_the_first_s_findings_do_not_rescue_it",
+            "retry::tests::a_run_cut_off_after_it_cost_money_keeps_what_it_stated_and_is_not_run_again",
         ),
-        "a_report_refused_twice_stays_refused_and_the_first_s_findings_do_not_rescue_it",
+        "a_run_cut_off_after_it_cost_money_keeps_what_it_stated_and_is_not_run_again",
     )]
 }
 

@@ -34,6 +34,10 @@ pub const REFUSED: &str = r#"{"type":"result","subtype":"success","is_error":tru
 /// What it logs for a run its own cost cap stopped.
 pub const CAPPED: &str = r#"{"type":"result","subtype":"error_max_budget_usd","is_error":true,"result":"","total_cost_usd":1.01,"num_turns":9}"#;
 
+/// What it logs for a run its turn budget cut off after it cost money: not
+/// capped, not turned away, only paid for.
+pub const CUT: &str = r#"{"type":"result","subtype":"error_max_turns","is_error":true,"result":"","total_cost_usd":0.05,"num_turns":20}"#;
+
 /// A stand-in for the `claude` command line: it keeps every command,
 /// fails the first runs of each agent [`ControlHost::fails`] names as
 /// it says, and answers every other run as [`Recorder`] does.
@@ -294,8 +298,8 @@ impl Clock for Waits {
 }
 
 /// What is wrong with running again: an overloaded run not waited for
-/// and run again, or a run its cost cap stopped or whose credential was
-/// refused run again.
+/// and run again, or a run whose credential was refused or that was
+/// charged and cut off run again.
 #[must_use]
 pub fn retry_problems(checkout: &Checkout, workdir: &Path) -> Vec<String> {
     if let Err(e) = review_runs::prepare(checkout, workdir) {
@@ -305,7 +309,7 @@ pub fn retry_problems(checkout: &Checkout, workdir: &Path) -> Vec<String> {
         fails: BTreeMap::from([
             ("lang-rust", (1, Some(OVERLOADED))),
             ("test-engineer-unit", (1, Some(REFUSED))),
-            ("lang-markdown", (1, Some(CAPPED))),
+            ("lang-markdown", (1, Some(CUT))),
         ]),
         ..ControlHost::default()
     };
@@ -338,7 +342,8 @@ pub fn retry_problems(checkout: &Checkout, workdir: &Path) -> Vec<String> {
 /// What is wrong with how often each agent ran, `runs_of` it, and the
 /// waits `waited`: lang-rust, turned away as overloaded, not run twice
 /// after one wait of 15 s or more, and test-engineer-unit, whose
-/// credential was refused, or lang-markdown, its cap reached, run again.
+/// credential was refused, or lang-markdown, cut off after it cost money,
+/// run again.
 #[must_use]
 pub fn retried_problems(runs_of: &dyn Fn(&str) -> usize, waited: &[Duration]) -> Vec<String> {
     let mut problems = Vec::new();
@@ -353,7 +358,7 @@ pub fn retried_problems(runs_of: &dyn Fn(&str) -> usize, waited: &[Duration]) ->
     for agent in ["test-engineer-unit", "lang-markdown"] {
         if runs_of(agent) != 1 {
             problems.push(format!(
-                "{agent}, which can never succeed by running again, ran {} times",
+                "{agent}, which was refused or charged and cut off, ran {} times, not once",
                 runs_of(agent)
             ));
         }

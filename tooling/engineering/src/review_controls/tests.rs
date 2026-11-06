@@ -100,8 +100,8 @@ fn an_overloaded_run_not_waited_for_or_one_that_cannot_succeed_run_again_is_name
         [
             "lang-rust, turned away as overloaded, ran 2 times after waits of [1s], not twice \
              after one wait of 15 s or more",
-            "test-engineer-unit, which can never succeed by running again, ran 2 times",
-            "lang-markdown, which can never succeed by running again, ran 2 times"
+            "test-engineer-unit, which was refused or charged and cut off, ran 2 times, not once",
+            "lang-markdown, which was refused or charged and cut off, ran 2 times, not once"
         ]
     );
 }

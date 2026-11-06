@@ -185,7 +185,7 @@ pub(super) fn review_agent_cases() -> Vec<Case> {
             "a deep generalist whose turn budget is no number",
             Injection::replace(
                 ".claude/agents/review-security-deep.md",
-                "maxTurns: 12\n",
+                "maxTurns: 60\n",
                 "maxTurns: many\n",
             ),
             "the_checkout_s_review_agents_are_all_defined",

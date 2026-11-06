@@ -76,7 +76,7 @@ fn review_run_breaks(w: &mut World) -> Result<(), String> {
 }
 
 #[then(
-    regex = r"^review-run waits with backoff before it runs again an agent the API turned away as overloaded or rate-limited, runs it a third time at most, leaves it a named gap when no deadline is left to wait, and never runs again one a cost cap stopped or whose credential was refused$"
+    regex = r"^review-run waits with backoff before it runs again an agent the API turned away as overloaded or rate-limited, runs it a third time at most, leaves it a named gap when no deadline is left to wait, and never runs again one a cost cap stopped, whose credential was refused or that was charged$"
 )]
 fn review_run_backs_off(w: &mut World) -> Result<(), String> {
     let work = testkit::TempDir::new().map_err(|e| format!("make a work directory: {e}"))?;
@@ -98,7 +98,7 @@ fn review_runs_in_parts(w: &mut World) -> Result<(), String> {
 }
 
 #[then(
-    regex = r"^review-run refuses a specialist's report that cites an id no requirement or invariant has, runs that specialist once more told why, and names the report refused again and a generalist's finding line it cannot read, each in a blocking finding, so the review requests changes and the gate posts that request rather than failing$"
+    regex = r"^review-run refuses a specialist's report that cites an id no requirement or invariant has, does not run that specialist again, it was paid for, and names its refused report and a generalist's finding line it cannot read, each in a blocking finding, so the review requests changes and the gate posts that request rather than failing$"
 )]
 fn review_run_names_refusals(w: &mut World) -> Result<(), String> {
     let work = testkit::TempDir::new().map_err(|e| format!("make a work directory: {e}"))?;
