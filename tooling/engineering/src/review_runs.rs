@@ -254,10 +254,55 @@ pub fn part_problems(name: &str, count: usize, prompts: &[(String, String)]) -> 
 /// The finding a stand-in specialist states in its text.
 pub const FINDING: &str = "src/a.rs:1 — if not addressed: a long line hides a bug — I9";
 
+/// The lines one `Read` of the agent's file tool takes unless told
+/// otherwise.
+pub const CHUNK: usize = 2000;
+
+/// The diff file `command`'s prompt tells its specialist to read, its
+/// part's when it runs in parts; none when it names none.
+#[must_use]
+pub fn diff_of(command: &Command) -> Option<String> {
+    let prompt = prompt_of(command);
+    let rest = prompt.split("Read only your own diff, `").nth(1)?;
+    rest.split('`').next().map(str::to_owned)
+}
+
+/// The stream-json lines of a main-thread `Read` of `path`, `limit`
+/// lines from line `offset`, in the model call `id`, and the tool's
+/// result, as the `claude` command line logs them.
+#[must_use]
+pub fn read_lines(id: &str, path: &str, (offset, limit): (usize, usize)) -> String {
+    let tool = format!("{id}-read-{offset}");
+    let call = serde_json::json!({"type": "assistant", "parent_tool_use_id": null, "message": {
+        "id": id, "model": "claude-haiku-5-5", "usage": {},
+        "content": [{"type": "tool_use", "id": tool, "name": "Read",
+                     "input": {"file_path": path, "offset": offset, "limit": limit}}]}});
+    let result = serde_json::json!({"type": "user", "parent_tool_use_id": null, "message": {
+        "content": [{"type": "tool_result", "tool_use_id": tool,
+                     "content": format!("lines {offset} to {} of {path}", offset + limit - 1)}]}});
+    format!("{call}\n{result}\n")
+}
+
+/// The reads, in the model call `id`, of the whole diff `command`'s
+/// prompt names, in chunks of [`CHUNK`] lines from its first, as
+/// [`read_lines`] logs them; none when it names none.
+#[must_use]
+pub fn reads_of(command: &Command, id: &str) -> String {
+    let Some(rel) = diff_of(command) else {
+        return String::new();
+    };
+    let path = command.cwd.join(&rel);
+    let lines = fs::read_to_string(&path).map_or(0, |t| t.lines().count());
+    let path = path.display().to_string();
+    (0..lines.max(1).div_ceil(CHUNK))
+        .map(|at| read_lines(id, &path, (at * CHUNK + 1, CHUNK)))
+        .collect()
+}
+
 /// Answers `command` as `agent` would, in its log alone: a specialist
-/// states one linked finding in its text and answers its outcome line;
-/// a generalist keeps, as a nit, the finding of the specialist
-/// [`GENERALISTS`] names for it.
+/// reads its whole diff, states one linked finding in its text and
+/// answers its outcome line; a generalist keeps, as a nit, the finding
+/// of the specialist [`GENERALISTS`] names for it.
 fn answer(command: &Command, agent: &str) -> Result<(), String> {
     let (text, result) = if let Some((_, path, from)) =
         GENERALISTS.iter().find(|(g, _, _)| *g == agent)
@@ -280,12 +325,15 @@ fn answer(command: &Command, agent: &str) -> Result<(), String> {
         .stdout_to
         .as_deref()
         .ok_or("the run logs to no file")?;
+    let id = format!("m-{agent}");
     let call = serde_json::json!({"type": "assistant", "parent_tool_use_id": null, "message": {
-        "id": format!("m-{agent}"), "model": "claude-haiku-5-5", "usage": {},
+        "id": id, "model": "claude-haiku-5-5", "usage": {},
         "content": [{"type": "text", "text": text}]}});
     let line = serde_json::json!({"type": "result", "subtype": "success", "is_error": false,
         "result": result, "total_cost_usd": 0.01, "num_turns": 2});
-    fs::write(log, format!("{call}\n{line}\n")).map_err(|e| format!("write {}: {e}", log.display()))
+    let reads = reads_of(command, &id);
+    fs::write(log, format!("{reads}{call}\n{line}\n"))
+        .map_err(|e| format!("write {}: {e}", log.display()))
 }
 
 /// Lays out in `workdir` what the review job prepares for `review-run`:

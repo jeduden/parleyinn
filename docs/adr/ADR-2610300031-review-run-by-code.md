@@ -17,11 +17,13 @@ summary: >-
 > Superseded in part by [ENG-28](../srs/10-engineering-quality.md). The cost
 > cap is 5 USD per pull request, not 40 USD per review. A charged run never
 > runs again. Each deep reviewer names its own model, effort and turns.
+> Every run's log is read, cut off or not, and is never headed `incomplete:`;
+> its `Read` calls decide whether it read its whole diff. A line that does
+> not read is a blocking finding, not a refused report.
 
-It supersedes ADR-2610262245, which is marked superseded and names
-this record. The layers, gate and required check that record decided
-stay, as "What stays" says; the reports as files change, as the
-decisions on the run log say.
+It supersedes ADR-2610262245, which is marked superseded and names this record.
+The layers, gate and required check that record decided stay, as "What stays"
+says; the reports as files change, as the decisions on the run log say.
 
 ## Context
 
@@ -30,20 +32,18 @@ call the specialists the review bundle dispatches and then the
 generalists, and answer with the review outcome. The gate refuses a
 review whose run log shows a dispatched agent left out.
 
-That agent failed to decide the review of three pull requests. It
-took a specialist call's reply that the call runs in the background
-for an answer. It answered before the generalists were called, and
-the gate refused its outcome. Rewording its skill
-(jeduden/parleyinn#99) did not remove the failure, and the polling
-that change added spends turns of a fixed budget. Calling every name
-in a list and waiting for each is what a program does exactly; a model
-does it only most of the time.
+That agent failed to decide the review of three pull requests. It took a
+specialist call's reply that the call runs in the background for an answer. It
+answered before the generalists were called, and the gate refused its outcome.
+Rewording its skill (jeduden/parleyinn#99) did not remove the failure, and the
+polling that change added spends turns of a fixed budget. Calling every name in
+a list and waiting for each is what a program does exactly; a model does it only
+most of the time.
 
-The pieces a program needs were already there. `review-bundle` writes
-the dispatch. `review-eval` starts one agent as `claude --agent` with
-the review's tools, write rule and turn budget, and reads its run log.
-`review-gate` reads the outcome, the consulted list, the answers and
-the reports.
+The pieces a program needs were already there. `review-bundle` writes the
+dispatch. `review-eval` starts one agent as `claude --agent` with the review's
+tools, write rule and turn budget, and reads its run log. `review-gate` reads
+the outcome, the consulted list, the answers and the reports.
 
 Each specialist also marked its findings `blocking` or `nit` and ended
 its report `outcome: sound`, `nits` or `blocking`, and a blocking

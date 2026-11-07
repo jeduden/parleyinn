@@ -136,11 +136,11 @@ fn a_specialist_run_again_after_its_report_was_refused_is_named() {
     assert!(retry_problems(&["a".to_owned()]).is_empty());
     assert_eq!(
         retry_problems(&["a".to_owned(), "b".to_owned()]),
-        ["review-run ran lang-rust 2 times, not once after its report was refused"]
+        ["review-run ran lang-rust 2 times, not once after it cited an unknown id"]
     );
     assert_eq!(
         retry_problems(&[]),
-        ["review-run ran lang-rust 0 times, not once after its report was refused"]
+        ["review-run ran lang-rust 0 times, not once after it cited an unknown id"]
     );
 }
 
@@ -191,5 +191,8 @@ fn a_gate_whose_files_cannot_be_written_is_named() {
     let problems = gate_problems(work.path());
 
     assert_eq!(problems.len(), 1, "{problems:?}");
-    assert!(problems[0].starts_with("write "), "{problems:?}");
+    assert!(
+        problems[0].starts_with("the gate failed rather than posting: write "),
+        "{problems:?}"
+    );
 }

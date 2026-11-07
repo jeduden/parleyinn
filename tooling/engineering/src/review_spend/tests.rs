@@ -98,6 +98,25 @@ fn a_review_held_to_the_cap_as_it_should_be_has_no_problem() {
 }
 
 #[test]
+fn a_review_that_started_every_agent_may_approve() {
+    let gaps = BTreeMap::new();
+    let held = Held {
+        started: 5,
+        out: "verdict=approve\nover_budget=0\n",
+        gaps: &gaps,
+        spend: Ok(0.05),
+        at_once: 1,
+    };
+    let want = Want {
+        started: 5,
+        at_once: 1,
+        spent: 0.05,
+    };
+
+    assert_eq!(held_problems("c", &held, want), Vec::<String>::new());
+}
+
+#[test]
 fn a_review_past_the_cap_that_runs_on_approves_or_loses_the_spend_is_named() {
     let gaps = over(1);
     let held = Held {

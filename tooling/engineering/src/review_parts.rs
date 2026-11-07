@@ -5,8 +5,10 @@
 //! each part's run, a finding every part states and one of its own
 //! part's. Run whole, the specialist must run once per part, each told
 //! its own part's diff file, and its report must be the merge of its
-//! parts'; run with one part cut off at its turn budget, the review must
-//! fail closed naming that part, every part's findings kept.
+//! parts'; run with one part cut off at its turn budget after it read
+//! its whole part, that part's log must be read as it stands: the
+//! specialist consulted, named nowhere as not reviewed, and every part's
+//! findings kept.
 
 use std::fs;
 use std::path::Path;
@@ -39,8 +41,9 @@ pub fn part_of(prompt: &str) -> Option<usize> {
 }
 
 /// A stand-in for the `claude` command line: each part of the
-/// specialist states [`FINDING`] and its own part's, then its outcome
-/// line, except part `cut`, whose run ends at its turn budget; the
+/// specialist reads its whole part, states [`FINDING`] and its own
+/// part's, then its outcome line, except part `cut`, whose run ends at
+/// its turn budget after its findings; the
 /// generalist keeps the finding as a nit. Every specialist prompt is
 /// kept.
 #[derive(Debug, Default)]
@@ -83,7 +86,8 @@ impl Host for PartHost {
         let line = serde_json::json!({"type": "result", "subtype": subtype,
             "is_error": subtype != "success", "result": result, "total_cost_usd": 0.01,
             "num_turns": 2});
-        fs::write(log, format!("{call}\n{line}\n"))
+        let reads = crate::review_runs::reads_of(command, "m");
+        fs::write(log, format!("{reads}{call}\n{line}\n"))
             .map_err(|e| format!("write {}: {e}", log.display()))?;
 
         Ok(Output {
@@ -214,36 +218,39 @@ pub fn whole_problems(prompts: &[String], workdir: &Path) -> Vec<String> {
     problems
 }
 
-/// What is wrong with what a run whose part 2 was cut off wrote in
-/// `workdir`: a review that does not fail naming that part, and a
-/// report that does not keep every part's findings under its
-/// incomplete line.
+/// What is wrong with what a run whose part 2 was cut off, after it
+/// read its whole part and stated its findings, wrote in `workdir`: the
+/// specialist not consulted or named not reviewed, and a report that is
+/// not every part's findings ended with the outcome merged from theirs,
+/// part 2's given by its lines.
 #[must_use]
 pub fn cut_problems(workdir: &Path) -> Vec<String> {
     let mut problems = Vec::new();
     let read = |rel: &str| fs::read_to_string(workdir.join(rel)).unwrap_or_default();
-    let named = format!(
-        "{SPECIALIST} did not answer (part 2 of {}: its run ended with error_max_turns)",
-        FILES.len()
-    );
-    let blocks = review_gate::parse_outcome(&read("review/outcome.json")).is_ok_and(|o| {
-        o.verdict == review_gate::REQUEST_CHANGES_VERDICT
-            && o.findings
-                .iter()
-                .any(|f| f.severity == review_gate::BLOCKING && f.body.starts_with(&named))
-    });
-    if !blocks {
+    if !read("review/consulted.json").contains(&format!("\"{SPECIALIST}\"")) {
         problems.push(format!(
-            "a part of {SPECIALIST} that did not answer does not fail the review naming it"
+            "{SPECIALIST}, whose part 2 was cut off after it read its whole part, is not consulted"
+        ));
+    }
+    let gaps = review_run::gaps::parse(&read(review_run::gaps::GAPS)).unwrap_or_default();
+    if let Some(gap) = gaps.iter().find(|g| g.name == SPECIALIST) {
+        problems.push(format!(
+            "{SPECIALIST}, which read every part whole, is named not reviewed: {}",
+            gap.reason
         ));
     }
     let report = read(&format!("review/reports/{SPECIALIST}.md"));
-    let keeps = report.starts_with("incomplete: part 2 of ")
-        && (1..=FILES.len()).all(|i| report.contains(&own_finding(i)));
-    if !keeps {
+    let mut want: Vec<String> = vec![FINDING.to_owned()];
+    want.extend((1..=FILES.len()).map(own_finding));
+    want.push(format!(
+        "outcome: findings — in {} parts: part 1, findings — part 1.; part 2, findings — 2 \
+         findings stated in the run log; part 3, findings — part 3.",
+        FILES.len()
+    ));
+    if report != format!("{}\n", want.join("\n")) {
         problems.push(format!(
-            "{SPECIALIST}'s report does not keep every part's findings under its incomplete \
-             line: {report:?}"
+            "{SPECIALIST}'s report does not keep every part's findings, part 2's read as it \
+             stands: {report:?}"
         ));
     }
 

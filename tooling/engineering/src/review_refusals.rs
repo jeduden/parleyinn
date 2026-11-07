@@ -1,18 +1,16 @@
 //! ENG-28: what the review's runner names instead of passing by. The
 //! gate holds no tree, so it reads a cited id by its shape alone; the
-//! runner, which reads the SRS, names a specialist's report that cites
-//! an id no requirement or invariant has in a blocking finding. A
+//! runner, which reads the SRS, names a specialist's finding that cites
+//! an id no requirement or invariant has in a blocking finding, quoting
+//! it, and keeps it out of the report its generalist reads. A
 //! generalist's finding line the runner cannot read is named the same
-//! way, never dropped as prose. A refused report came from a run that
-//! was paid for, so its specialist is not run again and what it stated
-//! stands. The check runs `review-run` on a work directory
+//! way, never dropped as prose. The run was paid for, so its specialist
+//! is not run again. The check runs `review-run` on a work directory
 //! with a stand-in for the `claude` command line whose specialist cites
 //! such an id on every run and whose generalist answers such a line, and
 //! requires the specialist run once, a review that requests changes
-//! naming both, and the gate, run on what
-//! `review-run` wrote, posting that request rather than failing: an
-//! unknown id is the one refusal the gate cannot read from the report
-//! alone.
+//! naming both, and the gate, run on what `review-run` wrote, posting
+//! that request rather than failing.
 
 use std::fs;
 use std::path::Path;
@@ -83,7 +81,8 @@ impl Host for RefusalHost {
             "content": [{"type": "text", "text": text}]}});
         let line = serde_json::json!({"type": "result", "subtype": "success",
             "is_error": false, "result": result, "total_cost_usd": 0.01, "num_turns": 2});
-        fs::write(log, format!("{call}\n{line}\n"))
+        let reads = crate::review_runs::reads_of(command, "m");
+        fs::write(log, format!("{reads}{call}\n{line}\n"))
             .map_err(|e| format!("write {}: {e}", log.display()))?;
 
         Ok(Output {
@@ -161,14 +160,14 @@ pub fn outcome_problems(workdir: &Path) -> Vec<String> {
 }
 
 /// What is wrong with the specialist's runs, by `prompts`, each one's
-/// prompt: run more than once. Its first run was paid for and its report
-/// refused, so what it stated stands and it is not paid for again.
+/// prompt: run more than once. Its first run was paid for, so its log is
+/// read as it stands and it is not paid for again.
 #[must_use]
 pub fn retry_problems(prompts: &[String]) -> Vec<String> {
     match prompts.len() {
         1 => Vec::new(),
         n => vec![format!(
-            "review-run ran {SPECIALIST} {n} times, not once after its report was refused"
+            "review-run ran {SPECIALIST} {n} times, not once after it cited an unknown id"
         )],
     }
 }
@@ -187,12 +186,29 @@ const HEAD: &str = "0123456789abcdef0123456789abcdef01234567";
 /// posts anything but a request for changes.
 #[must_use]
 pub fn gate_problems(workdir: &Path) -> Vec<String> {
+    match gate(workdir) {
+        Ok(review) if review.event == review_gate::REQUEST_CHANGES => Vec::new(),
+        Ok(review) => vec![format!(
+            "the gate posts {}, not a request for changes",
+            review.event
+        )],
+        Err(why) => vec![format!("the gate failed rather than posting: {why}")],
+    }
+}
+
+/// The review the gate decides from what `review-run` wrote in
+/// `workdir`, on a head whose CI passed and with no deterministic
+/// finding.
+///
+/// # Errors
+///
+/// Fails with the gate's last line of errors when it posts nothing, or
+/// naming the file it could not be handed.
+pub fn gate(workdir: &Path) -> Result<review_gate::Review, String> {
     let ci = r#"{"id": 1, "name": "CI", "status": "completed", "conclusion": "success"}"#;
     for (rel, text) in [(CHECK_RUNS, ci), (CHECKED, "[]")] {
         let path = workdir.join(rel);
-        if let Err(e) = fs::write(&path, text) {
-            return vec![format!("write {}: {e}", path.display())];
-        }
+        fs::write(&path, text).map_err(|e| format!("write {}: {e}", path.display()))?;
     }
     let at = |rel: &str| workdir.join(rel).display().to_string();
     let args = [
@@ -213,20 +229,10 @@ pub fn gate_problems(workdir: &Path) -> Vec<String> {
     let read = |path: &str| fs::read_to_string(path);
     let code = review_gate::cli::run(args, &mut out, &mut err, &read);
     match serde_json::from_slice::<review_gate::Review>(&out) {
-        Ok(review) if code == review_gate::cli::EXIT_OK => {
-            if review.event == review_gate::REQUEST_CHANGES {
-                Vec::new()
-            } else {
-                vec![format!(
-                    "the gate posts {}, not a request for changes",
-                    review.event
-                )]
-            }
-        }
+        Ok(review) if code == review_gate::cli::EXIT_OK => Ok(review),
         _ => {
             let err = String::from_utf8_lossy(&err);
-            let why = err.lines().last().unwrap_or_default();
-            vec![format!("the gate failed rather than posting: {why}")]
+            Err(err.lines().last().unwrap_or_default().to_owned())
         }
     }
 }

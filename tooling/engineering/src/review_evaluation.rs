@@ -107,7 +107,8 @@ fn table_case() -> Case {
 /// its answer or only in it, `answer` whether its answer is the outcome
 /// line, `more` than it or `no outcome` line, `outcome` whether that
 /// line gives the outcome the case expects, and `answered` whether the
-/// run ended with a successful result.
+/// run ended with a successful result, `cut` off after it was charged,
+/// or neither, with no model call.
 fn run_outcome(row: &BTreeMap<String, String>) -> String {
     let column = |key: &str| row.get(key).map_or("", String::as_str);
     let (component, case) = (table_component(), table_case());
@@ -147,6 +148,11 @@ fn run_outcome(row: &BTreeMap<String, String>) -> String {
             "success".to_owned()
         } else {
             "error_max_turns".to_owned()
+        },
+        cost: if column("answered") == "cut" {
+            0.05
+        } else {
+            0.0
         },
         answer,
         texts,
@@ -335,7 +341,9 @@ fn table_suite() -> SuiteRecord {
 fn failed_on(failure: &str) -> &'static str {
     if failure.starts_with("did not answer") {
         "no answer"
-    } else if failure.starts_with("report refused") {
+    } else if failure.starts_with("ended without") {
+        "cut"
+    } else if failure.starts_with("report") || failure.starts_with("set aside") {
         "report"
     } else if failure.starts_with("outcome ") {
         "outcome"

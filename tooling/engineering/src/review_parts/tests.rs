@@ -52,17 +52,26 @@ fn a_whole_run_that_did_not_split_or_merge_is_named() {
 }
 
 #[test]
-fn a_cut_run_that_neither_fails_nor_keeps_the_findings_is_named() {
+fn a_cut_part_read_whole_that_is_not_consulted_or_is_named_not_reviewed_is_named() {
     let work = TempDir::new().unwrap();
+    let gaps = work.path().join(review_run::gaps::GAPS);
+    std::fs::create_dir_all(gaps.parent().unwrap()).unwrap();
+    std::fs::write(
+        &gaps,
+        format!(r#"[{{"name": "{SPECIALIST}", "kind": "specialist", "reason": "partial: x"}}]"#),
+    )
+    .unwrap();
 
     let problems = cut_problems(work.path());
 
     assert_eq!(
         problems,
         [
-            "a part of test-engineer-unit that did not answer does not fail the review naming it",
-            "test-engineer-unit's report does not keep every part's findings under its \
-             incomplete line: \"\"",
+            "test-engineer-unit, whose part 2 was cut off after it read its whole part, is not \
+             consulted",
+            "test-engineer-unit, which read every part whole, is named not reviewed: partial: x",
+            "test-engineer-unit's report does not keep every part's findings, part 2's read as \
+             it stands: \"\"",
         ]
     );
 }

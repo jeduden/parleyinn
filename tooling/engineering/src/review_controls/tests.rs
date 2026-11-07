@@ -92,7 +92,8 @@ fn a_review_that_starts_a_generalist_past_the_breaker_or_names_no_abort_is_named
 fn an_overloaded_run_not_waited_for_or_one_that_cannot_succeed_run_again_is_named() {
     let runs = |n: usize| move |agent: &str| if agent == "lang-rust" { 2 } else { n };
     let capped = vec![format!(
-        "review-spec (generalist): did not answer: x; not run again: {CAP_STOPPED}"
+        "review-spec (generalist): ran, its log read: x; not run again: {CAP_STOPPED}, so its log \
+         is read as it stands"
     )];
     assert!(retried_problems(&runs(1), &[Duration::from_secs(15)], &capped).is_empty());
 
@@ -114,7 +115,8 @@ fn an_overloaded_run_not_waited_for_or_one_that_cannot_succeed_run_again_is_name
 fn a_run_a_cost_cap_stopped_not_named_so_is_named() {
     let once = |agent: &str| if agent == "lang-rust" { 2 } else { 1 };
     let charged = vec![
-        "review-spec (generalist): did not answer: x; not run again: it cost 1.0100 USD".to_owned(),
+        "review-spec (generalist): ran, its log read: x; not run again: it cost 1.0100 USD"
+            .to_owned(),
     ];
 
     let problems = retried_problems(&once, &[Duration::from_secs(15)], &charged);

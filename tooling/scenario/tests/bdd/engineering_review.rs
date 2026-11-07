@@ -89,7 +89,7 @@ fn review_run_backs_off(w: &mut World) -> Result<(), String> {
 }
 
 #[then(
-    regex = r"^review-run runs a specialist whose diff is past its split limit in parts, each on whole files of its diff, merges their reports into its one report, and fails the review naming a part that did not answer$"
+    regex = r"^review-run runs a specialist whose diff is past its split limit in parts, each on whole files of its diff, merges their reports into its one report, and reads a part cut off at its turn budget after it read its whole part as it stands$"
 )]
 fn review_runs_in_parts(w: &mut World) -> Result<(), String> {
     let work = testkit::TempDir::new().map_err(|e| format!("make a work directory: {e}"))?;
@@ -113,7 +113,18 @@ fn review_run_reads_whole_weighings(w: &mut World) -> Result<(), String> {
 }
 
 #[then(
-    regex = r"^review-run refuses a specialist's report that cites an id no requirement or invariant has, does not run that specialist again, it was paid for, and names its refused report and a generalist's finding line it cannot read, each in a blocking finding, so the review requests changes and the gate posts that request rather than failing$"
+    regex = r"^review-run reads every specialist's run log whatever result it ended with and decides from its Read calls whether it read its whole diff: one cut off at its turn budget after reading its whole diff is consulted and the review decided on its finding, one that read part of its diff is named partial with the lines it did not read, so the gate posts the request for changes, a line saying it is no finding is set aside and listed in review/ignored.json, a finding-shaped line that does not read is its own blocking finding beside the finding kept, and one whose log holds no model call did not run, runs once more as it cost nothing, and the gate posts nothing$"
+)]
+fn review_run_reads_every_log(w: &mut World) -> Result<(), String> {
+    let work = testkit::TempDir::new().map_err(|e| format!("make a work directory: {e}"))?;
+    outcome(engineering::review_logs::review_run_reads_every_log(
+        eng(w).checkout()?,
+        work.path(),
+    ))
+}
+
+#[then(
+    regex = r"^review-run names a specialist's finding that cites an id no requirement or invariant has in a blocking finding, keeps it out of the report, does not run that specialist again, it was paid for, and names a generalist's finding line it cannot read in a blocking finding, so the review requests changes and the gate posts that request rather than failing$"
 )]
 fn review_run_names_refusals(w: &mut World) -> Result<(), String> {
     let work = testkit::TempDir::new().map_err(|e| format!("make a work directory: {e}"))?;
@@ -137,7 +148,7 @@ fn review_run_resumes(w: &mut World) -> Result<(), String> {
 }
 
 #[then(
-    regex = r"^review-run given an answer store takes every accepted answer stored under an unchanged key, runs on a new commit only the specialist whose diff changed and its generalist, never stores a refused report, and runs again an agent whose stored report fails the report check$"
+    regex = r"^review-run given an answer store takes every accepted answer stored under an unchanged key, runs on a new commit only the specialist whose diff changed and its generalist, never stores a report holding a line that does not read, and runs again an agent whose stored report fails the report check$"
 )]
 fn review_run_answer_store(w: &mut World) -> Result<(), String> {
     let work = testkit::TempDir::new().map_err(|e| format!("make a work directory: {e}"))?;

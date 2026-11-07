@@ -435,7 +435,7 @@ pub fn retried_problems(
         ));
     } else if !lines.iter().any(|l| {
         l.starts_with("review-spec (generalist): ")
-            && l.ends_with(&format!("not run again: {CAP_STOPPED}"))
+            && l.contains(&format!("not run again: {CAP_STOPPED}"))
     }) {
         problems.push(format!(
             "review-spec, stopped by its cost cap, is not told as not run again because {CAP_STOPPED}"

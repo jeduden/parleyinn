@@ -125,8 +125,11 @@ fn a_refusing_host_states_a_line_in_no_form_for_its_agent_alone() {
     let started = stored(&repo(), work.path(), host, &store, &|_| Ok(()), &[]).unwrap();
 
     assert!(started.contains(GAP));
+    // The line in no form is named apart, never in the report.
     let report = fs::read_to_string(work.path().join(format!("review/reports/{GAP}.md"))).unwrap();
-    assert!(report.contains(NO_FORM), "{report}");
+    assert!(!report.contains(NO_FORM), "{report}");
+    let gaps = fs::read_to_string(work.path().join(review_run::gaps::GAPS)).unwrap();
+    assert!(gaps.contains(&format!("{NO_FORM}`")), "{gaps}");
     let key = key_in(work.path(), GAP).unwrap();
     assert!(!store.join(key).exists());
 }
@@ -148,7 +151,7 @@ fn a_refusing_host_whose_log_is_gone_is_named() {
 }
 
 #[test]
-fn a_refused_report_found_in_the_store_is_named() {
+fn an_answer_holding_a_line_that_does_not_read_found_in_the_store_is_named() {
     let work = TempDir::new().unwrap();
     let store = work.path().join("answers");
     let key = "a".repeat(64);
@@ -164,7 +167,9 @@ fn a_refused_report_found_in_the_store_is_named() {
 
     assert_eq!(
         refused_stored(work.path(), &store),
-        [format!("{GAP}'s refused report was stored as {key}")]
+        [format!(
+            "{GAP}'s answer, whose report held a line that does not read, was stored as {key}"
+        )]
     );
     assert!(refused_stored(&work.path().join("none"), &store)[0].starts_with("read "));
 }

@@ -86,8 +86,8 @@ pub struct Want {
 /// against what it should have done, `want`: another count of runs,
 /// more runs at once than their tier caps fit beside what was spent, an
 /// agent not started that is not named over budget or not counted, a
-/// review that does not request changes, or a spend file that is
-/// missing what was spent.
+/// review that left one unstarted and does not request changes, or a
+/// spend file that is missing what was spent.
 #[must_use]
 pub fn held_problems(case: &str, held: &Held, want: Want) -> Vec<String> {
     let Want {
@@ -120,7 +120,9 @@ pub fn held_problems(case: &str, held: &Held, want: Want) -> Vec<String> {
             held.out
         ));
     }
-    if !held.out.starts_with("verdict=request_changes\n") {
+    // A review that started every agent is decided on what they found;
+    // one that left an agent unstarted is never approved.
+    if left > 0 && !held.out.starts_with("verdict=request_changes\n") {
         problems.push(format!(
             "{case}: a review its pull request's cap stopped does not request changes: {}",
             held.out
@@ -153,7 +155,7 @@ fn spend_of(workdir: &Path) -> Result<f64, String> {
 /// result, every run starts and the killed one is charged its tier's
 /// cap; and with one whose result reported no cost, every run starts
 /// and that one is charged nothing. Each names the rest over budget,
-/// requests changes and keeps what it alone spent.
+/// requests changes when there is a rest, and keeps what it alone spent.
 #[must_use]
 pub fn cap_problems(checkout: &Checkout, workdir: &Path) -> Vec<String> {
     let one = PULL_REQUEST_COST_USD - SPECIALIST_BUDGET_USD - RUN_COST / 2.0;
