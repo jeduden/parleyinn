@@ -83,7 +83,7 @@ fn a_checkout_without_the_definitions_is_named_for_both_runs() {
 
     let problems = review_runs_in_parts(&c, work.path());
 
-    assert_eq!(problems.len(), 2, "{problems:?}");
+    assert_eq!(problems.len(), 3, "{problems:?}");
     assert!(
         problems
             .iter()
@@ -97,7 +97,7 @@ fn a_work_directory_that_cannot_be_written_is_named() {
     let work = TempDir::new().unwrap();
     fs::write(work.path().join("whole"), "a file").unwrap();
 
-    let err = run(&repo(), &work.path().join("whole"), None).unwrap_err();
+    let err = run(&repo(), &work.path().join("whole"), PartHost::default()).unwrap_err();
 
     assert!(err.starts_with("make "), "{err}");
 }
@@ -107,10 +107,11 @@ fn a_review_run_that_cannot_write_its_outcome_is_named() {
     let work = TempDir::new().unwrap();
     fs::create_dir_all(work.path().join("whole/review/outcome.json")).unwrap();
     fs::create_dir_all(work.path().join("cut/review/outcome.json")).unwrap();
+    fs::create_dir_all(work.path().join("silent/review/outcome.json")).unwrap();
 
     let problems = review_runs_in_parts(&repo(), work.path());
 
-    assert_eq!(problems.len(), 2, "{problems:?}");
+    assert_eq!(problems.len(), 3, "{problems:?}");
     assert!(
         problems
             .iter()
@@ -132,4 +133,39 @@ fn the_stand_in_fails_a_run_that_logs_nowhere_or_cannot_log() {
 
     let specialist = Command::new("claude", &[], work.path()).logging_to(&work.path().join("x/y"));
     assert!(host.run(&specialist).unwrap_err().starts_with("write "));
+}
+
+#[test]
+fn a_part_that_did_not_run_and_is_not_named_or_is_posted_is_named() {
+    let work = TempDir::new().unwrap();
+
+    let problems = silent_problems(work.path());
+
+    assert_eq!(
+        problems,
+        [
+            "a part of test-engineer-unit that did not run does not fail the review naming it",
+            "the part of test-engineer-unit that did not run is not its gap: []",
+            "the gate posts a review a part of test-engineer-unit did not run in",
+        ]
+    );
+}
+
+#[test]
+fn the_stand_in_s_silent_part_logs_a_result_alone_and_fails_with_nowhere_to_log() {
+    let work = TempDir::new().unwrap();
+    let host = PartHost {
+        silent: Some(2),
+        ..PartHost::default()
+    };
+    let prompt = ["-p", "you are part 2 of 3", "--agent", SPECIALIST];
+    let log = work.path().join("log.jsonl");
+
+    let nowhere = Command::new("claude", &prompt, work.path());
+    assert_eq!(host.run(&nowhere).unwrap_err(), "the run logs to no file");
+    let unwritable = nowhere.clone().logging_to(&work.path().join("x/y"));
+    assert!(host.run(&unwritable).unwrap_err().starts_with("write "));
+    host.run(&nowhere.logging_to(&log)).unwrap();
+    let ran = review_eval::log::parse(&fs::read_to_string(&log).unwrap());
+    assert!(!ran.ran(), "{ran:?}");
 }

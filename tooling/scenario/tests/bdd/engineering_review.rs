@@ -89,7 +89,7 @@ fn review_run_backs_off(w: &mut World) -> Result<(), String> {
 }
 
 #[then(
-    regex = r"^review-run runs a specialist whose diff is past its split limit in parts, each on whole files of its diff, merges their reports into its one report, and reads a part cut off at its turn budget after it read its whole part as it stands$"
+    regex = r"^review-run runs a specialist whose diff is past its split limit in parts, each on whole files of its diff, merges their reports into its one report, reads a part cut off at its turn budget after it read its whole part as it stands, and fails the review naming a part that did not run, so the gate posts nothing$"
 )]
 fn review_runs_in_parts(w: &mut World) -> Result<(), String> {
     let work = testkit::TempDir::new().map_err(|e| format!("make a work directory: {e}"))?;

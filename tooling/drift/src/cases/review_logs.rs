@@ -7,7 +7,8 @@
 //! beside a line that does not read discarded with it; a run whose log
 //! holds no model call taken as one that ran; and a run cut off before
 //! it stated any line or an outcome taken for a clean pass, by the
-//! review or by the grader.
+//! review or by the grader; and a part that did not run left out of the
+//! review the parts check runs end to end.
 
 use super::*;
 
@@ -92,6 +93,7 @@ pub(super) fn review_log_cases() -> Vec<Case> {
         ),
     ];
     cases.extend(cut_before_stating_cases());
+    cases.push(part_case());
     cases
 }
 
@@ -125,4 +127,23 @@ fn cut_before_stating_cases() -> Vec<Case> {
             "a_specialist_cut_off_before_it_stated_anything_fails_even_a_case_that_expects_none",
         ),
     ]
+}
+
+/// A part that did not run left out of the review the ENG-28 parts
+/// check runs end to end.
+fn part_case() -> Case {
+    case(
+        "a part that did not run left out of the review the ENG-28 parts check runs",
+        "ENG-28",
+        Injection::replace(
+            "tooling/review-run/src/parts.rs",
+            "if let Some(why) = &run.failure {",
+            "if let Some(why) = run.failure.as_ref().filter(|_| false) {",
+        ),
+        cargo_lib_test(
+            "engineering",
+            "review_parts::tests::a_specialist_split_on_the_checkout_s_definitions_has_no_problem",
+        ),
+        "a part of test-engineer-unit that did not run does not fail the review naming it",
+    )
 }
