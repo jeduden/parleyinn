@@ -47,15 +47,18 @@
 //! finding line, which is a whole finding; a withdrawal naming one
 //! removes nothing and leaves its note, so it is neither an error nor
 //! silent (I6).
-//! A finding, revision or withdrawal line in no form is malformed, and
-//! the report holding it is refused rather than handed to the generalist
-//! marked unlinked: a severity word where the consequence belongs, or a
-//! finding that links nothing, is the categorizing this format exists to
-//! end, and a refused report fails the review closed, as a report that
-//! ends with no outcome does. A linked finding citing an id no
-//! requirement has is refused too, naming the id, so a made-up
-//! requirement cannot carry a finding (`report_check` with the known
-//! ids; the gate, which holds no tree, checks each id's shape alone).
+//! A finding, revision or withdrawal line in no form is malformed: a
+//! severity word where the consequence belongs, or a finding that links
+//! nothing, is the categorizing this format exists to end. The review
+//! reads a report whatever its lines hold ([`split_with`]): each such
+//! line, and each linked finding citing an id no requirement has, is set
+//! apart and named on its own, never handed to the generalist and never
+//! discarding the findings beside it, and a line that says it is no
+//! finding is set aside and counted; [`with_outcome`] ends what reads
+//! with an outcome its lines give. A report that still holds such a
+//! line, or ends with no outcome, is refused, and the gate fails the
+//! review closed on it (`report_check` with the known ids; the gate,
+//! which holds no tree, checks each id's shape alone).
 
 use std::collections::BTreeSet;
 use std::fmt;
@@ -89,8 +92,8 @@ pub const ALL_WELL_WORDS: [&str; 5] = ["no finding", "no findings", "none", "fin
 /// The arrows a revision may not hold: one between an old place and a
 /// finding line would move a finding, which ENG-28 does not define.
 pub const ARROWS: [&str; 2] = [" → ", " -> "];
-/// What the first line of a report assembled from a run that did not
-/// finish starts with.
+/// What the first line of the report of a specialist that did not run
+/// starts with.
 pub const INCOMPLETE: &str = "incomplete:";
 /// The place the forms are written with: a line that names it where its
 /// place belongs copied a form instead of filling it in.
@@ -492,9 +495,9 @@ pub fn answer_outcome(answer: &str) -> Option<(&str, &'static str)> {
 /// nothing to replace states its finding line; a withdrawal that finds
 /// nothing to remove leaves a note in its stead
 /// ([`WITHDREW_NOTHING`]), so the reader sees it. A malformed line
-/// stays as written, so the report check names it; prose is left out. A run
-/// that did not finish passes `incomplete`, which heads the report and
-/// says why, so a reader sees the report is partial.
+/// stays as written, so the report check names it; prose is left out. A
+/// specialist that did not run passes `incomplete`, which heads the
+/// report and says why.
 #[must_use]
 pub fn assemble(texts: &[String], answer: &str, incomplete: Option<&str>) -> String {
     let mut kept: Vec<Kept> = Vec::new();
