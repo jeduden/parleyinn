@@ -2,6 +2,9 @@ use std::time::Duration;
 
 use super::*;
 
+/// Long past any wait a test makes: no test waits it out.
+const WAIT: Duration = Duration::from_secs(600);
+
 #[test]
 fn the_system_clock_moves_forward_waits_and_draws_within_the_unit() {
     let clock = SystemClock::default();
@@ -28,11 +31,9 @@ fn the_budget_refuses_a_run_whose_cap_no_longer_fits_beside_what_was_spent() {
     let budget = Budget::new(1.0, 0.0);
     assert_eq!(budget.refusal(0.5), None);
 
-    budget.reserve(0.5).unwrap();
-    budget.charge(0.5, 0.4, &|_| {});
+    budget.reserve(0.5, WAIT).unwrap().charge(0.4, &|_| {});
     assert_eq!(budget.refusal(0.6), None, "0.4 and 0.6 is the cap, no more");
-    budget.reserve(0.6).unwrap();
-    budget.charge(0.6, 0.2, &|_| {});
+    budget.reserve(0.6, WAIT).unwrap().charge(0.2, &|_| {});
 
     assert!((budget.spent() - 0.6).abs() < 1e-9);
     assert_eq!(
@@ -42,28 +43,32 @@ fn the_budget_refuses_a_run_whose_cap_no_longer_fits_beside_what_was_spent() {
              USD does not fit in its cap of 1.00 USD, so it was not started"
         )
     );
-    assert_eq!(budget.reserve(0.5), Err(budget.refusal(0.5).unwrap()));
+    assert_eq!(
+        budget.reserve(0.5, WAIT).err(),
+        Some(budget.refusal(0.5).unwrap())
+    );
 }
 
 #[test]
 fn a_run_fits_only_beside_the_caps_the_runs_in_flight_hold() {
     let budget = Budget::new(1.0, 0.0);
 
-    budget.reserve(0.3).unwrap();
-    budget.reserve(0.3).unwrap();
-    budget.reserve(0.3).unwrap();
+    let first = budget.reserve(0.3, WAIT).unwrap();
+    let _second = budget.reserve(0.3, WAIT).unwrap();
+    let _third = budget.reserve(0.3, WAIT).unwrap();
 
     assert!(!budget.fits(0.3), "three in flight hold 0.9");
     assert!(budget.fits(0.1));
     assert_eq!(budget.refusal(0.3), None, "it waits, it is not refused");
-    budget.charge(0.3, 0.05, &|_| {});
+    first.charge(0.05, &|_| {});
     assert!(budget.fits(0.3), "0.05 spent and 0.6 held leave room");
     // Sixteen specialists' caps fit in a pull request's cap, summed in
     // floating point; a seventeenth does not.
     let sixteen = Budget::new(PULL_REQUEST_COST_USD, 0.0);
+    let mut held = Vec::new();
     for _ in 0..16 {
         assert!(sixteen.fits(0.3));
-        sixteen.reserve(0.3).unwrap();
+        held.push(sixteen.reserve(0.3, WAIT).unwrap());
     }
     assert!(!sixteen.fits(0.3));
 }
@@ -71,32 +76,79 @@ fn a_run_fits_only_beside_the_caps_the_runs_in_flight_hold() {
 #[test]
 fn a_reservation_that_does_not_fit_waits_for_a_run_in_flight_to_end() {
     let budget = Budget::new(1.0, 0.0);
-    budget.reserve(0.8).unwrap();
+    let flight = budget.reserve(0.8, WAIT).unwrap();
 
-    std::thread::scope(|scope| {
-        let waiting = scope.spawn(|| budget.reserve(0.5));
+    let held = std::thread::scope(|scope| {
+        let waiting = scope.spawn(|| budget.reserve(0.5, WAIT));
         // It cannot be reserved while 0.8 is held, so it waits until the
         // run in flight ends, however long that takes here.
         std::thread::sleep(Duration::from_millis(20));
         assert!(!waiting.is_finished(), "it waits for room");
-        budget.charge(0.8, 0.1, &|_| {});
-        assert_eq!(waiting.join().unwrap(), Ok(()));
+        flight.charge(0.1, &|_| {});
+        waiting.join().unwrap()
     });
+    assert!(held.is_ok());
     assert!(!budget.fits(0.5), "0.1 spent and 0.5 held");
 }
 
 #[test]
 fn a_waiting_reservation_is_refused_once_what_ended_leaves_no_room() {
     let budget = Budget::new(1.0, 0.0);
-    budget.reserve(0.8).unwrap();
+    let flight = budget.reserve(0.8, WAIT).unwrap();
 
     std::thread::scope(|scope| {
-        let waiting = scope.spawn(|| budget.reserve(0.5));
+        let waiting = scope.spawn(|| budget.reserve(0.5, WAIT).map(drop));
         std::thread::sleep(Duration::from_millis(20));
-        budget.charge(0.8, 0.7, &|_| {});
+        flight.charge(0.7, &|_| {});
         let refused = waiting.join().unwrap().unwrap_err();
         assert!(refused.starts_with("over budget: "), "{refused}");
     });
+}
+
+#[test]
+fn a_reservation_dropped_uncharged_frees_its_cap_and_wakes_a_waiting_run() {
+    let budget = Budget::new(1.0, 0.0);
+    let flight = budget.reserve(0.8, WAIT).unwrap();
+
+    std::thread::scope(|scope| {
+        let waiting = scope.spawn(|| budget.reserve(0.5, WAIT).map(drop));
+        std::thread::sleep(Duration::from_millis(20));
+        drop(flight);
+        assert_eq!(waiting.join().unwrap(), Ok(()));
+    });
+    assert!(budget.spent().abs() < 1e-9, "nothing was charged");
+    assert!(budget.fits(1.0), "nothing is held");
+}
+
+#[test]
+fn a_run_that_panics_holding_a_reservation_frees_its_cap() {
+    let budget = Budget::new(1.0, 0.0);
+
+    let unwound = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        let _held = budget.reserve(0.8, WAIT).unwrap();
+        panic!("the run broke");
+    }));
+
+    assert!(unwound.is_err());
+    assert!(budget.fits(1.0), "its 0.8 is released");
+}
+
+#[test]
+fn a_reservation_waits_no_longer_than_its_deadline_for_room() {
+    let budget = Budget::new(1.0, 0.0);
+    let _flight = budget.reserve(0.8, WAIT).unwrap();
+
+    let refused = budget
+        .reserve(0.5, Duration::from_millis(20))
+        .err()
+        .unwrap();
+
+    assert_eq!(
+        refused,
+        "over budget: a run capped at 0.50 USD waited 0.02 s for the runs in flight to leave \
+         room in the pull request's cap of 1.00 USD, and they did not end, so it was not started"
+    );
+    assert!(!budget.fits(0.5), "the 0.8 in flight is still held");
 }
 
 #[test]
@@ -105,8 +157,10 @@ fn the_budget_counts_what_the_pull_request_s_earlier_reviews_spent() {
     assert_eq!(budget.refusal(0.5), None);
     let kept = std::sync::Mutex::new(Vec::new());
 
-    budget.reserve(0.5).unwrap();
-    budget.charge(0.5, 0.25, &|total| kept.lock().unwrap().push(total));
+    budget
+        .reserve(0.5, WAIT)
+        .unwrap()
+        .charge(0.25, &|total| kept.lock().unwrap().push(total));
 
     assert!((budget.spent() - 0.25).abs() < 1e-9, "this review's own");
     assert!((budget.total() - 0.75).abs() < 1e-9);

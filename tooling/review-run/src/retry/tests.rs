@@ -493,3 +493,58 @@ fn a_run_killed_after_model_calls_is_charged_its_tier_s_cap_and_kept_as_spent() 
     let spent = crate::spend::check(&spend).unwrap();
     assert!((spent - cap - runs[1].charged).abs() < 1e-9, "{spend}");
 }
+
+#[test]
+fn a_run_that_panics_releases_its_reservation_so_a_waiting_run_starts() {
+    let dir = workdir(false);
+    let host = FakeHost::new(|_| {
+        std::thread::sleep(std::time::Duration::from_millis(50));
+        panic!("the run broke");
+    });
+    let plan = Plan {
+        class: "standard".to_owned(),
+        touched: 1,
+        dispatch: parse_dispatch(r#"{"review-code": ["lang-rust"]}"#).unwrap(),
+    };
+    let known = known();
+    let r = Review {
+        host: &host,
+        clock: &crate::fake::FakeClock::default(),
+        workdir: dir.path(),
+        plan: &plan,
+        known: &known,
+        options: Options::default(),
+        resume: None,
+        keys: None,
+        store: None,
+        scrubber: None,
+        progress: &|_| {},
+    };
+    let most = runner::SPECIALIST_BUDGET_USD;
+    let c = Controls {
+        budget: crate::controls::Budget::new(most * 1.5, 0.0),
+        breaker: crate::controls::Breaker::new(crate::controls::Fraction::WHOLE, 1),
+        live: crate::live::Live::default(),
+    };
+    let unit = Unit::whole("lang-rust".to_owned());
+
+    let waited = std::thread::scope(|scope| {
+        let broken = scope.spawn(|| {
+            std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| tried(&r, &c, &unit, None)))
+                .is_err()
+        });
+        while c.budget.fits(most) {
+            std::thread::yield_now();
+        }
+        // Its cap does not fit beside the one the broken run holds.
+        let waiting = c
+            .budget
+            .reserve(most, std::time::Duration::from_secs(5))
+            .map(drop);
+        assert!(broken.join().unwrap(), "the run panicked");
+        waiting
+    });
+
+    assert_eq!(waited, Ok(()), "the broken run's cap was released");
+    assert!(c.budget.fits(most * 1.5), "nothing is held");
+}

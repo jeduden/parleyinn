@@ -185,14 +185,16 @@ impl Budget {
 
     /// Reserves `most` US dollars for a run about to start, once its
     /// cap fits: while runs in flight hold what it needs it waits for
-    /// one to end, and once it cannot fit whatever they cost it is
-    /// refused, why given. Each reservation is released by
-    /// [`Budget::charge`].
+    /// one to end, and once it cannot fit whatever they cost, or `wait`
+    /// passed with no room, it is refused, why given. The reservation
+    /// is released when the [`Reservation`] is charged or dropped, a run
+    /// that unwinds included, so no wait outlives the run it waits on.
     ///
     /// # Errors
     ///
-    /// Fails, saying why, when the run may never start.
-    pub fn reserve(&self, most: f64) -> Result<(), String> {
+    /// Fails, saying why, when the run may not start.
+    pub fn reserve(&self, most: f64, wait: Duration) -> Result<Reservation<'_>, String> {
+        let since = Instant::now();
         let mut ledger = self.lock();
         loop {
             if let Some(why) = self.refused(&ledger, most) {
@@ -202,25 +204,36 @@ impl Budget {
             // flight, each of which ends and wakes this wait.
             if self.within(ledger.spent + ledger.reserved + most) {
                 ledger.reserved += most;
-                return Ok(());
+                return Ok(Reservation { budget: self, most });
+            }
+            let left = wait.saturating_sub(since.elapsed());
+            if left.is_zero() {
+                return Err(self.waited(most, wait));
             }
             ledger = self
                 .freed
-                .wait(ledger)
-                .unwrap_or_else(PoisonError::into_inner);
+                .wait_timeout(ledger, left)
+                .unwrap_or_else(PoisonError::into_inner)
+                .0;
         }
     }
 
-    /// Releases the `most` a run that ended reserved, charges it `cost`
-    /// and hands `keep` what this review was charged so far, its own
-    /// spend alone, while no other run's cost is added, so what it keeps
-    /// never goes back; then wakes the runs waiting for room.
-    pub fn charge(&self, most: f64, cost: f64, keep: &dyn Fn(f64)) {
-        let mut ledger = self.lock();
-        ledger.reserved -= most;
-        ledger.spent += cost;
-        keep(ledger.spent);
-        drop(ledger);
+    /// Why a run capped at `most` US dollars was refused once it waited
+    /// `wait` for room.
+    fn waited(&self, most: f64, wait: Duration) -> String {
+        format!(
+            "{OVER_BUDGET} a run capped at {most:.2} USD waited {:.2} s for the runs in flight to \
+             leave room in the pull request's cap of {:.2} USD, and they did not end, so it was \
+             not started",
+            wait.as_secs_f64(),
+            self.cap
+        )
+    }
+
+    /// Releases the `most` a run reserved and wakes the runs waiting
+    /// for room.
+    fn release(&self, most: f64) {
+        self.lock().reserved -= most;
         self.freed.notify_all();
     }
 
@@ -235,6 +248,32 @@ impl Budget {
     #[must_use]
     pub fn total(&self) -> f64 {
         self.before + self.spent()
+    }
+}
+
+/// The cap a run in flight holds in the [`Budget`], until it is
+/// charged or dropped, either of which releases it.
+#[derive(Debug)]
+pub struct Reservation<'a> {
+    budget: &'a Budget,
+    most: f64,
+}
+
+impl Reservation<'_> {
+    /// Charges the run that ended `cost` and hands `keep` what this
+    /// review was charged so far, its own spend alone, while no other
+    /// run's cost is added, so what it keeps never goes back; then
+    /// releases the reservation.
+    pub fn charge(self, cost: f64, keep: &dyn Fn(f64)) {
+        let mut ledger = self.budget.lock();
+        ledger.spent += cost;
+        keep(ledger.spent);
+    }
+}
+
+impl Drop for Reservation<'_> {
+    fn drop(&mut self) {
+        self.budget.release(self.most);
     }
 }
 

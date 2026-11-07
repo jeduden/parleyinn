@@ -238,9 +238,10 @@ fn again(
 /// [`billed`] says, its reservation released.
 fn tried(r: &Review, c: &Controls, unit: &Unit, note: Option<&str>) -> (AgentRun, Option<String>) {
     let most = runner::budget_of(unit.kind);
-    if let Err(why) = c.budget.reserve(most) {
-        return not_started(r.workdir, unit, why);
-    }
+    let held = match c.budget.reserve(most, r.options.deadline) {
+        Ok(held) => held,
+        Err(why) => return not_started(r.workdir, unit, why),
+    };
     let label = unit.label();
     c.live.start(
         &label,
@@ -253,8 +254,7 @@ fn tried(r: &Review, c: &Controls, unit: &Unit, note: Option<&str>) -> (AgentRun
     let mut done = attempt(r.host, r.workdir, r.plan, unit, r.options.deadline, note);
     c.live.end(&label);
     done.0.charged = billed(&done.0.log, most);
-    c.budget
-        .charge(most, done.0.charged, &|spent| keep_spend(r, spent));
+    held.charge(done.0.charged, &|spent| keep_spend(r, spent));
 
     done
 }
