@@ -9,6 +9,8 @@ fn agent(name: &str, effort: &str, body: &str) -> (String, String) {
         "model: opus\nmaxTurns: 40\n"
     } else if generalist_of(name).is_some() {
         "maxTurns: 20\n"
+    } else if GENERALISTS.contains(&name) {
+        "maxTurns: 40\n"
     } else {
         ""
     };
@@ -280,5 +282,26 @@ fn a_specialist_or_a_generalist_that_can_write_is_named() {
     assert_eq!(
         problems(&f),
         ["review-code has tools Read, Grep, Glob, Write, want Read, Grep, Glob"]
+    );
+}
+
+#[test]
+fn a_medium_generalist_without_its_turn_budget_is_named() {
+    let named = |front: &str| {
+        let mut f = without("review-code");
+        f.push((
+            format!("{AGENTS}/review-code.md"),
+            format!(
+                "---\nname: review-code\ntools: Read, Grep, Glob\neffort: medium\n{front}---\n"
+            ),
+        ));
+        problems(&f)
+    };
+
+    assert_eq!(named("maxTurns: 40\n"), Vec::<String>::new());
+    assert_eq!(named(""), ["review-code names no maxTurns"]);
+    assert_eq!(
+        named("maxTurns: 0\n"),
+        ["review-code has maxTurns 0, want a whole number of turns above zero"]
     );
 }

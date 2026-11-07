@@ -124,6 +124,18 @@ pub(super) fn review_post_cases() -> Vec<Case> {
     ]
 }
 
+/// The drift ENG-28 exists to catch in a medium generalist, late so
+/// adding it moves no earlier case to another shard: one whose turn
+/// budget its own definition does not name.
+pub(super) fn review_generalist_turns_case() -> Case {
+    protection_case(
+        "a medium generalist run without its own turn budget",
+        Injection::replace(".claude/agents/review-code.md", "maxTurns: 40\n", ""),
+        "the_checkout_s_review_agents_are_all_defined",
+        "review-code names no maxTurns",
+    )
+}
+
 /// The drifts ENG-28 exists to catch in the agents the review consults:
 /// one the dispatch names but no file defines as named, or one at the
 /// wrong effort.

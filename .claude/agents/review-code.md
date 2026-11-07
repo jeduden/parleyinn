@@ -8,6 +8,7 @@ description: >-
 tools: Read, Grep, Glob
 model: sonnet
 effort: medium
+maxTurns: 40
 ---
 # Review generalist: code and tests
 

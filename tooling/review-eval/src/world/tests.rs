@@ -43,7 +43,7 @@ pub(crate) fn repository(root: &Path) {
     );
     write(
         ".claude/agents/review-code.md",
-        "---\nname: review-code\ndescription: code\ntools: Read, Grep, Glob\nmodel: sonnet\neffort: medium\n---\n# Code\n",
+        "---\nname: review-code\ndescription: code\ntools: Read, Grep, Glob\nmodel: sonnet\neffort: medium\nmaxTurns: 40\n---\n# Code\n",
     );
     write("crates/x/src/lib.rs", "pub fn ok() {}\n");
     fs::create_dir_all(root.join(".git")).unwrap();

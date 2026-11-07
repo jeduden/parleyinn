@@ -63,7 +63,7 @@ fn checkout() -> TempDir {
     repository(dir.path());
     for name in &component::names(dir.path()).unwrap() {
         let (model, turns) = if name.starts_with("review-") {
-            ("sonnet", "")
+            ("sonnet", "maxTurns: 40\n")
         } else {
             ("haiku", "maxTurns: 20\n")
         };

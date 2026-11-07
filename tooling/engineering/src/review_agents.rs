@@ -3,10 +3,9 @@
 //! section's specialist, each domain-model file's, the language and
 //! test-layer specialists, and the generalists. Specialists run at low
 //! effort and generalists at medium, as their front matter says; each
-//! generalist's deep instance runs on the strongest model at high effort
-//! with a larger turn budget.
+//! generalist's deep instance names its own model and effort. Every one
+//! names its own turn budget.
 
-use std::collections::BTreeMap;
 use std::fs;
 
 use review_bundle::dispatch::{
@@ -111,14 +110,12 @@ fn check(checkout: &Checkout, name: &str, effort: &str, names: Option<&str>) -> 
     } else if has != effort {
         return Some(format!("{name} runs at effort {has}, want {effort}"));
     }
-    if DEEP_GENERALISTS.contains(&name)
-        && let Some(problem) = deep_settings(name, &fields)
-    {
-        return Some(problem);
+    if DEEP_GENERALISTS.contains(&name) && field("model").is_empty() {
+        return Some(format!("{name} names no model"));
     }
-    if generalist_of(name).is_some()
-        && let Some(problem) = turns(name, field("maxTurns"))
-    {
+    // Every dispatched agent names its own turn budget; no other text
+    // states it.
+    if let Some(problem) = turns(name, field("maxTurns")) {
         return Some(problem);
     }
     if let Some(want) = generalist_of(name) {
@@ -133,17 +130,6 @@ fn check(checkout: &Checkout, name: &str, effort: &str, names: Option<&str>) -> 
     names
         .filter(|file| !text.contains(file))
         .map(|file| format!("{name} does not name {file}"))
-}
-
-/// The problem with deep instance `name`'s model or turn budget, if it names
-/// none, as
-/// its front matter `fields` read, if any.
-fn deep_settings(name: &str, fields: &BTreeMap<String, String>) -> Option<String> {
-    let field = |key: &str| fields.get(key).map_or("", String::as_str);
-    if field("model").is_empty() {
-        return Some(format!("{name} names no model"));
-    }
-    turns(name, field("maxTurns"))
 }
 
 /// The problem with agent `name`'s turn budget `has`, if it is not a
