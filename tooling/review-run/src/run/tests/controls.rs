@@ -295,6 +295,52 @@ fn a_run_overloaded_twice_waits_twice_as_long_the_second_time_and_keeps_both_log
     );
 }
 
+/// [`OVERLOADED`], after the run was charged for what it did before.
+const OVERLOADED_PAID: &str = r#"{"type":"result","subtype":"success","is_error":true,"result":"API Error: 529 {\"type\":\"error\",\"error\":{\"type\":\"overloaded_error\",\"message\":\"Overloaded\"}}","total_cost_usd":0.02,"num_turns":3}"#;
+
+#[test]
+fn an_overloaded_run_that_was_charged_is_neither_waited_for_nor_run_again() {
+    let (_dir, ran) = controlled(ONE, options(), 0.0, after(1, OVERLOADED_PAID));
+
+    let run = ran.run("lang-rust");
+    assert!(!run.answered());
+    assert_eq!(run.attempts, 1);
+    assert!(ran.clock.slept().is_empty());
+    assert!(
+        ran.lines[0].ends_with("; not run again: it cost 0.0200 USD, so what it stated stands"),
+        "{:?}",
+        ran.lines
+    );
+}
+
+#[test]
+fn a_later_overloaded_attempt_that_was_charged_is_not_run_again() {
+    let calls = AtomicUsize::new(0);
+    let (_dir, ran) = controlled(ONE, options(), 0.0, move |c| {
+        if !prompt_of(c).contains("a specialist") {
+            return fake::either(c);
+        }
+        match calls.fetch_add(1, Ordering::SeqCst) {
+            0 => fake::write_log(c, &format!("{OVERLOADED}\n")),
+            1 => fake::write_log(c, &format!("{OVERLOADED_PAID}\n")),
+            _ => return fake::either(c),
+        }
+        Ok(Output::default())
+    });
+
+    let run = ran.run("lang-rust");
+    assert!(!run.answered());
+    assert_eq!(run.attempts, 2);
+    assert_eq!(ran.clock.slept(), [Duration::from_secs(15)]);
+    assert!(
+        ran.lines
+            .iter()
+            .any(|l| l.ends_with("; not run again: it cost 0.0200 USD, so what it stated stands")),
+        "{:?}",
+        ran.lines
+    );
+}
+
 #[test]
 fn a_run_overloaded_three_times_ends_after_its_third_attempt() {
     let (_dir, ran) = controlled(ONE, options(), 0.0, after(9, OVERLOADED));

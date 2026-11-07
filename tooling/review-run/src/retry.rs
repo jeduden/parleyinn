@@ -103,10 +103,10 @@ pub(crate) fn run_one(r: &Review, c: &Controls, unit: &Unit) -> (AgentRun, Optio
         (r.progress)(&format!("{}; not run again: {why}", describe(&first)));
         return (first, report);
     }
-    // A run that cost money is paid for: a second run would start from
-    // scratch, pay again and meet the same limit. What it stated is its
-    // report, and the review names it as it is.
-    if let (Class::Again, Some(why)) = (class, charged(&first.log)) {
+    // A run that cost money is paid for, overloaded or not: a second run
+    // would start from scratch, pay again and meet the same limit. What
+    // it stated is its report, and the review names it as it is.
+    if let Some(why) = charged(&first.log) {
         (r.progress)(&format!(
             "{}; not run again: {why}, so what it stated stands",
             describe(&first)
@@ -190,10 +190,21 @@ fn again(
             return (run, report);
         }
         let (mut next, report) = tried(r, c, unit, note);
+        let paid = charged(&next.log);
         add_usage(&mut next.log, &last.0.log);
         next.attempts = last.0.attempts + 1;
         class = class_of(r, unit, &next);
-        if next.answered() || next.attempts >= MAX_ATTEMPTS || class != Class::Overloaded {
+        if let (false, Class::Overloaded, Some(why)) = (next.answered(), class, &paid) {
+            (r.progress)(&format!(
+                "{}; not run again: {why}, so what it stated stands",
+                describe(&next)
+            ));
+        }
+        if next.answered()
+            || next.attempts >= MAX_ATTEMPTS
+            || class != Class::Overloaded
+            || paid.is_some()
+        {
             let report = salvage(r.workdir, unit, first.run, &mut next, report);
             return (next, report);
         }
