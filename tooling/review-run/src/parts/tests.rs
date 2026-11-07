@@ -139,6 +139,7 @@ fn part_run(failure: Option<&str>, answer: &str, cost: f64) -> AgentRun {
             usage,
             texts: vec![answer.to_owned()],
             writes: Vec::new(),
+            reads: Vec::new(),
         },
         attempts: 1,
         parts: 1,
