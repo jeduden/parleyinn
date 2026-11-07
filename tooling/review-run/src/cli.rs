@@ -9,7 +9,10 @@
 //! `review/reports/`.
 //! It also writes what the review did not review, `review/gaps.json`
 //! and `review/not-reviewed.md`, and what it ran on,
-//! `review/run-id.json`. Given `--only` a gap list and `--from` an
+//! `review/run-id.json`, and what this review spent, `review/spend.json`,
+//! holding its runs to the pull request's cap beside what
+//! `--spent-before` says its earlier reviews spent, the sum the next
+//! review's workflow step takes of every one's kept spend. Given `--only` a gap list and `--from` an
 //! earlier run's review directory, it runs only what that run left
 //! without an accepted answer, or whose answer key changed, and decides
 //! the review as a full run would. Given `--answers` a store, it takes
@@ -68,7 +71,8 @@ pub const EXIT_USAGE: u8 = 2;
 
 /// How to call it.
 pub const USAGE: &str = "usage: review-run --workdir DIR [--parallel N] [--deadline SECONDS] \
-[--head-sha SHA] [--only GAPS --from DIR] [--max-cost-usd USD] [--breaker-fraction N/D] \
+[--head-sha SHA] [--only GAPS --from DIR] [--max-cost-usd USD] [--spent-before USD] \
+[--breaker-fraction N/D] \
 [--answers DIR [--answers-read-only]] [--previous FINDINGS] [--max-resumes N] [--summary FILE] \
 [--credential DIR]\n\
        review-run answers drop KEY --answers DIR";
@@ -351,19 +355,25 @@ fn record(
         mut outcome,
         consulted,
         answers,
+        weighings,
         not_reviewed,
     } = decision;
     if let Some(line) = from_store_line(runs) {
         outcome.summary.push_str(&line);
     }
+    let usage = usage::usage(runs, p.resume.as_ref().map(|r| r.from.as_str()));
+    // First, so what the runs cost is kept however the rest goes.
+    written.whole(
+        crate::spend::SPEND,
+        &crate::spend::text(usage::charged(runs)),
+    )?;
     let stalls = stall::tally(
         &not_reviewed,
         p.resume.as_ref().map_or(&[][..], |r| r.stalls.as_slice()),
     );
     let stalled = stall::amend(&mut outcome, &stalls, p.max_resumes)
-        + follow(written, p, &mut outcome, &answers)?;
+        + follow(written, p, &mut outcome, &weighings)?;
     written.json::<Vec<stall::Stall>>(stall::STALLS, &stalls)?;
-    let usage = usage::usage(runs, p.resume.as_ref().map(|r| r.from.as_str()));
     let reused = runs.iter().filter(|r| r.reused).count();
     let store_failed = runs.iter().filter(|r| r.store_failed).count();
     written.json(CONSULTED, &consulted)?;
@@ -530,7 +540,7 @@ fn resumed(
     Ok(plan_of)
 }
 
-/// Tracks `outcome`'s findings, `answers` holding each generalist's,
+/// Tracks `outcome`'s findings, `weighings` holding each generalist's,
 /// beside the previous review's when `p` has them: writes them to
 /// [`findings::FINDINGS`] and [`findings::FINDINGS_NOTES`] in `workdir`,
 /// adds what changed to the summary, and a blocking finding for each
@@ -544,9 +554,9 @@ fn follow(
     written: &Written,
     p: &Prepared,
     outcome: &mut review_gate::ReviewOutcome,
-    answers: &std::collections::BTreeMap<String, String>,
+    weighings: &std::collections::BTreeMap<String, String>,
 ) -> Result<usize, String> {
-    let found = findings::attributed(&outcome.findings, answers, &p.plan);
+    let found = findings::attributed(&outcome.findings, weighings, &p.plan);
     let run = p.id.head.as_deref().unwrap_or("unknown head");
     let tracking = findings::track(&found, p.previous.as_deref(), run, &|path| {
         findings::cited(written.workdir, path)
@@ -608,6 +618,14 @@ impl Written<'_> {
         fs::write(&path, text).map_err(|e| format!("write {}: {e}", path.display()))
     }
 
+    /// Writes `text`, scrubbed, to `rel` under the work directory whole,
+    /// as [`crate::spend::write`] does.
+    fn whole(&self, rel: &str, text: &str) -> Result<(), String> {
+        let (text, n) = self.scrubber.scrub(text);
+        self.leaks.fetch_add(n, Ordering::SeqCst);
+        crate::spend::write(&self.workdir.join(rel), &text)
+    }
+
     /// Writes `value` as JSON, scrubbed, to `rel` under the work
     /// directory.
     fn json<T: Serialize>(&self, rel: &str, value: &T) -> Result<(), String> {
@@ -616,6 +634,24 @@ impl Written<'_> {
         self.text(rel, &format!("{text}\n"))
     }
 }
+
+/// The flags that take a value.
+const FLAGS: [&str; 14] = [
+    "workdir",
+    "parallel",
+    "deadline",
+    "head-sha",
+    "only",
+    "from",
+    "max-cost-usd",
+    "spent-before",
+    "breaker-fraction",
+    "summary",
+    "answers",
+    "previous",
+    "max-resumes",
+    "credential",
+];
 
 /// Reads `--name value` and `--name=value` pairs: the work directory,
 /// required, the bound and the deadline, each a positive number, the
@@ -640,23 +676,7 @@ fn parse(args: impl IntoIterator<Item = String>) -> Result<Args, String> {
             Some((name, value)) => (name, Some(value.to_owned())),
             None => (flag, None),
         };
-        if ![
-            "workdir",
-            "parallel",
-            "deadline",
-            "head-sha",
-            "only",
-            "from",
-            "max-cost-usd",
-            "breaker-fraction",
-            "summary",
-            "answers",
-            "previous",
-            "max-resumes",
-            "credential",
-        ]
-        .contains(&name)
-        {
+        if !FLAGS.contains(&name) {
             return Err(format!("unknown flag {arg:?}"));
         }
         let value = inline
@@ -672,6 +692,7 @@ fn parse(args: impl IntoIterator<Item = String>) -> Result<Args, String> {
             "only" => only = Some(value),
             "from" => from = Some(value),
             "max-cost-usd" => options.max_cost_usd = positive(name, &value)?,
+            "spent-before" => options.spent_before = spent(name, &value)?,
             "breaker-fraction" => options.breaker = fraction(name, &value)?,
             "answers" => answers = Some(value),
             "previous" => previous = Some(value),
@@ -713,6 +734,15 @@ fn fraction(name: &str, value: &str) -> Result<Fraction, String> {
             "--{name} {value:?} is no ratio above zero and at most one, as 1/3"
         )),
     }
+}
+
+/// `value`, flag `name`'s, as an amount of zero or more.
+fn spent(name: &str, value: &str) -> Result<f64, String> {
+    value
+        .parse::<f64>()
+        .ok()
+        .filter(|n| n.is_finite() && *n >= 0.0)
+        .ok_or_else(|| format!("--{name} {value:?} is no amount of zero or more"))
 }
 
 /// `value`, flag `name`'s, as a number above zero.

@@ -259,17 +259,23 @@ pub const FINDING: &str = "src/a.rs:1 — if not addressed: a long line hides a 
 /// a generalist keeps, as a nit, the finding of the specialist
 /// [`GENERALISTS`] names for it.
 fn answer(command: &Command, agent: &str) -> Result<(), String> {
-    let (text, result) =
-        if let Some((_, path, from)) = GENERALISTS.iter().find(|(g, _, _)| *g == agent) {
-            let answer =
-                format!("{path}:1 — nit — a long line — {from}\n{agent} finds its scope sound.");
-            (answer.clone(), answer)
-        } else {
-            (
-                format!("I read the diff.\n{FINDING}"),
-                format!("outcome: findings — {agent} saw one finding."),
-            )
-        };
+    let (text, result) = if let Some((_, path, from)) =
+        GENERALISTS.iter().find(|(g, _, _)| *g == agent)
+    {
+        // It also weighs the stand-in specialists' finding, so no
+        // finding of theirs is left unweighed, in its own name, so the
+        // drop leaves the finding it keeps there from `from` standing.
+        let answer = format!(
+            "{path}:1 — nit — a long line — {from}\ndropped — src/a.rs:1 — weighed above — {agent}\n\
+                 {agent} finds its scope sound."
+        );
+        (answer.clone(), answer)
+    } else {
+        (
+            format!("I read the diff.\n{FINDING}"),
+            format!("outcome: findings — {agent} saw one finding."),
+        )
+    };
     let log = command
         .stdout_to
         .as_deref()

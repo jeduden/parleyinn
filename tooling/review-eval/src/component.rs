@@ -12,8 +12,11 @@ use review_bundle::dispatch::{
 };
 use sha2::{Digest, Sha256};
 
-/// A generalist's turn budget when its front matter names none.
-pub const GENERALIST_TURNS: usize = 40;
+/// A consultant's turn budget when its front matter names none: the
+/// skills that consult one run it with the session's budget, so the
+/// evaluation holds it to one fixed budget. A generalist and a
+/// specialist name their own, and no other text states it.
+pub const CONSULTANT_TURNS: usize = 40;
 /// The model a consultant runs on when its front matter names none:
 /// the skills that consult one run it on the session's model, so the
 /// evaluation holds it to one fixed model.
@@ -197,8 +200,8 @@ pub const TOOL_SET: [&str; 3] = ["Read", "Grep", "Glob"];
 ///
 /// Fails when its file cannot be read, its front matter does not read,
 /// names a key or a tool the component may not carry, or names no
-/// model while the component is no consultant, or its turn budget is
-/// not a number.
+/// model or no turn budget while the component is no consultant, or
+/// its turn budget is not a number.
 pub fn load(tree: &Path, name: &str) -> Result<Component, String> {
     let file = file_of(name);
     let text = fs::read_to_string(tree.join(&file)).map_err(|e| format!("read {file}: {e}"))?;
@@ -215,12 +218,6 @@ pub fn load(tree: &Path, name: &str) -> Result<Component, String> {
         (_, model) if model.is_empty() => return Err(format!("{file}: names no model")),
         (_, model) => model,
     };
-    let max_turns = match field("maxTurns").as_str() {
-        "" => GENERALIST_TURNS,
-        turns => turns
-            .parse()
-            .map_err(|_| format!("{file}: maxTurns {turns} is not a number"))?,
-    };
 
     let tools: Vec<String> = field("tools")
         .split(',')
@@ -228,6 +225,13 @@ pub fn load(tree: &Path, name: &str) -> Result<Component, String> {
         .filter(|t| !t.is_empty())
         .collect();
     allowed_tools(&file, kind, &tools)?;
+    let max_turns = match (kind, field("maxTurns").as_str()) {
+        (Kind::Consultant, "") => CONSULTANT_TURNS,
+        (_, "") => return Err(format!("{file}: names no maxTurns")),
+        (_, turns) => turns
+            .parse()
+            .map_err(|_| format!("{file}: maxTurns {turns} is not a number"))?,
+    };
 
     Ok(Component {
         name: name.to_owned(),

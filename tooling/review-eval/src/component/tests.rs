@@ -24,7 +24,7 @@ fn tree() -> TempDir {
     );
     write(
         ".claude/agents/review-code.md",
-        "---\nname: review-code\ndescription: code\ntools: Read, Grep, Glob\nmodel: sonnet\neffort: medium\n---\n# Code\n",
+        "---\nname: review-code\ndescription: code\ntools: Read, Grep, Glob\nmodel: sonnet\neffort: medium\nmaxTurns: 40\n---\n# Code\n",
     );
     write(
         ".claude/agents/review-code-deep.md",
@@ -172,15 +172,30 @@ fn a_specialist_is_held_to_one_line_each_whatever_its_wording() {
 }
 
 #[test]
-fn load_gives_a_generalist_without_a_turn_budget_the_default() {
+fn load_reads_a_generalist_s_turn_budget_and_refuses_one_that_names_none() {
     let dir = tree();
 
     let c = load(dir.path(), "review-code").unwrap();
 
     assert_eq!(c.kind, Kind::Generalist);
-    assert_eq!(c.max_turns, GENERALIST_TURNS);
+    assert_eq!(c.max_turns, 40);
     assert!(!c.strict_lines);
     assert_eq!(load(dir.path(), "review-code-deep").unwrap().max_turns, 40);
+    for name in ["review-code", "lang-rust"] {
+        let file = dir.path().join(format!(".claude/agents/{name}.md"));
+        let text = fs::read_to_string(&file).unwrap();
+        let unbudgeted: String = text
+            .lines()
+            .filter(|l| !l.starts_with("maxTurns:"))
+            .map(|l| format!("{l}\n"))
+            .collect();
+        fs::write(&file, unbudgeted).unwrap();
+
+        assert_eq!(
+            load(dir.path(), name).unwrap_err(),
+            format!(".claude/agents/{name}.md: names no maxTurns")
+        );
+    }
 }
 
 #[test]
@@ -329,7 +344,7 @@ fn load_gives_a_consultant_without_a_model_the_default_and_no_write_tool() {
     assert_eq!(c.kind, Kind::Consultant);
     assert_eq!(c.model, CONSULTANT_MODEL);
     assert_eq!(c.effort, "");
-    assert_eq!(c.max_turns, GENERALIST_TURNS);
+    assert_eq!(c.max_turns, CONSULTANT_TURNS);
     assert_eq!(c.tools, vec!["Read", "Grep", "Glob"]);
 
     fs::write(

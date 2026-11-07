@@ -1,24 +1,25 @@
 //! What a review's runs are held to beside each run's own deadline:
 //! the clock it reads, waits on and draws jitter from, which a test
-//! hands in so it never sleeps; the review's cost cap, the sum of what
-//! its finished runs cost, past which no run starts; and the circuit
+//! hands in so it never sleeps; the pull request's cost cap, which a
+//! run starts within only once its tier's cap fits beside what the
+//! earlier reviews and this review's finished runs cost and the caps
+//! of the runs in flight; and the circuit
 //! breaker, which counts the specialists that ended in a gap and, once
 //! more than its fraction of those dispatched did, starts no
 //! generalist. A run the cap or the breaker keeps from starting is
 //! named with why, never taken as clean (I6).
 
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::{Mutex, PoisonError};
+use std::sync::{Condvar, Mutex, MutexGuard, PoisonError};
 use std::thread;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use crate::live::Live;
 
-/// The run-level cost cap unless the run says otherwise, in US
-/// dollars: 56 specialists at the dearest a specialist of pull request
-/// 98's reviews cost, 0.30, and three generalists at theirs, 2.00, come
-/// to about 23, so 40 leaves room before a review stops.
-pub const MAX_COST_USD: f64 = 40.0;
+/// The cost cap of a pull request, counted over all of its reviews,
+/// unless the run says otherwise, in US dollars: the stakeholder's
+/// budget for one pull request.
+pub const PULL_REQUEST_COST_USD: f64 = 5.0;
 /// The fraction of the dispatched specialists that may end in a gap
 /// before no generalist starts, unless the run says otherwise: more
 /// than a third, exactly one third not tripping it.
@@ -104,46 +105,175 @@ pub fn unit(bits: u64) -> f64 {
     f64::from(millionths) / 1_000_000.0
 }
 
-/// The review's cost cap and what its finished runs cost.
+/// The pull request's cost cap, what its earlier reviews spent, what
+/// this review's finished runs were charged, and the tier caps of its
+/// runs in flight, reserved until each ends. A run starts only once its
+/// own tier's cap fits beside all of those, so runs started together
+/// can never spend past the cap; one that does not fit waits for runs
+/// in flight to end, and is refused once it cannot fit whatever they
+/// cost.
 #[derive(Debug)]
 pub struct Budget {
     cap: f64,
-    spent: Mutex<f64>,
+    before: f64,
+    ledger: Mutex<Ledger>,
+    freed: Condvar,
 }
 
+/// What a review's runs were charged, and what its runs in flight
+/// hold, in US dollars.
+#[derive(Debug, Default)]
+struct Ledger {
+    spent: f64,
+    reserved: f64,
+}
+
+/// What a sum of costs may pass the cap by and still fit, so that
+/// adding up tier caps in floating point never refuses what fits.
+const SLACK: f64 = 1e-9;
+
 impl Budget {
-    /// A cap of `cap` US dollars, nothing spent.
+    /// A cap of `cap` US dollars, `before` of it spent by the pull
+    /// request's earlier reviews.
     #[must_use]
-    pub fn new(cap: f64) -> Self {
+    pub fn new(cap: f64, before: f64) -> Self {
         Self {
             cap,
-            spent: Mutex::new(0.0),
+            before,
+            ledger: Mutex::new(Ledger::default()),
+            freed: Condvar::new(),
         }
     }
 
-    /// Adds what a finished run cost.
-    pub fn charge(&self, cost: f64) {
-        *self.spent.lock().unwrap_or_else(PoisonError::into_inner) += cost;
+    fn lock(&self) -> MutexGuard<'_, Ledger> {
+        self.ledger.lock().unwrap_or_else(PoisonError::into_inner)
     }
 
-    /// What the finished runs cost.
-    #[must_use]
-    pub fn spent(&self) -> f64 {
-        *self.spent.lock().unwrap_or_else(PoisonError::into_inner)
+    /// Whether `own`, of this review's, fits beside what the earlier
+    /// reviews spent.
+    fn within(&self, own: f64) -> bool {
+        self.before + own <= self.cap + SLACK
     }
 
-    /// Why no further run may start, once what was spent reached the
-    /// cap; none below it.
+    /// Whether a run whose tier caps it at `most` US dollars may start
+    /// now: its cap fits beside what was spent and what the runs in
+    /// flight hold.
     #[must_use]
-    pub fn refusal(&self) -> Option<String> {
-        let spent = self.spent();
-        (spent >= self.cap).then(|| {
+    pub fn fits(&self, most: f64) -> bool {
+        let ledger = self.lock();
+        self.within(ledger.spent + ledger.reserved + most)
+    }
+
+    /// Why a run capped at `most` US dollars may never start: its cap
+    /// does not fit beside what was spent, whatever the runs in flight
+    /// cost; none while it may.
+    #[must_use]
+    pub fn refusal(&self, most: f64) -> Option<String> {
+        self.refused(&self.lock(), most)
+    }
+
+    fn refused(&self, ledger: &Ledger, most: f64) -> Option<String> {
+        (!self.within(ledger.spent + most)).then(|| {
             format!(
-                "{OVER_BUDGET} the review's runs cost {spent:.4} USD, its cap is {:.2} USD, so \
-                 it was not started",
+                "{OVER_BUDGET} the pull request's reviews cost {:.4} USD, and a run capped at \
+                 {most:.2} USD does not fit in its cap of {:.2} USD, so it was not started",
+                self.before + ledger.spent,
                 self.cap
             )
         })
+    }
+
+    /// Reserves `most` US dollars for a run about to start, once its
+    /// cap fits: while runs in flight hold what it needs it waits for
+    /// one to end, and once it cannot fit whatever they cost, or `wait`
+    /// passed with no room, it is refused, why given. The reservation
+    /// is released when the [`Reservation`] is charged or dropped, a run
+    /// that unwinds included, so no wait outlives the run it waits on.
+    ///
+    /// # Errors
+    ///
+    /// Fails, saying why, when the run may not start.
+    pub fn reserve(&self, most: f64, wait: Duration) -> Result<Reservation<'_>, String> {
+        let since = Instant::now();
+        let mut ledger = self.lock();
+        loop {
+            if let Some(why) = self.refused(&ledger, most) {
+                return Err(why);
+            }
+            // Not refused, so what does not fit is held by runs in
+            // flight, each of which ends and wakes this wait.
+            if self.within(ledger.spent + ledger.reserved + most) {
+                ledger.reserved += most;
+                return Ok(Reservation { budget: self, most });
+            }
+            let left = wait.saturating_sub(since.elapsed());
+            if left.is_zero() {
+                return Err(self.waited(most, wait));
+            }
+            ledger = self
+                .freed
+                .wait_timeout(ledger, left)
+                .unwrap_or_else(PoisonError::into_inner)
+                .0;
+        }
+    }
+
+    /// Why a run capped at `most` US dollars was refused once it waited
+    /// `wait` for room.
+    fn waited(&self, most: f64, wait: Duration) -> String {
+        format!(
+            "{OVER_BUDGET} a run capped at {most:.2} USD waited {:.2} s for the runs in flight to \
+             leave room in the pull request's cap of {:.2} USD, and they did not end, so it was \
+             not started",
+            wait.as_secs_f64(),
+            self.cap
+        )
+    }
+
+    /// Releases the `most` a run reserved and wakes the runs waiting
+    /// for room.
+    fn release(&self, most: f64) {
+        self.lock().reserved -= most;
+        self.freed.notify_all();
+    }
+
+    /// What this review's finished runs were charged.
+    #[must_use]
+    pub fn spent(&self) -> f64 {
+        self.lock().spent
+    }
+
+    /// What the pull request's reviews cost so far, this one's finished
+    /// runs and the earlier reviews'.
+    #[must_use]
+    pub fn total(&self) -> f64 {
+        self.before + self.spent()
+    }
+}
+
+/// The cap a run in flight holds in the [`Budget`], until it is
+/// charged or dropped, either of which releases it.
+#[derive(Debug)]
+pub struct Reservation<'a> {
+    budget: &'a Budget,
+    most: f64,
+}
+
+impl Reservation<'_> {
+    /// Charges the run that ended `cost` and hands `keep` what this
+    /// review was charged so far, its own spend alone, while no other
+    /// run's cost is added, so what it keeps never goes back; then
+    /// releases the reservation.
+    pub fn charge(self, cost: f64, keep: &dyn Fn(f64)) {
+        let mut ledger = self.budget.lock();
+        ledger.spent += cost;
+        keep(ledger.spent);
+    }
+}
+
+impl Drop for Reservation<'_> {
+    fn drop(&mut self) {
+        self.budget.release(self.most);
     }
 }
 

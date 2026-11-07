@@ -9,6 +9,19 @@ its upgrade notes (ENG-23). ParleyInn follows semantic versioning.
 
 ## Unreleased
 
+- The review's cost cap moved from 40 USD per review to 5 USD per pull
+  request, counted over all of its reviews (ENG-28): each review keeps
+  what it alone spent in a `review-spend-pr-<N>-a<attempt>` artifact, a
+  rerun beside its first attempt's, and the next sums every one and
+  passes the sum to `review-run` as the new `--spent-before`; deleting
+  the pull request's `review-spend-pr-<N>-a*` artifacts resets its
+  budget. The per-run tier
+  caps are lower, 0.30 USD for a specialist and 1.50 for a generalist,
+  and a run starts only once its tier's cap fits beside what was spent
+  and the caps of the runs in flight; a run paid for that left no
+  result is charged its tier's cap. A review the cap stopped lists every
+  agent it did not run. Two deep generalists, `review-code-deep` and
+  `review-spec-deep`, run on Sonnet at medium effort.
 - CI now fails on a source, test, feature or configuration file past its
   kind's line limit that the size list
   (`tooling/engineering/oversize.txt`) does not list, and on a listed
@@ -49,9 +62,11 @@ its upgrade notes (ENG-23). ParleyInn follows semantic versioning.
   as its own agent, and writes the review outcome from what they
   answered. The review skill and its evaluation cases are removed.
   A change no rule routes gets one generalist, an agent that did not
-  answer runs once more, a change to a stakeholder path blocks until a
-  stakeholder comment consents (ENG-21), and every review reads the whole
-  diff.
+  answer runs once more only when its run cost nothing, a charged run
+  never runs again and what it stated stands, a generalist is read from
+  its whole run log and code decides when its weighing is partial, a
+  change to a stakeholder path blocks until a stakeholder comment
+  consents (ENG-21), and every review reads the whole diff.
 - Redaction now also redacts a secret that a neighbouring match hid from
   a rule's word boundary, such as an AWS access key directly followed by
   a principal's pattern (SEC-08). Its work is bounded by the redaction

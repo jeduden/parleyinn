@@ -118,8 +118,8 @@ pub fn prepare(workdir: &Path, name: &str, limit: usize) -> Result<Vec<Part>, St
 /// each part's, and that line as the answer, but no outcome line when a
 /// part's report has none, so the report check refuses it. A part that
 /// did not answer makes the run one that did not answer, its report
-/// headed incomplete naming each such part. Costs, turns, usage and
-/// attempts add up.
+/// headed incomplete naming each such part. Costs, what the budget
+/// charged, turns, usage and attempts add up.
 #[must_use]
 pub fn merge(name: &str, parts: Vec<(AgentRun, String)>) -> (AgentRun, String) {
     let count = parts.len();
@@ -132,7 +132,7 @@ pub fn merge(name: &str, parts: Vec<(AgentRun, String)>) -> (AgentRun, String) {
         subtype: SUCCESS.to_owned(),
         ..RunLog::default()
     };
-    let mut attempts = 0;
+    let (mut attempts, mut charged) = (0, 0.0);
     for (at, (run, report)) in parts.into_iter().enumerate() {
         let place = format!("part {} of {count}", at + 1);
         if let Some(why) = &run.failure {
@@ -144,6 +144,7 @@ pub fn merge(name: &str, parts: Vec<(AgentRun, String)>) -> (AgentRun, String) {
             log.answered = false;
         }
         attempts += run.attempts;
+        charged += run.charged;
         add(&mut log, run.log);
         let mut outcome = None;
         for line in report.lines() {
@@ -193,6 +194,7 @@ pub fn merge(name: &str, parts: Vec<(AgentRun, String)>) -> (AgentRun, String) {
             from_store: false,
             answer_key: None,
             store_failed: false,
+            charged,
         },
         report,
     )

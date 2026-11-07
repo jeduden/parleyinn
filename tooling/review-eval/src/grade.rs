@@ -173,16 +173,22 @@ fn stated_failures(expect: &Expect, log: &RunLog) -> Vec<String> {
 }
 
 /// A generalist answers with its kept and dropped findings and writes
-/// nothing. A kept finding is a line in the finding shape that is no
-/// dropped one; a dropped one is a line [`report::dropped`] reads as
-/// one, in which the path and words the case
-/// names are no kept finding. A consultant, `kind`, answers the same
-/// way, with nothing to drop; a line of it in a specialist's form, as a
-/// persona writes, is a kept finding too.
+/// nothing. Its weighing is read from its whole run log as the review
+/// reads it, [`report::weighing`]: each weighing line it stated as it
+/// went, the last at a place standing, then its final answer. A kept
+/// finding is a line in the finding shape that is no dropped one; a
+/// dropped one is a line [`report::dropped`] reads as one, in which the
+/// path and words the case names are no kept finding. A consultant,
+/// `kind`, answers the same way from its final answer alone, which the
+/// review never reads, with nothing to drop; a line of it in a
+/// specialist's form, as a persona writes, is a kept finding too.
 fn generalist(case: &Case, log: &RunLog, kind: Kind) -> Vec<String> {
     let mut failures = answered(log);
     failures.extend(log.writes.iter().map(|path| format!("wrote {path}")));
-    let text = &log.answer;
+    let text = &match kind {
+        Kind::Generalist => report::weighing(&log.texts, &log.answer),
+        _ => log.answer.clone(),
+    };
     let in_form = |l: &str| kind == Kind::Consultant && specialist_form(l);
     let kept: Vec<&str> = text
         .lines()

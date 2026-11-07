@@ -9,6 +9,8 @@ fn agent(name: &str, effort: &str, body: &str) -> (String, String) {
         "model: opus\nmaxTurns: 40\n"
     } else if generalist_of(name).is_some() {
         "maxTurns: 20\n"
+    } else if GENERALISTS.contains(&name) {
+        "maxTurns: 40\n"
     } else {
         ""
     };
@@ -208,17 +210,26 @@ fn a_deep_generalist_on_another_model_or_turn_budget_is_named() {
         problems(&f)
     };
 
-    assert_eq!(
-        deep("model: sonnet\nmaxTurns: 40\n"),
-        ["review-spec-deep runs on model sonnet, want opus"]
-    );
+    // Which model is the definition's own to say.
+    for model in ["opus", "sonnet"] {
+        assert_eq!(
+            deep(&format!("model: {model}\nmaxTurns: 40\n")),
+            Vec::<String>::new(),
+            "{model}"
+        );
+    }
+    assert_eq!(deep("maxTurns: 40\n"), ["review-spec-deep names no model"]);
     assert_eq!(
         deep("model: opus\n"),
-        ["review-spec-deep names no maxTurns, want 40"]
+        ["review-spec-deep names no maxTurns"]
+    );
+    assert_eq!(
+        problems(&replaced("review-spec-deep", "turbo", "x")),
+        ["review-spec-deep runs at effort turbo, want low, medium or high"]
     );
     assert_eq!(
         problems(&replaced("review-spec-deep", "medium", "x")),
-        ["review-spec-deep runs at effort medium, want high"]
+        Vec::<String>::new()
     );
 }
 
@@ -235,12 +246,19 @@ fn a_specialist_without_its_turn_cap_is_named() {
         problems(&f)
     };
 
-    assert_eq!(capped("maxTurns: 20\n"), Vec::<String>::new());
-    assert_eq!(
-        capped("maxTurns: 60\n"),
-        ["lang-shell runs for maxTurns 60, want 20"]
-    );
-    assert_eq!(capped(""), ["lang-shell names no maxTurns, want 20"]);
+    // Which number is the definition's own: the check names none.
+    for turns in ["maxTurns: 20\n", "maxTurns: 60\n", "maxTurns: 12\n"] {
+        assert_eq!(capped(turns), Vec::<String>::new(), "{turns}");
+    }
+    assert_eq!(capped(""), ["lang-shell names no maxTurns"]);
+    for bad in ["many", "0", "-3", "2.5"] {
+        assert_eq!(
+            capped(&format!("maxTurns: {bad}\n")),
+            [format!(
+                "lang-shell has maxTurns {bad}, want a whole number of turns above zero"
+            )]
+        );
+    }
 }
 
 #[test]
@@ -264,5 +282,26 @@ fn a_specialist_or_a_generalist_that_can_write_is_named() {
     assert_eq!(
         problems(&f),
         ["review-code has tools Read, Grep, Glob, Write, want Read, Grep, Glob"]
+    );
+}
+
+#[test]
+fn a_medium_generalist_without_its_turn_budget_is_named() {
+    let named = |front: &str| {
+        let mut f = without("review-code");
+        f.push((
+            format!("{AGENTS}/review-code.md"),
+            format!(
+                "---\nname: review-code\ntools: Read, Grep, Glob\neffort: medium\n{front}---\n"
+            ),
+        ));
+        problems(&f)
+    };
+
+    assert_eq!(named("maxTurns: 40\n"), Vec::<String>::new());
+    assert_eq!(named(""), ["review-code names no maxTurns"]);
+    assert_eq!(
+        named("maxTurns: 0\n"),
+        ["review-code has maxTurns 0, want a whole number of turns above zero"]
     );
 }

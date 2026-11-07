@@ -87,6 +87,7 @@ fn a_log_without_a_result_did_not_answer() {
     let log = parse("not json\n{\"type\":\"system\"}\n");
 
     assert!(!log.answered);
+    assert!(!log.resulted);
     assert_eq!(log.subtype, "none");
     assert_eq!(log.answer, "");
     assert_eq!(log.turns, 0);
@@ -99,6 +100,7 @@ fn a_result_that_errs_did_not_answer() {
     let log = parse(cut);
 
     assert!(!log.answered);
+    assert!(log.resulted, "a result came, an error");
     assert_eq!(log.subtype, "error_max_turns");
     assert_eq!(log.turns, 20);
 

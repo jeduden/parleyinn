@@ -1,0 +1,299 @@
+//! The drifts of how a pull request's reviews share one cost cap
+//! (ENG-28): what earlier reviews spent ignored, the total not kept or
+//! kept without them, and the workflow no longer carrying it from one
+//! review to the next. Late, so adding them moves no earlier case to
+//! another shard.
+
+use super::case;
+use crate::{Case, Check, Injection, cargo_lib_test};
+
+/// The workflow the cases drift.
+const WORKFLOW: &str = ".github/workflows/review.yml";
+/// The script that fetches what earlier reviews spent.
+const SCRIPT: &str = "scripts/review-spend.sh";
+
+/// The drifts the pull request's cap exists to rule out (ENG-28, I6).
+pub(super) fn review_spend_cases() -> Vec<Case> {
+    [
+        cap_cases(),
+        carry_cases(),
+        flight_cases(),
+        sum_cases(),
+        vec![long_lived_case()],
+    ]
+    .concat()
+}
+
+/// The drifts of the runs in flight: a run started though the tier caps
+/// of the runs in flight leave no room for its own, and a run paid for
+/// that left no result counted free, or one whose result reported no
+/// cost charged its tier's cap. Last, so adding them moves no
+/// earlier case to another shard.
+fn flight_cases() -> Vec<Case> {
+    vec![
+        case(
+            "review-run starting runs whose tier caps the runs in flight already hold",
+            "ENG-28",
+            Injection::replace(
+                "tooling/review-run/src/controls.rs",
+                "ledger.reserved += most;",
+                "ledger.reserved += 0.0;",
+            ),
+            cap_check(),
+            "3 runs ran at once, past the 2",
+        ),
+        case(
+            "review-run counting a run paid for that left no result as free",
+            "ENG-28",
+            Injection::replace(
+                "tooling/review-run/src/retry.rs",
+                "    } else if !log.resulted && charged(log).is_some() {\n        most\n",
+                "    } else if !log.resulted && charged(log).is_some() {\n        0.0\n",
+            ),
+            cap_check(),
+            "a review with a run cut off unbilled: review/spend.json says",
+        ),
+        case(
+            "review-run charging its tier's cap to a run whose result reported no cost",
+            "ENG-28",
+            Injection::replace(
+                "tooling/review-run/src/retry.rs",
+                "    } else if !log.resulted && charged(log).is_some() {\n",
+                "    } else if charged(log).is_some() {\n",
+            ),
+            cap_check(),
+            "a review with a run that reported no cost: review/spend.json says",
+        ),
+    ]
+}
+
+/// The drifts of the sum of what each earlier review kept: a rerun's
+/// first attempt left out, by the listing or the selection, an artifact
+/// a paged listing named twice summed twice, a run behind one that
+/// cannot be looked up only warned of, a rerun's spend kept under or in
+/// place of its first attempt's, and a file of many left out. Last, so adding them moves no earlier
+/// case to another shard.
+fn sum_cases() -> Vec<Case> {
+    vec![
+        case(
+            "what earlier reviews spent listed by a name with no run attempt",
+            "ENG-28",
+            Injection::replace(
+                SCRIPT,
+                "startswith(\\\"review-spend-pr-$PULL-a\\\")",
+                "startswith(\\\"review-spend-pr-$PULL\\\")",
+            ),
+            carry_check(),
+            "never looks for the artifacts of the pull request's own name, every attempt's",
+        ),
+        case(
+            "previous select --of spend taking the name with no run attempt alone",
+            "ENG-28",
+            Injection::replace(
+                "tooling/review-run/src/previous.rs",
+                ".filter(|a| is_spend_of(&a.name, pull) && !a.expired)",
+                ".filter(|a| a.name == format!(\"{SPEND}{pull}\") && !a.expired)",
+            ),
+            carry_check(),
+            "not artifacts 1, 4, 5 and 6",
+        ),
+        case(
+            "previous select --of spend summing an artifact a paged listing named twice",
+            "ENG-28",
+            Injection::replace(
+                "tooling/review-run/src/previous.rs",
+                "    named.dedup_by_key(|a| a.id);\n",
+                "",
+            ),
+            cargo_lib_test(
+                "review-run",
+                "previous::tests::an_artifact_a_listing_names_twice_is_summed_once",
+            ),
+            "an_artifact_a_listing_names_twice_is_summed_once",
+        ),
+        case(
+            "a run behind an earlier review's spend that cannot be looked up only warned of",
+            "ENG-28",
+            Injection::replace(
+                SCRIPT,
+                "    || fail \"Run $id, behind",
+                "    || echo \"::warning::Run $id, behind",
+            ),
+            carry_check(),
+            "goes on past a run it could not look up",
+        ),
+        case(
+            "a rerun's spend kept under its first attempt's name",
+            "ENG-28",
+            Injection::replace(WORKFLOW, "-a${{ github.run_attempt }}", ""),
+            carry_check(),
+            "no step uploads what the pull request's reviews spent",
+        ),
+        case(
+            "a rerun's spend replacing what its first attempt kept",
+            "ENG-28",
+            Injection::replace(
+                WORKFLOW,
+                "          path: review/spend.json\n",
+                "          path: review/spend.json\n          overwrite: true\n",
+            ),
+            carry_check(),
+            "may replace what an earlier one kept",
+        ),
+        case(
+            "previous spend reading one file of many",
+            "ENG-28",
+            Injection::replace(
+                "tooling/review-run/src/previous.rs",
+                ".map(|spent| sum + spent)",
+                ".map(|spent| spent)",
+            ),
+            carry_check(),
+            "summed spend files of 1.5 and 0.25 USD",
+        ),
+    ]
+}
+
+/// The drift of the bound on how many earlier reviews' spend a review
+/// sums: a long-lived pull request's hundreds of reviews refused, so
+/// every later review fails. Last, so adding it moves no earlier case to
+/// another shard.
+fn long_lived_case() -> Case {
+    case(
+        "previous select --of spend refusing a long-lived pull request's hundreds of reviews",
+        "ENG-28",
+        Injection::replace(
+            "tooling/review-run/src/previous.rs",
+            "pub const MAX_SPENDS: usize = 1000;",
+            "pub const MAX_SPENDS: usize = 100;",
+        ),
+        carry_check(),
+        "did not take all 150 earlier reviews' spend",
+    )
+}
+
+/// The engineering check of the cap on the checkout's `review-run`.
+fn cap_check() -> Check {
+    cargo_lib_test(
+        "engineering",
+        "review_spend::tests::the_checkout_s_review_run_holds_a_pull_request_s_reviews_to_its_cap",
+    )
+}
+
+/// The engineering check of how the workflow carries the spend.
+fn carry_check() -> Check {
+    cargo_lib_test(
+        "engineering",
+        "review_spend::tests::the_checkout_s_review_carries_what_a_pull_request_s_reviews_spent",
+    )
+}
+
+/// `review-run`'s drifts: the earlier reviews' spend left out of the
+/// cap or of the file that keeps it, or the file never kept.
+fn cap_cases() -> Vec<Case> {
+    vec![
+        case(
+            "review-run leaving what earlier reviews spent out of the pull request's cap",
+            "ENG-28",
+            Injection::replace(
+                "tooling/review-run/src/controls.rs",
+                "        self.before + own <= self.cap + SLACK\n",
+                "        own <= self.cap + SLACK\n",
+            ),
+            cap_check(),
+            "5 runs started, not 1",
+        ),
+        case(
+            "review-run reading --spent-before and dropping it",
+            "ENG-28",
+            Injection::replace(
+                "tooling/review-run/src/cli.rs",
+                "\"spent-before\" => options.spent_before = spent(name, &value)?,",
+                "\"spent-before\" => drop(spent(name, &value)?),",
+            ),
+            cap_check(),
+            "5 runs started, not 1",
+        ),
+        case(
+            "review-run keeping a run's cost twice in what it spent",
+            "ENG-28",
+            Injection::replace(
+                "tooling/review-run/src/cli.rs",
+                "&crate::spend::text(usage::charged(runs)),",
+                "&crate::spend::text(usage::total(&usage) + usage::charged(runs)),",
+            ),
+            cap_check(),
+            "review/spend.json says",
+        ),
+        case(
+            "review-run never keeping what the pull request's reviews spent",
+            "ENG-28",
+            Injection::replace(
+                "tooling/review-run/src/spend.rs",
+                "    fs::rename(&part, path)\n",
+                "    fs::rename(&part, part.with_extension(\"lost\"))\n",
+            ),
+            cap_check(),
+            "review/spend.json: No such file",
+        ),
+        case(
+            "a spend file past its size limit read as what was spent",
+            "ENG-28",
+            Injection::replace(
+                "tooling/review-run/src/spend.rs",
+                "    if text.len() > MAX_BYTES {",
+                "    if text.len() > MAX_BYTES * 1024 {",
+            ),
+            carry_check(),
+            "took a spend file past the size limit",
+        ),
+    ]
+}
+
+/// The workflow and script drifts: the spend never handed on, kept
+/// only after a review that succeeded, or fetched with no origin check
+/// or no reading of the file.
+fn carry_cases() -> Vec<Case> {
+    vec![
+        case(
+            "a review never given what earlier reviews of its pull request spent",
+            "ENG-28",
+            Injection::replace(WORKFLOW, " --spent-before \"$SPENT\" \\\n", " \\\n"),
+            carry_check(),
+            "as --spent-before",
+        ),
+        case(
+            "the spend kept only by a review that did not fail or get cancelled",
+            "ENG-28",
+            Injection::replace(
+                WORKFLOW,
+                "        if: always() && steps.scrub.outputs.scrubbed == 'true'\n        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2\n        with:\n          name: review-spend-pr-",
+                "        if: steps.scrub.outputs.scrubbed == 'true'\n        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2\n        with:\n          name: review-spend-pr-",
+            ),
+            carry_check(),
+            "reviews spent lacks",
+        ),
+        case(
+            "what earlier reviews spent picked with no check of the run that uploaded it",
+            "ENG-28",
+            Injection::replace(
+                SCRIPT,
+                "review-run -- previous select --of spend",
+                "review-run -- previous list --of spend",
+            ),
+            carry_check(),
+            "previous select --of spend",
+        ),
+        case(
+            "what earlier reviews spent fetched and never read",
+            "ENG-28",
+            Injection::replace(
+                SCRIPT,
+                "previous spend \"${files[@]}\"",
+                "previous check \"${files[@]}\"",
+            ),
+            carry_check(),
+            "never reads and sums the file of every earlier review",
+        ),
+    ]
+}

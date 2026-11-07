@@ -445,7 +445,13 @@ fn an_answer_whose_log_is_gone_is_told_and_counted() {
     let unit = crate::run::Unit::whole("review-code".to_owned());
     let run = crate::run::reused("review-code".to_owned(), unit.kind, "x", Vec::new());
 
-    let failed = super::keep(&review, &store, &unit, &"a".repeat(64), &(run, None));
+    let failed = super::keep(
+        &review,
+        &store,
+        (&unit, &"a".repeat(64)),
+        &(run, None),
+        &super::HeldTo::of(&review, &unit, &super::Answers::new()),
+    );
 
     assert!(failed);
     // Without its keys a review looks nothing up.
@@ -518,10 +524,122 @@ fn an_answer_that_held_the_token_is_never_stored_and_is_counted() {
     let run = crate::run::reused("review-code".to_owned(), unit.kind, "x", Vec::new());
     let key = "a".repeat(64);
 
-    let failed = super::keep(&review, &store, &unit, &key, &(run, None));
+    let failed = super::keep(
+        &review,
+        &store,
+        (&unit, &key),
+        &(run, None),
+        &super::HeldTo::of(&review, &unit, &super::Answers::new()),
+    );
 
     assert!(failed);
     assert!(!dir.path().join("answers").join(&key).exists());
     let lines = lines.lock().unwrap().clone();
     assert!(lines[0].ends_with("it held the Claude token"), "{lines:?}");
+}
+
+/// Answers as [`fake::either`], but review-code weighs another place
+/// than the one its specialists reported, so its weighing is partial.
+fn partial(c: &Command) -> Result<Output, String> {
+    if fake::agent_of(c) == "review-code" {
+        let text = "src/z.rs:9 — nit — long — lang-rust\nThe whole scope was weighed.";
+        return fake::answer(c, &[text], text);
+    }
+    fake::either(c)
+}
+
+#[test]
+fn a_generalist_whose_weighing_is_partial_is_never_stored_and_runs_again() {
+    let dir = workdir();
+    let store = store_in(dir.path());
+    let first = reviewed(dir.path(), &store, crate::parts::LIMIT, partial);
+    let key = first.run("review-code").answer_key.clone().unwrap();
+
+    assert_eq!(store.get(&key), Ok(None));
+    assert!(
+        first.lines.iter().any(|l| l
+            == "review-code (generalist): its answer was not stored: its weighing is partial: \
+                it weighed no finding at src/a.rs:3"),
+        "{:?}",
+        first.lines
+    );
+
+    let second = reviewed(dir.path(), &store, crate::parts::LIMIT, partial);
+
+    assert_eq!(second.started, ["review-code"]);
+}
+
+#[test]
+fn a_stored_generalist_whose_weighing_is_partial_is_not_replayed() {
+    let dir = workdir();
+    let store = store_in(dir.path());
+    let first = reviewed(dir.path(), &store, crate::parts::LIMIT, partial);
+    let run = first.run("review-code");
+    let key = run.answer_key.clone().unwrap();
+    // As a store an earlier review-run filled would hold it.
+    let log = fs::read_to_string(dir.path().join("review/logs/review-code.jsonl")).unwrap();
+    let usage = crate::usage::usage(std::slice::from_ref(run), None).remove(0);
+    store.put(&key, &log, None, &usage).unwrap();
+
+    let second = reviewed(dir.path(), &store, crate::parts::LIMIT, partial);
+
+    assert_eq!(second.started, ["review-code"]);
+    assert!(
+        second.lines.iter().any(|l| l.starts_with(&format!(
+            "review-code (generalist): its stored answer {key} is not taken, so it runs: its \
+             weighing is partial: it weighed no finding at src/a.rs:3"
+        ))),
+        "{:?}",
+        second.lines
+    );
+}
+
+/// Answers as [`fake::either`], but lang-rust is cut off by its turn
+/// budget after it stated its finding, its result still giving an
+/// outcome line, so its report reads but it did not answer; and
+/// review-code weighs only test-engineer-unit's place.
+fn cut_off(c: &Command) -> Result<Output, String> {
+    match fake::agent_of(c).as_str() {
+        "lang-rust" => {
+            let outcome = "outcome: findings — one.";
+            let log = fake::log_of(&[fake::FINDING, outcome], "error_max_turns", outcome, 0.05);
+            fake::write_log(c, &log);
+            Ok(Output::default())
+        }
+        "test-engineer-unit" => {
+            let finding = "src/b.rs:5 — if not addressed: a panic stops the hook — I9";
+            let outcome = "outcome: findings — one.";
+            fake::answer(c, &[finding, outcome], outcome)
+        }
+        "review-code" => {
+            let text = "src/b.rs:5 — nit — a panic — test-engineer-unit\nThe scope was weighed.";
+            fake::answer(c, &[text], text)
+        }
+        _ => fake::either(c),
+    }
+}
+
+#[test]
+fn a_generalist_is_held_to_the_reports_of_the_specialists_that_answered_alone() {
+    let dir = workdir();
+    let store = store_in(dir.path());
+
+    let first = reviewed(dir.path(), &store, crate::parts::LIMIT, cut_off);
+
+    assert!(!first.run("lang-rust").answered());
+    let report =
+        fs::read_to_string(dir.path().join(crate::plan::report_file("lang-rust"))).unwrap();
+    assert_eq!(
+        review_gate::report::findings_check(&report, None),
+        None,
+        "its report reads: {report}"
+    );
+    let key = first.run("review-code").answer_key.clone().unwrap();
+    assert!(store.get(&key).unwrap().is_some(), "{:?}", first.lines);
+    let second = reviewed(dir.path(), &store, crate::parts::LIMIT, cut_off);
+    assert!(
+        !second.started.contains(&"review-code".to_owned()),
+        "{:?}",
+        second.started
+    );
 }

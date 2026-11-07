@@ -14,6 +14,10 @@ summary: >-
 ---
 # ADR-2610300031: The review is run by code
 
+> Superseded in part by [ENG-28](../srs/10-engineering-quality.md). The cost
+> cap is 5 USD per pull request, not 40 USD per review. A charged run never
+> runs again. Each deep reviewer names its own model, effort and turns.
+
 It supersedes ADR-2610262245, which is marked superseded and names
 this record. The layers, gate and required check that record decided
 stay, as "What stays" says; the reports as files change, as the

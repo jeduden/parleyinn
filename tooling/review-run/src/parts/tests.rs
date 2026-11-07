@@ -124,6 +124,7 @@ fn part_run(failure: Option<&str>, answer: &str, cost: f64) -> AgentRun {
         failure: failure.map(str::to_owned),
         log: RunLog {
             answered: failure.is_none(),
+            resulted: true,
             subtype: if failure.is_none() {
                 "success"
             } else {
@@ -146,6 +147,7 @@ fn part_run(failure: Option<&str>, answer: &str, cost: f64) -> AgentRun {
         from_store: false,
         answer_key: None,
         store_failed: false,
+        charged: cost,
     }
 }
 
@@ -376,4 +378,16 @@ fn a_merge_keeps_the_subtype_of_its_first_failed_part() {
     let (run, _) = merge("lang-rust", parts);
 
     assert_eq!(run.log.subtype, "error_max_turns");
+}
+
+#[test]
+fn what_the_budget_charged_each_part_adds_up() {
+    let parts = vec![
+        (part_run(None, "outcome: none — a.", 0.25), String::new()),
+        (part_run(Some("cut"), "", 0.5), String::new()),
+    ];
+
+    let (run, _) = merge("lang-rust", parts);
+
+    assert!((run.charged - 0.75).abs() < 1e-9, "{}", run.charged);
 }

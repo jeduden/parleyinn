@@ -143,24 +143,23 @@ pub(super) fn review_place_form_cases() -> Vec<Case> {
     ]
 }
 
-/// The drift the review's second attempt must not bring (ENG-28), late
-/// so adding it moves no earlier case to another shard: a retry that
-/// merges the first attempt's findings into a second report the gate
-/// refuses again, so the two refused reports pass as one.
+/// The drift the review's rerun rule must not bring (ENG-28), late so
+/// adding it moves no earlier case to another shard: a run that cost
+/// money and was cut off, run again from scratch and paid for twice.
 pub(super) fn review_retry_cases() -> Vec<Case> {
     vec![case(
-        "a retried specialist's refused report rescued by its first attempt's findings",
+        "a charged run that did not answer is run again",
         "ENG-28",
         Injection::replace(
             "tooling/review-run/src/retry.rs",
-            "    let (Some(_), Some(failure)) = (&report, second.failure.clone()) else {\n        return report;\n    };\n",
-            "    let (Some(_), failure) = (&report, second.failure.clone()) else {\n        return report;\n    };\n    let failure = failure.unwrap_or_default();\n",
+            "    if let Some(why) = charged(&first.log) {\n",
+            "    if let Some(why) = charged(&first.log).filter(|_| false) {\n",
         ),
         cargo_lib_test(
             "review-run",
-            "retry::tests::a_report_refused_twice_stays_refused_and_the_first_s_findings_do_not_rescue_it",
+            "retry::tests::a_run_cut_off_after_it_cost_money_keeps_what_it_stated_and_is_not_run_again",
         ),
-        "a_report_refused_twice_stays_refused_and_the_first_s_findings_do_not_rescue_it",
+        "a_run_cut_off_after_it_cost_money_keeps_what_it_stated_and_is_not_run_again",
     )]
 }
 
@@ -300,19 +299,19 @@ pub(super) fn review_control_cases() -> Vec<Case> {
             "ENG-28",
             Injection::replace(
                 "tooling/review-eval/src/runner.rs",
-                "        \"--max-budget-usd\".to_owned(),\n",
-                "        \"--max-budget\".to_owned(),\n",
+                "[\"--max-budget-usd\".to_owned(), budget_usd(",
+                "[\"--max-budget\".to_owned(), budget_usd(",
             ),
             controlled(),
             want,
         ),
         case(
-            "review-run starting runs past the review's cost cap",
+            "review-run starting runs past the pull request's cost cap",
             "ENG-28",
             Injection::replace(
                 CONTROLS,
-                "(spent >= self.cap).then(|| {",
-                "(spent >= self.cap && false).then(|| {",
+                "        self.before + own <= self.cap + SLACK\n",
+                "        self.before + own <= f64::MAX\n",
             ),
             controlled(),
             want,
@@ -354,6 +353,79 @@ pub(super) fn review_control_cases() -> Vec<Case> {
             "a_review_run_on_the_checkout_s_definitions_has_no_problem",
         ),
     ]
+}
+
+/// The drifts the review's reading of a generalist's weighing must not
+/// bring (ENG-28, I6), late so adding them moves no earlier case to
+/// another shard: a weighing read from the final answer alone, so what
+/// was stated as it went is lost, a partial weighing the code no
+/// longer decides, so the generalist's word on its scope stands, and one
+/// line whose huge range covers every place in a file.
+pub(super) fn review_weighing_cases() -> Vec<Case> {
+    const OUTCOME: &str = "tooling/review-run/src/outcome.rs";
+    let check = || {
+        cargo_lib_test(
+            "engineering",
+            "review_weighings::tests::the_checkout_s_review_run_reads_a_whole_weighing_and_decides_a_partial_one",
+        )
+    };
+    let want = "the_checkout_s_review_run_reads_a_whole_weighing_and_decides_a_partial_one";
+    vec![
+        case(
+            "review-run reading a generalist's weighing from its final answer alone",
+            "ENG-28",
+            Injection::replace(
+                OUTCOME,
+                "Kind::Generalist => report::weighing(&run.log.texts, &run.log.answer),",
+                "Kind::Generalist => run.log.answer.clone(),",
+            ),
+            check(),
+            want,
+        ),
+        case(
+            "review-run taking a partial weighing as whole",
+            "ENG-28",
+            Injection::replace(
+                OUTCOME,
+                "        if !missed.is_empty() {\n",
+                "        if false && !missed.is_empty() {\n",
+            ),
+            check(),
+            want,
+        ),
+        case(
+            "review-run taking one line naming a huge range as weighing every place inside it",
+            "ENG-28",
+            Injection::replace(
+                OUTCOME,
+                "            .filter(|end| end.saturating_sub(start) < MAX_RANGE)\n",
+                "",
+            ),
+            check(),
+            "a weighing naming its file in a range too wide",
+        ),
+    ]
+}
+
+/// The drift the review's controls must not bring (ENG-28, I6), late so
+/// adding it moves no earlier case to another shard: a run its cost cap
+/// stopped read as one to run once more. Such a run was charged, so it
+/// is not run again either way; the check reads the reason told.
+pub(super) fn review_cap_retry_case() -> Case {
+    case(
+        "review-run reading a run a cost cap stopped as one to run once more",
+        "ENG-28",
+        Injection::replace(
+            "tooling/review-run/src/backoff.rs",
+            "        Class::Never(\"a cost cap stopped it, and another run would cost more\")\n",
+            "        Class::Again\n",
+        ),
+        cargo_lib_test(
+            "engineering",
+            "review_controls::tests::the_checkout_s_review_run_holds_its_agents_to_the_controls",
+        ),
+        "the_checkout_s_review_run_holds_its_agents_to_the_controls",
+    )
 }
 
 /// The drifts the gate's reading of a line at a place must not bring
