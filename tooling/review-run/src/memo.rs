@@ -24,7 +24,7 @@ use crate::usage;
 
 /// Each answering specialist's answer, by name: what a generalist's
 /// weighing is held to beside the reports.
-pub(crate) type Heard = std::collections::BTreeMap<String, String>;
+pub(crate) type Answers = std::collections::BTreeMap<String, String>;
 
 /// `unit`'s answer key in the review `r`: a specialist's or its part's
 /// own, a generalist's beside the reports its specialists left in the
@@ -45,7 +45,7 @@ pub(crate) fn recall(
     store: &Store,
     unit: &Unit,
     key: &str,
-    heard: &Heard,
+    heard: &Answers,
 ) -> Option<Done> {
     let label = || format!("{} ({})", unit.label(), unit.kind.word());
     let stored = match store.get(key) {
@@ -120,7 +120,7 @@ pub(crate) fn keep(
     store: &Store,
     (unit, key): (&Unit, &str),
     done: &Done,
-    heard: &Heard,
+    heard: &Answers,
 ) -> bool {
     let (run, report) = done;
     if !run.answered() {
@@ -184,11 +184,11 @@ pub(crate) fn keep(
 /// # Errors
 ///
 /// Fails naming the places it weighed no finding at.
-fn partial(r: &Review, unit: &Unit, log: &RunLog, heard: &Heard) -> Result<(), String> {
+fn partial(r: &Review, unit: &Unit, log: &RunLog, heard: &Answers) -> Result<(), String> {
     if unit.kind != Kind::Generalist {
         return Ok(());
     }
-    let reports: Heard = r
+    let reports: Answers = r
         .plan
         .dispatch
         .get(&unit.name)

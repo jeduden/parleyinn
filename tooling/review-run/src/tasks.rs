@@ -22,7 +22,7 @@ use review_eval::{component, runner};
 use review_gate::report::assemble;
 
 use crate::controls::Controls;
-use crate::memo::{self, Heard};
+use crate::memo::{self, Answers};
 use crate::parts;
 use crate::pipeline::pipeline;
 use crate::plan::Plan;
@@ -169,7 +169,7 @@ pub(crate) fn run_all(r: &Review, c: &Controls) -> Vec<AgentRun> {
 }
 
 /// Each of `runs` that answered, its answer by its name.
-fn heard<'a>(runs: impl Iterator<Item = &'a AgentRun>) -> Heard {
+fn heard<'a>(runs: impl Iterator<Item = &'a AgentRun>) -> Answers {
     runs.filter(|run| run.answered())
         .map(|run| (run.name.clone(), run.log.answer.clone()))
         .collect()
@@ -177,10 +177,10 @@ fn heard<'a>(runs: impl Iterator<Item = &'a AgentRun>) -> Heard {
 
 /// Runs `task`, given `inputs`, the results of the tasks it waits for,
 /// and `before`, what the specialists not run here answered.
-fn task(r: &Review, c: &Controls, (task, before): (&Task, &Heard), inputs: Vec<Done>) -> Done {
+fn task(r: &Review, c: &Controls, (task, before): (&Task, &Answers), inputs: Vec<Done>) -> Done {
     match task {
         Task::Unit(unit) => {
-            let done = one(r, c, unit, &Heard::new());
+            let done = one(r, c, unit, &Answers::new());
             if unit.part.is_none() {
                 settle(c, ended_in_gap(&done.0, done.1.as_deref(), r));
             }
@@ -285,7 +285,7 @@ fn whole(r: &Review, c: &Controls, name: &str) -> Option<AgentRun> {
 /// passes the check, else the answer the store holds under its key, when
 /// it is accepted again, else a run of its own, kept in the store once
 /// accepted; told to progress.
-fn one(r: &Review, c: &Controls, unit: &Unit, heard: &Heard) -> Done {
+fn one(r: &Review, c: &Controls, unit: &Unit, heard: &Answers) -> Done {
     let kept = match (reuse(r, &unit.name), &unit.part) {
         (Some(Reuse::Parts(kept)), Some(part)) => kept.get(&part.index),
         _ => None,
