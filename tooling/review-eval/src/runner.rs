@@ -31,25 +31,35 @@ pub const DISALLOWED: &str = "Bash,Edit,Write,NotebookEdit,WebFetch,WebSearch,Ag
 pub const SETTINGS: &str = r#"{"permissions":{"blockReadsOutsideWorkingDirectories":true}}"#;
 
 /// The most, in US dollars, one specialist's run may spend, passed as
-/// `--max-budget-usd`: the specialists of the reviews of pull request 98
-/// cost 0.01 to 0.30 each, so about three times the dearest leaves room
-/// for a long diff and stops a run gone round in circles. A run the cap
-/// stops ends with the result subtype [`OVER_BUDGET`].
-pub const SPECIALIST_BUDGET_USD: &str = "1.00";
-/// The same for a generalist, or a consultant, on the strongest model:
-/// those of pull request 98 cost up to 2.00, so 2.5 times that.
-pub const GENERALIST_BUDGET_USD: &str = "5.00";
+/// `--max-budget-usd`: real specialist runs cost 0.01 to 0.22 each, so
+/// this leaves room for a long diff, stops a run gone round in circles,
+/// and lets sixteen run at once within a pull request's 5 USD cap. A run
+/// the cap stops ends with the result subtype [`OVER_BUDGET`]. The one
+/// place a tier's cap is set: the review reserves it while the run runs,
+/// and charges it to a run that was charged and reported no cost.
+pub const SPECIALIST_BUDGET_USD: f64 = 0.30;
+/// The same for a generalist, or a consultant: real generalist runs
+/// cost 0.07 to 0.7, the dearest on the strongest model, so about twice
+/// that.
+pub const GENERALIST_BUDGET_USD: f64 = 1.50;
 
 /// The result subtype of a run its `--max-budget-usd` cap stopped.
 pub const OVER_BUDGET: &str = "error_max_budget_usd";
 
-/// The cap of one run of an agent of `kind`.
+/// The cap of one run of an agent of `kind`, in US dollars.
 #[must_use]
-pub fn budget_usd(kind: Kind) -> &'static str {
+pub fn budget_of(kind: Kind) -> f64 {
     match kind {
         Kind::Specialist => SPECIALIST_BUDGET_USD,
         Kind::Generalist | Kind::Consultant => GENERALIST_BUDGET_USD,
     }
+}
+
+/// The cap of one run of an agent of `kind`, as `--max-budget-usd`
+/// takes it.
+#[must_use]
+pub fn budget_usd(kind: Kind) -> String {
+    format!("{:.2}", budget_of(kind))
 }
 
 /// The prompt `component` gets for `world`: for a specialist or a
@@ -152,10 +162,7 @@ pub fn command_over(
     args.extend(["--allowedTools".to_owned(), TOOLS.to_owned()]);
     args.extend(["--disallowedTools".to_owned(), DISALLOWED.to_owned()]);
     args.extend(["--settings".to_owned(), SETTINGS.to_owned()]);
-    args.extend([
-        "--max-budget-usd".to_owned(),
-        budget_usd(component.kind).to_owned(),
-    ]);
+    args.extend(["--max-budget-usd".to_owned(), budget_usd(component.kind)]);
     match component.kind {
         Kind::Specialist | Kind::Generalist => {
             args.extend(["--agent".to_owned(), component.name.clone()]);

@@ -25,16 +25,16 @@ fn command(args: &[&str]) -> Command {
 #[test]
 fn a_run_without_its_tier_s_cap_is_named() {
     let commands = [
-        command(&["--agent", "lang-rust", "--max-budget-usd", "1.00"]),
-        command(&["--agent", "review-code", "--max-budget-usd", "1.00"]),
+        command(&["--agent", "lang-rust", "--max-budget-usd", "0.30"]),
+        command(&["--agent", "review-code", "--max-budget-usd", "0.30"]),
         command(&["--agent", "lang-shell"]),
     ];
 
     assert_eq!(
         tier_problems(&commands),
         [
-            "review-code ran without its tier's cost cap 5.00",
-            "lang-shell ran without its tier's cost cap 1.00"
+            "review-code ran without its tier's cost cap 1.50",
+            "lang-shell ran without its tier's cost cap 0.30"
         ]
     );
 }
