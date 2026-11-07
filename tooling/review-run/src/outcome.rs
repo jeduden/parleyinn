@@ -369,9 +369,10 @@ struct Heard<'a> {
 
 /// The places of `generalist`'s specialists' findings and requests that
 /// its `answer` weighs nowhere: no finding or dropped line of it is at
-/// the place's path, and none names the place. Decided from the reports
-/// and the answer alone, never by what the generalist says of its own
-/// scope; empty when it weighed every one, sorted.
+/// the place, or covers it as a range, and none names it exactly.
+/// Decided from the reports and the answer alone, never by what the
+/// generalist says of its own scope; empty when it weighed every one,
+/// sorted.
 fn unweighed(plan: &Plan, generalist: &str, answer: &str, heard: Heard) -> Vec<String> {
     let Heard {
         reports,
@@ -401,11 +402,6 @@ pub fn missed<'a>(reports: impl IntoIterator<Item = &'a str>, answer: &str) -> V
         .lines()
         .filter(|l| report::finding(l).is_some() || report::dropped(l))
         .collect();
-    let paths: BTreeSet<String> = weighing
-        .iter()
-        .filter_map(|l| report::finding(l))
-        .map(|f| f.path)
-        .collect();
     let mut missed = BTreeSet::new();
     for report in reports {
         for line in report.lines().map(review_gate::report::line) {
@@ -414,14 +410,48 @@ pub fn missed<'a>(reports: impl IntoIterator<Item = &'a str>, answer: &str) -> V
                 Line::Request(r) => (&r.path, r.line),
                 _ => continue,
             };
-            let place = format!("{path}:{number}");
-            if !paths.contains(path) && !weighing.iter().any(|l| l.contains(&place)) {
-                missed.insert(place);
+            let at = (path.clone(), number);
+            let weighed = weighing
+                .iter()
+                .any(|l| report::place_of(l) == Some(at.clone()) || names(l, path, number));
+            if !weighed {
+                missed.insert(format!("{path}:{number}"));
             }
         }
     }
 
     missed.into_iter().collect()
+}
+
+/// Whether `line` names the place `path:number`: `path:` where no path
+/// character comes before it, then the number or a range,
+/// `start-end`, holding it, and no digit after.
+fn names(line: &str, path: &str, number: usize) -> bool {
+    let pathy = |c: char| c.is_alphanumeric() || matches!(c, '/' | '.' | '_' | '-');
+    let head = format!("{path}:");
+    line.match_indices(&head).any(|(at, _)| {
+        if line[..at].chars().next_back().is_some_and(pathy) {
+            return false;
+        }
+        let rest = &line[at + head.len()..];
+        let (start, rest) = digits(rest);
+        let Some(start) = start else {
+            return false;
+        };
+        let end = rest
+            .strip_prefix(['-', '–'])
+            .and_then(|r| digits(r).0)
+            .unwrap_or(start);
+        (start..=end).contains(&number)
+    })
+}
+
+/// The number `text` starts with, and the text after it.
+fn digits(text: &str) -> (Option<usize>, &str) {
+    let end = text
+        .find(|c: char| !c.is_ascii_digit())
+        .unwrap_or(text.len());
+    (text[..end].parse().ok(), &text[end..])
 }
 
 /// Whether `f`, a finding `generalist` kept, came from a requirement

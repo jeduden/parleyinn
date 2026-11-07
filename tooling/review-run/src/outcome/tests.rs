@@ -796,11 +796,12 @@ fn a_generalist_that_weighs_none_of_a_specialist_s_findings_is_partial_by_the_re
 }
 
 #[test]
-fn a_finding_at_the_path_or_a_line_that_names_the_place_weighs_it() {
+fn a_finding_at_the_place_or_a_line_that_names_it_exactly_weighs_it() {
     for answer in [
-        "src/a.rs:40 — nit — same file, another line — lang-rust\nDone.",
         "src/b.rs:1 — nit — also src/a.rs:3 and two more — lang-rust\nDone.",
         "dropped — src/a.rs:3 — fine — lang-rust\nnone — nothing to add — review-code\nDone.",
+        "src/a.rs:1-5 — nit — the whole block — lang-rust\nDone.",
+        "src/b.rs:1 — nit — as at (src/a.rs:2-4) — lang-rust\nDone.",
     ] {
         let (runs, reports) = all_answered(answer);
 
@@ -808,4 +809,42 @@ fn a_finding_at_the_path_or_a_line_that_names_the_place_weighs_it() {
 
         assert_eq!(d.outcome.verdict, "approve", "{answer}");
     }
+}
+
+#[test]
+fn another_line_of_the_file_or_a_place_that_only_starts_alike_weighs_nothing() {
+    for answer in [
+        "src/a.rs:40 — nit — same file, another line — lang-rust\nDone.",
+        "dropped — src/a.rs:31 — fine — lang-rust\nDone.",
+        "dropped — lib/src/a.rs:3 — fine — lang-rust\nDone.",
+        "src/b.rs:1 — nit — see src/a.rs:30 — lang-rust\nDone.",
+        "src/a.rs:4-9 — nit — the block after it — lang-rust\nDone.",
+    ] {
+        let (runs, reports) = all_answered(answer);
+
+        let d = decide(&plan(DISPATCH), &runs, &reports, &known());
+
+        assert_eq!(d.outcome.verdict, "request_changes", "{answer}");
+        assert!(
+            d.outcome
+                .findings
+                .iter()
+                .any(|f| f.body.contains("weighed no finding at src/a.rs:3")),
+            "{answer}"
+        );
+    }
+}
+
+#[test]
+fn a_line_names_a_place_bounded_by_no_path_or_digit_character() {
+    assert!(names("see src/a.rs:3.", "src/a.rs", 3));
+    assert!(names("`src/a.rs:3`", "src/a.rs", 3));
+    assert!(names("src/a.rs:2–4", "src/a.rs", 3));
+    assert!(names("src/a.rs:9 and src/a.rs:3", "src/a.rs", 3));
+    assert!(!names("src/a.rs:31", "src/a.rs", 3));
+    assert!(!names("lib/src/a.rs:3", "src/a.rs", 3));
+    assert!(!names("src/a.rs:4-9", "src/a.rs", 3));
+    assert!(!names("src/a.rs:x", "src/a.rs", 3));
+    assert!(!names("src/a.rs:3-x", "src/a.rs", 4));
+    assert!(!names("nothing here", "src/a.rs", 3));
 }
