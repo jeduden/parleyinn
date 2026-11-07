@@ -538,3 +538,65 @@ fn a_run_that_panics_releases_its_reservation_so_a_waiting_run_starts() {
     assert_eq!(waited, Ok(()), "the broken run's cap was released");
     assert!(c.budget.fits(most * 1.5), "nothing is held");
 }
+
+#[test]
+fn a_second_attempt_cut_off_after_it_cost_money_is_told_and_not_run_a_third_time() {
+    let dir = workdir(false);
+    let tries = Mutex::new(0);
+
+    let (runs, lines, host) = review_of(dir.path(), move |c| {
+        if !prompt_of(c).contains("a specialist") {
+            return fake::generalist(c);
+        }
+        let mut n = tries.lock().unwrap();
+        *n += 1;
+        let log = if *n == 1 {
+            format!("{FREE}\n")
+        } else {
+            fake::log_of(&[fake::FINDING], "error_max_turns", "", 0.1)
+        };
+        fake::write_log(c, &log);
+        Ok(Output::default())
+    });
+
+    let rust = &runs[0];
+    assert_eq!(rust.failure, None);
+    assert_eq!(rust.attempts, 2);
+    assert_eq!(specialist_prompts(&host).len(), 2);
+    assert!(
+        lines
+            .iter()
+            .any(|l| l.contains("not run again: it cost 0.1000 USD")),
+        "{lines:?}"
+    );
+}
+
+#[test]
+fn a_second_attempt_a_cost_cap_stopped_is_told_why_it_never_runs_again() {
+    let dir = workdir(false);
+    let tries = Mutex::new(0);
+
+    let (runs, lines, _) = review_of(dir.path(), move |c| {
+        if !prompt_of(c).contains("a specialist") {
+            return fake::generalist(c);
+        }
+        let mut n = tries.lock().unwrap();
+        *n += 1;
+        let log = if *n == 1 {
+            format!("{FREE}\n")
+        } else {
+            fake::log_of(&[fake::FINDING], "error_max_budget_usd", "", 0.2)
+        };
+        fake::write_log(c, &log);
+        Ok(Output::default())
+    });
+
+    assert_eq!(runs[0].attempts, 2);
+    assert!(
+        lines
+            .iter()
+            .any(|l| l
+                .contains("not run again: a cost cap stopped it, and another run would cost more")),
+        "{lines:?}"
+    );
+}

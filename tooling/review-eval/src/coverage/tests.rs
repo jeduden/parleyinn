@@ -187,3 +187,12 @@ fn components_drop_empty_and_current_directory_parts_and_refuse_a_climb() {
     assert_eq!(components("/a/b"), Some(vec!["a", "b"]));
     assert_eq!(components("a/../b"), None);
 }
+
+#[test]
+fn a_work_directory_whose_name_is_not_utf8_names_no_diff() {
+    use std::os::unix::ffi::OsStrExt;
+    let root = Path::new(std::ffi::OsStr::from_bytes(b"/home/\xff"));
+    let reads = [read(DIFF, None, None)];
+
+    assert_eq!(unread(&reads, &[root], DIFF, 10), vec![(1, 10)]);
+}
