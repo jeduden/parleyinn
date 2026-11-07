@@ -17,6 +17,7 @@ pub mod check;
 pub mod cli;
 pub mod compare;
 pub mod component;
+pub mod coverage;
 pub mod credential;
 pub mod derived;
 pub mod diff;
