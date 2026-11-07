@@ -32,8 +32,13 @@ gh api --paginate "repos/$REPO/actions/artifacts?name=review-spend-pr-$PULL&per_
   && jq -s '{artifacts: .}' "$dir/pages.json" > "$dir/artifacts.json" \
   || fail "What earlier reviews of this pull request spent could not be listed, so no agent runs."
 : > "$dir/runs.jsonl"
-for id in $(jq -r '[.artifacts[].workflow_run.id | select(. != null)] | unique | .[]' \
-  "$dir/artifacts.json"); do
+# Read apart from the loop: a failure in a loop's word list is no failure
+# of the script, and would end the loop empty and take every earlier
+# review for one that spent nothing.
+run_ids=$(jq -r '[.artifacts[].workflow_run.id | select(. != null)] | unique | .[]' \
+  "$dir/artifacts.json") \
+  || fail "The runs behind what earlier reviews of this pull request spent did not read, so no agent runs."
+for id in $run_ids; do
   gh api "repos/$REPO/actions/runs/$id" --jq '{id, path, event}' >> "$dir/runs.jsonl" \
     || fail "Run $id, behind what an earlier review of this pull request spent, could not be looked up, so no agent runs."
 done
