@@ -29,6 +29,8 @@ pub struct Usage {
 pub struct RunLog {
     /// Whether a result came, and whether it was a success.
     pub answered: bool,
+    /// Whether a result came at all, a success or not.
+    pub resulted: bool,
     /// The result's subtype, or `none` without a result.
     pub subtype: String,
     /// The final answer's text.
@@ -124,6 +126,7 @@ impl Reading {
     fn result(&mut self, value: &Value) {
         let log = &mut self.log;
         let is_error = value["is_error"].as_bool() == Some(true);
+        log.resulted = true;
         log.answer = value["result"].as_str().unwrap_or_default().to_owned();
         log.subtype = match value["subtype"].as_str() {
             // The harness reports its own refusal, such as a usage limit,

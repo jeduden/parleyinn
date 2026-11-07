@@ -17,7 +17,7 @@ fn checkout() -> TempDir {
     let names = component::names(dir.path()).unwrap();
     for name in &names {
         let (tools, model, turns) = if name.starts_with("review-") {
-            ("Read, Grep, Glob", "sonnet", "")
+            ("Read, Grep, Glob", "sonnet", "maxTurns: 40\n")
         } else {
             ("Read, Grep, Glob", "haiku", "maxTurns: 20\n")
         };

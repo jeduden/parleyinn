@@ -73,6 +73,64 @@ fn a_review_writes_every_file_the_gate_reads() {
     assert_eq!(usage.as_array().unwrap().len(), 3);
     assert_eq!(usage[0]["calls"], 1);
     assert!(dir.path().join("review/logs/review-code.jsonl").exists());
+    let spend = fs::read_to_string(dir.path().join("review/spend.json")).unwrap();
+    assert!(
+        (crate::spend::check(&spend).unwrap() - 0.03).abs() < 1e-9,
+        "{spend}"
+    );
+}
+
+#[test]
+fn a_review_keeps_what_it_spent_alone_beside_what_earlier_reviews_spent() {
+    let dir = workdir();
+    let host = FakeHost::new(fake::either);
+
+    let (code, out, err) = run_with(
+        &host,
+        dir.path(),
+        &["--breaker-fraction=1", "--spent-before", "1.5"],
+    );
+
+    assert_eq!(code, EXIT_OK, "{err}");
+    assert!(out.contains("\ncost=0.0300\n"), "this review's own: {out}");
+    let spend = fs::read_to_string(dir.path().join("review/spend.json")).unwrap();
+    assert!(
+        (crate::spend::check(&spend).unwrap() - 0.03).abs() < 1e-9,
+        "{spend}"
+    );
+}
+
+#[test]
+fn a_review_whose_pull_request_spent_its_cap_starts_no_agent() {
+    let dir = workdir();
+    let host = FakeHost::new(fake::either);
+
+    let (code, out, err) = run_with(&host, dir.path(), &["--spent-before", "5"]);
+
+    assert_eq!(code, EXIT_OK, "{err}");
+    assert!(
+        out.starts_with("verdict=request_changes\n") && out.contains("\nover_budget=3\n"),
+        "{out}"
+    );
+    assert!(!dir.path().join("review/logs/review-code.jsonl").exists());
+    let spend = fs::read_to_string(dir.path().join("review/spend.json")).unwrap();
+    assert_eq!(crate::spend::check(&spend), Ok(0.0), "it spent nothing");
+}
+
+#[test]
+fn a_spend_file_that_cannot_be_kept_fails_the_review_naming_it() {
+    let dir = workdir();
+    fs::create_dir_all(dir.path().join("review/spend.json/full")).unwrap();
+    let host = FakeHost::new(fake::either);
+
+    let (code, out, err) = run_in(&host, dir.path());
+
+    assert_eq!(code, EXIT_FAILURE, "{out}");
+    assert!(
+        err.contains("review-run: what the pull request's reviews spent was not kept: rename "),
+        "{err}"
+    );
+    assert!(out.starts_with("failed=rename "), "{out}");
 }
 
 /// Standard output that takes no write.
@@ -569,6 +627,8 @@ fn the_flags_read_inline_or_as_the_next_argument() {
             "--from",
             "old",
             "--max-cost-usd=12.5",
+            "--spent-before",
+            "0.25",
             "--breaker-fraction",
             "1/2",
             "--summary",
@@ -589,6 +649,7 @@ fn the_flags_read_inline_or_as_the_next_argument() {
                 deadline: Duration::from_secs(30),
                 split: crate::parts::LIMIT,
                 max_cost_usd: 12.5,
+                spent_before: 0.25,
                 breaker: Fraction { num: 1, den: 2 },
                 ..Options::default()
             },
@@ -662,6 +723,23 @@ fn a_zero_bound_is_refused() {
         refusal(&["--workdir", "w", "--parallel", "0"]),
         "--parallel \"0\" is not a number above zero"
     );
+}
+
+#[test]
+fn a_spend_before_of_nothing_is_taken_and_one_that_is_no_amount_is_refused() {
+    let before = |v: &str| {
+        parse(args(&["--workdir", "w", "--spent-before", v])).map(|a| a.options.spent_before)
+    };
+    assert_eq!(before("0"), Ok(0.0));
+    assert_eq!(before("4.995"), Ok(4.995));
+    for bad in ["-0.01", "NaN", "inf", "some"] {
+        assert_eq!(
+            before(bad),
+            Err(format!(
+                "--spent-before {bad:?} is no amount of zero or more"
+            ))
+        );
+    }
 }
 
 #[test]

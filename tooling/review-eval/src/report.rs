@@ -88,6 +88,122 @@ pub fn finding(line: &str) -> Option<Finding> {
     })
 }
 
+/// A generalist's weighing as its run log gives it: each weighing line
+/// it stated in a message before its last in the strict form
+/// [`strict`] reads, each once and in order, then its final answer's
+/// lines, read leniently so the review names a line it cannot read. A line at a place, a finding
+/// or a dropped one, supersedes every line stated before it, in a
+/// message or the final answer, that is the same finding
+/// ([`identity`]): the last statement wins, so a draft finding can be
+/// dropped or revised later, and a finding at the same place from
+/// another source stays. A run that was cut off before its final answer
+/// has the lines it stated and no more, so the review reads what was
+/// paid for.
+#[must_use]
+pub fn weighing(texts: &[String], answer: &str) -> String {
+    let said: Vec<&str> = answer.lines().collect();
+    let mut out: Vec<&str> = Vec::new();
+    for line in texts.iter().flat_map(|t| t.lines()).map(str::trim) {
+        let again = said.iter().any(|s| s.trim() == line) || out.contains(&line);
+        if strict(line) && !again {
+            settle(&mut out, line);
+        }
+    }
+    for line in said {
+        settle(&mut out, line);
+    }
+
+    out.join("\n")
+}
+
+/// Whether `line`, in a message before a generalist's final answer, is
+/// a weighing line in the strict form: a finding whose severity is one
+/// of [`SEVERITIES`], `dropped — path:line — …`, `none — …`, or a line
+/// shaped as a finding the review cannot read that starts with a
+/// path-like word ([`placed`]). Working notes, `docs/x.md:12 — verified
+/// — …` or `Dropped, since …`, are narration, not a weighing.
+#[must_use]
+pub fn strict(line: &str) -> bool {
+    let severe = finding(line).is_some_and(|f| SEVERITIES.contains(&f.severity.as_str()));
+    let parts = split_dashes(bare(line));
+    let drops = match parts.as_slice() {
+        [first, place, _, ..] => {
+            first
+                .trim()
+                .trim_end_matches(['*', '_', '`'])
+                .eq_ignore_ascii_case(DROPPED)
+                && review_gate::report::place(place).is_some()
+        }
+        _ => false,
+    };
+
+    severe || drops || nothing(line) || (unread(line) && placed(line))
+}
+
+/// Adds `line` to `out`, first removing each line there that is the
+/// same finding.
+fn settle<'a>(out: &mut Vec<&'a str>, line: &'a str) {
+    if let Some(id) = identity(line) {
+        out.retain(|l| identity(l).as_ref() != Some(&id));
+    }
+    out.push(line);
+}
+
+/// Which finding a generalist's finding or dropped line is about: its
+/// place and the source it names ([`source_of`]). Two lines at one
+/// place that name different sources, or one a source and one none, are
+/// different findings, so a later line never erases another source's
+/// finding; none for a line at no place.
+#[must_use]
+pub fn identity(line: &str) -> Option<(String, usize, Option<String>)> {
+    let (path, number) = place_of(line)?;
+
+    Some((path, number, source_of(line)))
+}
+
+/// The source a generalist's finding or dropped line names: the last
+/// of four parts or more, markup aside and lowercased; none for a
+/// shorter line or one at no place.
+#[must_use]
+pub fn source_of(line: &str) -> Option<String> {
+    place_of(line)?;
+    let parts = split_dashes(bare(line));
+    if parts.len() < 4 {
+        return None;
+    }
+    parts.last().map(|part| {
+        part.trim()
+            .trim_matches(['`', '*', '_', '.'])
+            .to_lowercase()
+    })
+}
+
+/// The place, path and line, a generalist's finding or dropped line is
+/// at: a finding's own, or the part after a leading `dropped —`; none
+/// for any other line.
+#[must_use]
+pub fn place_of(line: &str) -> Option<(String, usize)> {
+    if let Some(f) = finding(line) {
+        return Some((f.path, f.line));
+    }
+    if !dropped(line) {
+        return None;
+    }
+    split_dashes(bare(line))
+        .get(1)
+        .and_then(|part| review_gate::report::place(part))
+}
+
+/// Whether `line` starts with a path-like word: its first part, markup
+/// aside, is one word holding a `/`, a `.` or a `:`.
+#[must_use]
+pub fn placed(line: &str) -> bool {
+    split_dashes(bare(line)).first().is_some_and(|part| {
+        let word = part.trim().trim_matches(['`', '*', '_']);
+        !word.is_empty() && !word.contains(char::is_whitespace) && word.contains(['/', '.', ':'])
+    })
+}
+
 /// The severities a generalist's finding gives.
 pub const SEVERITIES: [&str; 2] = ["blocking", "nit"];
 

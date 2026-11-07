@@ -227,7 +227,8 @@ fn write_all(
 /// specialist, its report `report`, may be stored or reused: its log
 /// shows a successful result with an answer, and a specialist's report
 /// is the one its log assembles and the gate takes, its ids held to
-/// `known`; a generalist's answer reads.
+/// `known`; a generalist's weighing, read from its whole log as the
+/// outcome reads it, reads.
 ///
 /// # Errors
 ///
@@ -248,7 +249,8 @@ pub fn accepted(
         return Err("its log answered nothing".to_owned());
     }
     if kind != Kind::Specialist {
-        return outcome::unreadable(&log.answer).map_or(Ok(()), |why| Err(why.to_owned()));
+        let weighing = review_eval::report::weighing(&log.texts, &log.answer);
+        return outcome::unreadable(&weighing).map_or(Ok(()), |why| Err(why.to_owned()));
     }
     let report = report.ok_or("it holds no report")?;
     if report != assemble(&log.texts, &log.answer, None) {

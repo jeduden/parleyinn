@@ -19,8 +19,8 @@ pub const SECURITY: &str = "review-security";
 pub const GENERALISTS: [&str; 3] = [CODE, SPEC, SECURITY];
 
 /// Each generalist's deep instance: the same template, run on the
-/// strongest model at high effort with more turns, which a deep review
-/// consults in its place.
+/// model, effort and turns its own definition names, which a deep
+/// review consults in its place.
 pub const CODE_DEEP: &str = "review-code-deep";
 pub const SPEC_DEEP: &str = "review-spec-deep";
 pub const SECURITY_DEEP: &str = "review-security-deep";

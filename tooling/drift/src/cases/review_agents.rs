@@ -75,7 +75,7 @@ pub(super) fn review_reach_cases() -> Vec<Case> {
             "ENG-28",
             Injection::replace(
                 REVIEW_WORKFLOW,
-                "          cargo run --locked --quiet --offline -p review-run -- --workdir . --parallel 32 \\\n            --credential \"$RUNNER_TEMP/claude-credential\" \\\n            ${PREVIOUS:+--previous \"$PREVIOUS\"} > review/run.txt\n",
+                "          cargo run --locked --quiet --offline -p review-run -- --workdir . --parallel 32 \\\n            --credential \"$RUNNER_TEMP/claude-credential\" --spent-before \"$SPENT\" \\\n            ${PREVIOUS:+--previous \"$PREVIOUS\"} > review/run.txt\n",
                 "          echo routed\n      - uses: anthropics/claude-code-action@0000000000000000000000000000000000000000\n",
             ),
             scenario("ENG-28"),
@@ -124,6 +124,18 @@ pub(super) fn review_post_cases() -> Vec<Case> {
     ]
 }
 
+/// The drift ENG-28 exists to catch in a medium generalist, late so
+/// adding it moves no earlier case to another shard: one whose turn
+/// budget its own definition does not name.
+pub(super) fn review_generalist_turns_case() -> Case {
+    protection_case(
+        "a medium generalist run without its own turn budget",
+        Injection::replace(".claude/agents/review-code.md", "maxTurns: 40\n", ""),
+        "the_checkout_s_review_agents_are_all_defined",
+        "review-code names no maxTurns",
+    )
+}
+
 /// The drifts ENG-28 exists to catch in the agents the review consults:
 /// one the dispatch names but no file defines as named, or one at the
 /// wrong effort.
@@ -166,20 +178,30 @@ pub(super) fn review_agent_cases() -> Vec<Case> {
             "review-security has tools Read, Grep, Glob, Write, want Read, Grep, Glob",
         ),
         protection_case(
-            "a deep review's generalist run on a weaker model",
+            "a deep review's generalist naming no model",
             Injection::replace(
-                ".claude/agents/review-code-deep.md",
+                ".claude/agents/review-security-deep.md",
                 "model: opus\n",
-                "model: sonnet\n",
+                "",
             ),
             "the_checkout_s_review_agents_are_all_defined",
-            "review-code-deep runs on model sonnet, want opus",
+            "review-security-deep names no model",
         ),
         protection_case(
             "a specialist run without its turn cap",
             Injection::replace(".claude/agents/lang-rust.md", "maxTurns: 20\n", ""),
             "the_checkout_s_review_agents_are_all_defined",
-            "lang-rust names no maxTurns, want 20",
+            "lang-rust names no maxTurns",
+        ),
+        protection_case(
+            "a deep generalist whose turn budget is no number",
+            Injection::replace(
+                ".claude/agents/review-security-deep.md",
+                "maxTurns: 60\n",
+                "maxTurns: many\n",
+            ),
+            "the_checkout_s_review_agents_are_all_defined",
+            "review-security-deep has maxTurns many, want a whole number of turns above zero",
         ),
         protection_case(
             "a specialist naming another generalist than the dispatch",

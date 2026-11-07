@@ -70,13 +70,15 @@ fn the_block_counts_the_finished_the_cost_and_each_running_agent() {
     }];
 
     assert_eq!(
-        block(&rows, live.finished(), 5, 0.123_45),
-        "progress: 2 of 5 agents finished, 0.1235 USD so far, 1 running\n  \
+        block(&rows, live.finished(), 5, (0.123_45, 5.0)),
+        "progress: 2 of 5 agents finished, the pull request's reviews spent 0.1235 of 5.00 USD \
+         so far, 1 running\n  \
          review-code (generalist), 2m05s: 7 calls, 4200 tokens in, 310 out"
     );
     assert_eq!(
-        block(&[], 0, 3, 0.0),
-        "progress: 0 of 3 agents finished, 0.0000 USD so far, 0 running"
+        block(&[], 0, 3, (0.0, 5.0)),
+        "progress: 0 of 3 agents finished, the pull request's reviews spent 0.0000 of 5.00 USD \
+         so far, 0 running"
     );
 }
 
@@ -117,6 +119,7 @@ fn agent_run(name: &str, failure: Option<&str>, reused: bool) -> AgentRun {
         from_store: false,
         answer_key: None,
         store_failed: false,
+        charged: 0.0,
     }
 }
 
@@ -168,6 +171,7 @@ fn the_watch_prints_while_the_work_runs_and_stops_with_it() {
         every: Duration::from_millis(1),
         total: 4,
         cost: &|| 0.25,
+        cap: 5.0,
         progress: &|l| lines.lock().unwrap().push(l.to_owned()),
     };
 
@@ -182,7 +186,8 @@ fn the_watch_prints_while_the_work_runs_and_stops_with_it() {
     let lines = lines.into_inner().unwrap();
     assert_eq!(
         lines[0],
-        "progress: 0 of 4 agents finished, 0.2500 USD so far, 0 running"
+        "progress: 0 of 4 agents finished, the pull request's reviews spent 0.2500 of 5.00 USD so \
+         far, 0 running"
     );
 }
 
@@ -195,6 +200,7 @@ fn the_watch_stops_when_its_work_panics() {
         every: Duration::from_secs(3600),
         total: 1,
         cost: &|| 0.0,
+        cap: 5.0,
         progress: &|_| {},
     };
 

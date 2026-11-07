@@ -28,6 +28,7 @@ fn decision(gaps: Vec<Gap>) -> Decision {
         },
         consulted: BTreeSet::new(),
         answers: BTreeMap::new(),
+        weighings: BTreeMap::new(),
         not_reviewed: gaps,
     }
 }

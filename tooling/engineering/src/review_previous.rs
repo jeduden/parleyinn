@@ -40,7 +40,7 @@ pub fn review_carries_findings(checkout: &Checkout) -> Result<Vec<String>, Strin
 }
 
 /// A job's steps, each from its `- ` line at the steps' indent.
-fn steps(text: &str) -> Vec<&str> {
+pub(crate) fn steps(text: &str) -> Vec<&str> {
     let mut starts: Vec<usize> = text
         .match_indices("\n      - ")
         .map(|(at, _)| at + 1)
@@ -112,7 +112,12 @@ pub fn workflow_problems(job: &str) -> Vec<String> {
     }
     let steps = steps(job);
     let at = |needle: &str| steps.iter().position(|s| s.contains(needle));
-    match at("previous select") {
+    // The spend is picked by the same command, `--of spend`: it is not
+    // the findings' fetch.
+    let fetch = steps
+        .iter()
+        .position(|s| s.contains("previous select") && !s.contains("--of spend"));
+    match fetch {
         None => problems.push(
             "no step picks the previous review's findings with review-run previous select"
                 .to_owned(),

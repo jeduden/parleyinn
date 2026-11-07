@@ -2,7 +2,7 @@
 //! is running, read from the tail of each running agent's stream-json
 //! log (its model calls and tokens so far from its assistant messages'
 //! usage), how many agents have finished of how many, and what the
-//! finished runs cost so far. When the review ends, the table of every
+//! pull request's reviews spent so far of its cap. When the review ends, the table of every
 //! run for the job summary. The formatting is pure; the watch reads the
 //! logs on the injected clock's time.
 
@@ -116,8 +116,11 @@ pub struct Watch<'a> {
     pub every: Duration,
     /// How many agents the review dispatched.
     pub total: usize,
-    /// What the finished runs cost so far.
+    /// What the pull request's reviews spent so far, the earlier
+    /// reviews' and this one's finished runs.
     pub cost: &'a (dyn Fn() -> f64 + Sync),
+    /// The pull request's cost cap, which `cost` counts toward.
+    pub cap: f64,
     pub progress: &'a (dyn Fn(&str) + Sync),
 }
 
@@ -137,7 +140,8 @@ pub fn watching<T>(live: &Live, watch: &Watch, work: impl FnOnce() -> T) -> T {
         scope.spawn(|| {
             while !live.wait(watch.every) {
                 let rows = live.rows(watch.clock.now());
-                (watch.progress)(&block(&rows, live.finished(), watch.total, (watch.cost)()));
+                let spent = ((watch.cost)(), watch.cap);
+                (watch.progress)(&block(&rows, live.finished(), watch.total, spent));
             }
         });
         let _stop = Stop(live);
@@ -170,11 +174,13 @@ fn row(label: String, running: &Running, now: Duration, so_far: &RunLog) -> Row 
 }
 
 /// The block: how many of `total` agents have `finished`, what the
-/// finished runs `cost`, and each of `rows`.
+/// pull request's reviews spent of its cap, `(spent, cap)`, the total
+/// the cap holds the runs to, and each of `rows`.
 #[must_use]
-pub fn block(rows: &[Row], finished: usize, total: usize, cost: f64) -> String {
+pub fn block(rows: &[Row], finished: usize, total: usize, (spent, cap): (f64, f64)) -> String {
     let mut s = format!(
-        "progress: {finished} of {total} agents finished, {cost:.4} USD so far, {} running",
+        "progress: {finished} of {total} agents finished, the pull request's reviews spent \
+         {spent:.4} of {cap:.2} USD so far, {} running",
         rows.len()
     );
     for r in rows {

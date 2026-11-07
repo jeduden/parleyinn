@@ -2,6 +2,9 @@ use std::time::Duration;
 
 use super::*;
 
+/// Long past any wait a test makes: no test waits it out.
+const WAIT: Duration = Duration::from_secs(600);
+
 #[test]
 fn the_system_clock_moves_forward_waits_and_draws_within_the_unit() {
     let clock = SystemClock::default();
@@ -24,21 +27,148 @@ fn a_draw_is_its_bits_in_millionths_below_one() {
 }
 
 #[test]
-fn the_budget_refuses_a_run_once_its_finished_runs_reach_the_cap() {
-    let budget = Budget::new(1.0);
-    assert_eq!(budget.refusal(), None);
+fn the_budget_refuses_a_run_whose_cap_no_longer_fits_beside_what_was_spent() {
+    let budget = Budget::new(1.0, 0.0);
+    assert_eq!(budget.refusal(0.5), None);
 
-    budget.charge(0.6);
-    assert_eq!(budget.refusal(), None);
-    budget.charge(0.4);
+    budget.reserve(0.5, WAIT).unwrap().charge(0.4, &|_| {});
+    assert_eq!(budget.refusal(0.6), None, "0.4 and 0.6 is the cap, no more");
+    budget.reserve(0.6, WAIT).unwrap().charge(0.2, &|_| {});
 
-    assert!((budget.spent() - 1.0).abs() < 1e-9);
+    assert!((budget.spent() - 0.6).abs() < 1e-9);
     assert_eq!(
-        budget.refusal().as_deref(),
+        budget.refusal(0.5).as_deref(),
         Some(
-            "over budget: the review's runs cost 1.0000 USD, its cap is 1.00 USD, so it was not \
-             started"
+            "over budget: the pull request's reviews cost 0.6000 USD, and a run capped at 0.50 \
+             USD does not fit in its cap of 1.00 USD, so it was not started"
         )
+    );
+    assert_eq!(
+        budget.reserve(0.5, WAIT).err(),
+        Some(budget.refusal(0.5).unwrap())
+    );
+}
+
+#[test]
+fn a_run_fits_only_beside_the_caps_the_runs_in_flight_hold() {
+    let budget = Budget::new(1.0, 0.0);
+
+    let first = budget.reserve(0.3, WAIT).unwrap();
+    let _second = budget.reserve(0.3, WAIT).unwrap();
+    let _third = budget.reserve(0.3, WAIT).unwrap();
+
+    assert!(!budget.fits(0.3), "three in flight hold 0.9");
+    assert!(budget.fits(0.1));
+    assert_eq!(budget.refusal(0.3), None, "it waits, it is not refused");
+    first.charge(0.05, &|_| {});
+    assert!(budget.fits(0.3), "0.05 spent and 0.6 held leave room");
+    // Sixteen specialists' caps fit in a pull request's cap, summed in
+    // floating point; a seventeenth does not.
+    let sixteen = Budget::new(PULL_REQUEST_COST_USD, 0.0);
+    let mut held = Vec::new();
+    for _ in 0..16 {
+        assert!(sixteen.fits(0.3));
+        held.push(sixteen.reserve(0.3, WAIT).unwrap());
+    }
+    assert!(!sixteen.fits(0.3));
+}
+
+#[test]
+fn a_reservation_that_does_not_fit_waits_for_a_run_in_flight_to_end() {
+    let budget = Budget::new(1.0, 0.0);
+    let flight = budget.reserve(0.8, WAIT).unwrap();
+
+    let held = std::thread::scope(|scope| {
+        let waiting = scope.spawn(|| budget.reserve(0.5, WAIT));
+        // It cannot be reserved while 0.8 is held, so it waits until the
+        // run in flight ends, however long that takes here.
+        std::thread::sleep(Duration::from_millis(20));
+        assert!(!waiting.is_finished(), "it waits for room");
+        flight.charge(0.1, &|_| {});
+        waiting.join().unwrap()
+    });
+    assert!(held.is_ok());
+    assert!(!budget.fits(0.5), "0.1 spent and 0.5 held");
+}
+
+#[test]
+fn a_waiting_reservation_is_refused_once_what_ended_leaves_no_room() {
+    let budget = Budget::new(1.0, 0.0);
+    let flight = budget.reserve(0.8, WAIT).unwrap();
+
+    std::thread::scope(|scope| {
+        let waiting = scope.spawn(|| budget.reserve(0.5, WAIT).map(drop));
+        std::thread::sleep(Duration::from_millis(20));
+        flight.charge(0.7, &|_| {});
+        let refused = waiting.join().unwrap().unwrap_err();
+        assert!(refused.starts_with("over budget: "), "{refused}");
+    });
+}
+
+#[test]
+fn a_reservation_dropped_uncharged_frees_its_cap_and_wakes_a_waiting_run() {
+    let budget = Budget::new(1.0, 0.0);
+    let flight = budget.reserve(0.8, WAIT).unwrap();
+
+    std::thread::scope(|scope| {
+        let waiting = scope.spawn(|| budget.reserve(0.5, WAIT).map(drop));
+        std::thread::sleep(Duration::from_millis(20));
+        drop(flight);
+        assert_eq!(waiting.join().unwrap(), Ok(()));
+    });
+    assert!(budget.spent().abs() < 1e-9, "nothing was charged");
+    assert!(budget.fits(1.0), "nothing is held");
+}
+
+#[test]
+fn a_run_that_panics_holding_a_reservation_frees_its_cap() {
+    let budget = Budget::new(1.0, 0.0);
+
+    let unwound = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        let _held = budget.reserve(0.8, WAIT).unwrap();
+        panic!("the run broke");
+    }));
+
+    assert!(unwound.is_err());
+    assert!(budget.fits(1.0), "its 0.8 is released");
+}
+
+#[test]
+fn a_reservation_waits_no_longer_than_its_deadline_for_room() {
+    let budget = Budget::new(1.0, 0.0);
+    let _flight = budget.reserve(0.8, WAIT).unwrap();
+
+    let refused = budget
+        .reserve(0.5, Duration::from_millis(20))
+        .err()
+        .unwrap();
+
+    assert_eq!(
+        refused,
+        "over budget: a run capped at 0.50 USD waited 0.02 s for the runs in flight to leave \
+         room in the pull request's cap of 1.00 USD, and they did not end, so it was not started"
+    );
+    assert!(!budget.fits(0.5), "the 0.8 in flight is still held");
+}
+
+#[test]
+fn the_budget_counts_what_the_pull_request_s_earlier_reviews_spent() {
+    let budget = Budget::new(1.0, 0.5);
+    assert_eq!(budget.refusal(0.5), None);
+    let kept = std::sync::Mutex::new(Vec::new());
+
+    budget
+        .reserve(0.5, WAIT)
+        .unwrap()
+        .charge(0.25, &|total| kept.lock().unwrap().push(total));
+
+    assert!((budget.spent() - 0.25).abs() < 1e-9, "this review's own");
+    assert!((budget.total() - 0.75).abs() < 1e-9);
+    assert_eq!(kept.into_inner().unwrap(), [0.25], "this review's own");
+    assert!(budget.refusal(0.3).is_some());
+    assert!(
+        Budget::new(1.0, 1.0).refusal(0.01).is_some(),
+        "spent before it ran"
     );
 }
 

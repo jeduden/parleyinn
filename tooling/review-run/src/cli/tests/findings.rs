@@ -111,3 +111,35 @@ fn a_review_whose_findings_or_stalls_cannot_be_written_fails() {
     fails_writing(crate::findings::FINDINGS_NOTES);
     fails_writing(crate::stall::STALLS);
 }
+
+/// A generalist cut off at its turn budget after it stated one blocking
+/// finding on `src/a.rs`.
+fn cut_off(c: &review_eval::host::Command) -> Result<review_eval::host::Output, String> {
+    if fake::prompt_of(c).contains("a specialist") {
+        return fake::specialist(c);
+    }
+    let text = "src/a.rs:3 — blocking — a long line hides a bug — lang-rust";
+    fake::write_log(c, &fake::log_of(&[text], "error_max_turns", "", 0.1));
+    Ok(review_eval::host::Output::default())
+}
+
+#[test]
+fn a_finding_kept_by_a_generalist_that_did_not_answer_is_attributed_to_it() {
+    let dir = workdir();
+
+    reviewed(dir.path(), None, cut_off);
+
+    let kept = read(dir.path(), crate::findings::FINDINGS);
+    let found = kept
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|f| {
+            f["body"]
+                .as_str()
+                .unwrap()
+                .contains("a long line hides a bug")
+        })
+        .unwrap_or_else(|| panic!("{kept}"));
+    assert_eq!(found["agent"], "review-code", "{kept}");
+}

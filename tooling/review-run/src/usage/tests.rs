@@ -16,6 +16,7 @@ fn run(name: &str, log: RunLog) -> AgentRun {
         from_store: false,
         answer_key: None,
         store_failed: false,
+        charged: 0.0,
     }
 }
 

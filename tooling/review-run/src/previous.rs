@@ -6,8 +6,17 @@
 //! run is skipped and counted, since any workflow a pull request
 //! defines may upload one. `previous check` refuses a findings file
 //! that is too large or does not read, so a broken history is named
-//! and never taken for an empty one (I6). The tool decides and the
-//! caller's script only fetches.
+//! and never taken for an empty one (I6). Each review keeps what it
+//! spent alone, under a name of its pull request and its run's attempt,
+//! so `previous select --of spend` names every artifact of the pull
+//! request's spend that a run of main's review workflow uploaded, by the
+//! same origin rule, an earlier attempt of the review's own run
+//! included, and `previous spend` reads each and sums them, refusing a
+//! spend file that is too large or does not read, so it is never taken
+//! for nothing spent. Two reviews of one pull request that run side by
+//! side, one cancelled, or a run and its rerun, each keep their own, so
+//! none erases another's. The tool decides and the caller's script only
+//! fetches.
 
 use std::fs;
 use std::io::Write;
@@ -18,8 +27,10 @@ use crate::cli::{EXIT_FAILURE, EXIT_OK, EXIT_USAGE};
 use crate::findings;
 
 /// How to call it.
-pub const USAGE: &str = "usage: review-run previous select --pull N --artifacts FILE --runs FILE\n\
-       review-run previous check FILE";
+pub const USAGE: &str = "usage: review-run previous select --pull N --artifacts FILE --runs FILE \
+[--of findings|spend]\n\
+       review-run previous check FILE\n\
+       review-run previous spend FILE...";
 
 /// The workflow whose runs may upload the findings a review carries.
 pub const WORKFLOW_PATH: &str = ".github/workflows/review.yml";
@@ -29,6 +40,16 @@ pub const WORKFLOW_PATH: &str = ".github/workflows/review.yml";
 pub const EVENTS: [&str; 2] = ["workflow_run", "issue_comment"];
 /// The most bytes a findings file may hold.
 pub const MAX_BYTES: usize = 1 << 20;
+/// How the name of the artifact a pull request's findings are kept
+/// under starts, its number after it.
+pub const FINDINGS: &str = "review-findings-pr-";
+/// How the name of the artifact what a pull request's reviews spent is
+/// kept under starts, its number after it, then [`ATTEMPT`].
+pub const SPEND: &str = "review-spend-pr-";
+/// What comes after the pull request's number in a spend artifact's
+/// name, the run attempt that kept it after it, so a rerun of a run
+/// keeps its own beside its first attempt's and replaces none.
+pub const ATTEMPT: &str = "-a";
 
 /// What the lookup found.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -46,6 +67,34 @@ impl Selection {
         let id = self.artifact.map(|a| a.to_string()).unwrap_or_default();
         format!(
             "previous_artifact={id}\nprevious_skipped={}\n",
+            self.skipped
+        )
+    }
+}
+
+/// The most earlier reviews' spend a review sums: far past what a pull
+/// request's reviews keep in the 90 days each artifact lasts, one per
+/// push, so a long-lived one is never stopped by the count; past it the
+/// step fails, naming how many, rather than leave any out.
+pub const MAX_SPENDS: usize = 1000;
+
+/// What the lookup of the earlier reviews' spend found.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Spends {
+    /// The artifacts to sum, each kept by one earlier review, by id.
+    pub artifacts: Vec<u64>,
+    /// The artifacts of the name, unexpired, refused for their origin.
+    pub skipped: u32,
+}
+
+impl Spends {
+    /// The lines the job's outputs take: the artifacts, space apart.
+    #[must_use]
+    pub fn lines(&self) -> String {
+        let ids: Vec<String> = self.artifacts.iter().map(u64::to_string).collect();
+        format!(
+            "spend_artifacts={}\nprevious_skipped={}\n",
+            ids.join(" "),
             self.skipped
         )
     }
@@ -101,11 +150,21 @@ impl Run {
 ///
 /// Fails when `pull` is not a pull request number.
 pub fn name(pull: &str) -> Result<String, String> {
+    name_of(FINDINGS, pull)
+}
+
+/// The artifact name starting `prefix` that pull request `pull`'s
+/// reviews keep.
+///
+/// # Errors
+///
+/// Fails when `pull` is not a pull request number.
+pub fn name_of(prefix: &str, pull: &str) -> Result<String, String> {
     if pull.is_empty() || !pull.bytes().all(|b| b.is_ascii_digit()) {
         return Err(format!("{pull:?} is not a pull request number"));
     }
 
-    Ok(format!("review-findings-pr-{pull}"))
+    Ok(format!("{prefix}{pull}"))
 }
 
 /// Picks the artifact of the pull request `pull` to carry findings
@@ -119,7 +178,21 @@ pub fn name(pull: &str) -> Result<String, String> {
 ///
 /// Fails when either input does not read, or `pull` is no number.
 pub fn select(pull: &str, artifacts: &str, runs: &str) -> Result<Selection, String> {
-    let wanted = name(pull)?;
+    select_of(FINDINGS, pull, artifacts, runs)
+}
+
+/// [`select`] of the artifact whose name starts `prefix`.
+///
+/// # Errors
+///
+/// Fails when either input does not read, or `pull` is no number.
+pub fn select_of(
+    prefix: &str,
+    pull: &str,
+    artifacts: &str,
+    runs: &str,
+) -> Result<Selection, String> {
+    let wanted = name_of(prefix, pull)?;
     let listing: Listing =
         serde_json::from_str(artifacts).map_err(|e| format!("artifacts do not read: {e}"))?;
     let runs: Vec<Run> =
@@ -152,6 +225,83 @@ pub fn select(pull: &str, artifacts: &str, runs: &str) -> Result<Selection, Stri
     })
 }
 
+/// Whether `name` is that of an artifact pull request `pull`'s spend
+/// is kept under: [`SPEND`], the number, [`ATTEMPT`] and the attempt's
+/// number, nothing after it.
+#[must_use]
+pub fn is_spend_of(name: &str, pull: &str) -> bool {
+    name.strip_prefix(SPEND)
+        .and_then(|rest| rest.strip_prefix(pull))
+        .and_then(|rest| rest.strip_prefix(ATTEMPT))
+        .is_some_and(|n| !n.is_empty() && n.bytes().all(|b| b.is_ascii_digit()))
+}
+
+/// Picks every artifact of the pull request `pull`'s spend to sum:
+/// `artifacts` and `runs` as [`select`] reads them. Each artifact whose
+/// name [`is_spend_of`] the pull request, not expired, is taken when its
+/// run is one of main's review workflow, an earlier attempt of the
+/// review's own run among them, as the review's own attempt has kept
+/// none yet, and otherwise refused and counted, its run unknown
+/// included; sorted by id, each once, though a listing paged while one
+/// was added names one twice.
+///
+/// # Errors
+///
+/// Fails when either input does not read, `pull` is no number, or more
+/// than [`MAX_SPENDS`] artifacts qualify.
+pub fn spends(pull: &str, artifacts: &str, runs: &str) -> Result<Spends, String> {
+    name_of(SPEND, pull)?;
+    let listing: Listing =
+        serde_json::from_str(artifacts).map_err(|e| format!("artifacts do not read: {e}"))?;
+    let runs: Vec<Run> =
+        serde_json::from_str(runs).map_err(|e| format!("runs do not read: {e}"))?;
+    let mut out = Spends {
+        artifacts: Vec::new(),
+        skipped: 0,
+    };
+    let mut named: Vec<&Artifact> = listing
+        .artifacts
+        .iter()
+        .filter(|a| is_spend_of(&a.name, pull) && !a.expired)
+        .collect();
+    named.sort_by_key(|a| a.id);
+    named.dedup_by_key(|a| a.id);
+    for a in named {
+        let trusted = a
+            .workflow_run
+            .as_ref()
+            .and_then(|r| runs.iter().find(|run| run.id == r.id))
+            .is_some_and(Run::is_main_review);
+        if trusted {
+            out.artifacts.push(a.id);
+        } else {
+            out.skipped += 1;
+        }
+    }
+    if out.artifacts.len() > MAX_SPENDS {
+        return Err(format!(
+            "{} earlier reviews of pull request {pull} kept what they spent, past the \
+             {MAX_SPENDS} a review sums",
+            out.artifacts.len()
+        ));
+    }
+
+    Ok(out)
+}
+
+/// What the spend files' `texts` say was spent, summed.
+///
+/// # Errors
+///
+/// Fails naming the first that [`crate::spend::check`] refuses.
+pub fn summed(texts: &[(String, String)]) -> Result<f64, String> {
+    texts.iter().try_fold(0.0, |sum, (path, text)| {
+        crate::spend::check(text)
+            .map(|spent| sum + spent)
+            .map_err(|e| format!("{path}: {e}"))
+    })
+}
+
 /// Checks a findings file's text.
 ///
 /// # Errors
@@ -179,18 +329,21 @@ pub fn subcommand(args: &[String]) -> Option<Vec<String>> {
 /// exit code.
 pub fn run(args: &[String], stdout: &mut dyn Write, stderr: &mut dyn Write) -> u8 {
     let result = match args.first().map(String::as_str) {
-        Some("select") => parse_select(&args[1..]).and_then(|(pull, a, r)| {
-            let read =
-                |path: &str| fs::read_to_string(path).map_err(|e| format!("read {path}: {e}"));
-            let selection = select(&pull, &read(&a)?, &read(&r)?)?;
-            Ok(selection.lines())
+        Some("select") => parse_select(&args[1..]).and_then(|s| {
+            let (a, r) = (read(&s.artifacts)?, read(&s.runs)?);
+            Ok(match s.of {
+                Of::Spend => spends(&s.pull, &a, &r)?.lines(),
+                Of::Findings => select(&s.pull, &a, &r)?.lines(),
+            })
         }),
+        Some("spend") => spend_of(&args[1..]),
         Some("check") => parse_check(&args[1..]).and_then(|path| {
-            let text = fs::read_to_string(&path).map_err(|e| format!("read {path}: {e}"))?;
-            check(&text).map_err(|e| format!("{path}: {e}"))?;
+            check(&read(&path)?).map_err(|e| format!("{path}: {e}"))?;
             Ok(String::new())
         }),
-        _ => Err(Usage::Wrong("the commands are select and check".to_owned())),
+        _ => Err(Usage::Wrong(
+            "the commands are select, check and spend".to_owned(),
+        )),
     };
     match result {
         Ok(text) => match write!(stdout, "{text}") {
@@ -211,6 +364,25 @@ pub fn run(args: &[String], stdout: &mut dyn Write, stderr: &mut dyn Write) -> u
     }
 }
 
+/// What the spend files at `paths` say was spent, summed, as the
+/// job's output takes it.
+fn spend_of(paths: &[String]) -> Result<String, Usage> {
+    if paths.is_empty() {
+        return Err(Usage::Wrong("spend needs a FILE or more".to_owned()));
+    }
+    let texts = paths
+        .iter()
+        .map(|p| read(p).map(|text| (p.clone(), text)))
+        .collect::<Result<Vec<_>, String>>()?;
+
+    Ok(format!("spent_before={}\n", summed(&texts)?))
+}
+
+/// The text of the file at `path`.
+fn read(path: &str) -> Result<String, String> {
+    fs::read_to_string(path).map_err(|e| format!("read {path}: {e}"))
+}
+
 /// Why a command did not give its output.
 enum Usage {
     /// The command line is wrong.
@@ -225,15 +397,33 @@ impl From<String> for Usage {
     }
 }
 
-/// Reads `--pull N --artifacts FILE --runs FILE`, in any order.
-fn parse_select(args: &[String]) -> Result<(String, String, String), Usage> {
-    let (mut pull, mut artifacts, mut runs) = (None, None, None);
+/// Which artifacts `select` picks: the previous review's findings, or
+/// every earlier review's spend.
+enum Of {
+    Findings,
+    Spend,
+}
+
+/// What `select` was asked: which artifacts, the pull request and the
+/// two files.
+struct Select {
+    of: Of,
+    pull: String,
+    artifacts: String,
+    runs: String,
+}
+
+/// Reads `--pull N --artifacts FILE --runs FILE [--of findings|spend]`,
+/// in any order.
+fn parse_select(args: &[String]) -> Result<Select, Usage> {
+    let (mut pull, mut artifacts, mut runs, mut of) = (None, None, None, None);
     let mut args = args.iter();
     while let Some(arg) = args.next() {
         let slot = match arg.as_str() {
             "--pull" => &mut pull,
             "--artifacts" => &mut artifacts,
             "--runs" => &mut runs,
+            "--of" => &mut of,
             other => return Err(Usage::Wrong(format!("unknown argument {other:?}"))),
         };
         *slot = Some(
@@ -242,8 +432,22 @@ fn parse_select(args: &[String]) -> Result<(String, String, String), Usage> {
                 .ok_or_else(|| Usage::Wrong(format!("{arg} needs a value")))?,
         );
     }
+    let of = match of.as_deref() {
+        None | Some("findings") => Of::Findings,
+        Some("spend") => Of::Spend,
+        Some(other) => {
+            return Err(Usage::Wrong(format!(
+                "--of {other:?} is neither findings nor spend"
+            )));
+        }
+    };
     match (pull, artifacts, runs) {
-        (Some(p), Some(a), Some(r)) => Ok((p, a, r)),
+        (Some(pull), Some(artifacts), Some(runs)) => Ok(Select {
+            of,
+            pull,
+            artifacts,
+            runs,
+        }),
         _ => Err(Usage::Wrong(
             "select needs --pull, --artifacts and --runs".to_owned(),
         )),
