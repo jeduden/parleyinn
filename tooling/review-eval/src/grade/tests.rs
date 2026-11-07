@@ -615,3 +615,42 @@ fn a_generalist_keeping_more_nits_than_the_case_allows_fails() {
     let graded = grade(&c, &case("review-code", expect), &answered_log(&two));
     assert!(graded.passed(), "{:?}", graded.failures);
 }
+
+#[test]
+fn a_generalist_is_graded_from_its_whole_weighing_as_the_review_reads_it() {
+    let c = component(Kind::Generalist, "review-code", false);
+    let expect = Expect {
+        finding: vec![wanted("crates/x/src/a.rs")],
+        none: vec![wanted("crates/x/src/b.rs")],
+        ..Expect::default()
+    };
+    // Its finding stated as it went, its draft at b.rs dropped later,
+    // and a final answer that is its scope sentence alone.
+    let log = stated_log(
+        &[
+            "crates/x/src/a.rs:12 — blocking — unwraps — lang-rust",
+            "crates/x/src/b.rs:3 — blocking — a draft — lang-rust",
+            "dropped — crates/x/src/b.rs:3 — no bug after all — lang-rust",
+        ],
+        "The whole scope was weighed.",
+    );
+
+    let graded = grade(&c, &case("review-code", expect), &log);
+
+    assert!(graded.passed(), "{:?}", graded.failures);
+}
+
+#[test]
+fn a_consultant_is_graded_from_its_final_answer_alone() {
+    let c = component(Kind::Consultant, "persona-agent", false);
+    let expect = Expect {
+        none: vec![wanted("crates/x/src/b.rs")],
+        ..Expect::default()
+    };
+    let log = stated_log(
+        &["crates/x/src/b.rs:3 — blocking — thinking aloud — persona-agent"],
+        "Nothing to report.",
+    );
+
+    assert!(grade(&c, &case("persona-agent", expect), &log).passed());
+}

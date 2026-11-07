@@ -75,10 +75,12 @@ records the design.
   its outcome, each finding expected or forbidden, nothing written; a
   case may also want a finding `stated` before the final answer, or a
   finding `withdrawn` or revised, read from the log's text. For a
-  generalist it reads the answer: each finding it must drop on a line
-  that starts with `dropped` or gives it as its severity, the rule
-  `review-run` reads its answer by. A specialist report the review
-  would refuse, with a line in no form or an outcome its lines
+  generalist it reads the weighing `review-run` reads, by the one shared
+  rule: each finding, dropped or `none —` line it stated as it went,
+  the last at a place standing, then its final answer; each finding it
+  must drop on a line that starts with `dropped` or gives it as its
+  severity. A consultant is read from its answer. A specialist report
+  the review would refuse, with a line in no form or an outcome its lines
   contradict, fails its run, as does an
   answer with no outcome line. A departure the review survives is a
   slip: an answer that is more than the outcome line, an eleventh
