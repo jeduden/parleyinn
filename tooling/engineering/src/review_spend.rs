@@ -34,6 +34,10 @@ const JOB: &str = "review";
 const AGENTS: usize = 5;
 /// What one run of the stand-in costs, in US dollars.
 const RUN_COST: f64 = 0.01;
+/// The specialist cut off unbilled, and the log of its run: model calls
+/// that used tokens and no result, so no cost reported.
+const CUT_OFF: &str = "lang-markdown";
+const UNBILLED: &str = r#"{"type":"assistant","parent_tool_use_id":null,"message":{"id":"m1","model":"claude-haiku-5-5","usage":{"input_tokens":10,"output_tokens":5},"content":[{"type":"text","text":"reading"}]}}"#;
 /// How long each run of the stand-in takes, so runs started together
 /// overlap.
 const HOLD: std::time::Duration = std::time::Duration::from_millis(30);
@@ -132,19 +136,46 @@ fn spend_of(workdir: &Path) -> Result<f64, String> {
 /// nothing after it; with them at it, no run starts at all; with room
 /// for two specialists' caps and eight runs allowed at once, never more
 /// than two run at once, the third waits for them and no generalist's
-/// cap fits. Each names the rest over budget, requests changes and
+/// cap fits; and with a specialist killed after its model calls, with
+/// no cost reported, every run starts and the killed one is charged its
+/// tier's cap. Each names the rest over budget, requests changes and
 /// keeps what the earlier reviews and it spent.
 #[must_use]
 pub fn cap_problems(checkout: &Checkout, workdir: &Path) -> Vec<String> {
     let one = PULL_REQUEST_COST_USD - SPECIALIST_BUDGET_USD - RUN_COST / 2.0;
     let two = PULL_REQUEST_COST_USD - 2.0 * SPECIALIST_BUDGET_USD;
     let mut problems = Vec::new();
-    for (case, before, parallel, started, at_once) in [
-        ("a review with room for one run", one, "1", 1, 1),
-        ("a review at the cap", PULL_REQUEST_COST_USD, "1", 0, 0),
-        ("a review with room for two runs at once", two, "8", 3, 2),
+    for (case, before, parallel, started, at_once, cut) in [
+        ("a review with room for one run", one, "1", 1, 1, false),
+        (
+            "a review at the cap",
+            PULL_REQUEST_COST_USD,
+            "1",
+            0,
+            0,
+            false,
+        ),
+        (
+            "a review with room for two runs at once",
+            two,
+            "8",
+            3,
+            2,
+            false,
+        ),
+        (
+            "a review with a run cut off unbilled",
+            0.0,
+            "1",
+            AGENTS,
+            1,
+            true,
+        ),
     ] {
-        let host = ControlHost::holding(HOLD);
+        let mut host = ControlHost::holding(HOLD);
+        if cut {
+            host.fails.insert(CUT_OFF, (1, Some(UNBILLED)));
+        }
         let dir = workdir.join(started.to_string());
         let before_flag = before.to_string();
         let flags = [
@@ -162,8 +193,11 @@ pub fn cap_problems(checkout: &Checkout, workdir: &Path) -> Vec<String> {
                 spend: spend_of(&dir),
                 at_once: host.at_once(),
             };
+            let billed = usize::from(cut);
             #[allow(clippy::cast_precision_loss, reason = "a handful of runs")]
-            let spent = before + RUN_COST * started as f64;
+            let spent = before
+                + RUN_COST * (started - billed) as f64
+                + SPECIALIST_BUDGET_USD * billed as f64;
             let want = Want {
                 started,
                 at_once,

@@ -22,17 +22,30 @@ pub(super) fn review_spend_cases() -> Vec<Case> {
 /// that reported no cost counted free. Last, so adding them moves no
 /// earlier case to another shard.
 fn flight_cases() -> Vec<Case> {
-    vec![case(
-        "review-run starting runs whose tier caps the runs in flight already hold",
-        "ENG-28",
-        Injection::replace(
-            "tooling/review-run/src/controls.rs",
-            "ledger.reserved += most;",
-            "ledger.reserved += 0.0;",
+    vec![
+        case(
+            "review-run starting runs whose tier caps the runs in flight already hold",
+            "ENG-28",
+            Injection::replace(
+                "tooling/review-run/src/controls.rs",
+                "ledger.reserved += most;",
+                "ledger.reserved += 0.0;",
+            ),
+            cap_check(),
+            "3 runs ran at once, past the 2",
         ),
-        cap_check(),
-        "3 runs ran at once, past the 2",
-    )]
+        case(
+            "review-run counting a run paid for that reported no cost as free",
+            "ENG-28",
+            Injection::replace(
+                "tooling/review-run/src/retry.rs",
+                "    } else if charged(log).is_some() {\n        most\n",
+                "    } else if charged(log).is_some() {\n        0.0\n",
+            ),
+            cap_check(),
+            "a review with a run cut off unbilled: review/spend.json says",
+        ),
+    ]
 }
 
 /// The engineering check of the cap on the checkout's `review-run`.

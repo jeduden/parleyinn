@@ -38,7 +38,7 @@ fn a_review_that_cannot_run_is_named_for_each_case() {
 
     let got = cap_problems(&repo(), &file);
 
-    assert_eq!(got.len(), 3, "{got:?}");
+    assert_eq!(got.len(), 4, "{got:?}");
     assert!(
         got[0].starts_with("a review with room for one run: "),
         "{got:?}"
@@ -46,6 +46,10 @@ fn a_review_that_cannot_run_is_named_for_each_case() {
     assert!(got[1].starts_with("a review at the cap: "), "{got:?}");
     assert!(
         got[2].starts_with("a review with room for two runs at once: "),
+        "{got:?}"
+    );
+    assert!(
+        got[3].starts_with("a review with a run cut off unbilled: "),
         "{got:?}"
     );
 }
