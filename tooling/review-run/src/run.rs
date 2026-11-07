@@ -215,7 +215,7 @@ pub fn review_on(r: &Review) -> Result<Vec<AgentRun>, String> {
         let path = r.workdir.join(dir);
         fs::create_dir_all(&path).map_err(|e| format!("make {}: {e}", path.display()))?;
     }
-    keep_spend(r, r.options.spent_before);
+    keep_spend(r, 0.0);
     let c = Controls {
         budget: Budget::new(r.options.max_cost_usd, r.options.spent_before),
         breaker: Breaker::new(r.options.breaker, r.plan.specialists().len()),
@@ -232,8 +232,8 @@ pub fn review_on(r: &Review) -> Result<Vec<AgentRun>, String> {
     Ok(live::watching(&c.live, &watch, || tasks::run_all(r, &c)))
 }
 
-/// Keeps `spent`, what the pull request's reviews cost so far, in
-/// [`SPEND`]; one that cannot be kept is told to progress (I6).
+/// Keeps `spent`, what this review cost so far, in [`SPEND`]; one that
+/// cannot be kept is told to progress (I6).
 pub(crate) fn keep_spend(r: &Review, spent: f64) {
     let path = r.workdir.join(SPEND);
     if let Err(e) = crate::spend::write(&path, &crate::spend::text(spent)) {

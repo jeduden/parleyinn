@@ -3,13 +3,16 @@
 //! `--spent-before`, toward the cap, starts a run only once its tier's
 //! cap fits beside that, its own finished runs and the caps of its runs
 //! in flight, names each agent it did not start over budget
-//! and keeps the total in `review/spend.json`. The review job fetches
-//! that file with `scripts/review-spend.sh` before the Claude token is
-//! staged, from the newest artifact under the pull request's own name a
-//! run of main's review workflow uploaded, passes it to `review-run`,
-//! scrubs the total it kept and uploads it for 90 days however the review
-//! ended; `review-run previous spend` names a spend file past 1 KiB or
-//! one that does not read, never taking it for nothing spent. The runs
+//! and keeps what it alone spent in `review/spend.json`. The review job
+//! fetches those files with `scripts/review-spend.sh` before the Claude
+//! token is staged, summing every artifact under the pull request's own name a
+//! run of main's review workflow uploaded, but its own run's, passes the
+//! sum to `review-run`, which keeps what this review alone spent, scrubs
+//! it and uploads it for 90 days however the review ended, replacing
+//! only its own run's; a run behind an artifact that cannot be looked
+//! up fails the step; `review-run previous spend` names a spend file
+//! past 1 KiB or one that does not read, never taking it for nothing
+//! spent. The runs
 //! use the stand-in `claude` of [`review_controls`], each run costing
 //! 0.01 US dollars, and the cap `review-run` takes when none is given.
 
@@ -19,7 +22,7 @@ use std::path::Path;
 
 use review_eval::runner::SPECIALIST_BUDGET_USD;
 use review_run::controls::PULL_REQUEST_COST_USD;
-use review_run::previous::Selection;
+use review_run::previous::Spends;
 
 use crate::Checkout;
 use crate::review_controls::{ControlHost, gaps, review};
@@ -115,8 +118,7 @@ pub fn held_problems(case: &str, held: &Held, want: Want) -> Vec<String> {
     match &held.spend {
         Ok(got) if (got - spent).abs() < 1e-9 => {}
         Ok(got) => problems.push(format!(
-            "{case}: review/spend.json says {got} USD, not the {spent} the earlier reviews and \
-             this one spent"
+            "{case}: review/spend.json says {got} USD, not the {spent} this review spent"
         )),
         Err(e) => problems.push(format!("{case}: {e}")),
     }
@@ -139,7 +141,7 @@ fn spend_of(workdir: &Path) -> Result<f64, String> {
 /// cap fits; and with a specialist killed after its model calls, with
 /// no cost reported, every run starts and the killed one is charged its
 /// tier's cap. Each names the rest over budget, requests changes and
-/// keeps what the earlier reviews and it spent.
+/// keeps what it alone spent.
 #[must_use]
 pub fn cap_problems(checkout: &Checkout, workdir: &Path) -> Vec<String> {
     let one = PULL_REQUEST_COST_USD - SPECIALIST_BUDGET_USD - RUN_COST / 2.0;
@@ -195,9 +197,8 @@ pub fn cap_problems(checkout: &Checkout, workdir: &Path) -> Vec<String> {
             };
             let billed = usize::from(cut);
             #[allow(clippy::cast_precision_loss, reason = "a handful of runs")]
-            let spent = before
-                + RUN_COST * (started - billed) as f64
-                + SPECIALIST_BUDGET_USD * billed as f64;
+            let spent =
+                RUN_COST * (started - billed) as f64 + SPECIALIST_BUDGET_USD * billed as f64;
             let want = Want {
                 started,
                 at_once,
@@ -227,20 +228,22 @@ pub fn carry_problems(checkout: &Checkout) -> Result<Vec<String>, String> {
     };
     let mut problems = workflow_problems(&job.text);
     problems.extend(file_problems(&review_run::spend::check));
+    problems.extend(sum_problems(&review_run::previous::summed));
     problems.extend(selection_problems());
 
     Ok(problems)
 }
 
 /// What is wrong with the `step` that fetches what the earlier reviews
-/// spent: it must pick by origin, read the file it fetched, look for
-/// the pull request's own name, cut the file one byte past the size cap
-/// and say in the job summary what it carried.
+/// spent: it must pick by origin, leave out the run's own, read and sum
+/// the files it fetched, look for the pull request's own name, cut each
+/// file one byte past the size cap, say in the job summary what it
+/// carried, and fail on a run it cannot look up.
 fn fetch_problems(step: &str) -> Vec<String> {
-    [
+    let mut problems: Vec<String> = [
         (
-            "previous spend",
-            "reads the file it fetched with review-run previous spend",
+            "previous spend \"${files[@]}\"",
+            "reads and sums the file of every earlier review with review-run previous spend",
         ),
         (
             "review-spend-pr-",
@@ -254,11 +257,38 @@ fn fetch_problems(step: &str) -> Vec<String> {
             "GITHUB_STEP_SUMMARY",
             "says in the job summary what earlier reviews spent",
         ),
+        (
+            "--except-run \"$GITHUB_RUN_ID\"",
+            "leaves out the spend its own run kept",
+        ),
     ]
     .into_iter()
     .filter(|(needle, _)| !step.contains(needle))
     .map(|(_, why)| format!("the step that fetches what earlier reviews spent never {why}"))
-    .collect()
+    .collect();
+    if !lookup_fails(step) {
+        problems.push(
+            "the step that fetches what earlier reviews spent goes on past a run it could not \
+             look up"
+                .to_owned(),
+        );
+    }
+
+    problems
+}
+
+/// Whether `step` fails when the run behind a spend artifact cannot be
+/// looked up: the line that looks it up, `actions/runs/$id`, is followed
+/// by `|| fail`, outside any pipe whose subshell would swallow the
+/// failure, and nothing only warns.
+fn lookup_fails(step: &str) -> bool {
+    let lines: Vec<&str> = step.lines().map(str::trim).collect();
+    let fails = lines
+        .iter()
+        .position(|l| l.contains("actions/runs/$id"))
+        .and_then(|at| lines.get(at + 1))
+        .is_some_and(|next| next.starts_with("|| fail "));
+    fails && !lines.iter().any(|l| l.starts_with("done |")) && !step.contains("::warning::")
 }
 
 /// What is wrong with the review job's text `job`, the scripts its steps
@@ -310,6 +340,7 @@ pub fn workflow_problems(job: &str) -> Vec<String> {
                 "if: always() && ",
                 "scrubbed == 'true'",
                 "path: review/spend.json",
+                "overwrite: true",
                 "retention-days: 90",
             ] {
                 if !step.contains(needle) {
@@ -359,19 +390,51 @@ pub fn file_problems(check: Check) -> Vec<String> {
     problems
 }
 
-/// What is wrong with `previous select --of spend`: it must take the
-/// newest artifact of the spend's name a run of main's review workflow
-/// uploaded, refusing and counting a newer one from the pull request's
-/// own event, and never the findings' artifact.
+/// `previous spend`'s sum, or what stands in for it: each spend file's
+/// path and text in, what they say was spent out.
+type Sum<'a> = &'a dyn Fn(&[(String, String)]) -> Result<f64, String>;
+
+/// What is wrong with the sum of what earlier reviews spent: it must add
+/// up every file, and refuse a sum one of whose files does not read,
+/// naming that file.
 #[must_use]
-pub fn selection_problems() -> Vec<String> {
-    selection_problems_with(&review_run::previous::select_of)
+pub fn sum_problems(sum: Sum) -> Vec<String> {
+    let file = |path: &str, text: String| (path.to_owned(), text);
+    let two = [
+        file("a", review_run::spend::text(1.5)),
+        file("b", review_run::spend::text(0.25)),
+    ];
+    let mut problems = Vec::new();
+    match sum(&two) {
+        Ok(spent) if (spent - 1.75).abs() < 1e-9 => {}
+        other => problems.push(format!(
+            "previous spend summed spend files of 1.5 and 0.25 USD as {other:?}"
+        )),
+    }
+    let broken = [two[0].clone(), file("b", "{".to_owned())];
+    match sum(&broken) {
+        Err(e) if e.starts_with("b: ") => {}
+        other => problems.push(format!(
+            "previous spend summed a spend file that does not read as {other:?}, not naming it"
+        )),
+    }
+
+    problems
 }
 
-/// `previous select`, or what stands in for it: the name's start, the
-/// pull request, the artifacts' listing and the runs' list in, the pick
-/// out.
-type Select<'a> = &'a dyn Fn(&str, &str, &str, &str) -> Result<Selection, String>;
+/// What is wrong with `previous select --of spend`: it must take every
+/// artifact of the spend's name a run of main's review workflow
+/// uploaded, but the review's own run's, refusing and counting one from
+/// the pull request's own event, and never the findings' artifact.
+#[must_use]
+pub fn selection_problems() -> Vec<String> {
+    selection_problems_with(&review_run::previous::spends)
+}
+
+/// `previous select --of spend`, or what stands in for it: the pull
+/// request, the artifacts' listing, the runs' list and the run to leave
+/// out in, the picks out.
+type Select<'a> = &'a dyn Fn(&str, &str, &str, Option<u64>) -> Result<Spends, String>;
 
 /// [`selection_problems`] of `select`.
 fn selection_problems_with(select: Select) -> Vec<String> {
@@ -381,21 +444,25 @@ fn selection_problems_with(select: Select) -> Vec<String> {
         )
     };
     let artifacts = format!(
-        r#"{{"artifacts":[{},{},{}]}}"#,
+        r#"{{"artifacts":[{},{},{},{},{}]}}"#,
         artifact(3, "review-findings-pr-7", "2026-11-01T12:00:00Z", 10),
         artifact(2, "review-spend-pr-7", "2026-11-01T11:00:00Z", 20),
         artifact(1, "review-spend-pr-7", "2026-11-01T10:00:00Z", 10),
+        artifact(4, "review-spend-pr-7", "2026-11-01T09:00:00Z", 30),
+        artifact(5, "review-spend-pr-7", "2026-11-01T13:00:00Z", 40),
     );
     let runs = r#"[{"id":20,"path":".github/workflows/review.yml","event":"pull_request"},
-        {"id":10,"path":".github/workflows/review.yml","event":"workflow_run"}]"#;
-    let picked = select(review_run::previous::SPEND, "7", &artifacts, runs);
-    match picked {
-        Ok(Selection {
-            artifact: Some(1),
+        {"id":10,"path":".github/workflows/review.yml","event":"workflow_run"},
+        {"id":30,"path":".github/workflows/review.yml","event":"issue_comment"},
+        {"id":40,"path":".github/workflows/review.yml","event":"workflow_run"}]"#;
+    // Run 40 is the review's own.
+    match select("7", &artifacts, runs, Some(40)) {
+        Ok(Spends {
+            artifacts,
             skipped: 1,
-        }) => Vec::new(),
+        }) if artifacts == [1, 4] => Vec::new(),
         other => vec![format!(
-            "previous select --of spend gave {other:?}, not artifact 1 with 1 refused"
+            "previous select --of spend gave {other:?}, not artifacts 1 and 4 with 1 refused"
         )],
     }
 }

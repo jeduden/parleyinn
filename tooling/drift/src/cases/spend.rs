@@ -14,7 +14,7 @@ const SCRIPT: &str = "scripts/review-spend.sh";
 
 /// The drifts the pull request's cap exists to rule out (ENG-28, I6).
 pub(super) fn review_spend_cases() -> Vec<Case> {
-    [cap_cases(), carry_cases(), flight_cases()].concat()
+    [cap_cases(), carry_cases(), flight_cases(), sum_cases()].concat()
 }
 
 /// The drifts of the runs in flight: a run started though the tier caps
@@ -44,6 +44,67 @@ fn flight_cases() -> Vec<Case> {
             ),
             cap_check(),
             "a review with a run cut off unbilled: review/spend.json says",
+        ),
+    ]
+}
+
+/// The drifts of the sum of what each earlier review kept: the run's own
+/// spend summed with the earlier ones, a run behind one that cannot be
+/// looked up only warned of, a rerun's spend kept beside its first's,
+/// and a file of many left out. Last, so adding them moves no earlier
+/// case to another shard.
+fn sum_cases() -> Vec<Case> {
+    vec![
+        case(
+            "what earlier reviews spent summed with what the review's own run kept",
+            "ENG-28",
+            Injection::replace(SCRIPT, " --except-run \"$GITHUB_RUN_ID\"", ""),
+            carry_check(),
+            "never leaves out the spend its own run kept",
+        ),
+        case(
+            "previous select --of spend taking the review's own run's spend",
+            "ENG-28",
+            Injection::replace(
+                "tooling/review-run/src/previous.rs",
+                "if run.is_some() && run == except {",
+                "if run.is_some() && run == except && false {",
+            ),
+            carry_check(),
+            "not artifacts 1 and 4",
+        ),
+        case(
+            "a run behind an earlier review's spend that cannot be looked up only warned of",
+            "ENG-28",
+            Injection::replace(
+                SCRIPT,
+                "    || fail \"Run $id, behind",
+                "    || echo \"::warning::Run $id, behind",
+            ),
+            carry_check(),
+            "goes on past a run it could not look up",
+        ),
+        case(
+            "the spend kept under a name a rerun of its own run cannot replace",
+            "ENG-28",
+            Injection::replace(
+                WORKFLOW,
+                "          path: review/spend.json\n          overwrite: true\n",
+                "          path: review/spend.json\n",
+            ),
+            carry_check(),
+            "reviews spent lacks \\\"overwrite: true",
+        ),
+        case(
+            "previous spend reading one file of many",
+            "ENG-28",
+            Injection::replace(
+                "tooling/review-run/src/previous.rs",
+                ".map(|spent| sum + spent)",
+                ".map(|spent| spent)",
+            ),
+            carry_check(),
+            "summed spend files of 1.5 and 0.25 USD",
         ),
     ]
 }
@@ -91,12 +152,12 @@ fn cap_cases() -> Vec<Case> {
             "5 runs started, not 1",
         ),
         case(
-            "review-run keeping its own spend without what earlier reviews spent",
+            "review-run keeping a run's cost twice in what it spent",
             "ENG-28",
             Injection::replace(
                 "tooling/review-run/src/cli.rs",
-                "&crate::spend::text(p.spent_before + usage::charged(runs)),",
                 "&crate::spend::text(usage::charged(runs)),",
+                "&crate::spend::text(usage::total(&usage) + usage::charged(runs)),",
             ),
             cap_check(),
             "review/spend.json says",
@@ -163,7 +224,11 @@ fn carry_cases() -> Vec<Case> {
         case(
             "what earlier reviews spent fetched and never read",
             "ENG-28",
-            Injection::replace(SCRIPT, "previous spend \"$dir", "previous check \"$dir"),
+            Injection::replace(
+                SCRIPT,
+                "previous spend \"${files[@]}\"",
+                "previous check \"${files[@]}\"",
+            ),
             carry_check(),
             "never reads the file it fetched",
         ),

@@ -191,14 +191,13 @@ jobs:
       # review-run starts each dispatched specialist, and each generalist
       # once its own specialists ended, as `claude --agent` from main's
       # definition: read tools alone, the pull request's tree as data, a
-      # 900-second deadline each, no run once the pull request's reviews
-      # spent its cap (ENG-28; ADR-2610300031). No agent gets a GitHub
+      # 900-second deadline each, a run only while its tier's cap fits the
+      # pull request's (ENG-28; ADR-2610300031). No agent gets a GitHub
       # token, and no step that runs one holds the Claude token: review-run
       # reads it from the staged credential only to scrub what it writes
       # and prints, and a review whose agent's output held it requests
       # changes and fails. It writes review/outcome.json and the rest; an
-      # exit other than 0 says it could not run. It runs on the
-      # stakeholder's Claude subscription (`claude setup-token`).
+      # exit other than 0 says it could not run. Billed to the stakeholder.
       - name: Review
         id: review
         if: steps.pull_head.outputs.number != ''
@@ -286,13 +285,14 @@ jobs:
             review/findings.md
           retention-days: 90
           if-no-files-found: error
-      # What the pull request's reviews spent, for its next, kept however this one ended.
-      - name: Keep what the pull request's reviews spent
+      # What this review spent, kept however it ended, for the next to sum.
+      - name: Keep what this review spent
         if: always() && steps.scrub.outputs.scrubbed == 'true'
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: review-spend-pr-${{ steps.pull_head.outputs.number }}
           path: review/spend.json
+          overwrite: true
           retention-days: 90
           if-no-files-found: warn
       # The run logs under review/logs/ stay in the job: they hold every

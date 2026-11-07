@@ -157,7 +157,7 @@ fn a_report_saying_a_run_was_not_started_that_cannot_be_written_is_named() {
 }
 
 #[test]
-fn what_earlier_reviews_spent_counts_toward_the_cap_and_is_kept_with_each_run() {
+fn what_earlier_reviews_spent_counts_toward_the_cap_and_the_review_keeps_its_own() {
     let options = Options {
         parallel: 1,
         max_cost_usd: 1.0,
@@ -176,7 +176,7 @@ fn what_earlier_reviews_spent_counts_toward_the_cap_and_is_kept_with_each_run() 
     );
     let spend = fs::read_to_string(dir.path().join(crate::spend::SPEND)).unwrap();
     assert!(
-        (crate::spend::check(&spend).unwrap() - 0.705).abs() < 1e-9,
+        (crate::spend::check(&spend).unwrap() - 0.02).abs() < 1e-9,
         "{spend}"
     );
 }

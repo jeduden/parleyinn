@@ -1,13 +1,16 @@
 #!/bin/bash
 # Fetches what the earlier reviews of the pull request spent, for
 # `review-run --spent-before`, which holds them all to one cost cap
-# (ENG-28). It only fetches: `review-run previous select --of spend`
-# decides which artifact is trusted, by the rule the previous findings
+# (ENG-28). Each review keeps what it spent alone, so this sums every
+# review's. It only fetches: `review-run previous select --of spend`
+# decides which artifacts are trusted, by the rule the previous findings
 # are picked by, since an artifact of this name may come from any
-# workflow a pull request defines, and `review-run previous spend` reads
-# the file. A spend that cannot be listed, told apart or read fails the
-# step, naming why: it is never taken for nothing spent (I6). What it
-# carried, or that it found none, it says in the job's summary.
+# workflow a pull request defines, and leaves out this run's own;
+# `review-run previous spend` reads each file and sums them. A spend
+# that cannot be listed, a run behind one that cannot be looked up, or
+# a file that cannot be fetched or read fails the step, naming why: it
+# is never taken for nothing spent (I6). How many earlier reviews it
+# summed, and what they spent, it says in the job's summary.
 #
 # Run by .github/workflows/review.yml, which hands it its values in
 # the environment; it takes the shell's default, no pipefail. Writes
@@ -28,32 +31,42 @@ gh api --paginate "repos/$REPO/actions/artifacts?name=review-spend-pr-$PULL&per_
   --jq '.artifacts[]' > "$dir/pages.json" \
   && jq -s '{artifacts: .}' "$dir/pages.json" > "$dir/artifacts.json" \
   || fail "What earlier reviews of this pull request spent could not be listed, so no agent runs."
+: > "$dir/runs.jsonl"
 for id in $(jq -r '[.artifacts[].workflow_run.id | select(. != null)] | unique | .[]' \
   "$dir/artifacts.json"); do
-  gh api "repos/$REPO/actions/runs/$id" --jq '{id, path, event}' \
-    || echo "::warning::run $id of an earlier review's spend could not be read; its artifact is refused" >&2
-done | jq -s . > "$dir/runs.json"
+  gh api "repos/$REPO/actions/runs/$id" --jq '{id, path, event}' >> "$dir/runs.jsonl" \
+    || fail "Run $id, behind what an earlier review of this pull request spent, could not be looked up, so no agent runs."
+done
+jq -s . "$dir/runs.jsonl" > "$dir/runs.json" \
+  || fail "The runs behind what earlier reviews of this pull request spent did not read, so no agent runs."
 picked=$(cargo run --locked --quiet --offline -p review-run -- previous select --of spend \
-  --pull "$PULL" --artifacts "$dir/artifacts.json" --runs "$dir/runs.json") \
+  --pull "$PULL" --except-run "$GITHUB_RUN_ID" \
+  --artifacts "$dir/artifacts.json" --runs "$dir/runs.json") \
   || fail "What earlier reviews of this pull request spent could not be told apart, so no agent runs."
-id=$(sed -n 's/^previous_artifact=//p' <<< "$picked")
+ids=$(sed -n 's/^spend_artifacts=//p' <<< "$picked")
 skipped=$(sed -n 's/^previous_skipped=//p' <<< "$picked")
 
 spent=0
-note="No earlier review of this pull request kept what it spent, so its budget starts at 0 USD."
-if [ -n "$id" ]; then
+count=0
+files=()
+for id in $ids; do
   # The cap is one byte past what `previous spend` accepts, so a file
   # past it is refused and not cut short into one that reads.
-  gh api "repos/$REPO/actions/artifacts/$id/zip" > "$dir/spend.zip" \
-    || fail "What earlier reviews of this pull request spent, artifact $id, could not be fetched, so no agent runs."
-  unzip -p "$dir/spend.zip" spend.json | head -c 1025 > "$dir/spend.json"
-  read=$(cargo run --locked --quiet --offline -p review-run -- previous spend "$dir/spend.json") \
-    || fail "What earlier reviews of this pull request spent, artifact $id, did not read, so no agent runs."
+  gh api "repos/$REPO/actions/artifacts/$id/zip" > "$dir/$id.zip" \
+    || fail "What an earlier review of this pull request spent, artifact $id, could not be fetched, so no agent runs."
+  unzip -p "$dir/$id.zip" spend.json | head -c 1025 > "$dir/$id.json"
+  files+=("$dir/$id.json")
+  count=$((count + 1))
+done
+note="No earlier review of this pull request kept what it spent, so its budget starts at 0 USD."
+if [ "$count" -gt 0 ]; then
+  read=$(cargo run --locked --quiet --offline -p review-run -- previous spend "${files[@]}") \
+    || fail "What earlier reviews of this pull request spent, artifacts $ids, did not read, so no agent runs."
   spent=$(sed -n 's/^spent_before=//p' <<< "$read")
-  note="Earlier reviews of this pull request spent $spent USD, as artifact $id keeps."
+  note="$count earlier review(s) of this pull request spent $spent USD in all, as artifacts $ids keep."
 fi
 if [ "${skipped:-0}" != 0 ]; then
-  note="$note $skipped artifact(s) of this pull request's spend were refused: from no run of main's review workflow, or from a run that could not be read."
+  note="$note $skipped artifact(s) of this pull request's spend were refused: from no run of main's review workflow."
 fi
 
 echo "::notice::$note"

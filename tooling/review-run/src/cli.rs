@@ -9,9 +9,10 @@
 //! `review/reports/`.
 //! It also writes what the review did not review, `review/gaps.json`
 //! and `review/not-reviewed.md`, and what it ran on,
-//! `review/run-id.json`, and what the pull request's reviews spent,
-//! `review/spend.json`, counting what `--spent-before` says its earlier
-//! reviews did. Given `--only` a gap list and `--from` an
+//! `review/run-id.json`, and what this review spent, `review/spend.json`,
+//! holding its runs to the pull request's cap beside what
+//! `--spent-before` says its earlier reviews spent, the sum the next
+//! review's workflow step takes of every one's kept spend. Given `--only` a gap list and `--from` an
 //! earlier run's review directory, it runs only what that run left
 //! without an accepted answer, or whose answer key changed, and decides
 //! the review as a full run would. Given `--answers` a store, it takes
@@ -191,8 +192,6 @@ struct Prepared {
     /// The previous review's kept findings, when given.
     previous: Option<Vec<Tracked>>,
     max_resumes: u32,
-    /// What the pull request's earlier reviews spent, in US dollars.
-    spent_before: f64,
 }
 
 /// Reads the review `args` name: its plan, the ids its reports may cite,
@@ -264,7 +263,6 @@ fn prepare(
         resume,
         previous,
         max_resumes: args.max_resumes,
-        spent_before: args.options.spent_before,
     })
 }
 
@@ -367,7 +365,7 @@ fn record(
     // First, so what the runs cost is kept however the rest goes.
     written.whole(
         crate::spend::SPEND,
-        &crate::spend::text(p.spent_before + usage::charged(runs)),
+        &crate::spend::text(usage::charged(runs)),
     )?;
     let stalls = stall::tally(
         &not_reviewed,

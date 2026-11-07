@@ -123,7 +123,7 @@ fn a_review_past_the_cap_that_runs_on_approves_or_loses_the_spend_is_named() {
             "c: 1 agents named over budget, not the 5 not started: verdict=approve\nover_budget=1\n",
             "c: a review its pull request's cap stopped does not request changes: \
              verdict=approve\nover_budget=1\n",
-            "c: review/spend.json says 0.01 USD, not the 5 the earlier reviews and this one spent",
+            "c: review/spend.json says 0.01 USD, not the 5 this review spent",
         ]
     );
     let unread = Held {
@@ -202,10 +202,35 @@ fn a_fetch_that_picks_by_no_origin_or_reads_no_file_is_named() {
     assert_eq!(
         got,
         [
-            "the step that fetches what earlier reviews spent never reads the file it fetched with \
-          review-run previous spend"
+            "the step that fetches what earlier reviews spent never reads and sums the file of \
+             every earlier review with review-run previous spend"
         ]
     );
+    let all = workflow_problems(&mutated(" --except-run \"$GITHUB_RUN_ID\"", ""));
+    assert_eq!(
+        all,
+        [
+            "the step that fetches what earlier reviews spent never leaves out the spend its own run kept"
+        ]
+    );
+}
+
+#[test]
+fn a_fetch_that_goes_on_past_a_run_it_could_not_look_up_is_named() {
+    let past = "the step that fetches what earlier reviews spent goes on past a run it could not \
+                look up";
+    let warned = mutated(
+        "    || fail \"Run $id, behind",
+        "    || echo \"::warning::Run $id, behind",
+    );
+    assert_eq!(workflow_problems(&warned), [past]);
+    // The loop's failures piped into jq end in its subshell, unseen.
+    let piped = mutated(
+        ": > \"$dir/runs.jsonl\"\n",
+        ": > \"$dir/runs.jsonl\"\ndone | jq\n",
+    );
+    assert_eq!(workflow_problems(&piped), [past]);
+    assert!(!lookup_fails("gh api \"repos/$REPO/actions/runs/$id\""));
 }
 
 #[test]
@@ -230,7 +255,7 @@ fn a_spend_fetched_after_the_token_is_staged_is_named() {
 
 #[test]
 fn a_fetch_step_that_lacks_its_checks_names_each() {
-    assert_eq!(fetch_problems("previous select --of spend").len(), 4);
+    assert_eq!(fetch_problems("previous select --of spend").len(), 6);
 }
 
 #[test]
@@ -247,8 +272,8 @@ fn a_reading_that_takes_any_file_or_misreads_one_is_named() {
 #[test]
 fn an_upload_lacking_its_retention_is_named() {
     let got = workflow_problems(&mutated(
-        "          path: review/spend.json\n          retention-days: 90\n",
-        "          path: review/spend.json\n",
+        "          overwrite: true\n          retention-days: 90\n",
+        "          overwrite: true\n",
     ));
 
     assert_eq!(
@@ -257,16 +282,43 @@ fn an_upload_lacking_its_retention_is_named() {
             "the step that uploads what the pull request's reviews spent lacks \"retention-days: 90\""
         ]
     );
+    let kept = workflow_problems(&mutated(
+        "          overwrite: true\n          retention-days: 90\n",
+        "          retention-days: 90\n",
+    ));
+    assert_eq!(
+        kept,
+        ["the step that uploads what the pull request's reviews spent lacks \"overwrite: true\""]
+    );
 }
 
 #[test]
 fn a_selection_that_takes_another_origin_or_fails_is_named() {
-    let failing = |_: &str, _: &str, _: &str, _: &str| Err("no listing".to_owned());
+    let failing = |_: &str, _: &str, _: &str, _: Option<u64>| Err("no listing".to_owned());
 
     let got = selection_problems_with(&failing);
 
     assert_eq!(
         got,
-        ["previous select --of spend gave Err(\"no listing\"), not artifact 1 with 1 refused"]
+        [
+            "previous select --of spend gave Err(\"no listing\"), not artifacts 1 and 4 with 1 \
+             refused"
+        ]
     );
+}
+
+#[test]
+fn a_sum_that_drops_a_file_or_takes_a_broken_one_is_named() {
+    let first = |texts: &[(String, String)]| review_run::spend::check(&texts[0].1);
+
+    let got = sum_problems(&first);
+
+    assert_eq!(
+        got,
+        [
+            "previous spend summed spend files of 1.5 and 0.25 USD as Ok(1.5)",
+            "previous spend summed a spend file that does not read as Ok(1.5), not naming it"
+        ]
+    );
+    assert!(sum_problems(&review_run::previous::summed).is_empty());
 }

@@ -212,14 +212,14 @@ impl Budget {
     }
 
     /// Releases the `most` a run that ended reserved, charges it `cost`
-    /// and hands `keep` the pull request's total so far, while no other
-    /// run's cost is added, so what it keeps never goes back; then
-    /// wakes the runs waiting for room.
+    /// and hands `keep` what this review was charged so far, its own
+    /// spend alone, while no other run's cost is added, so what it keeps
+    /// never goes back; then wakes the runs waiting for room.
     pub fn charge(&self, most: f64, cost: f64, keep: &dyn Fn(f64)) {
         let mut ledger = self.lock();
         ledger.reserved -= most;
         ledger.spent += cost;
-        keep(self.before + ledger.spent);
+        keep(ledger.spent);
         drop(ledger);
         self.freed.notify_all();
     }

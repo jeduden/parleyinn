@@ -81,7 +81,7 @@ fn a_review_writes_every_file_the_gate_reads() {
 }
 
 #[test]
-fn a_review_keeps_what_the_pull_request_s_reviews_spent_beside_what_it_ran() {
+fn a_review_keeps_what_it_spent_alone_beside_what_earlier_reviews_spent() {
     let dir = workdir();
     let host = FakeHost::new(fake::either);
 
@@ -95,7 +95,7 @@ fn a_review_keeps_what_the_pull_request_s_reviews_spent_beside_what_it_ran() {
     assert!(out.contains("\ncost=0.0300\n"), "this review's own: {out}");
     let spend = fs::read_to_string(dir.path().join("review/spend.json")).unwrap();
     assert!(
-        (crate::spend::check(&spend).unwrap() - 1.53).abs() < 1e-9,
+        (crate::spend::check(&spend).unwrap() - 0.03).abs() < 1e-9,
         "{spend}"
     );
 }
@@ -114,7 +114,7 @@ fn a_review_whose_pull_request_spent_its_cap_starts_no_agent() {
     );
     assert!(!dir.path().join("review/logs/review-code.jsonl").exists());
     let spend = fs::read_to_string(dir.path().join("review/spend.json")).unwrap();
-    assert_eq!(crate::spend::check(&spend), Ok(5.0));
+    assert_eq!(crate::spend::check(&spend), Ok(0.0), "it spent nothing");
 }
 
 #[test]

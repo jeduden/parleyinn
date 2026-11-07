@@ -179,7 +179,7 @@ fn review_carries_findings(w: &mut World) -> Result<(), String> {
 }
 
 #[then(
-    regex = r"^review-run carries what the earlier reviews of a pull request spent from the newest artifact under the pull request's own name that a run of main's review workflow uploaded, refuses and counts an artifact of that name from any other run, names a spend file past 1 KiB or one that does not read, and the review job fetches it before the Claude Code OAuth token is staged, passes it as --spent-before, scrubs the spend it kept and keeps it for 90 days for the next review however the review ended, and says in the job summary which earlier spend it carried or that it found none$"
+    regex = r"^review-run sums what each earlier review of a pull request spent from every artifact under the pull request's own name that a run of main's review workflow uploaded, but its own run's, refuses and counts an artifact of that name from any other run, names a spend file past 1 KiB or one that does not read, and the review job fetches them before the Claude Code OAuth token is staged, fails on a run behind one it cannot look up, passes the sum as --spent-before, scrubs what this review spent and keeps it for 90 days for the next review however the review ended, and says in the job summary how many earlier reviews it summed and what they spent or that it found none$"
 )]
 fn review_carries_spend(w: &mut World) -> Result<(), String> {
     outcome(engineering::review_spend::carry_problems(

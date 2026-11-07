@@ -110,7 +110,7 @@ fn the_budget_counts_what_the_pull_request_s_earlier_reviews_spent() {
 
     assert!((budget.spent() - 0.25).abs() < 1e-9, "this review's own");
     assert!((budget.total() - 0.75).abs() < 1e-9);
-    assert_eq!(kept.into_inner().unwrap(), [0.75]);
+    assert_eq!(kept.into_inner().unwrap(), [0.25], "this review's own");
     assert!(budget.refusal(0.3).is_some());
     assert!(
         Budget::new(1.0, 1.0).refusal(0.01).is_some(),

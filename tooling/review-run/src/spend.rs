@@ -1,9 +1,11 @@
-//! What a pull request's reviews spent (ENG-28): `review/spend.json`,
-//! `{"spent_usd": <total>}`, the cost of the earlier reviews the review
-//! was handed as `--spent-before` and what its budget charged its own
-//! finished runs, a run paid for that reported no cost charged its
-//! tier's cap. It is written when the review starts, again as each run
-//! ends, and once more when the review ends, each time whole, so a
+//! What a review spent (ENG-28): `review/spend.json`,
+//! `{"spent_usd": <total>}`, what its budget charged its own finished
+//! runs, a run paid for that reported no cost charged its tier's cap,
+//! and nothing of what the earlier reviews it was handed as
+//! `--spent-before` spent: the next review sums every review's own, so
+//! two reviews of one pull request that run side by side never erase
+//! each other's. It is written when the review starts, again as each
+//! run ends, and once more when the review ends, each time whole, so a
 //! review cut off after it spent still leaves what it spent for the
 //! next review of its pull request. A spend file past [`MAX_BYTES`] or
 //! one that does not read is named, never taken for nothing spent (I6).
@@ -19,7 +21,7 @@ pub const SPEND: &str = "review/spend.json";
 /// The most bytes a spend file may hold.
 pub const MAX_BYTES: usize = 1 << 10;
 
-/// What a pull request's reviews spent, in US dollars.
+/// What a review spent, in US dollars.
 #[derive(Debug, Clone, Copy, PartialEq, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct Spend {

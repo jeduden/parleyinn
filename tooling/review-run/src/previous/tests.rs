@@ -382,16 +382,93 @@ fn an_artifact_from_an_issue_comment_run_is_taken_when_it_alone_qualifies() {
     );
 }
 
+const SPEND_NAME: &str = "review-spend-pr-7";
+
 #[test]
-fn select_of_spend_takes_the_spend_artifact_by_the_same_origin_rule() {
+fn every_spend_artifact_from_main_s_review_workflow_is_taken_but_the_run_s_own() {
+    let a = listing(&[
+        artifact(15, SPEND_NAME, "2026-11-01T14:00:00Z", 150, false),
+        artifact(14, SPEND_NAME, "2026-11-01T13:00:00Z", 140, false),
+        artifact(13, SPEND_NAME, "2026-11-01T12:30:00Z", 130, false),
+        artifact(11, SPEND_NAME, "2026-11-01T12:10:00Z", 110, false),
+        artifact(16, SPEND_NAME, "2026-11-01T15:00:00Z", 999, false),
+        artifact(12, NAME, "2026-11-01T12:00:00Z", 130, false),
+        artifact(10, SPEND_NAME, "2026-11-01T10:00:00Z", 130, true),
+        r#"{"id":17,"name":"review-spend-pr-7","expired":false}"#.to_owned(),
+    ]);
+    let r = runs(&[
+        (150, REVIEW, "issue_comment"),
+        (140, REVIEW, "pull_request"),
+        (130, REVIEW, "workflow_run"),
+        (110, REVIEW, "workflow_run"),
+    ]);
+
+    // 16's run, 999, is the review's own; 14's ran on the pull request's
+    // definition and 17 names no run; 10 expired, 12 is the findings'.
+    assert_eq!(
+        spends("7", &a, &r, Some(999)).unwrap(),
+        Spends {
+            artifacts: vec![11, 13, 15],
+            skipped: 2
+        }
+    );
+    assert_eq!(
+        spends("7", &a, &r, None).unwrap().skipped,
+        3,
+        "16's run is unknown"
+    );
+}
+
+#[test]
+fn more_spend_artifacts_than_a_review_sums_are_refused_naming_how_many() {
+    let items: Vec<String> = (1..=101)
+        .map(|id| artifact(id, SPEND_NAME, "2026-11-01T12:00:00Z", 130, false))
+        .collect();
+    let r = runs(&[(130, REVIEW, "workflow_run")]);
+
+    let err = spends("7", &listing(&items), &r, None).unwrap_err();
+
+    assert_eq!(
+        err,
+        "101 earlier reviews of pull request 7 kept what they spent, past the 100 a review sums"
+    );
+    assert_eq!(
+        spends("7", &listing(&items[..100]), &r, None)
+            .unwrap()
+            .artifacts
+            .len(),
+        100
+    );
+    assert!(spends("x", "{}", "[]", None).is_err());
+    assert!(spends("7", "{", "[]", None).is_err());
+    assert!(spends("7", r#"{"artifacts":[]}"#, "[", None).is_err());
+}
+
+#[test]
+fn the_spend_lines_name_every_artifact_space_apart() {
+    let picked = Spends {
+        artifacts: vec![3, 5],
+        skipped: 1,
+    };
+    assert_eq!(picked.lines(), "spend_artifacts=3 5\nprevious_skipped=1\n");
+    let none = Spends {
+        artifacts: Vec::new(),
+        skipped: 0,
+    };
+    assert_eq!(none.lines(), "spend_artifacts=\nprevious_skipped=0\n");
+}
+
+#[test]
+fn select_of_spend_names_every_artifact_by_the_same_origin_rule() {
     let dir = TempDir::new().unwrap();
     let a = dir.path().join("a.json");
     let r = dir.path().join("r.json");
     fs::write(
         &a,
         listing(&[
-            artifact(14, "review-spend-pr-7", "2026-11-01T13:00:00Z", 140, false),
-            artifact(13, "review-spend-pr-7", "2026-11-01T12:30:00Z", 130, false),
+            artifact(14, SPEND_NAME, "2026-11-01T13:00:00Z", 140, false),
+            artifact(13, SPEND_NAME, "2026-11-01T12:30:00Z", 130, false),
+            artifact(15, SPEND_NAME, "2026-11-01T14:00:00Z", 150, false),
             artifact(12, NAME, "2026-11-01T12:00:00Z", 130, false),
         ]),
     )
@@ -401,54 +478,77 @@ fn select_of_spend_takes_the_spend_artifact_by_the_same_origin_rule() {
         runs(&[(140, REVIEW, "pull_request"), (130, REVIEW, "workflow_run")]),
     )
     .unwrap();
-    let line = |of: &str| {
-        run_with(&[
+    let line = |extra: &[&str]| {
+        let mut list = vec![
             "select",
-            "--of",
-            of,
             "--pull",
             "7",
             "--artifacts",
             a.to_str().unwrap(),
             "--runs",
             r.to_str().unwrap(),
-        ])
+        ];
+        list.extend(extra);
+        run_with(&list)
     };
 
     assert_eq!(
-        line("spend"),
+        line(&["--of", "spend", "--except-run", "150"]),
         (
             EXIT_OK,
-            "previous_artifact=13\nprevious_skipped=1\n".to_owned(),
+            "spend_artifacts=13\nprevious_skipped=1\n".to_owned(),
             String::new()
         )
     );
     assert_eq!(
-        line("findings").1,
+        line(&["--of", "spend"]).1,
+        "spend_artifacts=13\nprevious_skipped=2\n"
+    );
+    assert_eq!(
+        line(&["--of", "findings"]).1,
         "previous_artifact=12\nprevious_skipped=0\n"
     );
-    let (code, _, err) = line("costs");
-    assert_eq!(code, EXIT_USAGE);
-    assert!(
-        err.contains("--of \"costs\" is neither findings nor spend"),
-        "{err}"
-    );
-    assert_eq!(name_of(SPEND, "7").unwrap(), "review-spend-pr-7");
+    for (extra, want) in [
+        (
+            &["--of", "costs"][..],
+            "--of \"costs\" is neither findings nor spend",
+        ),
+        (
+            &["--of", "spend", "--except-run", "x"],
+            "--except-run \"x\" is no run id",
+        ),
+        (
+            &["--except-run", "150"],
+            "--except-run is for --of spend alone",
+        ),
+    ] {
+        let (code, _, err) = line(extra);
+        assert_eq!(code, EXIT_USAGE, "{extra:?}");
+        assert!(err.contains(want), "{err}");
+    }
+    assert_eq!(name_of(SPEND, "7").unwrap(), SPEND_NAME);
 }
 
 #[test]
-fn spend_prints_what_earlier_reviews_spent_and_names_a_file_that_does_not_read() {
+fn spend_sums_what_earlier_reviews_spent_and_names_a_file_that_does_not_read() {
     let dir = TempDir::new().unwrap();
-    let good = dir.path().join("spend.json");
+    let one = dir.path().join("one.json");
+    let two = dir.path().join("two.json");
     let bad = dir.path().join("bad.json");
-    fs::write(&good, crate::spend::text(1.25)).unwrap();
+    fs::write(&one, crate::spend::text(1.25)).unwrap();
+    fs::write(&two, crate::spend::text(0.5)).unwrap();
     fs::write(&bad, "{\"spent_usd\": ").unwrap();
+    let path = |p: &std::path::Path| p.to_str().unwrap().to_owned();
 
     assert_eq!(
-        run_with(&["spend", good.to_str().unwrap()]),
+        run_with(&["spend", &path(&one)]),
         (EXIT_OK, "spent_before=1.25\n".to_owned(), String::new())
     );
-    let (code, out, err) = run_with(&["spend", bad.to_str().unwrap()]);
+    assert_eq!(
+        run_with(&["spend", &path(&one), &path(&two)]).1,
+        "spent_before=1.75\n"
+    );
+    let (code, out, err) = run_with(&["spend", &path(&one), &path(&bad)]);
     assert_eq!((code, out.as_str()), (EXIT_FAILURE, ""));
     assert!(
         err.contains(&format!("{}: the spend file does not read", bad.display())),
@@ -459,5 +559,5 @@ fn spend_prints_what_earlier_reviews_spent_and_names_a_file_that_does_not_read()
     assert!(err.contains("read /nonexistent/s"), "{err}");
     let (code, _, err) = run_with(&["spend"]);
     assert_eq!(code, EXIT_USAGE);
-    assert!(err.contains("check and spend need one FILE"), "{err}");
+    assert!(err.contains("spend needs a FILE or more"), "{err}");
 }
