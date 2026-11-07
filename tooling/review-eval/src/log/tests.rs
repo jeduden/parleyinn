@@ -135,3 +135,51 @@ fn a_call_without_a_model_or_usage_counts_as_unknown() {
     assert_eq!(log.usage["unknown"].calls, 1);
     assert_eq!(log.usage["unknown"].fresh, 0);
 }
+
+const READS: &str = r#"{"type":"assistant","message":{"id":"m1","model":"m","content":[{"type":"tool_use","id":"toolu_1","name":"Read","input":{"file_path":"review/diffs/lang-rust.diff","offset":1,"limit":400}},{"type":"tool_use","id":"toolu_2","name":"Read","input":{"file_path":"review/diffs/lang-rust.diff"}}]}}
+{"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"toolu_1","is_error":false,"content":"..."},{"type":"tool_result","tool_use_id":"toolu_2","is_error":true,"content":"File content exceeds maximum allowed size"}]}}
+{"type":"assistant","message":{"id":"m2","model":"m","content":[{"type":"tool_use","id":"toolu_3","name":"Read","input":{"file_path":"/w/review/diffs/lang-rust.diff","offset":401}}]}}
+{"type":"assistant","parent_tool_use_id":"toolu_9","message":{"id":"s1","model":"m","content":[{"type":"tool_use","id":"toolu_4","name":"Read","input":{"file_path":"src/a.rs"}}]}}
+{"type":"user","parent_tool_use_id":"toolu_9","message":{"content":[{"type":"tool_result","tool_use_id":"toolu_4","is_error":true,"content":"no"}]}}
+"#;
+
+#[test]
+fn a_log_reads_each_main_thread_read_in_order_with_its_failure() {
+    let log = parse(READS);
+
+    assert_eq!(
+        log.reads,
+        vec![
+            ReadCall {
+                path: "review/diffs/lang-rust.diff".to_owned(),
+                offset: Some(1),
+                limit: Some(400),
+                failed: false,
+            },
+            ReadCall {
+                path: "review/diffs/lang-rust.diff".to_owned(),
+                offset: None,
+                limit: None,
+                failed: true,
+            },
+            // No result came: the read is not known to have failed.
+            ReadCall {
+                path: "/w/review/diffs/lang-rust.diff".to_owned(),
+                offset: Some(401),
+                limit: None,
+                failed: false,
+            },
+        ]
+    );
+}
+
+#[test]
+fn a_read_without_a_path_is_no_read_and_a_prompt_holds_no_result() {
+    let log = parse(
+        r#"{"type":"assistant","message":{"id":"m1","model":"m","content":[{"type":"tool_use","id":"t1","name":"Read","input":{}}]}}
+{"type":"user","message":{"content":"a prompt"}}
+{"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"t1","is_error":true}]}}"#,
+    );
+
+    assert!(log.reads.is_empty());
+}

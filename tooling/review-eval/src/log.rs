@@ -2,8 +2,9 @@
 //! as the review's run reads an agent's log. Each model call once (a
 //! call's blocks share one message id), its usage by model, the main
 //! thread's text blocks in order, which hold a specialist's findings as
-//! it stated them, the files written, the result's answer, cost, turns
-//! and duration, and the model the run resolved to.
+//! it stated them, the files written, the main thread's reads, the
+//! result's answer, cost, turns and duration, and the model the run
+//! resolved to.
 
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -22,6 +23,17 @@ pub struct Usage {
     pub cache_read: u64,
     pub output: u64,
     pub cost: f64,
+}
+
+/// One `Read` call the main thread made: the path, the 1-based line
+/// it started at and the lines it asked for, as the call named them,
+/// and whether the tool refused it, so it gave the reviewer nothing.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct ReadCall {
+    pub path: String,
+    pub offset: Option<usize>,
+    pub limit: Option<usize>,
+    pub failed: bool,
 }
 
 /// A run, read from its log.
@@ -46,6 +58,8 @@ pub struct RunLog {
     pub texts: Vec<String>,
     /// Every path a `Write` or `Edit` call named, in order.
     pub writes: Vec<String>,
+    /// Every `Read` call the main thread made, in order.
+    pub reads: Vec<ReadCall>,
 }
 
 /// What the reader carries between lines.
@@ -54,6 +68,8 @@ struct Reading {
     log: RunLog,
     /// The message ids seen, so a call's blocks count once.
     seen: BTreeSet<String>,
+    /// Each main-thread read's place in `reads`, by its tool use id.
+    reads: BTreeMap<String, usize>,
 }
 
 /// Reads a log of one JSON object per line; lines that are not JSON
@@ -73,6 +89,7 @@ pub fn parse(text: &str) -> RunLog {
     {
         match value["type"].as_str() {
             Some("assistant") => reading.assistant(&value),
+            Some("user") => reading.user(&value),
             Some("result") => reading.result(&value),
             _ => {}
         }
@@ -101,7 +118,7 @@ impl Reading {
         }
         for block in message["content"].as_array().into_iter().flatten() {
             match block["type"].as_str() {
-                Some("tool_use") => self.tool_use(block),
+                Some("tool_use") => self.tool_use(block, main),
                 Some("text") if main => {
                     if let Some(text) = block["text"].as_str() {
                         self.log.texts.push(text.to_owned());
@@ -112,12 +129,44 @@ impl Reading {
         }
     }
 
-    /// One tool call: a write's path.
-    fn tool_use(&mut self, block: &Value) {
-        if matches!(block["name"].as_str(), Some("Write" | "Edit"))
-            && let Some(path) = block["input"]["file_path"].as_str()
-        {
-            self.log.writes.push(path.to_owned());
+    /// One tool call: a write's path, or a main-thread read.
+    fn tool_use(&mut self, block: &Value, main: bool) {
+        let input = &block["input"];
+        let Some(path) = input["file_path"].as_str() else {
+            return;
+        };
+        match block["name"].as_str() {
+            Some("Write" | "Edit") => self.log.writes.push(path.to_owned()),
+            Some("Read") if main => {
+                let number = |key: &str| {
+                    input[key]
+                        .as_u64()
+                        .map(|n| usize::try_from(n).unwrap_or(usize::MAX))
+                };
+                let id = block["id"].as_str().unwrap_or_default().to_owned();
+                self.reads.insert(id, self.log.reads.len());
+                self.log.reads.push(ReadCall {
+                    path: path.to_owned(),
+                    offset: number("offset"),
+                    limit: number("limit"),
+                    failed: false,
+                });
+            }
+            _ => {}
+        }
+    }
+
+    /// The tools' results: a main-thread read the tool refused failed.
+    fn user(&mut self, value: &Value) {
+        for block in value["message"]["content"].as_array().into_iter().flatten() {
+            if block["is_error"].as_bool() == Some(true)
+                && let Some(at) = block["tool_use_id"]
+                    .as_str()
+                    .and_then(|id| self.reads.get(id))
+                && let Some(read) = self.log.reads.get_mut(*at)
+            {
+                read.failed = true;
+            }
         }
     }
 
