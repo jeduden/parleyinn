@@ -3,10 +3,9 @@
 //! section's specialist, each domain-model file's, the language and
 //! test-layer specialists, and the generalists. Specialists run at low
 //! effort and generalists at medium, as their front matter says; each
-//! generalist's deep instance runs on the strongest model at high effort
-//! with a larger turn budget.
+//! generalist's deep instance names its own model and effort. Every one
+//! names its own turn budget.
 
-use std::collections::BTreeMap;
 use std::fs;
 
 use review_bundle::dispatch::{
@@ -25,17 +24,13 @@ pub const AGENTS: &str = ".claude/agents";
 const TOOLS: &str = "Read, Grep, Glob";
 /// The effort a specialist runs at.
 const SPECIALIST_EFFORT: &str = "low";
-/// A specialist's turn budget. A run the budget cuts off before its
-/// answer keeps what it stated in its log, headed incomplete, and blocks
-/// the review.
-const SPECIALIST_TURNS: &str = "20";
 /// The effort a generalist runs at.
 const GENERALIST_EFFORT: &str = "medium";
-/// The effort, model and turn budget of a generalist's deep instance:
-/// the depth a deep review had when one agent ran it alone.
-const DEEP_EFFORT: &str = "high";
-const DEEP_MODEL: &str = "opus";
-const DEEP_TURNS: &str = "40";
+/// The efforts an agent may name. A generalist's deep instance names its
+/// own effort, model and turn budget in its definition, and no other
+/// text states them: a run its budget cuts off before its answer keeps
+/// what it stated in its log, headed incomplete, and blocks the review.
+const EFFORTS: [&str; 3] = ["low", "medium", "high"];
 
 /// Problems with the agents the review bundle can dispatch: one that is
 /// not defined, names itself otherwise, runs at the wrong effort, names
@@ -52,11 +47,7 @@ pub fn every_dispatched_agent_is_defined(checkout: &Checkout) -> Vec<String> {
             .iter()
             .map(|n| ((*n).to_owned(), GENERALIST_EFFORT, None)),
     );
-    want.extend(
-        DEEP_GENERALISTS
-            .iter()
-            .map(|n| ((*n).to_owned(), DEEP_EFFORT, None)),
-    );
+    want.extend(DEEP_GENERALISTS.iter().map(|n| ((*n).to_owned(), "", None)));
     want.extend(
         FIXED_SPECIALISTS
             .iter()
@@ -110,17 +101,21 @@ fn check(checkout: &Checkout, name: &str, effort: &str, names: Option<&str>) -> 
         return Some(format!("{name} has tools {has_tools}, want {TOOLS}"));
     }
     let has = field("effort");
-    if has != effort {
+    if DEEP_GENERALISTS.contains(&name) {
+        if !EFFORTS.contains(&has) {
+            return Some(format!(
+                "{name} runs at effort {has}, want low, medium or high"
+            ));
+        }
+    } else if has != effort {
         return Some(format!("{name} runs at effort {has}, want {effort}"));
     }
-    if DEEP_GENERALISTS.contains(&name)
-        && let Some(problem) = deep_settings(name, &fields)
-    {
-        return Some(problem);
+    if DEEP_GENERALISTS.contains(&name) && field("model").is_empty() {
+        return Some(format!("{name} names no model"));
     }
-    if generalist_of(name).is_some()
-        && let Some(problem) = turns(name, field("maxTurns"), SPECIALIST_TURNS)
-    {
+    // Every dispatched agent names its own turn budget; no other text
+    // states it.
+    if let Some(problem) = turns(name, field("maxTurns")) {
         return Some(problem);
     }
     if let Some(want) = generalist_of(name) {
@@ -137,23 +132,15 @@ fn check(checkout: &Checkout, name: &str, effort: &str, names: Option<&str>) -> 
         .map(|file| format!("{name} does not name {file}"))
 }
 
-/// The problem with deep instance `name`'s model or turn budget, as
-/// its front matter `fields` read, if any.
-fn deep_settings(name: &str, fields: &BTreeMap<String, String>) -> Option<String> {
-    let field = |key: &str| fields.get(key).map_or("", String::as_str);
-    let model = field("model");
-    if model != DEEP_MODEL {
-        return Some(format!("{name} runs on model {model}, want {DEEP_MODEL}"));
-    }
-    turns(name, field("maxTurns"), DEEP_TURNS)
-}
-
-/// The problem with agent `name`'s turn budget `has`, if it is not
-/// `want`.
-fn turns(name: &str, has: &str, want: &str) -> Option<String> {
+/// The problem with agent `name`'s turn budget `has`, if it is not a
+/// whole number of turns above zero. Which number is the definition's
+/// own to say.
+fn turns(name: &str, has: &str) -> Option<String> {
     match has {
-        "" => Some(format!("{name} names no maxTurns, want {want}")),
-        has if has != want => Some(format!("{name} runs for maxTurns {has}, want {want}")),
+        "" => Some(format!("{name} names no maxTurns")),
+        has if !has.parse::<u32>().is_ok_and(|n| n > 0) => Some(format!(
+            "{name} has maxTurns {has}, want a whole number of turns above zero"
+        )),
         _ => None,
     }
 }

@@ -157,6 +157,31 @@ fn a_report_saying_a_run_was_not_started_that_cannot_be_written_is_named() {
 }
 
 #[test]
+fn what_earlier_reviews_spent_counts_toward_the_cap_and_is_kept_with_each_run() {
+    let options = Options {
+        parallel: 1,
+        max_cost_usd: 1.0,
+        spent_before: 0.985,
+        ..options()
+    };
+
+    let (dir, ran) = controlled(DISPATCH, options, 0.0, fake::either);
+
+    // 0.985 and two runs of 0.01 reach the cap; nothing after them starts.
+    assert_eq!(ran.host.agents(), ["lang-markdown", "lang-rust"]);
+    let failure = ran.run("review-code").failure.clone().unwrap_or_default();
+    assert!(
+        failure.starts_with("over budget: the pull request's reviews cost 1.0050 USD"),
+        "{failure}"
+    );
+    let spend = fs::read_to_string(dir.path().join(crate::spend::SPEND)).unwrap();
+    assert!(
+        (crate::spend::check(&spend).unwrap() - 1.005).abs() < 1e-9,
+        "{spend}"
+    );
+}
+
+#[test]
 fn no_run_starts_once_the_finished_runs_cost_the_review_s_cap() {
     let options = Options {
         parallel: 1,
@@ -168,8 +193,8 @@ fn no_run_starts_once_the_finished_runs_cost_the_review_s_cap() {
 
     // Each run costs 0.01: two finish, and nothing after them starts.
     assert_eq!(ran.host.agents(), ["lang-markdown", "lang-rust"]);
-    let refused = "over budget: the review's runs cost 0.0200 USD, its cap is 0.01 USD, so it \
-                   was not started";
+    let refused = "over budget: the pull request's reviews cost 0.0200 USD, its cap is 0.01 \
+                   USD, so it was not started";
     for name in ["test-engineer-unit", "review-code", "review-spec"] {
         assert_eq!(ran.run(name).failure.as_deref(), Some(refused), "{name}");
         assert_eq!(ran.run(name).attempts, 0);
@@ -186,7 +211,7 @@ fn no_run_starts_once_the_finished_runs_cost_the_review_s_cap() {
 }
 
 #[test]
-fn a_cap_reached_before_a_retry_keeps_the_first_attempt_and_says_why() {
+fn a_run_that_cost_money_is_not_run_again_whether_or_not_a_cap_is_reached() {
     let options = Options {
         max_cost_usd: 0.03,
         ..options()
@@ -198,10 +223,7 @@ fn a_cap_reached_before_a_retry_keeps_the_first_attempt_and_says_why() {
     let run = ran.run("lang-rust");
     assert_eq!(
         run.failure.as_deref(),
-        Some(
-            "over budget: the review's runs cost 0.0500 USD, its cap is 0.03 USD, so it was not \
-             started again; before that its run ended with error_max_turns"
-        )
+        Some("its run ended with error_max_turns")
     );
     assert_eq!(run.attempts, 1);
     assert_eq!(ran.host.agents(), ["lang-rust"]);
@@ -293,6 +315,52 @@ fn a_run_overloaded_twice_waits_twice_as_long_the_second_time_and_keeps_both_log
             &"lang-rust (specialist): answered (0.0100 USD, 5 turns) on its third attempt"
                 .to_owned()
         ),
+        "{:?}",
+        ran.lines
+    );
+}
+
+/// [`OVERLOADED`], after the run was charged for what it did before.
+const OVERLOADED_PAID: &str = r#"{"type":"result","subtype":"success","is_error":true,"result":"API Error: 529 {\"type\":\"error\",\"error\":{\"type\":\"overloaded_error\",\"message\":\"Overloaded\"}}","total_cost_usd":0.02,"num_turns":3}"#;
+
+#[test]
+fn an_overloaded_run_that_was_charged_is_neither_waited_for_nor_run_again() {
+    let (_dir, ran) = controlled(ONE, options(), 0.0, after(1, OVERLOADED_PAID));
+
+    let run = ran.run("lang-rust");
+    assert!(!run.answered());
+    assert_eq!(run.attempts, 1);
+    assert!(ran.clock.slept().is_empty());
+    assert!(
+        ran.lines[0].ends_with("; not run again: it cost 0.0200 USD, so what it stated stands"),
+        "{:?}",
+        ran.lines
+    );
+}
+
+#[test]
+fn a_later_overloaded_attempt_that_was_charged_is_not_run_again() {
+    let calls = AtomicUsize::new(0);
+    let (_dir, ran) = controlled(ONE, options(), 0.0, move |c| {
+        if !prompt_of(c).contains("a specialist") {
+            return fake::either(c);
+        }
+        match calls.fetch_add(1, Ordering::SeqCst) {
+            0 => fake::write_log(c, &format!("{OVERLOADED}\n")),
+            1 => fake::write_log(c, &format!("{OVERLOADED_PAID}\n")),
+            _ => return fake::either(c),
+        }
+        Ok(Output::default())
+    });
+
+    let run = ran.run("lang-rust");
+    assert!(!run.answered());
+    assert_eq!(run.attempts, 2);
+    assert_eq!(ran.clock.slept(), [Duration::from_secs(15)]);
+    assert!(
+        ran.lines
+            .iter()
+            .any(|l| l.ends_with("; not run again: it cost 0.0200 USD, so what it stated stands")),
         "{:?}",
         ran.lines
     );
@@ -545,4 +613,64 @@ fn what_is_running_is_told_every_so_often() {
         .find(|l| l.starts_with("progress: "))
         .unwrap();
     assert!(block.contains(" of 2 agents finished, "), "{block}");
+}
+
+#[test]
+fn a_free_run_is_not_run_again_once_others_reached_the_cap_meanwhile() {
+    let options = Options {
+        max_cost_usd: 0.03,
+        ..options()
+    };
+    let lines = Arc::new(Mutex::new(Vec::new()));
+    let seen = Arc::clone(&lines);
+    // lang-rust has started: lang-markdown ends only after that, so the
+    // cap is reached while lang-rust runs, in any order the runs start.
+    let started = Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let started_by_rust = Arc::clone(&started);
+    let (_dir, ran) = told_to(lines, DISPATCH, options, 0.0, move |c| {
+        match agent_of(c).as_str() {
+            "lang-markdown" => {
+                let give_up = std::time::Instant::now() + Duration::from_secs(30);
+                while std::time::Instant::now() < give_up
+                    && !started.load(std::sync::atomic::Ordering::SeqCst)
+                {
+                    std::thread::sleep(Duration::from_millis(1));
+                }
+                fake::write_log(
+                    c,
+                    &fake::log_of(&[], "success", "outcome: none — clean.", 0.05),
+                );
+                Ok(Output::default())
+            }
+            // Fails at no cost once lang-markdown's cost was counted, or
+            // after half a minute.
+            "lang-rust" => {
+                started_by_rust.store(true, std::sync::atomic::Ordering::SeqCst);
+                let give_up = std::time::Instant::now() + Duration::from_secs(30);
+                while std::time::Instant::now() < give_up
+                    && !seen
+                        .lock()
+                        .unwrap()
+                        .iter()
+                        .any(|l| l.starts_with("lang-markdown (specialist): answered"))
+                {
+                    std::thread::sleep(Duration::from_millis(1));
+                }
+                Err("cannot start".to_owned())
+            }
+            _ => fake::either(c),
+        }
+    });
+
+    // test-engineer-unit runs beside them, so the sum is 0.05 or 0.06.
+    let run = ran.run("lang-rust");
+    let failure = run.failure.clone().unwrap_or_default();
+    assert_eq!(run.attempts, 1);
+    assert!(
+        failure.starts_with("over budget: the pull request's reviews cost 0.0")
+            && failure.ends_with(
+                " USD, its cap is 0.03 USD, so it was not started again; before that cannot start"
+            ),
+        "{failure}"
+    );
 }

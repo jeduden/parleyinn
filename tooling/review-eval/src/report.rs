@@ -88,6 +88,77 @@ pub fn finding(line: &str) -> Option<Finding> {
     })
 }
 
+/// A generalist's weighing as its run log gives it: each weighing line
+/// it stated in a message before its last, a finding, a dropped one or
+/// its `none —`, or a line shaped as a finding the review cannot read
+/// that starts with a path-like word ([`placed`]), each once and in
+/// order, then its final answer as it stands. A line at a place, a
+/// finding or a dropped one, supersedes every line stated before it at
+/// that place, the final answer's lines included: the last statement
+/// wins, so a draft finding can be dropped or revised later. A run that
+/// was cut off before its final answer has the lines it stated and no
+/// more, so the review reads what was paid for.
+#[must_use]
+pub fn weighing(texts: &[String], answer: &str) -> String {
+    let said: Vec<&str> = answer.lines().map(str::trim).collect();
+    let mut stated: Vec<&str> = Vec::new();
+    for line in texts.iter().flat_map(|t| t.lines()).map(str::trim) {
+        // Mid-run narration may read as a finding's shape, `Severity —
+        // nit — …`; only a line that names a path is one the agent meant
+        // as a finding, so only such a line is held unreadable.
+        let unreadable = unread(line) && placed(line);
+        let weighs = finding(line).is_some() || dropped(line) || nothing(line) || unreadable;
+        if weighs && !said.contains(&line) && !stated.contains(&line) {
+            supersede(&mut stated, line);
+            stated.push(line);
+        }
+    }
+    for line in &said {
+        supersede(&mut stated, line);
+    }
+    let mut out = stated.join("\n");
+    if !out.is_empty() && !answer.is_empty() {
+        out.push('\n');
+    }
+    out.push_str(answer);
+
+    out
+}
+
+/// Removes from `stated` each line at the place `line` is at, when it
+/// is at one.
+fn supersede(stated: &mut Vec<&str>, line: &str) {
+    if let Some(at) = place_of(line) {
+        stated.retain(|l| place_of(l).as_ref() != Some(&at));
+    }
+}
+
+/// The place, path and line, a generalist's finding or dropped line is
+/// at: a finding's own, or the part after a leading `dropped —`; none
+/// for any other line.
+#[must_use]
+pub fn place_of(line: &str) -> Option<(String, usize)> {
+    if let Some(f) = finding(line) {
+        return Some((f.path, f.line));
+    }
+    if !dropped(line) {
+        return None;
+    }
+    split_dashes(bare(line))
+        .get(1)
+        .and_then(|part| review_gate::report::place(part))
+}
+
+/// Whether `line` starts with a path-like word: its first part, markup
+/// aside, is one word holding a `/`, a `.` or a `:`.
+#[must_use]
+pub fn placed(line: &str) -> bool {
+    split_dashes(bare(line)).first().is_some_and(|part| {
+        let word = part.trim().trim_matches(['`', '*', '_']);
+        !word.is_empty() && !word.contains(char::is_whitespace) && word.contains(['/', '.', ':'])
+    })
+}
+
 /// The severities a generalist's finding gives.
 pub const SEVERITIES: [&str; 2] = ["blocking", "nit"];
 

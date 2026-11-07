@@ -293,3 +293,23 @@ fn a_value_that_does_not_serialize_is_named_with_its_directory() {
     assert_eq!(err, "store d: no");
     assert!(pretty(&usage(), Path::new("d")).unwrap().contains('{'));
 }
+
+#[test]
+fn a_generalist_s_weighing_is_read_from_its_whole_log_not_its_final_answer_alone() {
+    let stated = review_eval::log::parse(&fake::log_of(
+        &["src/a.rs:3 — nit — a long line — lang-rust", "sound."],
+        "success",
+        "sound.",
+        0.1,
+    ));
+    let unread_mid_run = review_eval::log::parse(&fake::log_of(
+        &["src/a.rs — blocking — no line — lang-rust"],
+        "success",
+        "src/b.rs:1 — nit — y — lang-rust\nsound.",
+        0.1,
+    ));
+
+    assert_eq!(accepted(Kind::Generalist, &stated, None, &known()), Ok(()));
+    let err = accepted(Kind::Generalist, &unread_mid_run, None, &known()).unwrap_err();
+    assert!(err.contains("cannot read"), "{err}");
+}

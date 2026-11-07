@@ -75,10 +75,12 @@ records the design.
   its outcome, each finding expected or forbidden, nothing written; a
   case may also want a finding `stated` before the final answer, or a
   finding `withdrawn` or revised, read from the log's text. For a
-  generalist it reads the answer: each finding it must drop on a line
-  that starts with `dropped` or gives it as its severity, the rule
-  `review-run` reads its answer by. A specialist report the review
-  would refuse, with a line in no form or an outcome its lines
+  generalist it reads the weighing `review-run` reads, by the one shared
+  rule: each finding, dropped or `none —` line it stated as it went,
+  the last at a place standing, then its final answer; each finding it
+  must drop on a line that starts with `dropped` or gives it as its
+  severity. A consultant is read from its answer. A specialist report
+  the review would refuse, with a line in no form or an outcome its lines
   contradict, fails its run, as does an
   answer with no outcome line. A departure the review survives is a
   slip: an answer that is more than the outcome line, an eleventh
@@ -115,8 +117,9 @@ permission, and ends before the job that holds the reviewer app's key.
 The review job's `review-run` starts each dispatched agent through the
 harness's own runner, so an agent in the review and in its cases gets
 the same reading tools, turn budget and prompt. Only the review runs a
-specialist that did not answer, or whose report the gate refuses, once
-more, told why; a case's run gets no second attempt. An agent left
+specialist again, and only one whose first run cost nothing, once, told
+why; a run that was charged is not paid for twice, and a case's run gets
+no second attempt. An agent left
 without an accepted report is listed in `review/gaps.json`, and a review
 resumed from that list is judged exactly as a full run. A review reuses a
 stored answer only under its unchanged answer key, held to the report

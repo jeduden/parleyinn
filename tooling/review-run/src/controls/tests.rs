@@ -25,20 +25,38 @@ fn a_draw_is_its_bits_in_millionths_below_one() {
 
 #[test]
 fn the_budget_refuses_a_run_once_its_finished_runs_reach_the_cap() {
-    let budget = Budget::new(1.0);
+    let budget = Budget::new(1.0, 0.0);
     assert_eq!(budget.refusal(), None);
 
-    budget.charge(0.6);
+    budget.charge(0.6, &|_| {});
     assert_eq!(budget.refusal(), None);
-    budget.charge(0.4);
+    budget.charge(0.4, &|_| {});
 
     assert!((budget.spent() - 1.0).abs() < 1e-9);
     assert_eq!(
         budget.refusal().as_deref(),
         Some(
-            "over budget: the review's runs cost 1.0000 USD, its cap is 1.00 USD, so it was not \
-             started"
+            "over budget: the pull request's reviews cost 1.0000 USD, its cap is 1.00 USD, so it \
+             was not started"
         )
+    );
+}
+
+#[test]
+fn the_budget_counts_what_the_pull_request_s_earlier_reviews_spent() {
+    let budget = Budget::new(1.0, 0.75);
+    assert_eq!(budget.refusal(), None);
+    let kept = std::sync::Mutex::new(Vec::new());
+
+    budget.charge(0.25, &|total| kept.lock().unwrap().push(total));
+
+    assert!((budget.spent() - 0.25).abs() < 1e-9, "this review's own");
+    assert!((budget.total() - 1.0).abs() < 1e-9);
+    assert_eq!(kept.into_inner().unwrap(), [1.0]);
+    assert!(budget.refusal().is_some());
+    assert!(
+        Budget::new(1.0, 1.0).refusal().is_some(),
+        "spent before it ran"
     );
 }
 

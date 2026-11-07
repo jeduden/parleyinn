@@ -89,12 +89,12 @@ pub struct Tracking {
 }
 
 /// Each of `findings`, the outcome's, with the generalist of `plan`
-/// whose answer in `answers` kept it at its place, or `review-run` for
-/// one the review raised itself.
+/// whose weighing in `weighings`, answered or cut off, kept it at its
+/// place, or `review-run` for one the review raised itself.
 #[must_use]
 pub fn attributed(
     findings: &[Finding],
-    answers: &BTreeMap<String, String>,
+    weighings: &BTreeMap<String, String>,
     plan: &Plan,
 ) -> Vec<(Finding, String)> {
     let generalists = plan.generalists();
@@ -104,7 +104,7 @@ pub fn attributed(
             let agent = generalists
                 .iter()
                 .find(|g| {
-                    answers.get(*g).is_some_and(|a| {
+                    weighings.get(*g).is_some_and(|a| {
                         outcome::kept(a).iter().any(|k| {
                             k.path == f.path && k.line == f.line && f.body.starts_with(&k.body)
                         })

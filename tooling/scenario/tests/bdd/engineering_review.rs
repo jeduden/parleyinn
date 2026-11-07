@@ -54,14 +54,16 @@ fn review_runs_by_code(w: &mut World) -> Result<(), String> {
 }
 
 #[then(
-    regex = r"^review-run passes each agent the cost cap of its tier, starts no run once the runs that ended cost the review's cap, and names each agent it did not start over budget, so the review requests changes$"
+    regex = r"^review-run passes each agent the cost cap of its tier, starts no run once what the pull request's earlier reviews spent and the runs that ended cost the pull request's cap, none at all when the earlier reviews reached it, names each agent it did not start over budget, so the review requests changes, and keeps what the pull request's reviews spent$"
 )]
 fn review_run_caps_cost(w: &mut World) -> Result<(), String> {
     let work = testkit::TempDir::new().map_err(|e| format!("make a work directory: {e}"))?;
-    outcome(engineering::review_controls::caps_problems(
+    let mut problems = engineering::review_controls::caps_problems(eng(w).checkout()?, work.path());
+    problems.extend(engineering::review_spend::cap_problems(
         eng(w).checkout()?,
-        work.path(),
-    ))
+        &work.path().join("spend"),
+    ));
+    outcome(problems)
 }
 
 #[then(
@@ -76,7 +78,7 @@ fn review_run_breaks(w: &mut World) -> Result<(), String> {
 }
 
 #[then(
-    regex = r"^review-run waits with backoff before it runs again an agent the API turned away as overloaded or rate-limited, runs it a third time at most, leaves it a named gap when no deadline is left to wait, and never runs again one a cost cap stopped or whose credential was refused$"
+    regex = r"^review-run waits with backoff before it runs again an agent the API turned away as overloaded or rate-limited, runs it a third time at most, leaves it a named gap when no deadline is left to wait, and never runs again one a cost cap stopped, whose credential was refused or that was charged$"
 )]
 fn review_run_backs_off(w: &mut World) -> Result<(), String> {
     let work = testkit::TempDir::new().map_err(|e| format!("make a work directory: {e}"))?;
@@ -98,7 +100,20 @@ fn review_runs_in_parts(w: &mut World) -> Result<(), String> {
 }
 
 #[then(
-    regex = r"^review-run refuses a specialist's report that cites an id no requirement or invariant has, runs that specialist once more told why, and names the report refused again and a generalist's finding line it cannot read, each in a blocking finding, so the review requests changes and the gate posts that request rather than failing$"
+    regex = r"^review-run reads a generalist's weighing from its whole run log, so a finding it stated before a final answer that only names its scope is kept, and itself decides partial a weighing that weighs no finding at a place its specialist reported, naming that place in a blocking finding and the generalist as not reviewed, whatever the generalist says of its scope$"
+)]
+fn review_run_reads_whole_weighings(w: &mut World) -> Result<(), String> {
+    let work = testkit::TempDir::new().map_err(|e| format!("make a work directory: {e}"))?;
+    outcome(
+        engineering::review_weighings::review_run_reads_whole_weighings(
+            eng(w).checkout()?,
+            work.path(),
+        ),
+    )
+}
+
+#[then(
+    regex = r"^review-run refuses a specialist's report that cites an id no requirement or invariant has, does not run that specialist again, it was paid for, and names its refused report and a generalist's finding line it cannot read, each in a blocking finding, so the review requests changes and the gate posts that request rather than failing$"
 )]
 fn review_run_names_refusals(w: &mut World) -> Result<(), String> {
     let work = testkit::TempDir::new().map_err(|e| format!("make a work directory: {e}"))?;
@@ -159,6 +174,15 @@ fn review_run_names_rulings(w: &mut World) -> Result<(), String> {
 )]
 fn review_carries_findings(w: &mut World) -> Result<(), String> {
     outcome(engineering::review_previous::review_carries_findings(
+        eng(w).checkout()?,
+    )?)
+}
+
+#[then(
+    regex = r"^review-run carries what the earlier reviews of a pull request spent from the newest artifact under the pull request's own name that a run of main's review workflow uploaded, refuses and counts an artifact of that name from any other run, names a spend file past 1 KiB or one that does not read, and the review job fetches it before the Claude Code OAuth token is staged, passes it as --spent-before, scrubs the spend it kept and keeps it for 90 days for the next review however the review ended, and says in the job summary which earlier spend it carried or that it found none$"
+)]
+fn review_carries_spend(w: &mut World) -> Result<(), String> {
+    outcome(engineering::review_spend::carry_problems(
         eng(w).checkout()?,
     )?)
 }
@@ -255,7 +279,7 @@ fn every_language_has_its_specialist(w: &mut World) -> Result<(), String> {
 }
 
 #[then(
-    regex = r"^every agent the review bundle can dispatch is defined, specialists at low effort with 20 turns, generalists at medium and their deep instances on opus at high effort with 40 turns$"
+    regex = r"^every agent the review bundle can dispatch is defined, specialists at low effort, generalists at medium and their deep instances each naming its own effort, model and turn budget$"
 )]
 fn review_agents_defined(w: &mut World) -> Result<(), String> {
     outcome(engineering::review_agents::every_dispatched_agent_is_defined(eng(w).checkout()?))

@@ -5,7 +5,8 @@
 //! third of the dispatched specialists failed, opening the review
 //! outcome with the abort; waits with backoff before it runs again an
 //! agent the API turned away as overloaded; and never runs again an
-//! agent a cost cap stopped or whose credential was refused. The checks
+//! agent a cost cap stopped, whose credential was refused or that was
+//! charged. The checks
 //! run `review-run` on the work directory [`review_runs::prepare`] lays
 //! out, with a stand-in for the `claude` command line that keeps every
 //! command and fails the runs it is told to as the command line would,
@@ -33,6 +34,10 @@ pub const OVERLOADED: &str = r#"{"type":"result","subtype":"success","is_error":
 pub const REFUSED: &str = r#"{"type":"result","subtype":"success","is_error":true,"result":"API Error: 401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"invalid token\"}}","total_cost_usd":0,"num_turns":1}"#;
 /// What it logs for a run its own cost cap stopped.
 pub const CAPPED: &str = r#"{"type":"result","subtype":"error_max_budget_usd","is_error":true,"result":"","total_cost_usd":1.01,"num_turns":9}"#;
+
+/// What it logs for a run its turn budget cut off after it cost money: not
+/// capped, not turned away, only paid for.
+pub const CUT: &str = r#"{"type":"result","subtype":"error_max_turns","is_error":true,"result":"","total_cost_usd":0.05,"num_turns":20}"#;
 
 /// A stand-in for the `claude` command line: it keeps every command,
 /// fails the first runs of each agent [`ControlHost::fails`] names as
@@ -99,7 +104,7 @@ impl Host for ControlHost {
 /// Runs `review-run` on `workdir`, prepared from `checkout`, with
 /// `host` and the flags `extra`: what it printed, or why it could not
 /// run.
-fn review(
+pub(crate) fn review(
     checkout: &Checkout,
     workdir: &Path,
     host: &ControlHost,
@@ -123,7 +128,7 @@ fn review(
 
 /// The reasons of the gaps `review-run` wrote in `workdir`, by name;
 /// the error of a list that does not read or parse.
-fn gaps(workdir: &Path) -> Result<BTreeMap<String, String>, String> {
+pub(crate) fn gaps(workdir: &Path) -> Result<BTreeMap<String, String>, String> {
     let path = workdir.join("review/gaps.json");
     let text = fs::read_to_string(&path).map_err(|e| format!("read {}: {e}", path.display()))?;
     let gaps = review_run::gaps::parse(&text).map_err(|e| format!("{}: {e}", path.display()))?;
@@ -294,8 +299,8 @@ impl Clock for Waits {
 }
 
 /// What is wrong with running again: an overloaded run not waited for
-/// and run again, or a run its cost cap stopped or whose credential was
-/// refused run again.
+/// and run again, or a run whose credential was refused or that was
+/// charged and cut off run again.
 #[must_use]
 pub fn retry_problems(checkout: &Checkout, workdir: &Path) -> Vec<String> {
     if let Err(e) = review_runs::prepare(checkout, workdir) {
@@ -305,11 +310,13 @@ pub fn retry_problems(checkout: &Checkout, workdir: &Path) -> Vec<String> {
         fails: BTreeMap::from([
             ("lang-rust", (1, Some(OVERLOADED))),
             ("test-engineer-unit", (1, Some(REFUSED))),
-            ("lang-markdown", (1, Some(CAPPED))),
+            ("lang-markdown", (1, Some(CUT))),
+            ("review-spec", (1, Some(CAPPED))),
         ]),
         ..ControlHost::default()
     };
     let clock = Waits::default();
+    let lines = Mutex::new(Vec::new());
     let ran = review_run::plan::read(workdir).and_then(|plan| {
         review_on(&Review {
             host: &host,
@@ -325,22 +332,39 @@ pub fn retry_problems(checkout: &Checkout, workdir: &Path) -> Vec<String> {
             keys: None,
             store: None,
             scrubber: None,
-            progress: &|_| {},
+            progress: &|line| {
+                lines
+                    .lock()
+                    .unwrap_or_else(PoisonError::into_inner)
+                    .push(line.to_owned());
+            },
         })
     });
     if let Err(e) = ran {
         return vec![e];
     }
     let waited = clock.0.into_inner().unwrap_or_else(PoisonError::into_inner);
-    retried_problems(&|agent| host.runs_of(agent), &waited)
+    let lines = lines.into_inner().unwrap_or_else(PoisonError::into_inner);
+    retried_problems(&|agent| host.runs_of(agent), &waited, &lines)
 }
 
-/// What is wrong with how often each agent ran, `runs_of` it, and the
-/// waits `waited`: lang-rust, turned away as overloaded, not run twice
-/// after one wait of 15 s or more, and test-engineer-unit, whose
-/// credential was refused, or lang-markdown, its cap reached, run again.
+/// Why progress says a run a cost cap stopped is not run again.
+pub const CAP_STOPPED: &str = "a cost cap stopped it, and another run would cost more";
+
+/// What is wrong with how often each agent ran, `runs_of` it, the
+/// waits `waited` and the progress `lines`: lang-rust, turned away as
+/// overloaded, not run twice after one wait of 15 s or more;
+/// test-engineer-unit, whose credential was refused, or lang-markdown,
+/// cut off after it cost money, run again; and review-spec, stopped by
+/// its cost cap, run again or not told as not run again for that cap.
+/// A capped run was charged too, so only its told reason shows the cap
+/// was read as one.
 #[must_use]
-pub fn retried_problems(runs_of: &dyn Fn(&str) -> usize, waited: &[Duration]) -> Vec<String> {
+pub fn retried_problems(
+    runs_of: &dyn Fn(&str) -> usize,
+    waited: &[Duration],
+    lines: &[String],
+) -> Vec<String> {
     let mut problems = Vec::new();
     let once = waited.len() == 1 && waited.iter().all(|w| *w >= Duration::from_secs(15));
     if runs_of("lang-rust") != 2 || !once {
@@ -353,10 +377,23 @@ pub fn retried_problems(runs_of: &dyn Fn(&str) -> usize, waited: &[Duration]) ->
     for agent in ["test-engineer-unit", "lang-markdown"] {
         if runs_of(agent) != 1 {
             problems.push(format!(
-                "{agent}, which can never succeed by running again, ran {} times",
+                "{agent}, which was refused or charged and cut off, ran {} times, not once",
                 runs_of(agent)
             ));
         }
+    }
+    if runs_of("review-spec") != 1 {
+        problems.push(format!(
+            "review-spec, stopped by its cost cap, ran {} times, not once",
+            runs_of("review-spec")
+        ));
+    } else if !lines.iter().any(|l| {
+        l.starts_with("review-spec (generalist): ")
+            && l.ends_with(&format!("not run again: {CAP_STOPPED}"))
+    }) {
+        problems.push(format!(
+            "review-spec, stopped by its cost cap, is not told as not run again because {CAP_STOPPED}"
+        ));
     }
 
     problems

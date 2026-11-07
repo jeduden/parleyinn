@@ -108,10 +108,9 @@ jobs:
           HEAD_SHA: ${{ steps.pull_head.outputs.head_sha }}
         run: git -C pr-head diff "origin/main...$HEAD_SHA" > pr.diff
       # A change to a CODEOWNERS path needs the stakeholder's consent
-      # (ENG-21), given in a comment or review on the pull request.
-      # Only what an owner in main's CODEOWNERS wrote is kept. A
-      # comment an agent posted through the owner's account ends with
-      # the Claude Code attribution line, and it is dropped.
+      # (ENG-21), in a comment or review on the pull request: only what an
+      # owner in main's CODEOWNERS wrote is kept, never a comment ending
+      # with the Claude Code attribution line an agent posts.
       - name: Collect the stakeholder's comments
         if: steps.pull_head.outputs.number != ''
         env:
@@ -128,21 +127,16 @@ jobs:
           tools: "rust github:jeduden/mdsmith"
           # Jobs handling review credentials never restore executable caches.
           cache: false
-      # The review class sets how deep the review goes, from the paths that
-      # changed: light for Markdown no stakeholder path holds, deep for
-      # any path CODEOWNERS assigns and for the gates' code, the reach
-      # tests and the security-sensitive crates, standard otherwise. The
-      # dispatch names the specialists review-run runs and the
-      # generalists that weigh their findings. What the bundle printed
+      # The review class, how deep the review goes, from the changed paths
+      # (ENG-28), and the dispatch, the specialists review-run runs and
+      # the generalists that weigh their findings; what the bundle printed
       # stays in class.txt, where review-run reads the class.
       - name: Bundle what the change touches
         id: bundle
         if: steps.pull_head.outputs.number != ''
         run: scripts/review-bundle.sh
-      # The reviewer components the pull request changes, each with its
-      # reason (ENG-32): the evaluate job below runs their cases. The
-      # plan is computed here, from the two trees, with main's tool, and
-      # the evaluate job reads it as data.
+      # The reviewer components the pull request changes (ENG-32), planned
+      # here with main's tool; the evaluate job runs their cases.
       - name: Plan the reviewer evaluation
         id: plan
         if: steps.pull_head.outputs.number != ''
@@ -174,6 +168,14 @@ jobs:
           REPO: ${{ github.repository }}
           PULL: ${{ steps.pull_head.outputs.number }}
         run: scripts/review-previous.sh
+      - name: Fetch what the pull request's reviews spent
+        id: spend
+        if: steps.pull_head.outputs.number != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PULL: ${{ steps.pull_head.outputs.number }}
+        run: scripts/review-spend.sh
       # The Claude token reaches no agent's environment and no file its
       # tools can read (ENG-28). This step alone holds it, in a credentials
       # file only its owner reads, under the runner's temporary directory,
@@ -188,26 +190,24 @@ jobs:
             --dir "$RUNNER_TEMP/claude-credential"
       # review-run starts each dispatched specialist, and each generalist
       # once its own specialists ended, as `claude --agent` from main's
-      # definition of it: read tools alone, the pull request's tree added
-      # as data, each with a 900-second deadline (ENG-28; ADR-2610300031
-      # has the parts, the cost caps and the mass-failure breaker). No
-      # agent gets a GitHub token, and no step that runs one holds the
-      # Claude token: review-run reads it from the staged credential only
-      # to scrub every file it writes and line it prints, and a review
-      # whose agent's output held it requests changes and fails, so
-      # nothing is posted. It writes review/outcome.json, consulted.json,
-      # answers.json and usage.json, each run's log under review/logs/;
-      # an exit other than 0 says it could not run. It runs on the
-      # stakeholder's Claude subscription (`claude setup-token`), so a
-      # review counts against the plan's usage limits.
+      # definition: read tools alone, the pull request's tree as data, a
+      # 900-second deadline each, no run once the pull request's reviews
+      # spent its cap (ENG-28; ADR-2610300031). No agent gets a GitHub
+      # token, and no step that runs one holds the Claude token: review-run
+      # reads it from the staged credential only to scrub what it writes
+      # and prints, and a review whose agent's output held it requests
+      # changes and fails. It writes review/outcome.json and the rest; an
+      # exit other than 0 says it could not run. It runs on the
+      # stakeholder's Claude subscription (`claude setup-token`).
       - name: Review
         id: review
         if: steps.pull_head.outputs.number != ''
         env:
           PREVIOUS: ${{ steps.previous.outputs.file }}
+          SPENT: ${{ steps.spend.outputs.spent }}
         run: |
           cargo run --locked --quiet --offline -p review-run -- --workdir . --parallel 32 \
-            --credential "$RUNNER_TEMP/claude-credential" \
+            --credential "$RUNNER_TEMP/claude-credential" --spent-before "$SPENT" \
             ${PREVIOUS:+--previous "$PREVIOUS"} > review/run.txt
       # Whatever review-run wrote is scrubbed of the token once more, a
       # run cut off before its own scrub included, before any step reads
@@ -222,7 +222,7 @@ jobs:
             --path review/logs --path review/reports --path review/answers.json \
             --path review/usage.json --path review/outcome.json --path review/consulted.json \
             --path review/gaps.json --path review/not-reviewed.md --path review/run-id.json \
-            --path review/findings.json --path review/findings.md \
+            --path review/findings.json --path review/findings.md --path review/spend.json \
             --path review/run.txt --path review/agent-runs.jsonl --path review/report.html
           code=$?
           set -e
@@ -234,8 +234,7 @@ jobs:
             echo "::error::what the review wrote held the Claude Code OAuth token, now redacted; revoke and rotate it, and nothing is posted"
           fi
           exit "$code"
-      # A review that could not run says why in the job summary, not in
-      # its log alone: review-run prints the reason as failed=<reason>.
+      # A review that could not run says why in the job summary (failed=<reason>).
       - name: Say why the review could not run
         if: failure() && steps.review.outcome == 'failure'
         run: scripts/review-say-why.sh
@@ -249,29 +248,21 @@ jobs:
         # fails the step here instead of passing an empty output on.
         run: scripts/review-read-outcome.sh
       # What the review cost, per agent, as review-run read it from each
-      # run's log: its model calls, fresh input, cache writes and reads,
-      # output, the parts it ran in (more than one when its diff was past
-      # the split limit), the attempts it took (one more for each run
-      # that did not answer) and the cost its result reported. A review that recorded
-      # none reports nothing; this step only reports and never fails the
-      # review.
+      # run's log: calls, tokens, parts, attempts and cost. It only
+      # reports and never fails the review.
       - name: Record what the review cost
         if: always() && steps.pull_head.outputs.number != ''
         run: scripts/review-record-cost.sh
-      # The run list review-run wrote after the run, failed or not, on one
-      # screen: the verdict, the counts, the wall time and each run
-      # whose answer was not taken, by name alone. The run list and the
-      # run report, review/report.html, go with the reports below; they
-      # hold timings, tokens, costs and gap reasons, never a tool result
-      # (ENG-28). It only reports and never fails the review.
+      # The run list review-run wrote, failed or not, on one screen; it and
+      # review/report.html go with the reports below, holding timings,
+      # tokens, costs and gap reasons, never a tool result (ENG-28). It
+      # only reports and never fails the review.
       - name: Summarize the review's run list
         if: always() && steps.pull_head.outputs.number != ''
         run: scripts/review-run-list-summary.sh
-      # The reports review-run assembled from the run logs, and the
-      # answers, for the post job's gate and for the review's readers:
-      # the review and its check link here. A review that failed keeps
-      # what it wrote too, a specialist cut off before its answer leaving
-      # its findings headed incomplete, so its author can read why.
+      # The reports and the answers, for the post job's gate and the
+      # review's readers. A review that failed keeps what it wrote too,
+      # so its author can read why.
       - name: Keep the specialists' reports
         if: always() && steps.scrub.outputs.scrubbed == 'true'
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -295,6 +286,15 @@ jobs:
             review/findings.md
           retention-days: 90
           if-no-files-found: error
+      # What the pull request's reviews spent, for its next, kept however this one ended.
+      - name: Keep what the pull request's reviews spent
+        if: always() && steps.scrub.outputs.scrubbed == 'true'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: review-spend-pr-${{ steps.pull_head.outputs.number }}
+          path: review/spend.json
+          retention-days: 90
+          if-no-files-found: warn
       # The run logs under review/logs/ stay in the job: they hold every
       # tool result an agent read, scrubbed of the token but whatever
       # else it read (ENG-28).

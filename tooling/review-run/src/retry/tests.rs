@@ -129,21 +129,8 @@ fn a_problem_of_no_line_is_the_gate_s_problem_alone() {
 }
 
 #[test]
-fn a_refused_report_s_note_names_what_was_refused_and_restates_the_forms() {
-    let note = note(&Why::Refused("has a report whose line 2 is malformed: `x`"));
-
-    assert_eq!(
-        note,
-        format!(
-            "The review refused your previous attempt's report: it has a report whose line 2 is \
-             malformed: `x`. This attempt is judged alone, so state every finding again. {FORMS}"
-        )
-    );
-}
-
-#[test]
 fn a_run_that_did_not_answer_is_told_why_and_to_state_as_it_goes() {
-    let note = note(&Why::Silent("its run ended with error_max_turns"));
+    let note = note("its run ended with error_max_turns");
 
     assert!(
         note.starts_with(
@@ -240,90 +227,47 @@ fn specialist_prompts(host: &FakeHost) -> Vec<String> {
 }
 
 #[test]
-fn a_refused_report_is_run_once_more_told_its_problem_and_judged_alone() {
+fn a_refused_report_stands_and_its_run_is_not_paid_for_again() {
     let dir = workdir(false);
 
     let (runs, lines, host) = review_of(dir.path(), refused_once);
 
     let rust = &runs[0];
     assert!(rust.answered(), "{:?}", rust.failure);
-    assert_eq!(rust.attempts, 2);
-    assert!((rust.log.cost - 0.02).abs() < 1e-9, "{}", rust.log.cost);
-    assert_eq!((rust.log.turns, rust.log.duration_ms), (6, 18));
-    let model = &rust.log.usage["claude-haiku-5-5"];
-    assert_eq!((model.calls, model.fresh, model.output), (2, 20, 10));
-    assert_eq!(runs[1].attempts, 1);
-    let prompts = specialist_prompts(&host);
-    assert_eq!(prompts.len(), 2);
-    assert!(!prompts[0].contains("previous attempt"));
-    let problem = format!(
-        "has a report whose line 2 is neither a linked finding nor a requirement request: \
-         `{MALFORMED}`"
-    );
+    assert_eq!(rust.attempts, 1);
+    assert_eq!(specialist_prompts(&host).len(), 1);
+    assert!((rust.log.cost - 0.01).abs() < 1e-9, "{}", rust.log.cost);
     assert!(
-        prompts[1].ends_with(&note(&Why::Refused(&problem))),
-        "{}",
-        prompts[1]
+        lines.iter().any(|l| l.starts_with("lang-rust (specialist)")
+            && l.ends_with("not run again: its report is refused and the run was paid for")),
+        "{lines:?}"
     );
-    assert_eq!(
-        lines[0],
-        format!("lang-rust (specialist) {problem}; running it once more")
-    );
-    // Judged alone: the first attempt's finding is not carried over.
-    assert_eq!(
-        fs::read_to_string(dir.path().join("review/reports/lang-rust.md")).unwrap(),
-        "outcome: none — clean.\n"
-    );
-    assert!(
-        dir.path()
-            .join("review/logs/lang-rust.first.jsonl")
-            .is_file()
-    );
-}
-
-#[test]
-fn a_report_refused_twice_stays_refused_and_the_first_s_findings_do_not_rescue_it() {
-    let dir = workdir(false);
-
-    let (runs, _, host) = review_of(dir.path(), |c| {
-        if !prompt_of(c).contains("a specialist") {
-            return fake::generalist(c);
-        }
-        // Refused each time, for a problem the other's lines would
-        // cure: a finding beside none, then findings beside none.
-        if prompt_of(c).contains("previous attempt") {
-            fake::answer(c, &[], "outcome: findings — one.")
-        } else {
-            fake::answer(c, &[fake::FINDING], "outcome: none — clean.")
-        }
-    });
-
-    assert_eq!(specialist_prompts(&host).len(), 2);
-    let rust = &runs[0];
-    assert!(rust.answered());
-    assert_eq!(rust.attempts, 2);
+    // What it stated is its report, refused as it stands.
     let report = fs::read_to_string(dir.path().join("review/reports/lang-rust.md")).unwrap();
-    assert_eq!(report, "outcome: findings — one.\n");
-    assert_eq!(
-        refusal(&report, &rust.log.answer, &known()).as_deref(),
-        Some("has a report whose outcome is findings but which holds none")
+    assert!(
+        report.contains(fake::FINDING) && report.contains(MALFORMED),
+        "{report}"
+    );
+    assert!(refusal(&report, &rust.log.answer, &known()).is_some());
+    assert!(
+        !dir.path()
+            .join("review/logs/lang-rust.first.jsonl")
+            .exists()
     );
 }
 
 #[test]
-fn a_second_attempt_that_does_not_answer_shows_what_both_stated() {
+fn a_run_cut_off_after_it_cost_money_keeps_what_it_stated_and_is_not_run_again() {
     let dir = workdir(false);
 
     let (runs, lines, host) = review_of(dir.path(), |c| {
         if !prompt_of(c).contains("a specialist") {
             return fake::generalist(c);
         }
-        let stated = if prompt_of(c).contains("previous attempt") {
-            "b.rs:2 — if not addressed: y — I2"
-        } else {
-            fake::FINDING
-        };
-        fake::write_log(c, &fake::log_of(&[stated], "error_max_turns", "", 0.1));
+        fake::write_log(
+            c,
+            &fake::log_of(&[fake::FINDING], "error_max_turns", "", 0.1),
+        );
         Ok(Output::default())
     });
 
@@ -332,40 +276,60 @@ fn a_second_attempt_that_does_not_answer_shows_what_both_stated() {
         rust.failure.as_deref(),
         Some("its run ended with error_max_turns")
     );
-    assert_eq!(rust.attempts, 2);
+    assert_eq!(rust.attempts, 1);
+    assert_eq!(specialist_prompts(&host).len(), 1);
     assert!(
-        specialist_prompts(&host)[1]
-            .ends_with(&note(&Why::Silent("its run ended with error_max_turns"))),
+        lines
+            .iter()
+            .any(|l| l.contains("not run again: it cost 0.1000 USD")),
         "{lines:?}"
     );
     assert_eq!(
         fs::read_to_string(dir.path().join("review/reports/lang-rust.md")).unwrap(),
         format!(
-            "incomplete: its run ended with error_max_turns\n{}\n\
-             b.rs:2 — if not addressed: y — I2\n",
+            "incomplete: its run ended with error_max_turns\n{}\n",
             fake::FINDING
         )
     );
 }
 
 #[test]
-fn a_salvaged_report_that_cannot_be_written_fails_the_run_saying_so() {
+fn a_run_that_cost_nothing_and_did_not_answer_is_run_once_more_told_why() {
     let dir = workdir(false);
-    let report = dir.path().join("review/reports/lang-rust.md");
 
-    let (runs, _, _) = review_of(dir.path(), move |c| {
+    let (runs, lines, host) = review_of(dir.path(), |c| {
         if !prompt_of(c).contains("a specialist") {
             return fake::generalist(c);
         }
-        let stated = if prompt_of(c).contains("previous attempt") {
-            // The second run's own report is not written, nor its salvage.
-            fs::remove_file(&report).unwrap();
-            fs::create_dir_all(&report).unwrap();
-            "b.rs:2 — if not addressed: y — I2"
-        } else {
-            fake::FINDING
-        };
-        fake::write_log(c, &fake::log_of(&[stated], "error_max_turns", "", 0.1));
+        if prompt_of(c).contains("previous attempt") {
+            return fake::specialist(c);
+        }
+        Err("claude did not start".to_owned())
+    });
+
+    let rust = &runs[0];
+    assert!(rust.answered(), "{:?}", rust.failure);
+    assert_eq!(rust.attempts, 2);
+    assert!(
+        specialist_prompts(&host)[1].ends_with(&note("claude did not start")),
+        "{lines:?}"
+    );
+}
+
+#[test]
+fn a_report_that_cannot_be_written_fails_the_run_saying_so() {
+    let dir = workdir(false);
+    // A directory where the report goes, so the write fails.
+    fs::create_dir_all(dir.path().join("review/reports/lang-rust.md")).unwrap();
+
+    let (runs, _, _) = review_of(dir.path(), |c| {
+        if !prompt_of(c).contains("a specialist") {
+            return fake::generalist(c);
+        }
+        fake::write_log(
+            c,
+            &fake::log_of(&[fake::FINDING], "error_max_turns", "", 0.1),
+        );
         Ok(Output::default())
     });
 
@@ -375,15 +339,10 @@ fn a_salvaged_report_that_cannot_be_written_fails_the_run_saying_so() {
             .starts_with("its run ended with error_max_turns; its report could not be written: "),
         "{failure}"
     );
-    assert_eq!(
-        failure.matches("could not be written").count(),
-        2,
-        "{failure}"
-    );
 }
 
 #[test]
-fn a_part_s_refused_report_is_run_once_more_and_the_merge_takes_the_second() {
+fn a_part_s_refused_report_stands_and_the_merge_names_it() {
     let dir = workdir(true);
 
     let (runs, lines, host) = review_of(dir.path(), |c| {
@@ -394,22 +353,88 @@ fn a_part_s_refused_report_is_run_once_more_and_the_merge_takes_the_second() {
         }
     });
 
-    assert_eq!(specialist_prompts(&host).len(), 3);
+    assert_eq!(specialist_prompts(&host).len(), 2);
     let rust = &runs[0];
-    assert!(rust.answered(), "{:?}", rust.failure);
-    assert_eq!((rust.parts, rust.attempts), (2, 3));
+    assert_eq!((rust.parts, rust.attempts), (2, 2));
     assert!(
-        lines.iter().any(|l| l.starts_with(
-            "lang-rust part 2 of 2 (specialist) has a report whose line 2 is neither"
-        )),
+        lines
+            .iter()
+            .any(|l| l.starts_with("lang-rust part 2 of 2 (specialist)")
+                && l.contains("not run again")),
         "{lines:?}"
     );
     let report = fs::read_to_string(dir.path().join("review/reports/lang-rust.md")).unwrap();
-    assert!(!report.contains(MALFORMED), "{report}");
-    assert_eq!(refusal(&report, &rust.log.answer, &known()), None);
-    assert!(
-        dir.path()
-            .join("review/logs/lang-rust.2.first.jsonl")
-            .is_file()
+    assert!(report.contains(MALFORMED), "{report}");
+    assert!(refusal(&report, &rust.log.answer, &known()).is_some());
+}
+
+/// One model call that used tokens, and no result: a run killed at its
+/// deadline or crashed after the model was called.
+const CALLED: &str = r#"{"type":"assistant","parent_tool_use_id":null,"message":{"id":"m1","model":"claude-haiku-5-5","usage":{"input_tokens":10,"output_tokens":5},"content":[{"type":"text","text":"src/a.rs:3 — if not addressed: a long line hides a bug — I9"}]}}"#;
+
+/// A result that failed before any model call: no cost, one turn
+/// counted, no usage.
+const FREE: &str = r#"{"type":"result","subtype":"error_during_execution","is_error":true,"result":"","total_cost_usd":0,"num_turns":1}"#;
+
+#[test]
+fn a_run_is_charged_by_its_model_usage_or_its_cost_never_by_its_turns() {
+    let parse = review_eval::log::parse;
+
+    assert_eq!(
+        charged(&parse(CALLED)).as_deref(),
+        Some("it made 1 model call")
     );
+    assert_eq!(charged(&parse(FREE)), None);
+    assert_eq!(charged(&review_eval::log::RunLog::default()), None);
+    let costly = parse(&fake::log("x", 0.25));
+    assert_eq!(charged(&costly).as_deref(), Some("it cost 0.2500 USD"));
+    let two = parse(&format!("{CALLED}\n{}", CALLED.replace("\"m1\"", "\"m2\"")));
+    assert_eq!(charged(&two).as_deref(), Some("it made 2 model calls"));
+}
+
+#[test]
+fn a_run_with_model_calls_and_no_result_is_charged_and_not_run_again() {
+    let dir = workdir(false);
+
+    let (runs, lines, host) = review_of(dir.path(), |c| {
+        if !prompt_of(c).contains("a specialist") {
+            return fake::generalist(c);
+        }
+        fake::write_log(c, &format!("{CALLED}\n"));
+        Ok(Output {
+            timed_out: true,
+            ..Output::default()
+        })
+    });
+
+    let rust = &runs[0];
+    assert_eq!(rust.failure.as_deref(), Some("its run ended with deadline"));
+    assert_eq!(rust.attempts, 1);
+    assert_eq!(specialist_prompts(&host).len(), 1);
+    assert!(
+        lines
+            .iter()
+            .any(|l| l.contains("not run again: it made 1 model call")),
+        "{lines:?}"
+    );
+}
+
+#[test]
+fn a_failure_that_cost_nothing_runs_once_more_whatever_turns_it_counts() {
+    let dir = workdir(false);
+
+    let (runs, _, host) = review_of(dir.path(), |c| {
+        if !prompt_of(c).contains("a specialist") {
+            return fake::generalist(c);
+        }
+        if prompt_of(c).contains("previous attempt") {
+            return fake::specialist(c);
+        }
+        fake::write_log(c, &format!("{FREE}\n"));
+        Ok(Output::default())
+    });
+
+    assert!(runs[0].answered(), "{:?}", runs[0].failure);
+    assert_eq!(runs[0].attempts, 2);
+    assert_eq!(specialist_prompts(&host).len(), 2);
 }

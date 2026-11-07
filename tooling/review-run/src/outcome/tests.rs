@@ -59,7 +59,7 @@ fn specialist(name: &str) -> (AgentRun, (String, String)) {
         ran(name, Kind::Specialist, &line),
         (
             name.to_owned(),
-            format!("a.rs:1 — if not addressed: x breaks — ENG-02\n\n{line}\n"),
+            format!("src/a.rs:3 — if not addressed: x breaks — ENG-02\n\n{line}\n"),
         ),
     )
 }
@@ -208,10 +208,21 @@ fn a_report_the_gate_would_refuse_blocks_and_is_named() {
             "has a report whose line 2 cites ENG-99, which no requirement or invariant has",
         ),
     ] {
-        let (runs, mut reports) = all_answered("none — nothing to add — review-code\nSound.");
+        let (runs, mut reports) = all_answered(
+            "dropped — src/a.rs:3 — fine — lang-rust\nnone — nothing to add — review-code\nSound.",
+        );
         match report {
             None => reports.remove("lang-rust"),
             Some(text) => reports.insert("lang-rust".to_owned(), text.to_owned()),
+        };
+
+        // The finding quotes the refused line; the summary names the problem.
+        let quoted = match problem {
+            p if p.contains("line 1 is") => format!("{p}: `a.rs:1 — nit — x`"),
+            p if p.contains("line 2 cites") => {
+                format!("{p}: `a.rs:1 — if not addressed: x breaks — ENG-99`")
+            }
+            p => p.to_owned(),
         };
 
         let d = decide(&plan(DISPATCH), &runs, &reports, &known());
@@ -221,7 +232,7 @@ fn a_report_the_gate_would_refuse_blocks_and_is_named() {
             d.outcome.findings,
             vec![blocking(
                 "review/reports/lang-rust.md",
-                format!("lang-rust {problem}")
+                format!("lang-rust {quoted}")
             )]
         );
         assert!(
@@ -242,7 +253,9 @@ fn an_answer_whose_outcome_line_carries_markup_or_a_stray_line_is_accepted() {
         "**Outcome: findings** — lang-rust  saw a finding.\n\nThat is all.",
         "I am done.\n`outcome: findings – lang-rust saw a finding`",
     ] {
-        let (mut runs, reports) = all_answered("none — nothing to add — review-code\nSound.");
+        let (mut runs, reports) = all_answered(
+            "dropped — src/a.rs:3 — fine — lang-rust\nnone — nothing to add — review-code\nSound.",
+        );
         runs[0] = ran("lang-rust", Kind::Specialist, answer);
 
         let d = decide(&plan(DISPATCH), &runs, &reports, &known());
@@ -417,7 +430,9 @@ fn a_generalist_that_says_neither_a_finding_nor_none_requests_changes() {
 
 #[test]
 fn a_generalist_that_says_none_is_a_clean_pass() {
-    let (runs, reports) = all_answered("none — nothing to add — review-code\nThe code is sound.");
+    let (runs, reports) = all_answered(
+        "dropped — src/a.rs:3 — fine — lang-rust\nnone — nothing to add — review-code\nThe code is sound.",
+    );
 
     let d = decide(&plan(DISPATCH), &runs, &reports, &known());
 
@@ -433,7 +448,7 @@ fn a_generalist_that_says_none_is_a_clean_pass() {
 #[test]
 fn a_specialist_s_finding_counts_only_as_its_generalist_weighs_it() {
     let (runs, reports) =
-        all_answered("dropped — a.rs:1 — no bug there — lang-rust\nThe code is sound.");
+        all_answered("dropped — src/a.rs:3 — no bug there — lang-rust\nThe code is sound.");
 
     let d = decide(&plan(DISPATCH), &runs, &reports, &known());
 
@@ -586,7 +601,9 @@ fn gap(name: &str, kind: &str, part: Option<usize>, reason: &str) -> Gap {
 
 #[test]
 fn a_review_every_agent_reported_to_has_nothing_not_reviewed() {
-    let (runs, reports) = all_answered("none — nothing to add — review-code\nSound.");
+    let (runs, reports) = all_answered(
+        "dropped — src/a.rs:3 — fine — lang-rust\nnone — nothing to add — review-code\nSound.",
+    );
 
     let d = decide(&plan(DISPATCH), &runs, &reports, &known());
 
@@ -633,7 +650,9 @@ fn every_agent_without_an_accepted_report_is_not_reviewed_with_why() {
 
 #[test]
 fn a_part_that_did_not_answer_is_the_part_not_reviewed() {
-    let (mut runs, reports) = all_answered("none — nothing to add — review-code\nSound.");
+    let (mut runs, reports) = all_answered(
+        "dropped — src/a.rs:3 — fine — lang-rust\nnone — nothing to add — review-code\nSound.",
+    );
     runs[0].failure = Some("part 2 of 3: its run ended with deadline".to_owned());
     runs[0].failed_parts = vec![(2, "its run ended with deadline".to_owned())];
     runs[0].parts = 3;
@@ -701,4 +720,158 @@ fn a_refused_report_and_an_unread_answer_are_not_reviewed() {
             "unread: it answered a finding line the review cannot read"
         )]
     );
+}
+
+#[test]
+fn a_generalist_cut_off_keeps_what_it_stated_and_is_named_as_not_answering() {
+    let (mut runs, reports) = all_answered("");
+    runs[2] = silent(
+        "review-code",
+        Kind::Generalist,
+        "its run ended with error_max_turns",
+    );
+    runs[2].log.texts = vec![
+        "reading".to_owned(),
+        "src/a.rs:3 — blocking — an unwrap — lang-rust\nsrc/b.rs:4 — nit — long — lang-rust"
+            .to_owned(),
+    ];
+
+    let d = decide(&plan(DISPATCH), &runs, &reports, &known());
+
+    assert_eq!(d.outcome.verdict, "request_changes");
+    let kept: Vec<_> = d
+        .outcome
+        .findings
+        .iter()
+        .map(|f| (f.path.as_str(), f.severity.as_str()))
+        .collect();
+    assert_eq!(
+        kept,
+        [
+            ("review/", "blocking"),
+            ("src/a.rs", "blocking"),
+            ("src/b.rs", "nit")
+        ]
+    );
+    assert!(d.outcome.summary.contains("kept 1 blocking and 1 nit"));
+    assert!(!d.consulted.contains("review-code"));
+    assert_eq!(d.not_reviewed.len(), 1);
+}
+
+#[test]
+fn a_generalist_that_states_its_weighing_as_it_goes_is_read_whole() {
+    let (mut runs, reports) = all_answered("The code is sound.");
+    runs[2].log.texts = vec!["src/a.rs:3 — nit — a long line — lang-rust".to_owned()];
+
+    let d = decide(&plan(DISPATCH), &runs, &reports, &known());
+
+    assert_eq!(d.outcome.verdict, "approve");
+    assert_eq!(d.outcome.findings.len(), 1);
+    assert!(d.answers["review-code"].contains("The code is sound."));
+}
+
+#[test]
+fn a_generalist_that_weighs_none_of_a_specialist_s_findings_is_partial_by_the_review_alone() {
+    // The specialists reported src/a.rs:3; the generalist weighed another
+    // file and says its scope is whole. The review, not the agent, decides.
+    let (runs, reports) =
+        all_answered("src/z.rs:9 — nit — long — lang-rust\nThe whole scope was weighed.");
+
+    let d = decide(&plan(DISPATCH), &runs, &reports, &known());
+
+    assert_eq!(d.outcome.verdict, "request_changes");
+    assert!(d.outcome.findings.iter().any(|f| f.body.contains(
+        "review-code weighed no finding at src/a.rs:3, which its specialists reported, so its \
+         weighing is partial"
+    )));
+    assert_eq!(
+        d.not_reviewed,
+        vec![gap(
+            "review-code",
+            "generalist",
+            None,
+            "unread: it weighed no finding at src/a.rs:3"
+        )]
+    );
+}
+
+#[test]
+fn a_finding_at_the_place_or_a_line_that_names_it_exactly_weighs_it() {
+    for answer in [
+        "src/b.rs:1 — nit — also src/a.rs:3 and two more — lang-rust\nDone.",
+        "dropped — src/a.rs:3 — fine — lang-rust\nnone — nothing to add — review-code\nDone.",
+        "src/a.rs:1-5 — nit — the whole block — lang-rust\nDone.",
+        "src/b.rs:1 — nit — as at (src/a.rs:2-4) — lang-rust\nDone.",
+    ] {
+        let (runs, reports) = all_answered(answer);
+
+        let d = decide(&plan(DISPATCH), &runs, &reports, &known());
+
+        assert_eq!(d.outcome.verdict, "approve", "{answer}");
+    }
+}
+
+#[test]
+fn another_line_of_the_file_or_a_place_that_only_starts_alike_weighs_nothing() {
+    for answer in [
+        "src/a.rs:40 — nit — same file, another line — lang-rust\nDone.",
+        "dropped — src/a.rs:31 — fine — lang-rust\nDone.",
+        "dropped — lib/src/a.rs:3 — fine — lang-rust\nDone.",
+        "src/b.rs:1 — nit — see src/a.rs:30 — lang-rust\nDone.",
+        "src/a.rs:4-9 — nit — the block after it — lang-rust\nDone.",
+    ] {
+        let (runs, reports) = all_answered(answer);
+
+        let d = decide(&plan(DISPATCH), &runs, &reports, &known());
+
+        assert_eq!(d.outcome.verdict, "request_changes", "{answer}");
+        assert!(
+            d.outcome
+                .findings
+                .iter()
+                .any(|f| f.body.contains("weighed no finding at src/a.rs:3")),
+            "{answer}"
+        );
+    }
+}
+
+#[test]
+fn a_line_names_a_place_bounded_by_no_path_or_digit_character() {
+    assert!(names("see src/a.rs:3.", "src/a.rs", 3));
+    assert!(names("`src/a.rs:3`", "src/a.rs", 3));
+    assert!(names("src/a.rs:2–4", "src/a.rs", 3));
+    assert!(names("src/a.rs:9 and src/a.rs:3", "src/a.rs", 3));
+    assert!(!names("src/a.rs:31", "src/a.rs", 3));
+    assert!(!names("lib/src/a.rs:3", "src/a.rs", 3));
+    assert!(!names("src/a.rs:4-9", "src/a.rs", 3));
+    assert!(!names("src/a.rs:x", "src/a.rs", 3));
+    assert!(!names("src/a.rs:3-x", "src/a.rs", 4));
+    assert!(!names("nothing here", "src/a.rs", 3));
+}
+
+#[test]
+fn each_generalist_s_weighing_is_kept_answered_or_cut_off_and_none_without_a_run() {
+    let (mut runs, reports) = all_answered("src/a.rs:3 — nit — x — lang-rust\nDone.");
+    let answered = decide(&plan(DISPATCH), &runs, &reports, &known());
+    assert_eq!(
+        answered.weighings["review-code"],
+        "src/a.rs:3 — nit — x — lang-rust\nDone."
+    );
+
+    runs[2] = silent(
+        "review-code",
+        Kind::Generalist,
+        "its run ended with deadline",
+    );
+    runs[2].log.texts = vec!["src/a.rs:3 — blocking — y — lang-rust\nreading".to_owned()];
+    let cut = decide(&plan(DISPATCH), &runs, &reports, &known());
+    assert_eq!(
+        cut.weighings["review-code"],
+        "src/a.rs:3 — blocking — y — lang-rust"
+    );
+    assert!(!cut.answers.contains_key("review-code"));
+
+    runs.pop();
+    let none = decide(&plan(DISPATCH), &runs, &reports, &known());
+    assert!(none.weighings.is_empty());
 }

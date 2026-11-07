@@ -218,7 +218,9 @@ fn a_report_that_cannot_be_written_fails_the_run_closed() {
         failure.starts_with("its report could not be written: "),
         "{failure}"
     );
-    assert_eq!(run.attempts, 2);
+    // The run was paid for, so it is not run again for a report that
+    // could not be written.
+    assert_eq!(run.attempts, 1);
 
     let run = one_run(dir.path(), |_| Err("cannot start".to_owned()));
     let failure = run.failure.unwrap();
@@ -501,7 +503,7 @@ fn a_run_that_did_not_answer_is_tried_once_more() {
 }
 
 #[test]
-fn a_run_that_fails_twice_fails_after_two_attempts_and_keeps_both_costs() {
+fn a_run_that_fails_after_it_cost_money_is_tried_once_and_keeps_its_cost() {
     let dir = workdir();
 
     let run = one_run(dir.path(), |c| {
@@ -513,8 +515,8 @@ fn a_run_that_fails_twice_fails_after_two_attempts_and_keeps_both_costs() {
     });
 
     assert!(!run.answered());
-    assert_eq!(run.attempts, 2);
-    assert!((run.log.cost - 0.5).abs() < 1e-9, "{}", run.log.cost);
+    assert_eq!(run.attempts, 1);
+    assert!((run.log.cost - 0.25).abs() < 1e-9, "{}", run.log.cost);
 }
 
 #[test]
@@ -629,38 +631,6 @@ fn a_first_log_that_cannot_be_kept_is_told() {
     assert!(
         lines[1].starts_with("lang-rust (specialist): its first log was not kept: rename "),
         "{lines:?}"
-    );
-}
-
-#[test]
-fn a_second_attempt_s_report_replaces_the_first_s() {
-    let dir = workdir();
-    let calls = AtomicUsize::new(0);
-
-    let (run, _) = one_run_told(dir.path(), move |c| {
-        if calls.fetch_add(1, Ordering::SeqCst) == 0 {
-            fake::write_log(
-                c,
-                &fake::log_of(
-                    &["b.rs:2 — if not addressed: y — I2"],
-                    "error_max_turns",
-                    "",
-                    0.1,
-                ),
-            );
-            Ok(Output::default())
-        } else {
-            fake::specialist(c)
-        }
-    });
-
-    assert!(run.answered());
-    assert_eq!(
-        fs::read_to_string(dir.path().join("review/reports/lang-rust.md")).unwrap(),
-        format!(
-            "{}\noutcome: findings — lang-rust saw one finding.\n",
-            fake::FINDING
-        )
     );
 }
 
@@ -818,7 +788,7 @@ fn a_specialist_whose_diff_is_past_the_split_runs_in_parts_and_its_reports_merge
 }
 
 #[test]
-fn a_part_that_does_not_answer_is_retried_and_then_fails_the_specialist_naming_it() {
+fn a_part_that_does_not_answer_keeps_what_it_stated_and_fails_the_specialist_naming_it() {
     let dir = workdir();
     big_diff(dir.path());
 
@@ -839,13 +809,13 @@ fn a_part_that_does_not_answer_is_retried_and_then_fails_the_specialist_naming_i
         }
     });
 
-    assert_eq!(host.agents().len(), 4);
+    assert_eq!(host.agents().len(), 3);
     let rust = &runs[0];
     assert_eq!(
         rust.failure.as_deref(),
         Some("part 2 of 2: its run ended with error_max_turns")
     );
-    assert_eq!((rust.parts, rust.attempts), (2, 3));
+    assert_eq!((rust.parts, rust.attempts), (2, 2));
     assert_eq!(
         fs::read_to_string(dir.path().join("review/reports/lang-rust.md")).unwrap(),
         format!(
@@ -856,14 +826,9 @@ fn a_part_that_does_not_answer_is_retried_and_then_fails_the_specialist_naming_i
         )
     );
     assert!(
-        dir.path()
-            .join("review/logs/lang-rust.2.first.jsonl")
-            .is_file()
-    );
-    assert!(
         lines.iter().any(|l| l.starts_with(
             "lang-rust part 2 of 2 (specialist): did not answer: its run ended with \
-             error_max_turns; running it once more"
+             error_max_turns; not run again: it cost 0.1000 USD"
         )),
         "{lines:?}"
     );

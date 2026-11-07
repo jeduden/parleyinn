@@ -11,8 +11,13 @@
 use std::fs;
 
 use review_eval::component::Kind;
+use review_eval::log::RunLog;
+use review_eval::report;
+use review_gate::report::findings_check;
 
 use crate::LOGS;
+use crate::outcome;
+use crate::plan::report_file;
 use crate::run::{Review, Unit, reused, write_report};
 use crate::store::{self, Put, Store};
 use crate::tasks::Done;
@@ -46,7 +51,9 @@ pub(crate) fn recall(r: &Review, store: &Store, unit: &Unit, key: &str) -> Optio
             return None;
         }
     };
-    if let Err(why) = store::accepted(unit.kind, &stored.log, stored.report.as_deref(), r.known) {
+    let taken = store::accepted(unit.kind, &stored.log, stored.report.as_deref(), r.known)
+        .and_then(|()| partial(r, unit, &stored.log));
+    if let Err(why) = taken {
         (r.progress)(&format!(
             "{}: its stored answer {key} is not taken, so it runs: {why}",
             label()
@@ -123,7 +130,9 @@ pub(crate) fn keep(r: &Review, store: &Store, unit: &Unit, key: &str, done: &Don
         return true;
     }
     let log = review_eval::log::parse(&text);
-    if let Err(why) = store::accepted(unit.kind, &log, report.as_deref(), r.known) {
+    let taken = store::accepted(unit.kind, &log, report.as_deref(), r.known)
+        .and_then(|()| partial(r, unit, &log));
+    if let Err(why) = taken {
         (r.progress)(&format!("{label}: its answer was not stored: {why}"));
         return false;
     }
@@ -148,6 +157,39 @@ pub(crate) fn keep(r: &Review, store: &Store, unit: &Unit, key: &str, done: &Don
             true
         }
     }
+}
+
+/// Whether `unit`'s answer, its log `log`, is whole: a generalist's
+/// weighing must weigh every place its specialists' reports in the work
+/// directory name, those the gate takes, as the outcome holds it to, so
+/// a partial weighing is neither stored nor taken and its gap runs.
+///
+/// # Errors
+///
+/// Fails naming the places it weighed no finding at.
+fn partial(r: &Review, unit: &Unit, log: &RunLog) -> Result<(), String> {
+    if unit.kind != Kind::Generalist {
+        return Ok(());
+    }
+    let reports: Vec<String> = r
+        .plan
+        .dispatch
+        .get(&unit.name)
+        .into_iter()
+        .flatten()
+        .filter_map(|s| fs::read_to_string(r.workdir.join(report_file(s))).ok())
+        .filter(|text| findings_check(text, Some(r.known)).is_none())
+        .collect();
+    let weighing = report::weighing(&log.texts, &log.answer);
+    let missed = outcome::missed(reports.iter().map(String::as_str), &weighing);
+    if missed.is_empty() {
+        return Ok(());
+    }
+
+    Err(format!(
+        "its weighing is partial: it weighed no finding at {}",
+        missed.join(", ")
+    ))
 }
 
 /// Whether the log `text` or the `report` holds a form of the Claude

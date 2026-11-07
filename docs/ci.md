@@ -57,6 +57,13 @@ is short, because a finding found late costs a whole round.
   unchanged; no workflow gives it a store yet.
   A review that aborts on a mass failure of its specialists says so
   apart from any finding: fix the outage or prompt, then `--resume`.
+- A pull request's reviews share one cost cap, ENG-28's, counted over
+  all of them: each review keeps the total in the `review-spend-pr-<N>`
+  artifact, and the next takes it as `review-run --spent-before`. A review
+  the cap stopped lists every agent it did not run, `over budget:`, in
+  `review/not-reviewed.md` and requests changes. Deleting the pull
+  request's `review-spend-pr-<N>` artifacts resets its budget, and
+  `--max-cost-usd` overrides the cap.
 - CI ends within ten minutes of a push. The slowest chain of jobs sets
   that; a job that grows toward its five-minute limit is split before it
   fails.

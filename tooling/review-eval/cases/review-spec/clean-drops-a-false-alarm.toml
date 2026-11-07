@@ -2,30 +2,32 @@ component = "review-spec"
 kind = "clean"
 title = "a specialist's finding the diff contradicts, dropped"
 
+# The edit sits in the domain model, which no CODEOWNERS path covers, so
+# the review bundle adds no consent finding for the generalist to keep.
 [[replace]]
-file = "features/engineering.feature"
-old = "Feature: Engineering quality (ENG)\n"
-new = "# The engineering scenarios, one per ENG row of the SRS.\nFeature: Engineering quality (ENG)\n"
-
-[[report]]
-agent = "lang-gherkin"
-content = '''
-features/engineering.feature:1 — if not addressed: the ENG-24 scenario is retagged and no longer proves its requirement — ENG-24
-
-outcome: findings — a retagged scenario
-'''
+file = "docs/domain-model/index.md"
+old = "# Domain model\n"
+new = "<!-- The one source of ParleyInn's concepts. -->\n# Domain model\n"
 
 [[report]]
 agent = "domain-model-hub"
 content = '''
-outcome: none — no concept touched
+docs/domain-model/index.md:47 — if not addressed: the hub no longer links the record concept file, so its terms have no source — I10
+
+outcome: findings — a dropped link
+'''
+
+[[report]]
+agent = "lang-gherkin"
+content = '''
+outcome: none — no scenario touched
 '''
 
 [expect]
 
 [[expect.none]]
-path = "features/engineering.feature"
+path = "docs/domain-model/index.md"
 
 [[expect.dropped]]
-path = "features/engineering.feature"
-mentions = ["ENG-24"]
+path = "docs/domain-model/index.md"
+mentions = ["record"]

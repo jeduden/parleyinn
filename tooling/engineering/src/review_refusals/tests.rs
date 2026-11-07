@@ -132,24 +132,15 @@ fn the_stand_in_keeps_each_specialist_run_s_prompt() {
 }
 
 #[test]
-fn a_specialist_not_run_once_more_told_its_refusal_is_named() {
-    let told = format!(
-        "x {} cites {UNKNOWN_ID} y {}",
-        "z",
-        review_run::retry::FORMS
-    );
-
-    assert!(retry_problems(&["a".to_owned(), told.clone()]).is_empty());
-    assert_eq!(
-        retry_problems(&["a".to_owned()]),
-        ["review-run ran lang-rust 1 time, not once more after its report was refused"]
-    );
+fn a_specialist_run_again_after_its_report_was_refused_is_named() {
+    assert!(retry_problems(&["a".to_owned()]).is_empty());
     assert_eq!(
         retry_problems(&["a".to_owned(), "b".to_owned()]),
-        [
-            "lang-rust's second run was not told its report cites ENG-999",
-            "lang-rust's second run was not told the forms again",
-        ]
+        ["review-run ran lang-rust 2 times, not once after its report was refused"]
+    );
+    assert_eq!(
+        retry_problems(&[]),
+        ["review-run ran lang-rust 0 times, not once after its report was refused"]
     );
 }
 
