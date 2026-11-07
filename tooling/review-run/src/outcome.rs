@@ -194,7 +194,8 @@ fn answers(
 
 /// The answering specialists whose report the gate refuses, or whose
 /// linked finding cites an id outside `known`, each with its problem,
-/// and a blocking finding on its report file added to `findings`.
+/// and a blocking finding on its report file added to `findings`, the
+/// refused line quoted.
 fn refused_reports(
     plan: &Plan,
     answers: &BTreeMap<String, String>,
@@ -209,7 +210,11 @@ fn refused_reports(
         };
         let report = reports.get(&name).map(String::as_str);
         if let Some(problem) = report_check(report, Some(answer), Some(known)) {
-            findings.push(blocking(&report_file(&name), format!("{name} {problem}")));
+            // The finding quotes the line refused, so the author sees it.
+            let quoted = report
+                .and_then(|text| crate::retry::refusal(text, answer, known))
+                .unwrap_or_else(|| problem.to_string());
+            findings.push(blocking(&report_file(&name), format!("{name} {quoted}")));
             refused.push((name, problem.to_string()));
         }
     }

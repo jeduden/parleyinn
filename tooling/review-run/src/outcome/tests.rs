@@ -216,6 +216,15 @@ fn a_report_the_gate_would_refuse_blocks_and_is_named() {
             Some(text) => reports.insert("lang-rust".to_owned(), text.to_owned()),
         };
 
+        // The finding quotes the refused line; the summary names the problem.
+        let quoted = match problem {
+            p if p.contains("line 1 is") => format!("{p}: `a.rs:1 — nit — x`"),
+            p if p.contains("line 2 cites") => {
+                format!("{p}: `a.rs:1 — if not addressed: x breaks — ENG-99`")
+            }
+            p => p.to_owned(),
+        };
+
         let d = decide(&plan(DISPATCH), &runs, &reports, &known());
 
         assert_eq!(d.outcome.verdict, "request_changes", "{problem}");
@@ -223,7 +232,7 @@ fn a_report_the_gate_would_refuse_blocks_and_is_named() {
             d.outcome.findings,
             vec![blocking(
                 "review/reports/lang-rust.md",
-                format!("lang-rust {problem}")
+                format!("lang-rust {quoted}")
             )]
         );
         assert!(

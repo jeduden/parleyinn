@@ -652,7 +652,7 @@ fn a_refused_report_is_not_run_again_blocks_the_review_and_the_gate_posts_nothin
                 && f.severity == "blocking"
                 && f.body
                     == "lang-rust has a report whose line 2 is neither a linked finding nor a \
-                    requirement request"),
+                    requirement request: `revised: `src/a.rs:3 — old` → `src/a.rs:3 — new``"),
         "{:?}",
         outcome.findings
     );
