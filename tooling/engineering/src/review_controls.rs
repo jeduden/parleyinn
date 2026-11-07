@@ -5,7 +5,8 @@
 //! third of the dispatched specialists failed, opening the review
 //! outcome with the abort; waits with backoff before it runs again an
 //! agent the API turned away as overloaded; and never runs again an
-//! agent a cost cap stopped or whose credential was refused. The checks
+//! agent a cost cap stopped, whose credential was refused or that was
+//! charged. The checks
 //! run `review-run` on the work directory [`review_runs::prepare`] lays
 //! out, with a stand-in for the `claude` command line that keeps every
 //! command and fails the runs it is told to as the command line would,
@@ -310,10 +311,12 @@ pub fn retry_problems(checkout: &Checkout, workdir: &Path) -> Vec<String> {
             ("lang-rust", (1, Some(OVERLOADED))),
             ("test-engineer-unit", (1, Some(REFUSED))),
             ("lang-markdown", (1, Some(CUT))),
+            ("review-spec", (1, Some(CAPPED))),
         ]),
         ..ControlHost::default()
     };
     let clock = Waits::default();
+    let lines = Mutex::new(Vec::new());
     let ran = review_run::plan::read(workdir).and_then(|plan| {
         review_on(&Review {
             host: &host,
@@ -329,23 +332,39 @@ pub fn retry_problems(checkout: &Checkout, workdir: &Path) -> Vec<String> {
             keys: None,
             store: None,
             scrubber: None,
-            progress: &|_| {},
+            progress: &|line| {
+                lines
+                    .lock()
+                    .unwrap_or_else(PoisonError::into_inner)
+                    .push(line.to_owned());
+            },
         })
     });
     if let Err(e) = ran {
         return vec![e];
     }
     let waited = clock.0.into_inner().unwrap_or_else(PoisonError::into_inner);
-    retried_problems(&|agent| host.runs_of(agent), &waited)
+    let lines = lines.into_inner().unwrap_or_else(PoisonError::into_inner);
+    retried_problems(&|agent| host.runs_of(agent), &waited, &lines)
 }
 
-/// What is wrong with how often each agent ran, `runs_of` it, and the
-/// waits `waited`: lang-rust, turned away as overloaded, not run twice
-/// after one wait of 15 s or more, and test-engineer-unit, whose
-/// credential was refused, or lang-markdown, cut off after it cost money,
-/// run again.
+/// Why progress says a run a cost cap stopped is not run again.
+pub const CAP_STOPPED: &str = "a cost cap stopped it, and another run would cost more";
+
+/// What is wrong with how often each agent ran, `runs_of` it, the
+/// waits `waited` and the progress `lines`: lang-rust, turned away as
+/// overloaded, not run twice after one wait of 15 s or more;
+/// test-engineer-unit, whose credential was refused, or lang-markdown,
+/// cut off after it cost money, run again; and review-spec, stopped by
+/// its cost cap, run again or not told as not run again for that cap.
+/// A capped run was charged too, so only its told reason shows the cap
+/// was read as one.
 #[must_use]
-pub fn retried_problems(runs_of: &dyn Fn(&str) -> usize, waited: &[Duration]) -> Vec<String> {
+pub fn retried_problems(
+    runs_of: &dyn Fn(&str) -> usize,
+    waited: &[Duration],
+    lines: &[String],
+) -> Vec<String> {
     let mut problems = Vec::new();
     let once = waited.len() == 1 && waited.iter().all(|w| *w >= Duration::from_secs(15));
     if runs_of("lang-rust") != 2 || !once {
@@ -362,6 +381,19 @@ pub fn retried_problems(runs_of: &dyn Fn(&str) -> usize, waited: &[Duration]) ->
                 runs_of(agent)
             ));
         }
+    }
+    if runs_of("review-spec") != 1 {
+        problems.push(format!(
+            "review-spec, stopped by its cost cap, ran {} times, not once",
+            runs_of("review-spec")
+        ));
+    } else if !lines.iter().any(|l| {
+        l.starts_with("review-spec (generalist): ")
+            && l.ends_with(&format!("not run again: {CAP_STOPPED}"))
+    }) {
+        problems.push(format!(
+            "review-spec, stopped by its cost cap, is not told as not run again because {CAP_STOPPED}"
+        ));
     }
 
     problems

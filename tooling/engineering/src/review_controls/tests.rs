@@ -91,9 +91,12 @@ fn a_review_that_starts_a_generalist_past_the_breaker_or_names_no_abort_is_named
 #[test]
 fn an_overloaded_run_not_waited_for_or_one_that_cannot_succeed_run_again_is_named() {
     let runs = |n: usize| move |agent: &str| if agent == "lang-rust" { 2 } else { n };
-    assert!(retried_problems(&runs(1), &[Duration::from_secs(15)]).is_empty());
+    let capped = vec![format!(
+        "review-spec (generalist): did not answer: x; not run again: {CAP_STOPPED}"
+    )];
+    assert!(retried_problems(&runs(1), &[Duration::from_secs(15)], &capped).is_empty());
 
-    let problems = retried_problems(&runs(2), &[Duration::from_secs(1)]);
+    let problems = retried_problems(&runs(2), &[Duration::from_secs(1)], &capped);
 
     assert_eq!(
         problems,
@@ -101,8 +104,26 @@ fn an_overloaded_run_not_waited_for_or_one_that_cannot_succeed_run_again_is_name
             "lang-rust, turned away as overloaded, ran 2 times after waits of [1s], not twice \
              after one wait of 15 s or more",
             "test-engineer-unit, which was refused or charged and cut off, ran 2 times, not once",
-            "lang-markdown, which was refused or charged and cut off, ran 2 times, not once"
+            "lang-markdown, which was refused or charged and cut off, ran 2 times, not once",
+            "review-spec, stopped by its cost cap, ran 2 times, not once"
         ]
+    );
+}
+
+#[test]
+fn a_run_a_cost_cap_stopped_not_named_so_is_named() {
+    let once = |agent: &str| if agent == "lang-rust" { 2 } else { 1 };
+    let charged = vec![
+        "review-spec (generalist): did not answer: x; not run again: it cost 1.0100 USD".to_owned(),
+    ];
+
+    let problems = retried_problems(&once, &[Duration::from_secs(15)], &charged);
+
+    assert_eq!(
+        problems,
+        [format!(
+            "review-spec, stopped by its cost cap, is not told as not run again because {CAP_STOPPED}"
+        )]
     );
 }
 
@@ -223,11 +244,14 @@ fn an_overloaded_run_is_named_when_its_runs_or_its_waits_alone_are_wrong() {
     let runs =
         |lang_rust: usize| move |agent: &str| if agent == "lang-rust" { lang_rust } else { 1 };
     let fifteen = Duration::from_secs(15);
+    let told = [format!(
+        "review-spec (generalist): x; not run again: {CAP_STOPPED}"
+    )];
 
-    let three_runs = retried_problems(&runs(3), &[fifteen]);
-    let short_wait = retried_problems(&runs(2), &[Duration::from_secs(14)]);
-    let two_waits = retried_problems(&runs(2), &[fifteen, fifteen * 2]);
-    let no_wait = retried_problems(&runs(2), &[]);
+    let three_runs = retried_problems(&runs(3), &[fifteen], &told);
+    let short_wait = retried_problems(&runs(2), &[Duration::from_secs(14)], &told);
+    let two_waits = retried_problems(&runs(2), &[fifteen, fifteen * 2], &told);
+    let no_wait = retried_problems(&runs(2), &[], &told);
 
     for problems in [three_runs, short_wait, two_waits, no_wait] {
         assert_eq!(problems.len(), 1, "{problems:?}");

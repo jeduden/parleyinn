@@ -152,8 +152,8 @@ pub(super) fn review_retry_cases() -> Vec<Case> {
         "ENG-28",
         Injection::replace(
             "tooling/review-run/src/retry.rs",
-            "    if class == Class::Again && paid(&first) {\n",
-            "    if class == Class::Again && paid(&first) && false {\n",
+            "    if let Some(why) = charged(&first.log) {\n",
+            "    if let Some(why) = charged(&first.log).filter(|_| false) {\n",
         ),
         cargo_lib_test(
             "review-run",
@@ -353,6 +353,27 @@ pub(super) fn review_control_cases() -> Vec<Case> {
             "a_review_run_on_the_checkout_s_definitions_has_no_problem",
         ),
     ]
+}
+
+/// The drift the review's controls must not bring (ENG-28, I6), late so
+/// adding it moves no earlier case to another shard: a run its cost cap
+/// stopped read as one to run once more. Such a run was charged, so it
+/// is not run again either way; the check reads the reason told.
+pub(super) fn review_cap_retry_case() -> Case {
+    case(
+        "review-run reading a run a cost cap stopped as one to run once more",
+        "ENG-28",
+        Injection::replace(
+            "tooling/review-run/src/backoff.rs",
+            "        Class::Never(\"a cost cap stopped it, and another run would cost more\")\n",
+            "        Class::Again\n",
+        ),
+        cargo_lib_test(
+            "engineering",
+            "review_controls::tests::the_checkout_s_review_run_holds_its_agents_to_the_controls",
+        ),
+        "the_checkout_s_review_run_holds_its_agents_to_the_controls",
+    )
 }
 
 /// The drifts the gate's reading of a line at a place must not bring
