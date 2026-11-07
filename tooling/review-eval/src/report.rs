@@ -89,10 +89,9 @@ pub fn finding(line: &str) -> Option<Finding> {
 }
 
 /// A generalist's weighing as its run log gives it: each weighing line
-/// it stated in a message before its last, a finding, a dropped one or
-/// its `none —`, or a line shaped as a finding the review cannot read
-/// that starts with a path-like word ([`placed`]), each once and in
-/// order, then its final answer's lines. A line at a place, a finding
+/// it stated in a message before its last in the strict form
+/// [`strict`] reads, each once and in order, then its final answer's
+/// lines, read leniently so the review names a line it cannot read. A line at a place, a finding
 /// or a dropped one, supersedes every line stated before it, in a
 /// message or the final answer, that is the same finding
 /// ([`identity`]): the last statement wins, so a draft finding can be
@@ -105,13 +104,8 @@ pub fn weighing(texts: &[String], answer: &str) -> String {
     let said: Vec<&str> = answer.lines().collect();
     let mut out: Vec<&str> = Vec::new();
     for line in texts.iter().flat_map(|t| t.lines()).map(str::trim) {
-        // Mid-run narration may read as a finding's shape, `Severity —
-        // nit — …`; only a line that names a path is one the agent meant
-        // as a finding, so only such a line is held unreadable.
-        let unreadable = unread(line) && placed(line);
-        let weighs = finding(line).is_some() || dropped(line) || nothing(line) || unreadable;
         let again = said.iter().any(|s| s.trim() == line) || out.contains(&line);
-        if weighs && !again {
+        if strict(line) && !again {
             settle(&mut out, line);
         }
     }
@@ -120,6 +114,30 @@ pub fn weighing(texts: &[String], answer: &str) -> String {
     }
 
     out.join("\n")
+}
+
+/// Whether `line`, in a message before a generalist's final answer, is
+/// a weighing line in the strict form: a finding whose severity is one
+/// of [`SEVERITIES`], `dropped — path:line — …`, `none — …`, or a line
+/// shaped as a finding the review cannot read that starts with a
+/// path-like word ([`placed`]). Working notes, `docs/x.md:12 — verified
+/// — …` or `Dropped, since …`, are narration, not a weighing.
+#[must_use]
+pub fn strict(line: &str) -> bool {
+    let severe = finding(line).is_some_and(|f| SEVERITIES.contains(&f.severity.as_str()));
+    let parts = split_dashes(bare(line));
+    let drops = match parts.as_slice() {
+        [first, place, _, ..] => {
+            first
+                .trim()
+                .trim_end_matches(['*', '_', '`'])
+                .eq_ignore_ascii_case(DROPPED)
+                && review_gate::report::place(place).is_some()
+        }
+        _ => false,
+    };
+
+    severe || drops || nothing(line) || (unread(line) && placed(line))
 }
 
 /// Adds `line` to `out`, first removing each line there that is the

@@ -278,3 +278,46 @@ fn a_source_is_the_last_part_of_a_line_of_four_or_more() {
     assert_eq!(source_of("a.rs:3 — nit — x"), None);
     assert_eq!(source_of("prose — with — four — parts"), None);
 }
+#[test]
+fn a_message_line_weighs_only_in_a_strict_form() {
+    let texts = vec![
+        "docs/x.md:12 — verified — the claim holds\n\
+         Dropped, since the specialist misread docs/x.md:12\n\
+         docs/y.md:2 — dropped — not a bug — lang-markdown\n\
+         docs/z.md:4 — Nit — long — lang-markdown\n\
+         **Dropped** — docs/x.md:12 — misread — lang-markdown\n\
+         none — nothing to add — x"
+            .to_owned(),
+    ];
+
+    assert_eq!(
+        weighing(&texts, ""),
+        "docs/z.md:4 — Nit — long — lang-markdown\n\
+         **Dropped** — docs/x.md:12 — misread — lang-markdown\n\
+         none — nothing to add — x"
+    );
+    // The final answer is read leniently, so the review names each line.
+    let answer = "docs/x.md:12 — verified — the claim holds";
+    assert_eq!(weighing(&[], answer), answer);
+}
+
+#[test]
+fn a_strict_line_is_a_finding_a_dropped_one_a_none_or_an_unread_placed_one() {
+    for line in [
+        "a.rs:3 — BLOCKING — x — y",
+        "- dropped — a.rs:3 — misread — y",
+        "none — nothing to add — x",
+        "a/b.md — nit — no line — y",
+    ] {
+        assert!(strict(line), "{line}");
+    }
+    for line in [
+        "a.rs:3 — major — x — y",
+        "a.rs:3 — dropped — misread — y",
+        "dropped — nowhere — fine",
+        "Dropped: a.rs:3",
+        "Severity — nit — style",
+    ] {
+        assert!(!strict(line), "{line}");
+    }
+}

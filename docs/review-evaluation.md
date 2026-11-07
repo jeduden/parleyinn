@@ -76,9 +76,11 @@ records the design.
   case may also want a finding `stated` before the final answer, or a
   finding `withdrawn` or revised, read from the log's text. For a
   generalist it reads the weighing `review-run` reads, by the one shared
-  rule: each finding, dropped or `none —` line it stated as it went,
-  then its final answer's lines, the last for a place and the source it
-  names standing, so another source's finding there stays; each finding it
+  rule: each `blocking` or `nit` finding, `dropped — path:line` or
+  `none —` line it stated as it went, other working notes left out, then
+  its final answer's lines, all read; the last for a place and the
+  source it names stands, so another source's finding there stays; each
+  finding it
   must drop on a line that starts with `dropped` or gives it as its
   severity. A consultant is read from its answer. A specialist report
   the review would refuse, with a line in no form or an outcome its lines
