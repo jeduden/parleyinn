@@ -330,3 +330,11 @@ fn a_claude_version_that_does_not_read_is_named() {
         Ok("2.1.0 (Claude Code)".to_owned())
     );
 }
+
+#[test]
+fn the_schema_is_the_third_so_no_answer_stored_unchecked_for_coverage_is_reused() {
+    // The second schema's answers were stored before the review decided
+    // from a run's reads whether it read its whole diff: none of them
+    // is reused, so every stored answer read its whole diff.
+    assert_eq!(SCHEMA, "review-run answer key 3");
+}

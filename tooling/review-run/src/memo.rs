@@ -92,6 +92,9 @@ pub(crate) fn recall(
             return None;
         }
     };
+    // Its reads are not held to its diff again: the store keeps no run
+    // that read only part of it ([`keep`]), and the key's schema keeps
+    // out every answer stored before that rule (`key::SCHEMA`).
     let taken = store::accepted(unit.kind, &stored.log, stored.report.as_deref(), r.known)
         .and_then(|()| partial(r, unit, &stored.log, held));
     if let Err(why) = taken {

@@ -44,9 +44,14 @@ use crate::REVIEW;
 use crate::plan::{Plan, report_file};
 use crate::run::world_of;
 
-/// The key's own version: a change to what a key holds changes it, so
-/// no answer keyed the old way is read as keyed the new.
-pub const SCHEMA: &str = "review-run answer key 2";
+/// The key's own version: a change to what a key holds, or to what the
+/// store holds under it, changes it, so no answer keyed the old way is
+/// read as keyed the new. The third came with the rule that the store
+/// keeps no run that read only part of its diff: an answer the second
+/// stored was never held to it, so none is reused. From the third on
+/// only a run that read its whole diff is stored, so a stored answer
+/// is not held to its reads again when it is taken.
+pub const SCHEMA: &str = "review-run answer key 3";
 
 /// The files of the pull request's tree, under `pr-head/`, whose change
 /// changes every key: the invariants, the agent instructions, the
