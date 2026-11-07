@@ -84,21 +84,18 @@ pub(crate) fn run_one(r: &Review, c: &Controls, unit: &Unit) -> (AgentRun, Optio
     let started = r.clock.now();
     let (first, report) = tried(r, c, unit, None);
     // A run whose definition did not read keeps its count of none.
-    if first.attempts == 0 || first.failure.is_none() {
-        if first.cut.is_some() {
-            tell_cut(r, unit, &first);
-        }
+    if first.attempts == 0 || (first.failure.is_none() && first.cut.is_none()) {
         return (first, report);
     }
     let class = class_of(r, unit, &first);
     if let Class::Never(why) = class {
-        (r.progress)(&format!("{}; not run again: {why}", describe(&first)));
+        not_again(r, &first, why);
         return (first, report);
     }
-    // A run that was paid for, whose report the review could not keep,
-    // is not paid for again.
+    // A run that was paid for, cut off or with a report the review could
+    // not keep, ran: it is not paid for again.
     if let Some(why) = charged(&first.log) {
-        (r.progress)(&format!("{}; not run again: {why}", describe(&first)));
+        not_again(r, &first, &why);
         return (first, report);
     }
     if class == Class::Again {
@@ -117,17 +114,25 @@ pub(crate) fn run_one(r: &Review, c: &Controls, unit: &Unit) -> (AgentRun, Optio
 }
 
 /// Tells progress that `run` of `unit`, cut off, is not run again: a
-/// cut run ran, so it was charged, and its log is read as it stands.
-/// Why is its class's when it may never run again, else its charge.
+/// cut run ran, so it was charged. Why is its class's when it may never
+/// run again, else its charge.
 fn tell_cut(r: &Review, unit: &Unit, run: &AgentRun) {
     let why = match class_of(r, unit, run) {
         Class::Never(why) => why.to_owned(),
         _ => charged(&run.log).unwrap_or_default(),
     };
-    (r.progress)(&format!(
-        "{}; not run again: {why}, so its log is read as it stands",
-        describe(run)
-    ));
+    not_again(r, run, &why);
+}
+
+/// Tells progress that `run` is not run again for `why`, and, for one
+/// cut off, that its log is read as it stands.
+fn not_again(r: &Review, run: &AgentRun, why: &str) {
+    let read = if run.cut.is_some() {
+        ", so its log is read as it stands"
+    } else {
+        ""
+    };
+    (r.progress)(&format!("{}; not run again: {why}{read}", describe(run)));
 }
 
 /// Why the run `log` reads was charged: it reported a cost, or, with
