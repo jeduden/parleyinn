@@ -187,6 +187,28 @@ fn a_spend_kept_only_when_the_review_succeeded_or_unscrubbed_is_named() {
 }
 
 #[test]
+fn a_spend_kept_under_one_name_for_every_attempt_or_replacing_one_is_named() {
+    let one_name = workflow_problems(&mutated("-a${{ github.run_attempt }}", ""));
+    assert_eq!(one_name.len(), 1, "{one_name:?}");
+    assert!(
+        one_name[0].starts_with("no step uploads what"),
+        "{one_name:?}"
+    );
+
+    let replacing = workflow_problems(&mutated(
+        "          path: review/spend.json\n",
+        "          path: review/spend.json\n          overwrite: true\n",
+    ));
+    assert_eq!(
+        replacing,
+        [
+            "the step that uploads what the pull request's reviews spent may replace what an \
+             earlier one kept"
+        ]
+    );
+}
+
+#[test]
 fn a_fetch_that_picks_by_no_origin_or_reads_no_file_is_named() {
     let unpicked = workflow_problems(&mutated(
         "review-run -- previous select --of spend",
@@ -206,11 +228,15 @@ fn a_fetch_that_picks_by_no_origin_or_reads_no_file_is_named() {
              every earlier review with review-run previous spend"
         ]
     );
-    let all = workflow_problems(&mutated(" --except-run \"$GITHUB_RUN_ID\"", ""));
+    let first = workflow_problems(&mutated(
+        "--jq \".artifacts[] | select(.name | startswith(\\\"review-spend-pr-$PULL-a\\\"))\"",
+        "--jq '.artifacts[]'",
+    ));
     assert_eq!(
-        all,
+        first,
         [
-            "the step that fetches what earlier reviews spent never leaves out the spend its own run kept"
+            "the step that fetches what earlier reviews spent never looks for the artifacts of the \
+             pull request's own name, every attempt's"
         ]
     );
 }
@@ -255,7 +281,7 @@ fn a_spend_fetched_after_the_token_is_staged_is_named() {
 
 #[test]
 fn a_fetch_step_that_lacks_its_checks_names_each() {
-    assert_eq!(fetch_problems("previous select --of spend").len(), 6);
+    assert_eq!(fetch_problems("previous select --of spend").len(), 5);
 }
 
 #[test]
@@ -272,8 +298,8 @@ fn a_reading_that_takes_any_file_or_misreads_one_is_named() {
 #[test]
 fn an_upload_lacking_its_retention_is_named() {
     let got = workflow_problems(&mutated(
-        "          overwrite: true\n          retention-days: 90\n",
-        "          overwrite: true\n",
+        "          path: review/spend.json\n          retention-days: 90\n",
+        "          path: review/spend.json\n",
     ));
 
     assert_eq!(
@@ -282,27 +308,19 @@ fn an_upload_lacking_its_retention_is_named() {
             "the step that uploads what the pull request's reviews spent lacks \"retention-days: 90\""
         ]
     );
-    let kept = workflow_problems(&mutated(
-        "          overwrite: true\n          retention-days: 90\n",
-        "          retention-days: 90\n",
-    ));
-    assert_eq!(
-        kept,
-        ["the step that uploads what the pull request's reviews spent lacks \"overwrite: true\""]
-    );
 }
 
 #[test]
 fn a_selection_that_takes_another_origin_or_fails_is_named() {
-    let failing = |_: &str, _: &str, _: &str, _: Option<u64>| Err("no listing".to_owned());
+    let failing = |_: &str, _: &str, _: &str| Err("no listing".to_owned());
 
     let got = selection_problems_with(&failing);
 
     assert_eq!(
         got,
         [
-            "previous select --of spend gave Err(\"no listing\"), not artifacts 1 and 4 with 1 \
-             refused"
+            "previous select --of spend gave Err(\"no listing\"), not artifacts 1, 4, 5 and 6 \
+             with 1 refused"
         ]
     );
 }

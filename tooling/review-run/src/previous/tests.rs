@@ -382,19 +382,23 @@ fn an_artifact_from_an_issue_comment_run_is_taken_when_it_alone_qualifies() {
     );
 }
 
-const SPEND_NAME: &str = "review-spend-pr-7";
+/// The spend artifact attempt 1 of a run keeps for pull request 7, and
+/// attempt 2's.
+const SPEND_NAME: &str = "review-spend-pr-7-a1";
+const RERUN_NAME: &str = "review-spend-pr-7-a2";
 
 #[test]
-fn every_spend_artifact_from_main_s_review_workflow_is_taken_but_the_run_s_own() {
+fn every_spend_artifact_from_main_s_review_workflow_is_taken_each_attempt_apart() {
     let a = listing(&[
         artifact(15, SPEND_NAME, "2026-11-01T14:00:00Z", 150, false),
+        artifact(18, RERUN_NAME, "2026-11-01T14:30:00Z", 150, false),
         artifact(14, SPEND_NAME, "2026-11-01T13:00:00Z", 140, false),
         artifact(13, SPEND_NAME, "2026-11-01T12:30:00Z", 130, false),
         artifact(11, SPEND_NAME, "2026-11-01T12:10:00Z", 110, false),
         artifact(16, SPEND_NAME, "2026-11-01T15:00:00Z", 999, false),
         artifact(12, NAME, "2026-11-01T12:00:00Z", 130, false),
         artifact(10, SPEND_NAME, "2026-11-01T10:00:00Z", 130, true),
-        r#"{"id":17,"name":"review-spend-pr-7","expired":false}"#.to_owned(),
+        r#"{"id":17,"name":"review-spend-pr-7-a1","expired":false}"#.to_owned(),
     ]);
     let r = runs(&[
         (150, REVIEW, "issue_comment"),
@@ -403,20 +407,49 @@ fn every_spend_artifact_from_main_s_review_workflow_is_taken_but_the_run_s_own()
         (110, REVIEW, "workflow_run"),
     ]);
 
-    // 16's run, 999, is the review's own; 14's ran on the pull request's
-    // definition and 17 names no run; 10 expired, 12 is the findings'.
+    // 15 and 18 are two attempts of one run, each its own review; 14 ran
+    // on the pull request's definition, 16's run is unknown and 17 names
+    // no run; 10 expired, 12 is the findings'.
     assert_eq!(
-        spends("7", &a, &r, Some(999)).unwrap(),
+        spends("7", &a, &r).unwrap(),
         Spends {
-            artifacts: vec![11, 13, 15],
-            skipped: 2
+            artifacts: vec![11, 13, 15, 18],
+            skipped: 3
         }
     );
-    assert_eq!(
-        spends("7", &a, &r, None).unwrap().skipped,
-        3,
-        "16's run is unknown"
-    );
+}
+
+#[test]
+fn a_spend_artifact_is_one_of_the_pull_request_s_only_by_its_whole_name() {
+    for name in [
+        "review-spend-pr-7",
+        "review-spend-pr-7-a",
+        "review-spend-pr-7-ax",
+        "review-spend-pr-7-a1x",
+        "review-spend-pr-71-a1",
+        "review-spend-pr-7-a1-a2",
+        "review-findings-pr-7",
+    ] {
+        let a = listing(&[artifact(1, name, "2026-11-01T12:00:00Z", 130, false)]);
+        let r = runs(&[(130, REVIEW, "workflow_run")]);
+
+        let got = spends("7", &a, &r).unwrap();
+
+        assert_eq!(got.artifacts, Vec::<u64>::new(), "{name}");
+        assert_eq!(got.skipped, 0, "{name}");
+    }
+    assert!(is_spend_of("review-spend-pr-7-a12", "7"));
+}
+
+#[test]
+fn an_artifact_a_listing_names_twice_is_summed_once() {
+    let a = listing(&[
+        artifact(13, SPEND_NAME, "2026-11-01T12:30:00Z", 130, false),
+        artifact(13, SPEND_NAME, "2026-11-01T12:30:00Z", 130, false),
+    ]);
+    let r = runs(&[(130, REVIEW, "workflow_run")]);
+
+    assert_eq!(spends("7", &a, &r).unwrap().artifacts, [13]);
 }
 
 #[test]
@@ -426,22 +459,22 @@ fn more_spend_artifacts_than_a_review_sums_are_refused_naming_how_many() {
         .collect();
     let r = runs(&[(130, REVIEW, "workflow_run")]);
 
-    let err = spends("7", &listing(&items), &r, None).unwrap_err();
+    let err = spends("7", &listing(&items), &r).unwrap_err();
 
     assert_eq!(
         err,
         "101 earlier reviews of pull request 7 kept what they spent, past the 100 a review sums"
     );
     assert_eq!(
-        spends("7", &listing(&items[..100]), &r, None)
+        spends("7", &listing(&items[..100]), &r)
             .unwrap()
             .artifacts
             .len(),
         100
     );
-    assert!(spends("x", "{}", "[]", None).is_err());
-    assert!(spends("7", "{", "[]", None).is_err());
-    assert!(spends("7", r#"{"artifacts":[]}"#, "[", None).is_err());
+    assert!(spends("x", "{}", "[]").is_err());
+    assert!(spends("7", "{", "[]").is_err());
+    assert!(spends("7", r#"{"artifacts":[]}"#, "[").is_err());
 }
 
 #[test]
@@ -468,7 +501,7 @@ fn select_of_spend_names_every_artifact_by_the_same_origin_rule() {
         listing(&[
             artifact(14, SPEND_NAME, "2026-11-01T13:00:00Z", 140, false),
             artifact(13, SPEND_NAME, "2026-11-01T12:30:00Z", 130, false),
-            artifact(15, SPEND_NAME, "2026-11-01T14:00:00Z", 150, false),
+            artifact(15, RERUN_NAME, "2026-11-01T14:00:00Z", 130, false),
             artifact(12, NAME, "2026-11-01T12:00:00Z", 130, false),
         ]),
     )
@@ -493,40 +526,33 @@ fn select_of_spend_names_every_artifact_by_the_same_origin_rule() {
     };
 
     assert_eq!(
-        line(&["--of", "spend", "--except-run", "150"]),
+        line(&["--of", "spend"]),
         (
             EXIT_OK,
-            "spend_artifacts=13\nprevious_skipped=1\n".to_owned(),
+            "spend_artifacts=13 15\nprevious_skipped=1\n".to_owned(),
             String::new()
         )
-    );
-    assert_eq!(
-        line(&["--of", "spend"]).1,
-        "spend_artifacts=13\nprevious_skipped=2\n"
     );
     assert_eq!(
         line(&["--of", "findings"]).1,
         "previous_artifact=12\nprevious_skipped=0\n"
     );
+    assert_eq!(line(&[]).1, "previous_artifact=12\nprevious_skipped=0\n");
     for (extra, want) in [
         (
             &["--of", "costs"][..],
             "--of \"costs\" is neither findings nor spend",
         ),
         (
-            &["--of", "spend", "--except-run", "x"],
-            "--except-run \"x\" is no run id",
-        ),
-        (
             &["--except-run", "150"],
-            "--except-run is for --of spend alone",
+            "unknown argument \"--except-run\"",
         ),
     ] {
         let (code, _, err) = line(extra);
         assert_eq!(code, EXIT_USAGE, "{extra:?}");
         assert!(err.contains(want), "{err}");
     }
-    assert_eq!(name_of(SPEND, "7").unwrap(), SPEND_NAME);
+    assert_eq!(name_of(SPEND, "7").unwrap(), "review-spend-pr-7");
 }
 
 #[test]

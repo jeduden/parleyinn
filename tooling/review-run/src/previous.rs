@@ -7,14 +7,16 @@
 //! defines may upload one. `previous check` refuses a findings file
 //! that is too large or does not read, so a broken history is named
 //! and never taken for an empty one (I6). Each review keeps what it
-//! spent alone, so `previous select --of spend` names every artifact of
-//! the pull request's spend that a run of main's review workflow
-//! uploaded, by the same origin rule, but for the review's own run, and
-//! `previous spend` reads each and sums them, refusing a spend file that
-//! is too large or does not read, so it is never taken for nothing
-//! spent. Two reviews of one pull request that run side by side, or one
-//! cancelled, each keep their own, so neither erases the other's. The
-//! tool decides and the caller's script only fetches.
+//! spent alone, under a name of its pull request and its run's attempt,
+//! so `previous select --of spend` names every artifact of the pull
+//! request's spend that a run of main's review workflow uploaded, by the
+//! same origin rule, an earlier attempt of the review's own run
+//! included, and `previous spend` reads each and sums them, refusing a
+//! spend file that is too large or does not read, so it is never taken
+//! for nothing spent. Two reviews of one pull request that run side by
+//! side, one cancelled, or a run and its rerun, each keep their own, so
+//! none erases another's. The tool decides and the caller's script only
+//! fetches.
 
 use std::fs;
 use std::io::Write;
@@ -26,7 +28,7 @@ use crate::findings;
 
 /// How to call it.
 pub const USAGE: &str = "usage: review-run previous select --pull N --artifacts FILE --runs FILE \
-[--of findings|spend [--except-run ID]]\n\
+[--of findings|spend]\n\
        review-run previous check FILE\n\
        review-run previous spend FILE...";
 
@@ -42,8 +44,12 @@ pub const MAX_BYTES: usize = 1 << 20;
 /// under starts, its number after it.
 pub const FINDINGS: &str = "review-findings-pr-";
 /// How the name of the artifact what a pull request's reviews spent is
-/// kept under starts, its number after it.
+/// kept under starts, its number after it, then [`ATTEMPT`].
 pub const SPEND: &str = "review-spend-pr-";
+/// What comes after the pull request's number in a spend artifact's
+/// name, the run attempt that kept it after it, so a rerun of a run
+/// keeps its own beside its first attempt's and replaces none.
+pub const ATTEMPT: &str = "-a";
 
 /// What the lookup found.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -217,24 +223,32 @@ pub fn select_of(
     })
 }
 
+/// Whether `name` is that of an artifact pull request `pull`'s spend
+/// is kept under: [`SPEND`], the number, [`ATTEMPT`] and the attempt's
+/// number, nothing after it.
+#[must_use]
+pub fn is_spend_of(name: &str, pull: &str) -> bool {
+    name.strip_prefix(SPEND)
+        .and_then(|rest| rest.strip_prefix(pull))
+        .and_then(|rest| rest.strip_prefix(ATTEMPT))
+        .is_some_and(|n| !n.is_empty() && n.bytes().all(|b| b.is_ascii_digit()))
+}
+
 /// Picks every artifact of the pull request `pull`'s spend to sum:
-/// `artifacts` and `runs` as [`select`] reads them. Each artifact of the
-/// name, not expired and not uploaded by the run `except`, the review's
-/// own, is taken when its run is one of main's review workflow, and
-/// otherwise refused and counted, its run unknown included; sorted by
-/// id.
+/// `artifacts` and `runs` as [`select`] reads them. Each artifact whose
+/// name [`is_spend_of`] the pull request, not expired, is taken when its
+/// run is one of main's review workflow, an earlier attempt of the
+/// review's own run among them, as the review's own attempt has kept
+/// none yet, and otherwise refused and counted, its run unknown
+/// included; sorted by id, each once, though a listing paged while one
+/// was added names one twice.
 ///
 /// # Errors
 ///
 /// Fails when either input does not read, `pull` is no number, or more
 /// than [`MAX_SPENDS`] artifacts qualify.
-pub fn spends(
-    pull: &str,
-    artifacts: &str,
-    runs: &str,
-    except: Option<u64>,
-) -> Result<Spends, String> {
-    let wanted = name_of(SPEND, pull)?;
+pub fn spends(pull: &str, artifacts: &str, runs: &str) -> Result<Spends, String> {
+    name_of(SPEND, pull)?;
     let listing: Listing =
         serde_json::from_str(artifacts).map_err(|e| format!("artifacts do not read: {e}"))?;
     let runs: Vec<Run> =
@@ -243,17 +257,18 @@ pub fn spends(
         artifacts: Vec::new(),
         skipped: 0,
     };
-    for a in listing
+    let mut named: Vec<&Artifact> = listing
         .artifacts
         .iter()
-        .filter(|a| a.name == wanted && !a.expired)
-    {
-        let run = a.workflow_run.as_ref().map(|r| r.id);
-        if run.is_some() && run == except {
-            continue;
-        }
-        let trusted = run
-            .and_then(|id| runs.iter().find(|r| r.id == id))
+        .filter(|a| is_spend_of(&a.name, pull) && !a.expired)
+        .collect();
+    named.sort_by_key(|a| a.id);
+    named.dedup_by_key(|a| a.id);
+    for a in named {
+        let trusted = a
+            .workflow_run
+            .as_ref()
+            .and_then(|r| runs.iter().find(|run| run.id == r.id))
             .is_some_and(Run::is_main_review);
         if trusted {
             out.artifacts.push(a.id);
@@ -268,7 +283,6 @@ pub fn spends(
             out.artifacts.len()
         ));
     }
-    out.artifacts.sort_unstable();
 
     Ok(out)
 }
@@ -315,9 +329,9 @@ pub fn run(args: &[String], stdout: &mut dyn Write, stderr: &mut dyn Write) -> u
     let result = match args.first().map(String::as_str) {
         Some("select") => parse_select(&args[1..]).and_then(|s| {
             let (a, r) = (read(&s.artifacts)?, read(&s.runs)?);
-            Ok(match s.except {
-                Some(except) => spends(&s.pull, &a, &r, except)?.lines(),
-                None => select_of(s.prefix, &s.pull, &a, &r)?.lines(),
+            Ok(match s.of {
+                Of::Spend => spends(&s.pull, &a, &r)?.lines(),
+                Of::Findings => select(&s.pull, &a, &r)?.lines(),
             })
         }),
         Some("spend") => spend_of(&args[1..]),
@@ -381,21 +395,26 @@ impl From<String> for Usage {
     }
 }
 
-/// What `select` was asked: the name's start, the pull request, the two
-/// files and, for the spend, the review's own run to leave out, if any.
+/// Which artifacts `select` picks: the previous review's findings, or
+/// every earlier review's spend.
+enum Of {
+    Findings,
+    Spend,
+}
+
+/// What `select` was asked: which artifacts, the pull request and the
+/// two files.
 struct Select {
-    prefix: &'static str,
+    of: Of,
     pull: String,
     artifacts: String,
     runs: String,
-    /// Set for the spend alone: the run to leave out.
-    except: Option<Option<u64>>,
 }
 
-/// Reads `--pull N --artifacts FILE --runs FILE [--of findings|spend
-/// [--except-run ID]]`, in any order.
+/// Reads `--pull N --artifacts FILE --runs FILE [--of findings|spend]`,
+/// in any order.
 fn parse_select(args: &[String]) -> Result<Select, Usage> {
-    let (mut pull, mut artifacts, mut runs, mut of, mut except) = (None, None, None, None, None);
+    let (mut pull, mut artifacts, mut runs, mut of) = (None, None, None, None);
     let mut args = args.iter();
     while let Some(arg) = args.next() {
         let slot = match arg.as_str() {
@@ -403,7 +422,6 @@ fn parse_select(args: &[String]) -> Result<Select, Usage> {
             "--artifacts" => &mut artifacts,
             "--runs" => &mut runs,
             "--of" => &mut of,
-            "--except-run" => &mut except,
             other => return Err(Usage::Wrong(format!("unknown argument {other:?}"))),
         };
         *slot = Some(
@@ -412,36 +430,21 @@ fn parse_select(args: &[String]) -> Result<Select, Usage> {
                 .ok_or_else(|| Usage::Wrong(format!("{arg} needs a value")))?,
         );
     }
-    let prefix = match of.as_deref() {
-        None | Some("findings") => FINDINGS,
-        Some("spend") => SPEND,
+    let of = match of.as_deref() {
+        None | Some("findings") => Of::Findings,
+        Some("spend") => Of::Spend,
         Some(other) => {
             return Err(Usage::Wrong(format!(
                 "--of {other:?} is neither findings nor spend"
             )));
         }
     };
-    let except = match (prefix, except) {
-        (SPEND, None) => Some(None),
-        (SPEND, Some(id)) => {
-            Some(Some(id.parse().map_err(|_| {
-                Usage::Wrong(format!("--except-run {id:?} is no run id"))
-            })?))
-        }
-        (_, None) => None,
-        (_, Some(_)) => {
-            return Err(Usage::Wrong(
-                "--except-run is for --of spend alone".to_owned(),
-            ));
-        }
-    };
     match (pull, artifacts, runs) {
         (Some(pull), Some(artifacts), Some(runs)) => Ok(Select {
-            prefix,
+            of,
             pull,
             artifacts,
             runs,
-            except,
         }),
         _ => Err(Usage::Wrong(
             "select needs --pull, --artifacts and --runs".to_owned(),

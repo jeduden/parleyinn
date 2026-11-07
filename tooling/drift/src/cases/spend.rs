@@ -60,30 +60,49 @@ fn flight_cases() -> Vec<Case> {
     ]
 }
 
-/// The drifts of the sum of what each earlier review kept: the run's own
-/// spend summed with the earlier ones, a run behind one that cannot be
-/// looked up only warned of, a rerun's spend kept beside its first's,
-/// and a file of many left out. Last, so adding them moves no earlier
+/// The drifts of the sum of what each earlier review kept: a rerun's
+/// first attempt left out, by the listing or the selection, an artifact
+/// a paged listing named twice summed twice, a run behind one that
+/// cannot be looked up only warned of, a rerun's spend kept under or in
+/// place of its first attempt's, and a file of many left out. Last, so adding them moves no earlier
 /// case to another shard.
 fn sum_cases() -> Vec<Case> {
     vec![
         case(
-            "what earlier reviews spent summed with what the review's own run kept",
+            "what earlier reviews spent listed by a name with no run attempt",
             "ENG-28",
-            Injection::replace(SCRIPT, " --except-run \"$GITHUB_RUN_ID\"", ""),
+            Injection::replace(
+                SCRIPT,
+                "startswith(\\\"review-spend-pr-$PULL-a\\\")",
+                "startswith(\\\"review-spend-pr-$PULL\\\")",
+            ),
             carry_check(),
-            "never leaves out the spend its own run kept",
+            "never looks for the artifacts of the pull request's own name, every attempt's",
         ),
         case(
-            "previous select --of spend taking the review's own run's spend",
+            "previous select --of spend taking the name with no run attempt alone",
             "ENG-28",
             Injection::replace(
                 "tooling/review-run/src/previous.rs",
-                "if run.is_some() && run == except {",
-                "if run.is_some() && run == except && false {",
+                ".filter(|a| is_spend_of(&a.name, pull) && !a.expired)",
+                ".filter(|a| a.name == format!(\"{SPEND}{pull}\") && !a.expired)",
             ),
             carry_check(),
-            "not artifacts 1 and 4",
+            "not artifacts 1, 4, 5 and 6",
+        ),
+        case(
+            "previous select --of spend summing an artifact a paged listing named twice",
+            "ENG-28",
+            Injection::replace(
+                "tooling/review-run/src/previous.rs",
+                "    named.dedup_by_key(|a| a.id);\n",
+                "",
+            ),
+            cargo_lib_test(
+                "review-run",
+                "previous::tests::an_artifact_a_listing_names_twice_is_summed_once",
+            ),
+            "an_artifact_a_listing_names_twice_is_summed_once",
         ),
         case(
             "a run behind an earlier review's spend that cannot be looked up only warned of",
@@ -97,15 +116,22 @@ fn sum_cases() -> Vec<Case> {
             "goes on past a run it could not look up",
         ),
         case(
-            "the spend kept under a name a rerun of its own run cannot replace",
+            "a rerun's spend kept under its first attempt's name",
+            "ENG-28",
+            Injection::replace(WORKFLOW, "-a${{ github.run_attempt }}", ""),
+            carry_check(),
+            "no step uploads what the pull request's reviews spent",
+        ),
+        case(
+            "a rerun's spend replacing what its first attempt kept",
             "ENG-28",
             Injection::replace(
                 WORKFLOW,
-                "          path: review/spend.json\n          overwrite: true\n",
                 "          path: review/spend.json\n",
+                "          path: review/spend.json\n          overwrite: true\n",
             ),
             carry_check(),
-            "reviews spent lacks \\\"overwrite: true",
+            "may replace what an earlier one kept",
         ),
         case(
             "previous spend reading one file of many",

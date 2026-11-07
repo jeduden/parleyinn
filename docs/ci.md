@@ -59,9 +59,9 @@ is short, because a finding found late costs a whole round.
   apart from any finding: fix the outage or prompt, then `--resume`.
 - A pull request's reviews share one cost cap, ENG-28's, 5 USD counted
   over all of them: each review keeps what it spent in a
-  `review-spend-pr-<N>` artifact, and the next sums every one but its own
-  run's into `review-run --spent-before`, so reviews run side by side or
-  cancelled never erase each other's. A run starts only once its tier's
+  `review-spend-pr-<N>-a<attempt>` artifact, and the next sums every one
+  into `review-run --spent-before`, so reviews run side by side,
+  cancelled or rerun never erase each other's. A run starts only once its tier's
   cap, 0.30 USD for a specialist and 1.50 for a generalist, fits beside
   what was spent and the caps of the runs in flight, else it waits; a run
   paid for that left no result, killed at its deadline, crashed or
@@ -69,7 +69,7 @@ is short, because a finding found late costs a whole round.
   reported no cost is charged nothing. A review the cap stopped
   lists every agent it did not run, `over budget:`, in
   `review/not-reviewed.md` and requests changes. Deleting the pull
-  request's `review-spend-pr-<N>` artifacts resets its budget, and
+  request's `review-spend-pr-<N>-a*` artifacts resets its budget, and
   `--max-cost-usd` overrides the cap.
 - CI ends within ten minutes of a push. The slowest chain of jobs sets
   that; a job that grows toward its five-minute limit is split before it

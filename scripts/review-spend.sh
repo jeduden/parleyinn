@@ -2,11 +2,14 @@
 # Fetches what the earlier reviews of the pull request spent, for
 # `review-run --spent-before`, which holds them all to one cost cap
 # (ENG-28). Each review keeps what it spent alone, so this sums every
-# review's. It only fetches: `review-run previous select --of spend`
-# decides which artifacts are trusted, by the rule the previous findings
-# are picked by, since an artifact of this name may come from any
-# workflow a pull request defines, and leaves out this run's own;
-# `review-run previous spend` reads each file and sums them. A spend
+# review's, each attempt of a run its own: `review-spend-pr-<N>-a<attempt>`,
+# so a rerun counts what its first attempt spent and replaces none. As
+# GitHub lists artifacts by an exact name alone, it lists the
+# repository's and keeps those whose name starts so. It only fetches:
+# `review-run previous select --of spend` decides which artifacts are
+# trusted, by the rule the previous findings are picked by, since an
+# artifact of this name may come from any workflow a pull request
+# defines; `review-run previous spend` reads each file and sums them. A spend
 # that cannot be listed, a run behind one that cannot be looked up, or
 # a file that cannot be fetched or read fails the step, naming why: it
 # is never taken for nothing spent (I6). How many earlier reviews it
@@ -27,8 +30,9 @@ fail() {
   exit 1
 }
 
-gh api --paginate "repos/$REPO/actions/artifacts?name=review-spend-pr-$PULL&per_page=100" \
-  --jq '.artifacts[]' > "$dir/pages.json" \
+gh api --paginate "repos/$REPO/actions/artifacts?per_page=100" \
+  --jq ".artifacts[] | select(.name | startswith(\"review-spend-pr-$PULL-a\"))" \
+  > "$dir/pages.json" \
   && jq -s '{artifacts: .}' "$dir/pages.json" > "$dir/artifacts.json" \
   || fail "What earlier reviews of this pull request spent could not be listed, so no agent runs."
 : > "$dir/runs.jsonl"
@@ -45,7 +49,7 @@ done
 jq -s . "$dir/runs.jsonl" > "$dir/runs.json" \
   || fail "The runs behind what earlier reviews of this pull request spent did not read, so no agent runs."
 picked=$(cargo run --locked --quiet --offline -p review-run -- previous select --of spend \
-  --pull "$PULL" --except-run "$GITHUB_RUN_ID" \
+  --pull "$PULL" \
   --artifacts "$dir/artifacts.json" --runs "$dir/runs.json") \
   || fail "What earlier reviews of this pull request spent could not be told apart, so no agent runs."
 ids=$(sed -n 's/^spend_artifacts=//p' <<< "$picked")

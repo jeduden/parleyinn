@@ -285,14 +285,13 @@ jobs:
             review/findings.md
           retention-days: 90
           if-no-files-found: error
-      # What this review spent, kept however it ended, for the next to sum.
+      # What this review spent, however it ended, per attempt, for the next to sum.
       - name: Keep what this review spent
         if: always() && steps.scrub.outputs.scrubbed == 'true'
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: review-spend-pr-${{ steps.pull_head.outputs.number }}
+          name: review-spend-pr-${{ steps.pull_head.outputs.number }}-a${{ github.run_attempt }}
           path: review/spend.json
-          overwrite: true
           retention-days: 90
           if-no-files-found: warn
       # The run logs under review/logs/ stay in the job: they hold every

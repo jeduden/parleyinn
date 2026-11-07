@@ -11,14 +11,15 @@ its upgrade notes (ENG-23). ParleyInn follows semantic versioning.
 
 - The review's cost cap moved from 40 USD per review to 5 USD per pull
   request, counted over all of its reviews (ENG-28): each review keeps
-  what it alone spent in a `review-spend-pr-<N>` artifact, and the next
-  sums every one but its own run's and passes the sum to `review-run` as
-  the new `--spent-before`; deleting the pull request's
-  `review-spend-pr-<N>` artifacts resets its budget. The per-run tier
+  what it alone spent in a `review-spend-pr-<N>-a<attempt>` artifact, a
+  rerun beside its first attempt's, and the next sums every one and
+  passes the sum to `review-run` as the new `--spent-before`; deleting
+  the pull request's `review-spend-pr-<N>-a*` artifacts resets its
+  budget. The per-run tier
   caps are lower, 0.30 USD for a specialist and 1.50 for a generalist,
   and a run starts only once its tier's cap fits beside what was spent
-  and the caps of the runs in flight; a run paid for that reported no
-  cost is charged its tier's cap. A review the cap stopped lists every
+  and the caps of the runs in flight; a run paid for that left no
+  result is charged its tier's cap. A review the cap stopped lists every
   agent it did not run. Two deep generalists, `review-code-deep` and
   `review-spec-deep`, run on Sonnet at medium effort.
 - CI now fails on a source, test, feature or configuration file past its
