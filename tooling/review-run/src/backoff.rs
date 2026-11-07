@@ -6,7 +6,8 @@
 //! left of its deadline. A run that can never succeed by running again is not run
 //! again, and why is named: one a cost cap stopped or kept from
 //! starting, and one its credential was refused for (a 401 or 403, an
-//! invalid token or key). Any other failure is run once more.
+//! invalid token or key). Any other failure is run once more. Whatever
+//! its class, a run that was charged is never run again (`retry`).
 
 use std::time::Duration;
 

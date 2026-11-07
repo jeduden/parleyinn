@@ -168,8 +168,7 @@ pub fn retry_problems(prompts: &[String]) -> Vec<String> {
     match prompts.len() {
         1 => Vec::new(),
         n => vec![format!(
-            "review-run ran {SPECIALIST} {n} time{}, not once after its report was refused",
-            if n == 1 { "" } else { "s" }
+            "review-run ran {SPECIALIST} {n} times, not once after its report was refused"
         )],
     }
 }

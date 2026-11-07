@@ -1,27 +1,25 @@
-//! The second attempt: an agent whose run did not answer, or a
-//! specialist, whole or a part, whose assembled report the gate would
-//! refuse, runs once more as the same agent. A specialist is told what
-//! was wrong, the gate's problem with the line it names, and the forms
-//! again; the second run is judged alone, its own report replacing the
-//! first's. Only a second run that again did not answer shows what both
-//! stated, under its `incomplete:` head, so nothing either found is lost
-//! while the run stays one that did not answer. A second report the gate
-//! refuses stays refused: the review names it as it would the first.
+//! The attempts after the first. A run that was charged, by its cost or
+//! by model calls that used tokens, is never run again, overloaded or
+//! not: what it stated is its report, headed `incomplete:` when it did
+//! not answer, and a report the gate refuses stands as refused, so no run
+//! is paid for twice. Only a run that cost nothing runs again, as the
+//! same agent: once, a specialist told why its first did not answer and
+//! the forms again, and judged by that run alone; a run the API turned
+//! away as overloaded waits first, and runs a third time at most.
 
 use std::collections::BTreeSet;
-use std::path::Path;
 use std::time::Duration;
 
 use review_eval::component::Kind;
 use review_eval::log::RunLog;
-use review_gate::report::{Problem, assemble, report_check};
+use review_gate::report::{Problem, report_check};
 
 use crate::LOGS;
 use crate::backoff::{self, Class, MAX_ATTEMPTS};
 use crate::controls::Controls;
 use crate::live::Running;
 use crate::parts::add_usage;
-use crate::run::{AgentRun, Review, Unit, attempt, describe, keep_log, not_started, write_report};
+use crate::run::{AgentRun, Review, Unit, attempt, describe, keep_log, not_started};
 
 /// Why an overloaded run gets no wait and so no further run.
 const SPENT: &str = "the API was overloaded and its backoff deadline is spent";
@@ -69,14 +67,14 @@ pub fn note(failure: &str) -> String {
     )
 }
 
-/// Runs `unit`, and once more when its run did not answer, or, for a
-/// specialist, when the gate would refuse its assembled report, holding
-/// its ids to the known ones. A definition that does not read, a run a
-/// cost cap stopped or kept from starting, and a run whose credential
-/// was refused are not run again, and progress is told why. A run the
-/// API turned away as overloaded first waits, as `backoff` says, and an
-/// attempt so turned away is followed by another while waits are left.
-/// The first failure or refusal is told to progress before the second
+/// Runs `unit`, and once more when its run did not answer and cost
+/// nothing. A definition that does not read, a run a cost cap stopped or
+/// kept from starting, a run whose credential was refused, a run whose
+/// report the gate refuses and a run that was charged are not run
+/// again, and progress is told why. A run the API turned away as
+/// overloaded first waits, as `backoff` says, and an attempt so turned
+/// away is followed by another while waits are left and it was not
+/// charged. The first failure is told to progress before the second
 /// attempt, which a specialist runs told [`note`], and the first log is
 /// kept as `<stem>.first.jsonl` beside the second's, a second turned
 /// away as `<stem>.second.jsonl`. No attempt starts once the finished
@@ -205,7 +203,6 @@ fn again(
             || class != Class::Overloaded
             || paid.is_some()
         {
-            let report = salvage(r.workdir, unit, first.run, &mut next, report);
             return (next, report);
         }
         keep(r, unit, "second");
@@ -286,39 +283,6 @@ fn keep(r: &Review, unit: &Unit, which: &str) {
             unit.kind.word()
         ));
     }
-}
-
-/// `report`, the second attempt's, or, when that attempt did not answer
-/// either, what both attempts stated under its `incomplete:` head,
-/// written as the specialist's report when `unit` is one run whole.
-fn salvage(
-    workdir: &Path,
-    unit: &Unit,
-    first: &AgentRun,
-    second: &mut AgentRun,
-    report: Option<String>,
-) -> Option<String> {
-    let (Some(_), Some(failure)) = (&report, second.failure.clone()) else {
-        return report;
-    };
-    let texts: Vec<String> = first
-        .log
-        .texts
-        .iter()
-        .chain(&second.log.texts)
-        .cloned()
-        .collect();
-    let text = assemble(&texts, &second.log.answer, Some(&failure));
-    if report.as_ref() == Some(&text) {
-        return report;
-    }
-    if unit.part.is_none()
-        && let Err(e) = write_report(workdir, &unit.name, &text)
-    {
-        second.failure = Some(format!("{failure}; {e}"));
-    }
-
-    Some(text)
 }
 
 #[cfg(test)]
