@@ -1,8 +1,9 @@
 //! What a pull request's reviews spent (ENG-28): `review/spend.json`,
 //! `{"spent_usd": <total>}`, the cost of the earlier reviews the review
-//! was handed as `--spent-before` and of its own finished runs. It is
-//! written when the review starts, again as each run ends, and once
-//! more from the usage when the review ends, each time whole, so a
+//! was handed as `--spent-before` and what its budget charged its own
+//! finished runs, a run paid for that reported no cost charged its
+//! tier's cap. It is written when the review starts, again as each run
+//! ends, and once more when the review ends, each time whole, so a
 //! review cut off after it spent still leaves what it spent for the
 //! next review of its pull request. A spend file past [`MAX_BYTES`] or
 //! one that does not read is named, never taken for nothing spent (I6).

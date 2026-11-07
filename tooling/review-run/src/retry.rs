@@ -12,6 +12,7 @@ use std::time::Duration;
 
 use review_eval::component::Kind;
 use review_eval::log::RunLog;
+use review_eval::runner;
 use review_gate::report::{Problem, report_check};
 
 use crate::LOGS;
@@ -148,6 +149,23 @@ fn charged(log: &RunLog) -> Option<String> {
     }
 }
 
+/// What the review charges the run `log` reads, of a tier whose cap is
+/// `most` US dollars: the cost it reported, or, for a run [`charged`]
+/// with none reported, killed at its deadline, crashed or cancelled in
+/// flight, the whole of its tier's cap, the most `--max-budget-usd` let
+/// it spend, so a run that was paid for is never counted free and no
+/// price table is needed; nothing for a run that cost nothing.
+#[must_use]
+pub fn billed(log: &RunLog, most: f64) -> f64 {
+    if log.cost > 0.0 {
+        log.cost
+    } else if charged(log).is_some() {
+        most
+    } else {
+        0.0
+    }
+}
+
 /// The first attempt, as the attempts after it need it.
 struct Attempt<'a> {
     run: &'a AgentRun,
@@ -189,6 +207,8 @@ fn again(
         }
         let (mut next, report) = tried(r, c, unit, note);
         let paid = charged(&next.log);
+        // Only a run charged nothing is run again, so the last
+        // attempt's charge is the run's.
         add_usage(&mut next.log, &last.0.log);
         next.attempts = last.0.attempts + 1;
         class = class_of(r, unit, &next);
@@ -211,8 +231,8 @@ fn again(
 }
 
 /// Runs `unit` once, with `note`, unless the review's finished runs
-/// reached its cost cap: noted as running while it runs, and its cost
-/// added once it ends.
+/// reached its cost cap: noted as running while it runs, and charged
+/// once it ends what [`billed`] says.
 fn tried(r: &Review, c: &Controls, unit: &Unit, note: Option<&str>) -> (AgentRun, Option<String>) {
     if let Some(why) = c.budget.refusal() {
         return not_started(r.workdir, unit, why);
@@ -226,10 +246,11 @@ fn tried(r: &Review, c: &Controls, unit: &Unit, note: Option<&str>) -> (AgentRun
             since: r.clock.now(),
         },
     );
-    let done = attempt(r.host, r.workdir, r.plan, unit, r.options.deadline, note);
+    let mut done = attempt(r.host, r.workdir, r.plan, unit, r.options.deadline, note);
     c.live.end(&label);
+    done.0.charged = billed(&done.0.log, runner::budget_of(unit.kind));
     c.budget
-        .charge(done.0.log.cost, &|spent| keep_spend(r, spent));
+        .charge(done.0.charged, &|spent| keep_spend(r, spent));
 
     done
 }

@@ -87,6 +87,13 @@ pub fn usage(runs: &[AgentRun], resumed_from: Option<&str>) -> Vec<AgentUsage> {
     out
 }
 
+/// What the review's budget charged `runs`, in US dollars: a run
+/// reused was charged nothing.
+#[must_use]
+pub fn charged(runs: &[AgentRun]) -> f64 {
+    runs.iter().map(|r| r.charged).sum()
+}
+
 /// The total cost of `usage`, in US dollars.
 #[must_use]
 pub fn total(usage: &[AgentUsage]) -> f64 {

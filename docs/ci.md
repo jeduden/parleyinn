@@ -59,7 +59,9 @@ is short, because a finding found late costs a whole round.
   apart from any finding: fix the outage or prompt, then `--resume`.
 - A pull request's reviews share one cost cap, ENG-28's, counted over
   all of them: each review keeps the total in the `review-spend-pr-<N>`
-  artifact, and the next takes it as `review-run --spent-before`. A review
+  artifact, and the next takes it as `review-run --spent-before`. A run
+  that was paid for and reported no cost, killed at its deadline, crashed
+  or cancelled, is charged its tier's whole cap. A review
   the cap stopped lists every agent it did not run, `over budget:`, in
   `review/not-reviewed.md` and requests changes. Deleting the pull
   request's `review-spend-pr-<N>` artifacts resets its budget, and

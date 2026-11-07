@@ -367,7 +367,7 @@ fn record(
     // First, so what the runs cost is kept however the rest goes.
     written.whole(
         crate::spend::SPEND,
-        &crate::spend::text(p.spent_before + usage::total(&usage)),
+        &crate::spend::text(p.spent_before + usage::charged(runs)),
     )?;
     let stalls = stall::tally(
         &not_reviewed,

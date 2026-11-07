@@ -112,6 +112,10 @@ pub struct AgentRun {
     pub answer_key: Option<String>,
     /// Whether its accepted answer could not be stored.
     pub store_failed: bool,
+    /// What the review's budget charged its runs, in US dollars: each
+    /// run's reported cost, or its tier's cap for a run that was charged
+    /// and reported none ([`crate::retry::billed`]).
+    pub charged: f64,
 }
 
 impl AgentRun {
@@ -130,6 +134,7 @@ impl AgentRun {
             from_store: false,
             answer_key: None,
             store_failed: false,
+            charged: 0.0,
         }
     }
 
@@ -345,6 +350,7 @@ pub(crate) fn specialist_units(
                     from_store: false,
                     answer_key: None,
                     store_failed: false,
+                    charged: 0.0,
                 });
             }
         }

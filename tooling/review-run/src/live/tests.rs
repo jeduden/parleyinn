@@ -117,6 +117,7 @@ fn agent_run(name: &str, failure: Option<&str>, reused: bool) -> AgentRun {
         from_store: false,
         answer_key: None,
         store_failed: false,
+        charged: 0.0,
     }
 }
 

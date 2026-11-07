@@ -357,6 +357,7 @@ fn a_later_overloaded_attempt_that_was_charged_is_not_run_again() {
     assert!(!run.answered());
     assert_eq!(run.attempts, 2);
     assert_eq!(ran.clock.slept(), [Duration::from_secs(15)]);
+    assert!((run.charged - 0.02).abs() < 1e-9, "the charged attempt's");
     assert!(
         ran.lines
             .iter()

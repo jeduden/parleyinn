@@ -438,3 +438,35 @@ fn a_failure_that_cost_nothing_runs_once_more_whatever_turns_it_counts() {
     assert_eq!(runs[0].attempts, 2);
     assert_eq!(specialist_prompts(&host).len(), 2);
 }
+
+#[test]
+fn a_run_is_billed_its_cost_or_its_tier_s_cap_when_charged_with_none_reported() {
+    let parse = review_eval::log::parse;
+
+    assert!((billed(&parse(CALLED), 0.3) - 0.3).abs() < 1e-9);
+    assert!((billed(&parse(&fake::log("x", 0.25)), 0.3) - 0.25).abs() < 1e-9);
+    assert!(billed(&parse(FREE), 0.3).abs() < 1e-9);
+}
+
+#[test]
+fn a_run_killed_after_model_calls_is_charged_its_tier_s_cap_and_kept_as_spent() {
+    let dir = workdir(false);
+
+    let (runs, _, _) = review_of(dir.path(), |c| {
+        if !prompt_of(c).contains("a specialist") {
+            return fake::generalist(c);
+        }
+        fake::write_log(c, &format!("{CALLED}\n"));
+        Ok(Output {
+            timed_out: true,
+            ..Output::default()
+        })
+    });
+
+    let cap = review_eval::runner::SPECIALIST_BUDGET_USD;
+    assert!((runs[0].charged - cap).abs() < 1e-9, "{}", runs[0].charged);
+    assert!(runs[0].log.cost.abs() < 1e-9, "its log reports no cost");
+    let spend = fs::read_to_string(dir.path().join(crate::spend::SPEND)).unwrap();
+    let spent = crate::spend::check(&spend).unwrap();
+    assert!((spent - cap - runs[1].charged).abs() < 1e-9, "{spend}");
+}
