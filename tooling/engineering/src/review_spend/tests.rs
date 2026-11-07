@@ -38,7 +38,7 @@ fn a_review_that_cannot_run_is_named_for_each_case() {
 
     let got = cap_problems(&repo(), &file);
 
-    assert_eq!(got.len(), 4, "{got:?}");
+    assert_eq!(got.len(), 5, "{got:?}");
     assert!(
         got[0].starts_with("a review with room for one run: "),
         "{got:?}"

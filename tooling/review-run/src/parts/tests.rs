@@ -124,6 +124,7 @@ fn part_run(failure: Option<&str>, answer: &str, cost: f64) -> AgentRun {
         failure: failure.map(str::to_owned),
         log: RunLog {
             answered: failure.is_none(),
+            resulted: true,
             subtype: if failure.is_none() {
                 "success"
             } else {

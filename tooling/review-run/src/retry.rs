@@ -150,16 +150,18 @@ fn charged(log: &RunLog) -> Option<String> {
 }
 
 /// What the review charges the run `log` reads, of a tier whose cap is
-/// `most` US dollars: the cost it reported, or, for a run [`charged`]
-/// with none reported, killed at its deadline, crashed or cancelled in
-/// flight, the whole of its tier's cap, the most `--max-budget-usd` let
-/// it spend, so a run that was paid for is never counted free and no
-/// price table is needed; nothing for a run that cost nothing.
+/// `most` US dollars: the cost its result reported, none or 0 being
+/// nothing, as a run billed to a subscription or answered from the
+/// cache reports; or, for a run [`charged`] that left no result at all,
+/// killed at its deadline, crashed or cancelled in flight, the whole of
+/// its tier's cap, the most `--max-budget-usd` let it spend, so a run
+/// that was paid for is never counted free and no price table is
+/// needed; nothing for a run that cost nothing.
 #[must_use]
 pub fn billed(log: &RunLog, most: f64) -> f64 {
     if log.cost > 0.0 {
         log.cost
-    } else if charged(log).is_some() {
+    } else if !log.resulted && charged(log).is_some() {
         most
     } else {
         0.0

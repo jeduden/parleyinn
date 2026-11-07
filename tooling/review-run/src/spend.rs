@@ -1,6 +1,6 @@
 //! What a review spent (ENG-28): `review/spend.json`,
 //! `{"spent_usd": <total>}`, what its budget charged its own finished
-//! runs, a run paid for that reported no cost charged its tier's cap,
+//! runs, a run paid for that left no result charged its tier's cap,
 //! and nothing of what the earlier reviews it was handed as
 //! `--spent-before` spent: the next review sums every review's own, so
 //! two reviews of one pull request that run side by side never erase

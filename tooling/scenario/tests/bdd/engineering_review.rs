@@ -54,7 +54,7 @@ fn review_runs_by_code(w: &mut World) -> Result<(), String> {
 }
 
 #[then(
-    regex = r"^review-run passes each agent the cost cap of its tier, starts a run only once its tier's cap fits in the pull request's cap beside what the earlier reviews spent, what the runs that ended were charged and the caps of the runs still running, none at all when the earlier reviews reached it, charges a run paid for that reported no cost its tier's cap, names each agent it did not start over budget, so the review requests changes, and keeps what the pull request's reviews spent$"
+    regex = r"^review-run passes each agent the cost cap of its tier, starts a run only once its tier's cap fits in the pull request's cap beside what the earlier reviews spent, what the runs that ended were charged and the caps of the runs still running, none at all when the earlier reviews reached it, charges a run paid for that left no result its tier's cap and one whose result reported no cost nothing, names each agent it did not start over budget, so the review requests changes, and keeps what the pull request's reviews spent$"
 )]
 fn review_run_caps_cost(w: &mut World) -> Result<(), String> {
     let work = testkit::TempDir::new().map_err(|e| format!("make a work directory: {e}"))?;

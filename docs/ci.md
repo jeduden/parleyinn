@@ -64,8 +64,9 @@ is short, because a finding found late costs a whole round.
   cancelled never erase each other's. A run starts only once its tier's
   cap, 0.30 USD for a specialist and 1.50 for a generalist, fits beside
   what was spent and the caps of the runs in flight, else it waits; a run
-  paid for that reported no cost, killed at its deadline, crashed or
-  cancelled, is charged its tier's whole cap. A review the cap stopped
+  paid for that left no result, killed at its deadline, crashed or
+  cancelled, is charged its tier's whole cap, and one whose result
+  reported no cost is charged nothing. A review the cap stopped
   lists every agent it did not run, `over budget:`, in
   `review/not-reviewed.md` and requests changes. Deleting the pull
   request's `review-spend-pr-<N>` artifacts resets its budget, and

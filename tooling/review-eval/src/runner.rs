@@ -36,7 +36,7 @@ pub const SETTINGS: &str = r#"{"permissions":{"blockReadsOutsideWorkingDirectori
 /// and lets sixteen run at once within a pull request's 5 USD cap. A run
 /// the cap stops ends with the result subtype [`OVER_BUDGET`]. The one
 /// place a tier's cap is set: the review reserves it while the run runs,
-/// and charges it to a run that was charged and reported no cost.
+/// and charges it to a run that was charged and left no result.
 pub const SPECIALIST_BUDGET_USD: f64 = 0.30;
 /// The same for a generalist, or a consultant: real generalist runs
 /// cost 0.07 to 0.7, the dearest on the strongest model, so about twice

@@ -449,6 +449,29 @@ fn a_run_is_billed_its_cost_or_its_tier_s_cap_when_charged_with_none_reported() 
 }
 
 #[test]
+fn a_run_that_answered_with_no_cost_reported_is_billed_nothing_whatever_its_tokens() {
+    let parse = review_eval::log::parse;
+    let result = r#"{"type":"result","subtype":"success","is_error":false,"result":"outcome: none — clean.","total_cost_usd":0,"num_turns":1}"#;
+    let answered = parse(&format!("{CALLED}\n{result}"));
+    assert!(charged(&answered).is_some(), "its model calls used tokens");
+
+    assert!(billed(&answered, 0.3).abs() < 1e-9);
+    let unpriced = parse(&format!(
+        "{CALLED}\n{}",
+        result.replace(",\"total_cost_usd\":0", "")
+    ));
+    assert!(billed(&unpriced, 0.3).abs() < 1e-9, "no cost in its result");
+    let failed = parse(&format!(
+        "{CALLED}\n{}",
+        result.replace("\"success\"", "\"error_max_turns\"")
+    ));
+    assert!(
+        billed(&failed, 0.3).abs() < 1e-9,
+        "a result, though no success"
+    );
+}
+
+#[test]
 fn a_run_killed_after_model_calls_is_charged_its_tier_s_cap_and_kept_as_spent() {
     let dir = workdir(false);
 

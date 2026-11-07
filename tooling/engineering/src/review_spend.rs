@@ -41,6 +41,13 @@ const RUN_COST: f64 = 0.01;
 /// that used tokens and no result, so no cost reported.
 const CUT_OFF: &str = "lang-markdown";
 const UNBILLED: &str = r#"{"type":"assistant","parent_tool_use_id":null,"message":{"id":"m1","model":"claude-haiku-5-5","usage":{"input_tokens":10,"output_tokens":5},"content":[{"type":"text","text":"reading"}]}}"#;
+/// The log of a run that made those calls and then left a result that
+/// reported no cost, as a run billed to a subscription does.
+const UNPRICED: &str = concat!(
+    r#"{"type":"assistant","parent_tool_use_id":null,"message":{"id":"m1","model":"claude-haiku-5-5","usage":{"input_tokens":10,"output_tokens":5},"content":[{"type":"text","text":"reading"}]}}"#,
+    "\n",
+    r#"{"type":"result","subtype":"error_during_execution","is_error":true,"result":"","total_cost_usd":0,"num_turns":1}"#
+);
 /// How long each run of the stand-in takes, so runs started together
 /// overlap.
 const HOLD: std::time::Duration = std::time::Duration::from_millis(30);
@@ -138,24 +145,27 @@ fn spend_of(workdir: &Path) -> Result<f64, String> {
 /// nothing after it; with them at it, no run starts at all; with room
 /// for two specialists' caps and eight runs allowed at once, never more
 /// than two run at once, the third waits for them and no generalist's
-/// cap fits; and with a specialist killed after its model calls, with
-/// no cost reported, every run starts and the killed one is charged its
-/// tier's cap. Each names the rest over budget, requests changes and
-/// keeps what it alone spent.
+/// cap fits; with a specialist killed after its model calls, with no
+/// result, every run starts and the killed one is charged its tier's
+/// cap; and with one whose result reported no cost, every run starts
+/// and that one is charged nothing. Each names the rest over budget,
+/// requests changes and keeps what it alone spent.
 #[must_use]
 pub fn cap_problems(checkout: &Checkout, workdir: &Path) -> Vec<String> {
     let one = PULL_REQUEST_COST_USD - SPECIALIST_BUDGET_USD - RUN_COST / 2.0;
     let two = PULL_REQUEST_COST_USD - 2.0 * SPECIALIST_BUDGET_USD;
     let mut problems = Vec::new();
+    let killed = Some((UNBILLED, SPECIALIST_BUDGET_USD));
+    let unpriced = Some((UNPRICED, 0.0));
     for (case, before, parallel, started, at_once, cut) in [
-        ("a review with room for one run", one, "1", 1, 1, false),
+        ("a review with room for one run", one, "1", 1, 1, None),
         (
             "a review at the cap",
             PULL_REQUEST_COST_USD,
             "1",
             0,
             0,
-            false,
+            None,
         ),
         (
             "a review with room for two runs at once",
@@ -163,7 +173,7 @@ pub fn cap_problems(checkout: &Checkout, workdir: &Path) -> Vec<String> {
             "8",
             3,
             2,
-            false,
+            None,
         ),
         (
             "a review with a run cut off unbilled",
@@ -171,14 +181,22 @@ pub fn cap_problems(checkout: &Checkout, workdir: &Path) -> Vec<String> {
             "1",
             AGENTS,
             1,
-            true,
+            killed,
+        ),
+        (
+            "a review with a run that reported no cost",
+            0.0,
+            "1",
+            AGENTS,
+            1,
+            unpriced,
         ),
     ] {
         let mut host = ControlHost::holding(HOLD);
-        if cut {
-            host.fails.insert(CUT_OFF, (1, Some(UNBILLED)));
+        if let Some((log, _)) = cut {
+            host.fails.insert(CUT_OFF, (1, Some(log)));
         }
-        let dir = workdir.join(started.to_string());
+        let dir = workdir.join(case.replace(' ', "-"));
         let before_flag = before.to_string();
         let flags = [
             "--parallel",
@@ -195,10 +213,9 @@ pub fn cap_problems(checkout: &Checkout, workdir: &Path) -> Vec<String> {
                 spend: spend_of(&dir),
                 at_once: host.at_once(),
             };
-            let billed = usize::from(cut);
+            let (cut_runs, cut_cost) = cut.map_or((0, 0.0), |(_, cost)| (1, cost));
             #[allow(clippy::cast_precision_loss, reason = "a handful of runs")]
-            let spent =
-                RUN_COST * (started - billed) as f64 + SPECIALIST_BUDGET_USD * billed as f64;
+            let spent = RUN_COST * (started - cut_runs) as f64 + cut_cost;
             let want = Want {
                 started,
                 at_once,

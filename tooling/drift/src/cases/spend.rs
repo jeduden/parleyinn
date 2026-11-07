@@ -19,7 +19,8 @@ pub(super) fn review_spend_cases() -> Vec<Case> {
 
 /// The drifts of the runs in flight: a run started though the tier caps
 /// of the runs in flight leave no room for its own, and a run paid for
-/// that reported no cost counted free. Last, so adding them moves no
+/// that left no result counted free, or one whose result reported no
+/// cost charged its tier's cap. Last, so adding them moves no
 /// earlier case to another shard.
 fn flight_cases() -> Vec<Case> {
     vec![
@@ -35,15 +36,26 @@ fn flight_cases() -> Vec<Case> {
             "3 runs ran at once, past the 2",
         ),
         case(
-            "review-run counting a run paid for that reported no cost as free",
+            "review-run counting a run paid for that left no result as free",
             "ENG-28",
             Injection::replace(
                 "tooling/review-run/src/retry.rs",
-                "    } else if charged(log).is_some() {\n        most\n",
-                "    } else if charged(log).is_some() {\n        0.0\n",
+                "    } else if !log.resulted && charged(log).is_some() {\n        most\n",
+                "    } else if !log.resulted && charged(log).is_some() {\n        0.0\n",
             ),
             cap_check(),
             "a review with a run cut off unbilled: review/spend.json says",
+        ),
+        case(
+            "review-run charging its tier's cap to a run whose result reported no cost",
+            "ENG-28",
+            Injection::replace(
+                "tooling/review-run/src/retry.rs",
+                "    } else if !log.resulted && charged(log).is_some() {\n",
+                "    } else if charged(log).is_some() {\n",
+            ),
+            cap_check(),
+            "a review with a run that reported no cost: review/spend.json says",
         ),
     ]
 }
