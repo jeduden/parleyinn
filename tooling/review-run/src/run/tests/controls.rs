@@ -601,6 +601,7 @@ fn errors_that_cannot_be_read_are_told_and_taken_as_none() {
 fn what_is_running_is_told_every_so_often() {
     let options = Options {
         every: Duration::from_millis(1),
+        spent_before: 1.5,
         ..options()
     };
     let lines = Arc::new(Mutex::new(Vec::new()));
@@ -626,6 +627,11 @@ fn what_is_running_is_told_every_so_often() {
         .find(|l| l.starts_with("progress: "))
         .unwrap();
     assert!(block.contains(" of 2 agents finished, "), "{block}");
+    // The pull request's total, what the cap holds the runs to.
+    assert!(
+        block.contains("the pull request's reviews spent 1.5000 of 5.00 USD so far"),
+        "{block}"
+    );
 }
 
 #[test]

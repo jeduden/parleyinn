@@ -225,7 +225,8 @@ pub fn review_on(r: &Review) -> Result<Vec<AgentRun>, String> {
         clock: r.clock,
         every: r.options.every,
         total: r.plan.agents().len(),
-        cost: &|| c.budget.spent(),
+        cost: &|| c.budget.total(),
+        cap: r.options.max_cost_usd,
         progress: r.progress,
     };
 
