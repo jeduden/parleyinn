@@ -684,9 +684,9 @@ pub(super) fn review_finding_shape_cases() -> Vec<Case> {
             "review-run deciding a review whose report cites an unknown id unnamed",
             "ENG-28",
             Injection::replace(
-                "tooling/review-run/src/outcome.rs",
-                "report_check(report, Some(answer), Some(known))",
-                "report_check(report, Some(answer), None)",
+                "tooling/review-run/src/reading.rs",
+                "split_with(&assemble(texts, answer, None), Some(known))",
+                "split_with(&assemble(texts, answer, None), None)",
             ),
             cargo_lib_test(
                 "engineering",

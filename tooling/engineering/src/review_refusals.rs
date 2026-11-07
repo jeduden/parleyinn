@@ -27,6 +27,9 @@ pub const SPECIALIST: &str = "lang-rust";
 pub const GENERALIST: &str = "review-code";
 /// The id the specialist cites, which no requirement or invariant has.
 pub const UNKNOWN_ID: &str = "ENG-999";
+/// A finding the specialist states beside the one citing [`UNKNOWN_ID`],
+/// citing an invariant, which stays in its report.
+pub const KNOWN_FINDING: &str = "src/b.rs:2 — if not addressed: a panic stops the hook — I9";
 /// The finding line the generalist answers, its place unreadable.
 pub const UNREAD: &str = "src/a.rs:x — blocking — an unwrap — lang-rust";
 
@@ -68,7 +71,9 @@ impl Host for RefusalHost {
             (answer.clone(), answer)
         } else {
             (
-                format!("src/a.rs:1 — if not addressed: a hook panics — {UNKNOWN_ID}"),
+                format!(
+                    "src/a.rs:1 — if not addressed: a hook panics — {UNKNOWN_ID}\n{KNOWN_FINDING}"
+                ),
                 "outcome: findings — one finding.".to_owned(),
             )
         };
@@ -153,6 +158,14 @@ pub fn outcome_problems(workdir: &Path) -> Vec<String> {
     if !named("review/", UNREAD) {
         problems.push(format!(
             "no blocking finding names {GENERALIST}'s finding line it cannot read"
+        ));
+    }
+    let report = fs::read_to_string(workdir.join(format!("review/reports/{SPECIALIST}.md")))
+        .unwrap_or_default();
+    if !report.contains(KNOWN_FINDING) || report.contains(UNKNOWN_ID) {
+        problems.push(format!(
+            "{SPECIALIST}'s report does not keep its finding apart from the one citing \
+             {UNKNOWN_ID}: {report:?}"
         ));
     }
 

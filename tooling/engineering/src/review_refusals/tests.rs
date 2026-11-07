@@ -34,6 +34,7 @@ fn an_outcome_that_approves_naming_neither_is_named() {
             "the review does not request changes: approve",
             "no blocking finding names lang-rust's report citing ENG-999",
             "no blocking finding names review-code's finding line it cannot read",
+            "lang-rust's report does not keep its finding apart from the one citing ENG-999: \"\"",
         ]
     );
 }
