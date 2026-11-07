@@ -381,3 +381,83 @@ fn an_artifact_from_an_issue_comment_run_is_taken_when_it_alone_qualifies() {
         }
     );
 }
+
+#[test]
+fn select_of_spend_takes_the_spend_artifact_by_the_same_origin_rule() {
+    let dir = TempDir::new().unwrap();
+    let a = dir.path().join("a.json");
+    let r = dir.path().join("r.json");
+    fs::write(
+        &a,
+        listing(&[
+            artifact(14, "review-spend-pr-7", "2026-11-01T13:00:00Z", 140, false),
+            artifact(13, "review-spend-pr-7", "2026-11-01T12:30:00Z", 130, false),
+            artifact(12, NAME, "2026-11-01T12:00:00Z", 130, false),
+        ]),
+    )
+    .unwrap();
+    fs::write(
+        &r,
+        runs(&[(140, REVIEW, "pull_request"), (130, REVIEW, "workflow_run")]),
+    )
+    .unwrap();
+    let line = |of: &str| {
+        run_with(&[
+            "select",
+            "--of",
+            of,
+            "--pull",
+            "7",
+            "--artifacts",
+            a.to_str().unwrap(),
+            "--runs",
+            r.to_str().unwrap(),
+        ])
+    };
+
+    assert_eq!(
+        line("spend"),
+        (
+            EXIT_OK,
+            "previous_artifact=13\nprevious_skipped=1\n".to_owned(),
+            String::new()
+        )
+    );
+    assert_eq!(
+        line("findings").1,
+        "previous_artifact=12\nprevious_skipped=0\n"
+    );
+    let (code, _, err) = line("costs");
+    assert_eq!(code, EXIT_USAGE);
+    assert!(
+        err.contains("--of \"costs\" is neither findings nor spend"),
+        "{err}"
+    );
+    assert_eq!(name_of(SPEND, "7").unwrap(), "review-spend-pr-7");
+}
+
+#[test]
+fn spend_prints_what_earlier_reviews_spent_and_names_a_file_that_does_not_read() {
+    let dir = TempDir::new().unwrap();
+    let good = dir.path().join("spend.json");
+    let bad = dir.path().join("bad.json");
+    fs::write(&good, crate::spend::text(1.25)).unwrap();
+    fs::write(&bad, "{\"spent_usd\": ").unwrap();
+
+    assert_eq!(
+        run_with(&["spend", good.to_str().unwrap()]),
+        (EXIT_OK, "spent_before=1.25\n".to_owned(), String::new())
+    );
+    let (code, out, err) = run_with(&["spend", bad.to_str().unwrap()]);
+    assert_eq!((code, out.as_str()), (EXIT_FAILURE, ""));
+    assert!(
+        err.contains(&format!("{}: the spend file does not read", bad.display())),
+        "{err}"
+    );
+    let (code, _, err) = run_with(&["spend", "/nonexistent/s"]);
+    assert_eq!(code, EXIT_FAILURE);
+    assert!(err.contains("read /nonexistent/s"), "{err}");
+    let (code, _, err) = run_with(&["spend"]);
+    assert_eq!(code, EXIT_USAGE);
+    assert!(err.contains("check and spend need one FILE"), "{err}");
+}
