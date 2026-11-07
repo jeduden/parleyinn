@@ -31,13 +31,15 @@ use review_gate::report::assemble;
 
 use crate::LOGS;
 use crate::controls::{
-    BREAKER_FRACTION, Breaker, Budget, Clock, Controls, Fraction, MAX_COST_USD, SystemClock,
+    BREAKER_FRACTION, Breaker, Budget, Clock, Controls, Fraction, PULL_REQUEST_COST_USD,
+    SystemClock,
 };
 use crate::key::Keys;
 use crate::live::{self, EVERY, Live, Watch};
 use crate::parts::{self, Part};
 use crate::plan::{Plan, report_file};
 use crate::resume::Resume;
+use crate::spend::SPEND;
 use crate::store::Store;
 use crate::tasks;
 
@@ -56,9 +58,11 @@ pub struct Options {
     pub deadline: Duration,
     /// The size, in bytes, past which a specialist's diff runs in parts.
     pub split: usize,
-    /// What the finished runs may cost, in US dollars, before no run
-    /// starts.
+    /// What the pull request's reviews may cost, in US dollars, before
+    /// no run starts.
     pub max_cost_usd: f64,
+    /// What the pull request's earlier reviews spent, in US dollars.
+    pub spent_before: f64,
     /// The fraction of the dispatched specialists that may end in a gap
     /// before no generalist starts.
     pub breaker: Fraction,
@@ -72,7 +76,8 @@ impl Default for Options {
             parallel: PARALLEL,
             deadline: DEADLINE,
             split: parts::LIMIT,
-            max_cost_usd: MAX_COST_USD,
+            max_cost_usd: PULL_REQUEST_COST_USD,
+            spent_before: 0.0,
             breaker: BREAKER_FRACTION,
             every: EVERY,
         }
@@ -193,8 +198,9 @@ pub fn review(
 /// progress of each, and every so often of what is running; a
 /// specialist's report is held to the known ids before it is taken.
 /// What the resume plan keeps is not run again; no run starts once the
-/// finished runs cost the review's cap, and no generalist once the
-/// breaker tripped.
+/// pull request's earlier reviews and this one's finished runs cost its
+/// cap, and no generalist once the breaker tripped. What they spent is
+/// kept in [`SPEND`] as the review starts and as each run ends.
 ///
 /// # Errors
 ///
@@ -204,8 +210,9 @@ pub fn review_on(r: &Review) -> Result<Vec<AgentRun>, String> {
         let path = r.workdir.join(dir);
         fs::create_dir_all(&path).map_err(|e| format!("make {}: {e}", path.display()))?;
     }
+    keep_spend(r, r.options.spent_before);
     let c = Controls {
-        budget: Budget::new(r.options.max_cost_usd),
+        budget: Budget::new(r.options.max_cost_usd, r.options.spent_before),
         breaker: Breaker::new(r.options.breaker, r.plan.specialists().len()),
         live: Live::default(),
     };
@@ -218,6 +225,17 @@ pub fn review_on(r: &Review) -> Result<Vec<AgentRun>, String> {
     };
 
     Ok(live::watching(&c.live, &watch, || tasks::run_all(r, &c)))
+}
+
+/// Keeps `spent`, what the pull request's reviews cost so far, in
+/// [`SPEND`]; one that cannot be kept is told to progress (I6).
+pub(crate) fn keep_spend(r: &Review, spent: f64) {
+    let path = r.workdir.join(SPEND);
+    if let Err(e) = crate::spend::write(&path, &crate::spend::text(spent)) {
+        (r.progress)(&format!(
+            "what the pull request's reviews spent was not kept: {e}"
+        ));
+    }
 }
 
 /// The run of `unit`, not started for `why`: it costs nothing and has

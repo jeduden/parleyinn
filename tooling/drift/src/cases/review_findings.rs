@@ -306,12 +306,12 @@ pub(super) fn review_control_cases() -> Vec<Case> {
             want,
         ),
         case(
-            "review-run starting runs past the review's cost cap",
+            "review-run starting runs past the pull request's cost cap",
             "ENG-28",
             Injection::replace(
                 CONTROLS,
-                "(spent >= self.cap).then(|| {",
-                "(spent >= self.cap && false).then(|| {",
+                "(total >= self.cap).then(|| {",
+                "(total >= self.cap && false).then(|| {",
             ),
             controlled(),
             want,

@@ -19,7 +19,7 @@ use crate::backoff::{self, Class, MAX_ATTEMPTS};
 use crate::controls::Controls;
 use crate::live::Running;
 use crate::parts::add_usage;
-use crate::run::{AgentRun, Review, Unit, attempt, describe, keep_log, not_started};
+use crate::run::{AgentRun, Review, Unit, attempt, describe, keep_log, keep_spend, not_started};
 
 /// Why an overloaded run gets no wait and so no further run.
 const SPENT: &str = "the API was overloaded and its backoff deadline is spent";
@@ -228,7 +228,8 @@ fn tried(r: &Review, c: &Controls, unit: &Unit, note: Option<&str>) -> (AgentRun
     );
     let done = attempt(r.host, r.workdir, r.plan, unit, r.options.deadline, note);
     c.live.end(&label);
-    c.budget.charge(done.0.log.cost);
+    c.budget
+        .charge(done.0.log.cost, &|spent| keep_spend(r, spent));
 
     done
 }

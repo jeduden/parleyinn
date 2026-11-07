@@ -157,6 +157,31 @@ fn a_report_saying_a_run_was_not_started_that_cannot_be_written_is_named() {
 }
 
 #[test]
+fn what_earlier_reviews_spent_counts_toward_the_cap_and_is_kept_with_each_run() {
+    let options = Options {
+        parallel: 1,
+        max_cost_usd: 1.0,
+        spent_before: 0.985,
+        ..options()
+    };
+
+    let (dir, ran) = controlled(DISPATCH, options, 0.0, fake::either);
+
+    // 0.985 and two runs of 0.01 reach the cap; nothing after them starts.
+    assert_eq!(ran.host.agents(), ["lang-markdown", "lang-rust"]);
+    let failure = ran.run("review-code").failure.clone().unwrap_or_default();
+    assert!(
+        failure.starts_with("over budget: the pull request's reviews cost 1.0050 USD"),
+        "{failure}"
+    );
+    let spend = fs::read_to_string(dir.path().join(crate::spend::SPEND)).unwrap();
+    assert!(
+        (crate::spend::check(&spend).unwrap() - 1.005).abs() < 1e-9,
+        "{spend}"
+    );
+}
+
+#[test]
 fn no_run_starts_once_the_finished_runs_cost_the_review_s_cap() {
     let options = Options {
         parallel: 1,
@@ -168,8 +193,8 @@ fn no_run_starts_once_the_finished_runs_cost_the_review_s_cap() {
 
     // Each run costs 0.01: two finish, and nothing after them starts.
     assert_eq!(ran.host.agents(), ["lang-markdown", "lang-rust"]);
-    let refused = "over budget: the review's runs cost 0.0200 USD, its cap is 0.01 USD, so it \
-                   was not started";
+    let refused = "over budget: the pull request's reviews cost 0.0200 USD, its cap is 0.01 \
+                   USD, so it was not started";
     for name in ["test-engineer-unit", "review-code", "review-spec"] {
         assert_eq!(ran.run(name).failure.as_deref(), Some(refused), "{name}");
         assert_eq!(ran.run(name).attempts, 0);
@@ -642,7 +667,7 @@ fn a_free_run_is_not_run_again_once_others_reached_the_cap_meanwhile() {
     let failure = run.failure.clone().unwrap_or_default();
     assert_eq!(run.attempts, 1);
     assert!(
-        failure.starts_with("over budget: the review's runs cost 0.0")
+        failure.starts_with("over budget: the pull request's reviews cost 0.0")
             && failure.ends_with(
                 " USD, its cap is 0.03 USD, so it was not started again; before that cannot start"
             ),

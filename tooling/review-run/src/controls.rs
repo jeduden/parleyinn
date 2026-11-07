@@ -1,7 +1,8 @@
 //! What a review's runs are held to beside each run's own deadline:
 //! the clock it reads, waits on and draws jitter from, which a test
-//! hands in so it never sleeps; the review's cost cap, the sum of what
-//! its finished runs cost, past which no run starts; and the circuit
+//! hands in so it never sleeps; the pull request's cost cap, the sum of
+//! what its earlier reviews and this review's finished runs cost, past
+//! which no run starts; and the circuit
 //! breaker, which counts the specialists that ended in a gap and, once
 //! more than its fraction of those dispatched did, starts no
 //! generalist. A run the cap or the breaker keeps from starting is
@@ -14,11 +15,10 @@ use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use crate::live::Live;
 
-/// The run-level cost cap unless the run says otherwise, in US
-/// dollars: 56 specialists at the dearest a specialist of pull request
-/// 98's reviews cost, 0.30, and three generalists at theirs, 2.00, come
-/// to about 23, so 40 leaves room before a review stops.
-pub const MAX_COST_USD: f64 = 40.0;
+/// The cost cap of a pull request, counted over all of its reviews,
+/// unless the run says otherwise, in US dollars: the stakeholder's
+/// budget for one pull request.
+pub const PULL_REQUEST_COST_USD: f64 = 5.0;
 /// The fraction of the dispatched specialists that may end in a gap
 /// before no generalist starts, unless the run says otherwise: more
 /// than a third, exactly one third not tripping it.
@@ -104,43 +104,58 @@ pub fn unit(bits: u64) -> f64 {
     f64::from(millionths) / 1_000_000.0
 }
 
-/// The review's cost cap and what its finished runs cost.
+/// The pull request's cost cap, what its earlier reviews spent and what
+/// this review's finished runs cost.
 #[derive(Debug)]
 pub struct Budget {
     cap: f64,
+    before: f64,
     spent: Mutex<f64>,
 }
 
 impl Budget {
-    /// A cap of `cap` US dollars, nothing spent.
+    /// A cap of `cap` US dollars, `before` of it spent by the pull
+    /// request's earlier reviews.
     #[must_use]
-    pub fn new(cap: f64) -> Self {
+    pub fn new(cap: f64, before: f64) -> Self {
         Self {
             cap,
+            before,
             spent: Mutex::new(0.0),
         }
     }
 
-    /// Adds what a finished run cost.
-    pub fn charge(&self, cost: f64) {
-        *self.spent.lock().unwrap_or_else(PoisonError::into_inner) += cost;
+    /// Adds what a finished run cost and hands `keep` the pull
+    /// request's total so far, while no other run's cost is added, so
+    /// what it keeps never goes back.
+    pub fn charge(&self, cost: f64, keep: &dyn Fn(f64)) {
+        let mut spent = self.spent.lock().unwrap_or_else(PoisonError::into_inner);
+        *spent += cost;
+        keep(self.before + *spent);
     }
 
-    /// What the finished runs cost.
+    /// What this review's finished runs cost.
     #[must_use]
     pub fn spent(&self) -> f64 {
         *self.spent.lock().unwrap_or_else(PoisonError::into_inner)
     }
 
-    /// Why no further run may start, once what was spent reached the
-    /// cap; none below it.
+    /// What the pull request's reviews cost so far, this one's finished
+    /// runs and the earlier reviews'.
+    #[must_use]
+    pub fn total(&self) -> f64 {
+        self.before + self.spent()
+    }
+
+    /// Why no further run may start, once what the pull request's
+    /// reviews spent reached the cap; none below it.
     #[must_use]
     pub fn refusal(&self) -> Option<String> {
-        let spent = self.spent();
-        (spent >= self.cap).then(|| {
+        let total = self.total();
+        (total >= self.cap).then(|| {
             format!(
-                "{OVER_BUDGET} the review's runs cost {spent:.4} USD, its cap is {:.2} USD, so \
-                 it was not started",
+                "{OVER_BUDGET} the pull request's reviews cost {total:.4} USD, its cap is {:.2} \
+                 USD, so it was not started",
                 self.cap
             )
         })
