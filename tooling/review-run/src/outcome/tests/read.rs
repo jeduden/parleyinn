@@ -127,7 +127,8 @@ fn the_lines_set_aside_are_listed_and_counted_and_block_nothing() {
     let (mut runs, reports) = all_answered(WEIGHED);
     let aside = line(Some(1), "src/b.rs:1 — no finding", "says all is well");
     runs[0].ignored = vec![aside.clone()];
-    // A specialist that did not run sets nothing aside.
+    // A specialist run in parts that did not run, one part having not
+    // run, still lists what the parts that ran set aside (I6).
     let mut silent = silent("test-engineer-unit", Kind::Specialist, "cannot start");
     silent.ignored = vec![aside.clone()];
     let mut two = runs.clone();
@@ -148,7 +149,7 @@ fn the_lines_set_aside_are_listed_and_counted_and_block_nothing() {
         decide(&plan(DISPATCH), &two, &reports, &known())
             .ignored
             .len(),
-        1
+        2
     );
 }
 
@@ -169,4 +170,38 @@ fn many_are_counted_in_the_plural() {
         "{summary}"
     );
     assert!(summary.contains("no finding: 2 lines of"), "{summary}");
+}
+
+#[test]
+fn a_part_that_read_part_of_its_diff_is_a_gap_beside_a_part_that_did_not_run() {
+    let (mut runs, reports) = all_answered(WEIGHED);
+    let why = "its log shows no Read of lines 5-9 of review/diffs/lang-rust.1.diff, of 9 lines";
+    runs[0].failure = Some("part 2 of 2: its run ended with none".to_owned());
+    runs[0].failed_parts = vec![(2, "its run ended with none".to_owned())];
+    runs[0].partial = vec![(Some(1), why.to_owned())];
+    runs[0].ignored = vec![line(Some(1), "a.rs:1 — fine", "says all is well")];
+
+    let d = decide(&plan(DISPATCH), &runs, &reports, &known());
+
+    assert_eq!(d.outcome.verdict, "request_changes");
+    // Part 1's gap is kept, so a resume runs it again rather than keep
+    // a part that skimmed its diff.
+    assert_eq!(
+        d.not_reviewed
+            .iter()
+            .filter(|g| g.name == "lang-rust")
+            .map(|g| (g.part, g.reason.clone()))
+            .collect::<Vec<_>>(),
+        [
+            (Some(1), format!("partial: {why}")),
+            (Some(2), "silent: its run ended with none".to_owned()),
+        ]
+    );
+    assert!(
+        d.outcome.findings.iter().any(|f| f.body.contains(why)),
+        "{:?}",
+        d.outcome.findings
+    );
+    // What it set aside is listed all the same.
+    assert_eq!(d.ignored.len(), 1);
 }

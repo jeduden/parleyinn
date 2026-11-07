@@ -274,8 +274,8 @@ fn whole(r: &Review, c: &Controls, name: &str) -> Option<AgentRun> {
     Some(run)
 }
 
-/// `unit`'s run: the part the earlier run kept, its report read from its
-/// log again, else the answer the store holds under its key, when it is
+/// `unit`'s run: the part the earlier run kept, its report and its
+/// reads of its diff read from its log again, else the answer the store holds under its key, when it is
 /// accepted again, else a run of its own, kept in the store once
 /// accepted; told to progress.
 fn one(r: &Review, c: &Controls, unit: &Unit, heard: &Answers) -> Done {
@@ -285,7 +285,8 @@ fn one(r: &Review, c: &Controls, unit: &Unit, heard: &Answers) -> Done {
     };
     let key = memo::key_of(r, unit);
     if let Some((log, part)) = kept.zip(unit.part.as_ref()) {
-        // A kept part is read from its log as a fresh one is.
+        // A kept part is read from its log as a fresh one is, its reads
+        // held to its diff again.
         let read = reading::read(
             (&unit.name, Some(part.index)),
             &log.texts,
@@ -296,6 +297,10 @@ fn one(r: &Review, c: &Controls, unit: &Unit, heard: &Answers) -> Done {
         run.answer_key = key;
         run.ignored = read.ignored;
         run.unreadable = read.unreadable;
+        run.partial.extend(
+            reading::uncovered(r.workdir, &unit.stem(), &log.reads)
+                .map(|why| (Some(part.index), why)),
+        );
         (r.progress)(&describe(&run));
         return (run, Some(read.report));
     }

@@ -26,14 +26,25 @@ fn resumed_split_run(dir: &Path, resume: &Resume) -> (Vec<AgentRun>, Vec<String>
     (runs, lines.into_inner().unwrap(), host)
 }
 
-/// A resume keeping lang-rust's part 1 as a log that stated `text` and
-/// answered `answer`.
+/// A resume keeping lang-rust's part 1 as a log that read its whole
+/// diff, stated `text` and answered `answer`.
 fn keeping_part_one(text: &str, answer: &str) -> Resume {
+    keeping_part_one_reading(text, answer, None)
+}
+
+/// [`keeping_part_one`], its one read of its diff `limit` lines long.
+fn keeping_part_one_reading(text: &str, answer: &str, limit: Option<usize>) -> Resume {
     let log = RunLog {
         answered: true,
         answer: answer.to_owned(),
         texts: vec![text.to_owned(), answer.to_owned()],
         cost: 5.0,
+        reads: vec![review_eval::log::ReadCall {
+            path: "review/diffs/lang-rust.1.diff".to_owned(),
+            limit,
+            answered: true,
+            ..review_eval::log::ReadCall::default()
+        }],
         ..RunLog::default()
     };
     Resume {
@@ -96,6 +107,27 @@ fn a_kept_part_is_read_again_and_its_line_that_does_not_read_named_by_its_part()
     assert!(
         report.contains("part 1, none — nothing stated in the run log"),
         "{report}"
+    );
+}
+
+#[test]
+fn a_kept_part_is_held_to_its_reads_of_its_diff_again() {
+    let dir = workdir();
+    big_diff(dir.path());
+    let resume = keeping_part_one_reading(fake::FINDING, "outcome: findings — kept.", Some(3));
+
+    let (runs, _, _) = resumed_split_run(dir.path(), &resume);
+
+    let rust = &runs[0];
+    assert!(!rust.whole(), "{rust:?}");
+    assert_eq!(rust.partial.len(), 1, "{:?}", rust.partial);
+    assert_eq!(
+        rust.partial[0],
+        (
+            Some(1),
+            "its log shows no Read of line 4 of review/diffs/lang-rust.1.diff, of 4 lines"
+                .to_owned()
+        )
     );
 }
 

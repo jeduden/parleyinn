@@ -243,6 +243,38 @@ fn a_specialist_named_by_parts_keeps_the_parts_that_answered() {
 }
 
 #[test]
+fn a_part_that_read_part_of_its_diff_runs_again_beside_one_that_did_not_run() {
+    // The outcome names part 1's partial read beside part 2's silence,
+    // so part 1 is not kept, and with no part left to keep the whole
+    // specialist runs again.
+    let gaps = vec![
+        Gap::new("lang-rust", Some(1), "partial: lines 5-9".to_owned()),
+        Gap::new("lang-rust", Some(2), "silent: x".to_owned()),
+    ];
+    let mut was = earlier(gaps);
+    was.parts.insert(
+        "lang-rust".to_owned(),
+        [
+            (1, answered("outcome: none — one.")),
+            (2, RunLog::default()),
+            (3, answered("outcome: none — three.")),
+        ]
+        .into(),
+    );
+
+    let resume = plan_of(&was, &id());
+
+    let Reuse::Parts(kept) = &resume.reuse["lang-rust"] else {
+        panic!("{:?}", resume.reuse["lang-rust"]);
+    };
+    assert_eq!(kept.keys().collect::<Vec<_>>(), [&3]);
+    was.parts.get_mut("lang-rust").unwrap().remove(&3);
+    let resume = plan_of(&was, &id());
+    assert!(!resume.reuse.contains_key("lang-rust"));
+    assert_eq!(resume.notes[0], "lang-rust: runs again: partial: lines 5-9");
+}
+
+#[test]
 fn a_specialist_named_whole_or_with_no_part_to_keep_runs_again_whole() {
     let both = vec![
         Gap::new("lang-rust", Some(2), "silent: x".to_owned()),

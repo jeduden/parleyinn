@@ -86,7 +86,7 @@ pub fn decide(
     let mut not_reviewed = not_reviewed(runs, &silent, &refused, &unread);
     not_reviewed.extend(partial.iter().chain(&unreadable).cloned());
     not_reviewed.sort_by(|a, b| (&a.name, a.part).cmp(&(&b.name, b.part)));
-    let ignored: Vec<ReportLine> = specialist_runs(plan, runs)
+    let ignored: Vec<ReportLine> = of_specialists(plan, runs)
         .flat_map(|run| run.ignored.iter().cloned())
         .collect();
     let approves = silent.is_empty()
@@ -138,24 +138,33 @@ pub fn decide(
 
 /// The runs of `plan`'s specialists in `runs` that ran.
 fn specialist_runs<'a>(plan: &Plan, runs: &'a [AgentRun]) -> impl Iterator<Item = &'a AgentRun> {
-    let specialists = plan.specialists();
-    runs.iter()
-        .filter(move |run| run.answered() && specialists.contains(&run.name))
+    of_specialists(plan, runs).filter(|run| run.answered())
 }
 
-/// The gaps of the specialists in `runs` that ran but did not read
-/// every line of their diff, and those whose report holds a line that
-/// does not read, by part, each named in a blocking finding added to
-/// `findings`: what they did not read, with why the run ended when it
-/// was cut off, and each line quoted with its problem. Their other
-/// findings stay in their report for the generalist.
+/// The runs of `plan`'s specialists in `runs`, whether they ran or not:
+/// a specialist run in parts that did not run, a part of it having not
+/// run, still holds what its parts that ran read and stated.
+fn of_specialists<'a>(plan: &Plan, runs: &'a [AgentRun]) -> impl Iterator<Item = &'a AgentRun> {
+    let specialists = plan.specialists();
+    runs.iter()
+        .filter(move |run| specialists.contains(&run.name))
+}
+
+/// The gaps of the specialists in `runs`, or their parts, that ran but
+/// did not read every line of their diff, and those whose report holds
+/// a line that does not read, by part, each named in a blocking finding
+/// added to `findings`: what they did not read, with why the run ended
+/// when it was cut off, and each line quoted with its problem. A part's
+/// gap stands beside another part that did not run, so a resume runs it
+/// again rather than keep it. Their other findings stay in their report
+/// for the generalist.
 fn read_partly(
     plan: &Plan,
     runs: &[AgentRun],
     findings: &mut Vec<Finding>,
 ) -> (Vec<Gap>, Vec<Gap>) {
     let (mut partial, mut unreadable) = (Vec::new(), Vec::new());
-    for run in specialist_runs(plan, runs) {
+    for run in of_specialists(plan, runs) {
         let cut = run
             .cut
             .as_deref()
