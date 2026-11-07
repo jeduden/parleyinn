@@ -190,7 +190,8 @@ pub fn workflow_problems(job: &str) -> Vec<String> {
     let mut problems = Vec::new();
     let steps = steps(job);
     let at = |needle: &str| steps.iter().position(|s| s.contains(needle));
-    match at("previous select --of spend") {
+    // The command, not a comment that names it.
+    match at("review-run -- previous select --of spend") {
         None => problems.push(
             "no step picks what earlier reviews spent with review-run previous select --of spend"
                 .to_owned(),

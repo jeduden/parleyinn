@@ -167,7 +167,10 @@ fn a_spend_kept_only_when_the_review_succeeded_or_unscrubbed_is_named() {
 
 #[test]
 fn a_fetch_that_picks_by_no_origin_or_reads_no_file_is_named() {
-    let unpicked = workflow_problems(&mutated("previous select --of spend", "previous list"));
+    let unpicked = workflow_problems(&mutated(
+        "review-run -- previous select --of spend",
+        "review-run -- previous list --of spend",
+    ));
     assert_eq!(unpicked.len(), 1, "{unpicked:?}");
     assert!(
         unpicked[0].contains("previous select --of spend"),
@@ -187,7 +190,9 @@ fn a_fetch_that_picks_by_no_origin_or_reads_no_file_is_named() {
 #[test]
 fn a_spend_fetched_after_the_token_is_staged_is_named() {
     let text = job();
-    let fetch = text.find("previous select --of spend").unwrap();
+    let fetch = text
+        .find("review-run -- previous select --of spend")
+        .unwrap();
     let stage = "      - name: early stage\n        run: cargo run -p review-eval -- stage-credential --dir d\n";
     let at = text[..fetch].rfind("\n      - ").unwrap() + 1;
     let early = format!("{}{stage}{}", &text[..at], &text[at..]);

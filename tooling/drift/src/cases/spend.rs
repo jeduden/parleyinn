@@ -123,8 +123,8 @@ fn carry_cases() -> Vec<Case> {
             "ENG-28",
             Injection::replace(
                 SCRIPT,
-                "previous select --of spend",
-                "previous list --of spend",
+                "review-run -- previous select --of spend",
+                "review-run -- previous list --of spend",
             ),
             carry_check(),
             "previous select --of spend",
