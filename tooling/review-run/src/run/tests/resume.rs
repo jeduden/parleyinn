@@ -132,6 +132,28 @@ fn a_kept_part_is_held_to_its_reads_of_its_diff_again() {
 }
 
 #[test]
+fn a_kept_part_cut_off_before_it_stated_anything_is_no_whole_review() {
+    let dir = workdir();
+    big_diff(dir.path());
+    let mut resume = keeping_part_one("I read the diff.", "");
+    if let Some(Reuse::Parts(kept)) = resume.reuse.get_mut("lang-rust") {
+        let log = kept.get_mut(&1).unwrap();
+        log.answered = false;
+        log.subtype = "error_max_turns".to_owned();
+        log.texts = vec!["I read the diff.".to_owned()];
+    }
+
+    let (runs, _, _) = resumed_split_run(dir.path(), &resume);
+
+    let rust = &runs[0];
+    assert!(!rust.whole(), "{rust:?}");
+    assert_eq!(
+        rust.stated_nothing,
+        [(Some(1), "its run ended with error_max_turns".to_owned())]
+    );
+}
+
+#[test]
 fn a_resume_keeping_an_agent_whole_starts_no_run_of_it() {
     let dir = workdir();
     let resume = Resume {

@@ -264,8 +264,8 @@ pub(super) fn review_log_report_cases() -> Vec<Case> {
             "ENG-28",
             Injection::replace(
                 "tooling/review-run/src/run.rs",
-                "    if crate::retry::charged(log).is_some() {\n",
-                "    if crate::retry::charged(log).is_some() || why.is_some() {\n",
+                "    if log.ran() { (None, why)",
+                "    if log.ran() || why.is_some() { (None, why)",
             ),
             cargo_lib_test(
                 "review-run",

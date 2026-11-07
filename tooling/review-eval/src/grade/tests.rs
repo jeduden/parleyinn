@@ -747,3 +747,40 @@ fn a_success_that_answered_nothing_and_used_no_model_did_not_run_as_the_review_s
 
     assert_eq!(graded.failures, ["did not answer: success"]);
 }
+
+#[test]
+fn a_specialist_cut_off_before_it_stated_anything_fails_even_a_case_that_expects_none() {
+    let c = component(Kind::Specialist, "lang-rust", true);
+    let expect = Expect {
+        outcome: vec!["none".to_owned()],
+        ..Expect::default()
+    };
+    let cut = RunLog {
+        subtype: "error_max_turns".to_owned(),
+        cost: 0.2,
+        texts: vec!["I read the diff.".to_owned()],
+        ..RunLog::default()
+    };
+
+    let graded = grade(&c, &case("lang-rust", expect.clone()), &cut);
+
+    assert_eq!(
+        graded.failures,
+        [
+            "ended without a successful result before it stated any line or an outcome: \
+          error_max_turns"
+        ]
+    );
+    // One that stated its outcome before it was cut off is graded on it.
+    let stated = RunLog {
+        texts: vec!["outcome: none — all holds.".to_owned()],
+        ..cut
+    };
+    let graded = grade(&c, &case("lang-rust", expect), &stated);
+    assert!(graded.passed(), "{:?}", graded.failures);
+    assert!(
+        graded.slips[0].starts_with("ended without a successful result"),
+        "{:?}",
+        graded.slips
+    );
+}

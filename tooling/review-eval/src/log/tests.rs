@@ -271,6 +271,9 @@ fn a_run_ran_when_it_answered_something_or_was_charged() {
         ..RunLog::default()
     };
     assert!(answered("outcome: none — x").ran());
+    assert!(answered("outcome: none — x").succeeded());
+    assert!(!answered("").succeeded());
+    assert!(!parse(CALLED).succeeded());
     // A success that answered nothing and used no model is no run, for
     // the grader as for the review.
     assert!(!answered(" ").ran());

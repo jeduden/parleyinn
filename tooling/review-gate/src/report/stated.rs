@@ -243,6 +243,28 @@ pub fn with_outcome(clean: &str, answer: &str) -> String {
     out
 }
 
+/// The outcome a specialist's report ends with when its run ended
+/// without a successful result before it stated any line or an outcome
+/// ([`states_nothing`]): the review's own, saying so, so it never reads
+/// as the specialist's clean pass.
+pub const CUT_BEFORE_STATING: &str = "outcome: none — the run ended without a successful \
+                                      result before it stated any line or an outcome, so \
+                                      this is no clean review";
+
+/// Whether a specialist's run, its log's text blocks `texts` and its
+/// final `answer`, stated nothing: no line of its texts is a finding,
+/// request, revision, withdrawal or any finding-shaped line, or an
+/// outcome line, and its answer gives no outcome line. Prose alone is
+/// nothing stated.
+#[must_use]
+pub fn states_nothing(texts: &[String], answer: &str) -> bool {
+    answer_outcome(answer).is_none()
+        && texts
+            .iter()
+            .flat_map(|t| t.lines())
+            .all(|l| line(l) == Line::Prose && outcome_of(l).is_none())
+}
+
 /// The problem with `report`, one [`with_outcome`] built, or none: the
 /// report check with the report's own outcome as its answer, since the
 /// outcome is the one its lines give.

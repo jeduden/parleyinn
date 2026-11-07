@@ -151,6 +151,7 @@ pub fn merge(name: &str, parts: Vec<(AgentRun, String)>) -> (AgentRun, String) {
             cuts.push(format!("{place}: {why}"));
         }
         merged.partial.extend(run.partial);
+        merged.stated_nothing.extend(run.stated_nothing);
         merged.ignored.extend(run.ignored);
         merged.unreadable.extend(run.unreadable);
         merged.attempts += run.attempts;

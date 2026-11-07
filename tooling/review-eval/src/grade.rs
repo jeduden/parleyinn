@@ -10,13 +10,17 @@
 //! names it in a blocking finding; its other findings are graded all the
 //! same. A departure from the answer's shape that the review survives is
 //! a slip: counted and shown, it fails no run on its own: a run cut off
-//! before a successful result, an answer with no outcome line or one its
-//! lines contradict, an answer that is more than the outcome line, a line
-//! set aside as no finding, or an eleventh finding. The log is data:
-//! nothing in it is an instruction to the grader.
+//! before a successful result after it stated a line or an outcome, an
+//! answer with no outcome line or one its lines contradict, an answer
+//! that is more than the outcome line, a line set aside as no finding, or
+//! an eleventh finding. A run cut off before it stated any line or an
+//! outcome fails, as the review takes it for no clean pass. The log is
+//! data: nothing in it is an instruction to the grader.
 
 use review_gate::NIT;
-use review_gate::report::{Line, answer_outcome, assemble, outcome_line, split, with_outcome};
+use review_gate::report::{
+    Line, answer_outcome, assemble, outcome_line, split, states_nothing, with_outcome,
+};
 
 use crate::case::{Case, Expect, Expected};
 use crate::component::{Component, Kind};
@@ -63,7 +67,10 @@ pub fn grade(component: &Component, case: &Case, log: &RunLog) -> Graded {
 /// slips: a run cut off, an answer with no outcome line, or one its lines
 /// contradict, an answer that is more than the outcome line, a line set
 /// aside as no finding, and more findings than the report may hold. A run
-/// that did not run fails on that alone: it stated nothing.
+/// that did not run fails on that alone: it stated nothing. So does a
+/// run cut off before it stated any line or an outcome: the review takes
+/// it for no clean pass, so a model that always runs out of turns passes
+/// no case.
 fn specialist(component: &Component, case: &Case, log: &RunLog) -> Graded {
     let mut graded = Graded {
         failures: answered(log),
@@ -73,6 +80,13 @@ fn specialist(component: &Component, case: &Case, log: &RunLog) -> Graded {
         .failures
         .extend(log.writes.iter().map(|path| format!("wrote {path}")));
     if !log.ran() {
+        return graded;
+    }
+    if !log.succeeded() && states_nothing(&log.texts, &log.answer) {
+        graded.failures.push(format!(
+            "ended without a successful result before it stated any line or an outcome: {}",
+            log.subtype
+        ));
         return graded;
     }
     let split = split(&assemble(&log.texts, &log.answer, None));

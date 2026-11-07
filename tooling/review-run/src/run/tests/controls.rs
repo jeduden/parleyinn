@@ -494,6 +494,9 @@ fn the_breaker_starts_no_generalist_once_more_than_its_fraction_of_specialists_f
     }
 }
 
+/// A model call that states the outcome line alone.
+const STATED_OUTCOME: &str = r#"{"type":"assistant","parent_tool_use_id":null,"message":{"id":"m1","model":"claude-haiku-5-5","usage":{"input_tokens":3,"output_tokens":2},"content":[{"type":"text","text":"outcome: none — all holds."}]}}"#;
+
 const CAPPED: &str = r#"{"type":"result","subtype":"error_max_budget_usd","is_error":true,"result":"","total_cost_usd":1.01,"num_turns":9}"#;
 
 /// Writes a one-line diff for the specialist `command` runs, which it
@@ -506,7 +509,8 @@ fn unread_diff(command: &Command) {
 
 /// `DISPATCH` run with lang-rust stating a line in no form beside its
 /// finding, and lang-markdown stopped by its cost cap: when `partial`,
-/// before it read its diff, else with no diff to read.
+/// before it read its diff or stated anything, else with no diff to
+/// read and its outcome stated.
 fn unreadable_and_capped(partial: bool) -> Ran {
     let options = Options {
         breaker: BREAKER_FRACTION,
@@ -519,10 +523,13 @@ fn unreadable_and_capped(partial: bool) -> Ran {
                 fake::answer(c, &[fake::FINDING, "a.rs:9 — not a form", outcome], outcome)
             }
             "lang-markdown" => {
-                if partial {
+                let stated = if partial {
                     unread_diff(c);
-                }
-                fake::write_log(c, &format!("{CAPPED}\n"));
+                    String::new()
+                } else {
+                    format!("{}\n", STATED_OUTCOME)
+                };
+                fake::write_log(c, &format!("{stated}{CAPPED}\n"));
                 Ok(Output::default())
             }
             _ => fake::either(c),

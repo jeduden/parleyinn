@@ -153,8 +153,8 @@ pub(super) fn review_retry_cases() -> Vec<Case> {
         "ENG-28",
         Injection::replace(
             "tooling/review-run/src/retry.rs",
-            "    if let Some(why) = charged(&first.log) {\n",
-            "    if let Some(why) = charged(&first.log).filter(|_| false) {\n",
+            "    if let Some(why) = first.log.charged() {\n",
+            "    if let Some(why) = first.log.charged().filter(|_| false) {\n",
         ),
         cargo_lib_test(
             "review-run",

@@ -221,3 +221,66 @@ fn a_report_line_reads_back_as_written_without_a_part_when_whole() {
     assert!(!json.contains("part"));
     assert_eq!(serde_json::from_str::<ReportLine>(&json).unwrap(), line);
 }
+
+/// A run's log that stated `lines`, then ended as `subtype` answering
+/// `answer`.
+fn ended(lines: &[&str], subtype: &str, answer: &str) -> RunLog {
+    RunLog {
+        answered: subtype == "success",
+        subtype: subtype.to_owned(),
+        answer: answer.to_owned(),
+        texts: texts(lines),
+        ..RunLog::default()
+    }
+}
+
+#[test]
+fn a_run_cut_off_before_it_stated_anything_is_marked_and_never_ends_a_clean_report() {
+    for log in [
+        ended(
+            &["I read the diff.", "Now the context."],
+            "error_max_turns",
+            "",
+        ),
+        ended(&[], "success", ""),
+    ] {
+        let read = read_run(("lang-rust", None), &log, &known());
+
+        assert!(read.stated_nothing, "{log:?}");
+        assert_eq!(read.answer, CUT_BEFORE_STATING);
+        assert_eq!(read.report, format!("{CUT_BEFORE_STATING}\n"));
+    }
+}
+
+#[test]
+fn a_run_cut_off_after_it_stated_a_line_or_an_outcome_is_read_as_it_stands() {
+    let finding = read_run(
+        ("lang-rust", None),
+        &ended(&[FINDING], "error_max_turns", ""),
+        &known(),
+    );
+    assert!(!finding.stated_nothing);
+    assert_eq!(
+        finding.answer,
+        "outcome: findings — 1 finding stated in the run log"
+    );
+    let outcome = read_run(
+        ("lang-rust", None),
+        &ended(&["outcome: none — all holds."], "error_max_turns", ""),
+        &known(),
+    );
+    // The outcome it stated, not its answer, gives none, as its lines do.
+    assert!(!outcome.stated_nothing);
+    assert_eq!(
+        outcome.answer,
+        "outcome: none — nothing stated in the run log"
+    );
+    // A run that ended with its answer stated something.
+    let answered = read_run(
+        ("lang-rust", None),
+        &ended(&[], "success", "outcome: none — clean."),
+        &known(),
+    );
+    assert!(!answered.stated_nothing);
+    assert_eq!(answered.answer, "outcome: none — clean.");
+}

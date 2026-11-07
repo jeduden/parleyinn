@@ -113,7 +113,7 @@ fn review_run_reads_whole_weighings(w: &mut World) -> Result<(), String> {
 }
 
 #[then(
-    regex = r"^review-run reads every specialist's run log whatever result it ended with and decides from its Read calls whether it read its whole diff: one cut off at its turn budget after reading its whole diff is consulted and the review decided on its finding, one that read part of its diff is named partial with the lines it did not read, so the gate posts the request for changes, a line saying it is no finding is set aside and listed in review/ignored.json, a finding-shaped line that does not read is its own blocking finding beside the finding kept, and one whose log holds no model call did not run, runs once more as it cost nothing, and the gate posts nothing$"
+    regex = r"^review-run reads every specialist's run log whatever result it ended with and decides from its Read calls whether it read its whole diff: one cut off at its turn budget after reading its whole diff is consulted and the review decided on its finding, one cut off before it stated any line or an outcome is named partial, never a clean pass, one that read part of its diff is named partial with the lines it did not read, so the gate posts the request for changes, a line saying it is no finding is set aside and listed in review/ignored.json, a finding-shaped line that does not read is its own blocking finding beside the finding kept, and one whose log holds no model call did not run, runs once more as it cost nothing, and the gate posts nothing$"
 )]
 fn review_run_reads_every_log(w: &mut World) -> Result<(), String> {
     let work = testkit::TempDir::new().map_err(|e| format!("make a work directory: {e}"))?;

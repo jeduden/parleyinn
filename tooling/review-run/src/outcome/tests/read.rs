@@ -273,3 +273,40 @@ fn the_lines_that_do_not_read_are_named_ten_at_most_each_cut_then_counted() {
     );
     assert!(summary.contains(" Not reviewed: lang-rust."), "{summary}");
 }
+
+#[test]
+fn a_specialist_cut_off_before_it_stated_anything_blocks_as_partial_and_is_not_counted_cut() {
+    let (mut runs, reports) = all_answered(WEIGHED);
+    let ended = "its run ended with error_max_turns";
+    runs[0].cut = Some(ended.to_owned());
+    runs[0].stated_nothing = vec![(None, ended.to_owned())];
+
+    let d = decide(&plan(DISPATCH), &runs, &reports, &known());
+
+    let why = format!(
+        "it ended without a successful result ({ended}) before it stated any line or an outcome"
+    );
+    assert_eq!(d.outcome.verdict, "request_changes");
+    assert_eq!(
+        d.outcome.findings[0],
+        blocking(
+            "review/",
+            format!("lang-rust {why}, so the review of it is partial")
+        )
+    );
+    assert_eq!(
+        d.not_reviewed,
+        [gap(
+            "lang-rust",
+            "specialist",
+            None,
+            &format!("partial: {why}")
+        )]
+    );
+    assert!(d.consulted.contains("lang-rust"));
+    assert!(
+        !d.outcome.summary.contains("specialist ended without"),
+        "{}",
+        d.outcome.summary
+    );
+}

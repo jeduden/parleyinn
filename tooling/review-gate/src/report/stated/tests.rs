@@ -378,3 +378,38 @@ fn a_stated_check_still_names_a_line_that_does_not_read() {
         Some(Problem::Malformed { line: 1 })
     );
 }
+
+#[test]
+fn a_run_states_nothing_when_no_line_of_its_texts_is_one_and_it_gave_no_outcome() {
+    let texts = |t: &[&str]| t.iter().map(|t| (*t).to_owned()).collect::<Vec<_>>();
+
+    assert!(states_nothing(&[], ""));
+    assert!(states_nothing(
+        &texts(&["I read the diff.", "Now the context."]),
+        "done"
+    ));
+    for stated in [
+        "a.rs:1 — if not addressed: x — I2",
+        "a.rs:1 — request: add a cap — why",
+        "withdrawn: a.rs:1 — it holds",
+        "revised: a.rs:1 — if not addressed: x — I2",
+        "a.rs:1 — fine",
+        "a.rs:1 — a line in no form",
+        "outcome: none — all holds.",
+    ] {
+        assert!(
+            !states_nothing(&texts(&["I read it.", stated]), ""),
+            "{stated}"
+        );
+    }
+    assert!(!states_nothing(&[], "outcome: none — all holds."));
+}
+
+#[test]
+fn the_outcome_of_a_run_cut_before_it_stated_anything_says_so_and_reads() {
+    let report = with_outcome("I read it.\n", CUT_BEFORE_STATING);
+
+    assert_eq!(report, format!("I read it.\n{CUT_BEFORE_STATING}\n"));
+    assert_eq!(stated_check(&report, None), None);
+    assert!(CUT_BEFORE_STATING.contains("no clean review"));
+}

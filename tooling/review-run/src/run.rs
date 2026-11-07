@@ -116,6 +116,10 @@ pub struct AgentRun {
     /// from one, whose log shows no read of some lines of its diff, with
     /// which.
     pub partial: Vec<(Option<usize>, String)>,
+    /// For a specialist, each run of it, whole or a part by its place
+    /// from one, that ended without a successful result before it stated
+    /// any line or an outcome, with why it ended: never a clean pass.
+    pub stated_nothing: Vec<(Option<usize>, String)>,
     /// The lines of its report set aside as no finding.
     pub ignored: Vec<ReportLine>,
     /// The finding-shaped lines of its report that do not read.
@@ -155,6 +159,7 @@ impl AgentRun {
             parts: 1,
             failed_parts: Vec::new(),
             partial: Vec::new(),
+            stated_nothing: Vec::new(),
             ignored: Vec::new(),
             unreadable: Vec::new(),
             reused: false,
@@ -173,10 +178,14 @@ impl AgentRun {
     }
 
     /// Whether the review of it is whole: it ran, read every line of its
-    /// diff and stated no line that does not read.
+    /// diff, stated something before it ended and no line that does not
+    /// read.
     #[must_use]
     pub fn whole(&self) -> bool {
-        self.answered() && self.partial.is_empty() && self.unreadable.is_empty()
+        self.answered()
+            && self.partial.is_empty()
+            && self.stated_nothing.is_empty()
+            && self.unreadable.is_empty()
     }
 }
 
@@ -492,14 +501,21 @@ pub(crate) fn attempt(
 /// and why it ran but ended without a successful result: its result was
 /// no success, or it answered nothing.
 fn ended(log: &RunLog) -> (Option<String>, Option<String>) {
-    let why = if !log.answered {
+    let why = cut_why(log);
+    if log.ran() { (None, why) } else { (why, None) }
+}
+
+/// Why the run `log` reads ended without a successful result: its
+/// result was no success, or it answered nothing; none when it ended
+/// with one.
+pub(crate) fn cut_why(log: &RunLog) -> Option<String> {
+    if !log.answered {
         Some(format!("its run ended with {}", log.subtype))
     } else if log.answer.trim().is_empty() {
         Some("its run answered nothing".to_owned())
     } else {
         None
-    };
-    if log.ran() { (None, why) } else { (why, None) }
+    }
 }
 
 /// The report specialist `unit`'s run gives from `log`, its ids held to
@@ -518,10 +534,14 @@ fn read_report(
         return assemble(&log.texts, &log.answer, Some(why));
     }
     let part = unit.part.as_ref().map(|p| p.index);
-    let read = reading::read((&unit.name, part), &log.texts, &log.answer, known);
+    let read = reading::read_run((&unit.name, part), log, known);
     log.answer = read.answer;
     run.ignored = read.ignored;
     run.unreadable = read.unreadable;
+    if read.stated_nothing {
+        run.stated_nothing
+            .push((part, run.cut.clone().unwrap_or_default()));
+    }
     run.partial
         .extend(reading::uncovered(workdir, &unit.stem(), &log.reads).map(|why| (part, why)));
 

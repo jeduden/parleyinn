@@ -100,7 +100,15 @@ impl RunLog {
     /// call. A run that did not is one the review may start again.
     #[must_use]
     pub fn ran(&self) -> bool {
-        (self.answered && !self.answer.trim().is_empty()) || self.charged().is_some()
+        self.succeeded() || self.charged().is_some()
+    }
+
+    /// Whether the run ended with a successful result that answered
+    /// something; a run that ran but did not was cut off, by its turn
+    /// budget, its deadline or its cost cap, or answered nothing.
+    #[must_use]
+    pub fn succeeded(&self) -> bool {
+        self.answered && !self.answer.trim().is_empty()
     }
 }
 

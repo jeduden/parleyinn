@@ -87,13 +87,16 @@ records the design.
   lines that read and those that do not, and ended with an outcome its
   lines give. A finding-shaped line that does not read fails its run,
   its other findings graded all the same. A departure the review
-  survives is a slip: a run cut off before a successful result, an
-  answer with no outcome line or one its lines contradict, an answer
-  that is more than the outcome line, a line set aside as no finding,
-  an eleventh finding. Slips are counted and shown per run and fail
-  none. A case passes with two of three runs, stopping once decided. A
-  run whose log holds no model call did not run, and is counted and
-  failed.
+  survives is a slip: a run cut off before a successful result after
+  it stated a line or an outcome, an answer with no outcome line or
+  one its lines contradict, an answer that is more than the outcome
+  line, a line set aside as no finding, an eleventh finding. Slips are
+  counted and shown per run and fail none. A case passes with two of
+  three runs, stopping once decided. A run whose log holds no model
+  call did not run, and is counted and failed, as is a specialist's run
+  cut off before it stated any line or an outcome, which the review
+  takes for no clean pass: a model that always runs out of turns passes
+  no case.
 - **The outputs** of a run go under `--out`: `scorecard.json`,
   `findings.json` in the shape the review gate reads, `report.md`, and
   each run's log, the specialist report assembled from it and its grade under

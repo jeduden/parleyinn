@@ -4,8 +4,10 @@
 //! specialist's reads of its diff no longer weighed, so a partial review
 //! reads as whole; the lines set aside as no finding left uncounted; a
 //! finding-shaped line that does not read dropped unseen; the findings
-//! beside a line that does not read discarded with it; and a run whose
-//! log holds no model call taken as one that ran.
+//! beside a line that does not read discarded with it; a run whose log
+//! holds no model call taken as one that ran; and a run cut off before
+//! it stated any line or an outcome taken for a clean pass, by the
+//! review or by the grader.
 
 use super::*;
 
@@ -21,14 +23,14 @@ fn check() -> Check {
 pub(super) fn review_log_cases() -> Vec<Case> {
     const RUN: &str = "tooling/review-run/src/run.rs";
     const OUTCOME: &str = "tooling/review-run/src/outcome.rs";
-    vec![
+    let mut cases = vec![
         case(
             "a run cut off after a model call read as one that did not run",
             "ENG-28",
             Injection::replace(
                 RUN,
-                "    if crate::retry::charged(log).is_some() {\n",
-                "    if crate::retry::charged(log).is_some() && why.is_none() {\n",
+                "    if log.ran() { (None, why)",
+                "    if log.ran() && why.is_none() { (None, why)",
             ),
             check(),
             "cut: a specialist cut off after reading its whole diff is not consulted",
@@ -60,8 +62,8 @@ pub(super) fn review_log_cases() -> Vec<Case> {
             "ENG-28",
             Injection::replace(
                 OUTCOME,
-                "        for line in &run.unreadable {\n",
-                "        for line in run.unreadable.iter().filter(|_| false) {\n",
+                "        for line in run.unreadable.iter().take(MOST_UNREADABLE) {\n",
+                "        for line in run.unreadable.iter().take(MOST_UNREADABLE).filter(|_| false) {\n",
             ),
             check(),
             "malformed: a line in no form is not its own blocking finding quoting it",
@@ -71,8 +73,8 @@ pub(super) fn review_log_cases() -> Vec<Case> {
             "ENG-28",
             Injection::replace(
                 "tooling/review-run/src/reading.rs",
-                "    let report = with_outcome(&split.clean, answer);\n",
-                "    let report = with_outcome(\n        if split.unreadable.is_empty() { &split.clean } else { \"\" },\n        answer,\n    );\n",
+                "    let report = with_outcome(&split.clean, ending);\n",
+                "    let report = with_outcome(\n        if split.unreadable.is_empty() { &split.clean } else { \"\" },\n        ending,\n    );\n",
             ),
             check(),
             "malformed: the finding beside a line in no form is not kept",
@@ -82,11 +84,45 @@ pub(super) fn review_log_cases() -> Vec<Case> {
             "ENG-28",
             Injection::replace(
                 RUN,
-                "    if crate::retry::charged(log).is_some() {\n",
-                "    if crate::retry::charged(log).is_some() || log.subtype != \"none\" {\n",
+                "    if log.ran() { (None, why)",
+                "    if log.ran() || log.subtype != \"none\" { (None, why)",
             ),
             check(),
             "silent: a specialist whose log holds no model call is consulted",
+        ),
+    ];
+    cases.extend(cut_before_stating_cases());
+    cases
+}
+
+/// A run cut off before it stated any line or an outcome taken for a
+/// clean pass, by the review and by the grader.
+fn cut_before_stating_cases() -> Vec<Case> {
+    vec![
+        case(
+            "a specialist cut off before it stated anything taken for a clean pass",
+            "ENG-28",
+            Injection::replace(
+                "tooling/review-run/src/reading.rs",
+                "    let stated_nothing = cut && states_nothing(texts, answer);\n",
+                "    let stated_nothing = cut && states_nothing(texts, answer) && texts.is_empty();\n",
+            ),
+            check(),
+            "cut-silent: a specialist cut off before it stated anything is not named partial",
+        ),
+        case(
+            "the grader passing a run cut off before it stated anything",
+            "ENG-32",
+            Injection::replace(
+                "tooling/review-eval/src/grade.rs",
+                "    if !log.succeeded() && states_nothing(&log.texts, &log.answer) {\n",
+                "    if !log.succeeded() && states_nothing(&log.texts, &log.answer) && log.texts.is_empty() {\n",
+            ),
+            cargo_lib_test(
+                "review-eval",
+                "grade::tests::a_specialist_cut_off_before_it_stated_anything_fails_even_a_case_that_expects_none",
+            ),
+            "a_specialist_cut_off_before_it_stated_anything_fails_even_a_case_that_expects_none",
         ),
     ]
 }

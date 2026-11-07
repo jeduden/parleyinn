@@ -7,9 +7,12 @@
 //! generalist keeps the specialist's finding as a nit; then the gate on
 //! what `review-run` wrote. A specialist cut off at its turn budget after
 //! its reads covered its whole diff must be consulted, its finding its
-//! report, and the review decided with no gap; one that read part of its
-//! diff must be a `partial:` gap naming the lines it did not read, so the
-//! review requests changes and the gate posts that request; a line that
+//! report, and the review decided with no gap; one cut off before it
+//! stated any line or an outcome must be a `partial:` gap saying so, its
+//! report no clean pass, so the review requests changes; one that read
+//! part of its diff must be a `partial:` gap naming the lines it did not
+//! read, so the review requests changes and the gate posts that request;
+//! a line that
 //! says it is no finding must be set aside and listed in
 //! `review/ignored.json`, the finding beside it kept; a finding-shaped
 //! line that does not read must be its own blocking finding quoting it,
@@ -44,6 +47,9 @@ pub enum Mode {
     /// It reads its whole diff, states its finding and is cut off at its
     /// turn budget before its answer.
     Cut,
+    /// It reads its whole diff and is cut off at its turn budget before
+    /// it states any line or an outcome.
+    CutSilent,
     /// It reads only its diff's first [`PART`] lines, states its finding
     /// and answers.
     Partial,
@@ -59,8 +65,9 @@ pub enum Mode {
 
 impl Mode {
     /// Every mode, in the order the check runs them.
-    pub const ALL: [Self; 5] = [
+    pub const ALL: [Self; 6] = [
         Self::Cut,
+        Self::CutSilent,
         Self::Partial,
         Self::AllWell,
         Self::Malformed,
@@ -72,6 +79,7 @@ impl Mode {
     pub fn name(self) -> &'static str {
         match self {
             Self::Cut => "cut",
+            Self::CutSilent => "cut-silent",
             Self::Partial => "partial",
             Self::AllWell => "all-well",
             Self::Malformed => "malformed",
@@ -158,13 +166,14 @@ pub fn specialist_log(command: &Command, mode: Mode) -> String {
     let stated = match mode {
         Mode::AllWell => format!("{FINDING}\n{ALL_WELL}"),
         Mode::Malformed => format!("{FINDING}\n{MALFORMED}"),
+        Mode::CutSilent => "I read the diff; now the context.".to_owned(),
         _ => FINDING.to_owned(),
     };
     let call = serde_json::json!({"type": "assistant", "parent_tool_use_id": null, "message": {
         "id": "m", "model": "claude-haiku-5-5",
         "usage": {"input_tokens": 10, "output_tokens": 5},
         "content": [{"type": "text", "text": stated}]}});
-    let result = if mode == Mode::Cut {
+    let result = if matches!(mode, Mode::Cut | Mode::CutSilent) {
         serde_json::json!({"type": "result", "subtype": "error_max_turns", "is_error": true,
             "result": "", "total_cost_usd": 0.05, "num_turns": 20})
     } else {
@@ -280,6 +289,7 @@ pub fn mode_problems(mode: Mode, wrote: &Wrote, runs: usize) -> Vec<String> {
     let consulted = wrote.consulted.contains(&format!("\"{SPECIALIST}\""));
     let wants = match mode {
         Mode::Cut => cut_wants(wrote, consulted, runs),
+        Mode::CutSilent => cut_silent_wants(wrote, consulted, runs),
         Mode::Partial => partial_wants(wrote, consulted),
         Mode::AllWell => vec![
             (
@@ -342,6 +352,40 @@ fn cut_wants(wrote: &Wrote, consulted: bool, runs: usize) -> Vec<(bool, &'static
             wrote.verdict() == review_gate::APPROVE_VERDICT
                 && wrote.gate.as_deref() == Ok(review_gate::APPROVE),
             "a review whose cut specialist read its whole diff is not decided as any other",
+        ),
+        (
+            runs == 1,
+            "a specialist cut off after it was charged is run again",
+        ),
+    ]
+}
+
+/// What a specialist cut off before it stated any line or an outcome
+/// must give: no clean pass.
+fn cut_silent_wants(wrote: &Wrote, consulted: bool, runs: usize) -> Vec<(bool, &'static str)> {
+    let why = "partial: it ended without a successful result (its run ended with \
+               error_max_turns) before it stated any line or an outcome";
+    vec![
+        (
+            consulted,
+            "a specialist cut off before it stated anything is not consulted",
+        ),
+        (
+            wrote.gap() == Some(why),
+            "a specialist cut off before it stated anything is not named partial",
+        ),
+        (
+            wrote.blocks("review/", "before it stated any line or an outcome"),
+            "a specialist cut off before it stated anything is not named in a blocking finding",
+        ),
+        (
+            wrote.report == format!("{}\n", review_gate::report::CUT_BEFORE_STATING),
+            "the report of a specialist cut off before it stated anything reads as a clean pass",
+        ),
+        (
+            wrote.gate.as_deref() == Ok(review_gate::REQUEST_CHANGES),
+            "the gate does not post the request for changes a specialist cut off before it \
+             stated anything makes",
         ),
         (
             runs == 1,

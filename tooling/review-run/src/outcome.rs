@@ -101,7 +101,9 @@ pub fn decide(
         consulted: &consulted,
         kept: kept_counts,
         cut: specialist_runs(plan, runs)
-            .filter(|run| run.cut.is_some() && run.partial.is_empty())
+            .filter(|run| {
+                run.cut.is_some() && run.partial.is_empty() && run.stated_nothing.is_empty()
+            })
             .count(),
         cut_generalists: runs
             .iter()
@@ -183,6 +185,18 @@ fn read_partly(
                     "{} did not read its whole diff{cut}: {why}, so the review of it is partial",
                     gap.label()
                 ),
+            ));
+            partial.push(gap);
+        }
+        for (part, ended) in &run.stated_nothing {
+            let why = format!(
+                "it ended without a successful result ({ended}) before it stated any line or \
+                 an outcome"
+            );
+            let gap = Gap::new(&run.name, *part, gaps::partial(&why));
+            findings.push(blocking(
+                REVIEW_PATH,
+                format!("{} {why}, so the review of it is partial", gap.label()),
             ));
             partial.push(gap);
         }

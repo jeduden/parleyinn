@@ -24,7 +24,17 @@ fn the_checkout_s_review_run_reads_every_log_whatever_its_run_ended_with() {
 fn every_mode_has_its_own_name() {
     let names: Vec<&str> = Mode::ALL.iter().map(|m| m.name()).collect();
 
-    assert_eq!(names, ["cut", "partial", "all-well", "malformed", "silent"]);
+    assert_eq!(
+        names,
+        [
+            "cut",
+            "cut-silent",
+            "partial",
+            "all-well",
+            "malformed",
+            "silent"
+        ]
+    );
 }
 
 #[test]
@@ -41,6 +51,15 @@ fn nothing_written_is_named_for_every_mode() {
             "cut: the finding the specialist stated before it was cut off is not its report",
             "cut: a review whose cut specialist read its whole diff is not decided as any other",
             "cut: a specialist cut off after it was charged is run again",
+            "cut-silent: a specialist cut off before it stated anything is not consulted",
+            "cut-silent: a specialist cut off before it stated anything is not named partial",
+            "cut-silent: a specialist cut off before it stated anything is not named in a \
+             blocking finding",
+            "cut-silent: the report of a specialist cut off before it stated anything reads as \
+             a clean pass",
+            "cut-silent: the gate does not post the request for changes a specialist cut off \
+             before it stated anything makes",
+            "cut-silent: a specialist cut off after it was charged is run again",
             "partial: a specialist that read part of its diff is not consulted",
             "partial: the lines a specialist did not read are not its gap",
             "partial: the lines a specialist did not read are not named in a blocking finding",

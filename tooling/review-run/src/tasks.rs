@@ -294,12 +294,7 @@ fn one(r: &Review, c: &Controls, unit: &Unit, heard: &Answers) -> Done {
     if let Some((log, part)) = kept.zip(unit.part.as_ref()) {
         // A kept part is read from its log as a fresh one is, its reads
         // held to its diff again.
-        let read = reading::read(
-            (&unit.name, Some(part.index)),
-            &log.texts,
-            &log.answer,
-            r.known,
-        );
+        let read = reading::read_run((&unit.name, Some(part.index)), log, r.known);
         let mut run = reused(unit.label(), unit.kind, &read.answer, log.texts.clone());
         run.answer_key = key;
         run.ignored = read.ignored;
@@ -308,6 +303,10 @@ fn one(r: &Review, c: &Controls, unit: &Unit, heard: &Answers) -> Done {
             reading::uncovered(r.workdir, &unit.stem(), &log.reads)
                 .map(|why| (Some(part.index), why)),
         );
+        if read.stated_nothing {
+            let why = crate::run::cut_why(log).unwrap_or_default();
+            run.stated_nothing.push((Some(part.index), why));
+        }
         (r.progress)(&describe(&run));
         return (run, Some(read.report));
     }

@@ -16,8 +16,10 @@ use std::path::{self, Path, PathBuf};
 
 use review_bundle::cli::DIFFS;
 use review_eval::coverage;
-use review_eval::log::ReadCall;
-use review_gate::report::{assemble, outcome_line, split_with, with_outcome};
+use review_eval::log::{ReadCall, RunLog};
+use review_gate::report::{
+    CUT_BEFORE_STATING, assemble, outcome_line, split_with, states_nothing, with_outcome,
+};
 use serde::{Deserialize, Serialize};
 
 use crate::REVIEW;
@@ -55,20 +57,51 @@ pub struct Read {
     pub ignored: Vec<ReportLine>,
     /// The finding-shaped lines that do not read.
     pub unreadable: Vec<ReportLine>,
+    /// Whether its run ended without a successful result before it
+    /// stated any line or an outcome: never a clean pass, its report
+    /// ends with [`CUT_BEFORE_STATING`], not an outcome derived from no
+    /// lines.
+    pub stated_nothing: bool,
 }
 
 /// The report of specialist `agent`, or of its part `part`, read from
 /// `texts`, its log's text blocks, and `answer`, its final answer, each
-/// id held to `known`.
+/// id held to `known`, as a run that ended with a successful result.
 #[must_use]
 pub fn read(
-    (agent, part): (&str, Option<usize>),
+    who: (&str, Option<usize>),
     texts: &[String],
     answer: &str,
     known: &BTreeSet<String>,
 ) -> Read {
+    read_as(who, (texts, answer), known, false)
+}
+
+/// The report of specialist `agent`, or of its part `part`, read from
+/// its run's `log`, whatever result it ended with, each id held to
+/// `known`: a run that ended without a successful result and stated no
+/// line and no outcome ([`states_nothing`]) is marked so.
+#[must_use]
+pub fn read_run(who: (&str, Option<usize>), log: &RunLog, known: &BTreeSet<String>) -> Read {
+    read_as(who, (&log.texts, &log.answer), known, !log.succeeded())
+}
+
+/// [`read`], of a run that was `cut` off before a successful result
+/// when it was.
+fn read_as(
+    (agent, part): (&str, Option<usize>),
+    (texts, answer): (&[String], &str),
+    known: &BTreeSet<String>,
+    cut: bool,
+) -> Read {
     let split = split_with(&assemble(texts, answer, None), Some(known));
-    let report = with_outcome(&split.clean, answer);
+    let stated_nothing = cut && states_nothing(texts, answer);
+    let ending = if stated_nothing {
+        CUT_BEFORE_STATING
+    } else {
+        answer
+    };
+    let report = with_outcome(&split.clean, ending);
     let line = |line: usize, text: String, why: String| ReportLine {
         agent: agent.to_owned(),
         part,
@@ -90,6 +123,7 @@ pub fn read(
             .map(|u| line(u.line, u.text, u.problem.to_string()))
             .collect(),
         report,
+        stated_nothing,
     }
 }
 

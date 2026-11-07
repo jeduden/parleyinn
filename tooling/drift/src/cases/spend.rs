@@ -47,8 +47,8 @@ fn flight_cases() -> Vec<Case> {
             "ENG-28",
             Injection::replace(
                 "tooling/review-run/src/retry.rs",
-                "    } else if !log.resulted && charged(log).is_some() {\n        most\n",
-                "    } else if !log.resulted && charged(log).is_some() {\n        0.0\n",
+                "    } else if !log.resulted && log.charged().is_some() {\n        most\n",
+                "    } else if !log.resulted && log.charged().is_some() {\n        0.0\n",
             ),
             cap_check(),
             "a review with a run cut off unbilled: review/spend.json says",
@@ -58,8 +58,8 @@ fn flight_cases() -> Vec<Case> {
             "ENG-28",
             Injection::replace(
                 "tooling/review-run/src/retry.rs",
-                "    } else if !log.resulted && charged(log).is_some() {\n",
-                "    } else if charged(log).is_some() {\n",
+                "    } else if !log.resulted && log.charged().is_some() {\n",
+                "    } else if log.charged().is_some() {\n",
             ),
             cap_check(),
             "a review with a run that reported no cost: review/spend.json says",

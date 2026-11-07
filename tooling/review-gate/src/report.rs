@@ -894,8 +894,8 @@ pub fn split_dashes(text: &str) -> Vec<&str> {
 mod stated;
 
 pub use stated::{
-    Ignored, Reason, Split, Unreadable, derived_outcome, split, split_with, stated_check,
-    with_outcome,
+    CUT_BEFORE_STATING, Ignored, Reason, Split, Unreadable, derived_outcome, split, split_with,
+    stated_check, states_nothing, with_outcome,
 };
 
 #[cfg(test)]
