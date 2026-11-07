@@ -1,7 +1,8 @@
 //! ENG-28: a pull request's reviews share one cost cap. `review-run`
 //! counts what the pull request's earlier reviews spent, handed in as
-//! `--spent-before`, toward the cap, starts no run once that and its own
-//! finished runs reach it, names each agent it did not start over budget
+//! `--spent-before`, toward the cap, starts a run only once its tier's
+//! cap fits beside that, its own finished runs and the caps of its runs
+//! in flight, names each agent it did not start over budget
 //! and keeps the total in `review/spend.json`. The review job fetches
 //! that file with `scripts/review-spend.sh` before the Claude token is
 //! staged, from the newest artifact under the pull request's own name a
@@ -16,6 +17,7 @@ use std::collections::BTreeMap;
 use std::fs;
 use std::path::Path;
 
+use review_eval::runner::SPECIALIST_BUDGET_USD;
 use review_run::controls::PULL_REQUEST_COST_USD;
 use review_run::previous::Selection;
 
@@ -32,6 +34,9 @@ const JOB: &str = "review";
 const AGENTS: usize = 5;
 /// What one run of the stand-in costs, in US dollars.
 const RUN_COST: f64 = 0.01;
+/// How long each run of the stand-in takes, so runs started together
+/// overlap.
+const HOLD: std::time::Duration = std::time::Duration::from_millis(30);
 /// The artifact name the spend is kept under, as the upload step writes it.
 const UPLOAD_NAME: &str = "name: review-spend-pr-${{ steps.pull_head.outputs.number }}";
 
@@ -46,20 +51,43 @@ pub struct Held<'a> {
     pub gaps: &'a BTreeMap<String, String>,
     /// What its `review/spend.json` says, or why it does not read.
     pub spend: Result<f64, String>,
+    /// The most runs that ran at once.
+    pub at_once: usize,
 }
 
-/// What is wrong with review `case`, which `held` says what it did, when
-/// `started` runs should have started and its spend file should say
-/// `spent`: another count of runs, an agent not started that is not
-/// named over budget or not counted, a review that does not request
-/// changes, or a spend file that is missing what was spent.
+/// What review `case` should have done: how many runs start, the most
+/// that run at once, and what its spend file says.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Want {
+    pub started: usize,
+    pub at_once: usize,
+    pub spent: f64,
+}
+
+/// What is wrong with review `case`, which `held` says what it did,
+/// against what it should have done, `want`: another count of runs,
+/// more runs at once than their tier caps fit beside what was spent, an
+/// agent not started that is not named over budget or not counted, a
+/// review that does not request changes, or a spend file that is
+/// missing what was spent.
 #[must_use]
-pub fn held_problems(case: &str, held: &Held, started: usize, spent: f64) -> Vec<String> {
+pub fn held_problems(case: &str, held: &Held, want: Want) -> Vec<String> {
+    let Want {
+        started,
+        at_once,
+        spent,
+    } = want;
     let mut problems = Vec::new();
     if held.started != started {
         problems.push(format!(
             "{case}: {} runs started, not {started}",
             held.started
+        ));
+    }
+    if held.at_once > at_once {
+        problems.push(format!(
+            "{case}: {} runs ran at once, past the {at_once} whose tier caps fit in the cap",
+            held.at_once
         ));
     }
     let left = AGENTS - started;
@@ -100,21 +128,31 @@ fn spend_of(workdir: &Path) -> Result<f64, String> {
 }
 
 /// What is wrong with the pull request's cap: with the earlier reviews
-/// a little under it, one run starts and nothing after it; with them at
-/// it, no run starts at all. Each names the rest over budget, requests
-/// changes and keeps what the earlier reviews and it spent.
+/// leaving room for one specialist's tier cap, one run starts and
+/// nothing after it; with them at it, no run starts at all; with room
+/// for two specialists' caps and eight runs allowed at once, never more
+/// than two run at once, the third waits for them and no generalist's
+/// cap fits. Each names the rest over budget, requests changes and
+/// keeps what the earlier reviews and it spent.
 #[must_use]
 pub fn cap_problems(checkout: &Checkout, workdir: &Path) -> Vec<String> {
-    let under = PULL_REQUEST_COST_USD - RUN_COST / 2.0;
+    let one = PULL_REQUEST_COST_USD - SPECIALIST_BUDGET_USD - RUN_COST / 2.0;
+    let two = PULL_REQUEST_COST_USD - 2.0 * SPECIALIST_BUDGET_USD;
     let mut problems = Vec::new();
-    for (case, before, started) in [
-        ("a review a little under the cap", under, 1),
-        ("a review at the cap", PULL_REQUEST_COST_USD, 0),
+    for (case, before, parallel, started, at_once) in [
+        ("a review with room for one run", one, "1", 1, 1),
+        ("a review at the cap", PULL_REQUEST_COST_USD, "1", 0, 0),
+        ("a review with room for two runs at once", two, "8", 3, 2),
     ] {
-        let host = ControlHost::default();
+        let host = ControlHost::holding(HOLD);
         let dir = workdir.join(started.to_string());
         let before_flag = before.to_string();
-        let flags = ["--parallel", "1", "--spent-before", before_flag.as_str()];
+        let flags = [
+            "--parallel",
+            parallel,
+            "--spent-before",
+            before_flag.as_str(),
+        ];
         let checked = review(checkout, &dir, &host, &flags).and_then(|out| {
             let gaps = gaps(&dir)?;
             let held = Held {
@@ -122,10 +160,16 @@ pub fn cap_problems(checkout: &Checkout, workdir: &Path) -> Vec<String> {
                 out: &out,
                 gaps: &gaps,
                 spend: spend_of(&dir),
+                at_once: host.at_once(),
             };
             #[allow(clippy::cast_precision_loss, reason = "a handful of runs")]
             let spent = before + RUN_COST * started as f64;
-            Ok(held_problems(case, &held, started, spent))
+            let want = Want {
+                started,
+                at_once,
+                spent,
+            };
+            Ok(held_problems(case, &held, want))
         });
         match checked {
             Ok(found) => problems.extend(found),

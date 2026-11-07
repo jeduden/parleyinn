@@ -9,14 +9,16 @@
 //! them is the one the two waves of old gave. A specialist that ends in
 //! a gap is counted by the breaker, and once it trips no generalist
 //! starts, which, as it is decided before any starts, no order of
-//! ending changes; a run the cost cap refuses is not started, and ends in
-//! a gap the breaker counts as any other. An agent
+//! ending changes; a run waits while its tier's cap does not fit in the
+//! pull request's cost cap beside the runs in flight, and a run the
+//! cost cap refuses is not started, and ends in a gap the breaker counts
+//! as any other. An agent
 //! kept whole from an earlier run is taken as it answered there, and a
 //! part kept is held to the report check again.
 
 use std::collections::BTreeMap;
 
-use review_eval::component;
+use review_eval::{component, runner};
 use review_gate::report::assemble;
 
 use crate::controls::Controls;
@@ -125,8 +127,20 @@ pub(crate) fn run_all(r: &Review, c: &Controls) -> Vec<AgentRun> {
         }
     }
     let g = graph(r.plan, units, generalists);
-    // A generalist starts only once the breaker is decided.
-    let gate = |at: usize| !matches!(g.tasks[at], Task::Generalist(_)) || c.breaker.decided();
+    // A run starts only once its tier's cap fits in the pull request's
+    // cost cap beside the runs in flight, and a generalist only once the
+    // breaker is decided. A task the gate holds is asked again as each
+    // task ends, and with nothing running the lowest ready one starts
+    // all the same, to be refused there if it still does not fit.
+    let gate = |at: usize| {
+        let (unit, generalist) = match &g.tasks[at] {
+            Task::Unit(unit) => (Some(unit), false),
+            Task::Generalist(unit) => (Some(unit), true),
+            Task::Merge(_) => (None, false),
+        };
+        let fits = unit.is_none_or(|u| c.budget.fits(runner::budget_of(u.kind)));
+        fits && (!generalist || c.breaker.decided())
+    };
     let done = pipeline(&g.waits, r.options.parallel, &gate, &|at, inputs| {
         task(r, c, &g.tasks[at], inputs)
     });
@@ -182,7 +196,7 @@ fn task(r: &Review, c: &Controls, task: &Task, inputs: Vec<Done>) -> Done {
             // keep it from starting, and the cap is what was set.
             let tripped = c
                 .budget
-                .refusal()
+                .refusal(runner::budget_of(unit.kind))
                 .map_or_else(|| c.breaker.refusal(), |_| None);
             let done = match tripped {
                 Some(why) => {

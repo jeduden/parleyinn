@@ -14,7 +14,25 @@ const SCRIPT: &str = "scripts/review-spend.sh";
 
 /// The drifts the pull request's cap exists to rule out (ENG-28, I6).
 pub(super) fn review_spend_cases() -> Vec<Case> {
-    [cap_cases(), carry_cases()].concat()
+    [cap_cases(), carry_cases(), flight_cases()].concat()
+}
+
+/// The drifts of the runs in flight: a run started though the tier caps
+/// of the runs in flight leave no room for its own, and a run paid for
+/// that reported no cost counted free. Last, so adding them moves no
+/// earlier case to another shard.
+fn flight_cases() -> Vec<Case> {
+    vec![case(
+        "review-run starting runs whose tier caps the runs in flight already hold",
+        "ENG-28",
+        Injection::replace(
+            "tooling/review-run/src/controls.rs",
+            "ledger.reserved += most;",
+            "ledger.reserved += 0.0;",
+        ),
+        cap_check(),
+        "3 runs ran at once, past the 2",
+    )]
 }
 
 /// The engineering check of the cap on the checkout's `review-run`.
@@ -42,8 +60,8 @@ fn cap_cases() -> Vec<Case> {
             "ENG-28",
             Injection::replace(
                 "tooling/review-run/src/controls.rs",
-                "        let total = self.total();\n",
-                "        let total = self.spent();\n",
+                "        self.before + own <= self.cap + SLACK\n",
+                "        own <= self.cap + SLACK\n",
             ),
             cap_check(),
             "5 runs started, not 1",
@@ -64,8 +82,8 @@ fn cap_cases() -> Vec<Case> {
             "ENG-28",
             Injection::replace(
                 "tooling/review-run/src/cli.rs",
-                "&crate::spend::text(p.spent_before + usage::total(&usage)),",
-                "&crate::spend::text(usage::total(&usage)),",
+                "&crate::spend::text(p.spent_before + usage::charged(runs)),",
+                "&crate::spend::text(usage::charged(runs)),",
             ),
             cap_check(),
             "review/spend.json says",

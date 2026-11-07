@@ -161,22 +161,22 @@ fn what_earlier_reviews_spent_counts_toward_the_cap_and_is_kept_with_each_run() 
     let options = Options {
         parallel: 1,
         max_cost_usd: 1.0,
-        spent_before: 0.985,
+        spent_before: 0.685,
         ..options()
     };
 
     let (dir, ran) = controlled(DISPATCH, options, 0.0, fake::either);
 
-    // 0.985 and two runs of 0.01 reach the cap; nothing after them starts.
+    // 0.685 and two runs of 0.01 leave no room for a third's 0.30 cap.
     assert_eq!(ran.host.agents(), ["lang-markdown", "lang-rust"]);
     let failure = ran.run("review-code").failure.clone().unwrap_or_default();
     assert!(
-        failure.starts_with("over budget: the pull request's reviews cost 1.0050 USD"),
+        failure.starts_with("over budget: the pull request's reviews cost 0.7050 USD"),
         "{failure}"
     );
     let spend = fs::read_to_string(dir.path().join(crate::spend::SPEND)).unwrap();
     assert!(
-        (crate::spend::check(&spend).unwrap() - 1.005).abs() < 1e-9,
+        (crate::spend::check(&spend).unwrap() - 0.705).abs() < 1e-9,
         "{spend}"
     );
 }
@@ -185,25 +185,37 @@ fn what_earlier_reviews_spent_counts_toward_the_cap_and_is_kept_with_each_run() 
 fn no_run_starts_once_the_finished_runs_cost_the_review_s_cap() {
     let options = Options {
         parallel: 1,
-        max_cost_usd: 0.015,
+        max_cost_usd: 0.31,
         ..options()
     };
 
     let (dir, ran) = controlled(DISPATCH, options, 0.0, fake::either);
 
-    // Each run costs 0.01: two finish, and nothing after them starts.
+    // Each run costs 0.01: two finish, and no 0.30 cap fits after them.
     assert_eq!(ran.host.agents(), ["lang-markdown", "lang-rust"]);
-    let refused = "over budget: the pull request's reviews cost 0.0200 USD, its cap is 0.01 \
-                   USD, so it was not started";
+    let refused = |most: &str| {
+        format!(
+            "over budget: the pull request's reviews cost 0.0200 USD, and a run capped at {most} \
+             USD does not fit in its cap of 0.31 USD, so it was not started"
+        )
+    };
+    let specialist = refused("0.30");
+    let generalist = refused("1.50");
+    assert_eq!(
+        ran.run("test-engineer-unit").failure.as_deref(),
+        Some(specialist.as_str())
+    );
+    for name in ["review-code", "review-spec"] {
+        assert_eq!(ran.run(name).failure.as_deref(), Some(generalist.as_str()));
+    }
     for name in ["test-engineer-unit", "review-code", "review-spec"] {
-        assert_eq!(ran.run(name).failure.as_deref(), Some(refused), "{name}");
-        assert_eq!(ran.run(name).attempts, 0);
+        assert_eq!(ran.run(name).attempts, 0, "{name}");
     }
     let report = fs::read_to_string(dir.path().join(report_file("test-engineer-unit"))).unwrap();
-    assert!(report.contains(refused), "{report}");
+    assert!(report.contains(&specialist), "{report}");
     assert!(
         ran.lines.contains(&format!(
-            "review-code (generalist): did not answer: {refused}"
+            "review-code (generalist): did not answer: {generalist}"
         )),
         "{:?}",
         ran.lines
@@ -213,7 +225,7 @@ fn no_run_starts_once_the_finished_runs_cost_the_review_s_cap() {
 #[test]
 fn a_run_that_cost_money_is_not_run_again_whether_or_not_a_cap_is_reached() {
     let options = Options {
-        max_cost_usd: 0.03,
+        max_cost_usd: 0.31,
         ..options()
     };
     let costly = r#"{"type":"result","subtype":"error_max_turns","is_error":true,"result":"","total_cost_usd":0.05,"num_turns":20}"#;
@@ -618,8 +630,10 @@ fn what_is_running_is_told_every_so_often() {
 
 #[test]
 fn a_free_run_is_not_run_again_once_others_reached_the_cap_meanwhile() {
+    // Two specialists' caps fit at once, and none beside what one of
+    // them costs.
     let options = Options {
-        max_cost_usd: 0.03,
+        max_cost_usd: 0.6,
         ..options()
     };
     let lines = Arc::new(Mutex::new(Vec::new()));
@@ -639,7 +653,7 @@ fn a_free_run_is_not_run_again_once_others_reached_the_cap_meanwhile() {
                 }
                 fake::write_log(
                     c,
-                    &fake::log_of(&[], "success", "outcome: none — clean.", 0.05),
+                    &fake::log_of(&[], "success", "outcome: none — clean.", 0.35),
                 );
                 Ok(Output::default())
             }
@@ -663,15 +677,107 @@ fn a_free_run_is_not_run_again_once_others_reached_the_cap_meanwhile() {
         }
     });
 
-    // test-engineer-unit runs beside them, so the sum is 0.05 or 0.06.
+    // test-engineer-unit's cap does not fit beside theirs, so it waits.
     let run = ran.run("lang-rust");
-    let failure = run.failure.clone().unwrap_or_default();
     assert_eq!(run.attempts, 1);
-    assert!(
-        failure.starts_with("over budget: the pull request's reviews cost 0.0")
-            && failure.ends_with(
-                " USD, its cap is 0.03 USD, so it was not started again; before that cannot start"
-            ),
-        "{failure}"
+    assert_eq!(
+        run.failure.as_deref(),
+        Some(
+            "over budget: the pull request's reviews cost 0.3500 USD, and a run capped at 0.30 \
+             USD does not fit in its cap of 0.60 USD, so it was not started again; before that \
+             cannot start"
+        )
     );
+}
+
+/// Answers as [`fake::either`] after a short wait, counting in `peak`
+/// the most specialists that ran at once and in `generalists` the most
+/// generalists.
+fn overlapping(
+    peak: Arc<(AtomicUsize, AtomicUsize)>,
+    generalists: Arc<(AtomicUsize, AtomicUsize)>,
+) -> impl Fn(&Command) -> Result<Output, String> + Sync + 'static {
+    move |c| {
+        let count = if prompt_of(c).contains("a specialist") {
+            &peak
+        } else {
+            &generalists
+        };
+        let now = count.0.fetch_add(1, Ordering::SeqCst) + 1;
+        count.1.fetch_max(now, Ordering::SeqCst);
+        std::thread::sleep(Duration::from_millis(20));
+        count.0.fetch_sub(1, Ordering::SeqCst);
+        fake::either(c)
+    }
+}
+
+#[test]
+fn a_deep_review_of_twenty_nine_agents_runs_them_all_sixteen_specialists_at_most_at_once() {
+    let dir = TempDir::new().unwrap();
+    let specialists: Vec<String> = (1..=26).map(|n| format!("srs-{n:02}")).collect();
+    for name in &specialists {
+        fake::define(dir.path(), name, 20);
+    }
+    let generalists = ["review-code", "review-spec", "review-security"];
+    let mut dispatch = serde_json::Map::new();
+    for (at, generalist) in generalists.iter().enumerate() {
+        fake::define(dir.path(), generalist, 40);
+        let own: Vec<&String> = specialists.iter().skip(at).step_by(3).collect();
+        dispatch.insert((*generalist).to_owned(), serde_json::json!(own));
+    }
+    let peak = Arc::new((AtomicUsize::new(0), AtomicUsize::new(0)));
+    let most = Arc::new((AtomicUsize::new(0), AtomicUsize::new(0)));
+    let host = FakeHost::new(overlapping(Arc::clone(&peak), Arc::clone(&most)));
+    let options = Options {
+        parallel: 32,
+        ..options()
+    };
+    assert!((options.max_cost_usd - crate::controls::PULL_REQUEST_COST_USD).abs() < 1e-9);
+
+    let runs = review_on(&Review {
+        host: &host,
+        clock: &crate::fake::FakeClock::default(),
+        workdir: dir.path(),
+        plan: &plan(&serde_json::Value::Object(dispatch).to_string()),
+        known: &known(),
+        options,
+        resume: None,
+        keys: None,
+        store: None,
+        scrubber: None,
+        progress: &|_| {},
+    })
+    .unwrap();
+
+    assert_eq!(runs.len(), 29);
+    for run in &runs {
+        assert!(run.answered(), "{}: {:?}", run.name, run.failure);
+    }
+    let at_once = peak.1.load(Ordering::SeqCst);
+    assert!((2..=16).contains(&at_once), "{at_once} specialists at once");
+    assert!(most.1.load(Ordering::SeqCst) <= 3);
+}
+
+#[test]
+fn a_generalist_whose_cap_does_not_fit_beside_another_s_waits_for_it_to_end() {
+    let peak = Arc::new((AtomicUsize::new(0), AtomicUsize::new(0)));
+    let most = Arc::new((AtomicUsize::new(0), AtomicUsize::new(0)));
+    // Three specialists' caps fit together, and one generalist's beside
+    // what they cost, never two.
+    let options = Options {
+        max_cost_usd: 2.0,
+        ..options()
+    };
+
+    let (_dir, ran) = controlled(
+        DISPATCH,
+        options,
+        0.0,
+        overlapping(Arc::clone(&peak), Arc::clone(&most)),
+    );
+
+    for run in &ran.runs {
+        assert!(run.answered(), "{}: {:?}", run.name, run.failure);
+    }
+    assert_eq!(most.1.load(Ordering::SeqCst), 1, "one generalist at a time");
 }

@@ -38,12 +38,16 @@ fn a_review_that_cannot_run_is_named_for_each_case() {
 
     let got = cap_problems(&repo(), &file);
 
-    assert_eq!(got.len(), 2, "{got:?}");
+    assert_eq!(got.len(), 3, "{got:?}");
     assert!(
-        got[0].starts_with("a review a little under the cap: "),
+        got[0].starts_with("a review with room for one run: "),
         "{got:?}"
     );
     assert!(got[1].starts_with("a review at the cap: "), "{got:?}");
+    assert!(
+        got[2].starts_with("a review with room for two runs at once: "),
+        "{got:?}"
+    );
 }
 
 #[test]
@@ -78,9 +82,15 @@ fn a_review_held_to_the_cap_as_it_should_be_has_no_problem() {
         out: "verdict=request_changes\nover_budget=4\n",
         gaps: &gaps,
         spend: Ok(5.005),
+        at_once: 1,
+    };
+    let want = Want {
+        started: 1,
+        at_once: 1,
+        spent: 5.005,
     };
 
-    assert!(held_problems("c", &held, 1, 5.005).is_empty());
+    assert!(held_problems("c", &held, want).is_empty());
 }
 
 #[test]
@@ -91,14 +101,21 @@ fn a_review_past_the_cap_that_runs_on_approves_or_loses_the_spend_is_named() {
         out: "verdict=approve\nover_budget=1\n",
         gaps: &gaps,
         spend: Ok(0.01),
+        at_once: 3,
+    };
+    let want = Want {
+        started: 0,
+        at_once: 2,
+        spent: 5.0,
     };
 
-    let got = held_problems("c", &held, 0, 5.0);
+    let got = held_problems("c", &held, want);
 
     assert_eq!(
         got,
         [
             "c: 4 runs started, not 0",
+            "c: 3 runs ran at once, past the 2 whose tier caps fit in the cap",
             "c: 1 agents named over budget, not the 5 not started: verdict=approve\nover_budget=1\n",
             "c: a review its pull request's cap stopped does not request changes: \
              verdict=approve\nover_budget=1\n",
@@ -109,7 +126,7 @@ fn a_review_past_the_cap_that_runs_on_approves_or_loses_the_spend_is_named() {
         spend: Err("read x: gone".to_owned()),
         ..held
     };
-    assert!(held_problems("c", &unread, 0, 5.0).contains(&"c: read x: gone".to_owned()));
+    assert!(held_problems("c", &unread, want).contains(&"c: read x: gone".to_owned()));
 }
 
 #[test]

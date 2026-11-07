@@ -78,8 +78,8 @@ pub fn note(failure: &str) -> String {
 /// charged. The first failure is told to progress before the second
 /// attempt, which a specialist runs told [`note`], and the first log is
 /// kept as `<stem>.first.jsonl` beside the second's, a second turned
-/// away as `<stem>.second.jsonl`. No attempt starts once the finished
-/// runs reached the review's cost cap. A part's assembled report comes
+/// away as `<stem>.second.jsonl`. No attempt starts until its tier's
+/// cap fits in the pull request's cost cap. A part's assembled report comes
 /// back with its run, for the merge.
 pub(crate) fn run_one(r: &Review, c: &Controls, unit: &Unit) -> (AgentRun, Option<String>) {
     let started = r.clock.now();
@@ -199,7 +199,7 @@ fn again(
             }
             waited += 1;
         }
-        if let Some(why) = c.budget.refusal() {
+        if let Some(why) = c.budget.refusal(runner::budget_of(unit.kind)) {
             let (mut run, report) = last;
             let before = run.failure.unwrap_or_default();
             run.failure = Some(format!("{why} again; before that {before}"));
@@ -230,11 +230,13 @@ fn again(
     }
 }
 
-/// Runs `unit` once, with `note`, unless the review's finished runs
-/// reached its cost cap: noted as running while it runs, and charged
-/// once it ends what [`billed`] says.
+/// Runs `unit` once, with `note`, once its tier's cap is reserved in
+/// the pull request's cost cap, and not at all when it can never be:
+/// noted as running while it runs, and charged once it ends what
+/// [`billed`] says, its reservation released.
 fn tried(r: &Review, c: &Controls, unit: &Unit, note: Option<&str>) -> (AgentRun, Option<String>) {
-    if let Some(why) = c.budget.refusal() {
+    let most = runner::budget_of(unit.kind);
+    if let Err(why) = c.budget.reserve(most) {
         return not_started(r.workdir, unit, why);
     }
     let label = unit.label();
@@ -248,9 +250,9 @@ fn tried(r: &Review, c: &Controls, unit: &Unit, note: Option<&str>) -> (AgentRun
     );
     let mut done = attempt(r.host, r.workdir, r.plan, unit, r.options.deadline, note);
     c.live.end(&label);
-    done.0.charged = billed(&done.0.log, runner::budget_of(unit.kind));
+    done.0.charged = billed(&done.0.log, most);
     c.budget
-        .charge(done.0.charged, &|spent| keep_spend(r, spent));
+        .charge(most, done.0.charged, &|spent| keep_spend(r, spent));
 
     done
 }

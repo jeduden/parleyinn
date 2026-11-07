@@ -310,8 +310,8 @@ pub(super) fn review_control_cases() -> Vec<Case> {
             "ENG-28",
             Injection::replace(
                 CONTROLS,
-                "(total >= self.cap).then(|| {",
-                "(total >= self.cap && false).then(|| {",
+                "        self.before + own <= self.cap + SLACK\n",
+                "        self.before + own <= f64::MAX\n",
             ),
             controlled(),
             want,

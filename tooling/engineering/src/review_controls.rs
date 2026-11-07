@@ -21,7 +21,7 @@ use std::time::Duration;
 
 use review_eval::component::kind_of;
 use review_eval::host::{Command, Host, Output};
-use review_eval::runner::budget_usd;
+use review_eval::runner::{SPECIALIST_BUDGET_USD, budget_usd};
 use review_run::controls::{Clock, Fraction};
 use review_run::run::{Options, Review, review_on};
 
@@ -41,14 +41,20 @@ pub const CUT: &str = r#"{"type":"result","subtype":"error_max_turns","is_error"
 
 /// A stand-in for the `claude` command line: it keeps every command,
 /// fails the first runs of each agent [`ControlHost::fails`] names as
-/// it says, and answers every other run as [`Recorder`] does.
+/// it says, answers every other run as [`Recorder`] does, each run
+/// taking [`ControlHost::hold`] first, and counts the most runs that
+/// ran at once.
 #[derive(Debug, Default)]
 pub struct ControlHost {
     /// By agent: how many of its first runs fail, and the log each
     /// writes, or none for a run that cannot start.
     pub fails: BTreeMap<&'static str, (usize, Option<&'static str>)>,
+    /// How long each run takes, so runs started together overlap.
+    pub hold: Duration,
     commands: Mutex<Vec<Command>>,
     recorder: Recorder,
+    /// How many runs run now, and the most that ran at once.
+    flying: Mutex<(usize, usize)>,
 }
 
 impl ControlHost {
@@ -59,6 +65,32 @@ impl ControlHost {
             .lock()
             .unwrap_or_else(PoisonError::into_inner)
             .clone()
+    }
+
+    /// A stand-in each of whose runs takes `hold`.
+    #[must_use]
+    pub fn holding(hold: Duration) -> Self {
+        Self {
+            hold,
+            ..Self::default()
+        }
+    }
+
+    /// The most runs that ran at once.
+    #[must_use]
+    pub fn at_once(&self) -> usize {
+        self.flying.lock().unwrap_or_else(PoisonError::into_inner).1
+    }
+
+    /// Counts a run started, when `started`, or one ended.
+    fn fly(&self, started: bool) {
+        let mut flying = self.flying.lock().unwrap_or_else(PoisonError::into_inner);
+        if started {
+            flying.0 += 1;
+            flying.1 = flying.1.max(flying.0);
+        } else {
+            flying.0 -= 1;
+        }
     }
 
     /// How many times `agent` ran.
@@ -76,6 +108,18 @@ impl Host for ControlHost {
         if let Some(out) = crate::review_runs::version(command) {
             return Ok(out);
         }
+        self.fly(true);
+        std::thread::sleep(self.hold);
+        let out = self.answer(command);
+        self.fly(false);
+        out
+    }
+}
+
+impl ControlHost {
+    /// Answers `command`: fails it as [`ControlHost::fails`] says, else
+    /// as [`Recorder`] does.
+    fn answer(&self, command: &Command) -> Result<Output, String> {
         let agent = agent_of(command);
         let ran = {
             let mut commands = self.commands.lock().unwrap_or_else(PoisonError::into_inner);
@@ -191,7 +235,9 @@ pub fn caps_problems(checkout: &Checkout, workdir: &Path) -> Vec<String> {
     let full = ControlHost::default();
     let capped = ControlHost::default();
     let dir = workdir.join("capped");
-    let flags = ["--parallel", "1", "--max-cost-usd", "0.01"];
+    // One specialist's cap fits, and none beside what it cost.
+    let cap = (SPECIALIST_BUDGET_USD + 0.005).to_string();
+    let flags = ["--parallel", "1", "--max-cost-usd", cap.as_str()];
     let out = review(checkout, &workdir.join("full"), &full, &[])
         .and_then(|_| review(checkout, &dir, &capped, &flags));
     match out {
