@@ -6,8 +6,8 @@ use crate::{Case, Injection, cargo_lib_test};
 
 /// The drifts the answer store and the loop breakers exist to rule out
 /// (ENG-28, I6), late so adding them moves no earlier case to another
-/// shard: reuse of an unchanged key silently disabled, a refused run
-/// stored, a gap loop breaker that never trips, and a blocking finding
+/// shard: reuse of an unchanged key silently disabled, a run whose
+/// report holds a line that does not read stored, a gap loop breaker that never trips, and a blocking finding
 /// stuck on an unchanged file never named for a stakeholder.
 pub(super) fn review_answer_cases() -> Vec<Case> {
     const MEMO: &str = "tooling/review-run/src/memo.rs";
@@ -25,15 +25,17 @@ pub(super) fn review_answer_cases() -> Vec<Case> {
             "an_unchanged_key_is_taken_from_the_store_and_runs_nothing",
         ),
         case(
-            "a refused run kept in the answer store",
+            "a run whose report holds a line that does not read kept in the answer store",
             "ENG-28",
             Injection::replace(
                 MEMO,
                 "    let taken = store::accepted(unit.kind, &log, report.as_deref(), r.known)\n        .and_then(|()| partial(r, unit, &log, held));\n",
                 "    let taken = Ok::<(), String>(());\n",
             ),
-            test("memo::tests::a_refused_or_silent_run_is_never_stored"),
-            "a_refused_or_silent_run_is_never_stored",
+            test(
+                "memo::tests::a_run_with_a_line_that_does_not_read_or_that_did_not_run_is_never_stored",
+            ),
+            "a_run_with_a_line_that_does_not_read_or_that_did_not_run_is_never_stored",
         ),
         case(
             "a loop breaker that never trips, so a resume reruns a stalled agent forever",

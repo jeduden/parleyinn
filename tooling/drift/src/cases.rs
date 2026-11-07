@@ -13,6 +13,7 @@ mod records;
 mod release;
 mod review_agents;
 mod review_findings;
+mod review_logs;
 mod review_reports;
 mod review_stability;
 mod spend;
@@ -155,6 +156,7 @@ pub fn cases() -> Vec<Case> {
         vec![review_cap_retry_case(), review_generalist_turns_case()],
         review_weighing_cases(),
         spend::review_spend_cases(),
+        review_logs::review_log_cases(),
         // Last: its cases edit source the later cases would run stale.
         license_text_cases(),
     ]

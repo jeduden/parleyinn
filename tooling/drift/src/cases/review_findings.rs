@@ -120,8 +120,8 @@ pub(super) fn review_place_form_cases() -> Vec<Case> {
             "ENG-28",
             Injection::replace(
                 REPORT,
-                "Line::Malformed if at_template(l) => {",
-                "Line::Malformed if at_template(l) && number == 0 => {",
+                "    if at_template(text) {\n        Problem::TemplatePlace",
+                "    if at_template(text) && number == 0 {\n        Problem::TemplatePlace",
             ),
             cargo_lib_test(
                 "review-gate",
@@ -146,9 +146,10 @@ pub(super) fn review_place_form_cases() -> Vec<Case> {
 /// The drift the review's rerun rule must not bring (ENG-28), late so
 /// adding it moves no earlier case to another shard: a run that cost
 /// money and was cut off, run again from scratch and paid for twice.
+/// A cut run ran, so its log is read as it stands.
 pub(super) fn review_retry_cases() -> Vec<Case> {
     vec![case(
-        "a charged run that did not answer is run again",
+        "a charged run cut off is run again",
         "ENG-28",
         Injection::replace(
             "tooling/review-run/src/retry.rs",
@@ -173,8 +174,8 @@ pub(super) fn review_unlinked_case() -> Case {
         "ENG-28",
         Injection::replace(
             "tooling/review-gate/src/report.rs",
-            "Line::Malformed if unlinked(l) => return Some(Problem::Unlinked { line: number }),",
-            "Line::Malformed if unlinked(l) && false => return Some(Problem::Unlinked { line: number }),",
+            "    } else if unlinked(text) {\n",
+            "    } else if unlinked(text) && false {\n",
         ),
         cargo_lib_test(
             "review-gate",
@@ -254,7 +255,7 @@ pub(super) fn review_resume_cases() -> Vec<Case> {
             "a_changed_definition_changes_its_agent_s_key_and_its_generalist_s_alone",
         ),
         case(
-            "an agent that did not answer left out of what was not reviewed, so it reads as clean",
+            "an agent that did not run left out of what was not reviewed, so it reads as clean",
             "ENG-28",
             Injection::replace(
                 "tooling/review-run/src/outcome.rs",
@@ -376,8 +377,8 @@ pub(super) fn review_weighing_cases() -> Vec<Case> {
             "ENG-28",
             Injection::replace(
                 OUTCOME,
-                "Kind::Generalist => report::weighing(&run.log.texts, &run.log.answer),",
-                "Kind::Generalist => run.log.answer.clone(),",
+                "(Kind::Generalist, _) => report::weighing(&run.log.texts, &run.log.answer),",
+                "(Kind::Generalist, _) => run.log.answer.clone(),",
             ),
             check(),
             want,
