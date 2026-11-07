@@ -299,8 +299,8 @@ pub(super) fn review_control_cases() -> Vec<Case> {
             "ENG-28",
             Injection::replace(
                 "tooling/review-eval/src/runner.rs",
-                "        \"--max-budget-usd\".to_owned(),\n",
-                "        \"--max-budget\".to_owned(),\n",
+                "[\"--max-budget-usd\".to_owned(), budget_usd(",
+                "[\"--max-budget\".to_owned(), budget_usd(",
             ),
             controlled(),
             want,
