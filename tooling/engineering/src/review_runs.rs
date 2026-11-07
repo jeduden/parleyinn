@@ -263,9 +263,10 @@ fn answer(command: &Command, agent: &str) -> Result<(), String> {
         GENERALISTS.iter().find(|(g, _, _)| *g == agent)
     {
         // It also weighs the stand-in specialists' finding, so no
-        // finding of theirs is left unweighed.
+        // finding of theirs is left unweighed, in its own name, so the
+        // drop leaves the finding it keeps there from `from` standing.
         let answer = format!(
-            "{path}:1 — nit — a long line — {from}\ndropped — src/a.rs:1 — weighed above — {from}\n\
+            "{path}:1 — nit — a long line — {from}\ndropped — src/a.rs:1 — weighed above — {agent}\n\
                  {agent} finds its scope sound."
         );
         (answer.clone(), answer)
