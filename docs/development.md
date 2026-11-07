@@ -284,8 +284,8 @@ directory, so none loads; the agents read them as data. The posted review names
 the gate as its author, states the review's verdict, and keeps the agents'
 findings, the deterministic ones and failed checks under their own headings. A
 pull request that changes a reviewer component also runs that component's
-evaluation cases, whose failures are blocking findings (ENG-32, [review-
-evaluation.md](review-evaluation.md)).
+evaluation cases, whose failures are blocking findings (ENG-32,
+[review-evaluation.md](review-evaluation.md)).
 
 What is left to the agent is judgement: whether the code and the step
 bindings do what each touched row says, new paths to the model (I2),
