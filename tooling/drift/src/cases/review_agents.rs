@@ -75,7 +75,7 @@ pub(super) fn review_reach_cases() -> Vec<Case> {
             "ENG-28",
             Injection::replace(
                 REVIEW_WORKFLOW,
-                "          cargo run --locked --quiet --offline -p review-run -- --workdir . --parallel 32 \\\n            --credential \"$RUNNER_TEMP/claude-credential\" \\\n            ${PREVIOUS:+--previous \"$PREVIOUS\"} > review/run.txt\n",
+                "          cargo run --locked --quiet --offline -p review-run -- --workdir . --parallel 32 \\\n            --credential \"$RUNNER_TEMP/claude-credential\" --spent-before \"$SPENT\" \\\n            ${PREVIOUS:+--previous \"$PREVIOUS\"} > review/run.txt\n",
                 "          echo routed\n      - uses: anthropics/claude-code-action@0000000000000000000000000000000000000000\n",
             ),
             scenario("ENG-28"),

@@ -54,14 +54,16 @@ fn review_runs_by_code(w: &mut World) -> Result<(), String> {
 }
 
 #[then(
-    regex = r"^review-run passes each agent the cost cap of its tier, starts no run once the runs that ended cost the review's cap, and names each agent it did not start over budget, so the review requests changes$"
+    regex = r"^review-run passes each agent the cost cap of its tier, starts no run once what the pull request's earlier reviews spent and the runs that ended cost the pull request's cap, none at all when the earlier reviews reached it, names each agent it did not start over budget, so the review requests changes, and keeps what the pull request's reviews spent$"
 )]
 fn review_run_caps_cost(w: &mut World) -> Result<(), String> {
     let work = testkit::TempDir::new().map_err(|e| format!("make a work directory: {e}"))?;
-    outcome(engineering::review_controls::caps_problems(
+    let mut problems = engineering::review_controls::caps_problems(eng(w).checkout()?, work.path());
+    problems.extend(engineering::review_spend::cap_problems(
         eng(w).checkout()?,
-        work.path(),
-    ))
+        &work.path().join("spend"),
+    ));
+    outcome(problems)
 }
 
 #[then(
@@ -172,6 +174,15 @@ fn review_run_names_rulings(w: &mut World) -> Result<(), String> {
 )]
 fn review_carries_findings(w: &mut World) -> Result<(), String> {
     outcome(engineering::review_previous::review_carries_findings(
+        eng(w).checkout()?,
+    )?)
+}
+
+#[then(
+    regex = r"^review-run carries what the earlier reviews of a pull request spent from the newest artifact under the pull request's own name that a run of main's review workflow uploaded, refuses and counts an artifact of that name from any other run, names a spend file past 1 KiB or one that does not read, and the review job fetches it before the Claude Code OAuth token is staged, passes it as --spent-before, scrubs the spend it kept and keeps it for 90 days for the next review however the review ended, and says in the job summary which earlier spend it carried or that it found none$"
+)]
+fn review_carries_spend(w: &mut World) -> Result<(), String> {
+    outcome(engineering::review_spend::carry_problems(
         eng(w).checkout()?,
     )?)
 }

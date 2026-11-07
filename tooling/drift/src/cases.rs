@@ -15,6 +15,7 @@ mod review_agents;
 mod review_findings;
 mod review_reports;
 mod review_stability;
+mod spend;
 
 use architecture::*;
 use boundary::*;
@@ -153,6 +154,7 @@ pub fn cases() -> Vec<Case> {
         previous::review_previous_cases(),
         vec![review_cap_retry_case(), review_generalist_turns_case()],
         review_weighing_cases(),
+        spend::review_spend_cases(),
         // Last: its cases edit source the later cases would run stale.
         license_text_cases(),
     ]

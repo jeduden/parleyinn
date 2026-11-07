@@ -104,7 +104,7 @@ impl Host for ControlHost {
 /// Runs `review-run` on `workdir`, prepared from `checkout`, with
 /// `host` and the flags `extra`: what it printed, or why it could not
 /// run.
-fn review(
+pub(crate) fn review(
     checkout: &Checkout,
     workdir: &Path,
     host: &ControlHost,
@@ -128,7 +128,7 @@ fn review(
 
 /// The reasons of the gaps `review-run` wrote in `workdir`, by name;
 /// the error of a list that does not read or parse.
-fn gaps(workdir: &Path) -> Result<BTreeMap<String, String>, String> {
+pub(crate) fn gaps(workdir: &Path) -> Result<BTreeMap<String, String>, String> {
     let path = workdir.join("review/gaps.json");
     let text = fs::read_to_string(&path).map_err(|e| format!("read {}: {e}", path.display()))?;
     let gaps = review_run::gaps::parse(&text).map_err(|e| format!("{}: {e}", path.display()))?;
