@@ -144,7 +144,7 @@ const READS: &str = r#"{"type":"assistant","message":{"id":"m1","model":"m","con
 "#;
 
 #[test]
-fn a_log_reads_each_main_thread_read_in_order_with_its_failure() {
+fn a_log_reads_each_main_thread_read_in_order_answered_only_by_a_result_that_is_no_error() {
     let log = parse(READS);
 
     assert_eq!(
@@ -154,23 +154,63 @@ fn a_log_reads_each_main_thread_read_in_order_with_its_failure() {
                 path: "review/diffs/lang-rust.diff".to_owned(),
                 offset: Some(1),
                 limit: Some(400),
-                failed: false,
+                answered: true,
+                bad_range: false,
             },
             ReadCall {
                 path: "review/diffs/lang-rust.diff".to_owned(),
                 offset: None,
                 limit: None,
-                failed: true,
+                answered: false,
+                bad_range: false,
             },
-            // No result came: the read is not known to have failed.
+            // No result came, as when the run was killed at its
+            // deadline: the read gave the reviewer nothing.
             ReadCall {
                 path: "/w/review/diffs/lang-rust.diff".to_owned(),
                 offset: Some(401),
                 limit: None,
-                failed: false,
+                answered: false,
+                bad_range: false,
             },
         ]
     );
+}
+
+#[test]
+fn a_read_s_numbers_read_as_whole_numbers_or_numeric_strings_and_else_are_a_bad_range() {
+    let call = |offset: Value, limit: Value| {
+        let mut input = serde_json::json!({"file_path": "a"});
+        for (key, value) in [("offset", offset), ("limit", limit)] {
+            if !value.is_null() || key == "offset" {
+                input[key] = value;
+            }
+        }
+        let line = serde_json::json!({"type": "assistant", "message": {"id": "m1",
+            "model": "m", "content": [{"type": "tool_use", "id": "t1", "name": "Read",
+            "input": input}]}});
+        let read = parse(&line.to_string()).reads.remove(0);
+        (read.offset, read.limit, read.bad_range)
+    };
+    let json = |text: &str| serde_json::from_str::<Value>(text).unwrap();
+
+    assert_eq!(call(json("3"), json("4")), (Some(3), Some(4), false));
+    assert_eq!(
+        call(json(r#""1500""#), json(r#"" 20 ""#)),
+        (Some(1500), Some(20), false)
+    );
+    // An offset given as null is none given.
+    assert_eq!(call(Value::Null, Value::Null), (None, None, false));
+    for (offset, limit) in [
+        ("1.5", "null"),
+        ("-1", "null"),
+        ("null", r#""many""#),
+        ("null", r#""-5""#),
+        ("null", "true"),
+        ("[1]", "null"),
+    ] {
+        assert!(call(json(offset), json(limit)).2, "{offset} {limit}");
+    }
 }
 
 #[test]

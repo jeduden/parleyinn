@@ -12,7 +12,7 @@ use std::collections::BTreeSet;
 use std::fmt::Write as _;
 use std::fs;
 use std::io;
-use std::path::Path;
+use std::path::{self, Path, PathBuf};
 
 use review_bundle::cli::DIFFS;
 use review_eval::coverage;
@@ -110,7 +110,9 @@ pub fn diff_file(stem: &str) -> String {
 /// Why the run of `stem`, whose log shows `reads`, did not read its
 /// whole diff under `workdir`: the ranges of it no read covered, or that
 /// its diff does not read; none when it read every line, or has no
-/// diff to read.
+/// diff to read. Only a read of that very file counts: a relative path
+/// under the work directory, or an absolute one under it as named or as
+/// resolved ([`coverage::unread`]).
 #[must_use]
 pub fn uncovered(workdir: &Path, stem: &str, reads: &[ReadCall]) -> Option<String> {
     let rel = diff_file(stem);
@@ -121,7 +123,14 @@ pub fn uncovered(workdir: &Path, stem: &str, reads: &[ReadCall]) -> Option<Strin
         Err(e) => return Some(format!("its diff {rel} does not read: {e}")),
     };
     let total = String::from_utf8_lossy(&text).lines().count();
-    let unread = coverage::unread(reads, &rel, total);
+    // The work directory as named and as resolved: an agent's tool may
+    // log either in an absolute path.
+    let roots: Vec<PathBuf> = [path::absolute(workdir).ok(), fs::canonicalize(workdir).ok()]
+        .into_iter()
+        .flatten()
+        .collect();
+    let roots: Vec<&Path> = roots.iter().map(PathBuf::as_path).collect();
+    let unread = coverage::unread(reads, &roots, &rel, total);
     (!unread.is_empty()).then(|| {
         let held = if total == 1 { "line" } else { "lines" };
         format!(

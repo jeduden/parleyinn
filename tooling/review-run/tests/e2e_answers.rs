@@ -39,6 +39,7 @@ case "$prompt" in
   *"a specialist"*)
     diff=$(printf '%s' "$prompt" | sed -n 's/.*Read only your own diff, `\([^`]*\)`.*/\1/p')
     printf '{"type":"assistant","parent_tool_use_id":null,"message":{"id":"m-%s","model":"claude-haiku-5-5","usage":{"input_tokens":3,"output_tokens":2},"content":[{"type":"tool_use","id":"r1","name":"Read","input":{"file_path":"%s/%s"}}]}}\n' "$agent" "$PWD" "$diff"
+    printf '{"type":"user","parent_tool_use_id":null,"message":{"content":[{"type":"tool_result","tool_use_id":"r1","content":"+fn a() {}"}]}}\n'
     printf '{"type":"assistant","parent_tool_use_id":null,"message":{"id":"m-%s","model":"claude-haiku-5-5","usage":{"input_tokens":3,"output_tokens":2},"content":[{"type":"text","text":"src/a.rs:3 — if not addressed: a long line hides a bug — I9%s"}]}}\n' "$agent" "$bad"
     printf '{"type":"result","subtype":"success","is_error":false,"result":"outcome: findings — %s saw one finding.","total_cost_usd":0.01,"num_turns":2}\n' "$agent"
     ;;

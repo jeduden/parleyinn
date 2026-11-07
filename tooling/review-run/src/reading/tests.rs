@@ -105,7 +105,8 @@ fn reading(path: &str, offset: Option<usize>, limit: Option<usize>) -> ReadCall 
         path: path.to_owned(),
         offset,
         limit,
-        failed: false,
+        answered: true,
+        bad_range: false,
     }
 }
 
@@ -120,13 +121,42 @@ fn with_diff(stem: &str, lines: usize) -> TempDir {
 #[test]
 fn a_diff_read_whole_in_chunks_is_covered() {
     let dir = with_diff("lang-rust", 30);
-    let path = "/work/review/diffs/lang-rust.diff";
+    let path = dir.path().join("review/diffs/lang-rust.diff");
+    let path = path.to_str().unwrap();
     let reads = [
         reading(path, None, Some(10)),
-        reading(path, Some(11), Some(20)),
+        reading("review/diffs/lang-rust.diff", Some(11), Some(20)),
     ];
 
     assert_eq!(uncovered(dir.path(), "lang-rust", &reads), None);
+}
+
+#[test]
+fn a_read_of_a_file_of_the_same_name_elsewhere_covers_nothing() {
+    let dir = with_diff("lang-rust", 1);
+    let reads = [
+        reading("pr-head/review/diffs/lang-rust.diff", None, None),
+        reading("/work/review/diffs/lang-rust.diff", None, None),
+    ];
+
+    assert_eq!(
+        uncovered(dir.path(), "lang-rust", &reads).unwrap(),
+        "its log shows no Read of line 1 of review/diffs/lang-rust.diff, of 1 line"
+    );
+}
+
+#[test]
+fn a_read_under_the_work_directory_s_resolved_name_covers_its_diff() {
+    let dir = with_diff("lang-rust", 1);
+    let link = TempDir::new().unwrap();
+    let named = link.path().join("work");
+    std::os::unix::fs::symlink(dir.path(), &named).unwrap();
+    let real = fs::canonicalize(dir.path())
+        .unwrap()
+        .join("review/diffs/lang-rust.diff");
+    let reads = [reading(real.to_str().unwrap(), None, None)];
+
+    assert_eq!(uncovered(&named, "lang-rust", &reads), None);
 }
 
 #[test]

@@ -27,13 +27,21 @@ pub struct Usage {
 
 /// One `Read` call the main thread made: the path, the 1-based line
 /// it started at and the lines it asked for, as the call named them,
-/// and whether the tool refused it, so it gave the reviewer nothing.
+/// whether a result that is no error answered it, and whether its
+/// offset or limit was given as no whole number. Only an answered read
+/// with a good range gave the reviewer lines: one the tool refused, or
+/// whose result never came, as when the run was killed at its deadline,
+/// gave it none.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct ReadCall {
     pub path: String,
     pub offset: Option<usize>,
     pub limit: Option<usize>,
-    pub failed: bool,
+    /// Whether a tool result that is no error came for it.
+    pub answered: bool,
+    /// Whether its offset or limit is there but neither a whole number
+    /// nor a string of one, so which lines it read is not known.
+    pub bad_range: bool,
 }
 
 /// A run, read from its log.
@@ -138,34 +146,31 @@ impl Reading {
         match block["name"].as_str() {
             Some("Write" | "Edit") => self.log.writes.push(path.to_owned()),
             Some("Read") if main => {
-                let number = |key: &str| {
-                    input[key]
-                        .as_u64()
-                        .map(|n| usize::try_from(n).unwrap_or(usize::MAX))
-                };
+                let (offset, limit) = (number(&input["offset"]), number(&input["limit"]));
                 let id = block["id"].as_str().unwrap_or_default().to_owned();
                 self.reads.insert(id, self.log.reads.len());
                 self.log.reads.push(ReadCall {
                     path: path.to_owned(),
-                    offset: number("offset"),
-                    limit: number("limit"),
-                    failed: false,
+                    bad_range: offset.is_err() || limit.is_err(),
+                    offset: offset.unwrap_or_default(),
+                    limit: limit.unwrap_or_default(),
+                    answered: false,
                 });
             }
             _ => {}
         }
     }
 
-    /// The tools' results: a main-thread read the tool refused failed.
+    /// The tools' results: a main-thread read is answered when the
+    /// last result for it is no error.
     fn user(&mut self, value: &Value) {
         for block in value["message"]["content"].as_array().into_iter().flatten() {
-            if block["is_error"].as_bool() == Some(true)
-                && let Some(at) = block["tool_use_id"]
-                    .as_str()
-                    .and_then(|id| self.reads.get(id))
+            if let Some(at) = block["tool_use_id"]
+                .as_str()
+                .and_then(|id| self.reads.get(id))
                 && let Some(read) = self.log.reads.get_mut(*at)
             {
-                read.failed = true;
+                read.answered = block["is_error"].as_bool() != Some(true);
             }
         }
     }
@@ -193,6 +198,20 @@ impl Reading {
         log.duration_ms = value["duration_ms"].as_u64().unwrap_or_default();
         add_model_usage(&mut log.usage, &value["modelUsage"]);
     }
+}
+
+/// A `Read`'s offset or limit: none when it is absent or null, the
+/// number when it is a whole number or a string of one, else an error,
+/// as the lines such a read gave are not known.
+fn number(value: &Value) -> Result<Option<usize>, ()> {
+    let n = match value {
+        Value::Null => return Ok(None),
+        Value::Number(n) => n.as_u64(),
+        Value::String(s) => s.trim().parse::<u64>().ok(),
+        _ => None,
+    };
+    n.map(|n| Some(usize::try_from(n).unwrap_or(usize::MAX)))
+        .ok_or(())
 }
 
 /// Adds one call's `usage` to `into`.
