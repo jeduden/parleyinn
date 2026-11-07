@@ -268,13 +268,93 @@ fn a_specialist_that_did_not_answer_fails_on_that_whatever_it_stated() {
 }
 
 #[test]
-fn a_specialist_that_answered_no_outcome_line_fails_on_that() {
+fn a_specialist_that_answered_no_outcome_line_slips_and_is_graded_on_its_lines() {
     let c = component(Kind::Specialist, "lang-rust", true);
     let log = stated_log(&[UNWRAP], "I am done.\nreview/reports/lang-rust.md");
+    let expect = Expect {
+        outcome: vec!["findings".to_owned()],
+        finding: vec![wanted("crates/x/src/a.rs")],
+        ..Expect::default()
+    };
 
-    let graded = grade(&c, &case("lang-rust", Expect::default()), &log);
+    let graded = grade(&c, &case("lang-rust", expect), &log);
 
-    assert_eq!(graded.failures, vec!["answered no outcome line"]);
+    assert!(graded.passed(), "{:?}", graded.failures);
+    assert_eq!(
+        graded.slips,
+        ["answered no outcome line, so the review gives it one from its lines"]
+    );
+}
+
+#[test]
+fn a_specialist_cut_off_after_a_model_call_is_graded_on_what_it_stated() {
+    let c = component(Kind::Specialist, "lang-rust", true);
+    let log = RunLog {
+        subtype: "error_max_turns".to_owned(),
+        cost: 0.2,
+        texts: vec![UNWRAP.to_owned(), "src/b.rs:1 — no finding".to_owned()],
+        ..RunLog::default()
+    };
+    let expect = Expect {
+        finding: vec![wanted("crates/x/src/a.rs")],
+        ..Expect::default()
+    };
+
+    let graded = grade(&c, &case("lang-rust", expect), &log);
+
+    assert!(graded.passed(), "{:?}", graded.failures);
+    assert_eq!(
+        graded.slips,
+        [
+            "ended without a successful result: error_max_turns",
+            "answered no outcome line, so the review gives it one from its lines",
+            "set aside as no finding: note: all is well, not a finding: src/b.rs:1 — no finding",
+        ]
+    );
+}
+
+#[test]
+fn a_run_is_one_that_ran_by_its_result_its_cost_or_a_model_call_that_used_tokens() {
+    let mut log = RunLog::default();
+    assert!(!ran(&log));
+    log.usage
+        .insert("m".to_owned(), crate::log::Usage::default());
+    assert!(!ran(&log));
+    log.usage.get_mut("m").unwrap().output = 1;
+    assert!(ran(&log));
+    assert!(ran(&RunLog {
+        cost: 0.1,
+        ..RunLog::default()
+    }));
+    assert!(ran(&answered_log("x")));
+}
+
+#[test]
+fn a_generalist_that_did_not_run_fails_on_that_and_one_cut_off_slips() {
+    let c = component(Kind::Generalist, "review-code", false);
+    let expect = Expect {
+        finding: vec![wanted("src/a.rs")],
+        ..Expect::default()
+    };
+    let silent = RunLog {
+        subtype: "none".to_owned(),
+        ..RunLog::default()
+    };
+    let cut = RunLog {
+        subtype: "error_max_turns".to_owned(),
+        cost: 0.3,
+        texts: vec!["src/a.rs:1 — blocking — an unwrap — lang-rust".to_owned()],
+        ..RunLog::default()
+    };
+
+    let graded = grade(&c, &case("review-code", expect.clone()), &silent);
+    assert_eq!(graded.failures, ["did not answer: none"]);
+    let graded = grade(&c, &case("review-code", expect), &cut);
+    assert!(graded.passed(), "{:?}", graded.failures);
+    assert_eq!(
+        graded.slips,
+        ["ended without a successful result: error_max_turns"]
+    );
 }
 
 #[test]
@@ -303,33 +383,49 @@ fn a_lenient_specialist_is_not_held_to_the_line_count() {
 }
 
 #[test]
-fn a_specialist_report_the_review_would_refuse_fails_its_run() {
+fn a_specialist_line_the_review_cannot_read_fails_its_run_and_the_rest_is_graded() {
     let c = component(Kind::Specialist, "lang-rust", true);
-    for (texts, answer, problem) in [
-        (
-            vec!["a.rs:1 — blocking — an unwrap — ENG-16"],
-            "outcome: findings — x.",
-            "has a report whose line 1 is neither a linked finding nor a requirement request",
-        ),
-        (
-            vec!["a.rs:1 — if not addressed: a panic — ENG-16"],
-            "outcome: none — x.",
-            "has a report whose outcome is none but which holds findings",
-        ),
-        (
-            vec![
-                "withdrawn: a.rs:1 — nothing was there",
-                "revised: a.rs:2 — if not addressed: a panic — ENG-16",
-            ],
-            "outcome: none — x.",
-            "has a report whose outcome is none but which holds findings",
-        ),
+    let bad = "a.rs:1 — blocking — an unwrap — ENG-16";
+    let log = stated_log(&[bad, UNWRAP], "outcome: findings — x.");
+    let expect = Expect {
+        finding: vec![wanted("crates/x/src/a.rs")],
+        ..Expect::default()
+    };
+
+    let graded = grade(&c, &case("lang-rust", expect), &log);
+
+    assert_eq!(
+        graded.failures,
+        [format!(
+            "report line does not read: has a report whose line 1 is neither a linked finding \
+             nor a requirement request: `{bad}`"
+        )]
+    );
+}
+
+#[test]
+fn an_outcome_its_lines_contradict_slips_and_the_review_s_is_graded() {
+    let c = component(Kind::Specialist, "lang-rust", true);
+    for texts in [
+        vec!["a.rs:1 — if not addressed: a panic — ENG-16"],
+        vec![
+            "withdrawn: a.rs:1 — nothing was there",
+            "revised: a.rs:2 — if not addressed: a panic — ENG-16",
+        ],
     ] {
-        let log = stated_log(&texts, answer);
+        let log = stated_log(&texts, "outcome: none — x.");
+        let expect = Expect {
+            outcome: vec!["findings".to_owned()],
+            ..Expect::default()
+        };
 
-        let graded = grade(&c, &case("lang-rust", Expect::default()), &log);
+        let graded = grade(&c, &case("lang-rust", expect), &log);
 
-        assert_eq!(graded.failures, vec![format!("report refused: {problem}")]);
+        assert!(graded.passed(), "{:?}", graded.failures);
+        assert_eq!(
+            graded.slips[0],
+            "answered outcome none, which its lines contradict, so the review gives findings"
+        );
     }
 }
 

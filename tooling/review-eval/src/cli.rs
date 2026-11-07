@@ -693,13 +693,14 @@ fn one_run(
             options.deadline,
         );
         let log = runner::run(host, &command)?;
-        // The report as the review would assemble it from the log, for
-        // the record; a run that did not finish is headed so.
-        let incomplete = (!log.answered).then(|| format!("its run ended with {}", log.subtype));
+        // The report as the review would read it from the log, for the
+        // record, whatever result the run ended with.
+        let assembled = review_gate::report::assemble(&log.texts, &log.answer, None);
+        let clean = review_gate::report::split(&assembled).clean;
         let report_path = dir.join("report.md");
         let written = fs::write(
             &report_path,
-            review_gate::report::assemble(&log.texts, &log.answer, incomplete.as_deref()),
+            review_gate::report::with_outcome(&clean, &log.answer),
         );
         let graded = grade::grade(component, case, &log);
         let mut record = RunRecord::new(&log, graded.failures, graded.slips);
