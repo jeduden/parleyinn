@@ -647,3 +647,28 @@ fn a_generalist_is_held_to_the_report_of_a_specialist_cut_off_as_to_any() {
     let second = reviewed(dir.path(), &store, crate::parts::LIMIT, cut_off);
     assert_eq!(second.started, ["lang-rust", "review-code"]);
 }
+
+/// Answers as the agents would, lang-rust also stating a line that
+/// says all is well beside its finding.
+fn setting_aside(c: &Command) -> Result<Output, String> {
+    if fake::agent_of(c) == "lang-rust" {
+        let outcome = "outcome: findings — one.";
+        return fake::answer(c, &[fake::FINDING, "src/b.rs:2 — fine", outcome], outcome);
+    }
+    fake::either(c)
+}
+
+#[test]
+fn an_answer_taken_from_the_store_keeps_the_lines_its_log_sets_aside() {
+    let dir = workdir();
+    let store = store_in(dir.path());
+    let first = reviewed(dir.path(), &store, crate::parts::LIMIT, setting_aside);
+    assert_eq!(first.run("lang-rust").ignored.len(), 1);
+
+    let second = reviewed(dir.path(), &store, crate::parts::LIMIT, setting_aside);
+
+    let rust = second.run("lang-rust");
+    assert!(rust.from_store, "{rust:?}");
+    assert_eq!(rust.ignored, first.run("lang-rust").ignored);
+    assert!(second.run("review-code").ignored.is_empty());
+}

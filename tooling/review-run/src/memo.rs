@@ -111,6 +111,17 @@ pub(crate) fn recall(
         _ => stored.log.answer.clone(),
     };
     let mut run = reused(unit.label(), unit.kind, &answer, stored.log.texts.clone());
+    if unit.kind == Kind::Specialist {
+        // What its log sets aside is set aside again, listed and counted.
+        let part = unit.part.as_ref().map(|p| p.index);
+        run.ignored = reading::read(
+            (&unit.name, part),
+            &stored.log.texts,
+            &stored.log.answer,
+            r.known,
+        )
+        .ignored;
+    }
     run.from_store = true;
     run.answer_key = Some(key.to_owned());
     let log = r.workdir.join(LOGS).join(format!("{}.jsonl", unit.stem()));

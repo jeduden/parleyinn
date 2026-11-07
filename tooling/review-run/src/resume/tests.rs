@@ -73,6 +73,7 @@ fn earlier(gaps: Vec<Gap>) -> Earlier {
         consulted: names.iter().map(|n| (*n).to_owned()).collect(),
         parts: BTreeMap::new(),
         stalls: Vec::new(),
+        ignored: Vec::new(),
     }
 }
 
@@ -611,4 +612,61 @@ fn a_stalled_generalist_is_not_run_again_and_its_specialists_keep_theirs() {
     assert!(resume.stalled.contains_key("review-security"));
     assert!(!resume.reuse.contains_key("review-security"));
     assert_eq!(resume.reuse.len(), 3);
+}
+
+/// A line `agent` set aside.
+fn aside(agent: &str) -> ReportLine {
+    ReportLine {
+        agent: agent.to_owned(),
+        part: None,
+        line: 1,
+        text: "src/a.rs:1 — fine".to_owned(),
+        why: "says all is well, which is not a finding".to_owned(),
+    }
+}
+
+#[test]
+fn a_specialist_kept_whole_keeps_the_lines_it_set_aside_and_one_run_again_none() {
+    let gaps = vec![Gap::new("test-engineer-unit", None, "silent: x".to_owned())];
+    let mut was = earlier(gaps);
+    was.ignored = vec![aside("lang-rust"), aside("test-engineer-unit")];
+
+    let resume = plan_of(&was, &id());
+
+    assert_eq!(resume.ignored["lang-rust"], [aside("lang-rust")]);
+    assert!(!resume.ignored.contains_key("test-engineer-unit"));
+}
+
+#[test]
+fn an_earlier_run_s_lines_set_aside_read_when_there_and_as_none_when_not() {
+    let dir = TempDir::new().unwrap();
+    let old = earlier_dir(dir.path(), "[]");
+    assert!(
+        read(&old.join("gaps.json"), &old)
+            .unwrap()
+            .ignored
+            .is_empty()
+    );
+
+    write(
+        &old,
+        "ignored.json",
+        &serde_json::to_string(&[aside("lang-rust")]).unwrap(),
+    );
+    assert_eq!(
+        read(&old.join("gaps.json"), &old).unwrap().ignored,
+        [aside("lang-rust")]
+    );
+
+    write(&old, "ignored.json", "{");
+    let err = read(&old.join("gaps.json"), &old).unwrap_err();
+    assert!(
+        err.contains("ignored.json: malformed lines set aside"),
+        "{err}"
+    );
+
+    fs::remove_file(old.join("ignored.json")).unwrap();
+    fs::create_dir(old.join("ignored.json")).unwrap();
+    let err = read(&old.join("gaps.json"), &old).unwrap_err();
+    assert!(err.starts_with("read "), "{err}");
 }

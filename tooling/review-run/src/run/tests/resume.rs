@@ -148,6 +148,7 @@ fn a_resume_keeping_an_agent_whole_starts_no_run_of_it() {
         ]
         .into(),
         notes: Vec::new(),
+        ignored: [("lang-rust".to_owned(), vec![aside()])].into(),
         ..Resume::default()
     };
     let host = FakeHost::new(fake::either);
@@ -174,8 +175,21 @@ fn a_resume_keeping_an_agent_whole_starts_no_run_of_it() {
     assert_eq!(rust.log.answer, "outcome: none — clean.");
     assert_eq!(rust.attempts, 0);
     assert!(rust.log.cost.abs() < f64::EPSILON);
+    // What it set aside in the earlier run is set aside still (I6).
+    assert_eq!(rust.ignored, [aside()]);
     let spec = runs.iter().find(|r| r.name == "review-spec").unwrap();
     assert_eq!(spec.kind, Kind::Generalist);
     assert!(spec.reused);
     assert_eq!(runs.len(), 5);
+}
+
+/// A line lang-rust set aside in an earlier run.
+fn aside() -> crate::reading::ReportLine {
+    crate::reading::ReportLine {
+        agent: "lang-rust".to_owned(),
+        part: None,
+        line: 1,
+        text: "src/a.rs:1 — fine".to_owned(),
+        why: "says all is well, which is not a finding".to_owned(),
+    }
 }

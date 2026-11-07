@@ -256,8 +256,9 @@ fn reuse<'a>(r: &'a Review, name: &str) -> Option<&'a Reuse> {
     r.resume.and_then(|resume| resume.reuse.get(name))
 }
 
-/// Agent `name`'s run kept whole from the earlier run, told to
-/// progress; none when it is not kept whole.
+/// Agent `name`'s run kept whole from the earlier run, with the lines
+/// it set aside there, told to progress; none when it is not kept
+/// whole.
 fn whole(r: &Review, c: &Controls, name: &str) -> Option<AgentRun> {
     let Some(Reuse::Whole(answer)) = reuse(r, name) else {
         return None;
@@ -269,6 +270,12 @@ fn whole(r: &Review, c: &Controls, name: &str) -> Option<AgentRun> {
         Vec::new(),
     );
     run.answer_key = memo::key_of(r, &Unit::whole(name.to_owned()));
+    // What it set aside there is still set aside, listed and counted.
+    run.ignored = r
+        .resume
+        .and_then(|resume| resume.ignored.get(name))
+        .cloned()
+        .unwrap_or_default();
     (r.progress)(&describe(&run));
     c.live.finish();
     Some(run)
