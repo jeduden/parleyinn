@@ -141,14 +141,8 @@ fn part_run(failure: Option<&str>, answer: &str, cost: f64) -> AgentRun {
             writes: Vec::new(),
             reads: Vec::new(),
         },
-        attempts: 1,
-        parts: 1,
-        failed_parts: Vec::new(),
-        reused: false,
-        from_store: false,
-        answer_key: None,
-        store_failed: false,
         charged: cost,
+        ..AgentRun::of(String::new(), Kind::Specialist, None, RunLog::default(), 1)
     }
 }
 

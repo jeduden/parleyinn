@@ -2,19 +2,20 @@
 //! and every dispatched generalist the same way once its own
 //! specialists have ended, each as `claude --agent` through the
 //! evaluation's runner, with the review's reading tools, turn budget and
-//! cost cap, and a deadline of its own. A run that cannot start, ends
-//! without a successful result, misses its deadline or answers nothing
-//! has not answered; the review goes on without it. A specialist's
-//! report is assembled from its run log, the finding lines it stated
-//! and its answer's outcome line, and written to the report file its
-//! generalist reads; a run that did not answer leaves what it stated
-//! there too, headed incomplete, so the findings it logged are not
-//! lost, while the run stays one that did not answer. A specialist
-//! whose diff is past the split limit runs in parts, each a run of its
-//! own under the same bound, and its report and run are merged from
-//! theirs; a part that did not answer leaves the specialist one that
-//! did not answer. A run is tried again as `retry` says. What starts
-//! when is `tasks`'s; what holds the runs back, `controls`'s.
+//! cost cap, and a deadline of its own. A run whose log holds a model
+//! call ran, and its log is read whatever result it ended with: one cut
+//! off by its turn budget, its deadline or its cost cap is no failure,
+//! only noted as cut. Only a run whose log holds no model call, one
+//! that could not start or that the API turned away, did not run; the
+//! review goes on without it. A specialist's report is read from its
+//! run log as `reading` says and written to the report file its
+//! generalist reads, and whether it read its whole diff is decided from
+//! the reads its log shows. A specialist whose diff is past the split
+//! limit runs in parts, each a run of its own under the same bound, and
+//! its report and run are merged from theirs; a part that did not run
+//! leaves the specialist one that did not run. A run is tried again as
+//! `retry` says. What starts when is `tasks`'s; what holds the runs
+//! back, `controls`'s.
 
 use std::collections::BTreeSet;
 use std::fs;
@@ -28,6 +29,8 @@ use review_eval::log::{RunLog, SUCCESS};
 use review_eval::runner;
 use review_eval::world::World;
 use review_gate::report::assemble;
+
+use crate::reading::{self, ReportLine};
 
 use crate::LOGS;
 use crate::controls::{
@@ -45,8 +48,8 @@ use crate::tasks;
 
 /// How many agents run at once unless the run says otherwise.
 pub const PARALLEL: usize = 8;
-/// How long one agent may run before it is killed and counted as one
-/// that did not answer.
+/// How long one agent may run before it is killed; what its log shows
+/// by then is read.
 pub const DEADLINE: Duration = Duration::from_secs(review_eval::DEADLINE_SECONDS);
 
 /// How the runs go.
@@ -90,19 +93,33 @@ pub struct AgentRun {
     pub name: String,
     /// A specialist or a generalist.
     pub kind: Kind,
-    /// Why it did not answer; none when it did.
+    /// Why it did not run, its log holding no model call, or why the
+    /// review could not keep what it ran; none when its log was read.
     pub failure: Option<String>,
+    /// Why a run whose log was read ended without a successful result:
+    /// its turn budget, deadline or cost cap cut it off, or it answered
+    /// nothing; none when it ended with one.
+    pub cut: Option<String>,
     /// Its log, read; empty when it logged nothing. After a second
-    /// attempt, the last one's, with both costs.
+    /// attempt, the last one's, with both costs. A specialist's answer
+    /// is the outcome line its report ends with.
     pub log: RunLog,
-    /// How many times it ran: two when the first did not answer; for a
+    /// How many times it ran: two when the first did not run; for a
     /// specialist run in parts, every part's attempts.
     pub attempts: u32,
     /// How many parts it ran in: one unless its diff was split.
     pub parts: u32,
-    /// For a specialist run in parts, each part that did not answer, by
+    /// For a specialist run in parts, each part that did not run, by
     /// its place from one, with why.
     pub failed_parts: Vec<(usize, String)>,
+    /// For a specialist, each run of it, whole or a part by its place
+    /// from one, whose log shows no read of some lines of its diff, with
+    /// which.
+    pub partial: Vec<(Option<usize>, String)>,
+    /// The lines of its report set aside as no finding.
+    pub ignored: Vec<ReportLine>,
+    /// The finding-shaped lines of its report that do not read.
+    pub unreadable: Vec<ReportLine>,
     /// Whether its answer was taken from an earlier run of the same
     /// inputs rather than run again.
     pub reused: bool,
@@ -121,15 +138,25 @@ pub struct AgentRun {
 impl AgentRun {
     /// The run of `name`, of `kind`, in one part, run `attempts` times,
     /// failing for `failure`, its log `log`; not reused.
-    fn of(name: String, kind: Kind, failure: Option<String>, log: RunLog, attempts: u32) -> Self {
+    pub(crate) fn of(
+        name: String,
+        kind: Kind,
+        failure: Option<String>,
+        log: RunLog,
+        attempts: u32,
+    ) -> Self {
         Self {
             name,
             kind,
             failure,
             log,
+            cut: None,
             attempts,
             parts: 1,
             failed_parts: Vec::new(),
+            partial: Vec::new(),
+            ignored: Vec::new(),
+            unreadable: Vec::new(),
             reused: false,
             from_store: false,
             answer_key: None,
@@ -138,10 +165,18 @@ impl AgentRun {
         }
     }
 
-    /// Whether the run answered without an error.
+    /// Whether it ran and its log was read: its answer is consulted,
+    /// whatever result it ended with.
     #[must_use]
     pub fn answered(&self) -> bool {
         self.failure.is_none()
+    }
+
+    /// Whether the review of it is whole: it ran, read every line of its
+    /// diff and stated no line that does not read.
+    #[must_use]
+    pub fn whole(&self) -> bool {
+        self.answered() && self.partial.is_empty() && self.unreadable.is_empty()
     }
 }
 
@@ -246,7 +281,8 @@ pub(crate) fn keep_spend(r: &Review, spent: f64) {
 
 /// The run of `unit`, not started for `why`: it costs nothing and has
 /// no attempt, so it is never tried again; a specialist's report says
-/// why, headed incomplete, and is written when it runs whole.
+/// why, headed incomplete, and is written when it runs whole: it did not
+/// run.
 pub(crate) fn not_started(workdir: &Path, unit: &Unit, why: String) -> (AgentRun, Option<String>) {
     let report = (unit.kind == Kind::Specialist).then(|| assemble(&[], "", Some(&why)));
     let mut failure = why;
@@ -340,18 +376,8 @@ pub(crate) fn specialist_units(
                     Err(e) => format!("{why}; {e}"),
                 };
                 unsplit.push(AgentRun {
-                    name,
-                    kind: Kind::Specialist,
-                    failure: Some(failure),
-                    log: RunLog::default(),
-                    attempts: 0,
                     parts: 0,
-                    failed_parts: Vec::new(),
-                    reused: false,
-                    from_store: false,
-                    answer_key: None,
-                    store_failed: false,
-                    charged: 0.0,
+                    ..AgentRun::of(name, Kind::Specialist, Some(failure), RunLog::default(), 0)
                 });
             }
         }
@@ -371,12 +397,16 @@ pub fn describe(run: &AgentRun) -> String {
     if run.reused {
         return format!("{} ({kind}): reused from the earlier run", run.name);
     }
-    let line = match &run.failure {
-        None => format!(
+    let line = match (&run.failure, &run.cut) {
+        (None, None) => format!(
             "{} ({kind}): answered ({:.4} USD, {} turns)",
             run.name, run.log.cost, run.log.turns
         ),
-        Some(why) => format!("{} ({kind}): did not answer: {why}", run.name),
+        (None, Some(cut)) => format!(
+            "{} ({kind}): ran, its log read: {cut} ({:.4} USD, {} turns)",
+            run.name, run.log.cost, run.log.turns
+        ),
+        (Some(why), _) => format!("{} ({kind}): did not run: {why}", run.name),
     };
     if run.parts > 1 {
         format!("{line} in {} parts, {} attempts", run.parts, run.attempts)
@@ -391,14 +421,12 @@ pub fn describe(run: &AgentRun) -> String {
 
 /// Runs `unit` once, logging under the logs' directory, with `note`,
 /// when there is one, added to its prompt, and for a specialist returns
-/// the report assembled from its log, written when it runs whole. A run
-/// that never started has no attempts.
+/// the report read from its log, its ids held to `known`, written when
+/// it runs whole. A run that never started has no attempts.
 pub(crate) fn attempt(
-    host: &dyn Host,
-    workdir: &Path,
-    plan: &Plan,
+    (host, workdir, plan): (&dyn Host, &Path, &Plan),
     unit: &Unit,
-    deadline: Duration,
+    (deadline, known): (Duration, &BTreeSet<String>),
     note: Option<&str>,
 ) -> (AgentRun, Option<String>) {
     let (name, kind) = (unit.name.as_str(), unit.kind);
@@ -439,38 +467,69 @@ pub(crate) fn attempt(
     if let Some(note) = note {
         told(&mut command.args, note);
     }
-    let (log, failure) = match runner::run(host, &command) {
+    let (mut log, failure, cut) = match runner::run(host, &command) {
         Ok(log) => {
-            let failure = if !log.answered {
-                Some(format!("its run ended with {}", log.subtype))
-            } else if log.answer.trim().is_empty() {
-                Some("its run answered nothing".to_owned())
-            } else {
-                None
-            };
-            (log, failure)
+            let (failure, cut) = ended(&log);
+            (log, failure, cut)
         }
-        Err(e) => (RunLog::default(), Some(e)),
+        Err(e) => (RunLog::default(), Some(e), None),
     };
-    let (failure, report) = match (kind, &unit.part) {
-        (_, Some(_)) => {
-            let text = assemble(&log.texts, &log.answer, failure.as_deref());
-            (failure, Some(text))
-        }
-        (Kind::Specialist, None) => {
-            let text = assemble(&log.texts, &log.answer, failure.as_deref());
-            match write_report(workdir, name, &text) {
-                Ok(()) => (failure, Some(text)),
-                Err(e) => (
-                    Some(failure.map_or(e.clone(), |f| format!("{f}; {e}"))),
-                    Some(text),
-                ),
-            }
-        }
-        _ => (failure, None),
-    };
+    let mut run = AgentRun::of(unit.label(), kind, failure, RunLog::default(), 1);
+    run.cut = cut;
+    let report =
+        (kind == Kind::Specialist).then(|| read_report(workdir, unit, &mut run, &mut log, known));
+    run.log = log;
+    if let (None, Some(text)) = (&unit.part, &report)
+        && let Err(e) = write_report(workdir, name, text)
+    {
+        run.failure = Some(run.failure.map_or(e.clone(), |f| format!("{f}; {e}")));
+    }
 
-    (AgentRun::of(unit.label(), kind, failure, log, 1), report)
+    (run, report)
+}
+
+/// Why the run `log` reads did not run, its log holding no model call,
+/// and why it ran but ended without a successful result: its result was
+/// no success, or it answered nothing.
+fn ended(log: &RunLog) -> (Option<String>, Option<String>) {
+    let why = if !log.answered {
+        Some(format!("its run ended with {}", log.subtype))
+    } else if log.answer.trim().is_empty() {
+        Some("its run answered nothing".to_owned())
+    } else {
+        None
+    };
+    if crate::retry::charged(log).is_some() {
+        (None, why)
+    } else {
+        (why, None)
+    }
+}
+
+/// The report specialist `unit`'s run gives from `log`, its ids held to
+/// `known`, as [`reading::read`] reads it: `log`'s answer becomes the
+/// outcome line the report ends with, and what it set aside, could not
+/// read and did not read of its diff under `workdir` are noted on
+/// `run`. A run that did not run says why, headed incomplete.
+fn read_report(
+    workdir: &Path,
+    unit: &Unit,
+    run: &mut AgentRun,
+    log: &mut RunLog,
+    known: &BTreeSet<String>,
+) -> String {
+    if let Some(why) = &run.failure {
+        return assemble(&log.texts, &log.answer, Some(why));
+    }
+    let part = unit.part.as_ref().map(|p| p.index);
+    let read = reading::read((&unit.name, part), &log.texts, &log.answer, known);
+    log.answer = read.answer;
+    run.ignored = read.ignored;
+    run.unreadable = read.unreadable;
+    run.partial
+        .extend(reading::uncovered(workdir, &unit.stem(), &log.reads).map(|why| (part, why)));
+
+    read.report
 }
 
 /// The world agent `name` of `plan` runs on in `workdir`: the review's

@@ -30,6 +30,7 @@ fn decision(gaps: Vec<Gap>) -> Decision {
         answers: BTreeMap::new(),
         weighings: BTreeMap::new(),
         not_reviewed: gaps,
+        ignored: Vec::new(),
     }
 }
 

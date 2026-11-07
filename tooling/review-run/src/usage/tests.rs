@@ -4,20 +4,7 @@ use review_eval::log::{self, RunLog};
 use super::*;
 
 fn run(name: &str, log: RunLog) -> AgentRun {
-    AgentRun {
-        name: name.to_owned(),
-        kind: Kind::Specialist,
-        failure: None,
-        log,
-        attempts: 1,
-        parts: 1,
-        failed_parts: Vec::new(),
-        reused: false,
-        from_store: false,
-        answer_key: None,
-        store_failed: false,
-        charged: 0.0,
-    }
+    AgentRun::of(name.to_owned(), Kind::Specialist, None, log, 1)
 }
 
 #[test]

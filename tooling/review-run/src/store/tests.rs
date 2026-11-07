@@ -37,7 +37,8 @@ fn usage() -> AgentUsage {
 fn answer() -> (String, String) {
     let log = fake::log_of(&[FINDING, OUTCOME], "success", OUTCOME, 0.01);
     let parsed = review_eval::log::parse(&log);
-    (log, assemble(&parsed.texts, &parsed.answer, None))
+    let read = crate::reading::read(("", None), &parsed.texts, &parsed.answer, &known());
+    (log, read.report)
 }
 
 fn store(dir: &TempDir) -> Store {
@@ -201,6 +202,7 @@ fn no_answer_but_a_successful_one_with_a_report_the_gate_takes_is_accepted() {
     let empty = review_eval::log::parse(&fake::log_of(&[], "success", " ", 0.01));
     let tampered = report.replace("a long line", "a short line");
     let unknown = BTreeSet::new();
+    let unread = crate::reading::read(("", None), &log.texts, &log.answer, &unknown).report;
     let cases: [(&RunLog, Option<&str>, &BTreeSet<String>, &str); 5] = [
         (
             &failed,
@@ -214,9 +216,9 @@ fn no_answer_but_a_successful_one_with_a_report_the_gate_takes_is_accepted() {
             &log,
             Some(&tampered),
             &known(),
-            "not the one its log assembles",
+            "not the one its log reads as",
         ),
-        (&log, Some(&report), &unknown, "refused"),
+        (&log, Some(&unread), &unknown, "a line that does not read"),
     ];
     for (log, report, known, want) in cases {
         let err = accepted(Kind::Specialist, log, report, known).unwrap_err();

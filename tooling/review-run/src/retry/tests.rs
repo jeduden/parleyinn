@@ -129,12 +129,12 @@ fn a_problem_of_no_line_is_the_gate_s_problem_alone() {
 }
 
 #[test]
-fn a_run_that_did_not_answer_is_told_why_and_to_state_as_it_goes() {
+fn a_run_that_did_not_run_is_told_why_and_to_state_as_it_goes() {
     let note = note("its run ended with error_max_turns");
 
     assert!(
         note.starts_with(
-            "Your previous attempt did not answer: its run ended with error_max_turns. \
+            "Your previous attempt did not run: its run ended with error_max_turns. \
              This attempt is judged alone: state each finding line the moment you have checked \
              it, read each file once, search no whole tree, and send your outcome line \
              before your turns or time run out. "
@@ -202,9 +202,10 @@ fn review_of(
 /// A malformed revision, as a specialist wrote one.
 const MALFORMED: &str = "revised: `a.rs:1 — old` → `a.rs:1 — new`";
 
-/// A specialist that, before it is told of a refusal, states a finding
-/// and [`MALFORMED`]; told, states nothing and answers none.
-fn refused_once(c: &Command) -> Result<Output, String> {
+/// A specialist that, before it is told why its first did not run,
+/// states a finding and [`MALFORMED`]; told, states nothing and answers
+/// none.
+fn malformed_once(c: &Command) -> Result<Output, String> {
     let prompt = prompt_of(c);
     if !prompt.contains("a specialist") {
         return fake::generalist(c);
@@ -227,28 +228,31 @@ fn specialist_prompts(host: &FakeHost) -> Vec<String> {
 }
 
 #[test]
-fn a_refused_report_stands_and_its_run_is_not_paid_for_again() {
+fn a_line_in_no_form_is_named_apart_and_its_run_is_not_paid_for_again() {
     let dir = workdir(false);
 
-    let (runs, lines, host) = review_of(dir.path(), refused_once);
+    let (runs, _, host) = review_of(dir.path(), malformed_once);
 
     let rust = &runs[0];
     assert!(rust.answered(), "{:?}", rust.failure);
     assert_eq!(rust.attempts, 1);
     assert_eq!(specialist_prompts(&host).len(), 1);
     assert!((rust.log.cost - 0.01).abs() < 1e-9, "{}", rust.log.cost);
-    assert!(
-        lines.iter().any(|l| l.starts_with("lang-rust (specialist)")
-            && l.ends_with("not run again: its report is refused and the run was paid for")),
-        "{lines:?}"
-    );
-    // What it stated is its report, refused as it stands.
+    // Its finding is its report, which the gate takes; the line in no
+    // form is named apart.
     let report = fs::read_to_string(dir.path().join("review/reports/lang-rust.md")).unwrap();
-    assert!(
-        report.contains(fake::FINDING) && report.contains(MALFORMED),
-        "{report}"
+    assert_eq!(
+        report,
+        format!("{}\noutcome: findings — one.\n", fake::FINDING)
     );
-    assert!(refusal(&report, &rust.log.answer, &known()).is_some());
+    assert_eq!(refusal(&report, &rust.log.answer, &known()), None);
+    assert_eq!(
+        rust.unreadable
+            .iter()
+            .map(|l| l.text.as_str())
+            .collect::<Vec<_>>(),
+        [MALFORMED]
+    );
     assert!(
         !dir.path()
             .join("review/logs/lang-rust.first.jsonl")
@@ -272,8 +276,9 @@ fn a_run_cut_off_after_it_cost_money_keeps_what_it_stated_and_is_not_run_again()
     });
 
     let rust = &runs[0];
+    assert_eq!(rust.failure, None);
     assert_eq!(
-        rust.failure.as_deref(),
+        rust.cut.as_deref(),
         Some("its run ended with error_max_turns")
     );
     assert_eq!(rust.attempts, 1);
@@ -281,13 +286,15 @@ fn a_run_cut_off_after_it_cost_money_keeps_what_it_stated_and_is_not_run_again()
     assert!(
         lines
             .iter()
-            .any(|l| l.contains("not run again: it cost 0.1000 USD")),
+            .any(|l| l
+                .ends_with("not run again: it cost 0.1000 USD, so its log is read as it stands")),
         "{lines:?}"
     );
+    // What it stated is its report, its outcome derived from its lines.
     assert_eq!(
         fs::read_to_string(dir.path().join("review/reports/lang-rust.md")).unwrap(),
         format!(
-            "incomplete: its run ended with error_max_turns\n{}\n",
+            "{}\noutcome: findings — 1 finding stated in the run log\n",
             fake::FINDING
         )
     );
@@ -335,19 +342,18 @@ fn a_report_that_cannot_be_written_fails_the_run_saying_so() {
 
     let failure = runs[0].failure.clone().unwrap();
     assert!(
-        failure
-            .starts_with("its run ended with error_max_turns; its report could not be written: "),
+        failure.starts_with("its report could not be written: "),
         "{failure}"
     );
 }
 
 #[test]
-fn a_part_s_refused_report_stands_and_the_merge_names_it() {
+fn a_part_s_line_in_no_form_is_named_by_its_part_and_the_merge_keeps_the_rest() {
     let dir = workdir(true);
 
-    let (runs, lines, host) = review_of(dir.path(), |c| {
+    let (runs, _, host) = review_of(dir.path(), |c| {
         if prompt_of(c).contains("you are part 2 of 2") {
-            refused_once(c)
+            malformed_once(c)
         } else {
             fake::specialist(c)
         }
@@ -356,16 +362,15 @@ fn a_part_s_refused_report_stands_and_the_merge_names_it() {
     assert_eq!(specialist_prompts(&host).len(), 2);
     let rust = &runs[0];
     assert_eq!((rust.parts, rust.attempts), (2, 2));
-    assert!(
-        lines
-            .iter()
-            .any(|l| l.starts_with("lang-rust part 2 of 2 (specialist)")
-                && l.contains("not run again")),
-        "{lines:?}"
-    );
     let report = fs::read_to_string(dir.path().join("review/reports/lang-rust.md")).unwrap();
-    assert!(report.contains(MALFORMED), "{report}");
-    assert!(refusal(&report, &rust.log.answer, &known()).is_some());
+    assert!(
+        report.contains(fake::FINDING) && !report.contains(MALFORMED),
+        "{report}"
+    );
+    assert_eq!(refusal(&report, &rust.log.answer, &known()), None);
+    assert_eq!(rust.unreadable.len(), 1);
+    assert_eq!(rust.unreadable[0].part, Some(2));
+    assert!(rust.partial.is_empty(), "{:?}", rust.partial);
 }
 
 /// One model call that used tokens, and no result: a run killed at its
@@ -408,7 +413,8 @@ fn a_run_with_model_calls_and_no_result_is_charged_and_not_run_again() {
     });
 
     let rust = &runs[0];
-    assert_eq!(rust.failure.as_deref(), Some("its run ended with deadline"));
+    assert_eq!(rust.failure, None);
+    assert_eq!(rust.cut.as_deref(), Some("its run ended with deadline"));
     assert_eq!(rust.attempts, 1);
     assert_eq!(specialist_prompts(&host).len(), 1);
     assert!(

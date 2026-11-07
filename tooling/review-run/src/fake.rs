@@ -1,7 +1,7 @@
 //! A host for the tests: `claude` runs a closure the test hands in,
 //! which writes the run's log as the real command line would: a
-//! specialist's text blocks, its findings among them, and its result;
-//! every command is kept.
+//! specialist's reads of its diff, its text blocks, its findings among
+//! them, and its result; every command is kept.
 
 use std::fs;
 use std::sync::Mutex;
@@ -107,6 +107,18 @@ pub(crate) const FINDING: &str = "src/a.rs:3 — if not addressed: a long line h
 /// A run's log: one model call with usage and a text block per entry of
 /// `texts`, and a result of `subtype` answering `answer` at `cost`.
 pub(crate) fn log_of(texts: &[&str], subtype: &str, answer: &str, cost: f64) -> String {
+    reading_log("", texts, subtype, answer, cost)
+}
+
+/// [`log_of`] after `reads`, the stream-json lines of the reads the
+/// run's one model call made.
+pub(crate) fn reading_log(
+    reads: &str,
+    texts: &[&str],
+    subtype: &str,
+    answer: &str,
+    cost: f64,
+) -> String {
     let blocks: Vec<serde_json::Value> = texts
         .iter()
         .map(|t| json!({"type": "text", "text": t}))
@@ -119,7 +131,46 @@ pub(crate) fn log_of(texts: &[&str], subtype: &str, answer: &str, cost: f64) -> 
     let result = json!({"type": "result", "subtype": subtype, "is_error": subtype != "success",
         "result": answer, "total_cost_usd": cost, "num_turns": 3, "duration_ms": 9});
 
+    format!("{reads}{call}\n{result}\n")
+}
+
+/// The lines one `Read` takes, as the agent's file tool reads them.
+pub(crate) const CHUNK: usize = 2000;
+
+/// The diff file `command`'s prompt tells its specialist to read, when
+/// it names one.
+pub(crate) fn diff_of(command: &Command) -> Option<String> {
+    let prompt = prompt_of(command);
+    let rest = prompt.split("Read only your own diff, `").nth(1)?;
+    rest.split('`').next().map(str::to_owned)
+}
+
+/// The stream-json lines of a `Read` of `path`, `limit` lines from
+/// `offset`, in the run's model call `m1`, and its result.
+pub(crate) fn read_lines(path: &str, offset: usize, limit: usize) -> String {
+    let id = format!("read-{offset}");
+    let call = json!({"type": "assistant", "parent_tool_use_id": null, "message": {
+        "id": "m1", "model": "claude-haiku-5-5", "usage": {},
+        "content": [{"type": "tool_use", "id": id, "name": "Read",
+                     "input": {"file_path": path, "offset": offset, "limit": limit}}]}});
+    let result = json!({"type": "user", "parent_tool_use_id": null, "message": {
+        "content": [{"type": "tool_result", "tool_use_id": id, "content": "+a"}]}});
     format!("{call}\n{result}\n")
+}
+
+/// The reads of the whole diff `command`'s prompt names, in chunks of
+/// [`CHUNK`] lines from its first, as stream-json lines; none when it
+/// names none.
+pub(crate) fn reads(command: &Command) -> String {
+    let Some(rel) = diff_of(command) else {
+        return String::new();
+    };
+    let path = command.cwd.join(&rel);
+    let lines = fs::read_to_string(&path).map_or(0, |t| t.lines().count());
+    let path = path.display().to_string();
+    (0..lines.max(1).div_ceil(CHUNK))
+        .map(|at| read_lines(&path, at * CHUNK + 1, CHUNK))
+        .collect()
 }
 
 /// A successful run's log answering `answer` at `cost`, with no text
@@ -128,10 +179,12 @@ pub(crate) fn log(answer: &str, cost: f64) -> String {
     log_of(&[answer], "success", answer, cost)
 }
 
-/// Answers `command` as its agent would: a log whose text blocks are
-/// `texts`, then a successful result answering `answer`.
+/// Answers `command` as its agent would: a log whose reads cover the
+/// whole diff its prompt names, whose text blocks are `texts`, then a
+/// successful result answering `answer`.
 pub(crate) fn answer(command: &Command, texts: &[&str], answer: &str) -> Result<Output, String> {
-    write_log(command, &log_of(texts, "success", answer, 0.01));
+    let log = reading_log(&reads(command), texts, "success", answer, 0.01);
+    write_log(command, &log);
 
     Ok(Output {
         code: Some(0),

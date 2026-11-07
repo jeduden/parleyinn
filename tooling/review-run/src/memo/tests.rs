@@ -195,7 +195,7 @@ fn a_specialist_s_fresh_report_that_differs_runs_its_generalist_again() {
 }
 
 #[test]
-fn a_refused_or_silent_run_is_never_stored() {
+fn a_run_with_a_line_that_does_not_read_or_that_did_not_run_is_never_stored() {
     let dir = workdir();
     let store = store_in(dir.path());
     let bad = "src/a.rs:3 — if not addressed: x — ENG-999";
@@ -217,7 +217,7 @@ fn a_refused_or_silent_run_is_never_stored() {
     assert!(store.get(&key("lang-markdown")).unwrap().is_some());
     assert!(
         first.lines.iter().any(|l| l.starts_with(
-            "lang-rust (specialist): its answer was not stored: its report is refused"
+            "lang-rust (specialist): its answer was not stored: its report holds a line that does not read"
         )),
         "{:?}",
         first.lines
@@ -248,7 +248,7 @@ fn a_tampered_stored_report_is_run_again_not_trusted() {
     assert_eq!(second.started, ["lang-rust"]);
     assert!(
         second.lines.iter().any(|l| l.starts_with(&format!(
-            "lang-rust (specialist): its stored answer {key} is not taken, so it runs: its report is not the one its log assembles"
+            "lang-rust (specialist): its stored answer {key} is not taken, so it runs: its report is not the one its log reads as"
         ))),
         "{:?}",
         second.lines
@@ -596,8 +596,8 @@ fn a_stored_generalist_whose_weighing_is_partial_is_not_replayed() {
 
 /// Answers as [`fake::either`], but lang-rust is cut off by its turn
 /// budget after it stated its finding, its result still giving an
-/// outcome line, so its report reads but it did not answer; and
-/// review-code weighs only test-engineer-unit's place.
+/// outcome line, so it ran and its report reads; and review-code weighs
+/// only test-engineer-unit's place.
 fn cut_off(c: &Command) -> Result<Output, String> {
     match fake::agent_of(c).as_str() {
         "lang-rust" => {
@@ -620,13 +620,14 @@ fn cut_off(c: &Command) -> Result<Output, String> {
 }
 
 #[test]
-fn a_generalist_is_held_to_the_reports_of_the_specialists_that_answered_alone() {
+fn a_generalist_is_held_to_the_report_of_a_specialist_cut_off_as_to_any() {
     let dir = workdir();
     let store = store_in(dir.path());
 
     let first = reviewed(dir.path(), &store, crate::parts::LIMIT, cut_off);
 
-    assert!(!first.run("lang-rust").answered());
+    let cut = first.run("lang-rust");
+    assert!(cut.answered() && cut.cut.is_some(), "{cut:?}");
     let report =
         fs::read_to_string(dir.path().join(crate::plan::report_file("lang-rust"))).unwrap();
     assert_eq!(
@@ -635,11 +636,14 @@ fn a_generalist_is_held_to_the_reports_of_the_specialists_that_answered_alone() 
         "its report reads: {report}"
     );
     let key = first.run("review-code").answer_key.clone().unwrap();
-    assert!(store.get(&key).unwrap().is_some(), "{:?}", first.lines);
-    let second = reviewed(dir.path(), &store, crate::parts::LIMIT, cut_off);
+    assert_eq!(store.get(&key), Ok(None), "{:?}", first.lines);
     assert!(
-        !second.started.contains(&"review-code".to_owned()),
+        first.lines.iter().any(|l| l.ends_with(
+            "its answer was not stored: its weighing is partial: it weighed no finding at src/a.rs:3"
+        )),
         "{:?}",
-        second.started
+        first.lines
     );
+    let second = reviewed(dir.path(), &store, crate::parts::LIMIT, cut_off);
+    assert_eq!(second.started, ["lang-rust", "review-code"]);
 }

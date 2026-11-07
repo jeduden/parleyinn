@@ -3,20 +3,21 @@
 //! path order, each part written beside it as `<name>.<i>.diff`; each
 //! part run as the same agent with the same prompt, told which part it
 //! has and every part's files; and the parts' reports and runs merged
-//! into the specialist's one report and run. A part that did not answer
-//! leaves the specialist one that did not answer, its report headed
-//! incomplete and naming that part, with every part's findings kept.
+//! into the specialist's one report and run. A part that did not run
+//! leaves the specialist one that did not run, its report headed
+//! incomplete and naming that part, with every part's findings kept; a
+//! part cut off is read as it stands, and what each part did not read
+//! of its diff, set aside or could not read stays named by its part.
 
 use std::fs;
 use std::path::Path;
 
-use review_bundle::cli::DIFFS;
 use review_bundle::diff;
 use review_eval::component::Kind;
 use review_eval::log::{RunLog, SUCCESS};
 use review_gate::report::{FINDINGS, INCOMPLETE, NONE, answer_outcome};
 
-use crate::REVIEW;
+use crate::reading::diff_file;
 use crate::run::AgentRun;
 
 /// The size, in bytes, past which a specialist's diff runs in parts,
@@ -52,12 +53,6 @@ impl Part {
     pub fn stem(&self, name: &str) -> String {
         format!("{name}.{}", self.index)
     }
-}
-
-/// `name`'s diff file, or its part `index`'s, relative to the work
-/// directory.
-fn diff_file(stem: &str) -> String {
-    format!("{REVIEW}/{DIFFS}/{stem}.diff")
 }
 
 /// The parts specialist `name` runs in, under the work directory
@@ -112,19 +107,30 @@ pub fn prepare(workdir: &Path, name: &str, limit: usize) -> Result<Vec<Part>, St
 }
 
 /// Specialist `name`'s run and report merged from its parts' runs and
-/// assembled reports, in part order: every part's finding lines, a line
-/// identical to an earlier one dropped; then, when every part answered,
-/// one outcome line, findings when any part's is, else none, saying
-/// each part's, and that line as the answer, but no outcome line when a
+/// read reports, in part order: every part's finding lines, a line
+/// identical to an earlier one dropped; then, when every part ran, one
+/// outcome line, findings when any part's is, else none, saying each
+/// part's, and that line as the answer, but no outcome line when a
 /// part's report has none, so the report check refuses it. A part that
-/// did not answer makes the run one that did not answer, its report
-/// headed incomplete naming each such part. Costs, what the budget
-/// charged, turns, usage and attempts add up.
+/// did not run makes the run one that did not run, its report headed
+/// incomplete naming each such part; a part cut off makes it cut, naming
+/// each such part. Costs, what the budget charged, turns, usage and
+/// attempts add up, and what each part did not read, set aside or could
+/// not read is kept.
 #[must_use]
 pub fn merge(name: &str, parts: Vec<(AgentRun, String)>) -> (AgentRun, String) {
     let count = parts.len();
-    let mut failures = Vec::new();
-    let mut failed_parts = Vec::new();
+    let (mut failures, mut cuts) = (Vec::new(), Vec::new());
+    let mut merged = AgentRun {
+        parts: u32::try_from(count).unwrap_or(u32::MAX),
+        ..AgentRun::of(
+            name.to_owned(),
+            Kind::Specialist,
+            None,
+            RunLog::default(),
+            0,
+        )
+    };
     let mut outcomes = Vec::new();
     let mut lines: Vec<String> = Vec::new();
     let mut log = RunLog {
@@ -132,32 +138,25 @@ pub fn merge(name: &str, parts: Vec<(AgentRun, String)>) -> (AgentRun, String) {
         subtype: SUCCESS.to_owned(),
         ..RunLog::default()
     };
-    let (mut attempts, mut charged) = (0, 0.0);
     for (at, (run, report)) in parts.into_iter().enumerate() {
         let place = format!("part {} of {count}", at + 1);
         if let Some(why) = &run.failure {
             failures.push(format!("{place}: {why}"));
-            failed_parts.push((at + 1, why.clone()));
+            merged.failed_parts.push((at + 1, why.clone()));
             if log.answered {
                 log.subtype.clone_from(&run.log.subtype);
             }
             log.answered = false;
+        } else if let Some(why) = &run.cut {
+            cuts.push(format!("{place}: {why}"));
         }
-        attempts += run.attempts;
-        charged += run.charged;
+        merged.partial.extend(run.partial);
+        merged.ignored.extend(run.ignored);
+        merged.unreadable.extend(run.unreadable);
+        merged.attempts += run.attempts;
+        merged.charged += run.charged;
         add(&mut log, run.log);
-        let mut outcome = None;
-        for line in report.lines() {
-            if line.starts_with(INCOMPLETE) {
-                continue;
-            }
-            if let Some((text, word)) = answer_outcome(line) {
-                outcome = Some((text.to_owned(), word));
-            } else if !lines.iter().any(|l| l == line) {
-                lines.push(line.to_owned());
-            }
-        }
-        outcomes.push((at + 1, outcome));
+        outcomes.push((at + 1, take_lines(&report, &mut lines)));
     }
     if count == 0 {
         failures.push("it ran in no part".to_owned());
@@ -180,24 +179,34 @@ pub fn merge(name: &str, parts: Vec<(AgentRun, String)>) -> (AgentRun, String) {
         }
         _ => String::new(),
     };
+    merged.cut = (failure.is_none() && !cuts.is_empty()).then(|| cuts.join("; "));
 
     (
         AgentRun {
-            name: name.to_owned(),
-            kind: Kind::Specialist,
             failure,
             log,
-            attempts,
-            parts: u32::try_from(count).unwrap_or(u32::MAX),
-            failed_parts,
-            reused: false,
-            from_store: false,
-            answer_key: None,
-            store_failed: false,
-            charged,
+            ..merged
         },
         report,
     )
+}
+
+/// Adds each line of a part's `report` but its outcome line and an
+/// incomplete heading to `lines`, a line identical to an earlier one
+/// dropped, and returns its outcome line and the word it gives.
+fn take_lines(report: &str, lines: &mut Vec<String>) -> Option<(String, &'static str)> {
+    let mut outcome = None;
+    for line in report.lines() {
+        if line.starts_with(INCOMPLETE) {
+            continue;
+        }
+        if let Some((text, word)) = answer_outcome(line) {
+            outcome = Some((text.to_owned(), word));
+        } else if !lines.iter().any(|l| l == line) {
+            lines.push(line.to_owned());
+        }
+    }
+    outcome
 }
 
 /// The outcome line of `count` parts whose outcome lines and words are

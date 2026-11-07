@@ -89,12 +89,30 @@ fn the_page_names_each_gap_with_why_and_never_reads_as_clean() {
 
     assert_eq!(
         page,
-        "# Not reviewed\n\nThese dispatched agents have no accepted report or answer, so the \
-         review read nothing from them. None of them is clean.\n\n\
+        "# Not reviewed\n\nThe review did not review these dispatched agents, or parts, \
+         whole: each did not run, read only part of its diff, stated a line that does not \
+         read, or gave an answer the review could not take. None of them is clean.\n\n\
          - `lang-rust part 2` (specialist): silent: x\n"
     );
     assert_eq!(
         markdown(&[]),
         "# Not reviewed\n\nEvery dispatched agent has an accepted report or answer.\n"
+    );
+}
+
+#[test]
+fn a_partial_or_unreadable_specialist_says_which_lines() {
+    let line = crate::reading::ReportLine {
+        agent: "lang-rust".to_owned(),
+        part: None,
+        line: 2,
+        text: "a.rs:1 — x".to_owned(),
+        why: "has a report whose line 2 is neither".to_owned(),
+    };
+
+    assert_eq!(partial("lines 1-4 unread"), "partial: lines 1-4 unread");
+    assert_eq!(
+        unreadable(&line),
+        "unreadable: has a report whose line 2 is neither: `a.rs:1 — x`"
     );
 }

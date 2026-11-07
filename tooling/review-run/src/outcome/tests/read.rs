@@ -1,0 +1,172 @@
+//! The outcome of specialists whose log was read whatever their run
+//! ended with: one cut off with its whole diff read is consulted and
+//! said, one that read part of its diff or stated a line that does not
+//! read blocks naming why, and the lines set aside are counted.
+
+use super::*;
+use crate::reading::ReportLine;
+
+/// A line of lang-rust's report, `why` it is set aside or unread.
+fn line(part: Option<usize>, text: &str, why: &str) -> ReportLine {
+    ReportLine {
+        agent: "lang-rust".to_owned(),
+        part,
+        line: 2,
+        text: text.to_owned(),
+        why: why.to_owned(),
+    }
+}
+
+const WEIGHED: &str = "src/a.rs:3 — nit — a long line — lang-rust\n\
+                       src/a.rs:3 — nit — again — test-engineer-unit\nSound.";
+
+#[test]
+fn a_specialist_cut_off_with_its_whole_diff_read_is_consulted_and_said() {
+    let (mut runs, reports) = all_answered(WEIGHED);
+    runs[0].cut = Some("its run ended with error_max_turns".to_owned());
+
+    let d = decide(&plan(DISPATCH), &runs, &reports, &known());
+
+    assert_eq!(d.outcome.verdict, "approve", "{:?}", d.outcome);
+    assert!(d.consulted.contains("lang-rust"));
+    assert!(d.not_reviewed.is_empty(), "{:?}", d.not_reviewed);
+    assert!(
+        d.outcome.summary.contains(
+            " 1 specialist ended without a successful result, cut off by a turn budget, \
+             deadline or cost cap, with every line of their diff read: what each one's log \
+             states is its report."
+        ),
+        "{}",
+        d.outcome.summary
+    );
+}
+
+#[test]
+fn a_specialist_that_read_part_of_its_diff_blocks_naming_the_lines_by_part() {
+    let (mut runs, reports) = all_answered(WEIGHED);
+    let why = "its log shows no Read of lines 5-9 of review/diffs/lang-rust.2.diff, of 9 lines";
+    runs[0].cut = Some("part 2 of 2: its run ended with error_max_turns".to_owned());
+    runs[0].partial = vec![(Some(2), why.to_owned())];
+
+    let d = decide(&plan(DISPATCH), &runs, &reports, &known());
+
+    assert_eq!(d.outcome.verdict, "request_changes");
+    assert_eq!(
+        d.outcome.findings[0],
+        blocking(
+            "review/",
+            format!(
+                "lang-rust part 2 did not read its whole diff (part 2 of 2: its run ended with \
+                 error_max_turns): {why}, so the review of it is partial"
+            )
+        )
+    );
+    assert_eq!(
+        d.not_reviewed,
+        [gap(
+            "lang-rust",
+            "specialist",
+            Some(2),
+            &format!("partial: {why}")
+        )]
+    );
+    assert!(d.consulted.contains("lang-rust"));
+    assert!(
+        d.outcome
+            .summary
+            .contains(" Read part of their diff: lang-rust part 2."),
+        "{}",
+        d.outcome.summary
+    );
+    assert!(
+        !d.outcome.summary.contains("with every line"),
+        "{}",
+        d.outcome.summary
+    );
+}
+
+#[test]
+fn a_line_that_does_not_read_blocks_quoted_and_the_rest_of_its_report_stands() {
+    let (mut runs, reports) = all_answered(WEIGHED);
+    let problem = "has a report whose line 2 is neither a linked finding nor a requirement request";
+    runs[0].unreadable = vec![line(None, "a.rs:9 — not a form", problem)];
+
+    let d = decide(&plan(DISPATCH), &runs, &reports, &known());
+
+    assert_eq!(d.outcome.verdict, "request_changes");
+    assert!(
+        d.outcome.findings.contains(&blocking(
+            "review/reports/lang-rust.md",
+            format!("lang-rust {problem}: `a.rs:9 — not a form`")
+        )),
+        "{:?}",
+        d.outcome.findings
+    );
+    // Its finding is weighed as any other, so the nit is kept.
+    assert!(d.outcome.findings.iter().any(|f| f.severity == "nit"));
+    assert_eq!(
+        d.not_reviewed,
+        [gap(
+            "lang-rust",
+            "specialist",
+            None,
+            &format!("unreadable: {problem}: `a.rs:9 — not a form`")
+        )]
+    );
+    assert!(
+        d.outcome
+            .summary
+            .contains(" Reports holding a line that does not read: lang-rust."),
+        "{}",
+        d.outcome.summary
+    );
+}
+
+#[test]
+fn the_lines_set_aside_are_listed_and_counted_and_block_nothing() {
+    let (mut runs, reports) = all_answered(WEIGHED);
+    let aside = line(Some(1), "src/b.rs:1 — no finding", "says all is well");
+    runs[0].ignored = vec![aside.clone()];
+    // A specialist that did not run sets nothing aside.
+    let mut silent = silent("test-engineer-unit", Kind::Specialist, "cannot start");
+    silent.ignored = vec![aside.clone()];
+    let mut two = runs.clone();
+    two[1] = silent;
+
+    let d = decide(&plan(DISPATCH), &runs, &reports, &known());
+
+    assert_eq!(d.outcome.verdict, "approve", "{:?}", d.outcome);
+    assert_eq!(d.ignored, [aside]);
+    assert!(
+        d.outcome.summary.contains(
+            " Set aside as no finding: 1 line of the specialists' reports (review/ignored.json)."
+        ),
+        "{}",
+        d.outcome.summary
+    );
+    assert_eq!(
+        decide(&plan(DISPATCH), &two, &reports, &known())
+            .ignored
+            .len(),
+        1
+    );
+}
+
+#[test]
+fn many_are_counted_in_the_plural() {
+    let (mut runs, reports) = all_answered(WEIGHED);
+    for run in &mut runs[..2] {
+        run.cut = Some("its run ended with deadline".to_owned());
+    }
+    runs[0].ignored = vec![line(None, "a", "w"), line(None, "b", "w")];
+
+    let summary = decide(&plan(DISPATCH), &runs, &reports, &known())
+        .outcome
+        .summary;
+
+    assert!(
+        summary.contains(" 2 specialists ended without"),
+        "{summary}"
+    );
+    assert!(summary.contains("no finding: 2 lines of"), "{summary}");
+}

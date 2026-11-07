@@ -50,8 +50,8 @@ pub struct Earlier {
 pub enum Reuse {
     /// Its whole answer, and for a specialist its report.
     Whole(String),
-    /// The parts of its split diff that answered, by place, each with
-    /// its log; the others run again.
+    /// The parts of its split diff no gap names that ran, by place, each
+    /// with its log; the others run again.
     Parts(BTreeMap<usize, RunLog>),
 }
 
@@ -277,8 +277,8 @@ fn whole(name: &str, earlier: &Earlier, now: &RunId) -> Result<Reuse, String> {
 }
 
 /// What specialist `name`, named by `gaps`, keeps: its whole answer
-/// when no gap names it; when every gap names a part, the parts that
-/// answered; else nothing, with why.
+/// when no gap names it; when every gap names a part, the parts no gap
+/// names that ran, cut off or not; else nothing, with why.
 fn keep(name: &str, gaps: &[&Gap], earlier: &Earlier, now: &RunId) -> Result<Reuse, String> {
     let Some(first) = gaps.first() else {
         return whole(name, earlier, now);
@@ -295,7 +295,7 @@ fn keep(name: &str, gaps: &[&Gap], earlier: &Earlier, now: &RunId) -> Result<Reu
         .get(name)
         .into_iter()
         .flatten()
-        .filter(|(at, log)| !failed.contains(at) && log.answered && !log.answer.trim().is_empty())
+        .filter(|(at, log)| !failed.contains(at) && crate::retry::did_run(log))
         .map(|(at, log)| (*at, log.clone()))
         .collect();
     if kept.is_empty() {

@@ -219,10 +219,11 @@ pub fn table(runs: &[AgentRun]) -> String {
             input += u.fresh + u.cache_write + u.cache_read;
             output += u.output;
         }
-        let result = match (&run.failure, run.reused) {
-            (_, true) => "reused".to_owned(),
-            (None, false) => "answered".to_owned(),
-            (Some(why), false) => cell(why),
+        let result = match (&run.failure, &run.cut, run.reused) {
+            (_, _, true) => "reused".to_owned(),
+            (None, None, false) => "answered".to_owned(),
+            (None, Some(why), false) => cell(&format!("ran, log read: {why}")),
+            (Some(why), _, false) => cell(&format!("did not run: {why}")),
         };
         let _ = writeln!(
             s,

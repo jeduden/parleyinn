@@ -76,7 +76,7 @@ fn a_resumed_specialist_runs_only_its_parts_not_kept_and_merges_the_kept_one() {
 }
 
 #[test]
-fn a_kept_part_the_report_check_refuses_runs_again() {
+fn a_kept_part_is_read_again_and_its_line_that_does_not_read_named_by_its_part() {
     let dir = workdir();
     big_diff(dir.path());
     let resume = keeping_part_one(
@@ -84,14 +84,19 @@ fn a_kept_part_the_report_check_refuses_runs_again() {
         "outcome: findings — part 1 kept.",
     );
 
-    let (_, lines, host) = resumed_split_run(dir.path(), &resume);
+    let (runs, _, host) = resumed_split_run(dir.path(), &resume);
 
-    assert_eq!(host.agents(), ["lang-rust", "lang-rust", "review-code"]);
-    let told = lines
-        .iter()
-        .find(|l| l.starts_with("lang-rust part 1 of 2 (specialist): its kept report was refused, so it runs again: "))
-        .unwrap_or_else(|| panic!("{lines:?}"));
-    assert!(told.contains("ENG-999"), "{told}");
+    assert_eq!(host.agents(), ["lang-rust", "review-code"]);
+    let rust = &runs[0];
+    assert_eq!(rust.unreadable.len(), 1, "{rust:?}");
+    assert_eq!(rust.unreadable[0].part, Some(1));
+    assert!(rust.unreadable[0].why.contains("ENG-999"));
+    let report = fs::read_to_string(dir.path().join(report_file("lang-rust"))).unwrap();
+    assert!(!report.contains("ENG-999"), "{report}");
+    assert!(
+        report.contains("part 1, none — nothing stated in the run log"),
+        "{report}"
+    );
 }
 
 #[test]
