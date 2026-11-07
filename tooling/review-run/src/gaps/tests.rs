@@ -116,3 +116,11 @@ fn a_partial_or_unreadable_specialist_says_which_lines() {
         "unreadable: has a report whose line 2 is neither: `a.rs:1 — x`"
     );
 }
+
+#[test]
+fn a_quoted_line_is_whole_up_to_its_cap_and_cut_with_an_ellipsis_past_it() {
+    let at_cap = "é".repeat(MOST_QUOTED);
+    assert_eq!(quoted(&at_cap), at_cap);
+    assert_eq!(quoted(&format!("{at_cap}x")), format!("{at_cap}…"));
+    assert_eq!(quoted("a.rs:1 — x"), "a.rs:1 — x");
+}

@@ -104,10 +104,24 @@ pub fn partial(why: &str) -> String {
 }
 
 /// The reason of a specialist whose report holds `line`, which does not
-/// read: its problem, the line quoted.
+/// read: its problem, the line quoted ([`quoted`]).
 #[must_use]
 pub fn unreadable(line: &ReportLine) -> String {
-    format!("{UNREADABLE} {}: `{}`", line.why, line.text)
+    format!("{UNREADABLE} {}: `{}`", line.why, quoted(&line.text))
+}
+
+/// The most characters of a line a finding or gap quotes: a longer one
+/// is cut there, so no line floods the posted review.
+pub const MOST_QUOTED: usize = 240;
+
+/// `text` as a finding or gap quotes it: whole, or its first
+/// [`MOST_QUOTED`] characters and `…` when it is longer.
+#[must_use]
+pub fn quoted(text: &str) -> String {
+    match text.char_indices().nth(MOST_QUOTED) {
+        Some((at, _)) => format!("{}…", &text[..at]),
+        None => text.to_owned(),
+    }
 }
 
 /// Reads a gap list: every entry an agent the review can dispatch, of

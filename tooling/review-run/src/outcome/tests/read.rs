@@ -4,6 +4,7 @@
 //! read blocks naming why, and the lines set aside are counted.
 
 use super::*;
+use crate::gaps::MOST_QUOTED;
 use crate::reading::ReportLine;
 
 /// A line of lang-rust's report, `why` it is set aside or unread.
@@ -224,4 +225,51 @@ fn a_generalist_cut_off_is_consulted_and_counted_in_the_summary() {
         "{}",
         d.outcome.summary
     );
+}
+
+#[test]
+fn the_lines_that_do_not_read_are_named_ten_at_most_each_cut_then_counted() {
+    let (mut runs, reports) = all_answered(WEIGHED);
+    let problem = "has a report whose line 2 is in no form";
+    let long = format!("a.rs:1 — {}", "x".repeat(300));
+    runs[0].unreadable = (0..12)
+        .map(|at| {
+            let text = if at == 0 {
+                long.clone()
+            } else {
+                format!("a.rs:{at} — not a form")
+            };
+            line(None, &text, problem)
+        })
+        .collect();
+
+    let d = decide(&plan(DISPATCH), &runs, &reports, &known());
+
+    let on_report: Vec<&str> = d
+        .outcome
+        .findings
+        .iter()
+        .filter(|f| f.path == "review/reports/lang-rust.md")
+        .map(|f| f.body.as_str())
+        .collect();
+    assert_eq!(on_report.len(), MOST_UNREADABLE + 1, "{on_report:?}");
+    let cut: String = long.chars().take(MOST_QUOTED).collect();
+    assert_eq!(on_report[0], format!("lang-rust {problem}: `{cut}…`"));
+    assert_eq!(on_report[10], "lang-rust and 2 more lines that do not read");
+    let gaps: Vec<&str> = d
+        .not_reviewed
+        .iter()
+        .filter(|g| g.name == "lang-rust")
+        .map(|g| g.reason.as_str())
+        .collect();
+    assert_eq!(gaps.len(), MOST_UNREADABLE + 1, "{gaps:?}");
+    assert_eq!(gaps[0], format!("unreadable: {problem}: `{cut}…`"));
+    assert_eq!(gaps[10], "unreadable: and 2 more lines that do not read");
+    // The summary names the agent once, however many lines.
+    let summary = &d.outcome.summary;
+    assert!(
+        summary.contains(" Reports holding a line that does not read: lang-rust."),
+        "{summary}"
+    );
+    assert!(summary.contains(" Not reviewed: lang-rust."), "{summary}");
 }

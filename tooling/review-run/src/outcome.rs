@@ -124,11 +124,11 @@ pub fn decide(
                 &counts,
                 &Named {
                     silent: &silent,
-                    partial: &partial.iter().map(Gap::label).collect::<Vec<_>>(),
-                    unreadable: &unreadable.iter().map(Gap::label).collect::<Vec<_>>(),
+                    partial: &labels(&partial),
+                    unreadable: &labels(&unreadable),
                     refused: &labelled(&refused),
                     unread: &unread.iter().map(|(n, _)| n.clone()).collect::<Vec<_>>(),
-                    not_reviewed: &not_reviewed.iter().map(Gap::label).collect::<Vec<_>>(),
+                    not_reviewed: &labels(&not_reviewed),
                 },
                 &closings,
             ),
@@ -186,17 +186,35 @@ fn read_partly(
             ));
             partial.push(gap);
         }
-        for line in &run.unreadable {
+        for line in run.unreadable.iter().take(MOST_UNREADABLE) {
             findings.push(blocking(
                 &report_file(&run.name),
-                format!("{} {}: `{}`", run.name, line.why, line.text),
+                format!("{} {}: `{}`", run.name, line.why, gaps::quoted(&line.text)),
             ));
             unreadable.push(Gap::new(&run.name, line.part, gaps::unreadable(line)));
+        }
+        let more = run.unreadable.len().saturating_sub(MOST_UNREADABLE);
+        if more > 0 {
+            let why = format!("and {} that do not read", counted(more, "more line"));
+            findings.push(blocking(
+                &report_file(&run.name),
+                format!("{} {why}", run.name),
+            ));
+            unreadable.push(Gap::new(
+                &run.name,
+                None,
+                format!("{} {why}", gaps::UNREADABLE),
+            ));
         }
     }
 
     (partial, unreadable)
 }
+
+/// The most lines of one agent's report that do not read the outcome
+/// names one by one, each in a blocking finding and a gap; the rest are
+/// counted in one more of each, so no report floods the posted review.
+pub const MOST_UNREADABLE: usize = 10;
 
 /// Each generalist's weighing, by name: an answered one's answer, as
 /// [`answers`] assembled it; one cut off before its answer, what it
@@ -219,6 +237,18 @@ fn weighings(
             Some((name, weighing))
         })
         .collect()
+}
+
+/// The labels of `gaps`, each once, in their order: the summary names
+/// an agent or part once however many of its lines do not read.
+fn labels(gaps: &[Gap]) -> Vec<String> {
+    let mut out: Vec<String> = Vec::new();
+    for label in gaps.iter().map(Gap::label) {
+        if !out.contains(&label) {
+            out.push(label);
+        }
+    }
+    out
 }
 
 /// Each refused specialist as the summary names it, with its problem.
