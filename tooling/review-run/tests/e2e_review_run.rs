@@ -864,7 +864,8 @@ fn a_review_past_its_cost_cap_starts_no_further_run_and_never_approves() {
         &dir,
         "",
         "",
-        &["--parallel", "1", "--max-cost-usd", "0.01"],
+        // Room for one specialist's 0.30 cap, and none once it ran.
+        &["--parallel", "1", "--max-cost-usd", "0.305"],
     );
 
     let stdout = String::from_utf8_lossy(&out.stdout);
