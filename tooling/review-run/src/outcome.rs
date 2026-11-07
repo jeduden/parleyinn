@@ -75,13 +75,7 @@ pub fn decide(
         kept: kept_counts,
         closings,
         unread,
-    } = weighed(
-        plan,
-        &weighings,
-        (&answers, &refused),
-        reports,
-        &mut findings,
-    );
+    } = weighed(plan, &weighings, (&answers, known), reports, &mut findings);
     let consulted: BTreeSet<String> = answers.keys().cloned().collect();
     let not_reviewed = not_reviewed(runs, &silent, &refused, &unread);
     let approves = silent.is_empty()
@@ -276,7 +270,7 @@ struct Weighed {
 fn weighed(
     plan: &Plan,
     weighings: &BTreeMap<String, String>,
-    (answers, refused): (&BTreeMap<String, String>, &[(String, String)]),
+    (answers, known): (&BTreeMap<String, String>, &BTreeSet<String>),
     reports: &BTreeMap<String, String>,
     findings: &mut Vec<Finding>,
 ) -> Weighed {
@@ -294,7 +288,7 @@ fn weighed(
         let heard = Heard {
             reports,
             answers,
-            refused,
+            known,
         };
         unread.extend(unread_by(plan, &name, answer, answered, heard, findings));
         for mut f in kept(answer) {
@@ -384,13 +378,13 @@ fn unread_by(
     unread
 }
 
-/// What the specialists gave: the answers, the reports and the
-/// refused ones.
+/// What the specialists gave: the answers and the reports, and the ids
+/// a report may cite.
 #[derive(Clone, Copy)]
 struct Heard<'a> {
     reports: &'a BTreeMap<String, String>,
     answers: &'a BTreeMap<String, String>,
-    refused: &'a [(String, String)],
+    known: &'a BTreeSet<String>,
 }
 
 /// The places of `generalist`'s specialists' findings and requests that
@@ -403,19 +397,37 @@ fn unweighed(plan: &Plan, generalist: &str, answer: &str, heard: Heard) -> Vec<S
     let Heard {
         reports,
         answers,
-        refused,
+        known,
     } = heard;
-    // A report the gate refuses is named as refused, not as unweighed.
-    let heard = plan
-        .dispatch
+
+    missed(held_to(plan, generalist, answers, reports, known), answer)
+}
+
+/// The reports `generalist`'s weighing is held to: of each of its
+/// specialists that answered, `answers` by name, its report in
+/// `reports`, when the gate takes it beside that answer, its ids held
+/// to `known`. A report the gate refuses is named as refused, not as
+/// unweighed. The one rule the outcome and the answer store hold a
+/// weighing to.
+#[must_use]
+pub fn held_to<'a>(
+    plan: &Plan,
+    generalist: &str,
+    answers: &BTreeMap<String, String>,
+    reports: &'a BTreeMap<String, String>,
+    known: &BTreeSet<String>,
+) -> Vec<&'a str> {
+    plan.dispatch
         .get(generalist)
         .into_iter()
         .flatten()
-        .filter(|s| answers.contains_key(*s))
-        .filter(|s| !refused.iter().any(|(name, _)| name == *s))
-        .filter_map(|s| reports.get(s).map(String::as_str));
-
-    missed(heard, answer)
+        .filter_map(|s| {
+            let (answer, report) = (answers.get(s)?, reports.get(s)?);
+            report_check(Some(report), Some(answer), Some(known))
+                .is_none()
+                .then_some(report.as_str())
+        })
+        .collect()
 }
 
 /// The places of the findings and requests in `reports` that the

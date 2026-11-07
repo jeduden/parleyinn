@@ -22,7 +22,7 @@ use review_eval::{component, runner};
 use review_gate::report::assemble;
 
 use crate::controls::Controls;
-use crate::memo;
+use crate::memo::{self, Heard};
 use crate::parts;
 use crate::pipeline::pipeline;
 use crate::plan::Plan;
@@ -126,6 +126,9 @@ pub(crate) fn run_all(r: &Review, c: &Controls) -> Vec<AgentRun> {
             None => generalists.push(Unit::whole(name)),
         }
     }
+    // What the specialists that are not run here answered, for a
+    // generalist's weighing to be held to beside its inputs'.
+    let before = heard(runs.iter());
     let g = graph(r.plan, units, generalists);
     // A run starts only once its tier's cap fits in the pull request's
     // cost cap beside the runs in flight, and a generalist only once the
@@ -142,7 +145,7 @@ pub(crate) fn run_all(r: &Review, c: &Controls) -> Vec<AgentRun> {
         fits && (!generalist || c.breaker.decided())
     };
     let done = pipeline(&g.waits, r.options.parallel, &gate, &|at, inputs| {
-        task(r, c, &g.tasks[at], inputs)
+        task(r, c, (&g.tasks[at], &before), inputs)
     });
     let mut done: Vec<Option<Done>> = done.into_iter().map(Some).collect();
     let mut take = |name: &str| {
@@ -165,11 +168,19 @@ pub(crate) fn run_all(r: &Review, c: &Controls) -> Vec<AgentRun> {
     runs
 }
 
-/// Runs `task`, given `inputs`, the results of the tasks it waits for.
-fn task(r: &Review, c: &Controls, task: &Task, inputs: Vec<Done>) -> Done {
+/// Each of `runs` that answered, its answer by its name.
+fn heard<'a>(runs: impl Iterator<Item = &'a AgentRun>) -> Heard {
+    runs.filter(|run| run.answered())
+        .map(|run| (run.name.clone(), run.log.answer.clone()))
+        .collect()
+}
+
+/// Runs `task`, given `inputs`, the results of the tasks it waits for,
+/// and `before`, what the specialists not run here answered.
+fn task(r: &Review, c: &Controls, (task, before): (&Task, &Heard), inputs: Vec<Done>) -> Done {
     match task {
         Task::Unit(unit) => {
-            let done = one(r, c, unit);
+            let done = one(r, c, unit, &Heard::new());
             if unit.part.is_none() {
                 settle(c, ended_in_gap(&done.0, done.1.as_deref(), r));
             }
@@ -204,7 +215,11 @@ fn task(r: &Review, c: &Controls, task: &Task, inputs: Vec<Done>) -> Done {
                     (r.progress)(&describe(&done.0));
                     done
                 }
-                None => one(r, c, unit),
+                None => {
+                    let mut heard = before.clone();
+                    heard.extend(self::heard(inputs.iter().map(|(run, _)| run)));
+                    one(r, c, unit, &heard)
+                }
             };
             c.live.finish();
             done
@@ -270,7 +285,7 @@ fn whole(r: &Review, c: &Controls, name: &str) -> Option<AgentRun> {
 /// passes the check, else the answer the store holds under its key, when
 /// it is accepted again, else a run of its own, kept in the store once
 /// accepted; told to progress.
-fn one(r: &Review, c: &Controls, unit: &Unit) -> Done {
+fn one(r: &Review, c: &Controls, unit: &Unit, heard: &Heard) -> Done {
     let kept = match (reuse(r, &unit.name), &unit.part) {
         (Some(Reuse::Parts(kept)), Some(part)) => kept.get(&part.index),
         _ => None,
@@ -294,14 +309,14 @@ fn one(r: &Review, c: &Controls, unit: &Unit) -> Done {
         }
     }
     if let (Some(store), Some(key)) = (r.store, &key)
-        && let Some(done) = memo::recall(r, store, unit, key)
+        && let Some(done) = memo::recall(r, store, unit, key, heard)
     {
         (r.progress)(&describe(&done.0));
         return done;
     }
     let mut done = run_one(r, c, unit);
     if let (Some(store), Some(key)) = (r.store, &key) {
-        done.0.store_failed = memo::keep(r, store, unit, key, &done);
+        done.0.store_failed = memo::keep(r, store, (unit, key), &done, heard);
     }
     done.0.answer_key = key;
     (r.progress)(&describe(&done.0));
