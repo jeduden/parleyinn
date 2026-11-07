@@ -17,7 +17,7 @@ use review_gate::report::{Problem, report_check};
 
 use crate::LOGS;
 use crate::backoff::{self, Class, MAX_ATTEMPTS};
-use crate::controls::Controls;
+use crate::controls::{Controls, Reservation};
 use crate::live::Running;
 use crate::parts::add_usage;
 use crate::run::{AgentRun, Review, Unit, attempt, describe, keep_log, keep_spend, not_started};
@@ -201,13 +201,19 @@ fn again(
             }
             waited += 1;
         }
-        if let Some(why) = c.budget.refusal(runner::budget_of(unit.kind)) {
-            let (mut run, report) = last;
-            let before = run.failure.unwrap_or_default();
-            run.failure = Some(format!("{why} again; before that {before}"));
-            return (run, report);
-        }
-        let (mut next, report) = tried(r, c, unit, note);
+        let held = match c
+            .budget
+            .reserve(runner::budget_of(unit.kind), r.options.deadline)
+        {
+            Ok(held) => held,
+            Err(why) => {
+                let (mut run, report) = last;
+                let before = run.failure.unwrap_or_default();
+                run.failure = Some(format!("{why} again; before that {before}"));
+                return (run, report);
+            }
+        };
+        let (mut next, report) = ran(r, c, unit, note, held);
         let paid = charged(&next.log);
         // Only a run charged nothing is run again, so the last
         // attempt's charge is the run's.
@@ -233,15 +239,27 @@ fn again(
 }
 
 /// Runs `unit` once, with `note`, once its tier's cap is reserved in
-/// the pull request's cost cap, and not at all when it can never be:
-/// noted as running while it runs, and charged once it ends what
-/// [`billed`] says, its reservation released.
+/// the pull request's cost cap, and not at all when it can never be.
 fn tried(r: &Review, c: &Controls, unit: &Unit, note: Option<&str>) -> (AgentRun, Option<String>) {
-    let most = runner::budget_of(unit.kind);
-    let held = match c.budget.reserve(most, r.options.deadline) {
-        Ok(held) => held,
-        Err(why) => return not_started(r.workdir, unit, why),
-    };
+    match c
+        .budget
+        .reserve(runner::budget_of(unit.kind), r.options.deadline)
+    {
+        Ok(held) => ran(r, c, unit, note, held),
+        Err(why) => not_started(r.workdir, unit, why),
+    }
+}
+
+/// Runs `unit` once, with `note`, its tier's cap `held`: noted as
+/// running while it runs, and charged once it ends what [`billed`]
+/// says, its reservation released.
+fn ran(
+    r: &Review,
+    c: &Controls,
+    unit: &Unit,
+    note: Option<&str>,
+    held: Reservation,
+) -> (AgentRun, Option<String>) {
     let label = unit.label();
     c.live.start(
         &label,
@@ -253,7 +271,7 @@ fn tried(r: &Review, c: &Controls, unit: &Unit, note: Option<&str>) -> (AgentRun
     );
     let mut done = attempt(r.host, r.workdir, r.plan, unit, r.options.deadline, note);
     c.live.end(&label);
-    done.0.charged = billed(&done.0.log, most);
+    done.0.charged = billed(&done.0.log, runner::budget_of(unit.kind));
     held.charge(done.0.charged, &|spent| keep_spend(r, spent));
 
     done
