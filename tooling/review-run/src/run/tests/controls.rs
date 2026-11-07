@@ -598,9 +598,19 @@ fn a_free_run_is_not_run_again_once_others_reached_the_cap_meanwhile() {
     };
     let lines = Arc::new(Mutex::new(Vec::new()));
     let seen = Arc::clone(&lines);
+    // lang-rust has started: lang-markdown ends only after that, so the
+    // cap is reached while lang-rust runs, in any order the runs start.
+    let started = Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let started_by_rust = Arc::clone(&started);
     let (_dir, ran) = told_to(lines, DISPATCH, options, 0.0, move |c| {
         match agent_of(c).as_str() {
             "lang-markdown" => {
+                let give_up = std::time::Instant::now() + Duration::from_secs(30);
+                while std::time::Instant::now() < give_up
+                    && !started.load(std::sync::atomic::Ordering::SeqCst)
+                {
+                    std::thread::sleep(Duration::from_millis(1));
+                }
                 fake::write_log(
                     c,
                     &fake::log_of(&[], "success", "outcome: none — clean.", 0.05),
@@ -610,6 +620,7 @@ fn a_free_run_is_not_run_again_once_others_reached_the_cap_meanwhile() {
             // Fails at no cost once lang-markdown's cost was counted, or
             // after half a minute.
             "lang-rust" => {
+                started_by_rust.store(true, std::sync::atomic::Ordering::SeqCst);
                 let give_up = std::time::Instant::now() + Duration::from_secs(30);
                 while std::time::Instant::now() < give_up
                     && !seen
