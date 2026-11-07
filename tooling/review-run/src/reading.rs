@@ -109,8 +109,9 @@ pub fn diff_file(stem: &str) -> String {
 
 /// Why the run of `stem`, whose log shows `reads`, did not read its
 /// whole diff under `workdir`: the ranges of it no read covered, or that
-/// its diff does not read; none when it read every line, or has no
-/// diff to read. Only a read of that very file counts: a relative path
+/// its diff is not there or does not read; none when it read every line
+/// of it, an empty diff having none. Every specialist, and every part,
+/// is told to read its diff, so one not found is never a whole review. Only a read of that very file counts: a relative path
 /// under the work directory, or an absolute one under it as named or as
 /// resolved ([`coverage::unread`]).
 #[must_use]
@@ -119,7 +120,11 @@ pub fn uncovered(workdir: &Path, stem: &str, reads: &[ReadCall]) -> Option<Strin
     let path = workdir.join(&rel);
     let text = match fs::read(&path) {
         Ok(text) => text,
-        Err(e) if e.kind() == io::ErrorKind::NotFound => return None,
+        Err(e) if e.kind() == io::ErrorKind::NotFound => {
+            return Some(format!(
+                "its diff {rel} was not found, so no read of it can be shown"
+            ));
+        }
         Err(e) => return Some(format!("its diff {rel} does not read: {e}")),
     };
     let total = String::from_utf8_lossy(&text).lines().count();

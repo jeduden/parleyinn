@@ -6,6 +6,7 @@
 use std::fs;
 use std::sync::Mutex;
 
+use review_eval::component::Kind;
 use review_eval::host::{Command, Host, Output};
 use serde_json::json;
 
@@ -232,6 +233,13 @@ pub(crate) fn define(dir: &std::path::Path, name: &str, turns: usize) {
         ),
     )
     .unwrap();
+    // Every specialist is told to read its diff: one the test gives none
+    // has an empty one, with no line to cover.
+    let diff = dir.join(format!("review/diffs/{name}.diff"));
+    if review_eval::component::kind_of(name) == Kind::Specialist && !diff.exists() {
+        fs::create_dir_all(diff.parent().unwrap()).unwrap();
+        fs::write(diff, "").unwrap();
+    }
 }
 
 /// Answers as a specialist or a generalist, by the prompt.

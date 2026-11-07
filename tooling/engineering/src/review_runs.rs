@@ -336,14 +336,33 @@ fn answer(command: &Command, agent: &str) -> Result<(), String> {
         .map_err(|e| format!("write {}: {e}", log.display()))
 }
 
-/// Lays out in `workdir` what the review job prepares for `review-run`:
-/// the dispatch, the bundle's printed output and the checkout's
-/// definitions of every dispatched agent.
+/// Lays out in `workdir` what the review job prepares for `review-run`,
+/// as [`lay_out`] does, and an empty diff for each specialist, which the
+/// bundle writes every one and each is told to read.
 ///
 /// # Errors
 ///
 /// Fails naming the file that cannot be read or written.
 pub fn prepare(checkout: &Checkout, workdir: &Path) -> Result<(), String> {
+    lay_out(checkout, workdir)?;
+    let dir = workdir.join("review").join(DIFFS);
+    fs::create_dir_all(&dir).map_err(|e| format!("make {}: {e}", dir.display()))?;
+    for name in SPECIALISTS {
+        let path = dir.join(format!("{name}.diff"));
+        fs::write(&path, "").map_err(|e| format!("write {}: {e}", path.display()))?;
+    }
+
+    Ok(())
+}
+
+/// Lays out in `workdir` what the review job prepares for `review-run`
+/// but the diffs: the dispatch, the bundle's printed output and the
+/// checkout's definitions of every dispatched agent.
+///
+/// # Errors
+///
+/// Fails naming the file that cannot be read or written.
+pub fn lay_out(checkout: &Checkout, workdir: &Path) -> Result<(), String> {
     let write = |dir: &str, file: &str, text: &str| {
         let dir = workdir.join(dir);
         fs::create_dir_all(&dir).map_err(|e| format!("make {}: {e}", dir.display()))?;
@@ -364,7 +383,6 @@ pub fn prepare(checkout: &Checkout, workdir: &Path) -> Result<(), String> {
         let text = checkout.read(&format!(".claude/agents/{file}"))?;
         write(".claude/agents", &file, &text)?;
     }
-
     Ok(())
 }
 
@@ -557,7 +575,7 @@ fn section(path: &str) -> String {
 /// told.
 #[must_use]
 pub fn split_runs_by_code(checkout: &Checkout, workdir: &Path) -> Vec<String> {
-    if let Err(e) = prepare(checkout, workdir) {
+    if let Err(e) = lay_out(checkout, workdir) {
         return vec![e];
     }
     let (name, files) = SPLIT;

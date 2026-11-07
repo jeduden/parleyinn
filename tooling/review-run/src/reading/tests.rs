@@ -185,14 +185,26 @@ fn a_diff_never_read_or_read_by_another_name_is_unread_whole() {
 }
 
 #[test]
-fn no_diff_has_nothing_to_cover_and_one_that_does_not_read_is_named() {
+fn a_diff_not_found_is_named_and_one_that_does_not_read_too() {
+    // Every specialist is told to read its diff, so one that is not
+    // there leaves no read of it to show: never a whole review.
     let dir = TempDir::new().unwrap();
-    assert_eq!(uncovered(dir.path(), "lang-rust", &[]), None);
+    assert_eq!(
+        uncovered(dir.path(), "lang-rust", &[]).unwrap(),
+        "its diff review/diffs/lang-rust.diff was not found, so no read of it can be shown"
+    );
     fs::create_dir_all(dir.path().join("review/diffs/lang-rust.diff")).unwrap();
 
     let why = uncovered(dir.path(), "lang-rust", &[]).unwrap();
 
     assert!(why.starts_with("its diff review/diffs/lang-rust.diff does not read: "));
+}
+
+#[test]
+fn an_empty_diff_has_nothing_to_cover() {
+    let dir = with_diff("lang-rust", 0);
+
+    assert_eq!(uncovered(dir.path(), "lang-rust", &[]), None);
 }
 
 #[test]

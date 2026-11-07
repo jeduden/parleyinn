@@ -122,6 +122,8 @@ pub fn prepare(checkout: &Checkout, workdir: &Path) -> Result<(), String> {
         let rel = format!(".claude/agents/{name}.md");
         write(&rel, &checkout.read(&rel)?)?;
     }
+    // The bundle writes the specialist a diff, which it is told to read.
+    write(&format!("review/diffs/{SPECIALIST}.diff"), "")?;
 
     Ok(())
 }

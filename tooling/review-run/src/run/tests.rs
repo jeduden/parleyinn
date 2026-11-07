@@ -487,6 +487,7 @@ fn a_report_from_before_the_run_is_written_over() {
 #[test]
 fn a_work_directory_without_room_for_logs_fails_the_review() {
     let dir = workdir();
+    fs::remove_dir_all(dir.path().join("review")).unwrap();
     fs::write(dir.path().join("review"), "a file").unwrap();
     let host = FakeHost::new(fake::either);
 
@@ -972,4 +973,23 @@ fn a_note_is_added_to_the_prompt_and_args_without_one_are_left_alone() {
     let mut args = vec!["-p".to_owned()];
     told(&mut args, "Part 1.");
     assert_eq!(args, ["-p"]);
+}
+
+#[test]
+fn a_specialist_whose_diff_is_not_found_is_partial_naming_it() {
+    let dir = workdir();
+    fs::remove_file(dir.path().join("review/diffs/lang-rust.diff")).unwrap();
+
+    let run = one_run(dir.path(), |c| fake::answer(c, &[], "outcome: none — x."));
+
+    assert!(run.answered());
+    assert!(!run.whole());
+    assert_eq!(
+        run.partial,
+        [(
+            None,
+            "its diff review/diffs/lang-rust.diff was not found, so no read of it can be shown"
+                .to_owned()
+        )]
+    );
 }
