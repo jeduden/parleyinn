@@ -29,7 +29,7 @@ pub(super) fn review_answer_cases() -> Vec<Case> {
             "ENG-28",
             Injection::replace(
                 MEMO,
-                "    let taken = store::accepted(unit.kind, &log, report.as_deref(), r.known)\n        .and_then(|()| partial(r, unit, &log, heard));\n",
+                "    let taken = store::accepted(unit.kind, &log, report.as_deref(), r.known)\n        .and_then(|()| partial(r, unit, &log, held));\n",
                 "    let taken = Ok::<(), String>(());\n",
             ),
             test("memo::tests::a_refused_or_silent_run_is_never_stored"),

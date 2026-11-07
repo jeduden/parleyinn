@@ -450,7 +450,7 @@ fn an_answer_whose_log_is_gone_is_told_and_counted() {
         &store,
         (&unit, &"a".repeat(64)),
         &(run, None),
-        &super::Answers::new(),
+        &super::HeldTo::of(&review, &unit, &super::Answers::new()),
     );
 
     assert!(failed);
@@ -529,7 +529,7 @@ fn an_answer_that_held_the_token_is_never_stored_and_is_counted() {
         &store,
         (&unit, &key),
         &(run, None),
-        &super::Answers::new(),
+        &super::HeldTo::of(&review, &unit, &super::Answers::new()),
     );
 
     assert!(failed);

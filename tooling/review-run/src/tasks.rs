@@ -308,15 +308,19 @@ fn one(r: &Review, c: &Controls, unit: &Unit, heard: &Answers) -> Done {
             )),
         }
     }
-    if let (Some(store), Some(key)) = (r.store, &key)
-        && let Some(done) = memo::recall(r, store, unit, key, heard)
+    // Its specialists' reports are read once, for the lookup and the
+    // keeping both.
+    let stored = r.store.zip(key.as_deref());
+    let held = stored.map(|_| memo::HeldTo::of(r, unit, heard));
+    if let (Some((store, key)), Some(held)) = (stored, &held)
+        && let Some(done) = memo::recall(r, store, unit, key, held)
     {
         (r.progress)(&describe(&done.0));
         return done;
     }
     let mut done = run_one(r, c, unit);
-    if let (Some(store), Some(key)) = (r.store, &key) {
-        done.0.store_failed = memo::keep(r, store, (unit, key), &done, heard);
+    if let (Some((store, key)), Some(held)) = (stored, &held) {
+        done.0.store_failed = memo::keep(r, store, (unit, key), &done, held);
     }
     done.0.answer_key = key;
     (r.progress)(&describe(&done.0));

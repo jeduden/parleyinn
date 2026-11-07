@@ -26,6 +26,37 @@ use crate::usage;
 /// weighing is held to beside the reports.
 pub(crate) type Answers = std::collections::BTreeMap<String, String>;
 
+/// What a unit's answer is held to before it is stored or taken: for a
+/// generalist, each answering specialist's answer and each of its
+/// specialists' reports in the work directory, by name, read once for
+/// both; nothing for a specialist.
+pub(crate) struct HeldTo<'a> {
+    answers: &'a Answers,
+    reports: Answers,
+}
+
+impl<'a> HeldTo<'a> {
+    /// What `unit`'s answer in the review `r` is held to, its
+    /// specialists' answers `answers`.
+    pub(crate) fn of(r: &Review, unit: &Unit, answers: &'a Answers) -> Self {
+        let reports = match unit.kind {
+            Kind::Generalist => r
+                .plan
+                .dispatch
+                .get(&unit.name)
+                .into_iter()
+                .flatten()
+                .filter_map(|s| {
+                    let text = fs::read_to_string(r.workdir.join(report_file(s))).ok()?;
+                    Some((s.clone(), text))
+                })
+                .collect(),
+            _ => Answers::new(),
+        };
+        Self { answers, reports }
+    }
+}
+
 /// `unit`'s answer key in the review `r`: a specialist's or its part's
 /// own, a generalist's beside the reports its specialists left in the
 /// work directory; none without the review's keys.
@@ -45,7 +76,7 @@ pub(crate) fn recall(
     store: &Store,
     unit: &Unit,
     key: &str,
-    heard: &Answers,
+    held: &HeldTo,
 ) -> Option<Done> {
     let label = || format!("{} ({})", unit.label(), unit.kind.word());
     let stored = match store.get(key) {
@@ -61,7 +92,7 @@ pub(crate) fn recall(
         }
     };
     let taken = store::accepted(unit.kind, &stored.log, stored.report.as_deref(), r.known)
-        .and_then(|()| partial(r, unit, &stored.log, heard));
+        .and_then(|()| partial(r, unit, &stored.log, held));
     if let Err(why) = taken {
         (r.progress)(&format!(
             "{}: its stored answer {key} is not taken, so it runs: {why}",
@@ -120,7 +151,7 @@ pub(crate) fn keep(
     store: &Store,
     (unit, key): (&Unit, &str),
     done: &Done,
-    heard: &Answers,
+    held: &HeldTo,
 ) -> bool {
     let (run, report) = done;
     if !run.answered() {
@@ -146,7 +177,7 @@ pub(crate) fn keep(
     }
     let log = review_eval::log::parse(&text);
     let taken = store::accepted(unit.kind, &log, report.as_deref(), r.known)
-        .and_then(|()| partial(r, unit, &log, heard));
+        .and_then(|()| partial(r, unit, &log, held));
     if let Err(why) = taken {
         (r.progress)(&format!("{label}: its answer was not stored: {why}"));
         return false;
@@ -175,33 +206,21 @@ pub(crate) fn keep(
 }
 
 /// Whether `unit`'s answer, its log `log`, is whole: a generalist's
-/// weighing must weigh every place named by the reports in the work
-/// directory of its specialists that answered, `heard` by name, by the
-/// outcome's own rule ([`outcome::held_to`]), so a partial weighing is
-/// neither stored nor taken and its gap runs, and one the outcome takes
-/// is never refused.
+/// weighing must weigh every place named by the reports `held` holds of
+/// its specialists that answered, by the outcome's own rule
+/// ([`outcome::held_to`]), so a partial weighing is neither stored nor
+/// taken and its gap runs, and one the outcome takes is never refused.
 ///
 /// # Errors
 ///
 /// Fails naming the places it weighed no finding at.
-fn partial(r: &Review, unit: &Unit, log: &RunLog, heard: &Answers) -> Result<(), String> {
+fn partial(r: &Review, unit: &Unit, log: &RunLog, held: &HeldTo) -> Result<(), String> {
     if unit.kind != Kind::Generalist {
         return Ok(());
     }
-    let reports: Answers = r
-        .plan
-        .dispatch
-        .get(&unit.name)
-        .into_iter()
-        .flatten()
-        .filter_map(|s| {
-            let text = fs::read_to_string(r.workdir.join(report_file(s))).ok()?;
-            Some((s.clone(), text))
-        })
-        .collect();
-    let held = outcome::held_to(r.plan, &unit.name, heard, &reports, r.known);
+    let reports = outcome::held_to(r.plan, &unit.name, held.answers, &held.reports, r.known);
     let weighing = report::weighing(&log.texts, &log.answer);
-    let missed = outcome::missed(held, &weighing);
+    let missed = outcome::missed(reports, &weighing);
     if missed.is_empty() {
         return Ok(());
     }
