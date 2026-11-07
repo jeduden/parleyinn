@@ -230,7 +230,7 @@ fn carry_cases() -> Vec<Case> {
                 "previous check \"${files[@]}\"",
             ),
             carry_check(),
-            "never reads the file it fetched",
+            "never reads and sums the file of every earlier review",
         ),
     ]
 }
