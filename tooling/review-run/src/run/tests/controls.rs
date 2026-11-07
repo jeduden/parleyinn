@@ -589,3 +589,52 @@ fn what_is_running_is_told_every_so_often() {
         .unwrap();
     assert!(block.contains(" of 2 agents finished, "), "{block}");
 }
+
+#[test]
+fn a_free_run_is_not_run_again_once_others_reached_the_cap_meanwhile() {
+    let options = Options {
+        max_cost_usd: 0.03,
+        ..options()
+    };
+    let lines = Arc::new(Mutex::new(Vec::new()));
+    let seen = Arc::clone(&lines);
+    let (_dir, ran) = told_to(lines, DISPATCH, options, 0.0, move |c| {
+        match agent_of(c).as_str() {
+            "lang-markdown" => {
+                fake::write_log(
+                    c,
+                    &fake::log_of(&[], "success", "outcome: none — clean.", 0.05),
+                );
+                Ok(Output::default())
+            }
+            // Fails at no cost once lang-markdown's cost was counted, or
+            // after half a minute.
+            "lang-rust" => {
+                let give_up = std::time::Instant::now() + Duration::from_secs(30);
+                while std::time::Instant::now() < give_up
+                    && !seen
+                        .lock()
+                        .unwrap()
+                        .iter()
+                        .any(|l| l.starts_with("lang-markdown (specialist): answered"))
+                {
+                    std::thread::sleep(Duration::from_millis(1));
+                }
+                Err("cannot start".to_owned())
+            }
+            _ => fake::either(c),
+        }
+    });
+
+    // test-engineer-unit runs beside them, so the sum is 0.05 or 0.06.
+    let run = ran.run("lang-rust");
+    let failure = run.failure.clone().unwrap_or_default();
+    assert_eq!(run.attempts, 1);
+    assert!(
+        failure.starts_with("over budget: the review's runs cost 0.0")
+            && failure.ends_with(
+                " USD, its cap is 0.03 USD, so it was not started again; before that cannot start"
+            ),
+        "{failure}"
+    );
+}
