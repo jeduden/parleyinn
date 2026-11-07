@@ -205,3 +205,23 @@ fn a_part_that_read_part_of_its_diff_is_a_gap_beside_a_part_that_did_not_run() {
     // What it set aside is listed all the same.
     assert_eq!(d.ignored.len(), 1);
 }
+
+#[test]
+fn a_generalist_cut_off_is_consulted_and_counted_in_the_summary() {
+    let (mut runs, reports) = all_answered(WEIGHED);
+    let at = runs.iter().position(|r| r.name == "review-code").unwrap();
+    runs[at].cut = Some("its run ended with error_max_turns".to_owned());
+
+    let d = decide(&plan(DISPATCH), &runs, &reports, &known());
+
+    assert_eq!(d.outcome.verdict, "approve", "{:?}", d.outcome);
+    assert!(d.consulted.contains("review-code"));
+    assert!(
+        d.outcome.summary.contains(
+            " 1 generalist ended without a successful result, cut off by a turn budget, \
+             deadline or cost cap: what each one's log states is its weighing."
+        ),
+        "{}",
+        d.outcome.summary
+    );
+}

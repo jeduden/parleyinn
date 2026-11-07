@@ -103,6 +103,12 @@ pub fn decide(
         cut: specialist_runs(plan, runs)
             .filter(|run| run.cut.is_some() && run.partial.is_empty())
             .count(),
+        cut_generalists: runs
+            .iter()
+            .filter(|run| {
+                run.answered() && run.cut.is_some() && plan.generalists().contains(&run.name)
+            })
+            .count(),
         ignored: ignored.len(),
     };
 
@@ -697,6 +703,8 @@ struct Counts<'a> {
     kept: (usize, usize),
     /// The specialists cut off that read their whole diff.
     cut: usize,
+    /// The generalists cut off, whose weighing is what their log states.
+    cut_generalists: usize,
     /// The lines set aside as no finding.
     ignored: usize,
 }
@@ -719,7 +727,8 @@ struct Named<'a> {
 }
 
 /// The summary: who ran of whom, what the generalists kept, how many
-/// specialists were cut off with their whole diff read, how many lines
+/// specialists were cut off with their whole diff read, how many
+/// generalists were cut off, how many lines
 /// were set aside, who did not run, who read part of their diff, whose
 /// report holds a line that does not read or the gate refuses, whose
 /// answer the review cannot read, who was consulted, and each
@@ -758,6 +767,14 @@ fn summary(counts: &Counts, named: &Named, closings: &[String]) -> String {
              cost cap, with every line of their diff read: what each one's log states is its \
              report.",
             counted(counts.cut, "specialist")
+        );
+    }
+    if counts.cut_generalists > 0 {
+        let _ = write!(
+            s,
+            " {} ended without a successful result, cut off by a turn budget, deadline or \
+             cost cap: what each one's log states is its weighing.",
+            counted(counts.cut_generalists, "generalist")
         );
     }
     if counts.ignored > 0 {
