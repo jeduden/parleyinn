@@ -373,6 +373,25 @@ fn unweighed(plan: &Plan, generalist: &str, answer: &str, heard: Heard) -> Vec<S
         answers,
         refused,
     } = heard;
+    // A report the gate refuses is named as refused, not as unweighed.
+    let heard = plan
+        .dispatch
+        .get(generalist)
+        .into_iter()
+        .flatten()
+        .filter(|s| answers.contains_key(*s))
+        .filter(|s| !refused.iter().any(|(name, _)| name == *s))
+        .filter_map(|s| reports.get(s).map(String::as_str));
+
+    missed(heard, answer)
+}
+
+/// The places of the findings and requests in `reports` that the
+/// weighing `answer` weighs nowhere, sorted and each once; empty when it
+/// weighs every one. The answer store holds a generalist to the same
+/// rule, so a partial weighing is neither stored nor replayed.
+#[must_use]
+pub fn missed<'a>(reports: impl IntoIterator<Item = &'a str>, answer: &str) -> Vec<String> {
     let weighing: Vec<&str> = answer
         .lines()
         .filter(|l| report::finding(l).is_some() || report::dropped(l))
@@ -383,15 +402,7 @@ fn unweighed(plan: &Plan, generalist: &str, answer: &str, heard: Heard) -> Vec<S
         .map(|f| f.path)
         .collect();
     let mut missed = BTreeSet::new();
-    for specialist in plan.dispatch.get(generalist).into_iter().flatten() {
-        // A report the gate refuses is named as refused, not as unweighed.
-        let Some(report) = reports
-            .get(specialist)
-            .filter(|_| answers.contains_key(specialist))
-            .filter(|_| !refused.iter().any(|(name, _)| name == specialist))
-        else {
-            continue;
-        };
+    for report in reports {
         for line in report.lines().map(review_gate::report::line) {
             let (path, number) = match &line {
                 Line::Linked(k) => (&k.path, k.line),

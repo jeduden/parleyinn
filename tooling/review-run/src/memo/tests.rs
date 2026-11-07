@@ -525,3 +525,59 @@ fn an_answer_that_held_the_token_is_never_stored_and_is_counted() {
     let lines = lines.lock().unwrap().clone();
     assert!(lines[0].ends_with("it held the Claude token"), "{lines:?}");
 }
+
+/// Answers as [`fake::either`], but review-code weighs another place
+/// than the one its specialists reported, so its weighing is partial.
+fn partial(c: &Command) -> Result<Output, String> {
+    if fake::agent_of(c) == "review-code" {
+        let text = "src/z.rs:9 — nit — long — lang-rust\nThe whole scope was weighed.";
+        return fake::answer(c, &[text], text);
+    }
+    fake::either(c)
+}
+
+#[test]
+fn a_generalist_whose_weighing_is_partial_is_never_stored_and_runs_again() {
+    let dir = workdir();
+    let store = store_in(dir.path());
+    let first = reviewed(dir.path(), &store, crate::parts::LIMIT, partial);
+    let key = first.run("review-code").answer_key.clone().unwrap();
+
+    assert_eq!(store.get(&key), Ok(None));
+    assert!(
+        first.lines.iter().any(|l| l
+            == "review-code (generalist): its answer was not stored: its weighing is partial: \
+                it weighed no finding at src/a.rs:3"),
+        "{:?}",
+        first.lines
+    );
+
+    let second = reviewed(dir.path(), &store, crate::parts::LIMIT, partial);
+
+    assert_eq!(second.started, ["review-code"]);
+}
+
+#[test]
+fn a_stored_generalist_whose_weighing_is_partial_is_not_replayed() {
+    let dir = workdir();
+    let store = store_in(dir.path());
+    let first = reviewed(dir.path(), &store, crate::parts::LIMIT, partial);
+    let run = first.run("review-code");
+    let key = run.answer_key.clone().unwrap();
+    // As a store an earlier review-run filled would hold it.
+    let log = fs::read_to_string(dir.path().join("review/logs/review-code.jsonl")).unwrap();
+    let usage = crate::usage::usage(std::slice::from_ref(run), None).remove(0);
+    store.put(&key, &log, None, &usage).unwrap();
+
+    let second = reviewed(dir.path(), &store, crate::parts::LIMIT, partial);
+
+    assert_eq!(second.started, ["review-code"]);
+    assert!(
+        second.lines.iter().any(|l| l.starts_with(&format!(
+            "review-code (generalist): its stored answer {key} is not taken, so it runs: its \
+             weighing is partial: it weighed no finding at src/a.rs:3"
+        ))),
+        "{:?}",
+        second.lines
+    );
+}
