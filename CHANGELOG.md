@@ -9,6 +9,20 @@ its upgrade notes (ENG-23). ParleyInn follows semantic versioning.
 
 ## Unreleased
 
+- The review reads every agent's run log whatever its run ended with
+  (ENG-28): a specialist cut off by its turn budget or deadline is
+  consulted, its report what its log states, and never run again. Only
+  an agent whose log holds no model call did not run. Whether a
+  specialist read its whole diff is decided from the `Read` calls in its
+  log: each unread range is a `partial:` gap in `review/gaps.json` and a
+  blocking finding, so the gate posts a request for changes. A line of a
+  report that says it is no finding is set aside and listed in
+  `review/ignored.json`, counted in the summary and as `ignored=` in the
+  run's output; a finding-shaped line that does not read is its own
+  blocking finding, an `unreadable:` gap, and discards none of the
+  report's other findings. The outcome line is derived from a report's
+  lines when the specialist's is missing or contradicts them, and the
+  reviewer evaluation grades a report the same way (ENG-32).
 - The review's cost cap moved from 40 USD per review to 5 USD per pull
   request, counted over all of its reviews (ENG-28): each review keeps
   what it alone spent in a `review-spend-pr-<N>-a<attempt>` artifact, a
