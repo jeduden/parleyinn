@@ -871,6 +871,35 @@ fn a_line_names_a_place_bounded_by_no_path_or_digit_character() {
 }
 
 #[test]
+fn a_range_wider_than_its_bound_names_its_first_line_alone() {
+    let widest = format!("src/a.rs:1-{MAX_RANGE}");
+    assert!(
+        names(&widest, "src/a.rs", MAX_RANGE),
+        "{MAX_RANGE} lines wide"
+    );
+    let wider = format!("src/a.rs:1-{}", MAX_RANGE + 1);
+    assert!(names(&wider, "src/a.rs", 1), "its first line");
+    assert!(!names(&wider, "src/a.rs", 2));
+    assert!(!names("src/a.rs:1-9999", "src/a.rs", 3));
+}
+
+#[test]
+fn one_line_of_a_huge_range_weighs_none_of_the_findings_inside_it() {
+    let (runs, reports) =
+        all_answered("src/b.rs:1 — nit — all of src/a.rs:1-9999 — lang-rust\nDone.");
+
+    let d = decide(&plan(DISPATCH), &runs, &reports, &known());
+
+    assert_eq!(d.outcome.verdict, "request_changes");
+    assert!(
+        d.outcome
+            .findings
+            .iter()
+            .any(|f| f.body.contains("weighed no finding at src/a.rs:3"))
+    );
+}
+
+#[test]
 fn each_generalist_s_weighing_is_kept_answered_or_cut_off_and_none_without_a_run() {
     let (mut runs, reports) = all_answered("src/a.rs:3 — nit — x — lang-rust\nDone.");
     let answered = decide(&plan(DISPATCH), &runs, &reports, &known());

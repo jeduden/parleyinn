@@ -10,7 +10,10 @@
 //! final answer, a sentence on its scope alone, which must approve with
 //! the nit it kept; once with one that weighs another place and says
 //! its scope is whole, which must request changes naming the place it
-//! weighed nowhere and the generalist as not reviewed.
+//! weighed nowhere and the generalist as not reviewed; and once with one
+//! whose line names the finding's file in a range wider than
+//! [`review_run::outcome::MAX_RANGE`] lines, which covers its first line
+//! alone and so must be decided partial the same way.
 
 use std::fs;
 use std::path::Path;
@@ -24,14 +27,23 @@ use crate::review_runs::agent_of;
 /// The place the specialist's finding is at.
 pub const PLACE: &str = "src/a.rs:1";
 
+/// A weighing line, but for its source, that weighs the finding at
+/// [`PLACE`].
+pub const WHOLE: &str = "src/a.rs:1 — nit — a hook panics";
+/// One at another place, naming none.
+pub const ELSEWHERE: &str = "src/z.rs:9 — nit — a hook panics";
+/// One at another place, naming [`PLACE`]'s file in a range past
+/// [`review_run::outcome::MAX_RANGE`] lines, which covers its first
+/// line alone.
+pub const WIDE: &str = "src/z.rs:9 — nit — a hook panics, as all of src/a.rs:0-9999";
+
 /// A stand-in for the `claude` command line: the specialist states a
 /// finding at [`PLACE`] and answers its outcome line; the generalist
-/// states its weighing in one message, at [`PLACE`] when it weighs
-/// `whole`, at another place otherwise, and answers a sentence on its
-/// scope alone.
-#[derive(Debug, Default)]
+/// states its weighing in one message, the line `weighs` then its
+/// source, and answers a sentence on its scope alone.
+#[derive(Debug)]
 pub struct WeighingHost {
-    pub whole: bool,
+    pub weighs: &'static str,
 }
 
 impl Host for WeighingHost {
@@ -40,13 +52,9 @@ impl Host for WeighingHost {
             return Ok(out);
         }
         let (texts, result) = if agent_of(command) == GENERALIST {
-            let at = if self.whole { PLACE } else { "src/z.rs:9" };
             let scope = format!("{GENERALIST} weighed its whole scope.");
             (
-                vec![
-                    format!("{at} — nit — a hook panics — {SPECIALIST}"),
-                    scope.clone(),
-                ],
+                vec![format!("{} — {SPECIALIST}", self.weighs), scope.clone()],
                 scope,
             )
         } else {
@@ -160,12 +168,13 @@ fn outcome_in(workdir: &Path) -> Option<review_gate::ReviewOutcome> {
 }
 
 /// Runs `review-run` on `workdir`, prepared from `checkout`, with a
-/// [`WeighingHost`] weighing `whole`: why it could not run, or nothing.
-fn review(checkout: &Checkout, workdir: &Path, whole: bool) -> Result<(), String> {
+/// [`WeighingHost`] weighing as `weighs`: why it could not run, or
+/// nothing.
+fn review(checkout: &Checkout, workdir: &Path, weighs: &'static str) -> Result<(), String> {
     prepare(checkout, workdir)?;
     let args = ["--workdir".to_owned(), workdir.display().to_string()];
     let (mut out, mut err) = (Vec::new(), Vec::new());
-    let code = review_run::cli::run(&WeighingHost { whole }, args, &mut out, &mut err);
+    let code = review_run::cli::run(&WeighingHost { weighs }, args, &mut out, &mut err);
     if code != review_run::cli::EXIT_OK {
         let err = String::from_utf8_lossy(&err);
         return Err(format!(
@@ -179,15 +188,25 @@ fn review(checkout: &Checkout, workdir: &Path, whole: bool) -> Result<(), String
 
 /// What is wrong with how `review-run`, on work directories under
 /// `workdir` prepared from `checkout`, reads a weighing stated as it
-/// went and decides a partial one.
+/// went and decides a partial one, a range too wide to cover the place
+/// included.
 #[must_use]
 pub fn review_run_reads_whole_weighings(checkout: &Checkout, workdir: &Path) -> Vec<String> {
     let whole = workdir.join("whole");
     let partial = workdir.join("partial");
-    match review(checkout, &whole, true).and_then(|()| review(checkout, &partial, false)) {
+    let wide = workdir.join("wide");
+    let ran = review(checkout, &whole, WHOLE)
+        .and_then(|()| review(checkout, &partial, ELSEWHERE))
+        .and_then(|()| review(checkout, &wide, WIDE));
+    match ran {
         Ok(()) => {
             let mut problems = whole_problems(&whole);
             problems.extend(partial_problems(&partial));
+            problems.extend(
+                partial_problems(&wide)
+                    .into_iter()
+                    .map(|p| format!("a weighing naming its file in a range too wide: {p}")),
+            );
             problems
         }
         Err(e) => vec![e],

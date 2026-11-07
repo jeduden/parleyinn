@@ -389,10 +389,10 @@ struct Heard<'a> {
 
 /// The places of `generalist`'s specialists' findings and requests that
 /// its `answer` weighs nowhere: no finding or dropped line of it is at
-/// the place, or covers it as a range, and none names it exactly.
-/// Decided from the reports and the answer alone, never by what the
-/// generalist says of its own scope; empty when it weighed every one,
-/// sorted.
+/// the place, or covers it as a range of at most [`MAX_RANGE`] lines,
+/// and none names it exactly. Decided from the reports and the answer
+/// alone, never by what the generalist says of its own scope; empty
+/// when it weighed every one, sorted.
 fn unweighed(plan: &Plan, generalist: &str, answer: &str, heard: Heard) -> Vec<String> {
     let Heard {
         reports,
@@ -461,9 +461,15 @@ pub fn missed<'a>(reports: impl IntoIterator<Item = &'a str>, answer: &str) -> V
     missed.into_iter().collect()
 }
 
+/// The most lines a range a weighing line names, `start-end`, may span
+/// and cover each of: a wider one names its first line alone, as a
+/// finding at it is read, so no one line can cover a whole file.
+pub const MAX_RANGE: usize = 20;
+
 /// Whether `line` names the place `path:number`: `path:` where no path
 /// character comes before it, then the number or a range,
-/// `start-end`, holding it, and no digit after.
+/// `start-end`, holding it, of at most [`MAX_RANGE`] lines, and no
+/// digit after.
 fn names(line: &str, path: &str, number: usize) -> bool {
     let pathy = |c: char| c.is_alphanumeric() || matches!(c, '/' | '.' | '_' | '-');
     let head = format!("{path}:");
@@ -479,6 +485,7 @@ fn names(line: &str, path: &str, number: usize) -> bool {
         let end = rest
             .strip_prefix(['-', '–'])
             .and_then(|r| digits(r).0)
+            .filter(|end| end.saturating_sub(start) < MAX_RANGE)
             .unwrap_or(start);
         (start..=end).contains(&number)
     })

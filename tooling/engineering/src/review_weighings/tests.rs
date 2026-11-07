@@ -89,7 +89,7 @@ fn a_checkout_without_the_definitions_or_a_review_that_cannot_run_is_named() {
 #[test]
 fn the_stand_in_fails_a_run_that_logs_nowhere_or_cannot_write_its_log() {
     let work = TempDir::new().unwrap();
-    let host = WeighingHost::default();
+    let host = WeighingHost { weighs: WHOLE };
     let args = ["--agent", "lang-rust"];
     let nowhere = Command::new("claude", &args, Path::new("/w"));
     assert_eq!(host.run(&nowhere).unwrap_err(), "the run logs to no file");

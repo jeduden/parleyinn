@@ -358,8 +358,9 @@ pub(super) fn review_control_cases() -> Vec<Case> {
 /// The drifts the review's reading of a generalist's weighing must not
 /// bring (ENG-28, I6), late so adding them moves no earlier case to
 /// another shard: a weighing read from the final answer alone, so what
-/// was stated as it went is lost, and a partial weighing the code no
-/// longer decides, so the generalist's word on its scope stands.
+/// was stated as it went is lost, a partial weighing the code no
+/// longer decides, so the generalist's word on its scope stands, and one
+/// line whose huge range covers every place in a file.
 pub(super) fn review_weighing_cases() -> Vec<Case> {
     const OUTCOME: &str = "tooling/review-run/src/outcome.rs";
     let check = || {
@@ -391,6 +392,17 @@ pub(super) fn review_weighing_cases() -> Vec<Case> {
             ),
             check(),
             want,
+        ),
+        case(
+            "review-run taking one line naming a huge range as weighing every place inside it",
+            "ENG-28",
+            Injection::replace(
+                OUTCOME,
+                "            .filter(|end| end.saturating_sub(start) < MAX_RANGE)\n",
+                "",
+            ),
+            check(),
+            "a weighing naming its file in a range too wide",
         ),
     ]
 }
