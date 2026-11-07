@@ -77,7 +77,8 @@ records the design.
   finding `withdrawn` or revised, read from the log's text. For a
   generalist it reads the weighing `review-run` reads, by the one shared
   rule: each finding, dropped or `none —` line it stated as it went,
-  the last at a place standing, then its final answer; each finding it
+  then its final answer's lines, the last for a place and the source it
+  names standing, so another source's finding there stays; each finding it
   must drop on a line that starts with `dropped` or gives it as its
   severity. A consultant is read from its answer. A specialist report
   the review would refuse, with a line in no form or an outcome its lines

@@ -346,6 +346,26 @@ fn kept_reads_severities_safely() {
 }
 
 #[test]
+fn a_blocking_finding_stays_kept_beside_another_source_s_line_at_its_place() {
+    let texts = vec![
+        "a.rs:3 — blocking — leaks a pin — lang-rust\n\
+         a.rs:3 — nit — long — lang-markdown\n\
+         dropped — a.rs:3 — misread — lang-markdown"
+            .to_owned(),
+    ];
+
+    let found = kept(&report::weighing(&texts, "Scope: all."));
+
+    assert_eq!(
+        found
+            .iter()
+            .map(|f| f.severity.as_str())
+            .collect::<Vec<_>>(),
+        vec!["blocking"]
+    );
+}
+
+#[test]
 fn a_numbered_dropped_line_is_no_closing_sentence() {
     assert_eq!(
         closing("The scope holds.\n1. dropped — b.rs:2 — y — me\n").as_deref(),

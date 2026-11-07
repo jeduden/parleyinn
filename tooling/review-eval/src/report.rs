@@ -92,45 +92,72 @@ pub fn finding(line: &str) -> Option<Finding> {
 /// it stated in a message before its last, a finding, a dropped one or
 /// its `none —`, or a line shaped as a finding the review cannot read
 /// that starts with a path-like word ([`placed`]), each once and in
-/// order, then its final answer as it stands. A line at a place, a
-/// finding or a dropped one, supersedes every line stated before it at
-/// that place, the final answer's lines included: the last statement
-/// wins, so a draft finding can be dropped or revised later. A run that
-/// was cut off before its final answer has the lines it stated and no
-/// more, so the review reads what was paid for.
+/// order, then its final answer's lines. A line at a place, a finding
+/// or a dropped one, supersedes every line stated before it, in a
+/// message or the final answer, that is the same finding
+/// ([`identity`]): the last statement wins, so a draft finding can be
+/// dropped or revised later, and a finding at the same place from
+/// another source stays. A run that was cut off before its final answer
+/// has the lines it stated and no more, so the review reads what was
+/// paid for.
 #[must_use]
 pub fn weighing(texts: &[String], answer: &str) -> String {
-    let said: Vec<&str> = answer.lines().map(str::trim).collect();
-    let mut stated: Vec<&str> = Vec::new();
+    let said: Vec<&str> = answer.lines().collect();
+    let mut out: Vec<&str> = Vec::new();
     for line in texts.iter().flat_map(|t| t.lines()).map(str::trim) {
         // Mid-run narration may read as a finding's shape, `Severity —
         // nit — …`; only a line that names a path is one the agent meant
         // as a finding, so only such a line is held unreadable.
         let unreadable = unread(line) && placed(line);
         let weighs = finding(line).is_some() || dropped(line) || nothing(line) || unreadable;
-        if weighs && !said.contains(&line) && !stated.contains(&line) {
-            supersede(&mut stated, line);
-            stated.push(line);
+        let again = said.iter().any(|s| s.trim() == line) || out.contains(&line);
+        if weighs && !again {
+            settle(&mut out, line);
         }
     }
-    for line in &said {
-        supersede(&mut stated, line);
+    for line in said {
+        settle(&mut out, line);
     }
-    let mut out = stated.join("\n");
-    if !out.is_empty() && !answer.is_empty() {
-        out.push('\n');
-    }
-    out.push_str(answer);
 
-    out
+    out.join("\n")
 }
 
-/// Removes from `stated` each line at the place `line` is at, when it
-/// is at one.
-fn supersede(stated: &mut Vec<&str>, line: &str) {
-    if let Some(at) = place_of(line) {
-        stated.retain(|l| place_of(l).as_ref() != Some(&at));
+/// Adds `line` to `out`, first removing each line there that is the
+/// same finding.
+fn settle<'a>(out: &mut Vec<&'a str>, line: &'a str) {
+    if let Some(id) = identity(line) {
+        out.retain(|l| identity(l).as_ref() != Some(&id));
     }
+    out.push(line);
+}
+
+/// Which finding a generalist's finding or dropped line is about: its
+/// place and the source it names ([`source_of`]). Two lines at one
+/// place that name different sources, or one a source and one none, are
+/// different findings, so a later line never erases another source's
+/// finding; none for a line at no place.
+#[must_use]
+pub fn identity(line: &str) -> Option<(String, usize, Option<String>)> {
+    let (path, number) = place_of(line)?;
+
+    Some((path, number, source_of(line)))
+}
+
+/// The source a generalist's finding or dropped line names: the last
+/// of four parts or more, markup aside and lowercased; none for a
+/// shorter line or one at no place.
+#[must_use]
+pub fn source_of(line: &str) -> Option<String> {
+    place_of(line)?;
+    let parts = split_dashes(bare(line));
+    if parts.len() < 4 {
+        return None;
+    }
+    parts.last().map(|part| {
+        part.trim()
+            .trim_matches(['`', '*', '_', '.'])
+            .to_lowercase()
+    })
 }
 
 /// The place, path and line, a generalist's finding or dropped line is

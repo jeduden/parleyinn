@@ -225,3 +225,56 @@ fn a_placed_line_starts_with_a_path_like_word() {
     assert!(!placed("the place — nit — y"));
     assert!(!placed(""));
 }
+
+#[test]
+fn a_later_line_at_a_place_from_another_source_keeps_the_earlier_one() {
+    let texts = vec![
+        "a.rs:3 — blocking — leaks a pin — lang-rust\na.rs:3 — nit — long — lang-markdown"
+            .to_owned(),
+        "dropped — a.rs:3 — misread — lang-markdown".to_owned(),
+    ];
+
+    assert_eq!(
+        weighing(&texts, "Scope: all."),
+        "a.rs:3 — blocking — leaks a pin — lang-rust\n\
+         dropped — a.rs:3 — misread — lang-markdown\nScope: all."
+    );
+}
+
+#[test]
+fn the_final_answer_weighs_by_the_same_rule_as_the_messages() {
+    let lines = "a.rs:3 — blocking — leaks a pin — lang-rust\n\
+                 a.rs:3 — nit — long — lang-markdown\n\
+                 a.rs:3 — nit — milder than it looked — lang-rust\n\
+                 dropped — a.rs:3 — misread — lang-markdown";
+    let want = "a.rs:3 — nit — milder than it looked — lang-rust\n\
+                dropped — a.rs:3 — misread — lang-markdown";
+
+    assert_eq!(weighing(&[lines.to_owned()], ""), want);
+    assert_eq!(weighing(&[], lines), want);
+}
+
+#[test]
+fn a_dropped_line_naming_no_source_supersedes_only_a_line_naming_none() {
+    let texts = vec!["a.rs:3 — blocking — leaks a pin — lang-rust\nb.rs:1 — nit — long".to_owned()];
+
+    assert_eq!(
+        weighing(&texts, "dropped — a.rs:3 — fine\ndropped — b.rs:1 — fine"),
+        "a.rs:3 — blocking — leaks a pin — lang-rust\n\
+         dropped — a.rs:3 — fine\ndropped — b.rs:1 — fine"
+    );
+}
+
+#[test]
+fn a_source_is_the_last_part_of_a_line_of_four_or_more() {
+    assert_eq!(
+        source_of("a.rs:3 — nit — x — **Lang-Rust**"),
+        Some("lang-rust".to_owned())
+    );
+    assert_eq!(
+        source_of("dropped — a.rs:3 — why — y"),
+        Some("y".to_owned())
+    );
+    assert_eq!(source_of("a.rs:3 — nit — x"), None);
+    assert_eq!(source_of("prose — with — four — parts"), None);
+}
