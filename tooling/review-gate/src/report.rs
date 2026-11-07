@@ -653,14 +653,8 @@ pub fn findings_check(text: &str, known: Option<&BTreeSet<String>>) -> Option<Pr
         let number = at + 1;
         match line(l) {
             Line::Prose | Line::Withdrawn(_) => {}
-            Line::Malformed if at_template(l) => {
-                return Some(Problem::TemplatePlace { line: number });
-            }
-            Line::Malformed if all_well(l) => {}
-            Line::Malformed if missing_dash(l) => return Some(Problem::Undashed { line: number }),
-            Line::Malformed if after_ids(l) => return Some(Problem::AfterIds { line: number }),
-            Line::Malformed if unlinked(l) => return Some(Problem::Unlinked { line: number }),
-            Line::Malformed => return Some(Problem::Malformed { line: number }),
+            Line::Malformed if all_well(l) && !at_template(l) => {}
+            Line::Malformed => return Some(form_problem(l, number)),
             Line::Request(_) => held = true,
             Line::Revised(Revision { finding, .. }) => {
                 held = true;
@@ -681,6 +675,23 @@ pub fn findings_check(text: &str, known: Option<&BTreeSet<String>>) -> Option<Pr
         (true, true) => Some(Problem::NoneWithFindings),
         (false, false) => Some(Problem::FindingsWithNone),
         _ => None,
+    }
+}
+
+/// What `text`, a malformed line at `number` in its report, is refused
+/// for: the template's place copied, a missing dash after its place, a
+/// remark after its ids, no id cited, or no form at all.
+fn form_problem(text: &str, number: usize) -> Problem {
+    if at_template(text) {
+        Problem::TemplatePlace { line: number }
+    } else if missing_dash(text) {
+        Problem::Undashed { line: number }
+    } else if after_ids(text) {
+        Problem::AfterIds { line: number }
+    } else if unlinked(text) {
+        Problem::Unlinked { line: number }
+    } else {
+        Problem::Malformed { line: number }
     }
 }
 

@@ -875,3 +875,19 @@ fn split_dashes_cuts_at_each_spaced_dash() {
     );
     assert_eq!(split_dashes("a-b"), ["a-b"]);
 }
+
+#[test]
+fn form_problem_names_what_a_malformed_line_is_refused_for() {
+    for (text, want) in [
+        ("path:line — fine", Problem::TemplatePlace { line: 3 }),
+        ("a.rs:1 if not addressed: x", Problem::Undashed { line: 3 }),
+        (
+            "a.rs:1 — if not addressed: x — I2 (yes)",
+            Problem::AfterIds { line: 3 },
+        ),
+        ("a.rs:1 — the range matches", Problem::Unlinked { line: 3 }),
+        ("a.rs:1 — nit — x", Problem::Malformed { line: 3 }),
+    ] {
+        assert_eq!(form_problem(text, 3), want, "{text:?}");
+    }
+}
