@@ -70,6 +70,40 @@ pub struct RunLog {
     pub reads: Vec<ReadCall>,
 }
 
+impl RunLog {
+    /// Why the run was charged: it reported a cost, or, with no cost in
+    /// it, as a run killed at its deadline or crashed before its result
+    /// has none, it made model calls that used tokens; none when it cost
+    /// nothing. The turns a result counts are no charge: a call the API
+    /// refused counts one and costs nothing.
+    #[must_use]
+    pub fn charged(&self) -> Option<String> {
+        if self.cost > 0.0 {
+            return Some(format!("it cost {:.4} USD", self.cost));
+        }
+        let calls: u64 = self
+            .usage
+            .values()
+            .filter(|u| u.fresh + u.cache_write + u.cache_read + u.output > 0)
+            .map(|u| u.calls)
+            .sum();
+        match calls {
+            0 => None,
+            1 => Some("it made 1 model call".to_owned()),
+            n => Some(format!("it made {n} model calls")),
+        }
+    }
+
+    /// Whether the run ran, as the review and the grader both decide
+    /// it: it ended with a successful result that answered something,
+    /// or it was [`charged`](Self::charged), so its log holds a model
+    /// call. A run that did not is one the review may start again.
+    #[must_use]
+    pub fn ran(&self) -> bool {
+        (self.answered && !self.answer.trim().is_empty()) || self.charged().is_some()
+    }
+}
+
 /// What the reader carries between lines.
 #[derive(Default)]
 struct Reading {

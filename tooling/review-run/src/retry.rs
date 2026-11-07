@@ -94,7 +94,7 @@ pub(crate) fn run_one(r: &Review, c: &Controls, unit: &Unit) -> (AgentRun, Optio
     }
     // A run that was paid for, cut off or with a report the review could
     // not keep, ran: it is not paid for again.
-    if let Some(why) = charged(&first.log) {
+    if let Some(why) = first.log.charged() {
         not_again(r, &first, &why);
         return (first, report);
     }
@@ -119,7 +119,7 @@ pub(crate) fn run_one(r: &Review, c: &Controls, unit: &Unit) -> (AgentRun, Optio
 fn tell_cut(r: &Review, unit: &Unit, run: &AgentRun) {
     let why = match class_of(r, unit, run) {
         Class::Never(why) => why.to_owned(),
-        _ => charged(&run.log).unwrap_or_default(),
+        _ => run.log.charged().unwrap_or_default(),
     };
     not_again(r, run, &why);
 }
@@ -135,38 +135,10 @@ fn not_again(r: &Review, run: &AgentRun, why: &str) {
     (r.progress)(&format!("{}; not run again: {why}{read}", describe(run)));
 }
 
-/// Why the run `log` reads was charged: it reported a cost, or, with
-/// no cost in it, as a run killed at its deadline or crashed before its
-/// result has none, it made model calls that used tokens; none when it
-/// cost nothing. The turns a result counts are no charge: a call the
-/// API refused counts one and costs nothing.
-pub(crate) fn charged(log: &RunLog) -> Option<String> {
-    if log.cost > 0.0 {
-        return Some(format!("it cost {:.4} USD", log.cost));
-    }
-    let calls: u64 = log
-        .usage
-        .values()
-        .filter(|u| u.fresh + u.cache_write + u.cache_read + u.output > 0)
-        .map(|u| u.calls)
-        .sum();
-    match calls {
-        0 => None,
-        1 => Some("it made 1 model call".to_owned()),
-        n => Some(format!("it made {n} model calls")),
-    }
-}
-
-/// Whether the run `log` reads ran: it ended with an answer, or was
-/// charged, so its log holds a model call.
-pub(crate) fn did_run(log: &RunLog) -> bool {
-    (log.answered && !log.answer.trim().is_empty()) || charged(log).is_some()
-}
-
 /// What the review charges the run `log` reads, of a tier whose cap is
 /// `most` US dollars: the cost its result reported, none or 0 being
 /// nothing, as a run billed to a subscription or answered from the
-/// cache reports; or, for a run [`charged`] that left no result at all,
+/// cache reports; or, for a run charged ([`RunLog::charged`]) that left no result at all,
 /// killed at its deadline, crashed or cancelled in flight, the whole of
 /// its tier's cap, the most `--max-budget-usd` let it spend, so a run
 /// that was paid for is never counted free and no price table is
@@ -175,7 +147,7 @@ pub(crate) fn did_run(log: &RunLog) -> bool {
 pub fn billed(log: &RunLog, most: f64) -> f64 {
     if log.cost > 0.0 {
         log.cost
-    } else if !log.resulted && charged(log).is_some() {
+    } else if !log.resulted && log.charged().is_some() {
         most
     } else {
         0.0

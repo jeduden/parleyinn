@@ -72,7 +72,7 @@ fn specialist(component: &Component, case: &Case, log: &RunLog) -> Graded {
     graded
         .failures
         .extend(log.writes.iter().map(|path| format!("wrote {path}")));
-    if !ran(log) {
+    if !log.ran() {
         return graded;
     }
     let split = split(&assemble(&log.texts, &log.answer, None));
@@ -205,7 +205,7 @@ fn stated_failures(expect: &Expect, log: &RunLog) -> Vec<String> {
 fn generalist(case: &Case, log: &RunLog, kind: Kind) -> Vec<String> {
     let mut failures = answered(log);
     failures.extend(log.writes.iter().map(|path| format!("wrote {path}")));
-    if !ran(log) {
+    if !log.ran() {
         return failures;
     }
     let text = &match kind {
@@ -239,7 +239,7 @@ fn generalist(case: &Case, log: &RunLog, kind: Kind) -> Vec<String> {
 
 /// The failure of a run that did not run: its log holds no model call.
 fn answered(log: &RunLog) -> Vec<String> {
-    if ran(log) {
+    if log.ran() {
         Vec::new()
     } else {
         vec![format!("did not answer: {}", log.subtype)]
@@ -249,22 +249,10 @@ fn answered(log: &RunLog) -> Vec<String> {
 /// The slip of a run that ran but ended without a successful result:
 /// the review reads its log all the same.
 fn cut(log: &RunLog) -> Vec<String> {
-    (ran(log) && !log.answered)
+    (log.ran() && !log.answered)
         .then(|| format!("ended without a successful result: {}", log.subtype))
         .into_iter()
         .collect()
-}
-
-/// Whether the run `log` reads ran, as the review decides it: it ended
-/// with a successful result, or its log holds a cost or a model call
-/// that used tokens.
-fn ran(log: &RunLog) -> bool {
-    log.answered
-        || log.cost > 0.0
-        || log
-            .usage
-            .values()
-            .any(|u| u.fresh + u.cache_write + u.cache_read + u.output > 0)
 }
 
 /// The failure of an `outcome` the case does not allow, when it names

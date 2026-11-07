@@ -314,22 +314,6 @@ fn a_specialist_cut_off_after_a_model_call_is_graded_on_what_it_stated() {
 }
 
 #[test]
-fn a_run_is_one_that_ran_by_its_result_its_cost_or_a_model_call_that_used_tokens() {
-    let mut log = RunLog::default();
-    assert!(!ran(&log));
-    log.usage
-        .insert("m".to_owned(), crate::log::Usage::default());
-    assert!(!ran(&log));
-    log.usage.get_mut("m").unwrap().output = 1;
-    assert!(ran(&log));
-    assert!(ran(&RunLog {
-        cost: 0.1,
-        ..RunLog::default()
-    }));
-    assert!(ran(&answered_log("x")));
-}
-
-#[test]
 fn a_generalist_that_did_not_run_fails_on_that_and_one_cut_off_slips() {
     let c = component(Kind::Generalist, "review-code", false);
     let expect = Expect {
@@ -749,4 +733,17 @@ fn a_consultant_is_graded_from_its_final_answer_alone() {
     );
 
     assert!(grade(&c, &case("persona-agent", expect), &log).passed());
+}
+
+#[test]
+fn a_success_that_answered_nothing_and_used_no_model_did_not_run_as_the_review_says() {
+    let c = component(Kind::Specialist, "lang-rust", false);
+    let expect = Expect {
+        outcome: vec!["none".to_owned()],
+        ..Expect::default()
+    };
+
+    let graded = grade(&c, &case("lang-rust", expect), &answered_log(""));
+
+    assert_eq!(graded.failures, ["did not answer: success"]);
 }

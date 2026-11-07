@@ -382,22 +382,6 @@ const CALLED: &str = r#"{"type":"assistant","parent_tool_use_id":null,"message":
 const FREE: &str = r#"{"type":"result","subtype":"error_during_execution","is_error":true,"result":"","total_cost_usd":0,"num_turns":1}"#;
 
 #[test]
-fn a_run_is_charged_by_its_model_usage_or_its_cost_never_by_its_turns() {
-    let parse = review_eval::log::parse;
-
-    assert_eq!(
-        charged(&parse(CALLED)).as_deref(),
-        Some("it made 1 model call")
-    );
-    assert_eq!(charged(&parse(FREE)), None);
-    assert_eq!(charged(&review_eval::log::RunLog::default()), None);
-    let costly = parse(&fake::log("x", 0.25));
-    assert_eq!(charged(&costly).as_deref(), Some("it cost 0.2500 USD"));
-    let two = parse(&format!("{CALLED}\n{}", CALLED.replace("\"m1\"", "\"m2\"")));
-    assert_eq!(charged(&two).as_deref(), Some("it made 2 model calls"));
-}
-
-#[test]
 fn a_run_with_model_calls_and_no_result_is_charged_and_not_run_again() {
     let dir = workdir(false);
 
@@ -459,7 +443,7 @@ fn a_run_that_answered_with_no_cost_reported_is_billed_nothing_whatever_its_toke
     let parse = review_eval::log::parse;
     let result = r#"{"type":"result","subtype":"success","is_error":false,"result":"outcome: none — clean.","total_cost_usd":0,"num_turns":1}"#;
     let answered = parse(&format!("{CALLED}\n{result}"));
-    assert!(charged(&answered).is_some(), "its model calls used tokens");
+    assert!(answered.charged().is_some(), "its model calls used tokens");
 
     assert!(billed(&answered, 0.3).abs() < 1e-9);
     let unpriced = parse(&format!(

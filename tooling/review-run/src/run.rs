@@ -499,11 +499,7 @@ fn ended(log: &RunLog) -> (Option<String>, Option<String>) {
     } else {
         None
     };
-    if crate::retry::charged(log).is_some() {
-        (None, why)
-    } else {
-        (why, None)
-    }
+    if log.ran() { (None, why) } else { (why, None) }
 }
 
 /// The report specialist `unit`'s run gives from `log`, its ids held to

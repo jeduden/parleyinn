@@ -324,7 +324,7 @@ fn keep(name: &str, gaps: &[&Gap], earlier: &Earlier, now: &RunId) -> Result<Reu
         .get(name)
         .into_iter()
         .flatten()
-        .filter(|(at, log)| !failed.contains(at) && crate::retry::did_run(log))
+        .filter(|(at, log)| !failed.contains(at) && log.ran())
         .map(|(at, log)| (*at, log.clone()))
         .collect();
     if kept.is_empty() {
