@@ -98,6 +98,19 @@ fn review_runs_in_parts(w: &mut World) -> Result<(), String> {
 }
 
 #[then(
+    regex = r"^review-run reads a generalist's weighing from its whole run log, so a finding it stated before a final answer that only names its scope is kept, and itself decides partial a weighing that weighs no finding at a place its specialist reported, naming that place in a blocking finding and the generalist as not reviewed, whatever the generalist says of its scope$"
+)]
+fn review_run_reads_whole_weighings(w: &mut World) -> Result<(), String> {
+    let work = testkit::TempDir::new().map_err(|e| format!("make a work directory: {e}"))?;
+    outcome(
+        engineering::review_weighings::review_run_reads_whole_weighings(
+            eng(w).checkout()?,
+            work.path(),
+        ),
+    )
+}
+
+#[then(
     regex = r"^review-run refuses a specialist's report that cites an id no requirement or invariant has, does not run that specialist again, it was paid for, and names its refused report and a generalist's finding line it cannot read, each in a blocking finding, so the review requests changes and the gate posts that request rather than failing$"
 )]
 fn review_run_names_refusals(w: &mut World) -> Result<(), String> {

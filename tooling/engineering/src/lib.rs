@@ -39,6 +39,7 @@ pub mod review_previous;
 pub mod review_refusals;
 pub mod review_resume;
 pub mod review_runs;
+pub mod review_weighings;
 pub mod review_workflow;
 pub mod stability_measurement;
 pub mod static_analysis;

@@ -355,6 +355,46 @@ pub(super) fn review_control_cases() -> Vec<Case> {
     ]
 }
 
+/// The drifts the review's reading of a generalist's weighing must not
+/// bring (ENG-28, I6), late so adding them moves no earlier case to
+/// another shard: a weighing read from the final answer alone, so what
+/// was stated as it went is lost, and a partial weighing the code no
+/// longer decides, so the generalist's word on its scope stands.
+pub(super) fn review_weighing_cases() -> Vec<Case> {
+    const OUTCOME: &str = "tooling/review-run/src/outcome.rs";
+    let check = || {
+        cargo_lib_test(
+            "engineering",
+            "review_weighings::tests::the_checkout_s_review_run_reads_a_whole_weighing_and_decides_a_partial_one",
+        )
+    };
+    let want = "the_checkout_s_review_run_reads_a_whole_weighing_and_decides_a_partial_one";
+    vec![
+        case(
+            "review-run reading a generalist's weighing from its final answer alone",
+            "ENG-28",
+            Injection::replace(
+                OUTCOME,
+                "Kind::Generalist => report::weighing(&run.log.texts, &run.log.answer),",
+                "Kind::Generalist => run.log.answer.clone(),",
+            ),
+            check(),
+            want,
+        ),
+        case(
+            "review-run taking a partial weighing as whole",
+            "ENG-28",
+            Injection::replace(
+                OUTCOME,
+                "        if !missed.is_empty() {\n",
+                "        if false && !missed.is_empty() {\n",
+            ),
+            check(),
+            want,
+        ),
+    ]
+}
+
 /// The drift the review's controls must not bring (ENG-28, I6), late so
 /// adding it moves no earlier case to another shard: a run its cost cap
 /// stopped read as one to run once more. Such a run was charged, so it
