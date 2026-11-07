@@ -10,9 +10,9 @@ use std::collections::BTreeSet;
 use std::fmt;
 
 use super::{
-    ALL_WELL, ALL_WELL_WORDS, FINDINGS, Line, Problem, REVISED, WITHDRAWN, WITHDREW_NOTHING,
-    all_well, answer_outcome, at_template, bare, form_problem, line, outcome_of, place,
-    report_check, split_dashes, strip_word, unknown_id,
+    ALL_WELL, ALL_WELL_WORDS, FINDINGS, Line, MARKUP, Problem, REVISED, TEMPLATE_PLACE, WITHDRAWN,
+    WITHDREW_NOTHING, all_well, answer_outcome, at_template, bare, defect_marked, form_problem,
+    line, outcome_of, place, report_check, split_dashes, strip_word, unknown_id,
 };
 
 /// A report split into the lines that read and those that do not.
@@ -145,13 +145,15 @@ fn problem(text: &str, number: usize, known: Option<&BTreeSet<String>>) -> Optio
 /// Whether `text`, a line at a place, says all is well there: it ends
 /// with one of [`ALL_WELL_WORDS`] ([`all_well`]), or the part after its
 /// place starts with one, alone or before punctuation, as `a.rs:1 — no
-/// finding; the call sits in a test` reads.
+/// finding; the call sits in a test` reads, and what follows the word
+/// holds none of [`super::DEFECT_MARKERS`]: `a.rs:1 — fine; but it
+/// panics` may state a defect, so it is no note.
 fn says_all_well(text: &str) -> bool {
     if all_well(text) {
         return true;
     }
     let parts = split_dashes(bare(text));
-    let [first, second, ..] = parts.as_slice() else {
+    let [first, second, rest @ ..] = parts.as_slice() else {
         return false;
     };
     let second = second.trim();
@@ -162,22 +164,36 @@ fn says_all_well(text: &str) -> bool {
                     .chars()
                     .next()
                     .is_none_or(|c| matches!(c, ';' | ':' | ',' | '.' | '!'))
+                && !defect_marked(&second[word.len()..])
+                && !rest.iter().any(|part| defect_marked(part))
         })
 }
 
-/// What a place holds when it is a placeholder, not a file and line.
-const PLACEHOLDERS: [&str; 3] = ["…", "...", "<"];
+/// The places the forms' templates name in place of a file and line.
+const TEMPLATE_PLACES: [&str; 2] = [TEMPLATE_PLACE, "<path>:<line>"];
+/// What a placeholder path ends with: an ellipsis.
+const ELLIPSES: [&str; 2] = ["…", "..."];
 
 /// Whether `text` is a revision or withdrawal whose place, before its
-/// first dash, is a placeholder: it holds `…`, `...` or `<`, or is the
-/// forms' own [`super::TEMPLATE_PLACE`].
+/// first dash, is a placeholder: one of the forms' template places, or
+/// a path that ends with an ellipsis and names no line, as
+/// `docs/srs/…` does. A `<` or an ellipsis elsewhere does not make one:
+/// such a line does not read.
 fn placeholder(text: &str) -> bool {
     let read = bare(text);
     let Some(rest) = strip_word(read, REVISED).or_else(|| strip_word(read, WITHDRAWN)) else {
         return false;
     };
-    let at = split_dashes(rest).first().copied().unwrap_or_default();
-    PLACEHOLDERS.iter().any(|p| at.contains(p)) || at_template(text)
+    let at = split_dashes(rest)
+        .first()
+        .copied()
+        .unwrap_or_default()
+        .trim()
+        .trim_matches(MARKUP);
+    TEMPLATE_PLACES.iter().any(|t| at.eq_ignore_ascii_case(t))
+        || (ELLIPSES.iter().any(|e| at.ends_with(e))
+            && !at.contains(char::is_whitespace)
+            && place(at).is_none())
 }
 
 /// The number of findings and requests `clean`, a report's lines that

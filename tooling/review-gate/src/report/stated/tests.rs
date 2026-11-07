@@ -203,6 +203,10 @@ fn says_all_well_reads_all_is_well_first_or_last_after_a_place() {
         "a.rs:1 — none. The row holds — as read",
         "a.rs:1 — if not addressed: x — sound",
         "**a.rs:1** — no finding",
+        "a.rs:1 — fine.",
+        "a.rs:1 — sound!",
+        // Run 1428's: `unwrap` and the test it sits in are no defect.
+        "crates/store/tests/soak.rs:1 — no finding; the soak's unwrap calls sit in an integration test…",
     ] {
         assert!(says_all_well(text), "{text:?}");
     }
@@ -219,12 +223,59 @@ fn says_all_well_reads_all_is_well_first_or_last_after_a_place() {
 }
 
 #[test]
+fn a_line_that_says_all_is_well_then_names_a_defect_is_no_note() {
+    for text in [
+        "src/a.rs:9 — none, the callers never check the Result — I3",
+        "src/a.rs:9 — fine; but the unwrap on line 12 panics",
+        "src/a.rs:9 — sound; However, a caller is missing",
+        "src/a.rs:9 — no finding: though the guard can't hold",
+        "src/a.rs:9 — fine — except the hook, which fails",
+        "src/a.rs:9 — fine. Unless a pin is lost, yet it is",
+        "src/a.rs:9 — none; still, there is no test for it",
+        "src/a.rs:9 — fine: it cannot hold, it is unsafe",
+        "src/a.rs:9 — the unwrap panics — fine",
+        "src/a.rs:9 — if not addressed: a socket never closes — sound",
+    ] {
+        assert!(!says_all_well(text), "{text:?}");
+        let got = split(&format!("{text}\noutcome: none — x"));
+        assert!(got.ignored.is_empty(), "{text:?}: {got:?}");
+        assert_eq!(got.unreadable.len(), 1, "{text:?}: {got:?}");
+        assert_eq!(got.unreadable[0].text, text);
+    }
+}
+
+#[test]
+fn a_defect_marker_is_a_whole_word_in_any_case() {
+    for text in [
+        "But",
+        "it PANICS here",
+        "the guard can’t hold",
+        "there is No Test",
+        "x, though",
+    ] {
+        assert!(defect_marked(text), "{text:?}");
+    }
+    for text in [
+        "butter",
+        "the soak's unwrap calls sit in an integration test outside the core",
+        "stillborn",
+        "no tests run",
+        "notest",
+        "",
+    ] {
+        assert!(!defect_marked(text), "{text:?}");
+    }
+}
+
+#[test]
 fn placeholder_reads_a_revision_or_withdrawal_at_no_real_place() {
     for text in [
         "withdrawn: docs/srs/… — x",
-        "withdrawn: docs/srs/...:12 x",
+        "withdrawn: docs/srs/... — x",
+        "withdrawn: … — x",
         "revised: <path>:<line> — if not addressed: x — I2",
         "Withdrawn: path:line — x",
+        "withdrawn: `docs/srs/…` — x",
     ] {
         assert!(placeholder(text), "{text:?}");
     }
@@ -232,6 +283,13 @@ fn placeholder_reads_a_revision_or_withdrawal_at_no_real_place() {
         "withdrawn: a.rs — no line",
         "docs/srs/… — if not addressed: x — I2",
         "revised: a.rs:4 — nit — x",
+        // A place with its line is no placeholder, whatever it holds.
+        "withdrawn: docs/srs/...:12 x",
+        // A malformed revision is not set aside for a `<` or a `...`
+        // somewhere before its first dash: it does not read.
+        "revised: src/a.rs:3 <old> — if not addressed: x — I2",
+        "revised: src/a.rs:3 ... — nit — x",
+        "withdrawn: src/a.rs:3 and the rest... — x",
     ] {
         assert!(!placeholder(text), "{text:?}");
     }

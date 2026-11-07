@@ -891,3 +891,19 @@ fn form_problem_names_what_a_malformed_line_is_refused_for() {
         assert_eq!(form_problem(text, 3), want, "{text:?}");
     }
 }
+
+#[test]
+fn a_line_ending_all_is_well_after_a_defect_is_no_note_and_the_check_refuses_it() {
+    let text = "a.rs:9 — the unwrap on line 12 panics — fine";
+    let report = assemble(&[text.to_owned()], "outcome: none — x", None);
+
+    assert!(!report.contains(ALL_WELL), "{report}");
+    assert_eq!(
+        findings_check(&format!("{text}\noutcome: none — x"), None),
+        Some(Problem::Malformed { line: 1 })
+    );
+    assert_eq!(
+        findings_check("a.rs:9 — the row holds — fine\noutcome: none — x", None),
+        None
+    );
+}

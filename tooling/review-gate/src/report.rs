@@ -89,6 +89,16 @@ pub const ALL_WELL: &str = "note: all is well, not a finding:";
 /// The words a line saying all is well ends with, in any case, after
 /// its last dash: a finding line ending with one is a note, not refused.
 pub const ALL_WELL_WORDS: [&str; 5] = ["no finding", "no findings", "none", "fine", "sound"];
+/// The words that mark a contrast or a defect, matched whole in any
+/// case: a line that says all is well and then holds one may state a
+/// defect after all, so it is no note but a line that does not read,
+/// failing closed. Kept short, as each one takes a note from the reader:
+/// `unwrap`, `test` and `outside` are no marker, so a note that a call
+/// sits in a test outside the core still reads as one.
+pub const DEFECT_MARKERS: [&str; 16] = [
+    "but", "however", "although", "though", "except", "unless", "yet", "still", "panics", "fails",
+    "missing", "never", "no test", "cannot", "can't", "unsafe",
+];
 /// The arrows a revision may not hold: one between an old place and a
 /// finding line would move a finding, which ENG-28 does not define.
 pub const ARROWS: [&str; 2] = [" → ", " -> "];
@@ -727,12 +737,13 @@ fn unlinked(text: &str) -> bool {
 
 /// Whether `text`, a malformed line, says all is well at a place: a
 /// place, a dash, and after its last dash one of [`ALL_WELL_WORDS`]
-/// alone, markup and trailing punctuation aside. Such a line is no
+/// alone, markup and trailing punctuation aside, with no word of
+/// [`DEFECT_MARKERS`] between its place and that word. Such a line is no
 /// defect in what is reviewed, so the assembly keeps it as a note
 /// ([`ALL_WELL`]) the reader sees, and the report check passes it by.
 fn all_well(text: &str) -> bool {
     let parts = split_dashes(bare(text));
-    let [first, .., last] = parts.as_slice() else {
+    let [first, between @ .., last] = parts.as_slice() else {
         return false;
     };
     let last = last
@@ -740,6 +751,21 @@ fn all_well(text: &str) -> bool {
         .trim_matches(|c: char| MARKUP.contains(&c) || c.is_ascii_punctuation());
     place(first).is_some_and(|(path, _)| !path.contains(char::is_whitespace))
         && ALL_WELL_WORDS.iter().any(|w| w.eq_ignore_ascii_case(last))
+        && !defect_marked(&between.join(" "))
+}
+
+/// Whether `text` holds one of [`DEFECT_MARKERS`] as whole words, in
+/// any case, a typographic apostrophe read as a plain one.
+fn defect_marked(text: &str) -> bool {
+    let lower = text.to_lowercase().replace('’', "'");
+    let words: Vec<&str> = lower
+        .split(|c: char| !(c.is_alphanumeric() || c == '\''))
+        .filter(|w| !w.is_empty())
+        .collect();
+    DEFECT_MARKERS.iter().any(|marker| {
+        let wanted: Vec<&str> = marker.split(' ').collect();
+        words.windows(wanted.len()).any(|w| w == wanted.as_slice())
+    })
 }
 
 /// Whether `text`, a malformed line, is a linked finding with a remark
