@@ -43,6 +43,9 @@ pub struct Decision {
     pub consulted: BTreeSet<String>,
     /// Each of their final answers, by name.
     pub answers: BTreeMap<String, String>,
+    /// Each generalist's weighing, answered or not, by name: what the
+    /// review kept its findings from.
+    pub weighings: BTreeMap<String, String>,
     /// Every dispatched agent, or part of one, without an accepted
     /// report or answer, by name: never clean.
     pub not_reviewed: Vec<Gap>,
@@ -61,6 +64,7 @@ pub fn decide(
     let mut findings = Vec::new();
     let (answers, silent) = answers(plan, runs, &mut findings);
     let refused = refused_reports(plan, &answers, reports, known, &mut findings);
+    let weighings = weighings(plan, runs, &answers);
     if plan.dispatch.is_empty() {
         findings.push(blocking(
             REVIEW_PATH,
@@ -71,7 +75,13 @@ pub fn decide(
         kept: kept_counts,
         closings,
         unread,
-    } = weighed(plan, runs, (&answers, &refused), reports, &mut findings);
+    } = weighed(
+        plan,
+        &weighings,
+        (&answers, &refused),
+        reports,
+        &mut findings,
+    );
     let consulted: BTreeSet<String> = answers.keys().cloned().collect();
     let not_reviewed = not_reviewed(runs, &silent, &refused, &unread);
     let approves = silent.is_empty()
@@ -107,8 +117,32 @@ pub fn decide(
         },
         consulted,
         answers,
+        weighings,
         not_reviewed,
     }
+}
+
+/// Each generalist's weighing, by name: an answered one's answer, as
+/// [`answers`] assembled it; one cut off before its answer, what it
+/// stated, so nothing it kept is lost.
+fn weighings(
+    plan: &Plan,
+    runs: &[AgentRun],
+    answers: &BTreeMap<String, String>,
+) -> BTreeMap<String, String> {
+    plan.generalists()
+        .into_iter()
+        .filter_map(|name| {
+            let weighing = match answers.get(&name) {
+                Some(answer) => answer.clone(),
+                None => {
+                    let run = runs.iter().find(|r| r.name == name)?;
+                    report::weighing(&run.log.texts, "")
+                }
+            };
+            Some((name, weighing))
+        })
+        .collect()
 }
 
 /// Each refused specialist as the summary names it, with its problem.
@@ -241,7 +275,7 @@ struct Weighed {
 /// specialist's requirement request, in `reports`, is kept as a nit.
 fn weighed(
     plan: &Plan,
-    runs: &[AgentRun],
+    weighings: &BTreeMap<String, String>,
     (answers, refused): (&BTreeMap<String, String>, &[(String, String)]),
     reports: &BTreeMap<String, String>,
     findings: &mut Vec<Finding>,
@@ -254,16 +288,8 @@ fn weighed(
         // A run cut off before its answer still has what it stated, and
         // that is weighed as it stands: the run is named as one that did
         // not answer, and nothing it kept is lost.
-        let stated;
-        let answer = match answers.get(&name) {
-            Some(answer) => answer,
-            None => match runs.iter().find(|r| r.name == name) {
-                Some(run) => {
-                    stated = report::weighing(&run.log.texts, "");
-                    &stated
-                }
-                None => continue,
-            },
+        let Some(answer) = weighings.get(&name) else {
+            continue;
         };
         let heard = Heard {
             reports,

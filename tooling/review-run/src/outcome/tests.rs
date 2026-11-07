@@ -848,3 +848,30 @@ fn a_line_names_a_place_bounded_by_no_path_or_digit_character() {
     assert!(!names("src/a.rs:3-x", "src/a.rs", 4));
     assert!(!names("nothing here", "src/a.rs", 3));
 }
+
+#[test]
+fn each_generalist_s_weighing_is_kept_answered_or_cut_off_and_none_without_a_run() {
+    let (mut runs, reports) = all_answered("src/a.rs:3 — nit — x — lang-rust\nDone.");
+    let answered = decide(&plan(DISPATCH), &runs, &reports, &known());
+    assert_eq!(
+        answered.weighings["review-code"],
+        "src/a.rs:3 — nit — x — lang-rust\nDone."
+    );
+
+    runs[2] = silent(
+        "review-code",
+        Kind::Generalist,
+        "its run ended with deadline",
+    );
+    runs[2].log.texts = vec!["src/a.rs:3 — blocking — y — lang-rust\nreading".to_owned()];
+    let cut = decide(&plan(DISPATCH), &runs, &reports, &known());
+    assert_eq!(
+        cut.weighings["review-code"],
+        "src/a.rs:3 — blocking — y — lang-rust"
+    );
+    assert!(!cut.answers.contains_key("review-code"));
+
+    runs.pop();
+    let none = decide(&plan(DISPATCH), &runs, &reports, &known());
+    assert!(none.weighings.is_empty());
+}

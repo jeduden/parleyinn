@@ -351,6 +351,7 @@ fn record(
         mut outcome,
         consulted,
         answers,
+        weighings,
         not_reviewed,
     } = decision;
     if let Some(line) = from_store_line(runs) {
@@ -361,7 +362,7 @@ fn record(
         p.resume.as_ref().map_or(&[][..], |r| r.stalls.as_slice()),
     );
     let stalled = stall::amend(&mut outcome, &stalls, p.max_resumes)
-        + follow(written, p, &mut outcome, &answers)?;
+        + follow(written, p, &mut outcome, &weighings)?;
     written.json::<Vec<stall::Stall>>(stall::STALLS, &stalls)?;
     let usage = usage::usage(runs, p.resume.as_ref().map(|r| r.from.as_str()));
     let reused = runs.iter().filter(|r| r.reused).count();
@@ -530,7 +531,7 @@ fn resumed(
     Ok(plan_of)
 }
 
-/// Tracks `outcome`'s findings, `answers` holding each generalist's,
+/// Tracks `outcome`'s findings, `weighings` holding each generalist's,
 /// beside the previous review's when `p` has them: writes them to
 /// [`findings::FINDINGS`] and [`findings::FINDINGS_NOTES`] in `workdir`,
 /// adds what changed to the summary, and a blocking finding for each
@@ -544,9 +545,9 @@ fn follow(
     written: &Written,
     p: &Prepared,
     outcome: &mut review_gate::ReviewOutcome,
-    answers: &std::collections::BTreeMap<String, String>,
+    weighings: &std::collections::BTreeMap<String, String>,
 ) -> Result<usize, String> {
-    let found = findings::attributed(&outcome.findings, answers, &p.plan);
+    let found = findings::attributed(&outcome.findings, weighings, &p.plan);
     let run = p.id.head.as_deref().unwrap_or("unknown head");
     let tracking = findings::track(&found, p.previous.as_deref(), run, &|path| {
         findings::cited(written.workdir, path)
