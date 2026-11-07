@@ -14,7 +14,14 @@ const SCRIPT: &str = "scripts/review-spend.sh";
 
 /// The drifts the pull request's cap exists to rule out (ENG-28, I6).
 pub(super) fn review_spend_cases() -> Vec<Case> {
-    [cap_cases(), carry_cases(), flight_cases(), sum_cases()].concat()
+    [
+        cap_cases(),
+        carry_cases(),
+        flight_cases(),
+        sum_cases(),
+        vec![long_lived_case()],
+    ]
+    .concat()
 }
 
 /// The drifts of the runs in flight: a run started though the tier caps
@@ -145,6 +152,24 @@ fn sum_cases() -> Vec<Case> {
             "summed spend files of 1.5 and 0.25 USD",
         ),
     ]
+}
+
+/// The drift of the bound on how many earlier reviews' spend a review
+/// sums: a long-lived pull request's hundreds of reviews refused, so
+/// every later review fails. Last, so adding it moves no earlier case to
+/// another shard.
+fn long_lived_case() -> Case {
+    case(
+        "previous select --of spend refusing a long-lived pull request's hundreds of reviews",
+        "ENG-28",
+        Injection::replace(
+            "tooling/review-run/src/previous.rs",
+            "pub const MAX_SPENDS: usize = 1000;",
+            "pub const MAX_SPENDS: usize = 100;",
+        ),
+        carry_check(),
+        "did not take all 150 earlier reviews' spend",
+    )
 }
 
 /// The engineering check of the cap on the checkout's `review-run`.

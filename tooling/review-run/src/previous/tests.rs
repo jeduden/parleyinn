@@ -454,7 +454,7 @@ fn an_artifact_a_listing_names_twice_is_summed_once() {
 
 #[test]
 fn more_spend_artifacts_than_a_review_sums_are_refused_naming_how_many() {
-    let items: Vec<String> = (1..=101)
+    let items: Vec<String> = (1..=1001)
         .map(|id| artifact(id, SPEND_NAME, "2026-11-01T12:00:00Z", 130, false))
         .collect();
     let r = runs(&[(130, REVIEW, "workflow_run")]);
@@ -463,14 +463,15 @@ fn more_spend_artifacts_than_a_review_sums_are_refused_naming_how_many() {
 
     assert_eq!(
         err,
-        "101 earlier reviews of pull request 7 kept what they spent, past the 100 a review sums"
+        "1001 earlier reviews of pull request 7 kept what they spent, past the 1000 a review sums"
     );
     assert_eq!(
-        spends("7", &listing(&items[..100]), &r)
+        spends("7", &listing(&items[..1000]), &r)
             .unwrap()
             .artifacts
             .len(),
-        100
+        1000,
+        "a long-lived pull request's hundreds of reviews are all summed"
     );
     assert!(spends("x", "{}", "[]").is_err());
     assert!(spends("7", "{", "[]").is_err());

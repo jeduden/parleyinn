@@ -52,6 +52,8 @@ const UNPRICED: &str = concat!(
 /// How long each run of the stand-in takes, so runs started together
 /// overlap.
 const HOLD: std::time::Duration = std::time::Duration::from_millis(30);
+/// How many earlier reviews' spend a long-lived pull request has kept.
+const MANY: usize = 150;
 /// The artifact name the spend is kept under, as the upload step writes it.
 const UPLOAD_NAME: &str =
     "name: review-spend-pr-${{ steps.pull_head.outputs.number }}-a${{ github.run_attempt }}";
@@ -448,7 +450,7 @@ pub fn sum_problems(sum: Sum) -> Vec<String> {
 /// review workflow uploaded, two attempts of one run each, refusing and
 /// counting one from the pull request's own event, and never the
 /// findings' artifact, another pull request's or the name with no
-/// attempt.
+/// attempt; and all of a long-lived pull request's [`MANY`].
 #[must_use]
 pub fn selection_problems() -> Vec<String> {
     selection_problems_with(&review_run::previous::spends)
@@ -481,7 +483,7 @@ fn selection_problems_with(select: Select) -> Vec<String> {
         {"id":30,"path":".github/workflows/review.yml","event":"issue_comment"},
         {"id":40,"path":".github/workflows/review.yml","event":"workflow_run"}]"#;
     // Run 40 is the review's own, rerun: 5 and 6 are its two attempts.
-    match select("7", &artifacts, runs) {
+    let mut problems = match select("7", &artifacts, runs) {
         Ok(Spends {
             artifacts,
             skipped: 1,
@@ -489,7 +491,22 @@ fn selection_problems_with(select: Select) -> Vec<String> {
         other => vec![format!(
             "previous select --of spend gave {other:?}, not artifacts 1, 4, 5 and 6 with 1 refused"
         )],
+    };
+    // A long-lived pull request, pushed to hundreds of times.
+    let many: Vec<String> = (1u64..)
+        .take(MANY)
+        .map(|id| artifact(id, "review-spend-pr-7-a1", "2026-11-01T10:00:00Z", 10))
+        .collect();
+    let many = format!(r#"{{"artifacts":[{}]}}"#, many.join(","));
+    match select("7", &many, runs) {
+        Ok(Spends { artifacts, .. }) if artifacts.len() == MANY => {}
+        other => problems.push(format!(
+            "previous select --of spend did not take all {MANY} earlier reviews' spend: {:?}",
+            other.map(|s| s.artifacts.len())
+        )),
     }
+
+    problems
 }
 
 #[cfg(test)]

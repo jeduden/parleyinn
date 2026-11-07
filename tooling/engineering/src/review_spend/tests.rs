@@ -320,7 +320,9 @@ fn a_selection_that_takes_another_origin_or_fails_is_named() {
         got,
         [
             "previous select --of spend gave Err(\"no listing\"), not artifacts 1, 4, 5 and 6 \
-             with 1 refused"
+             with 1 refused",
+            "previous select --of spend did not take all 150 earlier reviews' spend: \
+             Err(\"no listing\")"
         ]
     );
 }

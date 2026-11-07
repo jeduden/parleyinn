@@ -72,9 +72,11 @@ impl Selection {
     }
 }
 
-/// The most earlier reviews' spend a review sums: past it the step
-/// fails, naming how many, rather than leave any out.
-pub const MAX_SPENDS: usize = 100;
+/// The most earlier reviews' spend a review sums: far past what a pull
+/// request's reviews keep in the 90 days each artifact lasts, one per
+/// push, so a long-lived one is never stopped by the count; past it the
+/// step fails, naming how many, rather than leave any out.
+pub const MAX_SPENDS: usize = 1000;
 
 /// What the lookup of the earlier reviews' spend found.
 #[derive(Debug, Clone, PartialEq, Eq)]
