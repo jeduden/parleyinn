@@ -23,6 +23,7 @@ use crate::case::Case;
 use crate::component::{self, Component, file_of, hash, suite_of};
 use crate::credential::{self, Confined, TOKEN_VAR};
 use crate::host::Host;
+use crate::log::RunLog;
 use crate::plan::{self, Planned};
 use crate::score::{CaseRecord, RunRecord, Scorecard, SuiteRecord, decided};
 use crate::secret::Scrubber;
@@ -659,6 +660,25 @@ fn run_case(
     record
 }
 
+/// The report of a run as the review would read it from `log`, for the
+/// record: a run that did not run is headed so, and one cut off before
+/// it stated anything ends with the review's own outcome, never a clean
+/// pass.
+fn record_report(log: &RunLog) -> String {
+    use review_gate::report::{CUT_BEFORE_STATING, assemble, split, states_nothing, with_outcome};
+    if !log.ran() {
+        let why = format!("its run ended with {}", log.subtype);
+        return assemble(&log.texts, &log.answer, Some(&why));
+    }
+    let clean = split(&assemble(&log.texts, &log.answer, None)).clean;
+    let ending = if !log.succeeded() && states_nothing(&log.texts, &log.answer) {
+        CUT_BEFORE_STATING
+    } else {
+        &log.answer
+    };
+    with_outcome(&clean, ending)
+}
+
 /// One run of `case` for `component` under `dir`: the world built, the
 /// component run, its log and the report assembled from it kept, the
 /// grade written, the world torn down.
@@ -695,13 +715,8 @@ fn one_run(
         let log = runner::run(host, &command)?;
         // The report as the review would read it from the log, for the
         // record, whatever result the run ended with.
-        let assembled = review_gate::report::assemble(&log.texts, &log.answer, None);
-        let clean = review_gate::report::split(&assembled).clean;
         let report_path = dir.join("report.md");
-        let written = fs::write(
-            &report_path,
-            review_gate::report::with_outcome(&clean, &log.answer),
-        );
+        let written = fs::write(&report_path, record_report(&log));
         let graded = grade::grade(component, case, &log);
         let mut record = RunRecord::new(&log, graded.failures, graded.slips);
         record.notes.clone_from(&world.notes);

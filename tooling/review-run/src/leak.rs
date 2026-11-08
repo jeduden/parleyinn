@@ -37,6 +37,9 @@ pub fn scrub_runs(scrubber: &Scrubber, runs: &mut [AgentRun]) -> usize {
         run.log.writes.iter_mut().for_each(&mut scrub);
         run.failed_parts.iter_mut().for_each(|(_, why)| scrub(why));
         run.partial.iter_mut().for_each(|(_, why)| scrub(why));
+        run.stated_nothing
+            .iter_mut()
+            .for_each(|(_, why)| scrub(why));
         for line in run.ignored.iter_mut().chain(run.unreadable.iter_mut()) {
             scrub(&mut line.text);
             scrub(&mut line.why);

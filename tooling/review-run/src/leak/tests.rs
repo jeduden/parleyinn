@@ -24,6 +24,7 @@ fn leaking_run() -> AgentRun {
         parts: 2,
         failed_parts: vec![(1, format!("part {TOKEN}"))],
         partial: vec![(Some(2), format!("read near {TOKEN}"))],
+        stated_nothing: vec![(None, format!("ended near {TOKEN}"))],
         ignored: vec![line()],
         unreadable: vec![line()],
         ..AgentRun::of(String::new(), Kind::Specialist, None, RunLog::default(), 1)
@@ -46,7 +47,7 @@ fn every_agent_written_field_of_a_run_is_scrubbed_and_counted() {
     let scrubber = Scrubber::new(&[TOKEN]);
     let mut runs = vec![leaking_run()];
 
-    assert_eq!(scrub_runs(&scrubber, &mut runs), 12);
+    assert_eq!(scrub_runs(&scrubber, &mut runs), 13);
 
     let run = &runs[0];
     let all = format!("{run:?}");
