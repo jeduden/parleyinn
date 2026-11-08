@@ -232,10 +232,10 @@ fn a_run_past_its_deadline_is_killed_and_counted() {
     assert!(grade.starts_with("did not answer: deadline\n"), "{grade}");
     assert_eq!(
         fs::read_to_string(out.join("runs/lang-rust/defect/1/report.md")).unwrap(),
-        // A run killed before any model call stated nothing: the review
-        // reads its report as no finding, and the grader fails it as one
-        // that did not run.
-        "outcome: none — nothing stated in the run log\n"
+        // A run killed before any model call did not run: its record is
+        // headed so, never an outcome that reads as a clean pass, and the
+        // grader fails it as one that did not run.
+        "incomplete: its run ended with deadline\n"
     );
     let findings = fs::read_to_string(out.join("findings.json")).unwrap();
     assert!(findings.contains("did not answer: deadline"), "{findings}");
