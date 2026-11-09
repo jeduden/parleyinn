@@ -256,7 +256,7 @@ pub const FINDING: &str = "src/a.rs:1 — if not addressed: a long line hides a 
 
 /// The lines one `Read` of the agent's file tool takes unless told
 /// otherwise.
-pub const CHUNK: usize = 2000;
+pub const CHUNK: usize = review_eval::coverage::DEFAULT_LIMIT;
 
 /// The diff file `command`'s prompt tells its specialist to read, its
 /// part's when it runs in parts; none when it names none.

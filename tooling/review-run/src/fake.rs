@@ -136,7 +136,7 @@ pub(crate) fn reading_log(
 }
 
 /// The lines one `Read` takes, as the agent's file tool reads them.
-pub(crate) const CHUNK: usize = 2000;
+pub(crate) const CHUNK: usize = review_eval::coverage::DEFAULT_LIMIT;
 
 /// The diff file `command`'s prompt tells its specialist to read, when
 /// it names one.
