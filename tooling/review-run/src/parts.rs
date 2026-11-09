@@ -2,7 +2,9 @@
 //! the review bundle wrote for it, past [`LIMIT`], split by file in
 //! path order, each part written beside it as `<name>.<i>.diff`; each
 //! part run as the same agent with the same prompt, told which part it
-//! has and every part's files; and the parts' reports and runs merged
+//! has and every part's files, and, when its part is one file larger
+//! than one read of the agent's file tool returns, the line ranges to
+//! read it in; and the parts' reports and runs merged
 //! into the specialist's one report and run. A part that did not run
 //! leaves the specialist one that did not run, its report headed
 //! incomplete and naming that part, with every part's findings kept; a
@@ -91,9 +93,10 @@ pub fn prepare(workdir: &Path, name: &str, limit: usize) -> Result<Vec<Part>, St
             "Your diff is too large for one run, so the review runs you in {count} parts \
              and merges their reports: you are part {index} of {count}. Read only your \
              part's diff, `{own}`, not `{}`, and state findings on its files; you may \
-             Read and Grep the rest of the tree. The full diff's files, by part: \
+             Read and Grep the rest of the tree.{} The full diff's files, by part: \
              {by_part}.",
-            diff_file(name)
+            diff_file(name),
+            reading(&own, &p.text, limit)
         );
         parts.push(Part {
             index,
@@ -104,6 +107,55 @@ pub fn prepare(workdir: &Path, name: &str, limit: usize) -> Result<Vec<Part>, St
     }
 
     Ok(parts)
+}
+
+/// The line ranges, from one and inclusive, to read `text` in when it
+/// is more than `limit` bytes, what one read of the agent's file tool
+/// returns: each as many whole lines as fit in `limit`, a line larger
+/// than that alone. None when one read returns it whole.
+#[must_use]
+pub fn ranges(text: &str, limit: usize) -> Vec<(usize, usize)> {
+    if text.len() <= limit {
+        return Vec::new();
+    }
+    let mut ranges: Vec<(usize, usize)> = Vec::new();
+    let mut size = 0;
+    for (at, line) in text.split_inclusive('\n').enumerate() {
+        match ranges.last_mut() {
+            Some(last) if size + line.len() <= limit => {
+                last.1 = at + 1;
+                size += line.len();
+            }
+            _ => {
+                ranges.push((at + 1, at + 1));
+                size = line.len();
+            }
+        }
+    }
+
+    ranges
+}
+
+/// What a part is told of reading its diff `own`, `text`, when one read
+/// of the agent's file tool does not return it whole, as a file larger
+/// than `limit` alone in its part is: the line ranges to read it in
+/// ([`ranges`]). Nothing otherwise, or when it is one line.
+fn reading(own: &str, text: &str, limit: usize) -> String {
+    let ranges = ranges(text, limit);
+    // One line past the limit is one range: no other read returns it.
+    let Some((last, rest)) = ranges.split_last().filter(|(_, rest)| !rest.is_empty()) else {
+        return String::new();
+    };
+    let range = |(from, to): &(usize, usize)| format!("{from}-{to}");
+    let rest: Vec<String> = rest.iter().map(range).collect();
+    format!(
+        " One `Read` does not return `{own}` whole: read its {} lines in {} calls, each with \
+         `offset` and `limit`, lines {} and {}, and leave no line unread.",
+        last.1,
+        ranges.len(),
+        rest.join(", "),
+        range(last)
+    )
 }
 
 /// Specialist `name`'s run and report merged from its parts' runs and

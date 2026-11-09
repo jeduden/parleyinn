@@ -386,3 +386,55 @@ fn what_the_budget_charged_each_part_adds_up() {
 
     assert!((run.charged - 0.75).abs() < 1e-9, "{}", run.charged);
 }
+
+#[test]
+fn a_text_one_read_returns_whole_needs_no_ranges() {
+    assert_eq!(ranges("", 10), Vec::new());
+    assert_eq!(ranges("+a\n+b\n", 10), Vec::new());
+    assert_eq!(ranges("+a\n+b\n", 6), Vec::new());
+}
+
+#[test]
+fn a_text_past_one_read_is_read_in_line_ranges_each_within_it_or_one_line() {
+    // Lines of 3, 3, 9, 3 and 2 bytes: a line past the limit is a range
+    // alone, and the last has no line end.
+    let text = "+a\n+b\n+ccccccc\n+d\n+e";
+
+    assert_eq!(ranges(text, 6), [(1, 2), (3, 3), (4, 5)]);
+    assert_eq!(ranges(text, 5), [(1, 1), (2, 2), (3, 3), (4, 5)]);
+}
+
+#[test]
+fn a_part_larger_than_the_limit_is_told_the_line_ranges_to_read_and_one_within_it_is_not() {
+    let big = format!(
+        "diff --git a/a.md b/a.md\n{}",
+        format!("+{}\n", "x".repeat(40)).repeat(5)
+    );
+    let diff = [big, section("b.rs", 60)].concat();
+    let dir = with_diff("lang-markdown", &diff);
+
+    let parts = prepare(dir.path(), "lang-markdown", 100).unwrap();
+
+    assert_eq!(parts.len(), 2);
+    assert!(
+        parts[0].note.contains(
+            "One `Read` does not return `review/diffs/lang-markdown.1.diff` whole: read its 6 \
+             lines in 3 calls, each with `offset` and `limit`, lines 1-2, 3-4 and 5-6, and leave \
+             no line unread."
+        ),
+        "{}",
+        parts[0].note
+    );
+    assert!(
+        !parts[1].note.contains("does not return"),
+        "{}",
+        parts[1].note
+    );
+}
+
+#[test]
+fn a_part_of_one_line_past_the_limit_is_told_no_ranges() {
+    assert_eq!(ranges("+aaaaaaaa", 4), [(1, 1)]);
+    assert_eq!(reading("review/diffs/a.1.diff", "+aaaaaaaa", 4), "");
+    assert_eq!(reading("review/diffs/a.1.diff", "+a\n", 4), "");
+}
