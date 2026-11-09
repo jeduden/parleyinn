@@ -26,7 +26,7 @@ getrandom = "0.4.3"
 # LIBSQLITE3_FLAGS in .cargo/config.toml (ADR-2610110553).
 # The macOS Keychain, no TLS features (ADR-2610171300).
 security-framework = { version = "3.7.0", default-features = false }
-rusqlite = { version = "0.40.2", default-features = false, features = ["bundled"] }
+rusqlite = { version = "0.41.1", default-features = false, features = ["bundled"] }
 serde = { version = "1.0.229", features = ["derive"] }
 serde_json = "1.0.151"
 sha2 = "0.11.1"
