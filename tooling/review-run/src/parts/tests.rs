@@ -435,6 +435,30 @@ fn a_part_larger_than_the_limit_is_told_the_line_ranges_to_read_and_one_within_i
 #[test]
 fn a_part_of_one_line_past_the_limit_is_told_no_ranges() {
     assert_eq!(ranges("+aaaaaaaa", 4), [(1, 1)]);
-    assert_eq!(reading("review/diffs/a.1.diff", "+aaaaaaaa", 4), "");
-    assert_eq!(reading("review/diffs/a.1.diff", "+a\n", 4), "");
+    assert_eq!(reading("review/diffs/a.1.diff", "+aaaaaaaa", 4), None);
+    assert_eq!(reading("review/diffs/a.1.diff", "+a\n", 4), None);
+}
+
+#[test]
+fn a_text_of_more_lines_than_one_read_takes_is_read_in_ranges_of_that_many() {
+    let most = review_eval::coverage::DEFAULT_LIMIT;
+    let text = "+a\n".repeat(2 * most + 1);
+
+    assert_eq!(ranges(&"+a\n".repeat(most), usize::MAX), Vec::new());
+    assert_eq!(
+        ranges(&text, usize::MAX),
+        [
+            (1, most),
+            (most + 1, 2 * most),
+            (2 * most + 1, 2 * most + 1)
+        ]
+    );
+}
+
+#[test]
+fn a_whole_diff_that_is_missing_or_that_one_read_returns_has_no_ranges_to_tell() {
+    let dir = with_diff("lang-rust", "+a\n");
+
+    assert_eq!(whole_reading(dir.path(), "lang-rust"), None);
+    assert_eq!(whole_reading(dir.path(), "lang-toml"), None);
 }

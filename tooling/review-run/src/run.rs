@@ -470,8 +470,14 @@ pub(crate) fn attempt(
     let log_path = workdir.join(LOGS).join(format!("{}.jsonl", unit.stem()));
     let diff = unit.part.as_ref().map(|part| part.diff.as_str());
     let mut command = runner::command_over(&component, &world, None, &log_path, deadline, diff);
-    if let Some(part) = &unit.part {
-        told(&mut command.args, &part.note);
+    match &unit.part {
+        Some(part) => told(&mut command.args, &part.note),
+        None if kind == Kind::Specialist => {
+            if let Some(reading) = crate::parts::whole_reading(workdir, name) {
+                told(&mut command.args, &reading);
+            }
+        }
+        None => {}
     }
     if let Some(note) = note {
         told(&mut command.args, note);

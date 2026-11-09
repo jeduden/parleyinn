@@ -4,7 +4,8 @@
 //! part run as the same agent with the same prompt, told which part it
 //! has and every part's files, and, when its part is one file larger
 //! than one read of the agent's file tool returns, the line ranges to
-//! read it in; and the parts' reports and runs merged
+//! read it in, as a specialist run whole is told when its diff is more
+//! lines than one read takes; and the parts' reports and runs merged
 //! into the specialist's one report and run. A part that did not run
 //! leaves the specialist one that did not run, its report headed
 //! incomplete and naming that part, with every part's findings kept; a
@@ -16,6 +17,7 @@ use std::path::Path;
 
 use review_bundle::diff;
 use review_eval::component::Kind;
+use review_eval::coverage::DEFAULT_LIMIT;
 use review_eval::log::{RunLog, SUCCESS};
 use review_gate::report::{FINDINGS, INCOMPLETE, NONE, answer_outcome};
 
@@ -96,7 +98,7 @@ pub fn prepare(workdir: &Path, name: &str, limit: usize) -> Result<Vec<Part>, St
              Read and Grep the rest of the tree.{} The full diff's files, by part: \
              {by_part}.",
             diff_file(name),
-            reading(&own, &p.text, limit)
+            reading(&own, &p.text, limit).map_or_else(String::new, |r| format!(" {r}"))
         );
         parts.push(Part {
             index,
@@ -110,19 +112,20 @@ pub fn prepare(workdir: &Path, name: &str, limit: usize) -> Result<Vec<Part>, St
 }
 
 /// The line ranges, from one and inclusive, to read `text` in when it
-/// is more than `limit` bytes, what one read of the agent's file tool
-/// returns: each as many whole lines as fit in `limit`, a line larger
-/// than that alone. None when one read returns it whole.
+/// is more than one read of the agent's file tool returns, `limit`
+/// bytes or [`DEFAULT_LIMIT`] lines: each as many whole lines as fit in
+/// both, a line larger than `limit` alone. None when one read returns
+/// it whole.
 #[must_use]
 pub fn ranges(text: &str, limit: usize) -> Vec<(usize, usize)> {
-    if text.len() <= limit {
+    if text.len() <= limit && text.lines().count() <= DEFAULT_LIMIT {
         return Vec::new();
     }
     let mut ranges: Vec<(usize, usize)> = Vec::new();
     let mut size = 0;
     for (at, line) in text.split_inclusive('\n').enumerate() {
         match ranges.last_mut() {
-            Some(last) if size + line.len() <= limit => {
+            Some(last) if size + line.len() <= limit && at - last.0 < DEFAULT_LIMIT - 1 => {
                 last.1 = at + 1;
                 size += line.len();
             }
@@ -136,26 +139,35 @@ pub fn ranges(text: &str, limit: usize) -> Vec<(usize, usize)> {
     ranges
 }
 
-/// What a part is told of reading its diff `own`, `text`, when one read
-/// of the agent's file tool does not return it whole, as a file larger
-/// than `limit` alone in its part is: the line ranges to read it in
-/// ([`ranges`]). Nothing otherwise, or when it is one line.
-fn reading(own: &str, text: &str, limit: usize) -> String {
+/// What a specialist is told of reading its diff `own`, `text`, when
+/// one read of the agent's file tool does not return it whole, as a
+/// file larger than `limit` alone in its part is: the line ranges to
+/// read it in ([`ranges`]). None otherwise, or when it is one line.
+fn reading(own: &str, text: &str, limit: usize) -> Option<String> {
     let ranges = ranges(text, limit);
     // One line past the limit is one range: no other read returns it.
-    let Some((last, rest)) = ranges.split_last().filter(|(_, rest)| !rest.is_empty()) else {
-        return String::new();
-    };
+    let (last, rest) = ranges.split_last().filter(|(_, rest)| !rest.is_empty())?;
     let range = |(from, to): &(usize, usize)| format!("{from}-{to}");
     let rest: Vec<String> = rest.iter().map(range).collect();
-    format!(
-        " One `Read` does not return `{own}` whole: read its {} lines in {} calls, each with \
+    Some(format!(
+        "One `Read` does not return `{own}` whole: read its {} lines in {} calls, each with \
          `offset` and `limit`, lines {} and {}, and leave no line unread.",
         last.1,
         ranges.len(),
         rest.join(", "),
         range(last)
-    )
+    ))
+}
+
+/// What specialist `name`, run whole on its diff under `workdir`, is
+/// told of reading it ([`reading`]): its diff is within the split
+/// limit, so only its lines can be more than one read takes. None when
+/// one read returns it whole, or it is not there or does not read,
+/// which the reads of its log then show.
+pub(crate) fn whole_reading(workdir: &Path, name: &str) -> Option<String> {
+    let own = diff_file(name);
+    let text = fs::read_to_string(workdir.join(&own)).ok()?;
+    reading(&own, &text, usize::MAX)
 }
 
 /// Specialist `name`'s run and report merged from its parts' runs and

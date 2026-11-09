@@ -47,3 +47,47 @@ fn a_specialist_cut_off_before_it_stated_anything_is_no_whole_review() {
         format!("{}\n", review_gate::report::CUT_BEFORE_STATING)
     );
 }
+
+#[test]
+fn a_whole_specialist_whose_diff_is_more_lines_than_one_read_takes_is_told_the_ranges() {
+    let dir = workdir();
+    let lines = review_eval::coverage::DEFAULT_LIMIT + 1;
+    let diff = dir.path().join("review/diffs/lang-rust.diff");
+    fs::write(&diff, "+a\n".repeat(lines)).unwrap();
+    let host = FakeHost::new(fake::either);
+
+    let runs = review_with(
+        &host,
+        dir.path(),
+        &plan(r#"{"review-code": ["lang-rust"]}"#),
+    );
+
+    let calls = host.calls.lock().unwrap();
+    let prompt = prompt_of(calls.iter().find(|c| agent_of(c) == "lang-rust").unwrap());
+    assert!(
+        prompt.ends_with(
+            "One `Read` does not return `review/diffs/lang-rust.diff` whole: read its 2001 lines \
+             in 2 calls, each with `offset` and `limit`, lines 1-2000 and 2001-2001, and leave no \
+             line unread."
+        ),
+        "{prompt}"
+    );
+    assert!(runs[0].whole(), "{:?}", runs[0].partial);
+}
+
+#[test]
+fn a_whole_specialist_whose_diff_one_read_returns_is_told_no_ranges() {
+    let dir = workdir();
+    fs::write(dir.path().join("review/diffs/lang-rust.diff"), "+a\n").unwrap();
+    let host = FakeHost::new(fake::either);
+
+    review_with(
+        &host,
+        dir.path(),
+        &plan(r#"{"review-code": ["lang-rust"]}"#),
+    );
+
+    let calls = host.calls.lock().unwrap();
+    let prompt = prompt_of(calls.iter().find(|c| agent_of(c) == "lang-rust").unwrap());
+    assert!(!prompt.contains("does not return"), "{prompt}");
+}
