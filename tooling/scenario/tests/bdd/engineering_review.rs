@@ -67,14 +67,19 @@ fn review_run_caps_cost(w: &mut World) -> Result<(), String> {
 }
 
 #[then(
-    regex = r"^review-run starts no generalist once more than a third of the dispatched specialists, those a cost cap stopped or kept from starting among them, ended without an accepted report, and opens the review outcome with a blocking finding naming the mass failure$"
+    regex = r"^review-run starts no generalist once more than a third of the dispatched specialists, those a cost cap stopped or kept from starting among them and none that stated its report and read only part of its diff, ended without an accepted report, and opens the review outcome with a blocking finding naming the mass failure$"
 )]
 fn review_run_breaks(w: &mut World) -> Result<(), String> {
     let work = testkit::TempDir::new().map_err(|e| format!("make a work directory: {e}"))?;
-    outcome(engineering::review_controls::breaker_problems(
+    let mut problems = engineering::review_controls::breaker_problems(
         eng(w).checkout()?,
-        work.path(),
-    ))
+        &work.path().join("breaker"),
+    );
+    problems.extend(engineering::review_controls::unread_problems(
+        eng(w).checkout()?,
+        &work.path().join("unread"),
+    ));
+    outcome(problems)
 }
 
 #[then(

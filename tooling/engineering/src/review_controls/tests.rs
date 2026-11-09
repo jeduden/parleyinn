@@ -13,6 +13,7 @@ fn the_checkout_s_review_run_holds_its_agents_to_the_controls() {
 
     let mut problems = caps_problems(&repo(), &work.path().join("caps"));
     problems.extend(breaker_problems(&repo(), &work.path().join("breaker")));
+    problems.extend(unread_problems(&repo(), &work.path().join("unread")));
     problems.extend(retry_problems(&repo(), &work.path().join("retry")));
 
     assert!(problems.is_empty(), "{problems:?}");
@@ -137,6 +138,7 @@ fn a_checkout_without_the_agents_definitions_is_named_by_each_check() {
     for problems in [
         caps_problems(&c, &work.path().join("caps")),
         breaker_problems(&c, &work.path().join("breaker")),
+        unread_problems(&c, &work.path().join("unread")),
         retry_problems(&c, &work.path().join("retry")),
     ] {
         assert_eq!(problems.len(), 1, "{problems:?}");
@@ -239,6 +241,56 @@ fn an_abort_is_named_when_the_outcome_or_the_printed_count_alone_misses_it() {
     assert!(outcome_alone[0].starts_with("the review outcome does not open with the abort"));
     assert_eq!(count_alone.len(), 1, "{count_alone:?}");
     assert!(count_alone[0].starts_with("the review outcome does not open with the abort"));
+}
+
+#[test]
+fn a_review_that_aborts_on_specialists_that_only_left_their_diff_unread_is_named() {
+    let partial: BTreeMap<String, String> = UNREAD
+        .into_iter()
+        .map(|n| (n.to_owned(), "partial: its log shows no Read".to_owned()))
+        .collect();
+    let decided = r#"{"verdict": "request_changes", "summary": "s", "findings": []}"#;
+    let started = ["review-code", "review-spec"];
+    assert!(unread_problems_of(&started, "aborted=0\n", decided, &partial).is_empty());
+
+    let aborted =
+        r#"{"verdict": "request_changes", "summary": "review aborted: x", "findings": []}"#;
+    let problems = unread_problems_of(&["review-spec"], "aborted=1\n", aborted, &BTreeMap::new());
+
+    assert_eq!(
+        problems,
+        [
+            "review-code did not start though no specialist's run failed".to_owned(),
+            format!("the review aborted though no specialist's run failed: {aborted}"),
+            "lang-rust is not named partial: \"\"".to_owned(),
+            "test-engineer-unit is not named partial: \"\"".to_owned(),
+        ]
+    );
+    let count_alone = unread_problems_of(&started, "aborted=1\n", decided, &partial);
+    let outcome_alone = unread_problems_of(&started, "aborted=0\n", aborted, &partial);
+    assert_eq!(count_alone.len(), 1, "{count_alone:?}");
+    assert_eq!(outcome_alone.len(), 1, "{outcome_alone:?}");
+}
+
+#[test]
+fn an_unread_specialist_whose_prompt_names_no_diff_or_whose_diff_cannot_be_written_is_named() {
+    let host = ControlHost {
+        unread: UNREAD.to_vec(),
+        ..ControlHost::default()
+    };
+    let no_diff = command(&["-p", "no diff named", "--agent", "lang-rust"]);
+    let prompt = "Read only your own diff, `review/diffs/lang-rust.diff`.";
+    let no_file = command(&["-p", prompt, "--agent", "lang-rust"]);
+
+    assert_eq!(
+        host.run(&no_diff).unwrap_err(),
+        "lang-rust's prompt names no diff"
+    );
+    let e = host.run(&no_file).unwrap_err();
+    assert!(
+        e.starts_with("write /w/review/diffs/lang-rust.diff: "),
+        "{e}"
+    );
 }
 
 #[test]

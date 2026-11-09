@@ -269,8 +269,8 @@ repeat them, which costs tokens.
   the mass failure below is decided; 90 minutes at worst (cap 120).
 - Cost and failure are bounded by code (proposed): `--max-budget-usd` caps a run
   (1.00 a specialist, 5.00 a generalist), `--max-cost-usd` (40) starts no run
-  once finished runs cost it, and over a third of the specialists in a gap
-  starts no generalist: `review aborted:`.
+  once finished runs cost it, and over a third of the specialists in a gap, a
+  diff read only in part not counted, starts no generalist: `review aborted:`.
 - A run left without an accepted report is said, never read as clean:
   `review/gaps.json` and `review/not-reviewed.md` list it and why. `review-run
   --only <gaps> --from <dir>` reruns those and each agent whose answer key

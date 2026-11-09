@@ -15,7 +15,9 @@ its upgrade notes (ENG-23). ParleyInn follows semantic versioning.
   an agent whose log holds no model call did not run. Whether a
   specialist read its whole diff is decided from the `Read` calls in its
   log: each unread range is a `partial:` gap in `review/gaps.json` and a
-  blocking finding, so the gate posts a request for changes. A line of a
+  blocking finding, so the gate posts a request for changes; a
+  specialist that stated its report and read only part of its diff does
+  not count toward a mass failure, so the generalists still run. A line of a
   report that says it is no finding is set aside and listed in
   `review/ignored.json`, counted in the summary and as `ignored=` in the
   run's output; a finding-shaped line that does not read is its own

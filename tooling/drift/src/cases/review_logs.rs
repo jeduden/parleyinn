@@ -7,8 +7,9 @@
 //! beside a line that does not read discarded with it; a run whose log
 //! holds no model call taken as one that ran; and a run cut off before
 //! it stated any line or an outcome taken for a clean pass, by the
-//! review or by the grader; and a part that did not run left out of the
-//! review the parts check runs end to end.
+//! review or by the grader; a part that did not run left out of the
+//! review the parts check runs end to end; and a specialist that only
+//! left lines of its diff unread counted toward the mass failure.
 
 use super::*;
 
@@ -94,6 +95,7 @@ pub(super) fn review_log_cases() -> Vec<Case> {
     ];
     cases.extend(cut_before_stating_cases());
     cases.push(part_case());
+    cases.push(unread_case());
     cases
 }
 
@@ -145,5 +147,25 @@ fn part_case() -> Case {
             "parts::tests::a_failed_part_makes_the_merged_run_incomplete_naming_it_and_keeps_every_part_s_findings",
         ),
         "a_failed_part_makes_the_merged_run_incomplete_naming_it_and_keeps_every_part_s_findings",
+    )
+}
+
+/// A specialist that stated its report and only left lines of its diff
+/// unread counted toward the mass failure, so the generalists never
+/// weigh what it found.
+fn unread_case() -> Case {
+    case(
+        "review-run counting a specialist that only left its diff unread toward the mass failure",
+        "ENG-28",
+        Injection::replace(
+            "tooling/review-run/src/tasks.rs",
+            "    !run.answered() || !run.stated_nothing.is_empty() || !run.unreadable.is_empty()\n",
+            "    !run.whole()\n",
+        ),
+        cargo_lib_test(
+            "engineering",
+            "review_controls::tests::the_checkout_s_review_run_holds_its_agents_to_the_controls",
+        ),
+        "review-code did not start though no specialist's run failed",
     )
 }
