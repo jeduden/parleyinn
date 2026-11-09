@@ -21,11 +21,11 @@ use std::process::{Command, Output};
 use testkit::TempDir;
 
 /// A `claude` that answers as the agent it runs as: a specialist reads
-/// the whole diff its prompt names, but the one `UNREAD_AGENT` names,
+/// the whole diff its prompt names, but those `UNREAD_AGENT` names,
 /// states one linked finding in its text and answers its outcome line; a
 /// generalist keeps it as a nit and closes with a sentence. Started as a
-/// harness session's child it refuses; the agent `SILENT_AGENT` names
-/// never answers, and the one `CUT_AGENT` names states its finding and
+/// harness session's child it refuses; the agents `SILENT_AGENT` names
+/// never answer, and the one `CUT_AGENT` names states its finding and
 /// ends at its turn budget without an answer, or only its part
 /// `CUT_PART` does. A specialist run on a part of its diff also states
 /// a finding of that part's own. The agent `REFUSE_AGENT` names also
@@ -48,7 +48,7 @@ for a in "$@"; do
   if [ "$prev" = "--agent" ]; then agent="$a"; fi
   prev="$a"
 done
-if [ "$agent" = "$SILENT_AGENT" ]; then exec sleep 30; fi
+case " $SILENT_AGENT " in *" $agent "*) exec sleep 30 ;; esac
 if [ -n "$LEAK_AGENT" ] && [ "$agent" = "$LEAK_AGENT" ]; then
   token=$(sed -n 's/.*"accessToken":"\([^"]*\)".*/\1/p' "$CLAUDE_CONFIG_DIR/.credentials.json")
   printf '{"type":"assistant","parent_tool_use_id":null,"message":{"id":"m-%s","model":"claude-haiku-5-5","usage":{"input_tokens":3,"output_tokens":2},"content":[{"type":"text","text":"my environment holds %s"}]}}\n' "$agent" "$token"
@@ -73,7 +73,9 @@ fi
 case "$prompt" in
   *"a specialist"*)
     diff=$(printf '%s' "$prompt" | sed -n 's/.*Read only your own diff, `\([^`]*\)`.*/\1/p')
-    if [ "$agent" != "$UNREAD_AGENT" ]; then
+    unread=""
+    case " $UNREAD_AGENT " in *" $agent "*) unread=yes ;; esac
+    if [ -z "$unread" ]; then
       printf '{"type":"assistant","parent_tool_use_id":null,"message":{"id":"m-%s","model":"claude-haiku-5-5","usage":{"input_tokens":3,"cache_read_input_tokens":7,"output_tokens":2},"content":[{"type":"tool_use","id":"r1","name":"Read","input":{"file_path":"%s/%s"}}]}}\n' "$agent" "$PWD" "$diff"
       printf '{"type":"user","parent_tool_use_id":null,"message":{"content":[{"type":"tool_result","tool_use_id":"r1","content":"+fn a() {}"}]}}\n'
     fi
@@ -166,8 +168,9 @@ fn review_run_refusing(
     review_run_holding(home, dir, (silent, cut, refuse), &[], args)
 }
 
-/// [`review_run`], with `silent` naming the agent that never answers and
-/// `unread` the specialist that reads none of its diff.
+/// [`review_run`], with `silent` naming the agents that never answer and
+/// `unread` the specialists that read none of their diff, each a list
+/// with a space between.
 fn review_run_unread(home: &Path, dir: &Path, silent: &str, unread: &str, args: &[&str]) -> Output {
     review_run_holding(
         home,
@@ -865,13 +868,8 @@ fn a_mass_failure_of_the_specialists_starts_no_generalist_and_names_the_abort() 
     let dir = home.path().join("work");
     workdir(&dir);
 
-    let out = review_run_unread(
-        home.path(),
-        &dir,
-        "lang-rust",
-        "test-engineer-unit",
-        &["--deadline", "2"],
-    );
+    let silent = "lang-rust test-engineer-unit";
+    let out = review_run_unread(home.path(), &dir, silent, "", &["--deadline", "2"]);
 
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert_eq!(out.status.code(), Some(0), "{stdout}");
@@ -895,6 +893,45 @@ fn a_mass_failure_of_the_specialists_starts_no_generalist_and_names_the_abort() 
     let gaps = fs::read_to_string(dir.join("review/gaps.json")).unwrap();
     assert!(
         gaps.contains("\"reason\": \"aborted: 2 of 3 specialists failed"),
+        "{gaps}"
+    );
+}
+
+#[test]
+fn specialists_that_read_none_of_their_diff_are_partial_and_no_mass_failure() {
+    let home = TempDir::new().unwrap();
+    let dir = home.path().join("work");
+    workdir(&dir);
+
+    let unread = "lang-rust test-engineer-unit";
+    let out = review_run_unread(home.path(), &dir, "", unread, &[]);
+
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert_eq!(out.status.code(), Some(0), "{stdout}");
+    assert!(stdout.starts_with("verdict=request_changes\n"), "{stdout}");
+    assert!(stdout.contains("\naborted=0\n"), "{stdout}");
+    for name in ["review-code", "review-security"] {
+        assert!(
+            dir.join(format!("review/logs/{name}.jsonl")).exists(),
+            "{name} did not run"
+        );
+    }
+    let outcome = fs::read_to_string(dir.join("review/outcome.json")).unwrap();
+    assert!(!outcome.contains("review aborted"), "{outcome}");
+    let gaps: serde_json::Value =
+        serde_json::from_str(&fs::read_to_string(dir.join("review/gaps.json")).unwrap()).unwrap();
+    let reasons: Vec<(&str, bool)> = gaps
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|g| {
+            let partial = g["reason"].as_str().unwrap().starts_with("partial: ");
+            (g["name"].as_str().unwrap(), partial)
+        })
+        .collect();
+    assert_eq!(
+        reasons,
+        [("lang-rust", true), ("test-engineer-unit", true)],
         "{gaps}"
     );
 }

@@ -4,7 +4,7 @@ use review_gate::{APPROVE_VERDICT, ReviewOutcome};
 
 use super::*;
 use crate::controls::{BREAKER_FRACTION, Fraction};
-use crate::gaps::Gap;
+use crate::gaps::{self, Gap};
 use crate::plan::parse_dispatch;
 
 fn plan() -> Plan {
@@ -49,6 +49,28 @@ fn a_specialist_counts_once_however_many_of_its_parts_failed() {
         failed(&plan(), &decision(gaps)),
         3,
         "a cost cap's gap counts, a part twice or a generalist does not"
+    );
+}
+
+#[test]
+fn a_specialist_that_only_read_part_of_its_diff_does_not_count() {
+    let stated_nothing = gaps::stated_nothing("error_max_turns");
+    let gaps = vec![
+        Gap::new("lang-rust", Some(1), gaps::partial("lines 1-9 unread")),
+        Gap::new("lang-rust", Some(2), gaps::partial("lines 1-4 unread")),
+        Gap::new("lang-shell", None, gaps::partial("lines 1-2 unread")),
+        Gap::new("lang-markdown", None, stated_nothing),
+        Gap::new(
+            "srs-02-overall",
+            None,
+            "unreadable: no form: `x`".to_owned(),
+        ),
+    ];
+
+    assert_eq!(
+        failed(&plan(), &decision(gaps)),
+        2,
+        "one that stated nothing or a line that does not read counts, a partial read does not"
     );
 }
 

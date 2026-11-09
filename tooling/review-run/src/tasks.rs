@@ -182,7 +182,7 @@ fn task(r: &Review, c: &Controls, (task, before): (&Task, &Answers), inputs: Vec
         Task::Unit(unit) => {
             let done = one(r, c, unit, &Answers::new());
             if unit.part.is_none() {
-                settle(c, !done.0.whole());
+                settle(c, tips(&done.0));
             }
             done
         }
@@ -199,7 +199,7 @@ fn task(r: &Review, c: &Controls, (task, before): (&Task, &Answers), inputs: Vec
             }
             run.answer_key = r.keys.and_then(|k| k.own(name)).map(str::to_owned);
             (r.progress)(&describe(&run));
-            settle(c, !run.whole());
+            settle(c, tips(&run));
             (run, Some(report))
         }
         Task::Generalist(unit) => {
@@ -225,6 +225,14 @@ fn task(r: &Review, c: &Controls, (task, before): (&Task, &Answers), inputs: Vec
             done
         }
     }
+}
+
+/// Whether specialist `run` counts toward the breaker: it did not run,
+/// stated nothing before it ended, or stated a line that does not read.
+/// One that stated its report and only left lines of its diff unread
+/// did not fail, and does not.
+fn tips(run: &AgentRun) -> bool {
+    !run.answered() || !run.stated_nothing.is_empty() || !run.unreadable.is_empty()
 }
 
 /// Counts a specialist finished, and ended for the breaker, in a gap

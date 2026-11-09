@@ -563,6 +563,34 @@ fn an_unreadable_report_tips_the_breaker_past_a_third_beside_a_partial_one() {
 }
 
 #[test]
+fn specialists_that_only_read_part_of_their_diff_do_not_tip_the_breaker() {
+    let options = Options {
+        breaker: BREAKER_FRACTION,
+        ..options()
+    };
+    let (_dir, ran) = controlled(DISPATCH, options, 0.0, |c| {
+        if ["lang-rust", "lang-markdown"].contains(&agent_of(c).as_str()) {
+            // Its finding and its outcome stated, its diff never read.
+            unread_diff(c);
+            let outcome = "outcome: findings — one.";
+            let log = fake::log_of(&[fake::FINDING, outcome], "success", outcome, 0.01);
+            fake::write_log(c, &log);
+            return Ok(Output::default());
+        }
+        fake::either(c)
+    });
+
+    for specialist in ["lang-rust", "lang-markdown"] {
+        let run = ran.run(specialist);
+        assert!(run.answered() && !run.partial.is_empty(), "{specialist}");
+    }
+    // Two of three read none of their diff: gaps, and no mass failure.
+    for generalist in ["review-code", "review-spec"] {
+        assert!(ran.run(generalist).answered(), "{:?}", ran.lines);
+    }
+}
+
+#[test]
 fn runs_a_cost_cap_stopped_before_they_read_their_diff_tip_the_breaker() {
     let options = Options {
         breaker: BREAKER_FRACTION,

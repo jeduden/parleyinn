@@ -189,11 +189,8 @@ fn read_partly(
             partial.push(gap);
         }
         for (part, ended) in &run.stated_nothing {
-            let why = format!(
-                "it ended without a successful result ({ended}) before it stated any line or \
-                 an outcome"
-            );
-            let gap = Gap::new(&run.name, *part, gaps::partial(&why));
+            let why = gaps::nothing_stated(ended);
+            let gap = Gap::new(&run.name, *part, gaps::stated_nothing(ended));
             findings.push(blocking(
                 REVIEW_PATH,
                 format!("{} {why}, so the review of it is partial", gap.label()),

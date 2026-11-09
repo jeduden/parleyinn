@@ -124,3 +124,21 @@ fn a_quoted_line_is_whole_up_to_its_cap_and_cut_with_an_ellipsis_past_it() {
     assert_eq!(quoted(&format!("{at_cap}x")), format!("{at_cap}…"));
     assert_eq!(quoted("a.rs:1 — x"), "a.rs:1 — x");
 }
+
+#[test]
+fn a_specialist_that_stated_nothing_is_partial_and_never_one_that_only_left_lines_unread() {
+    let stated_nothing = stated_nothing("error_max_turns");
+    assert_eq!(
+        stated_nothing,
+        "partial: it ended without a successful result (error_max_turns) before it stated any \
+         line or an outcome"
+    );
+    assert_eq!(stated_nothing, partial(&nothing_stated("error_max_turns")));
+
+    let unread = Gap::new("lang-rust", Some(1), partial("lines 3-9 unread"));
+    assert!(unread.unread_lines());
+    for reason in [stated_nothing, silent("x"), "unreadable: y".to_owned()] {
+        let gap = Gap::new("lang-rust", None, reason);
+        assert!(!gap.unread_lines(), "{}", gap.reason);
+    }
+}

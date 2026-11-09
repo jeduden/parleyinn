@@ -67,6 +67,16 @@ impl Gap {
         }
     }
 
+    /// Whether it is of a specialist that stated its report and only
+    /// left lines of its diff unread: no failure of its run, so the
+    /// breaker does not count it.
+    #[must_use]
+    pub fn unread_lines(&self) -> bool {
+        self.reason
+            .strip_prefix(PARTIAL)
+            .is_some_and(|why| !why.trim_start().starts_with(STATED_NOTHING))
+    }
+
     /// How the summary names it.
     #[must_use]
     pub fn label(&self) -> String {
@@ -101,6 +111,23 @@ pub fn silent(why: &str) -> String {
 #[must_use]
 pub fn partial(why: &str) -> String {
     format!("{PARTIAL} {why}")
+}
+
+/// How what a specialist that stated nothing did starts.
+const STATED_NOTHING: &str = "it ended without a successful result";
+
+/// What a specialist did whose run ended as `ended` says before it
+/// stated any line or an outcome.
+#[must_use]
+pub fn nothing_stated(ended: &str) -> String {
+    format!("{STATED_NOTHING} ({ended}) before it stated any line or an outcome")
+}
+
+/// The reason of a specialist that stated nothing before its run ended
+/// as `ended` says: partial, and never one that only left lines unread.
+#[must_use]
+pub fn stated_nothing(ended: &str) -> String {
+    partial(&nothing_stated(ended))
 }
 
 /// The reason of a specialist whose report holds `line`, which does not
