@@ -141,9 +141,9 @@ fn part_case() -> Case {
             "if let Some(why) = run.failure.as_ref().filter(|_| false) {",
         ),
         cargo_lib_test(
-            "engineering",
-            "review_parts::tests::a_specialist_split_on_the_checkout_s_definitions_has_no_problem",
+            "review-run",
+            "parts::tests::a_failed_part_makes_the_merged_run_incomplete_naming_it_and_keeps_every_part_s_findings",
         ),
-        "a part of test-engineer-unit that did not run does not fail the review naming it",
+        "a_failed_part_makes_the_merged_run_incomplete_naming_it_and_keeps_every_part_s_findings",
     )
 }
