@@ -276,6 +276,34 @@ fn a_part_that_read_part_of_its_diff_runs_again_beside_one_that_did_not_run() {
 }
 
 #[test]
+fn a_part_named_by_several_gaps_runs_again_and_the_other_parts_are_kept() {
+    // One part may hold several gaps: the lines it did not read, and
+    // each line of its report that does not read.
+    let gaps = vec![
+        Gap::new("lang-rust", Some(2), "partial: lines 5-9".to_owned()),
+        Gap::new("lang-rust", Some(2), "unreadable: no form: `a`".to_owned()),
+        Gap::new("lang-rust", Some(2), "unreadable: no form: `b`".to_owned()),
+    ];
+    let mut was = earlier(gaps);
+    was.parts.insert(
+        "lang-rust".to_owned(),
+        [
+            (1, answered("outcome: none — one.")),
+            (2, answered("outcome: none — two.")),
+            (3, answered("outcome: none — three.")),
+        ]
+        .into(),
+    );
+
+    let resume = plan_of(&was, &id());
+
+    let Some(Reuse::Parts(kept)) = resume.reuse.get("lang-rust") else {
+        panic!("{:?}", resume.notes);
+    };
+    assert_eq!(kept.keys().collect::<Vec<_>>(), [&1, &3]);
+}
+
+#[test]
 fn a_specialist_named_whole_or_with_no_part_to_keep_runs_again_whole() {
     let both = vec![
         Gap::new("lang-rust", Some(2), "silent: x".to_owned()),

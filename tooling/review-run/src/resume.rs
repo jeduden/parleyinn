@@ -315,10 +315,12 @@ fn keep(name: &str, gaps: &[&Gap], earlier: &Earlier, now: &RunId) -> Result<Reu
     if let Some(why) = changed(name, earlier, now) {
         return Err(why);
     }
-    let failed: BTreeSet<usize> = gaps.iter().filter_map(|g| g.part).collect();
-    if failed.len() < gaps.len() {
+    // One part may be named by several gaps: the lines it did not read,
+    // and each line of its report that does not read.
+    if gaps.iter().any(|g| g.part.is_none()) {
         return Err(first.reason.clone());
     }
+    let failed: BTreeSet<usize> = gaps.iter().filter_map(|g| g.part).collect();
     let kept: BTreeMap<usize, RunLog> = earlier
         .parts
         .get(name)
