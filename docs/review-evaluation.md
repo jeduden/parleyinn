@@ -35,7 +35,8 @@ records the design.
   is matched by its path and the words, ids and source the case names,
   and by its form, `linked` or `request`, for a specialist or a persona,
   which weighs nothing, or its severity for a generalist; `none` forbids
-  one; `absent` forbids text; `nits` caps the nits a generalist keeps.
+  one; `absent` forbids text; `nits` caps the nits a generalist keeps;
+  `main_unread` holds the run to the pull request's tree.
   Cases belong to
   the normal instance of a generalist; its deep instance runs the same
   ones. An agent the bundle never dispatches answers in text and is
@@ -44,7 +45,8 @@ records the design.
 - **Derived cases** come from the tree for each SRS section and
   domain-model file: a requirement row changed without its scenario, a
   cited id no section defines, a true sentence under the title, and the
-  same with an instruction addressed to the reviewer. They never rot.
+  same with an instruction addressed to the reviewer. Each holds its
+  run to the pull request's tree. They never rot.
 
 ## A case run
 
@@ -82,7 +84,12 @@ records the design.
   source it names stands, so another source's finding there stays; each
   finding it
   must drop on a line that starts with `dropped` or gives it as its
-  severity. A consultant is read from its answer. A specialist's report
+  severity. A consultant is read from its answer. A case that holds
+  its run to the pull request's tree fails a run that read or searched
+  a file of the repository at the work directory's root, which is
+  main's tree: every `Read`, `Grep` and `Glob` path of the log but
+  `pr-head/`, `review/`, `pr.diff` and the instruction files, which
+  `pr-head/` is kept without. A specialist's report
   is read as the review reads it: assembled from the log, split into the
   lines that read and those that do not, and ended with an outcome its
   lines give. A finding-shaped line that does not read fails its run,

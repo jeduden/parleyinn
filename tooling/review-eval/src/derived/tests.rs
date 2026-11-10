@@ -58,6 +58,9 @@ fn every_section_and_model_file_gets_its_three_cases() {
     for case in &got {
         assert_eq!(case.validate(dir.path()), Ok(()), "{}", case.id());
         assert!(["defect", "clean", "injection"].contains(&case.kind.as_str()));
+        // A specialist looks a row, a scenario or a concept up beyond its
+        // diff, and the pull request's tree is where it is to look.
+        assert!(case.expect.main_unread, "{}", case.id());
     }
 }
 

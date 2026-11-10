@@ -68,6 +68,13 @@ pub struct RunLog {
     pub writes: Vec<String>,
     /// Every `Read` call the main thread made, in order.
     pub reads: Vec<ReadCall>,
+    /// The work directory the run started in, as its first line names
+    /// it; empty when the log names none.
+    pub cwd: String,
+    /// Every path a `Grep` or `Glob` call of the main thread named, in
+    /// order. A search that names none covers the whole work directory
+    /// and is not listed.
+    pub searches: Vec<String>,
 }
 
 impl RunLog {
@@ -141,6 +148,9 @@ pub fn parse(text: &str) -> RunLog {
             Some("assistant") => reading.assistant(&value),
             Some("user") => reading.user(&value),
             Some("result") => reading.result(&value),
+            Some("system") if reading.log.cwd.is_empty() => {
+                reading.log.cwd = value["cwd"].as_str().unwrap_or_default().to_owned();
+            }
             _ => {}
         }
     }
@@ -179,9 +189,16 @@ impl Reading {
         }
     }
 
-    /// One tool call: a write's path, or a main-thread read.
+    /// One tool call: a write's path, a main-thread read, or the path a
+    /// main-thread search names.
     fn tool_use(&mut self, block: &Value, main: bool) {
         let input = &block["input"];
+        if main
+            && matches!(block["name"].as_str(), Some("Grep" | "Glob"))
+            && let Some(path) = input["path"].as_str()
+        {
+            self.log.searches.push(path.to_owned());
+        }
         let Some(path) = input["file_path"].as_str() else {
             return;
         };

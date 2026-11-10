@@ -784,3 +784,124 @@ fn a_specialist_cut_off_before_it_stated_anything_fails_even_a_case_that_expects
         graded.slips
     );
 }
+
+/// A run in `/w/main` that read `reads` and searched `searches`.
+fn reading_log(reads: &[&str], searches: &[&str]) -> RunLog {
+    let mut log = stated_log(&[], "outcome: none — clean");
+    log.cwd = "/w/main".to_owned();
+    log.reads = reads
+        .iter()
+        .map(|path| crate::log::ReadCall {
+            path: (*path).to_owned(),
+            answered: true,
+            ..crate::log::ReadCall::default()
+        })
+        .collect();
+    log.searches = searches.iter().map(|s| (*s).to_owned()).collect();
+    log
+}
+
+#[test]
+fn a_case_may_hold_a_run_to_the_pull_request_s_tree() {
+    let specialist = component(Kind::Specialist, "srs-security", true);
+    let held = case(
+        "srs-security",
+        Expect {
+            outcome: vec!["none".to_owned()],
+            main_unread: true,
+            ..Expect::default()
+        },
+    );
+    let free = case(
+        "srs-security",
+        Expect {
+            outcome: vec!["none".to_owned()],
+            ..Expect::default()
+        },
+    );
+    let log = reading_log(
+        &[
+            "review/diffs/srs-security.diff",
+            "/w/main/docs/srs/06-security.md",
+            "pr-head/docs/srs/06-security.md",
+            "/w/main/pr-head/features/security.feature",
+        ],
+        &["features", "./docs/srs/", "features", "pr-head/features"],
+    );
+
+    assert_eq!(
+        grade(&specialist, &held, &log).failures,
+        vec![
+            "read main's tree, not the pull request's: docs/srs/06-security.md",
+            "read main's tree, not the pull request's: features",
+            "read main's tree, not the pull request's: docs/srs",
+        ]
+    );
+    assert_eq!(
+        grade(&specialist, &free, &log).failures,
+        Vec::<String>::new()
+    );
+
+    let in_head = reading_log(
+        &["review/context/srs-security.md", "pr-head/docs/srs/06.md"],
+        &["pr-head/features", "/w/main/pr-head"],
+    );
+    assert!(grade(&specialist, &held, &in_head).passed());
+}
+
+#[test]
+fn a_generalist_and_a_consultant_are_held_to_the_pull_request_s_tree_alike() {
+    let held = case(
+        "x",
+        Expect {
+            main_unread: true,
+            ..Expect::default()
+        },
+    );
+    let log = reading_log(&["crates/x/src/lib.rs"], &[]);
+
+    for kind in [Kind::Generalist, Kind::Consultant] {
+        assert_eq!(
+            grade(&component(kind, "x", false), &held, &log).failures,
+            vec!["read main's tree, not the pull request's: crates/x/src/lib.rs"]
+        );
+    }
+}
+
+#[test]
+fn main_s_tree_is_the_work_directory_less_the_review_s_own_files() {
+    // What the work directory holds beside main's files, and the
+    // instruction files, which the pull request's tree is kept without.
+    let beside = reading_log(
+        &[
+            "pr.diff",
+            "/w/main/pr.diff",
+            "review/bundle.md",
+            "stakeholder-comments.json",
+            ".claude/agents/srs-security.md",
+            "/w/main/CLAUDE.md",
+            "docs/AGENTS.md",
+            "crates/x/.mcp.json",
+            "CLAUDE.local.md",
+        ],
+        &[".", "", "/w/main", "/w/main/", "./", ".claude"],
+    );
+    assert_eq!(main_reads(&beside), Vec::<String>::new());
+
+    // A path outside the work directory is in neither tree.
+    let outside = reading_log(&["/etc/hosts", "/w/mainly/docs/x.md", "../docs/x.md"], &[]);
+    assert_eq!(main_reads(&outside), Vec::<String>::new());
+
+    // A log that names no work directory still reads a relative path
+    // from it; an absolute one cannot be placed.
+    let mut unnamed = reading_log(&["docs/x.md", "/w/main/docs/y.md"], &["features/"]);
+    unnamed.cwd = String::new();
+    assert_eq!(main_reads(&unnamed), vec!["docs/x.md", "features"]);
+
+    // A path that only starts like one beside main's files is main's.
+    let alike = reading_log(&["reviews/a.md", "pr-headless/a.md", "pr.diff.md"], &[]);
+    assert_eq!(
+        main_reads(&alike),
+        vec!["reviews/a.md", "pr-headless/a.md", "pr.diff.md"]
+    );
+}
