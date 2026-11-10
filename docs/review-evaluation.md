@@ -59,6 +59,11 @@ records the design.
   `review-bundle` writes for a specialist: the review class, the touched ids,
   its dispatch row and the deterministic findings on its files. The prompt
   tells the specialist to read it and its own diff, never the whole bundle.
+- **The prompt** tells every agent that `pr-head/` holds the pull
+  request's tree and that the tree around it is main's, which shows
+  only what the change replaced. A path a diff or an agent's
+  instructions name is relative to the repository, so an agent that
+  opens it at the root judges the change against main.
 - **The evaluation harness** starts `claude --agent <component>` with the
   review's reading tools and turn budget, on the component's model, or
   the evaluation's default for an agent that names none, or the one `--model`
