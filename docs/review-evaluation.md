@@ -93,8 +93,10 @@ records the design.
   its run to the pull request's tree fails a run that read or searched
   a file of the repository at the work directory's root, which is
   main's tree: every `Read`, `Grep` and `Glob` path of the log but
-  `pr-head/`, `review/`, `pr.diff` and the instruction files, which
-  `pr-head/` is kept without. A specialist's report
+  `pr-head/`, `review/`, `pr.diff`, the stakeholder's comments and the
+  instruction files. The instruction files at the root are main's too,
+  and reading them fails no run: `pr-head/` holds no copy of them, the
+  pull request's being text in `review/`. A specialist's report
   is read as the review reads it: assembled from the log, split into the
   lines that read and those that do not, and ended with an outcome its
   lines give. A finding-shaped line that does not read fails its run,

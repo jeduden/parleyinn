@@ -905,3 +905,42 @@ fn main_s_tree_is_the_work_directory_less_the_review_s_own_files() {
         vec!["reviews/a.md", "pr-headless/a.md", "pr.diff.md"]
     );
 }
+
+#[test]
+fn a_path_is_placed_within_the_work_directory_or_not_at_all() {
+    assert_eq!(within("/w/main", "docs/x.md"), Some("docs/x.md"));
+    assert_eq!(within("", "docs/x.md"), Some("docs/x.md"));
+    assert_eq!(within("/w/main", "/w/main/docs/x.md"), Some("/docs/x.md"));
+    assert_eq!(within("/w/main/", "/w/main/docs/x.md"), Some("/docs/x.md"));
+    assert_eq!(within("/w/main", "/w/main"), Some(""));
+    // A sibling whose name only starts alike is outside it.
+    assert_eq!(within("/w/main", "/w/mainly/docs/x.md"), None);
+    assert_eq!(within("/w/main", "/etc/hosts"), None);
+    // With no work directory named, an absolute path cannot be placed.
+    assert_eq!(within("", "/w/main/docs/x.md"), None);
+}
+
+#[test]
+fn only_a_case_that_holds_its_run_to_the_tree_fails_a_read_of_main_s() {
+    let log = reading_log(&["docs/x.md", "pr-head/docs/x.md"], &["features"]);
+    let held = Expect {
+        main_unread: true,
+        ..Expect::default()
+    };
+
+    assert_eq!(
+        tree_failures(&held, &log),
+        vec![
+            "read main's tree, not the pull request's: docs/x.md",
+            "read main's tree, not the pull request's: features",
+        ]
+    );
+    assert_eq!(
+        tree_failures(&Expect::default(), &log),
+        Vec::<String>::new()
+    );
+    assert_eq!(
+        tree_failures(&held, &reading_log(&["pr-head/docs/x.md"], &[])),
+        Vec::<String>::new()
+    );
+}
