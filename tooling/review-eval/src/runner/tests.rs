@@ -162,19 +162,14 @@ fn every_kind_is_told_to_read_the_pull_request_s_tree_and_not_main_s() {
         assert!(prompt.contains(HEAD_TREE), "{prompt}");
         assert!(!prompt.contains("  "), "{prompt}");
     }
-    assert!(
-        HEAD_TREE.starts_with(
-            "The pull request's tree is in `pr-head/`: read and search the repository's \
-             files there, each as `pr-head/<its path>`"
-        ),
-        "{HEAD_TREE}"
-    );
-    assert!(
-        HEAD_TREE.ends_with(
-            "The tree around it is main's: it shows only what the change replaced, and \
-             nothing the pull request adds."
-        ),
-        "{HEAD_TREE}"
+    // The whole wording is pinned: the middle clause is what stops an
+    // agent from opening a path as its diff or its instructions give it.
+    assert_eq!(
+        HEAD_TREE,
+        "The pull request's tree is in `pr-head/`: read and search the repository's files \
+         there, each as `pr-head/<its path>`, whatever path your diff or your instructions \
+         name. The tree around it is main's: it shows only what the change replaced, and \
+         nothing the pull request adds."
     );
 }
 
