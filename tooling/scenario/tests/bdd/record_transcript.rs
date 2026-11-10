@@ -485,8 +485,7 @@ fn stored_unparsed_and_drift(w: &mut World) -> Result<(), String> {
     // may trail the event a moment: wait for the drift counter, bounded.
     wait_until("the audit log to count the format drift", || {
         Ok(risen(w, "format_drift")? >= 1)
-    })
-    .ok();
+    })?;
     match (risen(w, "format_drift")?, risen(w, "events_unparsed")?) {
         (1, 1) => Ok(()),
         (drift, unparsed) => Err(format!(

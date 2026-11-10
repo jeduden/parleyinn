@@ -787,7 +787,7 @@ fn expand_returns_all(w: &mut World, n: usize) -> Result<(), String> {
 // and a transcript from outside the roots is ingested only when the
 // person names it on `parinn ingest --path` at a terminal. The scenario
 // stays pending: no surface shows a freshness mark yet (VIEW-04), and
-// its first step says so.
+// its first `Then` step says so.
 
 /// The line `parinn ingest` found past the ingest marker of "cut-short":
 /// the server read this many lines of it.

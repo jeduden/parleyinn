@@ -369,7 +369,9 @@ fn reports_short(w: &mut World, name: String) -> Result<(), String> {
     let (_, after) = shown
         .split_once("short of their end, which ingest resumes: ")
         .ok_or_else(|| format!("verify reports no transcript short of its end: {shown}"))?;
-    if after.contains(&format!("{name}.jsonl")) {
+    // Only that clause's own line names the sources short of their end.
+    let named = after.lines().next().unwrap_or_default();
+    if named.contains(&format!("{name}.jsonl")) {
         return Ok(());
     }
     Err(format!(
@@ -378,8 +380,9 @@ fn reports_short(w: &mut World, name: String) -> Result<(), String> {
 }
 
 /// The start markers the scenario's running MCP servers hold, locked as
-/// a server locks its own, until the process ends.
-static HELD_MARKERS: std::sync::Mutex<Vec<fs::File>> = std::sync::Mutex::new(Vec::new());
+/// a server locks its own, until the scenario's world ends.
+#[derive(Default)]
+struct HeldMarkers(Vec<fs::File>);
 
 #[given(
     regex = r"^a running MCP server's live ingest is short of the transcript's end and left no ingest marker yet$"
@@ -400,7 +403,7 @@ fn server_holds_transcript(w: &mut World) -> Result<(), String> {
     fs::set_permissions(&marker, fs::Permissions::from_mode(0o600)).map_err(|e| e.to_string())?;
     let file = fs::File::open(&marker).map_err(|e| e.to_string())?;
     file.lock().map_err(|e| e.to_string())?;
-    HELD_MARKERS.lock().map_err(|e| e.to_string())?.push(file);
+    w.section::<HeldMarkers>().0.push(file);
     Ok(())
 }
 
