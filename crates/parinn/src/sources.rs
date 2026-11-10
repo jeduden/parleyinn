@@ -247,6 +247,24 @@ pub(crate) fn completeness(
     found
 }
 
+/// How far the transcript sources of `store` fall short (ADM-09), and
+/// which generations were replaced before they were fully ingested
+/// (REC-08), as `parinn verify` finds them now.
+pub(crate) fn verified(
+    ctx: &Context,
+    home: &Home,
+    store: &Store,
+) -> Result<Completeness, StoreError> {
+    let found = completeness(
+        &store.sources()?,
+        &crate::capture::served(home),
+        &look,
+        (ctx.clock)().saturating_mul(1000),
+    );
+
+    Ok(found.with_replaced(&store.superseded()?))
+}
+
 /// What `parinn verify` finds of `source`, given what is at its path.
 fn outcome(source: &Source, at: Found, served: &[PathBuf], now_ms: u64) -> Outcome {
     let at = match at {

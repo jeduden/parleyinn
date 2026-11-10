@@ -1180,7 +1180,7 @@ fn verify_command(
         Ok(opened) => opened,
         Err(code) => return code,
     };
-    let incomplete = match completeness(ctx, &home, &store) {
+    let incomplete = match sources::verified(ctx, &home, &store) {
         Ok(found) => found,
         Err(e) => return failed("verify", &e, stderr),
     };
@@ -1267,23 +1267,6 @@ fn verified_store(ctx: &Context, stderr: &mut dyn Write) -> Result<(Home, Store)
     let store = Store::open(&home.store()).map_err(|e| store_failed("verify", &e, stderr))?;
 
     Ok((home, store))
-}
-
-/// How far the transcript sources of `store` fall short (ADM-09), as
-/// `parinn verify` finds them now.
-fn completeness(
-    ctx: &Context,
-    home: &Home,
-    store: &Store,
-) -> Result<sources::Completeness, store::StoreError> {
-    let found = sources::completeness(
-        &store.sources()?,
-        &capture::served(home),
-        &sources::look,
-        (ctx.clock)().saturating_mul(1000),
-    );
-
-    Ok(found.with_replaced(&store.superseded()?))
 }
 
 /// The ranges a purge a kill cut short has still to clear from the

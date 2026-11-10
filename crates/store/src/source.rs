@@ -37,6 +37,20 @@ impl Store {
         self.marker_time = ms;
         self
     }
+
+    /// Every generation of a transcript source a later one replaced
+    /// (REC-07), by path, oldest first.
+    ///
+    /// # Errors
+    ///
+    /// Fails when SQLite does or a row does not parse.
+    pub fn superseded(&self) -> Result<Vec<Source>, StoreError> {
+        select(
+            &self.conn,
+            &format!("{SUPERSEDED} AND ?1 = ?1 ORDER BY path, generation"),
+            "",
+        )
+    }
 }
 
 /// The tables of transcript sources, their places and ingested runs,
