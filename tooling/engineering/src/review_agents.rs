@@ -28,8 +28,8 @@ const SPECIALIST_EFFORT: &str = "low";
 const GENERALIST_EFFORT: &str = "medium";
 /// The efforts an agent may name. A generalist's deep instance names its
 /// own effort, model and turn budget in its definition, and no other
-/// text states them: a run its budget cuts off before its answer keeps
-/// what it stated in its log, headed incomplete, and blocks the review.
+/// text states them: a run its budget cuts off before its answer is
+/// read from its log as it stands.
 const EFFORTS: [&str; 3] = ["low", "medium", "high"];
 
 /// Problems with the agents the review bundle can dispatch: one that is

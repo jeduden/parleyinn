@@ -98,7 +98,7 @@ pub(super) fn review_report_form_cases() -> Vec<Case> {
             "ENG-28",
             Injection::replace(
                 REPORT,
-                "Line::Malformed => return Some(Problem::Malformed { line: number }),",
+                "Line::Malformed => return Some(form_problem(l, number)),",
                 "Line::Malformed => {}",
             ),
             cargo_lib_test("review-gate", gate_test),
@@ -185,24 +185,24 @@ pub(super) fn review_run_report_cases() -> Vec<Case> {
 }
 
 /// The drifts the evaluation's grading of a specialist's report exists
-/// to catch: a grader that takes a report the review would refuse or
+/// to catch: a grader that takes a line the review cannot read or
 /// reads a specialist's severity word, and a check that lets a
 /// generalist's case name a form.
 pub(super) fn review_report_grading_cases() -> Vec<Case> {
     vec![
         case(
-            "the grader passing a report the review would refuse",
+            "the grader passing a report line the review cannot read",
             "ENG-32",
             Injection::replace(
                 "tooling/review-eval/src/grade.rs",
-                "graded.failures.push(format!(\"report refused: {problem}\"));",
-                "graded.slips.push(format!(\"report refused: {problem}\"));",
+                "        graded.failures.push(format!(\n            \"report line does not read: ",
+                "        graded.slips.push(format!(\n            \"report line does not read: ",
             ),
             cargo_lib_test(
                 "review-eval",
-                "grade::tests::a_specialist_report_the_review_would_refuse_fails_its_run",
+                "grade::tests::a_specialist_line_the_review_cannot_read_fails_its_run_and_the_rest_is_graded",
             ),
-            "a_specialist_report_the_review_would_refuse_fails_its_run",
+            "a_specialist_line_the_review_cannot_read_fails_its_run_and_the_rest_is_graded",
         ),
         case(
             "the grader reading a specialist's line by a severity word",
@@ -237,8 +237,8 @@ pub(super) fn review_report_grading_cases() -> Vec<Case> {
 
 /// The drifts the report assembled from a specialist's run log exists to
 /// catch (ENG-28, ENG-32), late so adding them moves no earlier case to
-/// another shard: an assembly that keeps a withdrawn finding, a cut-off
-/// run whose salvaged findings make it one that answered, a gate taking
+/// another shard: an assembly that keeps a withdrawn finding, a run
+/// whose log holds no model call read as one that ran, a gate taking
 /// an answer with no outcome line, a specialist given a writing tool,
 /// and a grader reading a finding stated only in the answer as stated
 /// before it.
@@ -260,18 +260,18 @@ pub(super) fn review_log_report_cases() -> Vec<Case> {
             "a_withdrawal_removes_every_earlier_finding_at_its_place",
         ),
         case(
-            "a cut-off run counted as answered once its findings are salvaged",
+            "a run whose log holds no model call read as one that ran",
             "ENG-28",
             Injection::replace(
                 "tooling/review-run/src/run.rs",
-                "                Some(format!(\"its run ended with {}\", log.subtype))\n",
-                "                log.texts\n                    .is_empty()\n                    .then(|| format!(\"its run ended with {}\", log.subtype))\n",
+                "    if log.ran() { (None, why)",
+                "    if log.ran() || why.is_some() { (None, why)",
             ),
             cargo_lib_test(
                 "review-run",
-                "run::tests::a_run_cut_off_before_its_answer_keeps_what_it_stated_as_an_incomplete_report",
+                "run::tests::a_run_whose_log_holds_no_model_call_did_not_run_and_says_why",
             ),
-            "a_run_cut_off_before_its_answer_keeps_what_it_stated_as_an_incomplete_report",
+            "a_run_whose_log_holds_no_model_call_did_not_run_and_says_why",
         ),
         case(
             "the gate taking a specialist that answered no outcome line",
@@ -316,7 +316,7 @@ pub(super) fn review_log_report_cases() -> Vec<Case> {
 
 /// The drifts running a specialist in parts exists to catch (ENG-28),
 /// late so adding them moves no earlier case to another shard: a merge
-/// that drops a later part's findings, and a part that did not answer
+/// that drops a later part's findings, and a part that did not run
 /// leaving the specialist one that did.
 pub(super) fn review_run_parts_cases() -> Vec<Case> {
     const PARTS: &str = "tooling/review-run/src/parts.rs";
@@ -326,8 +326,8 @@ pub(super) fn review_run_parts_cases() -> Vec<Case> {
             "ENG-28",
             Injection::replace(
                 PARTS,
-                "} else if !lines.iter().any(|l| l == line) {",
-                "} else if at == 0 && !lines.iter().any(|l| l == line) {",
+                "        outcomes.push((at + 1, take_lines(&report, &mut lines)));\n",
+                "        let mut later = Vec::new();\n        let into = if at == 0 { &mut lines } else { &mut later };\n        outcomes.push((at + 1, take_lines(&report, into)));\n",
             ),
             cargo_lib_test(
                 "review-run",
@@ -336,7 +336,7 @@ pub(super) fn review_run_parts_cases() -> Vec<Case> {
             "the_merged_report_is_the_union_of_the_parts_in_order_with_one_outcome",
         ),
         case(
-            "a specialist's part that did not answer not failing the review",
+            "a specialist's part that did not run not failing the review",
             "ENG-28",
             Injection::replace(
                 PARTS,

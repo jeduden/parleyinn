@@ -1,9 +1,8 @@
 //! The attempts after the first. A run that was charged, by its cost or
-//! by model calls that used tokens, is never run again, overloaded or
-//! not: what it stated is its report, headed `incomplete:` when it did
-//! not answer, and a report the gate refuses stands as refused, so no run
-//! is paid for twice. Only a run that cost nothing runs again, as the
-//! same agent: once, a specialist told why its first did not answer and
+//! by model calls that used tokens, ran, and is never run again, cut off
+//! or not: its log is read as it stands, so no run is paid for twice.
+//! Only a run that cost nothing, which did not run, runs again, as the
+//! same agent: once, a specialist told why its first did not run and
 //! the forms again, and judged by that run alone; a run the API turned
 //! away as overloaded waits first, and runs a third time at most.
 
@@ -58,21 +57,21 @@ pub fn refusal(report: &str, answer: &str, known: &BTreeSet<String>) -> Option<S
 }
 
 /// What a specialist's second attempt is told, after its prompt, when
-/// its first run did not answer for `failure` and cost nothing.
+/// its first run did not run for `failure` and cost nothing.
 #[must_use]
 pub fn note(failure: &str) -> String {
     format!(
-        "Your previous attempt did not answer: {failure}. This attempt is judged alone: \
+        "Your previous attempt did not run: {failure}. This attempt is judged alone: \
          state each finding line the moment you have checked it, read each file once, search no \
          whole tree, and send your outcome line before your turns or time run out. {FORMS}"
     )
 }
 
-/// Runs `unit`, and once more when its run did not answer and cost
-/// nothing. A definition that does not read, a run a cost cap stopped or
-/// kept from starting, a run whose credential was refused, a run whose
-/// report the gate refuses and a run that was charged are not run
-/// again, and progress is told why. A run the API turned away as
+/// Runs `unit`, and once more when it did not run, its log holding no
+/// model call. A definition that does not read, a run a cost cap kept
+/// from starting, a run whose credential was refused and a run that was
+/// charged, cut off or not, are not run again, and progress is told why:
+/// a cut run by its class, a cost cap's, or by its charge. A run the API turned away as
 /// overloaded first waits, as `backoff` says, and an attempt so turned
 /// away is followed by another while waits are left and it was not
 /// charged. The first failure is told to progress before the second
@@ -84,32 +83,19 @@ pub fn note(failure: &str) -> String {
 pub(crate) fn run_one(r: &Review, c: &Controls, unit: &Unit) -> (AgentRun, Option<String>) {
     let started = r.clock.now();
     let (first, report) = tried(r, c, unit, None);
-    let refused = match (&report, first.answered()) {
-        (Some(text), true) => refusal(text, &first.log.answer, r.known),
-        _ => None,
-    };
     // A run whose definition did not read keeps its count of none.
-    if first.attempts == 0 || (first.answered() && refused.is_none()) {
+    if first.attempts == 0 || (first.failure.is_none() && first.cut.is_none()) {
         return (first, report);
     }
-    let class = match &refused {
-        // A report the gate refuses came from a run that was paid for,
-        // so what it stated stands and the review names the refusal.
-        Some(_) => Class::Never("its report is refused and the run was paid for"),
-        None => class_of(r, unit, &first),
-    };
+    let class = class_of(r, unit, &first);
     if let Class::Never(why) = class {
-        (r.progress)(&format!("{}; not run again: {why}", describe(&first)));
+        not_again(r, &first, why);
         return (first, report);
     }
-    // A run that cost money is paid for, overloaded or not: a second run
-    // would start from scratch, pay again and meet the same limit. What
-    // it stated is its report, and the review names it as it is.
-    if let Some(why) = charged(&first.log) {
-        (r.progress)(&format!(
-            "{}; not run again: {why}, so what it stated stands",
-            describe(&first)
-        ));
+    // A run that was paid for, cut off or with a report the review could
+    // not keep, ran: it is not paid for again.
+    if let Some(why) = first.log.charged() {
+        not_again(r, &first, &why);
         return (first, report);
     }
     if class == Class::Again {
@@ -127,32 +113,32 @@ pub(crate) fn run_one(r: &Review, c: &Controls, unit: &Unit) -> (AgentRun, Optio
     again(r, c, unit, first, note.as_deref())
 }
 
-/// Why the run `log` reads was charged: it reported a cost, or, with
-/// no cost in it, as a run killed at its deadline or crashed before its
-/// result has none, it made model calls that used tokens; none when it
-/// cost nothing. The turns a result counts are no charge: a call the
-/// API refused counts one and costs nothing.
-fn charged(log: &RunLog) -> Option<String> {
-    if log.cost > 0.0 {
-        return Some(format!("it cost {:.4} USD", log.cost));
-    }
-    let calls: u64 = log
-        .usage
-        .values()
-        .filter(|u| u.fresh + u.cache_write + u.cache_read + u.output > 0)
-        .map(|u| u.calls)
-        .sum();
-    match calls {
-        0 => None,
-        1 => Some("it made 1 model call".to_owned()),
-        n => Some(format!("it made {n} model calls")),
-    }
+/// Tells progress that `run` of `unit`, cut off, is not run again: a
+/// cut run ran, so it was charged. Why is its class's when it may never
+/// run again, else its charge.
+fn tell_cut(r: &Review, unit: &Unit, run: &AgentRun) {
+    let why = match class_of(r, unit, run) {
+        Class::Never(why) => why.to_owned(),
+        _ => run.log.charged().unwrap_or_default(),
+    };
+    not_again(r, run, &why);
+}
+
+/// Tells progress that `run` is not run again for `why`, and, for one
+/// cut off, that its log is read as it stands.
+fn not_again(r: &Review, run: &AgentRun, why: &str) {
+    let read = if run.cut.is_some() {
+        ", so its log is read as it stands"
+    } else {
+        ""
+    };
+    (r.progress)(&format!("{}; not run again: {why}{read}", describe(run)));
 }
 
 /// What the review charges the run `log` reads, of a tier whose cap is
 /// `most` US dollars: the cost its result reported, none or 0 being
 /// nothing, as a run billed to a subscription or answered from the
-/// cache reports; or, for a run [`charged`] that left no result at all,
+/// cache reports; or, for a run charged ([`RunLog::charged`]) that left no result at all,
 /// killed at its deadline, crashed or cancelled in flight, the whole of
 /// its tier's cap, the most `--max-budget-usd` let it spend, so a run
 /// that was paid for is never counted free and no price table is
@@ -161,7 +147,7 @@ fn charged(log: &RunLog) -> Option<String> {
 pub fn billed(log: &RunLog, most: f64) -> f64 {
     if log.cost > 0.0 {
         log.cost
-    } else if !log.resulted && charged(log).is_some() {
+    } else if !log.resulted && log.charged().is_some() {
         most
     } else {
         0.0
@@ -214,23 +200,15 @@ fn again(
             }
         };
         let (mut next, report) = ran(r, c, unit, note, held);
-        let paid = charged(&next.log);
         // Only a run charged nothing is run again, so the last
-        // attempt's charge is the run's.
+        // attempt's charge is the run's; a charged one ran.
         add_usage(&mut next.log, &last.0.log);
         next.attempts = last.0.attempts + 1;
         class = class_of(r, unit, &next);
-        if let (false, Class::Overloaded, Some(why)) = (next.answered(), class, &paid) {
-            (r.progress)(&format!(
-                "{}; not run again: {why}, so what it stated stands",
-                describe(&next)
-            ));
+        if next.cut.is_some() {
+            tell_cut(r, unit, &next);
         }
-        if next.answered()
-            || next.attempts >= MAX_ATTEMPTS
-            || class != Class::Overloaded
-            || paid.is_some()
-        {
+        if next.answered() || next.attempts >= MAX_ATTEMPTS || class != Class::Overloaded {
             return (next, report);
         }
         keep(r, unit, "second");
@@ -269,7 +247,12 @@ fn ran(
             since: r.clock.now(),
         },
     );
-    let mut done = attempt(r.host, r.workdir, r.plan, unit, r.options.deadline, note);
+    let mut done = attempt(
+        (r.host, r.workdir, r.plan),
+        unit,
+        (r.options.deadline, r.known),
+        note,
+    );
     c.live.end(&label);
     done.0.charged = billed(&done.0.log, runner::budget_of(unit.kind));
     held.charge(done.0.charged, &|spent| keep_spend(r, spent));
@@ -277,9 +260,10 @@ fn ran(
     done
 }
 
-/// What running `unit` again would do after `run` failed, from its
-/// failure and the errors in the `.stderr` beside its log; errors that
-/// are there but do not read are told to progress, and count as none.
+/// What running `unit` again would do after `run` did not run or was
+/// cut off, from why and the errors in the `.stderr` beside its log;
+/// errors that are there but do not read are told to progress, and
+/// count as none.
 fn class_of(r: &Review, unit: &Unit, run: &AgentRun) -> Class {
     let errors = r.workdir.join(LOGS).join(format!("{}.stderr", unit.stem()));
     let stderr = std::fs::read_to_string(&errors).unwrap_or_else(|e| {
@@ -292,7 +276,8 @@ fn class_of(r: &Review, unit: &Unit, run: &AgentRun) -> Class {
         }
         String::new()
     });
-    backoff::class(run.failure.as_deref().unwrap_or_default(), &stderr)
+    let why = run.failure.as_deref().or(run.cut.as_deref());
+    backoff::class(why.unwrap_or_default(), &stderr)
 }
 
 /// Waits before a run again after `run` was turned away as overloaded,

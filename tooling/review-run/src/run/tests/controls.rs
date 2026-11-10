@@ -215,7 +215,7 @@ fn no_run_starts_once_the_finished_runs_cost_the_review_s_cap() {
     assert!(report.contains(&specialist), "{report}");
     assert!(
         ran.lines.contains(&format!(
-            "review-code (generalist): did not answer: {generalist}"
+            "review-code (generalist): did not run: {generalist}"
         )),
         "{:?}",
         ran.lines
@@ -233,8 +233,9 @@ fn a_run_that_cost_money_is_not_run_again_whether_or_not_a_cap_is_reached() {
     let (_dir, ran) = controlled(ONE, options, 0.0, after(1, costly));
 
     let run = ran.run("lang-rust");
+    assert_eq!(run.failure, None);
     assert_eq!(
-        run.failure.as_deref(),
+        run.cut.as_deref(),
         Some("its run ended with error_max_turns")
     );
     assert_eq!(run.attempts, 1);
@@ -248,15 +249,17 @@ fn a_run_its_own_cap_stopped_is_never_run_again() {
     let (_dir, ran) = controlled(ONE, options(), 0.0, after(1, capped));
 
     let run = ran.run("lang-rust");
+    assert_eq!(run.failure, None);
     assert_eq!(
-        run.failure.as_deref(),
+        run.cut.as_deref(),
         Some("its run ended with error_max_budget_usd")
     );
     assert_eq!(run.attempts, 1);
     assert!(
         ran.lines.contains(
-            &"lang-rust (specialist): did not answer: its run ended with error_max_budget_usd; \
-              not run again: a cost cap stopped it, and another run would cost more"
+            &"lang-rust (specialist): ran, its log read: its run ended with \
+              error_max_budget_usd (1.0100 USD, 9 turns); not run again: a cost cap stopped it, \
+              and another run would cost more, so its log is read as it stands"
                 .to_owned()
         ),
         "{:?}",
@@ -340,11 +343,12 @@ fn an_overloaded_run_that_was_charged_is_neither_waited_for_nor_run_again() {
     let (_dir, ran) = controlled(ONE, options(), 0.0, after(1, OVERLOADED_PAID));
 
     let run = ran.run("lang-rust");
-    assert!(!run.answered());
+    assert!(run.answered() && run.cut.is_some(), "{run:?}");
     assert_eq!(run.attempts, 1);
     assert!(ran.clock.slept().is_empty());
     assert!(
-        ran.lines[0].ends_with("; not run again: it cost 0.0200 USD, so what it stated stands"),
+        ran.lines[0]
+            .ends_with("; not run again: it cost 0.0200 USD, so its log is read as it stands"),
         "{:?}",
         ran.lines
     );
@@ -366,14 +370,15 @@ fn a_later_overloaded_attempt_that_was_charged_is_not_run_again() {
     });
 
     let run = ran.run("lang-rust");
-    assert!(!run.answered());
+    assert!(run.answered() && run.cut.is_some(), "{run:?}");
     assert_eq!(run.attempts, 2);
     assert_eq!(ran.clock.slept(), [Duration::from_secs(15)]);
     assert!((run.charged - 0.02).abs() < 1e-9, "the charged attempt's");
     assert!(
         ran.lines
             .iter()
-            .any(|l| l.ends_with("; not run again: it cost 0.0200 USD, so what it stated stands")),
+            .any(|l| l
+                .ends_with("; not run again: it cost 0.0200 USD, so its log is read as it stands")),
         "{:?}",
         ran.lines
     );
@@ -489,11 +494,24 @@ fn the_breaker_starts_no_generalist_once_more_than_its_fraction_of_specialists_f
     }
 }
 
+/// A model call that states the outcome line alone.
+const STATED_OUTCOME: &str = r#"{"type":"assistant","parent_tool_use_id":null,"message":{"id":"m1","model":"claude-haiku-5-5","usage":{"input_tokens":3,"output_tokens":2},"content":[{"type":"text","text":"outcome: none — all holds."}]}}"#;
+
 const CAPPED: &str = r#"{"type":"result","subtype":"error_max_budget_usd","is_error":true,"result":"","total_cost_usd":1.01,"num_turns":9}"#;
 
-/// `DISPATCH` run with lang-rust's report refused by the gate and
-/// lang-markdown, when `capped`, stopped by its cost cap.
-fn refused_and_capped(capped: bool) -> Ran {
+/// Writes a one-line diff for the specialist `command` runs, which it
+/// does not read.
+fn unread_diff(command: &Command) {
+    let diffs = command.cwd.join("review/diffs");
+    fs::create_dir_all(&diffs).unwrap();
+    fs::write(diffs.join(format!("{}.diff", agent_of(command))), "+a\n").unwrap();
+}
+
+/// `DISPATCH` run with lang-rust stating a line in no form beside its
+/// finding, and lang-markdown stopped by its cost cap: when `partial`,
+/// before it read its diff or stated anything, else with no diff to
+/// read and its outcome stated.
+fn unreadable_and_capped(partial: bool) -> Ran {
     let options = Options {
         breaker: BREAKER_FRACTION,
         ..options()
@@ -501,11 +519,17 @@ fn refused_and_capped(capped: bool) -> Ran {
     controlled(DISPATCH, options, 0.0, move |c| {
         match agent_of(c).as_str() {
             "lang-rust" => {
-                let outcome = "outcome: none — clean.";
-                fake::answer(c, &[fake::FINDING, outcome], outcome)
+                let outcome = "outcome: findings — one.";
+                fake::answer(c, &[fake::FINDING, "a.rs:9 — not a form", outcome], outcome)
             }
-            "lang-markdown" if capped => {
-                fake::write_log(c, &format!("{CAPPED}\n"));
+            "lang-markdown" => {
+                let stated = if partial {
+                    unread_diff(c);
+                    String::new()
+                } else {
+                    format!("{}\n", STATED_OUTCOME)
+                };
+                fake::write_log(c, &format!("{stated}{CAPPED}\n"));
                 Ok(Output::default())
             }
             _ => fake::either(c),
@@ -515,19 +539,20 @@ fn refused_and_capped(capped: bool) -> Ran {
 }
 
 #[test]
-fn one_refused_report_of_three_is_a_third_and_trips_nothing() {
-    let ran = refused_and_capped(false);
+fn one_unreadable_report_of_three_is_a_third_and_a_capped_run_that_read_all_is_whole() {
+    let ran = unreadable_and_capped(false);
 
+    assert!(ran.run("lang-markdown").whole(), "{:?}", ran.lines);
     assert!(ran.run("review-code").answered(), "{:?}", ran.lines);
     assert!(ran.run("review-spec").answered(), "{:?}", ran.lines);
 }
 
 #[test]
-fn a_refused_report_tips_the_breaker_past_a_third_beside_a_run_a_cap_stopped() {
-    let ran = refused_and_capped(true);
+fn an_unreadable_report_tips_the_breaker_past_a_third_beside_a_partial_one() {
+    let ran = unreadable_and_capped(true);
 
-    // The capped specialist counts as one that ended without an
-    // accepted report, and the refused report is the second of three.
+    // The capped specialist read none of its diff, and the unreadable
+    // report is the second of three.
     let aborted = "aborted: 2 of 3 specialists failed (mass failure; likely an outage or a \
                    broken prompt), so it was not started";
     for generalist in ["review-code", "review-spec"] {
@@ -538,13 +563,42 @@ fn a_refused_report_tips_the_breaker_past_a_third_beside_a_run_a_cap_stopped() {
 }
 
 #[test]
-fn runs_a_cost_cap_stopped_tip_the_breaker_like_any_that_ended_without_a_report() {
+fn specialists_that_only_read_part_of_their_diff_do_not_tip_the_breaker() {
     let options = Options {
         breaker: BREAKER_FRACTION,
         ..options()
     };
     let (_dir, ran) = controlled(DISPATCH, options, 0.0, |c| {
         if ["lang-rust", "lang-markdown"].contains(&agent_of(c).as_str()) {
+            // Its finding and its outcome stated, its diff never read.
+            unread_diff(c);
+            let outcome = "outcome: findings — one.";
+            let log = fake::log_of(&[fake::FINDING, outcome], "success", outcome, 0.01);
+            fake::write_log(c, &log);
+            return Ok(Output::default());
+        }
+        fake::either(c)
+    });
+
+    for specialist in ["lang-rust", "lang-markdown"] {
+        let run = ran.run(specialist);
+        assert!(run.answered() && !run.partial.is_empty(), "{specialist}");
+    }
+    // Two of three read none of their diff: gaps, and no mass failure.
+    for generalist in ["review-code", "review-spec"] {
+        assert!(ran.run(generalist).answered(), "{:?}", ran.lines);
+    }
+}
+
+#[test]
+fn runs_a_cost_cap_stopped_before_they_read_their_diff_tip_the_breaker() {
+    let options = Options {
+        breaker: BREAKER_FRACTION,
+        ..options()
+    };
+    let (_dir, ran) = controlled(DISPATCH, options, 0.0, |c| {
+        if ["lang-rust", "lang-markdown"].contains(&agent_of(c).as_str()) {
+            unread_diff(c);
             fake::write_log(c, &format!("{CAPPED}\n"));
             return Ok(Output::default());
         }

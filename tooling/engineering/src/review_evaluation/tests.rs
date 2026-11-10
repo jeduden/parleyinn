@@ -45,83 +45,31 @@ fn the_table_s_component_is_a_strict_lined_specialist_and_its_case_a_defect() {
     assert_eq!((case.repetitions, case.passes), (3, 2));
 }
 
+/// The scenario's grading table, a row a line, its columns split by `|`.
+const GRADING: &str = "\
+as expected|found|none|outcome line|before answer|yes|passes
+other|missing|none|outcome line|before answer|yes|fails on outcome
+other|found|none|outcome line|before answer|yes|passes, slips on answer
+as expected|missing|found|outcome line|before answer|yes|fails on finding
+as expected|found|found|outcome line|before answer|yes|fails on forbidden
+as expected|found|none|more|before answer|yes|passes, slips on answer
+as expected|found|none|no outcome|before answer|yes|passes, slips on answer
+as expected|found|none|outcome line|only in answer|yes|fails on stating
+as expected|found|none|outcome line|before answer|no|fails on no answer
+as expected|found|none|outcome line|before answer|cut|passes, slips on cut
+other|missing|none|no outcome|before answer|cut|fails on cut";
+
 #[test]
 fn the_grading_table_of_the_scenario_holds() {
-    let rows = vec![
-        graded(
-            "as expected",
-            "found",
-            "none",
-            "outcome line",
-            "before answer",
-            "yes",
-            "passes",
-        ),
-        graded(
-            "other",
-            "found",
-            "none",
-            "outcome line",
-            "before answer",
-            "yes",
-            "fails on outcome",
-        ),
-        graded(
-            "as expected",
-            "missing",
-            "none",
-            "outcome line",
-            "before answer",
-            "yes",
-            "fails on finding",
-        ),
-        graded(
-            "as expected",
-            "found",
-            "found",
-            "outcome line",
-            "before answer",
-            "yes",
-            "fails on forbidden",
-        ),
-        graded(
-            "as expected",
-            "found",
-            "none",
-            "more",
-            "before answer",
-            "yes",
-            "passes, slips on answer",
-        ),
-        graded(
-            "as expected",
-            "found",
-            "none",
-            "no outcome",
-            "before answer",
-            "yes",
-            "fails on answer",
-        ),
-        graded(
-            "as expected",
-            "found",
-            "none",
-            "outcome line",
-            "only in answer",
-            "yes",
-            "fails on stating",
-        ),
-        graded(
-            "as expected",
-            "found",
-            "none",
-            "outcome line",
-            "before answer",
-            "no",
-            "fails on no answer",
-        ),
-    ];
+    let rows: Vec<_> = GRADING
+        .lines()
+        .map(|line| {
+            let c: Vec<&str> = line.split('|').collect();
+            graded(c[0], c[1], c[2], c[3], c[4], c[5], c[6])
+        })
+        .collect();
 
+    assert_eq!(rows.len(), 11);
     assert_eq!(run_graded(&rows), Vec::<String>::new());
 }
 
@@ -130,7 +78,7 @@ fn a_wrong_grading_row_is_named() {
     let rows = vec![
         graded(
             "other",
-            "found",
+            "missing",
             "none",
             "outcome line",
             "before answer",
@@ -169,9 +117,17 @@ fn every_failure_is_named_by_its_first_words() {
     assert_eq!(failed_on("did not answer: deadline"), "no answer");
     assert_eq!(
         failed_on(
-            "report refused: has a report whose line 1 is neither a linked finding nor a requirement request"
+            "report line does not read: has a report whose line 1 is neither a linked finding nor a requirement request: `x`"
         ),
         "report"
+    );
+    assert_eq!(
+        failed_on("set aside as no finding: a.rs:1 — fine"),
+        "report"
+    );
+    assert_eq!(
+        failed_on("ended without a successful result: error_max_turns"),
+        "cut"
     );
     assert_eq!(failed_on("outcome none, want findings"), "outcome");
     assert_eq!(failed_on("no finding at a.rs"), "finding");

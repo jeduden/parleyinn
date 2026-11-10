@@ -83,7 +83,8 @@ impl Host for WeighingHost {
             .collect();
         let line = serde_json::json!({"type": "result", "subtype": "success",
             "is_error": false, "result": result, "total_cost_usd": 0.01, "num_turns": 2});
-        fs::write(log, format!("{}\n{line}\n", calls.join("\n")))
+        let reads = crate::review_runs::reads_of(command, "m0");
+        fs::write(log, format!("{reads}{}\n{line}\n", calls.join("\n")))
             .map_err(|e| format!("write {}: {e}", log.display()))?;
 
         Ok(Output {

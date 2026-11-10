@@ -14,20 +14,20 @@
 //! cost cap refuses is not started, and ends in a gap the breaker counts
 //! as any other. An agent
 //! kept whole from an earlier run is taken as it answered there, and a
-//! part kept is held to the report check again.
+//! part kept is read from its log again.
 
 use std::collections::BTreeMap;
 
 use review_eval::{component, runner};
-use review_gate::report::assemble;
 
 use crate::controls::Controls;
 use crate::memo::{self, Answers};
 use crate::parts;
 use crate::pipeline::pipeline;
 use crate::plan::Plan;
+use crate::reading;
 use crate::resume::Reuse;
-use crate::retry::{refusal, run_one};
+use crate::retry::run_one;
 use crate::run::{AgentRun, Review, Unit, describe, not_started, reused, specialist_units};
 
 /// A task's result: its run, and a specialist's report.
@@ -182,7 +182,7 @@ fn task(r: &Review, c: &Controls, (task, before): (&Task, &Answers), inputs: Vec
         Task::Unit(unit) => {
             let done = one(r, c, unit, &Answers::new());
             if unit.part.is_none() {
-                settle(c, ended_in_gap(&done.0, done.1.as_deref(), r));
+                settle(c, tips(&done.0));
             }
             done
         }
@@ -199,7 +199,7 @@ fn task(r: &Review, c: &Controls, (task, before): (&Task, &Answers), inputs: Vec
             }
             run.answer_key = r.keys.and_then(|k| k.own(name)).map(str::to_owned);
             (r.progress)(&describe(&run));
-            settle(c, ended_in_gap(&run, Some(&report), r));
+            settle(c, tips(&run));
             (run, Some(report))
         }
         Task::Generalist(unit) => {
@@ -227,18 +227,19 @@ fn task(r: &Review, c: &Controls, (task, before): (&Task, &Answers), inputs: Vec
     }
 }
 
+/// Whether specialist `run` counts toward the breaker: it did not run,
+/// stated nothing before it ended, or stated a line that does not read.
+/// One that stated its report and only left lines of its diff unread
+/// did not fail, and does not.
+fn tips(run: &AgentRun) -> bool {
+    !run.answered() || !run.stated_nothing.is_empty() || !run.unreadable.is_empty()
+}
+
 /// Counts a specialist finished, and ended for the breaker, in a gap
 /// when `failed`.
 fn settle(c: &Controls, failed: bool) {
     c.live.finish();
     c.breaker.end(failed);
-}
-
-/// Whether specialist `run`, its report `report`, ended in a gap: a
-/// part or the whole that did not answer, a cost cap's included, or a
-/// report the gate refuses.
-fn ended_in_gap(run: &AgentRun, report: Option<&str>, r: &Review) -> bool {
-    run.failure.is_some() || refusal(report.unwrap_or_default(), &run.log.answer, r.known).is_some()
 }
 
 /// Why the resume plan does not run `name` again, when it stalled.
@@ -263,8 +264,9 @@ fn reuse<'a>(r: &'a Review, name: &str) -> Option<&'a Reuse> {
     r.resume.and_then(|resume| resume.reuse.get(name))
 }
 
-/// Agent `name`'s run kept whole from the earlier run, told to
-/// progress; none when it is not kept whole.
+/// Agent `name`'s run kept whole from the earlier run, with the lines
+/// it set aside there, told to progress; none when it is not kept
+/// whole.
 fn whole(r: &Review, c: &Controls, name: &str) -> Option<AgentRun> {
     let Some(Reuse::Whole(answer)) = reuse(r, name) else {
         return None;
@@ -276,14 +278,20 @@ fn whole(r: &Review, c: &Controls, name: &str) -> Option<AgentRun> {
         Vec::new(),
     );
     run.answer_key = memo::key_of(r, &Unit::whole(name.to_owned()));
+    // What it set aside there is still set aside, listed and counted.
+    run.ignored = r
+        .resume
+        .and_then(|resume| resume.ignored.get(name))
+        .cloned()
+        .unwrap_or_default();
     (r.progress)(&describe(&run));
     c.live.finish();
     Some(run)
 }
 
-/// `unit`'s run: the part the earlier run kept, when its report still
-/// passes the check, else the answer the store holds under its key, when
-/// it is accepted again, else a run of its own, kept in the store once
+/// `unit`'s run: the part the earlier run kept, its report and its
+/// reads of its diff read from its log again, else the answer the store holds under its key, when it is
+/// accepted again, else a run of its own, kept in the store once
 /// accepted; told to progress.
 fn one(r: &Review, c: &Controls, unit: &Unit, heard: &Answers) -> Done {
     let kept = match (reuse(r, &unit.name), &unit.part) {
@@ -291,22 +299,24 @@ fn one(r: &Review, c: &Controls, unit: &Unit, heard: &Answers) -> Done {
         _ => None,
     };
     let key = memo::key_of(r, unit);
-    if let Some(log) = kept {
-        let report = assemble(&log.texts, &log.answer, None);
-        // A kept part is held to the report check as a fresh one.
-        match refusal(&report, &log.answer, r.known) {
-            None => {
-                let mut run = reused(unit.label(), unit.kind, &log.answer, log.texts.clone());
-                run.answer_key = key;
-                (r.progress)(&describe(&run));
-                return (run, Some(report));
-            }
-            Some(why) => (r.progress)(&format!(
-                "{} ({}): its kept report was refused, so it runs again: {why}",
-                unit.label(),
-                unit.kind.word()
-            )),
+    if let Some((log, part)) = kept.zip(unit.part.as_ref()) {
+        // A kept part is read from its log as a fresh one is, its reads
+        // held to its diff again.
+        let read = reading::read_run((&unit.name, Some(part.index)), log, r.known);
+        let mut run = reused(unit.label(), unit.kind, &read.answer, log.texts.clone());
+        run.answer_key = key;
+        run.ignored = read.ignored;
+        run.unreadable = read.unreadable;
+        run.partial.extend(
+            reading::uncovered(r.workdir, &unit.stem(), &log.reads)
+                .map(|why| (Some(part.index), why)),
+        );
+        if read.stated_nothing {
+            let why = crate::run::cut_why(log).unwrap_or_default();
+            run.stated_nothing.push((Some(part.index), why));
         }
+        (r.progress)(&describe(&run));
+        return (run, Some(read.report));
     }
     // Its specialists' reports are read once, for the lookup and the
     // keeping both.

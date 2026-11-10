@@ -17,6 +17,10 @@ fn a_gap_that_counts_is_one_of_its_way() {
         ("over budget: x", Some("over budget:")),
         ("refused: x", Some("refused:")),
         ("unread: x", Some("unread:")),
+        // A specialist that skims its diff, or states a line that does
+        // not read, every run is no less stuck.
+        ("partial: x", Some("partial:")),
+        ("unreadable: x", Some("unreadable:")),
         ("aborted: x", None),
         ("stalled: x", None),
     ] {

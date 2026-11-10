@@ -135,3 +135,153 @@ fn a_call_without_a_model_or_usage_counts_as_unknown() {
     assert_eq!(log.usage["unknown"].calls, 1);
     assert_eq!(log.usage["unknown"].fresh, 0);
 }
+
+const READS: &str = r#"{"type":"assistant","message":{"id":"m1","model":"m","content":[{"type":"tool_use","id":"toolu_1","name":"Read","input":{"file_path":"review/diffs/lang-rust.diff","offset":1,"limit":400}},{"type":"tool_use","id":"toolu_2","name":"Read","input":{"file_path":"review/diffs/lang-rust.diff"}}]}}
+{"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"toolu_1","is_error":false,"content":"..."},{"type":"tool_result","tool_use_id":"toolu_2","is_error":true,"content":"File content exceeds maximum allowed size"}]}}
+{"type":"assistant","message":{"id":"m2","model":"m","content":[{"type":"tool_use","id":"toolu_3","name":"Read","input":{"file_path":"/w/review/diffs/lang-rust.diff","offset":401}}]}}
+{"type":"assistant","parent_tool_use_id":"toolu_9","message":{"id":"s1","model":"m","content":[{"type":"tool_use","id":"toolu_4","name":"Read","input":{"file_path":"src/a.rs"}}]}}
+{"type":"user","parent_tool_use_id":"toolu_9","message":{"content":[{"type":"tool_result","tool_use_id":"toolu_4","is_error":true,"content":"no"}]}}
+"#;
+
+#[test]
+fn a_log_reads_each_main_thread_read_in_order_answered_only_by_a_result_that_is_no_error() {
+    let log = parse(READS);
+
+    assert_eq!(
+        log.reads,
+        vec![
+            ReadCall {
+                path: "review/diffs/lang-rust.diff".to_owned(),
+                offset: Some(1),
+                limit: Some(400),
+                answered: true,
+                bad_range: false,
+            },
+            ReadCall {
+                path: "review/diffs/lang-rust.diff".to_owned(),
+                offset: None,
+                limit: None,
+                answered: false,
+                bad_range: false,
+            },
+            // No result came, as when the run was killed at its
+            // deadline: the read gave the reviewer nothing.
+            ReadCall {
+                path: "/w/review/diffs/lang-rust.diff".to_owned(),
+                offset: Some(401),
+                limit: None,
+                answered: false,
+                bad_range: false,
+            },
+        ]
+    );
+}
+
+#[test]
+fn a_read_s_numbers_read_as_whole_numbers_or_numeric_strings_and_else_are_a_bad_range() {
+    let call = |offset: Value, limit: Value| {
+        let mut input = serde_json::json!({"file_path": "a"});
+        for (key, value) in [("offset", offset), ("limit", limit)] {
+            if !value.is_null() || key == "offset" {
+                input[key] = value;
+            }
+        }
+        let line = serde_json::json!({"type": "assistant", "message": {"id": "m1",
+            "model": "m", "content": [{"type": "tool_use", "id": "t1", "name": "Read",
+            "input": input}]}});
+        let read = parse(&line.to_string()).reads.remove(0);
+        (read.offset, read.limit, read.bad_range)
+    };
+    let json = |text: &str| serde_json::from_str::<Value>(text).unwrap();
+
+    assert_eq!(call(json("3"), json("4")), (Some(3), Some(4), false));
+    assert_eq!(
+        call(json(r#""1500""#), json(r#"" 20 ""#)),
+        (Some(1500), Some(20), false)
+    );
+    // An offset given as null is none given.
+    assert_eq!(call(Value::Null, Value::Null), (None, None, false));
+    for (offset, limit) in [
+        ("1.5", "null"),
+        ("-1", "null"),
+        ("null", r#""many""#),
+        ("null", r#""-5""#),
+        ("null", "true"),
+        ("[1]", "null"),
+    ] {
+        assert!(call(json(offset), json(limit)).2, "{offset} {limit}");
+    }
+}
+
+#[test]
+fn a_read_without_a_path_is_no_read_and_a_prompt_holds_no_result() {
+    let log = parse(
+        r#"{"type":"assistant","message":{"id":"m1","model":"m","content":[{"type":"tool_use","id":"t1","name":"Read","input":{}}]}}
+{"type":"user","message":{"content":"a prompt"}}
+{"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"t1","is_error":true}]}}"#,
+    );
+
+    assert!(log.reads.is_empty());
+}
+
+/// One model call that used tokens, and no result: a run killed at its
+/// deadline or crashed after the model was called.
+const CALLED: &str = r#"{"type":"assistant","parent_tool_use_id":null,"message":{"id":"m1","model":"claude-haiku-5-5","usage":{"input_tokens":10,"output_tokens":5},"content":[{"type":"text","text":"src/a.rs:3 — if not addressed: a long line hides a bug — I9"}]}}"#;
+
+/// A result that failed before any model call: no cost, one turn
+/// counted, no usage.
+const FREE: &str = r#"{"type":"result","subtype":"error_during_execution","is_error":true,"result":"","total_cost_usd":0,"num_turns":1}"#;
+
+#[test]
+fn a_run_is_charged_by_its_model_usage_or_its_cost_never_by_its_turns() {
+    assert_eq!(
+        parse(CALLED).charged().as_deref(),
+        Some("it made 1 model call")
+    );
+    assert_eq!(parse(FREE).charged(), None);
+    assert_eq!(RunLog::default().charged(), None);
+    let costly = RunLog {
+        cost: 0.25,
+        ..RunLog::default()
+    };
+    assert_eq!(costly.charged().as_deref(), Some("it cost 0.2500 USD"));
+    let two = parse(&format!("{CALLED}\n{}", CALLED.replace("\"m1\"", "\"m2\"")));
+    assert_eq!(two.charged().as_deref(), Some("it made 2 model calls"));
+    // Tokens a result counts for a model whose calls the log did not
+    // show are no call it shows.
+    let mut unseen = RunLog::default();
+    unseen.usage.insert(
+        "m".to_owned(),
+        Usage {
+            output: 1,
+            ..Usage::default()
+        },
+    );
+    assert_eq!(unseen.charged(), None);
+}
+
+#[test]
+fn a_run_ran_when_it_answered_something_or_was_charged() {
+    assert!(parse(CALLED).ran());
+    assert!(!parse(FREE).ran());
+    let answered = |answer: &str| RunLog {
+        answered: true,
+        subtype: SUCCESS.to_owned(),
+        answer: answer.to_owned(),
+        ..RunLog::default()
+    };
+    assert!(answered("outcome: none — x").ran());
+    assert!(answered("outcome: none — x").succeeded());
+    assert!(!answered("").succeeded());
+    assert!(!parse(CALLED).succeeded());
+    // A success that answered nothing and used no model is no run, for
+    // the grader as for the review.
+    assert!(!answered(" ").ran());
+    assert!(
+        RunLog {
+            cost: 0.1,
+            ..RunLog::default()
+        }
+        .ran()
+    );
+}

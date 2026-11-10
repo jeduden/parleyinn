@@ -20,11 +20,12 @@ use std::process::{Command, Output};
 
 use testkit::TempDir;
 
-/// A `claude` that answers as the agent it runs as: a specialist states
-/// one linked finding in its text and answers its outcome line; a
+/// A `claude` that answers as the agent it runs as: a specialist reads
+/// the whole diff its prompt names, but those `UNREAD_AGENT` names,
+/// states one linked finding in its text and answers its outcome line; a
 /// generalist keeps it as a nit and closes with a sentence. Started as a
-/// harness session's child it refuses; the agent `SILENT_AGENT` names
-/// never answers, and the one `CUT_AGENT` names states its finding and
+/// harness session's child it refuses; the agents `SILENT_AGENT` names
+/// never answer, and the one `CUT_AGENT` names states its finding and
 /// ends at its turn budget without an answer, or only its part
 /// `CUT_PART` does. A specialist run on a part of its diff also states
 /// a finding of that part's own. The agent `REFUSE_AGENT` names also
@@ -47,7 +48,7 @@ for a in "$@"; do
   if [ "$prev" = "--agent" ]; then agent="$a"; fi
   prev="$a"
 done
-if [ "$agent" = "$SILENT_AGENT" ]; then exec sleep 30; fi
+case " $SILENT_AGENT " in *" $agent "*) exec sleep 30 ;; esac
 if [ -n "$LEAK_AGENT" ] && [ "$agent" = "$LEAK_AGENT" ]; then
   token=$(sed -n 's/.*"accessToken":"\([^"]*\)".*/\1/p' "$CLAUDE_CONFIG_DIR/.credentials.json")
   printf '{"type":"assistant","parent_tool_use_id":null,"message":{"id":"m-%s","model":"claude-haiku-5-5","usage":{"input_tokens":3,"output_tokens":2},"content":[{"type":"text","text":"my environment holds %s"}]}}\n' "$agent" "$token"
@@ -71,6 +72,13 @@ if [ "$agent" = "$REFUSE_AGENT" ]; then
 fi
 case "$prompt" in
   *"a specialist"*)
+    diff=$(printf '%s' "$prompt" | sed -n 's/.*Read only your own diff, `\([^`]*\)`.*/\1/p')
+    unread=""
+    case " $UNREAD_AGENT " in *" $agent "*) unread=yes ;; esac
+    if [ -z "$unread" ]; then
+      printf '{"type":"assistant","parent_tool_use_id":null,"message":{"id":"m-%s","model":"claude-haiku-5-5","usage":{"input_tokens":3,"cache_read_input_tokens":7,"output_tokens":2},"content":[{"type":"tool_use","id":"r1","name":"Read","input":{"file_path":"%s/%s"}}]}}\n' "$agent" "$PWD" "$diff"
+      printf '{"type":"user","parent_tool_use_id":null,"message":{"content":[{"type":"tool_result","tool_use_id":"r1","content":"+fn a() {}"}]}}\n'
+    fi
     printf '{"type":"assistant","parent_tool_use_id":null,"message":{"id":"m-%s","model":"claude-haiku-5-5","usage":{"input_tokens":3,"cache_read_input_tokens":7,"output_tokens":2},"content":[{"type":"text","text":"I read the diff.\\nsrc/a.rs:3 — if not addressed: a long line hides a bug — I9%s"}]}}\n' "$agent" "$own"
     if [ "$agent" = "$CUT_AGENT" ] && { [ -z "$CUT_PART" ] || [ "$part" = "$CUT_PART" ]; }; then
       printf '{"type":"result","subtype":"error_max_turns","is_error":true,"result":"","total_cost_usd":0.03,"num_turns":20}\n'
@@ -158,6 +166,19 @@ fn review_run_refusing(
     args: &[&str],
 ) -> Output {
     review_run_holding(home, dir, (silent, cut, refuse), &[], args)
+}
+
+/// [`review_run`], with `silent` naming the agents that never answer and
+/// `unread` the specialists that read none of their diff, each a list
+/// with a space between.
+fn review_run_unread(home: &Path, dir: &Path, silent: &str, unread: &str, args: &[&str]) -> Output {
+    review_run_holding(
+        home,
+        dir,
+        (silent, "", ""),
+        &[("UNREAD_AGENT", unread)],
+        args,
+    )
 }
 
 /// [`review_run_refusing`], with `env` set for the executable too.
@@ -350,7 +371,7 @@ fn the_gate_approves_what_the_run_wrote() {
     assert_eq!(
         String::from_utf8_lossy(&out.stdout),
         "verdict=approve\ndispatched=5\nconsulted=5\nfindings=1\ncost=0.1300\nreused=0\n\
-         store_failed=0\nstalled=0\nover_budget=0\naborted=0\n"
+         store_failed=0\nstalled=0\nover_budget=0\naborted=0\nignored=0\n"
     );
     assert_eq!(stderr.lines().count(), 5, "{stderr}");
     for name in ["lang-rust", "review-security"] {
@@ -375,7 +396,10 @@ fn the_gate_approves_what_the_run_wrote() {
     assert_eq!(review["event"], "APPROVE");
     assert_eq!(review["commit_id"], "abc123");
     let body = review["body"].as_str().unwrap();
-    assert!(body.contains("5 of 5 dispatched agents answered"), "{body}");
+    assert!(
+        body.contains("5 of 5 dispatched agents ran and their logs were read"),
+        "{body}"
+    );
     assert!(
         body.contains("- nit `src/a.rs:3`: a long line — lang-rust"),
         "{body}"
@@ -400,7 +424,7 @@ fn a_specialist_past_its_deadline_is_decided_and_the_gate_posts_nothing() {
     );
     assert!(
         stderr.contains(
-            "review-run: lang-rust (specialist): did not answer: its run ended with deadline"
+            "review-run: lang-rust (specialist): did not run: its run ended with deadline"
         ),
         "{stderr}"
     );
@@ -408,7 +432,7 @@ fn a_specialist_past_its_deadline_is_decided_and_the_gate_posts_nothing() {
     let outcome = review_gate::parse_outcome(&outcome).unwrap();
     assert!(outcome.findings.iter().any(|f| f.path == "review/"
         && f.severity == "blocking"
-        && f.body.starts_with("lang-rust did not answer")));
+        && f.body.starts_with("lang-rust did not run")));
 
     let (code, review, err) = gate(home.path(), &dir);
 
@@ -424,7 +448,7 @@ fn a_specialist_past_its_deadline_is_decided_and_the_gate_posts_nothing() {
 }
 
 #[test]
-fn a_specialist_cut_off_at_its_turn_budget_blocks_the_review_but_keeps_what_it_stated() {
+fn a_specialist_cut_off_at_its_turn_budget_after_reading_its_whole_diff_is_read_and_approved() {
     let home = TempDir::new().unwrap();
     let dir = home.path().join("work");
     workdir(&dir);
@@ -434,37 +458,69 @@ fn a_specialist_cut_off_at_its_turn_budget_blocks_the_review_but_keeps_what_it_s
     let stderr = String::from_utf8_lossy(&out.stderr);
     assert_eq!(out.status.code(), Some(0), "{stderr}");
     assert!(
-        String::from_utf8_lossy(&out.stdout).starts_with("verdict=request_changes\n"),
+        String::from_utf8_lossy(&out.stdout).starts_with("verdict=approve\n"),
         "{stderr}"
     );
     assert!(
         stderr.contains(
-            "review-run: lang-rust (specialist): did not answer: its run ended with error_max_turns; not run again: it cost 0.0300 USD, so what it stated stands"
+            "review-run: lang-rust (specialist): ran, its log read: its run ended with \
+             error_max_turns (0.0300 USD, 20 turns); not run again: it cost 0.0300 USD, so its \
+             log is read as it stands"
         ),
         "{stderr}"
     );
-    let outcome = fs::read_to_string(dir.join("review/outcome.json")).unwrap();
-    let outcome = review_gate::parse_outcome(&outcome).unwrap();
-    assert!(outcome.findings.iter().any(|f| f.path == "review/"
-        && f.severity == "blocking"
-        && f.body == "lang-rust did not answer (its run ended with error_max_turns), so the review is incomplete"));
-    // The finding it stated before the cut is kept for the author and
-    // the generalists, under a line that says the report is partial.
+    // The finding it stated before the cut is its report, its outcome
+    // derived from its lines.
     assert_eq!(
         fs::read_to_string(dir.join("review/reports/lang-rust.md")).unwrap(),
-        "incomplete: its run ended with error_max_turns\n\
-         src/a.rs:3 — if not addressed: a long line hides a bug — I9\n"
+        "src/a.rs:3 — if not addressed: a long line hides a bug — I9\n\
+         outcome: findings — 1 finding stated in the run log\n"
     );
     let consulted = fs::read_to_string(dir.join("review/consulted.json")).unwrap();
-    assert!(!consulted.contains("lang-rust"), "{consulted}");
+    assert!(consulted.contains("lang-rust"), "{consulted}");
 
     let (code, review, err) = gate(home.path(), &dir);
 
-    assert_eq!(code, review_gate::cli::EXIT_FAILURE);
-    assert_eq!(review, "");
+    assert_eq!(code, review_gate::cli::EXIT_OK, "{err}");
+    let review: serde_json::Value = serde_json::from_str(&review).unwrap();
+    assert_eq!(review["event"], "APPROVE");
+}
+
+#[test]
+fn a_specialist_that_read_none_of_its_diff_is_partial_and_the_gate_posts_the_request() {
+    let home = TempDir::new().unwrap();
+    let dir = home.path().join("work");
+    workdir(&dir);
+
+    let out = review_run_unread(home.path(), &dir, "", "lang-rust", &[]);
+
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert_eq!(out.status.code(), Some(0), "{stderr}");
+    assert!(
+        String::from_utf8_lossy(&out.stdout).starts_with("verdict=request_changes\n"),
+        "{stderr}"
+    );
+    let why = "its log shows no Read of line 1 of review/diffs/lang-rust.diff, of 1 line";
+    let gaps: serde_json::Value =
+        serde_json::from_str(&fs::read_to_string(dir.join("review/gaps.json")).unwrap()).unwrap();
     assert_eq!(
-        err,
-        "review-gate: review: dispatched but not consulted: lang-rust\n"
+        gaps,
+        serde_json::json!([{"name": "lang-rust", "kind": "specialist",
+            "reason": format!("partial: {why}")}])
+    );
+
+    let (code, review, err) = gate(home.path(), &dir);
+
+    assert_eq!(code, review_gate::cli::EXIT_OK, "{err}");
+    let review: serde_json::Value = serde_json::from_str(&review).unwrap();
+    assert_eq!(review["event"], "REQUEST_CHANGES");
+    let body = review["body"].as_str().unwrap();
+    assert!(
+        body.contains(&format!(
+            "- blocking `review/`: lang-rust did not read its whole diff: {why}, so the review of \
+             it is partial"
+        )),
+        "{body}"
     );
 }
 
@@ -570,7 +626,7 @@ fn a_specialist_whose_diff_is_past_the_limit_runs_in_parts_and_the_gate_reads_th
 }
 
 #[test]
-fn a_part_cut_off_at_its_turn_budget_blocks_the_review_naming_it_and_keeps_every_part_s_findings() {
+fn a_part_cut_off_at_its_turn_budget_after_reading_its_diff_is_merged_as_it_stands() {
     let home = TempDir::new().unwrap();
     let dir = home.path().join("work");
     workdir(&dir);
@@ -581,55 +637,42 @@ fn a_part_cut_off_at_its_turn_budget_blocks_the_review_naming_it_and_keeps_every
     let stderr = String::from_utf8_lossy(&out.stderr);
     assert_eq!(out.status.code(), Some(0), "{stderr}");
     assert!(
-        String::from_utf8_lossy(&out.stdout).starts_with("verdict=request_changes\n"),
+        String::from_utf8_lossy(&out.stdout).starts_with("verdict=approve\n"),
         "{stderr}"
     );
     assert!(
         stderr.contains(
-            "review-run: test-engineer-unit part 2 of 3 (specialist): did not answer: its run \
-             ended with error_max_turns; not run again: it cost 0.0300 USD, so what it stated stands"
+            "review-run: test-engineer-unit part 2 of 3 (specialist): ran, its log read: its run \
+             ended with error_max_turns (0.0300 USD, 20 turns); not run again: it cost 0.0300 \
+             USD, so its log is read as it stands"
         ),
         "{stderr}"
     );
-    let outcome = fs::read_to_string(dir.join("review/outcome.json")).unwrap();
-    let outcome = review_gate::parse_outcome(&outcome).unwrap();
-    assert!(
-        outcome.findings.iter().any(|f| f.path == "review/"
-            && f.severity == "blocking"
-            && f.body
-                == "test-engineer-unit did not answer (part 2 of 3: its run ended with \
-                    error_max_turns), so the review is incomplete"),
-        "{:?}",
-        outcome.findings
-    );
     assert_eq!(
         fs::read_to_string(dir.join("review/reports/test-engineer-unit.md")).unwrap(),
-        "incomplete: part 2 of 3: its run ended with error_max_turns\n\
-         src/a.rs:3 — if not addressed: a long line hides a bug — I9\n\
+        "src/a.rs:3 — if not addressed: a long line hides a bug — I9\n\
          src/part1.rs:1 — if not addressed: part 1 breaks — I9\n\
          src/part2.rs:1 — if not addressed: part 2 breaks — I9\n\
-         src/part3.rs:1 — if not addressed: part 3 breaks — I9\n"
+         src/part3.rs:1 — if not addressed: part 3 breaks — I9\n\
+         outcome: findings — in 3 parts: part 1, findings — test-engineer-unit saw one \
+         finding.; part 2, findings — 2 findings stated in the run log; part 3, findings — \
+         test-engineer-unit saw one finding.\n"
     );
     let unit = usage_of(&dir, "test-engineer-unit");
     assert_eq!(
         (unit["parts"].as_u64(), unit["attempts"].as_u64()),
         (Some(3), Some(3))
     );
-    let consulted = fs::read_to_string(dir.join("review/consulted.json")).unwrap();
-    assert!(!consulted.contains("test-engineer-unit"), "{consulted}");
 
     let (code, review, err) = gate(home.path(), &dir);
 
-    assert_eq!(code, review_gate::cli::EXIT_FAILURE);
-    assert_eq!(review, "");
-    assert_eq!(
-        err,
-        "review-gate: review: dispatched but not consulted: test-engineer-unit\n"
-    );
+    assert_eq!(code, review_gate::cli::EXIT_OK, "{err}");
+    let review: serde_json::Value = serde_json::from_str(&review).unwrap();
+    assert_eq!(review["event"], "APPROVE");
 }
 
 #[test]
-fn a_refused_report_is_not_run_again_blocks_the_review_and_the_gate_posts_nothing() {
+fn a_line_in_no_form_blocks_quoted_its_run_is_not_paid_for_again_and_the_gate_posts_it() {
     let home = TempDir::new().unwrap();
     let dir = home.path().join("work");
     workdir(&dir);
@@ -656,34 +699,37 @@ fn a_refused_report_is_not_run_again_blocks_the_review_and_the_gate_posts_nothin
         "{:?}",
         outcome.findings
     );
-    assert!(
-        stderr.contains("not run again: its report is refused and the run was paid for"),
-        "{stderr}"
-    );
     assert_eq!(usage_of(&dir, "lang-rust")["attempts"].as_u64(), Some(1));
+    // Its finding stays in its report; the line in no form is named apart.
+    assert_eq!(
+        fs::read_to_string(dir.join("review/reports/lang-rust.md")).unwrap(),
+        "src/a.rs:3 — if not addressed: a long line hides a bug — I9\n\
+         outcome: findings — lang-rust saw one finding.\n"
+    );
 
     let (code, review, err) = gate(home.path(), &dir);
 
-    assert_eq!(code, review_gate::cli::EXIT_FAILURE);
-    assert_eq!(review, "");
-    assert!(err.contains("lang-rust"), "{err}");
+    assert_eq!(code, review_gate::cli::EXIT_OK, "{err}");
+    let review: serde_json::Value = serde_json::from_str(&review).unwrap();
+    assert_eq!(review["event"], "REQUEST_CHANGES");
 }
 
 const HEAD: &str = "0123456789abcdef0123456789abcdef01234567";
 
 #[test]
-fn a_resumed_run_reruns_only_the_specialist_cut_off_and_its_generalist_and_the_gate_approves() {
+fn a_resumed_run_reruns_only_the_partial_specialist_and_its_generalist_and_the_gate_approves() {
     let home = TempDir::new().unwrap();
     let first = home.path().join("first");
     workdir(&first);
-    let out = review_run(home.path(), &first, "", "lang-rust", &["--head-sha", HEAD]);
+    let out = review_run_unread(home.path(), &first, "", "lang-rust", &["--head-sha", HEAD]);
     assert_eq!(out.status.code(), Some(0));
     let gaps: serde_json::Value =
         serde_json::from_str(&fs::read_to_string(first.join("review/gaps.json")).unwrap()).unwrap();
     assert_eq!(
         gaps,
         serde_json::json!([{"name": "lang-rust", "kind": "specialist",
-            "reason": "incomplete: its run ended with error_max_turns"}])
+            "reason": "partial: its log shows no Read of line 1 of review/diffs/lang-rust.diff, \
+                of 1 line"}])
     );
     let stderr = String::from_utf8_lossy(&out.stderr);
     assert!(
@@ -736,7 +782,10 @@ fn a_resumed_run_reruns_only_the_specialist_cut_off_and_its_generalist_and_the_g
     let review: serde_json::Value = serde_json::from_str(&review).unwrap();
     assert_eq!(review["event"], "APPROVE");
     let body = review["body"].as_str().unwrap();
-    assert!(body.contains("5 of 5 dispatched agents answered"), "{body}");
+    assert!(
+        body.contains("5 of 5 dispatched agents ran and their logs were read"),
+        "{body}"
+    );
 }
 
 #[test]
@@ -744,7 +793,7 @@ fn a_resumed_run_on_another_head_keeps_every_agent_whose_key_is_unchanged() {
     let home = TempDir::new().unwrap();
     let first = home.path().join("first");
     workdir(&first);
-    let out = review_run(home.path(), &first, "", "lang-rust", &["--head-sha", HEAD]);
+    let out = review_run_unread(home.path(), &first, "", "lang-rust", &["--head-sha", HEAD]);
     assert_eq!(out.status.code(), Some(0));
     let earlier = first.join("review");
     let dir = home.path().join("work");
@@ -819,18 +868,13 @@ fn a_mass_failure_of_the_specialists_starts_no_generalist_and_names_the_abort() 
     let dir = home.path().join("work");
     workdir(&dir);
 
-    let out = review_run(
-        home.path(),
-        &dir,
-        "lang-rust",
-        "test-engineer-unit",
-        &["--deadline", "2"],
-    );
+    let silent = "lang-rust test-engineer-unit";
+    let out = review_run_unread(home.path(), &dir, silent, "", &["--deadline", "2"]);
 
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert_eq!(out.status.code(), Some(0), "{stdout}");
     assert!(stdout.starts_with("verdict=request_changes\n"), "{stdout}");
-    assert!(stdout.ends_with("aborted=2\n"), "{stdout}");
+    assert!(stdout.ends_with("aborted=2\nignored=0\n"), "{stdout}");
     for name in ["review-code", "review-security"] {
         assert!(
             !dir.join(format!("review/logs/{name}.jsonl")).exists(),
@@ -849,6 +893,45 @@ fn a_mass_failure_of_the_specialists_starts_no_generalist_and_names_the_abort() 
     let gaps = fs::read_to_string(dir.join("review/gaps.json")).unwrap();
     assert!(
         gaps.contains("\"reason\": \"aborted: 2 of 3 specialists failed"),
+        "{gaps}"
+    );
+}
+
+#[test]
+fn specialists_that_read_none_of_their_diff_are_partial_and_no_mass_failure() {
+    let home = TempDir::new().unwrap();
+    let dir = home.path().join("work");
+    workdir(&dir);
+
+    let unread = "lang-rust test-engineer-unit";
+    let out = review_run_unread(home.path(), &dir, "", unread, &[]);
+
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert_eq!(out.status.code(), Some(0), "{stdout}");
+    assert!(stdout.starts_with("verdict=request_changes\n"), "{stdout}");
+    assert!(stdout.contains("\naborted=0\n"), "{stdout}");
+    for name in ["review-code", "review-security"] {
+        assert!(
+            dir.join(format!("review/logs/{name}.jsonl")).exists(),
+            "{name} did not run"
+        );
+    }
+    let outcome = fs::read_to_string(dir.join("review/outcome.json")).unwrap();
+    assert!(!outcome.contains("review aborted"), "{outcome}");
+    let gaps: serde_json::Value =
+        serde_json::from_str(&fs::read_to_string(dir.join("review/gaps.json")).unwrap()).unwrap();
+    let reasons: Vec<(&str, bool)> = gaps
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|g| {
+            let partial = g["reason"].as_str().unwrap().starts_with("partial: ");
+            (g["name"].as_str().unwrap(), partial)
+        })
+        .collect();
+    assert_eq!(
+        reasons,
+        [("lang-rust", true), ("test-engineer-unit", true)],
         "{gaps}"
     );
 }

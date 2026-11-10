@@ -54,7 +54,7 @@ fn a_review_writes_every_file_the_gate_reads() {
     assert_eq!(
         out,
         "verdict=approve\ndispatched=3\nconsulted=3\nfindings=1\ncost=0.0300\nreused=0\n\
-         store_failed=0\nstalled=0\nover_budget=0\naborted=0\n"
+         store_failed=0\nstalled=0\nover_budget=0\naborted=0\nignored=0\n"
     );
     assert_eq!(err.lines().count(), 3, "{err}");
     let outcome = fs::read_to_string(dir.path().join("review/outcome.json")).unwrap();
@@ -169,6 +169,47 @@ fn a_review_whose_step_outputs_cannot_be_printed_fails_naming_why() {
 }
 
 #[test]
+fn a_line_set_aside_as_no_finding_is_listed_beside_the_outcome_counted_and_told() {
+    let dir = workdir();
+    let host = FakeHost::new(|c| {
+        if fake::agent_of(c) == "lang-rust" {
+            let outcome = "outcome: findings — one.";
+            fake::answer(
+                c,
+                &[fake::FINDING, "src/b.rs:1 — no finding", outcome],
+                outcome,
+            )
+        } else {
+            fake::either(c)
+        }
+    });
+
+    let (code, out, err) = run_in(&host, dir.path());
+
+    assert_eq!(code, EXIT_OK, "{err}");
+    assert!(out.starts_with("verdict=approve\n"), "{out}");
+    assert!(out.ends_with("\nignored=1\n"), "{out}");
+    let ignored: Vec<ReportLine> = serde_json::from_value(read(dir.path(), IGNORED)).unwrap();
+    assert_eq!(ignored.len(), 1);
+    assert_eq!(ignored[0].agent, "lang-rust");
+    assert!(
+        ignored[0].text.ends_with("src/b.rs:1 — no finding"),
+        "{ignored:?}"
+    );
+    assert!(
+        err.contains(
+            "review-run: report lines set aside as no finding: 1, listed in review/ignored.json"
+        ),
+        "{err}"
+    );
+    let report = fs::read_to_string(dir.path().join("review/reports/lang-rust.md")).unwrap();
+    assert_eq!(
+        report,
+        format!("{}\noutcome: findings — one.\n", fake::FINDING)
+    );
+}
+
+#[test]
 fn a_review_whose_specialist_fails_is_still_decided() {
     let dir = workdir();
     let host = FakeHost::new(|c| {
@@ -184,7 +225,7 @@ fn a_review_whose_specialist_fails_is_still_decided() {
     assert_eq!(code, EXIT_OK);
     assert!(out.starts_with("verdict=request_changes\n"), "{out}");
     assert!(
-        err.contains("review-run: lang-rust (specialist): did not answer: claude: not found"),
+        err.contains("review-run: lang-rust (specialist): did not run: claude: not found"),
         "{err}"
     );
     let consulted = read(dir.path(), "review/consulted.json");

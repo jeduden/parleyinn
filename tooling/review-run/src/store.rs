@@ -7,9 +7,10 @@
 //!
 //! An answer is reused only when it is there, its log shows a
 //! successful result with an answer, and, for a specialist, its report
-//! is the one its log assembles and passes the gate's report check
-//! again; for a generalist, its answer reads. Only an accepted answer is
-//! stored: never a refused, incomplete, silent or over-budget run. A
+//! is the one its log reads as, with no line that does not read; for a
+//! generalist, its answer reads. Only an accepted answer is stored:
+//! never a run that did not run, was cut off, read only part of its diff
+//! or stated a line that does not read. A
 //! write goes to a directory of its own and is renamed into place, so a
 //! reader sees an answer whole or not at all, and of two writers of one
 //! key the first rename wins and the second leaves it as it is. A store
@@ -22,14 +23,12 @@ use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
 
-use review_eval::component::Kind;
-use review_eval::log::{self, RunLog, SUCCESS};
-use review_gate::report::assemble;
-
 use crate::key::is_key;
 use crate::outcome;
-use crate::retry::refusal;
+use crate::reading;
 use crate::usage::AgentUsage;
+use review_eval::component::Kind;
+use review_eval::log::{self, RunLog, SUCCESS};
 
 /// A stored answer's log.
 pub const LOG: &str = "log.jsonl";
@@ -226,9 +225,9 @@ fn write_all(
 /// Whether an answer of an agent of `kind`, its log `log` and, for a
 /// specialist, its report `report`, may be stored or reused: its log
 /// shows a successful result with an answer, and a specialist's report
-/// is the one its log assembles and the gate takes, its ids held to
-/// `known`; a generalist's weighing, read from its whole log as the
-/// outcome reads it, reads.
+/// is the one its log reads as, its ids held to `known`, with no line
+/// that does not read; a generalist's weighing, read from its whole log
+/// as the outcome reads it, reads.
 ///
 /// # Errors
 ///
@@ -253,11 +252,16 @@ pub fn accepted(
         return outcome::unreadable(&weighing).map_or(Ok(()), |why| Err(why.to_owned()));
     }
     let report = report.ok_or("it holds no report")?;
-    if report != assemble(&log.texts, &log.answer, None) {
-        return Err("its report is not the one its log assembles".to_owned());
+    // A stored log is read with no name: the lines it names are its own.
+    let read = reading::read(("", None), &log.texts, &log.answer, known);
+    if report != read.report {
+        return Err("its report is not the one its log reads as".to_owned());
     }
-    match refusal(report, &log.answer, known) {
-        Some(why) => Err(format!("its report is refused: {why}")),
+    match read.unreadable.first() {
+        Some(line) => Err(format!(
+            "its report holds a line that does not read: {}: `{}`",
+            line.why, line.text
+        )),
         None => Ok(()),
     }
 }

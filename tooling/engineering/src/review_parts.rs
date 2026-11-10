@@ -5,8 +5,12 @@
 //! each part's run, a finding every part states and one of its own
 //! part's. Run whole, the specialist must run once per part, each told
 //! its own part's diff file, and its report must be the merge of its
-//! parts'; run with one part cut off at its turn budget, the review must
-//! fail closed naming that part, every part's findings kept.
+//! parts'; run with one part cut off at its turn budget after it read
+//! its whole part, that part's log must be read as it stands: the
+//! specialist consulted, named nowhere as not reviewed, and every part's
+//! findings kept; run with one part that ends before any model call,
+//! the review must request changes naming that part, its gap must name
+//! it, and the gate must post nothing, the specialist not consulted.
 
 use std::fs;
 use std::path::Path;
@@ -39,15 +43,21 @@ pub fn part_of(prompt: &str) -> Option<usize> {
 }
 
 /// A stand-in for the `claude` command line: each part of the
-/// specialist states [`FINDING`] and its own part's, then its outcome
-/// line, except part `cut`, whose run ends at its turn budget; the
-/// generalist keeps the finding as a nit. Every specialist prompt is
-/// kept.
+/// specialist reads its whole part, states [`FINDING`] and its own
+/// part's, then its outcome line, except part `cut`, whose run ends at
+/// its turn budget after its findings, and part `silent`, whose run
+/// ends before any model call; the generalist keeps the finding as a
+/// nit. Every specialist prompt is kept.
 #[derive(Debug, Default)]
 pub struct PartHost {
     pub cut: Option<usize>,
+    pub silent: Option<usize>,
     pub prompts: Mutex<Vec<String>>,
 }
+
+/// The log of a run that ended before any model call, costing nothing.
+const SILENT: &str = "{\"type\":\"result\",\"subtype\":\"error_during_execution\",\
+                      \"is_error\":true,\"result\":\"\",\"total_cost_usd\":0,\"num_turns\":1}\n";
 
 impl Host for PartHost {
     fn run(&self, command: &Command) -> Result<Output, String> {
@@ -66,6 +76,17 @@ impl Host for PartHost {
             if let Ok(mut prompts) = self.prompts.lock() {
                 prompts.push(prompt);
             }
+            if self.silent == Some(part) {
+                let log = command
+                    .stdout_to
+                    .as_deref()
+                    .ok_or("the run logs to no file")?;
+                fs::write(log, SILENT).map_err(|e| format!("write {}: {e}", log.display()))?;
+                return Ok(Output {
+                    code: Some(0),
+                    ..Output::default()
+                });
+            }
             let text = format!("{FINDING}\n{}", own_finding(part));
             if self.cut == Some(part) {
                 (text, "error_max_turns", String::new())
@@ -83,7 +104,8 @@ impl Host for PartHost {
         let line = serde_json::json!({"type": "result", "subtype": subtype,
             "is_error": subtype != "success", "result": result, "total_cost_usd": 0.01,
             "num_turns": 2});
-        fs::write(log, format!("{call}\n{line}\n"))
+        let reads = crate::review_runs::reads_of(command, "m");
+        fs::write(log, format!("{reads}{call}\n{line}\n"))
             .map_err(|e| format!("write {}: {e}", log.display()))?;
 
         Ok(Output {
@@ -139,20 +161,16 @@ pub fn prepare(checkout: &Checkout, workdir: &Path) -> Result<(), String> {
     Ok(())
 }
 
-/// Runs `review-run` on `workdir`, prepared from `checkout`, with part
-/// `cut` cut off: the prompts its specialist's runs got, or why it
-/// could not run.
+/// Runs `review-run` on `workdir`, prepared from `checkout`, its
+/// specialist's runs as `host` answers them: the prompts they got, or
+/// why it could not run.
 ///
 /// # Errors
 ///
 /// Fails when the work directory cannot be prepared or review-run
 /// exits with a failure.
-pub fn run(checkout: &Checkout, workdir: &Path, cut: Option<usize>) -> Result<Vec<String>, String> {
+pub fn run(checkout: &Checkout, workdir: &Path, host: PartHost) -> Result<Vec<String>, String> {
     prepare(checkout, workdir)?;
-    let host = PartHost {
-        cut,
-        ..PartHost::default()
-    };
     let mut out = Vec::new();
     let mut err = Vec::new();
     let args = ["--workdir".to_owned(), workdir.display().to_string()];
@@ -214,19 +232,56 @@ pub fn whole_problems(prompts: &[String], workdir: &Path) -> Vec<String> {
     problems
 }
 
-/// What is wrong with what a run whose part 2 was cut off wrote in
-/// `workdir`: a review that does not fail naming that part, and a
-/// report that does not keep every part's findings under its
-/// incomplete line.
+/// What is wrong with what a run whose part 2 was cut off, after it
+/// read its whole part and stated its findings, wrote in `workdir`: the
+/// specialist not consulted or named not reviewed, and a report that is
+/// not every part's findings ended with the outcome merged from theirs,
+/// part 2's given by its lines.
 #[must_use]
 pub fn cut_problems(workdir: &Path) -> Vec<String> {
     let mut problems = Vec::new();
     let read = |rel: &str| fs::read_to_string(workdir.join(rel)).unwrap_or_default();
-    let named = format!(
-        "{SPECIALIST} did not answer (part 2 of {}: its run ended with error_max_turns)",
+    if !read("review/consulted.json").contains(&format!("\"{SPECIALIST}\"")) {
+        problems.push(format!(
+            "{SPECIALIST}, whose part 2 was cut off after it read its whole part, is not consulted"
+        ));
+    }
+    let gaps = review_run::gaps::parse(&read(review_run::gaps::GAPS)).unwrap_or_default();
+    if let Some(gap) = gaps.iter().find(|g| g.name == SPECIALIST) {
+        problems.push(format!(
+            "{SPECIALIST}, which read every part whole, is named not reviewed: {}",
+            gap.reason
+        ));
+    }
+    let report = read(&format!("review/reports/{SPECIALIST}.md"));
+    let mut want: Vec<String> = vec![FINDING.to_owned()];
+    want.extend((1..=FILES.len()).map(own_finding));
+    want.push(format!(
+        "outcome: findings — in {} parts: part 1, findings — part 1.; part 2, findings — 2 \
+         findings stated in the run log; part 3, findings — part 3.",
         FILES.len()
-    );
-    let blocks = review_gate::parse_outcome(&read("review/outcome.json")).is_ok_and(|o| {
+    ));
+    if report != format!("{}\n", want.join("\n")) {
+        problems.push(format!(
+            "{SPECIALIST}'s report does not keep every part's findings, part 2's read as it \
+             stands: {report:?}"
+        ));
+    }
+
+    problems
+}
+
+/// What is wrong with what a run whose part 2 ended before any model
+/// call, and again when run once more, wrote in `workdir`: a review that
+/// does not request changes naming that part in a blocking finding, a
+/// gap that does not name it, and a gate that posts a review the
+/// specialist did not run in.
+#[must_use]
+pub fn silent_problems(workdir: &Path) -> Vec<String> {
+    let mut problems = Vec::new();
+    let read = |rel: &str| fs::read_to_string(workdir.join(rel)).unwrap_or_default();
+    let named = format!("{SPECIALIST} did not run (part 2 of {}: ", FILES.len());
+    let blocks = review_gate::parse_outcome(&read(review_run::OUTCOME)).is_ok_and(|o| {
         o.verdict == review_gate::REQUEST_CHANGES_VERDICT
             && o.findings
                 .iter()
@@ -234,35 +289,57 @@ pub fn cut_problems(workdir: &Path) -> Vec<String> {
     });
     if !blocks {
         problems.push(format!(
-            "a part of {SPECIALIST} that did not answer does not fail the review naming it"
+            "a part of {SPECIALIST} that did not run does not fail the review naming it"
         ));
     }
-    let report = read(&format!("review/reports/{SPECIALIST}.md"));
-    let keeps = report.starts_with("incomplete: part 2 of ")
-        && (1..=FILES.len()).all(|i| report.contains(&own_finding(i)));
-    if !keeps {
+    let gaps = review_run::gaps::parse(&read(review_run::gaps::GAPS)).unwrap_or_default();
+    if !gaps
+        .iter()
+        .any(|g| g.name == SPECIALIST && g.part == Some(2) && g.reason.starts_with("silent:"))
+    {
         problems.push(format!(
-            "{SPECIALIST}'s report does not keep every part's findings under its incomplete \
-             line: {report:?}"
+            "the part of {SPECIALIST} that did not run is not its gap: {gaps:?}"
+        ));
+    }
+    let refused = crate::review_refusals::gate(workdir).is_err_and(|e| {
+        e.split_once("dispatched but not consulted: ")
+            .is_some_and(|(_, names)| names.split(", ").any(|n| n == SPECIALIST))
+    });
+    if !refused {
+        problems.push(format!(
+            "the gate posts a review a part of {SPECIALIST} did not run in"
         ));
     }
 
     problems
 }
 
-/// Runs `review-run` on two work directories under `workdir`, from
-/// `checkout`: one whole, one with the specialist's part 2 cut off, and
-/// returns what is wrong with what each ran and wrote.
+/// Runs `review-run` on three work directories under `workdir`, from
+/// `checkout`: one whole, one with the specialist's part 2 cut off, one
+/// with its part 2 ending before any model call, and returns what is
+/// wrong with what each ran and wrote.
 #[must_use]
 pub fn review_runs_in_parts(checkout: &Checkout, workdir: &Path) -> Vec<String> {
-    let whole = workdir.join("whole");
-    let cut = workdir.join("cut");
-    let mut problems = match run(checkout, &whole, None) {
+    let (whole, cut, silent) = (
+        workdir.join("whole"),
+        workdir.join("cut"),
+        workdir.join("silent"),
+    );
+    let mut problems = match run(checkout, &whole, PartHost::default()) {
         Ok(prompts) => whole_problems(&prompts, &whole),
         Err(e) => vec![e],
     };
-    match run(checkout, &cut, Some(2)) {
+    let host = |cut, silent| PartHost {
+        cut,
+        silent,
+        ..PartHost::default()
+    };
+    match run(checkout, &cut, host(Some(2), None)) {
         Ok(_) => problems.extend(cut_problems(&cut)),
+        Err(e) => problems.push(e),
+    }
+    match run(checkout, &silent, host(None, Some(2))) {
+        Ok(_) => problems.extend(silent_problems(&silent)),
         Err(e) => problems.push(e),
     }
 

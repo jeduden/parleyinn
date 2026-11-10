@@ -47,15 +47,18 @@
 //! finding line, which is a whole finding; a withdrawal naming one
 //! removes nothing and leaves its note, so it is neither an error nor
 //! silent (I6).
-//! A finding, revision or withdrawal line in no form is malformed, and
-//! the report holding it is refused rather than handed to the generalist
-//! marked unlinked: a severity word where the consequence belongs, or a
-//! finding that links nothing, is the categorizing this format exists to
-//! end, and a refused report fails the review closed, as a report that
-//! ends with no outcome does. A linked finding citing an id no
-//! requirement has is refused too, naming the id, so a made-up
-//! requirement cannot carry a finding (`report_check` with the known
-//! ids; the gate, which holds no tree, checks each id's shape alone).
+//! A finding, revision or withdrawal line in no form is malformed: a
+//! severity word where the consequence belongs, or a finding that links
+//! nothing, is the categorizing this format exists to end. The review
+//! reads a report whatever its lines hold ([`split_with`]): each such
+//! line, and each linked finding citing an id no requirement has, is set
+//! apart and named on its own, never handed to the generalist and never
+//! discarding the findings beside it, and a line that says it is no
+//! finding is set aside and counted; [`with_outcome`] ends what reads
+//! with an outcome its lines give. A report that still holds such a
+//! line, or ends with no outcome, is refused, and the gate fails the
+//! review closed on it (`report_check` with the known ids; the gate,
+//! which holds no tree, checks each id's shape alone).
 
 use std::collections::BTreeSet;
 use std::fmt;
@@ -86,11 +89,21 @@ pub const ALL_WELL: &str = "note: all is well, not a finding:";
 /// The words a line saying all is well ends with, in any case, after
 /// its last dash: a finding line ending with one is a note, not refused.
 pub const ALL_WELL_WORDS: [&str; 5] = ["no finding", "no findings", "none", "fine", "sound"];
+/// The words that mark a contrast or a defect, matched whole in any
+/// case: a line that says all is well and then holds one may state a
+/// defect after all, so it is no note but a line that does not read,
+/// failing closed. Kept short, as each one takes a note from the reader:
+/// `unwrap`, `test` and `outside` are no marker, so a note that a call
+/// sits in a test outside the core still reads as one.
+pub const DEFECT_MARKERS: [&str; 16] = [
+    "but", "however", "although", "though", "except", "unless", "yet", "still", "panics", "fails",
+    "missing", "never", "no test", "cannot", "can't", "unsafe",
+];
 /// The arrows a revision may not hold: one between an old place and a
 /// finding line would move a finding, which ENG-28 does not define.
 pub const ARROWS: [&str; 2] = [" → ", " -> "];
-/// What the first line of a report assembled from a run that did not
-/// finish starts with.
+/// What the first line of the report of a specialist that did not run
+/// starts with.
 pub const INCOMPLETE: &str = "incomplete:";
 /// The place the forms are written with: a line that names it where its
 /// place belongs copied a form instead of filling it in.
@@ -492,9 +505,9 @@ pub fn answer_outcome(answer: &str) -> Option<(&str, &'static str)> {
 /// nothing to replace states its finding line; a withdrawal that finds
 /// nothing to remove leaves a note in its stead
 /// ([`WITHDREW_NOTHING`]), so the reader sees it. A malformed line
-/// stays as written, so the report check names it; prose is left out. A run
-/// that did not finish passes `incomplete`, which heads the report and
-/// says why, so a reader sees the report is partial.
+/// stays as written, so the report check names it; prose is left out. A
+/// specialist that did not run passes `incomplete`, which heads the
+/// report and says why.
 #[must_use]
 pub fn assemble(texts: &[String], answer: &str, incomplete: Option<&str>) -> String {
     let mut kept: Vec<Kept> = Vec::new();
@@ -653,14 +666,8 @@ pub fn findings_check(text: &str, known: Option<&BTreeSet<String>>) -> Option<Pr
         let number = at + 1;
         match line(l) {
             Line::Prose | Line::Withdrawn(_) => {}
-            Line::Malformed if at_template(l) => {
-                return Some(Problem::TemplatePlace { line: number });
-            }
-            Line::Malformed if all_well(l) => {}
-            Line::Malformed if missing_dash(l) => return Some(Problem::Undashed { line: number }),
-            Line::Malformed if after_ids(l) => return Some(Problem::AfterIds { line: number }),
-            Line::Malformed if unlinked(l) => return Some(Problem::Unlinked { line: number }),
-            Line::Malformed => return Some(Problem::Malformed { line: number }),
+            Line::Malformed if all_well(l) && !at_template(l) => {}
+            Line::Malformed => return Some(form_problem(l, number)),
             Line::Request(_) => held = true,
             Line::Revised(Revision { finding, .. }) => {
                 held = true;
@@ -681,6 +688,23 @@ pub fn findings_check(text: &str, known: Option<&BTreeSet<String>>) -> Option<Pr
         (true, true) => Some(Problem::NoneWithFindings),
         (false, false) => Some(Problem::FindingsWithNone),
         _ => None,
+    }
+}
+
+/// What `text`, a malformed line at `number` in its report, is refused
+/// for: the template's place copied, a missing dash after its place, a
+/// remark after its ids, no id cited, or no form at all.
+fn form_problem(text: &str, number: usize) -> Problem {
+    if at_template(text) {
+        Problem::TemplatePlace { line: number }
+    } else if missing_dash(text) {
+        Problem::Undashed { line: number }
+    } else if after_ids(text) {
+        Problem::AfterIds { line: number }
+    } else if unlinked(text) {
+        Problem::Unlinked { line: number }
+    } else {
+        Problem::Malformed { line: number }
     }
 }
 
@@ -713,12 +737,13 @@ fn unlinked(text: &str) -> bool {
 
 /// Whether `text`, a malformed line, says all is well at a place: a
 /// place, a dash, and after its last dash one of [`ALL_WELL_WORDS`]
-/// alone, markup and trailing punctuation aside. Such a line is no
+/// alone, markup and trailing punctuation aside, with no word of
+/// [`DEFECT_MARKERS`] between its place and that word. Such a line is no
 /// defect in what is reviewed, so the assembly keeps it as a note
 /// ([`ALL_WELL`]) the reader sees, and the report check passes it by.
 fn all_well(text: &str) -> bool {
     let parts = split_dashes(bare(text));
-    let [first, .., last] = parts.as_slice() else {
+    let [first, between @ .., last] = parts.as_slice() else {
         return false;
     };
     let last = last
@@ -726,6 +751,21 @@ fn all_well(text: &str) -> bool {
         .trim_matches(|c: char| MARKUP.contains(&c) || c.is_ascii_punctuation());
     place(first).is_some_and(|(path, _)| !path.contains(char::is_whitespace))
         && ALL_WELL_WORDS.iter().any(|w| w.eq_ignore_ascii_case(last))
+        && !defect_marked(&between.join(" "))
+}
+
+/// Whether `text` holds one of [`DEFECT_MARKERS`] as whole words, in
+/// any case, a typographic apostrophe read as a plain one.
+fn defect_marked(text: &str) -> bool {
+    let lower = text.to_lowercase().replace('’', "'");
+    let words: Vec<&str> = lower
+        .split(|c: char| !(c.is_alphanumeric() || c == '\''))
+        .filter(|w| !w.is_empty())
+        .collect();
+    DEFECT_MARKERS.iter().any(|marker| {
+        let wanted: Vec<&str> = marker.split(' ').collect();
+        words.windows(wanted.len()).any(|w| w == wanted.as_slice())
+    })
 }
 
 /// Whether `text`, a malformed line, is a linked finding with a remark
@@ -850,6 +890,13 @@ pub fn split_dashes(text: &str) -> Vec<&str> {
         }
     }
 }
+
+mod stated;
+
+pub use stated::{
+    CUT_BEFORE_STATING, Ignored, Reason, Split, Unreadable, derived_outcome, split, split_with,
+    stated_check, states_nothing, with_outcome,
+};
 
 #[cfg(test)]
 mod tests;

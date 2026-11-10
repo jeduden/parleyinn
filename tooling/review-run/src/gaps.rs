@@ -1,15 +1,17 @@
-//! What the review did not review: every dispatched agent, or part of
-//! a specialist's, left without an accepted report or answer. A run
-//! that did not answer after its second attempt is silent, or
-//! incomplete when its turns ran out, over budget when a cost cap
-//! stopped it or kept it from starting, aborted when the circuit
-//! breaker kept it from starting, and stalled when the loop breaker
-//! kept it from running again; a report the gate refuses is
-//! refused, with the gate's problem; a generalist's answer the review
-//! cannot read is unread. The review writes the list beside its outcome,
-//! empty when there is none, so a later run can run just these again,
-//! and names each in the outcome's summary and in its own file, never
-//! as clean.
+//! What the review did not review whole: every dispatched agent, or
+//! part of a specialist's, that did not run, read only part of its diff
+//! or stated a line that does not read, and every answer it could not
+//! take. A run that did not run after its second attempt is silent,
+//! over budget when a cost cap kept it from starting, aborted when the
+//! circuit breaker kept it from starting, and stalled when the loop
+//! breaker kept it from running again; a specialist whose log shows no
+//! read of some lines of its diff is partial, naming them; one whose
+//! report holds a line that does not read is unreadable, quoting it; a
+//! report the gate refuses is refused, with the gate's problem; a
+//! generalist's answer the review cannot read is unread. The review
+//! writes the list beside its outcome, empty when there is none, so a
+//! later run can run just these again, and names each in the outcome's
+//! summary and in its own file, never as clean.
 
 use std::fmt::Write as _;
 
@@ -20,6 +22,7 @@ use review_eval::runner::OVER_BUDGET as OVER_BUDGET_SUBTYPE;
 
 use crate::controls::{ABORTED, OVER_BUDGET};
 use crate::findings::STALLED;
+use crate::reading::ReportLine;
 
 /// The list's file under the work directory.
 pub const GAPS: &str = "review/gaps.json";
@@ -28,6 +31,12 @@ pub const NOT_REVIEWED: &str = "review/not-reviewed.md";
 
 /// The result subtype of a run its turn budget cut off.
 const MAX_TURNS: &str = "error_max_turns";
+/// How the reason of a specialist that did not read its whole diff
+/// starts.
+pub const PARTIAL: &str = "partial:";
+/// How the reason of one whose report holds a line that does not read
+/// starts.
+pub const UNREADABLE: &str = "unreadable:";
 
 /// One agent, or one part of a specialist's, the review did not review.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -41,7 +50,8 @@ pub struct Gap {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub part: Option<usize>,
     /// Why: `silent:`, `incomplete:`, `over budget:`, `aborted:`,
-    /// `refused:` or `unread:`, then the cause.
+    /// `stalled:`, `partial:`, `unreadable:`, `refused:` or `unread:`,
+    /// then the cause.
     pub reason: String,
 }
 
@@ -55,6 +65,16 @@ impl Gap {
             part,
             reason,
         }
+    }
+
+    /// Whether it is of a specialist that stated its report and only
+    /// left lines of its diff unread: no failure of its run, so the
+    /// breaker does not count it.
+    #[must_use]
+    pub fn unread_lines(&self) -> bool {
+        self.reason
+            .strip_prefix(PARTIAL)
+            .is_some_and(|why| !why.trim_start().starts_with(STATED_NOTHING))
     }
 
     /// How the summary names it.
@@ -84,6 +104,51 @@ pub fn silent(why: &str) -> String {
         "silent:"
     };
     format!("{word} {why}")
+}
+
+/// The reason of a specialist that did not read its whole diff, `why`
+/// saying which lines.
+#[must_use]
+pub fn partial(why: &str) -> String {
+    format!("{PARTIAL} {why}")
+}
+
+/// How what a specialist that stated nothing did starts.
+const STATED_NOTHING: &str = "it ended without a successful result";
+
+/// What a specialist did whose run ended as `ended` says before it
+/// stated any line or an outcome.
+#[must_use]
+pub fn nothing_stated(ended: &str) -> String {
+    format!("{STATED_NOTHING} ({ended}) before it stated any line or an outcome")
+}
+
+/// The reason of a specialist that stated nothing before its run ended
+/// as `ended` says: partial, and never one that only left lines unread.
+#[must_use]
+pub fn stated_nothing(ended: &str) -> String {
+    partial(&nothing_stated(ended))
+}
+
+/// The reason of a specialist whose report holds `line`, which does not
+/// read: its problem, the line quoted ([`quoted`]).
+#[must_use]
+pub fn unreadable(line: &ReportLine) -> String {
+    format!("{UNREADABLE} {}: `{}`", line.why, quoted(&line.text))
+}
+
+/// The most characters of a line a finding or gap quotes: a longer one
+/// is cut there, so no line floods the posted review.
+pub const MOST_QUOTED: usize = 240;
+
+/// `text` as a finding or gap quotes it: whole, or its first
+/// [`MOST_QUOTED`] characters and `…` when it is longer.
+#[must_use]
+pub fn quoted(text: &str) -> String {
+    match text.char_indices().nth(MOST_QUOTED) {
+        Some((at, _)) => format!("{}…", &text[..at]),
+        None => text.to_owned(),
+    }
 }
 
 /// Reads a gap list: every entry an agent the review can dispatch, of
@@ -123,8 +188,8 @@ pub fn parse(text: &str) -> Result<Vec<Gap>, String> {
     Ok(gaps)
 }
 
-/// What the review did not review, for a person: each gap with why, or
-/// that every dispatched agent has an accepted report.
+/// What the review did not review whole, for a person: each gap with
+/// why, or that every dispatched agent has an accepted report.
 #[must_use]
 pub fn markdown(gaps: &[Gap]) -> String {
     let mut s = "# Not reviewed\n\n".to_owned();
@@ -133,8 +198,9 @@ pub fn markdown(gaps: &[Gap]) -> String {
         return s;
     }
     s.push_str(
-        "These dispatched agents have no accepted report or answer, so the review read \
-         nothing from them. None of them is clean.\n\n",
+        "The review did not review these dispatched agents, or parts, whole: each did \
+         not run, read only part of its diff, stated a line that does not read, or gave an \
+         answer the review could not take. None of them is clean.\n\n",
     );
     for gap in gaps {
         let _ = writeln!(s, "- `{}` ({}): {}", gap.label(), gap.kind, gap.reason);

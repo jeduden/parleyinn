@@ -2,21 +2,26 @@
 //! the review bundle wrote for it, past [`LIMIT`], split by file in
 //! path order, each part written beside it as `<name>.<i>.diff`; each
 //! part run as the same agent with the same prompt, told which part it
-//! has and every part's files; and the parts' reports and runs merged
-//! into the specialist's one report and run. A part that did not answer
-//! leaves the specialist one that did not answer, its report headed
-//! incomplete and naming that part, with every part's findings kept.
+//! has and every part's files, and, when its part is one file larger
+//! than one read of the agent's file tool returns, the line ranges to
+//! read it in, as a specialist run whole is told when its diff is more
+//! lines than one read takes; and the parts' reports and runs merged
+//! into the specialist's one report and run. A part that did not run
+//! leaves the specialist one that did not run, its report headed
+//! incomplete and naming that part, with every part's findings kept; a
+//! part cut off is read as it stands, and what each part did not read
+//! of its diff, set aside or could not read stays named by its part.
 
 use std::fs;
 use std::path::Path;
 
-use review_bundle::cli::DIFFS;
 use review_bundle::diff;
 use review_eval::component::Kind;
+use review_eval::coverage::DEFAULT_LIMIT;
 use review_eval::log::{RunLog, SUCCESS};
 use review_gate::report::{FINDINGS, INCOMPLETE, NONE, answer_outcome};
 
-use crate::REVIEW;
+use crate::reading::diff_file;
 use crate::run::AgentRun;
 
 /// The size, in bytes, past which a specialist's diff runs in parts,
@@ -52,12 +57,6 @@ impl Part {
     pub fn stem(&self, name: &str) -> String {
         format!("{name}.{}", self.index)
     }
-}
-
-/// `name`'s diff file, or its part `index`'s, relative to the work
-/// directory.
-fn diff_file(stem: &str) -> String {
-    format!("{REVIEW}/{DIFFS}/{stem}.diff")
 }
 
 /// The parts specialist `name` runs in, under the work directory
@@ -96,9 +95,10 @@ pub fn prepare(workdir: &Path, name: &str, limit: usize) -> Result<Vec<Part>, St
             "Your diff is too large for one run, so the review runs you in {count} parts \
              and merges their reports: you are part {index} of {count}. Read only your \
              part's diff, `{own}`, not `{}`, and state findings on its files; you may \
-             Read and Grep the rest of the tree. The full diff's files, by part: \
+             Read and Grep the rest of the tree.{} The full diff's files, by part: \
              {by_part}.",
-            diff_file(name)
+            diff_file(name),
+            reading(&own, &p.text, limit).map_or_else(String::new, |r| format!(" {r}"))
         );
         parts.push(Part {
             index,
@@ -111,20 +111,90 @@ pub fn prepare(workdir: &Path, name: &str, limit: usize) -> Result<Vec<Part>, St
     Ok(parts)
 }
 
+/// The line ranges, from one and inclusive, to read `text` in when it
+/// is more than one read of the agent's file tool returns, `limit`
+/// bytes or [`DEFAULT_LIMIT`] lines: each as many whole lines as fit in
+/// both, a line larger than `limit` alone. None when one read returns
+/// it whole.
+#[must_use]
+pub fn ranges(text: &str, limit: usize) -> Vec<(usize, usize)> {
+    if text.len() <= limit && text.lines().count() <= DEFAULT_LIMIT {
+        return Vec::new();
+    }
+    let mut ranges: Vec<(usize, usize)> = Vec::new();
+    let mut size = 0;
+    for (at, line) in text.split_inclusive('\n').enumerate() {
+        match ranges.last_mut() {
+            Some(last) if size + line.len() <= limit && at - last.0 < DEFAULT_LIMIT - 1 => {
+                last.1 = at + 1;
+                size += line.len();
+            }
+            _ => {
+                ranges.push((at + 1, at + 1));
+                size = line.len();
+            }
+        }
+    }
+
+    ranges
+}
+
+/// What a specialist is told of reading its diff `own`, `text`, when
+/// one read of the agent's file tool does not return it whole, as a
+/// file larger than `limit` alone in its part is: the line ranges to
+/// read it in ([`ranges`]). None otherwise, or when it is one line.
+fn reading(own: &str, text: &str, limit: usize) -> Option<String> {
+    let ranges = ranges(text, limit);
+    // One line past the limit is one range: no other read returns it.
+    let (last, rest) = ranges.split_last().filter(|(_, rest)| !rest.is_empty())?;
+    let range = |(from, to): &(usize, usize)| format!("{from}-{to}");
+    let rest: Vec<String> = rest.iter().map(range).collect();
+    Some(format!(
+        "One `Read` does not return `{own}` whole: read its {} lines in {} calls, each with \
+         `offset` and `limit`, lines {} and {}, and leave no line unread.",
+        last.1,
+        ranges.len(),
+        rest.join(", "),
+        range(last)
+    ))
+}
+
+/// What specialist `name`, run whole on its diff under `workdir`, is
+/// told of reading it ([`reading`]): its diff is within the split
+/// limit, so only its lines can be more than one read takes. None when
+/// one read returns it whole, or it is not there or does not read,
+/// which the reads of its log then show.
+pub(crate) fn whole_reading(workdir: &Path, name: &str) -> Option<String> {
+    let own = diff_file(name);
+    let text = fs::read_to_string(workdir.join(&own)).ok()?;
+    reading(&own, &text, usize::MAX)
+}
+
 /// Specialist `name`'s run and report merged from its parts' runs and
-/// assembled reports, in part order: every part's finding lines, a line
-/// identical to an earlier one dropped; then, when every part answered,
-/// one outcome line, findings when any part's is, else none, saying
-/// each part's, and that line as the answer, but no outcome line when a
+/// read reports, in part order: every part's finding lines, a line
+/// identical to an earlier one dropped; then, when every part ran, one
+/// outcome line, findings when any part's is, else none, saying each
+/// part's, and that line as the answer, but no outcome line when a
 /// part's report has none, so the report check refuses it. A part that
-/// did not answer makes the run one that did not answer, its report
-/// headed incomplete naming each such part. Costs, what the budget
-/// charged, turns, usage and attempts add up.
+/// did not run makes the run one that did not run, its report headed
+/// incomplete naming each such part; a part cut off makes it cut, naming
+/// each such part. Costs, what the budget charged, turns, usage and
+/// attempts add up, and what each part did not read, set aside or could
+/// not read is kept.
 #[must_use]
 pub fn merge(name: &str, parts: Vec<(AgentRun, String)>) -> (AgentRun, String) {
     let count = parts.len();
-    let mut failures = Vec::new();
-    let mut failed_parts = Vec::new();
+    let (mut failures, mut cuts) = (Vec::new(), Vec::new());
+    let mut merged = AgentRun {
+        parts: u32::try_from(count).unwrap_or(u32::MAX),
+        ..AgentRun::of(
+            name.to_owned(),
+            Kind::Specialist,
+            None,
+            RunLog::default(),
+            0,
+        )
+    };
     let mut outcomes = Vec::new();
     let mut lines: Vec<String> = Vec::new();
     let mut log = RunLog {
@@ -132,32 +202,26 @@ pub fn merge(name: &str, parts: Vec<(AgentRun, String)>) -> (AgentRun, String) {
         subtype: SUCCESS.to_owned(),
         ..RunLog::default()
     };
-    let (mut attempts, mut charged) = (0, 0.0);
     for (at, (run, report)) in parts.into_iter().enumerate() {
         let place = format!("part {} of {count}", at + 1);
         if let Some(why) = &run.failure {
             failures.push(format!("{place}: {why}"));
-            failed_parts.push((at + 1, why.clone()));
+            merged.failed_parts.push((at + 1, why.clone()));
             if log.answered {
                 log.subtype.clone_from(&run.log.subtype);
             }
             log.answered = false;
+        } else if let Some(why) = &run.cut {
+            cuts.push(format!("{place}: {why}"));
         }
-        attempts += run.attempts;
-        charged += run.charged;
+        merged.partial.extend(run.partial);
+        merged.stated_nothing.extend(run.stated_nothing);
+        merged.ignored.extend(run.ignored);
+        merged.unreadable.extend(run.unreadable);
+        merged.attempts += run.attempts;
+        merged.charged += run.charged;
         add(&mut log, run.log);
-        let mut outcome = None;
-        for line in report.lines() {
-            if line.starts_with(INCOMPLETE) {
-                continue;
-            }
-            if let Some((text, word)) = answer_outcome(line) {
-                outcome = Some((text.to_owned(), word));
-            } else if !lines.iter().any(|l| l == line) {
-                lines.push(line.to_owned());
-            }
-        }
-        outcomes.push((at + 1, outcome));
+        outcomes.push((at + 1, take_lines(&report, &mut lines)));
     }
     if count == 0 {
         failures.push("it ran in no part".to_owned());
@@ -180,24 +244,34 @@ pub fn merge(name: &str, parts: Vec<(AgentRun, String)>) -> (AgentRun, String) {
         }
         _ => String::new(),
     };
+    merged.cut = (failure.is_none() && !cuts.is_empty()).then(|| cuts.join("; "));
 
     (
         AgentRun {
-            name: name.to_owned(),
-            kind: Kind::Specialist,
             failure,
             log,
-            attempts,
-            parts: u32::try_from(count).unwrap_or(u32::MAX),
-            failed_parts,
-            reused: false,
-            from_store: false,
-            answer_key: None,
-            store_failed: false,
-            charged,
+            ..merged
         },
         report,
     )
+}
+
+/// Adds each line of a part's `report` but its outcome line and an
+/// incomplete heading to `lines`, a line identical to an earlier one
+/// dropped, and returns its outcome line and the word it gives.
+fn take_lines(report: &str, lines: &mut Vec<String>) -> Option<(String, &'static str)> {
+    let mut outcome = None;
+    for line in report.lines() {
+        if line.starts_with(INCOMPLETE) {
+            continue;
+        }
+        if let Some((text, word)) = answer_outcome(line) {
+            outcome = Some((text.to_owned(), word));
+        } else if !lines.iter().any(|l| l == line) {
+            lines.push(line.to_owned());
+        }
+    }
+    outcome
 }
 
 /// The outcome line of `count` parts whose outcome lines and words are

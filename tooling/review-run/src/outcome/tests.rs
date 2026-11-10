@@ -14,24 +14,12 @@ fn plan(dispatch: &str) -> Plan {
 const DISPATCH: &str = r#"{"review-code": ["lang-rust", "test-engineer-unit"]}"#;
 
 fn ran(name: &str, kind: Kind, answer: &str) -> AgentRun {
-    AgentRun {
-        name: name.to_owned(),
-        kind,
-        failure: None,
-        log: RunLog {
-            answered: true,
-            answer: answer.to_owned(),
-            ..RunLog::default()
-        },
-        attempts: 1,
-        parts: 1,
-        failed_parts: Vec::new(),
-        reused: false,
-        from_store: false,
-        answer_key: None,
-        store_failed: false,
-        charged: 0.0,
-    }
+    let log = RunLog {
+        answered: true,
+        answer: answer.to_owned(),
+        ..RunLog::default()
+    };
+    AgentRun::of(name.to_owned(), kind, None, log, 1)
 }
 
 fn silent(name: &str, kind: Kind, why: &str) -> AgentRun {
@@ -98,8 +86,8 @@ fn a_review_whose_agents_all_answered_with_only_nits_approves() {
     );
     assert_eq!(
         d.outcome.summary,
-        "3 of 3 dispatched agents answered: 2 of 2 specialists and 1 of 1 generalist. \
-         The generalists kept 0 blocking and 1 nit findings. \
+        "3 of 3 dispatched agents ran and their logs were read: 2 of 2 specialists and 1 of 1 \
+         generalist. The generalists kept 0 blocking and 1 nit findings. \
          Consulted: lang-rust, review-code, test-engineer-unit. \
          review-code: The code is sound."
     );
@@ -142,12 +130,11 @@ fn an_agent_that_did_not_answer_is_counted_named_and_blocks() {
         vec![
             blocking(
                 "review/",
-                "review-code did not answer (it was not run), so the review is incomplete"
-                    .to_owned()
+                "review-code did not run (it was not run), so the review is incomplete".to_owned()
             ),
             blocking(
                 "review/",
-                "test-engineer-unit did not answer (its run ended with deadline), so the review \
+                "test-engineer-unit did not run (its run ended with deadline), so the review \
                  is incomplete"
                     .to_owned()
             ),
@@ -155,7 +142,8 @@ fn an_agent_that_did_not_answer_is_counted_named_and_blocks() {
     );
     assert!(
         d.outcome.summary.starts_with(
-            "1 of 3 dispatched agents answered: 1 of 2 specialists and 0 of 1 generalist."
+            "1 of 3 dispatched agents ran and their logs were read: 1 of 2 specialists and 0 of \
+             1 generalist."
         ),
         "{}",
         d.outcome.summary
@@ -163,7 +151,7 @@ fn an_agent_that_did_not_answer_is_counted_named_and_blocks() {
     assert!(
         d.outcome
             .summary
-            .contains(" Did not answer: review-code, test-engineer-unit."),
+            .contains(" Did not run: review-code, test-engineer-unit."),
         "{}",
         d.outcome.summary
     );
@@ -185,10 +173,6 @@ fn a_report_the_gate_would_refuse_blocks_and_is_named() {
                 "incomplete: its run ended with error_max_turns\na.rs:1 — if not addressed: x breaks — ENG-02",
             ),
             "has a report that does not end with its outcome",
-        ),
-        (
-            Some("outcome: none — another."),
-            "answered another outcome in the run log than its report ends with",
         ),
         (
             Some(
@@ -925,3 +909,5 @@ fn each_generalist_s_weighing_is_kept_answered_or_cut_off_and_none_without_a_run
     let none = decide(&plan(DISPATCH), &runs, &reports, &known());
     assert!(none.weighings.is_empty());
 }
+
+mod read;

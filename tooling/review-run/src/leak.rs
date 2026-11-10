@@ -25,14 +25,25 @@ pub fn scrub_runs(scrubber: &Scrubber, runs: &mut [AgentRun]) -> usize {
         }
     };
     for run in runs.iter_mut() {
-        if let Some(failure) = run.failure.as_mut() {
-            scrub(failure);
+        for why in [run.failure.as_mut(), run.cut.as_mut()]
+            .into_iter()
+            .flatten()
+        {
+            scrub(why);
         }
         scrub(&mut run.log.subtype);
         scrub(&mut run.log.answer);
         run.log.texts.iter_mut().for_each(&mut scrub);
         run.log.writes.iter_mut().for_each(&mut scrub);
         run.failed_parts.iter_mut().for_each(|(_, why)| scrub(why));
+        run.partial.iter_mut().for_each(|(_, why)| scrub(why));
+        run.stated_nothing
+            .iter_mut()
+            .for_each(|(_, why)| scrub(why));
+        for line in run.ignored.iter_mut().chain(run.unreadable.iter_mut()) {
+            scrub(&mut line.text);
+            scrub(&mut line.why);
+        }
     }
 
     count

@@ -3,7 +3,8 @@
 //! finished cost the review's cap and names each agent it did not start
 //! over budget, never approving; starts no generalist once more than a
 //! third of the dispatched specialists failed, opening the review
-//! outcome with the abort; waits with backoff before it runs again an
+//! outcome with the abort, and counts none that only left lines of its
+//! diff unread; waits with backoff before it runs again an
 //! agent the API turned away as overloaded; and never runs again an
 //! agent a cost cap stopped, whose credential was refused or that was
 //! charged. The checks
@@ -49,6 +50,9 @@ pub struct ControlHost {
     /// By agent: how many of its first runs fail, and the log each
     /// writes, or none for a run that cannot start.
     pub fails: BTreeMap<&'static str, (usize, Option<&'static str>)>,
+    /// The specialists that state their report and read none of their
+    /// diff, which gets a line as each runs.
+    pub unread: Vec<&'static str>,
     /// How long each run takes, so runs started together overlap.
     pub hold: Duration,
     commands: Mutex<Vec<Command>>,
@@ -117,8 +121,9 @@ impl Host for ControlHost {
 }
 
 impl ControlHost {
-    /// Answers `command`: fails it as [`ControlHost::fails`] says, else
-    /// as [`Recorder`] does.
+    /// Answers `command`: as a specialist [`ControlHost::unread`] names
+    /// would, fails it as [`ControlHost::fails`] says, else as
+    /// [`Recorder`] does.
     fn answer(&self, command: &Command) -> Result<Output, String> {
         let agent = agent_of(command);
         let ran = {
@@ -126,6 +131,9 @@ impl ControlHost {
             commands.push(command.clone());
             commands.iter().filter(|c| agent_of(c) == agent).count()
         };
+        if self.unread.contains(&agent.as_str()) {
+            return unread(command, &agent);
+        }
         match self.fails.get(agent.as_str()) {
             Some((first, Some(log))) if ran <= *first => {
                 let path = command
@@ -143,6 +151,21 @@ impl ControlHost {
             _ => self.recorder.run(command),
         }
     }
+}
+
+/// Answers `command` as specialist `agent` that reads none of its
+/// diff: the diff its prompt names gets a line, and its log states its
+/// finding and its outcome after no read.
+fn unread(command: &Command, agent: &str) -> Result<Output, String> {
+    let rel = review_runs::diff_of(command).ok_or(format!("{agent}'s prompt names no diff"))?;
+    let diff = command.cwd.join(rel);
+    fs::write(&diff, "+a\n").map_err(|e| format!("write {}: {e}", diff.display()))?;
+    review_runs::stated(command, agent, "")?;
+
+    Ok(Output {
+        code: Some(0),
+        ..Output::default()
+    })
 }
 
 /// Runs `review-run` on `workdir`, prepared from `checkout`, with
@@ -292,15 +315,15 @@ pub fn aborted_problems(
     problems
 }
 
-/// What [`aborted_problems`] names of the review of `workdir`, prepared
-/// from `checkout`, two of whose three specialists cannot start.
-#[must_use]
-pub fn breaker_problems(checkout: &Checkout, workdir: &Path) -> Vec<String> {
-    let host = ControlHost {
-        fails: BTreeMap::from([("lang-rust", (2, None)), ("test-engineer-unit", (2, None))]),
-        ..ControlHost::default()
-    };
-    match review(checkout, workdir, &host, &[]) {
+/// What is wrong with a review: given the generalists that started,
+/// what it printed, its outcome and its gaps by agent.
+type Judge = fn(&[&str], &str, &str, &BTreeMap<String, String>) -> Vec<String>;
+
+/// What `judge` names of the review of `workdir`, prepared from
+/// `checkout` and run with `host`: given the generalists that started,
+/// what the review printed, its outcome and its gaps.
+fn judged(checkout: &Checkout, workdir: &Path, host: &ControlHost, judge: Judge) -> Vec<String> {
+    match review(checkout, workdir, host, &[]) {
         Ok(out) => {
             let started: Vec<&str> = review_runs::GENERALISTS
                 .iter()
@@ -311,12 +334,70 @@ pub fn breaker_problems(checkout: &Checkout, workdir: &Path) -> Vec<String> {
             fs::read_to_string(&outcome)
                 .map_err(|e| format!("read {}: {e}", outcome.display()))
                 .and_then(|outcome| {
-                    gaps(workdir).map(|gaps| aborted_problems(&started, &out, &outcome, &gaps))
+                    gaps(workdir).map(|gaps| judge(&started, &out, &outcome, &gaps))
                 })
                 .unwrap_or_else(|e| vec![e])
         }
         Err(e) => vec![e],
     }
+}
+
+/// What [`aborted_problems`] names of the review of `workdir`, prepared
+/// from `checkout`, two of whose three specialists cannot start.
+#[must_use]
+pub fn breaker_problems(checkout: &Checkout, workdir: &Path) -> Vec<String> {
+    let host = ControlHost {
+        fails: BTreeMap::from([("lang-rust", (2, None)), ("test-engineer-unit", (2, None))]),
+        ..ControlHost::default()
+    };
+    judged(checkout, workdir, &host, aborted_problems)
+}
+
+/// The two of the three specialists that read none of their diff.
+pub const UNREAD: [&str; 2] = ["lang-rust", "test-engineer-unit"];
+
+/// What is wrong with a review whose specialists [`UNREAD`] stated
+/// their report and read none of their diff, printing `out`, its
+/// outcome `outcome`, its gaps `gaps`, the generalists in `started`
+/// having started: a generalist that did not start, an abort, or one of
+/// them not named partial. No run of theirs failed, so it is no mass
+/// failure.
+#[must_use]
+pub fn unread_problems_of(
+    started: &[&str],
+    out: &str,
+    outcome: &str,
+    gaps: &BTreeMap<String, String>,
+) -> Vec<String> {
+    const NONE_FAILED: &str = "though no specialist's run failed";
+    let mut problems: Vec<String> = review_runs::GENERALISTS
+        .iter()
+        .filter(|(g, _, _)| !started.contains(g))
+        .map(|(g, _, _)| format!("{g} did not start {NONE_FAILED}"))
+        .collect();
+    if outcome.contains("review aborted:") || !out.contains("aborted=0\n") {
+        problems.push(format!("the review aborted {NONE_FAILED}: {outcome}"));
+    }
+    for specialist in UNREAD {
+        let reason = gaps.get(specialist).map_or("", String::as_str);
+        if !reason.starts_with(review_run::gaps::PARTIAL) {
+            problems.push(format!("{specialist} is not named partial: {reason:?}"));
+        }
+    }
+
+    problems
+}
+
+/// What [`unread_problems_of`] names of the review of `workdir`,
+/// prepared from `checkout`, whose specialists [`UNREAD`] read none of
+/// their diff.
+#[must_use]
+pub fn unread_problems(checkout: &Checkout, workdir: &Path) -> Vec<String> {
+    let host = ControlHost {
+        unread: UNREAD.to_vec(),
+        ..ControlHost::default()
+    };
+    judged(checkout, workdir, &host, unread_problems_of)
 }
 
 /// A clock that never sleeps: it keeps each wait and moves on by it.
@@ -435,7 +516,7 @@ pub fn retried_problems(
         ));
     } else if !lines.iter().any(|l| {
         l.starts_with("review-spec (generalist): ")
-            && l.ends_with(&format!("not run again: {CAP_STOPPED}"))
+            && l.contains(&format!("not run again: {CAP_STOPPED}"))
     }) {
         problems.push(format!(
             "review-spec, stopped by its cost cap, is not told as not run again because {CAP_STOPPED}"

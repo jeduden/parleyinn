@@ -271,7 +271,10 @@ fn a_mass_failure_opens_the_outcome_with_the_abort_and_counts_what_it_kept_from_
 
     assert_eq!(code, EXIT_OK, "{err}");
     assert!(out.starts_with("verdict=request_changes\n"), "{out}");
-    assert!(out.ends_with("over_budget=0\naborted=1\n"), "{out}");
+    assert!(
+        out.ends_with("over_budget=0\naborted=1\nignored=0\n"),
+        "{out}"
+    );
     let outcome = read(dir.path(), "review/outcome.json");
     assert!(
         outcome["findings"][0]["body"]

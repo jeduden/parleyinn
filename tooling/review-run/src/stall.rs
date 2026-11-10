@@ -1,14 +1,14 @@
 //! The loop breaker of resumed reviews: each run writes, beside its gap
 //! list, `review/stalls.json`, every gap counted by its agent, its part
-//! and the way it failed (silent, incomplete, over budget, refused or
-//! unread), with how many runs in a row, the first and every resume from
-//! it, ended in that same gap and why each time. Once a gap has recurred
-//! in [`MAX_RESUMES`] (`--max-resumes`) resumes in a row after the run that
-//! first ended in it, the
-//! agent has stalled: no resume runs it again, the review stays failed
-//! closed with it not reviewed, and its outcome holds a distinct
-//! blocking finding, `stalled: <agent> failed <N> times the same way;
-//! needs a person`, with the reasons, for a person to act on.
+//! and the way it failed (silent, incomplete, over budget, refused,
+//! unread, partial or unreadable), with how many runs in a row, the
+//! first and every resume from it, ended in that same gap and why each
+//! time. Once a gap has recurred in [`MAX_RESUMES`] (`--max-resumes`)
+//! resumes in a row after the run that first ended in it, the agent has
+//! stalled: no resume runs it again, the review stays failed closed with
+//! it not reviewed, and its outcome holds a distinct blocking finding,
+//! `stalled: <agent> failed <N> times the same way; needs a person`,
+//! with the reasons, for a person to act on.
 
 use std::collections::BTreeMap;
 
@@ -16,7 +16,7 @@ use review_gate::{BLOCKING, Finding, REQUEST_CHANGES_VERDICT, ReviewOutcome};
 use serde::{Deserialize, Serialize};
 
 use crate::findings::STALLED;
-use crate::gaps::Gap;
+use crate::gaps::{Gap, PARTIAL, UNREADABLE};
 use crate::outcome::REVIEW_PATH;
 
 /// The file under the work directory.
@@ -25,13 +25,17 @@ pub const STALLS: &str = "review/stalls.json";
 /// is not run again, unless the run says otherwise.
 pub const MAX_RESUMES: u32 = 2;
 /// The ways a gap fails that count toward a stall: a breaker's abort is
-/// another agent's failure, and a stall is already one.
-pub const COUNTED: [&str; 5] = [
+/// another agent's failure, and a stall is already one. A specialist
+/// that reads part of its diff, or states a line that does not read,
+/// every run counts as any other gap.
+pub const COUNTED: [&str; 7] = [
     "silent:",
     "incomplete:",
     "over budget:",
     "refused:",
     "unread:",
+    PARTIAL,
+    UNREADABLE,
 ];
 
 /// One gap, counted across runs.

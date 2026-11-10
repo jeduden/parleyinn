@@ -26,14 +26,25 @@ fn resumed_split_run(dir: &Path, resume: &Resume) -> (Vec<AgentRun>, Vec<String>
     (runs, lines.into_inner().unwrap(), host)
 }
 
-/// A resume keeping lang-rust's part 1 as a log that stated `text` and
-/// answered `answer`.
+/// A resume keeping lang-rust's part 1 as a log that read its whole
+/// diff, stated `text` and answered `answer`.
 fn keeping_part_one(text: &str, answer: &str) -> Resume {
+    keeping_part_one_reading(text, answer, None)
+}
+
+/// [`keeping_part_one`], its one read of its diff `limit` lines long.
+fn keeping_part_one_reading(text: &str, answer: &str, limit: Option<usize>) -> Resume {
     let log = RunLog {
         answered: true,
         answer: answer.to_owned(),
         texts: vec![text.to_owned(), answer.to_owned()],
         cost: 5.0,
+        reads: vec![review_eval::log::ReadCall {
+            path: "review/diffs/lang-rust.1.diff".to_owned(),
+            limit,
+            answered: true,
+            ..review_eval::log::ReadCall::default()
+        }],
         ..RunLog::default()
     };
     Resume {
@@ -76,7 +87,7 @@ fn a_resumed_specialist_runs_only_its_parts_not_kept_and_merges_the_kept_one() {
 }
 
 #[test]
-fn a_kept_part_the_report_check_refuses_runs_again() {
+fn a_kept_part_is_read_again_and_its_line_that_does_not_read_named_by_its_part() {
     let dir = workdir();
     big_diff(dir.path());
     let resume = keeping_part_one(
@@ -84,14 +95,62 @@ fn a_kept_part_the_report_check_refuses_runs_again() {
         "outcome: findings — part 1 kept.",
     );
 
-    let (_, lines, host) = resumed_split_run(dir.path(), &resume);
+    let (runs, _, host) = resumed_split_run(dir.path(), &resume);
 
-    assert_eq!(host.agents(), ["lang-rust", "lang-rust", "review-code"]);
-    let told = lines
-        .iter()
-        .find(|l| l.starts_with("lang-rust part 1 of 2 (specialist): its kept report was refused, so it runs again: "))
-        .unwrap_or_else(|| panic!("{lines:?}"));
-    assert!(told.contains("ENG-999"), "{told}");
+    assert_eq!(host.agents(), ["lang-rust", "review-code"]);
+    let rust = &runs[0];
+    assert_eq!(rust.unreadable.len(), 1, "{rust:?}");
+    assert_eq!(rust.unreadable[0].part, Some(1));
+    assert!(rust.unreadable[0].why.contains("ENG-999"));
+    let report = fs::read_to_string(dir.path().join(report_file("lang-rust"))).unwrap();
+    assert!(!report.contains("ENG-999"), "{report}");
+    assert!(
+        report.contains("part 1, none — nothing stated in the run log"),
+        "{report}"
+    );
+}
+
+#[test]
+fn a_kept_part_is_held_to_its_reads_of_its_diff_again() {
+    let dir = workdir();
+    big_diff(dir.path());
+    let resume = keeping_part_one_reading(fake::FINDING, "outcome: findings — kept.", Some(3));
+
+    let (runs, _, _) = resumed_split_run(dir.path(), &resume);
+
+    let rust = &runs[0];
+    assert!(!rust.whole(), "{rust:?}");
+    assert_eq!(rust.partial.len(), 1, "{:?}", rust.partial);
+    assert_eq!(
+        rust.partial[0],
+        (
+            Some(1),
+            "its log shows no Read of line 4 of review/diffs/lang-rust.1.diff, of 4 lines"
+                .to_owned()
+        )
+    );
+}
+
+#[test]
+fn a_kept_part_cut_off_before_it_stated_anything_is_no_whole_review() {
+    let dir = workdir();
+    big_diff(dir.path());
+    let mut resume = keeping_part_one("I read the diff.", "");
+    if let Some(Reuse::Parts(kept)) = resume.reuse.get_mut("lang-rust") {
+        let log = kept.get_mut(&1).unwrap();
+        log.answered = false;
+        log.subtype = "error_max_turns".to_owned();
+        log.texts = vec!["I read the diff.".to_owned()];
+    }
+
+    let (runs, _, _) = resumed_split_run(dir.path(), &resume);
+
+    let rust = &runs[0];
+    assert!(!rust.whole(), "{rust:?}");
+    assert_eq!(
+        rust.stated_nothing,
+        [(Some(1), "its run ended with error_max_turns".to_owned())]
+    );
 }
 
 #[test]
@@ -111,6 +170,7 @@ fn a_resume_keeping_an_agent_whole_starts_no_run_of_it() {
         ]
         .into(),
         notes: Vec::new(),
+        ignored: [("lang-rust".to_owned(), vec![aside()])].into(),
         ..Resume::default()
     };
     let host = FakeHost::new(fake::either);
@@ -137,8 +197,21 @@ fn a_resume_keeping_an_agent_whole_starts_no_run_of_it() {
     assert_eq!(rust.log.answer, "outcome: none — clean.");
     assert_eq!(rust.attempts, 0);
     assert!(rust.log.cost.abs() < f64::EPSILON);
+    // What it set aside in the earlier run is set aside still (I6).
+    assert_eq!(rust.ignored, [aside()]);
     let spec = runs.iter().find(|r| r.name == "review-spec").unwrap();
     assert_eq!(spec.kind, Kind::Generalist);
     assert!(spec.reused);
     assert_eq!(runs.len(), 5);
+}
+
+/// A line lang-rust set aside in an earlier run.
+fn aside() -> crate::reading::ReportLine {
+    crate::reading::ReportLine {
+        agent: "lang-rust".to_owned(),
+        part: None,
+        line: 1,
+        text: "src/a.rs:1 — fine".to_owned(),
+        why: "says all is well, which is not a finding".to_owned(),
+    }
 }

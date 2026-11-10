@@ -17,6 +17,7 @@ use review_eval::report;
 use crate::LOGS;
 use crate::outcome;
 use crate::plan::report_file;
+use crate::reading;
 use crate::run::{Review, Unit, reused, write_report};
 use crate::store::{self, Put, Store};
 use crate::tasks::Done;
@@ -91,6 +92,9 @@ pub(crate) fn recall(
             return None;
         }
     };
+    // Its reads are not held to its diff again: the store keeps no run
+    // that read only part of it ([`keep`]), and the key's schema keeps
+    // out every answer stored before that rule (`key::SCHEMA`).
     let taken = store::accepted(unit.kind, &stored.log, stored.report.as_deref(), r.known)
         .and_then(|()| partial(r, unit, &stored.log, held));
     if let Err(why) = taken {
@@ -101,12 +105,23 @@ pub(crate) fn recall(
         retire(r, store, key, &label());
         return None;
     }
-    let mut run = reused(
-        unit.label(),
-        unit.kind,
-        &stored.log.answer,
-        stored.log.texts.clone(),
-    );
+    // A specialist's answer is the outcome line its report ends with.
+    let answer = match (unit.kind, &stored.report) {
+        (Kind::Specialist, Some(report)) => reading::answer_of(report),
+        _ => stored.log.answer.clone(),
+    };
+    let mut run = reused(unit.label(), unit.kind, &answer, stored.log.texts.clone());
+    if unit.kind == Kind::Specialist {
+        // What its log sets aside is set aside again, listed and counted.
+        let part = unit.part.as_ref().map(|p| p.index);
+        run.ignored = reading::read(
+            (&unit.name, part),
+            &stored.log.texts,
+            &stored.log.answer,
+            r.known,
+        )
+        .ignored;
+    }
     run.from_store = true;
     run.answer_key = Some(key.to_owned());
     let log = r.workdir.join(LOGS).join(format!("{}.jsonl", unit.stem()));
@@ -143,8 +158,9 @@ fn retire(r: &Review, store: &Store, key: &str, label: &str) {
 }
 
 /// Stores `done`, `unit`'s run under `key`, when it is accepted: its
-/// final attempt's log, as written, and a specialist's report. Told to
-/// progress when it is not accepted or cannot be stored; returns
+/// final attempt's log, as written, and a specialist's report; a run
+/// that did not run, was cut off or read only part of its diff is not.
+/// Told to progress when it is not accepted or cannot be stored; returns
 /// whether storing failed.
 pub(crate) fn keep(
     r: &Review,
@@ -154,7 +170,7 @@ pub(crate) fn keep(
     held: &HeldTo,
 ) -> bool {
     let (run, report) = done;
-    if !run.answered() {
+    if !run.answered() || run.cut.is_some() || !run.partial.is_empty() {
         return false;
     }
     let label = format!("{} ({})", unit.label(), unit.kind.word());

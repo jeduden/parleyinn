@@ -1,8 +1,8 @@
 //! The `review-run` executable with an answer store, as the review
 //! workflow and a laptop run it: a stand-in `claude` on the path that
 //! answers as the agent it runs as and notes each run it starts. A
-//! second review of the same inputs starts no agent; a refused report is
-//! never stored; `review-run answers drop` takes one answer out, so only
+//! second review of the same inputs starts no agent; a report holding a
+//! line that does not read is never stored; `review-run answers drop` takes one answer out, so only
 //! that agent runs again; a store read alone gains nothing. Each run has
 //! a temporary `HOME` and `PARINN_HOME`.
 
@@ -20,7 +20,7 @@ use testkit::TempDir;
 
 /// A `claude` that prints its version, notes in `$HOME/started` the
 /// agent each run starts as, and answers as that agent: a specialist
-/// states one linked finding and its outcome line, or, as the agent
+/// reads its whole diff, states one linked finding and its outcome line, or, as the agent
 /// `REFUSE_AGENT` names, a line in no form beside it; a generalist keeps
 /// a nit and closes with a sentence.
 const CLAUDE: &str = r#"#!/bin/sh
@@ -37,6 +37,9 @@ bad=""
 if [ "$agent" = "$REFUSE_AGENT" ]; then bad="\\nsrc/a.rs:9 — a line in no form"; fi
 case "$prompt" in
   *"a specialist"*)
+    diff=$(printf '%s' "$prompt" | sed -n 's/.*Read only your own diff, `\([^`]*\)`.*/\1/p')
+    printf '{"type":"assistant","parent_tool_use_id":null,"message":{"id":"m-%s","model":"claude-haiku-5-5","usage":{"input_tokens":3,"output_tokens":2},"content":[{"type":"tool_use","id":"r1","name":"Read","input":{"file_path":"%s/%s"}}]}}\n' "$agent" "$PWD" "$diff"
+    printf '{"type":"user","parent_tool_use_id":null,"message":{"content":[{"type":"tool_result","tool_use_id":"r1","content":"+fn a() {}"}]}}\n'
     printf '{"type":"assistant","parent_tool_use_id":null,"message":{"id":"m-%s","model":"claude-haiku-5-5","usage":{"input_tokens":3,"output_tokens":2},"content":[{"type":"text","text":"src/a.rs:3 — if not addressed: a long line hides a bug — I9%s"}]}}\n' "$agent" "$bad"
     printf '{"type":"result","subtype":"success","is_error":false,"result":"outcome: findings — %s saw one finding.","total_cost_usd":0.01,"num_turns":2}\n' "$agent"
     ;;
@@ -168,7 +171,7 @@ fn a_second_review_of_the_same_inputs_starts_no_agent() {
 }
 
 #[test]
-fn a_refused_report_is_never_stored_and_its_agent_runs_again() {
+fn a_report_holding_a_line_that_does_not_read_is_never_stored_and_its_agent_runs_again() {
     let home = TempDir::new().unwrap();
     let store = home.path().join("answers");
 
@@ -178,7 +181,9 @@ fn a_refused_report_is_never_stored_and_its_agent_runs_again() {
 
     let (out, started) = reviewed(home.path(), "second", &store, "", &[]);
 
-    assert_eq!(started, ["lang-rust", "review-code"]);
+    // Its report, the line that did not read set apart, is the one a
+    // clean run gives, so its generalist's stored answer stands.
+    assert_eq!(started, ["lang-rust"]);
     assert!(
         stdout(&out).starts_with("verdict=approve\n"),
         "{}",

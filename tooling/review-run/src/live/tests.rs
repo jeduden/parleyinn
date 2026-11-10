@@ -102,24 +102,21 @@ fn agent_run(name: &str, failure: Option<&str>, reused: bool) -> AgentRun {
             cost: 0.5,
         },
     );
+    let log = RunLog {
+        cost: 0.5,
+        turns: 3,
+        usage,
+        ..RunLog::default()
+    };
     AgentRun {
-        name: name.to_owned(),
-        kind: review_eval::component::kind_of(name),
-        failure: failure.map(str::to_owned),
-        log: RunLog {
-            cost: 0.5,
-            turns: 3,
-            usage,
-            ..RunLog::default()
-        },
-        attempts: 2,
-        parts: 1,
-        failed_parts: Vec::new(),
         reused,
-        from_store: false,
-        answer_key: None,
-        store_failed: false,
-        charged: 0.0,
+        ..AgentRun::of(
+            name.to_owned(),
+            review_eval::component::kind_of(name),
+            failure.map(str::to_owned),
+            log,
+            2,
+        )
     }
 }
 
@@ -131,6 +128,10 @@ fn the_table_names_each_run_how_it_ended_and_what_it_took() {
         agent_run("lang-shell", Some(&long), false),
         agent_run("review-code", None, true),
         agent_run("review-spec", Some("its run ended with deadline"), false),
+        AgentRun {
+            cut: Some("its run ended with error_max_turns".to_owned()),
+            ..agent_run("lang-json", None, false)
+        },
     ];
 
     let table = table(&runs);
@@ -145,7 +146,7 @@ fn the_table_names_each_run_how_it_ended_and_what_it_took() {
         lines[4],
         "| lang-rust | specialist | answered | 2 | 3 | 6 | 4 | 0.5000 |"
     );
-    let cell = format!("its run ended with x   y {}…", "z".repeat(94));
+    let cell = format!("did not run: its run ended with x   y {}…", "z".repeat(81));
     assert_eq!(
         lines[5],
         format!("| lang-shell | specialist | {cell} | 2 | 3 | 6 | 4 | 0.5000 |")
@@ -156,9 +157,13 @@ fn the_table_names_each_run_how_it_ended_and_what_it_took() {
     );
     assert_eq!(
         lines[7],
-        "| review-spec | generalist | its run ended with deadline | 2 | 3 | 6 | 4 | 0.5000 |"
+        "| review-spec | generalist | did not run: its run ended with deadline | 2 | 3 | 6 | 4 | 0.5000 |"
     );
-    assert_eq!(lines.len(), 8);
+    assert_eq!(
+        lines[8],
+        "| lang-json | specialist | ran, log read: its run ended with error_max_turns | 2 | 3 | 6 | 4 | 0.5000 |"
+    );
+    assert_eq!(lines.len(), 9);
 }
 
 #[test]
