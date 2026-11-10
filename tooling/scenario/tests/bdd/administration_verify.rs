@@ -336,6 +336,26 @@ fn prefix_altered(w: &mut World) -> Result<(), String> {
     Ok(())
 }
 
+#[given(
+    regex = r"^a purge erased an event read from the transcript, whose file still holds the purged line's bytes$"
+)]
+fn purged_line_kept_by_the_harness(w: &mut World) -> Result<(), String> {
+    crate::recall::record_runs(w)?;
+    purge_run_events(w, "run-a", 2, 2)
+}
+
+#[then(
+    regex = r"^the output names no failed check, the transcript's bytes up to its ingest position matching its consumed-prefix hash with the purged line's bytes zeroed$"
+)]
+fn passes_with_purged_bytes_zeroed(w: &mut World) -> Result<(), String> {
+    let out = last_run(w)?;
+    let shown = String::from_utf8_lossy(&out.stderr).into_owned();
+    if shown.contains("parinn verify: ") {
+        return Err(format!("parinn verify names a failed check: {shown}"));
+    }
+    crate::erasure_prefix::hash_confirms_nothing(w)
+}
+
 #[then(
     regex = r#"^the output reports the transcript "([^"]+)" short of its end, which ingest resumes$"#
 )]

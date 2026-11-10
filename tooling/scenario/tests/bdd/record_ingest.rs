@@ -294,6 +294,77 @@ fn new_generation(w: &mut World, name: String, generation: u64, n: usize) -> Res
     ))
 }
 
+#[when(
+    regex = r#"^"([^"]+)" is appended to by (\d+) lines after a purge of its lines (\d+)-(\d+)$"#
+)]
+fn purged_then_appended(
+    w: &mut World,
+    name: String,
+    more: u64,
+    from: u64,
+    to: u64,
+) -> Result<(), String> {
+    let seq_of = |placed: &[Placed], line: u64| {
+        placed
+            .iter()
+            .find(|p| p.place.line == line)
+            .map(|p| p.address.seq.get())
+            .ok_or_else(|| format!("line {line} of {name:?} is not in the record"))
+    };
+    let placed = placed(w, &name)?;
+    let (first, last) = (seq_of(&placed, from)?, seq_of(&placed, to)?);
+    crate::erasure::purge_run_events(w, &name, first, last)?;
+    let path = transcript(w, &name)?;
+    let mut text = fs::read_to_string(&path).map_err(|e| e.to_string())?;
+    let count = text.lines().count() as u64;
+    text.push_str(&lines(&name, count + 1, count + more));
+    fs::write(&path, text).map_err(|e| e.to_string())
+}
+
+#[then(
+    regex = r#"^"([^"]+)" stays in transcript generation 1, its consumed prefix matching the stored hash with the bytes of each purged line zeroed, and its (\d+) new lines are recorded$"#
+)]
+fn resumed_past_a_purge(w: &mut World, name: String, more: u64) -> Result<(), String> {
+    let generations = generations(w, &name)?;
+    let [source] = generations.as_slice() else {
+        return Err(format!("{name:?} has {} generations", generations.len()));
+    };
+    let bytes = fs::read(transcript(w, &name)?).map_err(|e| e.to_string())?;
+    let offset = source.position.offset;
+    let zeroed = store::source::prefix_digest(&bytes, offset, &source.purged);
+    let as_written = store::source::prefix_digest(&bytes, offset, &[]);
+    if source.purged.is_empty() || zeroed != Some(source.position.prefix) || zeroed == as_written {
+        return Err(format!(
+            "{name:?}: the stored hash is not that of the prefix with its {} purged lines zeroed",
+            source.purged.len()
+        ));
+    }
+    let total = bytes
+        .split(|b| *b == b'\n')
+        .filter(|l| !l.is_empty())
+        .count() as u64;
+    let recorded: Vec<u64> = placed(w, &name)?.iter().map(|p| p.place.line).collect();
+    let new: Vec<u64> = (total - more + 1..=total).collect();
+    if offset == bytes.len() as u64 && new.iter().all(|n| recorded.contains(n)) {
+        return Ok(());
+    }
+    Err(format!(
+        "{name:?} stands at {offset} of {} bytes and records lines {recorded:?}",
+        bytes.len()
+    ))
+}
+
+#[then(regex = r#"^no audit entry records "([^"]+)"$"#)]
+fn no_audit_entry_records(w: &mut World, what: String) -> Result<(), String> {
+    let entries = audit::log::Log::new(home(w)?.audit())
+        .entries()
+        .map_err(|e| e.to_string())?;
+    match entries.iter().find(|e| e.detail == what || e.kind == what) {
+        Some(_) => Err(format!("an audit entry records {what:?}")),
+        None => Ok(()),
+    }
+}
+
 #[given(
     regex = r#"^"([^"]+)" has (\d+) lines of which (\d+) were ingested before both transcript files were deleted$"#
 )]
