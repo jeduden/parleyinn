@@ -1,7 +1,7 @@
 ---
 title: "13. Open questions and risks"
 summary: >-
-  Open questions OQ-01..56 with their resolution path, and the risk
+  Open questions OQ-01..58 with their resolution path, and the risk
   register with mitigations.
 ---
 # 13. Open questions and risks
@@ -79,4 +79,4 @@ summary: >-
 | Multi-run reasoning stays weak                                                       | High       | Low    | Kernel aggregation; tracked metric; not claimed as solved                                                                                                                                                                                                                                                     |
 | Maintainer concentration                                                             | Medium     | High   | ENG-21, ENG-25                                                                                                                                                                                                                                                                                                |
 | The harness drops earlier tool results from the agent's context without a compaction | Medium     | Medium | Seen once by S6 on a harness resume, not recorded: earlier `Read` results stopped reaching the model, with no compaction and no hook. Record it in a contract test before M2 relies on restoring only at a compaction; pins also restore at every harness resume (INJ-02), and recall reaches the record (I1) |
-| A path named on `parinn ingest --path` changes between check and read                | Low        | Medium | Ingest opens only the file it looked at (SEC-18); a swapped parent directory stays open                                                                                                                                                                                                                       |
+| A path named on `parinn ingest --path` changes between check and read                | Low        | Medium | The principal's own act at a terminal (REC-22), recorded untrusted; a swapped parent directory stays open                                                                                                                                                                                                     |
