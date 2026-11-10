@@ -184,3 +184,45 @@ fn a_witnessed_line_repeating_an_event_whose_content_was_erased_is_refused() {
     assert_eq!((ingested.refused, ingested.events), (1, 1));
     assert_eq!(ingested.witnessed_repeats, 0);
 }
+
+#[test]
+fn a_uuid_redaction_would_change_is_not_kept_beside_its_line_s_place() {
+    let dir = testkit::TempDir::new().unwrap();
+    let home = home(&dir);
+    let path = dir.path().join("run.jsonl");
+    std::fs::write(
+        &path,
+        "{\"uuid\":\"u1\"}\n{\"uuid\":\"AKIAIOSFODNN7EXAMPLE\"}\n",
+    )
+    .unwrap();
+
+    crate::ingest_path(&home, &path, &redactor(), &mut key::random::OsEntropy).unwrap();
+
+    let store = Store::open(&home.store()).unwrap();
+    let source = store.source(&path.to_string_lossy()).unwrap().unwrap();
+    let kept: Vec<Option<String>> = store
+        .placed(source.id)
+        .unwrap()
+        .into_iter()
+        .map(|p| p.place.uuid)
+        .collect();
+    assert_eq!(kept, [Some("u1".to_owned()), None]);
+    let bytes = std::fs::read(home.store()).unwrap();
+    assert!(!bytes.windows(20).any(|w| w == b"AKIAIOSFODNN7EXAMPLE"));
+}
+
+#[test]
+fn a_uuid_is_kept_only_when_redaction_leaves_it_whole() {
+    let redactor = redactor();
+
+    assert_eq!(
+        kept_uuid(&json!({"uuid": "u1"}), &redactor),
+        Some("u1".to_owned())
+    );
+    assert_eq!(
+        kept_uuid(&json!({"uuid": "AKIAIOSFODNN7EXAMPLE"}), &redactor),
+        None
+    );
+    assert_eq!(kept_uuid(&json!({"uuid": 7}), &redactor), None);
+    assert_eq!(kept_uuid(&json!({}), &redactor), None);
+}

@@ -182,7 +182,7 @@ impl<'a> Planner<'a> {
                     line: i as u64 + 1,
                     offset: line.offset,
                     length: line.end - line.offset,
-                    uuid: read.parsed[i]["uuid"].as_str().map(str::to_owned),
+                    uuid: kept_uuid(&read.parsed[i], read.redactor),
                 });
                 plan.refused_to = Some((i as u64 + 1, line.end));
                 continue;
@@ -450,6 +450,14 @@ fn sibling_uuids_of(
     found
 }
 
+/// The line's `uuid`, kept beside its place only when redaction leaves
+/// it whole, so a place carries no secret (SEC-08).
+fn kept_uuid(parsed: &Value, redactor: &Redactor) -> Option<String> {
+    let uuid = parsed["uuid"].as_str()?;
+
+    (redactor.redact_text(uuid).text == uuid).then(|| uuid.to_owned())
+}
+
 /// `path` with its links resolved, or as it is when it cannot be.
 fn canonical(path: &Path) -> PathBuf {
     path.canonicalize().unwrap_or_else(|_| path.to_path_buf())
@@ -529,7 +537,7 @@ impl Plan {
             line: at.number,
             offset: at.line.offset,
             length: at.line.end - at.line.offset,
-            uuid: at.parsed["uuid"].as_str().map(str::to_owned),
+            uuid: kept_uuid(at.parsed, redactor),
         });
         self.ends.push((at.writer, end, at.line.end));
 
