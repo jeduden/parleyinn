@@ -4,7 +4,7 @@ const { Fb, png, rng, IDX, RGB, PAL, ci, B2 } = require('./pix.js');
 const W = 480, H = 330, HZ = 206, GY = 236;
 
 const { halo, neonMask, boards, vboards, plate, lamp, FRAMES } = require('./kit.js');
-const ROOMS = require('./rooms.js');
+const INTERIOR = require('./interior.js');
 const YARD = require('./yard.js');
 
 // ---------- sky ----------
@@ -145,7 +145,7 @@ function innShell(g, t) {
   halo(g, 163, 67, 136, 34, ['pk', 'pkw'], 'pk', [0.34, 0.2, 0.1, 0.05], 8);
   halo(g, 163, 86, 136, 15, ['cy', 'cyw'], 'cy', [0.3, 0.16, 0.07], 8);
   g.glow(231, 84, 110, 40, 'pk', 0.2, 8);
-  // header beam over the open rooms, floor between them, end walls
+  // header beam over the open floors, floor between them, end walls
   g.R(84, 108, 290, 4, 'w1').H(84, 108, 290, 'w3').H(84, 111, 290, 'ink');
   g.R(INN.cut0 - 3, INN.up0, 3, 118, 'n1'); for (let j = INN.up0; j < 230; j += 3) g.px(INN.cut0 - 2, j + 1, 'n3');
   g.R(INN.cut1, INN.up0, 4, 118, 'w1').V(INN.cut1, INN.up0, 118, 'ink').V(371, INN.up0, 118, 'w0'); g.R(372, 110, 2, 120, 't2').V(373, 110, 120, 't1');
@@ -189,8 +189,8 @@ function scene(t) {
   t = t || 0; const g = new Fb(W, H, 't0');
   sky(g, t); land(g); YARD.gate(g, t); street(g); YARD.groundLight(g);
   YARD.forge(g, t); YARD.stageStop(g, t);
-  innShell(g, t); ROOMS.upstairs(g, t); ROOMS.saloon(g, t); facade(g, t); boardwalk(g);
-  YARD.hitch(g, t); YARD.rig(g, t); YARD.pen(g, t); YARD.claim(g); YARD.saguaro(g, 364, 296, 36); YARD.bootHill(g, t); YARD.coach(g, t); YARD.litter(g, t);
+  innShell(g, t); INTERIOR.upstairs(g, t); INTERIOR.saloon(g, t); facade(g, t); boardwalk(g);
+  YARD.hitch(g, t); YARD.rig(g, t); YARD.pen(g, t); YARD.stake(g); YARD.saguaro(g, 364, 296, 36); YARD.bootHill(g, t); YARD.coach(g, t); YARD.litter(g, t);
   return g;
 }
 module.exports = { scene, W, H, FRAMES, INN, wordmark, keyGlyph, LET };

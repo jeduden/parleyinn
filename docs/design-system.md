@@ -52,25 +52,25 @@ The picture uses 48 colours in seven ramps, and nothing is drawn outside
 them. `tokens.json` lists every one by its code, and `palette.png` loads
 them into a pixel editor. Eight carry names:
 
-| Name       | Code | Hex       | On the page              |
+| Name       | Code | Hex       | Where it shows           |
 | ---------- | ---- | --------- | ------------------------ |
 | Night      | t0   | `#0B1A29` | the ground               |
 | Bone       | p2   | `#EAD9B5` | text                     |
 | Dusk coral | d4   | `#CC6E57` | the sky over the mesa    |
 | Mesa plum  | d1   | `#5A2E48` | the mesa and the shade   |
 | Teal       | t4   | `#2F8C8A` | the waistcoats and glass |
-| Amber      | am   | `#FFC857` | labels that need you     |
+| Amber      | am   | `#FFC857` | focus, code, the tagline |
 | Neon pink  | pk   | `#FF5C8A` | the selected place       |
 | Neon cyan  | cy   | `#63F3E4` | links and numbers        |
 
-Four colours mean something wherever they appear:
+Four colours carry a meaning:
 
-- **Neon pink** is the house's own light: the name on the sign, the
-  horseshoe over the forge and the beams of the pen.
+- **Neon pink** is the house's own light: the name on the sign and the
+  beams of the pen. The forge is next door, so its horseshoe is iron.
 - **Neon cyan** is the working light: the key under the name, power
-  cells, landmark tabs and boundary plates.
-- **Amber** is lamplight and the proprietor's business: Needs you, the
-  call box and the keys on the board.
+  cells, the ledgers' bookmarks and boundary plates.
+- **Amber** is lamplight and the proprietor's business: the Needs you
+  sign and the rail its tickets hang on.
 - **Red** marks what must not be missed: UNTRUSTED, QUARANTINE, the seals
   and the band on every envelope.
 
@@ -80,11 +80,11 @@ They have one look, dark, and no light theme.
 
 ## Type
 
-| Face         | Use                       | Sizes        |
-| ------------ | ------------------------- | ------------ |
-| Jersey 15    | headings                  | 27 and 54 px |
-| Tiny5        | names, numbers and labels | 16 px        |
-| Chakra Petch | everything read at length | 15 to 17 px  |
+| Face         | Use                         | Sizes        |
+| ------------ | --------------------------- | ------------ |
+| Jersey 15    | headings                    | 27 and 54 px |
+| Tiny5        | names, numbers and captions | 16 px        |
+| Chakra Petch | everything read at length   | 15 to 17 px  |
 
 Jersey 15 draws on a 15-pixel cell and Tiny5 on a 5-pixel one, so both
 stay crisp only at whole multiples of it. The pages serve all three from
@@ -97,9 +97,10 @@ Tiny5 and Jersey 10, whose bitmaps `art/glyphs.json` holds.
 Hands are steel robots in poncho and hat, each with a power cell on its
 back: the agents, whose run is one charge. The house's own staff are
 brass, like the compositor who sets the restore block. The proprietor,
-the principal, is the one person in the house. The stage that brings
-sealed strongboxes is a peer, and the outfit's horse pulls the harness's
-wagon.
+the principal, keeps the house: a person or a service account. Figures
+from outside the house are dark iron: the outfit's horses, which pull
+the harness's wagon; the driver of the stage, a peer that brings sealed
+strongboxes; and the smith next door.
 
 ## Rules
 
@@ -141,17 +142,18 @@ whose text sits beside them; the rest is under the repository's license.
 
 ## Changing it
 
-The art source runs on Node 20 or later and needs no package. Change the
+The art source runs on Node.js 20 or later and needs no package. Change the
 source, rebuild, and check that the files match it:
 
 ```sh
-node docs/design/art/build.js            # writes the pages, tokens and images
+node docs/design/art/build.js            # writes pages, design tokens, images
 node docs/design/art/build.js --check    # fails naming each file that differs
 node docs/design/art/scene.js 0 160 64 142 40 4   # one detail, enlarged
 ```
 
-`scene.js` draws the sky, the street and the inn's shell, `rooms.js` the
-rooms and the figures in them, and `yard.js` everything outside.
+`scene.js` draws the sky, the street and the inn's shell, `interior.js`
+the inn's interior and the figures in it, and `yard.js` everything
+outside.
 `marks.js` places each number and its close-up, and `concepts.js` holds
 the key's text. The GitHub page repeats the README's opening, its Vision
 and Status, and the headline of each invariant; the build reads them from

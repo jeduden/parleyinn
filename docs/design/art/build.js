@@ -1,6 +1,6 @@
 'use strict';
-// Builds the GitHub page (docs/index.html), the design system's page (docs/design/index.html), the tokens and every
-// image under docs/design/assets from the picture's source, with Node's standard library alone.
+// Builds the GitHub page (docs/index.html), the design system's page (docs/design/index.html), the design tokens and
+// every image under docs/design/assets from the picture's source, with the standard library of Node.js alone.
 //   node docs/design/art/build.js           writes them
 //   node docs/design/art/build.js --check   writes nothing, and fails naming each file that differs from the source
 // The page copy that repeats the README is read from README.md, and the invariants from docs/srs/invariants.md, so the
@@ -9,7 +9,7 @@ const fs = require('fs'), path = require('path'), zlib = require('zlib');
 const { Fb, png, PAL, NAMES } = require('./pix.js');
 const { scene, W, H, FRAMES, wordmark, keyGlyph } = require('./scene.js');
 const { halo } = require('./kit.js');
-const ROOMS = require('./rooms.js'), YARD = require('./yard.js');
+const INTERIOR = require('./interior.js'), YARD = require('./yard.js');
 const M = require('./marks.js');
 const { CONCEPTS, INN } = require('./concepts.js');
 
@@ -88,13 +88,13 @@ const SIGN = crop(160, 64, 142, 40), BANNER = crop(60, 8, 360, 104), SOCIAL = cr
 const STACKED = (() => { const g = new Fb(100, 62, 'n1'); g.B(0, 0, 100, 62, 'ink'); g.B(1, 1, 98, 60, 'w2'); wordmark(g, 12, 8, 'PARLEY', 'pk', 'pkw', -1); wordmark(g, 34, 27, 'INN', 'pk', 'pkw', -1); keyGlyph(g, 12, 50, 76, 'cy', 'cyw'); halo(g, 2, 2, 96, 42, ['pk', 'pkw'], 'pk', [0.34, 0.2, 0.1, 0.05], 8); halo(g, 2, 45, 96, 13, ['cy', 'cyw'], 'cy', [0.3, 0.16, 0.07], 8); return g; })();
 const FLAT = (() => { const g = new Fb(126, 33); wordmark(g, 4, 3, 'PARLEY INN', 'p2', 'p2', -1); keyGlyph(g, 7, 24, 112, 'p2', 'p2'); return g; })();
 const ICON = (() => { const g = new Fb(16, 16); g.RR(0, 0, 16, 16, 'n1', 'pk'); g.H(4, 4, 4, 'cy'); g.H(4, 9, 4, 'cy'); g.V(3, 5, 4, 'cy'); g.V(8, 5, 4, 'cy'); g.H(9, 6, 4, 'cyw'); g.H(9, 7, 4, 'cy'); g.px(13, 6, 'cy'); g.px(13, 7, 'cy'); g.R(10, 8, 2, 2, 'cy'); g.V(13, 8, 3, 'cy'); return g; })();
-const { figure, PON, HAT, STEEL, BRASS, PROP, PROPL } = ROOMS;
+const { figure, PON, HAT, BRASS, DARK, PROP, PROPL } = INTERIOR;
 const CAST = [
   ['hand', 'A hand', 'agent', sprite(g => figure(g, 60, 80, { pon: PON.red, hat: HAT.brown, band: 'am', cell: true })), 'A steel robot in a red poncho and a brown hat, with a power cell on its back'],
   ['proprietor', 'The proprietor', 'principal', sprite(g => g.S(40, 40, PROP, PROPL)), 'A person in a black hat, a white shirt and a teal waistcoat'],
-  ['compositor', 'The compositor', 'restore block', sprite(g => figure(g, 60, 80, { metal: BRASS, arm: 'crank', shade: true, vest: 't2' })), 'A brass robot in an eyeshade and waistcoat, one arm raised to a crank'],
-  ['strongbox', 'A strongbox', 'seal', sprite(g => YARD.strongbox(g, 40, 40, 13, 9)), 'A steel strongbox with a red seal'],
-  ['horse', 'The outfit’s horse', 'harness', sprite(g => YARD.horse(g, 40, 80, STEEL, { blanket: true })), 'A steel robot horse with a striped saddle blanket'],
+  ['compositor', 'The compositor', 'restore builder', sprite(g => figure(g, 60, 80, { metal: BRASS, arm: 'crank', shade: true, vest: 't2' })), 'A brass robot in an eyeshade and waistcoat, one arm raised to a crank'],
+  ['strongbox', 'A strongbox', 'sealed range', sprite(g => YARD.strongbox(g, 40, 40, 13, 9)), 'A steel strongbox with a red seal'],
+  ['horse', 'The outfit’s horse', 'harness', sprite(g => YARD.horse(g, 40, 80, DARK, { blanket: true })), 'A dark iron robot horse with a striped saddle blanket'],
   ['stage', 'The stage', 'peer', sprite(g => YARD.coach(g, 0)), 'A red hover coach with a rocket at the back, strongboxes on the roof and a key on its door'],
 ];
 const LETTERING = [
@@ -103,7 +103,7 @@ const LETTERING = [
   ['tombstone', crop(397, 285, 49, 32), 'A tombstone', 'A headboard lettered PURGED, A2, 4812-4830'],
 ];
 
-// ---------- colours: every one the picture uses, in ramps, and the page's tokens, which are picture colours too ----------
+// ---------- colours: every one the picture uses, in ramps, and the page's design tokens, which are picture colours too ----------
 const used = new Set(); for (const g of frames) for (const c of g.d) used.add(c);
 const RAMPS = [['ink', 'n1', 'n2', 'n3', 'n4', 'n5'], ['t0', 't1', 't2', 't3', 't4', 't5', 'cy', 'cyw'], ['v1', 'v2', 'd0', 'd1', 'd2', 'd3', 'd4', 'd5', 'd6', 'am', 'd8', 'wh'], ['w0', 'w1', 'w2', 'w3', 'w4', 'w5', 'p0', 'p1', 'p2'], ['m0', 'm1', 'm2', 'm3'], ['r0', 'r1', 'r2', 'pk0', 'pk', 'pkw'], ['g0', 'g1', 'g2']];
 const RAMP_NAMES = ['Ink', 'Night and neon cyan', 'Dusk to lamplight', 'Timber and bone', 'Steel', 'Red and neon pink', 'Sage'];
@@ -112,14 +112,14 @@ const NCOL = RAMPS.flat().length;
 const NAMED = [['Night', 't0'], ['Bone', 'p2'], ['Dusk coral', 'd4'], ['Mesa plum', 'd1'], ['Teal', 't4'], ['Amber', 'am'], ['Neon pink', 'pk'], ['Neon cyan', 'cy']];
 const PAGE = { bg: 't0', bg2: 't1', ink: 'ink', line: 't2', line2: 't3', fg: 'p2', fg2: 'm3', mute: 'm2', pink: 'pk', cyan: 'cy', amber: 'am' };
 const USES = [
-  ['pk', 'Neon pink is the house’s own light: the name on the sign, the horseshoe over the forge and the beams of the pen.'],
-  ['cy', 'Neon cyan is the working light: the key under the name, power cells, landmark tabs and boundary plates.'],
-  ['am', 'Amber is lamplight and the proprietor’s business: Needs you, the call box and the keys on the board.'],
+  ['pk', 'Neon pink is the house’s own light: the name on the sign and the beams of the pen.'],
+  ['cy', 'Neon cyan is the working light: the key under the name, power cells, the ledgers’ bookmarks and boundary plates.'],
+  ['am', 'Amber is lamplight and the proprietor’s business: the Needs you sign and the rail its tickets hang on.'],
   ['r2', 'Red is for marks that must not be missed: UNTRUSTED, QUARANTINE, the seals and the band on every envelope.'],
 ];
 const FONTS = [
   ['display', 'Jersey 15', 'jersey-15-400.woff2', "'Jersey 15','Chakra Petch','Trebuchet MS',sans-serif", 'Headings, at 27 and 54 pixels: one or two of its 15-pixel cells.'],
-  ['label', 'Tiny5', 'tiny5-400.woff2', "'Tiny5','Chakra Petch','Trebuchet MS',sans-serif", 'Names, numbers and labels, at 16 pixels.'],
+  ['label', 'Tiny5', 'tiny5-400.woff2', "'Tiny5','Chakra Petch','Trebuchet MS',sans-serif", 'Names, numbers and captions, at 16 pixels.'],
   ['text', 'Chakra Petch', 'chakra-petch-400.woff2', "'Chakra Petch','Trebuchet MS',Verdana,sans-serif", 'Everything read at length, at 15 to 17 pixels.'],
 ];
 const PALETTE = (() => { const w = Math.max(...RAMPS.map(r => r.length)), g = new Fb(w * 8, RAMPS.length * 8); RAMPS.forEach((r, j) => r.forEach((c, i) => g.R(i * 8, j * 8, 8, 8, c))); return g; })();
@@ -145,7 +145,7 @@ for (const [id, , , g] of CAST) asset('cast-' + id + '.png', g, { transparent: t
 for (const [id, g] of LETTERING) asset('lettering-' + id + '.png', g);
 
 const fontFace = ([, fam, file]) => `@font-face{font-family:'${fam}';font-style:normal;font-weight:400;font-display:swap;src:url(fonts/${file}) format('woff2')}`;
-put('design/tokens.css', `/* The design system's tokens, generated by docs/design/art/build.js from the picture's palette: edit the source, not this file. */
+put('design/tokens.css', `/* ParleyInn's design tokens, generated by docs/design/art/build.js from the picture's palette: edit the source, not this file. */
 ${FONTS.map(fontFace).join('\n')}
 :root{color-scheme:dark;
 ${Object.entries(PAGE).map(([k, c]) => `--${k}:${PAL[c]};`).join('')}
@@ -174,7 +174,7 @@ const I_PREV = svg([[1, 3, 1, 2], [2, 2, 1, 4], [3, 1, 1, 6], [4, 3, 4, 2]]), I_
 const I_PAUSE = svg([[1, 1, 2, 6], [5, 1, 2, 6]]), I_PLAY = svg([[2, 0, 1, 8], [3, 1, 1, 6], [4, 2, 1, 4], [5, 3, 1, 2]]);
 const DESCRIPTION = flat(LEDE);
 const SIGN_ALT = 'ParleyInn in pink neon capitals over one long cyan key';
-const ALT = 'Pixel art of a frontier saloon at dusk under a ringed planet, with its front wall removed. Robot hands sit at a card table in the saloon, and upstairs are a record room, a print shop, a wire office and an office. Around it stand a forge, a hitching rail, a wagon, a stage stop, a gate and Boot Hill. The key lists its 28 numbered places.';
+const ALT = 'Pixel art of a frontier saloon at dusk under a ringed planet, with its front wall removed. Robot hands sit at a card table in the saloon, and upstairs are the ledger shelves, a print shop, a wire office and an office. Around it stand a forge, a hitching rail, a wagon, a stage stop, a gate and Boot Hill. The key lists its 28 numbered places.';
 
 function page({ base, title, description, canonical, body, script }) {
   // base is the path from the page to docs/: '' for docs/index.html, '../' for docs/design/index.html.
@@ -219,7 +219,7 @@ ${body.replace(new RegExp(`src="${A}`, 'g'), `src="${base}${A}`)}
 </main>
 <footer class="foot"><div class="wrap foot-in">
 <p>ParleyInn is MIT licensed and specified in the open: the <a href="${REPO}/blob/main/docs/srs/index.md">requirements</a>, the <a href="${REPO}/blob/main/docs/domain-model/index.md">domain model</a> and the <a href="${REPO}/blob/main/PLAN.md">plans</a>. Report a vulnerability privately, as <a href="${REPO}/blob/main/SECURITY.md">SECURITY.md</a> says.</p>
-<p>The picture is drawn in code under <a href="${REPO}/tree/main/docs/design/art">docs/design/art</a>, and every file this page loads comes from the repository. Its fonts, Jersey 15, Tiny5 and Chakra Petch, are their project authors’ work under the SIL Open Font License.</p>
+<p>The picture is drawn in code under <a href="${REPO}/tree/main/docs/design/art">docs/design/art</a>, and every file this page loads comes from the repository. Its fonts, Jersey 15, Tiny5 and Chakra Petch, are their authors’ work under the SIL Open Font License.</p>
 </div></footer>
 ${script || ''}</body>
 </html>
@@ -277,7 +277,7 @@ put('index.html', home);
 const kit = `<section class="intro" aria-labelledby="name">
 <div class="i-a"><p class="eyebrow">ParleyInn design system</p>
 <h1 id="name">Cut from one picture</h1></div>
-<div class="i-b"><p class="lede">Every colour, letter and figure here comes from the inn: ${W} by ${H} pixels in ${NCOL} colours, drawn in code one pixel at a time. Change the source under docs/design/art and run node docs/design/art/build.js, and this page, the GitHub page, the tokens and the images are rebuilt from it.</p>
+<div class="i-b"><p class="lede">Every colour, letter and figure here comes from the inn: ${W} by ${H} pixels in ${NCOL} colours, drawn in code one pixel at a time. Change the source under docs/design/art and run node docs/design/art/build.js, and this page, the GitHub page, the design tokens and the images are rebuilt from it.</p>
 <p class="hint">The rules, the files and how to change them are in <a href="${REPO}/blob/main/docs/design-system.md">docs/design-system.md</a>.</p></div>
 </section>
 <div class="kit">
@@ -297,17 +297,17 @@ ${img('sign.png', 0, SIGN_ALT, 'sign')}
 </section>
 <section class="k-cast" aria-labelledby="cast-h"><h2 id="cast-h">The cast</h2>
 <div class="cast">${CAST.map(([id, nm, what, , alt]) => `<figure><span class="spr">${img('cast-' + id + '.png', 0, alt)}</span><figcaption>${esc(nm)}<span>${esc(what)}</span></figcaption></figure>`).join('')}</div>
-<p>Hands are steel robots in poncho and hat. The house’s own staff are brass. The proprietor is the one person in the house.</p>
+<p>Hands are steel robots in poncho and hat. The house’s own staff are brass. The proprietor, the principal, keeps the house: a person or a service account. Figures from outside the house are dark iron: the outfit’s horses, the stage’s driver and the smith next door.</p>
 </section>
 <section class="k-type" aria-labelledby="type-h"><h2 id="type-h">Type</h2>
 <p class="spec"><span class="spec-d">Pins kept verbatim</span><small>Jersey 15, for headings. The sign’s own eight letters are drawn by hand, 15 pixels tall.</small></p>
-<p class="spec"><span class="spec-l">Seat 2 · Needs you · Recall · 4812-4830</span><small>Tiny5, for names, numbers and labels</small></p>
+<p class="spec"><span class="spec-l">A2·4812–4830 · Needs you · Recall</span><small>Tiny5, for names, numbers and captions</small></p>
 <p class="spec"><span class="spec-t">Every pin that restores is stored verbatim and restored verbatim after every compaction.</span><small>Chakra Petch, for everything read at length</small></p>
 <div class="shots">${LETTERING.map(([id, , cap, alt]) => `<figure>${img('lettering-' + id + '.png', 3, alt)}<figcaption class="cap2">${esc(cap)}</figcaption></figure>`).join('')}</div>
 <p>Lettering inside the picture is set from pixel fonts on their own grid: Micro 5, Silkscreen, Tiny5 and Jersey 10.</p>
 </section>
 <section class="k-voice" aria-labelledby="voice-h"><h2 id="voice-h">How it talks</h2>
-<ul class="voice"><li>Your pins ride back after every compaction.</li><li>Nothing comes down the wire till a hand asks.</li><li>Quarantined stays on the books and off the wire.</li></ul>
+<ul class="voice"><li>Pins that restore come back verbatim after every compaction.</li><li>Recalled content reaches an agent only when it asks, inside an envelope.</li><li>Quarantined content stays in the record and off every path to an agent.</li></ul>
 <p>The inn is the picture, never the vocabulary: copy names the domain model’s concepts, and the frontier only lends them a place.</p>
 </section>
 <section class="k-files" aria-labelledby="files-h"><h2 id="files-h">Files</h2>

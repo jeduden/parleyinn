@@ -1,8 +1,8 @@
 'use strict';
-// Everything outside the inn's rooms: the forge, the stage platform and the visiting stage, the gate, and the street in front.
+// Everything outside the inn: the forge, the stage platform and the visiting stage, the gate, and the street in front.
 const { Fb, rng, IDX, ci, B2 } = require('./pix.js');
-const { halo, neonMask, boards, vboards, plate, lamp, FRAMES } = require('./kit.js');
-const { figure, PON, HAT, STEEL, BRASS, DARK, vkey } = require('./rooms.js');
+const { halo, boards, vboards, plate, lamp, FRAMES } = require('./kit.js');
+const { figure, PON, HAT, STEEL, BRASS, DARK, vkey } = require('./interior.js');
 const ob = (g, x, y, w, h, f) => g.R(x - 1, y - 1, w + 2, h + 2, 'ink').R(x, y, w, h, f); // box with an outline outside it
 
 function puff(g, cx, cy, r, c, thin) { g.fn(Math.floor(cx - r), Math.floor(cy - r), Math.ceil(r * 2) + 1, Math.ceil(r * 2) + 1, (i, j) => { const d = (i + 0.5 - cx) ** 2 + (j + 0.5 - cy) ** 2; if (d > r * r) return 0; if (thin && B2[j & 1][i & 1] >= thin) return 0; return c; }); }
@@ -17,30 +17,31 @@ function forge(g, t) {
   g.V(40, 206, 7, 'm1'); g.V(42, 206, 7, 'm1'); g.px(41, 208, 'm1'); g.V(47, 206, 6, 'w3'); g.R(46, 211, 3, 2, 'm2');
   for (const x of [53, 60]) { g.V(x, 206, 5, 'm2'); g.V(x + 3, 206, 5, 'm2'); g.H(x + 1, 210, 2, 'm2'); }
   vkey(g, 69, 206, 'm2', 7);
-  // hearth with a plasma column between the hood and the coals
+  // hearth with a white-hot column between the hood and the coals
   ob(g, 11, 214, 21, 22, 'd1'); for (let j = 217; j < 236; j += 4) { g.H(11, j, 21, 'd0'); for (let i = 13 + ((j >> 2) & 1) * 4; i < 32; i += 8) g.V(i, j - 3, 3, 'd0'); } g.R(10, 212, 23, 2, 'n3'); g.H(10, 212, 23, 'n4');
   g.PG([[12, 198], [31, 198], [27, 203], [16, 203]], 'm1', 'ink'); g.H(14, 199, 16, 'm2');
   g.R(14, 209, 15, 3, 'd4'); for (let i = 0; i < 7; i++) g.px(14 + i * 2 + ((t + i) % 2), 209 + ((i * 3 + t) % 3), (i + t) % 3 ? 'am' : 'wh');
-  g.V(21, 203, 6, 'cyw'); g.V(22, 203, 6, 'cy'); g.px(21 + (t % 2), 205 + (t % 3), 'cyw'); g.px(19, 205, 'm3'); g.px(24, 205, 'm3'); g.px(19, 207, 'm3'); g.px(24, 207, 'm3');
+  g.V(21, 203, 6, 'wh'); g.V(22, 203, 6, 'd8'); g.px(21 + (t % 2), 205 + (t % 3), 'wh'); g.px(19, 205, 'm3'); g.px(24, 205, 'm3'); g.px(19, 207, 'm3'); g.px(24, 207, 'm3');
   // anvil, with work on it
   ob(g, 41, 228, 9, 8, 'w2'); g.V(41, 228, 8, 'w3'); g.H(41, 231, 9, 'w1');
   g.S(37, 221, ['..KKKKKKKKKKKK.', 'KKmmmmmmmmmmmK.', '.KKKMMMMMMMMK..', '....KMMMMMK....', '....KMMMMMK....', '...KMMMMMMMK...', '..KKKKKKKKKKK..'], { K: 'ink', m: 'm3', M: 'm1' });
   g.R(42, 220, 8, 2, 'am'); g.H(43, 220, 5, 'wh'); g.px(49, 219, 'am');
   const sp = [[40, 216], [52, 214], [46, 212], [55, 219], [37, 219], [50, 210]]; sp.forEach(([x, y], i) => { if ((t + i * 2) % 4 < 2) g.px(x + (t % 2), y - ((t + i) % 3), i % 2 ? 'am' : 'wh'); });
-  // the smith, hammer up
+  // the smith, hammer up: dark iron, for the forge is next door and the house's own staff are brass
   g.R(44, 199, 9, 5, 'ink'); g.R(45, 200, 7, 3, 'm1'); g.H(45, 200, 7, 'm3'); g.L(52, 209, 50, 204, 'w3'); g.L(53, 209, 51, 204, 'w2');
-  figure(g, 60, 236, { metal: BRASS, flip: true, arm: 'up', apron: 'w2', gog: true });
+  figure(g, 60, 236, { metal: DARK, flip: true, arm: 'up', apron: 'w2', gog: true });
   ob(g, 67, 224, 8, 12, 'w2'); g.H(67, 227, 8, 'm1'); g.H(67, 233, 8, 'm1'); g.H(68, 224, 6, 't4'); g.V(67, 224, 12, 'w3');
   // light inside the shed
-  g.clip(8, 198, 70, 38); g.shade(8, 198, 70, 38, (i, j) => 0.1 + Math.max(0, (i - 40) / 38) * 0.16, 6, true); g.glow(22, 208, 60, 40, 'd5', 0.8, 6, true); g.glow(22, 205, 12, 10, 'cy', 0.5, 6, true); g.unclip();
+  g.clip(8, 198, 70, 38); g.shade(8, 198, 70, 38, (i, j) => 0.1 + Math.max(0, (i - 40) / 38) * 0.16, 6, true); g.glow(22, 208, 60, 40, 'd5', 0.8, 6, true); g.glow(22, 205, 12, 10, 'd8', 0.5, 6, true); g.unclip();
   // posts and roof
   ob(g, 6, 200, 3, 36, 'w2'); g.V(6, 200, 36, 'w3'); ob(g, 76, 196, 3, 40, 'w2'); g.V(76, 196, 40, 'w3');
   g.PG([[2, 195], [82, 188], [82, 195], [2, 202]], 'm1', 'ink'); for (let x = 6; x < 80; x += 5) { const yt = Math.round(195 - (x - 2) * 7 / 80); g.V(x, yt + 1, 5, 'm0'); } g.L(3, 196, 81, 189, 'm2');
-  // sign on the roof with a neon horseshoe
+  // sign on the roof, with an iron horseshoe hung from it: the forge carries none of the house's neon
   g.V(30, 185, 9, 'w2'); g.V(62, 185, 6, 'w2'); ob(g, 23, 171, 46, 14, 'r1'); g.B(24, 172, 44, 12, 'r0'); g.T(46, 173, 'FORGE', 'p2', 'j10', { align: 'c', sh: 'r0' });
-  const off = t === 13; g.H(69, 175, 4, 'ink'); g.H(69, 176, 4, 'n3');
-  neonMask(g, 72, 171, ['##.....##', '##.....##', '##.....##', '##.....##', '##.....##', '##.....##', '###...###', '.#######.', '..#####..'], off ? 'pk0' : 'pk', off ? 'pk0' : 'pkw');
-  halo(g, 70, 168, 13, 16, ['pk', 'pkw'], 'pk', [0.3, 0.12], 8);
+  g.H(69, 175, 4, 'ink'); g.H(69, 176, 4, 'n3');
+  const shoe = new Fb(11, 11).S(1, 1, ['##.....##', '##.....##', '##.....##', '##.....##', '##.....##', '##.....##', '###...###', '.#######.', '..#####..'], { '#': 'n2' });
+  shoe.V(1, 1, 6, 'n3'); shoe.V(8, 1, 6, 'n3'); shoe.px(5, 8, 'd8');
+  g.blit(shoe.outlined('ink'), 71, 170);
 }
 
 function strongbox(g, x, y, w, h) {
@@ -98,9 +99,9 @@ function hitch(g, t) {
   g.T(97, 257, 'SessionStart', 'p1', 't5'); g.T(97, 264, 'UserPromptSubmit', 'p1', 't5'); g.T(97, 271, 'PermissionRequest', 'p1', 't5');
 }
 function rig(g, t) {
-  horse(g, 182, 286, DARK, { tip: 'pk' });
+  horse(g, 182, 286, DARK);
   g.L(184, 265, 168, 245, 'w0');
-  horse(g, 171, 291, STEEL, { blanket: true });
+  horse(g, 171, 291, DARK, { blanket: true });
   g.L(173, 271, 167, 247, 'w0'); g.H(154, 243, 14, 'w0'); g.px(153, 244, 'w0');
   g.L(205, 280, 214, 275, 'w2'); g.L(205, 281, 214, 276, 'ink');
   // wagon
@@ -133,7 +134,7 @@ function pen(g, t) {
   post(6, 292, 30); post(83, 292, 30);
   plate(g, 46, 296, 'QUARANTINE', 'r1', 'p2', 'm5', { h: 9, pad: 3 });
 }
-function claim(g) {
+function stake(g) {
   const pegs = [[330, 272], [354, 270], [357, 290], [326, 292]];
   for (let i = 0; i < 4; i++) { const a = pegs[i], b = pegs[(i + 1) % 4]; g.L(a[0], a[1] - 3, b[0], b[1] - 3, 'p0'); }
   for (const [x, y] of pegs) { g.R(x - 1, y - 6, 3, 7, 'ink'); g.V(x, y - 5, 5, 'w3'); g.px(x, y - 5, 'w4'); }
@@ -206,4 +207,4 @@ function groundLight(g) {
   g.glow(109, 240, 30, 16, 'am', 0.6, 6); g.glow(42, 240, 52, 16, 'd5', 0.55, 6); g.glow(405, 240, 44, 12, 'am', 0.4, 6);
   g.glow(45, 316, 60, 16, 'pk', 0.34, 6); g.glow(46, 286, 40, 12, 'pk', 0.2, 6);
 }
-module.exports = { forge, stageStop, gate, hitch, rig, pen, claim, saguaro, bootHill, coach, litter, groundLight, horse, strongbox };
+module.exports = { forge, stageStop, gate, hitch, rig, pen, stake, saguaro, bootHill, coach, litter, groundLight, horse, strongbox };

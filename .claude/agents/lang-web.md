@@ -25,13 +25,16 @@ language; another specialist covers the rest.
    page loads is a file under `docs/`. A CDN, a font service, analytics
    or a tracking pixel is a direct dependency no decision record
    justifies ([ENG-18](../../docs/srs/10-engineering-quality.md)).
-2. **No package.** The art source runs on Node's standard library alone:
-   no `require` of a package and no `package.json` (ENG-18).
-3. **The policy holds.** Each page keeps its `Content-Security-Policy`
-   meta tag as strict: no inline script, no `eval`, no new source.
+2. **No package.** The art source runs on the standard library of
+   Node.js alone: no `require` of a package and no `package.json`
+   (ENG-18).
+3. **The content security policy holds.** Each page keeps its
+   `Content-Security-Policy` meta tag as strict: no inline script, no
+   `eval`, no new source.
 4. **Generated files move with their source.** `node
-   docs/design/art/build.js` writes both pages, the tokens and the
-   images; a change to one comes with the source change that writes it.
+   docs/design/art/build.js` writes both pages, the design tokens and
+   the images; a change to one comes with the source change that writes
+   it.
 5. **Accessible.** Images carry alt text, controls are buttons with
    names, focus stays visible, and motion stops under
    `prefers-reduced-motion`.

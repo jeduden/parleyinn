@@ -1,5 +1,5 @@
 'use strict';
-// The inn's open rooms: record, print shop, wire office and office upstairs, the saloon below, and the figures in them.
+// The inn's interior: the ledger shelves, print shop, wire office and office upstairs, the saloon below, and the figures in them.
 const { Fb, rng, IDX, ci, B2 } = require('./pix.js');
 const { halo, boards, vboards, plate, lamp } = require('./kit.js');
 
@@ -68,7 +68,7 @@ function paper(g, x, y, w, h, lit, kind) {
 function bottle(g, x, y, c, h) { g.R(x, y - h + 2, 2, h - 2, c); g.px(x, y - h, 'p1'); g.px(x, y - h + 1, c); g.px(x + 1, y - h + 3, 'p2'); }
 const DK = { r1: 'r0', t3: 't2', p1: 'p0', w3: 'w2', d3: 'd2', n3: 'n2', t2: 't1', r0: 'w0', p0: 'w3', d2: 'd1', w2: 'w1', n4: 'n3', d4: 'd3' };
 
-function recordRoom(g, t) {
+function ledgerShelves(g, t) {
   const x0 = 131, x1 = 199, y0 = 112, y1 = 162; g.R(x0, y0, x1 - x0, y1 - y0, 'w0');
   const r = rng(77), ups = [132, 153, 174, 195], names = ['A1', 'A2', 'B1'], cols = ['r1', 't3', 'p1', 'w3', 'd3', 'n3', 't2', 'r0', 'p0', 'd2', 'w2', 'n4', 'd4'], late = [];
   for (let b = 0; b < 3; b++) {
@@ -98,7 +98,9 @@ function printShop(g, t) {
   // handbills drying on a line
   const sag = x => 116 + Math.round(Math.sin((x - x0) / (x1 - x0) * Math.PI) * 2);
   for (let x = x0; x < x1; x++) g.px(x, sag(x), 'ink');
-  for (const bx of [203, 212, 221, 250]) { const by = sag(bx + 3) + 1; g.R(bx, by, 7, 9, 'p2'); g.B(bx, by, 7, 9, 'w3'); g.H(bx + 1, by + 1, 5, 'r1'); g.H(bx + 1, by + 3, 5, 'n4'); g.H(bx + 1, by + 5, 4, 'n4'); g.H(bx + 1, by + 7, 5, 'n4'); g.px(bx + 3, by - 1, 'w2'); }
+  for (const bx of [221, 250]) { const by = sag(bx + 3) + 1; g.R(bx, by, 7, 9, 'p2'); g.B(bx, by, 7, 9, 'w3'); g.H(bx + 1, by + 1, 5, 'r1'); g.H(bx + 1, by + 3, 5, 'n4'); g.H(bx + 1, by + 5, 4, 'n4'); g.H(bx + 1, by + 7, 5, 'n4'); g.px(bx + 3, by - 1, 'w2'); }
+  // the B0 plate: only the core builds what reaches the model, and the handbill is what reaches it
+  plate(g, 209, 114, 'B0', 't1', 'cy', 'm5', { h: 9, pad: 3 });
   // hand press
   g.R(201, 157, 15, 5, 'w1'); g.H(201, 157, 15, 'w3'); g.B(201, 157, 15, 5, 'ink');
   g.R(202, 132, 2, 25, 'm1'); g.R(212, 132, 2, 25, 'm1'); g.V(202, 132, 25, 'm2'); g.V(212, 132, 25, 'm2');
@@ -138,10 +140,11 @@ function office(g, t) {
   for (let j = y0 + 3; j < 150; j += 6) for (let i = x0 + (((j - y0) / 6) & 1 ? 2 : 5); i < x1; i += 6) g.px(i, j, 'd0');
   g.R(x0, 150, x1 - x0, 12, 'w1'); g.H(x0, 150, x1 - x0, 'w3'); for (let x = x0 + 2; x < x1; x += 7) g.V(x, 152, 10, 'w0');
   g.clip(x0, y0, x1 - x0, y1 - y0); g.glow(339, 146, 40, 38, 'am', 0.5, 6, true); g.unclip();
-  // the key board under glass: principal key, device keys hung from it, seat keys hung from those
+  // the key board: the principal key's painted outline stands empty, for the house never keeps it; device keys
+  // hang below it, and seat keys from those
   const kx = 318, ky = 116; g.R(kx, ky, 27, 28, 'w3'); g.B(kx, ky, 27, 28, 'ink'); g.R(kx + 2, ky + 2, 23, 24, 'n1'); g.H(kx + 1, ky + 1, 25, 'w4');
   g.L(kx + 3, ky + 9, kx + 8, ky + 4, 'n2'); g.L(kx + 18, ky + 23, kx + 22, ky + 19, 'n2');
-  vkey(g, kx + 13, ky + 3, 'am', 8);
+  vkey(g, kx + 13, ky + 3, 'n3', 8);
   for (const dx of [5, 13, 21]) { if (dx !== 13) g.L(kx + 13, ky + 11, kx + dx, ky + 13, 'n4'); else g.px(kx + 13, ky + 12, 'n4'); vkey(g, kx + dx, ky + 13, 'd6', 6); for (const s of [-2, 2]) { g.px(kx + dx + s, ky + 19, 'n4'); vkey(g, kx + dx + s, ky + 20, 'm3', 4); } }
   // the safe
   const sx = 346, sy = 134; g.R(sx, sy, 21, 28, 'm1'); g.B(sx, sy, 21, 28, 'ink');
@@ -149,14 +152,13 @@ function office(g, t) {
   g.R(sx + 2, sy + 11, 17, 14, 'm2'); g.B(sx + 2, sy + 11, 17, 14, 'm0'); g.H(sx + 3, sy + 12, 15, 'm3');
   g.OV(sx + 4, sy + 14, 7, 7, 'm3', 'ink'); g.px(sx + 7, sy + 17, 'ink'); g.px(sx + 7, sy + 15, 'r2'); g.R(sx + 13, sy + 15, 2, 6, 'am'); g.px(sx + 14, sy + 15, 'd8');
   g.px(sx + 1, sy + 13, 'm0'); g.px(sx + 1, sy + 22, 'm0'); g.R(sx + 1, sy + 26, 3, 2, 'm0'); g.R(sx + 17, sy + 26, 3, 2, 'm0');
-  plate(g, sx + 10, 120, 'B0', 't1', 'cy', 'm5', { h: 9, pad: 3 });
   // cabinet with a ledger and a banker's lamp
   g.R(318, 150, 26, 12, 'w2'); g.B(318, 150, 26, 12, 'ink'); g.H(319, 151, 24, 'w4'); g.R(321, 153, 9, 3, 'w1'); g.R(332, 153, 9, 3, 'w1'); g.px(325, 154, 'am'); g.px(336, 154, 'am'); g.R(321, 157, 20, 3, 'w1'); g.px(331, 158, 'am');
   g.R(335, 144, 8, 2, 't4'); g.H(336, 144, 6, 't5'); g.V(339, 146, 3, 'am'); g.R(337, 149, 5, 1, 'am'); g.px(338, 146, 'wh'); g.px(340, 146, 'wh');
   g.R(321, 147, 11, 3, 'p2'); g.V(326, 147, 3, 'p0'); g.H(322, 148, 3, 'n4'); g.H(328, 148, 3, 'n4');
 }
 function upstairs(g, t) {
-  recordRoom(g, t); printShop(g, t); wireOffice(g, t); office(g, t);
+  ledgerShelves(g, t); printShop(g, t); wireOffice(g, t); office(g, t);
   for (const x of [198, 260, 314]) { g.R(x, 112, 2, 50, 'w1'); g.V(x, 112, 50, 'ink'); }
 }
 
@@ -172,7 +174,7 @@ function saloon(g, t) {
   g.shade(x0, 214, x1 - x0, 16, (i, j) => (j - 212) / 18 * 0.3, 6, true);
   g.glow(200, 178, 70, 56, 'am', 0.3, 6, true); g.glow(270, 178, 70, 56, 'am', 0.3, 6, true); g.glow(346, 198, 50, 38, 'am', 0.28, 6, true);
   g.unclip();
-  // the notice board: one intent on top, lit constraints and a preference, and the kinds that stay behind
+  // the pin board: one intent on top, lit constraints and a preference, and the pin types that stay behind
   const bx = 134, by = 173; g.R(bx, by, 44, 33, 'w1'); g.B(bx, by, 44, 33, 'ink'); g.B(bx + 1, by + 1, 42, 31, 'w3'); g.H(bx + 1, by + 1, 42, 'w4');
   paper(g, bx + 3, by + 23, 12, 7, false, 'n3'); paper(g, bx + 16, by + 23, 12, 7, false, 'n3'); paper(g, bx + 29, by + 23, 12, 7, false, 'n3');
   paper(g, bx + 12, by + 3, 20, 8, true, 'am');
@@ -183,7 +185,7 @@ function saloon(g, t) {
   g.R(cx - 3, y0 + 7, 7, 10, 'd1');
   for (const dx of [-4, -2, 0, 2, 4]) g.V(cx + dx, y0 + 7, 10, 'am'); g.H(cx - 4, y0 + 17, 9, 'am'); g.H(cx - 4, y0 + 18, 9, 'w3'); g.H(cx - 3, y0 + 14, 7, 'w3');
   const hop = (t % 6 === 2 || t % 6 === 3) ? -1 : 0; g.R(cx - 1, y0 + 11 + hop, 3, 3, 'd8'); g.px(cx + 1, y0 + 10 + hop, 'd8'); g.px(cx, y0 + 10 + hop, 'd8'); g.px(cx + 2, y0 + 11 + hop, 'd5'); g.px(cx + 1, y0 + 11 + hop, 'ink'); g.px(cx - 2, y0 + 13 + hop, 'am');
-  // the room: table, three seats, a tab on a spike for each
+  // the room: the card table, three seats, and the tab on its spike that runs for each
   const tx = 236;
   chairFront(g, tx, y1, 3); cardTable(g, tx, y1);
   chair(g, 212, y1, { no: 1 }); figure(g, 212, y1, { sit: true, arm: 'table', pon: PON.red, hat: HAT.brown, band: 'am', cell: true });
