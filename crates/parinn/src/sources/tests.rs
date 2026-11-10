@@ -60,6 +60,38 @@ fn a_source_is_lost_when_gone_with_bytes_unread_or_lines_held() {
 }
 
 #[test]
+fn a_replaced_generation_was_cut_off_with_bytes_unread_or_lines_held() {
+    let path = Path::new("/t/a.jsonl");
+    let whole = source(path, 5, 5);
+    let cut_short = source(path, 5, 9);
+    let held = Source {
+        held_since: Some(1),
+        ..source(path, 5, 5)
+    };
+    let found = Source {
+        lost: true,
+        ..source(path, 5, 5)
+    };
+    let superseded = [whole, cut_short.clone(), held.clone(), found.clone()];
+
+    assert_eq!(cut_off(&superseded), [&cut_short, &held, &found]);
+}
+
+#[test]
+fn verify_fails_each_generation_replaced_before_it_was_fully_ingested() {
+    let cut_short = source(Path::new("/t/a.jsonl"), 5, 9);
+    let whole = source(Path::new("/t/b.jsonl"), 5, 5);
+
+    let found = Completeness::default().with_replaced(&[cut_short, whole]);
+
+    assert_eq!(found.failed, [("/t/a.jsonl".to_owned(), CUT_OFF)]);
+    assert_eq!(
+        found.failure().unwrap(),
+        "transcript sources fall short: /t/a.jsonl was replaced before it was fully ingested"
+    );
+}
+
+#[test]
 fn the_status_names_held_and_lost_sources() {
     let status = SourcesStatus {
         held: vec!["/t/f.jsonl".into()],

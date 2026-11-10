@@ -78,6 +78,20 @@ pub(crate) fn lost(sources: &[Source]) -> Vec<&Source> {
         .collect()
 }
 
+/// Each of `superseded`, the generations a later one replaced, that was
+/// replaced before it was fully ingested: bytes it held were unread, an
+/// ingest marker held part of it, or ingest already found it so (REC-08).
+pub(crate) fn cut_off(superseded: &[Source]) -> Vec<&Source> {
+    superseded
+        .iter()
+        .filter(|s| s.lost || !s.position.complete() || s.held_since.is_some())
+        .collect()
+}
+
+/// Why a generation replaced before it was fully ingested fails
+/// (REC-08, I1).
+pub(crate) const CUT_OFF: &str = "was replaced before it was fully ingested";
+
 /// How long a source an ingest stopped short of stays short, its
 /// ingest marker at its position, before `parinn verify` fails it: 10
 /// minutes after the ingest left the marker, on either side of verify's
@@ -262,6 +276,17 @@ fn outcome(source: &Source, at: Found, served: &[PathBuf], now_ms: u64) -> Outco
 }
 
 impl Completeness {
+    /// This, with each of `superseded`, the generations a later one
+    /// replaced, that was replaced before it was fully ingested failing
+    /// too (REC-08).
+    pub(crate) fn with_replaced(mut self, superseded: &[Source]) -> Self {
+        for source in cut_off(superseded) {
+            self.failed.push((source.path.clone(), CUT_OFF));
+        }
+
+        self
+    }
+
     /// What `parinn verify` says of the sources that fail, one clause
     /// each, every path shown safe for a terminal (T16); none while they
     /// all hold.
@@ -336,10 +361,19 @@ pub(crate) fn lost_text(lost: &[String]) -> String {
     )
 }
 
+/// What the audit log says of a source gone before it was fully
+/// ingested.
+const GONE: &str = "transcript source gone before it was fully ingested:";
+
+/// What the audit log says of a generation replaced before it was fully
+/// ingested.
+const REPLACED_SHORT: &str = "transcript generation replaced before it was fully ingested:";
+
 /// Audits and counts, once each, every transcript source `parinn ingest
-/// --all` finds gone before it was fully ingested (REC-08, I6). A source
-/// is marked lost only after its audit entry is written, so one whose
-/// audit failed is found, and audited, again next time.
+/// --all` finds gone before it was fully ingested, and every generation
+/// it finds replaced before it was (REC-08, I6). A source is marked lost
+/// only after its audit entry is written, so one whose audit failed is
+/// found, and audited, again next time.
 pub(crate) fn audit_lost(
     ctx: &Context,
     home: &Home,
@@ -348,10 +382,15 @@ pub(crate) fn audit_lost(
 ) {
     let found = Store::open(&home.store()).and_then(|store| {
         let sources = store.sources()?;
-        let fresh: Vec<store::Source> = lost(&sources)
+        let superseded = store.superseded()?;
+        let gone = lost(&sources).into_iter().map(|s| (s, GONE));
+        let replaced = cut_off(&superseded)
             .into_iter()
-            .filter(|s| !s.lost)
-            .cloned()
+            .map(|s| (s, REPLACED_SHORT));
+        let fresh: Vec<(store::Source, &str)> = gone
+            .chain(replaced)
+            .filter(|(s, _)| !s.lost)
+            .map(|(s, detail)| (s.clone(), detail))
             .collect();
         Ok((store, fresh))
     });
@@ -362,7 +401,7 @@ pub(crate) fn audit_lost(
             return;
         }
     };
-    for source in fresh {
+    for (source, detail) in fresh {
         let stem = Path::new(&source.path)
             .file_stem()
             .map(|s| s.to_string_lossy().into_owned())
@@ -375,7 +414,7 @@ pub(crate) fn audit_lost(
             kind: Kind::Dropped,
             counter: Counter::TranscriptSourceLost,
             operation: "ingest",
-            detail: "transcript source gone before it was fully ingested:",
+            detail,
             key: &name,
         };
         if let Err(e) = ctx.audit(&occurrence) {

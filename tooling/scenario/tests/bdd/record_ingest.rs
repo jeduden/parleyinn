@@ -385,10 +385,54 @@ fn cut_short(w: &mut World, name: String, _lines: u64, landed: u64) -> Result<()
     fs::remove_file(&main).map_err(|e| e.to_string())
 }
 
+#[given(
+    regex = r#"^"([^"]+)" has (\d+) lines of which (\d+) were ingested before it was rewritten with a different first line and ingested again$"#
+)]
+fn rewritten_short(w: &mut World, name: String, _lines: u64, landed: u64) -> Result<(), String> {
+    let path = directory(w, "main-run")?.join(format!("{name}.jsonl"));
+    // The harness was still writing the next line when ingest read it.
+    let mut text = lines(&name, 1, landed);
+    text.push_str("{\"type\": \"x\", \"uuid\": \"cut");
+    fs::write(&path, text).map_err(|e| e.to_string())?;
+    name_transcript(w, &name, path.clone());
+    ingest_all(w)?;
+    let other = format!(
+        "{}\n{}",
+        json!({"type": "x", "first": "other"}),
+        lines(&name, 2, landed)
+    );
+    fs::write(&path, other).map_err(|e| e.to_string())?;
+    ingest_all(w)?;
+    ingest_all(w)
+}
+
 #[then(
     regex = r#"^the output names "([^"]+)", and only it, as a transcript source that disappeared before it was fully ingested$"#
 )]
 fn names_lost(w: &mut World, name: String) -> Result<(), String> {
+    names_only(w, &name, " disappeared before it was fully ingested")
+}
+
+#[then(
+    regex = r#"^the output names "([^"]+)", and only it, as a transcript generation replaced before it was fully ingested, which ingest audited and counted once$"#
+)]
+fn names_replaced(w: &mut World, name: String) -> Result<(), String> {
+    names_only(w, &name, " was replaced before it was fully ingested")?;
+    let said = format!("transcript generation replaced before it was fully ingested: {name}");
+    let entries = audit::log::Log::new(home(w)?.audit())
+        .entries()
+        .map_err(|e| e.to_string())?;
+    let counted = |e: &&audit::entry::Entry| e.counter.as_deref() == Some("transcript_source_lost");
+    let audited = entries.iter().filter(|e| e.detail == said).filter(counted);
+    match audited.count() {
+        1 => Ok(()),
+        n => Err(format!("ingest audited and counted {said:?} {n} times")),
+    }
+}
+
+/// Whether the last `parinn verify --json` fails `name`, and no other
+/// transcript source, for `why`.
+fn names_only(w: &mut World, name: &str, why: &str) -> Result<(), String> {
     let out = last_run(w)?;
     let report: Value = serde_json::from_slice(&out.stdout).map_err(|e| e.to_string())?;
     let broken = &report["broken"];
@@ -396,19 +440,20 @@ fn names_lost(w: &mut World, name: String) -> Result<(), String> {
         return Err(format!("verify found no incomplete source: {report}"));
     }
     // "transcript sources fall short: <path> <why>; <path> <why>"
-    const WHY: &str = " disappeared before it was fully ingested";
     let message = broken["message"].as_str().unwrap_or_default();
-    let lost: Vec<&str> = message
+    let failing: Vec<&str> = message
         .strip_prefix("transcript sources fall short: ")
         .unwrap_or_default()
         .split("; ")
-        .filter_map(|each| each.strip_suffix(WHY))
+        .filter_map(|each| each.strip_suffix(why))
         .collect();
-    let named = |p: &&str| Path::new(p).file_stem().is_some_and(|s| s == name.as_str());
-    if lost.len() == 1 && lost.iter().all(named) {
+    let named = |p: &&str| Path::new(p).file_stem().is_some_and(|s| s == name);
+    if failing.len() == 1 && failing.iter().all(named) {
         return Ok(());
     }
-    Err(format!("parinn verify names {lost:?} as lost"))
+    Err(format!(
+        "parinn verify names {failing:?} as one that{why}: {message}"
+    ))
 }
 
 /// The transcript directory of the run `name`.

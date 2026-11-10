@@ -135,9 +135,11 @@ Feature: Record (REC)
     Given an isolated ParleyInn home
     And an agent run with a Claude Code transcript "main-run"
     And "main-run" has 40 lines and has been ingested
+    And "rewritten" has 30 lines of which 20 were ingested before it was rewritten with a different first line and ingested again
     And "cut-short" has 30 lines of which 20 were ingested before both transcript files were deleted
     When the person runs "parinn verify --json"
     Then the output names "cut-short", and only it, as a transcript source that disappeared before it was fully ingested
+    And the output names "rewritten", and only it, as a transcript generation replaced before it was fully ingested, which ingest audited and counted once
     And "parinn event expand" still returns all 40 events of "main-run"
 
   @REC-09 @P0 @I1

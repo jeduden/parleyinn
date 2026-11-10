@@ -760,6 +760,43 @@ fn a_transcript_source_gone_before_it_was_fully_ingested_is_reported_and_audited
 }
 
 #[test]
+fn a_transcript_generation_replaced_before_it_was_fully_ingested_is_reported_and_audited_once() {
+    let p = Process::new();
+    let cut = transcript_in(&p, "-w-a", "cut-short.jsonl", b"{\"a\":1}\n{\"b\":");
+    let whole = transcript_in(&p, "-w-a", "main-run.jsonl", b"{\"a\":1}\n");
+    assert_eq!(p.invoke(&["ingest", "--all"], &DEV).0, EXIT_OK);
+    std::fs::write(&cut, b"{\"z\":9}\n").unwrap();
+    std::fs::write(&whole, b"{\"z\":9}\n").unwrap();
+
+    assert_eq!(p.invoke(&["ingest", "--all"], &DEV).0, EXIT_OK);
+    assert_eq!(p.invoke(&["ingest", "--all"], &DEV).0, EXIT_OK);
+
+    let audit = audit_text(&p);
+    assert_eq!(
+        audit
+            .matches("transcript generation replaced before it was fully ingested: cut-short")
+            .count(),
+        1,
+        "{audit}"
+    );
+    assert!(!audit.contains("fully ingested: main-run"), "{audit}");
+    let (_, out, _) = p.invoke(&["status", "--json"], &DEV);
+    let v: serde_json::Value = serde_json::from_str(&out).unwrap();
+    assert_eq!(v["counters"]["transcript_source_lost"]["total"], 1);
+    let (code, out, _) = p.invoke(&["verify", "--json"], &DEV);
+    assert_eq!(code, EXIT_INTEGRITY);
+    let v: serde_json::Value = serde_json::from_str(&out).unwrap();
+    assert_eq!(v["broken"]["check"], "transcript source completeness");
+    assert_eq!(
+        v["broken"]["message"],
+        format!(
+            "transcript sources fall short: {} was replaced before it was fully ingested",
+            cut.display()
+        )
+    );
+}
+
+#[test]
 fn ingest_says_which_lost_transcript_source_it_cannot_audit() {
     let p = Process::new();
     let cut = transcript_in(&p, "-w-a", "cut-short.jsonl", b"{\"a\":1}\n{\"b\":");

@@ -1276,12 +1276,14 @@ fn completeness(
     home: &Home,
     store: &Store,
 ) -> Result<sources::Completeness, store::StoreError> {
-    Ok(sources::completeness(
+    let found = sources::completeness(
         &store.sources()?,
         &capture::served(home),
         &sources::look,
         (ctx.clock)().saturating_mul(1000),
-    ))
+    );
+
+    Ok(found.with_replaced(&store.superseded()?))
 }
 
 /// The ranges a purge a kill cut short has still to clear from the
