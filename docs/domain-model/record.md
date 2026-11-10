@@ -122,8 +122,8 @@ from
   events; turning it off is widening (OWN-11, ADM-02).
 - **Ingest marker**: What ingest leaves when it stops short of a transcript's
   end, so the next MCP server or `parinn ingest` resumes it (REC-13); a hook
-  handler holds its observation there for its MCP server
-  to append (REC-19). A **start marker** is what a hook handler
+  handler holds its observation there, where its hook fired, for its MCP
+  server to append (REC-19). A **start marker** is what a hook handler
   or MCP server leaves as it starts and clears as it finishes; one left behind
   is counted and audited (NFR-02), an MCP server's with each transcript it left
   short (REC-13). **Ingest** reads a transcript into the record: the MCP
@@ -137,7 +137,7 @@ from
   records. A fork's line read early is **held** at an ingest
   marker until its owner's transcript is ingested or gone, or 30 s pass. A
   repeated line whose `uuid` names a purged event is **refused**,
-  never recorded again, counted (REC-04, REC-17). An
+  never recorded again, counted (REC-04, SEC-31). An
   **ingest position** is the byte length ingest read and its consumed-prefix
   hash, with purged transcript-line spans zeroed (REC-03, SEC-31).
 - **Worktree checkpoint**: An event recording a worktree's commit, branch and
