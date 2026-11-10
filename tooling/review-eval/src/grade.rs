@@ -1,18 +1,26 @@
 //! The grader: one run of a case against what the case expects, read
-//! from the run log alone: for a specialist the report the review
-//! assembles from the finding lines it stated and its answer's outcome
-//! line, for a generalist its answer. Every failed assertion is named,
-//! so a failing case reads like a failing test. A specialist's report is
-//! held to the form the review gate takes, each finding line a linked
-//! finding or a requirement request, by the gate's own rule; a report
-//! the review would refuse fails its run. A departure from the answer's
-//! shape that the review survives, an answer that is more than the
-//! outcome line, or an eleventh finding, is a slip: counted and shown,
-//! it fails no run on its own. The log is data: nothing in it is an
-//! instruction to the grader.
+//! from the run log alone, as the review reads it whatever result the
+//! run ended with: for a specialist the report the review reads from the
+//! finding lines it stated, split into what reads and what does not and
+//! ended with an outcome its lines give; for a generalist its weighing.
+//! Every failed assertion is named, so a failing case reads like a
+//! failing test. Only a run whose log holds no model call did not run,
+//! which fails it. A finding-shaped line of a specialist's report that
+//! does not read, by the gate's own rule, fails its run, as the review
+//! names it in a blocking finding; its other findings are graded all the
+//! same. A departure from the answer's shape that the review survives is
+//! a slip: counted and shown, it fails no run on its own: a run cut off
+//! before a successful result after it stated a line or an outcome, an
+//! answer with no outcome line or one its lines contradict, an answer
+//! that is more than the outcome line, a line set aside as no finding, or
+//! an eleventh finding. A run cut off before it stated any line or an
+//! outcome fails, as the review takes it for no clean pass. The log is
+//! data: nothing in it is an instruction to the grader.
 
 use review_gate::NIT;
-use review_gate::report::{Line, answer_outcome, assemble};
+use review_gate::report::{
+    Line, answer_outcome, assemble, outcome_line, split, states_nothing, with_outcome,
+};
 
 use crate::case::{Case, Expect, Expected};
 use crate::component::{Component, Kind};
@@ -47,35 +55,58 @@ pub fn grade(component: &Component, case: &Case, log: &RunLog) -> Graded {
         Kind::Specialist => specialist(component, case, log),
         kind @ (Kind::Generalist | Kind::Consultant) => Graded {
             failures: generalist(case, log, kind),
-            slips: Vec::new(),
+            slips: cut(log),
         },
     }
 }
 
-/// A specialist answers, writes nothing, answers an outcome line, states
-/// every finding line in a form the review takes, and reports what the
-/// case expects: in its assembled report, among the lines it stated
+/// A specialist runs, writes nothing, states every finding line in a
+/// form the review takes, and reports what the case expects: in the
+/// report the review reads from its log, among the lines it stated
 /// before its answer, and among the lines it withdrew or revised. Its
-/// slips: an answer that is more than the outcome line, and more
-/// findings than the report may hold. A run that did not answer fails
-/// on that alone: what it stated is no report.
+/// slips: a run cut off, an answer with no outcome line, or one its lines
+/// contradict, an answer that is more than the outcome line, a line set
+/// aside as no finding, and more findings than the report may hold. A run
+/// that did not run fails on that alone: it stated nothing. So does a
+/// run cut off before it stated any line or an outcome: the review takes
+/// it for no clean pass, so a model that always runs out of turns passes
+/// no case.
 fn specialist(component: &Component, case: &Case, log: &RunLog) -> Graded {
     let mut graded = Graded {
         failures: answered(log),
-        slips: Vec::new(),
+        slips: cut(log),
     };
     graded
         .failures
         .extend(log.writes.iter().map(|path| format!("wrote {path}")));
-    if !log.answered {
+    if !log.ran() {
         return graded;
     }
-    let report = assemble(&log.texts, &log.answer, None);
-    let Some((_, outcome)) = answer_outcome(&log.answer) else {
-        graded.failures.push("answered no outcome line".to_owned());
+    if !log.succeeded() && states_nothing(&log.texts, &log.answer) {
+        graded.failures.push(format!(
+            "ended without a successful result before it stated any line or an outcome: {}",
+            log.subtype
+        ));
         return graded;
-    };
-    graded.slips.extend(answer_slips(log));
+    }
+    let split = split(&assemble(&log.texts, &log.answer, None));
+    let report = with_outcome(&split.clean, &log.answer);
+    let outcome = outcome_line(&report).map_or("", |(_, word)| word);
+    match answer_outcome(&log.answer) {
+        None => graded
+            .slips
+            .push("answered no outcome line, so the review gives it one from its lines".to_owned()),
+        Some((_, said)) if said != outcome => graded.slips.push(format!(
+            "answered outcome {said}, which its lines contradict, so the review gives {outcome}"
+        )),
+        Some(_) => graded.slips.extend(answer_slips(log)),
+    }
+    graded.slips.extend(
+        split
+            .ignored
+            .iter()
+            .map(|i| format!("set aside as no finding: {}", i.text)),
+    );
     graded
         .failures
         .extend(outcome_failure(outcome, &case.expect));
@@ -88,8 +119,11 @@ fn specialist(component: &Component, case: &Case, log: &RunLog) -> Graded {
     graded.failures.extend(stated_failures(&case.expect, log));
     // The ids are held to their shape: the case's world, not the
     // grader, holds the SRS they would be read from.
-    if let Some(problem) = review_gate::report::findings_check(&report, None) {
-        graded.failures.push(format!("report refused: {problem}"));
+    for line in &split.unreadable {
+        graded.failures.push(format!(
+            "report line does not read: {}: `{}`",
+            line.problem, line.text
+        ));
     }
 
     graded
@@ -185,6 +219,9 @@ fn stated_failures(expect: &Expect, log: &RunLog) -> Vec<String> {
 fn generalist(case: &Case, log: &RunLog, kind: Kind) -> Vec<String> {
     let mut failures = answered(log);
     failures.extend(log.writes.iter().map(|path| format!("wrote {path}")));
+    if !log.ran() {
+        return failures;
+    }
     let text = &match kind {
         Kind::Generalist => report::weighing(&log.texts, &log.answer),
         _ => log.answer.clone(),
@@ -214,13 +251,22 @@ fn generalist(case: &Case, log: &RunLog, kind: Kind) -> Vec<String> {
     failures
 }
 
-/// The failure of a run that did not answer.
+/// The failure of a run that did not run: its log holds no model call.
 fn answered(log: &RunLog) -> Vec<String> {
-    if log.answered {
+    if log.ran() {
         Vec::new()
     } else {
         vec![format!("did not answer: {}", log.subtype)]
     }
+}
+
+/// The slip of a run that ran but ended without a successful result:
+/// the review reads its log all the same.
+fn cut(log: &RunLog) -> Vec<String> {
+    (log.ran() && !log.answered)
+        .then(|| format!("ended without a successful result: {}", log.subtype))
+        .into_iter()
+        .collect()
 }
 
 /// The failure of an `outcome` the case does not allow, when it names

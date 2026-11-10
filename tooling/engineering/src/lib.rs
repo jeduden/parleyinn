@@ -34,6 +34,7 @@ pub mod review_evaluation;
 pub mod review_languages;
 pub mod review_leak;
 pub mod review_limits;
+pub mod review_logs;
 pub mod review_parts;
 pub mod review_previous;
 pub mod review_refusals;

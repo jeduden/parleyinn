@@ -564,3 +564,25 @@ fn a_context_naming_fewer_touched_ids_than_the_bundle_counted_is_named() {
         ["the context for lang-markdown lacks the touched id ENG-28"]
     );
 }
+
+#[test]
+fn prepare_gives_each_specialist_an_empty_diff_and_names_one_it_cannot_write() {
+    let checkout = Checkout::new(&testkit::repo_root());
+    let work = TempDir::new().unwrap();
+    prepare(&checkout, work.path()).unwrap();
+    for name in SPECIALISTS {
+        let diff = work.path().join(format!("review/diffs/{name}.diff"));
+        assert_eq!(fs::read_to_string(diff).unwrap(), "", "{name}");
+    }
+
+    let work = TempDir::new().unwrap();
+    fs::create_dir_all(work.path().join("review")).unwrap();
+    fs::write(work.path().join("review/diffs"), "a file").unwrap();
+    let err = prepare(&checkout, work.path()).unwrap_err();
+    assert!(err.starts_with("make "), "{err}");
+
+    let work = TempDir::new().unwrap();
+    fs::create_dir_all(work.path().join("review/diffs/lang-rust.diff")).unwrap();
+    let err = prepare(&checkout, work.path()).unwrap_err();
+    assert!(err.starts_with("write "), "{err}");
+}

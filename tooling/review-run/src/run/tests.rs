@@ -13,6 +13,7 @@ use crate::fake::{self, FakeHost, agent_of, prompt_of};
 use crate::plan::parse_dispatch;
 
 mod controls;
+mod read;
 mod resume;
 
 fn plan(dispatch: &str) -> Plan {
@@ -159,7 +160,7 @@ fn a_specialist_s_report_is_assembled_from_its_log_and_written_for_its_generalis
 }
 
 #[test]
-fn a_run_cut_off_before_its_answer_keeps_what_it_stated_as_an_incomplete_report() {
+fn a_run_cut_off_before_its_answer_is_read_as_its_report() {
     let dir = workdir();
 
     let run = one_run(dir.path(), |c| {
@@ -180,17 +181,25 @@ fn a_run_cut_off_before_its_answer_keeps_what_it_stated_as_an_incomplete_report(
         Ok(Output::default())
     });
 
+    // It ran, so it is consulted: no failure, only cut off.
+    assert!(run.answered(), "{:?}", run.failure);
     assert_eq!(
-        run.failure.as_deref(),
+        run.cut.as_deref(),
         Some("its run ended with error_max_turns")
     );
     assert_eq!(
         fs::read_to_string(dir.path().join("review/reports/lang-rust.md")).unwrap(),
         format!(
-            "incomplete: its run ended with error_max_turns\n{}\na.rs:9 — not a form\n",
+            "{}\noutcome: findings — 1 finding stated in the run log\n",
             fake::FINDING
         )
     );
+    assert_eq!(
+        run.log.answer,
+        "outcome: findings — 1 finding stated in the run log"
+    );
+    assert_eq!(run.unreadable.len(), 1);
+    assert_eq!(run.unreadable[0].text, "a.rs:9 — not a form");
 }
 
 #[test]
@@ -368,7 +377,7 @@ fn one_run(
 }
 
 #[test]
-fn a_run_that_does_not_answer_says_why() {
+fn a_run_whose_log_holds_no_model_call_did_not_run_and_says_why() {
     let cases: Vec<(&str, fake::Claude)> = vec![
         ("cannot start", Box::new(|_| Err("cannot start".to_owned()))),
         (
@@ -378,6 +387,21 @@ fn a_run_that_does_not_answer_says_why() {
                 Ok(Output::default())
             }),
         ),
+        ("read ", Box::new(|_| Ok(Output::default()))),
+    ];
+    for (want, script) in cases {
+        let dir = workdir();
+        let run = one_run(dir.path(), script);
+        assert!(!run.answered());
+        let failure = run.failure.clone().unwrap();
+        assert!(failure.starts_with(want), "{want}: {failure}");
+        assert!(describe(&run).starts_with("lang-rust (specialist): did not run: "));
+    }
+}
+
+#[test]
+fn a_run_with_a_model_call_that_ended_without_an_answer_ran_and_says_why() {
+    let cases: Vec<(&str, fake::Claude)> = vec![
         (
             "its run ended with deadline",
             Box::new(|c| {
@@ -392,15 +416,19 @@ fn a_run_that_does_not_answer_says_why() {
             "its run answered nothing",
             Box::new(|c| fake::answer(c, &[], "  \n")),
         ),
-        ("read ", Box::new(|_| Ok(Output::default()))),
     ];
     for (want, script) in cases {
         let dir = workdir();
         let run = one_run(dir.path(), script);
-        assert!(!run.answered());
-        let failure = run.failure.clone().unwrap();
-        assert!(failure.starts_with(want), "{want}: {failure}");
-        assert!(describe(&run).starts_with("lang-rust (specialist): did not answer: "));
+        assert!(run.answered(), "{:?}", run.failure);
+        assert_eq!(run.cut.as_deref(), Some(want));
+        assert!(
+            describe(&run).starts_with(&format!(
+                "lang-rust (specialist): ran, its log read: {want} ("
+            )),
+            "{}",
+            describe(&run)
+        );
     }
 }
 
@@ -460,6 +488,7 @@ fn a_report_from_before_the_run_is_written_over() {
 #[test]
 fn a_work_directory_without_room_for_logs_fails_the_review() {
     let dir = workdir();
+    fs::remove_dir_all(dir.path().join("review")).unwrap();
     fs::write(dir.path().join("review"), "a file").unwrap();
     let host = FakeHost::new(fake::either);
 
@@ -514,7 +543,8 @@ fn a_run_that_fails_after_it_cost_money_is_tried_once_and_keeps_its_cost() {
         })
     });
 
-    assert!(!run.answered());
+    assert!(run.answered(), "{:?}", run.failure);
+    assert_eq!(run.cut.as_deref(), Some("its run answered nothing"));
     assert_eq!(run.attempts, 1);
     assert!((run.log.cost - 0.25).abs() < 1e-9, "{}", run.log.cost);
 }
@@ -590,7 +620,7 @@ fn a_first_run_that_did_not_answer_is_told_before_the_second() {
     assert_eq!(
         lines[..2],
         [
-            "lang-rust (specialist): did not answer: its run ended with none; running it once more",
+            "lang-rust (specialist): did not run: its run ended with none; running it once more",
             "lang-rust (specialist): answered (0.0100 USD, 3 turns) on its second attempt",
         ]
     );
@@ -787,50 +817,74 @@ fn a_specialist_whose_diff_is_past_the_split_runs_in_parts_and_its_reports_merge
     assert!(!dir.path().join("review/reports/lang-rust.1.md").exists());
 }
 
+/// A part 2 cut off by its turn budget after it read `reads` of its
+/// diff and stated a finding; every other run as [`part_specialist`].
+fn cut_part(c: &Command, reads: &str) -> Result<Output, String> {
+    if !prompt_of(c).contains("you are part 2 of 2") {
+        return part_specialist(c);
+    }
+    let finding = "b.rs:2 — if not addressed: y — I2";
+    fake::write_log(
+        c,
+        &fake::reading_log(reads, &[finding], "error_max_turns", "", 0.1),
+    );
+    Ok(Output::default())
+}
+
 #[test]
-fn a_part_that_does_not_answer_keeps_what_it_stated_and_fails_the_specialist_naming_it() {
+fn a_part_cut_off_after_reading_its_whole_diff_is_read_as_it_stands() {
     let dir = workdir();
     big_diff(dir.path());
 
-    let (runs, lines, host) = split_run(dir.path(), |c| {
-        if prompt_of(c).contains("you are part 2 of 2") {
-            fake::write_log(
-                c,
-                &fake::log_of(
-                    &["b.rs:2 — if not addressed: y — I2"],
-                    "error_max_turns",
-                    "",
-                    0.1,
-                ),
-            );
-            Ok(Output::default())
-        } else {
-            part_specialist(c)
-        }
-    });
+    let (runs, lines, host) = split_run(dir.path(), |c| cut_part(c, &fake::reads(c)));
 
     assert_eq!(host.agents().len(), 3);
     let rust = &runs[0];
+    assert_eq!(rust.failure, None);
     assert_eq!(
-        rust.failure.as_deref(),
+        rust.cut.as_deref(),
         Some("part 2 of 2: its run ended with error_max_turns")
     );
+    assert!(rust.whole(), "{rust:?}");
     assert_eq!((rust.parts, rust.attempts), (2, 2));
     assert_eq!(
         fs::read_to_string(dir.path().join("review/reports/lang-rust.md")).unwrap(),
         format!(
-            "incomplete: part 2 of 2: its run ended with error_max_turns\n{}\n\
-             src/part1.rs:1 — if not addressed: part 1 breaks — I9\n\
-             b.rs:2 — if not addressed: y — I2\n",
+            "{}\nsrc/part1.rs:1 — if not addressed: part 1 breaks — I9\n\
+             b.rs:2 — if not addressed: y — I2\n\
+             outcome: findings — in 2 parts: part 1, findings — part 1 saw two.; part 2, \
+             findings — 1 finding stated in the run log\n",
             fake::FINDING
         )
     );
     assert!(
-        lines.iter().any(|l| l.starts_with(
-            "lang-rust part 2 of 2 (specialist): did not answer: its run ended with \
-             error_max_turns; not run again: it cost 0.1000 USD"
-        )),
+        lines.iter().any(|l| l
+            == "lang-rust part 2 of 2 (specialist): ran, its log read: its run ended with \
+                error_max_turns (0.1000 USD, 3 turns); not run again: it cost 0.1000 USD, so its \
+                log is read as it stands"),
         "{lines:?}"
+    );
+}
+
+#[test]
+fn a_part_that_read_only_some_of_its_diff_leaves_its_specialist_partial_naming_the_rest() {
+    let dir = workdir();
+    big_diff(dir.path());
+
+    let (runs, _, _) = split_run(dir.path(), |c| {
+        let path = c.cwd.join("review/diffs/lang-rust.2.diff");
+        cut_part(c, &fake::read_lines(&path.display().to_string(), 1, 1))
+    });
+
+    let rust = &runs[0];
+    assert!(rust.answered() && !rust.whole(), "{rust:?}");
+    assert_eq!(
+        rust.partial,
+        [(
+            Some(2),
+            "its log shows no Read of line 2 of review/diffs/lang-rust.2.diff, of 2 lines"
+                .to_owned()
+        )]
     );
 }
 

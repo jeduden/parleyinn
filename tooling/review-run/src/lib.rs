@@ -1,15 +1,17 @@
 //! `review-run`: the review of a pull request run by code (ENG-28). It
 //! reads the dispatch the review bundle wrote, runs every specialist
 //! it names as an agent of its own, in parallel up to a bound and each
-//! with its own deadline and cost cap, assembles each one's report from
-//! its run log into a file, and runs each generalist once its own
+//! with its own deadline and cost cap, reads each one's report from its
+//! run log, whatever result the run ended with, into a file, decides
+//! from the reads its log shows whether it read its whole diff, and
+//! runs each generalist once its own
 //! specialists have finished, told those files; it starts no run once
 //! the review's cost cap is reached, and no generalist once a mass
 //! failure of the specialists tripped its breaker, and tells what is
 //! running as it goes. From what the runs produced it writes
 //! the review outcome, the agents consulted, their answers and their
-//! usage, the files the review gate reads, with every agent left
-//! without an accepted report or answer, never as clean, and what the
+//! usage, the files the review gate reads, with every agent not
+//! reviewed whole, never as clean, and what the
 //! review ran on. Each agent has an answer key over what its answer is
 //! a function of; given an answer store, an agent whose key holds an
 //! accepted answer there is not run again, and an accepted answer is
@@ -38,6 +40,7 @@ pub mod parts;
 pub mod pipeline;
 pub mod plan;
 pub mod previous;
+pub mod reading;
 pub mod requirements;
 pub mod resume;
 pub mod retry;
@@ -63,14 +66,16 @@ pub const REVIEW: &str = review_eval::world::REVIEW;
 /// run logs.
 pub const REPORTS: &str = review_eval::world::REPORTS;
 /// Each run's stream-json log, `<name>.jsonl`, and its errors,
-/// `<name>.stderr`; a first attempt's that did not answer as
+/// `<name>.stderr`; a first attempt's that did not run as
 /// `<name>.first.jsonl` and `<name>.first.stderr`.
 pub const LOGS: &str = "review/logs";
 /// The review outcome, in the shape the review gate reads.
 pub const OUTCOME: &str = "review/outcome.json";
-/// The agents whose run answered without an error.
+/// The agents that ran, whose run log the review read, whatever
+/// result it ended with.
 pub const CONSULTED: &str = "review/consulted.json";
-/// Each answering agent's final answer, by name.
+/// Each consulted agent's final answer, by name: a specialist's, the
+/// outcome line its report ends with.
 pub const ANSWERS: &str = "review/answers.json";
 /// Each agent's usage and cost, from its run log.
 pub const USAGE: &str = "review/usage.json";

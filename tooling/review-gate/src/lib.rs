@@ -100,8 +100,8 @@ pub struct Input {
     /// Every agent the review bundle dispatched: the generalists and
     /// their specialists.
     pub dispatched: BTreeSet<String>,
-    /// Every dispatched agent the review consulted: each one that
-    /// answered.
+    /// Every dispatched agent the review consulted: each one that ran,
+    /// whose run log the review read, whatever result it ended with.
     pub consulted: BTreeSet<String>,
     /// The specialists the review bundle dispatched, whose reports the
     /// generalists read.
@@ -370,9 +370,14 @@ pub fn parse_check_runs(data: &str) -> Result<Vec<CheckRun>, Error> {
 ///
 /// # Errors
 ///
-/// A head whose CI has not passed, or a review that left out an agent
-/// the review bundle dispatched, is an error, so the step fails loudly
-/// rather than posting anything.
+/// A head whose CI has not passed, a review that left out an agent the
+/// review bundle dispatched, one that did not run, or a specialist's
+/// report that fails the report check, is an error, so the step fails
+/// loudly rather than posting anything. A review whose agents all ran,
+/// however each run ended, is posted as the outcome decided it: a
+/// specialist that read only part of its diff or stated a line that
+/// does not read is a blocking finding there, so the gate posts the
+/// request for changes and says why.
 pub fn decide(input: &Input) -> Result<Option<Review>, Error> {
     if input.head != input.reviewed {
         return Ok(None);

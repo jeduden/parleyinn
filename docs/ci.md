@@ -69,7 +69,10 @@ is short, because a finding found late costs a whole round.
   cancelled, is charged its tier's whole cap, and one whose result
   reported no cost is charged nothing. A review the cap stopped
   lists every agent it did not run, `over budget:`, in
-  `review/not-reviewed.md` and requests changes. Deleting the pull
+  `review/not-reviewed.md` and requests changes. A run cut off by its
+  turn budget or deadline is not a failure and never runs again: its
+  log is read as its report, and the `Read` calls in it decide whether
+  it read its whole diff, each unread range a `partial:` gap. Deleting the pull
   request's `review-spend-pr-<N>-a*` artifacts resets its budget, and
   `--max-cost-usd` overrides the cap.
 - CI ends within ten minutes of a push. The slowest chain of jobs sets

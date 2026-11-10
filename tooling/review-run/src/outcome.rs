@@ -1,21 +1,22 @@
 //! The review outcome, decided from the runs alone: a pure function of
-//! the plan, each agent's run, each specialist's report as the run
-//! assembled it from the specialist's log, and the requirement ids the
-//! reports may cite. It approves exactly when every dispatched agent
-//! answered, every specialist's report takes the form the gate takes
-//! and ends with the outcome it answered, and no generalist kept a
-//! blocking finding. A specialist carries no
-//! severity: its findings reach the verdict only as its generalist
-//! weighs them, and a finding a generalist keeps from a specialist's
-//! requirement request stays a nit. An agent that did not answer, a
-//! report the gate would refuse or that cites an id no requirement has,
-//! and a generalist's finding line the review cannot read are each
-//! named in a blocking finding of its own, so the review is decided all
-//! the same and the author sees why it was not approved. The gate still
-//! refuses to post a review an agent did not answer or whose report it
-//! refuses (ENG-28), as its consulted list and reports show it; it reads
-//! a cited id by its shape alone, holding no tree, so a report citing
-//! an unknown id reaches it as the request for changes decided here.
+//! the plan, each agent's run, each specialist's report as the run read
+//! it from the specialist's log, and the requirement ids the reports may
+//! cite. Every agent that ran is consulted, whatever result its run
+//! ended with. It approves exactly when every dispatched agent ran,
+//! every specialist read its whole diff and stated no line that does
+//! not read, every report takes the form the gate takes, no
+//! generalist's weighing is partial and none kept a blocking finding. A
+//! specialist carries no severity: its findings reach the verdict only
+//! as its generalist weighs them, and a finding a generalist keeps from
+//! a specialist's requirement request stays a nit. An agent that did
+//! not run, each range of a diff a specialist did not read, each line of
+//! a report that does not read, a report the gate would refuse, and a
+//! generalist's finding line the review cannot read are each named in a
+//! blocking finding of its own, so the review is decided all the same
+//! and the author sees why it was not approved; each line a specialist
+//! set aside as no finding is counted. The gate still refuses to post a
+//! review a dispatched agent did not run in or whose report it refuses
+//! (ENG-28), as its consulted list and reports show it.
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::Write as _;
@@ -29,6 +30,7 @@ use review_gate::{
 
 use crate::gaps::{self, Gap};
 use crate::plan::{Plan, report_file};
+use crate::reading::ReportLine;
 use crate::run::AgentRun;
 
 /// Where a finding about the review itself points: the review's own
@@ -39,16 +41,19 @@ pub const REVIEW_PATH: &str = "review/";
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Decision {
     pub outcome: ReviewOutcome,
-    /// The agents whose run answered without an error.
+    /// The agents that ran, whose run log the review read.
     pub consulted: BTreeSet<String>,
-    /// Each of their final answers, by name.
+    /// Each of their final answers, by name: a specialist's, the
+    /// outcome line its report ends with.
     pub answers: BTreeMap<String, String>,
     /// Each generalist's weighing, answered or not, by name: what the
     /// review kept its findings from.
     pub weighings: BTreeMap<String, String>,
-    /// Every dispatched agent, or part of one, without an accepted
-    /// report or answer, by name: never clean.
+    /// Every dispatched agent, or part of one, the review did not
+    /// review whole, by name: never clean.
     pub not_reviewed: Vec<Gap>,
+    /// Every line of a specialist's report set aside as no finding.
+    pub ignored: Vec<ReportLine>,
 }
 
 /// Decides the review of `plan` from `runs` and `reports`, each
@@ -62,7 +67,8 @@ pub fn decide(
     known: &BTreeSet<String>,
 ) -> Decision {
     let mut findings = Vec::new();
-    let (answers, silent) = answers(plan, runs, &mut findings);
+    let (answers, silent) = answers(plan, runs, reports, &mut findings);
+    let (partial, unreadable) = read_partly(plan, runs, &mut findings);
     let refused = refused_reports(plan, &answers, reports, known, &mut findings);
     let weighings = weighings(plan, runs, &answers);
     if plan.dispatch.is_empty() {
@@ -77,16 +83,35 @@ pub fn decide(
         unread,
     } = weighed(plan, &weighings, (&answers, known), reports, &mut findings);
     let consulted: BTreeSet<String> = answers.keys().cloned().collect();
-    let not_reviewed = not_reviewed(runs, &silent, &refused, &unread);
+    let mut not_reviewed = not_reviewed(runs, &silent, &refused, &unread);
+    not_reviewed.extend(partial.iter().chain(&unreadable).cloned());
+    not_reviewed.sort_by(|a, b| (&a.name, a.part).cmp(&(&b.name, b.part)));
+    let ignored: Vec<ReportLine> = of_specialists(plan, runs)
+        .flat_map(|run| run.ignored.iter().cloned())
+        .collect();
     let approves = silent.is_empty()
         && refused.is_empty()
         && unread.is_empty()
+        && partial.is_empty()
+        && unreadable.is_empty()
         && !plan.dispatch.is_empty()
         && !findings.iter().any(|f| f.severity == BLOCKING);
     let counts = Counts {
         plan,
         consulted: &consulted,
         kept: kept_counts,
+        cut: specialist_runs(plan, runs)
+            .filter(|run| {
+                run.cut.is_some() && run.partial.is_empty() && run.stated_nothing.is_empty()
+            })
+            .count(),
+        cut_generalists: runs
+            .iter()
+            .filter(|run| {
+                run.answered() && run.cut.is_some() && plan.generalists().contains(&run.name)
+            })
+            .count(),
+        ignored: ignored.len(),
     };
 
     Decision {
@@ -101,9 +126,11 @@ pub fn decide(
                 &counts,
                 &Named {
                     silent: &silent,
+                    partial: &labels(&partial),
+                    unreadable: &labels(&unreadable),
                     refused: &labelled(&refused),
                     unread: &unread.iter().map(|(n, _)| n.clone()).collect::<Vec<_>>(),
-                    not_reviewed: &not_reviewed.iter().map(Gap::label).collect::<Vec<_>>(),
+                    not_reviewed: &labels(&not_reviewed),
                 },
                 &closings,
             ),
@@ -113,8 +140,92 @@ pub fn decide(
         answers,
         weighings,
         not_reviewed,
+        ignored,
     }
 }
+
+/// The runs of `plan`'s specialists in `runs` that ran.
+fn specialist_runs<'a>(plan: &Plan, runs: &'a [AgentRun]) -> impl Iterator<Item = &'a AgentRun> {
+    of_specialists(plan, runs).filter(|run| run.answered())
+}
+
+/// The runs of `plan`'s specialists in `runs`, whether they ran or not:
+/// a specialist run in parts that did not run, a part of it having not
+/// run, still holds what its parts that ran read and stated.
+fn of_specialists<'a>(plan: &Plan, runs: &'a [AgentRun]) -> impl Iterator<Item = &'a AgentRun> {
+    let specialists = plan.specialists();
+    runs.iter()
+        .filter(move |run| specialists.contains(&run.name))
+}
+
+/// The gaps of the specialists in `runs`, or their parts, that ran but
+/// did not read every line of their diff, and those whose report holds
+/// a line that does not read, by part, each named in a blocking finding
+/// added to `findings`: what they did not read, with why the run ended
+/// when it was cut off, and each line quoted with its problem. A part's
+/// gap stands beside another part that did not run, so a resume runs it
+/// again rather than keep it. Their other findings stay in their report
+/// for the generalist.
+fn read_partly(
+    plan: &Plan,
+    runs: &[AgentRun],
+    findings: &mut Vec<Finding>,
+) -> (Vec<Gap>, Vec<Gap>) {
+    let (mut partial, mut unreadable) = (Vec::new(), Vec::new());
+    for run in of_specialists(plan, runs) {
+        let cut = run
+            .cut
+            .as_deref()
+            .map_or_else(String::new, |why| format!(" ({why})"));
+        for (part, why) in &run.partial {
+            let gap = Gap::new(&run.name, *part, gaps::partial(why));
+            findings.push(blocking(
+                REVIEW_PATH,
+                format!(
+                    "{} did not read its whole diff{cut}: {why}, so the review of it is partial",
+                    gap.label()
+                ),
+            ));
+            partial.push(gap);
+        }
+        for (part, ended) in &run.stated_nothing {
+            let why = gaps::nothing_stated(ended);
+            let gap = Gap::new(&run.name, *part, gaps::stated_nothing(ended));
+            findings.push(blocking(
+                REVIEW_PATH,
+                format!("{} {why}, so the review of it is partial", gap.label()),
+            ));
+            partial.push(gap);
+        }
+        for line in run.unreadable.iter().take(MOST_UNREADABLE) {
+            findings.push(blocking(
+                &report_file(&run.name),
+                format!("{} {}: `{}`", run.name, line.why, gaps::quoted(&line.text)),
+            ));
+            unreadable.push(Gap::new(&run.name, line.part, gaps::unreadable(line)));
+        }
+        let more = run.unreadable.len().saturating_sub(MOST_UNREADABLE);
+        if more > 0 {
+            let why = format!("and {} that do not read", counted(more, "more line"));
+            findings.push(blocking(
+                &report_file(&run.name),
+                format!("{} {why}", run.name),
+            ));
+            unreadable.push(Gap::new(
+                &run.name,
+                None,
+                format!("{} {why}", gaps::UNREADABLE),
+            ));
+        }
+    }
+
+    (partial, unreadable)
+}
+
+/// The most lines of one agent's report that do not read the outcome
+/// names one by one, each in a blocking finding and a gap; the rest are
+/// counted in one more of each, so no report floods the posted review.
+pub const MOST_UNREADABLE: usize = 10;
 
 /// Each generalist's weighing, by name: an answered one's answer, as
 /// [`answers`] assembled it; one cut off before its answer, what it
@@ -137,6 +248,18 @@ fn weighings(
             Some((name, weighing))
         })
         .collect()
+}
+
+/// The labels of `gaps`, each once, in their order: the summary names
+/// an agent or part once however many of its lines do not read.
+fn labels(gaps: &[Gap]) -> Vec<String> {
+    let mut out: Vec<String> = Vec::new();
+    for label in gaps.iter().map(Gap::label) {
+        if !out.contains(&label) {
+            out.push(label);
+        }
+    }
+    out
 }
 
 /// Each refused specialist as the summary names it, with its problem.
@@ -185,12 +308,13 @@ fn not_reviewed(
     out
 }
 
-/// Each dispatched agent's answer, when its run answered, and the
-/// agents whose run did not, each with a blocking finding added to
-/// `findings`.
+/// Each dispatched agent's answer, when it ran, a specialist's the
+/// outcome line its report in `reports` ends with, and the agents that
+/// did not run, each with a blocking finding added to `findings`.
 fn answers(
     plan: &Plan,
     runs: &[AgentRun],
+    reports: &BTreeMap<String, String>,
     findings: &mut Vec<Finding>,
 ) -> (BTreeMap<String, String>, Vec<String>) {
     let mut answers = BTreeMap::new();
@@ -198,8 +322,9 @@ fn answers(
     for name in plan.agents() {
         match runs.iter().find(|r| r.name == name) {
             Some(run) if run.answered() => {
-                let text = match run.kind {
-                    Kind::Generalist => report::weighing(&run.log.texts, &run.log.answer),
+                let text = match (run.kind, reports.get(&name)) {
+                    (Kind::Generalist, _) => report::weighing(&run.log.texts, &run.log.answer),
+                    (_, Some(report)) => crate::reading::answer_of(report),
                     _ => run.log.answer.clone(),
                 };
                 answers.insert(name, text);
@@ -210,7 +335,7 @@ fn answers(
                     .unwrap_or_else(|| "it was not run".to_owned());
                 findings.push(blocking(
                     REVIEW_PATH,
-                    format!("{name} did not answer ({why}), so the review is incomplete"),
+                    format!("{name} did not run ({why}), so the review is incomplete"),
                 ));
                 silent.push(name);
             }
@@ -220,10 +345,12 @@ fn answers(
     (answers, silent)
 }
 
-/// The answering specialists whose report the gate refuses, or whose
+/// The specialists that ran whose report the gate refuses, or whose
 /// linked finding cites an id outside `known`, each with its problem,
 /// and a blocking finding on its report file added to `findings`, the
-/// refused line quoted.
+/// refused line quoted. A report read from its log never is: this holds
+/// a report that could not be written, or one kept from an earlier run,
+/// to the gate's rule.
 fn refused_reports(
     plan: &Plan,
     answers: &BTreeMap<String, String>,
@@ -615,24 +742,38 @@ struct Counts<'a> {
     consulted: &'a BTreeSet<String>,
     /// The generalists' kept findings: blocking, then nits.
     kept: (usize, usize),
+    /// The specialists cut off that read their whole diff.
+    cut: usize,
+    /// The generalists cut off, whose weighing is what their log states.
+    cut_generalists: usize,
+    /// The lines set aside as no finding.
+    ignored: usize,
 }
 
 /// The agents the summary names for what went wrong.
 struct Named<'a> {
-    /// The agents that did not answer.
+    /// The agents that did not run.
     silent: &'a [String],
+    /// The specialists, or parts, that did not read their whole diff.
+    partial: &'a [String],
+    /// The specialists, or parts, whose report holds a line that does
+    /// not read.
+    unreadable: &'a [String],
     /// The specialists whose report the gate refuses.
     refused: &'a [String],
     /// The generalists whose answer the review cannot read.
     unread: &'a [String],
-    /// Every agent or part without an accepted report or answer.
+    /// Every agent or part not reviewed whole.
     not_reviewed: &'a [String],
 }
 
-/// The summary: who answered of whom, what the generalists kept, who
-/// did not answer, whose report the gate refuses and whose answer the
-/// review cannot read, who was consulted, and each generalist's
-/// closing sentence.
+/// The summary: who ran of whom, what the generalists kept, how many
+/// specialists were cut off with their whole diff read, how many
+/// generalists were cut off, how many lines
+/// were set aside, who did not run, who read part of their diff, whose
+/// report holds a line that does not read or the gate refuses, whose
+/// answer the review cannot read, who was consulted, and each
+/// generalist's closing sentence.
 fn summary(counts: &Counts, named: &Named, closings: &[String]) -> String {
     let plan = counts.plan;
     let answered_of = |names: &[String]| {
@@ -646,8 +787,8 @@ fn summary(counts: &Counts, named: &Named, closings: &[String]) -> String {
         "The review bundle dispatched no agent.".to_owned()
     } else {
         format!(
-            "{} of {} dispatched agents answered: {} of {} {} and {} of {} {}. \
-             The generalists kept {} blocking and {} nit findings.",
+            "{} of {} dispatched agents ran and their logs were read: {} of {} {} and {} of {} \
+             {}. The generalists kept {} blocking and {} nit findings.",
             counts.consulted.len(),
             plan.agents().len(),
             answered_of(&specialists),
@@ -660,8 +801,38 @@ fn summary(counts: &Counts, named: &Named, closings: &[String]) -> String {
             counts.kept.1,
         )
     };
+    if counts.cut > 0 {
+        let _ = write!(
+            s,
+            " {} ended without a successful result, cut off by a turn budget, deadline or \
+             cost cap, with every line of their diff read: what each one's log states is its \
+             report.",
+            counted(counts.cut, "specialist")
+        );
+    }
+    if counts.cut_generalists > 0 {
+        let _ = write!(
+            s,
+            " {} ended without a successful result, cut off by a turn budget, deadline or \
+             cost cap: what each one's log states is its weighing.",
+            counted(counts.cut_generalists, "generalist")
+        );
+    }
+    if counts.ignored > 0 {
+        let _ = write!(
+            s,
+            " Set aside as no finding: {} of the specialists' reports ({}).",
+            counted(counts.ignored, "line"),
+            crate::reading::IGNORED
+        );
+    }
     for (label, names) in [
-        ("Did not answer", named.silent),
+        ("Did not run", named.silent),
+        ("Read part of their diff", named.partial),
+        (
+            "Reports holding a line that does not read",
+            named.unreadable,
+        ),
         ("Reports the gate refuses", named.refused),
         ("Answers the review cannot read", named.unread),
         ("Not reviewed", named.not_reviewed),
@@ -679,6 +850,15 @@ fn summary(counts: &Counts, named: &Named, closings: &[String]) -> String {
     }
 
     s
+}
+
+/// `n` `word`s, said: `1 line`, `2 lines`.
+fn counted(n: usize, word: &str) -> String {
+    if n == 1 {
+        format!("1 {word}")
+    } else {
+        format!("{n} {word}s")
+    }
 }
 
 /// The word for `n` agents of `kind`.

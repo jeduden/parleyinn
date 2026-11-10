@@ -22,6 +22,7 @@ use review_eval::log::{self, RunLog};
 
 use crate::gaps::{self, Gap};
 use crate::plan::{Plan, report_file};
+use crate::reading::{IGNORED, ReportLine};
 use crate::run_id::{self, RUN_ID, RunId};
 use crate::stall::{self, STALLS, Stall};
 use crate::{ANSWERS, CONSULTED, LOGS, REVIEW};
@@ -43,6 +44,9 @@ pub struct Earlier {
     /// Its gaps counted across the runs before it; none when it wrote
     /// none.
     pub stalls: Vec<Stall>,
+    /// The lines of its specialists' reports it set aside as no finding;
+    /// none when it wrote none.
+    pub ignored: Vec<ReportLine>,
 }
 
 /// What one agent keeps from the earlier run.
@@ -50,8 +54,8 @@ pub struct Earlier {
 pub enum Reuse {
     /// Its whole answer, and for a specialist its report.
     Whole(String),
-    /// The parts of its split diff that answered, by place, each with
-    /// its log; the others run again.
+    /// The parts of its split diff no gap names that ran, by place, each
+    /// with its log; the others run again.
     Parts(BTreeMap<usize, RunLog>),
 }
 
@@ -67,6 +71,9 @@ pub struct Resume {
     pub stalled: BTreeMap<String, String>,
     /// The earlier run's stalls, which this run's gaps count on from.
     pub stalls: Vec<Stall>,
+    /// The lines each specialist kept whole set aside in the earlier
+    /// run, by name: still set aside, listed and counted (I6).
+    pub ignored: BTreeMap<String, Vec<ReportLine>>,
 }
 
 /// `rel`, a path under the work directory's `review/`, under the
@@ -100,12 +107,10 @@ pub fn read(only: &Path, from: &Path) -> Result<Earlier, String> {
     let answers = review_gate::parse_answers(&text).map_err(|e| named(&path, e.to_string()))?;
     let (path, text) = load(earlier_file(from, CONSULTED))?;
     let consulted = review_gate::parse_consulted(&text).map_err(|e| named(&path, e.to_string()))?;
-    let path = earlier_file(from, STALLS);
-    let stalls = match fs::read_to_string(&path) {
-        Ok(text) => stall::parse(&text).map_err(|e| named(&path, e))?,
-        Err(e) if e.kind() == io::ErrorKind::NotFound => Vec::new(),
-        Err(e) => return Err(format!("read {}: {e}", path.display())),
-    };
+    let stalls = optional(&earlier_file(from, STALLS), stall::parse)?;
+    let ignored = optional(&earlier_file(from, IGNORED), |text| {
+        serde_json::from_str(text).map_err(|e| format!("malformed lines set aside: {e}"))
+    })?;
     let mut parts = BTreeMap::new();
     for gap in gaps.iter().filter(|g| g.part.is_some()) {
         if !parts.contains_key(&gap.name) {
@@ -121,7 +126,26 @@ pub fn read(only: &Path, from: &Path) -> Result<Earlier, String> {
         consulted,
         parts,
         stalls,
+        ignored,
     })
+}
+
+/// The file at `path`, read by `parse`, or none when it is not there,
+/// as an earlier run of an older tool leaves it.
+///
+/// # Errors
+///
+/// Fails naming the file when it is there but does not read, or does
+/// not read as its shape.
+fn optional<T>(
+    path: &Path,
+    parse: impl Fn(&str) -> Result<Vec<T>, String>,
+) -> Result<Vec<T>, String> {
+    match fs::read_to_string(path) {
+        Ok(text) => parse(&text).map_err(|e| format!("{}: {e}", path.display())),
+        Err(e) if e.kind() == io::ErrorKind::NotFound => Ok(Vec::new()),
+        Err(e) => Err(format!("read {}: {e}", path.display())),
+    }
 }
 
 /// Each part log of specialist `name` in the earlier run's directory
@@ -226,6 +250,11 @@ pub fn plan(plan: &Plan, earlier: &Earlier, now: &RunId, from: &str, max_resumes
                         "{name}: runs again in part, keeping {}",
                         places(kept.keys())
                     ));
+                } else {
+                    let aside = earlier.ignored.iter().filter(|l| l.agent == name);
+                    resume
+                        .ignored
+                        .insert(name.clone(), aside.cloned().collect());
                 }
                 resume.reuse.insert(name, reuse);
             }
@@ -277,8 +306,8 @@ fn whole(name: &str, earlier: &Earlier, now: &RunId) -> Result<Reuse, String> {
 }
 
 /// What specialist `name`, named by `gaps`, keeps: its whole answer
-/// when no gap names it; when every gap names a part, the parts that
-/// answered; else nothing, with why.
+/// when no gap names it; when every gap names a part, the parts no gap
+/// names that ran, cut off or not; else nothing, with why.
 fn keep(name: &str, gaps: &[&Gap], earlier: &Earlier, now: &RunId) -> Result<Reuse, String> {
     let Some(first) = gaps.first() else {
         return whole(name, earlier, now);
@@ -286,16 +315,18 @@ fn keep(name: &str, gaps: &[&Gap], earlier: &Earlier, now: &RunId) -> Result<Reu
     if let Some(why) = changed(name, earlier, now) {
         return Err(why);
     }
-    let failed: BTreeSet<usize> = gaps.iter().filter_map(|g| g.part).collect();
-    if failed.len() < gaps.len() {
+    // One part may be named by several gaps: the lines it did not read,
+    // and each line of its report that does not read.
+    if gaps.iter().any(|g| g.part.is_none()) {
         return Err(first.reason.clone());
     }
+    let failed: BTreeSet<usize> = gaps.iter().filter_map(|g| g.part).collect();
     let kept: BTreeMap<usize, RunLog> = earlier
         .parts
         .get(name)
         .into_iter()
         .flatten()
-        .filter(|(at, log)| !failed.contains(at) && log.answered && !log.answer.trim().is_empty())
+        .filter(|(at, log)| !failed.contains(at) && log.ran())
         .map(|(at, log)| (*at, log.clone()))
         .collect();
     if kept.is_empty() {

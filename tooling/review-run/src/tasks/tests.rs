@@ -76,3 +76,40 @@ fn each_generalist_waits_for_its_own_specialists_alone() {
         ]
     );
 }
+
+#[test]
+fn the_breaker_counts_a_run_that_failed_and_not_one_that_only_left_lines_unread() {
+    let run = |failure: Option<&str>| {
+        AgentRun::of(
+            "lang-rust".to_owned(),
+            review_eval::component::Kind::Specialist,
+            failure.map(str::to_owned),
+            review_eval::log::RunLog::default(),
+            1,
+        )
+    };
+    let unread = AgentRun {
+        partial: vec![(None, "lines 1-9 unread".to_owned())],
+        ..run(None)
+    };
+    let stated_nothing = AgentRun {
+        stated_nothing: vec![(None, "error_max_turns".to_owned())],
+        ..run(None)
+    };
+    let unreadable = AgentRun {
+        unreadable: vec![reading::ReportLine {
+            agent: "lang-rust".to_owned(),
+            part: None,
+            line: 1,
+            text: "a.rs:9 — not a form".to_owned(),
+            why: "no form".to_owned(),
+        }],
+        ..run(None)
+    };
+
+    assert!(!tips(&run(None)));
+    assert!(!tips(&unread));
+    assert!(tips(&run(Some("claude: not found"))));
+    assert!(tips(&stated_nothing));
+    assert!(tips(&unreadable));
+}

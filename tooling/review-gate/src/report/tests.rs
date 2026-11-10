@@ -875,3 +875,35 @@ fn split_dashes_cuts_at_each_spaced_dash() {
     );
     assert_eq!(split_dashes("a-b"), ["a-b"]);
 }
+
+#[test]
+fn form_problem_names_what_a_malformed_line_is_refused_for() {
+    for (text, want) in [
+        ("path:line — fine", Problem::TemplatePlace { line: 3 }),
+        ("a.rs:1 if not addressed: x", Problem::Undashed { line: 3 }),
+        (
+            "a.rs:1 — if not addressed: x — I2 (yes)",
+            Problem::AfterIds { line: 3 },
+        ),
+        ("a.rs:1 — the range matches", Problem::Unlinked { line: 3 }),
+        ("a.rs:1 — nit — x", Problem::Malformed { line: 3 }),
+    ] {
+        assert_eq!(form_problem(text, 3), want, "{text:?}");
+    }
+}
+
+#[test]
+fn a_line_ending_all_is_well_after_a_defect_is_no_note_and_the_check_refuses_it() {
+    let text = "a.rs:9 — the unwrap on line 12 panics — fine";
+    let report = assemble(&[text.to_owned()], "outcome: none — x", None);
+
+    assert!(!report.contains(ALL_WELL), "{report}");
+    assert_eq!(
+        findings_check(&format!("{text}\noutcome: none — x"), None),
+        Some(Problem::Malformed { line: 1 })
+    );
+    assert_eq!(
+        findings_check("a.rs:9 — the row holds — fine\noutcome: none — x", None),
+        None
+    );
+}

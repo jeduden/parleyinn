@@ -2,8 +2,9 @@
 //! as the review's run reads an agent's log. Each model call once (a
 //! call's blocks share one message id), its usage by model, the main
 //! thread's text blocks in order, which hold a specialist's findings as
-//! it stated them, the files written, the result's answer, cost, turns
-//! and duration, and the model the run resolved to.
+//! it stated them, the files written, the main thread's reads, the
+//! result's answer, cost, turns and duration, and the model the run
+//! resolved to.
 
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -22,6 +23,25 @@ pub struct Usage {
     pub cache_read: u64,
     pub output: u64,
     pub cost: f64,
+}
+
+/// One `Read` call the main thread made: the path, the 1-based line
+/// it started at and the lines it asked for, as the call named them,
+/// whether a result that is no error answered it, and whether its
+/// offset or limit was given as no whole number. Only an answered read
+/// with a good range gave the reviewer lines: one the tool refused, or
+/// whose result never came, as when the run was killed at its deadline,
+/// gave it none.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct ReadCall {
+    pub path: String,
+    pub offset: Option<usize>,
+    pub limit: Option<usize>,
+    /// Whether a tool result that is no error came for it.
+    pub answered: bool,
+    /// Whether its offset or limit is there but neither a whole number
+    /// nor a string of one, so which lines it read is not known.
+    pub bad_range: bool,
 }
 
 /// A run, read from its log.
@@ -46,6 +66,50 @@ pub struct RunLog {
     pub texts: Vec<String>,
     /// Every path a `Write` or `Edit` call named, in order.
     pub writes: Vec<String>,
+    /// Every `Read` call the main thread made, in order.
+    pub reads: Vec<ReadCall>,
+}
+
+impl RunLog {
+    /// Why the run was charged: it reported a cost, or, with no cost in
+    /// it, as a run killed at its deadline or crashed before its result
+    /// has none, it made model calls that used tokens; none when it cost
+    /// nothing. The turns a result counts are no charge: a call the API
+    /// refused counts one and costs nothing.
+    #[must_use]
+    pub fn charged(&self) -> Option<String> {
+        if self.cost > 0.0 {
+            return Some(format!("it cost {:.4} USD", self.cost));
+        }
+        let calls: u64 = self
+            .usage
+            .values()
+            .filter(|u| u.fresh + u.cache_write + u.cache_read + u.output > 0)
+            .map(|u| u.calls)
+            .sum();
+        match calls {
+            0 => None,
+            1 => Some("it made 1 model call".to_owned()),
+            n => Some(format!("it made {n} model calls")),
+        }
+    }
+
+    /// Whether the run ran, as the review and the grader both decide
+    /// it: it ended with a successful result that answered something,
+    /// or it was [`charged`](Self::charged), so its log holds a model
+    /// call. A run that did not is one the review may start again.
+    #[must_use]
+    pub fn ran(&self) -> bool {
+        self.succeeded() || self.charged().is_some()
+    }
+
+    /// Whether the run ended with a successful result that answered
+    /// something; a run that ran but did not was cut off, by its turn
+    /// budget, its deadline or its cost cap, or answered nothing.
+    #[must_use]
+    pub fn succeeded(&self) -> bool {
+        self.answered && !self.answer.trim().is_empty()
+    }
 }
 
 /// What the reader carries between lines.
@@ -54,6 +118,8 @@ struct Reading {
     log: RunLog,
     /// The message ids seen, so a call's blocks count once.
     seen: BTreeSet<String>,
+    /// Each main-thread read's place in `reads`, by its tool use id.
+    reads: BTreeMap<String, usize>,
 }
 
 /// Reads a log of one JSON object per line; lines that are not JSON
@@ -73,6 +139,7 @@ pub fn parse(text: &str) -> RunLog {
     {
         match value["type"].as_str() {
             Some("assistant") => reading.assistant(&value),
+            Some("user") => reading.user(&value),
             Some("result") => reading.result(&value),
             _ => {}
         }
@@ -101,7 +168,7 @@ impl Reading {
         }
         for block in message["content"].as_array().into_iter().flatten() {
             match block["type"].as_str() {
-                Some("tool_use") => self.tool_use(block),
+                Some("tool_use") => self.tool_use(block, main),
                 Some("text") if main => {
                     if let Some(text) = block["text"].as_str() {
                         self.log.texts.push(text.to_owned());
@@ -112,12 +179,41 @@ impl Reading {
         }
     }
 
-    /// One tool call: a write's path.
-    fn tool_use(&mut self, block: &Value) {
-        if matches!(block["name"].as_str(), Some("Write" | "Edit"))
-            && let Some(path) = block["input"]["file_path"].as_str()
-        {
-            self.log.writes.push(path.to_owned());
+    /// One tool call: a write's path, or a main-thread read.
+    fn tool_use(&mut self, block: &Value, main: bool) {
+        let input = &block["input"];
+        let Some(path) = input["file_path"].as_str() else {
+            return;
+        };
+        match block["name"].as_str() {
+            Some("Write" | "Edit") => self.log.writes.push(path.to_owned()),
+            Some("Read") if main => {
+                let (offset, limit) = (number(&input["offset"]), number(&input["limit"]));
+                let id = block["id"].as_str().unwrap_or_default().to_owned();
+                self.reads.insert(id, self.log.reads.len());
+                self.log.reads.push(ReadCall {
+                    path: path.to_owned(),
+                    bad_range: offset.is_err() || limit.is_err(),
+                    offset: offset.unwrap_or_default(),
+                    limit: limit.unwrap_or_default(),
+                    answered: false,
+                });
+            }
+            _ => {}
+        }
+    }
+
+    /// The tools' results: a main-thread read is answered when the
+    /// last result for it is no error.
+    fn user(&mut self, value: &Value) {
+        for block in value["message"]["content"].as_array().into_iter().flatten() {
+            if let Some(at) = block["tool_use_id"]
+                .as_str()
+                .and_then(|id| self.reads.get(id))
+                && let Some(read) = self.log.reads.get_mut(*at)
+            {
+                read.answered = block["is_error"].as_bool() != Some(true);
+            }
         }
     }
 
@@ -144,6 +240,20 @@ impl Reading {
         log.duration_ms = value["duration_ms"].as_u64().unwrap_or_default();
         add_model_usage(&mut log.usage, &value["modelUsage"]);
     }
+}
+
+/// A `Read`'s offset or limit: none when it is absent or null, the
+/// number when it is a whole number or a string of one, else an error,
+/// as the lines such a read gave are not known.
+fn number(value: &Value) -> Result<Option<usize>, ()> {
+    let n = match value {
+        Value::Null => return Ok(None),
+        Value::Number(n) => n.as_u64(),
+        Value::String(s) => s.trim().parse::<u64>().ok(),
+        _ => None,
+    };
+    n.map(|n| Some(usize::try_from(n).unwrap_or(usize::MAX)))
+        .ok_or(())
 }
 
 /// Adds one call's `usage` to `into`.

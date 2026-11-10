@@ -13,6 +13,7 @@ fn leaking_run() -> AgentRun {
         name: "lang-rust".to_owned(),
         kind: Kind::Specialist,
         failure: Some(format!("its run ended near {TOKEN}")),
+        cut: Some(format!("cut near {TOKEN}")),
         log: RunLog {
             subtype: format!("x{TOKEN}"),
             answer: format!("outcome: none — {TOKEN}"),
@@ -20,14 +21,24 @@ fn leaking_run() -> AgentRun {
             writes: vec![TOKEN.to_owned()],
             ..RunLog::default()
         },
-        attempts: 1,
         parts: 2,
         failed_parts: vec![(1, format!("part {TOKEN}"))],
-        reused: false,
-        from_store: false,
-        answer_key: None,
-        store_failed: false,
-        charged: 0.0,
+        partial: vec![(Some(2), format!("read near {TOKEN}"))],
+        stated_nothing: vec![(None, format!("ended near {TOKEN}"))],
+        ignored: vec![line()],
+        unreadable: vec![line()],
+        ..AgentRun::of(String::new(), Kind::Specialist, None, RunLog::default(), 1)
+    }
+}
+
+/// A report line holding the token in its text and its why.
+fn line() -> crate::reading::ReportLine {
+    crate::reading::ReportLine {
+        agent: "lang-rust".to_owned(),
+        part: None,
+        line: 1,
+        text: format!("text {TOKEN}"),
+        why: format!("why {TOKEN}"),
     }
 }
 
@@ -36,7 +47,7 @@ fn every_agent_written_field_of_a_run_is_scrubbed_and_counted() {
     let scrubber = Scrubber::new(&[TOKEN]);
     let mut runs = vec![leaking_run()];
 
-    assert_eq!(scrub_runs(&scrubber, &mut runs), 6);
+    assert_eq!(scrub_runs(&scrubber, &mut runs), 13);
 
     let run = &runs[0];
     let all = format!("{run:?}");

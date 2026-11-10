@@ -3,13 +3,14 @@
 //! `--answers`, takes every accepted answer stored under an unchanged
 //! key in place of a run; on a new commit that changes one specialist's
 //! diff it runs that specialist and the generalist weighing it, nothing
-//! else; it never stores a refused report; and it runs again an agent
+//! else; it never stores a report holding a line that does not read;
+//! and it runs again an agent
 //! whose stored report fails the report check, never trusting it. A
 //! resumed review whose agent failed the same way in two resumes in a
 //! row does not run it again and names it stalled. The check runs
 //! `review-run` on work directories holding the checkout's definitions,
 //! with a stand-in for the `claude` command line that records each run
-//! and refuses one specialist's report when told to.
+//! and has one specialist state a line in no form when told to.
 
 use std::collections::BTreeSet;
 use std::fs;
@@ -24,7 +25,7 @@ use crate::review_resume::{
 };
 use crate::review_runs::{self, Event, Recorder, agent_of};
 
-/// A report line in no form, which the report check refuses.
+/// A report line in no form, which the review names apart.
 pub const NO_FORM: &str = "src/a.rs:2 — a line in no form";
 
 /// A stand-in for the `claude` command line that answers as
@@ -203,7 +204,7 @@ pub fn review_answers(checkout: &Checkout, work: &Path) -> Vec<String> {
     check(
         run("refused", refusing, &fresh, &unchanged, &[]),
         &all,
-        "a review whose specialist's report is refused",
+        "a review whose specialist states a line in no form",
     );
     problems.extend(refused_stored(&work.join("refused"), &fresh));
     problems.extend(poisoned(checkout, work, &store));
@@ -369,7 +370,9 @@ fn ruling_problems(bodies: &[Vec<String>]) -> Vec<String> {
 pub fn refused_stored(workdir: &Path, store: &Path) -> Vec<String> {
     match key_in(workdir, GAP) {
         Ok(key) if store.join(&key).exists() => {
-            vec![format!("{GAP}'s refused report was stored as {key}")]
+            vec![format!(
+                "{GAP}'s answer, whose report held a line that does not read, was stored as {key}"
+            )]
         }
         Ok(_) => Vec::new(),
         Err(e) => vec![e],

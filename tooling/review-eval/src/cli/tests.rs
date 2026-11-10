@@ -828,3 +828,50 @@ fn a_report_or_grade_that_cannot_be_written_is_noted_on_its_run() {
 mod credential;
 mod progress;
 mod publish;
+
+fn model_call(log: &mut RunLog) {
+    log.usage.entry("m".to_owned()).or_default().calls = 1;
+    log.usage.entry("m".to_owned()).or_default().output = 5;
+}
+
+#[test]
+fn a_run_that_did_not_run_leaves_a_report_headed_incomplete() {
+    let log = RunLog {
+        subtype: "spawn_failed".to_owned(),
+        ..RunLog::default()
+    };
+
+    let report = record_report(&log);
+
+    assert!(
+        report.starts_with("incomplete: its run ended with spawn_failed"),
+        "{report}"
+    );
+}
+
+#[test]
+fn a_run_cut_off_before_it_stated_anything_ends_with_the_reviews_outcome() {
+    let mut log = RunLog {
+        subtype: "error_max_turns".to_owned(),
+        texts: vec!["reading the diff".to_owned()],
+        ..RunLog::default()
+    };
+    model_call(&mut log);
+
+    let report = record_report(&log);
+
+    assert!(report.contains("no clean review"), "{report}");
+}
+
+#[test]
+fn a_run_that_answered_ends_with_the_outcome_its_lines_agree_with() {
+    let mut log = RunLog {
+        answered: true,
+        answer: "outcome: none — nothing found".to_owned(),
+        subtype: "success".to_owned(),
+        ..RunLog::default()
+    };
+    model_call(&mut log);
+
+    assert_eq!(record_report(&log), "outcome: none — nothing found\n");
+}

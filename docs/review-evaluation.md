@@ -82,15 +82,21 @@ records the design.
   source it names stands, so another source's finding there stays; each
   finding it
   must drop on a line that starts with `dropped` or gives it as its
-  severity. A consultant is read from its answer. A specialist report
-  the review would refuse, with a line in no form or an outcome its lines
-  contradict, fails its run, as does an
-  answer with no outcome line. A departure the review survives is a
-  slip: an answer that is more than the outcome line, an eleventh
-  finding. Slips are counted and shown per run and fail none. A case
-  passes with two of three runs, stopping once decided. A run that
-  does not answer, or runs past its deadline, is counted and failed,
-  whatever it stated.
+  severity. A consultant is read from its answer. A specialist's report
+  is read as the review reads it: assembled from the log, split into the
+  lines that read and those that do not, and ended with an outcome its
+  lines give. A finding-shaped line that does not read fails its run,
+  its other findings graded all the same. A departure the review
+  survives is a slip: a run cut off before a successful result after
+  it stated a line or an outcome, an answer with no outcome line or
+  one its lines contradict, an answer that is more than the outcome
+  line, a line set aside as no finding, an eleventh finding. Slips are
+  counted and shown per run and fail none. A case passes with two of
+  three runs, stopping once decided. A run whose log holds no model
+  call did not run, and is counted and failed, as is a specialist's run
+  cut off before it stated any line or an outcome, which the review
+  takes for no clean pass: a model that always runs out of turns passes
+  no case.
 - **The outputs** of a run go under `--out`: `scorecard.json`,
   `findings.json` in the shape the review gate reads, `report.md`, and
   each run's log, the specialist report assembled from it and its grade under
@@ -120,10 +126,11 @@ permission, and ends before the job that holds the reviewer app's key.
 The review job's `review-run` starts each dispatched agent through the
 harness's own runner, so an agent in the review and in its cases gets
 the same reading tools, turn budget and prompt. Only the review runs a
-specialist again, and only one whose first run cost nothing, once, told
-why; a run that was charged is not paid for twice, and a case's run gets
-no second attempt. An agent left
-without an accepted report is listed in `review/gaps.json`, and a review
+specialist again, and only one that did not run and cost nothing, once,
+told why; a run that was charged, cut off or not, is read as its log
+stands and never paid for twice, and a case's run gets no second
+attempt. An agent not reviewed whole, one that did not run or read only
+part of its diff, is listed in `review/gaps.json`, and a review
 resumed from that list is judged exactly as a full run. A review reuses a
 stored answer only under its unchanged answer key, held to the report
 check again; a case's run never reuses one. A case that fails

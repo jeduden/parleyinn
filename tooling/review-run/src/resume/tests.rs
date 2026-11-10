@@ -73,6 +73,7 @@ fn earlier(gaps: Vec<Gap>) -> Earlier {
         consulted: names.iter().map(|n| (*n).to_owned()).collect(),
         parts: BTreeMap::new(),
         stalls: Vec::new(),
+        ignored: Vec::new(),
     }
 }
 
@@ -240,6 +241,66 @@ fn a_specialist_named_by_parts_keeps_the_parts_that_answered() {
             "review-code: runs again: its specialist lang-rust runs again",
         ]
     );
+}
+
+#[test]
+fn a_part_that_read_part_of_its_diff_runs_again_beside_one_that_did_not_run() {
+    // The outcome names part 1's partial read beside part 2's silence,
+    // so part 1 is not kept, and with no part left to keep the whole
+    // specialist runs again.
+    let gaps = vec![
+        Gap::new("lang-rust", Some(1), "partial: lines 5-9".to_owned()),
+        Gap::new("lang-rust", Some(2), "silent: x".to_owned()),
+    ];
+    let mut was = earlier(gaps);
+    was.parts.insert(
+        "lang-rust".to_owned(),
+        [
+            (1, answered("outcome: none — one.")),
+            (2, RunLog::default()),
+            (3, answered("outcome: none — three.")),
+        ]
+        .into(),
+    );
+
+    let resume = plan_of(&was, &id());
+
+    let Reuse::Parts(kept) = &resume.reuse["lang-rust"] else {
+        panic!("{:?}", resume.reuse["lang-rust"]);
+    };
+    assert_eq!(kept.keys().collect::<Vec<_>>(), [&3]);
+    was.parts.get_mut("lang-rust").unwrap().remove(&3);
+    let resume = plan_of(&was, &id());
+    assert!(!resume.reuse.contains_key("lang-rust"));
+    assert_eq!(resume.notes[0], "lang-rust: runs again: partial: lines 5-9");
+}
+
+#[test]
+fn a_part_named_by_several_gaps_runs_again_and_the_other_parts_are_kept() {
+    // One part may hold several gaps: the lines it did not read, and
+    // each line of its report that does not read.
+    let gaps = vec![
+        Gap::new("lang-rust", Some(2), "partial: lines 5-9".to_owned()),
+        Gap::new("lang-rust", Some(2), "unreadable: no form: `a`".to_owned()),
+        Gap::new("lang-rust", Some(2), "unreadable: no form: `b`".to_owned()),
+    ];
+    let mut was = earlier(gaps);
+    was.parts.insert(
+        "lang-rust".to_owned(),
+        [
+            (1, answered("outcome: none — one.")),
+            (2, answered("outcome: none — two.")),
+            (3, answered("outcome: none — three.")),
+        ]
+        .into(),
+    );
+
+    let resume = plan_of(&was, &id());
+
+    let Some(Reuse::Parts(kept)) = resume.reuse.get("lang-rust") else {
+        panic!("{:?}", resume.notes);
+    };
+    assert_eq!(kept.keys().collect::<Vec<_>>(), [&1, &3]);
 }
 
 #[test]
@@ -579,4 +640,61 @@ fn a_stalled_generalist_is_not_run_again_and_its_specialists_keep_theirs() {
     assert!(resume.stalled.contains_key("review-security"));
     assert!(!resume.reuse.contains_key("review-security"));
     assert_eq!(resume.reuse.len(), 3);
+}
+
+/// A line `agent` set aside.
+fn aside(agent: &str) -> ReportLine {
+    ReportLine {
+        agent: agent.to_owned(),
+        part: None,
+        line: 1,
+        text: "src/a.rs:1 — fine".to_owned(),
+        why: "says all is well, which is not a finding".to_owned(),
+    }
+}
+
+#[test]
+fn a_specialist_kept_whole_keeps_the_lines_it_set_aside_and_one_run_again_none() {
+    let gaps = vec![Gap::new("test-engineer-unit", None, "silent: x".to_owned())];
+    let mut was = earlier(gaps);
+    was.ignored = vec![aside("lang-rust"), aside("test-engineer-unit")];
+
+    let resume = plan_of(&was, &id());
+
+    assert_eq!(resume.ignored["lang-rust"], [aside("lang-rust")]);
+    assert!(!resume.ignored.contains_key("test-engineer-unit"));
+}
+
+#[test]
+fn an_earlier_run_s_lines_set_aside_read_when_there_and_as_none_when_not() {
+    let dir = TempDir::new().unwrap();
+    let old = earlier_dir(dir.path(), "[]");
+    assert!(
+        read(&old.join("gaps.json"), &old)
+            .unwrap()
+            .ignored
+            .is_empty()
+    );
+
+    write(
+        &old,
+        "ignored.json",
+        &serde_json::to_string(&[aside("lang-rust")]).unwrap(),
+    );
+    assert_eq!(
+        read(&old.join("gaps.json"), &old).unwrap().ignored,
+        [aside("lang-rust")]
+    );
+
+    write(&old, "ignored.json", "{");
+    let err = read(&old.join("gaps.json"), &old).unwrap_err();
+    assert!(
+        err.contains("ignored.json: malformed lines set aside"),
+        "{err}"
+    );
+
+    fs::remove_file(old.join("ignored.json")).unwrap();
+    fs::create_dir(old.join("ignored.json")).unwrap();
+    let err = read(&old.join("gaps.json"), &old).unwrap_err();
+    assert!(err.starts_with("read "), "{err}");
 }

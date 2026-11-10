@@ -7,8 +7,10 @@
 //! written under `review/`, with each run's log under `review/logs/`
 //! and each specialist's report, assembled from its log, under
 //! `review/reports/`.
-//! It also writes what the review did not review, `review/gaps.json`
-//! and `review/not-reviewed.md`, and what it ran on,
+//! It also writes what the review did not review whole,
+//! `review/gaps.json` and `review/not-reviewed.md`, the lines of the
+//! specialists' reports it set aside as no finding,
+//! `review/ignored.json`, and what it ran on,
 //! `review/run-id.json`, and what this review spent, `review/spend.json`,
 //! holding its runs to the pull request's cap beside what
 //! `--spent-before` says its earlier reviews spent, the sum the next
@@ -52,6 +54,7 @@ use crate::live;
 use crate::outcome::{Decision, decide};
 use crate::plan::{self, report_file};
 use crate::previous;
+use crate::reading::{IGNORED, ReportLine};
 use crate::requirements;
 use crate::resume::{self, Resume};
 use crate::run::{self, AgentRun, Options};
@@ -357,6 +360,7 @@ fn record(
         answers,
         weighings,
         not_reviewed,
+        ignored,
     } = decision;
     if let Some(line) = from_store_line(runs) {
         outcome.summary.push_str(&line);
@@ -380,6 +384,7 @@ fn record(
     written.json(ANSWERS, &answers)?;
     written.json::<Vec<AgentUsage>>(USAGE_FILE, &usage)?;
     written.json::<Vec<Gap>>(GAPS, &not_reviewed)?;
+    written.json::<Vec<ReportLine>>(IGNORED, &ignored)?;
     written.text(NOT_REVIEWED, &gaps::markdown(&not_reviewed))?;
     written.json(RUN_ID, &p.id)?;
     if let Some(path) = summary {
@@ -394,7 +399,13 @@ fn record(
     if let Some(resume) = &p.resume {
         progress(&resumed_line(resume, runs));
     }
-    // What has no accepted report is said last, never left for a
+    if !ignored.is_empty() {
+        progress(&format!(
+            "report lines set aside as no finding: {}, listed in {IGNORED}",
+            ignored.len()
+        ));
+    }
+    // What was not reviewed whole is said last, never left for a
     // reader to take as clean.
     if !not_reviewed.is_empty() {
         let names: Vec<String> = not_reviewed.iter().map(Gap::label).collect();
@@ -407,7 +418,8 @@ fn record(
 
     Ok(format!(
         "verdict={}\ndispatched={}\nconsulted={}\nfindings={}\ncost={:.4}\nreused={reused}\n\
-         store_failed={store_failed}\nstalled={stalled}\nover_budget={}\naborted={}\n",
+         store_failed={store_failed}\nstalled={stalled}\nover_budget={}\naborted={}\n\
+         ignored={}\n",
         outcome.verdict,
         p.plan.agents().len(),
         consulted.len(),
@@ -415,6 +427,7 @@ fn record(
         usage::total(&usage),
         held.0,
         held.1,
+        ignored.len(),
     ))
 }
 

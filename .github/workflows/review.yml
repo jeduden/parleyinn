@@ -218,9 +218,9 @@ jobs:
           set +e
           cargo run --locked --quiet --offline -p review-eval -- scrub \
             --credential "$RUNNER_TEMP/claude-credential" \
-            --path review/logs --path review/reports --path review/answers.json \
-            --path review/usage.json --path review/outcome.json --path review/consulted.json \
-            --path review/gaps.json --path review/not-reviewed.md --path review/run-id.json \
+            --path review/logs --path review/reports --path review/answers.json --path review/usage.json \
+            --path review/outcome.json --path review/consulted.json --path review/gaps.json \
+            --path review/not-reviewed.md --path review/ignored.json --path review/run-id.json \
             --path review/findings.json --path review/findings.md --path review/spend.json \
             --path review/run.txt --path review/agent-runs.jsonl --path review/report.html
           code=$?
@@ -270,6 +270,7 @@ jobs:
           path: |
             review/reports/
             review/answers.json
+            review/ignored.json
             review/report.html
             review/agent-runs.jsonl
             review/usage.json
