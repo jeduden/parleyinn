@@ -77,6 +77,20 @@ fn a_source_starts_at_generation_1_and_each_new_generation_counts_on() {
 }
 
 #[test]
+fn the_superseded_generations_are_those_a_later_one_replaced() {
+    let dir = TempDir::new().unwrap();
+    let mut store = open(&dir);
+    assert_eq!(store.superseded().unwrap(), Vec::new());
+
+    let first = store.start_generation("/t/a.jsonl", "/t").unwrap();
+    let second = store.start_generation("/t/a.jsonl", "/t").unwrap();
+    store.start_generation("/t/a.jsonl", "/t").unwrap();
+    store.start_generation("/t/b.jsonl", "/t").unwrap();
+
+    assert_eq!(store.superseded().unwrap(), vec![first, second]);
+}
+
+#[test]
 fn each_ingest_marker_keeps_when_ingest_left_it_there() {
     let dir = TempDir::new().unwrap();
     let mut store = open(&dir).with_marker_time(1_000);

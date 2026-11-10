@@ -410,6 +410,10 @@ pub(crate) fn select(
 pub(crate) const NEWEST: &str = "WHERE generation = (SELECT max(generation)
      FROM transcript_sources t WHERE t.path = transcript_sources.path)";
 
+/// Each generation of a source that a later one replaced.
+pub(crate) const SUPERSEDED: &str = "WHERE generation < (SELECT max(generation)
+     FROM transcript_sources t WHERE t.path = transcript_sources.path)";
+
 /// Starts the next generation of the source at `path`, in `directory`,
 /// nothing read of it, its ingest marker left at `at`.
 pub(crate) fn start(

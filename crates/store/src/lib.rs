@@ -1370,6 +1370,23 @@ impl Store {
         )
     }
 
+    /// Every generation of a transcript source a later one replaced
+    /// (REC-07), by path, oldest first.
+    ///
+    /// # Errors
+    ///
+    /// Fails when SQLite does or a row does not parse.
+    pub fn superseded(&self) -> Result<Vec<Source>, StoreError> {
+        source::select(
+            &self.conn,
+            &format!(
+                "{} AND ?1 = ?1 ORDER BY path, generation",
+                source::SUPERSEDED
+            ),
+            "",
+        )
+    }
+
     /// Starts the next generation of the transcript source at `path`,
     /// which lies in the transcript directory `directory`, its first
     /// when none was read (REC-07).
