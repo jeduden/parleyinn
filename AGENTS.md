@@ -1,7 +1,6 @@
 # Agent Notes
 
 <!-- Included from CLAUDE.md: edit it, then run `mdsmith fix .`. -->
-
 Instructions for AI coding agents (Codex, Copilot, Claude).
 
 <?include
@@ -183,6 +182,7 @@ row: "- [{filename}]({filename}) — {summary}"
 - [CHANGELOG.md](CHANGELOG.md) — Release notes and upgrade notes per version, newest first (ENG-23).
 - [DEPENDENCIES.md](DEPENDENCIES.md) — Every direct dependency, listed through the decision record that justifies it (ENG-18, ENG-26). The ENG-18 scenario fails the build when the manifests and the dependency ADRs disagree or a license is off the allow-list.
 - [docs/ci.md](docs/ci.md) — What ParleyInn asks of its CI: a fast build, a stable build that does not flake, and failure output that tells the author what to do, with the ci-engineer agent and ci-review skill that check it.
+- [docs/design-system.md](docs/design-system.md) — The design system: one pixel picture of the inn and the mark, colours, type and cast cut from it, the rules for using them, and the files under docs/design that build the GitHub page from it.
 - [docs/development.md](docs/development.md) — Build commands, static analysis and supply-chain checks, and how CI, the nightly fuzz job and the signed release pipeline work. Testing has its own page, docs/testing.md.
 - [docs/domain-model/index.md](docs/domain-model/index.md) — ParleyInn's domain model: the closed set of concepts with their definitions, how they relate, the terms that are not ParleyInn concepts, and how names in code, docs and UI follow the model. The SRS links here for every term, and the domain-model agent reviews against it.
 - [docs/review-evaluation.md](docs/review-evaluation.md) — How the review's agents are held to evaluation cases (ENG-32): the cases each reviewer component has, the world and harness a run builds, the deterministic grader, what the review of a pull request runs, the weekly run against the published scorecard, and how a candidate model is compared before a component moves to it.

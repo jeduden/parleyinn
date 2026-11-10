@@ -1,8 +1,15 @@
 # ParleyInn
 
+![ParleyInn's neon sign at dusk](docs/design/assets/banner-2x.png)
+
 Your Claude agents as part of your team: work with them at your pace,
 see what they build while they build it, and point at exactly what you
 mean.
+
+The [ParleyInn page](https://jeduden.github.io/parleyinn/) draws the
+domain model as a frontier inn and numbers 28 of its concepts. The
+[design system](docs/design-system.md) holds the mark, the colours and
+the type cut from that picture.
 
 ## Vision
 
@@ -223,6 +230,7 @@ cargo test -p scenario --test bdd               # the requirement matrix
 cargo clippy --workspace --all-targets          # lint
 cargo run -p coverage                           # coverage per test layer
 mdsmith check .                                 # Markdown
+node docs/design/art/build.js --check           # the page and its images
 ```
 
 [docs/development.md](docs/development.md) has the full reference.
