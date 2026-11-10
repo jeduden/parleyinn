@@ -36,6 +36,9 @@ const GHERKIN: &str = "lang-gherkin";
 const MARKDOWN: &str = "lang-markdown";
 const JSON: &str = "lang-json";
 const YAML: &str = "lang-yaml";
+/// The specialist for the web page under `docs/`: its HTML, CSS and
+/// JavaScript, the design system's art source among them.
+const WEB: &str = "lang-web";
 const CI: &str = "ci-engineer";
 const UNIT: &str = "test-engineer-unit";
 const INTEGRATION: &str = "test-engineer-integration";
@@ -48,10 +51,15 @@ const BENCHMARKS: [&str; 2] = ["tooling/benchmark/", "tooling/calibrate/"];
 /// The fixtures, corpora, research notes and spikes: data, whose files
 /// no language specialist reads, Markdown aside.
 pub const DATA_ROOTS: [&str; 4] = ["testdata/", "fuzz/corpus/", "research/", "plan/"];
-/// The files written in no language: license texts, lists, checksums
-/// and git's own files, by extension or by name.
-const PLAIN_TEXT: [&str; 4] = ["txt", "sha256", "gitignore", "gitattributes"];
+/// The files written in no language: license texts, lists, checksums,
+/// git's own files and the empty marker that has GitHub Pages serve
+/// `docs/` as it is, by extension or by name.
+const PLAIN_TEXT: [&str; 5] = ["txt", "sha256", "gitignore", "gitattributes", "nojekyll"];
 const PLAIN_NAMES: [&str; 3] = ["LICENSE", "THIRD_PARTY_LICENSES", "CODEOWNERS"];
+/// The files no reader takes as text, images and fonts, by extension:
+/// the design system's art source draws the images, and the fonts carry
+/// their license beside them.
+const ASSETS: [&str; 2] = ["png", "woff2"];
 /// The files that decide who approves what and what the agents load:
 /// the officer and the CI engineer read them whatever their language.
 const GOVERNANCE: [&str; 3] = [
@@ -68,11 +76,12 @@ const NEVER_DEGRADES: &str = "I9";
 /// with the generalist that weighs its findings: the single source of
 /// both, so no specialist is listed without its route. The section and
 /// domain-model specialists follow their files.
-pub const FIXED_SPECIALISTS: [(&str, &str); 15] = [
+pub const FIXED_SPECIALISTS: [(&str, &str); 16] = [
     (RUST, CODE),
     (TOML, CODE),
     (JSON, CODE),
     (YAML, CODE),
+    (WEB, CODE),
     (SHELL, CODE),
     (ACTIONS, CODE),
     (GHERKIN, SPEC),
@@ -355,19 +364,22 @@ pub fn language_specialist(path: &str) -> Option<&'static str> {
         "yml" | "yaml" => Some(YAML),
         "json" => Some(JSON),
         "feature" => Some(GHERKIN),
+        "html" | "css" | "js" => Some(WEB),
         _ => None,
     }
 }
 
 /// Whether the file at `path` is source or configuration, which ENG-28
 /// wants a language specialist for: anything outside [`DATA_ROOTS`]
-/// that is not plain text.
+/// that is neither plain text nor an image or a font.
 #[must_use]
 pub fn needs_a_language(path: &str) -> bool {
     let name = path.rsplit('/').next().unwrap_or(path);
+    let ext = extension(path);
     !DATA_ROOTS.iter().any(|d| path.starts_with(d))
         && !PLAIN_NAMES.contains(&name)
-        && !PLAIN_TEXT.contains(&extension(path))
+        && !PLAIN_TEXT.contains(&ext)
+        && !ASSETS.contains(&ext)
 }
 
 /// The extension of the file at `path`, or of a dot file its name.

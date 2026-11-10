@@ -16,6 +16,7 @@ const CREATED: &[(&str, &str)] = &[
     ("lang-markdown", "docs/x.md"),
     ("lang-shell", "scripts/x.sh"),
     ("lang-toml", "crates/x/Cargo.toml"),
+    ("lang-web", "docs/x.html"),
     ("lang-yaml", "x.yml"),
     ("performance", "crates/x/src/y.rs"),
     ("review-code", "crates/x/src/y.rs"),

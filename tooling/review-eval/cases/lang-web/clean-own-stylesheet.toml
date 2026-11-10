@@ -1,0 +1,43 @@
+component = "lang-web"
+kind = "clean"
+title = "a page that loads only its own stylesheet"
+
+[[create]]
+file = "docs/design/mark.html"
+content = '''
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'self'; base-uri 'none'; form-action 'none'">
+<title>ParleyInn's mark</title>
+<link rel="stylesheet" href="mark.css">
+</head>
+<body>
+<main>
+<h1>The mark</h1>
+<p>The sign is the mark: the name in pink neon over one long cyan key.</p>
+</main>
+</body>
+</html>
+'''
+
+[[create]]
+file = "docs/design/mark.css"
+content = '''
+body{margin:0;background:#0B1A29;color:#EAD9B5;font:16px/1.5 system-ui,sans-serif}
+main{max-width:65ch;margin:0 auto;padding:32px 16px}
+h1{font-size:27px}
+'''
+
+[expect]
+outcome = ["none", "findings"]
+
+[[expect.none]]
+path = "docs/design/mark.html"
+form = "linked"
+
+[[expect.none]]
+path = "docs/design/mark.css"
+form = "linked"

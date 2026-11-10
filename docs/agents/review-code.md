@@ -22,6 +22,7 @@ row: "- [`{name}`]({filename})"
 - [`lang-rust`](../../.claude/agents/lang-rust.md)
 - [`lang-shell`](../../.claude/agents/lang-shell.md)
 - [`lang-toml`](../../.claude/agents/lang-toml.md)
+- [`lang-web`](../../.claude/agents/lang-web.md)
 - [`lang-yaml`](../../.claude/agents/lang-yaml.md)
 - [`performance`](../../.claude/agents/performance.md)
 - [`test-engineer-end-to-end`](../../.claude/agents/test-engineer-end-to-end.md)
@@ -33,9 +34,8 @@ row: "- [`{name}`]({filename})"
 
 - Does the code do what each touched row says, and no more, and is
   each behaviour proven at the lowest test layer that can prove it?
-- Do errors keep their cause, blocking calls take a deadline, and I/O
-  sit behind a seam a test injects
-  ([ENG-03, ENG-04](../srs/10-engineering-quality.md))?
+- Do errors keep their cause, blocking calls take a deadline and I/O sit behind
+  a seam a test injects ([ENG-03, ENG-04](../srs/10-engineering-quality.md))?
 - Does it stay inside its budgets, grow no worse than `O(n log n)` in
   the store's size, and keep its benchmark?
 - Does CI build fast and fail with output that tells the author what to do?
