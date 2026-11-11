@@ -55,6 +55,8 @@ mod provenance_trust;
 mod recall;
 mod recall_address;
 mod recall_scope;
+mod recall_search;
+mod recall_server;
 mod record;
 mod record_homes;
 mod record_hooks;
