@@ -86,8 +86,8 @@ fn merged(old: &[Span], new: &[Span]) -> Vec<Span> {
 
 /// The hash of `source`'s consumed prefix with `spans` zeroed, read from
 /// its transcript; none-confirming when no reader is injected, or when the
-/// transcript no longer begins with the bytes the stored hash covers, which
-/// the flag marks as a failure to confirm (I6).
+/// transcript no longer begins with the bytes the stored hash covers. The
+/// flag marks either as a failure to confirm, which the purge counts (I6).
 ///
 /// # Errors
 ///
@@ -98,7 +98,7 @@ fn recomputed(
     read: Option<Transcripts>,
 ) -> io::Result<(Digest, bool)> {
     let Some(read) = read else {
-        return Ok((unconfirmable(), false));
+        return Ok((unconfirmable(), true));
     };
     let path = Path::new(&source.path);
     let offset = source.position.offset;

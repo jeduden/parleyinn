@@ -339,7 +339,7 @@ fn a_purge_that_cannot_read_the_transcript_leaves_a_hash_that_confirms_nothing()
         let now = store.source(&path).unwrap().unwrap();
         assert_eq!(now.position.prefix, unconfirmable());
         assert_eq!(now.purged.len(), 1);
-        assert_eq!(purged.finished.unconfirmed, u64::from(reader.is_some()));
+        assert_eq!(purged.finished.unconfirmed, 1);
     }
 }
 
