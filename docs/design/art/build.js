@@ -112,7 +112,7 @@ const NCOL = RAMPS.flat().length;
 const NAMED = [['Night', 't0'], ['Bone', 'p2'], ['Dusk coral', 'd4'], ['Mesa plum', 'd1'], ['Teal', 't4'], ['Amber', 'am'], ['Neon cyan', 'cy'], ['Neon pink', 'pk']];
 const PAGE = { bg: 't0', bg2: 't1', ink: 'ink', line: 't2', line2: 't3', fg: 'p2', fg2: 'm3', mute: 'm2', pink: 'pk', cyan: 'cy', amber: 'am' };
 const USES = [
-  ['cy', 'Neon cyan is the house’s own light: the name on the sign and the beams of the pen.'],
+  ['cy', 'Neon cyan is the house’s own light: the name on the sign, ROOMS over the balcony and the beams of the pen.'],
   ['pk', 'Neon pink is the working light: the key under the name, power cells, the ledgers’ bookmarks and boundary plates.'],
   ['am', 'Amber is lamplight and the proprietor’s business: the Needs you sign and the rail its tickets hang on.'],
   ['r2', 'Red is for marks that must not be missed: UNTRUSTED, QUARANTINE, the seals and the band on every envelope.'],

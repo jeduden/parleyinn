@@ -1,6 +1,6 @@
 'use strict';
 // Helpers shared by every part of the scene: light that spreads from bright pixels, neon lettering, boards, plates and lamps.
-const { Fb, rng, IDX, RGB, ci, B2 } = require('./pix.js');
+const { Fb, rng, IDX, RGB, ci, B2, mix } = require('./pix.js');
 // ---------- shared helpers ----------
 // Light spreading from pixels of the given source colours: alphas[d-1] is the strength at distance d.
 function halo(g, x, y, w, h, src, target, alphas, steps) {
@@ -26,6 +26,11 @@ function plate(g, cx, y, str, bg, fg, font, o) { // small lettered plate centred
   o = o || {}; font = font || 'm5'; const tw = g.tw(str, font), pad = o.pad === undefined ? 2 : o.pad, w = tw + pad * 2, x = Math.round(cx - w / 2), h = (o.h || 9);
   g.R(x, y, w, h, bg); g.B(x, y, w, h, o.edge || 'ink'); g.T(x + pad, y + Math.floor((h - 5) / 2), str, fg, font); return [x, y, w, h];
 }
+// Light whose steps are chosen by hand: a colour named in rows climbs its own row, step by step; any other blends toward the fallback.
+function ramped(rows, fallback) {
+  const T = new Map(Object.entries(rows).map(([c, r]) => [ci(c), r.map(ci)])), F = RGB[ci(fallback)];
+  return (cur, lv, steps) => { const r = T.get(cur); return r ? r[Math.min(lv, r.length) - 1] : mix(cur, F, lv, steps); };
+}
 function lamp(g, x, y, t, o) { // hanging oil lamp: cord from the ceiling at y, flame flickers
   o = o || {}; const drop = o.drop || 5; g.V(x, y, drop, 'ink');
   g.R(x - 2, y + drop, 5, 1, 'n3'); g.R(x - 1, y + drop + 1, 3, 3, 'd8'); g.px(x, y + drop + 2, 'wh'); if (t % 5 === 3) g.px(x, y + drop + 1, 'wh'); g.px(x - 2, y + drop + 2, 'am'); g.px(x + 2, y + drop + 2, 'am'); g.R(x - 1, y + drop + 4, 3, 1, 'n3');
@@ -33,4 +38,4 @@ function lamp(g, x, y, t, o) { // hanging oil lamp: cord from the ceiling at y, 
 }
 
 const FRAMES = 24;
-module.exports = { halo, neonMask, boards, vboards, plate, lamp, FRAMES };
+module.exports = { halo, neonMask, boards, vboards, plate, lamp, ramped, FRAMES };

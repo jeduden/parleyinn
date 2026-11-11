@@ -60,13 +60,14 @@ them into a pixel editor. Eight carry names:
 | Mesa plum  | d1   | `#5A2E48` | the mesa and the shade   |
 | Teal       | t4   | `#2F8C8A` | the waistcoats and glass |
 | Amber      | am   | `#FFC857` | focus, code, the tagline |
-| Neon cyan  | cy   | `#63F3E4` | the selected place       |
+| Neon cyan  | cy   | `#1FE5D5` | the selected place       |
 | Neon pink  | pk   | `#FF5C8A` | links and numbers        |
 
 Four colours carry a meaning:
 
-- **Neon cyan** is the house's own light: the name on the sign and the
-  beams of the pen. The forge is next door, so its horseshoe is iron.
+- **Neon cyan** is the house's own light: the name on the sign, ROOMS
+  over the balcony and the beams of the pen. The forge is next door, so
+  its horseshoe is iron.
 - **Neon pink** is the working light: the key under the name, power
   cells, the ledgers' bookmarks and boundary plates.
 - **Amber** is lamplight and the proprietor's business: the Needs you
@@ -112,7 +113,8 @@ For pixel art:
    colour.
 3. Outline figures and things in ink, one pixel wide.
 4. Neon cyan and pink are lights: they glow onto what is near and take no
-   light themselves.
+   light themselves. Cyan's glow climbs the teal ramp, since a straight
+   blend would step the brown boards to a warmer brown.
 
 For the pages:
 

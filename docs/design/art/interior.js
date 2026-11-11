@@ -78,7 +78,7 @@ function ledgerShelves(g, t) {
       const end = (b === 2 && s === 3) ? bx + 8 : (b === 2 && s === 4) ? bx : bx + bw; let x = bx;
       while (x < end) { const k = r(), w = k < 0.22 ? 1 : k < 0.86 ? 2 : 3; if (x + w > end) break; if (r() < 0.06) { x += 1; continue; } const hh = 5 + Math.floor(r() * 2.3), c = cols[Math.floor(r() * cols.length)];
         g.R(x, sy - hh, w, hh, c); if (w > 1) g.V(x + w - 1, sy - hh, hh, DK[c] || 'n2'); if (r() < 0.45) g.px(x, sy - 3, r() < 0.5 ? 'am' : 'p2');
-        if (r() < 0.15 && hh < 7) { const xx = x, yy = sy - hh - 2; late.push(() => { g.R(xx, yy + 1, 2, 3, 'pk'); g.px(xx, yy + 1, 'pkw'); }); }
+        if (r() < 0.15 && hh < 7) { const xx = x, yy = sy - hh - 2; late.push(() => { g.R(xx, yy + 1, 2, 3, 'pk0'); g.px(xx, yy + 1, 'pk'); }); }
         x += w; }
       if (b === 2 && s === 3) { g.R(bx + 9, sy - 2, 6, 2, 'p1'); g.H(bx + 9, sy - 2, 6, 'r1'); }
     }
@@ -88,7 +88,6 @@ function ledgerShelves(g, t) {
   g.L(181, 161, 187, 123, 'w4'); g.L(186, 161, 192, 123, 'w4'); for (let k = 0; k < 7; k++) { const yy = 157 - k * 5, xx = 181 + Math.round((161 - yy) * 6 / 38); g.H(xx + 1, yy, 4, 'w3'); }
   g.clip(x0, y0, x1 - x0, y1 - y0); g.glow(154, 120, 44, 38, 'am', 0.5, 6, true); g.unclip();
   late.forEach(f => f());
-  halo(g, x0, y0, x1 - x0, y1 - y0, ['pk'], 'pk', [0.3], 8);
   lamp(g, 154, y0, t, { drop: 2 });
 }
 function printShop(g, t) {
@@ -217,6 +216,5 @@ function saloon(g, t) {
   // the register, where every refusal rings up
   const rx = 322; g.R(rx + 1, 196, 10, 8, 'n1'); g.B(rx + 1, 196, 10, 8, 'ink'); g.T(rx + 3, 198, '07', 'pk', 'm5'); g.R(rx, 204, 12, 6, 'w3'); g.B(rx, 204, 12, 6, 'ink'); g.H(rx + 1, 204, 10, 'am'); for (let i = 0; i < 5; i++) { g.px(rx + 1 + i * 2, 206, 'p2'); g.px(rx + 2 + i * 2, 208, 'p2'); } g.px(rx + 12, 205, 'm3'); g.px(rx + 13, 204, 'm3'); g.px(rx + 13, 203, 'am');
   lamp(g, 200, y0, t, { drop: 4 }); lamp(g, 270, y0, t, { drop: 4 });
-  halo(g, x0, 200, x1 - x0, 30, ['pk'], 'pk', [0.26], 8);
 }
 module.exports = { figure, upstairs, saloon, PON, HAT, STEEL, BRASS, DARK, vkey, bottle, chair, PROP, PROPL };

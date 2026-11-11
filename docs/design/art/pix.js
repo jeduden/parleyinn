@@ -5,7 +5,7 @@ const zlib = require('zlib'), fs = require('fs'), path = require('path');
 const PAL = {
   ink: '#15101C', n1: '#231C2D', n2: '#372F45', n3: '#544C66', n4: '#7F7892', n5: '#B3ADC2',
   t0: '#0B1A29', t1: '#0F2A3A', t2: '#164250', t3: '#1F5E68', t4: '#2F8C8A', t5: '#6CC9B4',
-  cy: '#63F3E4', cyw: '#D9FFF5',
+  cy: '#1FE5D5', cyw: '#D9FFF5',
   v1: '#353B63', v2: '#62487A',
   d0: '#38203A', d1: '#5A2E48', d2: '#7F4152', d3: '#A95A59', d4: '#CC6E57', d5: '#E98F59', d6: '#F5B46A',
   am: '#FFC857', d8: '#FFE7A3', wh: '#FFF6DC',
@@ -104,9 +104,10 @@ class Fb {
   }
   // blend light of an RGB colour into what is there: a(x,y) in 0..1, snapped to palette, dithered between steps
   // nd = no dither: the light falls in clean bands, which keeps small detail legible
+  // target may also be a function (colour, step, steps) => colour, for light whose steps are chosen by hand
   light(x, y, w, h, target, a, steps, nd) {
-    steps = steps || 6; if (typeof target === 'string') target = RGB[ci(target)];
-    return this.fn(x, y, w, h, (i, j, cur) => { if (!cur || NO_BLEND.has(cur)) return 0; let v = a(i, j); if (!(v > 0)) return 0; if (v > 1) v = 1; const A = v * steps, b = Math.floor(A), f = A - b; const lv = nd ? (Math.abs(f - 0.5) < 0.13 ? b + (B2[j & 1][i & 1] < 2 ? 1 : 0) : Math.round(A)) : b + (f * 4 > B2[j & 1][i & 1] + 0.5 ? 1 : 0); return lv > 0 ? mix(cur, target, lv, steps) : 0; });
+    steps = steps || 6; const pick = typeof target === 'function' ? target : null; if (typeof target === 'string') target = RGB[ci(target)];
+    return this.fn(x, y, w, h, (i, j, cur) => { if (!cur || NO_BLEND.has(cur)) return 0; let v = a(i, j); if (!(v > 0)) return 0; if (v > 1) v = 1; const A = v * steps, b = Math.floor(A), f = A - b; const lv = nd ? (Math.abs(f - 0.5) < 0.13 ? b + (B2[j & 1][i & 1] < 2 ? 1 : 0) : Math.round(A)) : b + (f * 4 > B2[j & 1][i & 1] + 0.5 ? 1 : 0); return lv > 0 ? (pick ? pick(cur, lv, steps) : mix(cur, target, lv, steps)) : 0; });
   }
   glow(cx, cy, rx, ry, target, strength, steps, nd) {
     return this.light(Math.floor(cx - rx), Math.floor(cy - ry), Math.ceil(rx * 2) + 1, Math.ceil(ry * 2) + 1, target, (i, j) => { const u = (i + 0.5 - cx) / rx, v = (j + 0.5 - cy) / ry, d = Math.sqrt(u * u + v * v); return d >= 1 ? 0 : strength * (1 - d) * (1 - d); }, steps, nd);

@@ -3,7 +3,7 @@
 const { Fb, png, rng, IDX, RGB, PAL, ci, B2 } = require('./pix.js');
 const W = 480, H = 330, HZ = 206, GY = 236;
 
-const { halo, neonMask, boards, vboards, plate, lamp, FRAMES } = require('./kit.js');
+const { halo, neonMask, boards, vboards, plate, lamp, ramped, FRAMES } = require('./kit.js');
 const INTERIOR = require('./interior.js');
 const YARD = require('./yard.js');
 
@@ -91,6 +91,8 @@ const LET = {
   N: ['####...####', '####...####', '.####..###.', '.####..###.', '.#####.###.', '.#####.###.', '.###.#####.', '.###.#####.', '.###.#####.', '.###..####.', '.###..####.', '.###..####.', '.###..####.', '####...####', '####...####'],
 };
 const UNLIT = { cy: 't4', pk: 'pk0' }; // an unlit tube shows the colour of its glass
+// cyan light climbs the teal ramp: blended straight toward cyan, the brown boards would step to a warmer brown
+const CYAN = ramped({ ink: ['t0', 't1', 't2'], n1: ['t1', 't2', 't3', 't4'], d0: ['t2', 't3', 't4'], w1: ['t2', 't3', 't4'], w2: ['t3', 't4', 't5'] }, 'cy');
 function wordmark(g, x, y, str, edge, core, dead) { // returns width; dead = index of a letter drawn unlit
   let cx = x, n = 0;
   for (const ch of str) { if (ch === ' ') { cx += 7; continue; } const rows = LET[ch]; if (n === dead) neonMask(g, cx, y, rows, UNLIT[edge], UNLIT[edge]); else neonMask(g, cx, y, rows, edge, core); cx += rows[0].length + 2; n++; }
@@ -137,15 +139,16 @@ function innShell(g, t) {
   // painted lettering either side of the sign
   g.T(124, 76, 'ROOMS', 'p0', 's5', { align: 'c' }); g.T(124, 84, '& SEATS', 'p0', 's5', { align: 'c' });
   g.T(337, 72, 'PINS', 'p0', 's5', { align: 'c' }); g.T(337, 80, 'KEPT', 'p0', 's5', { align: 'c' }); g.T(337, 88, 'VERBATIM', 'p0', 's5', { align: 'c' });
+  // the sign lights the wall around its board
+  g.glow(231, 84, 110, 40, CYAN, 0.5, 8);
   // the sign board
   g.R(162, 66, 138, 36, 'n1').B(162, 66, 138, 36, 'ink').B(163, 67, 136, 34, 'w2');
   for (const x of [170, 290]) { g.R(x, 62, 2, 4, 'm1'); }
   const dead = (t === 15 || t === 17) ? 3 : -1;
   wordmark(g, 173, 71, 'PARLEY INN', 'cy', 'cyw', dead);
   keyGlyph(g, 174, 92, 112, 'pk', 'pkw');
-  halo(g, 163, 67, 136, 34, ['cy', 'cyw'], 'cy', [0.34, 0.2, 0.1, 0.05], 8);
+  halo(g, 163, 67, 136, 34, ['cy', 'cyw'], CYAN, [0.5, 0.3, 0.15, 0.06], 8);
   halo(g, 163, 86, 136, 15, ['pk', 'pkw'], 'pk', [0.3, 0.16, 0.07], 8);
-  // the sign lights its board only: cyan falling on the brown wall would step it to a warmer brown
   // header beam over the open floors, floor between them, end walls
   g.R(84, 108, 290, 4, 'w1').H(84, 108, 290, 'w3').H(84, 111, 290, 'ink');
   g.R(INN.cut0 - 3, INN.up0, 3, 118, 'n1'); for (let j = INN.up0; j < 230; j += 3) g.px(INN.cut0 - 2, j + 1, 'n3');
@@ -162,8 +165,8 @@ function facade(g, t) {
   g.R(x1 - 1, 112, 3, 118, 't2').V(x1 - 1, 112, 118, 't3').V(x1 + 1, 112, 118, 't1');
   // ROOMS in neon
   g.R(89, 114, 37, 13, 'n1').B(89, 114, 37, 13, 'ink');
-  g.T(108, 116, 'ROOMS', (t === 6) ? 'pk0' : 'pk', 'j10', { align: 'c' });
-  halo(g, 90, 115, 35, 11, ['pk'], 'pk', [0.3, 0.14], 8);
+  g.T(108, 116, 'ROOMS', (t === 6) ? UNLIT.cy : 'cy', 'j10', { align: 'c' });
+  halo(g, 90, 115, 35, 11, ['cy'], CYAN, [0.3, 0.14], 8);
   // balcony door, lit from inside
   g.R(98, 130, 18, 29, 't2').B(98, 130, 18, 29, 'ink'); g.R(100, 132, 14, 25, 'd6'); g.R(100, 132, 14, 6, 'am'); g.V(107, 132, 25, 't2'); g.H(100, 143, 14, 't2'); g.R(100, 150, 14, 7, 'd5');
   g.R(101, 133, 2, 9, 'r1'); g.R(111, 133, 2, 9, 'r1'); // curtains
