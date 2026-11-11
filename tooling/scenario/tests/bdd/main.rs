@@ -37,6 +37,7 @@ mod engineering_protection;
 mod engineering_reach;
 mod engineering_release;
 mod engineering_review;
+mod engineering_soak;
 mod engineering_third_party;
 mod engineering_workflows;
 mod erasure;
