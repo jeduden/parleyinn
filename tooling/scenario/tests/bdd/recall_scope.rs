@@ -44,6 +44,9 @@ pub struct ScopeSteps {
     seen: Vec<WriterId>,
     /// How many extended-recall entries the audit log held before.
     extended_before: usize,
+    /// The run the bound calls name, when a step other than RCL-05's
+    /// bound one.
+    run: Option<String>,
 }
 
 /// The writers of RCL-05's world, by who they belong to.
@@ -112,7 +115,7 @@ fn seat_with_events(
 
 /// Appends to the transcript `name` the lines `lines`, and waits until
 /// ingest read them.
-fn append_and_read(w: &mut World, name: &str, lines: &[Value]) -> Result<(), String> {
+pub fn append_and_read(w: &mut World, name: &str, lines: &[Value]) -> Result<(), String> {
     let path = named(w, name)?;
     let mut file = fs::OpenOptions::new()
         .append(true)
@@ -232,9 +235,27 @@ fn bound_arguments(w: &mut World, text: &str) -> Result<Value, String> {
     crate::record_search::arguments_of(w, text)
 }
 
+/// Serves the transcript `name`, which a step registered, as the run the
+/// bound calls name: a stand-in harness binds it, and ingest reads
+/// `lines` of it (RCL-02's `rooms` scope needs a bound run).
+pub fn bind_run(w: &mut World, name: &str, lines: &[Value]) -> Result<(), String> {
+    let path = crate::security_redaction::transcripts(w)
+        .into_iter()
+        .find(|(n, _)| n == name)
+        .map(|(_, path)| path)
+        .ok_or_else(|| format!("no step registered the transcript {name:?}"))?;
+    crate::record_live::live(w)
+        .transcripts
+        .insert(name.to_owned(), path);
+    serve(w, name, "startup", &[])?;
+    append_and_read(w, name, lines)?;
+    steps(w).run = Some(name.to_owned());
+    Ok(())
+}
+
 /// Calls `tool` with `arguments` as the run does: under the tool-use id
 /// of a line its transcript carries.
-fn call_bound(w: &mut World, tool: &str, arguments: Value) -> Result<Reply, String> {
+pub fn call_bound(w: &mut World, tool: &str, arguments: Value) -> Result<Reply, String> {
     steps(w).calls += 1;
     let id = format!("toolu_scope{}", steps(w).calls);
     let (mut call, _) = recorded_call("Bash")?;
@@ -243,7 +264,8 @@ fn call_bound(w: &mut World, tool: &str, arguments: Value) -> Result<Reply, Stri
         "00000000-0000-4000-8000-{:012x}",
         9000 + steps(w).calls
     ));
-    append_and_read(w, RUN, &[call])?;
+    let run = steps(w).run.clone().unwrap_or_else(|| RUN.to_owned());
+    append_and_read(w, &run, &[call])?;
     let params = json!({
         "name": tool,
         "arguments": arguments,

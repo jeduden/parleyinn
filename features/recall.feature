@@ -19,8 +19,8 @@ Feature: Recall (RCL)
     Then it returns "session_binding" as "held" or "not_held", "search_index" as "readable" or "unreadable", "searches_timed_out" as a count and "version", and no recalled content or envelope, whether or not a run is found for the call
     And the call is recorded as no recall event
 
-  @RCL-02 @P0 @pending
-  Scenario Outline: event search honours its filters and caps hits at k
+  @RCL-02 @P0
+  Scenario Outline: event search filters by exact provenance class and by provenance class family and caps hits at k
     Given an isolated ParleyInn home
     And an agent run with a Claude Code transcript "mixed-provenance"
     When the agent calls the MCP tool "event_search" with <args>
@@ -29,16 +29,17 @@ Feature: Recall (RCL)
     And a relevant hit from a short run still ranks above the repeated hits of a long run
 
     Examples:
-      | args                                 | hits |
-      | query "deploy"                       | 10   |
-      | query "deploy", k 50                 | 50   |
-      | query "deploy", k 500                | 50   |
-      | query "deploy", scope "rooms"        | 10   |
-      | query "deploy", provenance ["web"]   | 10   |
-      | query "deploy", kind ["tool_result"] | 10   |
-      | query "deploy", trust "trusted"      | 10   |
-      | query "deploy", since "2026-01-01"   | 10   |
-      | query "deploy", until "2026-06-30"   | 10   |
+      | args                                   | hits |
+      | query "deploy"                         | 10   |
+      | query "deploy", k 50                   | 50   |
+      | query "deploy", k 500                  | 50   |
+      | query "deploy", scope "rooms"          | 10   |
+      | query "deploy", run "mixed-provenance" | 10   |
+      | query "deploy", provenance ["web"]     | 10   |
+      | query "deploy", kind ["tool_result"]   | 10   |
+      | query "deploy", trust "trusted"        | 10   |
+      | query "deploy", since "2026-01-01"     | 10   |
+      | query "deploy", until "2026-06-30"     | 10   |
 
   @RCL-03 @P0 @I1
   Scenario: event expand returns exact post-redaction content under the model-token cap

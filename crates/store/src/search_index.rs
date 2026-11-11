@@ -501,8 +501,9 @@ pub struct Search<'a> {
     pub writers: &'a [WriterId],
     /// Provenance classes, by name; none means any.
     pub provenance: &'a [String],
-    /// Event kinds, by name; none means any.
-    pub kinds: &'a [String],
+    /// Provenance class families, by name: `tool_result` matches every
+    /// `tool_result:<tool>` (RCL-02); none means any.
+    pub provenance_families: &'a [String],
     /// Transcript times from here on.
     pub since: Option<&'a str>,
     /// Transcript times up to here, a date taking its whole day.
@@ -538,12 +539,24 @@ fn ranked_matches(search: &Search<'_>, limited: bool) -> (String, Vec<Sql>) {
         let writers: Vec<String> = search.writers.iter().map(ToString::to_string).collect();
         args.push(Sql::Text(serde_json::Value::from(writers).to_string()));
     }
-    for (column, values) in [("provenance", search.provenance), ("kind", search.kinds)] {
-        if !values.is_empty() {
-            let marks = vec!["?"; values.len()].join(", ");
-            sql.push_str(&format!(" AND e.{column} IN ({marks})"));
-            args.extend(values.iter().cloned().map(Sql::Text));
+    if !search.provenance.is_empty() {
+        let marks = vec!["?"; search.provenance.len()].join(", ");
+        sql.push_str(&format!(" AND e.provenance IN ({marks})"));
+        args.extend(search.provenance.iter().cloned().map(Sql::Text));
+    }
+    if !search.provenance_families.is_empty() {
+        sql.push_str(" AND (");
+        for (n, name) in search.provenance_families.iter().enumerate() {
+            if n > 0 {
+                sql.push_str(" OR ");
+            }
+            sql.push_str("e.provenance = ? OR substr(e.provenance, 1, ?) = ?");
+            let family = format!("{name}:");
+            args.push(Sql::Text(name.clone()));
+            args.push(Sql::Integer(family.chars().count() as i64));
+            args.push(Sql::Text(family));
         }
+        sql.push(')');
     }
     if let Some(since) = search.since {
         sql.push_str(" AND e.transcript_timestamp >= ?");
