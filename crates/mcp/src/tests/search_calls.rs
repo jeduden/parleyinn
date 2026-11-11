@@ -148,6 +148,38 @@ fn the_trusted_filter_finds_nothing_while_no_event_is_trusted() {
     assert_eq!(envelope_of(&result)["items"], json!([]));
 }
 
+/// A recorded Claude Code 2.1.296 transcript whose Bash call prints
+/// "hi": its result is the one `tool_result:Bash` event.
+const RECORDED: &str = "testdata/claude-code/2.1.296/transcripts/projects/-w-my-app/686aa14f-b535-45bc-9ed0-5400ea84bec7.jsonl";
+
+#[test]
+fn the_kind_filter_selects_a_family_and_the_provenance_filter_a_class() {
+    let text = std::fs::read_to_string(testkit::repo_root().join(RECORDED)).unwrap();
+    let lines: Vec<String> = text.lines().map(str::to_owned).collect();
+    let f = super::recall_calls::fixture_of(&lines);
+    let mut server = f.server();
+    let mut classes = |more: Value| -> Vec<Value> {
+        envelope_of(&ask(&mut server, "hi", more))["items"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|item| item["provenance"].clone())
+            .collect()
+    };
+    let result = [json!("tool_result:Bash")];
+
+    // The search finds other classes too, so each filter narrows.
+    assert!(classes(json!({})).len() > 1);
+    // The family reaches every tool's results; the class is exact.
+    assert_eq!(classes(json!({"kind": ["tool_result"]})), result);
+    assert_eq!(classes(json!({"provenance": ["tool_result:Bash"]})), result);
+    assert_eq!(
+        classes(json!({"provenance": ["tool_result"]})),
+        Vec::<Value>::new()
+    );
+    assert_eq!(classes(json!({"kind": ["tool"]})), Vec::<Value>::new());
+}
+
 #[test]
 fn the_filters_narrow_the_hits() {
     let f = fixture();

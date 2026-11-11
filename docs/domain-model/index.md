@@ -98,8 +98,8 @@ errors and logs use the model's words.
   `kernel-worker`.
 - An option that selects a concept is named for it: `--author`, `--seat`,
   `--writer`, `--run`, `--room`.
-- The versioned `kind` field of `event_search` is the one retained exception:
-  it selects a provenance class family under RCL-02 and never means event kind.
+- The versioned `kind` filter of `event_search` is the one retained exception:
+  it selects a provenance class family under RCL-02 and never an event kind.
 - A **settings key** names one setting in a settings layer:
   `<concept>.<setting>`, or `<concept>.<room>.<setting>` or
   `<concept>.<room>.<qualifier>` per room, the concept singular and in snake
