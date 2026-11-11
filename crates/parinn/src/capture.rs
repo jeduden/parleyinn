@@ -398,7 +398,8 @@ impl Running {
     }
 
     /// Audits what one live ingest found: each redaction, unparsed line,
-    /// format drift, new generation and witnessed repeat (I6).
+    /// format drift, new generation, witnessed repeat and refused repeat
+    /// (I6).
     fn audit_ingested(&self, ingested: &Ingested) {
         for rule in &ingested.redactions {
             self.audit(&keyed(
@@ -440,6 +441,14 @@ impl Running {
                 Kind::Coalesced,
                 Counter::WitnessedRepeatRecorded,
                 "witnessed line repeating another transcript recorded as its own event in",
+                &ingested.name,
+            ));
+        }
+        for _ in 0..ingested.refused {
+            self.audit(&keyed(
+                Kind::Rejected,
+                Counter::RepeatOfPurgedRefused,
+                "refused a repeated line whose `uuid` names a purged event, in",
                 &ingested.name,
             ));
         }

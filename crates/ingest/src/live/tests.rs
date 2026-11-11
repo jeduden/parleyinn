@@ -305,3 +305,64 @@ fn a_transcript_rewritten_shorter_starts_a_new_generation() {
     assert!(rewritten.new_generation);
     assert_eq!((rewritten.generation, rewritten.events), (2, 1));
 }
+
+#[test]
+fn a_witnessed_line_whose_uuid_names_a_purged_event_is_refused() {
+    let dir = TempDir::new().unwrap();
+    let home = home(&dir);
+    let parent = dir.path().join("parent.jsonl");
+    std::fs::write(&parent, line(1)).unwrap();
+    let owner = crate::ingest_path(&home, &parent, &redactor(), &mut OsEntropy).unwrap();
+    let mut store = Store::open(&home.store()).unwrap();
+    let device = administration::node::Node::find(&home, &store)
+        .unwrap()
+        .device_writer();
+    let erase = store::Erase {
+        writer: owner.writer,
+        first: record::id::Seq::FIRST,
+        last: record::id::Seq::FIRST,
+    };
+    store.purge(device, &[], &[erase]).unwrap();
+    let path = main_transcript(&dir, &format!("{}{}", line(1), line(2)));
+    let mut seats = RunSeats::default();
+
+    let ingested = ingest(&home, &path, &mut seats, None).unwrap();
+
+    assert_eq!((ingested.refused, ingested.events), (1, 1));
+    assert_eq!(ingested.witnessed_repeats, 0);
+}
+
+#[test]
+fn a_purged_line_of_a_served_transcript_does_not_read_as_a_rewrite() {
+    let dir = TempDir::new().unwrap();
+    let home = home(&dir);
+    let path = main_transcript(&dir, &(1..=3).map(line).collect::<String>());
+    let mut seats = RunSeats::default();
+    let first = ingest(&home, &path, &mut seats, None).unwrap();
+    let mut store = Store::open(&home.store())
+        .unwrap()
+        .with_transcripts(crate::read::transcript);
+    let device = administration::node::Node::find(&home, &store)
+        .unwrap()
+        .device_writer();
+    let second = record::id::Seq::new(2).unwrap();
+    let erase = store::Erase {
+        writer: first.writer,
+        first: second,
+        last: second,
+    };
+    assert_eq!(store.purge(device, &[], &[erase]).unwrap().events, 1);
+    drop(store);
+
+    // The transcript still holds the purged line's bytes: its consumed
+    // prefix matches the stored hash only with those bytes zeroed.
+    assert_eq!(ingest(&home, &path, &mut seats, None), None);
+
+    let mut longer = std::fs::read_to_string(&path).unwrap();
+    longer.push_str(&line(4));
+    std::fs::write(&path, longer).unwrap();
+    let appended = ingest(&home, &path, &mut seats, None).unwrap();
+
+    assert!(!appended.new_generation);
+    assert_eq!((appended.generation, appended.events), (1, 1));
+}

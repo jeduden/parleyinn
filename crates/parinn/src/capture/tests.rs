@@ -813,3 +813,25 @@ fn a_marker_link_or_fifo_is_neither_followed_nor_waited_on() {
     assert_eq!(answer.expect("served waited on a FIFO marker"), [f.main()]);
     drop(marker);
 }
+
+#[test]
+fn each_refused_repeated_line_is_counted_by_the_live_ingest() {
+    let f = Fixture::new();
+    let other = f.projects().join("other.jsonl");
+    std::fs::write(&other, line(1, None)).unwrap();
+    let mut ingested = ingest::ingest_path(
+        &f.home,
+        &other,
+        &Redactor::new(&[]).unwrap().0,
+        &mut OsEntropy,
+    )
+    .unwrap();
+    ingested.refused = 2;
+
+    f.running(None, None).audit_ingested(&ingested);
+
+    assert_eq!(
+        f.counted(),
+        ["repeat_of_purged_refused", "repeat_of_purged_refused"]
+    );
+}

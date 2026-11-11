@@ -294,6 +294,7 @@ pub struct Store {
     /// When, in milliseconds on ingest's clock, an ingest marker this
     /// store leaves is left (ADM-09).
     marker_time: u64,
+    transcripts: Option<source::Transcripts>,
 }
 
 impl fmt::Debug for Store {
@@ -408,6 +409,7 @@ impl Store {
             payloads: Payloads::new(dir.join("payloads"), Box::new(OsDisk)),
             threshold: DEFAULT_PAYLOAD_THRESHOLD,
             marker_time: 0,
+            transcripts: None,
         })
     }
 
@@ -416,15 +418,6 @@ impl Store {
     #[must_use]
     pub fn with_payload_threshold(mut self, threshold: usize) -> Self {
         self.threshold = threshold;
-        self
-    }
-
-    /// This store, each ingest marker it leaves, as a generation starts
-    /// or a position moves, recorded as left at `ms`, in milliseconds on
-    /// ingest's clock (ADM-09). The store reads no clock itself.
-    #[must_use]
-    pub fn with_marker_time(mut self, ms: u64) -> Self {
-        self.marker_time = ms;
         self
     }
 
@@ -1468,6 +1461,22 @@ impl Store {
         Ok(out)
     }
 
+    /// The event that first recorded the line `uuid` names in the
+    /// transcript directory `directory`, read from a transcript source
+    /// other than `path`; never a repeat reference (REC-04).
+    ///
+    /// # Errors
+    ///
+    /// Fails when SQLite does or the stored address does not parse.
+    pub fn line_owner(
+        &self,
+        directory: &str,
+        uuid: &str,
+        path: &str,
+    ) -> Result<Option<Address>, StoreError> {
+        source::owner(&self.conn, directory, uuid, path)
+    }
+
     /// The events of the transcript source generation `id`, in line
     /// order.
     ///
@@ -1476,22 +1485,6 @@ impl Store {
     /// Fails when SQLite does or a row does not parse.
     pub fn placed(&self, id: i64) -> Result<Vec<Placed>, StoreError> {
         source::placed(&self.conn, id)
-    }
-
-    /// The event that first recorded the line `uuid` names in the
-    /// transcript directory `directory`, read from a transcript source
-    /// other than `path`; never a repeat reference (REC-04).
-    ///
-    /// # Errors
-    ///
-    /// Fails when SQLite does or a row does not parse.
-    pub fn line_owner(
-        &self,
-        directory: &str,
-        uuid: &str,
-        path: &str,
-    ) -> Result<Option<Address>, StoreError> {
-        source::owner(&self.conn, directory, uuid, path)
     }
 
     /// Keeps `run`, an ingested run (REC-02): for its transcript source

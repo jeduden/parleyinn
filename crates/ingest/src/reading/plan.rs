@@ -49,6 +49,15 @@ pub(super) struct Plan {
     pub(super) released: usize,
     pub(super) references: usize,
     pub(super) conflicts: usize,
+    /// How many lines were refused: their `uuid` names a purged event
+    /// (REC-04).
+    pub(super) refused: usize,
+    /// The positions, lengths and harness UUIDs of those refused copies,
+    /// whose bytes the consumed-prefix hash takes as zeros (SEC-31).
+    pub(super) refused_places: Vec<Place>,
+    /// The line number and end offset of the last line refused, so the
+    /// ingest position moves past a refusal no recorded line follows.
+    pub(super) refused_to: Option<(u64, u64)>,
     /// Each (owner, repeating) pair of writers whose repeat owner no
     /// fork observation chose.
     pub(super) chosen: BTreeSet<(WriterId, WriterId)>,
@@ -84,6 +93,9 @@ pub(super) struct Planner<'a> {
     /// The `uuid`s the directory's other transcripts hold, read once a
     /// fork's line needs them.
     siblings: Option<BTreeSet<String>>,
+    /// Harness UUIDs whose event content a purge erased, in any
+    /// transcript source of this directory, loaded once for this plan.
+    purged: BTreeSet<String>,
     /// Whether a fork observation names each ingested run's harness
     /// session, by writer.
     forked: BTreeMap<WriterId, bool>,
@@ -111,6 +123,7 @@ impl<'a> Planner<'a> {
             .sources()?
             .iter()
             .any(|s| s.directory == named.directory && s.path != named.path);
+        let purged = store.purged_line_uuids(&named.directory)?;
         let forked = runs
             .sessions
             .iter()
@@ -122,6 +135,7 @@ impl<'a> Planner<'a> {
             inputs,
             held_since: source.held_since,
             siblings: None,
+            purged,
             forked,
             others,
             used: BTreeSet::new(),
@@ -157,6 +171,17 @@ impl<'a> Planner<'a> {
             if decision == Decision::Hold {
                 plan.hold = true;
                 break;
+            }
+            if decision == Decision::Refused {
+                plan.refused += 1;
+                plan.refused_places.push(Place {
+                    line: i as u64 + 1,
+                    offset: line.offset,
+                    length: line.end - line.offset,
+                    uuid: kept_uuid(&read.parsed[i], read.redactor),
+                });
+                plan.refused_to = Some((i as u64 + 1, line.end));
+                continue;
             }
             let user = matches!(classified, Classified::Line(Provenance::User, _));
             let prompt = self.prompt(store, &read.parsed[i], &key, user, &decision, &read)?;
@@ -224,16 +249,11 @@ impl<'a> Planner<'a> {
         let Some(uuid) = line["uuid"].as_str() else {
             return Ok(Decision::Own);
         };
+        if self.purged.contains(uuid) {
+            return Ok(Decision::Refused);
+        }
         if self.live {
-            // A witnessed line is never a repeat reference, nor held
-            // (REC-04): one another transcript recorded is its own event.
-            let named = self.named;
-            let repeats = self.others
-                && store
-                    .line_owner(&named.directory, uuid, &named.path)?
-                    .is_some();
-            self.witnessed_repeats += usize::from(repeats);
-            return Ok(Decision::Own);
+            return self.decide_witnessed(store, uuid);
         }
         let owner = self.owner(store, uuid)?;
         let fork = self.inputs.forks.contains(&key.harness_session);
@@ -247,6 +267,28 @@ impl<'a> Planner<'a> {
         };
 
         Ok(repeat::decide(&facts, redacted))
+    }
+
+    /// What becomes of a witnessed line: never a repeat reference, nor
+    /// held (REC-04). One whose `uuid` another transcript's event holds
+    /// is its own event, counted for the caller to audit, and refused
+    /// when that event was purged.
+    fn decide_witnessed(&mut self, store: &Store, uuid: &str) -> Result<Decision, IngestError> {
+        let named = self.named;
+        let held = if self.others {
+            store.line_owner(&named.directory, uuid, &named.path)?
+        } else {
+            None
+        };
+        if let Some(address) = held {
+            let purged = store.event(address)?.is_some_and(|e| e.content.is_none());
+            if purged {
+                return Ok(Decision::Refused);
+            }
+            self.witnessed_repeats += 1;
+        }
+
+        Ok(Decision::Own)
     }
 
     /// The event of another transcript of the directory that first
@@ -265,6 +307,7 @@ impl<'a> Planner<'a> {
         let event = store.event(address)?;
 
         Ok(fork.zip(event).map(|(fork, event)| Owner {
+            purged: event.content.is_none(),
             address,
             provenance: event.link.header.provenance.clone(),
             text: event
@@ -310,6 +353,14 @@ fn sibling_uuids(directory: &str, path: &str) -> BTreeSet<String> {
     }
 
     found
+}
+
+/// The line's `uuid`, kept beside its place only when redaction leaves
+/// it whole, so a place carries no secret (SEC-08).
+fn kept_uuid(parsed: &Value, redactor: &Redactor) -> Option<String> {
+    let uuid = parsed["uuid"].as_str()?;
+
+    (redactor.redact_text(uuid).text == uuid).then(|| uuid.to_owned())
 }
 
 /// One line a plan takes.
@@ -385,7 +436,8 @@ impl Plan {
         self.places.push(Place {
             line: at.number,
             offset: at.line.offset,
-            uuid: at.parsed["uuid"].as_str().map(str::to_owned),
+            length: at.line.end - at.line.offset,
+            uuid: kept_uuid(at.parsed, redactor),
         });
         self.ends.push((at.writer, end, at.line.end));
 

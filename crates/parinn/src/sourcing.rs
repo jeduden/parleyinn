@@ -10,8 +10,9 @@ use crate::Context;
 /// Audits what an ingest found of its transcript source, one entry
 /// each, naming the source by its redacted name: a new transcript
 /// generation (REC-07); each line repeating a `uuid` with other
-/// content, each repeat owner no fork observation chose, a hold begun
-/// and each line released from one (REC-04).
+/// content, each repeat owner no fork observation chose, a hold begun,
+/// each line released from one and each refused for naming a purged
+/// event (REC-04).
 pub(super) fn audit(ctx: &Context, ingested: &ingest::Ingested, stderr: &mut dyn Write) {
     let keyed = |kind, counter, detail| Occurrence::Keyed {
         kind,
@@ -59,6 +60,14 @@ pub(super) fn audit(ctx: &Context, ingested: &ingest::Ingested, stderr: &mut dyn
                 Kind::TimedOut,
                 Counter::RepeatReleased,
                 "repeated line released into its own run in",
+            ),
+        ),
+        (
+            ingested.refused,
+            keyed(
+                Kind::Rejected,
+                Counter::RepeatOfPurgedRefused,
+                "refused a repeated line whose `uuid` names a purged event, in",
             ),
         ),
     ];

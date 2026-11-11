@@ -108,6 +108,7 @@ Feature: Administration and lifecycle (ADM)
     And the commitment key and payload reference of every purged event are erased
     And a tombstone event per purged range carries only addresses, counts, reason and a digest over the purged events' commitments, and the structural fields, provenance and recorder of each purged act, tombstone and event the key set holds, never their text
     And "parinn rebuild" then derives room state, the key set and the quarantine set as before the purge, but for the purged content
+    And the consumed-prefix hash of each transcript source with a purged line is recomputed with the bytes of each purged transcript line zeroed, so it confirms no guess at the purged bytes, only each purged line's position, length and the harness's own `uuid` remain, only ParleyInn's own record of the source changes, never the harness's transcript file, and "parinn ingest" resumes that source
     And the store is vacuumed and "parinn verify" exits 0
     And once the purge reports the range erased, with encryption at rest on and off, no file in the home or the storage engine's temporary directory, read decrypted, contains a canary token only the purged events carried, their commitment keys or a search index entry naming a purged address
     And while another process holds a read transaction on the store, the purge does not report the range erased and audits and counts each residue; once that transaction closes, the purge reports the range erased and the residue check passes

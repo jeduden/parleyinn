@@ -126,6 +126,9 @@ pub struct Ingested {
     /// How many witnessed lines repeating another transcript's event
     /// were recorded as their own, never repeat references (REC-04).
     pub witnessed_repeats: usize,
+    /// How many lines were refused, their `uuid` naming a purged event
+    /// (REC-04).
+    pub refused: usize,
     /// The events the search index leaves out that no ingest has
     /// reported yet (REC-11, I6): the caller audits each, then notes it
     /// with `Store::mark_search_index_gaps_reported`.

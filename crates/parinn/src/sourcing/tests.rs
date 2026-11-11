@@ -30,6 +30,7 @@ fn each_finding_of_a_transcript_source_is_audited_once() {
     found.owners_chosen = 1;
     found.hold_started = true;
     found.released = 3;
+    found.refused = 2;
 
     p.with_context(&DEV, |ctx| super::audit(ctx, &found, &mut Vec::new()));
 
@@ -38,6 +39,7 @@ fn each_finding_of_a_transcript_source_is_audited_once() {
     assert_eq!(counted(&p, "repeat_owner_chosen"), 1);
     assert_eq!(counted(&p, "repeat_held"), 1);
     assert_eq!(counted(&p, "repeat_released"), 3);
+    assert_eq!(counted(&p, "repeat_of_purged_refused"), 2);
 }
 
 #[test]
@@ -69,6 +71,7 @@ fn each_entry_says_its_kind_and_names_the_source() {
     found.owners_chosen = 1;
     found.hold_started = true;
     found.released = 1;
+    found.refused = 1;
     let name = found.name.clone();
 
     p.with_context(&DEV, |ctx| super::audit(ctx, &found, &mut Vec::new()));
@@ -84,6 +87,7 @@ fn each_entry_says_its_kind_and_names_the_source() {
         ("repeat_owner_chosen", "coalesced"),
         ("repeat_held", "truncated"),
         ("repeat_released", "timed-out"),
+        ("repeat_of_purged_refused", "rejected"),
     ];
     for (counter, kind) in expected {
         assert!(

@@ -5,7 +5,8 @@
 //! shrinks or is rewritten, records a repeated line once, and `parinn
 //! verify` names a source gone before it was fully ingested.
 //!
-//! `@REC-01`, `@REC-03` and `@REC-07` are bound. `@REC-02` stays pending:
+//! `@REC-01`, `@REC-03` and `@REC-07` are bound; REC-07's steps for a
+//! purged line are in `record_purged`. `@REC-02` stays pending:
 //! the rooms a later run reaches through the `rooms` scope and its
 //! restore blocks are M2's and M7's. `@REC-04` stays pending: fork
 //! observations are phase 9's hook observations, live ingest phase 10's
@@ -51,7 +52,7 @@ fn line(name: &str, n: u64) -> Value {
 }
 
 /// Lines `from` to `to` of the transcript `name`, each ended.
-fn lines(name: &str, from: u64, to: u64) -> String {
+pub(crate) fn lines(name: &str, from: u64, to: u64) -> String {
     (from..=to)
         .map(|n| format!("{}\n", line(name, n)))
         .collect()
@@ -80,7 +81,7 @@ fn ingest_all(w: &mut World) -> Result<(), String> {
     ))
 }
 
-fn open(w: &World) -> Result<Store, String> {
+pub(crate) fn open(w: &World) -> Result<Store, String> {
     Store::open(&home(w)?.store()).map_err(|e| e.to_string())
 }
 
@@ -92,13 +93,13 @@ fn kept(path: &Path) -> Result<String, String> {
 }
 
 /// Every generation of the transcript source of `name`, oldest first.
-fn generations(w: &mut World, name: &str) -> Result<Vec<Source>, String> {
+pub(crate) fn generations(w: &mut World, name: &str) -> Result<Vec<Source>, String> {
     let path = kept(&transcript(w, name)?)?;
     open(w)?.generations(&path).map_err(|e| e.to_string())
 }
 
 /// Every event read from the transcript `name`, in every generation.
-fn placed(w: &mut World, name: &str) -> Result<Vec<Placed>, String> {
+pub(crate) fn placed(w: &mut World, name: &str) -> Result<Vec<Placed>, String> {
     let store = open(w)?;
     let mut out = Vec::new();
     for generation in generations(w, name)? {
@@ -262,13 +263,19 @@ fn changed(w: &mut World, name: String, how: String, keep: String) -> Result<(),
         let keep: u64 = keep.parse().map_err(|_| format!("{keep:?} lines"))?;
         lines(&name, 1, keep)
     } else {
-        format!(
-            "{}\n{}",
-            json!({"type": "x", "first": "other"}),
-            lines(&name, 2, count)
-        )
+        rewritten(&name, count)
     };
     fs::write(&path, changed).map_err(|e| e.to_string())
+}
+
+/// The transcript `name` of `count` lines, rewritten: another first
+/// line, then its own lines 2 to `count`.
+pub(crate) fn rewritten(name: &str, count: u64) -> String {
+    format!(
+        "{}\n{}",
+        json!({"type": "x", "first": "other"}),
+        lines(name, 2, count)
+    )
 }
 
 #[then(
@@ -292,6 +299,17 @@ fn new_generation(w: &mut World, name: String, generation: u64, n: usize) -> Res
         "{name:?} is at generation {newest:?}; generation 1 keeps {present} of {} events",
         kept.len()
     ))
+}
+
+#[then(regex = r#"^no audit entry records "([^"]+)"$"#)]
+fn no_audit_entry_records(w: &mut World, what: String) -> Result<(), String> {
+    let entries = audit::log::Log::new(home(w)?.audit())
+        .entries()
+        .map_err(|e| e.to_string())?;
+    match entries.iter().find(|e| e.detail == what || e.kind == what) {
+        Some(_) => Err(format!("an audit entry records {what:?}")),
+        None => Ok(()),
+    }
 }
 
 #[given(

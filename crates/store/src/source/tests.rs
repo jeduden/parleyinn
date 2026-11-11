@@ -27,6 +27,7 @@ fn place(line: u64, uuid: Option<&str>) -> Place {
     Place {
         line,
         offset: (line - 1) * 10,
+        length: 10,
         uuid: uuid.map(str::to_owned),
     }
 }
@@ -236,6 +237,218 @@ fn a_position_moves_only_forward() {
 }
 
 #[test]
+fn refused_copies_of_purged_lines_keep_only_their_zeroed_spans_and_uuids() {
+    let dir = TempDir::new().unwrap();
+    let mut store = open(&dir);
+    let source = store.start_generation("/t/a.jsonl", "/t").unwrap();
+    let refused = [place(1, Some("u1")), place(2, Some("u2"))];
+
+    store
+        .advance_refusing(source.id, &position(20, 2), &refused)
+        .unwrap();
+
+    let source = store.source("/t/a.jsonl").unwrap().unwrap();
+    assert_eq!(
+        source.purged,
+        [
+            Span {
+                offset: 0,
+                length: 10
+            },
+            Span {
+                offset: 10,
+                length: 10
+            }
+        ]
+    );
+    let uuids: Vec<String> = store
+        .conn
+        .prepare("SELECT uuid FROM transcript_purged_copies ORDER BY line")
+        .unwrap()
+        .query_map([], |row| row.get(0))
+        .unwrap()
+        .collect::<Result<_, _>>()
+        .unwrap();
+    assert_eq!(uuids, ["u1", "u2"]);
+}
+
+#[test]
+fn purged_line_uuids_are_loaded_together_without_event_associations() {
+    let dir = TempDir::new().unwrap();
+    let mut store = open(&dir);
+    let a = store.start_generation("/t/a.jsonl", "/t").unwrap();
+    let other = store.start_generation("/other/a.jsonl", "/other").unwrap();
+
+    store
+        .advance_refusing(
+            a.id,
+            &position(20, 2),
+            &[place(1, Some("u1")), place(2, Some("u2"))],
+        )
+        .unwrap();
+    store
+        .advance_refusing(other.id, &position(10, 1), &[place(1, Some("u3"))])
+        .unwrap();
+
+    assert_eq!(
+        store.purged_line_uuids("/t").unwrap(),
+        BTreeSet::from(["u1".to_owned(), "u2".to_owned()]),
+        "the source's own residue counts: a rewritten transcript is a new generation"
+    );
+    assert_eq!(
+        store.purged_line_uuids("/other").unwrap(),
+        BTreeSet::from(["u3".to_owned()])
+    );
+}
+
+#[test]
+fn a_store_from_before_purged_copies_still_reads_its_sources() {
+    let dir = TempDir::new().unwrap();
+    let mut store = open(&dir);
+    let source = store.start_generation("/t/a.jsonl", "/t").unwrap();
+    store
+        .conn
+        .execute_batch(
+            "DROP INDEX transcript_purged_copies_uuid;
+             DROP TABLE transcript_purged_copies;",
+        )
+        .unwrap();
+
+    assert_eq!(store.source("/t/a.jsonl").unwrap(), Some(source));
+    assert!(store.purged_line_uuids("/t").unwrap().is_empty());
+}
+
+#[test]
+fn no_refused_copy_moves_a_legacy_source_without_making_the_copies_table() {
+    let dir = TempDir::new().unwrap();
+    let mut store = open(&dir);
+    let source = store.start_generation("/t/a.jsonl", "/t").unwrap();
+    store
+        .conn
+        .execute_batch(
+            "DROP INDEX transcript_purged_copies_uuid;
+             DROP TABLE transcript_purged_copies;",
+        )
+        .unwrap();
+
+    store
+        .advance_refusing(source.id, &position(10, 1), &[])
+        .unwrap();
+
+    assert_eq!(
+        store.source("/t/a.jsonl").unwrap().unwrap().position,
+        position(10, 1)
+    );
+    let copies: bool = store
+        .conn
+        .query_row(
+            "SELECT count(*) FROM sqlite_master WHERE name = 'transcript_purged_copies'",
+            [],
+            |row| row.get(0),
+        )
+        .unwrap();
+    assert!(!copies);
+}
+
+#[test]
+fn a_refused_copy_behind_a_position_another_ingest_moved_is_refused_whole() {
+    let dir = TempDir::new().unwrap();
+    let mut store = open(&dir);
+    let source = store.start_generation("/t/a.jsonl", "/t").unwrap();
+    store.advance(source.id, &position(10, 1)).unwrap();
+
+    let err = store
+        .advance_refusing(source.id, &position(20, 2), &[place(1, Some("u1"))])
+        .unwrap_err();
+
+    assert!(
+        matches!(err, StoreError::PositionMoved { source: id } if id == source.id),
+        "{err}"
+    );
+    assert_eq!(
+        store.source("/t/a.jsonl").unwrap().unwrap().position,
+        position(10, 1)
+    );
+}
+
+#[test]
+fn malformed_purged_copy_tables_fail_without_moving_the_source() {
+    for table in [
+        "CREATE TABLE transcript_purged_copies (
+             source INTEGER PRIMARY KEY
+         ) STRICT, WITHOUT ROWID;",
+        "CREATE TABLE transcript_purged_copies (
+             source INTEGER NOT NULL,
+             line INTEGER NOT NULL,
+             uuid TEXT NOT NULL,
+             PRIMARY KEY (source, line)
+         ) STRICT, WITHOUT ROWID;",
+    ] {
+        let dir = TempDir::new().unwrap();
+        let mut store = open(&dir);
+        let source = store.start_generation("/t/a.jsonl", "/t").unwrap();
+        store
+            .conn
+            .execute_batch(
+                "DROP INDEX transcript_purged_copies_uuid;
+                 DROP TABLE transcript_purged_copies;",
+            )
+            .unwrap();
+        store.conn.execute_batch(table).unwrap();
+
+        assert!(
+            store
+                .advance_refusing(source.id, &position(10, 1), &[place(1, Some("u1"))])
+                .is_err()
+        );
+        assert_eq!(offset(&store.conn, source.id).unwrap(), 0);
+    }
+}
+
+#[test]
+fn a_refused_copy_that_cannot_be_inserted_fails_without_moving_the_source() {
+    let dir = TempDir::new().unwrap();
+    let mut store = open(&dir);
+    let source = store.start_generation("/t/a.jsonl", "/t").unwrap();
+    store
+        .conn
+        .execute_batch(
+            "CREATE TRIGGER refuse_copy BEFORE INSERT ON transcript_purged_copies
+             BEGIN SELECT RAISE(FAIL, 'refused'); END;",
+        )
+        .unwrap();
+
+    assert!(
+        store
+            .advance_refusing(source.id, &position(10, 1), &[place(1, Some("u1"))])
+            .is_err()
+    );
+    assert_eq!(offset(&store.conn, source.id).unwrap(), 0);
+}
+
+#[test]
+fn a_purged_copy_table_without_spans_makes_a_source_unreadable() {
+    let dir = TempDir::new().unwrap();
+    let mut store = open(&dir);
+    store.start_generation("/t/a.jsonl", "/t").unwrap();
+    store
+        .conn
+        .execute_batch(
+            "DROP INDEX transcript_purged_copies_uuid;
+             DROP TABLE transcript_purged_copies;
+             CREATE TABLE transcript_purged_copies (
+                 source INTEGER NOT NULL,
+                 line INTEGER NOT NULL,
+                 uuid TEXT NOT NULL,
+                 PRIMARY KEY (source, line)
+             ) STRICT, WITHOUT ROWID;",
+        )
+        .unwrap();
+
+    assert!(store.source("/t/a.jsonl").is_err());
+}
+
+#[test]
 fn advance_hold_and_lose_change_only_the_state() {
     let dir = TempDir::new().unwrap();
     let mut store = open(&dir);
@@ -419,4 +632,119 @@ fn a_run_is_named_by_its_harness_session_and_a_subagent_by_its_agent_id_too() {
 
     assert_eq!(run(None).run_name(), "s1");
     assert_eq!(run(Some("a7")).run_name(), "s1/a7");
+}
+
+#[test]
+fn a_store_from_before_purged_copies_holds_no_residue_of_purged_lines() {
+    let dir = TempDir::new().unwrap();
+    let mut store = open(&dir);
+    let source = store.start_generation("/t/a.jsonl", "/t").unwrap();
+    store
+        .conn
+        .execute_batch(
+            "DROP INDEX transcript_purged_copies_uuid;
+             DROP TABLE transcript_purged_copies;",
+        )
+        .unwrap();
+
+    assert!(store.purged_places(source.id).unwrap().is_empty());
+}
+
+#[test]
+fn a_line_an_older_store_marked_purged_reads_as_a_zeroed_span() {
+    let dir = TempDir::new().unwrap();
+    let mut store = open(&dir);
+    let source = store.start_generation("/t/a.jsonl", "/t").unwrap();
+    store
+        .conn
+        .execute(
+            "INSERT INTO transcript_places (event, source, line, byte_offset, byte_length, purged)
+             VALUES (1, ?1, 1, 4, 6, 1), (2, ?1, 2, 0, 3, 0)",
+            [source.id],
+        )
+        .unwrap();
+
+    let now = store.source("/t/a.jsonl").unwrap().unwrap();
+
+    assert_eq!(
+        now.purged,
+        [Span {
+            offset: 4,
+            length: 6
+        }]
+    );
+}
+
+#[test]
+fn two_sources_of_one_directory_that_share_a_purged_uuid_name_it_once() {
+    let dir = TempDir::new().unwrap();
+    let mut store = open(&dir);
+    let a = store.start_generation("/t/a.jsonl", "/t").unwrap();
+    let b = store.start_generation("/t/b.jsonl", "/t").unwrap();
+    store
+        .advance_refusing(a.id, &position(10, 1), &[place(1, Some("shared"))])
+        .unwrap();
+    store
+        .advance_refusing(b.id, &position(10, 1), &[place(1, Some("shared"))])
+        .unwrap();
+
+    assert_eq!(
+        store.purged_line_uuids("/t").unwrap(),
+        BTreeSet::from(["shared".to_owned()])
+    );
+}
+
+/// A store whose residue table lacks the columns the reads name.
+fn without_residue_columns(store: &Store) {
+    store
+        .conn
+        .execute_batch(
+            "DROP INDEX transcript_purged_copies_uuid;
+             DROP TABLE transcript_purged_copies;
+             CREATE TABLE transcript_purged_copies (
+                 source INTEGER PRIMARY KEY
+             ) STRICT, WITHOUT ROWID;",
+        )
+        .unwrap();
+}
+
+#[test]
+fn a_residue_table_without_places_makes_the_residue_unreadable() {
+    let dir = TempDir::new().unwrap();
+    let mut store = open(&dir);
+    let source = store.start_generation("/t/a.jsonl", "/t").unwrap();
+    without_residue_columns(&store);
+
+    assert!(store.purged_places(source.id).is_err());
+}
+
+#[test]
+fn a_residue_table_without_uuids_makes_the_directory_uuids_unreadable() {
+    let dir = TempDir::new().unwrap();
+    let mut store = open(&dir);
+    store.start_generation("/t/a.jsonl", "/t").unwrap();
+    without_residue_columns(&store);
+
+    assert!(store.purged_line_uuids("/t").is_err());
+}
+
+#[test]
+fn a_purged_line_whose_place_cannot_be_read_makes_the_source_unreadable() {
+    let dir = TempDir::new().unwrap();
+    let mut store = open(&dir);
+    store.start_generation("/t/a.jsonl", "/t").unwrap();
+    store
+        .conn
+        .execute_batch(
+            "DROP INDEX transcript_places_uuid;
+             DROP TABLE transcript_places;
+             CREATE TABLE transcript_places (
+                 event INTEGER PRIMARY KEY, source INTEGER, line INTEGER,
+                 byte_offset, byte_length, purged INTEGER, uuid TEXT
+             );
+             INSERT INTO transcript_places VALUES (1, 1, 1, 'x', 4, 1, NULL);",
+        )
+        .unwrap();
+
+    assert!(store.source("/t/a.jsonl").is_err());
 }
