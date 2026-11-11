@@ -7,7 +7,7 @@ summary: >-
   @REC-11 and @SEC-04 off @pending and passing. Event and payload text is
   indexed in the append transaction up to 1 MiB, and event_search finds
   it by literal terms, ranked by BM25 over the newest 2,000 matches,
-  damped per run. @RCL-02, raised here, was bound later and passes; NFR-03 is
+  damped per run. @RCL-02 was bound afterwards and passes; NFR-03 is
   benchmarked; the index is a derived file of its own, so the record
   holds 1.42x its text, within NFR-09's 1.5x; the index is 0.75x.
 ---
