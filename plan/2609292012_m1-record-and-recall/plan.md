@@ -283,7 +283,8 @@ footer: |
 - [x] Every M1 part is proven. Remainders: REC-02 → M2; ADM-07, ADM-09
   and SEC-31 → M3; SEC-12, NFR-04/05, SEC-05's transcript rows and
   PRV-14 → M5; REC-22/24 and LANE-02 → M7; PRV-09's peer rows → M8
-- [x] CI `eval` recalls 216/216 at one to three compactions (§11.1)
+- [x] CI `eval` recalls 216/216 within ten hits at one to three
+  compactions (§11.1)
 - [x] `parinn verify` proves completeness (16/17 ADM-09 rows), and
   quarantine works (RCL-06; seven SEC-12 rows); remainders are assigned
 - [x] S12's `s12_rebuild` makes one identical index from two writer logs

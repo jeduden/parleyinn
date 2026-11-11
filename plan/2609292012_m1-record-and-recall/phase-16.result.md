@@ -74,7 +74,8 @@ Rows that stay `@pending` after M1, with their remaining milestone
 - REC-22: all steps pass but the first Then, a freshness mark with
   source and ingest position on every surface (VIEW-04, M7).
 - REC-02: its last step needs restore blocks and a join (M2).
-- REC-24: its confirm step is M7's.
+- REC-24: its confirm step is M7's; its quarantine Given and others
+  are unbound.
 - LANE-02: M1's repository-identity and local-worktree-bind part holds;
   its branch-link, room-state and complete rebinding remainder is M7.
 - In part by §12.2: SEC-12 (flag row, M5), ENG-06, -15, -23, -29, SEC-17,
@@ -84,8 +85,8 @@ Passing and off `@pending`: ENG-09, SEC-18, REC-04, REC-08, REC-12, REC-26,
 RCL-02 (10 of 10), REC-17. REC-08's replaced-generation clause has its
 step. REC-26's typed rows need `unshare -p -f --mount-proc`.
 Resume past a marker: ingest seat, `ingested`.
-An unconfirmed purge never re-records a purged line that carries a `uuid`;
-known limit: a purged line with no `uuid` can still be re-recorded. PRV-14 stays
+A purged line that carries a `uuid` is never recorded again; OQ-57 has
+what that misses. PRV-14 stays
 `@pending` (user's ruling): its ambiguous-run race closes in M5's task 11.
 
 By the user's final ruling SEC-05 (its transcript rows) and windowed ingest are

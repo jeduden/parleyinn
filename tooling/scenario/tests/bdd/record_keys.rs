@@ -269,7 +269,7 @@ fn audited(w: &mut World) -> Result<(), String> {
 }
 
 #[then(
-    regex = r"^a structural node identity change event in the new device seat in the personal room carries only the fingerprints of the replaced and new device key or token key, followed by the new key's inception, which starts a new key event log$"
+    regex = r"^a structural node identity change event in the new device seat in the personal room carries only the fingerprints of the replaced and new device key or token key and the chain head of the key event log it leaves \(PRV-12\), followed by the new key's inception, which starts a new key event log$"
 )]
 fn change_event(w: &mut World) -> Result<(), String> {
     let old = keys(w).old_device.ok_or("no step recorded the old node")?;
