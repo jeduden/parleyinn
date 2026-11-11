@@ -83,7 +83,7 @@ For the stakeholder:
   say the server mints every key, pending the stakeholder's comment.
 - REC-22 was unbound here. Since: a path named on `parinn ingest
   --path` at a terminal is a widening act, `@SEC-18` passes, REC-22's
-  steps are bound; it stays `@pending` for VIEW-04.
+  steps but its last are bound; it stays `@pending` for VIEW-04.
 - A session binding is matched by the harness process's id; a reused
   process id could match a stale binding. Off Linux no binding is taken.
 - Unit line coverage (`cargo llvm-cov --lib`): mcp and hook 100%,
