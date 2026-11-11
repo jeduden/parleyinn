@@ -136,6 +136,7 @@ fn each_counter_of_the_mcp_server_has_its_name() {
         (Counter::RecallRefused, "recall_refused"),
         (Counter::PurgeRefused, "purge_refused"),
         (Counter::PurgeUnfinished, "purge_unfinished"),
+        (Counter::IngestSourceUnread, "ingest_source_unread"),
         (
             Counter::TranscriptPrefixUnconfirmed,
             "transcript_prefix_unconfirmed",

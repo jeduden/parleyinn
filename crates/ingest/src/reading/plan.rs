@@ -4,6 +4,7 @@
 
 use std::cell::Cell;
 use std::collections::{BTreeMap, BTreeSet};
+use std::path::{Path, PathBuf};
 
 use administration::home::Home;
 use administration::node::Node;
@@ -17,7 +18,7 @@ use serde_json::{Value, json};
 use store::{NewEvent, Place, Source, Store};
 use transcript::shape::Shapes;
 
-use super::{Named, Runs};
+use super::{Named, Runs, with_causes};
 use crate::prompt::{self, Outcome, PromptLine};
 use crate::read::{self, Line};
 use crate::repeat::{self, Decision, Facts, Owner, Rule};
@@ -72,6 +73,9 @@ pub(super) struct Plan {
     /// How many witnessed lines repeating another transcript's event
     /// were recorded as their own (REC-04).
     pub(super) witnessed_repeats: usize,
+    /// The transcripts of the directory that could not be read to learn
+    /// the `uuid`s they hold, by redacted name, with why (I6).
+    pub(super) unread: Vec<crate::UnreadSource>,
 }
 
 impl Plan {
@@ -92,7 +96,7 @@ pub(super) struct Planner<'a> {
     held_since: Option<u64>,
     /// The `uuid`s the directory's other transcripts hold, read once a
     /// fork's line needs them.
-    siblings: Option<BTreeSet<String>>,
+    siblings: Option<Siblings>,
     /// Harness UUIDs whose event content a purge erased, in any
     /// transcript source of this directory, loaded once for this plan.
     purged: BTreeSet<String>,
@@ -198,6 +202,7 @@ impl<'a> Planner<'a> {
             }
         }
         plan.witnessed_repeats = self.witnessed_repeats;
+        plan.unread = self.unread(read.redactor);
 
         Ok(plan)
     }
@@ -253,15 +258,15 @@ impl<'a> Planner<'a> {
             return Ok(Decision::Refused);
         }
         if self.live {
-            return self.decide_witnessed(store, uuid);
+            return self.decide_witnessed(store, uuid, key, redacted);
         }
         let owner = self.owner(store, uuid)?;
         let fork = self.inputs.forks.contains(&key.harness_session);
-        let in_sibling = fork && owner.is_none() && self.siblings().contains(uuid);
+        let in_other_transcript = fork && owner.is_none() && self.siblings().all.contains(uuid);
         let facts = Facts {
             owner,
-            fork,
-            in_sibling,
+            harness_fork: fork,
+            in_other_transcript,
             held_since: self.held_since,
             now: self.inputs.now_ms,
         };
@@ -269,11 +274,20 @@ impl<'a> Planner<'a> {
         Ok(repeat::decide(&facts, redacted))
     }
 
-    /// What becomes of a witnessed line: never a repeat reference, nor
-    /// held (REC-04). One whose `uuid` another transcript's event holds
-    /// is its own event, counted for the caller to audit, and refused
-    /// when that event was purged.
-    fn decide_witnessed(&mut self, store: &Store, uuid: &str) -> Result<Decision, IngestError> {
+    /// What becomes of a witnessed line: never a repeat reference
+    /// (REC-04). One whose `uuid` another transcript's event holds is its
+    /// own event, counted for the caller to audit, and refused when that
+    /// event was purged. Before any event holds it, a fork's line is held
+    /// for a transcript another MCP server holds a session binding for,
+    /// and never for one no server does: it is its own event at once,
+    /// counted when another transcript holds its `uuid`.
+    fn decide_witnessed(
+        &mut self,
+        store: &Store,
+        uuid: &str,
+        key: &RunKey,
+        redacted: &str,
+    ) -> Result<Decision, IngestError> {
         let named = self.named;
         let held = if self.others {
             store.line_owner(&named.directory, uuid, &named.path)?
@@ -286,9 +300,23 @@ impl<'a> Planner<'a> {
                 return Ok(Decision::Refused);
             }
             self.witnessed_repeats += 1;
+            return Ok(Decision::Own);
         }
+        let fork = self.inputs.forks.contains(&key.harness_session);
+        let repeated = fork && self.siblings().all.contains(uuid);
+        let facts = Facts {
+            owner: None,
+            harness_fork: fork,
+            in_other_transcript: repeated && self.siblings().served.contains(uuid),
+            held_since: self.held_since,
+            now: self.inputs.now_ms,
+        };
+        let decision = repeat::decide(&facts, redacted);
+        // A fork's line recorded at once, though another transcript
+        // holds its `uuid`, is counted for the caller to audit.
+        self.witnessed_repeats += usize::from(repeated && decision == Decision::Own);
 
-        Ok(Decision::Own)
+        Ok(decision)
     }
 
     /// The event of another transcript of the directory that first
@@ -316,38 +344,105 @@ impl<'a> Planner<'a> {
                 .and_then(|c| c["text"].as_str())
                 .unwrap_or_default()
                 .to_owned(),
-            fork,
+            harness_fork: fork,
         }))
     }
 
+    /// What the planner could not read of the directory's other
+    /// transcripts, named as the redactor shows them.
+    fn unread(&self, redactor: &Redactor) -> Vec<crate::UnreadSource> {
+        let Some(siblings) = &self.siblings else {
+            return Vec::new();
+        };
+        siblings
+            .unread
+            .iter()
+            .map(|(path, why)| crate::UnreadSource {
+                name: redactor
+                    .redact_text(&path.file_stem().unwrap_or_default().to_string_lossy())
+                    .text,
+                why: why.clone(),
+            })
+            .collect()
+    }
+
     /// The `uuid`s the directory's other transcripts hold.
-    fn siblings(&mut self) -> &BTreeSet<String> {
-        let named = self.named;
+    fn siblings(&mut self) -> &Siblings {
+        let (named, inputs) = (self.named, self.inputs);
         self.siblings
-            .get_or_insert_with(|| sibling_uuids(&named.directory, &named.path))
+            .get_or_insert_with(|| sibling_uuids(&named.directory, &named.path, &inputs.served))
     }
 }
 
-/// Every `uuid` the transcripts in `directory` but `path` hold; a
-/// transcript that cannot be read holds none.
-fn sibling_uuids(directory: &str, path: &str) -> BTreeSet<String> {
-    let mut found = BTreeSet::new();
-    let Ok(entries) = std::fs::read_dir(directory) else {
-        return found;
+/// The `uuid`s the transcripts of a directory but one hold.
+#[derive(Debug, Default)]
+struct Siblings {
+    /// Every one.
+    all: BTreeSet<String>,
+    /// Those of transcripts another MCP server holds a session binding
+    /// for.
+    served: BTreeSet<String>,
+    /// Each directory or transcript that could not be read, with why:
+    /// the lines read before a failure stay in the sets above.
+    unread: Vec<(PathBuf, String)>,
+}
+
+/// Every `uuid` the transcripts in `directory` but `path` hold, and
+/// those of the transcripts in `served`. What cannot be read holds none,
+/// and is kept in [`Siblings::unread`] for the caller to count (I6, I9).
+fn sibling_uuids(directory: &str, path: &str, served: &BTreeSet<PathBuf>) -> Siblings {
+    let listing = std::fs::read_dir(directory).map(|e| e.map(|entry| entry.map(|e| e.path())));
+
+    sibling_uuids_of(listing, directory, path, served)
+}
+
+/// [`sibling_uuids`] of the entries `listing` gives for `directory`.
+fn sibling_uuids_of(
+    listing: std::io::Result<impl Iterator<Item = std::io::Result<PathBuf>>>,
+    directory: &str,
+    path: &str,
+    served: &BTreeSet<PathBuf>,
+) -> Siblings {
+    let mut found = Siblings::default();
+    let entries = match listing {
+        Ok(entries) => entries,
+        Err(e) => {
+            found
+                .unread
+                .push((PathBuf::from(directory), with_causes(&e)));
+            return found;
+        }
     };
-    for entry in entries.flatten() {
-        let other = entry.path();
+    let served: BTreeSet<PathBuf> = served.iter().map(|p| canonical(p)).collect();
+    for entry in entries {
+        let other = match entry {
+            Ok(other) => other,
+            Err(e) => {
+                found
+                    .unread
+                    .push((PathBuf::from(directory), with_causes(&e)));
+                continue;
+            }
+        };
         if other.to_string_lossy() == path || other.extension().is_none_or(|e| e != "jsonl") {
             continue;
         }
-        let Ok(bytes) = read::transcript(&other) else {
-            continue;
+        let bytes = match read::transcript(&other) {
+            Ok(bytes) => bytes,
+            Err(e) => {
+                found.unread.push((other, with_causes(&e)));
+                continue;
+            }
         };
         let text = String::from_utf8_lossy(&bytes);
+        let bound = served.contains(&canonical(&other));
         for line in read::lines(&text) {
             let parsed: Value = serde_json::from_str(line.text).unwrap_or(Value::Null);
             if let Some(uuid) = parsed["uuid"].as_str() {
-                found.insert(uuid.to_owned());
+                found.all.insert(uuid.to_owned());
+                if bound {
+                    found.served.insert(uuid.to_owned());
+                }
             }
         }
     }
@@ -361,6 +456,11 @@ fn kept_uuid(parsed: &Value, redactor: &Redactor) -> Option<String> {
     let uuid = parsed["uuid"].as_str()?;
 
     (redactor.redact_text(uuid).text == uuid).then(|| uuid.to_owned())
+}
+
+/// `path` with its links resolved, or as it is when it cannot be.
+fn canonical(path: &Path) -> PathBuf {
+    path.canonicalize().unwrap_or_else(|_| path.to_path_buf())
 }
 
 /// One line a plan takes.

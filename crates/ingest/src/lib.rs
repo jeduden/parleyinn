@@ -67,6 +67,18 @@ pub struct RunReport {
     pub events: usize,
 }
 
+/// A transcript of the directory an ingest could not read while it
+/// learned which `uuid`s the directory's other transcripts hold, so a
+/// repeated line may have been recorded as its own (I6, I9).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct UnreadSource {
+    /// Its file name without the extension, redacted as a line is; the
+    /// directory's own name when the directory could not be listed.
+    pub name: String,
+    /// Why, with each cause behind it.
+    pub why: String,
+}
+
 /// What one ingest recorded.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Ingested {
@@ -126,6 +138,10 @@ pub struct Ingested {
     /// How many witnessed lines repeating another transcript's event
     /// were recorded as their own, never repeat references (REC-04).
     pub witnessed_repeats: usize,
+    /// The transcripts of the directory it could not read to learn their
+    /// `uuid`s (I6): the caller counts and audits each; the ingest went
+    /// on without them.
+    pub unread_sources: Vec<UnreadSource>,
     /// How many lines were refused, their `uuid` naming a purged event
     /// (REC-04).
     pub refused: usize,
@@ -252,6 +268,10 @@ pub struct Inputs {
     pub now_ms: u64,
     /// Whether the deployment mode is `interactive` (PRV-04).
     pub interactive: bool,
+    /// The transcripts another running MCP server of this node holds a
+    /// session binding for: a witnessed fork's line is held for one of
+    /// them, never for another (REC-04).
+    pub served: BTreeSet<PathBuf>,
 }
 
 /// Ingests the transcript at `path` as [`ingest_with`] does, with the

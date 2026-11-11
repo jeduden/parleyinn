@@ -77,6 +77,20 @@ fn a_source_starts_at_generation_1_and_each_new_generation_counts_on() {
 }
 
 #[test]
+fn the_superseded_generations_are_those_a_later_one_replaced() {
+    let dir = TempDir::new().unwrap();
+    let mut store = open(&dir);
+    assert_eq!(store.superseded().unwrap(), Vec::new());
+
+    let first = store.start_generation("/t/a.jsonl", "/t").unwrap();
+    let second = store.start_generation("/t/a.jsonl", "/t").unwrap();
+    store.start_generation("/t/a.jsonl", "/t").unwrap();
+    store.start_generation("/t/b.jsonl", "/t").unwrap();
+
+    assert_eq!(store.superseded().unwrap(), vec![first, second]);
+}
+
+#[test]
 fn each_ingest_marker_keeps_when_ingest_left_it_there() {
     let dir = TempDir::new().unwrap();
     let mut store = open(&dir).with_marker_time(1_000);
@@ -513,6 +527,22 @@ fn a_line_owner_is_the_first_event_of_another_source_in_the_directory() {
     assert_eq!(store.line_owner("/t", "u1", "/t/a.jsonl").unwrap(), None);
     assert_eq!(store.line_owner("/t", "u2", "/t/a.jsonl").unwrap(), None);
     assert_eq!(store.line_owner("/t", "u3", "/t/a.jsonl").unwrap(), None);
+}
+
+#[test]
+fn the_ingested_run_of_a_writer_is_read_by_the_writer() {
+    let dir = TempDir::new().unwrap();
+    let mut store = open(&dir);
+    let kept = IngestedRun {
+        writer: writer(1),
+        path: "/t/s.jsonl".into(),
+        harness_session: "s".into(),
+        agent_id: Some("a1".into()),
+    };
+    store.add_run(&kept).unwrap();
+
+    assert_eq!(store.ingested_run_of(writer(1)).unwrap(), Some(kept));
+    assert_eq!(store.ingested_run_of(writer(2)).unwrap(), None);
 }
 
 #[test]

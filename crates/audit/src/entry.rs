@@ -226,6 +226,10 @@ pub enum Counter {
     /// A purge could not read a transcript to recompute its source's
     /// consumed-prefix hash, which then confirms nothing (SEC-31, I6).
     TranscriptPrefixUnconfirmed,
+    /// A transcript beside the one an ingest read could not be read to
+    /// learn its `uuid`s, so a repeated line may have been recorded as its
+    /// own event; the ingest went on without it (REC-04, I6).
+    IngestSourceUnread,
     /// A retention policy aged a range out and the node purged it
     /// (REC-15, SEC-22).
     RetentionPurged,
@@ -302,6 +306,7 @@ impl Counter {
             Self::PurgeRefused => "purge_refused",
             Self::PurgeUnfinished => "purge_unfinished",
             Self::TranscriptPrefixUnconfirmed => "transcript_prefix_unconfirmed",
+            Self::IngestSourceUnread => "ingest_source_unread",
             Self::RetentionPurged => "retention_purged",
             Self::RetentionFailed => "retention_failed",
             Self::VerifyTimedOut => "verify_timed_out",

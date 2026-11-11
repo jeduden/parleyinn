@@ -67,6 +67,7 @@ mod record_keys;
 mod record_live;
 mod record_purged;
 mod record_search;
+mod record_servers;
 mod record_store;
 mod record_transcript;
 mod security;

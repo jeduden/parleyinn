@@ -5,13 +5,10 @@
 //! shrinks or is rewritten, records a repeated line once, and `parinn
 //! verify` names a source gone before it was fully ingested.
 //!
-//! `@REC-01`, `@REC-03` and `@REC-07` are bound; REC-07's steps for a
-//! purged line are in `record_purged`. `@REC-02` stays pending:
-//! the rooms a later run reaches through the `rooms` scope and its
-//! restore blocks are M2's and M7's. `@REC-04` stays pending: fork
-//! observations are phase 9's hook observations, live ingest phase 10's
-//! and purge phase 14's. `@REC-08` stays pending: `parinn event expand`
-//! is phase 13's.
+//! `@REC-01`, `@REC-03`, `@REC-04`, `@REC-07` and `@REC-08` are bound;
+//! REC-07's steps for a purged line are in `record_purged`. `@REC-02`
+//! stays pending: the rooms a later run reaches through the `rooms`
+//! scope and its restore blocks are M2's and M7's.
 //!
 //! A transcript a step writes holds lines of a type no supported version
 //! records, each with its own `uuid`: the record keeps each whole.
@@ -332,21 +329,75 @@ fn cut_short(w: &mut World, name: String, _lines: u64, landed: u64) -> Result<()
     fs::remove_file(&main).map_err(|e| e.to_string())
 }
 
+#[given(
+    regex = r#"^"([^"]+)" has (\d+) lines of which (\d+) were ingested before it was rewritten with a different first line and ingested again$"#
+)]
+fn rewritten_short(w: &mut World, name: String, _lines: u64, landed: u64) -> Result<(), String> {
+    let path = directory(w, "main-run")?.join(format!("{name}.jsonl"));
+    // The harness was still writing the next line when ingest read it.
+    let mut text = lines(&name, 1, landed);
+    text.push_str("{\"type\": \"x\", \"uuid\": \"cut");
+    fs::write(&path, text).map_err(|e| e.to_string())?;
+    name_transcript(w, &name, path.clone());
+    ingest_all(w)?;
+    let other = format!(
+        "{}\n{}",
+        json!({"type": "x", "first": "other"}),
+        lines(&name, 2, landed)
+    );
+    fs::write(&path, other).map_err(|e| e.to_string())?;
+    ingest_all(w)?;
+    ingest_all(w)
+}
+
 #[then(
     regex = r#"^the output names "([^"]+)", and only it, as a transcript source that disappeared before it was fully ingested$"#
 )]
 fn names_lost(w: &mut World, name: String) -> Result<(), String> {
+    names_only(w, &name, " disappeared before it was fully ingested")
+}
+
+#[then(
+    regex = r#"^the output names "([^"]+)", and only it, as a transcript generation replaced before it was fully ingested, which ingest audited and counted once$"#
+)]
+fn names_replaced(w: &mut World, name: String) -> Result<(), String> {
+    names_only(w, &name, " was replaced before it was fully ingested")?;
+    let said = format!("transcript generation replaced before it was fully ingested: {name}");
+    let entries = audit::log::Log::new(home(w)?.audit())
+        .entries()
+        .map_err(|e| e.to_string())?;
+    let counted = |e: &&audit::entry::Entry| e.counter.as_deref() == Some("transcript_source_lost");
+    let audited = entries.iter().filter(|e| e.detail == said).filter(counted);
+    match audited.count() {
+        1 => Ok(()),
+        n => Err(format!("ingest audited and counted {said:?} {n} times")),
+    }
+}
+
+/// Whether the last `parinn verify --json` fails `name`, and no other
+/// transcript source, for `why`.
+fn names_only(w: &mut World, name: &str, why: &str) -> Result<(), String> {
     let out = last_run(w)?;
     let report: Value = serde_json::from_slice(&out.stdout).map_err(|e| e.to_string())?;
-    let lost: Vec<&str> = report["lost_sources"]
-        .as_array()
-        .map(|a| a.iter().filter_map(Value::as_str).collect())
-        .unwrap_or_default();
-    let named = |p: &&str| Path::new(p).file_stem().is_some_and(|s| s == name.as_str());
-    if lost.len() == 1 && lost.iter().all(named) {
+    let broken = &report["broken"];
+    if broken["check"] != "transcript source completeness" {
+        return Err(format!("verify found no incomplete source: {report}"));
+    }
+    // "transcript sources fall short: <path> <why>; <path> <why>"
+    let message = broken["message"].as_str().unwrap_or_default();
+    let failing: Vec<&str> = message
+        .strip_prefix("transcript sources fall short: ")
+        .unwrap_or_default()
+        .split("; ")
+        .filter_map(|each| each.strip_suffix(why))
+        .collect();
+    let named = |p: &&str| Path::new(p).file_stem().is_some_and(|s| s == name);
+    if failing.len() == 1 && failing.iter().all(named) {
         return Ok(());
     }
-    Err(format!("parinn verify names {lost:?} as lost"))
+    Err(format!(
+        "parinn verify names {failing:?} as one that{why}: {message}"
+    ))
 }
 
 /// The transcript directory of the run `name`.
@@ -612,6 +663,9 @@ fn not_attributed(w: &mut World, name: String, parent: String) -> Result<(), Str
     regex = r#"^a transcript "([^"]+)" in the transcript directory of "([^"]+)" that repeats the uuid of a line of "([^"]+)" with other text$"#
 )]
 fn planted(w: &mut World, name: String, parent: String, _same: String) -> Result<(), String> {
+    if crate::record_homes::in_homes(w) {
+        return crate::record_homes::plant(w);
+    }
     fill(w, &parent, 6)?;
     let mut copy = line(&parent, 1);
     copy["n"] = json!("other text");
@@ -622,6 +676,9 @@ fn planted(w: &mut World, name: String, parent: String, _same: String) -> Result
     regex = r#"^that line of "([^"]+)" is recorded as its own event, the counter "repeat_conflicts" increases by 1 and an audit entry records the conflict$"#
 )]
 fn conflict(w: &mut World, name: String) -> Result<(), String> {
+    if crate::record_homes::in_homes(w) {
+        return crate::record_homes::planted_conflicts(w);
+    }
     let events = placed(w, &name)?;
     let own = events.len() == 1 && events[0].kind != EventKind::RepeatReference;
     let audit = home(w)?.audit();
@@ -638,6 +695,36 @@ fn conflict(w: &mut World, name: String) -> Result<(), String> {
     Err(format!(
         "{name:?} holds {events:?}; {conflicts} audit entries count a conflict"
     ))
+}
+
+#[then(regex = r#"^"parinn event expand" still returns all (\d+) events of "main-run"$"#)]
+fn expand_returns_all(w: &mut World, n: usize) -> Result<(), String> {
+    const CONTINUE: &str = "continue with --cursor ";
+    let mut items = 0;
+    let mut args = vec!["event".to_owned(), "expand".to_owned(), format!("A1:1-{n}")];
+    // The answer is capped per page; each page names the cursor to go on.
+    for _ in 0..n {
+        let refs: Vec<&str> = args.iter().map(String::as_str).collect();
+        crate::record::run_core_at_terminal(w, &refs)?;
+        let text = String::from_utf8_lossy(&last_run(w)?.stdout).into_owned();
+        items += text
+            .lines()
+            .filter(|l| l.starts_with("parinn:room/"))
+            .count();
+        let Some(cursor) = text.lines().find_map(|l| l.split(CONTINUE).nth(1)) else {
+            break;
+        };
+        args = vec![
+            "event".to_owned(),
+            "expand".to_owned(),
+            "--cursor".to_owned(),
+            cursor.trim().to_owned(),
+        ];
+    }
+    if items == n {
+        return Ok(());
+    }
+    Err(format!("event expand returned {items} of {n} events"))
 }
 
 // REC-22: events `parinn ingest` appends are `ingested` and untrusted,

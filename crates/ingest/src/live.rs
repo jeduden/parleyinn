@@ -8,10 +8,12 @@
 //!   next read.
 //! - A held hook observation of the transcript's harness session goes to
 //!   the main run's run seat at the offset where its hook fired (REC-19).
-//! - A witnessed line is never a repeat reference, and never held: one
-//!   whose `uuid` another transcript's event recorded is its own event,
-//!   counted for the caller to audit, and refused when that event was
-//!   purged (REC-04).
+//! - A witnessed line is never a repeat reference: one whose `uuid`
+//!   another transcript's event recorded is its own event, counted for
+//!   the caller to audit, and refused when that event was purged. A
+//!   fork's line no event holds yet is held for a transcript another
+//!   MCP server holds a session binding for, and goes at once, counted,
+//!   into its own run's run seat when none does (REC-04).
 //! - An append another ingest got ahead of is refused in its transaction
 //!   ([`store::StoreError::PositionMoved`]); the next read goes on from
 //!   where that one left off (REC-06).

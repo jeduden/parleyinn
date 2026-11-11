@@ -118,6 +118,7 @@ pub(crate) fn ingest(
         index_gaps,
         index_gaps_unread,
         witnessed_repeats: plan.witnessed_repeats,
+        unread_sources: plan.unread.clone(),
         refused: plan.refused,
         matched: observations.matched,
         prompt_conflicts: observations.conflicts,
@@ -429,8 +430,9 @@ impl<'r> Runs<'r> {
             self.of_source.insert(key.agent_id.clone(), writer);
             // The run's writers are those ingest recorded for it, so a
             // recall scoped to the run reaches this seat (RCL-05).
-            let kept = store.ingested_run(&self.path, key.agent_id.as_deref())?;
-            if kept.is_none_or(|run| run.writer != writer) {
+            // A `parinn ingest` may have started an ingest seat past
+            // this one since, so any row of this seat counts as kept.
+            if store.ingested_run_of(writer)?.is_none() {
                 store.add_run(&IngestedRun {
                     writer,
                     path: self.path.clone(),
@@ -442,9 +444,11 @@ impl<'r> Runs<'r> {
         }
         // After a node identity change, what remains of a run goes to a
         // new ingest seat the new device key certifies (REC-19, REC-24):
-        // the old writer gets nothing more.
+        // the old writer gets nothing more. A run seat a stopped MCP
+        // server left, whose key only that server held, is no ingest
+        // seat: `parinn ingest` starts its own beside it (REC-19, REC-22).
         if let Some(writer) = self.of_source.get(&key.agent_id).copied()
-            && (self.certified.contains(&writer) || certified_by(store, writer, node)?)
+            && (self.certified.contains(&writer) || ingest_seat_of(store, writer, node)?)
         {
             self.certified.insert(writer);
             return Ok(writer);
@@ -466,12 +470,14 @@ impl<'r> Runs<'r> {
     }
 }
 
-/// Whether the seat of `writer` was certified by `node`'s device key.
-fn certified_by(store: &Store, writer: WriterId, node: &Node) -> Result<bool, IngestError> {
+/// Whether the seat of `writer` is an ingest seat `node`'s device key
+/// certified.
+fn ingest_seat_of(store: &Store, writer: WriterId, node: &Node) -> Result<bool, IngestError> {
     let device = node.device().public();
 
     Ok(store.seat(writer)?.is_some_and(|seat| {
-        SeatCertificate::from_value(&seat.certificate).is_ok_and(|c| c.certifying_key == device)
+        SeatCertificate::from_value(&seat.certificate)
+            .is_ok_and(|c| c.certifying_key == device && c.ingest_seat)
     }))
 }
 

@@ -37,6 +37,20 @@ impl Store {
         self.marker_time = ms;
         self
     }
+
+    /// Every generation of a transcript source a later one replaced
+    /// (REC-07), by path, oldest first.
+    ///
+    /// # Errors
+    ///
+    /// Fails when SQLite does or a row does not parse.
+    pub fn superseded(&self) -> Result<Vec<Source>, StoreError> {
+        select(
+            &self.conn,
+            &format!("{SUPERSEDED} AND ?1 = ?1 ORDER BY path, generation"),
+            "",
+        )
+    }
 }
 
 /// The tables of transcript sources, their places and ingested runs,
@@ -410,6 +424,10 @@ pub(crate) fn select(
 pub(crate) const NEWEST: &str = "WHERE generation = (SELECT max(generation)
      FROM transcript_sources t WHERE t.path = transcript_sources.path)";
 
+/// Each generation of a source that a later one replaced.
+pub(crate) const SUPERSEDED: &str = "WHERE generation < (SELECT max(generation)
+     FROM transcript_sources t WHERE t.path = transcript_sources.path)";
+
 /// Starts the next generation of the source at `path`, in `directory`,
 /// nothing read of it, its ingest marker left at `at`.
 pub(crate) fn start(
@@ -576,6 +594,22 @@ pub(crate) fn refuse_copies(
 }
 
 impl Store {
+    /// The ingested run `writer` keeps, none when it keeps none: a
+    /// read by the table's primary key.
+    ///
+    /// # Errors
+    ///
+    /// Fails when SQLite does or a row does not parse.
+    pub fn ingested_run_of(&self, writer: WriterId) -> Result<Option<IngestedRun>, StoreError> {
+        runs(
+            &self.conn,
+            "WHERE writer = ?1 AND ?2 = ?2",
+            &writer.to_string(),
+            "",
+        )
+        .map(|mut r| r.pop())
+    }
+
     /// The position, length and harness UUID left for each purged line
     /// of source `id`, with no event association (SEC-31).
     pub fn purged_places(&self, id: i64) -> Result<Vec<Place>, StoreError> {

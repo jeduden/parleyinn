@@ -1,4 +1,6 @@
 use super::*;
+use crate::tests::{DEV, Process, audit_text, transcript_in};
+use crate::{EXIT_INTEGRITY, EXIT_OK};
 use record::digest::Digest;
 use store::Position;
 use testkit::TempDir;
@@ -57,6 +59,38 @@ fn a_source_is_lost_when_gone_with_bytes_unread_or_lines_held() {
     ];
 
     assert_eq!(lost(&all), [&cut_short, &held, &found]);
+}
+
+#[test]
+fn a_replaced_generation_was_cut_off_with_bytes_unread_or_lines_held() {
+    let path = Path::new("/t/a.jsonl");
+    let whole = source(path, 5, 5);
+    let cut_short = source(path, 5, 9);
+    let held = Source {
+        held_since: Some(1),
+        ..source(path, 5, 5)
+    };
+    let found = Source {
+        lost: true,
+        ..source(path, 5, 5)
+    };
+    let superseded = [whole, cut_short.clone(), held.clone(), found.clone()];
+
+    assert_eq!(cut_off(&superseded), [&cut_short, &held, &found]);
+}
+
+#[test]
+fn verify_fails_each_generation_replaced_before_it_was_fully_ingested() {
+    let cut_short = source(Path::new("/t/a.jsonl"), 5, 9);
+    let whole = source(Path::new("/t/b.jsonl"), 5, 5);
+
+    let found = Completeness::default().with_replaced(&[cut_short, whole]);
+
+    assert_eq!(found.failed, [("/t/a.jsonl".to_owned(), CUT_OFF)]);
+    assert_eq!(
+        found.failure().unwrap(),
+        "transcript sources fall short: /t/a.jsonl was replaced before it was fully ingested"
+    );
 }
 
 #[test]
@@ -438,6 +472,163 @@ fn a_link_swapped_in_at_a_recorded_path_is_not_followed() {
     std::os::unix::fs::symlink(&outside, &path).unwrap();
 
     assert_eq!(look(&path, 5, &[]), Found::Unreadable);
+}
+
+/// [`BODY`] then a line of `len` bytes, with or without its line break.
+fn body_then_line(len: usize, ended: bool) -> Vec<u8> {
+    let mut bytes = BODY.to_vec();
+    bytes.extend(vec![b'x'; len]);
+    if ended {
+        bytes.push(b'\n');
+    }
+    bytes
+}
+
+#[test]
+fn a_scan_finds_whether_a_whole_line_lies_past_the_position() {
+    for ended in [true, false] {
+        let at = scan(body_then_line(10, ended).as_slice(), 20, &[]).unwrap();
+        assert_eq!(at.unread_line, ended);
+    }
+    assert_eq!(scan(&BODY[..4], 20, &[]).unwrap().prefix, None);
+}
+
+#[test]
+fn a_source_whose_limit_line_was_replaced_by_a_short_one_is_short_again() {
+    let dir = TempDir::new().unwrap();
+    let path = on_disk(&dir, "run-a.jsonl", &[BODY, b"eeee\n"].concat());
+
+    let found = completeness(&[source(&path, 20, 26)], &[], &look, NOW);
+
+    assert_eq!(found.short, [path.to_string_lossy().into_owned()]);
+}
+
+/// A home whose only source was cut short and is now gone.
+fn with_a_lost_source() -> crate::tests::Process {
+    let p = crate::tests::Process::new();
+    let cut = crate::tests::transcript_in(&p, "-w-a", "cut-short.jsonl", b"{\"a\":1}\n{\"b\":");
+    assert_eq!(p.invoke(&["ingest", "--all"], &crate::tests::DEV).0, 0);
+    std::fs::remove_file(cut).unwrap();
+    p
+}
+
+fn lost_flags(p: &crate::tests::Process) -> Vec<bool> {
+    let store = Store::open(&p.parinn_home().join("store.db")).unwrap();
+    store.sources().unwrap().iter().map(|s| s.lost).collect()
+}
+
+#[test]
+fn a_lost_source_is_marked_only_once_its_audit_entry_is_written() {
+    let p = with_a_lost_source();
+    let home = Home::locate(Some(p.parinn_home().as_os_str()), None).unwrap();
+    let audit_dir = p.parinn_home().join("audit");
+    let moved = p.parinn_home().join("audit.moved");
+    std::fs::rename(&audit_dir, &moved).unwrap();
+    std::fs::write(&audit_dir, "").unwrap();
+    crate::tests::set_mode(&audit_dir, 0o600);
+    let mut stderr = Vec::new();
+    let redactor = Err("no rules".to_owned());
+
+    p.with_context(&crate::tests::DEV, |ctx| {
+        audit_lost(ctx, &home, &redactor, &mut stderr);
+    });
+
+    assert_eq!(lost_flags(&p), [false], "found again next time");
+    std::fs::remove_file(&audit_dir).unwrap();
+    std::fs::rename(&moved, &audit_dir).unwrap();
+    p.with_context(&crate::tests::DEV, |ctx| {
+        audit_lost(ctx, &home, &redactor, &mut stderr);
+    });
+    assert_eq!(lost_flags(&p), [true]);
+    let audit = crate::tests::audit_text(&p);
+    assert_eq!(
+        audit.matches("transcript_source_lost").count(),
+        1,
+        "{audit}"
+    );
+    assert!(!audit.contains("cut-short"), "{audit}");
+}
+
+#[test]
+fn a_lost_source_is_named_through_the_redactor() {
+    let p = with_a_lost_source();
+    let home = Home::locate(Some(p.parinn_home().as_os_str()), None).unwrap();
+    let redactor = Redactor::new(&["cut-[a-z]+".to_owned()])
+        .map(|r| r.0)
+        .map_err(|e| e.to_string());
+
+    p.with_context(&crate::tests::DEV, |ctx| {
+        audit_lost(ctx, &home, &redactor, &mut Vec::new());
+    });
+
+    let audit = crate::tests::audit_text(&p);
+    assert_eq!(
+        audit.matches("transcript_source_lost").count(),
+        1,
+        "{audit}"
+    );
+    assert!(!audit.contains("cut-short"), "{audit}");
+}
+
+#[test]
+fn a_source_that_cannot_be_marked_lost_says_so_on_stderr() {
+    let p = with_a_lost_source();
+    let home = Home::locate(Some(p.parinn_home().as_os_str()), None).unwrap();
+    rusqlite::Connection::open(p.parinn_home().join("store.db"))
+        .unwrap()
+        .execute_batch(
+            "CREATE TRIGGER no_loss BEFORE UPDATE ON transcript_sources
+             BEGIN SELECT RAISE(ABORT, 'refused'); END",
+        )
+        .unwrap();
+    let mut stderr = Vec::new();
+
+    p.with_context(&crate::tests::DEV, |ctx| {
+        audit_lost(ctx, &home, &Err(String::new()), &mut stderr);
+    });
+
+    let text = String::from_utf8(stderr).unwrap();
+    assert!(
+        text.starts_with("parinn ingest: mark a transcript source lost: "),
+        "{text}"
+    );
+}
+
+#[test]
+fn a_transcript_generation_replaced_before_it_was_fully_ingested_is_reported_and_audited_once() {
+    let p = Process::new();
+    let cut = transcript_in(&p, "-w-a", "cut-short.jsonl", b"{\"a\":1}\n{\"b\":");
+    let whole = transcript_in(&p, "-w-a", "main-run.jsonl", b"{\"a\":1}\n");
+    assert_eq!(p.invoke(&["ingest", "--all"], &DEV).0, EXIT_OK);
+    std::fs::write(&cut, b"{\"z\":9}\n").unwrap();
+    std::fs::write(&whole, b"{\"z\":9}\n").unwrap();
+
+    assert_eq!(p.invoke(&["ingest", "--all"], &DEV).0, EXIT_OK);
+    assert_eq!(p.invoke(&["ingest", "--all"], &DEV).0, EXIT_OK);
+
+    let audit = audit_text(&p);
+    assert_eq!(
+        audit
+            .matches("transcript generation replaced before it was fully ingested: cut-short")
+            .count(),
+        1,
+        "{audit}"
+    );
+    assert!(!audit.contains("fully ingested: main-run"), "{audit}");
+    let (_, out, _) = p.invoke(&["status", "--json"], &DEV);
+    let v: serde_json::Value = serde_json::from_str(&out).unwrap();
+    assert_eq!(v["counters"]["transcript_source_lost"]["total"], 1);
+    let (code, out, _) = p.invoke(&["verify", "--json"], &DEV);
+    assert_eq!(code, EXIT_INTEGRITY);
+    let v: serde_json::Value = serde_json::from_str(&out).unwrap();
+    assert_eq!(v["broken"]["check"], "transcript source completeness");
+    assert_eq!(
+        v["broken"]["message"],
+        format!(
+            "transcript sources fall short: {} was replaced before it was fully ingested",
+            cut.display()
+        )
+    );
 }
 
 #[test]
