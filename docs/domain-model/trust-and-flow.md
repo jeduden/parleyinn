@@ -21,8 +21,8 @@ summary: >-
   classifies as `trusted` (PRV-02), narrowed in a foreign room (RCL-10) and by a
   missing attended mark (PRV-04);
   everything else is untrusted.
-- **Provenance class family**: A class's text before its first colon, or the
-  whole class when it has none. RCL-02's versioned `kind` field of
+- **Provenance class family**: A provenance's text before its first colon, or
+  the whole provenance when it has none. RCL-02's versioned `kind` field of
   `event_search` selects it, never an event kind; an envelope item's `kind` is
   its event kind, which is recorded apart from its provenance (Event).
 - **Deployment mode**: `interactive` (a person types at the harness) or

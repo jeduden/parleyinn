@@ -163,15 +163,54 @@ fn ranked(items: &[Value]) -> Result<(), String> {
     Ok(())
 }
 
-/// What the search asked of the filters left out: the hits of the same
-/// query with only the trust filter gone, kept apart from the answer.
-fn without_trust(w: &mut World, arguments: &Value) -> Result<Vec<Value>, String> {
+/// The hits of the same query with the filter `name` left out, up to
+/// the most a search returns, kept apart from the answer.
+fn without(w: &mut World, arguments: &Value, name: &str) -> Result<Vec<Value>, String> {
     let kept = last_reply(w)?;
     let mut open = arguments.clone();
-    open.as_object_mut().map(|o| o.remove("trust"));
+    if let Some(fields) = open.as_object_mut() {
+        fields.remove(name);
+        fields.insert("k".to_owned(), json!(50));
+    }
     let answer = call_tool(w, "event_search", open)?;
     set_reply(w, kept);
     items_of(&answer)
+}
+
+/// Fails unless the row's answer shows its filters at work. A search
+/// for trusted hits returns none, nothing a search finds being trusted
+/// yet, while the same search without the filter finds untrusted hits
+/// only. Every other row returns a hit, and a provenance class or
+/// family filter refuses a hit the same search finds without it, so an
+/// empty answer or a filter that keeps everything proves no row.
+fn filters_at_work(
+    w: &mut World,
+    store: &Store,
+    items: &[Value],
+    arguments: &Value,
+) -> Result<(), String> {
+    if arguments["trust"] == "trusted" {
+        let open = without(w, arguments, "trust")?;
+        if open.is_empty() || open.iter().any(|i| i["trust"] != "untrusted") {
+            return Err("the search without the trust filter finds no untrusted hit only".into());
+        }
+        return Ok(());
+    }
+    if items.is_empty() {
+        return Err("the search returned no hit, so the row proves no filter".into());
+    }
+    for name in ["provenance", "kind"] {
+        if arguments.get(name).is_none() {
+            continue;
+        }
+        let open = without(w, arguments, name)?;
+        if open.iter().all(|i| matches(store, i, arguments).is_ok()) {
+            return Err(format!(
+                "the search without the {name} filter finds no hit the filter refuses"
+            ));
+        }
+    }
+    Ok(())
 }
 
 #[then(
@@ -188,15 +227,7 @@ fn at_most_k_matching(w: &mut World, most: usize) -> Result<(), String> {
         matches(&store, item, &arguments)?;
     }
     ranked(&items)?;
-    if arguments["trust"] == "trusted" {
-        // Nothing is trusted that a search finds, so none is returned:
-        // the same search without the filter finds only untrusted hits.
-        let open = without_trust(w, &arguments)?;
-        if open.is_empty() || open.iter().any(|i| i["trust"] != "untrusted") {
-            return Err("the search without the trust filter finds no untrusted hit only".into());
-        }
-    }
-    Ok(())
+    filters_at_work(w, &store, &items, &arguments)
 }
 
 #[then(

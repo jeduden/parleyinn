@@ -74,7 +74,7 @@ fn base(query: &Compiled) -> Search<'_> {
         rooms: rooms(),
         writers: &[],
         provenance: &[],
-        kinds: &[],
+        provenance_families: &[],
         since: None,
         until: None,
         k: 10,
@@ -368,12 +368,12 @@ fn provenance_and_kind_filters_keep_the_events_they_name() {
     let dir = TempDir::new().unwrap();
     let store = mixed(&dir);
     let query = compiled("deploy");
-    let with = |provenance: &[String], kinds: &[String]| {
+    let with = |provenance: &[String], provenance_families: &[String]| {
         seqs(
             &store
                 .search(&Search {
                     provenance,
-                    kinds,
+                    provenance_families,
                     ..base(&query)
                 })
                 .unwrap(),
@@ -407,21 +407,15 @@ fn the_kind_filter_matches_the_provenance_class_family() {
                 class(1, "Bash"),
                 class(2, "WebFetch"),
                 line(3, "deploy web", Provenance::Web, None),
-                line(
-                    4,
-                    "deploy lookalike",
-                    Provenance::parse("tool_resultx").unwrap_or(Provenance::File),
-                    None,
-                ),
             ],
         )
         .unwrap();
     let query = compiled("deploy");
-    let with = |kinds: &[String]| {
+    let with = |provenance_families: &[String]| {
         let mut found = seqs(
             &store
                 .search(&Search {
-                    kinds,
+                    provenance_families,
                     ..base(&query)
                 })
                 .unwrap(),
@@ -437,7 +431,11 @@ fn the_kind_filter_matches_the_provenance_class_family() {
         with(&["web".to_owned(), "tool_result".to_owned()]),
         [1, 2, 3]
     );
+    // A family is the whole text before the colon, and a class the
+    // whole text: neither matches as a prefix.
     assert!(with(&["tool".to_owned()]).is_empty());
+    assert!(with(&["tool_result:B".to_owned()]).is_empty());
+    assert!(with(&["we".to_owned()]).is_empty());
 }
 
 #[test]
