@@ -376,7 +376,7 @@ Feature: Record (REC)
     And that quarantine stays in force on the node until a release there
     And that configuration acceptance takes no effect on the node: the deployment mode stays "automation" until the person accepts the configuration there
     And an audit entry records the node identity change
-    And a structural node identity change event in the new device seat in the personal room carries only the fingerprints of the replaced and new device key or token key, followed by the new key's inception, which starts a new key event log
+    And a structural node identity change event in the new device seat in the personal room carries only the fingerprints of the replaced and new device key or token key and the chain head of the key event log it leaves (PRV-12), followed by the new key's inception, which starts a new key event log
     And the new seat's writer reads origin "peer" until a confirm signed by a managed-policy confirmation key names that inception, then "witnessed"
     And no event is appended under the old device key or the old seat key
     And an unavailable node identity value read again within the hook budgets and found unchanged counts as no change

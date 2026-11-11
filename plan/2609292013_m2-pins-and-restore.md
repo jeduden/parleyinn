@@ -19,14 +19,17 @@ byte-deterministic restore block that untrusted content can never reach.
 ## Context
 
 Milestone M2. Scope: PIN P0, INJ P0, ADM-01 to ADM-03, ADM-10, ADM-17 and
-SEC-11.
+SEC-11, and the last step of REC-02, which M1 leaves `@pending`: a later
+run of an agent reaches the agent's rooms through the `rooms` recall scope
+and its restore blocks, holding no seat, add or role there until it joins
+under LANE-23.
 
 ## Tasks
 
 1. Pins as operator events, immutable, budgeted: PIN-01 to PIN-04,
    PIN-06, PIN-08
 2. The TrustedText type and the restore builder: INJ-01 to INJ-09,
-   SEC-07
+   SEC-07; REC-02's last step, bound with the own-principal join
 3. Project config may only tighten: SEC-11
 4. Plugin distribution, install and uninstall, read-only doctor, and
    installed commands free of secrets and home paths: ADM-01 to ADM-03,
