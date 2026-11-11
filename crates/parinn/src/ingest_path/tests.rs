@@ -234,4 +234,32 @@ fn an_act_that_cannot_be_taken_leaves_the_path_unread() {
     assert_eq!((code, out.as_str()), (EXIT_FAILURE, ""));
     assert!(err.starts_with("parinn ingest: "), "{err}");
     assert_eq!(err.matches("parinn ingest: ").count(), 1, "{err}");
+    // Nothing was ingested: what stands where the store goes is empty.
+    assert_eq!(fs::read_dir(&store).unwrap().count(), 0);
+}
+
+#[test]
+fn a_path_outside_the_roots_the_audit_log_cannot_take_is_still_refused_and_said() {
+    let p = off_terminal();
+    let path = elsewhere(&p, "elsewhere.jsonl");
+    // The first refusal makes the home; then a file stands where its
+    // audit log goes.
+    named(&p, &path);
+    let audit_dir = p.parinn_home().join("audit");
+    let _ = fs::remove_dir_all(&audit_dir);
+    fs::write(&audit_dir, "").unwrap();
+    set_mode(&audit_dir, 0o600);
+
+    let (code, out, err) = named(&p, &path);
+
+    assert_eq!((code, out.as_str()), (EXIT_FAILURE, ""));
+    assert!(
+        err.starts_with("parinn ingest: audit a path outside allowed roots: "),
+        "{err}"
+    );
+    assert!(
+        err.ends_with("parinn ingest: path outside allowed roots\n"),
+        "{err}"
+    );
+    assert!(!p.parinn_home().join("store.db").exists());
 }

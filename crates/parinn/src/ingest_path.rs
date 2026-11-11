@@ -114,6 +114,8 @@ fn transcript(
 fn widen(ctx: &Context, path: &Path, stderr: &mut dyn Write) -> Option<Result<PathBuf, Declined>> {
     let resolved = fs::canonicalize(path).ok()?;
     let home = ctx.home().ok()?;
+    // A home that is not there yet holds no path, so a root that does
+    // not resolve reads as "not in the home": the named path resolved.
     if fs::canonicalize(home.root()).is_ok_and(|root| resolved.starts_with(root)) {
         return None;
     }

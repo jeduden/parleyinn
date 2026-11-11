@@ -444,3 +444,62 @@ fn a_witnessed_line_whose_uuid_names_a_purged_event_is_refused() {
     assert_eq!((ingested.refused, ingested.events), (1, 1));
     assert_eq!(ingested.witnessed_repeats, 0);
 }
+
+#[test]
+fn a_purged_line_of_a_served_transcript_does_not_read_as_a_rewrite() {
+    let dir = TempDir::new().unwrap();
+    let home = home(&dir);
+    let path = main_transcript(&dir, &(1..=3).map(line).collect::<String>());
+    let mut seats = RunSeats::default();
+    let first = ingest(&home, &path, &mut seats, None).unwrap();
+    let mut store = Store::open(&home.store())
+        .unwrap()
+        .with_transcripts(crate::read::transcript);
+    let device = administration::node::Node::find(&home, &store)
+        .unwrap()
+        .device_writer();
+    let second = record::id::Seq::new(2).unwrap();
+    let erase = store::Erase {
+        writer: first.writer,
+        first: second,
+        last: second,
+    };
+    assert_eq!(store.purge(device, &[], &[erase]).unwrap().events, 1);
+    drop(store);
+
+    // The transcript still holds the purged line's bytes: its consumed
+    // prefix matches the stored hash only with those bytes zeroed.
+    assert_eq!(ingest(&home, &path, &mut seats, None), None);
+
+    let mut longer = std::fs::read_to_string(&path).unwrap();
+    longer.push_str(&line(4));
+    std::fs::write(&path, longer).unwrap();
+    let appended = ingest(&home, &path, &mut seats, None).unwrap();
+
+    assert!(!appended.new_generation);
+    assert_eq!((appended.generation, appended.events), (1, 1));
+}
+
+#[test]
+fn an_ingest_reports_the_sibling_transcript_it_could_not_read() {
+    let dir = TempDir::new().unwrap();
+    let home = home(&dir);
+    // A directory named as a transcript: listed, and not a file to read.
+    std::fs::create_dir(dir.path().join("sub.jsonl")).unwrap();
+    let path = main_transcript(&dir, &line(1));
+    let mut seats = RunSeats::default();
+
+    // A fork's line makes ingest read the directory's other transcripts.
+    let ingested = live(&home, &path, &held_for(&[], 0), &mut seats).unwrap();
+
+    assert_eq!(ingested.events, 1, "the transcript itself is read (I9)");
+    assert_eq!(ingested.unread_sources.len(), 1);
+    assert_eq!(ingested.unread_sources[0].name, "sub");
+    assert!(
+        ingested.unread_sources[0]
+            .why
+            .contains("not a regular file"),
+        "{}",
+        ingested.unread_sources[0].why
+    );
+}

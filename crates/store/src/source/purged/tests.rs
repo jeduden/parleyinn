@@ -162,6 +162,32 @@ fn a_prefix_digest_wants_the_bytes_it_covers() {
 }
 
 #[test]
+fn a_span_longer_than_one_run_of_zeros_is_zeroed_whole() {
+    // The zeros are fed 4096 at a time; a purged line of 10,000 bytes
+    // takes three runs, the last a short one.
+    let body: Vec<u8> = (0..12_000u32)
+        .map(|n| u8::try_from(n % 251).unwrap() + 1)
+        .collect();
+    let span = [Span {
+        offset: 1000,
+        length: 10_000,
+    }];
+    let mut expected = body.clone();
+    expected[1000..11_000].fill(0);
+
+    assert_eq!(
+        crate::source::prefix_digest(&body, 12_000, &span),
+        Some(digest(&expected))
+    );
+    for cut in [0, 999, 1000, 5096, 5097, 10_999, 11_000, 12_000] {
+        let mut hash = Zeroed::new(&span);
+        hash.update(&body[..cut]);
+        hash.update(&body[cut..]);
+        assert_eq!(hash.digest(), digest(&expected), "cut at {cut}");
+    }
+}
+
+#[test]
 fn a_purge_zeroes_its_lines_and_keeps_only_their_place_length_and_harness_uuid() {
     let dir = TempDir::new().unwrap();
     let (mut store, source, path) = ingested(&dir, writer(1), "a.jsonl");
