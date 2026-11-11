@@ -2659,7 +2659,7 @@ fn dropped_log_lines_are_audited_one_entry_each() {
 
 #[test]
 fn ingest_refuses_a_path_outside_the_allowed_roots_and_reads_nothing() {
-    let p = Process::new();
+    let p = crate::ingest_path::tests::off_terminal();
     let outside = p.dir.path().join("t.jsonl");
     std::fs::write(&outside, "AKIAIOSFODNN7EXAMPLE\n").unwrap();
     let climbing = format!(
@@ -2723,7 +2723,7 @@ fn ingest_refuses_while_a_settings_layer_fails() {
 
 #[test]
 fn ingest_reads_within_the_configured_transcript_roots_only() {
-    let p = Process::new();
+    let p = crate::ingest_path::tests::off_terminal();
     let elsewhere = p.dir.path().join("elsewhere");
     std::fs::create_dir_all(&elsewhere).unwrap();
     std::fs::write(elsewhere.join("t.jsonl"), "a\n").unwrap();
@@ -2777,7 +2777,7 @@ fn ingest_says_when_it_cannot_audit_its_refusal() {
 
 #[test]
 fn ingest_says_when_it_cannot_audit_a_path_outside_the_roots() {
-    let p = Process::new();
+    let p = crate::ingest_path::tests::off_terminal();
     let (code, _, _) = p.invoke(&["ingest", "--path", &p.transcript("a\n")], &DEV);
     assert_eq!(code, EXIT_OK);
     let audit_dir = p.parinn_home().join("audit");
@@ -2799,7 +2799,7 @@ fn ingest_says_when_it_cannot_audit_a_path_outside_the_roots() {
 }
 
 /// Every audit entry the home at `p` holds, as text.
-fn audit_text(p: &Process) -> String {
+pub(crate) fn audit_text(p: &Process) -> String {
     let dir = p.parinn_home().join("audit");
     let mut text = String::new();
     let Ok(entries) = std::fs::read_dir(dir) else {
