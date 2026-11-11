@@ -702,7 +702,11 @@ fn a_free_run_is_not_run_again_once_others_reached_the_cap_meanwhile() {
     // cap is reached while lang-rust runs, in any order the runs start.
     let started = Arc::new(std::sync::atomic::AtomicBool::new(false));
     let started_by_rust = Arc::clone(&started);
-    let (_dir, ran) = told_to(lines, DISPATCH, options, 0.0, move |c| {
+    // Only these two specialists run: a third admitted first would take
+    // one of the two places the cap gives, and each would wait on the
+    // other.
+    let two = r#"{"review-code": ["lang-rust"], "review-spec": ["lang-markdown"]}"#;
+    let (_dir, ran) = told_to(lines, two, options, 0.0, move |c| {
         match agent_of(c).as_str() {
             "lang-markdown" => {
                 let give_up = std::time::Instant::now() + Duration::from_secs(30);
@@ -737,7 +741,6 @@ fn a_free_run_is_not_run_again_once_others_reached_the_cap_meanwhile() {
         }
     });
 
-    // test-engineer-unit's cap does not fit beside theirs, so it waits.
     let run = ran.run("lang-rust");
     assert_eq!(run.attempts, 1);
     assert_eq!(

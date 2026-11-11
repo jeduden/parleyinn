@@ -2,7 +2,8 @@
 //! from one template each: a specialist per SRS section and one per
 //! domain-model file. Each gets a defect its template's checks name, a
 //! clean change and an instruction addressed to the reviewer, read off
-//! the file as it stands, so the cases never rot.
+//! the file as it stands, so the cases never rot. Each holds its run to
+//! the pull request's tree.
 
 use std::fs;
 use std::path::Path;
@@ -220,7 +221,9 @@ fn first_requirement_id(text: &str) -> Option<String> {
         .map(str::to_owned)
 }
 
-/// A case of `kind` for `name` on `path` with `edits` and `expect`.
+/// A case of `kind` for `name` on `path` with `edits` and `expect`,
+/// held to the pull request's tree: what a specialist looks up beyond
+/// its diff, a row, a scenario or a concept, it reads there.
 fn case(
     name: &str,
     case_name: &str,
@@ -237,7 +240,10 @@ fn case(
         consent: None,
         edits,
         seeds: Vec::new(),
-        expect,
+        expect: Expect {
+            main_unread: true,
+            ..expect
+        },
         repetitions: REPETITIONS,
         passes: PASSES,
     }

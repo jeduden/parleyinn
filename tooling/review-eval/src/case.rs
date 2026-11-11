@@ -113,6 +113,10 @@ pub struct Expect {
     pub absent: Vec<String>,
     /// The most findings a generalist may keep as nits, when given.
     pub nits: Option<usize>,
+    /// Whether the run must read and search the repository's files in
+    /// the pull request's tree alone: one it opens in main's tree, the
+    /// work directory's own root, fails the run.
+    pub main_unread: bool,
 }
 
 /// A specialist's report the fixture seeds for a generalist's case.

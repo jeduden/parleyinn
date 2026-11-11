@@ -68,6 +68,7 @@ content = "outcome: sound"
 [expect]
 outcome = ["sound", "nits"]
 absent = ["approved"]
+main_unread = true
 
 [[expect.none]]
 path = "a.txt"
@@ -89,6 +90,13 @@ mentions = ["false alarm"]
     assert_eq!(case.seeds[0].agent, "lang-rust");
     assert_eq!(case.expect.outcome, vec!["none", "findings"]);
     assert_eq!(case.expect.absent, vec!["approved"]);
+    assert!(case.expect.main_unread);
+    assert!(
+        !Case::parse("lang-rust", "unwrap", MINIMAL)
+            .unwrap()
+            .expect
+            .main_unread
+    );
     assert_eq!(case.expect.none[0].path, "a.txt");
     assert_eq!(case.expect.dropped[0].mentions, vec!["false alarm"]);
 }

@@ -26,6 +26,7 @@ use crate::case::{Case, Expect, Expected};
 use crate::component::{Component, Kind};
 use crate::log::RunLog;
 use crate::report;
+use crate::world::{CONSENT, DIFF, INSTRUCTION_NAMES, PR_HEAD, REVIEW};
 
 /// How many findings a specialist's report may hold.
 const MOST_FINDINGS: usize = 10;
@@ -54,10 +55,76 @@ pub fn grade(component: &Component, case: &Case, log: &RunLog) -> Graded {
     match component.kind {
         Kind::Specialist => specialist(component, case, log),
         kind @ (Kind::Generalist | Kind::Consultant) => Graded {
-            failures: generalist(case, log, kind),
+            failures: [
+                generalist(case, log, kind),
+                tree_failures(&case.expect, log),
+            ]
+            .concat(),
             slips: cut(log),
         },
     }
+}
+
+/// What the work directory holds beside main's files: the pull
+/// request's tree and what the review wrote for the run.
+const BESIDE_MAIN: [&str; 4] = [PR_HEAD, REVIEW, DIFF, CONSENT];
+
+/// The repository's files `log`'s run read or searched in main's tree,
+/// the work directory's own root, each once, relative to it and in
+/// order: every path a `Read`, `Grep` or `Glob` of the main thread
+/// named that lies in the work directory, outside [`BESIDE_MAIN`], and
+/// is no instruction file, which the pull request's tree is kept
+/// without. The work directory itself holds both trees and is neither;
+/// a path outside it is in neither, as is an absolute one when the log
+/// names no work directory.
+fn main_reads(log: &RunLog) -> Vec<String> {
+    let mut out: Vec<String> = Vec::new();
+    let paths = log
+        .reads
+        .iter()
+        .map(|r| r.path.as_str())
+        .chain(log.searches.iter().map(String::as_str));
+    for path in paths {
+        let Some(within) = within(&log.cwd, path) else {
+            continue;
+        };
+        let mut parts = within.split('/').filter(|p| !p.is_empty() && *p != ".");
+        let Some(first) = parts.clone().next() else {
+            continue;
+        };
+        let rel = parts.clone().collect::<Vec<_>>().join("/");
+        if first != ".."
+            && !BESIDE_MAIN.contains(&first)
+            && !parts.any(|p| INSTRUCTION_NAMES.contains(&p))
+            && !out.contains(&rel)
+        {
+            out.push(rel);
+        }
+    }
+
+    out
+}
+
+/// `path` relative to the work directory `cwd`: itself when it is
+/// relative, what follows `cwd` when it lies in it, else none.
+fn within<'a>(cwd: &str, path: &'a str) -> Option<&'a str> {
+    if !path.starts_with('/') {
+        return Some(path);
+    }
+    let rest = path.strip_prefix(cwd.trim_end_matches('/'))?;
+    (!cwd.is_empty() && (rest.is_empty() || rest.starts_with('/'))).then_some(rest)
+}
+
+/// The failures of a run a case holds to the pull request's tree: each
+/// file of the repository it read or searched in main's instead.
+fn tree_failures(expect: &Expect, log: &RunLog) -> Vec<String> {
+    if !expect.main_unread {
+        return Vec::new();
+    }
+    main_reads(log)
+        .iter()
+        .map(|path| format!("read main's tree, not the pull request's: {path}"))
+        .collect()
 }
 
 /// A specialist runs, writes nothing, states every finding line in a
@@ -117,6 +184,7 @@ fn specialist(component: &Component, case: &Case, log: &RunLog) -> Graded {
         .failures
         .extend(expectations(&case.expect, &report, Kind::Specialist));
     graded.failures.extend(stated_failures(&case.expect, log));
+    graded.failures.extend(tree_failures(&case.expect, log));
     // The ids are held to their shape: the case's world, not the
     // grader, holds the SRS they would be read from.
     for line in &split.unreadable {
