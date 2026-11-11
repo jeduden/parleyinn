@@ -508,9 +508,9 @@ fn ingest(
     failures += ingest_all(ctx, &home, &held, &redactor, &inputs, stderr).1;
     apply_retention(ctx, &home, settings, stderr);
     if target == IngestTarget::All {
-        audit_lost(ctx, &home, stderr);
+        sources::audit_lost(ctx, &home, stderr);
     }
-    let shown = ingest_report(&target, &reports, failures, as_json);
+    let shown = ingest_report::ingest_report(&target, &reports, failures, as_json);
     let code = written(write!(stdout, "{shown}"), stderr);
 
     if failures > 0 { EXIT_FAILURE } else { code }
@@ -598,46 +598,6 @@ fn held_sources(
     ingest_path::within(ctx, settings, &held, stderr)
 }
 
-/// Audits and counts, once each, every transcript source `parinn ingest
-/// --all` finds gone before it was fully ingested (REC-08, I6).
-fn audit_lost(ctx: &Context, home: &Home, stderr: &mut dyn Write) {
-    let found = Store::open(&home.store()).and_then(|mut store| {
-        let sources = store.sources()?;
-        let fresh: Vec<store::Source> = sources::lost(&sources)
-            .into_iter()
-            .filter(|s| !s.lost)
-            .cloned()
-            .collect();
-        for source in &fresh {
-            store.lose(source.id)?;
-        }
-        Ok(fresh)
-    });
-    let fresh = match found {
-        Ok(fresh) => fresh,
-        Err(e) => {
-            let _ = writeln!(stderr, "parinn ingest: find lost transcript sources: {e}");
-            return;
-        }
-    };
-    for source in fresh {
-        let name = Path::new(&source.path)
-            .file_stem()
-            .map(|s| s.to_string_lossy().into_owned())
-            .unwrap_or_default();
-        let occurrence = Occurrence::Keyed {
-            kind: Kind::Dropped,
-            counter: Counter::TranscriptSourceLost,
-            operation: "ingest",
-            detail: "transcript source gone before it was fully ingested:",
-            key: &name,
-        };
-        if let Err(e) = ctx.audit(&occurrence) {
-            let _ = writeln!(stderr, "parinn ingest: audit a lost transcript source: {e}");
-        }
-    }
-}
-
 /// What `parinn ingest`'s command line asks for, or why it is refused.
 fn ingest_args(mut args: impl Iterator<Item = String>) -> Result<(IngestTarget, bool), String> {
     let (mut all, mut path, mut as_json) = (false, None, false);
@@ -708,7 +668,7 @@ fn record_ingested(ctx: &Context, ingested: &ingest::Ingested, stderr: &mut dyn 
     audit_redactions(ctx, &ingested.redactions, stderr);
     audit_scan_limited(ctx, ingested.scan_limited, stderr);
     audit_parsing(ctx, ingested, stderr);
-    audit_sourcing(ctx, ingested, stderr);
+    sourcing::audit(ctx, ingested, stderr);
     audit_prompts(ctx, ingested, stderr);
     audit_index_gaps(ctx, ingested, stderr);
     tracing::info!(
@@ -721,125 +681,6 @@ fn record_ingested(ctx: &Context, ingested: &ingest::Ingested, stderr: &mut dyn 
         format_drift = ingested.drifts.len() as u64,
         "ingested"
     );
-}
-
-/// What `parinn ingest` prints of the transcripts it recorded: for
-/// `--path`, the one; for `--all`, each, or that there was none.
-fn ingest_report(
-    target: &IngestTarget,
-    reports: &[ingest::Ingested],
-    failures: usize,
-    as_json: bool,
-) -> String {
-    let one = |i: &ingest::Ingested| {
-        json!({
-            "writer": i.writer.to_string(),
-            "seat": i.seat.to_string(),
-            "room": i.room.to_string(),
-            "events": i.events,
-            "generation": i.generation,
-            "held": i.held,
-            "runs": runs_json(&i.runs),
-        })
-    };
-    if as_json && *target == IngestTarget::All {
-        let all: Vec<Value> = reports.iter().map(one).collect();
-        return format!("{}\n", json!({"transcripts": all}));
-    }
-    if reports.is_empty() && failures == 0 && *target == IngestTarget::All {
-        return "ingested no transcript\n".to_owned();
-    }
-    reports
-        .iter()
-        .map(|i| {
-            if as_json {
-                format!("{}\n", one(i))
-            } else {
-                format!("ingested {} lines into writer {}\n", i.events, i.writer)
-            }
-        })
-        .collect()
-}
-
-/// Each run an ingest appended to, as `parinn ingest --json` shows it:
-/// its writer and seat, the harness's agent id, the run its parent link
-/// ties it to, and how many events it gained (REC-02).
-fn runs_json(runs: &[ingest::RunReport]) -> Value {
-    runs.iter()
-        .map(|r| {
-            json!({
-                "writer": r.writer.to_string(),
-                "seat": r.seat.to_string(),
-                "agent_id": r.agent_id,
-                "parent": r.parent.map(|p| p.to_string()),
-                "events": r.events,
-            })
-        })
-        .collect()
-}
-
-/// Audits what an ingest found of its transcript source, one entry
-/// each, naming the source by its redacted name: a new transcript
-/// generation (REC-07); each line repeating a `uuid` with other
-/// content, each repeat owner no fork observation chose, a hold begun
-/// and each line released from one (REC-04).
-fn audit_sourcing(ctx: &Context, ingested: &ingest::Ingested, stderr: &mut dyn Write) {
-    let keyed = |kind, counter, detail| Occurrence::Keyed {
-        kind,
-        counter,
-        operation: "ingest",
-        detail,
-        key: &ingested.name,
-    };
-    let occurrences = [
-        (
-            usize::from(ingested.new_generation),
-            keyed(
-                Kind::Truncated,
-                Counter::NewTranscriptGeneration,
-                "new transcript generation of",
-            ),
-        ),
-        (
-            ingested.conflicts,
-            keyed(
-                Kind::Rejected,
-                Counter::RepeatConflicts,
-                "repeated uuid with other content, recorded as its own event, in",
-            ),
-        ),
-        (
-            ingested.owners_chosen,
-            keyed(
-                Kind::Coalesced,
-                Counter::RepeatOwnerChosen,
-                "repeated lines owned by the run that first recorded them, repeated in",
-            ),
-        ),
-        (
-            usize::from(ingested.hold_started),
-            keyed(
-                Kind::Truncated,
-                Counter::RepeatHeld,
-                "repeated lines held at an ingest marker in",
-            ),
-        ),
-        (
-            ingested.released,
-            keyed(
-                Kind::TimedOut,
-                Counter::RepeatReleased,
-                "repeated line released into its own run in",
-            ),
-        ),
-    ];
-    for (times, occurrence) in &occurrences {
-        for _ in 0..*times {
-            if let Err(e) = ctx.audit(occurrence) {
-                let _ = writeln!(stderr, "parinn ingest: audit the transcript source: {e}");
-            }
-        }
-    }
 }
 
 /// Audits each prompt line an ingest found carrying a `prompt_id`
@@ -1339,7 +1180,7 @@ fn verify_command(
         Ok(opened) => opened,
         Err(code) => return code,
     };
-    let incomplete = match completeness(ctx, &home, &store) {
+    let incomplete = match sources::verified(ctx, &home, &store) {
         Ok(found) => found,
         Err(e) => return failed("verify", &e, stderr),
     };
@@ -1426,21 +1267,6 @@ fn verified_store(ctx: &Context, stderr: &mut dyn Write) -> Result<(Home, Store)
     let store = Store::open(&home.store()).map_err(|e| store_failed("verify", &e, stderr))?;
 
     Ok((home, store))
-}
-
-/// How far the transcript sources of `store` fall short (ADM-09), as
-/// `parinn verify` finds them now.
-fn completeness(
-    ctx: &Context,
-    home: &Home,
-    store: &Store,
-) -> Result<sources::Completeness, store::StoreError> {
-    Ok(sources::completeness(
-        &store.sources()?,
-        &capture::served(home),
-        &sources::look,
-        (ctx.clock)().saturating_mul(1000),
-    ))
 }
 
 /// The ranges a purge a kill cut short has still to clear from the
@@ -2196,6 +2022,7 @@ mod hook_handlers;
 mod identity_status;
 mod index_gaps;
 mod ingest_path;
+mod ingest_report;
 mod licenses;
 mod purge;
 mod quarantine;
@@ -2206,6 +2033,7 @@ mod retention;
 mod segments;
 mod settings;
 mod sources;
+mod sourcing;
 
 pub use hook_handlers::budget_override;
 pub use settings::managed_policy;
