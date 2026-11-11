@@ -398,6 +398,25 @@ fn a_witnessed_fork_line_is_never_held_for_a_transcript_no_server_holds_a_bindin
 }
 
 #[test]
+fn a_witnessed_line_of_no_fork_is_neither_held_nor_counted_for_another_transcript() {
+    let dir = TempDir::new().unwrap();
+    let home = home(&dir);
+    let parent = dir.path().join("parent.jsonl");
+    std::fs::write(&parent, format!("{}{}", line(1), line(2))).unwrap();
+    let path = main_transcript(&dir, &format!("{}{}", line(1), line(3)));
+    let mut seats = RunSeats::default();
+    let inputs = Inputs {
+        forks: Default::default(),
+        ..held_for(&[parent.as_path()], 1_000)
+    };
+
+    let ingested = live(&home, &path, &inputs, &mut seats).unwrap();
+
+    assert!(!ingested.held);
+    assert_eq!((ingested.events, ingested.witnessed_repeats), (2, 0));
+}
+
+#[test]
 fn a_witnessed_fork_line_held_is_its_own_event_once_the_owner_ingested_it() {
     let dir = TempDir::new().unwrap();
     let home = home(&dir);

@@ -371,7 +371,12 @@ fn reports_short(w: &mut World, name: String) -> Result<(), String> {
         .ok_or_else(|| format!("verify reports no transcript short of its end: {shown}"))?;
     // Only that clause's own line names the sources short of their end.
     let named = after.lines().next().unwrap_or_default();
-    if named.contains(&format!("{name}.jsonl")) {
+    let file = format!("{name}.jsonl");
+    // The file's own name, whole: "xrun-a.jsonl" is not "run-a.jsonl".
+    if named
+        .split(", ")
+        .any(|path| std::path::Path::new(path.trim()).file_name() == Some(file.as_ref()))
+    {
         return Ok(());
     }
     Err(format!(
