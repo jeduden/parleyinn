@@ -3,15 +3,15 @@
 const { Fb, rng, IDX, ci, B2 } = require('./pix.js');
 const { halo, boards, vboards, plate, lamp } = require('./kit.js');
 
-const PON = { red: ['r1', 'r0', 'r2', 'p1'], teal: ['t3', 't2', 't4', 'am'], ochre: ['d5', 'd3', 'd6', 'r1'], violet: ['v2', 'v1', 'n4', 'cy'], bone: ['p1', 'p0', 'p2', 'r1'] };
+const PON = { red: ['r1', 'r0', 'r2', 'p1'], teal: ['t3', 't2', 't4', 'am'], ochre: ['d5', 'd3', 'd6', 'r1'], violet: ['v2', 'v1', 'n4', 'pk'], bone: ['p1', 'p0', 'p2', 'r1'] };
 const HAT = { brown: ['w2', 'w3'], grey: ['n3', 'n4'], black: ['n1', 'n2'], tan: ['w4', 'w5'] };
 const STEEL = ['m2', 'm1', 'm3', 'm0'], BRASS = ['d5', 'd3', 'd6', 'w1'], DARK = ['m1', 'm0', 'm2', 'n1'];
 
 // A robot, side on, facing right unless flipped. x is the middle of the body and y the floor it stands or sits over.
 function figure(g, x, y, o) {
-  o = Object.assign({ metal: STEEL, eye: 'cy', arm: 'rest' }, o || {});
+  o = Object.assign({ metal: STEEL, eye: 'pk', arm: 'rest' }, o || {});
   const L = new Fb(44, 42), [mb, md, ml, mk] = o.metal, sit = !!o.sit;
-  if (o.cell) { L.R(11, 23, 3, 6, 'm1'); L.V(12, 24, 4, 'cy'); L.px(12, 23, 'am'); }
+  if (o.cell) { L.R(11, 23, 3, 6, 'm1'); L.V(12, 24, 4, 'pk'); L.px(12, 23, 'am'); }
   if (sit) {
     L.R(25, 30, 2, 6, md); L.R(25, 36, 3, 2, 'w0');
     L.R(22, 27, 8, 2, mb); L.px(29, 27, ml); L.px(29, 28, mk);
@@ -78,7 +78,7 @@ function ledgerShelves(g, t) {
       const end = (b === 2 && s === 3) ? bx + 8 : (b === 2 && s === 4) ? bx : bx + bw; let x = bx;
       while (x < end) { const k = r(), w = k < 0.22 ? 1 : k < 0.86 ? 2 : 3; if (x + w > end) break; if (r() < 0.06) { x += 1; continue; } const hh = 5 + Math.floor(r() * 2.3), c = cols[Math.floor(r() * cols.length)];
         g.R(x, sy - hh, w, hh, c); if (w > 1) g.V(x + w - 1, sy - hh, hh, DK[c] || 'n2'); if (r() < 0.45) g.px(x, sy - 3, r() < 0.5 ? 'am' : 'p2');
-        if (r() < 0.15 && hh < 7) { const xx = x, yy = sy - hh - 2; late.push(() => { g.R(xx, yy + 1, 2, 3, 'cy'); g.px(xx, yy + 1, 'cyw'); }); }
+        if (r() < 0.15 && hh < 7) { const xx = x, yy = sy - hh - 2; late.push(() => { g.R(xx, yy + 1, 2, 3, 'pk'); g.px(xx, yy + 1, 'pkw'); }); }
         x += w; }
       if (b === 2 && s === 3) { g.R(bx + 9, sy - 2, 6, 2, 'p1'); g.H(bx + 9, sy - 2, 6, 'r1'); }
     }
@@ -88,7 +88,7 @@ function ledgerShelves(g, t) {
   g.L(181, 161, 187, 123, 'w4'); g.L(186, 161, 192, 123, 'w4'); for (let k = 0; k < 7; k++) { const yy = 157 - k * 5, xx = 181 + Math.round((161 - yy) * 6 / 38); g.H(xx + 1, yy, 4, 'w3'); }
   g.clip(x0, y0, x1 - x0, y1 - y0); g.glow(154, 120, 44, 38, 'am', 0.5, 6, true); g.unclip();
   late.forEach(f => f());
-  halo(g, x0, y0, x1 - x0, y1 - y0, ['cy'], 'cy', [0.3], 8);
+  halo(g, x0, y0, x1 - x0, y1 - y0, ['pk'], 'pk', [0.3], 8);
   lamp(g, 154, y0, t, { drop: 2 });
 }
 function printShop(g, t) {
@@ -100,7 +100,7 @@ function printShop(g, t) {
   for (let x = x0; x < x1; x++) g.px(x, sag(x), 'ink');
   for (const bx of [221, 250]) { const by = sag(bx + 3) + 1; g.R(bx, by, 7, 9, 'p2'); g.B(bx, by, 7, 9, 'w3'); g.H(bx + 1, by + 1, 5, 'r1'); g.H(bx + 1, by + 3, 5, 'n4'); g.H(bx + 1, by + 5, 4, 'n4'); g.H(bx + 1, by + 7, 5, 'n4'); g.px(bx + 3, by - 1, 'w2'); }
   // the B0 plate: only the core builds what reaches the model, and the handbill is what reaches it
-  plate(g, 209, 114, 'B0', 't1', 'cy', 'm5', { h: 9, pad: 3 });
+  plate(g, 209, 114, 'B0', 't1', 'pk', 'm5', { h: 9, pad: 3 });
   // hand press
   g.R(201, 157, 15, 5, 'w1'); g.H(201, 157, 15, 'w3'); g.B(201, 157, 15, 5, 'ink');
   g.R(202, 132, 2, 25, 'm1'); g.R(212, 132, 2, 25, 'm1'); g.V(202, 132, 25, 'm2'); g.V(212, 132, 25, 'm2');
@@ -127,9 +127,9 @@ function wireOffice(g, t) {
   const px0 = 265, py0 = 127; g.R(px0 - 1, py0 - 1, 25, 19, 'w3'); g.B(px0 - 1, py0 - 1, 25, 19, 'ink');
   for (let rr = 0; rr < 3; rr++) for (let c = 0; c < 4; c++) { const cx = px0 + c * 6, cy = py0 + rr * 6; g.R(cx, cy, 5, 5, 'w0'); if ((rr * 4 + c) % 3 !== 1) { g.R(cx + 1, cy + 3, 4, 2, 'p2'); g.px(cx + 1, cy + 3, 'r2'); g.px(cx + 1, cy + 4, 'r2'); if ((rr + c) % 2) g.H(cx, cy + 2, 4, 'p1'); } }
   // desk, sounder, envelopes with their red warning band, and the tube that drops them to the call box
-  g.R(299, 151, 9, 11, 'm1'); g.B(299, 151, 9, 11, 'ink'); g.H(300, 152, 7, 'm2'); g.px(305, 155, t % 6 < 3 ? 'cy' : 't4'); g.R(301, 157, 5, 3, 'ink'); g.H(302, 158, 3, 'p2');
+  g.R(299, 151, 9, 11, 'm1'); g.B(299, 151, 9, 11, 'ink'); g.H(300, 152, 7, 'm2'); g.px(305, 155, t % 6 < 3 ? 'pk' : 'pk0'); g.R(301, 157, 5, 3, 'ink'); g.H(302, 158, 3, 'p2');
   g.R(288, 147, 25, 2, 'w3'); g.H(288, 147, 25, 'w4'); g.H(288, 149, 25, 'ink'); g.V(289, 150, 12, 'w2'); g.V(311, 150, 12, 'w2');
-  g.R(301, 136, 11, 11, 'm1'); g.B(301, 136, 11, 11, 'ink'); g.R(303, 138, 7, 6, 't1'); g.H(304, 139, 4, 'cy'); g.H(304, 141, 5, 't4'); if (t % 4 < 2) g.px(304, 143, 'cy'); g.px(310, 145, 'r2');
+  g.R(301, 136, 11, 11, 'm1'); g.B(301, 136, 11, 11, 'ink'); g.R(303, 138, 7, 6, 't1'); g.H(304, 139, 4, 'pk'); g.H(304, 141, 5, 'pk0'); if (t % 4 < 2) g.px(304, 143, 'pk'); g.px(310, 145, 'r2');
   for (let k = 0; k < 3; k++) { g.R(291, 145 - k * 2, 8, 2, 'p2'); g.H(291, 146 - k * 2, 8, 'p1'); g.R(291, 145 - k * 2, 2, 2, 'r2'); }
   g.R(275, 153, 8, 2, 'w3'); g.V(276, 155, 7, 'w2'); g.V(281, 155, 7, 'w2'); g.H(276, 158, 6, 'w1');
   figure(g, 279, y1, { metal: BRASS, sit: true, arm: 'type', shade: true, vest: 't4' });
@@ -195,15 +195,15 @@ function saloon(g, t) {
   const hx = 221, hy = 175; g.V(236, 168, hy - 168, 'p1'); g.px(236, hy - 1, 'm3');
   g.R(hx, hy, 31, 25, 'p2'); g.B(hx, hy, 31, 25, 'ink'); g.T(hx + 2, hy + 2, 'RESTORE', 'r1', 'm5'); g.H(hx + 2, hy + 8, 27, 'ink');
   [['am', 20], ['r2', 22], ['t4', 17]].forEach(([c, w], k) => { const yy = hy + 10 + k * 4; g.R(hx + 2, yy, 2, 2, c); g.H(hx + 6, yy, w, 'n3'); g.H(hx + 6, yy + 2, w - 6, 'n4'); });
-  g.px(hx + 3, hy + 22, 'cy'); g.px(hx + 6, hy + 22, 'cy'); g.px(hx + 9, hy + 22, 'cy'); g.H(hx + 13, hy + 22, 14, 'n4');
+  g.px(hx + 3, hy + 22, 'pk'); g.px(hx + 6, hy + 22, 'pk'); g.px(hx + 9, hy + 22, 'pk'); g.H(hx + 13, hy + 22, 14, 'n4');
   // the call box and its tube
   g.R(303, y0, 2, 22, 't4'); g.V(303, y0, 22, 't5'); g.R(302, y0 + 1, 4, 2, 'm2'); g.H(302, y0 + 1, 4, 'm3'); g.R(303, y0 + 4, 2, 3, 'p2'); g.H(303, y0 + 5, 2, 'r2');
   plate(g, 304, 177, 'RECALL', 'n1', 'am', 'm5', { h: 9, pad: 3 });
   g.R(303, 186, 2, 4, 't4'); g.V(303, 186, 4, 't5');
-  g.R(297, 190, 14, 24, 'w2'); g.B(297, 190, 14, 24, 'ink'); g.H(298, 191, 12, 'w4'); g.R(299, 193, 10, 7, 'w1'); g.H(300, 194, 8, 'am'); g.H(300, 196, 8, 'am'); g.H(300, 198, 8, 'am'); g.px(308, 192, t % 6 < 2 ? 'cy' : 't4');
+  g.R(297, 190, 14, 24, 'w2'); g.B(297, 190, 14, 24, 'ink'); g.H(298, 191, 12, 'w4'); g.R(299, 193, 10, 7, 'w1'); g.H(300, 194, 8, 'am'); g.H(300, 196, 8, 'am'); g.H(300, 198, 8, 'am'); g.px(308, 192, t % 6 < 2 ? 'pk' : 'pk0');
   g.R(299, 203, 10, 6, 'ink'); g.H(300, 207, 6, 'p2'); g.px(300, 206, 'r2'); g.H(301, 206, 5, 'p1');
   g.px(296, 207, 'm3'); g.px(295, 208, 'm3'); g.px(294, 209, 'm3'); g.px(294, 210, 'am');
-  figure(g, 284, y1, { arm: 'crank', pon: PON.ochre, hat: HAT.black, band: 'cy', cell: true });
+  figure(g, 284, y1, { arm: 'crank', pon: PON.ochre, hat: HAT.black, band: 'pk', cell: true });
   // the bar
   const b0 = 320;
   g.R(336, 189, 30, 12, 'n2'); g.B(335, 188, 32, 14, 'w3'); g.L(358, 199, 364, 193, 'n3'); g.H(336, 201, 30, 'w4');
@@ -215,8 +215,8 @@ function saloon(g, t) {
   g.R(b0, 212, x1 - b0, 18, 'w2'); g.B(b0, 212, x1 - b0, 18, 'ink'); g.R(b0 - 1, 210, x1 - b0 + 1, 2, 'w4'); g.H(b0 - 1, 211, x1 - b0 + 1, 'w3');
   for (let k = 0; k < 3; k++) { g.R(b0 + 3 + k * 14, 215, 12, 9, 'w1'); g.H(b0 + 3 + k * 14, 223, 12, 'w3'); } g.H(b0 + 1, 226, x1 - b0 - 2, 'am'); g.H(b0 + 1, 227, x1 - b0 - 2, 'w0');
   // the register, where every refusal rings up
-  const rx = 322; g.R(rx + 1, 196, 10, 8, 'n1'); g.B(rx + 1, 196, 10, 8, 'ink'); g.T(rx + 3, 198, '07', 'cy', 'm5'); g.R(rx, 204, 12, 6, 'w3'); g.B(rx, 204, 12, 6, 'ink'); g.H(rx + 1, 204, 10, 'am'); for (let i = 0; i < 5; i++) { g.px(rx + 1 + i * 2, 206, 'p2'); g.px(rx + 2 + i * 2, 208, 'p2'); } g.px(rx + 12, 205, 'm3'); g.px(rx + 13, 204, 'm3'); g.px(rx + 13, 203, 'am');
+  const rx = 322; g.R(rx + 1, 196, 10, 8, 'n1'); g.B(rx + 1, 196, 10, 8, 'ink'); g.T(rx + 3, 198, '07', 'pk', 'm5'); g.R(rx, 204, 12, 6, 'w3'); g.B(rx, 204, 12, 6, 'ink'); g.H(rx + 1, 204, 10, 'am'); for (let i = 0; i < 5; i++) { g.px(rx + 1 + i * 2, 206, 'p2'); g.px(rx + 2 + i * 2, 208, 'p2'); } g.px(rx + 12, 205, 'm3'); g.px(rx + 13, 204, 'm3'); g.px(rx + 13, 203, 'am');
   lamp(g, 200, y0, t, { drop: 4 }); lamp(g, 270, y0, t, { drop: 4 });
-  halo(g, x0, 200, x1 - x0, 30, ['cy'], 'cy', [0.26], 8);
+  halo(g, x0, 200, x1 - x0, 30, ['pk'], 'pk', [0.26], 8);
 }
 module.exports = { figure, upstairs, saloon, PON, HAT, STEEL, BRASS, DARK, vkey, bottle, chair, PROP, PROPL };

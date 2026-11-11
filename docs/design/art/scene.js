@@ -40,7 +40,7 @@ function sky(g, t) {
   // a stage far out, climbing
   const tr = [[152, 46], [176, 37], [200, 29], [222, 22], [238, 17]];
   for (let k = 0; k + 1 < tr.length; k++) g.L(tr[k][0], tr[k][1], tr[k + 1][0], tr[k + 1][1], k < 1 ? 't2' : k < 2 ? 't3' : k < 3 ? 'n4' : 'n5');
-  g.px(239 + (t % 2), 16, 'wh'); g.px(240, 16, 'cy'); g.px(241, 15, 'wh');
+  g.px(239 + (t % 2), 16, 'wh'); g.px(240, 16, 'pk'); g.px(241, 15, 'wh');
   // streak clouds, lit from underneath
   const cl = (x, y, w, a, b) => { g.H(x + 2, y, w - 5, a); g.H(x, y + 1, w, a); g.H(x + 3, y + 2, w - 9, b); };
   cl(392, 150, 60, 'd2', 'd4'); cl(426, 163, 54, 'd3', 'd5'); cl(360, 171, 40, 'd3', 'd5'); cl(-6, 158, 52, 'd2', 'd4'); cl(10, 176, 64, 'd3', 'd5'); cl(96, 168, 30, 'd3', 'd4');
@@ -90,9 +90,10 @@ const LET = {
   I: ['#######', '#######', '..###..', '..###..', '..###..', '..###..', '..###..', '..###..', '..###..', '..###..', '..###..', '..###..', '..###..', '#######', '#######'],
   N: ['####...####', '####...####', '.####..###.', '.####..###.', '.#####.###.', '.#####.###.', '.###.#####.', '.###.#####.', '.###.#####.', '.###..####.', '.###..####.', '.###..####.', '.###..####.', '####...####', '####...####'],
 };
+const UNLIT = { cy: 't4', pk: 'pk0' }; // an unlit tube shows the colour of its glass
 function wordmark(g, x, y, str, edge, core, dead) { // returns width; dead = index of a letter drawn unlit
   let cx = x, n = 0;
-  for (const ch of str) { if (ch === ' ') { cx += 7; continue; } const rows = LET[ch]; if (n === dead) neonMask(g, cx, y, rows, 'pk0', 'pk0'); else neonMask(g, cx, y, rows, edge, core); cx += rows[0].length + 2; n++; }
+  for (const ch of str) { if (ch === ' ') { cx += 7; continue; } const rows = LET[ch]; if (n === dead) neonMask(g, cx, y, rows, UNLIT[edge], UNLIT[edge]); else neonMask(g, cx, y, rows, edge, core); cx += rows[0].length + 2; n++; }
   return cx - 2 - x;
 }
 function keyGlyph(g, x, y, len, c, core) { // a long key lying flat: bow at the left, bit at the right
@@ -140,11 +141,11 @@ function innShell(g, t) {
   g.R(162, 66, 138, 36, 'n1').B(162, 66, 138, 36, 'ink').B(163, 67, 136, 34, 'w2');
   for (const x of [170, 290]) { g.R(x, 62, 2, 4, 'm1'); }
   const dead = (t === 15 || t === 17) ? 3 : -1;
-  wordmark(g, 173, 71, 'PARLEY INN', 'pk', 'pkw', dead);
-  keyGlyph(g, 174, 92, 112, 'cy', 'cyw');
-  halo(g, 163, 67, 136, 34, ['pk', 'pkw'], 'pk', [0.34, 0.2, 0.1, 0.05], 8);
-  halo(g, 163, 86, 136, 15, ['cy', 'cyw'], 'cy', [0.3, 0.16, 0.07], 8);
-  g.glow(231, 84, 110, 40, 'pk', 0.2, 8);
+  wordmark(g, 173, 71, 'PARLEY INN', 'cy', 'cyw', dead);
+  keyGlyph(g, 174, 92, 112, 'pk', 'pkw');
+  halo(g, 163, 67, 136, 34, ['cy', 'cyw'], 'cy', [0.34, 0.2, 0.1, 0.05], 8);
+  halo(g, 163, 86, 136, 15, ['pk', 'pkw'], 'pk', [0.3, 0.16, 0.07], 8);
+  // the sign lights its board only: cyan falling on the brown wall would step it to a warmer brown
   // header beam over the open floors, floor between them, end walls
   g.R(84, 108, 290, 4, 'w1').H(84, 108, 290, 'w3').H(84, 111, 290, 'ink');
   g.R(INN.cut0 - 3, INN.up0, 3, 118, 'n1'); for (let j = INN.up0; j < 230; j += 3) g.px(INN.cut0 - 2, j + 1, 'n3');
@@ -161,8 +162,8 @@ function facade(g, t) {
   g.R(x1 - 1, 112, 3, 118, 't2').V(x1 - 1, 112, 118, 't3').V(x1 + 1, 112, 118, 't1');
   // ROOMS in neon
   g.R(89, 114, 37, 13, 'n1').B(89, 114, 37, 13, 'ink');
-  g.T(108, 116, 'ROOMS', (t === 6) ? 't4' : 'cy', 'j10', { align: 'c' });
-  halo(g, 90, 115, 35, 11, ['cy'], 'cy', [0.3, 0.14], 8);
+  g.T(108, 116, 'ROOMS', (t === 6) ? 'pk0' : 'pk', 'j10', { align: 'c' });
+  halo(g, 90, 115, 35, 11, ['pk'], 'pk', [0.3, 0.14], 8);
   // balcony door, lit from inside
   g.R(98, 130, 18, 29, 't2').B(98, 130, 18, 29, 'ink'); g.R(100, 132, 14, 25, 'd6'); g.R(100, 132, 14, 6, 'am'); g.V(107, 132, 25, 't2'); g.H(100, 143, 14, 't2'); g.R(100, 150, 14, 7, 'd5');
   g.R(101, 133, 2, 9, 'r1'); g.R(111, 133, 2, 9, 'r1'); // curtains

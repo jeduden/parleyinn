@@ -57,7 +57,7 @@ function stageStop(g, t) {
   g.V(416, 190, 3, 'ink'); ob(g, 415, 193, 3, 4, 'am'); g.px(416, 194, 'wh'); g.H(414, 192, 5, 'n3');
   g.clip(378, 190, 56, 37); g.glow(416, 196, 20, 18, 'am', 0.5, 6, true); g.unclip();
   strongbox(g, 396, 215, 14, 12); strongbox(g, 412, 218, 12, 9); strongbox(g, 400, 206, 12, 8);
-  plate(g, 393, 197, 'B2', 't1', 'cy', 'm5', { h: 9, pad: 3 });
+  plate(g, 393, 197, 'B2', 't1', 'pk', 'm5', { h: 9, pad: 3 });
 }
 function gate(g, t) {
   // telegraph pole and the line back to the inn
@@ -66,20 +66,20 @@ function gate(g, t) {
   for (const x of [443, 469]) { ob(g, x, 178, 3, 58, 'w2'); g.V(x, 178, 58, 'w3'); g.V(x + 2, 178, 58, 'w1'); }
   ob(g, 439, 178, 37, 4, 'w2'); g.H(439, 178, 37, 'w4'); g.H(439, 181, 37, 'w1');
   g.V(449, 182, 3, 'ink'); g.V(465, 182, 3, 'ink'); ob(g, 444, 185, 27, 16, 'w1'); g.H(444, 185, 27, 'w2'); g.T(458, 187, 'PUBLIC', 'p1', 'm5', { align: 'c' }); g.T(458, 194, 'ROAD', 'p1', 'm5', { align: 'c' });
-  g.V(455, 174, 4, 'ink'); g.V(460, 174, 4, 'ink'); plate(g, 458, 166, 'B3', 't1', 'cy', 'm5', { h: 9, pad: 3 });
-  plate(g, 437, 203, 'B1', 't1', 'cy', 'm5', { h: 9, pad: 3 }); g.px(442, 207, 'ink');
+  g.V(455, 174, 4, 'ink'); g.V(460, 174, 4, 'ink'); plate(g, 458, 166, 'B3', 't1', 'pk', 'm5', { h: 9, pad: 3 });
+  plate(g, 437, 203, 'B1', 't1', 'pk', 'm5', { h: 9, pad: 3 }); g.px(442, 207, 'ink');
   // a neon wire marks the lot's edge
-  g.H(472, 212, 8, 'cy'); g.H(433, 212, 10, 'cy'); g.V(436, 213, 14, 'w2'); g.H(472, 220, 8, 'w2'); g.H(433, 220, 10, 'w2');
-  halo(g, 430, 210, 50, 5, ['cy'], 'cy', [0.25], 8);
+  g.H(472, 212, 8, 'pk'); g.H(433, 212, 10, 'pk'); g.V(436, 213, 14, 'w2'); g.H(472, 220, 8, 'w2'); g.H(433, 220, 10, 'w2');
+  halo(g, 430, 210, 50, 5, ['pk'], 'pk', [0.25], 8);
 }
 
 function horse(g, x, y, metal, o) { // nose at x, hooves on y, facing left
   o = o || {}; const [mb, md, ml, mk] = metal, L = new Fb(40, 30);
   L.R(15, 16, 2, 10, md); L.R(15, 26, 3, 2, 'n1'); L.R(30, 15, 2, 11, md); L.R(30, 26, 3, 2, 'n1');
-  L.L(32, 10, 35, 13, mk); L.L(35, 13, 35, 19, mk); L.px(35, 20, o.tip || 'cy'); L.L(33, 10, 36, 13, md);
+  L.L(32, 10, 35, 13, mk); L.L(35, 13, 35, 19, mk); L.px(35, 20, o.tip || 'pk'); L.L(33, 10, 36, 13, md);
   L.OV(9, 8, 24, 9, mb); L.H(12, 8, 18, ml); L.H(12, 16, 18, md); L.H(10, 15, 22, md);
   L.PG([[9, 10], [15, 9], [12, 2], [7, 3]], mb); L.PG([[1, 5], [7, 2], [10, 4], [9, 7], [3, 9], [1, 8]], mb); L.H(3, 3, 5, ml);
-  L.px(6, 4, o.eye || 'cy'); L.px(2, 7, mk); L.px(9, 1, mb); L.px(10, 0, mb); L.L(11, 2, 15, 8, mk); L.px(11, 3, 'pk0'); L.px(12, 5, 'pk0'); L.px(14, 7, 'pk0');
+  L.px(6, 4, o.eye || 'pk'); L.px(2, 7, mk); L.px(9, 1, mb); L.px(10, 0, mb); L.L(11, 2, 15, 8, mk); L.px(11, 3, 't4'); L.px(12, 5, 't4'); L.px(14, 7, 't4');
   L.R(12, 16, 2, 10, mb); L.px(12, 21, mk); L.px(13, 21, mk); L.R(11, 26, 4, 2, 'n1'); L.R(27, 16, 2, 10, mb); L.px(27, 21, mk); L.px(28, 21, mk); L.R(26, 26, 4, 2, 'n1');
   L.V(22, 10, 5, md); L.px(19, 12, mk); L.px(25, 12, mk);
   if (o.blanket) { L.R(17, 7, 9, 5, 'r1'); L.H(17, 9, 9, 'p1'); L.H(17, 11, 9, 'am'); L.R(18, 5, 7, 2, 'w2'); L.H(18, 5, 7, 'w3'); }
@@ -122,15 +122,15 @@ function rig(g, t) {
   ob(g, 287, 281, 37, 11, 'p1'); g.H(287, 281, 37, 'p2'); g.R(287, 290, 37, 2, 'p0'); g.V(289, 281, 11, 'r1'); g.V(321, 281, 11, 'r1'); g.T(305, 284, 'SUMMARY', 'r1', 'm5', { align: 'c' });
 }
 function pen(g, t) {
-  const post = (x, y, h) => { ob(g, x, y, 3, h, 'm1'); g.V(x, y, h, 'm2'); g.R(x, y - 2, 3, 2, 'pk'); g.px(x + 1, y - 3, 'pkw'); };
+  const post = (x, y, h) => { ob(g, x, y, 3, h, 'm1'); g.V(x, y, h, 'm2'); g.R(x, y - 2, 3, 2, 'cy'); g.px(x + 1, y - 3, 'cyw'); };
   const dim = (t === 3 || t === 17);
-  g.H(17, 270, 60, 'pk0'); g.H(17, 278, 60, 'pk0'); g.L(8, 300, 15, 270, 'pk0'); g.L(8, 310, 15, 278, 'pk0'); g.L(84, 300, 77, 270, 'pk0'); g.L(84, 310, 77, 278, 'pk0');
+  g.H(17, 270, 60, 't4'); g.H(17, 278, 60, 't4'); g.L(8, 300, 15, 270, 't4'); g.L(8, 310, 15, 278, 't4'); g.L(84, 300, 77, 270, 't4'); g.L(84, 310, 77, 278, 't4');
   post(14, 264, 22); post(76, 264, 22);
   ob(g, 22, 284, 18, 14, 'w2'); g.H(22, 284, 18, 'w3'); g.V(31, 285, 13, 'w1'); for (let i = 22; i < 40; i++) for (let j = 289; j < 293; j++) g.px(i, j, ((i + j) >> 1) & 1 ? 'am' : 'n1');
   ob(g, 44, 288, 14, 10, 'w1'); g.H(44, 288, 14, 'w2'); g.L(44, 288, 57, 297, 'w3'); g.L(57, 288, 44, 297, 'w3');
   ob(g, 62, 277, 8, 9, 'm1'); g.H(62, 279, 8, 'm0'); g.H(62, 283, 8, 'm0'); g.V(62, 277, 9, 'm2');
   g.R(60, 296, 11, 2, 'ink'); g.R(60, 290, 11, 2, 'r1'); g.R(61, 292, 10, 2, 't3'); g.R(60, 294, 11, 2, 'p1'); g.V(70, 290, 6, 'p2'); g.R(59, 289, 13, 1, 'ink');
-  g.H(9, 300, 75, dim ? 'pk0' : 'pk'); g.H(9, 310, 75, 'pk');
+  g.H(9, 300, 75, dim ? 't4' : 'cy'); g.H(9, 310, 75, 'cy');
   post(6, 292, 30); post(83, 292, 30);
   plate(g, 46, 296, 'QUARANTINE', 'r1', 'p2', 'm5', { h: 9, pad: 3 });
 }
@@ -167,12 +167,12 @@ function bootHill(g, t) {
 function coach(g, t) {
   const x = 388, y = 246, fl = t % 2;
   // hover pods and their glow on the ground
-  g.glow(x + 26, y + 26, 34, 6, 'cy', 0.5 + fl * 0.1, 6);
+  g.glow(x + 26, y + 26, 34, 6, 'pk', 0.5 + fl * 0.1, 6);
   ob(g, x + 9, y + 20, 11, 3, 'm1'); g.H(x + 9, y + 20, 11, 'm2'); ob(g, x + 32, y + 20, 11, 3, 'm1'); g.H(x + 32, y + 20, 11, 'm2');
-  g.H(x + 10, y + 24, 9, fl ? 'cy' : 'cyw'); g.H(x + 33, y + 24, 9, fl ? 'cyw' : 'cy'); g.V(x + 14, y + 18, 2, 'm0'); g.V(x + 37, y + 18, 2, 'm0');
+  g.H(x + 10, y + 24, 9, fl ? 'pk' : 'pkw'); g.H(x + 33, y + 24, 9, fl ? 'pkw' : 'pk'); g.V(x + 14, y + 18, 2, 'm0'); g.V(x + 37, y + 18, 2, 'm0');
   // rocket at the back
   g.PG([[x + 47, y + 5], [x + 54, y + 3], [x + 54, y + 14], [x + 47, y + 12]], 'm1', 'ink'); g.V(x + 53, y + 4, 10, 'm2'); g.H(x + 48, y + 8, 5, 'm0');
-  g.H(x + 55, y + 8, 2 + fl, 'cy'); g.px(x + 55, y + 7, 'cyw'); g.px(x + 55, y + 9, 'cyw'); g.px(x + 57 + fl, y + 8, 't4');
+  g.H(x + 55, y + 8, 2 + fl, 'pk'); g.px(x + 55, y + 7, 'pkw'); g.px(x + 55, y + 9, 'pkw'); g.px(x + 57 + fl, y + 8, 'pk0');
   // body
   ob(g, x + 6, y, 40, 18, 'r1'); g.H(x + 6, y, 40, 'r2'); g.H(x + 6, y + 14, 40, 'am'); g.R(x + 6, y + 15, 40, 3, 'r0'); g.px(x + 6, y + 17, 'ink'); g.px(x + 45, y + 17, 'ink');
   ob(g, x + 4, y - 3, 44, 2, 'w1'); g.H(x + 4, y - 3, 44, 'w3');
@@ -205,6 +205,6 @@ function litter(g, t) {
 function groundLight(g) {
   g.light(86, 236, 296, 30, 'd5', (i, j) => { const fall = Math.max(0, 1 - (j - 236) / 26); return 0.44 * fall * fall; }, 6);
   g.glow(109, 240, 30, 16, 'am', 0.6, 6); g.glow(42, 240, 52, 16, 'd5', 0.55, 6); g.glow(405, 240, 44, 12, 'am', 0.4, 6);
-  g.glow(45, 316, 60, 16, 'pk', 0.34, 6); g.glow(46, 286, 40, 12, 'pk', 0.2, 6);
+  g.glow(45, 316, 60, 16, 'cy', 0.34, 6); g.glow(46, 286, 40, 12, 'cy', 0.2, 6);
 }
 module.exports = { forge, stageStop, gate, hitch, rig, pen, stake, saguaro, bootHill, coach, litter, groundLight, horse, strongbox };

@@ -85,9 +85,9 @@ function trim(g) {
 }
 const sprite = draw => { const g = new Fb(W, H); draw(g); return trim(g); };
 const SIGN = crop(160, 64, 142, 40), BANNER = crop(60, 8, 360, 104), SOCIAL = crop(40, 40, 400, 210);
-const STACKED = (() => { const g = new Fb(100, 62, 'n1'); g.B(0, 0, 100, 62, 'ink'); g.B(1, 1, 98, 60, 'w2'); wordmark(g, 12, 8, 'PARLEY', 'pk', 'pkw', -1); wordmark(g, 34, 27, 'INN', 'pk', 'pkw', -1); keyGlyph(g, 12, 50, 76, 'cy', 'cyw'); halo(g, 2, 2, 96, 42, ['pk', 'pkw'], 'pk', [0.34, 0.2, 0.1, 0.05], 8); halo(g, 2, 45, 96, 13, ['cy', 'cyw'], 'cy', [0.3, 0.16, 0.07], 8); return g; })();
+const STACKED = (() => { const g = new Fb(100, 62, 'n1'); g.B(0, 0, 100, 62, 'ink'); g.B(1, 1, 98, 60, 'w2'); wordmark(g, 12, 8, 'PARLEY', 'cy', 'cyw', -1); wordmark(g, 34, 27, 'INN', 'cy', 'cyw', -1); keyGlyph(g, 12, 50, 76, 'pk', 'pkw'); halo(g, 2, 2, 96, 42, ['cy', 'cyw'], 'cy', [0.34, 0.2, 0.1, 0.05], 8); halo(g, 2, 45, 96, 13, ['pk', 'pkw'], 'pk', [0.3, 0.16, 0.07], 8); return g; })();
 const FLAT = (() => { const g = new Fb(126, 33); wordmark(g, 4, 3, 'PARLEY INN', 'p2', 'p2', -1); keyGlyph(g, 7, 24, 112, 'p2', 'p2'); return g; })();
-const ICON = (() => { const g = new Fb(16, 16); g.RR(0, 0, 16, 16, 'n1', 'pk'); g.H(4, 4, 4, 'cy'); g.H(4, 9, 4, 'cy'); g.V(3, 5, 4, 'cy'); g.V(8, 5, 4, 'cy'); g.H(9, 6, 4, 'cyw'); g.H(9, 7, 4, 'cy'); g.px(13, 6, 'cy'); g.px(13, 7, 'cy'); g.R(10, 8, 2, 2, 'cy'); g.V(13, 8, 3, 'cy'); return g; })();
+const ICON = (() => { const g = new Fb(16, 16); g.RR(0, 0, 16, 16, 'n1', 'cy'); g.H(4, 4, 4, 'pk'); g.H(4, 9, 4, 'pk'); g.V(3, 5, 4, 'pk'); g.V(8, 5, 4, 'pk'); g.H(9, 6, 4, 'pkw'); g.H(9, 7, 4, 'pk'); g.px(13, 6, 'pk'); g.px(13, 7, 'pk'); g.R(10, 8, 2, 2, 'pk'); g.V(13, 8, 3, 'pk'); return g; })();
 const { figure, PON, HAT, BRASS, DARK, PROP, PROPL } = INTERIOR;
 const CAST = [
   ['hand', 'A hand', 'agent', sprite(g => figure(g, 60, 80, { pon: PON.red, hat: HAT.brown, band: 'am', cell: true })), 'A steel robot in a red poncho and a brown hat, with a power cell on its back'],
@@ -109,11 +109,11 @@ const RAMPS = [['ink', 'n1', 'n2', 'n3', 'n4', 'n5'], ['t0', 't1', 't2', 't3', '
 const RAMP_NAMES = ['Ink', 'Night and neon cyan', 'Dusk to lamplight', 'Timber and bone', 'Steel', 'Red and neon pink', 'Sage'];
 { const u = [...used].map(i => NAMES[i - 1]).sort().join(), s = RAMPS.flat().sort().join(); if (u !== s) throw new Error('the ramps differ from the colours the picture uses: used ' + u + ', ramps ' + s); }
 const NCOL = RAMPS.flat().length;
-const NAMED = [['Night', 't0'], ['Bone', 'p2'], ['Dusk coral', 'd4'], ['Mesa plum', 'd1'], ['Teal', 't4'], ['Amber', 'am'], ['Neon pink', 'pk'], ['Neon cyan', 'cy']];
+const NAMED = [['Night', 't0'], ['Bone', 'p2'], ['Dusk coral', 'd4'], ['Mesa plum', 'd1'], ['Teal', 't4'], ['Amber', 'am'], ['Neon cyan', 'cy'], ['Neon pink', 'pk']];
 const PAGE = { bg: 't0', bg2: 't1', ink: 'ink', line: 't2', line2: 't3', fg: 'p2', fg2: 'm3', mute: 'm2', pink: 'pk', cyan: 'cy', amber: 'am' };
 const USES = [
-  ['pk', 'Neon pink is the house’s own light: the name on the sign and the beams of the pen.'],
-  ['cy', 'Neon cyan is the working light: the key under the name, power cells, the ledgers’ bookmarks and boundary plates.'],
+  ['cy', 'Neon cyan is the house’s own light: the name on the sign and the beams of the pen.'],
+  ['pk', 'Neon pink is the working light: the key under the name, power cells, the ledgers’ bookmarks and boundary plates.'],
   ['am', 'Amber is lamplight and the proprietor’s business: the Needs you sign and the rail its tickets hang on.'],
   ['r2', 'Red is for marks that must not be missed: UNTRUSTED, QUARANTINE, the seals and the band on every envelope.'],
 ];
@@ -173,7 +173,7 @@ const svg = rects => `<svg viewBox="0 0 8 8" width="16" height="16" aria-hidden=
 const I_PREV = svg([[1, 3, 1, 2], [2, 2, 1, 4], [3, 1, 1, 6], [4, 3, 4, 2]]), I_NEXT = svg([[6, 3, 1, 2], [5, 2, 1, 4], [4, 1, 1, 6], [0, 3, 4, 2]]);
 const I_PAUSE = svg([[1, 1, 2, 6], [5, 1, 2, 6]]), I_PLAY = svg([[2, 0, 1, 8], [3, 1, 1, 6], [4, 2, 1, 4], [5, 3, 1, 2]]);
 const DESCRIPTION = flat(LEDE);
-const SIGN_ALT = 'ParleyInn in pink neon capitals over one long cyan key';
+const SIGN_ALT = 'ParleyInn in cyan neon capitals over one long pink key';
 const ALT = 'Pixel art of a frontier saloon at dusk under a ringed planet, with its front wall removed. Robot hands sit at a card table in the saloon, and upstairs are the ledger shelves, a print shop, a wire office and an office. Around it stand a forge, a hitching rail, a wagon, a stage stop, a gate and Boot Hill. The key lists its 28 numbered places.';
 
 function page({ base, title, description, canonical, body, script }) {
@@ -284,7 +284,7 @@ const kit = `<section class="intro" aria-labelledby="name">
 <section class="k-mark" aria-labelledby="mark-h"><h2 id="mark-h">The mark</h2>
 ${img('sign.png', 0, SIGN_ALT, 'sign')}
 <p>The name in hand-set neon over one long key. Peers are enrolled by key and a principal trusts another principal by key, so the key is the one symbol that holds everywhere in the model. In text the name is always ParleyInn, one word; only the sign sets PARLEY and INN apart.</p>
-<div class="shots"><figure>${img('mark-stacked.png', 2, 'ParleyInn stacked in pink neon, PARLEY over INN, with the key beneath')}<figcaption class="cap2">Stacked</figcaption></figure><figure>${img('mark-flat.png', 2, 'ParleyInn and the key in one flat colour')}<figcaption class="cap2">One colour</figcaption></figure><figure><div class="icons">${img('icon.png', 4, 'The key as a square icon')}${img('icon.png', 2, '')}${img('icon.png', 1, '')}</div><figcaption class="cap2">Icon at 64, 32 and 16</figcaption></figure></div>
+<div class="shots"><figure>${img('mark-stacked.png', 2, 'ParleyInn stacked in cyan neon, PARLEY over INN, with the key beneath')}<figcaption class="cap2">Stacked</figcaption></figure><figure>${img('mark-flat.png', 2, 'ParleyInn and the key in one flat colour')}<figcaption class="cap2">One colour</figcaption></figure><figure><div class="icons">${img('icon.png', 4, 'The key as a square icon')}${img('icon.png', 2, '')}${img('icon.png', 1, '')}</div><figcaption class="cap2">Icon at 64, 32 and 16</figcaption></figure></div>
 <div class="shots"><figure>${img('banner.png', 0, 'The inn’s false front and roofline under the night sky, with the neon sign in the middle', 'banner')}<figcaption class="cap2">Banner, for the top of a README</figcaption></figure></div>
 <p class="tag">Pins kept verbatim.</p>
 </section>
@@ -293,7 +293,7 @@ ${img('sign.png', 0, SIGN_ALT, 'sign')}
 <div class="ramps" role="img" aria-label="All ${NCOL} colours of the picture, in ${RAMPS.length} ramps">${RAMPS.map(r => `<div class="ramp">${r.map(c => `<i class="c-${c}" title="${c} ${PAL[c]}"></i>`).join('')}</div>`).join('')}</div>
 <p class="cap2">All ${NCOL}, in ${RAMPS.length} ramps, and nothing else</p>
 <ul class="uses">${USES.map(([c, t]) => `<li><i class="c-${c}"></i><p>${esc(t)}</p></li>`).join('')}</ul>
-<p>The page is drawn in the same colours: night for the ground, bone for text, steel for quiet text, and the sign’s pink, cyan and amber for accents.</p>
+<p>The page is drawn in the same colours: night for the ground, bone for text, steel for quiet text, and the sign’s cyan, pink and amber for accents.</p>
 </section>
 <section class="k-cast" aria-labelledby="cast-h"><h2 id="cast-h">The cast</h2>
 <div class="cast">${CAST.map(([id, nm, what, , alt]) => `<figure><span class="spr">${img('cast-' + id + '.png', 0, alt)}</span><figcaption>${esc(nm)}<span>${esc(what)}</span></figcaption></figure>`).join('')}</div>

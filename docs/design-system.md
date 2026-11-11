@@ -29,7 +29,7 @@ A hook is a hook, drawn on a hitching rail.
 
 ## The mark
 
-The sign is the mark: PARLEY INN in pink neon over one long cyan key.
+The sign is the mark: PARLEY INN in cyan neon over one long pink key.
 Peers are enrolled by key and a principal trusts another principal by
 key, so the key is the one symbol that holds everywhere in the model.
 
@@ -60,14 +60,14 @@ them into a pixel editor. Eight carry names:
 | Mesa plum  | d1   | `#5A2E48` | the mesa and the shade   |
 | Teal       | t4   | `#2F8C8A` | the waistcoats and glass |
 | Amber      | am   | `#FFC857` | focus, code, the tagline |
-| Neon pink  | pk   | `#FF5C8A` | the selected place       |
-| Neon cyan  | cy   | `#63F3E4` | links and numbers        |
+| Neon cyan  | cy   | `#63F3E4` | the selected place       |
+| Neon pink  | pk   | `#FF5C8A` | links and numbers        |
 
 Four colours carry a meaning:
 
-- **Neon pink** is the house's own light: the name on the sign and the
+- **Neon cyan** is the house's own light: the name on the sign and the
   beams of the pen. The forge is next door, so its horseshoe is iron.
-- **Neon cyan** is the working light: the key under the name, power
+- **Neon pink** is the working light: the key under the name, power
   cells, the ledgers' bookmarks and boundary plates.
 - **Amber** is lamplight and the proprietor's business: the Needs you
   sign and the rail its tickets hang on.
@@ -75,7 +75,7 @@ Four colours carry a meaning:
   and the band on every envelope.
 
 The pages use the same colours: night for the ground, bone for text,
-steel for quiet text, and the sign's pink, cyan and amber for accents.
+steel for quiet text, and the sign's cyan, pink and amber for accents.
 They have one look, dark, and no light theme.
 
 ## Type
@@ -111,7 +111,7 @@ For pixel art:
 2. Draw only in the 48 colours. Light is a step along a ramp, never a new
    colour.
 3. Outline figures and things in ink, one pixel wide.
-4. Neon pink and cyan are lights: they glow onto what is near and take no
+4. Neon cyan and pink are lights: they glow onto what is near and take no
    light themselves.
 
 For the pages:
