@@ -7,9 +7,10 @@
 //! row serves the transcript "mixed-provenance" live, as RCL-05's
 //! stand-in harness does, and calls as the run. The `kind` filter names
 //! a provenance class family (`tool_result` matches `tool_result:Bash`).
-//! No event a search can find is trusted yet (PRV-02, OQ-40), so the
-//! `trust "trusted"` row returns no hit; its step proves the filter,
-//! not the fixture, left nothing.
+//! No event a search can find is trusted yet: until OQ-40 provides a
+//! signing key every run leaves R3 and R8 open, so no `user` event is
+//! trusted (PRV-02, PRV-08). The `trust "trusted"` row returns no hit;
+//! its step proves the filter, not the fixture, left nothing.
 
 use std::collections::BTreeMap;
 

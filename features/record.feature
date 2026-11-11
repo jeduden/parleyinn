@@ -339,6 +339,7 @@ Feature: Record (REC)
     And the "user" event and the "harness_meta" event from "pre-install" have trust "untrusted"
     And this node records "elsewhere" as an ingested run in the principal's personal room, shown as "ingested", and every event of it has trust "untrusted"
     And ingesting "elsewhere" is recorded as the person's widening principal act at a terminal (OWN-11, OWN-12), and the same path named in a hook input or a transcript line is rejected as outside the allowed roots (SEC-18)
+    And "elsewhere" is read only once its path resolves, symlinks included, to a regular file, and its lines are redacted before they are stored
     And every event "parinn ingest" read past the ingest marker of "cut-short" carries the "ingested" origin and has trust "untrusted"
 
   @REC-23 @P2 @I2 @I4 @I6 @pending

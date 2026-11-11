@@ -24,7 +24,7 @@ summary: >-
 - **Provenance class family**: A class's text before its first colon, or the
   whole class when it has none. RCL-02's versioned `kind` field of
   `event_search` selects it, never an event kind; an envelope item's `kind` is
-  its event kind, apart from its Provenance (record.md).
+  its event kind, which is recorded apart from its provenance (Event).
 - **Deployment mode**: `interactive` (a person types at the harness) or
   `automation` (a pipeline does, the default), set per node by managed policy
   or accepted configuration (PRV-02, PRV-04, ADM-04, `node.deployment_mode`).
