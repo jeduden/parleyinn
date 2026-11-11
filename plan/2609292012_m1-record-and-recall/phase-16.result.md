@@ -90,7 +90,7 @@ items moved (plan.md, §12.2). To M3: ADM-09's landmark row, ENG-06's
 migration, SEC-08's `purge --run`. To M5: SEC-12's flag row, SEC-17,
 ENG-22, ENG-23, NFR-05's target. To M7: SEC-19, ENG-29, NFR-01, the PRV
 remainders. To M8: PRV-09. Open in M1: bound steps for RCL-02 and
-ADM-09's other rows; rulings on LANE-02, REC-24, the residue.
+ADM-09's other rows; rulings on LANE-02, REC-24.
 
 - [x] ADM-09's two pending-purge rows (PR #90) are bound and pass, run
   with `@pending` lifted by hand
