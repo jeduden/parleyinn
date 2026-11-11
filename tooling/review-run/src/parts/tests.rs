@@ -140,6 +140,8 @@ fn part_run(failure: Option<&str>, answer: &str, cost: f64) -> AgentRun {
             texts: vec![answer.to_owned()],
             writes: Vec::new(),
             reads: Vec::new(),
+            cwd: String::new(),
+            searches: Vec::new(),
         },
         charged: cost,
         ..AgentRun::of(String::new(), Kind::Specialist, None, RunLog::default(), 1)

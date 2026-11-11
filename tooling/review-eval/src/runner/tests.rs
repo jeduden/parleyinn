@@ -145,6 +145,34 @@ fn each_kind_gets_its_prompt() {
     assert!(generalist.contains("reports are none."), "{generalist}");
 }
 
+#[test]
+fn every_kind_is_told_to_read_the_pull_request_s_tree_and_not_main_s() {
+    let w = world("standard");
+
+    for (kind, name) in [
+        (Kind::Specialist, "srs-security"),
+        (Kind::Generalist, "review-spec"),
+        (Kind::Consultant, "persona-agent"),
+    ] {
+        let prompt = prompt(&component(kind, name), &w);
+
+        // A path a diff or an agent's instructions name is relative to the
+        // repository, and the work directory's root is main's tree: an
+        // agent that reads it there judges the change against main.
+        assert!(prompt.contains(HEAD_TREE), "{prompt}");
+        assert!(!prompt.contains("  "), "{prompt}");
+    }
+    // The whole wording is pinned: the middle clause is what stops an
+    // agent from opening a path as its diff or its instructions give it.
+    assert_eq!(
+        HEAD_TREE,
+        "The pull request's tree is in `pr-head/`: read and search the repository's files \
+         there, each as `pr-head/<its path>`, whatever path your diff or your instructions \
+         name. The tree around it is main's: it shows only what the change replaced, and \
+         nothing the pull request adds."
+    );
+}
+
 fn args_of(c: &Command) -> Vec<&str> {
     c.args.iter().map(String::as_str).collect()
 }

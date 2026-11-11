@@ -28,7 +28,7 @@ pub const INSTRUCTIONS_TEXT: &str = "review/pr-instructions.txt";
 pub const PATTERNS: &str = "review/mdsmith-patterns.json";
 /// The instruction files the workflow keeps out of the agent's load
 /// path, at any depth of the pull request's tree.
-const INSTRUCTION_NAMES: [&str; 5] = [
+pub(crate) const INSTRUCTION_NAMES: [&str; 5] = [
     ".claude",
     "CLAUDE.md",
     "CLAUDE.local.md",
