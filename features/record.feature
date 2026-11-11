@@ -125,10 +125,11 @@ Feature: Record (REC)
     And <audit>
 
     Examples:
-      | change                                                | outcome                                                                                                                                                               | audit                                                          |
-      | truncated to 10 lines                                 | "main-run" starts transcript generation 2 and all 40 events of transcript generation 1 remain in the record                                                           | an audit entry records "new transcript generation of main-run" |
-      | rewritten with a different first line                 | "main-run" starts transcript generation 2 and all 40 events of transcript generation 1 remain in the record                                                           | an audit entry records "new transcript generation of main-run" |
-      | appended to by 5 lines after a purge of its lines 5-6 | "main-run" stays in transcript generation 1, its consumed prefix matching the stored hash with the bytes of each purged line zeroed, and its 5 new lines are recorded | no audit entry records "new transcript generation of main-run" |
+      | change                                                               | outcome                                                                                                                                                                                                | audit                                                          |
+      | truncated to 10 lines                                                | "main-run" starts transcript generation 2 and all 40 events of transcript generation 1 remain in the record                                                                                            | an audit entry records "new transcript generation of main-run" |
+      | rewritten with a different first line                                | "main-run" starts transcript generation 2 and all 40 events of transcript generation 1 remain in the record                                                                                            | an audit entry records "new transcript generation of main-run" |
+      | appended to by 5 lines after a purge of its lines 5-6                | "main-run" stays in transcript generation 1, its consumed prefix matching the stored hash with the bytes of each purged line zeroed, and its 5 new lines are recorded                                  | no audit entry records "new transcript generation of main-run" |
+      | rewritten with a different first line after a purge of its lines 5-6 | "main-run" starts transcript generation 2, its purged lines 5-6 are each refused with an audit entry and never recorded again, and the 38 other events of transcript generation 1 remain in the record | an audit entry records "new transcript generation of main-run" |
 
   @REC-08 @P0 @I1 @I6
   Scenario: the record outlives its transcript sources and verify reports transcript sources lost before full ingestion

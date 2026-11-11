@@ -5,12 +5,10 @@
 //! shrinks or is rewritten, records a repeated line once, and `parinn
 //! verify` names a source gone before it was fully ingested.
 //!
-//! `@REC-01`, `@REC-03` and `@REC-07` are bound. `@REC-02` stays pending:
-//! the rooms a later run reaches through the `rooms` scope and its
-//! restore blocks are M2's and M7's. `@REC-04` stays pending: fork
-//! observations are phase 9's hook observations, live ingest phase 10's
-//! and purge phase 14's. `@REC-08` stays pending: `parinn event expand`
-//! is phase 13's.
+//! `@REC-01`, `@REC-03`, `@REC-04`, `@REC-07` and `@REC-08` are bound;
+//! REC-07's steps for a purged line are in `record_purged`. `@REC-02`
+//! stays pending: the rooms a later run reaches through the `rooms`
+//! scope and its restore blocks are M2's and M7's.
 //!
 //! A transcript a step writes holds lines of a type no supported version
 //! records, each with its own `uuid`: the record keeps each whole.
@@ -51,7 +49,7 @@ fn line(name: &str, n: u64) -> Value {
 }
 
 /// Lines `from` to `to` of the transcript `name`, each ended.
-fn lines(name: &str, from: u64, to: u64) -> String {
+pub(crate) fn lines(name: &str, from: u64, to: u64) -> String {
     (from..=to)
         .map(|n| format!("{}\n", line(name, n)))
         .collect()
@@ -80,7 +78,7 @@ fn ingest_all(w: &mut World) -> Result<(), String> {
     ))
 }
 
-fn open(w: &World) -> Result<Store, String> {
+pub(crate) fn open(w: &World) -> Result<Store, String> {
     Store::open(&home(w)?.store()).map_err(|e| e.to_string())
 }
 
@@ -92,13 +90,13 @@ fn kept(path: &Path) -> Result<String, String> {
 }
 
 /// Every generation of the transcript source of `name`, oldest first.
-fn generations(w: &mut World, name: &str) -> Result<Vec<Source>, String> {
+pub(crate) fn generations(w: &mut World, name: &str) -> Result<Vec<Source>, String> {
     let path = kept(&transcript(w, name)?)?;
     open(w)?.generations(&path).map_err(|e| e.to_string())
 }
 
 /// Every event read from the transcript `name`, in every generation.
-fn placed(w: &mut World, name: &str) -> Result<Vec<Placed>, String> {
+pub(crate) fn placed(w: &mut World, name: &str) -> Result<Vec<Placed>, String> {
     let store = open(w)?;
     let mut out = Vec::new();
     for generation in generations(w, name)? {
@@ -262,13 +260,19 @@ fn changed(w: &mut World, name: String, how: String, keep: String) -> Result<(),
         let keep: u64 = keep.parse().map_err(|_| format!("{keep:?} lines"))?;
         lines(&name, 1, keep)
     } else {
-        format!(
-            "{}\n{}",
-            json!({"type": "x", "first": "other"}),
-            lines(&name, 2, count)
-        )
+        rewritten(&name, count)
     };
     fs::write(&path, changed).map_err(|e| e.to_string())
+}
+
+/// The transcript `name` of `count` lines, rewritten: another first
+/// line, then its own lines 2 to `count`.
+pub(crate) fn rewritten(name: &str, count: u64) -> String {
+    format!(
+        "{}\n{}",
+        json!({"type": "x", "first": "other"}),
+        lines(name, 2, count)
+    )
 }
 
 #[then(
@@ -291,66 +295,6 @@ fn new_generation(w: &mut World, name: String, generation: u64, n: usize) -> Res
     Err(format!(
         "{name:?} is at generation {newest:?}; generation 1 keeps {present} of {} events",
         kept.len()
-    ))
-}
-
-#[when(
-    regex = r#"^"([^"]+)" is appended to by (\d+) lines after a purge of its lines (\d+)-(\d+)$"#
-)]
-fn purged_then_appended(
-    w: &mut World,
-    name: String,
-    more: u64,
-    from: u64,
-    to: u64,
-) -> Result<(), String> {
-    let seq_of = |placed: &[Placed], line: u64| {
-        placed
-            .iter()
-            .find(|p| p.place.line == line)
-            .map(|p| p.address.seq.get())
-            .ok_or_else(|| format!("line {line} of {name:?} is not in the record"))
-    };
-    let placed = placed(w, &name)?;
-    let (first, last) = (seq_of(&placed, from)?, seq_of(&placed, to)?);
-    crate::erasure::purge_run_events(w, &name, first, last)?;
-    let path = transcript(w, &name)?;
-    let mut text = fs::read_to_string(&path).map_err(|e| e.to_string())?;
-    let count = text.lines().count() as u64;
-    text.push_str(&lines(&name, count + 1, count + more));
-    fs::write(&path, text).map_err(|e| e.to_string())
-}
-
-#[then(
-    regex = r#"^"([^"]+)" stays in transcript generation 1, its consumed prefix matching the stored hash with the bytes of each purged line zeroed, and its (\d+) new lines are recorded$"#
-)]
-fn resumed_past_a_purge(w: &mut World, name: String, more: u64) -> Result<(), String> {
-    let generations = generations(w, &name)?;
-    let [source] = generations.as_slice() else {
-        return Err(format!("{name:?} has {} generations", generations.len()));
-    };
-    let bytes = fs::read(transcript(w, &name)?).map_err(|e| e.to_string())?;
-    let offset = source.position.offset;
-    let zeroed = store::source::prefix_digest(&bytes, offset, &source.purged);
-    let as_written = store::source::prefix_digest(&bytes, offset, &[]);
-    if source.purged.is_empty() || zeroed != Some(source.position.prefix) || zeroed == as_written {
-        return Err(format!(
-            "{name:?}: the stored hash is not that of the prefix with its {} purged lines zeroed",
-            source.purged.len()
-        ));
-    }
-    let total = bytes
-        .split(|b| *b == b'\n')
-        .filter(|l| !l.is_empty())
-        .count() as u64;
-    let recorded: Vec<u64> = placed(w, &name)?.iter().map(|p| p.place.line).collect();
-    let new: Vec<u64> = (total - more + 1..=total).collect();
-    if offset == bytes.len() as u64 && new.iter().all(|n| recorded.contains(n)) {
-        return Ok(());
-    }
-    Err(format!(
-        "{name:?} stands at {offset} of {} bytes and records lines {recorded:?}",
-        bytes.len()
     ))
 }
 
