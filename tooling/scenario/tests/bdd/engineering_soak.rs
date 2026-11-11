@@ -9,92 +9,13 @@ use std::process::Command;
 
 use administration::node::Node;
 use cucumber::{then, when};
+use engineering::soak::{CI, EVENTS, NIGHTLY, SOAK, miri_problems, nightly_problems};
 use engineering::static_analysis::{UNSAFE_SHIM, crates_forbid_unsafe};
 use key::random::OsEntropy;
 use store::Store;
 
 use crate::World;
 use crate::record::{first_start, last_run, run_core};
-
-/// The soak test's source, the nightly workflow's evidence for the
-/// 1,000,000-event claim.
-const SOAK: &str = "crates/store/tests/soak.rs";
-
-/// The nightly workflow that runs the soak at 1,000,000 events.
-const NIGHTLY: &str = ".github/workflows/nightly.yml";
-
-/// The writers the soak runs, as its source declares them.
-const WRITERS: &str = "const WRITERS: u8 = 50;";
-
-/// The lines of the job `name` in a workflow, comments dropped: the
-/// job's own line to the next job's.
-fn job(workflow: &str, name: &str) -> Option<Vec<String>> {
-    let head = format!("  {name}:");
-    let mut lines = workflow
-        .lines()
-        .skip_while(|l| l.trim_end() != head)
-        .skip(1)
-        .take_while(|l| {
-            l.trim().is_empty() || l.starts_with("   ") || l.trim_start().starts_with('#')
-        })
-        .filter(|l| !l.trim_start().starts_with('#'))
-        .map(str::to_owned)
-        .peekable();
-    lines.peek()?;
-
-    Some(lines.collect())
-}
-
-/// Whether some line of `job` holds every one of `parts`.
-fn has_line(job: &[String], parts: &[&str]) -> bool {
-    job.iter().any(|l| parts.iter().all(|p| l.contains(p)))
-}
-
-/// What is wrong with the nightly workflow's soak job, given the
-/// workflow's text and the soak test's source.
-fn nightly_problems(nightly: &str, soak: &str) -> Vec<String> {
-    let mut problems = Vec::new();
-    if !soak.contains(WRITERS) {
-        problems.push(format!(
-            "{SOAK} does not declare {WRITERS:?}: the soak must run 50 writers"
-        ));
-    }
-    let Some(soak_job) = job(nightly, "soak") else {
-        problems.push(format!(
-            "{NIGHTLY} has no job \"soak\": add it, running \"cargo test --locked --release -p store --test soak\""
-        ));
-        return problems;
-    };
-    if !has_line(&soak_job, &["cargo test", "-p store", "--test soak"]) {
-        problems.push(format!(
-            "the soak job of {NIGHTLY} does not run \"cargo test -p store --test soak\": the soak test is the evidence"
-        ));
-    }
-    if !has_line(&soak_job, &["PARINN_SOAK_EVENTS", "\"1000000\""]) {
-        problems.push(format!(
-            "the soak job of {NIGHTLY} does not set PARINN_SOAK_EVENTS to \"1000000\": set it, or the 1000000-event claim has no evidence"
-        ));
-    }
-    problems
-}
-
-/// What is wrong with CI's Miri job, given the workflow's text.
-fn miri_problems(ci: &str) -> Vec<String> {
-    let Some(miri) = job(ci, "miri") else {
-        return vec![
-            ".github/workflows/ci.yml has no job \"miri\": add it, running \"cargo miri test -p platform\""
-                .to_owned(),
-        ];
-    };
-    if has_line(&miri, &["miri test", "-p platform"]) {
-        return Vec::new();
-    }
-
-    vec![
-        "the miri job of .github/workflows/ci.yml does not run \"cargo miri test -p platform\": the platform crate holds the unsafe code Miri must run"
-            .to_owned(),
-    ]
-}
 
 /// The store the scenario's home holds.
 fn store_path(w: &World) -> std::path::PathBuf {
@@ -193,9 +114,9 @@ fn verify_exits_zero(w: &mut World) -> Result<(), String> {
     regex = r#"^the nightly workflow "([^"]+)" runs the same soak test with 50 writers and the setting "([^"]+)" events, and its result is the evidence for the 1000000-event claim$"#
 )]
 fn nightly_runs_the_soak(_: &mut World, file: String, events: String) -> Result<(), String> {
-    if file != NIGHTLY || events != "1000000" {
+    if file != NIGHTLY || events != EVENTS {
         return Err(format!(
-            "the step names {file} and {events}, not {NIGHTLY} and 1000000"
+            "the step names {file} and {events}, not {NIGHTLY} and {EVENTS}"
         ));
     }
     let checkout = engineering::Checkout::new(&testkit::repo_root());
@@ -208,7 +129,7 @@ fn nightly_runs_the_soak(_: &mut World, file: String, events: String) -> Result<
     regex = r#"^every unsafe block that shares memory between threads runs under Miri in the pull request workflow "([^"]+)": only the "([^"]+)" crate may hold unsafe code, and Miri runs that crate's tests$"#
 )]
 fn ci_runs_miri(_: &mut World, file: String, krate: String) -> Result<(), String> {
-    if file != ".github/workflows/ci.yml" || format!("crates/{krate}") != UNSAFE_SHIM {
+    if file != CI || format!("crates/{krate}") != UNSAFE_SHIM {
         return Err(format!(
             "the step names {file} and {krate}, not CI's and the one unsafe shim, {UNSAFE_SHIM}"
         ));

@@ -46,8 +46,8 @@ Outcome:
   the seeded kills both check it.
 - ENG-09: a soak of 50 writers; at 1M events (release, 13 min), 4,293 of
   10,000 appends passed the 5 s busy deadline and were retried, as live
-  ingest retries. It runs nightly. @ENG-09 passes (ruled 2 November
-  2026): every pull request runs 50 certified writers to 10,000 events,
+  ingest retries. It runs nightly. @ENG-09 passes, as its row now
+  asks: every pull request runs 50 certified writers to 10,000 events,
   then `parinn verify` exits 0.
 - NFR-05: a floor benchmark; each run costs ingest about 12 ms.
 - Gates run: scenario gate, fmt, clippy `-D warnings`, `mdsmith check .`,
