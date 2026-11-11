@@ -59,3 +59,36 @@ fn a_finding_the_audit_log_cannot_take_is_said_on_stderr() {
         "{text}"
     );
 }
+
+#[test]
+fn each_entry_says_its_kind_and_names_the_source() {
+    let p = Process::new();
+    let mut found = ingested(&p);
+    found.new_generation = true;
+    found.conflicts = 1;
+    found.owners_chosen = 1;
+    found.hold_started = true;
+    found.released = 1;
+    let name = found.name.clone();
+
+    p.with_context(&DEV, |ctx| super::audit(ctx, &found, &mut Vec::new()));
+
+    let said: Vec<(String, String)> = audited(&p)
+        .into_iter()
+        .filter(|e| e.operation == "ingest" && e.detail.ends_with(&name))
+        .filter_map(|e| Some((e.counter?, e.kind)))
+        .collect();
+    let expected = [
+        ("new_transcript_generation", "truncated"),
+        ("repeat_conflicts", "rejected"),
+        ("repeat_owner_chosen", "coalesced"),
+        ("repeat_held", "truncated"),
+        ("repeat_released", "timed-out"),
+    ];
+    for (counter, kind) in expected {
+        assert!(
+            said.contains(&(counter.to_owned(), kind.to_owned())),
+            "{counter} as {kind}: {said:?}"
+        );
+    }
+}
