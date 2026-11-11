@@ -619,8 +619,9 @@ pub(super) fn benchmark_cases() -> Vec<Case> {
     .concat()
 }
 
-/// ENG-09: the nightly soak runs at 1,000,000 events and CI runs Miri
-/// over the `platform` crate; the scenario also runs the soak itself.
+/// ENG-09: the nightly soak runs at 1,000,000 events, no crate but
+/// `platform` can hold unsafe code and CI runs Miri over that crate;
+/// the scenario also runs the soak itself.
 pub(super) fn soak_cases() -> Vec<Case> {
     vec![
         case(
@@ -655,6 +656,17 @@ pub(super) fn soak_cases() -> Vec<Case> {
             ),
             scenario("ENG-09"),
             "does not run \"cargo miri test -p platform\"",
+        ),
+        case(
+            "a crate Miri does not run left free to hold unsafe code",
+            "ENG-09",
+            Injection::replace(
+                "tooling/finding-ledger/Cargo.toml",
+                "[lints]\nworkspace = true\n",
+                "",
+            ),
+            scenario("ENG-09"),
+            "crate tooling/finding-ledger neither inherits the workspace lints nor forbids unsafe code in src/lib.rs",
         ),
     ]
 }

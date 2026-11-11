@@ -1,14 +1,15 @@
 //! The ENG-09 steps: 50 writers append 10,000 events in all through the
 //! store's soak test into an isolated home, no address repeats and no
 //! seq is skipped, `parinn verify` then exits 0 over that store, the
-//! nightly workflow runs the soak at 1,000,000 events and CI runs Miri
-//! over the `platform` crate.
+//! nightly workflow runs the soak at 1,000,000 events, no crate but
+//! `platform` can hold unsafe code and CI runs Miri over that crate.
 
 use std::collections::BTreeSet;
 use std::process::Command;
 
 use administration::node::Node;
 use cucumber::{then, when};
+use engineering::static_analysis::{UNSAFE_SHIM, crates_forbid_unsafe};
 use key::random::OsEntropy;
 use store::Store;
 
@@ -204,15 +205,20 @@ fn nightly_runs_the_soak(_: &mut World, file: String, events: String) -> Result<
 }
 
 #[then(
-    regex = r#"^the pull request workflow "([^"]+)" runs Miri over the tests of the "([^"]+)" crate, the one crate holding unsafe code$"#
+    regex = r#"^every unsafe block that shares memory between threads runs under Miri in the pull request workflow "([^"]+)": only the "([^"]+)" crate may hold unsafe code, and Miri runs that crate's tests$"#
 )]
 fn ci_runs_miri(_: &mut World, file: String, krate: String) -> Result<(), String> {
-    if file != ".github/workflows/ci.yml" || krate != "platform" {
+    if file != ".github/workflows/ci.yml" || format!("crates/{krate}") != UNSAFE_SHIM {
         return Err(format!(
-            "the step names {file} and {krate}, not CI's and platform"
+            "the step names {file} and {krate}, not CI's and the one unsafe shim, {UNSAFE_SHIM}"
         ));
     }
-    let ci = engineering::Checkout::new(&testkit::repo_root()).read(&file)?;
+    let checkout = engineering::Checkout::new(&testkit::repo_root());
+    let ci = checkout.read(&file)?;
+    // Every unsafe block is the shim's only while no other crate can
+    // switch the ban off, so the step holds both halves of the row.
+    let mut problems = crates_forbid_unsafe(&checkout);
+    problems.extend(miri_problems(&ci));
 
-    engineering::outcome(miri_problems(&ci))
+    engineering::outcome(problems)
 }

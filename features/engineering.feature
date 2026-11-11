@@ -93,7 +93,7 @@ Feature: Engineering quality (ENG)
     Then no two events share an address (writer, seq), and no seq is duplicated or skipped within any writer's log
     And "parinn verify" exits 0
     And the nightly workflow ".github/workflows/nightly.yml" runs the same soak test with 50 writers and the setting "1000000" events, and its result is the evidence for the 1000000-event claim
-    And the pull request workflow ".github/workflows/ci.yml" runs Miri over the tests of the "platform" crate, the one crate holding unsafe code
+    And every unsafe block that shares memory between threads runs under Miri in the pull request workflow ".github/workflows/ci.yml": only the "platform" crate may hold unsafe code, and Miri runs that crate's tests
 
   @ENG-10 @P0 @pending
   Scenario: golden files fix the exact bytes of restore blocks and envelopes
