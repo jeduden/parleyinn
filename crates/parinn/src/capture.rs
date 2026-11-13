@@ -56,6 +56,16 @@ const LOOK: Duration = Duration::from_millis(10);
 /// The directory of the MCP servers' start markers, in the home.
 const MARKERS: &str = "mcp";
 
+/// The file in the home whose seconds a development build's live ingest
+/// reads as the time, when a test leaves one: its way to move the clock
+/// past REC-04's 30 s without waiting. A release build never reads it.
+pub(crate) const TEST_CLOCK: &str = "test-clock";
+
+/// The seconds the file `path` holds, if it holds them.
+fn left_by_test(path: &Path) -> Option<u64> {
+    fs::read_to_string(path).ok()?.trim().parse().ok()
+}
+
 /// What live ingest shares with the server: the runs of each tool-use
 /// id its ingest read, whether it holds a session binding, and whether
 /// it should stop.
@@ -171,6 +181,9 @@ pub(crate) struct Running {
     transcripts: BTreeMap<PathBuf, u64>,
     /// The paths refused, each audited once.
     refused: BTreeSet<PathBuf>,
+    /// The paths whose tool-use ids failed to scan, each audited once
+    /// until a scan succeeds.
+    unscanned: BTreeSet<PathBuf>,
     marker: Option<StartMarker>,
     /// When its run seats' open segments last closed, and how often
     /// they close while it appends (REC-19).
@@ -189,6 +202,7 @@ impl Capture {
             sessions: Vec::new(),
             transcripts: BTreeMap::new(),
             refused: BTreeSet::new(),
+            unscanned: BTreeSet::new(),
             marker: None,
             closed: now_instant(),
             close_every: SEGMENT_EVERY,
@@ -221,8 +235,18 @@ impl Running {
     /// Whether the audit log took `occurrence`.
     fn audited(&self, occurrence: &Occurrence) -> bool {
         Log::new(self.capture.home.audit())
-            .append(occurrence, (self.capture.clock)())
+            .append(occurrence, self.now())
             .is_ok()
+    }
+
+    /// Now, in seconds since the Unix epoch: the clock, or, in a
+    /// development build, the seconds a test left in the home's
+    /// [`TEST_CLOCK`] file.
+    fn now(&self) -> u64 {
+        let left = cfg!(debug_assertions)
+            .then(|| left_by_test(&self.capture.home.root().join(TEST_CLOCK)))
+            .flatten();
+        left.unwrap_or_else(|| (self.capture.clock)())
     }
 
     /// Takes every session binding of its harness process no MCP server
@@ -339,9 +363,12 @@ impl Running {
         if new {
             self.marker = StartMarker::leave(&self.capture.home, &transcripts, self.marker.take());
         }
-        // Each read leaves its ingest marker at the time it reads (ADM-09).
+        // Each read leaves its ingest marker at the time it reads (ADM-09),
+        // and holds a fork's line only for a transcript another server
+        // holds a session binding for (REC-04).
         let inputs = ingest::Inputs {
-            now_ms: (self.capture.clock)().saturating_mul(1000),
+            now_ms: self.now().saturating_mul(1000),
+            served: served_elsewhere(&self.capture.home, &transcripts),
             ..self.capture.inputs.clone()
         };
         for path in transcripts {
@@ -359,7 +386,7 @@ impl Running {
                 Ok(None) => {}
                 Err(e) => self.failed(&path, &e),
             }
-            self.read_tool_uses(&path);
+            self.read_line_fields(&path);
         }
         if self.closed.elapsed() >= self.close_every {
             self.close_segments();
@@ -398,7 +425,8 @@ impl Running {
     }
 
     /// Audits what one live ingest found: each redaction, unparsed line,
-    /// format drift, new generation and witnessed repeat (I6).
+    /// format drift, new generation, witnessed repeat, refused repeat, hold
+    /// begun and line released (I6).
     fn audit_ingested(&self, ingested: &Ingested) {
         for rule in &ingested.redactions {
             self.audit(&keyed(
@@ -443,6 +471,35 @@ impl Running {
                 &ingested.name,
             ));
         }
+        for _ in 0..ingested.refused {
+            self.audit(&keyed(
+                Kind::Rejected,
+                Counter::RepeatOfPurgedRefused,
+                "refused a repeated line whose `uuid` names a purged event, in",
+                &ingested.name,
+            ));
+        }
+        if ingested.hold_started {
+            self.audit(&keyed(
+                Kind::Truncated,
+                Counter::RepeatHeld,
+                "repeated lines held at an ingest marker in",
+                &ingested.name,
+            ));
+        }
+        for _ in 0..ingested.released {
+            self.audit(&keyed(
+                Kind::TimedOut,
+                Counter::RepeatReleased,
+                "repeated line released into its own run in",
+                &ingested.name,
+            ));
+        }
+        for unread in &ingested.unread_sources {
+            let why = unread.why.as_str();
+            tracing::warn!(error = why, "read a sibling transcript");
+            self.audit(&crate::sourcing::unread_occurrence("mcp", &unread.name));
+        }
         self.audit_index_gaps(ingested);
     }
 
@@ -461,9 +518,11 @@ impl Running {
         }
     }
 
-    /// Reads the tool-use ids of the lines of the transcript at `path`
-    /// that ingest read since the last time, each with its run.
-    fn read_tool_uses(&mut self, path: &Path) {
+    /// Reads the tool-use ids and checks the path fields of the lines of
+    /// the transcript at `path` that ingest read since the last time.
+    /// A transcript line's `cwd` never becomes an allowed root; an
+    /// outside one is rejected and audited (SEC-18).
+    fn read_line_fields(&mut self, path: &Path) {
         let Some(from) = self.transcripts.get(path).copied() else {
             return;
         };
@@ -475,8 +534,12 @@ impl Running {
         if read <= from {
             return;
         }
-        let Ok(bytes) = ingest::read::transcript(path) else {
-            return;
+        let bytes = match ingest::read::transcript(path) {
+            Ok(bytes) => bytes,
+            Err(e) => {
+                self.audit_unscanned(path, &e);
+                return;
+            }
         };
         let range = bytes
             .get(as_index(from)..as_index(read))
@@ -484,12 +547,33 @@ impl Running {
         let defaults = Defaults::of(path);
         for line in String::from_utf8_lossy(range).lines() {
             let parsed: Value = serde_json::from_str(line).unwrap_or(Value::Null);
+            if let Some(cwd) = parsed["cwd"].as_str() {
+                self.resolve(Path::new(cwd));
+            }
             let run = run_name(&defaults.key(&parsed));
             for id in tool_use_ids(&parsed) {
                 self.capture.shared.read(id, run.clone());
             }
         }
+        self.unscanned.remove(path);
         self.transcripts.insert(path.to_path_buf(), read);
+    }
+
+    /// Audits, once until it reads again, a transcript whose tool-use ids
+    /// could not be scanned; the next poll tries again. One gone gives
+    /// none: its loss is counted where it is found (REC-08, I6).
+    fn audit_unscanned(&mut self, path: &Path, e: &io::Error) {
+        if e.kind() == io::ErrorKind::NotFound || !self.unscanned.insert(path.to_path_buf()) {
+            return;
+        }
+        let why = e.to_string();
+        tracing::warn!(error = why.as_str(), "scan a transcript's tool uses");
+        self.audit(&Occurrence::Degraded {
+            kind: Kind::Failed,
+            counter: Counter::LiveIngestFailed,
+            operation: "mcp",
+            detail: "a transcript's tool-use ids could not be read; the next read tries again",
+        });
     }
 
     /// Audits each transcript left short of its end, closes the run
@@ -542,10 +626,14 @@ fn remainders<'p>(home: &Home, paths: impl Iterator<Item = &'p PathBuf>) -> Vec<
                 .ok()
                 .flatten()
                 .map_or(0, |s| s.position.offset);
-            let complete = ingest::read::transcript(path)
-                .map(|b| b.iter().rposition(|c| *c == b'\n').map_or(0, |i| i + 1))
-                .unwrap_or(0);
-            read < complete as u64
+            // One that cannot be read may hold more than was ingested.
+            match ingest::read::transcript(path) {
+                Ok(bytes) => {
+                    let complete = bytes.iter().rposition(|c| *c == b'\n').map_or(0, |i| i + 1);
+                    read < complete as u64
+                }
+                Err(e) => e.kind() != io::ErrorKind::NotFound,
+            }
         })
         .map(|path| {
             path.file_stem()
@@ -689,6 +777,15 @@ pub(crate) fn count_stopped(
     audited
 }
 
+/// The transcripts a running MCP server other than the one that reads
+/// `own` holds a session binding for.
+fn served_elsewhere(home: &Home, own: &[PathBuf]) -> BTreeSet<PathBuf> {
+    served(home)
+        .into_iter()
+        .filter(|path| !own.contains(path))
+        .collect()
+}
+
 /// The start markers of the MCP servers, as `parinn verify` reads them:
 /// behind this seam, so a test sets them out (ENG-03).
 pub(crate) trait Markers {
@@ -741,5 +838,8 @@ pub(crate) fn served_by(markers: &dyn Markers) -> Vec<PathBuf> {
         .collect()
 }
 
+#[cfg(test)]
+#[path = "capture/failure/tests.rs"]
+mod failure_tests;
 #[cfg(test)]
 mod tests;
