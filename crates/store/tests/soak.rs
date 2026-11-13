@@ -137,7 +137,12 @@ fn fifty_writers_appending_at_once_keep_every_log_gap_free_and_every_address_uni
     Store::open(&path).unwrap();
 
     let ids = writers();
-    assert_eq!(ids.len(), usize::from(WRITERS), "writers");
+    assert_eq!(
+        ids.len(),
+        usize::from(WRITERS),
+        "the soak runs {WRITERS} writers, and PARINN_SOAK_WRITERS lists {}",
+        ids.len()
+    );
     let retried = soak(&path, &ids, per);
     println!(
         "{total} events by {WRITERS} writers, {retried} opens and appends retried past the busy deadline"
