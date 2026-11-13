@@ -910,4 +910,36 @@ fn each_generalist_s_weighing_is_kept_answered_or_cut_off_and_none_without_a_run
     assert!(none.weighings.is_empty());
 }
 
+const FOUND: &str = "src/a.rs:3 — if not addressed: a long line hides a bug — I9";
+const ASKED: &str = "docs/x.md:7 — request: add a row — a motive";
+
+#[test]
+fn the_places_of_reports_are_each_listed_once_sorted_findings_and_requests() {
+    let one = format!("{FOUND}\nprose\n{ASKED}\noutcome: findings — two");
+    let two = format!("{FOUND}\n");
+
+    assert_eq!(
+        places([one.as_str(), two.as_str()]),
+        vec!["docs/x.md:7".to_owned(), "src/a.rs:3".to_owned()]
+    );
+    assert!(places(["outcome: none — nothing"]).is_empty());
+}
+
+#[test]
+fn a_prompt_names_each_place_to_answer_and_none_without_places() {
+    assert_eq!(answerable(&[]), None);
+    let note = answerable(&["src/a.rs:3".to_owned(), "docs/x.md:7".to_owned()]).unwrap();
+
+    assert!(note.contains("`src/a.rs:3`, `docs/x.md:7`"), "{note}");
+    assert!(note.contains("range"), "{note}");
+    assert!(note.contains("at most 20 lines"), "{note}");
+}
+
+#[test]
+fn the_places_told_are_the_places_a_weighing_is_held_to() {
+    let report = format!("{FOUND}\n{ASKED}\n");
+
+    assert_eq!(missed([report.as_str()], ""), places([report.as_str()]));
+}
+
 mod read;
