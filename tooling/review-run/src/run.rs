@@ -477,7 +477,11 @@ pub(crate) fn attempt(
                 told(&mut command.args, &reading);
             }
         }
-        None => {}
+        None => {
+            if let Some(answerable) = answerable_note(workdir, plan, name) {
+                told(&mut command.args, &answerable);
+            }
+        }
     }
     if let Some(note) = note {
         told(&mut command.args, note);
@@ -565,6 +569,18 @@ pub(crate) fn world_of(workdir: &Path, plan: &Plan, name: &str) -> World {
         seeded: plan.reports_of(name),
         notes: Vec::new(),
     }
+}
+
+/// The note telling generalist `name` the places its specialists'
+/// reports in `workdir` name and it must answer, when they name any.
+fn answerable_note(workdir: &Path, plan: &Plan, name: &str) -> Option<String> {
+    let reports: Vec<String> = plan
+        .reports_of(name)
+        .iter()
+        .filter_map(|rel| fs::read_to_string(workdir.join(rel)).ok())
+        .collect();
+
+    crate::outcome::answerable(&crate::outcome::places(reports.iter().map(String::as_str)))
 }
 
 /// Adds `note` to the prompt among `args`, the value after `-p`.

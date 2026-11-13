@@ -588,6 +588,49 @@ pub fn missed<'a>(reports: impl IntoIterator<Item = &'a str>, answer: &str) -> V
     missed.into_iter().collect()
 }
 
+/// The places of the findings and requests in `reports`, each once, in
+/// the form a weighing line names them, `path:line`, sorted: what a
+/// generalist is told it must answer before it starts, the same places
+/// [`missed`] holds its weighing to.
+#[must_use]
+pub fn places<'a>(reports: impl IntoIterator<Item = &'a str>) -> Vec<String> {
+    let mut out = BTreeSet::new();
+    for report in reports {
+        for line in report.lines().map(review_gate::report::line) {
+            match &line {
+                Line::Linked(k) => out.insert(format!("{}:{}", k.path, k.line)),
+                Line::Request(r) => out.insert(format!("{}:{}", r.path, r.line)),
+                _ => continue,
+            };
+        }
+    }
+
+    out.into_iter().collect()
+}
+
+/// The note a generalist's prompt ends with for the `places` its
+/// specialists reported, none when they reported none: each must be
+/// answered by a line at it, or at a range holding it of at most
+/// [`MAX_RANGE`] lines, however alike its findings.
+#[must_use]
+pub fn answerable(places: &[String]) -> Option<String> {
+    if places.is_empty() {
+        return None;
+    }
+    let list = places
+        .iter()
+        .map(|p| format!("`{p}`"))
+        .collect::<Vec<_>>()
+        .join(", ");
+
+    Some(format!(
+        "Your specialists reported at these places: {list}. The review counts a place weighed \
+         only when a finding or dropped line of yours is at it, or at a range holding it of \
+         at most {MAX_RANGE} lines, such as `path:29-30`, so answer every one, a duplicate \
+         or adjacent finding too."
+    ))
+}
+
 /// The most lines a range a weighing line names, `start-end`, may span
 /// and cover each of: a wider one names its first line alone, as a
 /// finding at it is read, so no one line can cover a whole file.
