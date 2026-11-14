@@ -180,9 +180,9 @@ fn without(w: &mut World, arguments: &Value, name: &str) -> Result<Vec<Value>, S
 /// for trusted hits returns none, nothing a search finds being trusted
 /// yet, while the same search without the filter finds untrusted hits
 /// only: a row to tighten once OQ-40 lets an event be trusted. Every
-/// other row returns a hit, and a run, provenance class or family
-/// filter refuses a hit the same search finds without it, so an empty
-/// answer or a filter that keeps everything proves no row.
+/// other row returns a hit, and a run, provenance class, family or
+/// time filter refuses a hit the same search finds without it, so an
+/// empty answer or a filter that keeps everything proves no row.
 fn filters_at_work(
     w: &mut World,
     store: &Store,
@@ -199,7 +199,7 @@ fn filters_at_work(
     if items.is_empty() {
         return Err("the search returned no hit, so the row proves no filter".into());
     }
-    for name in ["run", "provenance", "kind"] {
+    for name in ["run", "provenance", "kind", "since", "until"] {
         if arguments.get(name).is_none() {
             continue;
         }
