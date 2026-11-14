@@ -78,3 +78,31 @@ fn a_lengthened_path_is_found_after_any_text_before_it() {
         assert!(missed([report.as_str()], answer).is_empty(), "{answer}");
     }
 }
+
+#[test]
+fn a_short_and_a_long_spelling_of_one_path_reported_together_are_one_place() {
+    let reports = [
+        report_at("trust-and-flow.md:24"),
+        report_at("docs/domain-model/trust-and-flow.md:24"),
+    ];
+    let both: Vec<&str> = reports.iter().map(String::as_str).collect();
+    let answer = kept_at("docs/domain-model/trust-and-flow.md:24");
+
+    assert!(missed(both.clone(), &answer).is_empty());
+    assert!(missed(both, &kept_at("trust-and-flow.md:24")).is_empty());
+}
+
+#[test]
+fn a_bare_name_with_two_longer_spellings_reported_stays_ambiguous() {
+    let reports = [
+        report_at("lib.rs:5"),
+        report_at("crates/a/lib.rs:5"),
+        report_at("crates/b/lib.rs:5"),
+    ];
+    let all: Vec<&str> = reports.iter().map(String::as_str).collect();
+
+    assert_eq!(
+        missed(all, &kept_at("crates/a/lib.rs:5")),
+        ["crates/b/lib.rs:5", "lib.rs:5"]
+    );
+}
