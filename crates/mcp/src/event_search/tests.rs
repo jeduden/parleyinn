@@ -20,7 +20,7 @@ fn a_call_with_only_a_query_asks_for_ten_hits_in_any_run_of_the_room() {
     assert_eq!(params.text, "deploy");
     assert_eq!(params.k, 10);
     assert_eq!(params.writer, None);
-    assert!(params.provenance.is_empty() && params.kinds.is_empty());
+    assert!(params.provenance.is_empty() && params.provenance_families.is_empty());
     assert_eq!(params.trust, None);
     assert_eq!((params.since, params.until), (None, None));
 }
@@ -84,7 +84,7 @@ fn the_filters_are_short_lists_of_short_strings() {
     let params = parsed(json!({"provenance": ["web", "file"], "kind": ["tool_result"]})).unwrap();
 
     assert_eq!(params.provenance, ["web", "file"]);
-    assert_eq!(params.kinds, ["tool_result"]);
+    assert_eq!(params.provenance_families, ["tool_result"]);
     let many: Vec<String> = (0..17).map(|n| n.to_string()).collect();
     for bad in [
         json!({"provenance": "web"}),

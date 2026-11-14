@@ -125,6 +125,9 @@ pub enum Counter {
     /// Held repeated lines were released into their own run's writer,
     /// after 30 s or once their owner's transcript was gone (REC-04).
     RepeatReleased,
+    /// A repeated line whose `uuid` names a purged event was refused,
+    /// never recorded again (REC-04, REC-17).
+    RepeatOfPurgedRefused,
     /// A transcript source disappeared before it was fully ingested
     /// (REC-08).
     TranscriptSourceLost,
@@ -220,6 +223,13 @@ pub enum Counter {
     /// transaction could not finish: the residue stays journalled for the
     /// next attempt (ADM-07, SEC-14, I6).
     PurgeUnfinished,
+    /// A purge could not read a transcript to recompute its source's
+    /// consumed-prefix hash, which then confirms nothing (SEC-31, I6).
+    TranscriptPrefixUnconfirmed,
+    /// A transcript beside the one an ingest read could not be read to
+    /// learn its `uuid`s, so a repeated line may have been recorded as its
+    /// own event; the ingest went on without it (REC-04, I6).
+    IngestSourceUnread,
     /// A retention policy aged a range out and the node purged it
     /// (REC-15, SEC-22).
     RetentionPurged,
@@ -264,6 +274,7 @@ impl Counter {
             Self::RepeatOwnerChosen => "repeat_owner_chosen",
             Self::RepeatHeld => "repeat_held",
             Self::RepeatReleased => "repeat_released",
+            Self::RepeatOfPurgedRefused => "repeat_of_purged_refused",
             Self::TranscriptSourceLost => "transcript_source_lost",
             Self::HookInputRejected => "hook_input_rejected",
             Self::HookBudgetExceeded => "hook_budget_exceeded",
@@ -294,6 +305,8 @@ impl Counter {
             Self::RecallRefused => "recall_refused",
             Self::PurgeRefused => "purge_refused",
             Self::PurgeUnfinished => "purge_unfinished",
+            Self::TranscriptPrefixUnconfirmed => "transcript_prefix_unconfirmed",
+            Self::IngestSourceUnread => "ingest_source_unread",
             Self::RetentionPurged => "retention_purged",
             Self::RetentionFailed => "retention_failed",
             Self::VerifyTimedOut => "verify_timed_out",

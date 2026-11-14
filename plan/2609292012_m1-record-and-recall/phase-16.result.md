@@ -18,41 +18,22 @@ Outcome:
 - ENG-03, ENG-07, ENG-11: passing (cucumber); ENG-07 and ENG-11 have two
   drift cases each.
 - ENG-03's hold on injectable I/O: ruled met by the stakeholder's
-  [consent on PR #91][consent]; the seams are listed in
-  development.md. No
-  ENG-03 step checks the "all I/O through injectable traits" clause
-  mechanically, as plan 2609292011's phase 3 also records.
-- Verify and the start markers' readers open a transcript source or a
-  marker through ingest's guarded open: a link swapped in is not
-  followed and a FIFO is not waited on; verify reports such a source as
-  failed, unreadable (ADM-09, SEC-18, ENG-03).
-- Store schema: `transcript_sources` gained `marked_at` with no schema
-  version bump or migration. Nothing is released yet, so a store made
-  by main's build gets SQLite's column error, not ADM-05's named
-  refusal; acceptable before the first release.
-- parinn-eval: seeded runs in the 2.1.296 line shapes; a scripted agent
-  asks event_search then event_get. Within ten hits, 72/72 at each depth
-  (Wilson 95% from 94.9%). Within five, depth 3 falls to 87.5%. Without
-  recall, the context after the last compaction holds 0/216. CI's
-  `eval` job holds `tooling/eval/recall-v1.txt` to a fresh run.
-- S12: `crates/store/tests/s12_rebuild.rs` covers either order, row ids
-  from addresses, secure-delete and truncated logs. The trust policy's
-  unit tests show trust needs the mode.
-- ENG-06: kills of purge, at a terminal, and of rebuild. They found
-  verify exiting 3 after a kill between a purge's transaction and its
-  finishing. Verify stays read-only: it names the unfinished purge
-  (`pending_purges`), counts it, leaves the index unchecked and exits
-  0; the next purge, ingest or rebuild finishes it. A built case and
-  the seeded kills both check it.
-- ENG-09: a soak of 50 writers; at 1M events (release, 13 min), 4,293 of
-  10,000 appends passed the 5 s busy deadline and were retried, as live
-  ingest retries. It runs nightly. @ENG-09 passes, as its row now
-  asks: every pull request runs 50 certified writers to 10,000 events,
-  then `parinn verify` exits 0.
-- NFR-05: a floor benchmark; each run costs ingest about 12 ms.
-- Gates run: scenario gate, fmt, clippy `-D warnings`, `mdsmith check .`,
-  `cargo test --workspace` (156 scenarios), `cargo run -p coverage`
-  (100% in all layers, unit 99% or more), after merging main.
+  [consent on PR #91][consent]; no step checks that clause.
+- Verify and the start markers' readers open a source through ingest's
+  guarded open: a swapped link is not followed, a FIFO not waited on (ADM-09,
+  SEC-18, ENG-03).
+- Store schema: `transcript_sources` gained `marked_at`, no version bump.
+- parinn-eval: a scripted agent asking event_search then event_get: 72/72
+  within ten hits; CI's `eval` job holds `tooling/eval/recall-v1.txt`.
+- S12: `crates/store/tests/s12_rebuild.rs` covers either order and
+  truncated logs.
+- ENG-06: kills of purge and of rebuild. After a kill between a purge's
+  transaction and its finishing, verify stays read-only: it names the
+  unfinished purge (`pending_purges`), leaves the index unchecked and
+  exits 0; the next purge, ingest or rebuild finishes it.
+- ENG-09: @ENG-09 passes (ruled 2 November 2026): 50 certified writers,
+  10,000 events, then `parinn verify` exits 0; nightly runs 1M.
+- Gates run: scenario gate, fmt, clippy, mdsmith, tests, coverage.
 
 Raised (scenarios stay `@pending`):
 
@@ -64,37 +45,59 @@ Raised (scenarios stay `@pending`):
 
 For the stakeholder:
 
-- Names (no domain-model agent here): `parinn-eval`, `ingest_fifty_runs`,
-  `run_killed_at_terminal`.
-- Counters, domain-model agent verdict: `verify_unfinished` did not fit
-  (the cause is a deadline); renamed here to `verify_timed_out`, and the
-  `parinn verify` report key `unfinished_purges` to `pending_purges`
-  (purges awaiting the next rebuild). `purge_unfinished` does not fit
-  either: the model says `purge_failed` or `purge_timed_out`, and the
-  report key's analogue likewise; both kept for now on main, stakeholder
-  to rule. `recall_refused` fits; `recall_rejected` is the strict-literal
-  alternative.
-- Verify's derived-index recheck is bounded at 60 s
-  (`INDEX_CHECK_SECS`). On a store whose derivation always takes longer,
-  ADM-09's derived artifact check never runs (NFR-05). A ruling on the
-  bound is wanted.
-- Verify no longer writes (ruled); wording on PR #90.
+- Counters (domain-model agent): `verify_unfinished` became
+  `verify_timed_out`, report key `unfinished_purges` `pending_purges`.
+  `purge_unfinished` does not fit (`purge_failed` or `purge_timed_out`
+  do); kept on main, stakeholder to rule. `recall_refused` fits.
+- Verify no longer writes (ruled).
 - §11.1 measurement wording on claude/m1-phase-16-docs (PR #90).
-- Stakeholder paths: `.github/workflows/ci.yml` and `nightly.yml`,
-  `tooling/`, `Cargo.toml`, `tooling/*/Cargo.toml`.
-- Inherited items untouched: S2 `integrity`, phase 14/15 counters and
-  renames, `tombstones`.
+- Stakeholder paths: `ci.yml`, `nightly.yml`, `tooling/`.
 
-Plan close (stays 🔳): met are recall, S12 and the checks. The raised
+Plan close (✅): recall, S12 and the checks are met. ENG-03's mechanical
+clauses pass; the accepted stakeholder inspection on PR #91 is its
+injectable-I/O evidence, which cucumber does not claim to inspect. Raised
 items moved (plan.md, §12.2). To M3: ADM-09's landmark row, ENG-06's
-migration, SEC-08's `purge --run`. To M5: SEC-12's flag row, SEC-17,
-ENG-22, ENG-23, NFR-05's target. To M7: SEC-19, ENG-29, NFR-01, the PRV
-remainders. To M8: PRV-09. Open in M1: bound steps for RCL-02 and
-ADM-09's other rows; rulings on LANE-02, REC-24, the residue.
+migration, `purge --run`. To M5: SEC-12's flag row, SEC-17, ENG-22,
+ENG-23, and the NFR-04 and NFR-05 targets. To M7: SEC-19, ENG-29, NFR-01,
+PRV remainders, REC-24's confirm and LANE-02's remainder. To M8: PRV-09.
 
-- [x] ADM-09's two pending-purge rows (PR #90) are bound and pass, run
-  with `@pending` lifted by hand
-- [ ] M1 binds ADM-09's deadline, source, ingest marker and
-  consumed-prefix rows; the landmark row is M3's
+Rows that stay `@pending` after M1, with their remaining milestone
+(cucumber, 2 November 2026):
+
+- SEC-31, ADM-07: M3's; steps not bound. Their rows keep of a purged
+  line only its position, length and the harness's own `uuid` (REC-04).
+  Ruled: NFR-03..05 in part in M1 (NFR-04 was benchmarked but did
+  not meet its target; the NFR-04 and NFR-05 targets and MEM-02 are in
+  M5); `parinn ingest --path` keeps its OWN-22 gate, a path inside
+  `PARINN_HOME` stays refused (safe default).
+- ADM-09: 16 of 17 rows pass; the landmark row is M3's.
+- REC-22: all steps pass but the first Then, a freshness mark with
+  source and ingest position on every surface (VIEW-04, M7).
+- REC-02: its last step needs restore blocks and a join (M2).
+- REC-24: its confirm step is M7's; its quarantine Given and others
+  are unbound.
+- LANE-02: M1's repository-identity and local-worktree-bind part holds;
+  its branch-link, room-state and complete rebinding remainder is M7.
+- In part by §12.2: SEC-12 (flag row, M5), ENG-06, -15, -23, -29, SEC-17,
+  -19, PRV rows (above).
+
+Passing and off `@pending`: ENG-09, SEC-18, REC-04, REC-08, REC-12, REC-26,
+RCL-02 (10 of 10), REC-17. REC-08's replaced-generation clause has its
+step. REC-26's typed rows need `unshare -p -f --mount-proc`.
+Resume past a marker: ingest seat, `ingested`.
+A purged line that carries a `uuid` is never recorded again; OQ-57 has
+what that misses. PRV-14 stays
+`@pending` (user's ruling): its ambiguous-run race closes in M5's task 11.
+
+By the user's final ruling SEC-05 (its transcript rows) and windowed ingest are
+M5's; ingest and live capture read a transcript whole, as on main. The review
+gate's blockers: I1 against an oversize line, quadratic cost of a resumed
+source, capture poll latency. SEC-05 is `@pending` again by that ruling.
+
+- [x] ADM-09's other rows pass with `@pending` lifted, all but the
+  landmark row, M3's
+
+Ruled: v1.0 ends before M8; PRV-09 and PRV-02's peer rows stay in M8
+(§11.2 option C). Verify's 60 s bound (`INDEX_CHECK_SECS`) is postponed.
 
 [consent]: https://github.com/jeduden/parleyinn/pull/91#issuecomment-6402652493

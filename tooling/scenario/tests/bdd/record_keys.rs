@@ -21,6 +21,7 @@ use cucumber::{given, then};
 use key::certificate::{SeatCertificate, SeatKind};
 use key::key_event::{KeyEvent, NodeIdentityChange};
 use key::signing::PublicKey;
+use record::chain::SeenHead;
 use record::event::EventKind;
 use record::id::{Address, RoomId, Seq, WriterId};
 use serde_json::Value;
@@ -269,11 +270,22 @@ fn audited(w: &mut World) -> Result<(), String> {
 }
 
 #[then(
-    regex = r"^a structural node identity change event in the new device seat in the personal room carries only the fingerprints of the replaced and new device key or token key, followed by the new key's inception, which starts a new key event log$"
+    regex = r"^a structural node identity change event in the new device seat in the personal room carries only the fingerprints of the replaced and new device key or token key and the chain head of the key event log it leaves \(PRV-12\), followed by the new key's inception, which starts a new key event log$"
 )]
 fn change_event(w: &mut World) -> Result<(), String> {
     let old = keys(w).old_device.ok_or("no step recorded the old node")?;
-    let (node, _) = node(w)?;
+    let old_writer = keys(w)
+        .old_device_writer
+        .ok_or("no step recorded the old node")?;
+    let (node, store) = node(w)?;
+    // The key event log it leaves ends where the old device seat's
+    // writer does, nothing being appended under the old keys.
+    let left = store
+        .log(old_writer)
+        .map_err(|e| e.to_string())?
+        .last()
+        .map(|s| SeenHead::new(s.link.header.address, s.link.hash))
+        .ok_or("the old device seat holds no event")?;
     let (_, _, log) = new_device_seat(w)?;
     let content = log
         .first()
@@ -295,6 +307,7 @@ fn change_event(w: &mut World) -> Result<(), String> {
     if fields != ["chain_head", "key", "replaces"]
         || change.replaces != old.fingerprint()
         || change.key != node.device().public().fingerprint()
+        || change.chain_head != left
         || !starts
     {
         return Err(format!(
