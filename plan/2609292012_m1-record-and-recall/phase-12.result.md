@@ -59,7 +59,7 @@ For the stakeholder:
 - M1 deviates from RCL-02 and §9.2 twice. A run cannot yet be derived
   from its seats' writers, so `run` takes a writer id and damping is
   per writer. RCL-02 says nothing of ranking only the newest 2,000
-  matches. `recall.feature` line 26 ("a short run ... a long run") is
+  matches. `recall.feature` line 30 ("a short run ... a long run") is
   proven only per writer.
 - Deviation from REC-11, for the stakeholder: `event_search` cannot
   find the events of a writer whose slot a smaller writer id holds, nor

@@ -23,6 +23,7 @@ Feature: Recall (RCL)
   Scenario Outline: event search filters by exact provenance class and by provenance class family and caps hits at k
     Given an isolated ParleyInn home
     And an agent run with a Claude Code transcript "mixed-provenance"
+    And an agent run with a Claude Code transcript "short-run"
     When the agent calls the MCP tool "event_search" with <args>
     Then the recall result is wrapped in the envelope
     And the envelope contains at most <hits> items, each matching the filter, ranked by BM25 score
