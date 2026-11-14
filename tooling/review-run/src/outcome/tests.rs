@@ -942,4 +942,5 @@ fn the_places_told_are_the_places_a_weighing_is_held_to() {
     assert_eq!(missed([report.as_str()], ""), places([report.as_str()]));
 }
 
+mod paths;
 mod read;
