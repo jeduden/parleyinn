@@ -1,0 +1,32 @@
+# The golden home
+
+A small ParleyInn home the 0.0.0 build wrote at M1's close: the proving
+slice's transcript, ingested once. `parinn verify` and a recall of fixed
+addresses in the current build must give the bytes under `expected/`
+(`crates/parinn/tests/e2e_golden_home.rs`). A later version adds its own
+sibling directory and a migration test that opens this one (ENG-23).
+
+## Its keys are not a secret
+
+`home/keys` holds four key files, made for this home and used nowhere
+else: a device key, a recovery key and two seat keys. They guard nothing
+and are committed on purpose. A secret scan that flags them is
+a false positive; allow the path `testdata/golden-home/`. Never put a key
+of a real home here.
+
+## Writing it again
+
+Only for a change of format on purpose, which also needs a migration
+from this version:
+
+```text
+cargo test -p parinn --test e2e_golden_home -- --ignored regenerate
+```
+
+The test copies the home before it reads it, so a read never changes the
+committed files.
+
+## Its machine
+
+A home is bound to the node identity it started under (REC-24). The test
+pins a fixed identity file, so the home reads the same on every machine.
