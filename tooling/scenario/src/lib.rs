@@ -189,11 +189,10 @@ fn example_rows(sc: &gherkin::Scenario) -> Vec<BTreeMap<String, String>> {
     let tables = sc.examples.iter().filter_map(|e| e.table.as_ref());
     let mut out = Vec::new();
     for table in tables {
-        let Some((header, rows)) = table.rows.split_first() else {
-            continue;
-        };
-        for row in rows {
-            out.push(header.iter().cloned().zip(row.iter().cloned()).collect());
+        let header: Vec<&String> = table.rows.first().into_iter().flatten().collect();
+        for row in table.rows.iter().skip(1) {
+            let cells = row.iter().cloned();
+            out.push(header.iter().map(|h| (*h).clone()).zip(cells).collect());
         }
     }
 

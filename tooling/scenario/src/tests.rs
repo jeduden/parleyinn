@@ -53,6 +53,18 @@ fn scenarios_reads_tags_and_pending() {
 }
 
 #[test]
+fn scenarios_read_each_step_s_kind_and_an_outline_s_examples() {
+    let body = "Feature: Record\n\n  @REC-01 @P0 @I1\n  Scenario Outline: ingest\n    Given <a>\n    And <b>\n    When it runs\n    Then it is done\n\n    Examples:\n      | a | b |\n      | 1 | 2 |\n      | 3 | 4 |\n";
+    let dir = write_feature(body);
+
+    let got = scenarios(dir.path()).unwrap();
+
+    assert_eq!(got[0].step_kinds, ["given", "given", "when", "then"]);
+    assert_eq!(got[0].examples.len(), 2);
+    assert_eq!(got[0].examples[1]["b"], "4");
+}
+
+#[test]
 fn scenarios_in_reads_a_feature_from_its_text_as_the_walk_reads_the_file() {
     let body = "Feature: Record\n\n  @REC-01 @P0 @I1 @pending\n  Scenario: ingest\n    Given nothing\n\n  Rule: sources\n\n    @NFR-01\n    Scenario: fast\n      Given nothing\n";
     let dir = write_feature(body);
