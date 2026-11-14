@@ -35,6 +35,13 @@ const VERSION: &str = "0.0.0";
 /// The transcript the golden home records: the proving slice's.
 const TRANSCRIPT: &str = "testdata/claude-code/2.1.296/transcripts/projects/-w-my-app/686aa14f-b535-45bc-9ed0-5400ea84bec7.jsonl";
 
+/// The machine the golden home was written on, as its node identity
+/// file says: a fixed one, so the home verifies and reads the same on
+/// every machine (REC-24 binds a home to the node identity it started
+/// under, and a different one would read the home's keys as another
+/// node's).
+const MACHINE_ID: &str = "golden-home-0.0.0-machine\n";
+
 /// The sequence numbers read back: the first line, a prompt, the last.
 const SEQS: [u64; 3] = [1, 3, 57];
 
@@ -50,11 +57,27 @@ fn core() -> Confinement {
     Confinement::of(Component::Core).unwrap_or_else(|e| panic!("{e}"))
 }
 
-/// Runs the core in `world` (its `HOME`), confined.
+/// The environment that gives a start in `world` the fixed node
+/// identity, written beside the home.
+fn identity_env(world: &Path) -> String {
+    let file = world.join("machine-id");
+    fs::write(&file, MACHINE_ID).unwrap();
+    file.display().to_string()
+}
+
+/// Runs the core in `world` (its `HOME`), confined, as the golden
+/// machine.
 #[track_caller]
 fn parinn(world: &Path, args: &[&str]) -> std::process::Output {
+    let identity = identity_env(world);
     core()
-        .run(Path::new(env!("CARGO_BIN_EXE_parinn")), args, world)
+        .run_in(
+            Path::new(env!("CARGO_BIN_EXE_parinn")),
+            args,
+            world,
+            &[("PARINN_TEST_NODE_IDENTITY", &identity)],
+            None,
+        )
         .unwrap_or_else(|e| panic!("{e}"))
 }
 
@@ -105,12 +128,14 @@ fn event_reply(world: &Path, writer: &str, seq: u64) -> String {
         }}),
     ];
     let input: String = requests.iter().map(|r| format!("{r}\n")).collect();
+    let identity = identity_env(world);
     let out = core()
-        .run_with_input(
+        .run_in(
             Path::new(env!("CARGO_BIN_EXE_parinn")),
             &["mcp"],
             world,
-            input.as_bytes(),
+            &[("PARINN_TEST_NODE_IDENTITY", &identity)],
+            Some(input.as_bytes()),
         )
         .unwrap_or_else(|e| panic!("{e}"));
     assert!(

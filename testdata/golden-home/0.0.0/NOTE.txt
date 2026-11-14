@@ -25,3 +25,8 @@ cargo test -p parinn --test e2e_golden_home -- --ignored regenerate
 
 The test copies the home before it reads it, so a read never changes the
 committed files.
+
+## Its machine
+
+A home is bound to the node identity it started under (REC-24). The test
+pins a fixed identity file, so the home reads the same on every machine.
