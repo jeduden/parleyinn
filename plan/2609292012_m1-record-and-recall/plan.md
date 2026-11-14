@@ -288,8 +288,8 @@ footer: |
 - [x] `parinn verify` proves completeness (16/17 ADM-09 rows), and
   quarantine works (RCL-06; seven SEC-12 rows); remainders are assigned
 - [x] S12's `s12_rebuild` makes one identical index from two writer logs
-- [x] REC-17 leaves no value that confirms a purged event: only position,
-  length and the harness's own `uuid` remain (stakeholder ruling)
+- [x] A purge keeps of a purged transcript line only its position, its
+  length and the harness's own `uuid` (ADM-07, REC-04)
 - [x] M1's dependencies have accepted ADRs and meet ENG-18/ENG-26
 - [x] ENG-11's coverage floors hold for every security-sensitive crate
 - [x] The fuzz targets of ENG-07 run nightly from committed corpora

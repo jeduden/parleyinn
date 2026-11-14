@@ -64,9 +64,9 @@ PRV remainders, REC-24's confirm and LANE-02's remainder. To M8: PRV-09.
 Rows that stay `@pending` after M1, with their remaining milestone
 (cucumber, 2 November 2026):
 
-- SEC-31, ADM-07: M3's; steps not bound. Ruled: only each purged line's
-  position, length and the harness's own `uuid` remain (REC-17, REC-04).
-  Ruled too: NFR-03..05 in part in M1 (NFR-04 was benchmarked but did
+- SEC-31, ADM-07: M3's; steps not bound. Their rows keep of a purged
+  line only its position, length and the harness's own `uuid` (REC-04).
+  Ruled: NFR-03..05 in part in M1 (NFR-04 was benchmarked but did
   not meet its target; the NFR-04 and NFR-05 targets and MEM-02 are in
   M5); `parinn ingest --path` keeps its OWN-22 gate, a path inside
   `PARINN_HOME` stays refused (safe default).
