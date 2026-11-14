@@ -143,11 +143,21 @@ fn audited(
 
 /// Whether the writer `writer`'s seat is a run seat of this node and
 /// no ingest seat: one whose events are witnessed.
-fn witnessed(w: &World, writer: ::record::id::WriterId) -> Result<bool, String> {
+pub fn witnessed(w: &World, writer: ::record::id::WriterId) -> Result<bool, String> {
     let seat = store(w)?.seat(writer).map_err(|e| e.to_string())?;
     Ok(seat
         .and_then(|s| SeatCertificate::from_value(&s.certificate).ok())
         .is_some_and(|c| !c.ingest_seat && c.seat_kind.as_str() == "run"))
+}
+
+#[given(
+    regex = r#"^an agent run with a Claude Code transcript "([^"]+)", served by its harness session's MCP server$"#
+)]
+fn served_run(w: &mut World, name: String) -> Result<(), String> {
+    crate::security_redaction::agent_run_with_transcript(w, name.clone())?;
+    let path = crate::security_redaction::transcript(w, &name)?;
+    live(w).transcripts.insert(name.clone(), path);
+    serve(w, &name, "startup", &[])
 }
 
 #[given(

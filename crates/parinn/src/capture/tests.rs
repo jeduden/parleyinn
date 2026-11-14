@@ -9,16 +9,16 @@ use testkit::TempDir;
 use super::*;
 
 const SESSION: &str = "5e55a0de-0000-4000-8000-0000000000d1";
-const HARNESS: u32 = 77;
+pub(super) const HARNESS: u32 = 77;
 
-struct Fixture {
-    dir: TempDir,
-    home: Home,
-    shared: Arc<Shared>,
+pub(super) struct Fixture {
+    pub(super) dir: TempDir,
+    pub(super) home: Home,
+    pub(super) shared: Arc<Shared>,
 }
 
 impl Fixture {
-    fn new() -> Self {
+    pub(super) fn new() -> Self {
         let dir = TempDir::new().unwrap();
         let home = Home::locate(Some(dir.path().join(".parinn").as_os_str()), None).unwrap();
         home.create().unwrap();
@@ -30,11 +30,11 @@ impl Fixture {
         }
     }
 
-    fn projects(&self) -> PathBuf {
+    pub(super) fn projects(&self) -> PathBuf {
         self.dir.path().join("projects").join("p")
     }
 
-    fn main(&self) -> PathBuf {
+    pub(super) fn main(&self) -> PathBuf {
         self.projects().join(format!("{SESSION}.jsonl"))
     }
 
@@ -44,7 +44,7 @@ impl Fixture {
         dir.join(format!("agent-{id}.jsonl"))
     }
 
-    fn running(&self, harness: Option<u32>, limit: Option<usize>) -> Running {
+    pub(super) fn running(&self, harness: Option<u32>, limit: Option<usize>) -> Running {
         let roots = AllowedRoots::default().with(&self.dir.path().join("projects"), Access::Read);
         Running {
             capture: Capture {
@@ -62,6 +62,7 @@ impl Fixture {
             sessions: Vec::new(),
             transcripts: BTreeMap::new(),
             refused: BTreeSet::new(),
+            unscanned: BTreeSet::new(),
             marker: None,
             closed: now_instant(),
             close_every: SEGMENT_EVERY,
@@ -94,7 +95,7 @@ impl Fixture {
     }
 
     /// The counter of each audit entry.
-    fn counted(&self) -> Vec<String> {
+    pub(super) fn counted(&self) -> Vec<String> {
         Log::new(self.home.audit())
             .entries()
             .unwrap()
@@ -112,7 +113,7 @@ impl Fixture {
 
 /// A transcript line of the main run, or of the subagent `agent`,
 /// carrying the tool call `tool_use_id` when given.
-fn line(n: u64, tool_use_id: Option<&str>) -> String {
+pub(super) fn line(n: u64, tool_use_id: Option<&str>) -> String {
     let value = match tool_use_id {
         Some(id) => json!({
             "type": "assistant",
@@ -388,6 +389,42 @@ fn a_transcript_outside_the_roots_or_a_link_swapped_in_is_refused_once() {
 }
 
 #[test]
+fn a_path_named_by_a_transcript_line_is_checked_but_never_becomes_a_root() {
+    let f = Fixture::new();
+    let outside = f.dir.path().join("elsewhere");
+    std::fs::create_dir_all(&outside).unwrap();
+    let value = json!({
+        "type": "atis-latch",
+        "atis": "x",
+        "sessionId": SESSION,
+        "cwd": outside,
+    });
+    std::fs::write(f.main(), format!("{value}\n")).unwrap();
+    f.bind(SESSION, &f.main(), HARNESS);
+    let mut running = f.running(Some(HARNESS), None);
+
+    running.bind();
+    running.poll();
+    running.poll();
+
+    assert_eq!(
+        f.counted()
+            .iter()
+            .filter(|counter| counter.as_str() == "path_outside_allowed_roots")
+            .count(),
+        1
+    );
+    assert!(
+        Store::open(&f.home.store())
+            .unwrap()
+            .source(&outside.to_string_lossy())
+            .unwrap()
+            .is_none(),
+        "a path named only by a transcript line was never read as a source"
+    );
+}
+
+#[test]
 fn a_transcript_not_written_yet_waits_and_one_that_fails_is_audited() {
     let f = Fixture::new();
     f.bind(SESSION, &f.main(), HARNESS);
@@ -604,7 +641,7 @@ fn a_transcript_gone_after_its_ingest_gives_no_tool_uses_and_is_read_again_later
     let mut running = f.running(Some(HARNESS), None);
     running.transcripts.insert(f.main(), 0);
 
-    running.read_tool_uses(&f.main());
+    running.read_line_fields(&f.main());
 
     assert!(f.shared.runs_of("toolu_m").is_empty());
     assert_eq!(running.transcripts.get(&f.main()), Some(&0));
@@ -622,6 +659,76 @@ fn a_marker_that_cannot_be_opened_is_passed_over() {
 
     assert_eq!(count_stopped(&f.home, "ingest", &audit), 0);
     assert!(link.symlink_metadata().is_ok(), "left as it is");
+}
+
+#[test]
+fn a_test_can_move_live_ingest_s_clock_through_a_file_in_the_home() {
+    let f = Fixture::new();
+    let running = f.running(None, None);
+    assert_eq!(running.now(), 1_760_000_000);
+
+    std::fs::write(f.home.root().join(TEST_CLOCK), "5000\n").unwrap();
+    assert_eq!(running.now(), 5_000);
+    assert!(running.audited(&Occurrence::Degraded {
+        kind: Kind::Failed,
+        counter: Counter::LiveIngestFailed,
+        operation: "mcp",
+        detail: "d",
+    }));
+    let entries = Log::new(f.home.audit()).entries().unwrap();
+    assert_eq!(entries[0].time, 5_000);
+
+    std::fs::write(f.home.root().join(TEST_CLOCK), "not seconds").unwrap();
+    assert_eq!(running.now(), 1_760_000_000);
+}
+
+#[test]
+fn a_refusal_a_hold_and_a_release_of_repeated_lines_are_counted_by_the_live_ingest() {
+    let f = Fixture::new();
+    let other = f.projects().join("other.jsonl");
+    std::fs::write(&other, line(1, None)).unwrap();
+    let mut ingested = ingest::ingest_path(
+        &f.home,
+        &other,
+        &Redactor::new(&[]).unwrap().0,
+        &mut OsEntropy,
+    )
+    .unwrap();
+    ingested.refused = 2;
+    ingested.hold_started = true;
+    ingested.released = 1;
+
+    f.running(None, None).audit_ingested(&ingested);
+
+    assert_eq!(
+        f.counted(),
+        [
+            "repeat_of_purged_refused",
+            "repeat_of_purged_refused",
+            "repeat_held",
+            "repeat_released"
+        ]
+    );
+}
+
+#[test]
+fn a_transcript_another_server_serves_is_one_this_server_does_not() {
+    let f = Fixture::new();
+    let (mine, theirs) = (f.main(), f.projects().join("other.jsonl"));
+    let markers = f.home.root().join(MARKERS);
+    std::fs::create_dir_all(&markers).unwrap();
+    let marker = markers.join("a.marker");
+    std::fs::write(
+        &marker,
+        format!("{}\n{}\n", mine.display(), theirs.display()),
+    )
+    .unwrap();
+    let held = std::fs::File::open(&marker).unwrap();
+    held.try_lock().unwrap();
+
+    let elsewhere = served_elsewhere(&f.home, std::slice::from_ref(&mine));
+
+    assert_eq!(elsewhere, BTreeSet::from([theirs]));
 }
 
 #[test]

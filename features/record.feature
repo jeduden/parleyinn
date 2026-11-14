@@ -50,7 +50,7 @@ Feature: Record (REC)
     Then the record contains exactly 50 events, one per line of "main-run"
     And the ingest position of "main-run" stores its byte length and the SHA-256 of its consumed prefix
 
-  @REC-04 @P0 @I1 @I10 @pending
+  @REC-04 @P0 @I1 @I10
   Scenario: events are attributed to the run of their transcript, not the hook input, and a line a harness fork repeats is recorded once, in its owning run's writer, whichever transcript is ingested first
     Given an isolated ParleyInn home
     And an agent run with a Claude Code transcript "parent-run"
@@ -121,22 +121,26 @@ Feature: Record (REC)
     And "main-run" has 40 lines and has been ingested
     When "main-run" is <change>
     And the person runs "parinn ingest --all"
-    Then "main-run" starts transcript generation 2 and all 40 events of transcript generation 1 remain in the record
-    And an audit entry records "new transcript generation of main-run"
+    Then <outcome>
+    And <audit>
 
     Examples:
-      | change                                |
-      | truncated to 10 lines                 |
-      | rewritten with a different first line |
+      | change                                                               | outcome                                                                                                                                                                                                | audit                                                          |
+      | truncated to 10 lines                                                | "main-run" starts transcript generation 2 and all 40 events of transcript generation 1 remain in the record                                                                                            | an audit entry records "new transcript generation of main-run" |
+      | rewritten with a different first line                                | "main-run" starts transcript generation 2 and all 40 events of transcript generation 1 remain in the record                                                                                            | an audit entry records "new transcript generation of main-run" |
+      | appended to by 5 lines after a purge of its lines 5-6                | "main-run" stays in transcript generation 1, its consumed prefix matching the stored hash with the bytes of each purged line zeroed, and its 5 new lines are recorded                                  | no audit entry records "new transcript generation of main-run" |
+      | rewritten with a different first line after a purge of its lines 5-6 | "main-run" starts transcript generation 2, its purged lines 5-6 are each refused with an audit entry and never recorded again, and the 38 other events of transcript generation 1 remain in the record | an audit entry records "new transcript generation of main-run" |
 
-  @REC-08 @P0 @I1 @I6 @pending
+  @REC-08 @P0 @I1 @I6
   Scenario: the record outlives its transcript sources and verify reports transcript sources lost before full ingestion
     Given an isolated ParleyInn home
     And an agent run with a Claude Code transcript "main-run"
     And "main-run" has 40 lines and has been ingested
+    And "rewritten" has 30 lines of which 20 were ingested before it was rewritten with a different first line and ingested again
     And "cut-short" has 30 lines of which 20 were ingested before both transcript files were deleted
     When the person runs "parinn verify --json"
     Then the output names "cut-short", and only it, as a transcript source that disappeared before it was fully ingested
+    And the output names "rewritten", and only it, as a transcript generation replaced before it was fully ingested, which ingest audited and counted once
     And "parinn event expand" still returns all 40 events of "main-run"
 
   @REC-09 @P0 @I1
@@ -173,7 +177,7 @@ Feature: Record (REC)
     When the agent calls the MCP tool "event_search" with query "wombat"
     Then the hits are ranked by score, the "user" event naming "wombat" five times above the one naming it once
 
-  @REC-12 @P0 @I10 @pending
+  @REC-12 @P0 @I10
   Scenario: events are appended in transcript order and seq alone defines order
     Given an isolated ParleyInn home
     And an agent run with a Claude Code transcript "main-run"
@@ -334,6 +338,8 @@ Feature: Record (REC)
     Then every event of "pre-install" carries the "ingested" origin, freshness mark and trust mark with its transcript source and ingest position, shown on every surface, and none is shown as witnessed
     And the "user" event and the "harness_meta" event from "pre-install" have trust "untrusted"
     And this node records "elsewhere" as an ingested run in the principal's personal room, shown as "ingested", and every event of it has trust "untrusted"
+    And ingesting "elsewhere" is recorded as the person's widening principal act at a terminal (OWN-11, OWN-12), and the same path named in a hook input or a transcript line is rejected as outside the allowed roots (SEC-18)
+    And "elsewhere" is read only once its path resolves, symlinks included, to a regular file, and its lines are redacted before they are stored
     And every event "parinn ingest" read past the ingest marker of "cut-short" carries the "ingested" origin and has trust "untrusted"
 
   @REC-23 @P2 @I2 @I4 @I6 @pending
@@ -395,7 +401,7 @@ Feature: Record (REC)
     And every address, commitment and chain head is unchanged
     And "parinn verify" exits 0
 
-  @REC-26 @P0 @I1 @I2 @I6 @pending
+  @REC-26 @P0 @I1 @I2 @I6
   Scenario Outline: a transcript line or hook input whose shape differs from its harness version's is kept, counted and audited as format drift
     Given an isolated ParleyInn home
     And deployment mode "interactive"

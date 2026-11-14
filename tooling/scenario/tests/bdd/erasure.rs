@@ -867,15 +867,15 @@ fn release_is_recorded(w: &mut World) -> Result<(), String> {
 )]
 fn forty_events(w: &mut World, count: u64, from: u64, to: u64) -> Result<(), String> {
     let lines: Vec<Value> = (1..=count)
-        .map(|n| json!(format!("confidential note {n}: zebra-secret-{n}")))
+        .map(|n| {
+            let text = format!("confidential note {n}: zebra-secret-{n}");
+            json!({"type": "x", "uuid": format!("forty-{n}"), "sessionId": "forty", "text": text})
+        })
         .collect();
     let dir = w.home.join(".claude").join("projects").join("-w-app");
     fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
     let path = dir.join("forty.jsonl");
-    let text: String = lines
-        .iter()
-        .map(|l| format!("{}\n", l.as_str().unwrap_or_default()))
-        .collect();
+    let text: String = lines.iter().map(|l| format!("{l}\n")).collect();
     fs::write(&path, text).map_err(|e| e.to_string())?;
     name_transcript(w, "forty", path.clone());
     ingest(w, &path)?;
@@ -1063,8 +1063,8 @@ fn no_guess_confirmed(w: &mut World) -> Result<(), String> {
             needles.push(Digest::of(&[guess]).to_hex().into_bytes());
         }
     }
-    match found_in_home(w, &needles)? {
-        Some(found) => Err(format!("a retained value confirms a guess: {found}")),
-        None => Ok(()),
+    if let Some(found) = found_in_home(w, &needles)? {
+        return Err(format!("a retained value confirms a guess: {found}"));
     }
+    crate::erasure_prefix::closed(w)
 }

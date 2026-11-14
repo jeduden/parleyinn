@@ -150,6 +150,44 @@ fn a_restarted_server_goes_on_in_a_new_run_seat_from_the_ingest_marker() {
 }
 
 #[test]
+fn parinn_ingest_past_a_servers_marker_goes_to_its_own_ingest_seat_never_the_run_seat() {
+    let dir = TempDir::new().unwrap();
+    let home = home(&dir);
+    let path = main_transcript(&dir, &(1..=5).map(line).collect::<String>());
+    let stopped = ingest(&home, &path, &mut RunSeats::default(), Some(3)).unwrap();
+
+    let cli = |at: &Path| {
+        crate::ingest_with(&home, at, &redactor(), &Inputs::default(), &mut OsEntropy).unwrap()
+    };
+    let resumed = cli(&path);
+
+    assert_eq!(resumed.events, 2);
+    assert_ne!(resumed.writer, stopped.writer, "the run seat's key is gone");
+    let store = Store::open(&home.store()).unwrap();
+    let cert =
+        SeatCertificate::from_value(&store.seat(resumed.writer).unwrap().unwrap().certificate)
+            .unwrap();
+    assert!(cert.ingest_seat, "so its events are ingested");
+    assert_eq!(contents(&home, stopped.writer).len(), 3, "still witnessed");
+    let numbers: Vec<Value> = contents(&home, resumed.writer)
+        .iter()
+        .map(|c| c["line"].clone())
+        .collect();
+    assert_eq!(numbers, [json!(4), json!(5)]);
+
+    // Every later `parinn ingest` extends that ingest seat.
+    std::fs::write(&path, (1..=6).map(line).collect::<String>()).unwrap();
+    let later = cli(&path);
+    assert_eq!((later.writer, later.events), (resumed.writer, 1));
+
+    // A restarted server takes its own run seat past the marker.
+    std::fs::write(&path, (1..=7).map(line).collect::<String>()).unwrap();
+    let next = ingest(&home, &path, &mut RunSeats::default(), None).unwrap();
+    assert_eq!(next.events, 1);
+    assert!(![stopped.writer, resumed.writer].contains(&next.writer));
+}
+
+#[test]
 fn a_held_hook_observation_lands_in_the_main_run_seat_where_its_hook_fired() {
     let dir = TempDir::new().unwrap();
     let home = home(&dir);
@@ -304,4 +342,183 @@ fn a_transcript_rewritten_shorter_starts_a_new_generation() {
 
     assert!(rewritten.new_generation);
     assert_eq!((rewritten.generation, rewritten.events), (2, 1));
+}
+
+/// Inputs naming the harness session of `fork.jsonl` a fork, with
+/// `served` held by another MCP server, at `now_ms`.
+fn held_for(served: &[&Path], now_ms: u64) -> Inputs {
+    Inputs {
+        forks: [SESSION.to_owned()].into(),
+        served: served.iter().map(|p| p.to_path_buf()).collect(),
+        now_ms,
+        ..Inputs::default()
+    }
+}
+
+fn live(home: &Home, path: &Path, inputs: &Inputs, seats: &mut RunSeats) -> Option<Ingested> {
+    ingest_live(home, path, &redactor(), inputs, seats, None, &mut OsEntropy).unwrap()
+}
+
+#[test]
+fn a_witnessed_fork_line_is_held_for_a_transcript_another_server_holds_a_binding_for() {
+    let dir = TempDir::new().unwrap();
+    let home = home(&dir);
+    let parent = dir.path().join("parent.jsonl");
+    std::fs::write(&parent, format!("{}{}", line(1), line(2))).unwrap();
+    let path = main_transcript(&dir, &format!("{}{}{}", line(1), line(2), line(3)));
+    let mut seats = RunSeats::default();
+    let at = |ms| held_for(&[parent.as_path()], ms);
+
+    let held = live(&home, &path, &at(1_000), &mut seats).unwrap();
+    let still = live(&home, &path, &at(30_999), &mut seats).unwrap();
+    let released = live(&home, &path, &at(31_000), &mut seats).unwrap();
+
+    assert!(held.held && held.hold_started);
+    assert_eq!((held.events, held.witnessed_repeats), (0, 0));
+    assert!(still.held && !still.hold_started);
+    assert!(!released.held);
+    assert_eq!((released.events, released.references), (3, 0));
+    assert_eq!(released.released, 3);
+}
+
+#[test]
+fn a_witnessed_fork_line_is_never_held_for_a_transcript_no_server_holds_a_binding_for() {
+    let dir = TempDir::new().unwrap();
+    let home = home(&dir);
+    let parent = dir.path().join("parent.jsonl");
+    std::fs::write(&parent, format!("{}{}", line(1), line(2))).unwrap();
+    let path = main_transcript(&dir, &format!("{}{}", line(1), line(3)));
+    let mut seats = RunSeats::default();
+
+    let ingested = live(&home, &path, &held_for(&[], 1_000), &mut seats).unwrap();
+
+    assert!(!ingested.held);
+    assert_eq!((ingested.events, ingested.released), (2, 0));
+    assert_eq!(ingested.witnessed_repeats, 1, "line 1 repeats a line");
+}
+
+#[test]
+fn a_witnessed_line_of_no_fork_is_neither_held_nor_counted_for_another_transcript() {
+    let dir = TempDir::new().unwrap();
+    let home = home(&dir);
+    let parent = dir.path().join("parent.jsonl");
+    std::fs::write(&parent, format!("{}{}", line(1), line(2))).unwrap();
+    let path = main_transcript(&dir, &format!("{}{}", line(1), line(3)));
+    let mut seats = RunSeats::default();
+    let inputs = Inputs {
+        forks: Default::default(),
+        ..held_for(&[parent.as_path()], 1_000)
+    };
+
+    let ingested = live(&home, &path, &inputs, &mut seats).unwrap();
+
+    assert!(!ingested.held);
+    assert_eq!((ingested.events, ingested.witnessed_repeats), (2, 0));
+}
+
+#[test]
+fn a_witnessed_fork_line_held_is_its_own_event_once_the_owner_ingested_it() {
+    let dir = TempDir::new().unwrap();
+    let home = home(&dir);
+    let parent = dir.path().join("parent.jsonl");
+    std::fs::write(&parent, line(1)).unwrap();
+    let path = main_transcript(&dir, &line(1));
+    let mut seats = RunSeats::default();
+    let at = |ms| held_for(&[parent.as_path()], ms);
+    let held = live(&home, &path, &at(1_000), &mut seats).unwrap();
+    crate::ingest_path(&home, &parent, &redactor(), &mut OsEntropy).unwrap();
+
+    let owned = live(&home, &path, &at(2_000), &mut seats).unwrap();
+
+    assert!(held.held);
+    assert_eq!(
+        (owned.events, owned.references, owned.witnessed_repeats),
+        (1, 0, 1)
+    );
+    assert!(!owned.held);
+}
+
+#[test]
+fn a_witnessed_line_whose_uuid_names_a_purged_event_is_refused() {
+    let dir = TempDir::new().unwrap();
+    let home = home(&dir);
+    let parent = dir.path().join("parent.jsonl");
+    std::fs::write(&parent, line(1)).unwrap();
+    let owner = crate::ingest_path(&home, &parent, &redactor(), &mut OsEntropy).unwrap();
+    let mut store = Store::open(&home.store()).unwrap();
+    let device = administration::node::Node::find(&home, &store)
+        .unwrap()
+        .device_writer();
+    let erase = store::Erase {
+        writer: owner.writer,
+        first: record::id::Seq::FIRST,
+        last: record::id::Seq::FIRST,
+    };
+    store.purge(device, &[], &[erase]).unwrap();
+    let path = main_transcript(&dir, &format!("{}{}", line(1), line(2)));
+    let mut seats = RunSeats::default();
+
+    let ingested = ingest(&home, &path, &mut seats, None).unwrap();
+
+    assert_eq!((ingested.refused, ingested.events), (1, 1));
+    assert_eq!(ingested.witnessed_repeats, 0);
+}
+
+#[test]
+fn a_purged_line_of_a_served_transcript_does_not_read_as_a_rewrite() {
+    let dir = TempDir::new().unwrap();
+    let home = home(&dir);
+    let path = main_transcript(&dir, &(1..=3).map(line).collect::<String>());
+    let mut seats = RunSeats::default();
+    let first = ingest(&home, &path, &mut seats, None).unwrap();
+    let mut store = Store::open(&home.store())
+        .unwrap()
+        .with_transcripts(crate::read::transcript);
+    let device = administration::node::Node::find(&home, &store)
+        .unwrap()
+        .device_writer();
+    let second = record::id::Seq::new(2).unwrap();
+    let erase = store::Erase {
+        writer: first.writer,
+        first: second,
+        last: second,
+    };
+    assert_eq!(store.purge(device, &[], &[erase]).unwrap().events, 1);
+    drop(store);
+
+    // The transcript still holds the purged line's bytes: its consumed
+    // prefix matches the stored hash only with those bytes zeroed.
+    assert_eq!(ingest(&home, &path, &mut seats, None), None);
+
+    let mut longer = std::fs::read_to_string(&path).unwrap();
+    longer.push_str(&line(4));
+    std::fs::write(&path, longer).unwrap();
+    let appended = ingest(&home, &path, &mut seats, None).unwrap();
+
+    assert!(!appended.new_generation);
+    assert_eq!((appended.generation, appended.events), (1, 1));
+}
+
+#[test]
+fn an_ingest_reports_the_sibling_transcript_it_could_not_read() {
+    let dir = TempDir::new().unwrap();
+    let home = home(&dir);
+    // A directory named as a transcript: listed, and not a file to read.
+    std::fs::create_dir(dir.path().join("sub.jsonl")).unwrap();
+    let path = main_transcript(&dir, &line(1));
+    let mut seats = RunSeats::default();
+
+    // A fork's line makes ingest read the directory's other transcripts.
+    let ingested = live(&home, &path, &held_for(&[], 0), &mut seats).unwrap();
+
+    assert_eq!(ingested.events, 1, "the transcript itself is read (I9)");
+    assert_eq!(ingested.unread_sources.len(), 1);
+    assert_eq!(ingested.unread_sources[0].name, "sub");
+    assert!(
+        ingested.unread_sources[0]
+            .why
+            .contains("not a regular file"),
+        "{}",
+        ingested.unread_sources[0].why
+    );
 }
