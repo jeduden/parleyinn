@@ -4,9 +4,9 @@ title: "Exit: the engineering gates, the recall evaluation and the S12 rebuild t
 status: "✅"
 result: true
 summary: >-
-  @ENG-03, @ENG-07 and @ENG-11 off @pending and passing. parinn-eval
+  @ENG-03, @ENG-07, @ENG-09 and @ENG-11 off @pending and passing. parinn-eval
   recalls 216 of 216 planted values after one to three compactions
-  within ten hits; the S12 rebuild test passes. @ENG-06, @ENG-09,
+  within ten hits; the S12 rebuild test passes. @ENG-06,
   @ENG-15, @ENG-23 and @ENG-29 stay @pending, each raised.
 ---
 # Phase 16 result
@@ -46,7 +46,9 @@ Outcome:
   the seeded kills both check it.
 - ENG-09: a soak of 50 writers; at 1M events (release, 13 min), 4,293 of
   10,000 appends passed the 5 s busy deadline and were retried, as live
-  ingest retries. It runs nightly.
+  ingest retries. It runs nightly. @ENG-09 passes, as its row now
+  asks: every pull request runs 50 certified writers to 10,000 events,
+  then `parinn verify` exits 0.
 - NFR-05: a floor benchmark; each run costs ingest about 12 ms.
 - Gates run: scenario gate, fmt, clippy `-D warnings`, `mdsmith check .`,
   `cargo test --workspace` (156 scenarios), `cargo run -p coverage`
@@ -55,8 +57,6 @@ Outcome:
 Raised (scenarios stay `@pending`):
 
 - ENG-06: no migration before M3 (ruling 3).
-- ENG-09: 1M events cannot run in a pull request's scenario budget; a
-  ruling on splitting nightly from PR steps is wanted.
 - ENG-15: NFR-01 needs the room view (M7); NFR-05's target needs the
   reference hardware.
 - ENG-23: no release and no migration yet.
@@ -90,7 +90,7 @@ items moved (plan.md, §12.2). To M3: ADM-09's landmark row, ENG-06's
 migration, SEC-08's `purge --run`. To M5: SEC-12's flag row, SEC-17,
 ENG-22, ENG-23, NFR-05's target. To M7: SEC-19, ENG-29, NFR-01, the PRV
 remainders. To M8: PRV-09. Open in M1: bound steps for RCL-02 and
-ADM-09's other rows; rulings on LANE-02, REC-24, ENG-09, the residue.
+ADM-09's other rows; rulings on LANE-02, REC-24, the residue.
 
 - [x] ADM-09's two pending-purge rows (PR #90) are bound and pass, run
   with `@pending` lifted by hand
