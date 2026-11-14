@@ -23,6 +23,7 @@ fn sc(id: &str, pending: bool) -> scenario::Scenario {
         invariants: vec!["I1".into()],
         pending,
         steps: vec!["a step".into()],
+        ..scenario::Scenario::default()
     }
 }
 

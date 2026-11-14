@@ -87,8 +87,9 @@ These land in part, as §12.2 bounds them or as their scenarios reach past M1:
 | PRV-01, -02, -04, -05, -06, -08 | rows a transcript, hook input or the key set prove                      | a signed sandbox state, rooms, the launcher, M7; another node's key, M8 |
 
 A scenario of a row that lands in part stays `@pending`, its M1 part
-proven by bound steps or named tests, as ENG-12 in plan 2609292011. One
-that cannot pass as written is a finding to raise, never re-pended.
+proven by named tests, never by steps no running row uses, as ENG-12 in
+plan 2609292011. One that cannot pass as written is a finding to raise,
+never re-pended.
 
 The "rest" column and §12.2 give each item the milestone that can do it.
 PRV-09 went to M3 (a restore's events) and M8 (a peer's).

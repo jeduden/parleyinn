@@ -40,6 +40,8 @@ fn scenarios_reads_tags_and_pending() {
             invariants: vec!["I1".into(), "I10".into()],
             pending: true,
             steps: vec!["nothing".into()],
+            step_kinds: vec!["given".into()],
+            examples: Vec::new(),
         }
     );
     assert_eq!(got[1].id, "NFR-01");
