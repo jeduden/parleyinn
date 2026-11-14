@@ -567,6 +567,8 @@ pub fn missed<'a>(reports: impl IntoIterator<Item = &'a str>, answer: &str) -> V
         .lines()
         .filter(|l| report::finding(l).is_some() || report::dropped(l))
         .collect();
+    let reports: Vec<&str> = reports.into_iter().collect();
+    let known = reported_paths(&reports);
     let mut missed = BTreeSet::new();
     for report in reports {
         for line in report.lines().map(review_gate::report::line) {
@@ -576,9 +578,9 @@ pub fn missed<'a>(reports: impl IntoIterator<Item = &'a str>, answer: &str) -> V
                 _ => continue,
             };
             let at = (path.clone(), number);
-            let weighed = weighing
-                .iter()
-                .any(|l| report::place_of(l) == Some(at.clone()) || names(l, path, number));
+            let weighed = weighing.iter().any(|l| {
+                report::place_of(l) == Some(at.clone()) || named_by(l, path, number, &known)
+            });
             if !weighed {
                 missed.insert(format!("{path}:{number}"));
             }
@@ -586,6 +588,58 @@ pub fn missed<'a>(reports: impl IntoIterator<Item = &'a str>, answer: &str) -> V
     }
 
     missed.into_iter().collect()
+}
+
+/// The paths the findings and requests in `reports` name, each once.
+fn reported_paths(reports: &[&str]) -> BTreeSet<String> {
+    reports
+        .iter()
+        .flat_map(|r| r.lines().map(review_gate::report::line))
+        .filter_map(|line| match line {
+            Line::Linked(k) => Some(k.path),
+            Line::Request(r) => Some(r.path),
+            _ => None,
+        })
+        .collect()
+}
+
+/// Whether `a` is `b`, or `b` with directories before it.
+fn tail_of(a: &str, b: &str) -> bool {
+    a == b || a.strip_suffix(b).is_some_and(|d| d.ends_with('/'))
+}
+
+/// Whether `line` names the place `path:number`, spelled as `path`, a
+/// tail of it at a `/` that no other path of `known` ends in, or, for a
+/// `path` that is a bare file name, a path that ends in it when no other
+/// path of `known` is a tail of it or has it as one: an agent that
+/// shortens or lengthens a path still weighs the finding, while an
+/// ambiguous basename names none. A reported path with directories is
+/// not lengthened, since the longer path may be another file.
+fn named_by(line: &str, path: &str, number: usize, known: &BTreeSet<String>) -> bool {
+    if names(line, path, number) {
+        return true;
+    }
+    let others = || known.iter().filter(|q| q.as_str() != path);
+    let shorter = path
+        .match_indices('/')
+        .map(|(i, _)| &path[i + 1..])
+        .filter(|t| !t.is_empty() && !others().any(|q| tail_of(q, t)))
+        .any(|t| names(line, t, number));
+    if shorter {
+        return true;
+    }
+    let alone = !path.contains('/') && !others().any(|q| tail_of(q, path) || tail_of(path, q));
+    let head = format!("/{path}:");
+
+    alone
+        && line.match_indices(&head).any(|(at, _)| {
+            let start = line[..at]
+                .rfind(|c: char| !(c.is_alphanumeric() || matches!(c, '/' | '.' | '_' | '-')))
+                .map_or(0, |i| {
+                    i + line[i..].chars().next().map_or(1, char::len_utf8)
+                });
+            names(line, &line[start..at + 1 + path.len()], number)
+        })
 }
 
 /// The places of the findings and requests in `reports`, each once, in
