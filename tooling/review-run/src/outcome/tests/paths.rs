@@ -66,3 +66,15 @@ fn an_ambiguous_basename_weighs_nothing() {
         ["src/a.rs:3"]
     );
 }
+
+#[test]
+fn a_lengthened_path_is_found_after_any_text_before_it() {
+    let report = report_at("trust-and-flow.md:24");
+
+    for answer in [
+        "dropped — docs/model/trust-and-flow.md:24 — noise",
+        "dropped —docs/model/trust-and-flow.md:24 — noise",
+    ] {
+        assert!(missed([report.as_str()], answer).is_empty(), "{answer}");
+    }
+}
