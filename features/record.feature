@@ -121,13 +121,15 @@ Feature: Record (REC)
     And "main-run" has 40 lines and has been ingested
     When "main-run" is <change>
     And the person runs "parinn ingest --all"
-    Then "main-run" starts transcript generation 2 and all 40 events of transcript generation 1 remain in the record
-    And an audit entry records "new transcript generation of main-run"
+    Then <outcome>
+    And <audit>
 
     Examples:
-      | change                                |
-      | truncated to 10 lines                 |
-      | rewritten with a different first line |
+      | change                                                               | outcome                                                                                                                                                                                                | audit                                                          |
+      | truncated to 10 lines                                                | "main-run" starts transcript generation 2 and all 40 events of transcript generation 1 remain in the record                                                                                            | an audit entry records "new transcript generation of main-run" |
+      | rewritten with a different first line                                | "main-run" starts transcript generation 2 and all 40 events of transcript generation 1 remain in the record                                                                                            | an audit entry records "new transcript generation of main-run" |
+      | appended to by 5 lines after a purge of its lines 5-6                | "main-run" stays in transcript generation 1, its consumed prefix matching the stored hash with the bytes of each purged line zeroed, and its 5 new lines are recorded                                  | no audit entry records "new transcript generation of main-run" |
+      | rewritten with a different first line after a purge of its lines 5-6 | "main-run" starts transcript generation 2, its purged lines 5-6 are each refused with an audit entry and never recorded again, and the 38 other events of transcript generation 1 remain in the record | an audit entry records "new transcript generation of main-run" |
 
   @REC-08 @P0 @I1 @I6 @pending
   Scenario: the record outlives its transcript sources and verify reports transcript sources lost before full ingestion
@@ -334,6 +336,8 @@ Feature: Record (REC)
     Then every event of "pre-install" carries the "ingested" origin, freshness mark and trust mark with its transcript source and ingest position, shown on every surface, and none is shown as witnessed
     And the "user" event and the "harness_meta" event from "pre-install" have trust "untrusted"
     And this node records "elsewhere" as an ingested run in the principal's personal room, shown as "ingested", and every event of it has trust "untrusted"
+    And ingesting "elsewhere" is recorded as the person's widening principal act at a terminal (OWN-11, OWN-12), and the same path named in a hook input or a transcript line is rejected as outside the allowed roots (SEC-18)
+    And "elsewhere" is read only once its path resolves, symlinks included, to a regular file, and its lines are redacted before they are stored
     And every event "parinn ingest" read past the ingest marker of "cut-short" carries the "ingested" origin and has trust "untrusted"
 
   @REC-23 @P2 @I2 @I4 @I6 @pending

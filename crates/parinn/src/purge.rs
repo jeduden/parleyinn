@@ -193,6 +193,7 @@ fn carry(ctx: &Context, asked: &Asked, stderr: &mut dyn Write) -> Result<String,
         counter: None,
     };
     ctx.audit(&said).map_err(unnoted)?;
+    audit_unconfirmed(ctx, &done.finished);
     if !done.finished.vacuumed {
         return Err(Failure::Residue);
     }
@@ -301,6 +302,20 @@ fn left_over(done: &Result<store::Finished, store::StoreError>) -> bool {
     match done {
         Ok(done) => !(done.nothing || done.vacuumed),
         Err(_) => true,
+    }
+}
+
+/// Audits and counts, once each, the transcript sources a purge could
+/// not read to recompute their consumed-prefix hash (SEC-31, I6).
+pub(crate) fn audit_unconfirmed(ctx: &Context, done: &store::Finished) {
+    for _ in 0..done.unconfirmed {
+        let occurrence = Occurrence::Degraded {
+            kind: Kind::Failed,
+            counter: Counter::TranscriptPrefixUnconfirmed,
+            operation: OP,
+            detail: "a purge could not read a transcript; its source's prefix hash confirms nothing",
+        };
+        crate::logged("audit an unconfirmed prefix hash", ctx.audit(&occurrence));
     }
 }
 

@@ -25,7 +25,7 @@ use record::id::{Address, Seq, WriterId};
 use rusqlite::{Connection, TransactionBehavior, params};
 use serde_json::Value;
 
-use crate::{NewEvent, Out, Store, StoreError, search_index, seq_of, sql};
+use crate::{NewEvent, Out, Store, StoreError, search_index, seq_of, source, sql};
 
 /// The journal of what a purge still has to finish.
 pub(crate) const SCHEMA: &str = "
@@ -73,6 +73,9 @@ pub struct Finished {
     pub vacuumed: bool,
     /// Whether anything was left to finish.
     pub nothing: bool,
+    /// Transcript sources the purge could not read to recompute their
+    /// consumed-prefix hash, which then confirms nothing (SEC-31, I6).
+    pub unconfirmed: u64,
 }
 
 impl Store {
@@ -99,6 +102,7 @@ impl Store {
             threshold: self.threshold,
         };
         secure_delete(&self.conn)?;
+        let (rehashes, unconfirmed) = source::purged::plan(&self.conn, ranges, self.transcripts)?;
         let tx = self
             .conn
             .transaction_with_behavior(TransactionBehavior::Immediate)?;
@@ -106,7 +110,9 @@ impl Store {
         let mut events = 0;
         for range in ranges {
             events += erase(&tx, range)?;
+            source::purged::mark(&tx, range)?;
         }
+        source::purged::apply(&tx, &rehashes)?;
         let appended = if record.is_empty() {
             Vec::new()
         } else {
@@ -114,7 +120,10 @@ impl Store {
         };
         journal(&tx, VACUUM, "")?;
         tx.commit()?;
-        let finished = self.finish_purge()?;
+        let finished = Finished {
+            unconfirmed,
+            ..self.finish_purge()?
+        };
 
         Ok(Purged {
             appended,

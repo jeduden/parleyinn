@@ -59,7 +59,7 @@ summary: >-
 - **Seal**: A seat key's signature over its writer id, a seq and the chain head
   at that seq (REC-18), made where that key lives (REC-19). Events after the
   newest seal are unsigned.
-- **Prompt commitment**: Unlike an event's commitment, a commitment to the
+- **Prompt commitment**: A commitment to the
   redacted text a `UserPromptSubmit` hook handler got, under its own random key
   kept only on this node, recorded with the hook input's `prompt_id` in a
   structural hook observation; the first transcript line carrying that
@@ -122,21 +122,24 @@ from
   events; turning it off is widening (OWN-11, ADM-02).
 - **Ingest marker**: What ingest leaves when it stops short of a transcript's
   end, so the next MCP server or `parinn ingest` resumes it (REC-13); a hook
-  handler holds its observation there, where its hook fired, for its MCP server
-  to append (REC-19). A **start marker** is what a hook handler
+  handler holds its observation there, where its hook fired, for its MCP
+  server to append (REC-19). A **start marker** is what a hook handler
   or MCP server leaves as it starts and clears as it finishes; one left behind
   is counted and audited (NFR-02), an MCP server's with each transcript it left
   short (REC-13). **Ingest** reads a transcript into the record: the MCP
-  server's **live ingest** as it grows (REC-13), or `parinn ingest` (REC-22). A
+  server's **live ingest** (REC-13), or `parinn ingest` (REC-22). A
   line a harness fork repeats is recorded once, in the writer of the run it
-  belongs to; every other run that repeats it records a **repeat reference**
+  belongs to; every other run repeating it records a **repeat reference**
   to that event's address, never a copy (REC-04). The
   run it belongs to is the one no **fork observation**, a `SessionStart` hook
   observation with `source` = `fork`, names; with none, the run that first
   recorded it, as a structural **repeat owner** event in the device seat
   records. A fork's line read before its owner's is **held** at an ingest
-  marker until its owner's transcript is ingested or gone, or 30 s pass. An
-  **ingest position** is how far ingest read a transcript source (REC-03).
+  marker until its owner's transcript is ingested or gone, or 30 s pass. A
+  repeated line with a purged line's `uuid` is refused: audited, counted,
+  never recorded again (SEC-31). An
+  **ingest position** is the byte length ingest read and its consumed-prefix
+  hash, purged lines' bytes zeroed (REC-03, SEC-31).
 - **Worktree checkpoint**: An event recording a worktree's commit, branch and
   redacted diff since the previous worktree checkpoint (REC-20).
 - **Derived artifact**: Anything computed from the record and the node's key
@@ -145,9 +148,8 @@ from
   the same when their **canonical digest**, a digest of their content, schema
   and the stored settings that decide what a read returns, that no storage
   layout, insertion history or arrival order affects (§8.3), matches
-  (ADM-08). Unqualified, "content" is an event's content; a derived artifact's
-  content is always said of the artifact. The **quarantine set** is what a node
-  holds quarantined.
+  (ADM-08). Unqualified, "content" is an event's content. The **quarantine
+  set** is what a node holds quarantined.
 - **Redaction**: Removing secrets from content before it is stored, on import,
   or from what an export's, a publish's or an invite's review step sends,
   recorded (I1, SEC-08). Three kinds of **redaction rule** apply: the
@@ -175,7 +177,7 @@ from
 - **Gap marker**: What stands where content is missing: a tombstone for a purged
   range, a **quarantine marker** for a quarantined address, or a **truncation
   marker** on capped kernel output. A **missing range** is part of a writer this
-  node does not hold, such as a peer's lost tail; a **capture gap** is part of a
+  node does not hold; a **capture gap** is part of a
   run its capture did not record.
 - **Integrity status**: What a room or writer shows about its chain and seals,
   one of §9.7.5's values (VIEW-10); `refused` shows a refused segment

@@ -118,7 +118,7 @@ row: "- [{title}]({filename}) — {summary}"
 - [5. Functional requirements: peer network](05d-peer-requirements.md) — Normative functional requirements for the peer network (PEER): enrollment, sync, ephemeral nodes, blind peers and what peers exchange. Part of §5.
 - [5. Functional requirements: provenance and trust](05e-provenance-requirements.md) — Normative functional requirements for provenance and trust (PRV): provenance classes, the trusted sources, deployment mode, writers, and the keys and certificates that tie seats to principals. Part of §5.
 - [5. Functional requirements: pins, recall and restore](05f-pins-recall-and-restore-requirements.md) — Normative functional requirements for pins, recall, landmarks, restore and the kernel (PIN, RCL, LMK, INJ, CMP). Part of §5.
-- [6. Security](06-security.md) — Threat model (assets, threat sources, threats T1–T12 and T14–T29 with their controls, and the residual risks R1–R8 only a sandbox removes) and the normative security requirements SEC-01..32; the boundary register continues in 06b.
+- [6. Security](06-security.md) — Threat model (assets, threat sources, threats T1–T12 and T14–T29 with their controls, and the residual risks R1–R8 only a sandbox removes) and the normative security requirements SEC-01..32, SEC-28 in 06b; the boundary register continues there.
 - [6. Security: boundary register](06b-boundary-register.md) — The boundary register: every ParleyInn component, process and protocol with its network boundary, or why it is rejected (SEC-19). Part of §6.
 - [7. Non-functional requirements](07-non-functional-requirements.md) — Normative non-functional requirements NFR-01..15: latency, throughput, scale, availability, durability, concurrency, footprint, portability, compatibility, usability, maintainability, documentation.
 - [8. Data and storage](08-data-and-storage.md) — Normative home layout, logical schema, canonical encoding (RFC 8785 + SHA-256), the conservative model-token estimator, and the lifecycle grid naming what each M1–M5 lifecycle event does to each derived artifact.
@@ -128,7 +128,7 @@ row: "- [{title}]({filename}) — {summary}"
 - [10. Engineering quality (ENG)](10-engineering-quality.md) — Engineering quality requirements ENG-01..34: code organisation, testing, static analysis, supply chain, and process.
 - [11. Verification and acceptance](11-verification-and-acceptance.md) — The evaluation plan with baselines and acceptance targets, and the definition of done for v1.0.
 - [12. Delivery plan](12-delivery-plan.md) — Milestone M0 spikes S1–S13 and milestones M1–M9 with their scope and exit criteria; what freezes each initial target.
-- [13. Open questions and risks](13-open-questions-and-risks.md) — Open questions OQ-01..56 with their resolution path, and the risk register with mitigations.
+- [13. Open questions and risks](13-open-questions-and-risks.md) — Open questions OQ-01..58 with their resolution path, and the risk register with mitigations.
 - [14. References](14-references.md) — The papers, issues, and standards the specification cites.
 - [Appendix A — Concern traceability](appendix-a-concern-traceability.md) — Every concern raised during research and review, mapped to the requirements that answer it.
 - [Appendix B — Invariant coverage](appendix-b-invariant-coverage.md) — Which requirements serve each invariant, generated from the Traces column of §5–§6, plus the requirement count by priority. A gate test keeps both in step with the tables.

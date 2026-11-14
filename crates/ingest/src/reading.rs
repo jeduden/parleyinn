@@ -3,7 +3,6 @@
 //! of a repeated line (REC-04), and the appends that move the ingest
 //! position with the lines they cover.
 
-use std::cell::Cell;
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 
@@ -11,24 +10,39 @@ use administration::home::Home;
 use administration::node::Node;
 use key::certificate::SeatCertificate;
 use key::random::{Entropy, draw};
-use provenance::{Classified, Classifier, Session};
 use record::commitment::CommitmentKey;
-use record::digest::{Digest, Running};
+use record::digest::Digest;
 use record::event::{EventKind, Provenance};
 use record::id::{Address, WriterId};
 use redaction::Redactor;
 use redaction::account::HarnessAccountIdentifiers;
 use serde_json::{Value, json};
+use store::source::{Zeroed, prefix_digest};
 use store::{Held, IngestedRun, NewEvent, Place, Placed, Position, Source, Store};
-use transcript::shape::Shapes;
 
 use crate::live::RunSeats;
 use crate::observed::{self, Observed};
-use crate::prompt::{self, Outcome, PromptLine};
+use crate::prompt::Outcome;
 use crate::read::{self, Line};
-use crate::repeat::{self, Decision, Facts, Owner, Rule};
+use crate::repeat;
 use crate::run::{Defaults, RunKey};
-use crate::{IngestError, Ingested, Inputs, RunReport, content, turn_end, well_formed};
+
+use self::plan::{Plan, Planner, Read};
+use crate::{IngestError, Ingested, Inputs, RunReport};
+
+/// `redactor`, also redacting the harness account identifiers `lines`
+/// name.
+fn with_account_identifiers(
+    redactor: &Redactor,
+    lines: &[Line<'_>],
+) -> Result<Redactor, IngestError> {
+    let mut ids = HarnessAccountIdentifiers::default();
+    lines.iter().for_each(|l| ids.learn(l.text));
+
+    redactor
+        .with_identifiers(&ids)
+        .map_err(IngestError::Redaction)
+}
 
 /// Who records what an ingest reads, and in which seats.
 pub(crate) enum Recorder<'r> {
@@ -56,11 +70,7 @@ pub(crate) fn ingest(
         .iter()
         .map(|l| serde_json::from_str(l.text).unwrap_or(Value::Null))
         .collect();
-    let mut ids = HarnessAccountIdentifiers::default();
-    lines.iter().for_each(|l| ids.learn(l.text));
-    let redactor = redactor
-        .with_identifiers(&ids)
-        .map_err(IngestError::Redaction)?;
+    let redactor = with_account_identifiers(redactor, &lines)?;
     home.create().map_err(IngestError::Admin)?;
     let mut store = open_store(home, inputs)?;
     let node = Node::open(home, &mut store, entropy).map_err(IngestError::Admin)?;
@@ -108,6 +118,7 @@ pub(crate) fn ingest(
         index_gaps,
         index_gaps_unread,
         witnessed_repeats: plan.witnessed_repeats,
+        refused: plan.refused,
         matched: observations.matched,
         prompt_conflicts: observations.conflicts,
         not_attended: observations.not_attended,
@@ -224,7 +235,7 @@ impl Resume {
             let source = store.start_generation(&named.path, &named.directory)?;
             return Ok(Self::at(source, 0, lines, bytes, false));
         };
-        if continues(&source.position, bytes) {
+        if continues(&source, bytes) {
             let offset = source.position.offset;
             let index = lines
                 .iter()
@@ -240,7 +251,7 @@ impl Resume {
         }
         // Bytes read before another ingest moved the position past their
         // end are no rewrite: the source only grew since (REC-06).
-        if behind(&source.position, bytes, Path::new(&named.path)) {
+        if behind(&source, bytes, Path::new(&named.path)) {
             return Err(IngestError::Store(store::StoreError::PositionMoved {
                 source: source.id,
             }));
@@ -291,20 +302,20 @@ fn as_index(offset: u64) -> usize {
     usize::try_from(offset).unwrap_or(usize::MAX)
 }
 
-/// Whether `bytes` still begin with the prefix `position` consumed.
-fn continues(position: &Position, bytes: &[u8]) -> bool {
-    bytes
-        .get(..as_index(position.offset))
-        .is_some_and(|prefix| Digest::of(&[prefix]) == position.prefix)
+/// Whether `bytes` still begin with the prefix `source`'s position
+/// consumed, the bytes of each purged line zeroed (SEC-31, REC-07).
+fn continues(source: &Source, bytes: &[u8]) -> bool {
+    prefix_digest(bytes, source.position.offset, &source.purged)
+        .is_some_and(|digest| digest == source.position.prefix)
 }
 
-/// Whether `bytes`, which end before `position`, were read before another
-/// ingest moved it: the source at `path` now reads on from the prefix
-/// `position` consumed. A source that cannot be read again, or that no
-/// longer holds that prefix, was rewritten: REC-07's.
-fn behind(position: &Position, bytes: &[u8], path: &Path) -> bool {
-    bytes.len() < as_index(position.offset)
-        && read::transcript(path).is_ok_and(|now| continues(position, &now))
+/// Whether `bytes`, which end before `source`'s position, were read
+/// before another ingest moved it: the source at `path` now reads on
+/// from the prefix its position consumed. A source that cannot be read
+/// again, or that no longer holds that prefix, was rewritten: REC-07's.
+fn behind(source: &Source, bytes: &[u8], path: &Path) -> bool {
+    bytes.len() < as_index(source.position.offset)
+        && read::transcript(path).is_ok_and(|now| continues(source, &now))
 }
 
 /// The redacted lines the newest generation of the source at `path`
@@ -464,375 +475,6 @@ fn certified_by(store: &Store, writer: WriterId, node: &Node) -> Result<bool, In
     }))
 }
 
-/// What one ingest reads.
-struct Read<'r, 'a> {
-    node: &'r Node,
-    home: &'r Home,
-    lines: &'r [Line<'a>],
-    parsed: &'r [Value],
-    /// The index of the first line to read.
-    from: usize,
-    defaults: &'r Defaults,
-    redactor: &'r Redactor,
-}
-
-/// What an ingest will append, line by line, with what reading found.
-#[derive(Default)]
-struct Plan {
-    events: Vec<NewEvent>,
-    places: Vec<Place>,
-    /// For each event: its writer, whether a segment closes after it,
-    /// and the byte offset just past its line.
-    ends: Vec<(WriterId, bool, u64)>,
-    /// Whether an ingest marker holds the line after the last.
-    hold: bool,
-    released: usize,
-    references: usize,
-    conflicts: usize,
-    /// Each (owner, repeating) pair of writers whose repeat owner no
-    /// fork observation chose.
-    chosen: BTreeSet<(WriterId, WriterId)>,
-    redactions: Vec<String>,
-    /// How many lines' redaction scan limit was reached (I9).
-    scan_limited: usize,
-    unparsed: usize,
-    drifts: Vec<String>,
-    /// Each prompt line's event, by its index, with its `prompt_id` and
-    /// what became of the prompt commitment it names (PRV-08).
-    prompts: Vec<(usize, String, Outcome)>,
-    /// How many witnessed lines repeating another transcript's event
-    /// were recorded as their own (REC-04).
-    witnessed_repeats: usize,
-}
-
-impl Plan {
-    /// How many events it appends to each writer.
-    fn events_by_writer(&self) -> BTreeMap<WriterId, usize> {
-        let mut out = BTreeMap::new();
-        for (writer, _, _) in &self.ends {
-            *out.entry(*writer).or_insert(0) += 1;
-        }
-        out
-    }
-}
-
-/// Decides what becomes of each line an ingest reads.
-struct Planner<'a> {
-    named: &'a Named,
-    inputs: &'a Inputs,
-    held_since: Option<u64>,
-    /// The `uuid`s the directory's other transcripts hold, read once a
-    /// fork's line needs them.
-    siblings: Option<BTreeSet<String>>,
-    /// Whether a fork observation names each ingested run's harness
-    /// session, by writer.
-    forked: BTreeMap<WriterId, bool>,
-    /// Whether ingest has read another transcript of the directory,
-    /// whose events a line could repeat.
-    others: bool,
-    /// The prompt commitments, by harness session and `prompt_id`, a
-    /// line this ingest read used up.
-    used: BTreeSet<(String, String)>,
-    /// Whether the MCP server ingests live, its lines witnessed.
-    live: bool,
-    /// How many witnessed lines repeat another transcript's event.
-    witnessed_repeats: usize,
-}
-
-impl<'a> Planner<'a> {
-    fn new(
-        store: &Store,
-        named: &'a Named,
-        inputs: &'a Inputs,
-        source: &Source,
-        runs: &Runs<'_>,
-    ) -> Result<Self, IngestError> {
-        let others = store
-            .sources()?
-            .iter()
-            .any(|s| s.directory == named.directory && s.path != named.path);
-        let forked = runs
-            .sessions
-            .iter()
-            .map(|(w, s)| (*w, inputs.forks.contains(s)))
-            .collect();
-
-        Ok(Self {
-            named,
-            inputs,
-            held_since: source.held_since,
-            siblings: None,
-            forked,
-            others,
-            used: BTreeSet::new(),
-            live: runs.live(),
-            witnessed_repeats: 0,
-        })
-    }
-
-    /// Plans the lines `read` reads, in order, until one is held.
-    fn plan(
-        &mut self,
-        store: &mut Store,
-        runs: &mut Runs<'_>,
-        session: &Session,
-        read: Read<'_, '_>,
-        entropy: &mut dyn Entropy,
-    ) -> Result<Plan, IngestError> {
-        let shapes = Shapes::supported();
-        let mut classifier = Classifier::new(&shapes, *session, read.redactor);
-        // The lines read before, replayed, so a result finds its call.
-        for line in &read.lines[..read.from] {
-            classifier.line(line.text);
-        }
-        let mut plan = Plan::default();
-        for (i, line) in read.lines.iter().enumerate().skip(read.from) {
-            let key = read.defaults.key(&read.parsed[i]);
-            let writer = runs.ensure(store, read.node, read.home, &key, entropy)?;
-            self.forked
-                .insert(writer, self.inputs.forks.contains(&key.harness_session));
-            let classified = classifier.line(line.text);
-            let redacted = read.redactor.redact_line(line.text);
-            let decision = self.decide(store, &read.parsed[i], &key, &redacted.text)?;
-            if decision == Decision::Hold {
-                plan.hold = true;
-                break;
-            }
-            let user = matches!(classified, Classified::Line(Provenance::User, _));
-            let prompt = self.prompt(store, &read.parsed[i], &key, user, &decision, &read)?;
-            let at = Planned {
-                writer,
-                number: i as u64 + 1,
-                line,
-                parsed: &read.parsed[i],
-            };
-            plan.add(at, classified, redacted, decision, read.redactor, entropy)?;
-            if let Some((prompt_id, outcome)) = prompt {
-                plan.prompts
-                    .push((plan.events.len() - 1, prompt_id, outcome));
-            }
-        }
-        plan.witnessed_repeats = self.witnessed_repeats;
-
-        Ok(plan)
-    }
-
-    /// What the parsed line `line` of the run `key`, classed `user` when
-    /// `user`, does to the prompt commitment its `prompt_id` names, when
-    /// it is a prompt line recorded as its own event (PRV-08).
-    fn prompt(
-        &mut self,
-        store: &Store,
-        line: &Value,
-        key: &RunKey,
-        user: bool,
-        decision: &Decision,
-        read: &Read<'_, '_>,
-    ) -> Result<Option<(String, Outcome)>, IngestError> {
-        if matches!(decision, Decision::Reference { .. }) {
-            return Ok(None);
-        }
-        let Some(prompt_line) = PromptLine::of(line) else {
-            return Ok(None);
-        };
-        let id = (key.harness_session.clone(), prompt_line.prompt_id.clone());
-        let commitment = store.prompt_commitment(&id.0, &id.1)?;
-        let redact = |text: &str| read.redactor.redact_text(text).text;
-        let outcome = prompt::outcome(
-            commitment.as_ref(),
-            self.used.contains(&id),
-            user,
-            &prompt_line,
-            &redact,
-        );
-        if outcome.is_some() {
-            self.used.insert(id);
-        }
-
-        Ok(outcome.map(|o| (prompt_line.prompt_id, o)))
-    }
-
-    /// What becomes of the parsed line `line` of the run `key`, whose
-    /// redacted text is `redacted` (REC-04).
-    fn decide(
-        &mut self,
-        store: &Store,
-        line: &Value,
-        key: &RunKey,
-        redacted: &str,
-    ) -> Result<Decision, IngestError> {
-        let Some(uuid) = line["uuid"].as_str() else {
-            return Ok(Decision::Own);
-        };
-        if self.live {
-            // A witnessed line is never a repeat reference, nor held
-            // (REC-04): one another transcript recorded is its own event.
-            let named = self.named;
-            let repeats = self.others
-                && store
-                    .line_owner(&named.directory, uuid, &named.path)?
-                    .is_some();
-            self.witnessed_repeats += usize::from(repeats);
-            return Ok(Decision::Own);
-        }
-        let owner = self.owner(store, uuid)?;
-        let fork = self.inputs.forks.contains(&key.harness_session);
-        let in_sibling = fork && owner.is_none() && self.siblings().contains(uuid);
-        let facts = Facts {
-            owner,
-            fork,
-            in_sibling,
-            held_since: self.held_since,
-            now: self.inputs.now_ms,
-        };
-
-        Ok(repeat::decide(&facts, redacted))
-    }
-
-    /// The event of another transcript of the directory that first
-    /// recorded the line `uuid` names, if an ingested run holds one.
-    fn owner(&self, store: &Store, uuid: &str) -> Result<Option<Owner>, IngestError> {
-        let named = self.named;
-        if !self.others {
-            return Ok(None);
-        }
-        let Some(address) = store.line_owner(&named.directory, uuid, &named.path)? else {
-            return Ok(None);
-        };
-        // An event a place names is an ingested run's, and holds its
-        // line until purge removes it.
-        let fork = self.forked.get(&address.writer).copied();
-        let event = store.event(address)?;
-
-        Ok(fork.zip(event).map(|(fork, event)| Owner {
-            address,
-            provenance: event.link.header.provenance.clone(),
-            text: event
-                .content
-                .as_ref()
-                .and_then(|c| c["text"].as_str())
-                .unwrap_or_default()
-                .to_owned(),
-            fork,
-        }))
-    }
-
-    /// The `uuid`s the directory's other transcripts hold.
-    fn siblings(&mut self) -> &BTreeSet<String> {
-        let named = self.named;
-        self.siblings
-            .get_or_insert_with(|| sibling_uuids(&named.directory, &named.path))
-    }
-}
-
-/// Every `uuid` the transcripts in `directory` but `path` hold; a
-/// transcript that cannot be read holds none.
-fn sibling_uuids(directory: &str, path: &str) -> BTreeSet<String> {
-    let mut found = BTreeSet::new();
-    let Ok(entries) = std::fs::read_dir(directory) else {
-        return found;
-    };
-    for entry in entries.flatten() {
-        let other = entry.path();
-        if other.to_string_lossy() == path || other.extension().is_none_or(|e| e != "jsonl") {
-            continue;
-        }
-        let Ok(bytes) = read::transcript(&other) else {
-            continue;
-        };
-        let text = String::from_utf8_lossy(&bytes);
-        for line in read::lines(&text) {
-            let parsed: Value = serde_json::from_str(line.text).unwrap_or(Value::Null);
-            if let Some(uuid) = parsed["uuid"].as_str() {
-                found.insert(uuid.to_owned());
-            }
-        }
-    }
-
-    found
-}
-
-/// One line a plan takes.
-struct Planned<'p, 'a> {
-    writer: WriterId,
-    number: u64,
-    line: &'p Line<'a>,
-    parsed: &'p Value,
-}
-
-impl Plan {
-    /// Adds the line `at`, classed as `classified` and redacted to
-    /// `redacted`, as `decision` says.
-    fn add(
-        &mut self,
-        at: Planned<'_, '_>,
-        classified: Classified,
-        redacted: redaction::Redacted,
-        decision: Decision,
-        redactor: &Redactor,
-        entropy: &mut dyn Entropy,
-    ) -> Result<(), IngestError> {
-        let limited = Cell::new(0);
-        let describe = |text: &str| {
-            let redacted = redactor.redact_text(text);
-            limited.set(limited.get() + usize::from(redacted.limited));
-            redacted.text
-        };
-        let (kind, provenance, drift) = match classified {
-            Classified::Unparsed(drift) => {
-                self.unparsed += 1;
-                (EventKind::UnparsedLine, Provenance::Unparsed, drift)
-            }
-            Classified::Line(provenance, drift) => (EventKind::TranscriptLine, provenance, drift),
-        };
-        self.drifts.extend(drift.map(|d| d.describe(&describe)));
-        self.scan_limited += limited.get();
-        let end = turn_end(at.parsed) || provenance == Provenance::SubagentResult;
-        let (kind, provenance, content) = match decision {
-            Decision::Reference {
-                owner,
-                provenance,
-                rule,
-            } => {
-                self.references += 1;
-                if rule == Rule::FirstRecorded {
-                    self.chosen.insert((owner.writer, at.writer));
-                }
-                let content = json!({"line": at.number, "repeats": owner.to_string()});
-                (EventKind::RepeatReference, provenance, content)
-            }
-            other => {
-                self.conflicts += usize::from(other == Decision::Conflict);
-                self.released += usize::from(other == Decision::Released);
-                let content = content(at.number, &redacted.text, redacted.rules.len());
-                self.redactions.extend(redacted.rules);
-                self.scan_limited += usize::from(redacted.limited);
-                (kind, provenance, content)
-            }
-        };
-        self.events.push(NewEvent {
-            kind,
-            provenance,
-            content,
-            commitment_key: CommitmentKey::from_bytes(draw(entropy).map_err(IngestError::Key)?),
-            // Read from the line's own structure, as its class is; the
-            // timestamp only when well formed, so it carries no secret.
-            transcript_timestamp: at.parsed["timestamp"]
-                .as_str()
-                .filter(|t| well_formed(t))
-                .map(str::to_owned),
-        });
-        self.places.push(Place {
-            line: at.number,
-            offset: at.line.offset,
-            uuid: at.parsed["uuid"].as_str().map(str::to_owned),
-        });
-        self.ends.push((at.writer, end, at.line.end));
-
-        Ok(())
-    }
-}
-
 /// What [`append`] appended.
 struct Landed {
     /// How many line events, and the address of each.
@@ -859,7 +501,8 @@ fn append(
     entropy: &mut dyn Entropy,
 ) -> Result<Landed, IngestError> {
     let seen = bytes.len() as u64;
-    let mut running = Running::default();
+    let purged = zeroed_spans(resume, plan);
+    let mut running = Zeroed::new(&purged);
     running.update(
         bytes
             .get(..as_index(resume.position.offset))
@@ -885,10 +528,13 @@ fn append(
     for range in transactions(&plan.ends, &starts) {
         let (writer, _, end) = plan.ends[range.end - 1];
         let first = plan.places[range.start].offset;
+        let from = position.offset;
         observing.flush(store, Some(first), entropy)?;
+        // From the position, so a line refused before this one is part
+        // of the prefix.
         running.update(
             bytes
-                .get(as_index(first)..as_index(end))
+                .get(as_index(position.offset)..as_index(end))
                 .unwrap_or_default(),
         );
         position = Position {
@@ -897,13 +543,14 @@ fn append(
             lines: plan.places[range.end - 1].line,
             seen,
         };
-        let appended = store.append_lines(
+        let appended = store.append_lines_refusing(
             writer,
             &plan.events[range.clone()],
             &plan.places[range.clone()],
             &closes[range.clone()],
             resume.source.id,
             &position,
+            refused_from(&plan.refused_places, from, end),
         );
         addresses.extend(appended.map_err(|source| IngestError::Partial {
             writer,
@@ -913,7 +560,24 @@ fn append(
         })?);
         landed += range.len();
     }
-    store.advance(resume.source.id, &position)?;
+    // A refusal no recorded line follows still moves the position, or
+    // the next read would refuse it again.
+    let tail = position.offset;
+    if let Some((line, end)) = plan.refused_to.filter(|(_, end)| *end > position.offset) {
+        running.update(
+            bytes
+                .get(as_index(position.offset)..as_index(end))
+                .unwrap_or_default(),
+        );
+        position = Position {
+            offset: end,
+            prefix: running.digest(),
+            lines: line,
+            seen,
+        };
+    }
+    let refused = refused_from(&plan.refused_places, tail, u64::MAX);
+    advance(store, resume.source.id, &position, refused)?;
     observing.flush(store, Some(position.offset), entropy)?;
 
     Ok(Landed {
@@ -921,6 +585,47 @@ fn append(
         addresses,
         observations: observing.appended,
     })
+}
+
+/// The refused copies, in offset order, that start in `from..to`: the
+/// ones a transaction ending at `to` takes, so none is passed to a
+/// transaction past the position that moved beyond it (REC-04).
+fn refused_from(refused: &[Place], from: u64, to: u64) -> &[Place] {
+    let start = refused.partition_point(|p| p.offset < from);
+    let end = refused.partition_point(|p| p.offset < to);
+    refused.get(start..end).unwrap_or_default()
+}
+
+/// The spans of the source whose bytes are zeros in the consumed-prefix
+/// hash: each purged line's, and each refused copy of a purged line's,
+/// which the hash takes as zeros too (SEC-31).
+fn zeroed_spans(resume: &Resume, plan: &Plan) -> Vec<store::source::Span> {
+    let mut spans = resume.source.purged.clone();
+    spans.extend(plan.refused_places.iter().map(|place| store::source::Span {
+        offset: place.offset,
+        length: place.length,
+    }));
+    spans.sort_by_key(|span| (span.offset, span.length));
+    spans.dedup();
+
+    spans
+}
+
+/// Moves the source `id` to `position`, keeping the places of the refused
+/// copies of purged lines `plan` holds when no recorded line did.
+fn advance(
+    store: &mut Store,
+    id: i64,
+    position: &Position,
+    refused: &[Place],
+) -> Result<(), IngestError> {
+    if !refused.is_empty() {
+        store.advance_refusing(id, position, refused)?;
+    } else {
+        store.advance(id, position)?;
+    }
+
+    Ok(())
 }
 
 /// The hook observations a live ingest appends to the main run's run
@@ -1227,6 +932,8 @@ fn reports(
         })
         .collect()
 }
+
+mod plan;
 
 #[cfg(test)]
 mod tests;

@@ -147,13 +147,15 @@ its sources, its control and how far that holds.
 - **Erasure residue** (S3, S6). A purge erases each event's content,
   commitment key, preview, payload and transcript timestamp, takes its search
   index postings out and vacuums both files with secure delete (ADM-07,
-  SEC-14). It leaves three things. The transcript source's prefix hash, an
-  unkeyed SHA-256 over the consumed bytes, the erased lines among them,
-  confirms a guess of those bytes. Each erased line's byte offset gives its
-  length. Its `uuid` stays, as REC-04 keeps it. The audit's purge entry names
-  the range and the act, never the content. An open finding for the
-  stakeholder; a test pins what is left
-  (`a_purge_leaves_the_prefix_hash_and_places_of_its_transcript_source`).
+  SEC-14). It recomputes the consumed-prefix hash of each transcript source
+  with a purged line, that line's bytes zeroed, so the hash confirms no guess
+  of them (SEC-31). A purge that cannot read the transcript leaves a hash that
+  confirms nothing and counts the source (I6). What stays is each purged
+  line's position, its length and the harness's own `uuid`, as REC-04 keeps
+  it. Another source that holds the line as a repeated line keeps its hash
+  over the line's bytes, open as OQ-57. The audit's purge entry names the
+  range and the act, never the content. The store's tests pin what is left
+  (`crates/store/src/source/purged/tests.rs`).
 - **A secret stored before redaction** (S1). Ingest redacts each line before
   anything is written (SEC-08). Enforced in M1 in part (test:
   `ingest_redacts_before_anything_is_written`); the SEC-08 scenario is still

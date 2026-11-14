@@ -69,7 +69,7 @@ fn found(store: &Store, word: &str) -> usize {
             rooms: &[room()],
             writers: &[],
             provenance: &[],
-            kinds: &[],
+            provenance_families: &[],
             since: None,
             until: None,
             k: 10,

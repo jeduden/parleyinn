@@ -49,7 +49,7 @@ row: "- [{title}]({filename}) — {summary}"
 - [Seats and keys](seats-and-keys.md) — Seats and the keys behind them: run and device seats, room and seat ids, seat, device, principal and token keys, key events and key event logs, recovery keys, key stores, certificates, access tokens, authenticators and CI keys.
 - [Acts and roles](acts-and-roles.md) — The three act kinds and what they may do: room acts, principal acts and their classes, expire acts, roles, appointments, joins, moderation, handover, stamps and the room merge.
 - [Git and forge](git-and-forge.md) — Repositories, branches and commits, the forge, results with their evidence and proof classes, qualified links, comparisons, outcomes and verdicts.
-- [Trust and flow](trust-and-flow.md) — Trust and how content reaches an agent: trust levels and sources, recall, endorsement, trust grants, delegation, rule levels, away policies, fixed templates, sandbox state and risk acceptance, quotas and spend, counters, canary and stats, run status and room status, the Needs you queue and focus set, overlap, forks, presence hints and petnames.
+- [Trust and flow](trust-and-flow.md) — Trust and how content reaches an agent: trust levels and sources, provenance class families, recall, endorsement, trust grants, delegation, rule levels, away policies, fixed templates, sandbox state and risk acceptance, quotas and spend, counters, canary and stats, run status and room status, the Needs you queue and focus set, overlap, forks, presence hints and petnames.
 - [Components and surfaces](components-and-surfaces.md) — ParleyInn's components inside their network boundaries, the room view's surfaces and the outcome window.
 <?/catalog?>
 
@@ -98,6 +98,8 @@ errors and logs use the model's words.
   `kernel-worker`.
 - An option that selects a concept is named for it: `--author`, `--seat`,
   `--writer`, `--run`, `--room`.
+- The versioned `kind` filter of `event_search` is the one retained exception:
+  it selects a provenance class family under RCL-02 and never an event kind.
 - A **settings key** names one setting in a settings layer:
   `<concept>.<setting>`, or `<concept>.<room>.<setting>` or
   `<concept>.<room>.<qualifier>` per room, the concept singular and in snake
