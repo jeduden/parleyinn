@@ -48,6 +48,10 @@ summary: >-
   the 31 section specialists' cases followed: 2 of 372 runs failed,
   each on a request that did not hold its form, and none of 21 reads
   of a section took main's copy.
+- The local review showed one more value worked out. Told to read a
+  long diff's lines 1-120 and 121-220, two specialists counted their
+  offsets from nought and left line 220 unread. The instruction now
+  gives each call's `offset` and `limit`.
 - [review-evaluation.md](../../docs/review-evaluation.md) states the
   rules a stable case, and what a reviewer is handed, hold to.
 

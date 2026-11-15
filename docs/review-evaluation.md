@@ -85,7 +85,10 @@ handed, hold to these rules:
   file. A reviewer's tool numbers the lines of the diff file itself, and
   one place in ten, 83 of 826, took that number before the diffs carried
   their own. A specialist's context names the ADR a change to the
-  invariants lands with, which its own diff does not hold.
+  invariants lands with, which its own diff does not hold. A reviewer
+  told to read a long diff in several calls is handed each call's
+  `offset` and `limit`: two that worked them out from line ranges
+  counted from nought and left the last line unread.
 
 Read every failed run before changing anything. It names a choice the
 instruction left open, or a fixture that is not what the case says. It
