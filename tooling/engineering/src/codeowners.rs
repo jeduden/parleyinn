@@ -292,12 +292,13 @@ pub fn no_owner_on_any_other_path(checkout: &Checkout) -> Vec<String> {
 }
 
 /// Whether `pattern` is one of `allowed` or lies under a directory of
-/// it.
+/// it. Each of `allowed` is a path from the root, so a directory of the
+/// same name deeper in the tree is not under it.
 fn within(allowed: &[String], pattern: &str) -> bool {
     let pattern = pattern.trim_start_matches('/');
     allowed
         .iter()
-        .any(|a| pattern == a || (a.ends_with('/') && matches(a, pattern)))
+        .any(|a| pattern == a || (a.ends_with('/') && matches(&format!("/{a}"), pattern)))
 }
 
 /// Problems with the entries that use syntax this reader cannot judge.

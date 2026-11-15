@@ -260,6 +260,8 @@ fn an_owner_on_any_other_path_is_named() {
         "/features/ @boss",
         "/tooling/engineering/oversize.txt @boss",
         "/SECURITY.md @boss",
+        "/tooling/x/.claude/ @boss",
+        "/crates/pin/scripts/ @boss",
         "/tooling/review-eval/cases/ @boss",
         "/tooling/review-run/ @boss",
         "/docs/agents/x/ @boss",
