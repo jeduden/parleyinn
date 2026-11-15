@@ -57,22 +57,10 @@ fn between_names_each_changed_component_and_why() {
     assert_eq!(
         got,
         vec![
-            Planned {
-                component: "lang-rust".to_owned(),
-                reason: "instructions changed".to_owned(),
-            },
-            Planned {
-                component: "lang-toml".to_owned(),
-                reason: "new component".to_owned(),
-            },
-            Planned {
-                component: "review-code".to_owned(),
-                reason: "cases changed".to_owned(),
-            },
-            Planned {
-                component: "review-code-deep".to_owned(),
-                reason: "cases changed".to_owned(),
-            },
+            Planned::new("lang-rust".to_owned(), "instructions changed".to_owned()),
+            Planned::new("lang-toml".to_owned(), "new component".to_owned()),
+            Planned::new("review-code".to_owned(), "cases changed".to_owned()),
+            Planned::new("review-code-deep".to_owned(), "cases changed".to_owned()),
         ]
     );
 }
@@ -113,10 +101,7 @@ fn files_read_a_directory_or_nothing() {
 
 #[test]
 fn a_planned_component_round_trips_through_json() {
-    let planned = Planned {
-        component: "lang-rust".to_owned(),
-        reason: "instructions changed".to_owned(),
-    };
+    let planned = Planned::new("lang-rust".to_owned(), "instructions changed".to_owned());
 
     let text = serde_json::to_string(&planned).unwrap();
 
@@ -172,14 +157,11 @@ fn a_shared_section_change_plans_one_component_per_set_of_sections() {
     assert_eq!(
         got,
         vec![
-            Planned {
-                component: "lang-a".to_owned(),
-                reason: "shared sections changed; also covers lang-b, lang-c".to_owned(),
-            },
-            Planned {
-                component: "lang-d".to_owned(),
-                reason: "shared sections changed".to_owned(),
-            },
+            Planned::new(
+                "lang-a".to_owned(),
+                "shared sections changed; also covers lang-b, lang-c".to_owned()
+            ),
+            Planned::new("lang-d".to_owned(), "shared sections changed".to_owned()),
         ]
     );
 }
@@ -255,5 +237,187 @@ fn an_estimate_reads_as_one_line() {
     assert_eq!(
         estimate(100, 12).to_string(),
         "about 210 runs, about 7 min, about $8.40"
+    );
+}
+
+/// Two trees for the consent tests: main's, whose CODEOWNERS assigns
+/// the cases, and a pull request's that changes one case of
+/// `lang-rust`, adds one and a note beside them, removes the only case
+/// of `review-code`, and brings the component `lang-toml` with a case.
+fn consent_trees() -> (TempDir, TempDir) {
+    let (base, head) = (TempDir::new().unwrap(), TempDir::new().unwrap());
+    tree(base.path());
+    tree(head.path());
+    let write = |root: &Path, rel: &str, body: &str| {
+        let path = root.join(rel);
+        fs::create_dir_all(path.parent().unwrap()).unwrap();
+        fs::write(path, body).unwrap();
+    };
+    write(
+        base.path(),
+        ".github/CODEOWNERS",
+        "# the stakeholder\n/tooling/review-eval/cases/ @owner\n",
+    );
+    let cases = "tooling/review-eval/cases";
+    write(
+        head.path(),
+        &format!("{cases}/lang-rust/unwrap.toml"),
+        "v2\n",
+    );
+    write(
+        head.path(),
+        &format!("{cases}/lang-rust/added.toml"),
+        "new\n",
+    );
+    write(
+        head.path(),
+        &format!("{cases}/lang-rust/notes.md"),
+        "a note\n",
+    );
+    fs::remove_file(head.path().join(format!("{cases}/review-code/keeps.toml"))).unwrap();
+    write(head.path(), ".claude/agents/lang-toml.md", "toml v1\n");
+    write(
+        head.path(),
+        &format!("{cases}/lang-toml/table.toml"),
+        "new\n",
+    );
+
+    (base, head)
+}
+
+#[test]
+fn consented_sorts_each_changed_case_file_by_the_stakeholder_s_consent() {
+    let (base, head) = consent_trees();
+    let planned = between(base.path(), head.path()).unwrap();
+    let consents = [
+        "looks right".to_owned(),
+        "I consent to `tooling/review-eval/cases/lang-rust/unwrap.toml` \
+         and to tooling/review-eval/cases/review-code/."
+            .to_owned(),
+    ];
+
+    let got = consented(base.path(), head.path(), planned, &consents).unwrap();
+
+    let sorted: Vec<(&str, &[String], &[String])> = got
+        .iter()
+        .map(|p| (p.component.as_str(), &p.consented[..], &p.unconsented[..]))
+        .collect();
+    let (unwrap, added, keeps) = (
+        "unwrap.toml".to_owned(),
+        "added.toml".to_owned(),
+        "keeps.toml".to_owned(),
+    );
+    assert_eq!(
+        sorted,
+        [
+            // A changed case the comment names; an added one it does not.
+            ("lang-rust", &[unwrap][..], &[added][..]),
+            // A component main holds no case for is judged by its own.
+            ("lang-toml", &[][..], &[][..]),
+            // A removed case, named through its directory; the deep
+            // instance runs the same suite.
+            ("review-code", &[keeps.clone()][..], &[][..]),
+            ("review-code-deep", &[keeps][..], &[][..]),
+        ]
+    );
+}
+
+#[test]
+fn consented_takes_no_comment_for_no_consent() {
+    let (base, head) = consent_trees();
+    let planned = between(base.path(), head.path()).unwrap();
+
+    let got = consented(base.path(), head.path(), planned, &[]).unwrap();
+
+    assert!(got.iter().all(|p| p.consented.is_empty()), "{got:?}");
+    assert_eq!(got[0].unconsented, ["added.toml", "unwrap.toml"]);
+}
+
+#[test]
+fn consented_reads_main_s_codeowners_or_none() {
+    let (base, head) = consent_trees();
+    let planned = between(base.path(), head.path()).unwrap();
+    // A pattern names what it owns only while main's CODEOWNERS assigns
+    // it; the pull request's CODEOWNERS is not read.
+    fs::write(base.path().join(CODEOWNERS), "unwrap.toml @owner\n").unwrap();
+    fs::create_dir_all(head.path().join(".github")).unwrap();
+    fs::write(head.path().join(CODEOWNERS), "added.toml @owner\n").unwrap();
+    let by_patterns = ["consenting to unwrap.toml and added.toml".to_owned()];
+
+    let got = consented(base.path(), head.path(), planned.clone(), &by_patterns).unwrap();
+    assert_eq!(got[0].consented, ["unwrap.toml"]);
+    assert_eq!(got[0].unconsented, ["added.toml"]);
+
+    // A tree without CODEOWNERS assigns nothing; a path named in full
+    // still names itself.
+    fs::remove_file(base.path().join(CODEOWNERS)).unwrap();
+    let in_full = ["tooling/review-eval/cases/lang-rust/added.toml is fine".to_owned()];
+    let got = consented(base.path(), head.path(), planned.clone(), &in_full).unwrap();
+    assert_eq!(got[0].consented, ["added.toml"]);
+
+    // One that does not read fails the plan.
+    fs::create_dir_all(base.path().join(CODEOWNERS)).unwrap();
+    let err = consented(base.path(), head.path(), planned, &in_full).unwrap_err();
+    assert!(err.starts_with("read "), "{err}");
+    assert!(err.contains("CODEOWNERS"), "{err}");
+}
+
+#[test]
+fn a_planned_component_carries_its_sorted_case_files_through_json() {
+    let planned = Planned {
+        consented: vec!["a.toml".to_owned()],
+        unconsented: vec!["b.toml".to_owned()],
+        ..Planned::new("lang-rust".to_owned(), "cases changed".to_owned())
+    };
+
+    let text = serde_json::to_string(&planned).unwrap();
+
+    assert_eq!(
+        text,
+        "{\"component\":\"lang-rust\",\"reason\":\"cases changed\",\
+         \"consented\":[\"a.toml\"],\"unconsented\":[\"b.toml\"]}"
+    );
+    assert_eq!(serde_json::from_str::<Planned>(&text).unwrap(), planned);
+}
+
+#[test]
+fn consented_fails_on_a_case_directory_that_does_not_read() {
+    let (base, head) = consent_trees();
+    let planned = between(base.path(), head.path()).unwrap();
+    // Main's directory of lang-rust's cases is a file: its case files
+    // cannot be compared, and the plan fails rather than sort none.
+    let dir = base.path().join("tooling/review-eval/cases/lang-rust");
+    fs::remove_dir_all(&dir).unwrap();
+    fs::write(&dir, "no directory").unwrap();
+
+    let err = consented(base.path(), head.path(), planned, &[]).unwrap_err();
+
+    assert!(err.starts_with("read "), "{err}");
+    assert!(err.contains("lang-rust"), "{err}");
+}
+
+#[test]
+fn a_planned_component_says_which_version_of_its_sorted_case_files_judges() {
+    let planned = Planned::new("lang-rust".to_owned(), "cases changed".to_owned());
+    // No case file sorted, no line.
+    assert_eq!(planned.judged(), Vec::<String>::new());
+    let theirs = Planned {
+        consented: vec!["a.toml".to_owned(), "b.toml".to_owned()],
+        ..planned.clone()
+    };
+    assert_eq!(
+        theirs.judged(),
+        ["the pull request's version judges, a stakeholder comment names it: a.toml, b.toml"]
+    );
+    let both = Planned {
+        unconsented: vec!["c.toml".to_owned()],
+        ..theirs
+    };
+    assert_eq!(
+        both.judged(),
+        [
+            "the pull request's version judges, a stakeholder comment names it: a.toml, b.toml",
+            "main's version judges, no stakeholder comment names it: c.toml",
+        ]
     );
 }

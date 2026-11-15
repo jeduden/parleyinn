@@ -312,10 +312,7 @@ fn edit_section_changes_only_the_named_section_s_body() {
 }
 
 fn planned(component: &str, reason: &str) -> Planned {
-    Planned {
-        component: component.to_owned(),
-        reason: reason.to_owned(),
-    }
+    Planned::new(component.to_owned(), reason.to_owned())
 }
 
 #[test]

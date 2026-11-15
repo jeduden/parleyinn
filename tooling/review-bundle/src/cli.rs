@@ -195,7 +195,11 @@ fn failed<E: std::fmt::Display>(verb: &'static str, path: &Path) -> impl FnOnce(
 /// The bodies of the comments in `json`, the owners' comments, that
 /// consent: each non-blank one that is no review requesting changes.
 /// Each comment must carry a string `author`, `at` and `body`.
-fn consents(json: &str) -> Result<Vec<String>, String> {
+///
+/// # Errors
+///
+/// Fails when `json` is no array of such comments.
+pub fn consents(json: &str) -> Result<Vec<String>, String> {
     let value: Value = serde_json::from_str(json).map_err(|e| e.to_string())?;
     let comments = value.as_array().ok_or("not an array of comments")?;
     let mut consent = Vec::new();
