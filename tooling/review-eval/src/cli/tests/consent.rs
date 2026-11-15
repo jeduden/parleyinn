@@ -62,6 +62,7 @@ fn plan_sorts_the_changed_cases_by_the_comments_of_consent() {
     let (code, _, err) = plan(&text(&head.path().join("none.json")));
     assert_eq!(code, EXIT_FAILURE);
     assert!(err.starts_with("review-eval: read "), "{err}");
+    assert!(err.contains("none.json"), "{err}");
     fs::write(head.path().join("stakeholder-comments.json"), "{}").unwrap();
     let (code, _, err) = plan(&consent);
     assert_eq!(code, EXIT_FAILURE);
