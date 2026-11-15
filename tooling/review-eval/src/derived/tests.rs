@@ -259,7 +259,7 @@ fn ids_and_rows_are_recognised_strictly() {
 }
 
 #[test]
-fn the_id_a_model_case_swaps_is_a_requirement_s_and_its_line_is_known() {
+fn the_id_a_model_case_swaps_is_a_requirement_s() {
     // An open question's id is no requirement's: a linked finding may
     // not end with it, so a swap of it has no right answer in that form.
     assert_eq!(
@@ -267,6 +267,10 @@ fn the_id_a_model_case_swaps_is_a_requirement_s_and_its_line_is_known() {
         Some("CON-02".to_owned())
     );
     assert_eq!(first_requirement_id("open as OQ-32 says"), None);
+}
+
+#[test]
+fn the_line_of_an_id_is_its_first_and_the_first_line_when_it_is_nowhere() {
     assert_eq!(
         line_of("# hub\n\nIt cites PIN-08.\nPIN-08 again.\n", "PIN-08"),
         3
