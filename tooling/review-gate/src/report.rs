@@ -393,12 +393,18 @@ fn linked(path: String, number: usize, consequence: &str, rest: &[&str]) -> Opti
 }
 
 /// A requirement request at `path:number`: a change word and the
-/// requirement, then after a dash its motivation.
+/// requirement, then after a dash its motivation. A request with no
+/// such dash gives its motivation after the first of [`REASONS`]: a
+/// reviewer that writes `; `, `: ` or `because` there asked all the same.
 fn request(path: String, number: usize, asked: &str, rest: &[&str]) -> Option<Request> {
     let (change, requirement) = asked.split_once(' ')?;
     let change = change.to_lowercase();
+    let (requirement, undashed) = match rest {
+        [] => reasoned(requirement),
+        _ => (requirement, ""),
+    };
     let requirement = requirement.trim();
-    let motivation = rest.join(" — ").trim().to_owned();
+    let motivation = format!("{undashed}{}", rest.join(" — ")).trim().to_owned();
     (CHANGES.contains(&change.as_str()) && !requirement.is_empty() && !motivation.is_empty()).then(
         || Request {
             path,
@@ -408,6 +414,28 @@ fn request(path: String, number: usize, asked: &str, rest: &[&str]) -> Option<Re
             motivation,
         },
     )
+}
+
+/// What may stand between a request's requirement and its motivation
+/// where the dash is left out.
+const REASONS: [&str; 7] = [
+    "; ",
+    ": ",
+    ". ",
+    ", since ",
+    ", because ",
+    " since ",
+    " because ",
+];
+
+/// `asked` cut at the first of [`REASONS`] in it: the requirement and
+/// the motivation, which is empty when it holds none.
+fn reasoned(asked: &str) -> (&str, &str) {
+    REASONS
+        .iter()
+        .filter_map(|sep| asked.find(sep).map(|at| (at, sep.len())))
+        .min()
+        .map_or((asked, ""), |(at, len)| (&asked[..at], &asked[at + len..]))
 }
 
 /// A revision, `rest` after `revised:`: one full finding line in one of
