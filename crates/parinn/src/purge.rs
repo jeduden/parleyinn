@@ -285,12 +285,17 @@ fn describe(refusals: &[Refusal], limit: usize) -> String {
 
 /// Finishes a purge a crash or a busy log cut short, when `store`
 /// holds one (ADM-07, SEC-14): the next purge, ingest or rebuild does
-/// it; verify only reports it. A
-/// step that still cannot finish is audited and counted (I6), and
-/// never stops the command that found it (I9).
+/// it; verify only reports it. The transcript sources that purge could
+/// not confirm are audited and counted here, since its own command
+/// failed before it could (SEC-31). A step that still cannot finish is
+/// audited and counted (I6), and never stops the command that found it
+/// (I9).
 pub(crate) fn finish(ctx: &Context, store: &mut Store) {
     let done = store.finish_purge();
     crate::logged("finish a purge", done.as_ref());
+    if let Ok(done) = &done {
+        audit_unconfirmed(ctx, done);
+    }
     if left_over(&done) {
         audit_residue(ctx);
     }

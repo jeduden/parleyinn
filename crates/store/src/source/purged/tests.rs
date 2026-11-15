@@ -344,6 +344,72 @@ fn a_purge_that_cannot_read_the_transcript_leaves_a_hash_that_confirms_nothing()
 }
 
 #[test]
+fn the_unconfirmed_count_outlives_a_finishing_step_that_fails() {
+    let dir = TempDir::new().unwrap();
+    let (mut store, _, _) = ingested(&dir, writer(1), "a.jsonl");
+    // A journalled payload no step can remove, so finishing fails after
+    // the purge's transaction committed.
+    store.conn.execute_batch(crate::purge::SCHEMA).unwrap();
+    store
+        .conn
+        .execute(
+            "INSERT INTO purge_journal (kind, target) VALUES ('payload', 'no payload name')",
+            [],
+        )
+        .unwrap();
+
+    let failed = store.purge(writer(2), &[], &[range(writer(1), 2, 2)]);
+
+    assert!(failed.is_err(), "the finishing step fails");
+    store
+        .conn
+        .execute("DELETE FROM purge_journal WHERE kind = 'payload'", [])
+        .unwrap();
+    let resumed = store.finish_purge().unwrap();
+    assert_eq!(
+        resumed.unconfirmed, 1,
+        "the purge that finishes it reports the source it could not confirm"
+    );
+    assert!(!resumed.nothing);
+    assert_eq!(
+        store.finish_purge().unwrap().unconfirmed,
+        0,
+        "and once only"
+    );
+}
+
+#[test]
+fn each_purge_adds_the_sources_it_could_not_confirm_to_those_journalled() {
+    let dir = TempDir::new().unwrap();
+    let (mut store, _, _) = ingested(&dir, writer(1), "a.jsonl");
+    store.conn.execute_batch(crate::purge::SCHEMA).unwrap();
+    store
+        .conn
+        .execute(
+            "INSERT INTO purge_journal (kind, target) VALUES ('payload', 'no payload name')",
+            [],
+        )
+        .unwrap();
+
+    assert!(
+        store
+            .purge(writer(2), &[], &[range(writer(1), 2, 2)])
+            .is_err()
+    );
+    assert!(
+        store
+            .purge(writer(2), &[], &[range(writer(1), 3, 3)])
+            .is_err()
+    );
+
+    store
+        .conn
+        .execute("DELETE FROM purge_journal WHERE kind = 'payload'", [])
+        .unwrap();
+    assert_eq!(store.finish_purge().unwrap().unconfirmed, 2);
+}
+
+#[test]
 fn a_transcript_that_no_longer_holds_what_was_consumed_confirms_nothing() {
     for rewritten in [&BODY[..10], b"zzz\nbbb\nccc\nddd\neee\n"] {
         let dir = TempDir::new().unwrap();

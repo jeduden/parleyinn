@@ -440,6 +440,34 @@ fn a_residue_the_purge_could_not_clear_is_audited_counted_and_said() {
 }
 
 #[test]
+fn the_command_that_finishes_a_purge_audits_the_sources_it_could_not_confirm() {
+    let (p, _) = with_a_run();
+    let (home, mut store) = open(&p);
+    // What a purge whose finishing step failed leaves journalled.
+    rusqlite::Connection::open(home.store())
+        .unwrap()
+        .execute_batch(
+            "CREATE TABLE IF NOT EXISTS purge_journal (
+                 id INTEGER PRIMARY KEY, kind TEXT NOT NULL, target TEXT NOT NULL,
+                 UNIQUE (kind, target)
+             ) STRICT;
+             INSERT INTO purge_journal (kind, target) VALUES ('vacuum', ''), ('unconfirmed', '2');",
+        )
+        .unwrap();
+
+    p.with_context(&DEV, |ctx| finish(ctx, &mut store));
+
+    assert_eq!(counted(&p, "transcript_prefix_unconfirmed").len(), 2);
+    assert!(counted(&p, "purge_unfinished").is_empty(), "it finished");
+    p.with_context(&DEV, |ctx| finish(ctx, &mut store));
+    assert_eq!(
+        counted(&p, "transcript_prefix_unconfirmed").len(),
+        2,
+        "audited once"
+    );
+}
+
+#[test]
 fn each_source_a_purge_could_not_read_is_audited_and_counted() {
     let p = Process::new();
     let done = store::Finished {
