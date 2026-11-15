@@ -6,9 +6,9 @@
 use crate::report::{bare, dropped, split_dashes};
 
 /// Whether `line` names `path`: it holds the path as written, or its
-/// place is a tail of the path at a `/` that no other file of `files`,
-/// the files the case changes, ends in. A tail two of the case's files
-/// share names neither.
+/// place is a tail of the path, or of a file of `files` under it, at a
+/// `/` that no other file of `files`, the files the case changes, ends
+/// in. A tail two of the case's files share names neither.
 pub(super) fn names(line: &str, path: &str, files: &[&str]) -> bool {
     line.contains(path) || lines(line, path, files).is_some()
 }
@@ -16,13 +16,18 @@ pub(super) fn names(line: &str, path: &str, files: &[&str]) -> bool {
 /// The lines the place of `line` that names `path` covers, its first
 /// and its last: one line twice, or the two ends of a range,
 /// `path:12-20`; a place under a directory more, `pr-head/docs/x.md:3`,
-/// names the path too. `None` when no place of the line names the path,
-/// though its sentence may.
+/// names the path too, and so does one that names a file of `files`
+/// under `path`, where a case wants a finding anywhere in a module.
+/// `None` when no place of the line names the path, though its sentence
+/// may.
 pub(super) fn lines(line: &str, path: &str, files: &[&str]) -> Option<(usize, usize)> {
+    let named = |place: &str, path: &str| {
+        ends_in(place, path)
+            || (tail_of(path, place) && !files.iter().any(|f| *f != path && ends_in(f, place)))
+    };
     places(line)
         .find(|(place, _, _)| {
-            ends_in(place, path)
-                || (tail_of(path, place) && !files.iter().any(|f| *f != path && ends_in(f, place)))
+            named(place, path) || files.iter().any(|f| f.starts_with(path) && named(place, f))
         })
         .map(|(_, first, last)| (first, last))
 }

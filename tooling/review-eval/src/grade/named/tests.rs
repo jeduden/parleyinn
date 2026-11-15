@@ -141,3 +141,25 @@ fn a_place_at_a_tail_of_a_case_s_file_is_a_slip_once_a_file() {
         Vec::<String>::new()
     );
 }
+
+#[test]
+fn a_tail_of_a_file_under_the_wanted_path_names_it() {
+    // A case may want a finding under a module, its file or its tests.
+    let module = "tooling/review-bundle/src/sizes";
+    let files = [
+        "tooling/review-bundle/src/sizes.rs",
+        "tooling/review-bundle/src/sizes/tests.rs",
+        "tooling/review-bundle/src/lib.rs",
+    ];
+
+    for place in ["sizes.rs:32", "src/sizes.rs:32", "sizes/tests.rs:4"] {
+        let line = format!("{place} — if not addressed: its error arms take no test — ENG-11");
+        assert!(names(&line, module, &files), "{place}");
+    }
+    // A file of the case outside the module, and a tail two files share.
+    let outside = "lib.rs:3 — if not addressed: its error arms take no test — ENG-11";
+    assert!(!names(outside, module, &files));
+    let shared = "tests.rs:4 — if not addressed: its error arms take no test — ENG-11";
+    let twice = [files[1], "tooling/review-bundle/src/sizes/more/tests.rs"];
+    assert!(!names(shared, module, &twice));
+}
