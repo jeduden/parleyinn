@@ -66,7 +66,7 @@ pub(super) fn review_late_cases() -> Vec<Case> {
             Injection::replace(
                 "tooling/review-eval/src/plan.rs",
                 "                shared.entry(sections_of(&a)).or_default().push(name);\n",
-                "                shared.entry(sections_of(&a)).or_default().push(name.clone());\n                out.push(Planned { component: name, reason: \"shared sections changed\".to_owned() });\n",
+                "                shared.entry(sections_of(&a)).or_default().push(name.clone());\n                out.push(Planned::new(name, \"shared sections changed\".to_owned()));\n",
             ),
             scenario("ENG-32"),
             "components planned for the sections",
