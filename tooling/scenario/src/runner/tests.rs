@@ -93,6 +93,18 @@ fn selects_skips_pending_and_applies_tags_and_filters() {
     assert!(by_tag.selects("another", bound.iter()));
 }
 
+#[test]
+fn selects_runs_a_row_tagged_runs_though_its_scenario_is_pending() {
+    let all = Options::default();
+    let eng24 = parse_args(&args(&["--tags", "@ENG-24"])).unwrap();
+    let row = tags(&["ENG-24", "P0", "pending", "runs"]);
+
+    assert!(all.selects("x", row.iter()));
+    assert!(eng24.selects("x", row.iter()));
+    assert!(!eng24.selects("x", tags(&["ENG-01", "pending", "runs"]).iter()));
+    assert!(!all.selects("x", tags(&["ENG-24", "pending"]).iter()));
+}
+
 /// A future that is pending until polled `left` more times, waking
 /// itself each time: by reference on this thread, or by value from
 /// another thread.
