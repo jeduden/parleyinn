@@ -1,0 +1,28 @@
+component = "lang-markdown"
+kind = "defect"
+title = "a doc contradicting a requirement beside an open question, linked to the requirement alone"
+
+# The doc states as settled what PIN-03 does not say and OQ-56 leaves
+# open. The finding ends with a requirement or invariant id: an open
+# question is named in its sentence, never among its ids.
+[[create]]
+file = "docs/pin-size.md"
+content = '''
+---
+summary: >-
+  How large a pin may be.
+---
+# Pin size
+
+A pin holds at most 1,000 estimated model tokens, as OQ-56 settled:
+`parinn` refuses a longer one. Its length in characters has no bound.
+'''
+
+[expect]
+outcome = ["findings"]
+absent = ["— OQ-", ", OQ-"]
+
+[[expect.finding]]
+path = "docs/pin-size.md"
+form = "linked"
+ids = ["PIN-03"]
