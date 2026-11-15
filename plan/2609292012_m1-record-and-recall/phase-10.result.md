@@ -82,8 +82,8 @@ For the stakeholder:
   server mints them, OQ-55's recommended option. SEC-10 and its step now
   say the server mints every key, pending the stakeholder's comment.
 - REC-22 stays unbound and `@pending`: no surface shows its
-  freshness mark. Since: a path named on `parinn ingest --path` at a
-  terminal is a widening act (`ingest_path`'s unit tests), and
+  freshness mark. Since: `parinn ingest --path` to a path outside the
+  transcript roots, at a terminal, is widening (unit tested), and
   `@SEC-18` passes.
 - A session binding is matched by the harness process's id; a reused
   process id could match a stale binding. Off Linux no binding is taken.
