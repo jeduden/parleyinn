@@ -14,9 +14,8 @@
 //! A product crate (under `crates/`) never depends on a tooling crate
 //! (under `tooling/`) as a normal or build dependency, declared or not:
 //! the product's executables must not link repository tooling. The
-//! tooling crates fall under the same declarations. The manifests are
-//! the stakeholder's paths in CODEOWNERS, so a change to a direction
-//! waits for the stakeholder's approval.
+//! tooling crates fall under the same declarations. A manifest reviews
+//! deep, so the review weighs a change to a direction.
 
 use std::collections::{BTreeMap, BTreeSet};
 

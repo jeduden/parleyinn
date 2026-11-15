@@ -246,3 +246,26 @@ fn a_nit_the_bundle_does_not_list_is_named() {
         vec!["the review bundle lists no ENG-34 or ENG-28 nit"]
     );
 }
+
+#[test]
+fn the_review_bundle_holds_the_size_list_to_only_shrinking() {
+    assert_eq!(size_list_only_shrinks(), Vec::<String>::new());
+}
+
+#[test]
+fn a_bundle_that_blocks_no_change_or_every_change_of_the_size_list_is_named() {
+    assert_eq!(
+        size_list_problems(|_, _| false),
+        [
+            "the review bundle does not block at the size list for a raised file with no stakeholder comment",
+            "the review bundle does not block at the size list for an added file with no stakeholder comment",
+        ]
+    );
+    assert_eq!(
+        size_list_problems(|_, _| true),
+        [
+            "the review bundle blocks at the size list for a raised file with a stakeholder comment that names the size list",
+            "the review bundle blocks at the size list for a lowered file",
+        ]
+    );
+}

@@ -4,13 +4,19 @@
 //! ENG-34 row states, then runs the review bundle on a change in a
 //! fixture tree, once with a Rust file past its limit and a file no
 //! specialist reads and once with files within their limits that
-//! specialists read, and reads the findings it wrote.
+//! specialists read, and reads the findings it wrote. It also holds the
+//! bundle to the size list only shrinking: a change that adds a file to
+//! the size list or raises a file's listed lines blocks until a
+//! stakeholder comment names the size list, and one that only lowers
+//! them blocks nothing.
 
 use std::fs;
 use std::path::Path;
 
 use review_bundle::cli;
 use review_bundle::limits::{LIMITS, RUST_LINES};
+use review_bundle::size_list::SIZE_LIST;
+use review_bundle::{BLOCKING, Snapshot, analyse};
 use serde_json::Value;
 
 use crate::Checkout;
@@ -259,6 +265,76 @@ pub fn no_nit(built: &Built) -> Vec<String> {
         .filter(|n| ours(n))
         .map(|n| format!("a nit at {}: {}", n.path, n.body))
         .collect()
+}
+
+/// A stakeholder comment that names the size list.
+const NAMES_THE_SIZE_LIST: &str = "consenting: tooling/engineering/oversize.txt";
+
+/// The changes to the size list the bundle is held to: the changed
+/// lines, whether a stakeholder comment names the size list, whether
+/// the bundle must block, and what the change is.
+const SIZE_LIST_CHANGES: [(&str, bool, bool, &str); 4] = [
+    (
+        "-crates/a/src/lib.rs 1100\n+crates/a/src/lib.rs 1101\n",
+        false,
+        true,
+        "a raised file with no stakeholder comment",
+    ),
+    (
+        "+crates/b/src/lib.rs 1001\n",
+        false,
+        true,
+        "an added file with no stakeholder comment",
+    ),
+    (
+        "-crates/a/src/lib.rs 1100\n+crates/a/src/lib.rs 1101\n",
+        true,
+        false,
+        "a raised file with a stakeholder comment that names the size list",
+    ),
+    (
+        "-crates/a/src/lib.rs 1100\n+crates/a/src/lib.rs 1099\n",
+        false,
+        false,
+        "a lowered file",
+    ),
+];
+
+/// Whether the review bundle's deterministic findings block at the size
+/// list, citing ENG-34, for a change of the size list by `lines`, with
+/// a stakeholder comment that names the size list when `named`.
+fn blocks_at_the_size_list(lines: &str, named: bool) -> bool {
+    let diff = format!("diff --git a/{SIZE_LIST} b/{SIZE_LIST}\n{lines}");
+    let consents: Vec<String> = named
+        .then(|| NAMES_THE_SIZE_LIST.to_owned())
+        .into_iter()
+        .collect();
+    let tree = Snapshot::default();
+
+    analyse(&tree, &tree, &diff, &consents)
+        .findings
+        .iter()
+        .any(|f| f.path == SIZE_LIST && f.severity == BLOCKING && f.body.contains("(ENG-34)"))
+}
+
+/// The problems when `blocks` does not block exactly the changes that
+/// lengthen the size list with no stakeholder comment naming it.
+fn size_list_problems(blocks: impl Fn(&str, bool) -> bool) -> Vec<String> {
+    SIZE_LIST_CHANGES
+        .iter()
+        .filter(|(lines, named, want, _)| blocks(lines, *named) != *want)
+        .map(|(_, _, want, what)| {
+            let does = if *want { "does not block" } else { "blocks" };
+            format!("the review bundle {does} at the size list for {what}")
+        })
+        .collect()
+}
+
+/// The problems when the review bundle does not hold the size list to
+/// only shrinking (ENG-34).
+#[must_use]
+pub fn size_list_only_shrinks() -> Vec<String> {
+    size_list_problems(blocks_at_the_size_list)
 }
 
 #[cfg(test)]
