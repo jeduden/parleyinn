@@ -224,6 +224,31 @@ fn purged_without_uuid_then_rewritten_while_served(
     harness.stop()
 }
 
+/// Whether the newest transcript generation of `name` records `line`
+/// again without a `uuid`, at the byte length of a line the purge of
+/// the first left without one, beside a line that keeps no `uuid` and
+/// has another length: REC-07 counts the first as unchecked and leaves
+/// the second out.
+fn repeats_at_a_purged_length(w: &mut World, name: &str, line: u64) -> Result<bool, String> {
+    let generations = generations(w, name)?;
+    let first = generations.first().ok_or("no generation")?;
+    let newest = generations.last().ok_or("no generation")?;
+    let store = open(w)?;
+    let purged: Vec<u64> = store
+        .purged_places(first.id)
+        .map_err(|e| e.to_string())?
+        .iter()
+        .filter(|place| place.uuid.is_none())
+        .map(|place| place.length)
+        .collect();
+    let placed = store.placed(newest.id).map_err(|e| e.to_string())?;
+    let without_uuid = || placed.iter().filter(|p| p.place.uuid.is_none());
+    let again = without_uuid().any(|p| p.place.line == line && purged.contains(&p.place.length));
+    let other = without_uuid().any(|p| p.place.line != line && !purged.contains(&p.place.length));
+
+    Ok(again && other)
+}
+
 #[then(
     regex = r#"^the MCP server left "([^"]+)" in transcript generation (\d+), waiting for "parinn ingest" with an audit entry, and now "[^"]+" starts transcript generation (\d+), its line (\d+) is recorded again and counted as unchecked against purged lines with an audit entry, and the (\d+) other events of transcript generation 1 remain in the record$"#
 )]
@@ -249,11 +274,7 @@ fn unchecked_in_a_new_generation(
             newest.generation
         ));
     }
-    let again = open(w)?
-        .placed(newest.id)
-        .map_err(|e| e.to_string())?
-        .iter()
-        .any(|p| p.place.line == line && p.place.uuid.is_none());
+    let again = repeats_at_a_purged_length(w, &name, line)?;
     let (present, unchecked) = (kept_of_the_first(w, &name)?, audited(w, UNCHECKED)?);
     let refused = audited(w, REFUSED)?;
     if again && present == kept && unchecked == 1 && refused == 0 {
@@ -261,6 +282,6 @@ fn unchecked_in_a_new_generation(
     }
 
     Err(format!(
-        "{name:?}: generation {generation} records line {line} again: {again}; generation 1 keeps {present} events; {unchecked} unchecked lines and {refused} refusals are audited"
+        "{name:?}: generation {generation} records line {line} again at a purged line's byte length, beside a line without a `uuid` of another length: {again}; generation 1 keeps {present} events; {unchecked} unchecked lines and {refused} refusals are audited"
     ))
 }

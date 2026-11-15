@@ -97,7 +97,7 @@ Feature: Administration and lifecycle (ADM)
     And "parinn verify" exits 0 on the home after the backup restore
     And the backup restore recorded a "minted anew" its principal act names, whose writers read origin "peer" until it counts as PRV-12 says, as when a confirm signed by a managed-policy confirmation key names it, and a later "parinn rebuild" derives the same current key event log (PRV-12)
 
-  @ADM-07 @P0 @I1 @I5 @pending
+  @ADM-07 @P0 @I1 @I5 @I6 @pending
   Scenario Outline: purge removes a scope everywhere, erases its commitment keys and leaves a tombstone
     Given an isolated ParleyInn home
     And an agent run with a Claude Code transcript "run-a" in room "room-a"
