@@ -1,6 +1,6 @@
 {
-  "room": "4be071fee6a083c7c53227b58c0d61e5b220104f3d8f1c5a3d5dec60bd130e7a",
+  "room": "6eaab4eb8a4ab17932788ff69ae3e7497955128045d72dbca863077aeaefe8db",
   "transcript": "testdata/claude-code/2.1.296/transcripts/projects/-w-my-app/686aa14f-b535-45bc-9ed0-5400ea84bec7.jsonl",
   "version": "0.0.0",
-  "writer": "faf51568a0deea2d7e01847f7ab83e4cb59bdb853ea73cd2188cfa91a6b6495f"
+  "writer": "d27eadfe384b9f12e174cc70d1cc7f21c1f324f9f41404e42419c21b55625354"
 }
