@@ -57,7 +57,7 @@ pub use recall::{EventFacts, RangeEvent, RecallReach, Stats};
 pub use search::rank::Hit;
 pub use search_index::{GapClass, IndexGap, Search};
 pub use segment::{SEGMENT_VERSION, Segment};
-pub use source::{IngestedRun, Place, Placed, Position, Source};
+pub use source::{IngestedRun, Place, Placed, Position, PurgedLines, Source};
 
 /// The store's schema version (ADM-05, ADM-11).
 pub const SCHEMA_VERSION: u32 = 1;

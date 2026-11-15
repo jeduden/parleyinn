@@ -127,8 +127,7 @@ impl<'a> Planner<'a> {
         runs: &Runs<'_>,
     ) -> Result<Self, IngestError> {
         let others = store.shares_directory(&named.directory, &named.path)?;
-        let purged = store.purged_line_uuids(&named.directory)?;
-        let unrefusable = store.purged_lengths_without_uuid(&named.directory)?;
+        let purged = store.purged_lines(&named.directory)?;
         let forked = runs
             .sessions
             .iter()
@@ -140,8 +139,8 @@ impl<'a> Planner<'a> {
             inputs,
             held_since: source.held_since,
             siblings: None,
-            purged,
-            unrefusable,
+            purged: purged.uuids,
+            unrefusable: purged.lengths_without_uuid,
             forked,
             others,
             used: BTreeSet::new(),

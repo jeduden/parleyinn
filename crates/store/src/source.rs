@@ -254,6 +254,17 @@ pub struct Place {
     pub uuid: Option<String>,
 }
 
+/// What the purged lines of one directory's transcript sources left.
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
+pub struct PurgedLines {
+    /// The harness UUIDs kept: a line that carries one is refused.
+    pub uuids: BTreeSet<String>,
+    /// The byte lengths of the purged lines kept without a UUID. No
+    /// refusal reaches a repeat of one, so an ingest counts a line of
+    /// such a length it records without a `uuid` as unchecked (REC-07).
+    pub lengths_without_uuid: BTreeSet<u64>,
+}
+
 /// An event's place, with its address and kind.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Placed {
@@ -634,23 +645,12 @@ impl Store {
         Ok(shares?)
     }
 
-    /// The harness UUIDs left by purged lines in any transcript source
-    /// of `directory`, an earlier generation of a rewritten transcript
-    /// included, ready for an ingest to test in memory (REC-04, REC-07,
+    /// What the purged lines in any transcript source of `directory`
+    /// left, an earlier generation of a rewritten transcript included,
+    /// read once for an ingest to test in memory (REC-04, REC-07,
     /// SEC-31).
-    pub fn purged_line_uuids(&self, directory: &str) -> Result<BTreeSet<String>, StoreError> {
-        purged_line_uuids(&self.conn, directory)
-    }
-
-    /// The byte lengths of the purged lines in any transcript source of
-    /// `directory` that keep no harness UUID. No repeat of such a line
-    /// can be refused by `uuid`, so an ingest counts a line of one of
-    /// these lengths it records without a `uuid` as unchecked (REC-07).
-    pub fn purged_lengths_without_uuid(
-        &self,
-        directory: &str,
-    ) -> Result<BTreeSet<u64>, StoreError> {
-        purged_lengths_without_uuid(&self.conn, directory)
+    pub fn purged_lines(&self, directory: &str) -> Result<PurgedLines, StoreError> {
+        purged_lines(&self.conn, directory)
     }
 
     /// Appends transcript lines and atomically keeps the positions of
@@ -823,46 +823,32 @@ pub(crate) fn owner(
     found.map(|(w, s)| address(&w, s)).transpose()
 }
 
-/// The allowed residue UUIDs of purged lines in the transcript sources of
+/// The allowed residue of the purged lines in the transcript sources of
 /// `directory`. An older store without the residue table holds none.
-fn purged_line_uuids(conn: &Connection, directory: &str) -> Result<BTreeSet<String>, StoreError> {
-    let query = "SELECT count(*) FROM sqlite_master WHERE name = 'transcript_purged_copies'";
-    if !conn.query_row(query, [], |row| row.get::<_, bool>(0))? {
-        return Ok(BTreeSet::new());
-    }
-    let mut statement = conn.prepare(
-        "SELECT DISTINCT p.uuid FROM transcript_purged_copies p
-         JOIN transcript_sources s ON s.id = p.source
-         WHERE p.uuid IS NOT NULL AND s.directory = ?1
-         ORDER BY p.uuid",
-    )?;
-    let rows = statement.query_map([directory], |row| row.get(0))?;
-
-    Ok(rows.collect::<Result<_, _>>()?)
-}
-
-/// The byte lengths of the purged lines in the transcript sources of
-/// `directory` whose residue holds no UUID. An older store without the
-/// residue table holds none.
-fn purged_lengths_without_uuid(
-    conn: &Connection,
-    directory: &str,
-) -> Result<BTreeSet<u64>, StoreError> {
+fn purged_lines(conn: &Connection, directory: &str) -> Result<PurgedLines, StoreError> {
+    let mut found = PurgedLines::default();
     if !conn.query_row(HAS_COPIES, [], |row| row.get::<_, bool>(0))? {
-        return Ok(BTreeSet::new());
+        return Ok(found);
     }
     let mut statement = conn.prepare(
-        "SELECT DISTINCT p.byte_length FROM transcript_purged_copies p
+        "SELECT DISTINCT p.uuid, CASE WHEN p.uuid IS NULL THEN p.byte_length END
+         FROM transcript_purged_copies p
          JOIN transcript_sources s ON s.id = p.source
-         WHERE p.uuid IS NULL AND s.directory = ?1",
+         WHERE s.directory = ?1",
     )?;
-    let rows = statement.query_map([directory], |row| row.get::<_, i64>(0))?;
+    let rows = statement.query_map([directory], |row| {
+        Ok((
+            row.get::<_, Option<String>>(0)?,
+            row.get::<_, Option<i64>>(1)?,
+        ))
+    })?;
+    for row in rows {
+        let (uuid, length) = row?;
+        found.uuids.extend(uuid);
+        found.lengths_without_uuid.extend(length.map(count));
+    }
 
-    Ok(rows
-        .collect::<Result<Vec<_>, _>>()?
-        .into_iter()
-        .map(count)
-        .collect())
+    Ok(found)
 }
 
 /// The ingested runs `filter` selects, `?1` and `?2` being `a` and `b`.

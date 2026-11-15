@@ -291,12 +291,12 @@ fn purged_line_uuids_are_loaded_together_without_event_associations() {
         .unwrap();
 
     assert_eq!(
-        store.purged_line_uuids("/t").unwrap(),
+        store.purged_lines("/t").unwrap().uuids,
         BTreeSet::from(["u1".to_owned(), "u2".to_owned()]),
         "the source's own residue counts: a rewritten transcript is a new generation"
     );
     assert_eq!(
-        store.purged_line_uuids("/other").unwrap(),
+        store.purged_lines("/other").unwrap().uuids,
         BTreeSet::from(["u3".to_owned()])
     );
 }
@@ -326,15 +326,19 @@ fn the_lengths_of_purged_lines_that_keep_no_uuid_are_loaded_by_directory() {
         .unwrap();
 
     assert_eq!(
-        store.purged_lengths_without_uuid("/t").unwrap(),
-        BTreeSet::from([10, 44]),
+        store.purged_lines("/t").unwrap(),
+        PurgedLines {
+            uuids: BTreeSet::from(["u2".to_owned()]),
+            lengths_without_uuid: BTreeSet::from([10, 44]),
+        },
         "the line that keeps its uuid is refused by it, so its length is not held"
     );
-    assert!(
-        store
-            .purged_lengths_without_uuid("/other")
-            .unwrap()
-            .is_empty()
+    assert_eq!(
+        store.purged_lines("/other").unwrap(),
+        PurgedLines {
+            uuids: BTreeSet::from(["u3".to_owned()]),
+            lengths_without_uuid: BTreeSet::new(),
+        }
     );
 }
 
@@ -352,8 +356,7 @@ fn a_store_from_before_purged_copies_still_reads_its_sources() {
         .unwrap();
 
     assert_eq!(store.source("/t/a.jsonl").unwrap(), Some(source));
-    assert!(store.purged_line_uuids("/t").unwrap().is_empty());
-    assert!(store.purged_lengths_without_uuid("/t").unwrap().is_empty());
+    assert_eq!(store.purged_lines("/t").unwrap(), PurgedLines::default());
 }
 
 #[test]
@@ -727,7 +730,7 @@ fn two_sources_of_one_directory_that_share_a_purged_uuid_name_it_once() {
         .unwrap();
 
     assert_eq!(
-        store.purged_line_uuids("/t").unwrap(),
+        store.purged_lines("/t").unwrap().uuids,
         BTreeSet::from(["shared".to_owned()])
     );
 }
@@ -763,8 +766,7 @@ fn a_residue_table_without_uuids_makes_the_directory_uuids_unreadable() {
     store.start_generation("/t/a.jsonl", "/t").unwrap();
     without_residue_columns(&store);
 
-    assert!(store.purged_line_uuids("/t").is_err());
-    assert!(store.purged_lengths_without_uuid("/t").is_err());
+    assert!(store.purged_lines("/t").is_err());
 }
 
 #[test]
