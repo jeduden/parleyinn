@@ -309,6 +309,22 @@ fn a_review_whose_credential_does_not_read_runs_no_agent() {
 }
 
 #[test]
+fn a_review_whose_work_directory_does_not_read_runs_no_agent() {
+    // The texts the scrub spares are read from the work directory: one
+    // that does not read fails the review, never a scrub that spares none.
+    let dir = workdir();
+    let host = FakeHost::new(fake::either);
+    let missing = dir.path().join("missing");
+
+    let (code, out, _) = run_holding(&host, &missing, None, &[]);
+
+    assert_eq!(code, EXIT_FAILURE);
+    assert!(out.starts_with("failed=read "), "{out}");
+    assert!(out.contains("missing"), "{out}");
+    assert!(host.agents().is_empty());
+}
+
+#[test]
 fn a_review_whose_logs_directory_cannot_be_made_fails_naming_it() {
     let dir = workdir();
     fs::write(dir.path().join("review/logs"), "a file").unwrap();
