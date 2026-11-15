@@ -1,0 +1,33 @@
+# Until the section this specialist checks is on main, its cases bring
+# the section's file themselves. The cases derived from the section
+# take their place once it is there.
+component = "srs-review-requirements"
+kind = "defect"
+title = "a requirement row added with no scenario"
+
+[[create]]
+file = "docs/srs/10a-review-requirements.md"
+content = '''
+---
+title: "10.5 The review"
+summary: >-
+  A part of §10 on the review.
+---
+# 10.5 The review
+
+This file is part of ParleyInn. The table lists: **ID** · **Pri** ·
+**Requirement** · **Ver** (verification method).
+
+| ID     | Pri | Requirement                                                   | Ver |
+| ------ | --- | ------------------------------------------------------------- | --- |
+| ENG-36 | P0  | The review MUST record each of its runs in the audit log.     | T   |
+'''
+
+[expect]
+outcome = ["findings"]
+main_unread = true
+
+[[expect.finding]]
+path = "docs/srs/10a-review-requirements.md"
+form = "linked"
+ids = ["ENG-36"]

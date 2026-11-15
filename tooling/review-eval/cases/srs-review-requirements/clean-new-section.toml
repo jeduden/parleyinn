@@ -1,0 +1,27 @@
+# Until the section this specialist checks is on main, its cases bring
+# the section's file themselves. The cases derived from the section
+# take their place once it is there.
+component = "srs-review-requirements"
+kind = "clean"
+title = "the section's file with a title and a true sentence"
+
+[[create]]
+file = "docs/srs/10a-review-requirements.md"
+content = '''
+---
+title: "10.5 The review"
+summary: >-
+  A part of §10 that holds no requirement yet.
+---
+# 10.5 The review
+
+This file is part of ParleyInn.
+'''
+
+[expect]
+outcome = ["none", "findings"]
+main_unread = true
+
+[[expect.none]]
+path = "docs/srs/10a-review-requirements.md"
+form = "linked"
