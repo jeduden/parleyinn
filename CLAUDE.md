@@ -201,8 +201,8 @@ Open only the [SRS](docs/srs/index.md) section a task touches.
 Agents review each other's pull requests, and GitHub merges them (ENG-21).
 Open yours ready, never as a draft, and enable auto-merge. Ask the stakeholder
 for nothing, unless it changes a path [CODEOWNERS](.github/CODEOWNERS) names:
-the agent instructions, `tooling/review-*`, CI, its bans and acceptances, and
-`.mdsmith.yml`. Then ask once, listing those paths, for a consenting comment. On
+the agent instructions, `tooling/review-*`, CI with its manifests, tool pins,
+bans and acceptances, and `.mdsmith.yml`. Then ask once, naming those paths. On
 GitHub, write every `@`-word in backticks: a bare one, such as `@I2`, mentions
 that GitHub user (jeduden/parleyinn#22).
 

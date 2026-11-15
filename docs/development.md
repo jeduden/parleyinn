@@ -193,7 +193,7 @@ id), one approval from a reviewer other than the author, and a code owner's
 approval where [CODEOWNERS](../.github/CODEOWNERS) names one. The ENG-21
 gate tests read it, and CODEOWNERS: it names the stakeholder as code owner
 of what guides the review, and of nothing else: the agent instructions, the
-`tooling/review-*` crates, CI, its bans and acceptances, and `.mdsmith.yml`
+`tooling/review-*` crates, CI with what it builds from, and `.mdsmith.yml`
 ([ADR-2611151030](adr/ADR-2611151030-stakeholder-paths.md)). Two tag
 rulesets sit beside it. `releases-semver` keeps each `v*.*.*` tag fixed on a
 signed commit that passed `CI`. `no-other-tags-allowed` refuses every other

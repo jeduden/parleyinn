@@ -237,7 +237,7 @@ Feature: Engineering quality (ENG)
     And commits must be signed
     And every pull request needs an approval from a reviewer other than its author
     And every pull request needs the "review-gate" check, taken from the reviewer app alone
-    And CODEOWNERS names the stakeholder on what guides the review: the agent instructions, the review's code and cases, CI and the merge rules, the bans and acceptances CI holds the code to, and the linter configuration
+    And CODEOWNERS names the stakeholder on what guides the review: the agent instructions, the review's code and cases, CI and the merge rules, the manifests and tool pins CI builds and checks with, the bans and acceptances CI holds the code to, and the linter configuration
     And CODEOWNERS names no code owner on any other path
     And CODEOWNERS names no code owner on Rust source outside the review's crates, so any other code change needs only a reviewer other than its author
 

@@ -5,7 +5,7 @@ const INDEX: &str = "| **Stakeholder** | @boss, also the security reviewer |\n";
 const ENG: &str = "\
 | ID | Pri | Requirement | Ver |
 |---|---|---|---|
-| ENG-21 | P0 | Only a change to what guides the review needs the stakeholder: the agent instructions, the review's code, cases and scorecard, CI and the merge rules (`CODEOWNERS` itself among them), the bans and acceptances CI holds the code to and the linter configuration (`.mdsmith.yml`). | I |
+| ENG-21 | P0 | Only a change to what guides the review needs the stakeholder: the agent instructions, the review's code, cases and scorecard, CI and the merge rules (`CODEOWNERS` itself among them), the manifests and tool pins CI builds and checks with, the bans and acceptances CI holds the code to and the linter configuration (`.mdsmith.yml`). | I |
 ";
 
 const OWNERS: &str = "\
@@ -16,6 +16,8 @@ const OWNERS: &str = "\
 /tooling/review-*/ @boss
 /.github/         @boss # trailing
 /scripts/         @boss
+/Cargo.toml       @boss
+/tooling/*/Cargo.toml @boss
 /crates/*/clippy.toml @boss
 /deny.toml        @boss
 /.mdsmith.yml     @boss
@@ -182,6 +184,12 @@ fn an_enforcing_path_without_the_stakeholder_is_named_with_its_class() {
         "crates/zed/clippy.toml (the bans and acceptances CI holds the code to) is owned by [@other]",
     );
 
+    let owners = OWNERS.replace("/Cargo.toml       @boss\n", "");
+    has(
+        &problems(&owners),
+        "Cargo.toml (the manifests and tool pins CI builds and checks with) is owned by [], want @boss",
+    );
+
     let owners = OWNERS.replace("/.mdsmith.yml     @boss\n", "");
     has(
         &problems(&owners),
@@ -250,8 +258,8 @@ fn an_owner_on_any_other_path_is_named() {
         "/docs/ @boss",
         "/docs/srs/ @boss",
         "/features/ @boss",
-        "/Cargo.toml @boss",
-        "/crates/*/Cargo.toml @boss",
+        "/tooling/review-run/ @boss",
+        "/rust-toolchain.toml @boss",
         "/tooling/engineering/oversize.txt @boss",
         "/SECURITY.md @boss",
         "/tooling/review-eval/cases/ @boss",

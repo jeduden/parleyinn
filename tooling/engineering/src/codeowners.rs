@@ -1,7 +1,8 @@
 //! ENG-21: `CODEOWNERS` names the stakeholder on what guides the
 //! review (the agent instructions, the review's code, cases and
-//! scorecard, CI and the merge rules, the bans and acceptances CI holds
-//! the code to, the linter configuration), on
+//! scorecard, CI and the merge rules, the manifests and tool pins CI
+//! builds and checks with, the bans and acceptances it holds the code
+//! to, the linter configuration), on
 //! nothing else, and on no Rust source outside the review's crates.
 //!
 //! The guiding paths come from the ENG-21 row of the SRS: each class
@@ -38,6 +39,20 @@ const ENFORCING: &[(&str, &[&str])] = &[
     ("the review's code, cases and scorecard", &[REVIEW_CRATES]),
     ("CI and the merge rules", &[".github/", "scripts/"]),
     ("`CODEOWNERS` itself", &[".github/CODEOWNERS"]),
+    // A manifest's `[lints]` decides whether the bans take effect, and
+    // the mise files pin the tools CI's gates run.
+    (
+        "the manifests and tool pins CI builds and checks with",
+        &[
+            "Cargo.toml",
+            "crates/*/Cargo.toml",
+            "tooling/*/Cargo.toml",
+            "mise.toml",
+            "mise.lock",
+            "mise.dev.toml",
+            "mise.dev.lock",
+        ],
+    ),
     (
         "the bans and acceptances CI holds the code to",
         &[

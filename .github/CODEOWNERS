@@ -23,6 +23,17 @@
 /.github/                     @jeduden
 /scripts/                     @jeduden
 
+# The manifests and tool pins CI builds and checks with: a manifest's
+# [lints] decides whether the bans below take effect, and the mise files
+# pin the tools the gates run.
+/Cargo.toml                   @jeduden
+/crates/*/Cargo.toml          @jeduden
+/tooling/*/Cargo.toml         @jeduden
+/mise.toml                    @jeduden
+/mise.lock                    @jeduden
+/mise.dev.toml                @jeduden
+/mise.dev.lock                @jeduden
+
 # The bans and acceptances CI holds the code to: the clippy
 # configuration that refuses sockets, program starts, clocks and random
 # order (SEC-01, ENG-16, ENG-03), the supply-chain policy, the benchmark
