@@ -61,8 +61,10 @@ exactly one kind (LANE-31).
     has no member seat in, ask for or accept a join, endorse, loosen a rule
     level, turn on or change an away policy other than turning it off,
     quarantine removing a pin, pin version or landmark from a restore block,
-    release a quarantine, purge or apply an erasure request, export, bind a
-    repository identity by hand or rebind it, accept open residual risks
+    release a quarantine, purge or apply an erasure request, export, ingest a
+    regular transcript file outside the transcript roots through `parinn ingest
+    --path` at a terminal, bind a repository identity by hand or rebind it,
+    accept open residual risks
     (OWN-22), certify a service account's principal key, assign a role, set a
     room's admission, appoint a moderator or the facilitator, stamp a pin
     version, name a successor, offer a handover, record a trust grant, allow

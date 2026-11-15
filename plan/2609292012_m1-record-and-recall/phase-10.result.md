@@ -81,8 +81,10 @@ For the stakeholder:
 - `@SEC-10`'s last step handed run-seat keys over at launch; the MCP
   server mints them, OQ-55's recommended option. SEC-10 and its step now
   say the server mints every key, pending the stakeholder's comment.
-- REC-22 stays unbound: SEC-18 still refuses its transcript from
-  outside the roots (raised in phase 8).
+- REC-22 stays unbound and `@pending`: no surface shows its
+  freshness mark. Since: `parinn ingest --path` to a path outside the
+  transcript roots, at a terminal, is widening (unit tested), and
+  `@SEC-18` passes.
 - A session binding is matched by the harness process's id; a reused
   process id could match a stale binding. Off Linux no binding is taken.
 - Unit line coverage (`cargo llvm-cov --lib`): mcp and hook 100%,
