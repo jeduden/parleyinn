@@ -32,8 +32,8 @@ pub(super) fn review_late_cases() -> Vec<Case> {
             "ENG-28",
             Injection::replace(
                 REVIEW_WORKFLOW,
-                "            review/usage.json\n          if-no-files-found: error\n",
-                "            review/usage.json\n            review/logs/\n          if-no-files-found: error\n",
+                "            review/dispatch.json\n          if-no-files-found: error\n",
+                "            review/dispatch.json\n            review/logs/\n          if-no-files-found: error\n",
             ),
             scenario("ENG-28"),
             "agent job review uploads review/logs, every tool result its agents read",

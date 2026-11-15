@@ -75,6 +75,15 @@ is short, because a finding found late costs a whole round.
   it read its whole diff, each unread range a `partial:` gap. Deleting the pull
   request's `review-spend-pr-<N>-a*` artifacts resets its budget, and
   `--max-cost-usd` overrides the cap.
+- A stakeholder's comment on a head the agents already reviewed costs
+  nothing. Each review keeps its review outcome, with the head and
+  dispatch it was decided on, in its `review-reports` artifact. The
+  review a comment brings takes the newest one of the same head and
+  dispatch that left no gap, runs no agent and states only the
+  deterministic findings again, the consent among them. Its job summary
+  says which run it reused, or why its agents ran. A comment made while
+  a review runs waits for it and cancels nothing, so consent can be
+  given at any time.
 - CI ends within ten minutes of a push. The slowest chain of jobs sets
   that; a job that grows toward its five-minute limit is split before it
   fails.
