@@ -32,7 +32,8 @@ records the design.
   one TOML file each. A case names the files it creates, the text it
   replaces, the reports it seeds for a generalist, the stakeholder's
   consent when it grants one, and what the report must say. A finding
-  is matched by its path and the words, ids and source the case names,
+  is matched by its path, or a tail of it that ends no other file of the
+  case, and the line, words, ids and source the case names,
   and by its form, `linked` or `request`, for a specialist or a persona,
   which weighs nothing, or its severity for a generalist; `none` forbids
   one; `absent` forbids text; `nits` caps the nits a generalist keeps;
@@ -44,9 +45,38 @@ records the design.
   apply to it.
 - **Derived cases** come from the tree for each SRS section and
   domain-model file: a requirement row changed without its scenario, a
-  cited id no section defines, a true sentence under the title, and the
+  cited id no section defines, a sentence in terms the model excludes,
+  whose finding cites ENG-35, a true sentence under the title, and the
   same with an instruction addressed to the reviewer. Each holds its
   run to the pull request's tree. They never rot.
+
+## A stable case
+
+A reviewer is a model, and its run varies wherever its instructions or
+the case leave it a choice. Every one of the 83 failed runs of the
+first full measurement, four runs of each case, was traced to such a
+choice, and they did not follow the model or the length of a run. A
+case that fails one run in four is a finding about the case or the
+instruction, never noise to outvote. So a case holds to four rules:
+
+- **One right answer in the report's form.** A defect breaks a
+  requirement the reviewer can cite, so its finding is a linked line
+  with that id; a concern no requirement states is a request, and the
+  case wants a request. A case that wants a blocking finding for a rule
+  with no id rewards an invented link.
+- **A clean change gives the reviewer nothing to weigh.** A comment, or
+  a sentence reworded with its meaning kept. A plan, a new test or a
+  new sentence is never clean to a reviewer whose remit is to find its
+  gaps, and what it then says is true.
+- **A defect's fixture holds the planted defect alone**, at a path no
+  other file of the case ends with.
+- **A finding is known by what the report's form fixes**: its place,
+  the ids it cites, its source and its form or severity. A word of its
+  sentence decides only where the form fixes nothing else.
+
+Read every failed run before changing anything. It names a choice the
+instruction left open, or a fixture that is not what the case says. It
+may also name an expectation the reviewer met in other words.
 
 ## A case run
 
