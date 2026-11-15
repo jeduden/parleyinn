@@ -360,3 +360,19 @@ fn a_held_path_no_act_names_is_refused_once_it_lies_outside_the_roots() {
     assert_eq!(refusals(&p), pairs(&[HELD, OUTSIDE]));
     assert!(acts(&p).is_empty());
 }
+
+#[test]
+fn a_held_path_that_is_no_regular_file_any_more_is_refused() {
+    let mut p = Process::new();
+    let path = fork_elsewhere(&mut p);
+    named(&p, &path);
+    fs::remove_file(&path).unwrap();
+    fs::create_dir(&path).unwrap();
+
+    let (code, _, _) = p.invoke(&["ingest", "--all"], &DEV);
+
+    assert_eq!(code, EXIT_OK);
+    assert!(held(&p, &path), "nothing is read from it");
+    assert_eq!(refusals(&p), pairs(&[HELD, OUTSIDE]));
+    assert_eq!(acts(&p).len(), 1);
+}

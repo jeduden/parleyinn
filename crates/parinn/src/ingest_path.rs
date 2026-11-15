@@ -75,13 +75,15 @@ pub(crate) fn within(
     stderr: &mut dyn Write,
 ) -> Vec<PathBuf> {
     let roots = roots(ctx, settings);
-    let named = named_before(ctx);
+    // Read once, and only when a held path lies outside the roots.
+    let mut named = None;
 
     held.iter()
         .filter_map(|path| {
             if let Ok(within) = roots.resolve(path, Access::Read) {
                 return Some(within.path().to_path_buf());
             }
+            let named = named.get_or_insert_with(|| named_before(ctx));
             let again = outside_home(ctx, path)
                 .filter(|resolved| is_file(resolved) && named.contains(&digest(resolved)));
             if again.is_none() {
@@ -116,7 +118,7 @@ fn digest(resolved: &Path) -> String {
 
 /// The digest of `resolved`, a path the principal names.
 fn path_digest(resolved: &Path) -> Digest {
-    Digest::of(&[resolved.to_string_lossy().as_bytes()])
+    Digest::of(&[resolved.as_os_str().as_encoded_bytes()])
 }
 
 /// The transcript roots, each resolved.
