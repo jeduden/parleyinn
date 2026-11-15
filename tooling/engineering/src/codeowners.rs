@@ -53,6 +53,7 @@ const ENFORCING: &[(&str, &[&str])] = &[
             "mise.dev.toml",
             "mise.dev.lock",
             "rust-toolchain.toml",
+            "fuzz/rust-toolchain.toml",
         ],
     ),
     (

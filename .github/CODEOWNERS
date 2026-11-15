@@ -25,7 +25,7 @@
 
 # The manifests and tool pins CI builds and checks with: a manifest's
 # [lints] decides whether the bans below take effect, and the mise files
-# and rust-toolchain.toml pin the tools the gates run.
+# and each rust-toolchain.toml pin the tools the gates run.
 /Cargo.toml                   @jeduden
 /crates/*/Cargo.toml          @jeduden
 /tooling/*/Cargo.toml         @jeduden
@@ -35,6 +35,7 @@
 /mise.dev.toml                @jeduden
 /mise.dev.lock                @jeduden
 /rust-toolchain.toml          @jeduden
+/fuzz/rust-toolchain.toml     @jeduden
 
 # The bans and acceptances CI holds the code to: the clippy
 # configuration that refuses sockets, program starts, clocks and random
