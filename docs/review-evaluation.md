@@ -76,7 +76,7 @@ handed, hold to these rules:
   what the rest of it draws.
 - **An example in the instructions is followed to the letter.** The
   model specialists' examples named a place as `x.md:3`, and 15 of the
-  17 findings written with a file's name alone were theirs.
+  18 runs that failed on a file's name alone were theirs.
 - **A finding is known by what the report's form fixes**: its place,
   the ids it cites, its source and its form or severity. A word of its
   sentence decides only where the form fixes nothing else.

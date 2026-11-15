@@ -17,7 +17,8 @@ summary: >-
 4. **Invariants.** A row keeps tracing the invariants it serves.
    A change to an invariant, or to a row
    [ENG-29](../srs/10-engineering-quality.md) marks for
-   [I2](../srs/invariants.md#i2) review, lands with the ADR your context names.
+   [I2](../srs/invariants.md#i2) review, lands with its accepted ADR: your
+   context names it, and a change whose context names none lacks it.
 5. **Terms.** The section speaks the domain model's concepts: a term the
    model excludes breaks ENG-35.
 
