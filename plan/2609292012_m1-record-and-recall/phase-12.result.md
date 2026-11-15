@@ -7,7 +7,7 @@ summary: >-
   @REC-11 and @SEC-04 off @pending and passing. Event and payload text is
   indexed in the append transaction up to 1 MiB, and event_search finds
   it by literal terms, ranked by BM25 over the newest 2,000 matches,
-  damped per run. @RCL-02 cannot pass in M1 and is raised; NFR-03 is
+  damped per run. @RCL-02 was bound afterwards and passes; NFR-03 is
   benchmarked; the index is a derived file of its own, so the record
   holds 1.42x its text, within NFR-09's 1.5x; the index is 0.75x.
 ---
@@ -59,7 +59,7 @@ For the stakeholder:
 - M1 deviates from RCL-02 and §9.2 twice. A run cannot yet be derived
   from its seats' writers, so `run` takes a writer id and damping is
   per writer. RCL-02 says nothing of ranking only the newest 2,000
-  matches. `recall.feature` line 26 ("a short run ... a long run") is
+  matches. `recall.feature` line 30 ("a short run ... a long run") is
   proven only per writer.
 - Deviation from REC-11, for the stakeholder: `event_search` cannot
   find the events of a writer whose slot a smaller writer id holds, nor
@@ -68,11 +68,10 @@ For the stakeholder:
   each ingest (I6). They count gaps, not events: the audit detail is
   fixed text and a writer id, so a count of events needs a numeric
   field the stakeholder must allow. A wider row id lifts it.
-- `@RCL-02` stays `@pending`, no step bound. Its calls name no scope,
-  so `run` needs the session binding (phase 9). Its transcript
-  "mixed-provenance" has no steps, and no live ingest (phase 10) reads
-  it. `trust "trusted"` needs phase 11, `scope "rooms"` phase 13. Unit
-  tests in `mcp` and `search` prove its filters, cap and damping.
+- `@RCL-02` stayed `@pending` here, no step bound. Bound since, once
+  phases 9 to 13 had landed: its ten rows pass (cucumber), the `rooms`
+  row as a bound run. Its `kind` field selects a provenance class
+  family; `trust "trusted"` finds no hit until OQ-40 (PRV-08).
 - `@SEC-04`'s deadline row sets `PARINN_TEST_QUERY_DEADLINE_MS`, as no
   bounded search runs for 2 s. NFR-03 is stated at 10M events; the
   evidence is 1M.
