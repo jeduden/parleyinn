@@ -40,18 +40,20 @@ summary: >-
   place. The grader takes a tail of a file under a wanted module and
   no longer takes an outcome line for a finding.
 - One round of every case on the tree with all of that: 5 of 241 runs
-  failed. Read: one was the grader's error on an outcome line, fixed;
-  one asked the author to remove a sentence in excluded terms where
-  the case wants a finding, and the section check now says an excluded
-  term breaks ENG-35; one wrote its id inside the sentence, a form
-  lapse; two read main's copy of their section. Four more rounds of
-  the 31 section specialists' cases followed: 2 of 372 runs failed,
-  each on a request that did not hold its form, and none of 21 reads
-  of a section took main's copy.
+  failed, each read, and closed where a cause showed. Four more rounds
+  of the 31 section specialists' cases: 2 of 372 runs failed, each on
+  a request that did not hold its form, and none of 21 reads of a
+  section took main's copy.
 - The local review showed one more value worked out. Told to read a
   long diff's lines 1-120 and 121-220, two specialists counted their
   offsets from nought and left line 220 unread. The instruction now
   gives each call's `offset` and `limit`.
+- #141, #142 and #143 landed the harness first, with one cause more:
+  a run's work directory named `main` made agents look for `pr-head/`
+  one directory up, refused in 36 of 3,308 runs, 0 of 217 since.
+- ENG-28's row and scenario name the ENG-29 record.
+- Three false-alarm cases know the dropped line by its place and
+  source, where a word of its reason failed a right drop.
 - [review-evaluation.md](../../docs/review-evaluation.md) states the
   rules a stable case, and what a reviewer is handed, hold to.
 
@@ -71,10 +73,8 @@ summary: >-
   that holds one tree, the pull request's with main's instruction
   files, would leave nothing to work out. It changes the review's
   workflow, so it is a plan of its own.
-- 65 written cases still know a finding by words of its sentence. A
+- 63 written cases still know a finding by words of its sentence. A
   case moves to place, ids and source when a run shows its words
   miss a right finding.
-- ENG-28's row lists what a specialist's context names and does not
-  yet list the ENG-29 record.
 - The first scorecard is published from the first scheduled run that
   passes on main, with `review-eval publish`.
