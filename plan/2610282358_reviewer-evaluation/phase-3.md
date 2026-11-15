@@ -48,6 +48,7 @@ GREEN sites:
 - [review-evaluation.md](../../docs/review-evaluation.md), which states
   the rules a stable case holds to.
 
-Gate: `review-eval check` passes, and four runs of every case on the
-branch fail no case twice. Publishing the first scorecard stays with
-the first scheduled run that passes on main.
+Gate: `review-eval check` passes, and every failed run of four runs of
+every case on the branch is read and traced to its cause, recorded in
+the handoff. Publishing the first scorecard stays with the first
+scheduled run that passes on main.

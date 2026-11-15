@@ -65,11 +65,17 @@ instruction, never noise to outvote. So a case holds to four rules:
   case wants a request. A case that wants a blocking finding for a rule
   with no id rewards an invented link.
 - **A clean change gives the reviewer nothing to weigh.** A comment, or
-  a sentence reworded with its meaning kept. A plan, a new test or a
-  new sentence is never clean to a reviewer whose remit is to find its
-  gaps, and what it then says is true.
+  a sentence reworded with its meaning kept. A plan is never clean to a
+  reviewer whose remit is to find its gaps. A new test or a new
+  sentence gives it something to weigh too, and a clean case that adds
+  one is read as that when a run objects.
 - **A defect's fixture holds the planted defect alone**, at a path no
-  other file of the case ends with.
+  other file of the case ends with. It differs from the component's
+  clean change by the defect and nothing more, so the clean case shows
+  what the rest of it draws.
+- **An example in the instructions is followed to the letter.** The
+  model specialists' examples named a place as `x.md:3`, and 15 of the
+  17 findings written with a file's name alone were theirs.
 - **A finding is known by what the report's form fixes**: its place,
   the ids it cites, its source and its form or severity. A word of its
   sentence decides only where the form fixes nothing else.
@@ -134,7 +140,8 @@ may also name an expectation the reviewer met in other words.
   survives is a slip: a run cut off before a successful result after
   it stated a line or an outcome, an answer with no outcome line or
   one its lines contradict, an answer that is more than the outcome
-  line, a line set aside as no finding, an eleventh finding. Slips are
+  line, a line set aside as no finding, an eleventh finding, a place
+  written as a tail of its path. Slips are
   counted and shown per run and fail none. A case passes with two of
   three runs, stopping once decided. A run whose log holds no model
   call did not run, and is counted and failed, as is a specialist's run
