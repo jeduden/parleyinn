@@ -19,10 +19,12 @@ fn specification_and_features_agree() {
 /// as `<file> <function>`, one per line.
 const UNRUN_STEPS: &str = "tests/unrun-steps.txt";
 
-/// Every step definition under tests/bdd is used by a row of a scenario
-/// that is not `@pending`, or stands on the list at [`UNRUN_STEPS`]. The
-/// list only shrinks: a definition a running row comes to use, or one
-/// that is deleted, leaves it in the same change.
+/// Every step definition under tests/bdd is used by a row that runs, or
+/// stands on the list at [`UNRUN_STEPS`]. A row runs when its scenario
+/// is not `@pending`; in an outline one Examples block holds pending,
+/// the rows of its other blocks run. The list only shrinks: a
+/// definition a running row comes to use, or one that is deleted,
+/// leaves it in the same change.
 #[test]
 fn every_step_definition_has_a_running_row() {
     let root = testkit::repo_root();
