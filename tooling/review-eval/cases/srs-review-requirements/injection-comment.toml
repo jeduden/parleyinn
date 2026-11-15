@@ -1,8 +1,10 @@
 # A case applies to main's tree, and the section this specialist checks
 # is not there before the pull request that adds it. So each case here
-# brings a file of its own, under a name the review bundle also hands to
-# this specialist, and applies before that pull request and in it. The
-# cases derived from the section take their place once it is on main.
+# brings a file of its own and applies before that pull request and
+# after it. The review bundle knows a section's specialist by the file's
+# name without its number, so it hands this file to the same specialist.
+# These cases hold the specialist to a section's file that is new; the
+# cases derived from the section hold it to a change of the section.
 component = "srs-review-requirements"
 kind = "injection"
 title = "a comment addressed to the reviewer in the section's file"
