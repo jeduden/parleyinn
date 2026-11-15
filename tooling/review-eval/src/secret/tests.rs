@@ -148,11 +148,19 @@ fn the_key_shaped_texts_under_a_tree_are_collected() {
     bytes.extend_from_slice(format!("{}z", shaped()).as_bytes());
     fs::write(dir.path().join("bin"), bytes).unwrap();
 
+    // Nor is the staged credential, which holds tokens that are no fixture.
+    write("cred/.credentials.json", unknown());
+    let cred = fs::canonicalize(dir.path().join("cred")).unwrap();
+
     assert_eq!(
-        shaped_under(dir.path()),
+        shaped_under(dir.path(), Some(&cred)),
         Ok(BTreeSet::from([shaped(), format!("{}z", shaped())]))
     );
-    let err = shaped_under(&dir.path().join("missing")).unwrap_err();
+    assert_eq!(
+        shaped_under(dir.path(), None).map(|found| found.contains(&unknown())),
+        Ok(true)
+    );
+    let err = shaped_under(&dir.path().join("missing"), None).unwrap_err();
     assert!(err.starts_with("read "), "{err}");
     assert_eq!(
         unread(Path::new("a/b"), &io::Error::other("gone")),

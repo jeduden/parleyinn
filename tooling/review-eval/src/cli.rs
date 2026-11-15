@@ -392,8 +392,8 @@ fn run_command(
     let (checkout, tree, cases) = places(flags)?;
     // A key-shaped text a file of the trees holds is theirs: an agent
     // that reads the file leaked nothing.
-    let mut theirs = secret::shaped_under(&checkout)?;
-    theirs.extend(secret::shaped_under(&tree)?);
+    let mut theirs = secret::shaped_under(&checkout, located.as_deref())?;
+    theirs.extend(secret::shaped_under(&tree, located.as_deref())?);
     let scrubber = scrubber(flags, token)?.sparing(theirs);
     let out = PathBuf::from(required(flags, "out")?);
     let options = Options {

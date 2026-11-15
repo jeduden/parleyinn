@@ -98,6 +98,80 @@ fn a_review_confines_every_agent_to_the_staged_credential() {
     }
 }
 
+/// A text of the Claude shape, built at run time so this file holds
+/// none: what a test of the tree under review keeps as a fixture.
+fn fixture() -> String {
+    format!("sk-{}-api03-{}", "ant", "Ff42_-".repeat(6))
+}
+
+/// A specialist that read a file of the tree holding [`fixture`] and
+/// quotes it; every other agent answers as it does.
+fn quoting(command: &review_eval::host::Command) -> Result<review_eval::host::Output, String> {
+    if fake::agent_of(command) != "lang-rust" {
+        return fake::either(command);
+    }
+    let text = format!("pr-head/tests.rs holds {}", fixture());
+    fake::answer(command, &[&text], "outcome: none — a fixture, no finding")
+}
+
+#[test]
+fn a_key_shaped_text_a_file_of_the_work_directory_holds_is_no_leak() {
+    let dir = workdir();
+    fs::create_dir_all(dir.path().join("pr-head")).unwrap();
+    fs::write(
+        dir.path().join("pr-head/tests.rs"),
+        format!("const KEY: &str = \"{}\";\n", fixture()),
+    )
+    .unwrap();
+    let cred = dir.path().join("cred");
+    review_eval::credential::stage(&cred, TOKEN).unwrap();
+    let host = FakeHost::new(quoting);
+
+    let (code, out, err) = run_holding(
+        &host,
+        dir.path(),
+        None,
+        &["--credential", cred.to_str().unwrap()],
+    );
+
+    assert_eq!(code, EXIT_OK, "{out}\n{err}");
+    assert!(out.starts_with("verdict=approve\n"), "{out}");
+    let all = written(dir.path());
+    // Nothing the review wrote holds the shape, so the scrub that
+    // follows the review, which knows no tree, finds nothing either.
+    assert!(!all.contains(&fixture()), "{all}");
+    assert!(all.contains(review_eval::secret::TREE_TEXT), "{all}");
+    assert!(
+        !out.contains(&fixture()) && !err.contains(&fixture()),
+        "{err}"
+    );
+}
+
+#[test]
+fn a_key_shaped_text_beside_the_staged_credential_is_a_leak() {
+    // The credential's directory may lie in the work directory, and
+    // what it holds is no fixture of the tree.
+    let dir = workdir();
+    let cred = dir.path().join("cred");
+    review_eval::credential::stage(&cred, TOKEN).unwrap();
+    fs::write(cred.join("refresh"), fixture()).unwrap();
+    let host = FakeHost::new(quoting);
+
+    let (code, out, err) = run_holding(
+        &host,
+        dir.path(),
+        None,
+        &["--credential", cred.to_str().unwrap()],
+    );
+
+    assert_eq!(code, EXIT_FAILURE, "{err}");
+    assert!(
+        out.starts_with("failed=an agent's output contained the Claude token: "),
+        "{out}"
+    );
+    assert!(!written(dir.path()).contains(&fixture()));
+}
+
 #[test]
 fn a_review_whose_agent_leaked_the_token_scrubs_it_everywhere_and_fails_closed() {
     let dir = workdir();

@@ -292,20 +292,23 @@ fn scrub_shape(text: &str, spared: &BTreeSet<String>) -> (String, usize) {
 
 /// Every token of the Claude shape a file under `root` holds, at any
 /// depth, [`NOT_THE_TREE`] left out: the texts a scrub of what agents
-/// read there spares.
+/// read there spares. The directory `apart`, as resolved, is left out
+/// too: the staged credential's, whose tokens are no fixture.
 ///
 /// # Errors
 ///
-/// Fails when a directory or a file cannot be read.
-pub fn shaped_under(root: &Path) -> Result<BTreeSet<String>, String> {
+/// Fails when `root` does not resolve, or a directory or a file cannot
+/// be read.
+pub fn shaped_under(root: &Path, apart: Option<&Path>) -> Result<BTreeSet<String>, String> {
     let mut found = BTreeSet::new();
-    let mut dirs = vec![root.to_path_buf()];
+    let mut dirs = vec![fs::canonicalize(root).map_err(|e| unread(root, &e))?];
     while let Some(dir) = dirs.pop() {
         for entry in fs::read_dir(&dir).map_err(|e| unread(&dir, &e))? {
             let entry = entry.map_err(|e| unread(&dir, &e))?;
             let kind = entry.file_type().map_err(|e| unread(&entry.path(), &e))?;
             if kind.is_dir() {
-                if !NOT_THE_TREE.iter().any(|name| entry.file_name() == *name) {
+                let named = NOT_THE_TREE.iter().any(|name| entry.file_name() == *name);
+                if !named && apart != Some(&entry.path()) {
                     dirs.push(entry.path());
                 }
             } else if kind.is_file() {
