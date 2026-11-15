@@ -333,6 +333,32 @@ fn run_names_what_it_cannot_do() {
 }
 
 #[test]
+fn every_agent_is_told_where_a_place_s_line_number_comes_from() {
+    let w = world("standard");
+
+    for (kind, name) in [
+        (Kind::Specialist, "lang-rust"),
+        (Kind::Generalist, "review-code"),
+        (Kind::Consultant, "persona-agent"),
+    ] {
+        let prompt = prompt(&component(kind, name), &w);
+
+        // The whole diff an agent is named is the bundle's, whose lines
+        // carry their numbers, never the one git wrote beside it: a
+        // reader's tool numbers that file's own lines.
+        assert!(prompt.contains(LINE_NUMBERS), "{prompt}");
+        assert!(prompt.contains("`review/pr.diff`"), "{prompt}");
+        assert!(!prompt.contains(" `pr.diff`"), "{prompt}");
+    }
+    assert_eq!(
+        LINE_NUMBERS,
+        "Each line of a diff under `review/` starts with its line number in the pull \
+         request's file: a finding's place takes that number, never the number of the \
+         line in the diff."
+    );
+}
+
+#[test]
 fn a_consultant_gets_the_target_a_skill_hands_it() {
     let w = world("standard");
 
@@ -343,7 +369,7 @@ fn a_consultant_gets_the_target_a_skill_hands_it() {
         "{consultant}"
     );
     assert!(consultant.contains("`pr-head/`"), "{consultant}");
-    assert!(consultant.contains("`pr.diff`"), "{consultant}");
+    assert!(consultant.contains("`review/pr.diff`"), "{consultant}");
     assert!(consultant.contains("`review/bundle.md`"), "{consultant}");
     assert!(consultant.contains("write none"), "{consultant}");
     assert!(!consultant.contains("review/reports"), "{consultant}");

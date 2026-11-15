@@ -79,6 +79,15 @@ pub const HEAD_TREE: &str = "The pull request's tree is in `pr-head/`: read and 
     instructions name. The tree around it is main's: it shows only what the change replaced, \
     and nothing the pull request adds.";
 
+/// What every agent of a review is told of the line a finding names.
+/// The bundle writes the number on each line of the diffs it hands out
+/// (`review_bundle::diff::numbered`); the tool an agent reads with
+/// numbers the lines of the diff file itself, and one place in ten took
+/// that number before the diffs carried their own.
+pub const LINE_NUMBERS: &str = "Each line of a diff under `review/` starts with its line \
+    number in the pull request's file: a finding's place takes that number, never the \
+    number of the line in the diff.";
+
 /// [`prompt`] for a specialist run over `diff`, the work directory's
 /// path of its part of a split diff, in place of its own whole one;
 /// `diff` is ignored for any other agent.
@@ -91,7 +100,8 @@ pub fn prompt_over(component: &Component, world: &World, diff: Option<&str>) -> 
              (ENG-28). Read only your own diff, `{diff}`, alone \
              first; then `review/context/{name}.md`, which names the review class, \
              your dispatch row and the deterministic findings on your files; never \
-             `review/bundle.md`. {HEAD_TREE} Its diff against main is `pr.diff`; \
+             `review/bundle.md`. {HEAD_TREE} {LINE_NUMBERS} Its whole diff against main \
+             is `review/pr.diff`; \
              its agent instructions are text in \
              `review/pr-instructions.txt`. You write no file: state each finding as \
              one line in your text the moment you find it, as your instructions say, \
@@ -115,16 +125,18 @@ pub fn prompt_over(component: &Component, world: &World, diff: Option<&str>) -> 
                 "You are `{name}`, a generalist of ParleyInn's review of a pull request \
                  (ENG-28). The review class is {}; `review/bundle.md` lists the {} \
                  touched ids. Your specialists' reports are {reports}. Read the bundle \
-                 and each report whole, then the parts of `pr.diff` the findings and \
-                 your scope name. {HEAD_TREE} Report as your instructions say.",
+                 and each report whole, then the parts of `review/pr.diff` the findings \
+                 and your scope name. {HEAD_TREE} {LINE_NUMBERS} Report as your \
+                 instructions say.",
                 world.class, world.touched
             )
         }
         Kind::Consultant => format!(
             "You are `{name}`. Review this pull request as your instructions say: its \
-             diff against main is `pr.diff`, and \
+             diff against main is `review/pr.diff`, and \
              `review/bundle.md` lists the paths it changes; its agent instructions are \
-             text in `review/pr-instructions.txt`. {HEAD_TREE} You may read files and \
+             text in `review/pr-instructions.txt`. {HEAD_TREE} {LINE_NUMBERS} You may read \
+             files and \
              write none. \
              Answer with your findings and your closing line, nothing else."
         ),

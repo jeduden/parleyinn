@@ -109,6 +109,15 @@ pub fn context(a: &Analysis, name: &str) -> String {
             other.len()
         );
     }
+    if let Some(r) = &a.eng_29_record {
+        let _ = write!(
+            b,
+            "\n## ENG-29 record\n\nThis change changes the accepted ADR `{}`, which names \
+             ENG-29 and what it guards, and a stakeholder comment consents to the change: \
+             the bundle checked both.\n",
+            code(&r.path)
+        );
+    }
 
     b
 }
