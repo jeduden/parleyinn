@@ -91,7 +91,7 @@ Feature: Record (REC)
     Then that line of "planted-run" is recorded as its own event, the counter "repeat_conflicts" increases by 1 and an audit entry records the conflict
     Given the person purged the events of the 40 repeated lines from the run of "parent-run"
     When a harness fork of "parent-run" with the transcript "late-fork", repeating those 40 lines, is ingested
-    Then none of those lines is recorded again, each refusal is counted and audited, and the record keeps only their uuids beside the tombstones
+    Then none of those lines is recorded again, each refusal is counted and audited, and the record keeps only their uuids, byte offsets and lengths beside the tombstones
 
   @REC-05 @P0 @I1 @I6
   Scenario: unreadable transcript lines are kept as redacted unparsed events
