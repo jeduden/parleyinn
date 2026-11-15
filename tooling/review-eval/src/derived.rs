@@ -45,6 +45,10 @@ pub const TERMS_ID: &str = "ENG-35";
 /// What a derived defect adds to a requirement row.
 pub const ADDED_MUST: &str = " It MUST also record the change in the audit log.";
 
+/// The prefix of an open question's id, which is no requirement's: the
+/// report rule refuses it among a finding's ids.
+const OPEN_QUESTION: &str = "OQ-";
+
 /// The single source of the invariants, which ENG-29 guards.
 pub const INVARIANTS: &str = "docs/srs/invariants.md";
 /// The sentence the clean change adds to the invariants, true wherever
@@ -204,8 +208,11 @@ fn first_row(text: &str) -> Option<(String, String)> {
     text.lines().find_map(|line| {
         let cells: Vec<&str> = line.split('|').map(str::trim).collect();
         let id = cells.get(1)?;
-        (cells.len() >= 5 && srs_id(id) && cells.get(2).is_some_and(|p| p.starts_with('P')))
-            .then(|| (format!("{line}\n"), (*id).to_owned()))
+        (cells.len() >= 5
+            && srs_id(id)
+            && !id.starts_with(OPEN_QUESTION)
+            && cells.get(2).is_some_and(|p| p.starts_with('P')))
+        .then(|| (format!("{line}\n"), (*id).to_owned()))
     })
 }
 

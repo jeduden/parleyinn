@@ -299,3 +299,18 @@ fn the_invariants_consent_names_every_stakeholder_path_its_case_changes() {
         );
     }
 }
+
+#[test]
+fn an_open_question_s_row_is_no_requirement_row() {
+    // A linked finding ends with requirement ids, and an open question's
+    // is refused among them, so a MUST added to its row has no right
+    // answer in that form.
+    let question = "| OQ-09 | P1 | Which licence? | the stakeholder |\n";
+    let requirement = "| SEC-01 | P0 | It MUST refuse. | T |\n";
+
+    assert_eq!(first_row(question), None);
+    assert_eq!(
+        first_row(&format!("{question}{requirement}")),
+        Some((requirement.to_owned(), "SEC-01".to_owned()))
+    );
+}
