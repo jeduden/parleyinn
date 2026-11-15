@@ -67,8 +67,8 @@ fn a_whole_specialist_whose_diff_is_more_lines_than_one_read_takes_is_told_the_r
     assert!(
         prompt.ends_with(
             "One `Read` does not return `review/diffs/lang-rust.diff` whole: read its 2001 lines \
-             in 2 calls, each with `offset` and `limit`, lines 1-2000 and 2001-2001, and leave no \
-             line unread."
+             in 2 calls, `offset` 1 with `limit` 2000 and `offset` 2001 with `limit` 1, and \
+             leave no line unread. `offset` is the first line a call reads, counted from 1."
         ),
         "{prompt}"
     );

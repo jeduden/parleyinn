@@ -7,13 +7,28 @@
 //! Claude shape, `sk-ant-` and a run of token characters, the review
 //! holds or not. A count above zero means an agent's output held the
 //! token: the review fails closed.
+//!
+//! One text of that shape is no token of the review's: one a file of
+//! the trees the agents read holds, a fixture a test or a corpus keeps.
+//! An agent that reads such a file has it in its run log, and that is
+//! the tree's text, not a leak. The scrub replaces it with
+//! [`TREE_TEXT`], so nothing the review keeps holds the shape, and does
+//! not count it. The review's own token counts wherever it stands.
 
+use std::collections::BTreeSet;
 use std::fs;
 use std::io;
 use std::path::Path;
 
 /// What stands in for each form of the token found.
 pub const REDACTED: &str = "[REDACTED token]";
+
+/// What stands in for a text of the Claude shape a tree holds.
+pub const TREE_TEXT: &str = "[key-shaped text of the tree]";
+
+/// The directories under a tree whose files are no text of it: what git
+/// and a build wrote.
+pub const NOT_THE_TREE: [&str; 2] = [".git", "target"];
 
 /// How a Claude token starts.
 pub const SHAPE: &str = "sk-ant-";
@@ -47,10 +62,12 @@ pub fn refusal(doing: &str) -> String {
 pub const STANDARD: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 pub const URL_SAFE: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
 
-/// The forms of the secrets it searches for, longest first.
+/// The forms of the secrets it searches for, longest first, and the
+/// texts of the Claude shape the trees hold.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Scrubber {
     forms: Vec<String>,
+    spared: BTreeSet<String>,
 }
 
 impl Scrubber {
@@ -68,7 +85,34 @@ impl Scrubber {
         forms.sort_by(|a, b| b.len().cmp(&a.len()).then_with(|| a.cmp(b)));
         forms.dedup();
 
-        Self { forms }
+        Self {
+            forms,
+            spared: BTreeSet::new(),
+        }
+    }
+
+    /// This scrubber, taking each of `texts` for the tree's own and no
+    /// leak: [`shaped_under`] the trees the agents read.
+    #[must_use]
+    pub fn sparing(mut self, texts: BTreeSet<String>) -> Self {
+        self.spared = texts;
+
+        self
+    }
+
+    /// What a run says of the texts it spares, so each replacement that
+    /// is no leak is announced (I6); nothing when the trees hold none.
+    #[must_use]
+    pub fn spares(&self) -> Option<String> {
+        let n = self.spared.len();
+        let s = if n == 1 { "" } else { "s" };
+
+        (n > 0).then(|| {
+            format!(
+                "the scrub spares {n} key-shaped text{s} the trees hold: \
+                 replaced with {TREE_TEXT}, no leak"
+            )
+        })
     }
 
     /// A scrubber for `secrets` that fails closed, never naming the
@@ -86,7 +130,8 @@ impl Scrubber {
         Ok(Self::new(secrets))
     }
 
-    /// `text` with every form replaced, and how many were.
+    /// `text` with every form replaced, and how many were: a text of
+    /// the shape a tree holds is replaced too and is not counted.
     #[must_use]
     pub fn scrub(&self, text: &str) -> (String, usize) {
         let mut out = text.to_owned();
@@ -98,13 +143,14 @@ impl Scrubber {
                 count += n;
             }
         }
-        let (out, shaped) = scrub_shape(&out);
+        let (out, shaped) = scrub_shape(&out, &self.spared);
 
         (out, count + shaped)
     }
 
-    /// Scrubs the file at `path` in place, rewriting it only when it
-    /// held a form; a missing file holds none.
+    /// Scrubs the file at `path` in place, rewriting it only when the
+    /// scrub replaced something in it, and answers how many forms it
+    /// held; a missing file holds none.
     ///
     /// # Errors
     ///
@@ -115,8 +161,9 @@ impl Scrubber {
             Err(e) if e.kind() == io::ErrorKind::NotFound => return Ok(0),
             Err(e) => return Err(format!("read {}: {e}", path.display())),
         };
-        let (text, n) = self.scrub(&String::from_utf8_lossy(&bytes));
-        if n > 0 {
+        let before = String::from_utf8_lossy(&bytes);
+        let (text, n) = self.scrub(&before);
+        if text != before {
             fs::write(path, text).map_err(|e| format!("write {}: {e}", path.display()))?;
         }
 
@@ -222,30 +269,89 @@ fn token_char(c: char) -> bool {
     c.is_ascii_alphanumeric() || c == '-' || c == '_'
 }
 
+/// The first text of the Claude shape in `text`: where it starts, where
+/// it ends, and whether it is a token, [`SHAPE`] followed by at least
+/// [`SHAPE_TAIL`] token characters, and not the shape named in prose.
+fn shape_at(text: &str) -> Option<(usize, usize, bool)> {
+    let at = text.find(SHAPE)?;
+    let from = &text[at + SHAPE.len()..];
+    let tail = from.find(|c: char| !token_char(c)).unwrap_or(from.len());
+
+    Some((at, at + SHAPE.len() + tail, tail >= SHAPE_TAIL))
+}
+
 /// `text` with every token of the Claude shape replaced, and how many
-/// were: [`SHAPE`] followed by at least [`SHAPE_TAIL`] token characters.
-fn scrub_shape(text: &str) -> (String, usize) {
+/// were tokens no tree holds: one of `spared` gives way to
+/// [`TREE_TEXT`] and is not counted.
+fn scrub_shape(text: &str, spared: &BTreeSet<String>) -> (String, usize) {
     let mut out = String::with_capacity(text.len());
     let mut rest = text;
     let mut count = 0;
-    while let Some(at) = rest.find(SHAPE) {
-        let (before, from) = rest.split_at(at);
-        out.push_str(before);
-        let tail = from[SHAPE.len()..]
-            .find(|c: char| !token_char(c))
-            .unwrap_or(from.len() - SHAPE.len());
-        let end = SHAPE.len() + tail;
-        if tail >= SHAPE_TAIL {
+    while let Some((at, end, token)) = shape_at(rest) {
+        out.push_str(&rest[..at]);
+        let found = &rest[at..end];
+        if !token {
+            out.push_str(found);
+        } else if spared.contains(found) {
+            out.push_str(TREE_TEXT);
+        } else {
             out.push_str(REDACTED);
             count += 1;
-        } else {
-            out.push_str(&from[..end]);
         }
-        rest = &from[end..];
+        rest = &rest[end..];
     }
     out.push_str(rest);
 
     (out, count)
+}
+
+/// Every token of the Claude shape a file under `root` holds, at any
+/// depth, [`NOT_THE_TREE`] left out: the texts a scrub of what agents
+/// read there spares. The directory `apart`, as resolved, is left out
+/// too: the staged credential's, whose tokens are no fixture.
+///
+/// # Errors
+///
+/// Fails when `root` does not resolve, or a directory or a file cannot
+/// be read.
+pub fn shaped_under(root: &Path, apart: Option<&Path>) -> Result<BTreeSet<String>, String> {
+    let mut found = BTreeSet::new();
+    let mut dirs = vec![fs::canonicalize(root).map_err(|e| unread(root, &e))?];
+    while let Some(dir) = dirs.pop() {
+        for entry in fs::read_dir(&dir).map_err(|e| unread(&dir, &e))? {
+            let entry = entry.map_err(|e| unread(&dir, &e))?;
+            let kind = entry.file_type().map_err(|e| unread(&entry.path(), &e))?;
+            // A link is neither a directory nor a file here, so none is
+            // followed out of the tree.
+            if kind.is_dir() {
+                let named = NOT_THE_TREE.iter().any(|name| entry.file_name() == *name);
+                if !named && apart != Some(&entry.path()) {
+                    dirs.push(entry.path());
+                }
+            } else if kind.is_file() {
+                let bytes = fs::read(entry.path()).map_err(|e| unread(&entry.path(), &e))?;
+                collect_shaped(&String::from_utf8_lossy(&bytes), &mut found);
+            }
+        }
+    }
+
+    Ok(found)
+}
+
+/// Adds every token of the Claude shape in `text` to `found`.
+fn collect_shaped(text: &str, found: &mut BTreeSet<String>) {
+    let mut rest = text;
+    while let Some((at, end, token)) = shape_at(rest) {
+        if token {
+            found.insert(rest[at..end].to_owned());
+        }
+        rest = &rest[end..];
+    }
+}
+
+/// Why `path` was not read.
+fn unread(path: &Path, e: &io::Error) -> String {
+    format!("read {}: {e}", path.display())
 }
 
 #[cfg(test)]

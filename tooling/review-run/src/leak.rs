@@ -14,15 +14,16 @@ use crate::outcome::REVIEW_PATH;
 use crate::run::AgentRun;
 
 /// Scrubs every field of `runs` an agent's output reaches, in place,
-/// and answers how many forms of the token it replaced.
+/// and answers how many forms of the token it replaced; a key-shaped
+/// text the tree holds is replaced too and is none of them.
 pub fn scrub_runs(scrubber: &Scrubber, runs: &mut [AgentRun]) -> usize {
     let mut count = 0;
     let mut scrub = |text: &mut String| {
         let (clean, n) = scrubber.scrub(text);
-        if n > 0 {
+        if clean != *text {
             *text = clean;
-            count += n;
         }
+        count += n;
     };
     for run in runs.iter_mut() {
         for why in [run.failure.as_mut(), run.cut.as_mut()]

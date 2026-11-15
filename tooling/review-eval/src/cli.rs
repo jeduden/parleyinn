@@ -26,7 +26,7 @@ use crate::host::Host;
 use crate::log::RunLog;
 use crate::plan::{self, Planned};
 use crate::score::{CaseRecord, RunRecord, Scorecard, SuiteRecord, decided};
-use crate::secret::Scrubber;
+use crate::secret::{self, Scrubber};
 use crate::{CASES, DEADLINE_SECONDS, check, compare, grade, published, runner, world};
 
 /// Every case passed, or the command had nothing to fail on.
@@ -384,13 +384,20 @@ fn run_command(
     let located = one(flags, "credential")?
         .map(|dir| credential::locate(Path::new(&dir)))
         .transpose()?;
-    let scrubber = scrubber(flags, token)?;
     let confined = located.as_deref().map(|dir| Confined::new(host, dir));
     let host: &dyn Host = match &confined {
         Some(confined) => confined,
         None => host,
     };
     let (checkout, tree, cases) = places(flags)?;
+    // A key-shaped text a file of the trees holds is theirs: an agent
+    // that reads the file leaked nothing.
+    let mut theirs = secret::shaped_under(&checkout, located.as_deref())?;
+    theirs.extend(secret::shaped_under(&tree, located.as_deref())?);
+    let scrubber = scrubber(flags, token)?.sparing(theirs);
+    if let Some(line) = scrubber.spares() {
+        let _ = writeln!(stderr, "{line}");
+    }
     let out = PathBuf::from(required(flags, "out")?);
     let options = Options {
         checkout: checkout.clone(),
