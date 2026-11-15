@@ -175,9 +175,11 @@ The scrub takes for the token every form of the staged one, and any
 text of the Claude key's shape. One such text is no leak: a fixture a
 file of main's tree or the pull request's holds, which an agent that
 reads the file has in its run log. The review and the evaluation replace
-it with a marker of its own and do not count it. A text of that shape
-that no file of the trees holds still fails the review closed, and so
-does the staged token wherever it stands.
+it with a marker of its own and do not count it, and each says at its
+start how many such texts it spares. A link in a tree is never followed,
+so a file outside the trees lends no text. A text of that shape that no
+file of the trees holds still fails the review closed, and so does the
+staged token wherever it stands.
 
 ### The plugins every harness session fetches
 

@@ -144,6 +144,9 @@ pub fn run_with(
         let _ = writeln!(out, "review-run: {line}");
     };
     let guarded = guard(&args, token).and_then(|(scrubber, located)| {
+        if let Some(line) = scrubber.spares() {
+            progress(&line);
+        }
         let confined = located.as_deref().map(|dir| Confined::new(host, dir));
         let host: &dyn Host = match &confined {
             Some(confined) => confined,

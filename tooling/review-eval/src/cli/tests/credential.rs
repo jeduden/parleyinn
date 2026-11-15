@@ -277,6 +277,11 @@ fn run_takes_a_key_shaped_text_a_file_of_the_checkout_holds_for_no_leak() {
         "{log}"
     );
     assert!(!out.contains(&fixture) && !err.contains(&fixture));
+    // The principal sees the rule at work (I6).
+    assert!(
+        err.contains("the scrub spares 1 key-shaped text the trees hold"),
+        "{err}"
+    );
 }
 
 #[test]

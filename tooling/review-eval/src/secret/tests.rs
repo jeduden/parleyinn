@@ -148,6 +148,13 @@ fn the_key_shaped_texts_under_a_tree_are_collected() {
     bytes.extend_from_slice(format!("{}z", shaped()).as_bytes());
     fs::write(dir.path().join("bin"), bytes).unwrap();
 
+    // Nor is what a link of the tree points at: a link is never followed,
+    // so a file outside the tree stays outside.
+    let outside = TempDir::new().unwrap();
+    let elsewhere = format!("{}y", shaped());
+    fs::write(outside.path().join("key"), &elsewhere).unwrap();
+    std::os::unix::fs::symlink(outside.path(), dir.path().join("linked-dir")).unwrap();
+    std::os::unix::fs::symlink(outside.path().join("key"), dir.path().join("linked-file")).unwrap();
     // Nor is the staged credential, which holds tokens that are no fixture.
     write("cred/.credentials.json", unknown());
     let cred = fs::canonicalize(dir.path().join("cred")).unwrap();
@@ -159,6 +166,10 @@ fn the_key_shaped_texts_under_a_tree_are_collected() {
     assert_eq!(
         shaped_under(dir.path(), None).map(|found| found.contains(&unknown())),
         Ok(true)
+    );
+    assert_eq!(
+        shaped_under(dir.path(), None).map(|found| found.contains(&elsewhere)),
+        Ok(false)
     );
     let err = shaped_under(&dir.path().join("missing"), None).unwrap_err();
     assert!(err.starts_with("read "), "{err}");
@@ -283,4 +294,25 @@ fn base64_encodes_as_the_standard_says() {
     assert_eq!(encode(b"foo", STANDARD), "Zm9v");
     assert_eq!(encode(&[0xfb, 0xff], STANDARD), "+/8");
     assert_eq!(encode(&[0xfb, 0xff], URL_SAFE), "-_8");
+}
+
+#[test]
+fn a_scrubber_says_how_many_texts_of_the_trees_it_spares() {
+    assert_eq!(Scrubber::new(&[TOKEN]).spares(), None);
+    let one = Scrubber::new(&[]).sparing(BTreeSet::from([shaped()]));
+    assert_eq!(
+        one.spares(),
+        Some(format!(
+            "the scrub spares 1 key-shaped text the trees hold: \
+             replaced with {TREE_TEXT}, no leak"
+        ))
+    );
+    let two = Scrubber::new(&[]).sparing(BTreeSet::from([shaped(), unknown()]));
+    assert_eq!(
+        two.spares(),
+        Some(format!(
+            "the scrub spares 2 key-shaped texts the trees hold: \
+             replaced with {TREE_TEXT}, no leak"
+        ))
+    );
 }

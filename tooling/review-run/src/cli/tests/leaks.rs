@@ -145,6 +145,11 @@ fn a_key_shaped_text_a_file_of_the_work_directory_holds_is_no_leak() {
         !out.contains(&fixture()) && !err.contains(&fixture()),
         "{err}"
     );
+    // The principal sees the rule at work (I6).
+    assert!(
+        err.contains("review-run: the scrub spares 1 key-shaped text the trees hold"),
+        "{err}"
+    );
 }
 
 #[test]

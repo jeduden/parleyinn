@@ -395,6 +395,9 @@ fn run_command(
     let mut theirs = secret::shaped_under(&checkout, located.as_deref())?;
     theirs.extend(secret::shaped_under(&tree, located.as_deref())?);
     let scrubber = scrubber(flags, token)?.sparing(theirs);
+    if let Some(line) = scrubber.spares() {
+        let _ = writeln!(stderr, "{line}");
+    }
     let out = PathBuf::from(required(flags, "out")?);
     let options = Options {
         checkout: checkout.clone(),

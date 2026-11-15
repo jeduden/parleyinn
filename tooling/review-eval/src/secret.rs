@@ -100,6 +100,21 @@ impl Scrubber {
         self
     }
 
+    /// What a run says of the texts it spares, so each replacement that
+    /// is no leak is announced (I6); nothing when the trees hold none.
+    #[must_use]
+    pub fn spares(&self) -> Option<String> {
+        let n = self.spared.len();
+        let s = if n == 1 { "" } else { "s" };
+
+        (n > 0).then(|| {
+            format!(
+                "the scrub spares {n} key-shaped text{s} the trees hold: \
+                 replaced with {TREE_TEXT}, no leak"
+            )
+        })
+    }
+
     /// A scrubber for `secrets` that fails closed, never naming the
     /// secret, when one is too short to be a form: the scrub could not
     /// match it, so nothing it guards may run. An empty one is none.
@@ -306,6 +321,8 @@ pub fn shaped_under(root: &Path, apart: Option<&Path>) -> Result<BTreeSet<String
         for entry in fs::read_dir(&dir).map_err(|e| unread(&dir, &e))? {
             let entry = entry.map_err(|e| unread(&dir, &e))?;
             let kind = entry.file_type().map_err(|e| unread(&entry.path(), &e))?;
+            // A link is neither a directory nor a file here, so none is
+            // followed out of the tree.
             if kind.is_dir() {
                 let named = NOT_THE_TREE.iter().any(|name| entry.file_name() == *name);
                 if !named && apart != Some(&entry.path()) {
