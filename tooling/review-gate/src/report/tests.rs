@@ -968,4 +968,14 @@ fn a_request_is_cut_at_its_first_reason_and_whole_without_one() {
         reasoned("a cap on docs/ci.md:23"),
         ("a cap on docs/ci.md:23", "")
     );
+    for (asked, motivation) in [
+        ("a cap since none holds it", "none holds it"),
+        ("a cap, since none holds it", "none holds it"),
+        ("a cap because it grows", "it grows"),
+        ("a cap, because it grows", "it grows"),
+        ("a cap: it grows", "it grows"),
+        ("a cap. It grows", "It grows"),
+    ] {
+        assert_eq!(reasoned(asked), ("a cap", motivation), "{asked:?}");
+    }
 }
