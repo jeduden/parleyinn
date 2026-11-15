@@ -28,10 +28,11 @@ pub const CHECKOUT_STEP: &str = "the repository checkout";
 /// CI to the TOML checks; the two gates of ENG-32 over the reviewer
 /// evaluation cases; and the gates behind SEC-01's core row,
 /// SEC-15, SEC-17, SEC-19 and ENG-22.
-pub const GATE_TESTS: [&str; 46] = [
+pub const GATE_TESTS: [&str; 47] = [
     "specification_parses",
     "decision_records_parse",
     "specification_and_features_agree",
+    "every_step_definition_has_a_running_row",
     "appendix_b_matches_the_traces",
     "appendix_c_covers_every_requirement",
     "personas_match_the_agents",
