@@ -49,7 +49,9 @@ claim and revise or withdraw what does not hold.
 5. **Rules have a holder.** A `MUST` the text adds that no requirement
    holds is a request to add that requirement, its why after a second
    spaced dash: no `;`, `since` or `because` stands in for it.
-6. **Agent instructions** direct no destructive command at
+6. **Open questions are no ids.** Name one (`OQ-12`) in a finding's
+   sentence; end the line with the requirement it bears on, alone.
+7. **Agent instructions** direct no destructive command at
    non-isolated state, and change only with the stakeholder
    ([CODEOWNERS](../../.github/CODEOWNERS)).
 
