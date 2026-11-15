@@ -1,8 +1,9 @@
 ---
 title: "10. Engineering quality (ENG)"
 summary: >-
-  Engineering quality requirements ENG-01..34 except ENG-28 and ENG-32:
-  code organisation, testing, static analysis, supply chain, and process.
+  Engineering quality requirements (ENG): code organisation, testing,
+  static analysis, supply chain, and process. Those of the review
+  continue in 10a.
 ---
 # 10. Engineering quality (ENG)
 
