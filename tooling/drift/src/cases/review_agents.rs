@@ -297,6 +297,26 @@ pub(super) fn review_evaluation_cases() -> Vec<Case> {
     ]
 }
 
+/// ENG-29's row dropping a row I4 rests on: the guard reads the guarded
+/// rows from ENG-29's text, so the row is then changed with no record.
+fn eng_29_row_case() -> Case {
+    case(
+        "ENG-29 no longer naming a row I4's boundaries rest on",
+        "ENG-29",
+        Injection::replace(
+            "docs/srs/10-engineering-quality.md",
+            "OWN-29, SEC-01)",
+            "OWN-29)",
+        ),
+        cargo_test(
+            "review-bundle",
+            "bundle",
+            "the_rows_i2_and_i4_rest_on_are_guarded_by_eng_29",
+        ),
+        "---- the_rows_i2_and_i4_rest_on_are_guarded_by_eng_29 stdout ----",
+    )
+}
+
 /// The drifts ENG-28 exists to catch in what the approval rests on: the
 /// review gate, the deterministic findings and the review bundle.
 pub(super) fn review_gate_cases() -> Vec<Case> {
@@ -363,21 +383,7 @@ pub(super) fn review_gate_cases() -> Vec<Case> {
             ),
             "---- the_requirements_eng_29_marks_follow_its_row stdout ----",
         ),
-        case(
-            "ENG-29 no longer naming a row I4's boundaries rest on",
-            "ENG-29",
-            Injection::replace(
-                "docs/srs/10-engineering-quality.md",
-                "OWN-29, SEC-01)",
-                "OWN-29)",
-            ),
-            cargo_test(
-                "review-bundle",
-                "bundle",
-                "the_rows_i2_and_i4_rest_on_are_guarded_by_eng_29",
-            ),
-            "---- the_rows_i2_and_i4_rest_on_are_guarded_by_eng_29 stdout ----",
-        ),
+        eng_29_row_case(),
         // The shared sections no longer a stakeholder path, a change to
         // one routes light; the failure prints the class the bundle chose.
         case(
