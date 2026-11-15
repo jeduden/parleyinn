@@ -110,8 +110,10 @@ fn the_lines_of_a_place_are_its_line_or_the_ends_of_its_range() {
     assert_eq!(at("docs/x.md:12 — blocking — it — yours"), Some((12, 12)));
     assert_eq!(at("x.md:12-20 — nit — it — yours"), Some((12, 20)));
     assert_eq!(at("`docs/x.md:3–4` — nit — it — yours"), Some((3, 4)));
-    // A range written backwards covers its first line alone.
+    // A range written backwards covers its first line alone, and so
+    // does one whose end is no number.
     assert_eq!(at("docs/x.md:9-2 — nit — it — yours"), Some((9, 9)));
+    assert_eq!(at("docs/x.md:3-abc — nit — it — yours"), Some((3, 3)));
     // The pull request's tree, named with its directory.
     assert_eq!(at("pr-head/docs/x.md:7 — nit — it — yours"), Some((7, 7)));
     assert_eq!(
@@ -138,6 +140,13 @@ fn a_place_at_a_tail_of_a_case_s_file_is_a_slip_once_a_file() {
     );
     assert_eq!(
         tail_slips("outcome: none — fine", &files),
+        Vec::<String>::new()
+    );
+    // A tail two files of the case share names neither, so it is no
+    // slip of either.
+    let shared = ["a/tests.rs", "b/tests.rs"];
+    assert_eq!(
+        tail_slips("tests.rs:4 — if not addressed: it — ENG-01", &shared),
         Vec::<String>::new()
     );
 }

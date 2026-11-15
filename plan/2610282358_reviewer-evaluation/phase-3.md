@@ -23,7 +23,7 @@ instructions or the case left to the reviewer.
   ends with the id it breaks (ENG-28), and no requirement stated the
   terms rule, so the case had no right answer.
 - 18 runs: the right finding, its path written as the file's name
-  alone.
+  alone, 15 of them a model specialist's.
 - 12 runs: a persona's clean case was a plan, which is never clean to
   a persona.
 - 5 runs: a fixture called clean that held a true defect.
