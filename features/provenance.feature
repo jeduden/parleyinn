@@ -103,11 +103,15 @@ Feature: Provenance and trust (PRV)
     Then the event is stored with provenance "user" and its trust level is "<trust>"
     And <audit>
 
+    @runs
     Examples:
       | configuration                                                                                                                                           | mark                      | trust     | audit                                                                                 |
       | the person's configuration sets no deployment mode, and the repository's ".parinn.toml" sets "node.deployment_mode" to "interactive"                     | with the attended mark    | untrusted | an audit entry records "rejected repository setting node.deployment_mode"             |
       | the person's configuration sets "node.deployment_mode" to "interactive"                                                                                 | without the attended mark | untrusted | the counter "harness_session_not_attended" increases by 1 and an audit entry names it |
       | the person's configuration sets "node.deployment_mode" to "interactive", and the MCP server's environment has "CLAUDE_CODE_SESSION_ATTENDED" set to "1" | without the attended mark | untrusted | the counter "harness_session_not_attended" increases by 1 and an audit entry names it |
+
+    Examples:
+      | configuration                                                                                                                                           | mark                      | trust     | audit                                                                                 |
       | the person's configuration sets "node.deployment_mode" to "interactive"                                                                                 | with the attended mark    | trusted   | no audit entry names the deployment mode                                              |
 
   @PRV-05 @P0 @I2 @pending
@@ -119,6 +123,7 @@ Feature: Provenance and trust (PRV)
     Then the event is stored with provenance "<provenance>" and its trust level is "untrusted"
     And an audit entry for each settings layer records "rejected trust override for <provenance>"
 
+    @runs
     Examples:
       | provenance       |
       | assistant        |
@@ -129,9 +134,12 @@ Feature: Provenance and trust (PRV)
       | file             |
       | subagent_result  |
       | harness_text     |
+      | unparsed         |
+
+    Examples:
+      | provenance       |
       | post             |
       | summary          |
-      | unparsed         |
 
   @PRV-06 @P0 @I2 @pending
   Scenario Outline: a landmark, or kernel output, a recall result or an export built from events, records the events it comes from and inherits their taint
@@ -178,9 +186,9 @@ Feature: Provenance and trust (PRV)
     When <item> is recorded
     Then the event is stored with provenance "<provenance>" and its trust level is "<trust>"
 
+    @runs
     Examples:
       | item                                                                                                                                             | provenance       | trust     |
-      | a "user" line carrying a prompt typed at the harness's input, matched, while every run on the node has a signed sandbox state blocking R3 and R8 | user             | trusted   |
       | a "user" line carrying a prompt typed at the harness's input, matched, while a run on the node leaves R8 open                                    | user             | untrusted |
       | a "user" line whose promptSource is "system", carrying a task notification                                                                       | harness_text     | untrusted |
       | a "user" line typed at the input whose text matches no prompt a "UserPromptSubmit" hook handler of its harness session got                       | user             | untrusted |
@@ -197,8 +205,12 @@ Feature: Provenance and trust (PRV)
       | a Bash tool_result whose output contains "<system-reminder>"                                                                                     | tool_result:Bash | untrusted |
       | an "ai-title" transcript line carrying a harness session title                                                                                   | harness_text     | untrusted |
       | a "last-prompt" transcript line repeating a typed prompt                                                                                         | harness_text     | untrusted |
-      | a subagent's "user" line carrying the delegated task its parent's run wrote                                                                      | harness_text     | untrusted |
       | a "user" line of a harness session a run's Bash tool call started                                                                                | harness_text     | untrusted |
+
+    Examples:
+      | item                                                                                                                                             | provenance       | trust     |
+      | a "user" line carrying a prompt typed at the harness's input, matched, while every run on the node has a signed sandbox state blocking R3 and R8 | user             | trusted   |
+      | a subagent's "user" line carrying the delegated task its parent's run wrote                                                                      | harness_text     | untrusted |
 
   @PRV-09 @P0 @I2 @I8 @pending
   Scenario Outline: an event's writer comes from the key that verifiably signed it, never from a field
@@ -369,14 +381,18 @@ Feature: Provenance and trust (PRV)
     Then <outcome>
     And the redacted log (OPS-05) names the call's tool-use id and <logged>
 
+    @runs
     Examples:
       | case                                                                                 | outcome                                                                                                    | logged                                 |
       | ingest has read the line carrying the call's tool-use id before the call arrives     | the call is served under the run that line belongs to, without waiting                                     | that run and no wait                   |
       | the line carrying the call's tool-use id reaches the transcript 0.5 s after the call | the call waits until ingest reads the line, then is served under the run that line belongs to              | that run and how long the call waited  |
       | no line carries the call's tool-use id within 2 s                                    | the call is refused with an explicit error, and the counter "tool_call_run_not_found" increases by 1       | the cause and how long the call waited |
       | the call carries no tool-use id                                                      | the call is refused with an explicit error, and the counter "tool_call_without_tool_use_id" increases by 1 | the cause                              |
-      | lines of both runs carry the call's tool-use id                                      | the call is refused with an explicit error, and the counter "tool_call_run_ambiguous" increases by 1       | the cause                              |
-      | the call's arguments name the other run                                              | the call is served under the run its line belongs to, not the run its arguments name                       | the run its line belongs to            |
       | the subagent runs in the background                                                  | the call is served under the subagent's run                                                                | the subagent's run                     |
       | both runs call at the same moment                                                    | each call is served under its own run                                                                      | each call's own run                    |
       | the MCP server restarts after the line was written and before the call               | ingest resumes from its ingest marker and the call is served under the run that line belongs to            | that run                               |
+
+    Examples:
+      | case                                                                                 | outcome                                                                                                    | logged                                 |
+      | lines of both runs carry the call's tool-use id                                      | the call is refused with an explicit error, and the counter "tool_call_run_ambiguous" increases by 1       | the cause                              |
+      | the call's arguments name the other run                                              | the call is served under the run its line belongs to, not the run its arguments name                       | the run its line belongs to            |

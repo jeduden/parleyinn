@@ -539,10 +539,9 @@ jobs:
     env:
       # Every nth case from the shard's own, n the matrix's size, so the
       # shards together hold every case once and each fits the budget.
-      # Each shard first builds every check its cases name, about two
-      # minutes whatever its size, so a shard's cases add the rest:
-      # 24 keep the slowest near four minutes of its five.
+      # Each shard first builds its checks (cached, 2 minutes cold).
       DRIFT_SHARD: ${{ strategy.job-index }}/${{ strategy.job-total }}
+      DRIFT_TARGET_DIR: ${{ github.workspace }}-drift-target
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -576,6 +575,7 @@ jobs:
       # ENG-30: the license check reads only the sources cargo has
       # already fetched, for every release target.
       - run: cargo fetch --locked
+      - uses: ./.github/actions/drift-target
       - run: scripts/ci-gate.sh drift
 
   # ENG-15: the benchmark gate. The base is the head's first parent:
