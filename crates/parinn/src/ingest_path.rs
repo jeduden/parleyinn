@@ -6,8 +6,11 @@
 //! act (OWN-11, OWN-12), allowed once the path resolves to a regular
 //! file outside the home, and recorded before anything is read. A path
 //! from hook input or a transcript line never has the exception, and
-//! neither does one named without a terminal.
+//! neither does one named without a terminal. The act also covers
+//! reading its path again while an ingest marker holds lines of it, so
+//! a hold is released as REC-04 asks without a second act.
 
+use std::collections::BTreeSet;
 use std::fs;
 use std::io::Write;
 use std::path::{Path, PathBuf};
@@ -16,8 +19,10 @@ use administration::act::Act;
 use allowed_root::{Access, AllowedRoots};
 use audit::entry::{Counter, Kind, Occurrence};
 use record::digest::Digest;
+use store::Store;
 
 use crate::act::Taking;
+use crate::settings::acts_in;
 use crate::{Context, failed};
 
 const OP: &str = "ingest";
@@ -58,8 +63,11 @@ pub(crate) fn allowed(
     (found, refused)
 }
 
-/// The transcripts among `held`, an ingest marker's sources, within
-/// the roots; each other is refused and audited, never named.
+/// The transcripts among `held`, an ingest marker's sources, that
+/// `ingest` may read again: each within the roots, and each the
+/// principal named on `--path` in an act the record holds, whose held
+/// lines that act covers until they are released (REC-04). Each other
+/// is refused and audited.
 pub(crate) fn within(
     ctx: &Context,
     settings: &configuration::resolve::Settings,
@@ -67,10 +75,50 @@ pub(crate) fn within(
     stderr: &mut dyn Write,
 ) -> Vec<PathBuf> {
     let roots = roots(ctx, settings);
+    // Read once, and only when a held path lies outside the roots.
+    let mut named = None;
 
     held.iter()
-        .filter_map(|path| transcript(ctx, &roots, path, false, stderr).ok())
+        .filter_map(|path| {
+            if let Ok(within) = roots.resolve(path, Access::Read) {
+                return Some(within.path().to_path_buf());
+            }
+            let named = named.get_or_insert_with(|| named_before(ctx));
+            let again = outside_home(ctx, path)
+                .filter(|resolved| is_file(resolved) && named.contains(&digest(resolved)));
+            if again.is_none() {
+                outside(ctx, stderr);
+            }
+            again
+        })
         .collect()
+}
+
+/// The path digests the `ingest --path` acts in the record name; none
+/// when the record cannot be read, so a held path stays refused.
+fn named_before(ctx: &Context) -> BTreeSet<String> {
+    let recorded = ctx.home().map_err(|e| e.to_string()).and_then(|home| {
+        let store = Store::open(&home.store()).map_err(|e| e.to_string())?;
+        acts_in(&home, &store)
+    });
+
+    recorded
+        .unwrap_or_default()
+        .into_iter()
+        .filter(|act| act.name == "ingest_path")
+        .filter_map(|act| Some(act.content.get("path_digest")?.as_str()?.to_owned()))
+        .collect()
+}
+
+/// The digest an `ingest --path` act carries of the resolved path it
+/// names, as text.
+fn digest(resolved: &Path) -> String {
+    path_digest(resolved).to_hex()
+}
+
+/// The digest of `resolved`, a path the principal names.
+fn path_digest(resolved: &Path) -> Digest {
+    Digest::of(&[resolved.as_os_str().as_encoded_bytes()])
 }
 
 /// The transcript roots, each resolved.
@@ -108,10 +156,20 @@ fn transcript(
 }
 
 /// The path the principal named, once the act that widens the roots to
-/// it is taken. None when it is no path they may name: it does not
-/// resolve, or it lies in the home, whose keys and store are no
-/// transcript.
+/// it is taken. None when it is no path they may name.
 fn widen(ctx: &Context, path: &Path, stderr: &mut dyn Write) -> Option<Result<PathBuf, Declined>> {
+    let resolved = outside_home(ctx, path)?;
+    if !is_file(&resolved) {
+        return Some(Err(not_a_file(ctx, stderr)));
+    }
+
+    Some(take(ctx, resolved, stderr))
+}
+
+/// `path` resolved, when the principal may name it. None when it does
+/// not resolve, or it lies in the home, whose keys and store are no
+/// transcript.
+fn outside_home(ctx: &Context, path: &Path) -> Option<PathBuf> {
     let resolved = fs::canonicalize(path).ok()?;
     let home = ctx.home().ok()?;
     // A home that is not there yet holds no path, so a root that does
@@ -119,18 +177,20 @@ fn widen(ctx: &Context, path: &Path, stderr: &mut dyn Write) -> Option<Result<Pa
     if fs::canonicalize(home.root()).is_ok_and(|root| resolved.starts_with(root)) {
         return None;
     }
-    if !fs::metadata(&resolved).is_ok_and(|m| m.is_file()) {
-        return Some(Err(not_a_file(ctx, stderr)));
-    }
 
-    Some(take(ctx, resolved, stderr))
+    Some(resolved)
+}
+
+/// Whether `resolved` is a regular file.
+fn is_file(resolved: &Path) -> bool {
+    fs::metadata(resolved).is_ok_and(|m| m.is_file())
 }
 
 /// Records the act that names `resolved`.
 fn take(ctx: &Context, resolved: PathBuf, stderr: &mut dyn Write) -> Result<PathBuf, Declined> {
     let mut taking = Taking::open(ctx).map_err(Declined::Why)?;
     let act = Act::IngestPath {
-        path_digest: Digest::of(&[resolved.to_string_lossy().as_bytes()]),
+        path_digest: path_digest(&resolved),
     };
     taking
         .take(ctx, OP, &act, stderr)

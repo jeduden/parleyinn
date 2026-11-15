@@ -1,6 +1,8 @@
 # Step definitions that no row of a scenario that runs uses yet, one per
 # line as "<file> <function>". The list only shrinks (ENG-27): write the
 # row and drop the line, or delete the definition and drop the line.
+# In an outline, "@pending" on one Examples block holds only that block's
+# rows back: the scenario still counts as pending, its other rows run.
 administration_verify.rs entry_altered
 administration_verify.rs foreign_object
 administration_verify.rs hash_altered

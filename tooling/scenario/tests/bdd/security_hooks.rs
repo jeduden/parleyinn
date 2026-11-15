@@ -52,6 +52,8 @@ const PRIVATE_KEY: &str = "BEGIN OPENSSH PRIVATE KEY";
 #[derive(Debug, Default)]
 pub struct PathSteps {
     cwd: Option<PathBuf>,
+    /// The top level of the run's repository.
+    top: Option<PathBuf>,
     path: Option<PathBuf>,
     by_person: bool,
     by_configuration: bool,
@@ -102,6 +104,7 @@ fn run_in_repository(w: &mut World, cwd: String, top: String) -> Result<(), Stri
     crate::security_redaction::home_files(&top, &mut files)?;
     let steps = paths(w);
     steps.cwd = Some(cwd);
+    steps.top = Some(top);
     steps.repository = files;
     Ok(())
 }
@@ -281,8 +284,7 @@ fn read_not_written(w: &mut World) -> Result<(), String> {
     if refusals(w, Some("mcp"), "path outside allowed roots")? > 0 {
         return Err("the MCP server refused a path of the run's repository".to_owned());
     }
-    let top = paths(w).cwd.clone().ok_or("no cwd")?;
-    let top = top.parent().ok_or("no top level")?.to_path_buf();
+    let top = paths(w).top.clone().ok_or("no step made a repository")?;
     let mut now = Vec::new();
     crate::security_redaction::home_files(&top, &mut now)?;
     if now == paths(w).repository {

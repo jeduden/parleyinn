@@ -42,6 +42,7 @@ fn scenarios_reads_tags_and_pending() {
             steps: vec!["nothing".into()],
             step_kinds: vec!["given".into()],
             examples: Vec::new(),
+            running: Vec::new(),
         }
     );
     assert_eq!(got[1].id, "NFR-01");
@@ -62,6 +63,48 @@ fn scenarios_read_each_step_s_kind_and_an_outline_s_examples() {
     assert_eq!(got[0].step_kinds, ["given", "given", "when", "then"]);
     assert_eq!(got[0].examples.len(), 2);
     assert_eq!(got[0].examples[1]["b"], "4");
+    assert_eq!(got[0].running, got[0].examples);
+}
+
+/// An outline of two rows `a` and `b` and a third, `c`, in a block of
+/// its own, with `tags` on the feature, the rule, the scenario and the
+/// second block.
+fn outline(tags: [&str; 4]) -> String {
+    let [feature, rule, scenario, block] = tags;
+    format!(
+        "{feature}\nFeature: Outline\n\n  {rule}\n  Rule: r\n\n    @SEC-04 @P0 @I9 {scenario}\n    Scenario Outline: literal terms\n      Given <q>\n\n      Examples:\n        | q |\n        | a |\n        | b |\n\n      {block}\n      Examples:\n        | q |\n        | c |\n"
+    )
+}
+
+#[test]
+fn scenarios_keep_the_rows_of_the_examples_blocks_not_pending_as_running() {
+    let dir = write_feature(&outline(["", "", "", "@pending"]));
+
+    let got = scenarios(dir.path()).unwrap();
+
+    assert!(got[0].pending, "one pending block holds the scenario");
+    let cells = |rows: &[BTreeMap<String, String>]| -> Vec<String> {
+        rows.iter().map(|r| r["q"].clone()).collect()
+    };
+    assert_eq!(cells(&got[0].examples), ["a", "b", "c"]);
+    assert_eq!(cells(&got[0].running), ["a", "b"]);
+}
+
+#[test]
+fn scenarios_keep_no_running_row_under_a_pending_feature_rule_or_scenario() {
+    for tags in [
+        ["@pending", "", "", ""],
+        ["", "@pending", "", ""],
+        ["", "", "@pending", ""],
+    ] {
+        let dir = write_feature(&outline(tags));
+
+        let got = scenarios(dir.path()).unwrap();
+
+        assert!(got[0].pending, "{tags:?}");
+        assert_eq!(got[0].examples.len(), 3, "{tags:?}");
+        assert!(got[0].running.is_empty(), "{tags:?}");
+    }
 }
 
 #[test]
