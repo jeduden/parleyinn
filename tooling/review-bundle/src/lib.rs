@@ -16,6 +16,7 @@ pub mod dispatch;
 pub mod limits;
 pub mod owners;
 pub mod render;
+pub mod size_list;
 pub mod snapshot;
 
 #[cfg(test)]
