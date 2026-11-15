@@ -154,8 +154,9 @@ The review's tooling words are engineering-tooling words too, described in
 - **Review context, review class, touched ids, dispatch row**: the file
   `review/context/<specialist>.md` that the review bundle writes for one
   specialist, holding the review class (light, standard or deep), the ids the
-  change touches, the dispatch row that names the specialist and the
-  deterministic findings on its files.
+  change touches, the dispatch row that names the specialist, the
+  deterministic findings on its files and the ENG-29 record a guarded
+  change lands with.
 - **Stability measurement**: reviews of the same pull-request snapshots,
   repeated to measure how stable the review is.
 - **Flip rate, finding overlap**: how stable the review is: the share of a

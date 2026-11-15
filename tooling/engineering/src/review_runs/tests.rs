@@ -500,6 +500,44 @@ fn a_bundle_that_cannot_be_written_or_run_is_named() {
 }
 
 #[test]
+fn a_context_is_held_to_the_section_and_the_path_of_the_record() {
+    let named = format!("## ENG-29 record\n\nThis change changes the accepted ADR `{RECORD}`.\n");
+    let lacks = [format!(
+        "the context for lang-markdown lacks the ENG-29 record {RECORD}"
+    )];
+
+    assert!(record_lacks("lang-markdown", &named).is_empty());
+    assert_eq!(record_lacks("lang-markdown", "## ENG-29 record\n"), lacks);
+    assert_eq!(record_lacks("lang-markdown", &format!("`{RECORD}`")), lacks);
+}
+
+#[test]
+fn a_bundle_context_for_a_guarded_change_on_the_checkout_names_its_record() {
+    let work = TempDir::new().unwrap();
+
+    let problems = record_problems(&Checkout::new(&testkit::repo_root()), work.path());
+
+    assert!(problems.is_empty(), "{problems:?}");
+}
+
+#[test]
+fn a_record_check_whose_bundle_did_not_run_or_wrote_no_context_is_named() {
+    let work = TempDir::new().unwrap();
+
+    let problems = record_problems(
+        &Checkout::new(&work.path().join("none")),
+        &work.path().join("out"),
+    );
+    assert!(
+        problems[0].starts_with("review-bundle exited "),
+        "{problems:?}"
+    );
+
+    let problems = record_in(work.path());
+    assert!(problems[0].starts_with("read "), "{problems:?}");
+}
+
+#[test]
 fn a_file_the_bundle_did_not_write_is_named() {
     let work = TempDir::new().unwrap();
 
