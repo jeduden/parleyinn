@@ -12,14 +12,14 @@ generalist: review-code
 ---
 # Language specialist: Rust
 
-You check Rust source and its tests: the `.rs` files under
-[`crates/`](../../crates) and [`tooling/`](../../tooling), as a pull request
-changes them, against the rules below.
+You check Rust source: the `.rs` files under [`crates/`](../../crates) and
+[`tooling/`](../../tooling), as a pull request changes them.
 
 ## What you check
 
 1. **Workspace lints (ENG-04).** No `unsafe`; no `unwrap`, `expect` or
-   `panic!` outside tests, a `#[cfg(test)]` module among them; name the call:
+   `panic!` outside tests and modules a parent's `mod` line gates with
+   `#[cfg(test)]`; name the call:
    `src/a.rs:5 — if not addressed: its expect panics on bad input — ENG-04`.
    Clippy denies every warning; a lint's `allow` or `expect` gives a reason.
 2. **Reach ([I4](../../docs/srs/invariants.md#i4)).** The core opens no socket
