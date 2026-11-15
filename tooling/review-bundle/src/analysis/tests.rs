@@ -74,13 +74,11 @@ fn analyse_routes_by_the_paths_that_changed() {
         (vec!["docs/guide.md", "README.md"], Class::Light),
         (vec!["plan/x/plan.md", "README.md"], Class::Standard),
         (vec!["docs/domain-model/run.md"], Class::Standard),
-        (vec!["features/notes.md"], Class::Standard),
         (vec![], Class::Standard),
         (
             vec!["plan/x/plan.md", "crates/parinn/src/lib.rs"],
             Class::Standard,
         ),
-        (vec!["features/record.feature"], Class::Standard),
         (vec!["README.md", "docs/srs/05.md"], Class::Deep),
         (vec!["crates/pinx/Cargo.toml"], Class::Deep),
     ];
@@ -90,6 +88,32 @@ fn analyse_routes_by_the_paths_that_changed() {
         assert_eq!(got.class, want, "{paths:?}");
         assert_eq!(got.class == Class::Deep, !got.owned.is_empty(), "{paths:?}");
         assert!(got.unparsed.is_empty(), "{paths:?}");
+    }
+}
+
+#[test]
+fn what_lands_on_the_review_alone_reviews_deep_with_no_code_owner() {
+    for (path, want) in [
+        ("docs/srs/05.md", Class::Deep),
+        ("docs/adr/ADR-2610111200-x.md", Class::Deep),
+        ("features/record.feature", Class::Deep),
+        ("features/notes.md", Class::Deep),
+        ("Cargo.toml", Class::Deep),
+        ("crates/pinx/Cargo.toml", Class::Deep),
+        ("crates/pinx/clippy.toml", Class::Deep),
+        ("mise.lock", Class::Deep),
+        ("SECURITY.md", Class::Deep),
+        ("docs/SECURITY.md.txt", Class::Standard),
+        ("x/docs/srs/05.md", Class::Light),
+        ("docs/srs.md", Class::Light),
+    ] {
+        let unowned = Snapshot {
+            codeowners: String::new(),
+            ..base()
+        };
+        let got = analyse(&unowned, &unowned, &header(path), &[]);
+        assert_eq!(got.class, want, "{path}");
+        assert!(got.owned.is_empty(), "{path}");
     }
 }
 

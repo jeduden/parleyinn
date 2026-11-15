@@ -28,6 +28,28 @@ const NOT_LIGHT: [&str; 3] = ["docs/domain-model/", "plan/", "features/"];
 /// ENG-11 row names join it.
 const DEEP_CODE: [&str; 1] = ["tooling/"];
 
+/// The text no stakeholder path holds that still reviews deep, since
+/// it lands on the review's approval alone (ENG-21): the specification,
+/// the decision records and the scenarios.
+const DEEP_TEXT: [&str; 3] = ["docs/srs/", "docs/adr/", "features/"];
+
+/// The files, at any depth, no stakeholder path holds that still review
+/// deep: the build, lint, coverage and toolchain configuration and the
+/// supply-chain and disclosure policy.
+const DEEP_FILES: [&str; 11] = [
+    "Cargo.toml",
+    "clippy.toml",
+    "deny.toml",
+    "codecov.yml",
+    "rust-toolchain.toml",
+    "mise.toml",
+    "mise.lock",
+    "mise.dev.toml",
+    "mise.dev.lock",
+    "SECURITY.md",
+    "DEPENDENCIES.md",
+];
+
 /// The requirement whose text names the security-sensitive crates.
 const ENG_11: &str = "ENG-11";
 
@@ -162,7 +184,9 @@ pub fn analyse(base: &Snapshot, head: &Snapshot, diff: &str, consents: &[String]
     // Without the list, every crate counts as security-sensitive, so the
     // class and the dispatch fail closed.
     let crates = crates.unwrap_or_else(|| vec![dispatch::EVERY_CRATE.to_owned()]);
-    let deep = paths.iter().any(|p| deep_code(&crates, p));
+    let deep = paths
+        .iter()
+        .any(|p| deep_code(&crates, p) || deep_unowned(p));
     // The rows that bring their section's specialist: those the change
     // edits, and those code names; a row Markdown only quotes is in the
     // bundle but brings no one.
@@ -305,8 +329,16 @@ fn deep_code(crates: &[String], path: &str) -> bool {
     DEEP_CODE.iter().any(|d| path.starts_with(d)) || dispatch::security_code(path, crates)
 }
 
-/// The review class: deep when `deep` says a stakeholder path or deep
-/// code changed, or a header does not read; light when only prose
+/// Whether `path` reviews deep though no stakeholder path holds it and
+/// it is no code: the specification, a decision record, a scenario, or
+/// a configuration or policy file of [`DEEP_FILES`].
+fn deep_unowned(path: &str) -> bool {
+    let name = path.rsplit('/').next().unwrap_or(path);
+    DEEP_TEXT.iter().any(|d| path.starts_with(d)) || DEEP_FILES.contains(&name)
+}
+
+/// The review class: deep when `deep` says a stakeholder path, deep
+/// code or deep text changed, or a header does not read; light when only prose
 /// Markdown did; standard otherwise.
 fn classify(paths: &[String], deep: bool, unparsed: &[String]) -> Class {
     let light = |p: &String| p.ends_with(".md") && !NOT_LIGHT.iter().any(|d| p.starts_with(d));
