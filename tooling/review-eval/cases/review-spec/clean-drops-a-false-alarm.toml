@@ -28,6 +28,10 @@ outcome: none — no scenario touched
 [[expect.none]]
 path = "docs/domain-model/index.md"
 
+# The dropped line is known by its place and its source, which the
+# generalist copies from the report, never by a word of its reason,
+# which the generalist is free to choose.
 [[expect.dropped]]
 path = "docs/domain-model/index.md"
-mentions = ["record"]
+line = 47
+source = "domain-model-hub"
