@@ -55,8 +55,9 @@ it pass now, and on which model. Read
 7. **`review-eval` and the gate tests stay honest.** A change to
    `tooling/review-eval` that makes a case easier to pass, drops a
    grading rule or a drift case, or reads the pull request's cases for
-   a reviewer component main already has, beyond the case files the
-   evaluation plan lists as consented (ENG-21), is blocking.
+   a reviewer component main already has, is blocking. The one case
+   file of such a component it may read from the pull request is one
+   whose change a stakeholder comment names (ENG-21).
 
 ## How you review
 
