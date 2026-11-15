@@ -113,9 +113,13 @@ Feature: Engineering quality (ENG)
     When "<component>" opens a socket outside the boundary the register assigns it
     Then the suite fails naming the component and the caller
 
+    @runs
     Examples:
       | component           | confinement                   |
       | core                | denies all network            |
+
+    Examples:
+      | component           | confinement                   |
       | room-view component | denies all but loopback       |
       | launcher            | denies all but loopback       |
       | peer component      | allows only its register rows |

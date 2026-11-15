@@ -1,6 +1,9 @@
 # Step definitions that no row of a scenario that runs uses yet, one per
 # line as "<file> <function>". The list only shrinks (ENG-27): write the
 # row and drop the line, or delete the definition and drop the line.
+# In an outline, "@pending" on one Examples block holds only that block's
+# rows back: the scenario still counts as pending, its other rows run.
+# A block tagged "@runs" has its rows run though its scenario is pending.
 administration_verify.rs entry_altered
 administration_verify.rs foreign_object
 administration_verify.rs hash_altered
@@ -16,9 +19,6 @@ administration_verify.rs trust_altered
 engineering_benchmark.rs a_change_slows_a_benchmark
 engineering_benchmark.rs the_job_fails_naming_it
 engineering_benchmark.rs the_suite_covering
-engineering_boundary.rs confined
-engineering_boundary.rs fails_naming
-engineering_boundary.rs opens_a_socket
 engineering_contract.rs every_one_parses
 engineering_contract.rs recordings
 engineering_contract.rs replays
@@ -29,11 +29,6 @@ engineering_reach.rs evidence_gated
 engineering_reach.rs gates_on_the_static_checks
 engineering_reach.rs reads_the_evidence
 engineering_reach.rs the_ci_workflow
-erasure.rs matched_absent
-erasure.rs no_pin_to_remove
-erasure.rs operator_event_records
-erasure.rs release_is_recorded
-erasure.rs store_matching
 lane.rs a_later_change
 lane.rs clone_that
 lane.rs first_bind_is_structural
@@ -45,22 +40,14 @@ lane.rs rebound_after_a_node_identity_change
 lane.rs replaced_provisional_is_named
 lane.rs the_secret_is_kept_to_the_node
 principal_acts.rs acknowledgement_recorded
-principal_acts.rs act_is
-principal_acts.rs authenticated_surface
 principal_acts.rs counts_as_unsandboxed
-principal_acts.rs own_22
 principal_acts.rs unsandboxed_run
 principal_acts.rs writes_widening
-principal_acts.rs writes_widening_there
 provenance.rs bash_result_class
 provenance.rs classes_in_set
 provenance.rs every_kind
 provenance.rs one_class_each
-provenance_hooks.rs capture_records_user_turn
-provenance_hooks.rs deployment_configured
 provenance_hooks.rs no_entry_names_the_mode
-provenance_hooks.rs not_attended_counted
-provenance_hooks.rs observed_item_recorded
 provenance_policy.rs derived_and_not_stored
 provenance_policy.rs event_of_this_node
 provenance_policy.rs rebuild_keeps_trust
@@ -71,26 +58,8 @@ provenance_seats.rs genesis_minted
 provenance_seats.rs home_without_authenticator
 provenance_seats.rs starts_first
 provenance_tool_calls.rs arguments_name_other
-provenance_tool_calls.rs background
 provenance_tool_calls.rs both_runs
-provenance_tool_calls.rs each_own
-provenance_tool_calls.rs harness_session
-provenance_tool_calls.rs line_after
-provenance_tool_calls.rs log_names
-provenance_tool_calls.rs no_id
-provenance_tool_calls.rs no_line
-provenance_tool_calls.rs read_before
-provenance_tool_calls.rs refused
-provenance_tool_calls.rs restarts
-provenance_tool_calls.rs same_moment
-provenance_tool_calls.rs served_after_restart
-provenance_tool_calls.rs served_after_wait
-provenance_tool_calls.rs served_at_once
 provenance_tool_calls.rs served_not_argued
-provenance_tool_calls.rs served_subagent
-provenance_trust.rs each_layer_rejected
-provenance_trust.rs event_ingested
-provenance_trust.rs every_layer_trusts
 record_homes.rs fork_in_both
 record_homes.rs held_until_parent
 record_homes.rs home_holding
@@ -156,8 +125,6 @@ record_transcript.rs status_shows_drift
 record_transcript.rs stored_unparsed_and_drift
 record_transcript.rs stored_whole_harness_text
 record_transcript.rs stored_whole_never_user
-security.rs hook_exits_0_with_no_injection
-security.rs hook_runs_with
 security_boundary.rs assigned_to_one
 security_boundary.rs at_a_minor_release
 security_boundary.rs boundary_check_runs

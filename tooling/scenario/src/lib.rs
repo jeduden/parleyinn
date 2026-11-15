@@ -26,6 +26,10 @@ pub use steps::{StepDef, check_steps, step_definitions};
 /// than counting a pass that proves nothing.
 pub const PENDING: &str = "pending";
 
+/// The tag of an Examples block whose rows run although their scenario
+/// is pending: the rows that pass before the whole scenario does.
+pub const RUNS: &str = "runs";
+
 /// One scenario under `features/`, as both the gate and the runner see
 /// it. A Scenario Outline is one scenario however many Examples rows it
 /// has.
@@ -48,6 +52,10 @@ pub struct Scenario {
     /// An outline's Examples rows, each as header to cell; empty for a
     /// scenario that is not an outline.
     pub examples: Vec<BTreeMap<String, String>>,
+    /// The Examples rows the runner runs: those of the blocks tagged
+    /// `runs`, and of the blocks not tagged `pending` unless the
+    /// scenario, its rule or its feature is.
+    pub running: Vec<BTreeMap<String, String>>,
 }
 
 /// What reading the scenarios can fail with.
@@ -167,9 +175,8 @@ fn feature_scenarios(path: &Path, feature: &gherkin::Feature) -> Result<Vec<Scen
         .flat_map(|r| r.scenarios.iter().map(move |s| (&r.tags, s)));
     let mut out = Vec::new();
     for (rule_tags, sc) in top.chain(ruled) {
-        let tags = feature.tags.iter().chain(rule_tags).chain(&sc.tags);
-        let tags = tags.chain(sc.examples.iter().flat_map(|e| &e.tags));
-        out.push(scenario_of(path, sc, tags)?);
+        let outer = feature.tags.iter().chain(rule_tags).chain(&sc.tags);
+        out.push(scenario_of(path, sc, outer)?);
     }
 
     Ok(out)
@@ -184,11 +191,12 @@ fn kind_of(ty: gherkin::StepType) -> &'static str {
     }
 }
 
-/// An outline's Examples rows, each keyed by its table's header.
-fn example_rows(sc: &gherkin::Scenario) -> Vec<BTreeMap<String, String>> {
-    let tables = sc.examples.iter().filter_map(|e| e.table.as_ref());
+/// The rows of the Examples `blocks`, each keyed by its table's header.
+fn example_rows<'a>(
+    blocks: impl Iterator<Item = &'a gherkin::Examples>,
+) -> Vec<BTreeMap<String, String>> {
     let mut out = Vec::new();
-    for table in tables {
+    for table in blocks.filter_map(|e| e.table.as_ref()) {
         let header: Vec<&String> = table.rows.first().into_iter().flatten().collect();
         for row in table.rows.iter().skip(1) {
             let cells = row.iter().cloned();
@@ -199,20 +207,31 @@ fn example_rows(sc: &gherkin::Scenario) -> Vec<BTreeMap<String, String>> {
     out
 }
 
-/// Reads one scenario's tags: its requirement id, priority, invariants,
-/// and whether it is pending.
+/// Reads one scenario and its tags: its requirement id, priority,
+/// invariants, and whether it is pending. `outer` holds the tags of its
+/// feature, its rule and its own; an Examples block's tags count beside
+/// them. A block tagged pending keeps its own rows from running, and a
+/// block tagged runs has its rows run whatever holds the scenario.
 fn scenario_of<'a>(
     path: &Path,
-    sc: &gherkin::Scenario,
-    tags: impl Iterator<Item = &'a String>,
+    sc: &'a gherkin::Scenario,
+    outer: impl Iterator<Item = &'a String> + Clone,
 ) -> Result<Scenario, Error> {
+    let held = outer.clone().any(|t| t == PENDING);
+    let misplaced = outer.clone().any(|t| t == RUNS);
+    let running = sc.examples.iter().filter(|e| {
+        let tagged = |tag: &str| e.tags.iter().any(|t| t == tag);
+        tagged(RUNS) || !(held || tagged(PENDING))
+    });
+    let tags = outer.chain(sc.examples.iter().flat_map(|e| &e.tags));
     let mut out = Scenario {
         path: path.to_path_buf(),
         line: sc.position.line,
         name: sc.name.clone(),
         steps: sc.steps.iter().map(|s| s.value.clone()).collect(),
         step_kinds: sc.steps.iter().map(|s| kind_of(s.ty).to_owned()).collect(),
-        examples: example_rows(sc),
+        examples: example_rows(sc.examples.iter()),
+        running: example_rows(running),
         ..Scenario::default()
     };
     let (mut ids, mut priorities) = (Vec::new(), Vec::new());
@@ -226,6 +245,11 @@ fn scenario_of<'a>(
         }
     }
     let at = format!("{}:{}: {:?}", path.display(), out.line, out.name);
+    if misplaced {
+        return Err(Error::Tags(format!(
+            "{at} carries the tag {RUNS}, which belongs on an Examples block"
+        )));
+    }
     if ids.len() != 1 {
         return Err(Error::Tags(format!(
             "{at} carries {} requirement tags, want exactly one",

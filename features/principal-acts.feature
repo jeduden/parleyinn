@@ -145,10 +145,14 @@ Feature: Principal acts (OWN)
     When "alice" writes a "<class>" principal act there
     Then the act is "<expected>"
 
+    @runs
     Examples:
       | principal surface | risk state      | class                   | expected                                                                                                |
       | authenticated     | permits         | widening                | accepted                                                                                                |
       | authenticated     | does not permit | widening                | refused                                                                                                 |
+
+    Examples:
+      | principal surface | risk state      | class                   | expected                                                                                                |
       | authenticated     | permits         | named by no requirement | treated as widening and accepted                                                                        |
       | authenticated     | permits         | cut                     | recorded with a mark naming its principal surface, free text untrusted whatever its event's trust level |
       | authenticated     | permits         | neutral                 | recorded with a mark naming its principal surface, free text untrusted whatever its event's trust level |

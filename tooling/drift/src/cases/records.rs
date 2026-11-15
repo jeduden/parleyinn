@@ -308,9 +308,10 @@ pub(super) fn repository_cases() -> Vec<Case> {
 }
 
 /// The drifts the step gate catches: a step definition no running row
-/// uses, and the list of those drifting from the definitions.
+/// uses, the list of those drifting from the definitions, and the rows
+/// of an outline that run ([`outline_cases`]).
 pub(super) fn step_gate_cases() -> Vec<Case> {
-    vec![
+    let mut cases = vec![
         case(
             "a step definition no row of a scenario that runs uses",
             "every_step_definition_has_a_running_row",
@@ -366,6 +367,43 @@ pub(super) fn step_gate_cases() -> Vec<Case> {
                 "every_step_definition_has_a_running_row",
             ),
             "record_store.rs sized_results: listed, but a row that runs now uses it",
+        ),
+    ];
+    cases.extend(outline_cases());
+
+    cases
+}
+
+/// The step gate's cases on the rows of an outline that run: a block
+/// held pending in a scenario that runs, and a block tagged to run in a
+/// pending scenario.
+fn outline_cases() -> Vec<Case> {
+    vec![
+        case(
+            "an outline's row moved to an Examples block held pending, its step definition unlisted",
+            "every_step_definition_has_a_running_row",
+            Injection::replace(
+                "features/assumptions.feature",
+                "      | partial compaction | a \"compact_boundary\" line is appended                                       |",
+                "\n    @pending\n    Examples:\n      | flow               | shape                                 |\n      | partial compaction | a \"compact_boundary\" line is appended |",
+            ),
+            cargo_test(
+                "scenario",
+                "gate",
+                "every_step_definition_has_a_running_row",
+            ),
+            "assumptions.rs line_appended: no row of a scenario that runs uses this step definition",
+        ),
+        case(
+            "a pending outline's Examples block no longer tagged to run, its step definitions unlisted",
+            "every_step_definition_has_a_running_row",
+            Injection::replace("features/engineering.feature", "    @runs", ""),
+            cargo_test(
+                "scenario",
+                "gate",
+                "every_step_definition_has_a_running_row",
+            ),
+            "engineering_boundary.rs confined: no row of a scenario that runs uses this step definition",
         ),
     ]
 }

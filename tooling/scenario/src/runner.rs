@@ -18,7 +18,7 @@ use std::thread::{self, Thread};
 use cucumber::gherkin::tagexpr::TagOperation;
 use cucumber::tag::Ext as _;
 
-use crate::PENDING;
+use crate::{PENDING, RUNS};
 
 /// Which scenarios a run selects.
 #[derive(Debug, Clone, Default)]
@@ -188,14 +188,17 @@ impl Options {
 
     /// Whether a run with these options runs the scenario `name`
     /// carrying `tags`, written without their `@`. A pending scenario is
-    /// never run: it is declared, not written.
+    /// never run: it is declared, not written. The rows of an Examples
+    /// block tagged `runs` are, whatever holds their scenario.
     #[must_use]
     pub fn selects<'a>(&self, name: &str, tags: impl Iterator<Item = &'a String> + Clone) -> bool {
         let matches_filter = |f: &String| {
             name.contains(f.as_str()) || tags.clone().any(|t| t == f.trim_start_matches('@'))
         };
 
-        !tags.clone().any(|t| t == PENDING)
+        let tagged = |tag: &str| tags.clone().any(|t| t == tag);
+
+        (tagged(RUNS) || !tagged(PENDING))
             && self
                 .tags
                 .as_ref()
