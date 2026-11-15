@@ -613,7 +613,8 @@ fn tail_of(a: &str, b: &str) -> bool {
 /// `path` that is a bare file name, a path that ends in it when no other
 /// path of `known` is a tail of it or has it as one: an agent that
 /// shortens or lengthens a path still weighs the finding, while an
-/// ambiguous basename names none. A reported path with directories is
+/// ambiguous basename names none; a bare name reported beside exactly
+/// one longer spelling of it is that file. A reported path with directories is
 /// not lengthened, since the longer path may be another file.
 fn named_by(line: &str, path: &str, number: usize, known: &BTreeSet<String>) -> bool {
     if names(line, path, number) {
@@ -623,10 +624,20 @@ fn named_by(line: &str, path: &str, number: usize, known: &BTreeSet<String>) -> 
     let shorter = path
         .match_indices('/')
         .map(|(i, _)| &path[i + 1..])
-        .filter(|t| !t.is_empty() && !others().any(|q| tail_of(q, t)))
+        .filter(|t| !t.is_empty() && !others().any(|q| q != *t && tail_of(q, t)))
         .any(|t| names(line, t, number));
     if shorter {
         return true;
+    }
+    if !path.contains('/') {
+        let mut longer = others().filter(|q| tail_of(q, path));
+        // One longer spelling reported beside the bare name is the same
+        // file, so a line naming it weighs the bare place too.
+        if let (Some(only), None) = (longer.next(), longer.next())
+            && names(line, only, number)
+        {
+            return true;
+        }
     }
     let alone = !path.contains('/') && !others().any(|q| tail_of(q, path) || tail_of(path, q));
     let head = format!("/{path}:");
