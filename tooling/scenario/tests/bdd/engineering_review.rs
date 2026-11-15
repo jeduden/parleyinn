@@ -195,7 +195,7 @@ fn review_carries_findings(w: &mut World) -> Result<(), String> {
 }
 
 #[then(
-    regex = r"^a review that a stakeholder's comment brought runs no agent when an earlier review of the same head, from a run behind the spend it trusts, kept its review outcome under the same dispatch and left no dispatched agent without an accepted report: each review keeps its review outcome, the agents it consulted, its run id, its gaps and its dispatch among its reports, the comment's review takes them as its own and states the deterministic findings again, says in the job summary whether it reused one and runs its agents when it did not, and waits for a running review of its pull request, cancelling none$"
+    regex = r"^a review that a stakeholder's pull-request comment brought runs no agent when an earlier review of the same head, from a run behind the spend it trusts, kept its review outcome under the same dispatch and left no dispatched agent without an accepted report: each review keeps its review outcome, the agents it consulted, its run id, its gaps and its dispatch among its reports, the comment's review takes them as its own and states the deterministic findings again, says in the job summary whether it reused one and runs its agents when it did not, and waits for a running review of its pull request, cancelling none$"
 )]
 fn review_reuses_a_verdict(w: &mut World) -> Result<(), String> {
     outcome(engineering::review_verdict::review_reuses_a_verdict(

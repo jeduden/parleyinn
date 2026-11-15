@@ -147,7 +147,7 @@ repository's own engineering tooling, such as ENG-28's review gate and the
 requirement naming its fields. The domain-model agent skips them.
 
 The review's tooling words are engineering-tooling words too, described in
-[review-evaluation.md](../review-evaluation.md):
+[review-evaluation.md](../review-evaluation.md) and [ci.md](../ci.md):
 
 - **Reviewer component, case, scorecard**: the review's agents, the cases that
   hold them and the published results.
@@ -174,10 +174,9 @@ The review's tooling words are engineering-tooling words too, described in
   row, or a blocking finding kept in three reviews in a row on an unchanged
   file; a person acts on it.
 - **Size list**: `tooling/engineering/oversize.txt`, which lists each file past
-  its kind's line limit with the lines it holds (ENG-34), described in
-  [ci.md](../ci.md).
-- **Review outcome, dispatch**: what a review's agents decided, its verdict,
-  summary and findings, and the agents the review bundle chose for a change.
+  its kind's line limit with the lines it holds (ENG-34).
+- **Review outcome**: what a review's agents decided: its verdict, summary and
+  findings.
 - **Specialist report**: what one of the review's specialist agents gives, its
   findings and outcome; neither the run report nor a forge report.
 
