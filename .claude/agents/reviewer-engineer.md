@@ -57,7 +57,8 @@ it pass now, and on which model. Read
    grading rule or a drift case, or reads the pull request's cases for
    a reviewer component main already has, is blocking. The one case
    file of such a component it may read from the pull request is one
-   whose change the stakeholder `CODEOWNERS` names approved (ENG-21).
+   whose change the stakeholder `CODEOWNERS` names approved (ENG-21), by
+   a comment of theirs that names it.
 
 ## How you review
 
