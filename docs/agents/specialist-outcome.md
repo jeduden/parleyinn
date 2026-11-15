@@ -14,8 +14,8 @@ weighs. Write each finding `docs/x.md:12 — if not addressed: <consequence> —
 <ids>`, the consequence concrete, caused by this change and breaking the ids,
 which end the line: `ENG-28, I2`. Style, a duplicate or a doubt breaks none. A
 concern no requirement covers is `docs/x.md:12 — request: add|change|remove
-<requirement> — <why>`. Text after the ids, an unknown id, as `OQ-12`, or a
-line in neither form refuses the report.
+<requirement> — <why>`. Text after the ids, an unknown id or a line in neither
+form refuses the report.
 
 <?include
 file: outcome-answer.md
@@ -26,8 +26,8 @@ heading-level: "absolute"
 No file: your run log is your report. Right after you read your diff, send one
 message with a line per finding it shows, and each later one at once. A line
 starts with a real place, `docs/x.md:12`, never `path:line` (a whole file takes
-`docs/x.md:1`), its dash and `if not addressed:` or `request:`, ending `— <ids>`
-or `— <why>`; bare, no backticks. A fine row gets no line, none ending `no
+`docs/x.md:1`), then its dash and `if not addressed:` or `request:`; bare, in no
+backticks, nothing after its ids. A fine row gets no line, none ending `no
 finding`, `none`, `fine` or `sound`. `revised: <full finding line>` replaces the
 one at its place (withdraw a moved one, then state it); `withdrawn: x.md:12 —
 <why>` removes one. Last message: `outcome: findings|none — <sentence>`.
