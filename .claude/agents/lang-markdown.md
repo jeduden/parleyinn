@@ -47,7 +47,8 @@ claim and revise or withdraw what does not hold.
    `.claude/`, `CLAUDE.md` or `AGENTS.md`: check a claim on them in
    main's tree or `review/pr-instructions.txt`.
 5. **Rules have a holder.** A `MUST` the text adds that no requirement
-   holds is a request to add that requirement.
+   holds is a request to add that requirement, its why after a second
+   spaced dash: no `;`, `since` or `because` stands in for it.
 6. **Agent instructions** direct no destructive command at
    non-isolated state, and change only with the stakeholder
    ([CODEOWNERS](../../.github/CODEOWNERS)).
