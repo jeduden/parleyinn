@@ -245,6 +245,13 @@ fn ids_and_rows_are_recognised_strictly() {
         Some("REC-01".to_owned())
     );
     assert_eq!(first_requirement_id("nothing"), None);
+    // An open question's id is no requirement's: a linked finding may
+    // not end with it, so a swap of it has no right answer in that form.
+    assert_eq!(
+        first_requirement_id("open as OQ-32 says, under CON-02"),
+        Some("CON-02".to_owned())
+    );
+    assert_eq!(first_requirement_id("open as OQ-32 says"), None);
     assert_eq!(
         line_of("# hub\n\nIt cites PIN-08.\nPIN-08 again.\n", "PIN-08"),
         3

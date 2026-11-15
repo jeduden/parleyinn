@@ -227,10 +227,12 @@ fn srs_id(word: &str) -> bool {
         && digits.chars().all(|c| c.is_ascii_digit())
 }
 
-/// The first requirement id `text` cites.
+/// The first requirement id `text` cites, an open question's left out:
+/// a linked finding ends with requirement ids, and an open question's
+/// is refused among them.
 fn first_requirement_id(text: &str) -> Option<String> {
     text.split(|c: char| !(c.is_ascii_uppercase() || c.is_ascii_digit() || c == '-'))
-        .find(|word| srs_id(word))
+        .find(|word| srs_id(word) && !word.starts_with(OPEN_QUESTION))
         .map(str::to_owned)
 }
 
