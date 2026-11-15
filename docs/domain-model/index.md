@@ -174,7 +174,10 @@ The review's tooling words are engineering-tooling words too, described in
   row, or a blocking finding kept in three reviews in a row on an unchanged
   file; a person acts on it.
 - **Size list**: `tooling/engineering/oversize.txt`, which lists each file past
-  its kind's line limit with the lines it holds (ENG-34).
+  its kind's line limit with the lines it holds (ENG-34), described in
+  [ci.md](../ci.md).
+- **Review outcome, dispatch**: what a review's agents decided, its verdict,
+  summary and findings, and the agents the review bundle chose for a change.
 - **Specialist report**: what one of the review's specialist agents gives, its
   findings and outcome; neither the run report nor a forge report.
 

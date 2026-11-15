@@ -212,9 +212,9 @@ Agents review each other's pull requests, and GitHub merges them (ENG-21). Open
 yours ready, never as a draft, and enable auto-merge. Ask the stakeholder for
 nothing, unless it changes a path [CODEOWNERS](.github/CODEOWNERS) names (the
 agent instructions, `tooling/review-*`, CI with its manifests, tool pins, bans
-and acceptances, and `.mdsmith.yml`), an invariant or a row ENG-29 guards, or
-lengthens the size list (ENG-34). Then ask once, naming those paths. On GitHub,
-write every `@`-word in backticks: a bare `@I2` mentions that user (#22).
+and acceptances, and `.mdsmith.yml`) or lengthens the size list (ENG-34): then
+ask once, naming those paths. A change ENG-29 guards lands with its ADR. On
+GitHub, write each `@`-word in backticks: a bare `@I2` mentions that user (#22).
 
 ## Requirements and Scenarios
 

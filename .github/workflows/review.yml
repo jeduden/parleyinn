@@ -25,10 +25,11 @@ on: # zizmor: ignore[dangerous-triggers] main's definition runs by design; the p
 permissions: {}
 
 # One review of a pull request at a time. A newer CI run makes an older
-# review moot and cancels it. A comment's review cancels none: it waits
-# for the one that runs, then reuses its verdict, and a cancelled run is
-# charged its agents' whole caps. A comment that brings no review (an
-# agent's, or one from outside the repository) takes a group of its own.
+# review moot and cancels it. A comment's review cancels no running one:
+# it waits, then reuses its verdict, since a cancelled run is charged its
+# agents' whole caps; a newer comment's review takes a waiting one's place.
+# A comment that brings no review (an agent's, or one from outside the
+# repository) takes a group of its own.
 concurrency:
   group: >-
     review-pull-${{ github.event.workflow_run.pull_requests[0].number ||
@@ -390,7 +391,7 @@ jobs:
       # The findings for the gate, the report, the scorecard and each
       # run's grade and report; the run logs stay in the job.
       - name: Keep the evaluation
-        if: always() && (steps.plan.outputs.empty != 'false' || steps.scrub.outputs.scrubbed == 'true')
+        if: always() && (steps.plan.outputs.empty == 'true' || steps.plan.outputs.empty == 'kept' || steps.scrub.outputs.scrubbed == 'true')
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: review-evaluation

@@ -82,8 +82,9 @@ is short, because a finding found late costs a whole round.
   dispatch that left no gap, runs no agent and states only the
   deterministic findings again, the consent among them. Its job summary
   says which run it reused, or why its agents ran. A comment made while
-  a review runs waits for it and cancels nothing, so consent can be
-  given at any time.
+  a review runs waits for it and cancels no running review, so consent
+  can be given at any time; of several comments made meanwhile, the
+  newest one's review runs.
 - CI ends within ten minutes of a push. The slowest chain of jobs sets
   that; a job that grows toward its five-minute limit is split before it
   fails.
