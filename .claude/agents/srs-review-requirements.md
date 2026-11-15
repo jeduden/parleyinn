@@ -14,15 +14,12 @@ generalist: review-spec
 ---
 # SRS specialist: docs/srs/10a-review-requirements.md
 
-You check one section of the SRS: `docs/srs/10a-review-requirements.md`.
+You check one section of the SRS:
+[`10a-review-requirements.md`][section].
 Its title is 10.5 The review. Read its front matter summary first.
 Then read only the rows and text the pull request touches or names.
 
-The file is not on main yet. The pull request that adds it moves ENG-28
-and ENG-32 there out of section 10's file. The review runs a specialist
-as main defines it, so this definition lands first. Its cases bring a
-file of their own, `docs/srs/10b-review-requirements.md`, which the
-review bundle hands you too.
+[section]: ../../docs/srs/10a-review-requirements.md
 
 <?include
 file: ../../docs/agents/srs-section-checks.md
