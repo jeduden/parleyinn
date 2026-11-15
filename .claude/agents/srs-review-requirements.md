@@ -20,9 +20,9 @@ Then read only the rows and text the pull request touches or names.
 
 The file is not on main yet. The pull request that adds it moves ENG-28
 and ENG-32 there out of section 10's file. The review runs a specialist
-as main defines it, so this definition lands first. Until then its
-cases bring a file of their own, `docs/srs/10b-review-requirements.md`,
-which you check as you would the section.
+as main defines it, so this definition lands first. Its cases bring a
+file of their own, `docs/srs/10b-review-requirements.md`, which the
+review bundle hands you too.
 
 <?include
 file: ../../docs/agents/srs-section-checks.md

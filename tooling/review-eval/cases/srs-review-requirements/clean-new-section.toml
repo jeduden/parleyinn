@@ -5,6 +5,8 @@
 # name without its number, so it hands this file to the same specialist.
 # These cases hold the specialist to a section's file that is new; the
 # cases derived from the section hold it to a change of the section.
+# The file has a title and a case a name of its own, so neither meets
+# the section's or a derived case's once the section is on main.
 component = "srs-review-requirements"
 kind = "clean"
 title = "the section's file with a title and a true sentence"
@@ -13,11 +15,11 @@ title = "the section's file with a title and a true sentence"
 file = "docs/srs/10b-review-requirements.md"
 content = '''
 ---
-title: "10.5 The review"
+title: "Review notes"
 summary: >-
-  A part of §10 that holds no requirement yet.
+  Notes on the review, which hold no requirement yet.
 ---
-# 10.5 The review
+# Review notes
 
 This file is part of ParleyInn.
 '''
