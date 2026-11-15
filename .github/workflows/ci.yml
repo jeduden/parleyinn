@@ -531,11 +531,6 @@ jobs:
   drift:
     name: drift (shard ${{ matrix.shard }})
     runs-on: ubuntu-latest
-    # The build target is cached below, so a warm shard skips the
-    # dependency build. A cold one (a changed Cargo.lock or toolchain)
-    # still builds for about two minutes, and one slow runner stretched
-    # a shard past five; ten leaves room for both without hiding a hung
-    # check.
     timeout-minutes: 10
     strategy:
       fail-fast: false
@@ -544,10 +539,8 @@ jobs:
     env:
       # Every nth case from the shard's own, n the matrix's size, so the
       # shards together hold every case once and each fits the budget.
-      # Each shard first builds every check its cases name, about two
-      # minutes cold whatever its size, so a shard's cases add the rest.
-      # The build target is restored from the cache below, so the
-      # dependencies compile once per lockfile, not once per shard.
+      # Each shard first builds every check its cases name (cached
+      # below, two minutes cold), so a shard's cases add the rest.
       DRIFT_SHARD: ${{ strategy.job-index }}/${{ strategy.job-total }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -582,28 +575,8 @@ jobs:
       # ENG-30: the license check reads only the sources cargo has
       # already fetched, for every release target.
       - run: cargo fetch --locked
-      # The runner context is not available to a job's env, so the
-      # directory is named here for the steps after it.
-      - name: Name the drift build target
-        run: echo "DRIFT_TARGET_DIR=$RUNNER_TEMP/drift-target" >> "$GITHUB_ENV"
-      # Every shard restores the build target; shard 0 alone saves it,
-      # so 24 jobs do not race to reserve one key. A miss only costs the
-      # cold build, never a failure (I9).
-      - name: Restore the drift build target
-        id: drift-target
-        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: ${{ env.DRIFT_TARGET_DIR }}
-          key: drift-target-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml') }}
-          restore-keys: |
-            drift-target-${{ runner.os }}-${{ runner.arch }}-
+      - uses: ./.github/actions/drift-target
       - run: scripts/ci-gate.sh drift
-      - name: Save the drift build target
-        if: success() && matrix.shard == 0 && steps.drift-target.outputs.cache-hit != 'true'
-        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: ${{ env.DRIFT_TARGET_DIR }}
-          key: drift-target-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml') }}
 
   # ENG-15: the benchmark gate. The base is the head's first parent:
   # the main a pull request's merge commit sits on, or main before a

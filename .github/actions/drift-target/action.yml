@@ -1,0 +1,19 @@
+name: Cache the drift build target
+description: Name the directory the drift suite builds into (DRIFT_TARGET_DIR) and keep it between runs, so a shard does not compile every dependency
+runs:
+  using: composite
+  steps:
+    # The runner context is not available to a job's env, so a step
+    # names the directory for the steps after it.
+    - name: Name the drift build target
+      shell: bash
+      run: echo "DRIFT_TARGET_DIR=$RUNNER_TEMP/drift-target" >> "$GITHUB_ENV"
+    # Restored by every shard, saved when the job ends by one that
+    # missed; a miss only costs the cold build, never a failure (I9).
+    - name: Cache the drift build target
+      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ${{ runner.temp }}/drift-target
+        key: drift-target-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml') }}
+        restore-keys: |
+          drift-target-${{ runner.os }}-${{ runner.arch }}-
