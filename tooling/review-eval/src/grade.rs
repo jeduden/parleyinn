@@ -360,22 +360,19 @@ fn outcome_failure(outcome: &str, expect: &Expect) -> Option<String> {
 }
 
 /// The failures of `findings`, one per line, a `kind`'s, against the
-/// findings `expect` wants and forbids and the text it forbids.
+/// findings `expect` wants and forbids and the text it forbids. An
+/// outcome line among them is no finding, whatever file its sentence
+/// names.
 fn expectations(expect: &Expect, findings: &str, kind: Kind, files: &[&str]) -> Vec<String> {
     let mut failures = Vec::new();
+    let lines = || findings.lines().filter(|l| answer_outcome(l).is_none());
     for wanted in &expect.finding {
-        if !findings
-            .lines()
-            .any(|l| line_matches(l, wanted, kind, files))
-        {
+        if !lines().any(|l| line_matches(l, wanted, kind, files)) {
             failures.push(format!("no finding {}", describe(wanted)));
         }
     }
     for forbidden in &expect.none {
-        if let Some(line) = findings
-            .lines()
-            .find(|l| line_matches(l, forbidden, kind, files))
-        {
+        if let Some(line) = lines().find(|l| line_matches(l, forbidden, kind, files)) {
             failures.push(format!(
                 "a finding {}: {}",
                 describe(forbidden),
