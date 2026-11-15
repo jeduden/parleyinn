@@ -46,9 +46,11 @@ Findings for the stakeholder:
   doc directories; claims elsewhere, such as key custody, cite no
   test; a cited test is only shown to exist and not be ignored.
 - Erasure residue, as phase 15 left it: a purge kept the source's
-  unkeyed prefix hash and the purged lines' offsets. Phase 16 closed
-  it by ruling: a purge zeroes each purged line's bytes in that hash
-  (the unit tests of `crates/store/src/source/purged.rs`).
+  unkeyed prefix hash and the purged lines' offsets. Phase 16 narrowed
+  it: a purge zeroes each purged line's bytes in the hash of the source
+  the event was read from (the unit tests of
+  `crates/store/src/source/purged.rs`). OQ-57 keeps open, for M3, what
+  the refusal and the zeroing miss.
 - Does ADM-09 list a `store` check? The served marker is forgeable by
   a same-user process. CI's `--all-features` is a `.github` change.
 
