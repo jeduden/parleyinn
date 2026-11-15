@@ -62,10 +62,14 @@ Feature: Security (SEC)
     Then the hook handler exits 0 with no injection
     And <expected>
 
+    @runs
     Examples:
       | input                                               | expected                                                                     |
       | stdin of 1 MiB plus one byte                        | an audit entry records "hook input exceeds 1 MiB"                            |
       | a JSON object nested 65 levels deep                 | an audit entry records "hook input nesting exceeds depth 64"                 |
+
+    Examples:
+      | input                                               | expected                                                                     |
       | a transcript line larger than the payload threshold | the line is streamed to the payload store without being kept whole in memory |
 
   @SEC-06 @P0 @I2
@@ -164,6 +168,7 @@ Feature: Security (SEC)
     And a quarantine that would remove a pin, a pin version or a landmark from a restore block takes effect only as a confirmed widening principal act
     And releasing the quarantine, a widening principal act, is recorded as an "operator" event the same way
 
+    @runs
     Examples:
       | selector                     |
       | --range A1:100-200           |
@@ -172,8 +177,11 @@ Feature: Security (SEC)
       | --room room-1                |
       | --writer w-1                 |
       | --provenance web             |
-      | --flag instruction_like      |
       | --since 2026-01-01T00:00:00Z |
+
+    Examples:
+      | selector                     |
+      | --flag instruction_like      |
 
   @SEC-13 @P1 @I2 @pending
   Scenario: a run is tainted once untrusted content is recalled into it
