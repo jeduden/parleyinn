@@ -33,7 +33,7 @@ instructions or the case left to the reviewer.
 - 5 runs: the reviewer's own slips, which the cases are there to catch.
 
 What the measurement on the branch showed. Four runs of each of 241
-cases: 15 of 964 runs failed, 14 cases once and one twice. Every failed
+cases: 15 of 964 runs failed, 13 cases once and one twice. Every failed
 run was read, and so was every failed run of one more round on the
 final tree, 5 of 241. The [handoff](phase-3.result.md) lists their
 causes. One sat in no instruction and no case: a reviewer's tool

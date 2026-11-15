@@ -424,10 +424,10 @@ Feature: Engineering quality (ENG)
   Scenario: a breach of the domain model's terms or of its rules for names is reported as a finding linked to ENG-35
     Given the repository checkout
     When a change adds, to a section of the specification, a sentence that uses a term the domain model excludes outside where the model's hub allows it
-    And it adds a sentence that names a concept of a concept file of the domain model in a word the model does not define
+    And it adds, to a concept file of the domain model, a sentence that uses a term the model excludes for that file's concepts
+    And it adds, to that concept file, a sentence that names one of its concepts in a word the model does not define
     And it adds a function, type, module, crate, CLI verb, MCP tool, settings key or event whose name breaks the hub's rules for names
     Then that section's specialist reports the first sentence as a finding linked to ENG-35
-    And the specialist of a concept file of the domain model reports a use of a term the model excludes for its concepts as a finding linked to ENG-35
-    And the hub's specialist reports a use of any term the model excludes, outside where the hub allows it, as a finding linked to ENG-35
-    And that concept file's specialist reports the second sentence as a finding linked to ENG-35
+    And the hub's specialist reports the first sentence as a finding linked to ENG-35
+    And that concept file's specialist reports the second sentence and the third, each as a finding linked to ENG-35
     And the hub's specialist reports the name as a finding linked to ENG-35

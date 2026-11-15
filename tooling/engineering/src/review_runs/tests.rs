@@ -521,20 +521,53 @@ fn a_bundle_context_for_a_guarded_change_on_the_checkout_names_its_record() {
 }
 
 #[test]
-fn a_record_check_whose_bundle_did_not_run_or_wrote_no_context_is_named() {
+fn a_record_check_whose_bundle_did_not_run_is_named() {
     let work = TempDir::new().unwrap();
 
     let problems = record_problems(
         &Checkout::new(&work.path().join("none")),
         &work.path().join("out"),
     );
+
     assert!(
         problems[0].starts_with("review-bundle exited "),
         "{problems:?}"
     );
+}
+
+/// The context file the record check reads under `out`.
+fn record_context(out: &Path) -> std::path::PathBuf {
+    out.join(format!("{CONTEXTS}/{}.md", CONTEXT.0))
+}
+
+#[test]
+fn a_context_the_bundle_did_not_write_is_named_by_its_path() {
+    let work = TempDir::new().unwrap();
 
     let problems = record_in(work.path());
-    assert!(problems[0].starts_with("read "), "{problems:?}");
+
+    let file = record_context(work.path());
+    assert_eq!(problems.len(), 1, "{problems:?}");
+    assert!(
+        problems[0].starts_with(&format!("read {}: ", file.display())),
+        "{problems:?}"
+    );
+}
+
+#[test]
+fn a_written_context_that_leaves_the_record_out_is_named() {
+    let work = TempDir::new().unwrap();
+    let file = record_context(work.path());
+    fs::create_dir_all(file.parent().unwrap()).unwrap();
+    fs::write(&file, "## Dispatch\n").unwrap();
+
+    assert_eq!(
+        record_in(work.path()),
+        [format!(
+            "the context for {} lacks the ENG-29 record {RECORD}",
+            CONTEXT.0
+        )]
+    );
 }
 
 #[test]
