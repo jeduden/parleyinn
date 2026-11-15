@@ -59,8 +59,8 @@ records the design.
   component, or the case fails before any model runs. The run's work
   directory is the world's own directory, whose path names no tree: an
   agent whose work directory ended in `main` took `pr-head/` and
-  `review/` for its siblings and read them one directory up, which the
-  run refuses.
+  `review/` for its siblings and looked for them one directory up,
+  outside what a run may read.
 - **The review context** is the file `review/context/<name>.md` that
   `review-bundle` writes for a specialist: the review class, the touched ids,
   its dispatch row, the deterministic findings on its files and the ENG-29
