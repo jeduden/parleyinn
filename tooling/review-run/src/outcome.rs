@@ -567,6 +567,8 @@ pub fn missed<'a>(reports: impl IntoIterator<Item = &'a str>, answer: &str) -> V
         .lines()
         .filter(|l| report::finding(l).is_some() || report::dropped(l))
         .collect();
+    let reports: Vec<&str> = reports.into_iter().collect();
+    let known = reported_paths(&reports);
     let mut missed = BTreeSet::new();
     for report in reports {
         for line in report.lines().map(review_gate::report::line) {
@@ -576,9 +578,9 @@ pub fn missed<'a>(reports: impl IntoIterator<Item = &'a str>, answer: &str) -> V
                 _ => continue,
             };
             let at = (path.clone(), number);
-            let weighed = weighing
-                .iter()
-                .any(|l| report::place_of(l) == Some(at.clone()) || names(l, path, number));
+            let weighed = weighing.iter().any(|l| {
+                report::place_of(l) == Some(at.clone()) || named_by(l, path, number, &known)
+            });
             if !weighed {
                 missed.insert(format!("{path}:{number}"));
             }
@@ -586,6 +588,112 @@ pub fn missed<'a>(reports: impl IntoIterator<Item = &'a str>, answer: &str) -> V
     }
 
     missed.into_iter().collect()
+}
+
+/// The paths the findings and requests in `reports` name, each once.
+fn reported_paths(reports: &[&str]) -> BTreeSet<String> {
+    reports
+        .iter()
+        .flat_map(|r| r.lines().map(review_gate::report::line))
+        .filter_map(|line| match line {
+            Line::Linked(k) => Some(k.path),
+            Line::Request(r) => Some(r.path),
+            _ => None,
+        })
+        .collect()
+}
+
+/// Whether `a` is `b`, or `b` with directories before it.
+fn tail_of(a: &str, b: &str) -> bool {
+    a == b || a.strip_suffix(b).is_some_and(|d| d.ends_with('/'))
+}
+
+/// Whether `line` names the place `path:number`, spelled as `path`, a
+/// tail of it at a `/` that no other path of `known` ends in, or, for a
+/// `path` that is a bare file name, a path that ends in it when no other
+/// path of `known` is a tail of it or has it as one: an agent that
+/// shortens or lengthens a path still weighs the finding, while an
+/// ambiguous basename names none; a bare name reported beside exactly
+/// one longer spelling of it is that file. A reported path with directories is
+/// not lengthened, since the longer path may be another file.
+fn named_by(line: &str, path: &str, number: usize, known: &BTreeSet<String>) -> bool {
+    if names(line, path, number) {
+        return true;
+    }
+    let others = || known.iter().filter(|q| q.as_str() != path);
+    let shorter = path
+        .match_indices('/')
+        .map(|(i, _)| &path[i + 1..])
+        .filter(|t| !t.is_empty() && !others().any(|q| q != *t && tail_of(q, t)))
+        .any(|t| names(line, t, number));
+    if shorter {
+        return true;
+    }
+    if !path.contains('/') {
+        let mut longer = others().filter(|q| tail_of(q, path));
+        // One longer spelling reported beside the bare name is the same
+        // file, so a line naming it weighs the bare place too.
+        if let (Some(only), None) = (longer.next(), longer.next())
+            && names(line, only, number)
+        {
+            return true;
+        }
+    }
+    let alone = !path.contains('/') && !others().any(|q| tail_of(q, path) || tail_of(path, q));
+    let head = format!("/{path}:");
+
+    alone
+        && line.match_indices(&head).any(|(at, _)| {
+            let start = line[..at]
+                .rfind(|c: char| !(c.is_alphanumeric() || matches!(c, '/' | '.' | '_' | '-')))
+                .map_or(0, |i| {
+                    i + line[i..].chars().next().map_or(1, char::len_utf8)
+                });
+            names(line, &line[start..at + 1 + path.len()], number)
+        })
+}
+
+/// The places of the findings and requests in `reports`, each once, in
+/// the form a weighing line names them, `path:line`, sorted: what a
+/// generalist is told it must answer before it starts, the same places
+/// [`missed`] holds its weighing to.
+#[must_use]
+pub fn places<'a>(reports: impl IntoIterator<Item = &'a str>) -> Vec<String> {
+    let mut out = BTreeSet::new();
+    for report in reports {
+        for line in report.lines().map(review_gate::report::line) {
+            match &line {
+                Line::Linked(k) => out.insert(format!("{}:{}", k.path, k.line)),
+                Line::Request(r) => out.insert(format!("{}:{}", r.path, r.line)),
+                _ => continue,
+            };
+        }
+    }
+
+    out.into_iter().collect()
+}
+
+/// The note a generalist's prompt ends with for the `places` its
+/// specialists reported, none when they reported none: each must be
+/// answered by a line at it, or at a range holding it of at most
+/// [`MAX_RANGE`] lines, however alike its findings.
+#[must_use]
+pub fn answerable(places: &[String]) -> Option<String> {
+    if places.is_empty() {
+        return None;
+    }
+    let list = places
+        .iter()
+        .map(|p| format!("`{p}`"))
+        .collect::<Vec<_>>()
+        .join(", ");
+
+    Some(format!(
+        "Your specialists reported at these places: {list}. The review counts a place weighed \
+         only when a finding or dropped line of yours is at it, or at a range holding it of \
+         at most {MAX_RANGE} lines, such as `path:29-30`, so answer every one, a duplicate \
+         or adjacent finding too."
+    ))
 }
 
 /// The most lines a range a weighing line names, `start-end`, may span

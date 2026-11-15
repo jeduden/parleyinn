@@ -75,8 +75,9 @@ fn resumed_past_a_purge(w: &mut World, name: String, more: u64) -> Result<(), St
         .filter(|l| !l.is_empty())
         .count() as u64;
     let recorded: Vec<u64> = placed(w, &name)?.iter().map(|p| p.place.line).collect();
-    let new: Vec<u64> = (total - more + 1..=total).collect();
-    if offset == bytes.len() as u64 && new.iter().all(|n| recorded.contains(n)) {
+    let new: Vec<u64> = (total.saturating_sub(more) + 1..=total).collect();
+    let all_new = total >= more && new.iter().all(|n| recorded.contains(n));
+    if offset == bytes.len() as u64 && all_new {
         return Ok(());
     }
     Err(format!(

@@ -128,7 +128,8 @@ fn since_and_until_are_a_date_or_a_utc_time() {
 #[test]
 fn the_request_and_the_search_carry_the_call_through() {
     let params = parsed(json!({
-        "query": "deploy", "phrase": "p q", "provenance": ["web"], "since": "2026-01-01", "k": 3,
+        "query": "deploy", "phrase": "p q", "provenance": ["web"], "kind": ["tool_result"],
+        "since": "2026-01-01", "k": 3,
     }))
     .unwrap();
     let compiled = search::compile(&params.request()).unwrap();
@@ -145,5 +146,6 @@ fn the_request_and_the_search_carry_the_call_through() {
         (&[room][..], &[writer][..], 3, DEADLINE)
     );
     assert_eq!(search.provenance, ["web"]);
+    assert_eq!(search.provenance_families, ["tool_result"]);
     assert_eq!(search.since, Some("2026-01-01"));
 }

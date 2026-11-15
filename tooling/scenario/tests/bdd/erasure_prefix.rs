@@ -7,7 +7,6 @@
 
 use std::fs;
 
-use cucumber::then;
 use store::Source;
 use store::source::{prefix_digest, unconfirmable};
 
@@ -126,18 +125,4 @@ fn succeeded(w: &mut World, what: &str) -> Result<(), String> {
         out.status,
         String::from_utf8_lossy(&out.stderr).trim()
     ))
-}
-
-#[then(
-    regex = r#"^the transcript source's consumed-prefix hash is recomputed over the prefix with the bytes of each purged transcript line zeroed, so it confirms no guess at the purged bytes, only each purged line's position, length and the harness's own `uuid` remain, only ParleyInn's own record of the source changes, never the harness's transcript file, and "parinn ingest" resumes the source and "parinn verify" exits 0$"#
-)]
-fn security_residue_closed(w: &mut World) -> Result<(), String> {
-    closed(w)
-}
-
-#[then(
-    regex = r#"^the consumed-prefix hash of each transcript source with a purged line is recomputed with the bytes of each purged transcript line zeroed, so it confirms no guess at the purged bytes, only each purged line's position, length and the harness's own `uuid` remain, only ParleyInn's own record of the source changes, never the harness's transcript file, and "parinn ingest" resumes that source$"#
-)]
-fn administration_residue_closed(w: &mut World) -> Result<(), String> {
-    closed(w)
 }

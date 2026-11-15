@@ -136,10 +136,10 @@ from
   recorded it, as a structural **repeat owner** event in the device seat
   records. A fork's line read before its owner's is **held** at an ingest
   marker until its owner's transcript is ingested or gone, or 30 s pass. A
-  repeated line with a purged event's `uuid` is refused: audited, counted,
+  repeated line with a purged line's `uuid` is refused: audited, counted,
   never recorded again (SEC-31). An
   **ingest position** is the byte length ingest read and its consumed-prefix
-  hash, purged transcript-line spans zeroed (REC-03, SEC-31).
+  hash, purged lines' bytes zeroed (REC-03, SEC-31).
 - **Worktree checkpoint**: An event recording a worktree's commit, branch and
   redacted diff since the previous worktree checkpoint (REC-20).
 - **Derived artifact**: Anything computed from the record and the node's key

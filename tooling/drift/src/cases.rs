@@ -43,6 +43,9 @@ const FUZZING: &str = "docs/adr/ADR-2610171200-fuzzing-libfuzzer-sys.md";
 /// The decision [`TEST_STACK`] superseded.
 const OLD_TEST_STACK: &str = "docs/adr/ADR-2610101913-test-stack-after-go.md";
 
+/// The list of step definitions no running row uses, which only shrinks.
+const UNRUN_STEPS: &str = "tooling/scenario/tests/unrun-steps.txt";
+
 /// The release workflow the ENG-20 cases drift.
 const RELEASE_WORKFLOW: &str = ".github/workflows/release.yml";
 
@@ -94,6 +97,7 @@ pub fn cases() -> Vec<Case> {
         review_agent_cases(),
         review_evaluation_cases(),
         gate_cases(),
+        step_gate_cases(),
         parse_cases(),
         persona_cases(),
         agent_cases(),
