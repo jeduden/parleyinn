@@ -153,6 +153,7 @@ pub fn cases() -> Vec<Case> {
         ci_gates::cases(),
         file_size_cases(),
         previous::review_previous_cases(),
+        soak_cases(),
         vec![review_cap_retry_case(), review_generalist_turns_case()],
         review_weighing_cases(),
         spend::review_spend_cases(),

@@ -43,6 +43,7 @@ pub mod review_runs;
 pub mod review_spend;
 pub mod review_weighings;
 pub mod review_workflow;
+pub mod soak;
 pub mod stability_measurement;
 pub mod static_analysis;
 pub mod telemetry;

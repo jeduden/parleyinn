@@ -907,3 +907,75 @@ fn a_line_ending_all_is_well_after_a_defect_is_no_note_and_the_check_refuses_it(
         None
     );
 }
+
+#[test]
+fn a_request_whose_motivation_follows_other_punctuation_than_a_dash_reads() {
+    for (text, requirement, motivation) in [
+        (
+            "ci.yml:77 — request: change the eval job to download the artifact; no job repeats a build",
+            "the eval job to download the artifact",
+            "no job repeats a build",
+        ),
+        (
+            "ci.yml:77 — request: add a cap on size, since no requirement holds it",
+            "a cap on size",
+            "no requirement holds it",
+        ),
+        (
+            "ci.yml:77 — request: add a cap on size because none holds it",
+            "a cap on size",
+            "none holds it",
+        ),
+        (
+            "ci.yml:77 — request: change the step: it repeats docs/ci.md:23",
+            "the step",
+            "it repeats docs/ci.md:23",
+        ),
+        (
+            "ci.yml:77 — request: remove the rebuild. The artifact holds it.",
+            "the rebuild",
+            "The artifact holds it.",
+        ),
+    ] {
+        let Line::Request(r) = line(text) else {
+            panic!("not a request: {text:?}");
+        };
+        assert_eq!(
+            (r.requirement.as_str(), r.motivation.as_str()),
+            (requirement, motivation)
+        );
+    }
+}
+
+#[test]
+fn a_request_with_a_dash_keeps_its_requirement_whole() {
+    let Line::Request(r) = line("a.rs:1 — request: add a cap; a small one — reports grow")
+    else {
+        panic!("not a request");
+    };
+
+    assert_eq!(r.requirement, "a cap; a small one");
+    assert_eq!(r.motivation, "reports grow");
+}
+
+#[test]
+fn a_request_is_cut_at_its_first_reason_and_whole_without_one() {
+    assert_eq!(
+        reasoned("a cap; it grows: fast"),
+        ("a cap", "it grows: fast")
+    );
+    assert_eq!(
+        reasoned("a cap on docs/ci.md:23"),
+        ("a cap on docs/ci.md:23", "")
+    );
+    for (asked, motivation) in [
+        ("a cap since none holds it", "none holds it"),
+        ("a cap, since none holds it", "none holds it"),
+        ("a cap because it grows", "it grows"),
+        ("a cap, because it grows", "it grows"),
+        ("a cap: it grows", "it grows"),
+        ("a cap. It grows", "It grows"),
+    ] {
+        assert_eq!(reasoned(asked), ("a cap", motivation), "{asked:?}");
+    }
+}
