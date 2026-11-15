@@ -66,10 +66,6 @@ pub(crate) fn ingest(
     entropy: &mut dyn Entropy,
 ) -> Result<Ingested, IngestError> {
     let lines = read::lines(text);
-    let parsed: Vec<Value> = lines
-        .iter()
-        .map(|l| serde_json::from_str(l.text).unwrap_or(Value::Null))
-        .collect();
     let redactor = with_account_identifiers(redactor, &lines)?;
     home.create().map_err(IngestError::Admin)?;
     let mut store = open_store(home, inputs)?;
@@ -79,7 +75,12 @@ pub(crate) fn ingest(
     inputs.forks.extend(observed.forks());
     let inputs = &inputs;
     let named = Named::of(path, &redactor);
-    let resume = Resume::find(&mut store, &named, text.as_bytes(), &lines, &redactor)?;
+    let live = matches!(recorder, Recorder::Live(_));
+    let resume = Resume::find(&mut store, &named, text.as_bytes(), &lines, &redactor, live)?;
+    let parsed: Vec<Value> = lines
+        .iter()
+        .map(|l| serde_json::from_str(l.text).unwrap_or(Value::Null))
+        .collect();
     let defaults = Defaults::of(path);
     let mut runs = Runs::load(&store, &named.path, recorder)?;
     let own = runs.ensure(&mut store, &node, home, &defaults.own(), entropy)?;
@@ -224,13 +225,16 @@ impl Resume {
     /// Where to resume the source `named`, whose bytes are `bytes`: past
     /// its position while its consumed prefix stands; else in a new
     /// generation, past the longest prefix equal by content to the
-    /// earlier generation's ingested lines (REC-07).
+    /// earlier generation's ingested lines (REC-07). A `live` ingest
+    /// starts no generation of a source a purge erased a line of that
+    /// kept no `uuid`: it waits for `parinn ingest`.
     fn find(
         store: &mut Store,
         named: &Named,
         bytes: &[u8],
         lines: &[Line<'_>],
         redactor: &Redactor,
+        live: bool,
     ) -> Result<Self, IngestError> {
         let Some(source) = store.source(&named.path)? else {
             let source = store.start_generation(&named.path, &named.directory)?;
@@ -256,6 +260,11 @@ impl Resume {
             return Err(IngestError::Store(store::StoreError::PositionMoved {
                 source: source.id,
             }));
+        }
+        if live && holds_unrefusable(store, &named.path)? {
+            return Err(IngestError::Waits {
+                name: named.name.clone(),
+            });
         }
         let earlier = earlier_texts(store, &named.path)?;
         let same = lines
@@ -317,6 +326,20 @@ fn continues(source: &Source, bytes: &[u8]) -> bool {
 fn behind(source: &Source, bytes: &[u8], path: &Path) -> bool {
     bytes.len() < as_index(source.position.offset)
         && read::transcript(path).is_ok_and(|now| continues(source, &now))
+}
+
+/// Whether a purge erased a line of the source at `path`, in any of its
+/// generations, that kept no `uuid`: one a new generation cannot refuse
+/// (REC-07, OQ-57).
+fn holds_unrefusable(store: &Store, path: &str) -> Result<bool, IngestError> {
+    for generation in store.generations(path)? {
+        let purged = store.purged_places(generation.id)?;
+        if purged.iter().any(|place| place.uuid.is_none()) {
+            return Ok(true);
+        }
+    }
+
+    Ok(false)
 }
 
 /// The redacted lines the newest generation of the source at `path`

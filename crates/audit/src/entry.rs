@@ -132,6 +132,10 @@ pub enum Counter {
     /// purged line kept without one: it may repeat that line, and was
     /// not checked against it (REC-07).
     RepeatOfPurgedUnchecked,
+    /// A live ingest left a rewritten transcript source waiting for
+    /// `parinn ingest`: a purge erased a line of it that kept no `uuid`,
+    /// which a new transcript generation cannot refuse (REC-07).
+    TranscriptGenerationWaits,
     /// A transcript source disappeared before it was fully ingested
     /// (REC-08).
     TranscriptSourceLost,
@@ -276,6 +280,7 @@ impl Counter {
             Self::RepeatReleased => "repeat_released",
             Self::RepeatOfPurgedRefused => "repeat_of_purged_refused",
             Self::RepeatOfPurgedUnchecked => "repeat_of_purged_unchecked",
+            Self::TranscriptGenerationWaits => "transcript_generation_waits",
             Self::TranscriptSourceLost => "transcript_source_lost",
             Self::HookInputRejected => "hook_input_rejected",
             Self::HookBudgetExceeded => "hook_budget_exceeded",

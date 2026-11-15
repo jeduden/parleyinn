@@ -89,6 +89,10 @@ fn each_counter_of_ingest_and_repeats_has_its_name() {
             Counter::RepeatOfPurgedUnchecked,
             "repeat_of_purged_unchecked",
         ),
+        (
+            Counter::TranscriptGenerationWaits,
+            "transcript_generation_waits",
+        ),
         (Counter::TranscriptSourceLost, "transcript_source_lost"),
     ];
     for (counter, name) in counters {

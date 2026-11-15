@@ -177,6 +177,11 @@ pub enum IngestError {
         lines: usize,
         source: StoreError,
     },
+    /// A live ingest left the rewritten transcript source shown as
+    /// `name` waiting for `parinn ingest`: a purge erased a line of it
+    /// that kept no `uuid`, which a new transcript generation cannot
+    /// refuse (REC-07).
+    Waits { name: String },
 }
 
 impl fmt::Display for IngestError {
@@ -203,6 +208,10 @@ impl fmt::Display for IngestError {
                 f,
                 "writer {writer} recorded {landed} of {lines} lines before the store failed: {source}"
             ),
+            Self::Waits { name } => write!(
+                f,
+                "the rewritten transcript {name} waits for `parinn ingest`: a purged line of it keeps no `uuid`"
+            ),
         }
     }
 }
@@ -215,7 +224,7 @@ impl std::error::Error for IngestError {
             Self::Key(e) => Some(e),
             Self::Admin(e) => Some(e),
             Self::Store(e) | Self::Partial { source: e, .. } => Some(e),
-            Self::NotUtf8(_) | Self::Empty(_) => None,
+            Self::NotUtf8(_) | Self::Empty(_) | Self::Waits { .. } => None,
         }
     }
 }
