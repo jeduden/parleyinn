@@ -241,9 +241,9 @@ Feature: Engineering quality (ENG)
     And commits must be signed
     And every pull request needs an approval from a reviewer other than its author
     And every pull request needs the "review-gate" check, taken from the reviewer app alone
-    And CODEOWNERS names the stakeholder on the specification, the decision records, the scenarios and the process that builds and checks the code
+    And CODEOWNERS names the stakeholder on what guides the review: the agent instructions, the review's code, cases and scorecard, CI and the merge rules, the manifests and tool pins CI builds and checks with, the bans and acceptances CI holds the code to, and the linter configuration
     And CODEOWNERS names no code owner on any other path
-    And CODEOWNERS names no code owner on Rust source, so a code change needs only a reviewer other than its author
+    And CODEOWNERS names no code owner on Rust source outside the review's crates, so any other code change needs only a reviewer other than its author
 
   @ENG-22 @P0 @pending
   Scenario: every privacy or data-flow statement cites its proving test
@@ -417,3 +417,4 @@ Feature: Engineering quality (ENG)
     When the size check reads a tree with a listed file grown, a listed file shrunk but still past its limit, a file past its limit that is not listed, a listed file that fits and a listed file that is gone
     Then it names the grown file, the shrunk file, the unlisted file, the file that fits and the file that is gone
     And it names no file held at its listed size or within its limit
+    And the review bundle blocks a change that adds a file to the size list or raises a file's listed lines until a stakeholder comment names the size list, and blocks no change that only lowers them

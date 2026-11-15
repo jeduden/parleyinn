@@ -167,7 +167,9 @@ when a gate failed.
   grew must be split; a file that shrank yet stays past its limit must
   have its listed lines lowered, so a regrowth cannot hide behind an old
   number. The size list only shrinks: a listed file that fits, or is
-  gone, must leave it. To fix a failure, split the file, or move a
+  gone, must leave it, and the review bundle blocks a change that adds
+  a file to it or raises a file's listed lines until a stakeholder
+  comment names the size list. To fix a failure, split the file, or move a
   workflow `run:` body into a script under `scripts/`, then lower or
   drop the file's line in the size list.
 

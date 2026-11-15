@@ -131,6 +131,21 @@ diff --git broken
 }
 
 #[test]
+fn removed_lines_names_each_removed_line_with_its_file() {
+    let diff = "\
+diff --git a/x.rs b/y.rs
+--- a/x.rs
++++ b/y.rs
++one
+-gone
+ same
+";
+
+    assert_eq!(removed_lines(diff), [("y.rs".to_owned(), "gone")]);
+    assert!(removed_lines("-orphan\n").is_empty());
+}
+
+#[test]
 fn changed_paths_reads_a_path_holding_b_slash_only_when_unambiguous() {
     let same = "diff --git a/crates/x b/clippy.toml b/crates/x b/clippy.toml\n";
     let renamed = "diff --git a/x b/y.md b/docs/srs/invariants.md\n";

@@ -363,15 +363,15 @@ pub(super) fn review_gate_cases() -> Vec<Case> {
             ),
             "---- the_requirements_eng_29_marks_follow_its_row stdout ----",
         ),
-        // The SRS no longer a stakeholder path, a change to it routes
-        // light; the failure prints the class the bundle chose.
+        // The shared sections no longer a stakeholder path, a change to
+        // one routes light; the failure prints the class the bundle chose.
         case(
-            "CODEOWNERS no longer holding the SRS",
+            "CODEOWNERS no longer holding the agents' shared sections",
             "ENG-28",
             Injection::replace(
                 ".github/CODEOWNERS",
-                "/docs/srs/                    @jeduden",
-                "/docs/srsx/                   @jeduden",
+                "/docs/agents/                 @jeduden",
+                "/docs/agentsx/                @jeduden",
             ),
             cargo_test(
                 "review-bundle",
@@ -387,12 +387,12 @@ pub(super) fn review_gate_cases() -> Vec<Case> {
 /// the test asserts with its own message, which names the finding.
 pub(super) fn consent_case() -> Case {
     case(
-        "CODEOWNERS no longer asking consent for the SRS",
+        "CODEOWNERS no longer asking consent for the agents' shared sections",
         "ENG-21",
         Injection::replace(
             ".github/CODEOWNERS",
-            "/docs/srs/                    @jeduden",
-            "/docs/srsx/                   @jeduden",
+            "/docs/agents/                 @jeduden",
+            "/docs/agentsx/                @jeduden",
         ),
         cargo_test(
             "review-bundle",
