@@ -106,7 +106,8 @@ review.
 - The acceptance files stay the stakeholder's, as ADR-2610142300 and
   ADR-2610262245 rest on. The size list does not: ENG-34 no longer
   calls it the stakeholder's, since most pull requests change it, and
-  an agent's approval can now lengthen it. `SECURITY.md` and
+  an agent's approval can now lengthen it. The review's agents are
+  then the only guard on "the size list only shrinks". `SECURITY.md` and
   `DEPENDENCIES.md` also change on the agents' approval alone.
 - A pull request that adds a crate or a dependency changes a manifest,
   so it still waits for the stakeholder.
