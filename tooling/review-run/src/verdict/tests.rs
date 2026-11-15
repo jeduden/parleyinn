@@ -189,3 +189,16 @@ fn what_was_kept_is_weighed_without_a_directory() {
         Verdict::Fresh(format!("the earlier review was of {HEAD}, not {OTHER}"))
     );
 }
+
+#[test]
+fn a_directory_that_keeps_no_run_id_is_not_reused() {
+    let dir = TempDir::new().unwrap();
+
+    match weigh(dir.path(), HEAD, DISPATCH_TEXT) {
+        Verdict::Fresh(why) => assert!(
+            why.starts_with("the earlier review kept no run-id.json: "),
+            "{why}"
+        ),
+        Verdict::Reused => panic!("an empty directory was reused"),
+    }
+}
