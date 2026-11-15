@@ -588,3 +588,98 @@ fn spend_sums_what_earlier_reviews_spent_and_names_a_file_that_does_not_read() {
     assert_eq!(code, EXIT_USAGE);
     assert!(err.contains("spend needs a FILE or more"), "{err}");
 }
+
+const HEAD: &str = "0123456789abcdef0123456789abcdef01234567";
+
+/// An earlier review's directory that kept a verdict of [`HEAD`], and a
+/// dispatch file beside it.
+fn kept_review() -> (TempDir, String, String) {
+    let dir = TempDir::new().unwrap();
+    let dispatch = r#"{"review-code": ["lang-rust"]}"#;
+    for (name, text) in [
+        (
+            "run-id.json",
+            format!(r#"{{"head":"{HEAD}","inputs":"i","split":1,"agents":{{}}}}"#),
+        ),
+        ("gaps.json", "[]".to_owned()),
+        ("dispatch.json", dispatch.to_owned()),
+        (
+            "outcome.json",
+            r#"{"verdict":"approve","summary":"fine","findings":[]}"#.to_owned(),
+        ),
+        (
+            "consulted.json",
+            r#"["lang-rust","review-code"]"#.to_owned(),
+        ),
+    ] {
+        fs::write(dir.path().join(name), text).unwrap();
+    }
+    let now = dir.path().join("now.json").display().to_string();
+    fs::write(&now, dispatch).unwrap();
+    let at = dir.path().display().to_string();
+    (dir, at, now)
+}
+
+#[test]
+fn verdict_says_whether_the_earlier_review_stands_for_this_head() {
+    let (_dir, at, now) = kept_review();
+    let other = "89abcdef0123456789abcdef0123456789abcdef";
+
+    assert_eq!(
+        run_with(&["verdict", "--dir", &at, "--head", HEAD, "--dispatch", &now]),
+        (EXIT_OK, "reused=true\n".to_owned(), String::new())
+    );
+    let (code, out, _) = run_with(&["verdict", "--head", other, "--dispatch", &now, "--dir", &at]);
+    assert_eq!(code, EXIT_OK);
+    assert_eq!(
+        out,
+        format!("reused=false\nwhy=the earlier review was of {HEAD}, not {other}\n")
+    );
+}
+
+#[test]
+fn verdict_refuses_a_wrong_command_line_and_names_a_dispatch_it_cannot_read() {
+    let (_dir, at, now) = kept_review();
+
+    for (bad, why) in [
+        (
+            vec!["verdict", "--dir", &at, "--head", HEAD],
+            "verdict needs --dir, --head and --dispatch",
+        ),
+        (
+            vec!["verdict", "--dir", &at, "--head"],
+            "--head needs a value",
+        ),
+        (
+            vec!["verdict", "--nope", "x"],
+            "unknown argument \"--nope\"",
+        ),
+        (
+            vec![
+                "verdict",
+                "--dir",
+                &at,
+                "--head",
+                "main",
+                "--dispatch",
+                &now,
+            ],
+            "--head \"main\" is no commit id",
+        ),
+    ] {
+        let (code, out, err) = run_with(&bad);
+        assert_eq!((code, out.as_str()), (EXIT_USAGE, ""), "{bad:?}");
+        assert!(err.contains(why), "{err}");
+    }
+    let (code, _, err) = run_with(&[
+        "verdict",
+        "--dir",
+        &at,
+        "--head",
+        HEAD,
+        "--dispatch",
+        "/nonexistent",
+    ]);
+    assert_eq!(code, EXIT_FAILURE);
+    assert!(err.contains("read /nonexistent"), "{err}");
+}

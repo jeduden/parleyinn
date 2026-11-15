@@ -3,8 +3,9 @@
 //! and recomputes the source's consumed-prefix hash with the bytes of
 //! each purged line zeroed. Ingest, resume and `parinn verify` zero the
 //! same spans, so the hash confirms no guess at the purged bytes and the
-//! source still resumes; only each purged line's position and length
-//! remain. The harness's transcript file is only read.
+//! source still resumes; only each purged line's position, length and
+//! the harness's own `uuid` remain. The harness's transcript file is
+//! only read.
 
 use std::io;
 use std::path::Path;
