@@ -366,6 +366,17 @@ fn numbered_writes_each_line_s_number_in_the_pull_request_s_file() {
 }
 
 #[test]
+fn numbered_leaves_the_note_on_a_missing_newline_inside_a_hunk_as_it_is() {
+    // The note follows main's last line, before the pull request's.
+    let diff = "@@ -3 +3 @@\n-old\n\\ No newline at end of file\n+new\n";
+
+    assert_eq!(
+        numbered(diff),
+        "@@ -3 +3 @@\n      -old\n\\ No newline at end of file\n    3 +new\n"
+    );
+}
+
+#[test]
 fn numbered_leaves_what_is_no_hunk_as_it_is() {
     // A header that does not read opens no hunk, and a hunk cut short
     // ends at the next file's header.
