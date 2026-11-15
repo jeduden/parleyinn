@@ -245,6 +245,21 @@ fn ids_and_rows_are_recognised_strictly() {
         Some("REC-01".to_owned())
     );
     assert_eq!(first_requirement_id("nothing"), None);
+    assert_eq!(
+        first_row("| ID | Pri | Requirement | Ver |\n| x | y | z | w |\n"),
+        None
+    );
+    assert_eq!(
+        first_row("| ENG-01 | P0  | Pins. | T    |\n"),
+        Some((
+            "| ENG-01 | P0  | Pins. | T    |\n".to_owned(),
+            "ENG-01".to_owned()
+        ))
+    );
+}
+
+#[test]
+fn the_id_a_model_case_swaps_is_a_requirement_s_and_its_line_is_known() {
     // An open question's id is no requirement's: a linked finding may
     // not end with it, so a swap of it has no right answer in that form.
     assert_eq!(
@@ -258,17 +273,6 @@ fn ids_and_rows_are_recognised_strictly() {
     );
     assert_eq!(line_of("PIN-08 first", "PIN-08"), 1);
     assert_eq!(line_of("no id here", "PIN-08"), 1);
-    assert_eq!(
-        first_row("| ID | Pri | Requirement | Ver |\n| x | y | z | w |\n"),
-        None
-    );
-    assert_eq!(
-        first_row("| ENG-01 | P0  | Pins. | T    |\n"),
-        Some((
-            "| ENG-01 | P0  | Pins. | T    |\n".to_owned(),
-            "ENG-01".to_owned()
-        ))
-    );
 }
 
 #[test]
