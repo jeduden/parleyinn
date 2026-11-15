@@ -307,6 +307,69 @@ pub(super) fn repository_cases() -> Vec<Case> {
     ]
 }
 
+/// The drifts the step gate catches: a step definition no running row
+/// uses, and the list of those drifting from the definitions.
+pub(super) fn step_gate_cases() -> Vec<Case> {
+    vec![
+        case(
+            "a step definition no row of a scenario that runs uses",
+            "every_step_definition_has_a_running_row",
+            Injection::replace(
+                "tooling/scenario/tests/bdd/administration_verify.rs",
+                "/// An all-zero digest, as text.",
+                "#[given(regex = r\"^a step no row uses$\")]\nfn drifted(_w: &mut World) {}\n\n/// An all-zero digest, as text.",
+            ),
+            cargo_test(
+                "scenario",
+                "gate",
+                "every_step_definition_has_a_running_row",
+            ),
+            "administration_verify.rs drifted: no row of a scenario that runs uses this step definition",
+        ),
+        case(
+            "a step definition taken off the list of those no running row uses",
+            "every_step_definition_has_a_running_row",
+            Injection::replace_line(UNRUN_STEPS, "administration_verify.rs foreign_object", ""),
+            cargo_test(
+                "scenario",
+                "gate",
+                "every_step_definition_has_a_running_row",
+            ),
+            "administration_verify.rs foreign_object: no row of a scenario that runs uses this step definition",
+        ),
+        case(
+            "the list naming a step definition that was deleted",
+            "every_step_definition_has_a_running_row",
+            Injection::replace_line(
+                UNRUN_STEPS,
+                "administration_verify.rs foreign_object",
+                "administration_verify.rs deleted_step",
+            ),
+            cargo_test(
+                "scenario",
+                "gate",
+                "every_step_definition_has_a_running_row",
+            ),
+            "administration_verify.rs deleted_step: listed, but no step definition has that name",
+        ),
+        case(
+            "the list naming a step definition a running row now uses",
+            "every_step_definition_has_a_running_row",
+            Injection::replace_line(
+                UNRUN_STEPS,
+                "administration_verify.rs foreign_object",
+                "administration_verify.rs foreign_object\nrecord_store.rs sized_results",
+            ),
+            cargo_test(
+                "scenario",
+                "gate",
+                "every_step_definition_has_a_running_row",
+            ),
+            "record_store.rs sized_results: listed, but a row that runs now uses it",
+        ),
+    ]
+}
+
 /// The drifts the gate tests and mdsmith catch between the SRS, the
 /// scenarios and the generated sections.
 pub(super) fn gate_cases() -> Vec<Case> {
