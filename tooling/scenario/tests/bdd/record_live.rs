@@ -24,7 +24,7 @@ use crate::live::{
     Harness, append_lines, clean_line, lines_read, placed_lines, source_key, store, wait_until,
 };
 use crate::record::{home, last_run, run_core};
-use crate::record_hooks::session_start;
+use crate::record_hooks::{session_path, session_start};
 
 /// What the live steps track.
 #[derive(Debug, Default)]
@@ -103,7 +103,10 @@ pub fn serve(
     source: &str,
     extra: &[(&str, &str)],
 ) -> Result<(), String> {
-    let transcript = named(w, name)?;
+    // The transcript the hook input names, which the server's start
+    // marker names once it serves: a harness session no step made a
+    // transcript for is served too (REC-08's fork).
+    let transcript = session_path(w, name)?;
     let (before, left) = (taken_bindings(w, name)?, start_markers(w, &transcript)?);
     let mut harness = Harness::start(w, true, extra)?;
     harness.hook("SessionStart", &session_start(w, name, source)?)?;
