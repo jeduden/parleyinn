@@ -22,7 +22,8 @@ const UNRUN_STEPS: &str = "tests/unrun-steps.txt";
 /// Every step definition under tests/bdd is used by a row that runs, or
 /// stands on the list at [`UNRUN_STEPS`]. A row runs when its scenario
 /// is not `@pending`; in an outline one Examples block holds pending,
-/// the rows of its other blocks run. The list only shrinks: a
+/// the rows of its other blocks run, and the rows of a block tagged
+/// `@runs` run though their scenario is pending. The list only shrinks: a
 /// definition a running row comes to use, or one that is deleted,
 /// leaves it in the same change.
 #[test]
