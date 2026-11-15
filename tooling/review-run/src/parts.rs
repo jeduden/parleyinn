@@ -3,8 +3,8 @@
 //! path order, each part written beside it as `<name>.<i>.diff`; each
 //! part run as the same agent with the same prompt, told which part it
 //! has and every part's files, and, when its part is one file larger
-//! than one read of the agent's file tool returns, the line ranges to
-//! read it in, as a specialist run whole is told when its diff is more
+//! than one read of the agent's file tool returns, the calls to read
+//! it in, as a specialist run whole is told when its diff is more
 //! lines than one read takes; and the parts' reports and runs merged
 //! into the specialist's one report and run. A part that did not run
 //! leaves the specialist one that did not run, its report headed
@@ -141,21 +141,25 @@ pub fn ranges(text: &str, limit: usize) -> Vec<(usize, usize)> {
 
 /// What a specialist is told of reading its diff `own`, `text`, when
 /// one read of the agent's file tool does not return it whole, as a
-/// file larger than `limit` alone in its part is: the line ranges to
-/// read it in ([`ranges`]). None otherwise, or when it is one line.
+/// file larger than `limit` alone in its part is: the `offset` and
+/// `limit` of each call that reads it ([`ranges`]), which it copies and
+/// never works out from a range of lines. A reviewer that took a
+/// range's first line for an offset counted from nought left the last
+/// line of its diff unread. None otherwise, or when it is one line.
 fn reading(own: &str, text: &str, limit: usize) -> Option<String> {
     let ranges = ranges(text, limit);
     // One line past the limit is one range: no other read returns it.
     let (last, rest) = ranges.split_last().filter(|(_, rest)| !rest.is_empty())?;
-    let range = |(from, to): &(usize, usize)| format!("{from}-{to}");
-    let rest: Vec<String> = rest.iter().map(range).collect();
+    let call =
+        |(from, to): &(usize, usize)| format!("`offset` {from} with `limit` {}", to + 1 - from);
+    let rest: Vec<String> = rest.iter().map(call).collect();
     Some(format!(
-        "One `Read` does not return `{own}` whole: read its {} lines in {} calls, each with \
-         `offset` and `limit`, lines {} and {}, and leave no line unread.",
+        "One `Read` does not return `{own}` whole: read its {} lines in {} calls, {} and {}, \
+         and leave no line unread. `offset` is the first line a call reads, counted from 1.",
         last.1,
         ranges.len(),
         rest.join(", "),
-        range(last)
+        call(last)
     ))
 }
 
