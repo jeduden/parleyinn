@@ -468,6 +468,27 @@ fn analyse_asks_eng_29_s_record_for_a_row_marked_for_i2_review() {
 }
 
 #[test]
+fn analyse_asks_eng_29_s_record_for_a_change_to_its_own_row() {
+    let mut head = base();
+    let own = head.requirements.len() - 1;
+    head.requirements[own].text = "A change to an invariant MUST land with an ADR.".into();
+
+    let (findings, _) = guarded(&mut head.clone(), None, &["docs/srs/10.md"], false);
+    let adr = record("accepted", "ENG-29: its own row changes, approved.");
+    let (with_record, record) = guarded(&mut head, Some(adr), &[ADR], true);
+
+    assert_eq!(
+        findings,
+        [eng_29_finding(
+            &row_path(&base(), "ENG-29").unwrap(),
+            "this change touches ENG-29's own row (ENG-29), but no accepted ADR under docs/adr that this change changes names ENG-29; and no stakeholder comment consents to it"
+        )]
+    );
+    assert!(with_record.is_empty());
+    assert!(record.is_some());
+}
+
+#[test]
 fn analyse_places_a_removed_marked_row_where_main_had_it() {
     let mut head = base();
     head.requirements.remove(2);

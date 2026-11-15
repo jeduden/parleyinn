@@ -15,6 +15,10 @@ pub const INVARIANTS: &str = "docs/srs/invariants.md";
 /// The requirement whose text names the requirements marked for I2
 /// review.
 const ENG_29: &str = "ENG-29";
+/// How a finding names a change to ENG-29's row: the row holds the list
+/// of requirements marked for I2 review, so a change to it could take
+/// one off that list.
+const OWN_ROW: &str = "ENG-29's own row";
 
 /// Where the decision records live.
 const ADR_DIR: &str = "docs/adr/";
@@ -446,8 +450,9 @@ fn ratchet(base: &Snapshot, head: &Snapshot) -> Vec<Finding> {
         .collect()
 }
 
-/// ENG-29: a change to an invariant, or to a requirement ENG-29 marks
-/// for I2 review, lands only with an accepted decision record, changed
+/// ENG-29: a change to an invariant, to a requirement ENG-29 marks for
+/// I2 review, or to ENG-29's own row, which holds that list, lands only
+/// with an accepted decision record, changed
 /// in the same pull request, that names ENG-29 and what it covers, and
 /// with the stakeholder's consent: `consent`, a consenting comment on
 /// the pull request, whatever paths it names. Returns the finding when either is
@@ -465,7 +470,8 @@ fn eng_29(
         .filter(|id| marked.contains(id))
         .collect();
     let invariant = base.invariants != head.invariants || paths.iter().any(|p| p == INVARIANTS);
-    if rows.is_empty() && !invariant {
+    let own = requirements.contains_key(ENG_29);
+    if rows.is_empty() && !invariant && !own {
         return (Vec::new(), None);
     }
     let mut names = vec![ENG_29];
@@ -473,6 +479,9 @@ fn eng_29(
     if invariant {
         names.push("invariant");
         guarded.push("an invariant");
+    }
+    if own {
+        guarded.push(OWN_ROW);
     }
     names.extend(rows.iter().map(|id| id.as_str()));
     guarded.extend(rows.iter().map(|id| id.as_str()));
@@ -498,6 +507,8 @@ fn eng_29(
         INVARIANTS.to_owned()
     } else {
         rows.first()
+            .map(|id| id.as_str())
+            .or(own.then_some(ENG_29))
             .and_then(|id| row_path(head, id).or_else(|| row_path(base, id)))
             .unwrap_or_default()
     };

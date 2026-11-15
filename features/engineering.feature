@@ -364,7 +364,7 @@ Feature: Engineering quality (ENG)
   @ENG-29 @P0 @pending
   Scenario: an invariant or I2-review change lands only with an ADR recording a named security reviewer's approval
     Given the repository checkout
-    When a change to an invariant or to a requirement marked for I2 review is proposed
+    When a change to an invariant, to a requirement marked for I2 review or to ENG-29 itself is proposed
     Then it lands only with an accepted ADR that records a named human security reviewer's approval
     And until that ADR is accepted, every B1, B2 or B3 component is built only as a prototype
     And evidence from the release build proves no release artifact or tagged release contains prototype code
