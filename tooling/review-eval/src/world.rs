@@ -51,10 +51,10 @@ pub struct World {
     pub notes: Vec<String>,
 }
 
-/// Builds the world of `case` for `component`, read from `tree`, under
+/// Builds the world of `case` for `component`, read from `tree`, at
 /// `dir`, from the checkout at `checkout`. Its worktrees are added under
 /// `worktrees`, one world at a time: git names a worktree's record after
-/// its path's last component, `main` or `pr-head` for every world, and
+/// its path's last component, `world` or `pr-head` for every world, and
 /// two adds at once race for the same free name.
 ///
 /// # Errors
@@ -71,7 +71,10 @@ pub fn build(
     dir: &Path,
     worktrees: &Mutex<()>,
 ) -> Result<World, String> {
-    let main = dir.join("main");
+    // The world's directory is the work directory: a component named
+    // for a tree, as `main` was, reads as a sibling of `pr-head/` and
+    // `review/`, and an agent that builds a whole path then leaves it out.
+    let main = dir.to_path_buf();
     let pr_head = main.join(PR_HEAD);
     {
         let _one_at_a_time = worktrees.lock().unwrap_or_else(PoisonError::into_inner);
@@ -110,7 +113,7 @@ pub fn build(
     })
 }
 
-/// Removes the worktrees a world under `dir` holds and prunes the
+/// Removes the worktrees a world at `dir` holds and prunes the
 /// checkout's record of them, under `worktrees`, the lock [`build`]
 /// adds them under.
 ///
@@ -123,7 +126,7 @@ pub fn teardown(
     dir: &Path,
     worktrees: &Mutex<()>,
 ) -> Result<(), String> {
-    let main = dir.join("main");
+    let main = dir.to_path_buf();
     let _one_at_a_time = worktrees.lock().unwrap_or_else(PoisonError::into_inner);
     let mut problems = Vec::new();
     for path in [main.join(PR_HEAD), main] {

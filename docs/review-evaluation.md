@@ -32,7 +32,8 @@ records the design.
   one TOML file each. A case names the files it creates, the text it
   replaces, the reports it seeds for a generalist, the stakeholder's
   consent when it grants one, and what the report must say. A finding
-  is matched by its path and the words, ids and source the case names,
+  is matched by its path, or a tail of it that ends no other file of the
+  case, and the line, words, ids and source the case names,
   and by its form, `linked` or `request`, for a specialist or a persona,
   which weighs nothing, or its severity for a generalist; `none` forbids
   one; `absent` forbids text; `nits` caps the nits a generalist keeps;
@@ -53,17 +54,26 @@ records the design.
 - **The world** of a run is the review's own input: a worktree of main
   with the component under test copied in, the case's edits in a second
   worktree as `pr-head/`, its instruction files moved out, `pr.diff`,
-  and `review/` from `review-bundle`. The dispatch must bring the
-  component, or the case fails before any model runs.
+  and `review/` from `review-bundle`, whose diffs carry each line's
+  number in the pull request's file. The dispatch must bring the
+  component, or the case fails before any model runs. The run's work
+  directory is the world's own directory, whose path names no tree: an
+  agent whose work directory ended in `main` took `pr-head/` and
+  `review/` for its siblings and looked for them one directory up,
+  outside what a run may read.
 - **The review context** is the file `review/context/<name>.md` that
   `review-bundle` writes for a specialist: the review class, the touched ids,
-  its dispatch row and the deterministic findings on its files. The prompt
-  tells the specialist to read it and its own diff, never the whole bundle.
+  its dispatch row, the deterministic findings on its files and the ENG-29
+  record a guarded change lands with, which its own diff does not hold. The
+  prompt tells the specialist to read it and its own diff, never the whole
+  bundle.
 - **The prompt** tells every agent that `pr-head/` holds the pull
   request's tree and that the tree around it is main's, which shows
   only what the change replaced. A path a diff or an agent's
   instructions name is relative to the repository, so an agent that
-  opens it at the root judges the change against main.
+  opens it at the root judges the change against main. It names the
+  instruction files `pr-head/` does not hold and where their text is,
+  `review/pr-instructions.txt`, so no agent searches for them.
 - **The evaluation harness** starts `claude --agent <component>` with the
   review's reading tools and turn budget, on the component's model, or
   the evaluation's default for an agent that names none, or the one `--model`
@@ -104,7 +114,8 @@ records the design.
   survives is a slip: a run cut off before a successful result after
   it stated a line or an outcome, an answer with no outcome line or
   one its lines contradict, an answer that is more than the outcome
-  line, a line set aside as no finding, an eleventh finding. Slips are
+  line, a line set aside as no finding, an eleventh finding, a place
+  written as a tail of its path. Slips are
   counted and shown per run and fail none. A case passes with two of
   three runs, stopping once decided. A run whose log holds no model
   call did not run, and is counted and failed, as is a specialist's run
