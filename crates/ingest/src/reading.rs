@@ -261,7 +261,7 @@ impl Resume {
                 source: source.id,
             }));
         }
-        if live && holds_unrefusable(store, &named.path)? {
+        if live && store.purged_without_uuid(&named.path)? {
             return Err(IngestError::Waits {
                 name: named.name.clone(),
             });
@@ -326,20 +326,6 @@ fn continues(source: &Source, bytes: &[u8]) -> bool {
 fn behind(source: &Source, bytes: &[u8], path: &Path) -> bool {
     bytes.len() < as_index(source.position.offset)
         && read::transcript(path).is_ok_and(|now| continues(source, &now))
-}
-
-/// Whether a purge erased a line of the source at `path`, in any of its
-/// generations, that kept no `uuid`: one a new generation cannot refuse
-/// (REC-07, OQ-57).
-fn holds_unrefusable(store: &Store, path: &str) -> Result<bool, IngestError> {
-    for generation in store.generations(path)? {
-        let purged = store.purged_places(generation.id)?;
-        if purged.iter().any(|place| place.uuid.is_none()) {
-            return Ok(true);
-        }
-    }
-
-    Ok(false)
 }
 
 /// The redacted lines the newest generation of the source at `path`

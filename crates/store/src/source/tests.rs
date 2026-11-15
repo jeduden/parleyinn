@@ -868,3 +868,40 @@ fn listing_the_sources_gives_each_its_own_purged_spans_in_offset_order() {
         ]
     );
 }
+
+#[test]
+fn a_source_holds_a_purged_line_without_uuid_in_any_of_its_generations_only() {
+    let dir = TempDir::new().unwrap();
+    let mut store = open(&dir);
+    let first = store.start_generation("/t/a.jsonl", "/t").unwrap();
+    let kept = store.start_generation("/t/b.jsonl", "/t").unwrap();
+    store
+        .advance_refusing(first.id, &position(10, 1), &[place(1, None)])
+        .unwrap();
+    store
+        .advance_refusing(kept.id, &position(10, 1), &[place(1, Some("u1"))])
+        .unwrap();
+    store.start_generation("/t/a.jsonl", "/t").unwrap();
+
+    assert!(
+        store.purged_without_uuid("/t/a.jsonl").unwrap(),
+        "an earlier generation's counts"
+    );
+    assert!(
+        !store.purged_without_uuid("/t/b.jsonl").unwrap(),
+        "its purged line keeps its uuid, and the other source's is not its own"
+    );
+    assert!(!store.purged_without_uuid("/t/never.jsonl").unwrap());
+
+    store
+        .conn
+        .execute_batch(
+            "DROP INDEX transcript_purged_copies_uuid;
+             DROP TABLE transcript_purged_copies;",
+        )
+        .unwrap();
+    assert!(
+        !store.purged_without_uuid("/t/a.jsonl").unwrap(),
+        "a store from before the residue table holds none"
+    );
+}
