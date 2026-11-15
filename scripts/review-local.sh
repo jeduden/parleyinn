@@ -123,7 +123,8 @@ mkdir -p review/reports
 run mdsmith help patterns -f json > review/mdsmith-patterns.json
 tool review-bundle -- --base . --head pr-head --diff pr.diff \
   --consent stakeholder-comments.json --out review > class.txt
-tool review-eval -- plan --base . --head pr-head --out review/eval-plan.json
+tool review-eval -- plan --base . --head pr-head \
+  --consent stakeholder-comments.json --out review/eval-plan.json
 # A staged token's directory is refused to every agent, and what they
 # write is scrubbed of the token.
 credential=()
