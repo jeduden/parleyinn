@@ -75,6 +75,22 @@ fn the_families_named_narrow_a_search_together_with_its_other_filters() {
         ..filtered
     };
     assert_eq!(found(&store, &timed), [1]);
+    // An exact class and a family both named must both hold.
+    let web = ["web".to_owned()];
+    let tool_results = ["tool_result".to_owned()];
+    let both = Search {
+        provenance: &web,
+        provenance_families: &tool_results,
+        ..base(&query)
+    };
+    assert!(found(&store, &both).is_empty());
+    let bash = ["tool_result:Bash".to_owned()];
+    let narrowed = Search {
+        provenance: &bash,
+        provenance_families: &tool_results,
+        ..base(&query)
+    };
+    assert_eq!(found(&store, &narrowed), [1]);
     let elsewhere = [RoomId::derive(&[9; 32], &[9; 16])];
     let roomed = Search {
         rooms: &elsewhere,
