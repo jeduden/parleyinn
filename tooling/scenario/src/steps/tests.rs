@@ -64,7 +64,8 @@ fn definitions_in_refuses_what_it_cannot_read() {
         ("#[given(r#)]\nfn f() {}", "not a string literal"),
         ("#[given(\"open)]\nfn f() {}", "unterminated string"),
         ("#[given(\"a\\", "unterminated string"),
-        ("#[given(\"a\")]\nstruct S;", "no function"),
+        ("#[given(\"a\")]\nstruct S;\nfn f() {}", "no function"),
+        ("#[given(\"a\")]\n", "no function"),
     ] {
         let err = definitions_in("a.rs", text).unwrap_err().to_string();
 
@@ -84,7 +85,31 @@ fn step_definitions_reads_the_rs_files_of_a_directory() {
 
     let keys: Vec<_> = got.iter().map(StepDef::key).collect();
     assert_eq!(keys, ["a.rs a", "b.rs b"]);
-    assert!(step_definitions(&dir.path().join("none")).is_err());
+    let missing = dir.path().join("none");
+    let err = step_definitions(&missing).unwrap_err();
+    assert!(
+        matches!(&err, Error::Walk { path, .. } if *path == missing),
+        "{err}"
+    );
+}
+
+#[test]
+fn step_definitions_names_a_file_it_cannot_read() {
+    let dir = testkit::TempDir::new().unwrap();
+    std::fs::create_dir(dir.path().join("dir.rs")).unwrap();
+
+    let err = step_definitions(dir.path()).unwrap_err();
+
+    assert!(matches!(err, Error::Walk { .. }), "{err}");
+}
+
+#[test]
+fn definitions_in_reads_an_indented_attribute_and_skips_comments_below_it() {
+    let got = defs(
+        "mod m {\n    #[when(\"it runs\")]\n    // note\n\n    #[allow(dead_code)]\n    fn runs() {}\n}\n",
+    );
+
+    assert_eq!(got[0].name, "runs");
 }
 
 #[test]

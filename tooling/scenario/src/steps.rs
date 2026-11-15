@@ -85,9 +85,8 @@ fn definitions_in(file: &str, text: &str) -> Result<Vec<StepDef>, Error> {
         let at = format!("{file}:{}", i + 1);
         let body = attribute_body(rest, &lines[i + 1..]);
         let pattern = pattern_of(&body).map_err(|why| Error::Steps(format!("{at}: {why}")))?;
-        let name = lines[i + 1..]
-            .iter()
-            .find_map(|l| fn_name(l))
+        let consumed = body.matches('\n').count();
+        let name = fn_after(&lines[i + 1 + consumed..])
             .ok_or_else(|| Error::Steps(format!("{at}: no function follows the attribute")))?;
         out.push(StepDef {
             file: file.to_owned(),
@@ -100,12 +99,26 @@ fn definitions_in(file: &str, text: &str) -> Result<Vec<StepDef>, Error> {
     Ok(out)
 }
 
+/// The name of the function the first item below an attribute declares,
+/// past blank lines, comments and further attributes; `None` when that
+/// item is not a function.
+fn fn_after(lines: &[&str]) -> Option<String> {
+    let item = lines.iter().find(|l| {
+        let l = l.trim_start();
+        !(l.is_empty() || l.starts_with("#[") || l.starts_with("//"))
+    })?;
+
+    fn_name(item)
+}
+
 /// The kind and the text after the opening of a step attribute that
-/// starts `line`.
+/// starts `line`, however far the line is indented.
 fn attribute(line: &str) -> Option<(&'static str, &str)> {
     ["given", "when", "then"].into_iter().find_map(|kind| {
         let open = format!("#[{kind}(");
-        line.strip_prefix(open.as_str()).map(|rest| (kind, rest))
+        line.trim_start()
+            .strip_prefix(open.as_str())
+            .map(|rest| (kind, rest))
     })
 }
 
