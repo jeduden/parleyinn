@@ -173,10 +173,12 @@ fn a_model_defect_cites_an_id_no_section_defines() {
         panic!("{:?}", case.edits);
     };
     assert_eq!((old.as_str(), new.as_str()), ("PIN-08", "PIN-99"));
-    // Known by its place and its form: the swapped id is the file's one
-    // change, and a finding may name it by its line and not by its text.
+    // Known by its place and its form: a finding may name the swapped
+    // id by its line and not by its text, so the line it stands on is
+    // the place the case wants.
     let missing = &case.expect.finding[0];
     assert_eq!(missing.form.as_deref(), Some("linked"));
+    assert_eq!(missing.line, Some(3));
     assert!(missing.mentions.is_empty());
     let excluded = got
         .iter()
@@ -243,6 +245,12 @@ fn ids_and_rows_are_recognised_strictly() {
         Some("REC-01".to_owned())
     );
     assert_eq!(first_requirement_id("nothing"), None);
+    assert_eq!(
+        line_of("# hub\n\nIt cites PIN-08.\nPIN-08 again.\n", "PIN-08"),
+        3
+    );
+    assert_eq!(line_of("PIN-08 first", "PIN-08"), 1);
+    assert_eq!(line_of("no id here", "PIN-08"), 1);
     assert_eq!(
         first_row("| ID | Pri | Requirement | Ver |\n| x | y | z | w |\n"),
         None

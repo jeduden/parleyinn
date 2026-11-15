@@ -180,7 +180,7 @@ fn model(root: &Path, path: &str, name: &str) -> Result<Vec<Case>, String> {
     let text = read(root, path)?;
     let title = title_line(path, &text)?;
     let defect = match first_requirement_id(&text) {
-        Some(id) => missing_requirement(name, path, &id),
+        Some(id) => missing_requirement(name, path, &id, line_of(&text, &id)),
         None => excluded_terms(name, path, &title),
     };
 
@@ -324,11 +324,19 @@ fn excluded_terms(name: &str, path: &str, title: &str) -> Case {
     )
 }
 
-/// The first cited requirement id swapped for one that does not exist:
-/// the model specialist's check of every id its file cites. The swap is
-/// the file's one change, so a linked finding at the file is its
-/// finding, whether its sentence names the id or the line holds it.
-fn missing_requirement(name: &str, path: &str, id: &str) -> Case {
+/// The line of `text`, from one, its first `word` stands on, which is
+/// where an edit that replaces the word lands.
+fn line_of(text: &str, word: &str) -> usize {
+    let before = text.find(word).map_or("", |at| &text[..at]);
+    before.matches('\n').count() + 1
+}
+
+/// The first cited requirement id, on `line` of the file, swapped for
+/// one that does not exist: the model specialist's check of every id
+/// its file cites. The swap is the file's one change, so a linked
+/// finding at its line is its finding, whether its sentence names the
+/// id or not.
+fn missing_requirement(name: &str, path: &str, id: &str, line: usize) -> Case {
     let prefix = id.split_once('-').map_or(id, |(p, _)| p);
     let missing = format!("{prefix}-99");
     case(
@@ -345,6 +353,7 @@ fn missing_requirement(name: &str, path: &str, id: &str) -> Case {
             outcome: vec![FINDINGS.to_owned()],
             finding: vec![Expected {
                 path: path.to_owned(),
+                line: Some(line),
                 form: Some(LINKED.to_owned()),
                 ..Expected::default()
             }],
