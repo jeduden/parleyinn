@@ -33,6 +33,8 @@ const MOST_FINDINGS: usize = 10;
 /// How far a cited line may be from the one a case names.
 const WITHIN: usize = 3;
 
+mod named;
+
 /// The run's grade: every assertion that failed, none on a pass, and
 /// every slip, which fails nothing.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -156,6 +158,7 @@ fn specialist(component: &Component, case: &Case, log: &RunLog) -> Graded {
         ));
         return graded;
     }
+    let files = files_of(case);
     let split = split(&assemble(&log.texts, &log.answer, None));
     let report = with_outcome(&split.clean, &log.answer);
     let outcome = outcome_line(&report).map_or("", |(_, word)| word);
@@ -180,10 +183,15 @@ fn specialist(component: &Component, case: &Case, log: &RunLog) -> Graded {
     if component.strict_lines {
         graded.slips.extend(shape_slips(&report));
     }
+    graded.failures.extend(expectations(
+        &case.expect,
+        &report,
+        Kind::Specialist,
+        &files,
+    ));
     graded
         .failures
-        .extend(expectations(&case.expect, &report, Kind::Specialist));
-    graded.failures.extend(stated_failures(&case.expect, log));
+        .extend(stated_failures(&case.expect, log, &files));
     graded.failures.extend(tree_failures(&case.expect, log));
     // The ids are held to their shape: the case's world, not the
     // grader, holds the SRS they would be read from.
@@ -231,7 +239,7 @@ fn shape_slips(report: &str) -> Vec<String> {
 /// and withdrawn or revised, against `log`'s text blocks: a stated
 /// finding is a line of a block other than the answer, a withdrawn one
 /// a `withdrawn:` or `revised:` line naming its place in any block.
-fn stated_failures(expect: &Expect, log: &RunLog) -> Vec<String> {
+fn stated_failures(expect: &Expect, log: &RunLog, files: &[&str]) -> Vec<String> {
     let answer = log.answer.trim();
     let before: Vec<&str> = log
         .texts
@@ -243,7 +251,7 @@ fn stated_failures(expect: &Expect, log: &RunLog) -> Vec<String> {
     for wanted in &expect.stated {
         if !before
             .iter()
-            .any(|l| line_matches(l, wanted, Kind::Specialist))
+            .any(|l| line_matches(l, wanted, Kind::Specialist, files))
         {
             failures.push(format!(
                 "did not state before its answer {}",
@@ -265,7 +273,7 @@ fn stated_failures(expect: &Expect, log: &RunLog) -> Vec<String> {
     for wanted in &expect.withdrawn {
         if !changes
             .iter()
-            .any(|l| line_matches(l, wanted, Kind::Specialist))
+            .any(|l| line_matches(l, wanted, Kind::Specialist, files))
         {
             failures.push(format!("did not withdraw or revise {}", describe(wanted)));
         }
@@ -290,6 +298,7 @@ fn generalist(case: &Case, log: &RunLog, kind: Kind) -> Vec<String> {
     if !log.ran() {
         return failures;
     }
+    let files = files_of(case);
     let text = &match kind {
         Kind::Generalist => report::weighing(&log.texts, &log.answer),
         _ => log.answer.clone(),
@@ -299,7 +308,7 @@ fn generalist(case: &Case, log: &RunLog, kind: Kind) -> Vec<String> {
         .lines()
         .filter(|l| !report::dropped(l) && (report::finding(l).is_some() || in_form(l)))
         .collect();
-    failures.extend(expectations(&case.expect, &kept.join("\n"), kind));
+    failures.extend(expectations(&case.expect, &kept.join("\n"), kind, &files));
     let nits = kept
         .iter()
         .filter(|l| report::finding(l).is_some_and(|f| f.severity == NIT))
@@ -310,13 +319,18 @@ fn generalist(case: &Case, log: &RunLog, kind: Kind) -> Vec<String> {
     for dropped in &case.expect.dropped {
         if !text
             .lines()
-            .any(|l| report::dropped(l) && line_matches(l, dropped, Kind::Generalist))
+            .any(|l| report::dropped(l) && line_matches(l, dropped, Kind::Generalist, &files))
         {
             failures.push(format!("did not drop {}", describe(dropped)));
         }
     }
 
     failures
+}
+
+/// The files `case` changes, which a report line may name by a tail.
+fn files_of(case: &Case) -> Vec<&str> {
+    case.edits.iter().map(crate::case::Edit::file).collect()
 }
 
 /// The failure of a run that did not run: its log holds no model call.
@@ -346,15 +360,21 @@ fn outcome_failure(outcome: &str, expect: &Expect) -> Option<String> {
 
 /// The failures of `findings`, one per line, a `kind`'s, against the
 /// findings `expect` wants and forbids and the text it forbids.
-fn expectations(expect: &Expect, findings: &str, kind: Kind) -> Vec<String> {
+fn expectations(expect: &Expect, findings: &str, kind: Kind, files: &[&str]) -> Vec<String> {
     let mut failures = Vec::new();
     for wanted in &expect.finding {
-        if !findings.lines().any(|l| line_matches(l, wanted, kind)) {
+        if !findings
+            .lines()
+            .any(|l| line_matches(l, wanted, kind, files))
+        {
             failures.push(format!("no finding {}", describe(wanted)));
         }
     }
     for forbidden in &expect.none {
-        if let Some(line) = findings.lines().find(|l| line_matches(l, forbidden, kind)) {
+        if let Some(line) = findings
+            .lines()
+            .find(|l| line_matches(l, forbidden, kind, files))
+        {
             failures.push(format!(
                 "a finding {}: {}",
                 describe(forbidden),
@@ -404,13 +424,14 @@ fn describe(wanted: &Expected) -> String {
 }
 
 /// Whether `line`, a `kind`'s, is a finding `wanted` describes: it
-/// names the path and holds every word, one of the alternatives, each
+/// names the path, as written or by a tail of it no other of the case's
+/// `files` ends in ([`named::names`]), and holds every word, one of the alternatives, each
 /// id and the source the case names, a number within reach of the line
 /// the case names, and the severity or form the case names.
-fn line_matches(line: &str, wanted: &Expected, kind: Kind) -> bool {
+fn line_matches(line: &str, wanted: &Expected, kind: Kind, files: &[&str]) -> bool {
     let lower = line.to_lowercase();
     let has = |word: &str| lower.contains(&word.to_lowercase());
-    line.contains(&wanted.path)
+    named::names(line, &wanted.path, files)
         && wanted.mentions.iter().all(|w| has(w))
         && (wanted.mentions_any.is_empty() || wanted.mentions_any.iter().any(|w| has(w)))
         && graded_as(line, wanted, kind)

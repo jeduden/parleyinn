@@ -445,21 +445,26 @@ fn a_specialist_s_line_is_matched_by_its_form_and_never_by_a_severity_word() {
     let weighed = "a.rs:3 — blocking — a pin is lost — I3";
     let s = Kind::Specialist;
 
-    assert!(line_matches(linked, &form("linked"), s));
-    assert!(!line_matches(request, &form("linked"), s));
-    assert!(line_matches(request, &form("request"), s));
-    assert!(!line_matches(linked, &form("request"), s));
+    assert!(line_matches(linked, &form("linked"), s, &[]));
+    assert!(!line_matches(request, &form("linked"), s, &[]));
+    assert!(line_matches(request, &form("request"), s, &[]));
+    assert!(!line_matches(linked, &form("request"), s, &[]));
     // A case written while specialists weighed: blocking wants a
     // linked finding, a nit either form, and neither a severity word.
-    assert!(line_matches(linked, &severity("blocking"), s));
-    assert!(!line_matches(request, &severity("blocking"), s));
-    assert!(line_matches(request, &severity("nit"), s));
-    assert!(line_matches(linked, &severity("nit"), s));
-    assert!(!line_matches(weighed, &severity("blocking"), s));
-    assert!(!line_matches(weighed, &severity("nit"), s));
-    assert!(line_matches(weighed, &wanted("a.rs"), s));
+    assert!(line_matches(linked, &severity("blocking"), s, &[]));
+    assert!(!line_matches(request, &severity("blocking"), s, &[]));
+    assert!(line_matches(request, &severity("nit"), s, &[]));
+    assert!(line_matches(linked, &severity("nit"), s, &[]));
+    assert!(!line_matches(weighed, &severity("blocking"), s, &[]));
+    assert!(!line_matches(weighed, &severity("nit"), s, &[]));
+    assert!(line_matches(weighed, &wanted("a.rs"), s, &[]));
     // A generalist's line has no form.
-    assert!(!line_matches(weighed, &form("linked"), Kind::Generalist));
+    assert!(!line_matches(
+        weighed,
+        &form("linked"),
+        Kind::Generalist,
+        &[]
+    ));
     assert_eq!(describe(&form("request")), "at a.rs as a request line");
 }
 
@@ -519,21 +524,38 @@ fn a_line_matches_what_the_case_names_and_nothing_less() {
     let line = "pr-head/a.rs:12 — blocking — an unwrap outside tests — ENG-16 — lang-rust";
 
     let g = Kind::Generalist;
-    assert!(line_matches(line, &full, g));
-    assert!(!line_matches(&line.replace("12", "13"), &full, g));
-    assert!(!line_matches(&line.replace("ENG-16", "ENG-17"), &full, g));
-    assert!(!line_matches(&line.replace("tests", "code"), &full, g));
-    assert!(!line_matches(&line.replace("lang-rust", "yours"), &full, g));
-    assert!(!line_matches(&line.replace("blocking", "nit"), &full, g));
+    assert!(line_matches(line, &full, g, &[]));
+    assert!(!line_matches(&line.replace("12", "13"), &full, g, &[]));
+    assert!(!line_matches(
+        &line.replace("ENG-16", "ENG-17"),
+        &full,
+        g,
+        &[]
+    ));
+    assert!(!line_matches(&line.replace("tests", "code"), &full, g, &[]));
+    assert!(!line_matches(
+        &line.replace("lang-rust", "yours"),
+        &full,
+        g,
+        &[]
+    ));
+    assert!(!line_matches(
+        &line.replace("blocking", "nit"),
+        &full,
+        g,
+        &[]
+    ));
     assert!(!line_matches(
         "b.rs:12 — blocking — unwrap tests ENG-16 lang-rust",
         &full,
-        g
+        g,
+        &[]
     ));
     assert!(line_matches(
         "a.rs:9 — blocking — Unwrap in tests — ENG-16 by lang-rust",
         &full,
-        g
+        g,
+        &[]
     ));
     assert_eq!(
         describe(&full),
@@ -592,16 +614,23 @@ fn a_severity_is_read_from_its_slot_only() {
     assert!(line_matches(
         "a.rs:3 — blocking — it breaks I2",
         &blocking,
-        g
+        g,
+        &[]
     ));
     assert!(!line_matches(
         "a.rs:3 — nit — this is not blocking",
         &blocking,
-        g
+        g,
+        &[]
     ));
     // A line that is no finding line has no slot; its prose is read whole.
-    assert!(line_matches("a.rs mentions blocking prose", &blocking, g));
-    assert!(!line_matches("a.rs mentions nothing", &blocking, g));
+    assert!(line_matches(
+        "a.rs mentions blocking prose",
+        &blocking,
+        g,
+        &[]
+    ));
+    assert!(!line_matches("a.rs mentions nothing", &blocking, g, &[]));
 }
 
 #[test]
@@ -661,14 +690,20 @@ fn a_consultant_s_line_in_a_specialist_s_form_is_kept_and_matched_by_its_form() 
         severity: Some("blocking".into()),
         ..wanted("a.rs")
     };
-    assert!(line_matches(linked, &blocking, s));
+    assert!(line_matches(linked, &blocking, s, &[]));
     assert!(line_matches(
         "a.rs:3 — blocking — a pin is lost",
         &blocking,
-        s
+        s,
+        &[]
     ));
-    assert!(!line_matches("a.rs:3 — nit — a pin is lost", &blocking, s));
-    assert!(!line_matches(linked, &at("request"), s));
+    assert!(!line_matches(
+        "a.rs:3 — nit — a pin is lost",
+        &blocking,
+        s,
+        &[]
+    ));
+    assert!(!line_matches(linked, &at("request"), s, &[]));
 }
 
 #[test]
@@ -944,3 +979,5 @@ fn only_a_case_that_holds_its_run_to_the_tree_fails_a_read_of_main_s() {
         Vec::<String>::new()
     );
 }
+
+mod paths;
