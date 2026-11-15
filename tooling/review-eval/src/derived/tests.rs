@@ -178,7 +178,11 @@ fn a_model_defect_cites_an_id_no_section_defines() {
         .iter()
         .find(|c| c.id() == "domain-model-places/defect-excluded-terms")
         .unwrap();
-    assert_eq!(excluded.expect.finding[0].mentions_any, EXCLUDED_WORDS);
+    // Known by the requirement it cites, not by a word of its sentence.
+    let finding = &excluded.expect.finding[0];
+    assert_eq!(finding.ids, vec![TERMS_ID]);
+    assert_eq!(finding.form.as_deref(), Some("linked"));
+    assert!(finding.mentions_any.is_empty());
 }
 
 #[test]

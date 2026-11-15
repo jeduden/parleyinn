@@ -36,8 +36,10 @@ pub const CLEAN_SENTENCE: &str = "This file is part of ParleyInn.";
 pub const MODEL_SENTENCE: &str = "This file is part of ParleyInn's domain model.";
 /// A sentence in terms the domain model excludes.
 pub const EXCLUDED_SENTENCE: &str = "A bot on the lane records each attempt it makes.";
-/// The excluded terms it uses, which a report names.
-pub const EXCLUDED_WORDS: [&str; 3] = ["lane", "bot", "attempt"];
+/// The requirement a sentence in excluded terms breaks, which its
+/// finding cites: a finding is known by what the report's form fixes,
+/// its place and its ids, never by a word of its sentence.
+pub const TERMS_ID: &str = "ENG-35";
 /// What a derived defect adds to a requirement row.
 pub const ADDED_MUST: &str = " It MUST also record the change in the audit log.";
 
@@ -304,7 +306,8 @@ fn excluded_terms(name: &str, path: &str, title: &str) -> Case {
             outcome: vec![FINDINGS.to_owned()],
             finding: vec![Expected {
                 path: path.to_owned(),
-                mentions_any: EXCLUDED_WORDS.iter().map(|w| (*w).to_owned()).collect(),
+                form: Some(LINKED.to_owned()),
+                ids: vec![TERMS_ID.to_owned()],
                 ..Expected::default()
             }],
             ..Expect::default()

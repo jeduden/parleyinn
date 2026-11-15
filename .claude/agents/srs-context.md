@@ -38,7 +38,7 @@ heading-level: "2"
    A change to an invariant, or to a row
    [ENG-29](../../docs/srs/10-engineering-quality.md) marks for
    [I2](../../docs/srs/invariants.md#i2) review, lands with its accepted ADR.
-5. **Terms.** The section speaks the domain model's concepts.
+5. **Terms.** The section speaks the domain model's concepts (ENG-35).
 
 Your turns are few, and your diff takes most of them. Read your diff, then the
 rows it touches or names, a read or a grep each. Before you open anything else,
