@@ -57,7 +57,8 @@ the case leave it a choice. Every one of the 83 failed runs of the
 first full measurement, four runs of each case, was traced to such a
 choice, and they did not follow the model or the length of a run. A
 case that fails one run in four is a finding about the case or the
-instruction, never noise to outvote. So a case holds to four rules:
+instruction, never noise to outvote. So a case, and what a reviewer is
+handed, hold to these rules:
 
 - **One right answer in the report's form.** A defect breaks a
   requirement the reviewer can cite, so its finding is a linked line
@@ -79,6 +80,12 @@ instruction, never noise to outvote. So a case holds to four rules:
 - **A finding is known by what the report's form fixes**: its place,
   the ids it cites, its source and its form or severity. A word of its
   sentence decides only where the form fixes nothing else.
+- **What a reviewer needs, it reads and never works out.** Each line
+  of a diff the bundle hands out starts with its line number in the
+  file. A reviewer's tool numbers the lines of the diff file itself, and
+  one place in ten, 83 of 826, took that number before the diffs carried
+  their own. A specialist's context names the ADR a change to the
+  invariants lands with, which its own diff does not hold.
 
 Read every failed run before changing anything. It names a choice the
 instruction left open, or a fixture that is not what the case says. It
@@ -89,7 +96,8 @@ may also name an expectation the reviewer met in other words.
 - **The world** of a run is the review's own input: a worktree of main
   with the component under test copied in, the case's edits in a second
   worktree as `pr-head/`, its instruction files moved out, `pr.diff`,
-  and `review/` from `review-bundle`. The dispatch must bring the
+  and `review/` from `review-bundle`, whose diffs carry each line's
+  number in the pull request's file. The dispatch must bring the
   component, or the case fails before any model runs.
 - **The review context** is the file `review/context/<name>.md` that
   `review-bundle` writes for a specialist: the review class, the touched ids,
