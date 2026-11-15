@@ -38,8 +38,9 @@ review.
     crates;
   - CI and the merge rules: `.github/`, which holds the workflows, the
     rulesets and CODEOWNERS itself, and `scripts/`;
-  - the manifests and tool pins CI builds and checks with: every
-    `Cargo.toml`, whose `[lints]` decide whether the bans take effect,
+  - the manifests and tool pins CI builds and checks with: the
+    `Cargo.toml` of the workspace, of each crate and of the fuzz crate,
+    whose `[lints]` decide whether the bans take effect,
     and the mise files, which pin the tools the gates run;
   - the bans and acceptances CI holds the code to: every
     `clippy.toml`, `deny.toml`, `tooling/benchmark/accepted.txt` and
@@ -58,9 +59,13 @@ review.
 - Main's ruleset does not change. It still requires a code owner's
   approval where CODEOWNERS names one, and the bundle still blocks a
   change to such a path until a stakeholder comment names it.
-- ENG-29 does not change: a change to an invariant, or to a row marked
-  for I2 review, still needs its accepted record and a stakeholder
-  comment.
+- ENG-29 does not change, and the review bundle is what enforces it
+  while its scenario is `@pending`: a change to an invariant, or to a
+  row ENG-29 marks for I2 review (PRV-10 to PRV-13 today), is a
+  blocking deterministic finding until an accepted record in the same
+  change names ENG-29 and each id, and the stakeholder commented on the
+  pull request. The workflow drops every comment an agent posts, so no
+  agent can write that comment, and the bundle is the stakeholder's.
 
 ## Alternatives
 

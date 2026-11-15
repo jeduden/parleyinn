@@ -47,6 +47,7 @@ const ENFORCING: &[(&str, &[&str])] = &[
             "Cargo.toml",
             "crates/*/Cargo.toml",
             "tooling/*/Cargo.toml",
+            "fuzz/Cargo.toml",
             "mise.toml",
             "mise.lock",
             "mise.dev.toml",

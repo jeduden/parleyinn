@@ -29,6 +29,7 @@
 /Cargo.toml                   @jeduden
 /crates/*/Cargo.toml          @jeduden
 /tooling/*/Cargo.toml         @jeduden
+/fuzz/Cargo.toml              @jeduden
 /mise.toml                    @jeduden
 /mise.lock                    @jeduden
 /mise.dev.toml                @jeduden
