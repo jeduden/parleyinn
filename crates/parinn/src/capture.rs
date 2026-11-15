@@ -184,6 +184,9 @@ pub(crate) struct Running {
     /// The paths whose tool-use ids failed to scan, each audited once
     /// until a scan succeeds.
     unscanned: BTreeSet<PathBuf>,
+    /// The rewritten transcripts left waiting for `parinn ingest`, each
+    /// audited once until it is ingested again (REC-07).
+    waiting: BTreeSet<PathBuf>,
     marker: Option<StartMarker>,
     /// When its run seats' open segments last closed, and how often
     /// they close while it appends (REC-19).
@@ -203,6 +206,7 @@ impl Capture {
             transcripts: BTreeMap::new(),
             refused: BTreeSet::new(),
             unscanned: BTreeSet::new(),
+            waiting: BTreeSet::new(),
             marker: None,
             closed: now_instant(),
             close_every: SEGMENT_EVERY,
@@ -381,6 +385,9 @@ impl Running {
                 self.capture.limit,
                 &mut OsEntropy,
             );
+            if read.is_ok() {
+                self.waiting.remove(&path);
+            }
             match read {
                 Ok(Some(ingested)) => self.audit_ingested(&ingested),
                 Ok(None) => {}
@@ -405,7 +412,8 @@ impl Running {
 
     /// Audits an ingest that failed: a link swapped in for a transcript
     /// is refused; one another ingest got ahead of, or not written yet,
-    /// is read again next time.
+    /// is read again next time; a rewritten one that waits for `parinn
+    /// ingest` is audited once until it is ingested again (REC-07).
     fn failed(&mut self, path: &Path, e: &IngestError) {
         match e {
             e if e.position_moved() => {}
@@ -414,6 +422,16 @@ impl Running {
                 self.transcripts.remove(path);
                 self.sessions.retain(|b| b.main != path);
                 self.refuse(path);
+            }
+            IngestError::Waits { name } => {
+                if self.waiting.insert(path.to_path_buf()) {
+                    self.audit(&keyed(
+                        Kind::Rejected,
+                        Counter::TranscriptGenerationWaits,
+                        "a rewritten transcript with a purged line that kept no `uuid` waits for `parinn ingest`:",
+                        name,
+                    ));
+                }
             }
             _ => self.audit(&Occurrence::Degraded {
                 kind: Kind::Failed,
