@@ -27,9 +27,9 @@ not listed here. What each invariant says is in its single source,
 
 ## Requirement count
 
-| Priority | Functional and security (§5–§6) | Engineering (§10) |
-| -------- | ------------------------------- | ----------------- |
-| P0       | 92                              | 32                |
-| P1       | 109                             | 2                 |
-| P2       | 38                              | 0                 |
-| —        | Non-functional (§7): 15         |                   |
+| Priority | Functional and security (§5–§6) | Engineering (§10, §10.5) |
+| -------- | ------------------------------- | ------------------------ |
+| P0       | 92                              | 32                       |
+| P1       | 109                             | 2                        |
+| P2       | 38                              | 0                        |
+| —        | Non-functional (§7): 15         |                          |
