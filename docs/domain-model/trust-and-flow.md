@@ -22,10 +22,8 @@ summary: >-
   missing attended mark (PRV-04);
   everything else is untrusted.
 - **Provenance class family**: A provenance's text before its first colon, or
-  the whole provenance when it has none. RCL-02's versioned `kind` filter of
-  `event_search` selects it, never an event kind; the `kind` an envelope gives
-  a recalled event is its event kind, recorded apart from its provenance
-  (Event).
+  the whole provenance when it has none. The versioned `kind` filter of
+  `event_search` selects it (RCL-02), never an event kind (§9.2).
 - **Deployment mode**: `interactive` (a person types at the harness) or
   `automation` (a pipeline does, the default), set per node by managed policy
   or accepted configuration (PRV-02, PRV-04, ADM-04, `node.deployment_mode`).
