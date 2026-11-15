@@ -379,3 +379,45 @@ fn a_planned_component_carries_its_sorted_case_files_through_json() {
     );
     assert_eq!(serde_json::from_str::<Planned>(&text).unwrap(), planned);
 }
+
+#[test]
+fn consented_fails_on_a_case_directory_that_does_not_read() {
+    let (base, head) = consent_trees();
+    let planned = between(base.path(), head.path()).unwrap();
+    // Main's directory of lang-rust's cases is a file: its case files
+    // cannot be compared, and the plan fails rather than sort none.
+    let dir = base.path().join("tooling/review-eval/cases/lang-rust");
+    fs::remove_dir_all(&dir).unwrap();
+    fs::write(&dir, "no directory").unwrap();
+
+    let err = consented(base.path(), head.path(), planned, &[]).unwrap_err();
+
+    assert!(err.starts_with("read "), "{err}");
+    assert!(err.contains("lang-rust"), "{err}");
+}
+
+#[test]
+fn a_planned_component_says_which_version_of_its_sorted_case_files_judges() {
+    let planned = Planned::new("lang-rust".to_owned(), "cases changed".to_owned());
+    // No case file sorted, no line.
+    assert_eq!(planned.judged(), Vec::<String>::new());
+    let theirs = Planned {
+        consented: vec!["a.toml".to_owned(), "b.toml".to_owned()],
+        ..planned.clone()
+    };
+    assert_eq!(
+        theirs.judged(),
+        ["the pull request's version judges, a stakeholder comment names it: a.toml, b.toml"]
+    );
+    let both = Planned {
+        unconsented: vec!["c.toml".to_owned()],
+        ..theirs
+    };
+    assert_eq!(
+        both.judged(),
+        [
+            "the pull request's version judges, a stakeholder comment names it: a.toml, b.toml",
+            "main's version judges, no stakeholder comment names it: c.toml",
+        ]
+    );
+}
