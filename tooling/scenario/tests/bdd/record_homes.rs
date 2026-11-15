@@ -546,7 +546,7 @@ fn late_fork_ingested(w: &mut World) -> Result<(), String> {
 const LATE_FORK: &str = "5e55a0de-0000-4000-8000-0000000000cc";
 
 #[then(
-    regex = r"^none of those lines is recorded again, each refusal is counted and audited, and the record keeps only their uuids beside the tombstones$"
+    regex = r"^none of those lines is recorded again, each refusal is counted and audited, and the record keeps only their uuids, byte offsets and lengths beside the tombstones$"
 )]
 fn refused_and_uuids_kept(w: &mut World) -> Result<(), String> {
     let path = session_path(w, LATE_FORK)?;
@@ -575,6 +575,9 @@ fn refused_and_uuids_kept(w: &mut World) -> Result<(), String> {
             .purged_places(generation.id)
             .map_err(|e| e.to_string())?
         {
+            if place.length == 0 {
+                return Err(format!("line {} keeps no length", place.line));
+            }
             uuids.push(place.uuid.unwrap_or_default());
         }
     }
