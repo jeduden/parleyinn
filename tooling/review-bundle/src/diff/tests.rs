@@ -342,3 +342,55 @@ fn split_is_deterministic_whatever_order_the_diff_lists_its_files_in() {
         [vec!["a.rs"], vec!["b.rs", "c.rs"]]
     );
 }
+
+#[test]
+fn numbered_writes_each_line_s_number_in_the_pull_request_s_file() {
+    let diff = concat!(
+        "diff --git a/a.rs b/a.rs\n--- a/a.rs\n+++ b/a.rs\n",
+        "@@ -7,3 +7,4 @@ fn x() {\n one\n-two\n+2\n+3\n four\n",
+        "@@ -20 +21 @@\n-old\n+new\n\\ No newline at end of file\n",
+        "diff --git a/b.rs b/b.rs\nnew file mode 100644\n--- /dev/null\n+++ b/b.rs\n",
+        "@@ -0,0 +1,2 @@\n+--- x\n+y\n",
+    );
+
+    // A removed line has no number; a header is left as it is, and a
+    // line of a hunk that reads like one, `+--- x`, is still its line.
+    let want = concat!(
+        "diff --git a/a.rs b/a.rs\n--- a/a.rs\n+++ b/a.rs\n",
+        "@@ -7,3 +7,4 @@ fn x() {\n    7  one\n      -two\n    8 +2\n    9 +3\n   10  four\n",
+        "@@ -20 +21 @@\n      -old\n   21 +new\n\\ No newline at end of file\n",
+        "diff --git a/b.rs b/b.rs\nnew file mode 100644\n--- /dev/null\n+++ b/b.rs\n",
+        "@@ -0,0 +1,2 @@\n    1 +--- x\n    2 +y\n",
+    );
+    assert_eq!(numbered(diff), want);
+}
+
+#[test]
+fn numbered_leaves_what_is_no_hunk_as_it_is() {
+    // A header that does not read opens no hunk, and a hunk cut short
+    // ends at the next file's header.
+    let odd = "diff --git a/a b/a\n@@ broken @@\n+x\n";
+    assert_eq!(numbered(odd), odd);
+    let cut = "@@ -1,2 +1,2 @@\n a\ndiff --git a/b b/b\n+++ b/b\n";
+    assert_eq!(
+        numbered(cut),
+        "@@ -1,2 +1,2 @@\n    1  a\ndiff --git a/b b/b\n+++ b/b\n"
+    );
+    assert_eq!(numbered(""), "");
+}
+
+#[test]
+fn hunk_reads_the_lines_a_header_counts() {
+    assert_eq!(hunk("@@ -7,3 +9,4 @@ fn x() {\n"), Some((3, 9, 4)));
+    assert_eq!(hunk("@@ -20 +21 @@\n"), Some((1, 21, 1)));
+    assert_eq!(hunk("@@ -0,0 +1,2 @@\n"), Some((0, 1, 2)));
+    for odd in [
+        "@@ broken @@",
+        "@@ -a,1 +1,1 @@",
+        "@@ -1,1 +1,b @@",
+        "+@@ -1 +1 @@",
+        "@@ -1 +1",
+    ] {
+        assert_eq!(hunk(odd), None, "{odd}");
+    }
+}
