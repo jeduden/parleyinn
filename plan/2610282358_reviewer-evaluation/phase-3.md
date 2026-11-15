@@ -1,7 +1,7 @@
 ---
 n: 3
 title: "Stable cases, so the scheduled run passes"
-status: "🔳"
+status: "✅"
 result: false
 ---
 # Phase 3: stable cases, so the scheduled run passes
@@ -34,20 +34,11 @@ instructions or the case left to the reviewer.
 
 What the measurement on the branch showed. Four runs of each of 241
 cases: 15 of 964 runs failed, 14 cases once and one twice. Every failed
-run was read:
-
-- 4 runs: a place carried the diff file's line number, not the file's.
-  A reviewer's tool numbers the lines of the diff it reads, and 83 of
-  826 places took that number.
-- 1 run: a nit stated after a blocking finding at the same place
-  replaced it, as the review reads a later line there.
-- 3 runs: a clean fixture that drew a fair remark.
-- 1 run: the invariants' specialist could not see the ADR the change
-  lands with, which its own diff does not hold.
-- 3 runs: the right finding in other words or at another fair place
-  than the case's.
-- 2 runs: a finding line that did not hold its form.
-- 1 run: a request where the case wants a finding.
+run was read, and so was every failed run of one more round on the
+final tree, 5 of 241. The [handoff](phase-3.result.md) lists their
+causes. One sat in no instruction and no case: a reviewer's tool
+numbers the lines of the diff it reads, and 83 of 826 places took that
+number, not the file's.
 
 BDD coverage: `@ENG-35` lands `@pending`; `@ENG-32` is unchanged.
 
@@ -60,7 +51,8 @@ GREEN sites:
 - the ENG-35 row;
 - the specialists' report rule under `docs/agents`, where one question
   decides a finding's form;
-- the grader, which knows a finding by its place, ids and source;
+- the grader, which knows a finding by its place, ids and source, and
+  takes no outcome line for one;
 - the fixtures;
 - the review bundle, which writes each line's number in the file into
   the diffs an agent reads, and names the ENG-29 record in a
@@ -68,6 +60,7 @@ GREEN sites:
 - the prompt, which says a place takes the number its diff line starts
   with;
 - the generalists' report rule, where a place takes one line;
+- the section specialists' terms check, which says what breaks ENG-35;
 - [review-evaluation.md](../../docs/review-evaluation.md), which states
   the rules a stable case holds to.
 
