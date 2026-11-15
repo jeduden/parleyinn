@@ -51,6 +51,7 @@ pub mod stall;
 pub mod store;
 pub(crate) mod tasks;
 pub mod usage;
+pub mod verdict;
 
 #[cfg(test)]
 #[allow(

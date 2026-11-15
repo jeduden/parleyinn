@@ -135,9 +135,9 @@ pub(super) fn stability_workflow_cases() -> Vec<Case> {
             "a file the review uploads that its scrub does not list",
             "ENG-28",
             Injection::replace(
-                ".github/workflows/review.yml",
-                " --path review/agent-runs.jsonl --path review/report.html\n",
-                "\n",
+                "scripts/review-scrub.sh",
+                " --path review/agent-runs.jsonl --path review/report.html \\\n",
+                " \\\n",
             ),
             scenario("ENG-28"),
             "review.yml: agent job review uploads in step \"Keep the specialists' reports\" before a scrub",

@@ -17,6 +17,7 @@ mod review_logs;
 mod review_reports;
 mod review_stability;
 mod spend;
+mod verdict;
 
 use architecture::*;
 use boundary::*;
@@ -163,6 +164,7 @@ pub fn cases() -> Vec<Case> {
         spend::review_spend_cases(),
         review_logs::review_log_cases(),
         vec![size_list_growth_case()],
+        verdict::review_verdict_cases(),
         // Last: its cases edit source the later cases would run stale.
         license_text_cases(),
     ]
