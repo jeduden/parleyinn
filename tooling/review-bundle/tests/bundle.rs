@@ -92,3 +92,34 @@ fn the_requirements_eng_29_marks_follow_its_row() {
         "{bundle}"
     );
 }
+
+/// ENG-29 also guards the rows that spell out I2's closed paths and I4's
+/// boundaries: a change to any of them is a finding until its record
+/// and the stakeholder's comment are there.
+#[test]
+fn the_rows_i2_and_i4_rest_on_are_guarded_by_eng_29() {
+    for id in [
+        "INJ-01", "INJ-02", "INJ-04", "INJ-10", "OWN-08", "OWN-24", "OWN-29", "SEC-01",
+    ] {
+        let base = tree();
+        let mut head = tree();
+        let row = head.requirements.iter_mut().find(|r| r.id == id).unwrap();
+        row.text.push_str(" Edited.");
+        let path = row.path.display().to_string();
+
+        let got = analyse(
+            &base,
+            &head,
+            &format!("diff --git a/{path} b/{path}\n"),
+            &[],
+        );
+
+        assert!(
+            got.findings
+                .iter()
+                .any(|f| f.body.contains(&format!("touches {id} (ENG-29)"))),
+            "{id}: {:?}",
+            got.findings
+        );
+    }
+}
