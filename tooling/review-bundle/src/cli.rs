@@ -8,6 +8,7 @@
 //! review, its `state`, which the workflow filters before the command
 //! reads it. One with a non-blank body, other than a review that
 //! requests changes, consents: to each owned path it names (ENG-21),
+//! to a lengthened size list when it names the size list (ENG-34),
 //! and, whatever it names, to the change ENG-29 guards.
 
 use std::collections::{BTreeMap, BTreeSet};

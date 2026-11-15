@@ -135,3 +135,20 @@ fn check_cases() -> Vec<Case> {
         ),
     ]
 }
+
+/// The drift the size list's guard exists to catch (ENG-34), late so
+/// adding it moves no earlier case to another shard: the review bundle
+/// no longer blocking a change that lengthens the size list.
+pub(super) fn size_list_growth_case() -> Case {
+    case(
+        "the review bundle no longer blocking a change that lengthens the size list",
+        "ENG-34",
+        Injection::replace(
+            "tooling/review-bundle/src/analysis.rs",
+            "findings.extend(size_list::finding(diff, names_the_size_list));",
+            "findings.extend(size_list::finding(diff, names_the_size_list).filter(|_| false));",
+        ),
+        scenario("ENG-34"),
+        "the review bundle does not block at the size list for a raised file with no stakeholder comment",
+    )
+}
