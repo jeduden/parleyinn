@@ -104,7 +104,13 @@ fn a_nightly_workflow_without_a_soak_job_is_a_problem_that_names_the_command() {
         ]
     );
     // The missing job is reported beside the soak's own problem.
-    assert_eq!(nightly_problems(&nightly, "").len(), 2);
+    assert_eq!(
+        nightly_problems(&nightly, ""),
+        [
+            "crates/store/tests/soak.rs does not declare \"const WRITERS: u8 = 50;\": the soak must run 50 writers",
+            ".github/workflows/nightly.yml has no job \"soak\": add it, running \"cargo test --locked --release -p store --test soak\""
+        ]
+    );
 }
 
 #[test]

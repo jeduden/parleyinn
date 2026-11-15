@@ -1,8 +1,9 @@
 //! The ENG-09 steps: 50 writers append 10,000 events in all through the
 //! store's soak test into an isolated home, no address repeats and no
 //! seq is skipped, `parinn verify` then exits 0 over that store, the
-//! nightly workflow runs the soak at 1,000,000 events, no crate but
-//! `platform` can hold unsafe code and CI runs Miri over that crate.
+//! nightly workflow is set to run the soak at 1,000,000 events, no
+//! crate but the one unsafe shim can hold unsafe code and CI runs Miri
+//! over that crate.
 
 use std::collections::BTreeSet;
 use std::process::Command;
@@ -10,7 +11,7 @@ use std::process::Command;
 use administration::node::Node;
 use cucumber::{then, when};
 use engineering::soak::{CI, EVENTS, NIGHTLY, SOAK, miri_problems, nightly_problems};
-use engineering::static_analysis::{UNSAFE_SHIM, crates_forbid_unsafe};
+use engineering::static_analysis::crates_forbid_unsafe;
 use key::random::OsEntropy;
 use store::Store;
 
@@ -111,7 +112,7 @@ fn verify_exits_zero(w: &mut World) -> Result<(), String> {
 }
 
 #[then(
-    regex = r#"^the nightly workflow "([^"]+)" runs the same soak test with 50 writers and the setting "([^"]+)" events, and its result is the evidence for the 1000000-event claim$"#
+    regex = r#"^the nightly workflow "([^"]+)" is set to run the same soak test with 50 writers and "([^"]+)" events$"#
 )]
 fn nightly_runs_the_soak(_: &mut World, file: String, events: String) -> Result<(), String> {
     if file != NIGHTLY || events != EVENTS {
@@ -126,18 +127,17 @@ fn nightly_runs_the_soak(_: &mut World, file: String, events: String) -> Result<
 }
 
 #[then(
-    regex = r#"^every unsafe block that shares memory between threads runs under Miri in the pull request workflow "([^"]+)": only the "([^"]+)" crate may hold unsafe code, and Miri runs that crate's tests$"#
+    regex = r#"^every unsafe block that shares memory between threads runs under Miri or ThreadSanitizer in the pull request workflow "([^"]+)"$"#
 )]
-fn ci_runs_miri(_: &mut World, file: String, krate: String) -> Result<(), String> {
-    if file != CI || format!("crates/{krate}") != UNSAFE_SHIM {
-        return Err(format!(
-            "the step names {file} and {krate}, not CI's and the one unsafe shim, {UNSAFE_SHIM}"
-        ));
+fn ci_runs_miri(_: &mut World, file: String) -> Result<(), String> {
+    if file != CI {
+        return Err(format!("the step names {file}, not {CI}"));
     }
     let checkout = engineering::Checkout::new(&testkit::repo_root());
     let ci = checkout.read(&file)?;
-    // Every unsafe block is the shim's only while no other crate can
-    // switch the ban off, so the step holds both halves of the row.
+    // Every unsafe block is the one shim's while no other crate can
+    // switch the ban off, and Miri runs that shim's tests: the row's
+    // "Miri or ThreadSanitizer", met by Miri.
     let mut problems = crates_forbid_unsafe(&checkout);
     problems.extend(miri_problems(&ci));
 

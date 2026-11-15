@@ -280,6 +280,26 @@ fn a_generalist_is_told_its_specialists_report_files_and_reads_only() {
 }
 
 #[test]
+fn a_generalist_is_told_each_place_its_specialists_reported() {
+    let dir = workdir();
+    let host = FakeHost::new(fake::either);
+
+    review_with(&host, dir.path(), &plan(DISPATCH));
+
+    let calls = host.calls.lock().unwrap().clone();
+    let prompt = prompt_of(calls.iter().find(|c| agent_of(c) == "review-code").unwrap());
+    assert!(
+        prompt.contains("reported at these places: `src/a.rs:3`."),
+        "{prompt}"
+    );
+    let specialist = prompt_of(calls.iter().find(|c| agent_of(c) == "lang-rust").unwrap());
+    assert!(
+        !specialist.contains("reported at these places"),
+        "{specialist}"
+    );
+}
+
+#[test]
 fn progress_names_each_run() {
     let dir = workdir();
     let host = FakeHost::new(fake::either);
