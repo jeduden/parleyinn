@@ -106,12 +106,22 @@ fn refusal(kept: &Kept, head: &str, dispatch: &str) -> Result<(), String> {
     Ok(())
 }
 
+/// Weighs `kept` against a review of `head` under `dispatch`, the
+/// dispatch file's text.
+#[must_use]
+pub fn weigh_kept(kept: &Kept, head: &str, dispatch: &str) -> Verdict {
+    match refusal(kept, head, dispatch) {
+        Ok(()) => Verdict::Reused,
+        Err(why) => Verdict::Fresh(why),
+    }
+}
+
 /// Weighs what the earlier review kept in `dir` against a review of
 /// `head` under `dispatch`, the dispatch file's text.
 #[must_use]
 pub fn weigh(dir: &Path, head: &str, dispatch: &str) -> Verdict {
-    match read(dir).and_then(|kept| refusal(&kept, head, dispatch)) {
-        Ok(()) => Verdict::Reused,
+    match read(dir) {
+        Ok(kept) => weigh_kept(&kept, head, dispatch),
         Err(why) => Verdict::Fresh(why),
     }
 }

@@ -180,3 +180,12 @@ fn a_kept_file_that_does_not_read_is_named_and_not_reused() {
         "{got}"
     );
 }
+
+#[test]
+fn what_was_kept_is_weighed_without_a_directory() {
+    assert_eq!(weigh_kept(&kept(), HEAD, DISPATCH_TEXT), Verdict::Reused);
+    assert_eq!(
+        weigh_kept(&kept(), OTHER, DISPATCH_TEXT),
+        Verdict::Fresh(format!("the earlier review was of {HEAD}, not {OTHER}"))
+    );
+}
