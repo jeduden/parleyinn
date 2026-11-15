@@ -420,9 +420,11 @@ Feature: Engineering quality (ENG)
     And the review bundle blocks a change that adds a file to the size list or raises a file's listed lines until a stakeholder comment names the size list, and blocks no change that only lowers them
 
   @ENG-35 @P0 @pending
-  Scenario: a use of a term the domain model excludes is reported as a finding linked to ENG-35
+  Scenario: a breach of the domain model's terms or of its rules for names is reported as a finding linked to ENG-35
     Given the repository checkout
     When a change adds, to a section of the specification, a sentence that uses a term the domain model excludes outside where the model's hub allows it
     Then that section's specialist reports the sentence as a finding linked to ENG-35
     And the specialist of a concept file of the domain model reports a use of a term the model excludes for its concepts as a finding linked to ENG-35
     And the hub's specialist reports a use of any term the model excludes, outside where the hub allows it, as a finding linked to ENG-35
+    And the specialist of a concept file reports a use that names one of its concepts in a word the model does not define as a finding linked to ENG-35
+    And the hub's specialist reports a name of a function, type, module, crate, CLI verb, MCP tool, settings key or event that breaks the hub's rules for names as a finding linked to ENG-35
