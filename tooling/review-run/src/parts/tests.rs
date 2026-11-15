@@ -421,8 +421,9 @@ fn a_part_larger_than_the_limit_is_told_the_line_ranges_to_read_and_one_within_i
     assert!(
         parts[0].note.contains(
             "One `Read` does not return `review/diffs/lang-markdown.1.diff` whole: read its 6 \
-             lines in 3 calls, each with `offset` and `limit`, lines 1-2, 3-4 and 5-6, and leave \
-             no line unread."
+             lines in 3 calls, `offset` 1 with `limit` 2, `offset` 3 with `limit` 2 and \
+             `offset` 5 with `limit` 2, and leave no line unread. `offset` is the first line \
+             a call reads, counted from 1."
         ),
         "{}",
         parts[0].note
