@@ -226,9 +226,10 @@ fn the_executable_refuses_a_live_scenario_put_back_on_pending() {
     let checked: serde_json::Value =
         serde_json::from_str(&fs::read_to_string(home.path().join("checked.json")).unwrap())
             .unwrap();
-    // The scenario's finding, and ENG-21's: `features/` has a code owner.
+    // The scenario's finding alone: `features/` has no code owner, so
+    // ENG-21 asks nothing and the ratchet is what blocks.
     assert!(
-        checked
+        !checked
             .as_array()
             .unwrap()
             .iter()
