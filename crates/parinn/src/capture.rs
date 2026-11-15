@@ -425,8 +425,8 @@ impl Running {
     }
 
     /// Audits what one live ingest found: each redaction, unparsed line,
-    /// format drift, new generation, witnessed repeat, refused repeat, hold
-    /// begun and line released (I6).
+    /// format drift, new generation, witnessed repeat, refused or unchecked
+    /// repeat of a purged line, hold begun and line released (I6).
     fn audit_ingested(&self, ingested: &Ingested) {
         for rule in &ingested.redactions {
             self.audit(&keyed(
@@ -471,14 +471,7 @@ impl Running {
                 &ingested.name,
             ));
         }
-        for _ in 0..ingested.refused {
-            self.audit(&keyed(
-                Kind::Rejected,
-                Counter::RepeatOfPurgedRefused,
-                "refused a repeated line whose `uuid` names a purged event, in",
-                &ingested.name,
-            ));
-        }
+        self.audit_purged_repeats(ingested);
         if ingested.hold_started {
             self.audit(&keyed(
                 Kind::Truncated,
@@ -500,6 +493,20 @@ impl Running {
             tracing::warn!(error = why, "read a sibling transcript");
             self.audit(&crate::sourcing::unread_occurrence("mcp", &unread.name));
         }
+        self.audit_index_gaps(ingested);
+    }
+
+    /// Audits each line refused for its purged `uuid`, and each recorded
+    /// unchecked against purged lines (REC-04, REC-07, I6).
+    fn audit_purged_repeats(&self, ingested: &Ingested) {
+        for _ in 0..ingested.refused {
+            self.audit(&keyed(
+                Kind::Rejected,
+                Counter::RepeatOfPurgedRefused,
+                "refused a repeated line whose `uuid` names a purged event, in",
+                &ingested.name,
+            ));
+        }
         for _ in 0..ingested.unchecked {
             self.audit(&keyed(
                 Kind::Failed,
@@ -508,7 +515,6 @@ impl Running {
                 &ingested.name,
             ));
         }
-        self.audit_index_gaps(ingested);
     }
 
     /// Audits, once each, the events the search index leaves out that no
