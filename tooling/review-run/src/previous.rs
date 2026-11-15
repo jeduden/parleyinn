@@ -15,8 +15,9 @@
 //! spend file that is too large or does not read, so it is never taken
 //! for nothing spent. Two reviews of one pull request that run side by
 //! side, one cancelled, or a run and its rerun, each keep their own, so
-//! none erases another's. The tool decides and the caller's script only
-//! fetches.
+//! none erases another's. `previous verdict` says whether the verdict an
+//! earlier review kept stands for the review a comment brought
+//! (`verdict`). The tool decides and the caller's script only fetches.
 
 use std::fs;
 use std::io::Write;
@@ -30,7 +31,8 @@ use crate::findings;
 pub const USAGE: &str = "usage: review-run previous select --pull N --artifacts FILE --runs FILE \
 [--of findings|spend]\n\
        review-run previous check FILE\n\
-       review-run previous spend FILE...";
+       review-run previous spend FILE...\n\
+       review-run previous verdict --dir DIR --head SHA --dispatch FILE";
 
 /// The workflow whose runs may upload the findings a review carries.
 pub const WORKFLOW_PATH: &str = ".github/workflows/review.yml";
@@ -341,8 +343,9 @@ pub fn run(args: &[String], stdout: &mut dyn Write, stderr: &mut dyn Write) -> u
             check(&read(&path)?).map_err(|e| format!("{path}: {e}"))?;
             Ok(String::new())
         }),
+        Some("verdict") => verdict_of(&args[1..]),
         _ => Err(Usage::Wrong(
-            "the commands are select, check and spend".to_owned(),
+            "the commands are select, check, spend and verdict".to_owned(),
         )),
     };
     match result {
@@ -376,6 +379,38 @@ fn spend_of(paths: &[String]) -> Result<String, Usage> {
         .collect::<Result<Vec<_>, String>>()?;
 
     Ok(format!("spent_before={}\n", summed(&texts)?))
+}
+
+/// Whether the verdict the earlier review kept in `--dir` stands for a
+/// review of `--head` under the dispatch `--dispatch` holds, as the
+/// job's outputs take it (`verdict`).
+fn verdict_of(args: &[String]) -> Result<String, Usage> {
+    let (mut dir, mut head, mut dispatch) = (None, None, None);
+    let mut args = args.iter();
+    while let Some(arg) = args.next() {
+        let slot = match arg.as_str() {
+            "--dir" => &mut dir,
+            "--head" => &mut head,
+            "--dispatch" => &mut dispatch,
+            other => return Err(Usage::Wrong(format!("unknown argument {other:?}"))),
+        };
+        *slot = Some(
+            args.next()
+                .cloned()
+                .ok_or_else(|| Usage::Wrong(format!("{arg} needs a value")))?,
+        );
+    }
+    let (Some(dir), Some(head), Some(dispatch)) = (dir, head, dispatch) else {
+        return Err(Usage::Wrong(
+            "verdict needs --dir, --head and --dispatch".to_owned(),
+        ));
+    };
+    if !crate::run_id::is_commit(&head) {
+        return Err(Usage::Wrong(format!("--head {head:?} is no commit id")));
+    }
+    let dispatch = read(&dispatch)?;
+
+    Ok(crate::verdict::weigh(std::path::Path::new(&dir), &head, &dispatch).lines())
 }
 
 /// The text of the file at `path`.
