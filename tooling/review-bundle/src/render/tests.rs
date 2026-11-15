@@ -375,3 +375,26 @@ fn context_says_none_when_no_finding_is_on_the_specialist_s_files() {
         "{got}"
     );
 }
+
+#[test]
+fn context_names_the_eng_29_record_the_change_lands_with() {
+    // A specialist reads only its own diff, which holds no ADR: without
+    // the record's path it reads a guarded change as landing with none.
+    let mut a = analyse(&base(), &base(), "diff --git a/a.rs b/a.rs\n+x\n", &[]);
+    assert!(!context(&a, "lang-rust").contains("ENG-29"), "no record");
+    a.eng_29_record = Some(Record {
+        path: "docs/adr/ADR-1-x.md".into(),
+        summary: "Approved.\nBy them.".into(),
+    });
+
+    let got = context(&a, "lang-rust");
+
+    assert!(
+        got.ends_with(
+            "\n## ENG-29 record\n\nThis change changes the accepted ADR `docs/adr/ADR-1-x.md`, \
+             which names ENG-29 and what it guards, and a stakeholder comment consents to the \
+             change: the bundle checked both.\n"
+        ),
+        "{got}"
+    );
+}

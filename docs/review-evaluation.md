@@ -93,8 +93,10 @@ may also name an expectation the reviewer met in other words.
   component, or the case fails before any model runs.
 - **The review context** is the file `review/context/<name>.md` that
   `review-bundle` writes for a specialist: the review class, the touched ids,
-  its dispatch row and the deterministic findings on its files. The prompt
-  tells the specialist to read it and its own diff, never the whole bundle.
+  its dispatch row, the deterministic findings on its files and the ENG-29
+  record a guarded change lands with, which its own diff does not hold. The
+  prompt tells the specialist to read it and its own diff, never the whole
+  bundle.
 - **The prompt** tells every agent that `pr-head/` holds the pull
   request's tree and that the tree around it is main's, which shows
   only what the change replaced. A path a diff or an agent's
