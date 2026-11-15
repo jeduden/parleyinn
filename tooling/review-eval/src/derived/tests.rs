@@ -173,7 +173,11 @@ fn a_model_defect_cites_an_id_no_section_defines() {
         panic!("{:?}", case.edits);
     };
     assert_eq!((old.as_str(), new.as_str()), ("PIN-08", "PIN-99"));
-    assert_eq!(case.expect.finding[0].mentions, vec!["PIN-99"]);
+    // Known by its place and its form: the swapped id is the file's one
+    // change, and a finding may name it by its line and not by its text.
+    let missing = &case.expect.finding[0];
+    assert_eq!(missing.form.as_deref(), Some("linked"));
+    assert!(missing.mentions.is_empty());
     let excluded = got
         .iter()
         .find(|c| c.id() == "domain-model-places/defect-excluded-terms")

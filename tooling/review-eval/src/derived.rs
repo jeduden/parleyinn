@@ -325,7 +325,9 @@ fn excluded_terms(name: &str, path: &str, title: &str) -> Case {
 }
 
 /// The first cited requirement id swapped for one that does not exist:
-/// the model specialist's check of every id its file cites.
+/// the model specialist's check of every id its file cites. The swap is
+/// the file's one change, so a linked finding at the file is its
+/// finding, whether its sentence names the id or the line holds it.
 fn missing_requirement(name: &str, path: &str, id: &str) -> Case {
     let prefix = id.split_once('-').map_or(id, |(p, _)| p);
     let missing = format!("{prefix}-99");
@@ -337,13 +339,13 @@ fn missing_requirement(name: &str, path: &str, id: &str) -> Case {
         vec![Edit::Replace {
             file: path.to_owned(),
             old: id.to_owned(),
-            new: missing.clone(),
+            new: missing,
         }],
         Expect {
             outcome: vec![FINDINGS.to_owned()],
             finding: vec![Expected {
                 path: path.to_owned(),
-                mentions: vec![missing],
+                form: Some(LINKED.to_owned()),
                 ..Expected::default()
             }],
             ..Expect::default()
