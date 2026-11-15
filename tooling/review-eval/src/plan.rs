@@ -51,6 +51,26 @@ impl Planned {
             ..Self::default()
         }
     }
+
+    /// What the plan says of its sorted case files, a line per list
+    /// that holds one: which the pull request's version judges, and
+    /// which main's.
+    #[must_use]
+    pub fn judged(&self) -> Vec<String> {
+        let line = |how: &str, files: &[String]| {
+            (!files.is_empty()).then(|| format!("{how}: {}", files.join(", ")))
+        };
+        let theirs = "the pull request's version judges, a stakeholder comment names it";
+        let mains = "main's version judges, no stakeholder comment names it";
+
+        [
+            line(theirs, &self.consented),
+            line(mains, &self.unconsented),
+        ]
+        .into_iter()
+        .flatten()
+        .collect()
+    }
 }
 
 /// The components to run for a pull request whose tree is `head`,
