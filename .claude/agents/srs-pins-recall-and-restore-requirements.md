@@ -34,7 +34,7 @@ heading-level: "2"
 2. **Each touched row against its scenario.** Every requirement id has exactly
    one scenario under [`features/`](../../features), tagged with the id, the
    row's priority and its traced invariants; a changed row changes its scenario
-   in the same pull request.
+   in the same pull request. A finding on a row ends in the row's id.
 3. **Each touched row against the code.** What the change builds does
    what the row says, no more and no less; a MUST it leaves unmet is a
    finding.
