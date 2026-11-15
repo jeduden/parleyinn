@@ -638,7 +638,7 @@ fn with_recorded(
 /// change edits, and the requirement it names.
 pub const CONTEXT: (&str, &str, &str) = (
     "lang-markdown",
-    "docs/srs/10-engineering-quality.md",
+    "docs/agents/specialist-outcome.md",
     "ENG-28",
 );
 

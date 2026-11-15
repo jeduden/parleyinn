@@ -7,7 +7,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 
-use crate::{BLOCKING, Finding, NIT, Snapshot, diff, dispatch, owners};
+use crate::{BLOCKING, Finding, NIT, Snapshot, diff, dispatch, owners, size_list};
 
 /// The invariants file ENG-29 guards.
 pub const INVARIANTS: &str = "docs/srs/invariants.md";
@@ -15,6 +15,10 @@ pub const INVARIANTS: &str = "docs/srs/invariants.md";
 /// The requirement whose text names the requirements marked for I2
 /// review.
 const ENG_29: &str = "ENG-29";
+/// How a finding names a change to ENG-29's row: the row holds the list
+/// of requirements marked for I2 review, so a change to it could take
+/// one off that list.
+const OWN_ROW: &str = "ENG-29's own row";
 
 /// Where the decision records live.
 const ADR_DIR: &str = "docs/adr/";
@@ -27,6 +31,28 @@ const NOT_LIGHT: [&str; 3] = ["docs/domain-model/", "plan/", "features/"];
 /// gates. Each crate's reach test and the security-sensitive crates the
 /// ENG-11 row names join it.
 const DEEP_CODE: [&str; 1] = ["tooling/"];
+
+/// The text no stakeholder path holds that still reviews deep, since
+/// it lands on the review's approval alone (ENG-21): the specification,
+/// the decision records and the scenarios.
+const DEEP_TEXT: [&str; 3] = ["docs/srs/", "docs/adr/", "features/"];
+
+/// The files, at any depth, no stakeholder path holds that still review
+/// deep: the build, lint, coverage and toolchain configuration and the
+/// supply-chain and disclosure policy.
+const DEEP_FILES: [&str; 11] = [
+    "Cargo.toml",
+    "clippy.toml",
+    "deny.toml",
+    "codecov.yml",
+    "rust-toolchain.toml",
+    "mise.toml",
+    "mise.lock",
+    "mise.dev.toml",
+    "mise.dev.lock",
+    "SECURITY.md",
+    "DEPENDENCIES.md",
+];
 
 /// The requirement whose text names the security-sensitive crates.
 const ENG_11: &str = "ENG-11";
@@ -121,7 +147,8 @@ pub struct Analysis {
 /// Compares `base`, main's tree, with `head`, the pull request's, whose
 /// diff against main is `diff`. `consents` are the bodies of the
 /// stakeholder's comments on the pull request that consent: each to the
-/// owned paths it names (ENG-21), and any one of them to an ENG-29
+/// owned paths it names (ENG-21) and to a lengthened size list when it
+/// names the size list (ENG-34), and any one of them to an ENG-29
 /// change.
 #[must_use]
 pub fn analyse(base: &Snapshot, head: &Snapshot, diff: &str, consents: &[String]) -> Analysis {
@@ -150,6 +177,10 @@ pub fn analyse(base: &Snapshot, head: &Snapshot, diff: &str, consents: &[String]
         .filter(|p| !consents.iter().any(|c| owners::names(&patterns, c, p)))
         .collect();
     findings.extend(stakeholder_paths(&owned, &unconsented));
+    let names_the_size_list = consents
+        .iter()
+        .any(|c| owners::names(&patterns, c, size_list::SIZE_LIST));
+    findings.extend(size_list::finding(diff, names_the_size_list));
     findings.extend(unparsed.iter().map(|h| nit(h, UNPARSED)));
     findings.extend(lifted_bans(diff));
     let crates = security_crates(base);
@@ -162,7 +193,9 @@ pub fn analyse(base: &Snapshot, head: &Snapshot, diff: &str, consents: &[String]
     // Without the list, every crate counts as security-sensitive, so the
     // class and the dispatch fail closed.
     let crates = crates.unwrap_or_else(|| vec![dispatch::EVERY_CRATE.to_owned()]);
-    let deep = paths.iter().any(|p| deep_code(&crates, p));
+    let deep = paths
+        .iter()
+        .any(|p| deep_code(&crates, p) || deep_unowned(p));
     // The rows that bring their section's specialist: those the change
     // edits, and those code names; a row Markdown only quotes is in the
     // bundle but brings no one.
@@ -305,8 +338,16 @@ fn deep_code(crates: &[String], path: &str) -> bool {
     DEEP_CODE.iter().any(|d| path.starts_with(d)) || dispatch::security_code(path, crates)
 }
 
-/// The review class: deep when `deep` says a stakeholder path or deep
-/// code changed, or a header does not read; light when only prose
+/// Whether `path` reviews deep though no stakeholder path holds it and
+/// it is no code: the specification, a decision record, a scenario, or
+/// a configuration or policy file of [`DEEP_FILES`].
+fn deep_unowned(path: &str) -> bool {
+    let name = path.rsplit('/').next().unwrap_or(path);
+    DEEP_TEXT.iter().any(|d| path.starts_with(d)) || DEEP_FILES.contains(&name)
+}
+
+/// The review class: deep when `deep` says a stakeholder path, deep
+/// code or deep text changed, or a header does not read; light when only prose
 /// Markdown did; standard otherwise.
 fn classify(paths: &[String], deep: bool, unparsed: &[String]) -> Class {
     let light = |p: &String| p.ends_with(".md") && !NOT_LIGHT.iter().any(|d| p.starts_with(d));
@@ -414,8 +455,9 @@ fn ratchet(base: &Snapshot, head: &Snapshot) -> Vec<Finding> {
         .collect()
 }
 
-/// ENG-29: a change to an invariant, or to a requirement ENG-29 marks
-/// for I2 review, lands only with an accepted decision record, changed
+/// ENG-29: a change to an invariant, to a requirement ENG-29 marks for
+/// I2 review, or to ENG-29's own row, which holds that list, lands only
+/// with an accepted decision record, changed
 /// in the same pull request, that names ENG-29 and what it covers, and
 /// with the stakeholder's consent: `consent`, a consenting comment on
 /// the pull request, whatever paths it names. Returns the finding when either is
@@ -433,7 +475,8 @@ fn eng_29(
         .filter(|id| marked.contains(id))
         .collect();
     let invariant = base.invariants != head.invariants || paths.iter().any(|p| p == INVARIANTS);
-    if rows.is_empty() && !invariant {
+    let own = requirements.contains_key(ENG_29);
+    if rows.is_empty() && !invariant && !own {
         return (Vec::new(), None);
     }
     let mut names = vec![ENG_29];
@@ -441,6 +484,9 @@ fn eng_29(
     if invariant {
         names.push("invariant");
         guarded.push("an invariant");
+    }
+    if own {
+        guarded.push(OWN_ROW);
     }
     names.extend(rows.iter().map(|id| id.as_str()));
     guarded.extend(rows.iter().map(|id| id.as_str()));
@@ -466,6 +512,8 @@ fn eng_29(
         INVARIANTS.to_owned()
     } else {
         rows.first()
+            .map(|id| id.as_str())
+            .or(own.then_some(ENG_29))
             .and_then(|id| row_path(head, id).or_else(|| row_path(base, id)))
             .unwrap_or_default()
     };
