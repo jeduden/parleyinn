@@ -306,11 +306,18 @@ fn journal_unconfirmed(conn: &Connection, count: u64) -> Result<(), StoreError> 
 }
 
 /// The journalled count of transcript sources no purge could confirm.
+/// A count that does not parse is the journal damaged, never a zero
+/// (I6).
 fn unconfirmed(conn: &Connection) -> Result<u64, StoreError> {
-    Ok(journalled(conn, UNCONFIRMED)?
-        .iter()
-        .filter_map(|(_, count)| count.parse::<u64>().ok())
-        .sum())
+    let mut total = 0;
+    for (_, count) in journalled(conn, UNCONFIRMED)? {
+        total += count.parse::<u64>().map_err(|_| StoreError::Corrupt {
+            address: None,
+            what: format!("journalled count of unconfirmed sources {count:?}"),
+        })?;
+    }
+
+    Ok(total)
 }
 
 /// The journalled targets of `kind`, with their ids, oldest first.

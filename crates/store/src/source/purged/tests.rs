@@ -513,3 +513,24 @@ fn a_purge_whose_residue_table_cannot_be_made_fails_whole() {
 
     assert!(mark(&store.conn, &range(writer(1), 1, 1)).is_err());
 }
+
+#[test]
+fn a_journalled_unconfirmed_count_that_does_not_parse_fails_the_finish_and_never_reads_as_zero() {
+    let dir = TempDir::new().unwrap();
+    let (mut store, _, _) = ingested(&dir, writer(1), "a.jsonl");
+    store.conn.execute_batch(crate::purge::SCHEMA).unwrap();
+    store
+        .conn
+        .execute(
+            "INSERT INTO purge_journal (kind, target) VALUES ('unconfirmed', 'three')",
+            [],
+        )
+        .unwrap();
+
+    let failed = store.finish_purge().unwrap_err();
+
+    assert!(
+        matches!(&failed, crate::StoreError::Corrupt { address: None, what } if what.contains("\"three\"")),
+        "{failed}"
+    );
+}
