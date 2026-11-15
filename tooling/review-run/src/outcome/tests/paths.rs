@@ -50,7 +50,10 @@ fn an_ambiguous_basename_weighs_nothing() {
         missed(both.clone(), &kept_at("lib.rs:5")),
         ["crates/a/src/lib.rs:5", "crates/b/src/lib.rs:5"]
     );
-    assert!(missed(both, &kept_at("crates/a/src/lib.rs:5")).len() == 1);
+    assert_eq!(
+        missed(both, &kept_at("crates/a/src/lib.rs:5")),
+        ["crates/b/src/lib.rs:5"]
+    );
 
     let short = [report_at("lib.rs:5"), report_at("crates/b/lib.rs:5")];
     let both: Vec<&str> = short.iter().map(String::as_str).collect();
@@ -105,4 +108,12 @@ fn a_bare_name_with_two_longer_spellings_reported_stays_ambiguous() {
         missed(all, &kept_at("crates/a/lib.rs:5")),
         ["crates/b/lib.rs:5", "lib.rs:5"]
     );
+}
+
+#[test]
+fn a_path_with_directories_is_not_another_path_that_ends_in_it() {
+    let reports = [report_at("src/a.rs:3"), report_at("lib/src/a.rs:3")];
+    let both: Vec<&str> = reports.iter().map(String::as_str).collect();
+
+    assert_eq!(missed(both, &kept_at("lib/src/a.rs:3")), ["src/a.rs:3"]);
 }
