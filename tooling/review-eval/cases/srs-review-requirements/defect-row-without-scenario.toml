@@ -1,12 +1,14 @@
-# Until the section this specialist checks is on main, its cases bring
-# the section's file themselves. The cases derived from the section
-# take their place once it is there.
+# A case applies to main's tree, and the section this specialist checks
+# is not there before the pull request that adds it. So each case here
+# brings a file of its own, under a name the review bundle also hands to
+# this specialist, and applies before that pull request and in it. The
+# cases derived from the section take their place once it is on main.
 component = "srs-review-requirements"
 kind = "defect"
 title = "a requirement row added with no scenario"
 
 [[create]]
-file = "docs/srs/10a-review-requirements.md"
+file = "docs/srs/10b-review-requirements.md"
 content = '''
 ---
 title: "10.5 The review"
@@ -28,6 +30,6 @@ outcome = ["findings"]
 main_unread = true
 
 [[expect.finding]]
-path = "docs/srs/10a-review-requirements.md"
+path = "docs/srs/10b-review-requirements.md"
 form = "linked"
 ids = ["ENG-36"]
