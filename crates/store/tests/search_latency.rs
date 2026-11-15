@@ -122,7 +122,7 @@ fn time(store: &Store, word: &str, k: usize) -> (Duration, Duration, usize) {
         rooms: &[room()],
         writers: &[],
         provenance: &[],
-        kinds: &[],
+        provenance_families: &[],
         since: None,
         until: None,
         k,

@@ -156,7 +156,7 @@ fn answers(store: &Store) -> Vec<Vec<(String, u64)>> {
                 rooms: &[room()],
                 writers: &[],
                 provenance: &[],
-                kinds: &[],
+                provenance_families: &[],
                 since: None,
                 until: None,
                 k: 50,
