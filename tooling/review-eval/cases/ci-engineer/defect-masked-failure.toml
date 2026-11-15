@@ -13,4 +13,6 @@ outcome = ["findings"]
 [[expect.finding]]
 path = ".github/workflows/ci.yml"
 form = "linked"
-mentions_any = ["|| true", "mask", "green", "fail"]
+# The words a line on a failure that no longer fails its job may use:
+# one run named it as a low recall that passes CI unseen.
+mentions_any = ["|| true", "mask", "green", "fail", "pass", "succe", "exit", "swallow", "ignor", "hid", "unseen", "silent"]
