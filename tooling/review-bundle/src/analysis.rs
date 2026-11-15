@@ -7,7 +7,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 
-use crate::{BLOCKING, Finding, NIT, Snapshot, diff, dispatch, owners};
+use crate::{BLOCKING, Finding, NIT, Snapshot, diff, dispatch, owners, size_list};
 
 /// The invariants file ENG-29 guards.
 pub const INVARIANTS: &str = "docs/srs/invariants.md";
@@ -147,7 +147,8 @@ pub struct Analysis {
 /// Compares `base`, main's tree, with `head`, the pull request's, whose
 /// diff against main is `diff`. `consents` are the bodies of the
 /// stakeholder's comments on the pull request that consent: each to the
-/// owned paths it names (ENG-21), and any one of them to an ENG-29
+/// owned paths it names (ENG-21) and to a lengthened size list when it
+/// names the size list (ENG-34), and any one of them to an ENG-29
 /// change.
 #[must_use]
 pub fn analyse(base: &Snapshot, head: &Snapshot, diff: &str, consents: &[String]) -> Analysis {
@@ -176,6 +177,10 @@ pub fn analyse(base: &Snapshot, head: &Snapshot, diff: &str, consents: &[String]
         .filter(|p| !consents.iter().any(|c| owners::names(&patterns, c, p)))
         .collect();
     findings.extend(stakeholder_paths(&owned, &unconsented));
+    let names_the_size_list = consents
+        .iter()
+        .any(|c| owners::names(&patterns, c, size_list::SIZE_LIST));
+    findings.extend(size_list::finding(diff, names_the_size_list));
     findings.extend(unparsed.iter().map(|h| nit(h, UNPARSED)));
     findings.extend(lifted_bans(diff));
     let crates = security_crates(base);

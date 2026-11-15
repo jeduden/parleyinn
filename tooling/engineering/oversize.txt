@@ -4,8 +4,8 @@
 # number listed: split a file that grew, and lower the number of a file
 # that shrank but is still past its limit, so a regrowth cannot hide.
 # A listed file that fits its limit, or is gone, must be removed. The
-# list only shrinks: a change that adds a line or raises a number says
-# why, and the review weighs it (ENG-34); no code owner guards the list.
+# list only shrinks: never add a line, and never raise a number,
+# without the stakeholder's acceptance.
 # The limits are the review bundle's (tooling/review-bundle/src/limits.rs);
 # see tooling/engineering/src/file_sizes.rs and docs/ci.md.
 .github/workflows/ci.yml 936

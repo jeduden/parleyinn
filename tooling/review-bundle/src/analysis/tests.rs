@@ -832,3 +832,19 @@ fn a_change_without_a_stakeholder_path_has_no_eng_21_finding() {
 
     assert!(got.findings.iter().all(|f| !f.body.contains("ENG-21")));
 }
+
+#[test]
+fn a_lengthened_size_list_needs_a_comment_that_names_it() {
+    let list = size_list::SIZE_LIST;
+    let diff = format!("{}-a.rs 1100\n+a.rs 1101\n", header(list));
+    let blocks = |consents: &[String]| {
+        let got = analyse(&base(), &base(), &diff, consents);
+        got.findings
+            .iter()
+            .any(|f| f.path == list && f.severity == BLOCKING && f.body.contains("(ENG-34)"))
+    };
+
+    assert!(blocks(&[]));
+    assert!(blocks(&["Consent for docs/srs/.".into()]));
+    assert!(!blocks(&[format!("consenting: {list}")]));
+}
