@@ -11,6 +11,9 @@
 //! budget. Unset, one run holds every case. `DRIFT_TOUCHING`, the
 //! changed files one path a line, keeps the cases that inject one of
 //! them, which is how `scripts/ci-local.sh` runs the suite.
+//! `DRIFT_TARGET_DIR` names a directory the build target lives in
+//! instead of the work directory's sibling, so CI restores it between
+//! runs and a shard compiles only what changed, not every dependency.
 
 #![allow(
     clippy::unwrap_used,
@@ -42,7 +45,9 @@ const POLL: Duration = Duration::from_millis(100);
 #[ignore = "needs mdsmith and taplo on PATH; CI's drift job runs it"]
 fn every_drift_is_caught() {
     let tmp = TempDir::new().unwrap();
-    let (work, target) = (tmp.path().join("work"), tmp.path().join("target"));
+    let work = tmp.path().join("work");
+    let target = std::env::var_os("DRIFT_TARGET_DIR")
+        .map_or_else(|| tmp.path().join("target"), std::path::PathBuf::from);
 
     let spec = std::env::var("DRIFT_SHARD").ok();
     let files = std::env::var("DRIFT_TOUCHING").ok();
