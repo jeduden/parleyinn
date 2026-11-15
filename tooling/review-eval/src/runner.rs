@@ -74,10 +74,17 @@ pub fn prompt(component: &Component, world: &World) -> String {
 /// directory. A path a diff or an agent's instructions name is relative
 /// to the repository, and the work directory's own root is main's tree:
 /// an agent that reads the path there judges the change against main.
+/// The pull request's instruction files (`world::INSTRUCTION_NAMES`) are
+/// the one thing `pr-head/` does not hold: an agent that looked for one
+/// there found nothing and searched around the work directory, where the
+/// run refuses it.
 pub const HEAD_TREE: &str = "The pull request's tree is in `pr-head/`: read and search the \
     repository's files there, each as `pr-head/<its path>`, whatever path your diff or your \
     instructions name. The tree around it is main's: it shows only what the change replaced, \
-    and nothing the pull request adds.";
+    and nothing the pull request adds. `pr-head/` holds no agent instructions: the pull \
+    request's `.claude/` directories and its `CLAUDE.md`, `CLAUDE.local.md`, `AGENTS.md` and \
+    `.mcp.json` files are text in `review/pr-instructions.txt`, each file under a \
+    `===== <its path> =====` line.";
 
 /// What every agent of a review is told of the line a finding names.
 /// The bundle writes the number on each line of the diffs it hands out
@@ -101,9 +108,7 @@ pub fn prompt_over(component: &Component, world: &World, diff: Option<&str>) -> 
              first; then `review/context/{name}.md`, which names the review class, \
              your dispatch row and the deterministic findings on your files; never \
              `review/bundle.md`. {HEAD_TREE} {LINE_NUMBERS} Its whole diff against main \
-             is `review/pr.diff`; \
-             its agent instructions are text in \
-             `review/pr-instructions.txt`. You write no file: state each finding as \
+             is `review/pr.diff`. You write no file: state each finding as \
              one line in your text the moment you find it, as your instructions say, \
              and answer with your outcome line alone, `outcome: findings — <sentence>` \
              or `outcome: none — <sentence>`. The review assembles your report from \
@@ -134,10 +139,8 @@ pub fn prompt_over(component: &Component, world: &World, diff: Option<&str>) -> 
         Kind::Consultant => format!(
             "You are `{name}`. Review this pull request as your instructions say: its \
              diff against main is `review/pr.diff`, and \
-             `review/bundle.md` lists the paths it changes; its agent instructions are \
-             text in `review/pr-instructions.txt`. {HEAD_TREE} {LINE_NUMBERS} You may read \
-             files and \
-             write none. \
+             `review/bundle.md` lists the paths it changes. {HEAD_TREE} {LINE_NUMBERS} \
+             You may read files and write none. \
              Answer with your findings and your closing line, nothing else."
         ),
     }

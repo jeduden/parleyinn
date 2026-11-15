@@ -577,7 +577,7 @@ fn instructions_move_out_from_any_depth_but_not_from_git_s_own_directory() {
     write("sub/.claude/settings.json", "{}\n");
     write(".git/CLAUDE.md", "not moved\n");
     write("keep.md", "kept\n");
-    let into = dir.path().join("main/review/pr-instructions.txt");
+    let into = dir.path().join("review/pr-instructions.txt");
 
     move_instructions(&root, &into).unwrap();
 

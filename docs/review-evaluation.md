@@ -56,7 +56,11 @@ records the design.
   worktree as `pr-head/`, its instruction files moved out, `pr.diff`,
   and `review/` from `review-bundle`, whose diffs carry each line's
   number in the pull request's file. The dispatch must bring the
-  component, or the case fails before any model runs.
+  component, or the case fails before any model runs. The run's work
+  directory is the world's own directory, whose path names no tree: an
+  agent whose work directory ended in `main` took `pr-head/` and
+  `review/` for its siblings and read them one directory up, which the
+  run refuses.
 - **The review context** is the file `review/context/<name>.md` that
   `review-bundle` writes for a specialist: the review class, the touched ids,
   its dispatch row, the deterministic findings on its files and the ENG-29
@@ -67,7 +71,9 @@ records the design.
   request's tree and that the tree around it is main's, which shows
   only what the change replaced. A path a diff or an agent's
   instructions name is relative to the repository, so an agent that
-  opens it at the root judges the change against main.
+  opens it at the root judges the change against main. It names the
+  instruction files `pr-head/` does not hold and where their text is,
+  `review/pr-instructions.txt`, so no agent searches for them.
 - **The evaluation harness** starts `claude --agent <component>` with the
   review's reading tools and turn budget, on the component's model, or
   the evaluation's default for an agent that names none, or the one `--model`
