@@ -183,6 +183,7 @@ fn specialist(component: &Component, case: &Case, log: &RunLog) -> Graded {
     if component.strict_lines {
         graded.slips.extend(shape_slips(&report));
     }
+    graded.slips.extend(named::tail_slips(&report, &files));
     graded.failures.extend(expectations(
         &case.expect,
         &report,
@@ -426,7 +427,7 @@ fn describe(wanted: &Expected) -> String {
 /// Whether `line`, a `kind`'s, is a finding `wanted` describes: it
 /// names the path, as written or by a tail of it no other of the case's
 /// `files` ends in ([`named::names`]), and holds every word, one of the alternatives, each
-/// id and the source the case names, a number within reach of the line
+/// id and the source the case names, a place within reach of the line
 /// the case names, and the severity or form the case names.
 fn line_matches(line: &str, wanted: &Expected, kind: Kind, files: &[&str]) -> bool {
     let lower = line.to_lowercase();
@@ -435,12 +436,24 @@ fn line_matches(line: &str, wanted: &Expected, kind: Kind, files: &[&str]) -> bo
         && wanted.mentions.iter().all(|w| has(w))
         && (wanted.mentions_any.is_empty() || wanted.mentions_any.iter().any(|w| has(w)))
         && graded_as(line, wanted, kind)
-        && wanted.ids.iter().all(|id| line.contains(id))
+        && cites(line, &wanted.ids)
         && wanted.source.as_deref().is_none_or(has)
         && wanted.line.is_none_or(|at| {
             let within = wanted.within.unwrap_or(WITHIN);
-            numbers(line).any(|n| n.abs_diff(at) <= within)
+            named::lines(line, &wanted.path, files)
+                .is_some_and(|(first, last)| at + within >= first && at <= last + within)
         })
+}
+
+/// Whether `line` cites every id of `ids`: among the ids a linked
+/// finding ends with, where it is one, so an id its sentence only names
+/// is not cited; anywhere in a line of another form, which ends with no
+/// ids.
+fn cites(line: &str, ids: &[String]) -> bool {
+    match review_gate::report::line(line) {
+        Line::Linked(linked) => ids.iter().all(|id| linked.ids.contains(id)),
+        _ => ids.iter().all(|id| line.contains(id.as_str())),
+    }
 }
 
 /// Whether `line` is a linked finding or a requirement request.
@@ -488,12 +501,6 @@ fn graded_as(line: &str, wanted: &Expected, kind: Kind) -> bool {
     };
 
     form && severity
-}
-
-/// Every number in `line`.
-fn numbers(line: &str) -> impl Iterator<Item = usize> + '_ {
-    line.split(|c: char| !c.is_ascii_digit())
-        .filter_map(|digits| digits.parse().ok())
 }
 
 #[cfg(test)]

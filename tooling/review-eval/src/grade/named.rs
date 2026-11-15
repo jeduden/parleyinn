@@ -10,23 +10,70 @@ use crate::report::{bare, dropped, split_dashes};
 /// the files the case changes, ends in. A tail two of the case's files
 /// share names neither.
 pub(super) fn names(line: &str, path: &str, files: &[&str]) -> bool {
-    line.contains(path)
-        || places(line).any(|place| {
-            tail_of(path, &place) && !files.iter().any(|f| *f != path && ends_in(f, &place))
-        })
+    line.contains(path) || lines(line, path, files).is_some()
 }
 
-/// The path of each place `line` may be at: its first part, and its
-/// second when it is a dropped line, `dropped — path:line — why`, each
-/// read from its last word, so the word of a `revised:` or `withdrawn:`
-/// line before it is left out. A place in the prose is none.
-fn places(line: &str) -> impl Iterator<Item = String> + '_ {
+/// The lines the place of `line` that names `path` covers, its first
+/// and its last: one line twice, or the two ends of a range,
+/// `path:12-20`; a place under a directory more, `pr-head/docs/x.md:3`,
+/// names the path too. `None` when no place of the line names the path,
+/// though its sentence may.
+pub(super) fn lines(line: &str, path: &str, files: &[&str]) -> Option<(usize, usize)> {
+    places(line)
+        .find(|(place, _, _)| {
+            ends_in(place, path)
+                || (tail_of(path, place) && !files.iter().any(|f| *f != path && ends_in(f, place)))
+        })
+        .map(|(_, first, last)| (first, last))
+}
+
+/// The slips of a `report` whose lines name a file of `files` by a tail
+/// of its path, one a file: the grader takes the tail, and the review
+/// weighs it, but a `withdrawn:` or `revised:` line reaches a finding
+/// only by the path as it was written.
+pub(super) fn tail_slips(report: &str, files: &[&str]) -> Vec<String> {
+    let mut slips: Vec<String> = report
+        .lines()
+        .flat_map(places)
+        .filter_map(|(place, _, _)| {
+            let mut ending = files.iter().filter(|f| tail_of(f, &place));
+            let file = ending.next()?;
+            ending
+                .next()
+                .is_none()
+                .then(|| format!("names {file} by its tail {place}"))
+        })
+        .collect();
+    slips.sort();
+    slips.dedup();
+    slips
+}
+
+/// Each place `line` may be at, its path and the first and last line
+/// it covers: its first part, and its second when it is a dropped line,
+/// `dropped — path:line — why`, each read from its last word, so the
+/// word of a `revised:` or `withdrawn:` line before it is left out. A
+/// place in the prose is none.
+fn places(line: &str) -> impl Iterator<Item = (String, usize, usize)> + '_ {
     let parts = if dropped(line) { 2 } else { 1 };
     split_dashes(bare(line))
         .into_iter()
         .take(parts)
         .filter_map(|part| part.split_whitespace().next_back())
-        .filter_map(|word| review_gate::report::place(word).map(|(path, _)| path))
+        .filter_map(|word| {
+            let (path, first) = review_gate::report::place(word)?;
+            Some((path, first, last_of(word).unwrap_or(first).max(first)))
+        })
+}
+
+/// The last line of the range a place's `word` ends in, `path:12-20`,
+/// when it ends in one.
+fn last_of(word: &str) -> Option<usize> {
+    let (_, range) = word.rsplit_once(':')?;
+    let (_, last) = range.rsplit_once(['-', '–'])?;
+    last.trim_matches(|c: char| !c.is_ascii_digit())
+        .parse()
+        .ok()
 }
 
 /// Whether `tail` is `path` with one or more of its directories left

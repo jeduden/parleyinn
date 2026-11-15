@@ -101,3 +101,43 @@ fn a_tail_two_files_of_the_case_share_names_neither() {
         &files
     ));
 }
+
+#[test]
+fn the_lines_of_a_place_are_its_line_or_the_ends_of_its_range() {
+    let path = "docs/x.md";
+    let at = |line: &str| lines(line, path, &[path]);
+
+    assert_eq!(at("docs/x.md:12 — blocking — it — yours"), Some((12, 12)));
+    assert_eq!(at("x.md:12-20 — nit — it — yours"), Some((12, 20)));
+    assert_eq!(at("`docs/x.md:3–4` — nit — it — yours"), Some((3, 4)));
+    // A range written backwards covers its first line alone.
+    assert_eq!(at("docs/x.md:9-2 — nit — it — yours"), Some((9, 9)));
+    // The pull request's tree, named with its directory.
+    assert_eq!(at("pr-head/docs/x.md:7 — nit — it — yours"), Some((7, 7)));
+    assert_eq!(
+        at("dropped — docs/x.md:5 — main has it — lang-rust"),
+        Some((5, 5))
+    );
+    // Another file's place, and a place the sentence alone holds.
+    assert_eq!(at("docs/y.md:12 — nit — like docs/x.md:3 — yours"), None);
+    assert_eq!(at("no place here"), None);
+}
+
+#[test]
+fn a_place_at_a_tail_of_a_case_s_file_is_a_slip_once_a_file() {
+    let files = ["docs/x.md", "docs/y.md"];
+    let report = "x.md:3 — if not addressed: it — ENG-01\n\
+                  x.md:9 — if not addressed: it again — ENG-01\n\
+                  docs/y.md:3 — if not addressed: whole — ENG-01\n\
+                  z.md:3 — if not addressed: no file of the case — ENG-01\n\
+                  outcome: findings — three";
+
+    assert_eq!(
+        tail_slips(report, &files),
+        vec!["names docs/x.md by its tail x.md"]
+    );
+    assert_eq!(
+        tail_slips("outcome: none — fine", &files),
+        Vec::<String>::new()
+    );
+}
