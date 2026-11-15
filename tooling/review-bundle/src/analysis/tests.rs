@@ -75,13 +75,11 @@ fn analyse_routes_by_the_paths_that_changed() {
         (vec!["docs/guide.md", "README.md"], Class::Light),
         (vec!["plan/x/plan.md", "README.md"], Class::Standard),
         (vec!["docs/domain-model/run.md"], Class::Standard),
-        (vec!["features/notes.md"], Class::Standard),
         (vec![], Class::Standard),
         (
             vec!["plan/x/plan.md", "crates/parinn/src/lib.rs"],
             Class::Standard,
         ),
-        (vec!["features/record.feature"], Class::Standard),
         (vec!["README.md", "docs/srs/05.md"], Class::Deep),
         (vec!["crates/pinx/Cargo.toml"], Class::Deep),
     ];
@@ -91,6 +89,39 @@ fn analyse_routes_by_the_paths_that_changed() {
         assert_eq!(got.class, want, "{paths:?}");
         assert_eq!(got.class == Class::Deep, !got.owned.is_empty(), "{paths:?}");
         assert!(got.unparsed.is_empty(), "{paths:?}");
+    }
+}
+
+#[test]
+fn what_lands_on_the_review_alone_reviews_deep_with_no_code_owner() {
+    for (path, want) in [
+        ("docs/srs/05.md", Class::Deep),
+        ("docs/adr/ADR-2610111200-x.md", Class::Deep),
+        ("features/record.feature", Class::Deep),
+        ("features/notes.md", Class::Deep),
+        ("Cargo.toml", Class::Deep),
+        ("crates/pinx/Cargo.toml", Class::Deep),
+        ("crates/pinx/clippy.toml", Class::Deep),
+        ("mise.lock", Class::Deep),
+        ("SECURITY.md", Class::Deep),
+        ("deny.toml", Class::Deep),
+        ("codecov.yml", Class::Deep),
+        ("rust-toolchain.toml", Class::Deep),
+        ("mise.toml", Class::Deep),
+        ("mise.dev.toml", Class::Deep),
+        ("mise.dev.lock", Class::Deep),
+        ("DEPENDENCIES.md", Class::Deep),
+        ("docs/SECURITY.md.txt", Class::Standard),
+        ("x/docs/srs/05.md", Class::Light),
+        ("docs/srs.md", Class::Light),
+    ] {
+        let unowned = Snapshot {
+            codeowners: String::new(),
+            ..base()
+        };
+        let got = analyse(&unowned, &unowned, &header(path), &[]);
+        assert_eq!(got.class, want, "{path}");
+        assert!(got.owned.is_empty(), "{path}");
     }
 }
 
@@ -437,6 +468,27 @@ fn analyse_asks_eng_29_s_record_for_a_row_marked_for_i2_review() {
 }
 
 #[test]
+fn analyse_asks_eng_29_s_record_for_a_change_to_its_own_row() {
+    let mut head = base();
+    let own = head.requirements.len() - 1;
+    head.requirements[own].text = "A change to an invariant MUST land with an ADR.".into();
+
+    let (findings, _) = guarded(&mut head.clone(), None, &["docs/srs/10.md"], false);
+    let adr = record("accepted", "ENG-29: its own row changes, approved.");
+    let (with_record, record) = guarded(&mut head, Some(adr), &[ADR], true);
+
+    assert_eq!(
+        findings,
+        [eng_29_finding(
+            &row_path(&base(), "ENG-29").unwrap(),
+            "this change touches ENG-29's own row (ENG-29), but no accepted ADR under docs/adr that this change changes names ENG-29; and no stakeholder comment consents to it"
+        )]
+    );
+    assert!(with_record.is_empty());
+    assert!(record.is_some());
+}
+
+#[test]
 fn analyse_places_a_removed_marked_row_where_main_had_it() {
     let mut head = base();
     head.requirements.remove(2);
@@ -779,4 +831,20 @@ fn a_change_without_a_stakeholder_path_has_no_eng_21_finding() {
     let got = analyse(&base(), &base(), &header("crates/parinn/src/main.rs"), &[]);
 
     assert!(got.findings.iter().all(|f| !f.body.contains("ENG-21")));
+}
+
+#[test]
+fn a_lengthened_size_list_needs_a_comment_that_names_it() {
+    let list = size_list::SIZE_LIST;
+    let diff = format!("{}-a.rs 1100\n+a.rs 1101\n", header(list));
+    let blocks = |consents: &[String]| {
+        let got = analyse(&base(), &base(), &diff, consents);
+        got.findings
+            .iter()
+            .any(|f| f.path == list && f.severity == BLOCKING && f.body.contains("(ENG-34)"))
+    };
+
+    assert!(blocks(&[]));
+    assert!(blocks(&["Consent for docs/srs/.".into()]));
+    assert!(!blocks(&[format!("consenting: {list}")]));
 }
