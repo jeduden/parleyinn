@@ -46,8 +46,8 @@ heading-level: "2"
 2. List every concept your file defines: the bold term opening each
    list item, and any bold term defined inside one. For a pull request,
    take steps 3 to 6 only for what its diff adds, changes or removes.
-3. Search the repository for each concept and each word the hub
-   excludes for it: each use means it, under your file's name (ENG-35).
+3. Search the repository for each concept and each word the hub excludes
+   for it: each use means it, under your file's name, or breaks ENG-35.
 4. Check your file against itself and the hub: each concept defined
    once, each pointer naming a concept defined there, and each relation
    in the hub that names your concepts agreeing.
