@@ -40,16 +40,23 @@ fn an_invariant_edit_without_its_record_is_a_blocking_finding() {
     );
 
     assert_eq!(got.class, Class::Deep);
-    // ENG-29's, and ENG-21's: the SRS has a code owner.
+    // ENG-29's alone: the SRS has no code owner, so ENG-21 asks nothing.
     assert!(
         got.findings.iter().any(|f| f.body.contains("ENG-29")),
         "{:?}",
         got.findings
     );
     assert!(
-        got.findings.iter().any(|f| f.body.contains("(ENG-21)")),
+        !got.findings.iter().any(|f| f.body.contains("(ENG-21)")),
         "{:?}",
         got.findings
+    );
+
+    let owned = analyse(&t, &t, "diff --git a/CLAUDE.md b/CLAUDE.md\n", &[]);
+    assert!(
+        owned.findings.iter().any(|f| f.body.contains("(ENG-21)")),
+        "{:?}",
+        owned.findings
     );
 }
 

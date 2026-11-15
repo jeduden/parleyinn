@@ -61,6 +61,29 @@ fn every_agent_written_field_of_a_run_is_scrubbed_and_counted() {
 }
 
 #[test]
+fn a_key_shaped_text_the_tree_holds_is_replaced_in_a_run_and_is_no_leak() {
+    // Built at run time, so this file holds no text of the shape.
+    let fixture = format!("sk-{}-api03-{}", "ant", "Ff42_-".repeat(6));
+    let scrubber =
+        Scrubber::new(&[TOKEN]).sparing(std::collections::BTreeSet::from([fixture.clone()]));
+    let mut run = leaking_run();
+    run.log.answer = format!("outcome: findings — tests.rs holds {fixture}");
+    let mut runs = vec![run];
+
+    // The token's thirteen places but for the answer, which holds the
+    // tree's text and no token.
+    assert_eq!(scrub_runs(&scrubber, &mut runs), 12);
+
+    assert_eq!(
+        runs[0].log.answer,
+        format!(
+            "outcome: findings — tests.rs holds {}",
+            review_eval::secret::TREE_TEXT
+        )
+    );
+}
+
+#[test]
 fn a_leak_makes_the_review_request_changes_with_a_named_blocking_finding() {
     let mut outcome = ReviewOutcome {
         verdict: APPROVE_VERDICT.to_owned(),

@@ -61,7 +61,11 @@ fn flags<'a>(base: &'a Path, head: &'a Path, diff: &'a Path, out: &'a Path) -> V
 fn the_executable_bundles_this_repository_against_itself() {
     let out = TempDir::new().unwrap();
     let diff = out.path().join("pr.diff");
-    fs::write(&diff, "diff --git a/docs/srs/10-engineering-quality.md b/docs/srs/10-engineering-quality.md\n+ENG-28\n").unwrap();
+    fs::write(
+        &diff,
+        "diff --git a/docs/agents/review-code.md b/docs/agents/review-code.md\n+ENG-28\n",
+    )
+    .unwrap();
     let root = testkit::repo_root();
 
     let run = review_bundle(out.path(), &flags(&root, &root, &diff, out.path()));
@@ -84,7 +88,7 @@ fn the_executable_blocks_a_stakeholder_path_without_a_consent() {
     let diff = out.path().join("pr.diff");
     fs::write(
         &diff,
-        "diff --git a/docs/srs/10-engineering-quality.md b/docs/srs/10-engineering-quality.md\n+ENG-28\n",
+        "diff --git a/docs/agents/review-code.md b/docs/agents/review-code.md\n+ENG-28\n",
     )
     .unwrap();
     let root = testkit::repo_root();
@@ -106,13 +110,13 @@ fn the_executable_blocks_a_stakeholder_path_without_a_consent() {
 }
 
 /// The ENG-21 finding's severity when the stakeholder's one comment on
-/// a change to the SRS reads `body`.
+/// a change to a shared section of the agent instructions reads `body`.
 fn eng_21_severity(body: &str) -> String {
     let out = TempDir::new().unwrap();
     let diff = out.path().join("pr.diff");
     fs::write(
         &diff,
-        "diff --git a/docs/srs/10-engineering-quality.md b/docs/srs/10-engineering-quality.md\n+ENG-28\n",
+        "diff --git a/docs/agents/review-code.md b/docs/agents/review-code.md\n+ENG-28\n",
     )
     .unwrap();
     let root = testkit::repo_root();
@@ -140,9 +144,9 @@ fn eng_21_severity(body: &str) -> String {
 
 #[test]
 fn the_executable_takes_consent_only_for_the_paths_a_comment_names() {
-    assert_eq!(eng_21_severity("Consent for `docs/srs/`."), "nit");
+    assert_eq!(eng_21_severity("Consent for `docs/agents/`."), "nit");
     assert_eq!(
-        eng_21_severity("Consent for .github/ and the SRS."),
+        eng_21_severity("Consent for .github/ and the agent instructions."),
         "blocking"
     );
 }
@@ -222,9 +226,10 @@ fn the_executable_refuses_a_live_scenario_put_back_on_pending() {
     let checked: serde_json::Value =
         serde_json::from_str(&fs::read_to_string(home.path().join("checked.json")).unwrap())
             .unwrap();
-    // The scenario's finding, and ENG-21's: `features/` has a code owner.
+    // The scenario's finding alone: `features/` has no code owner, so
+    // ENG-21 asks nothing and the ratchet is what blocks.
     assert!(
-        checked
+        !checked
             .as_array()
             .unwrap()
             .iter()

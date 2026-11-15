@@ -144,6 +144,9 @@ pub fn run_with(
         let _ = writeln!(out, "review-run: {line}");
     };
     let guarded = guard(&args, token).and_then(|(scrubber, located)| {
+        if let Some(line) = scrubber.spares() {
+            progress(&line);
+        }
         let confined = located.as_deref().map(|dir| Confined::new(host, dir));
         let host: &dyn Host = match &confined {
             Some(confined) => confined,
@@ -281,12 +284,15 @@ fn with_leaks(reviewed: Result<String, String>, found: usize) -> Result<String, 
 }
 
 /// The scrubber for the token staged under `args`' credential and
-/// `token`, and that credential's directory, located.
+/// `token`, and that credential's directory, located. A key-shaped
+/// text a file of the work directory holds, main's tree or the pull
+/// request's, is the tree's own and no leak; the credential's
+/// directory is no part of either.
 ///
 /// # Errors
 ///
-/// Fails when the credential does not resolve or read, or a token is
-/// too short for the scrub to match.
+/// Fails when the credential does not resolve or read, a token is too
+/// short for the scrub to match, or the work directory does not read.
 fn guard(args: &Args, token: Option<&str>) -> Result<(Scrubber, Option<PathBuf>), String> {
     let located = args
         .credential
@@ -296,7 +302,10 @@ fn guard(args: &Args, token: Option<&str>) -> Result<(Scrubber, Option<PathBuf>)
     let staged = located.as_deref().map(credential::read).transpose()?;
     let secrets: Vec<&str> = staged.as_deref().into_iter().chain(token).collect();
 
-    Ok((Scrubber::guarded(&secrets)?, located))
+    let workdir = Path::new(&args.workdir);
+    let theirs = review_eval::secret::shaped_under(workdir, located.as_deref())?;
+
+    Ok((Scrubber::guarded(&secrets)?.sparing(theirs), located))
 }
 
 /// Runs the review `args` name and writes its files, each scrubbed by

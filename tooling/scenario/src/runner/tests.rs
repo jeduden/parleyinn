@@ -93,6 +93,53 @@ fn selects_skips_pending_and_applies_tags_and_filters() {
     assert!(by_tag.selects("another", bound.iter()));
 }
 
+#[test]
+fn selects_runs_a_row_tagged_runs_though_its_scenario_is_pending() {
+    let all = Options::default();
+    let eng24 = parse_args(&args(&["--tags", "@ENG-24"])).unwrap();
+    let row = tags(&["ENG-24", "P0", "pending", "runs"]);
+
+    assert!(all.selects("x", row.iter()));
+    assert!(eng24.selects("x", row.iter()));
+    assert!(!eng24.selects("x", tags(&["ENG-01", "pending", "runs"]).iter()));
+    assert!(!all.selects("x", tags(&["ENG-24", "pending"]).iter()));
+}
+
+/// The rows of `feature` a run with no option selects, each by the cell
+/// of its column `q`, given to `selects` as the scenario runner gives
+/// them: cucumber's expansion of each row, tagged with the feature's
+/// tags and its own.
+fn selected_rows(feature: &str) -> Vec<String> {
+    use cucumber::feature::Ext as _;
+    use cucumber::gherkin::{Feature, GherkinEnv};
+
+    let feature = Feature::parse(feature, GherkinEnv::default())
+        .unwrap()
+        .expand_examples()
+        .unwrap();
+
+    feature
+        .scenarios
+        .iter()
+        .filter(|sc| Options::default().selects(&sc.name, feature.tags.iter().chain(&sc.tags)))
+        .map(|sc| sc.steps[0].value.clone())
+        .collect()
+}
+
+#[test]
+fn selects_gets_each_row_of_an_outline_with_its_examples_block_s_tags() {
+    let outline = |scenario: &str, first: &str, second: &str| {
+        format!(
+            "Feature: F\n\n  @SEC-04 {scenario}\n  Scenario Outline: s\n    Given <q>\n\n    {first}\n    Examples:\n      | q |\n      | a |\n      | b |\n\n    {second}\n    Examples:\n      | q |\n      | c |\n"
+        )
+    };
+
+    assert_eq!(selected_rows(&outline("@pending", "@runs", "")), ["a", "b"]);
+    assert_eq!(selected_rows(&outline("", "", "@pending")), ["a", "b"]);
+    assert_eq!(selected_rows(&outline("", "", "")), ["a", "b", "c"]);
+    assert!(selected_rows(&outline("@pending", "", "")).is_empty());
+}
+
 /// A future that is pending until polled `left` more times, waking
 /// itself each time: by reference on this thread, or by value from
 /// another thread.

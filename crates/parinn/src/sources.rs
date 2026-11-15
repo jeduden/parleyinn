@@ -4,14 +4,16 @@
 //! fully ingested, and how far `parinn verify` finds each short of its
 //! end (ADM-09).
 
-use std::io::{self, Read};
+use std::io::{self, Read, Write};
 use std::path::{Path, PathBuf};
 
 use administration::home::Home;
+use audit::entry::{Counter, Kind, Occurrence};
 use record::digest::{Digest, Running};
 use serde_json::{Value, json};
 use store::{Source, Store, StoreError};
 
+use crate::Context;
 use crate::event::inline;
 
 /// The transcript sources `parinn status` reports.
@@ -223,6 +225,21 @@ pub(crate) fn completeness(
     found
 }
 
+/// How far the transcript sources of `store` fall short (ADM-09), as
+/// `parinn verify` finds them now.
+pub(crate) fn verified(
+    ctx: &Context,
+    home: &Home,
+    store: &Store,
+) -> Result<Completeness, StoreError> {
+    Ok(completeness(
+        &store.sources()?,
+        &crate::capture::served(home),
+        &look,
+        (ctx.clock)().saturating_mul(1000),
+    ))
+}
+
 /// What `parinn verify` finds of `source`, given what is at its path.
 fn outcome(source: &Source, at: Found, served: &[PathBuf], now_ms: u64) -> Outcome {
     let at = match at {
@@ -324,6 +341,46 @@ pub(crate) fn lost_text(lost: &[String]) -> String {
         "transcript sources gone before they were fully ingested: {}",
         shown(lost)
     )
+}
+
+/// Audits and counts, once each, every transcript source `parinn ingest
+/// --all` finds gone before it was fully ingested (REC-08, I6).
+pub(crate) fn audit_lost(ctx: &Context, home: &Home, stderr: &mut dyn Write) {
+    let found = Store::open(&home.store()).and_then(|mut store| {
+        let sources = store.sources()?;
+        let fresh: Vec<store::Source> = lost(&sources)
+            .into_iter()
+            .filter(|s| !s.lost)
+            .cloned()
+            .collect();
+        for source in &fresh {
+            store.lose(source.id)?;
+        }
+        Ok(fresh)
+    });
+    let fresh = match found {
+        Ok(fresh) => fresh,
+        Err(e) => {
+            let _ = writeln!(stderr, "parinn ingest: find lost transcript sources: {e}");
+            return;
+        }
+    };
+    for source in fresh {
+        let name = Path::new(&source.path)
+            .file_stem()
+            .map(|s| s.to_string_lossy().into_owned())
+            .unwrap_or_default();
+        let occurrence = Occurrence::Keyed {
+            kind: Kind::Dropped,
+            counter: Counter::TranscriptSourceLost,
+            operation: "ingest",
+            detail: "transcript source gone before it was fully ingested:",
+            key: &name,
+        };
+        if let Err(e) = ctx.audit(&occurrence) {
+            let _ = writeln!(stderr, "parinn ingest: audit a lost transcript source: {e}");
+        }
+    }
 }
 
 #[cfg(test)]

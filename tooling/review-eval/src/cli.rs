@@ -26,7 +26,7 @@ use crate::host::Host;
 use crate::log::RunLog;
 use crate::plan::{self, Planned};
 use crate::score::{CaseRecord, RunRecord, Scorecard, SuiteRecord, decided};
-use crate::secret::Scrubber;
+use crate::secret::{self, Scrubber};
 use crate::{CASES, DEADLINE_SECONDS, check, compare, grade, published, runner, world};
 
 /// Every case passed, or the command had nothing to fail on.
@@ -42,7 +42,7 @@ pub const EXIT_LEAKED: u8 = 3;
 
 /// How to call it.
 pub const USAGE: &str = "usage: review-eval check [--checkout DIR] [--tree DIR] [--cases DIR]
-       review-eval plan --base DIR --head DIR [--out FILE]
+       review-eval plan --base DIR --head DIR [--consent FILE] [--out FILE]
        review-eval run --out DIR (--component NAME)... | --all | --plan FILE
                        [--checkout DIR] [--tree DIR] [--cases DIR] [--base-cases DIR]
                        [--model MODEL] [--credential DIR]
@@ -74,8 +74,8 @@ pub struct Options {
     pub cases: PathBuf,
     /// Written cases that judge a component instead of `cases`'s when
     /// they hold a directory for it: main's, in the review of a pull
-    /// request.
-    pub base_cases: Option<PathBuf>,
+    /// request, but for the case files the stakeholder consented to.
+    pub base_cases: Option<check::Base>,
     /// A model every component runs on instead of its own.
     pub model: Option<String>,
     /// Repetitions and passes in place of each case's own.
@@ -256,10 +256,18 @@ fn check_command(flags: &Flags, stdout: &mut dyn Write) -> Result<u8, Problem> {
 }
 
 fn plan_command(flags: &Flags, stdout: &mut dyn Write) -> Result<u8, Problem> {
-    only(flags, &["base", "head", "out"])?;
+    only(flags, &["base", "head", "out", "consent"])?;
     let base = required(flags, "base")?;
     let head = required(flags, "head")?;
-    let planned = plan::between(Path::new(&base), Path::new(&head))?;
+    let mut planned = plan::between(Path::new(&base), Path::new(&head))?;
+    // The stakeholder's comments, as the review collects them: a case
+    // file one of them names judges as the pull request has it (ENG-21).
+    if let Some(file) = one(flags, "consent")? {
+        let unread = |e: String| format!("read {file}: {e}");
+        let json = fs::read_to_string(&file).map_err(|e| unread(e.to_string()))?;
+        let consents = review_bundle::cli::consents(&json).map_err(unread)?;
+        planned = plan::consented(Path::new(&base), Path::new(&head), planned, &consents)?;
+    }
     if let Some(out) = one(flags, "out")? {
         let text = serde_json::to_string_pretty(&planned).map_err(|e| e.to_string())?;
         fs::write(&out, format!("{text}\n")).map_err(|e| format!("write {out}: {e}"))?;
@@ -269,6 +277,9 @@ fn plan_command(flags: &Flags, stdout: &mut dyn Write) -> Result<u8, Problem> {
     }
     for p in &planned {
         let _ = writeln!(stdout, "{}: {}", p.component, p.reason);
+        for line in p.judged() {
+            let _ = writeln!(stdout, "  {line}");
+        }
     }
     if !planned.is_empty() {
         let names: Vec<String> = planned.iter().map(|p| p.component.clone()).collect();
@@ -384,19 +395,23 @@ fn run_command(
     let located = one(flags, "credential")?
         .map(|dir| credential::locate(Path::new(&dir)))
         .transpose()?;
-    let scrubber = scrubber(flags, token)?;
     let confined = located.as_deref().map(|dir| Confined::new(host, dir));
     let host: &dyn Host = match &confined {
         Some(confined) => confined,
         None => host,
     };
     let (checkout, tree, cases) = places(flags)?;
+    // A key-shaped text a file of the trees holds is theirs: an agent
+    // that reads the file leaked nothing.
+    let mut theirs = secret::shaped_under(&checkout, located.as_deref())?;
+    theirs.extend(secret::shaped_under(&tree, located.as_deref())?);
+    let scrubber = scrubber(flags, token)?.sparing(theirs);
     let out = PathBuf::from(required(flags, "out")?);
     let options = Options {
         checkout: checkout.clone(),
         tree,
         cases,
-        base_cases: one(flags, "base-cases")?.map(PathBuf::from),
+        base_cases: base_cases(flags)?,
         model: one(flags, "model")?,
         repetitions: number(flags, "repetitions")?,
         passes: number(flags, "passes")?,
@@ -406,6 +421,11 @@ fn run_command(
         ),
         out,
     };
+    // What the run takes for no leak, and what the consent moved (I6).
+    let moved = options.base_cases.as_ref().and_then(consent_line);
+    for line in scrubber.spares().into_iter().chain(moved) {
+        let _ = writeln!(stderr, "{line}");
+    }
     let components = selected(flags, &checkout)?;
     if components.is_empty() {
         let _ = writeln!(stdout, "nothing to evaluate");
@@ -441,6 +461,62 @@ fn run_command(
     })
 }
 
+/// The plan `plan --out` wrote to `file`.
+fn read_plan(file: &str) -> Result<Vec<Planned>, Problem> {
+    let text = fs::read_to_string(file).map_err(|e| format!("read {file}: {e}"))?;
+
+    Ok(serde_json::from_str(&text).map_err(|e| format!("read {file}: {e}"))?)
+}
+
+/// Main's cases, when `--base-cases` names them, with the case files
+/// the plan of `--plan` says a stakeholder comment consents to: those
+/// judge as the pull request has them (ENG-21).
+fn base_cases(flags: &Flags) -> Result<Option<check::Base>, Problem> {
+    let Some(cases) = one(flags, "base-cases")? else {
+        return Ok(None);
+    };
+    let planned = match one(flags, "plan")? {
+        Some(file) => read_plan(&file)?,
+        None => Vec::new(),
+    };
+    let consented = planned
+        .iter()
+        .flat_map(|p| p.consented.iter().map(|file| case_of(&p.component, file)))
+        .collect();
+
+    Ok(Some(check::Base {
+        cases: PathBuf::from(cases),
+        consented,
+    }))
+}
+
+/// What a run says of the cases the stakeholder's consent moved from
+/// main's version to the pull request's, so the exception shows (I6);
+/// nothing when it moved none.
+fn consent_line(base: &check::Base) -> Option<String> {
+    let names: Vec<String> = base
+        .consented
+        .iter()
+        .map(|(component, name)| format!("{component}/{name}"))
+        .collect();
+
+    (!names.is_empty()).then(|| {
+        format!(
+            "by the stakeholder's consent the pull request's version judges {}: {}",
+            counted(names.len(), "case"),
+            names.join(", ")
+        )
+    })
+}
+
+/// The case the file `file` of `component`'s suite holds, by its
+/// component and name.
+fn case_of(component: &str, file: &str) -> (String, String) {
+    let name = file.strip_suffix(".toml").unwrap_or(file);
+
+    (suite_of(component), name.to_owned())
+}
+
 /// The components `run` was asked for: named, all, or a plan's.
 fn selected(flags: &Flags, checkout: &Path) -> Result<Vec<String>, Problem> {
     let named = flags.get("component").cloned().unwrap_or_default();
@@ -450,9 +526,7 @@ fn selected(flags: &Flags, checkout: &Path) -> Result<Vec<String>, Problem> {
         (false, false, None) => named,
         (true, true, None) => component::names(checkout)?,
         (true, false, Some(file)) => {
-            let text = fs::read_to_string(&file).map_err(|e| format!("read {file}: {e}"))?;
-            let planned: Vec<Planned> =
-                serde_json::from_str(&text).map_err(|e| format!("read {file}: {e}"))?;
+            let planned = read_plan(&file)?;
             planned.into_iter().map(|p| p.component).collect()
         }
         _ => {
@@ -505,7 +579,7 @@ pub fn evaluate(
         &options.checkout,
         &options.tree,
         &options.cases,
-        options.base_cases.as_deref(),
+        options.base_cases.as_ref(),
         Some(components),
     );
     if !problems.is_empty() {
@@ -514,7 +588,7 @@ pub fn evaluate(
             problems.join("\n")
         ));
     }
-    let base = options.base_cases.as_deref();
+    let base = options.base_cases.as_ref();
     let cases = check::all_cases_from(&options.checkout, &options.cases, base)?;
     let mut jobs: Vec<(Component, Case)> = Vec::new();
     let mut suites: Vec<SuiteRecord> = Vec::new();

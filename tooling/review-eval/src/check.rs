@@ -6,7 +6,7 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use review_bundle::dispatch::{DEEP_GENERALISTS, GENERALISTS, agents};
 use review_bundle::{Snapshot, analyse};
@@ -29,11 +29,25 @@ pub fn all_cases(root: &Path, cases_dir: &Path) -> Result<Vec<Case>, String> {
     all_cases_from(root, cases_dir, None)
 }
 
-/// [`all_cases`], with a component's written cases taken from
-/// `base_cases` instead when it has a directory there: the cases main
-/// already holds judge a component main already has, so a change
-/// cannot soften the cases that judge it; a new component is judged by
-/// the cases it brings.
+/// Main's written cases, in the review of a pull request, and the case
+/// files excepted from them.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct Base {
+    /// Main's case directory.
+    pub cases: PathBuf,
+    /// The case files, each by its component and case name, whose
+    /// change in the pull request a stakeholder comment consents to
+    /// (ENG-21): the pull request's version judges.
+    pub consented: BTreeSet<(String, String)>,
+}
+
+/// [`all_cases`], with a component's written cases taken from `base`
+/// instead when it has a directory there: the cases main already holds
+/// judge a component main already has, so a change cannot soften the
+/// cases that judge it; a new component is judged by the cases it
+/// brings. The one exception is the stakeholder's: a case file of
+/// `base.consented` judges as the pull request has it, changed or
+/// added, and judges no more when the pull request removed it.
 ///
 /// # Errors
 ///
@@ -41,14 +55,18 @@ pub fn all_cases(root: &Path, cases_dir: &Path) -> Result<Vec<Case>, String> {
 pub fn all_cases_from(
     root: &Path,
     cases_dir: &Path,
-    base_cases: Option<&Path>,
+    base: Option<&Base>,
 ) -> Result<Vec<Case>, String> {
     let mut cases = case::load_dir(cases_dir)?;
-    if let Some(base) = base_cases {
-        let judging = case::load_dir(base)?;
-        let kept: BTreeSet<&str> = judging.iter().map(|c| c.component.as_str()).collect();
-        cases.retain(|c| !kept.contains(c.component.as_str()));
-        cases.extend(judging);
+    if let Some(base) = base {
+        let judging = case::load_dir(&base.cases)?;
+        let kept: BTreeSet<String> = judging.iter().map(|c| c.component.clone()).collect();
+        let theirs = |c: &Case| {
+            base.consented
+                .contains(&(c.component.clone(), c.name.clone()))
+        };
+        cases.retain(|c| !kept.contains(&c.component) || theirs(c));
+        cases.extend(judging.into_iter().filter(|c| !theirs(c)));
     }
     cases.extend(derived::cases(root)?);
     cases.sort_by_key(Case::id);
@@ -99,10 +117,10 @@ pub fn problems_from(
     root: &Path,
     tree: &Path,
     cases_dir: &Path,
-    base_cases: Option<&Path>,
+    main: Option<&Base>,
     selection: Option<&[String]>,
 ) -> Vec<String> {
-    examine_from(root, tree, cases_dir, base_cases, selection).map_or_else(|e| vec![e], |p| p.all())
+    examine_from(root, tree, cases_dir, main, selection).map_or_else(|e| vec![e], |p| p.all())
 }
 
 /// The components without their kinds of case, or what could not be
@@ -195,14 +213,14 @@ pub fn examine_from(
     root: &Path,
     tree: &Path,
     cases_dir: &Path,
-    base_cases: Option<&Path>,
+    main: Option<&Base>,
     selection: Option<&[String]>,
 ) -> Result<Problems, String> {
     let components = catalog(root, tree, selection)?;
     let selected = |name: &str| {
         selection.is_none_or(|names| names.iter().any(|n| suite_of(n) == suite_of(name)))
     };
-    let cases: Vec<Case> = all_cases_from(root, cases_dir, base_cases)?
+    let cases: Vec<Case> = all_cases_from(root, cases_dir, main)?
         .into_iter()
         .filter(|c| selected(&c.component))
         .collect();

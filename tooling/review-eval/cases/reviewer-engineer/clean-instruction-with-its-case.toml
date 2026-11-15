@@ -1,6 +1,10 @@
 component = "reviewer-engineer"
 kind = "clean"
 title = "a new check in a reviewer component, with the case that proves it"
+# The change touches paths CODEOWNERS assigns: without the comment the
+# bundle holds a blocking ENG-21 finding the reviewer repeats, and the
+# clean change is not clean.
+consent = "Approved: the open-work check in .claude/agents/lang-rust.md and its case, tooling/review-eval/cases/lang-rust/defect-todo.toml."
 
 [[replace]]
 file = ".claude/agents/lang-rust.md"

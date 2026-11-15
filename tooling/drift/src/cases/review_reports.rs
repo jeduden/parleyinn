@@ -66,7 +66,7 @@ pub(super) fn review_late_cases() -> Vec<Case> {
             Injection::replace(
                 "tooling/review-eval/src/plan.rs",
                 "                shared.entry(sections_of(&a)).or_default().push(name);\n",
-                "                shared.entry(sections_of(&a)).or_default().push(name.clone());\n                out.push(Planned { component: name, reason: \"shared sections changed\".to_owned() });\n",
+                "                shared.entry(sections_of(&a)).or_default().push(name.clone());\n                out.push(Planned::new(name, \"shared sections changed\".to_owned()));\n",
             ),
             scenario("ENG-32"),
             "components planned for the sections",
@@ -217,6 +217,20 @@ pub(super) fn review_report_grading_cases() -> Vec<Case> {
                 "grade::tests::a_specialist_s_line_is_matched_by_its_form_and_never_by_a_severity_word",
             ),
             "a_specialist_s_line_is_matched_by_its_form_and_never_by_a_severity_word",
+        ),
+        case(
+            "the evaluation judging by a case of the pull request no stakeholder consented to",
+            "ENG-32",
+            Injection::replace(
+                "tooling/review-eval/src/check.rs",
+                "        cases.retain(|c| !kept.contains(&c.component) || theirs(c));\n",
+                "        cases.retain(|c| !kept.contains(&c.component) || true);\n",
+            ),
+            cargo_lib_test(
+                "review-eval",
+                "check::tests::main_s_cases_judge_a_component_main_has_but_for_a_consented_case_file",
+            ),
+            "main_s_cases_judge_a_component_main_has_but_for_a_consented_case_file",
         ),
         case(
             "the evaluation's check taking a generalist's case that names a form",

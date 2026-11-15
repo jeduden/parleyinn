@@ -225,6 +225,66 @@ fn run_confines_each_agent_to_the_staged_credential_and_fails_closed_on_a_leak()
 }
 
 #[test]
+fn run_takes_a_key_shaped_text_a_file_of_the_checkout_holds_for_no_leak() {
+    let dir = checkout();
+    sound_cases(dir.path());
+    // Built at run time, so this file holds no text of the shape.
+    let fixture = format!("sk-{}-api03-{}", "ant", "Ff42_-".repeat(6));
+    fs::write(
+        dir.path().join("fixture.rs"),
+        format!("const KEY: &str = \"{fixture}\";\n"),
+    )
+    .unwrap();
+    let mut host = FakeHost::new(dir.path());
+    let obedient = obedient_claude();
+    let quoted = fixture.clone();
+    host.claude = Box::new(move |c: &Command| {
+        let out = obedient(c)?;
+        let path = c.stdout_to.as_ref().unwrap();
+        let log = fs::read_to_string(path).unwrap().replace(
+            "an unwrap outside tests panics",
+            &format!("fixture.rs holds {quoted}"),
+        );
+        fs::write(path, log).unwrap();
+        Ok(out)
+    });
+    let root = TempDir::new().unwrap();
+    let out_dir = root.path().join("out");
+
+    let (code, out, err) = run_cli_with(
+        &host,
+        None,
+        &[
+            "run",
+            "--checkout",
+            &text(dir.path()),
+            "--component",
+            "lang-rust",
+            "--out",
+            &text(&out_dir),
+            "--repetitions",
+            "1",
+            "--passes",
+            "1",
+        ],
+    );
+
+    assert_ne!(code, EXIT_LEAKED, "{out}\n{err}");
+    assert!(!err.contains("contained the Claude token"), "{err}");
+    let log = fs::read_to_string(out_dir.join("runs/lang-rust/defect/1/log.jsonl")).unwrap();
+    assert!(
+        !log.contains(&fixture) && log.contains(crate::secret::TREE_TEXT),
+        "{log}"
+    );
+    assert!(!out.contains(&fixture) && !err.contains(&fixture));
+    // The principal sees the rule at work (I6).
+    assert!(
+        err.contains("the scrub spares 1 key-shaped text the trees hold"),
+        "{err}"
+    );
+}
+
+#[test]
 fn run_names_a_credential_it_cannot_read() {
     let dir = checkout();
     let host = FakeHost::new(dir.path());

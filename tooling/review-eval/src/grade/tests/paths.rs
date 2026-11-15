@@ -95,4 +95,9 @@ fn a_wanted_id_is_one_the_linked_line_cites_not_one_its_sentence_holds() {
     let in_the_sentence =
         "docs/srs/06-security.md:8 — if not addressed: it breaks ENG-35 for rooms — LANE-01";
     assert_eq!(grade_of(in_the_sentence).len(), 1, "{in_the_sentence}");
+    // A line of another form ends with no ids: it cites the ones it holds.
+    let request = "docs/srs/06-security.md:8 — request: change ENG-35 — it speaks of a lane";
+    assert_eq!(grade_of(request), Vec::<String>::new());
+    let another = "docs/srs/06-security.md:8 — request: change ENG-36 — it speaks of a lane";
+    assert_eq!(grade_of(another).len(), 1, "{another}");
 }

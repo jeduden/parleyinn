@@ -30,10 +30,13 @@ It changes only harness configuration, under I7.
   generation** (REC-07). The **transcript roots** (`transcript.roots`) are the
   directories ingest reads transcripts from by default (REC-01, SEC-18). An
   **allowed root** is a directory within which every path ParleyInn receives
-  must
-  resolve: the transcript roots, the home, and, for reading only, a run's
-  worktree and its repository's git directory (SEC-18). A path outside every
-  allowed root is refused. As a
+  from a hook input, transcript or settings layer must resolve: the transcript
+  roots, the home, and, for reading only, a run's worktree and its repository's
+  git directory (SEC-18). The one path ParleyInn may read outside every allowed
+  root is a regular transcript file the principal names on `parinn ingest
+  --path` at a terminal, as a widening principal act (REC-22, SEC-18); a path
+  from a hook input or transcript line never takes that exception. Every other
+  path outside every allowed root is refused. As a
   ParleyInn term, "source" is a transcript source or a trusted source; the
   harness's
   `source` field and §6.1's threat sources keep their own sense. Each

@@ -114,7 +114,9 @@ pub fn context(a: &Analysis, name: &str) -> String {
             b,
             "\n## ENG-29 record\n\nThis change changes the accepted ADR `{}`, which names \
              ENG-29 and what it guards, and a stakeholder comment consents to the change: \
-             the bundle checked both.\n",
+             the bundle checked both and no more. Whether the record names the human \
+             security reviewer whose approval ENG-29 asks for, the review checks, from the \
+             record.\n",
             code(&r.path)
         );
     }

@@ -1,4 +1,7 @@
+use std::collections::BTreeSet;
 use std::fs;
+use std::io;
+use std::path::Path;
 
 use testkit::TempDir;
 
@@ -93,6 +96,104 @@ fn any_token_of_the_claude_shape_is_replaced_even_unknown() {
     // The shape named in prose, too short to be a token, stays.
     let prose = format!("a token starts sk-{}-oat01-…", "ant");
     assert_eq!(s.scrub(&prose), (prose.clone(), 0));
+}
+
+/// Another token of that shape, which no tree holds.
+fn unknown() -> String {
+    format!("sk-{}-api03-{}", "ant", "Qq17_-".repeat(8))
+}
+
+#[test]
+fn a_key_shaped_text_the_tree_holds_is_replaced_and_is_no_leak() {
+    let s = Scrubber::new(&[]).sparing(BTreeSet::from([shaped()]));
+
+    let (text, n) = s.scrub(&format!("a.rs:3: \"{}\", then \"{}\"", shaped(), unknown()));
+
+    // The tree's own text is no token of the review's: it is replaced,
+    // so nothing kept holds the shape, and only the unknown one counts.
+    assert_eq!(
+        text,
+        format!("a.rs:3: \"{TREE_TEXT}\", then \"{REDACTED}\"")
+    );
+    assert_eq!(n, 1);
+    // A longer run of token characters is another text than the tree's.
+    let longer = format!("{}x", shaped());
+    assert_eq!(s.scrub(&longer), (REDACTED.to_owned(), 1));
+}
+
+#[test]
+fn the_review_s_own_token_is_a_leak_even_where_a_tree_holds_it() {
+    let s = Scrubber::new(&[&shaped()]).sparing(BTreeSet::from([shaped()]));
+
+    assert_eq!(s.scrub(&shaped()), (REDACTED.to_owned(), 1));
+}
+
+#[test]
+fn the_key_shaped_texts_under_a_tree_are_collected() {
+    let dir = TempDir::new().unwrap();
+    let write = |rel: &str, body: String| {
+        let path = dir.path().join(rel);
+        fs::create_dir_all(path.parent().unwrap()).unwrap();
+        fs::write(path, body).unwrap();
+    };
+    write(
+        "crates/a/src/tests.rs",
+        format!("let key = \"{}\";\n", shaped()),
+    );
+    write("notes.md", format!("a token starts sk-{}-oat01-…\n", "ant"));
+    // What a build or git wrote is no text of the tree.
+    write("target/debug/x", unknown());
+    write(".git/objects/y", unknown());
+    let mut bytes = vec![0xff, 0xfe];
+    bytes.extend_from_slice(format!("{}z", shaped()).as_bytes());
+    fs::write(dir.path().join("bin"), bytes).unwrap();
+
+    // Nor is what a link of the tree points at: a link is never followed,
+    // so a file outside the tree stays outside.
+    let outside = TempDir::new().unwrap();
+    let elsewhere = format!("{}y", shaped());
+    fs::write(outside.path().join("key"), &elsewhere).unwrap();
+    std::os::unix::fs::symlink(outside.path(), dir.path().join("linked-dir")).unwrap();
+    std::os::unix::fs::symlink(outside.path().join("key"), dir.path().join("linked-file")).unwrap();
+    // Nor is the staged credential, which holds tokens that are no fixture.
+    write("cred/.credentials.json", unknown());
+    let cred = fs::canonicalize(dir.path().join("cred")).unwrap();
+
+    assert_eq!(
+        shaped_under(dir.path(), Some(&cred)),
+        Ok(BTreeSet::from([shaped(), format!("{}z", shaped())]))
+    );
+    assert_eq!(
+        shaped_under(dir.path(), None).map(|found| found.contains(&unknown())),
+        Ok(true)
+    );
+    assert_eq!(
+        shaped_under(dir.path(), None).map(|found| found.contains(&elsewhere)),
+        Ok(false)
+    );
+    let err = shaped_under(&dir.path().join("missing"), None).unwrap_err();
+    assert!(err.starts_with("read "), "{err}");
+    assert_eq!(
+        unread(Path::new("a/b"), &io::Error::other("gone")),
+        "read a/b: gone"
+    );
+}
+
+#[test]
+fn a_file_holding_only_the_tree_s_text_is_rewritten_and_is_no_leak() {
+    let dir = TempDir::new().unwrap();
+    let path = dir.path().join("log.jsonl");
+    fs::write(&path, format!("{{\"text\":\"{}\"}}\n", shaped())).unwrap();
+    let s = Scrubber::new(&[TOKEN]).sparing(BTreeSet::from([shaped()]));
+
+    assert_eq!(s.scrub_tree(dir.path()).unwrap(), 0);
+
+    assert_eq!(
+        fs::read_to_string(&path).unwrap(),
+        format!("{{\"text\":\"{TREE_TEXT}\"}}\n")
+    );
+    // A second scrub that knows no tree finds nothing left to take for a token.
+    assert_eq!(Scrubber::new(&[TOKEN]).scrub_tree(dir.path()).unwrap(), 0);
 }
 
 #[test]
@@ -193,4 +294,25 @@ fn base64_encodes_as_the_standard_says() {
     assert_eq!(encode(b"foo", STANDARD), "Zm9v");
     assert_eq!(encode(&[0xfb, 0xff], STANDARD), "+/8");
     assert_eq!(encode(&[0xfb, 0xff], URL_SAFE), "-_8");
+}
+
+#[test]
+fn a_scrubber_says_how_many_texts_of_the_trees_it_spares() {
+    assert_eq!(Scrubber::new(&[TOKEN]).spares(), None);
+    let one = Scrubber::new(&[]).sparing(BTreeSet::from([shaped()]));
+    assert_eq!(
+        one.spares(),
+        Some(format!(
+            "the scrub spares 1 key-shaped text the trees hold: \
+             replaced with {TREE_TEXT}, no leak"
+        ))
+    );
+    let two = Scrubber::new(&[]).sparing(BTreeSet::from([shaped(), unknown()]));
+    assert_eq!(
+        two.spares(),
+        Some(format!(
+            "the scrub spares 2 key-shaped texts the trees hold: \
+             replaced with {TREE_TEXT}, no leak"
+        ))
+    );
 }

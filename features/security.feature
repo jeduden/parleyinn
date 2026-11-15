@@ -62,10 +62,14 @@ Feature: Security (SEC)
     Then the hook handler exits 0 with no injection
     And <expected>
 
+    @runs
     Examples:
       | input                                               | expected                                                                     |
       | stdin of 1 MiB plus one byte                        | an audit entry records "hook input exceeds 1 MiB"                            |
       | a JSON object nested 65 levels deep                 | an audit entry records "hook input nesting exceeds depth 64"                 |
+
+    Examples:
+      | input                                               | expected                                                                     |
       | a transcript line larger than the payload threshold | the line is streamed to the payload store without being kept whole in memory |
 
   @SEC-06 @P0 @I2
@@ -164,6 +168,7 @@ Feature: Security (SEC)
     And a quarantine that would remove a pin, a pin version or a landmark from a restore block takes effect only as a confirmed widening principal act
     And releasing the quarantine, a widening principal act, is recorded as an "operator" event the same way
 
+    @runs
     Examples:
       | selector                     |
       | --range A1:100-200           |
@@ -172,8 +177,11 @@ Feature: Security (SEC)
       | --room room-1                |
       | --writer w-1                 |
       | --provenance web             |
-      | --flag instruction_like      |
       | --since 2026-01-01T00:00:00Z |
+
+    Examples:
+      | selector                     |
+      | --flag instruction_like      |
 
   @SEC-13 @P1 @I2 @pending
   Scenario: a run is tainted once untrusted content is recalled into it
@@ -221,21 +229,27 @@ Feature: Security (SEC)
     And it covers every row of the boundary register and the threat sources acting across each boundary
     And it compares ParleyInn with Zed Delta control by control on record signing, trust in other principals, central-service dependence and key custody
 
-  @SEC-18 @P0 @I8 @pending
-  Scenario Outline: paths outside the allowed roots are rejected and audited, and the run's worktree and its repository's git directory are read-only
+  @SEC-18 @P0 @I8
+  Scenario Outline: paths outside the allowed roots are rejected and audited unless the person names them at the terminal, and the run's worktree and its repository's git directory are read-only
     Given an isolated ParleyInn home
     And the transcript roots are "~/.claude/projects"
     And a run whose hook "cwd" is "~/src/app/pkg", inside a repository whose top level is "~/src/app"
-    When the hook "SessionStart" runs, or the run's MCP server ingests a transcript line, naming the path "<path>"
+    When <named by> names the path "<path>"
     Then <expected>
 
     Examples:
-      | path                                                     | expected                                                                                               |
-      | /etc/passwd                                              | the path is rejected, nothing is read from it, and an audit entry records "path outside allowed roots" |
-      | ~/.claude/projects/../../.ssh/id_ed25519                 | the path is rejected, nothing is read from it, and an audit entry records "path outside allowed roots" |
-      | ~/.claude/projects/p/link-to-root.jsonl (a symlink to /) | the path is rejected, nothing is read from it, and an audit entry records "path outside allowed roots" |
-      | ~/src/app/.git/HEAD                                      | the file is read, and nothing in the repository is written                                             |
-      | ~/src/app/docs/key (a symlink to ~/.ssh/id_ed25519)      | the path is rejected, nothing is read from it, and an audit entry records "path outside allowed roots" |
+      | named by                                              | path                                                       | expected                                                                                                                                                              |
+      | the hook "SessionStart" input                         | /etc/passwd                                                | the path is rejected, nothing is read from it, and an audit entry records "path outside allowed roots"                                                                |
+      | the hook "SessionStart" input                         | ~/.claude/projects/../../.ssh/id_ed25519                   | the path is rejected, nothing is read from it, and an audit entry records "path outside allowed roots"                                                                |
+      | the hook "SessionStart" input                         | ~/.claude/projects/p/link-to-root.jsonl (a symlink to /)   | the path is rejected, nothing is read from it, and an audit entry records "path outside allowed roots"                                                                |
+      | the hook "SessionStart" input                         | ~/src/app/.git/HEAD                                        | the file is read, and nothing in the repository is written                                                                                                            |
+      | the hook "SessionStart" input                         | ~/src/app/docs/key (a symlink to ~/.ssh/id_ed25519)        | the path is rejected, nothing is read from it, and an audit entry records "path outside allowed roots"                                                                |
+      | the hook "SessionStart" input                         | /tmp/elsewhere.jsonl (a regular file)                      | the path is rejected, nothing is read from it, and an audit entry records "path outside allowed roots"                                                                |
+      | a transcript line the run's MCP server ingests        | /tmp/elsewhere.jsonl (a regular file)                      | the path is rejected, nothing is read from it, and an audit entry records "path outside allowed roots"                                                                |
+      | the accepted configuration setting "transcript.roots" | ~/configured-transcripts (a symlink to ~/.claude/projects) | the configured transcript root is resolved to its target before its JSONL files are read                                                                              |
+      | the person, on "parinn ingest --path" at a terminal   | /tmp/elsewhere.jsonl (a regular file)                      | the path is resolved and read as the person's widening principal act, its lines are redacted and untrusted with origin "ingested", and nothing is written to the file |
+      | the person, on "parinn ingest --path" at a terminal   | /tmp/link.jsonl (a symlink to /tmp/elsewhere.jsonl)        | the path is resolved to its target and read as the person's widening principal act, its lines are redacted and untrusted with origin "ingested"                       |
+      | the person, on "parinn ingest --path" at a terminal   | /tmp/dir (a directory)                                     | the path is refused as not a regular file, nothing is read from it, and an audit entry records it                                                                     |
 
   @SEC-19 @P0 @I4 @pending
   Scenario: every component, process and protocol sits in exactly one boundary of the register

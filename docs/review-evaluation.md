@@ -96,75 +96,72 @@ may also name an expectation the reviewer met in other words.
 
 ## A case run
 
-- **The world** of a run is the review's own input: a worktree of main
-  with the component under test copied in, the case's edits in a second
-  worktree as `pr-head/`, its instruction files moved out, `pr.diff`,
-  and `review/` from `review-bundle`, whose diffs carry each line's
-  number in the pull request's file. The dispatch must bring the
-  component, or the case fails before any model runs.
+- **The world** of a run is the review's own input: a worktree of main with
+  the component under test copied in, the case's edits in a second worktree as
+  `pr-head/`, its instruction files moved out, `pr.diff`, and `review/` from
+  `review-bundle`, whose diffs carry each line's number in the pull request's
+  file. The dispatch must bring the component, or the case fails before any
+  model runs. The run's work directory is the world's own directory, whose
+  path names no tree: an agent whose work directory ended in `main` took
+  `pr-head/` and `review/` for its siblings and looked for them one directory
+  up, outside what a run may read.
 - **The review context** is the file `review/context/<name>.md` that
   `review-bundle` writes for a specialist: the review class, the touched ids,
   its dispatch row, the deterministic findings on its files and the ENG-29
   record a guarded change lands with, which its own diff does not hold. The
   prompt tells the specialist to read it and its own diff, never the whole
   bundle.
-- **The prompt** tells every agent that `pr-head/` holds the pull
-  request's tree and that the tree around it is main's, which shows
-  only what the change replaced. A path a diff or an agent's
-  instructions name is relative to the repository, so an agent that
-  opens it at the root judges the change against main.
+- **The prompt** tells every agent that `pr-head/` holds the pull request's
+  tree and that the tree around it is main's, which shows only what the change
+  replaced. A path a diff or an agent's instructions name is relative to the
+  repository, so an agent that opens it at the root judges the change against
+  main. It names the instruction files `pr-head/` does not hold and where
+  their text is, `review/pr-instructions.txt`, so no agent searches for them.
 - **The evaluation harness** starts `claude --agent <component>` with the
-  review's reading tools and turn budget, on the component's model, or
-  the evaluation's default for an agent that names none, or the one `--model`
+  review's reading tools and turn budget, on the component's model, or the
+  evaluation's default for an agent that names none, or the one `--model`
   names. `review-run` starts each agent of a review through the same runner.
-  Each run, a case's too, has its tier's cost cap, `--max-budget-usd`.
-  It refuses
-  a component whose front matter names a key outside name, description, tools,
-  model, effort, maxTurns and generalist, or a tool its kind may not use, so a
-  definition under test cannot start a process or widen its reach through the
-  run (I4).
-- **The grader** is deterministic and reads the run log alone. A
-  specialist writes no file: its specialist report is assembled from the log as
+  Each run, a case's too, has its tier's cost cap, `--max-budget-usd`. It
+  refuses a component whose front matter names a key outside name,
+  description, tools, model, effort, maxTurns and generalist, or a tool its
+  kind may not use, so a definition under test cannot start a process or widen
+  its reach through the run (I4).
+- **The grader** is deterministic and reads the run log alone. A specialist
+  writes no file: its specialist report is assembled from the log as
   `review-run` assembles it, every finding, request, `revised:` and
-  `withdrawn:` line it stated in its text replayed in order, then the
-  outcome line its final answer gives. The grader reads that specialist report:
-  its outcome, each finding expected or forbidden, nothing written; a
-  case may also want a finding `stated` before the final answer, or a
-  finding `withdrawn` or revised, read from the log's text. For a
-  generalist it reads the weighing `review-run` reads, by the one shared
-  rule: each `blocking` or `nit` finding, `dropped — path:line` or
-  `none —` line it stated as it went, other working notes left out, then
-  its final answer's lines, all read; the last for a place and the
-  source it names stands, so another source's finding there stays; each
-  finding it
-  must drop on a line that starts with `dropped` or gives it as its
-  severity. A consultant is read from its answer. A case that holds
-  its run to the pull request's tree fails a run that read or searched
-  a file of the repository at the work directory's root, which is
-  main's tree: every `Read`, `Grep` and `Glob` path of the log but
-  `pr-head/`, `review/`, `pr.diff`, the stakeholder's comments and the
-  instruction files. The instruction files at the root are main's too,
-  and reading them fails no run: `pr-head/` holds no copy of them, the
-  pull request's being text in `review/`. A specialist's report
-  is read as the review reads it: assembled from the log, split into the
-  lines that read and those that do not, and ended with an outcome its
-  lines give. A finding-shaped line that does not read fails its run,
-  its other findings graded all the same. A departure the review
-  survives is a slip: a run cut off before a successful result after
-  it stated a line or an outcome, an answer with no outcome line or
-  one its lines contradict, an answer that is more than the outcome
-  line, a line set aside as no finding, an eleventh finding, a place
-  written as a tail of its path. Slips are
-  counted and shown per run and fail none. A case passes with two of
-  three runs, stopping once decided. A run whose log holds no model
-  call did not run, and is counted and failed, as is a specialist's run
-  cut off before it stated any line or an outcome, which the review
-  takes for no clean pass: a model that always runs out of turns passes
-  no case.
-- **The outputs** of a run go under `--out`: `scorecard.json`,
-  `findings.json` in the shape the review gate reads, `report.md`, and
-  each run's log, the specialist report assembled from it and its grade under
-  `runs/`.
+  `withdrawn:` line it stated in its text replayed in order, then the outcome
+  line its final answer gives. The grader reads that specialist report: its
+  outcome, each finding expected or forbidden, nothing written; a case may
+  also want a finding `stated` before the final answer, or a finding
+  `withdrawn` or revised, read from the log's text. For a generalist it reads
+  the weighing `review-run` reads, by the one shared rule: each `blocking` or
+  `nit` finding, `dropped — path:line` or `none —` line it stated as it went,
+  other working notes left out, then its final answer's lines, all read; the
+  last for a place and the source it names stands, so another source's finding
+  there stays; each finding it must drop on a line that starts with `dropped`
+  or gives it as its severity. A consultant is read from its answer. A case
+  that holds its run to the pull request's tree fails a run that read or
+  searched a file of the repository at the work directory's root, which is
+  main's tree: every `Read`, `Grep` and `Glob` path of the log but `pr-head/`,
+  `review/`, `pr.diff`, the stakeholder's comments and the instruction files.
+  The instruction files at the root are main's too, and reading them fails no
+  run: `pr-head/` holds no copy of them, the pull request's being text in
+  `review/`. A specialist's report is read as the review reads it: assembled
+  from the log, split into the lines that read and those that do not, and
+  ended with an outcome its lines give. A finding-shaped line that does not
+  read fails its run, its other findings graded all the same. A departure the
+  review survives is a slip: a run cut off before a successful result after it
+  stated a line or an outcome, an answer with no outcome line or one its lines
+  contradict, an answer that is more than the outcome line, a line set aside
+  as no finding, an eleventh finding, a place written as a tail of its path.
+  Slips are counted and shown per run and fail none. A case passes with two of
+  three runs, stopping once decided. A run whose log holds no model call did
+  not run, and is counted and failed, as is a specialist's run cut off before
+  it stated any line or an outcome, which the review takes for no clean pass:
+  a model that always runs out of turns passes no case.
+- **The outputs** of a run go under `--out`: `scorecard.json`, `findings.json`
+  in the shape the review gate reads, `report.md`, and each run's log, the
+  specialist report assembled from it and its grade under `runs/`.
 
 ## The commands
 
@@ -208,6 +205,16 @@ already has is judged by main's cases; the pull request's cases judge
 only the components it adds, so a change cannot soften the cases that
 judge it.
 
+The one exception is the stakeholder's to make. The cases are a
+stakeholder path, so a pull request that changes one waits for a
+stakeholder comment that names it (ENG-21). A case file such a comment
+names judges as the pull request has it: its changed text, a case it
+adds, and no case where it removes one. Without this a wrong case on
+main could never be corrected, since main's version would fail the
+change that corrects it. Every other case of the component stays
+main's. The plan sorts the case files that differ into the two lists
+and prints both, and the evaluation says which cases the consent moved.
+
 ### What bounds the evaluate job
 
 The job runs reviewer components the pull request defines, with the
@@ -217,9 +224,20 @@ Claude OAuth token. Five things bound it:
 - its token is `contents: read`, with no write permission;
 - the harness refuses a definition whose front matter key or tool is
   outside its allow-lists, so none can start a process (I4);
-- main's cases judge the components main already has;
+- main's cases judge the components main already has, but for a case
+  file whose change a stakeholder comment names;
 - one step stages the token where no agent reads it, and the job
   scrubs what it keeps of the token before it uploads (ENG-28).
+
+The scrub takes for the token every form of the staged one, and any
+text of the Claude key's shape. One such text is no leak: a fixture a
+file of main's tree or the pull request's holds, which an agent that
+reads the file has in its run log. The review and the evaluation replace
+it with a marker of its own and do not count it, and each says at its
+start how many such texts it spares. A link in a tree is never followed,
+so a file outside the trees lends no text. A text of that shape that no
+file of the trees holds still fails the review closed, and so does the
+staged token wherever it stands.
 
 ### The plugins every harness session fetches
 
