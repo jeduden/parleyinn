@@ -195,6 +195,15 @@ fn review_carries_findings(w: &mut World) -> Result<(), String> {
 }
 
 #[then(
+    regex = r"^a review that a stakeholder's comment brought runs no agent when an earlier review of the same head, from a run behind the spend it trusts, kept its review outcome under the same dispatch and left no dispatched agent without an accepted report: each review keeps its review outcome, the agents it consulted, its run id, its gaps and its dispatch among its reports, the comment's review takes them as its own and states the deterministic findings again, says in the job summary whether it reused one and runs its agents when it did not, and waits for a running review of its pull request, cancelling none$"
+)]
+fn review_reuses_a_verdict(w: &mut World) -> Result<(), String> {
+    outcome(engineering::review_verdict::review_reuses_a_verdict(
+        eng(w).checkout()?,
+    )?)
+}
+
+#[then(
     regex = r"^review-run sums what each earlier review of a pull request spent from every artifact under the pull request's own name, of any run attempt, that a run of main's review workflow uploaded, an earlier attempt of its own run's included, refuses and counts an artifact of that name from any other run, names a spend file past 1 KiB or one that does not read, and the review job fetches them before the Claude Code OAuth token is staged, fails on a run behind one it cannot look up, passes the sum as --spent-before, scrubs what this review spent and keeps it for 90 days for the next review, under its run's attempt and replacing none, however the review ended, and says in the job summary how many earlier reviews it summed and what they spent or that it found none$"
 )]
 fn review_carries_spend(w: &mut World) -> Result<(), String> {
