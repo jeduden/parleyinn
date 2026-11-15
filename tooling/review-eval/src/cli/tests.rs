@@ -825,6 +825,7 @@ fn a_report_or_grade_that_cannot_be_written_is_noted_on_its_run() {
     assert!(out.contains("defect/1/grade.txt: "), "{out}");
 }
 
+mod consent;
 mod credential;
 mod progress;
 mod publish;

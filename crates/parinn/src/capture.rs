@@ -500,6 +500,14 @@ impl Running {
             tracing::warn!(error = why, "read a sibling transcript");
             self.audit(&crate::sourcing::unread_occurrence("mcp", &unread.name));
         }
+        for _ in 0..ingested.unchecked {
+            self.audit(&keyed(
+                Kind::Failed,
+                Counter::RepeatOfPurgedUnchecked,
+                "recorded a line that keeps no `uuid`, unchecked against purged lines, in",
+                &ingested.name,
+            ));
+        }
         self.audit_index_gaps(ingested);
     }
 

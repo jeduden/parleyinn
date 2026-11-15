@@ -120,6 +120,7 @@ pub(crate) fn ingest(
         witnessed_repeats: plan.witnessed_repeats,
         unread_sources: plan.unread.clone(),
         refused: plan.refused,
+        unchecked: plan.unchecked,
         matched: observations.matched,
         prompt_conflicts: observations.conflicts,
         not_attended: observations.not_attended,

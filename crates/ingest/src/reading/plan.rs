@@ -59,6 +59,10 @@ pub(super) struct Plan {
     /// The line number and end offset of the last line refused, so the
     /// ingest position moves past a refusal no recorded line follows.
     pub(super) refused_to: Option<(u64, u64)>,
+    /// How many lines were recorded with no kept `uuid` and the byte
+    /// length of a purged line kept without one: unchecked against
+    /// purged lines (REC-07).
+    pub(super) unchecked: usize,
     /// Each (owner, repeating) pair of writers whose repeat owner no
     /// fork observation chose.
     pub(super) chosen: BTreeSet<(WriterId, WriterId)>,
@@ -100,6 +104,9 @@ pub(super) struct Planner<'a> {
     /// Harness UUIDs whose event content a purge erased, in any
     /// transcript source of this directory, loaded once for this plan.
     purged: BTreeSet<String>,
+    /// The byte lengths of the directory's purged lines that keep no
+    /// `uuid`, which no refusal reaches.
+    unrefusable: BTreeSet<u64>,
     /// Whether a fork observation names each ingested run's harness
     /// session, by writer.
     forked: BTreeMap<WriterId, bool>,
@@ -124,7 +131,7 @@ impl<'a> Planner<'a> {
         runs: &Runs<'_>,
     ) -> Result<Self, IngestError> {
         let others = store.shares_directory(&named.directory, &named.path)?;
-        let purged = store.purged_line_uuids(&named.directory)?;
+        let purged = store.purged_lines(&named.directory)?;
         let forked = runs
             .sessions
             .iter()
@@ -136,7 +143,8 @@ impl<'a> Planner<'a> {
             inputs,
             held_since: source.held_since,
             siblings: None,
-            purged,
+            purged: purged.uuids,
+            unrefusable: purged.lengths_without_uuid,
             forked,
             others,
             used: BTreeSet::new(),
@@ -184,6 +192,7 @@ impl<'a> Planner<'a> {
                 plan.refused_to = Some((i as u64 + 1, line.end));
                 continue;
             }
+            plan.unchecked += usize::from(self.unchecked(line, &read.parsed[i], read.redactor));
             let user = matches!(classified, Classified::Line(Provenance::User, _));
             let prompt = self.prompt(store, &read.parsed[i], &key, user, &decision, &read)?;
             let at = Planned {
@@ -269,6 +278,15 @@ impl<'a> Planner<'a> {
         };
 
         Ok(repeat::decide(&facts, redacted))
+    }
+
+    /// Whether the recorded line `line`, parsed as `parsed`, may repeat a
+    /// purged line no refusal reaches: it keeps no `uuid` and has the
+    /// byte length of a purged line of the directory kept without one
+    /// (REC-07).
+    fn unchecked(&self, line: &Line<'_>, parsed: &Value, redactor: &Redactor) -> bool {
+        self.unrefusable.contains(&(line.end - line.offset))
+            && kept_uuid(parsed, redactor).is_none()
     }
 
     /// What becomes of a witnessed line: never a repeat reference

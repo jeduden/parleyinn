@@ -87,10 +87,11 @@ For the stakeholder:
 
 Plan close (stays 🔳): met are recall, S12 and the checks. The raised
 items moved (plan.md, §12.2). To M3: ADM-09's landmark row, ENG-06's
-migration, SEC-08's `purge --run`. To M5: SEC-12's flag row, SEC-17,
-ENG-22, ENG-23, NFR-05's target. To M7: SEC-19, ENG-29, NFR-01, the PRV
-remainders. To M8: PRV-09. Since: RCL-02, REC-04, REC-08, REC-12,
-REC-26 pass; the residue is closed. Open in M1: rulings on LANE-02,
+migration, SEC-08's `purge --run`, SEC-31's residue (OQ-57). To M5:
+SEC-12's flag row, SEC-17, ENG-22, ENG-23, NFR-05's target. To M7:
+SEC-19, ENG-29, NFR-01, the PRV remainders. To M8: PRV-09. Since:
+RCL-02, REC-04, REC-08, REC-12, REC-26 pass; the residue is narrowed.
+Open in M1: rulings on LANE-02,
 REC-24.
 
 - [x] ADM-09's two pending-purge rows (PR #90) are bound and pass, run

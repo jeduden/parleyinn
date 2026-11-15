@@ -45,8 +45,12 @@ pub const CHECKED: &str = "checked.json";
 /// which the review gate holds the review to (ENG-28).
 pub const DISPATCH: &str = "dispatch.json";
 /// The directory under `--out` that holds each specialist's diff,
-/// `<its name>.diff`: only the changed files it reads.
+/// `<its name>.diff`: only the changed files it reads, each line with
+/// its number in the pull request's file (`diff::numbered`).
 pub const DIFFS: &str = "diffs";
+/// The whole diff's file name under `--out`, numbered as a specialist's
+/// is: what a generalist reads, in place of the diff git wrote.
+pub const WHOLE: &str = "pr.diff";
 /// The directory under `--out` that holds each specialist's context,
 /// `<its name>.md`: the review class, its dispatch row and the
 /// deterministic findings on its files, read in place of the bundle.
@@ -120,6 +124,7 @@ fn build(
     write(CHECKED, &format!("{findings}\n"))?;
     let dispatch = serde_json::to_string_pretty(&a.dispatch).map_err(failed("encode", out))?;
     write(DISPATCH, &format!("{dispatch}\n"))?;
+    write(WHOLE, &crate::diff::numbered(&diff))?;
     let diffs = out.join(DIFFS);
     fs::create_dir_all(&diffs).map_err(failed("write", &diffs))?;
     let contexts = out.join(CONTEXTS);
@@ -128,7 +133,7 @@ fn build(
     for (specialist, scope) in &a.scopes {
         write(
             &format!("{DIFFS}/{specialist}.diff"),
-            &diff_for(&diff, scope, &tree),
+            &crate::diff::numbered(&diff_for(&diff, scope, &tree)),
         )?;
         write(
             &format!("{CONTEXTS}/{specialist}.md"),
@@ -190,7 +195,11 @@ fn failed<E: std::fmt::Display>(verb: &'static str, path: &Path) -> impl FnOnce(
 /// The bodies of the comments in `json`, the owners' comments, that
 /// consent: each non-blank one that is no review requesting changes.
 /// Each comment must carry a string `author`, `at` and `body`.
-fn consents(json: &str) -> Result<Vec<String>, String> {
+///
+/// # Errors
+///
+/// Fails when `json` is no array of such comments.
+pub fn consents(json: &str) -> Result<Vec<String>, String> {
     let value: Value = serde_json::from_str(json).map_err(|e| e.to_string())?;
     let comments = value.as_array().ok_or("not an array of comments")?;
     let mut consent = Vec::new();

@@ -3,7 +3,9 @@
 //! with each purged line's bytes zeroed, and one rewritten after a purge
 //! starts a new transcript generation that refuses each purged line by
 //! its `uuid`, audits each refusal and records neither again (REC-04,
-//! SEC-31).
+//! SEC-31). A purged line that carries no `uuid` is recorded again by
+//! the new transcript generation, counted and audited as unchecked
+//! against purged lines.
 
 use std::fs;
 
@@ -11,12 +13,20 @@ use cucumber::{then, when};
 
 use crate::World;
 use crate::record::home;
-use crate::record_ingest::{generations, lines, open, placed, rewritten};
+use crate::record_ingest::{generations, ingest_all, lines, open, placed, rewritten};
 use crate::security_redaction::transcript;
 
 /// What the audit log says of each line a purge erased that ingest
 /// refuses, before the transcript it names.
 const REFUSED: &str = "refused a repeated line whose `uuid` names a purged event";
+
+/// What the audit log says of each line recorded without a check
+/// against purged lines, before the transcript it names.
+const UNCHECKED: &str = "recorded a line that keeps no `uuid`, unchecked against purged lines";
+
+/// A transcript line that carries no `uuid`, of a length no other line
+/// of these steps has.
+const NO_UUID: &str = "{\"type\":\"x\",\"note\":\"this line carries no uuid\"}\n";
 
 /// Purges the events read from lines `from` to `to` of the transcript
 /// `name`, as a person does.
@@ -112,15 +122,15 @@ fn kept_of_the_first(w: &mut World, name: &str) -> Result<usize, String> {
     Ok(present)
 }
 
-/// How many audit entries record a refused line.
-fn refusals(w: &World) -> Result<usize, String> {
+/// How many audit entries' detail starts with `said`.
+fn audited(w: &World, said: &str) -> Result<usize, String> {
     let entries = audit::log::Log::new(home(w)?.audit())
         .entries()
         .map_err(|e| e.to_string())?;
 
     Ok(entries
         .iter()
-        .filter(|e| e.detail.starts_with(REFUSED))
+        .filter(|e| e.detail.starts_with(said))
         .count())
 }
 
@@ -150,7 +160,7 @@ fn refused_in_a_new_generation(
         .map(|p| p.place.line)
         .filter(|line| (from..=to).contains(line))
         .collect();
-    let (present, refused) = (kept_of_the_first(w, &name)?, refusals(w)?);
+    let (present, refused) = (kept_of_the_first(w, &name)?, audited(w, REFUSED)?);
     let purged = usize::try_from(to - from + 1).map_err(|e| e.to_string())?;
     if again.is_empty() && present == kept && refused == purged {
         return Ok(());
@@ -158,5 +168,64 @@ fn refused_in_a_new_generation(
 
     Err(format!(
         "{name:?}: generation {generation} records lines {again:?} again, generation 1 keeps {present} events and {refused} refusals are audited"
+    ))
+}
+
+#[when(
+    regex = r#"^"([^"]+)" is rewritten with a different first line after a purge of its ingested line (\d+), which carries no uuid$"#
+)]
+fn purged_without_uuid_then_rewritten(
+    w: &mut World,
+    name: String,
+    line: u64,
+) -> Result<(), String> {
+    let path = transcript(w, &name)?;
+    let mut text = fs::read_to_string(&path).map_err(|e| e.to_string())?;
+    let count = text.lines().count() as u64;
+    if line != count + 1 {
+        return Err(format!(
+            "{name:?} has {count} lines, so it gains line {}",
+            count + 1
+        ));
+    }
+    text.push_str(NO_UUID);
+    fs::write(&path, text).map_err(|e| e.to_string())?;
+    ingest_all(w)?;
+    purge_lines(w, &name, line, line)?;
+
+    fs::write(&path, format!("{}{NO_UUID}", rewritten(&name, count))).map_err(|e| e.to_string())
+}
+
+#[then(
+    regex = r#"^"([^"]+)" starts transcript generation (\d+), its line (\d+) is recorded again and counted as unchecked against purged lines with an audit entry, and the (\d+) other events of transcript generation 1 remain in the record$"#
+)]
+fn unchecked_in_a_new_generation(
+    w: &mut World,
+    name: String,
+    generation: u64,
+    line: u64,
+    kept: usize,
+) -> Result<(), String> {
+    let generations = generations(w, &name)?;
+    let newest = generations.last().ok_or("no generation")?;
+    if newest.generation != generation {
+        return Err(format!(
+            "{name:?} is at generation {}, not {generation}",
+            newest.generation
+        ));
+    }
+    let again = open(w)?
+        .placed(newest.id)
+        .map_err(|e| e.to_string())?
+        .iter()
+        .any(|p| p.place.line == line && p.place.uuid.is_none());
+    let (present, unchecked) = (kept_of_the_first(w, &name)?, audited(w, UNCHECKED)?);
+    let refused = audited(w, REFUSED)?;
+    if again && present == kept && unchecked == 1 && refused == 0 {
+        return Ok(());
+    }
+
+    Err(format!(
+        "{name:?}: generation {generation} records line {line} again: {again}; generation 1 keeps {present} events; {unchecked} unchecked lines and {refused} refusals are audited"
     ))
 }

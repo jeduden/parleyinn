@@ -9,6 +9,7 @@
 //! can fail closed on it.
 
 use std::collections::{BTreeMap, BTreeSet};
+use std::fmt::Write as _;
 
 /// The header every file's section of a diff starts with.
 const HEADER: &str = "diff --git ";
@@ -316,6 +317,67 @@ pub fn split(diff: &str, limit: usize) -> Vec<Part> {
     }
 
     parts
+}
+
+/// The width of the number [`numbered`] writes before a line.
+const GUTTER: usize = 5;
+
+/// `diff` with the line number each line has in the pull request's file
+/// written before it: every added and context line of a hunk starts
+/// with its number, a removed line with the same width left blank, so
+/// a reader copies a finding's line and never counts it. A reader's
+/// tool numbers the lines of the diff file itself, which are not the
+/// file's. Headers, and what follows a hunk header that does not read,
+/// stay as they are.
+#[must_use]
+pub fn numbered(diff: &str) -> String {
+    let mut out = String::with_capacity(diff.len() + diff.len() / 4);
+    // The lines of the hunk still to come, on main's side and on the
+    // pull request's, and the number of the latter's next line.
+    let (mut old, mut new, mut at) = (0usize, 0usize, 0usize);
+    for line in diff.split_inclusive('\n') {
+        if line.starts_with(HEADER) || (old == 0 && new == 0) {
+            (old, at, new) = hunk(line).unwrap_or_default();
+            out.push_str(line);
+            continue;
+        }
+        match line.as_bytes().first() {
+            Some(b'\\') => out.push_str(line),
+            Some(b'-') => {
+                old = old.saturating_sub(1);
+                let _ = write!(out, "{:>GUTTER$} {line}", "");
+            }
+            first => {
+                if first != Some(&b'+') {
+                    old = old.saturating_sub(1);
+                }
+                new = new.saturating_sub(1);
+                let _ = write!(out, "{at:>GUTTER$} {line}");
+                at += 1;
+            }
+        }
+    }
+
+    out
+}
+
+/// What a hunk header, `@@ -a,b +c,d @@`, counts: the lines the hunk
+/// holds of main's side, the number of the pull request's first, and the
+/// lines it holds of the pull request's. A side with no count holds one
+/// line. `None` for any other line.
+fn hunk(line: &str) -> Option<(usize, usize, usize)> {
+    let rest = line.strip_prefix("@@ -")?;
+    let (old, rest) = rest.split_once(" +")?;
+    let (new, _) = rest.split_once(" @@")?;
+    let side = |s: &str| -> Option<(usize, usize)> {
+        match s.split_once(',') {
+            Some((start, count)) => Some((start.parse().ok()?, count.parse().ok()?)),
+            None => Some((s.parse().ok()?, 1)),
+        }
+    };
+    let ((_, old), (start, new)) = (side(old)?, side(new)?);
+
+    Some((old, start, new))
 }
 
 #[cfg(test)]

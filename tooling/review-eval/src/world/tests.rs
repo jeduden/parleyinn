@@ -93,7 +93,10 @@ fn build_sets_the_class_and_the_dispatch_as_the_bundle_does() {
 
     let (host, world) = built(dir.path());
 
-    assert_eq!(world.main, dir.path().join("world/main"));
+    // The world's directory is the work directory itself: no path
+    // component beside `pr-head/` and `review/` names a tree an agent
+    // could take for their sibling.
+    assert_eq!(world.main, dir.path().join("world"));
     assert_eq!(world.class, "standard");
     assert_eq!(world.touched, 0);
     let dispatch = fs::read_to_string(world.main.join("review/dispatch.json")).unwrap();
@@ -507,7 +510,7 @@ fn teardown_runs_git_under_the_worktree_lock() {
         held: Mutex::new(Vec::new()),
     };
     let dir = TempDir::new().unwrap();
-    fs::create_dir_all(dir.path().join("main/pr-head")).unwrap();
+    fs::create_dir_all(dir.path().join("pr-head")).unwrap();
 
     assert_eq!(teardown(&host, dir.path(), dir.path(), &worktrees), Ok(()));
 
@@ -537,8 +540,8 @@ fn teardown_names_a_worktree_it_cannot_remove() {
         }
     }
     let dir = TempDir::new().unwrap();
-    fs::create_dir_all(dir.path().join("main/pr-head")).unwrap();
-    let main = dir.path().join("main");
+    fs::create_dir_all(dir.path().join("pr-head")).unwrap();
+    let main = dir.path().to_path_buf();
 
     let err = teardown(&Failing, dir.path(), dir.path(), &Mutex::new(())).unwrap_err();
     assert_eq!(
@@ -574,7 +577,7 @@ fn instructions_move_out_from_any_depth_but_not_from_git_s_own_directory() {
     write("sub/.claude/settings.json", "{}\n");
     write(".git/CLAUDE.md", "not moved\n");
     write("keep.md", "kept\n");
-    let into = dir.path().join("main/review/pr-instructions.txt");
+    let into = dir.path().join("review/pr-instructions.txt");
 
     move_instructions(&root, &into).unwrap();
 

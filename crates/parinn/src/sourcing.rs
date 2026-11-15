@@ -93,6 +93,14 @@ pub(super) fn audit(ctx: &Context, ingested: &ingest::Ingested, stderr: &mut dyn
                 "refused a repeated line whose `uuid` names a purged event, in",
             ),
         ),
+        (
+            ingested.unchecked,
+            keyed(
+                Kind::Failed,
+                Counter::RepeatOfPurgedUnchecked,
+                "recorded a line that keeps no `uuid`, unchecked against purged lines, in",
+            ),
+        ),
     ];
     audit_unread(ctx, ingested, stderr);
     for (times, occurrence) in &occurrences {

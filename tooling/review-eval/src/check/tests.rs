@@ -598,3 +598,95 @@ fn a_consultant_case_that_does_not_apply_is_named_and_a_skill_s_case_names_no_co
         "{got:?}"
     );
 }
+
+/// The written cases of the language specialists that judge, each
+/// with its id and title.
+fn judging(root: &Path, cases: &Path, base: &Base) -> Vec<(String, String)> {
+    all_cases_from(root, cases, Some(base))
+        .unwrap()
+        .into_iter()
+        .filter(|c| c.component.starts_with("lang-"))
+        .map(|c| (c.id(), c.title))
+        .collect()
+}
+
+#[test]
+fn main_s_cases_judge_a_component_main_has_but_for_a_consented_case_file() {
+    let dir = checkout();
+    let main = TempDir::new().unwrap();
+    let titled = |title: &str| UNWRAP.replacen("an unwrap", title, 1);
+    // Main holds two cases of lang-rust; the pull request changes one,
+    // removes the other, adds a third, and brings lang-toml's first.
+    write_case(
+        main.path(),
+        "lang-rust",
+        "kept",
+        "defect",
+        &titled("main's kept"),
+    );
+    write_case(
+        main.path(),
+        "lang-rust",
+        "gone",
+        "clean",
+        &titled("main's gone"),
+    );
+    write_case(
+        dir.path(),
+        "lang-rust",
+        "kept",
+        "defect",
+        &titled("theirs kept"),
+    );
+    write_case(
+        dir.path(),
+        "lang-rust",
+        "added",
+        "clean",
+        &titled("theirs added"),
+    );
+    let toml = titled("theirs table").replace("lang-rust", "lang-toml");
+    write_case(dir.path(), "lang-toml", "table", "defect", &toml);
+    let cases = dir.path().join(crate::CASES);
+    let base = |consented: &[&str]| Base {
+        cases: main.path().join(crate::CASES),
+        consented: consented
+            .iter()
+            .map(|name| ("lang-rust".to_owned(), (*name).to_owned()))
+            .collect(),
+    };
+    let ids = |got: &[(String, String)]| -> Vec<String> {
+        got.iter()
+            .map(|(id, title)| format!("{id}: {title}"))
+            .collect()
+    };
+
+    // Without consent main's cases judge lang-rust, the new component's
+    // own judge it.
+    assert_eq!(
+        ids(&judging(dir.path(), &cases, &base(&[]))),
+        [
+            "lang-rust/gone: main's gone",
+            "lang-rust/kept: main's kept",
+            "lang-toml/table: theirs table",
+        ]
+    );
+    // A consented case file judges as the pull request has it: changed,
+    // added, or removed and so gone. The rest stay main's.
+    assert_eq!(
+        ids(&judging(dir.path(), &cases, &base(&["kept"]))),
+        [
+            "lang-rust/gone: main's gone",
+            "lang-rust/kept: theirs kept",
+            "lang-toml/table: theirs table",
+        ]
+    );
+    assert_eq!(
+        ids(&judging(dir.path(), &cases, &base(&["added", "gone"]))),
+        [
+            "lang-rust/added: theirs added",
+            "lang-rust/kept: main's kept",
+            "lang-toml/table: theirs table",
+        ]
+    );
+}

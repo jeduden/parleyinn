@@ -6,6 +6,7 @@ use testkit::TempDir;
 use super::*;
 use crate::host::Output;
 use crate::host::fake::FakeHost;
+use crate::world::{INSTRUCTION_NAMES, INSTRUCTIONS_TEXT};
 
 fn component(kind: Kind, name: &str) -> Component {
     Component {
@@ -161,6 +162,15 @@ fn every_kind_is_told_to_read_the_pull_request_s_tree_and_not_main_s() {
         // agent that reads it there judges the change against main.
         assert!(prompt.contains(HEAD_TREE), "{prompt}");
         assert!(!prompt.contains("  "), "{prompt}");
+        // Where the pull request's instruction files are is said once,
+        // beside the tree they are missing from.
+        assert_eq!(prompt.matches(INSTRUCTIONS_TEXT).count(), 1, "{prompt}");
+    }
+    // Every file the workflow moves out of `pr-head/` is named: an agent
+    // that looks for one there finds nothing and searches around the
+    // work directory, where the run refuses it.
+    for name in INSTRUCTION_NAMES {
+        assert!(HEAD_TREE.contains(&format!("`{name}")), "{name}");
     }
     // The whole wording is pinned: the middle clause is what stops an
     // agent from opening a path as its diff or its instructions give it.
@@ -169,7 +179,10 @@ fn every_kind_is_told_to_read_the_pull_request_s_tree_and_not_main_s() {
         "The pull request's tree is in `pr-head/`: read and search the repository's files \
          there, each as `pr-head/<its path>`, whatever path your diff or your instructions \
          name. The tree around it is main's: it shows only what the change replaced, and \
-         nothing the pull request adds."
+         nothing the pull request adds. `pr-head/` holds no agent instructions: the pull \
+         request's `.claude/` directories and its `CLAUDE.md`, `CLAUDE.local.md`, \
+         `AGENTS.md` and `.mcp.json` files are text in `review/pr-instructions.txt`, each \
+         file under a `===== <its path> =====` line."
     );
 }
 
@@ -333,6 +346,32 @@ fn run_names_what_it_cannot_do() {
 }
 
 #[test]
+fn every_agent_is_told_where_a_place_s_line_number_comes_from() {
+    let w = world("standard");
+
+    for (kind, name) in [
+        (Kind::Specialist, "lang-rust"),
+        (Kind::Generalist, "review-code"),
+        (Kind::Consultant, "persona-agent"),
+    ] {
+        let prompt = prompt(&component(kind, name), &w);
+
+        // The whole diff an agent is named is the bundle's, whose lines
+        // carry their numbers, never the one git wrote beside it: a
+        // reader's tool numbers that file's own lines.
+        assert!(prompt.contains(LINE_NUMBERS), "{prompt}");
+        assert!(prompt.contains("`review/pr.diff`"), "{prompt}");
+        assert!(!prompt.contains(" `pr.diff`"), "{prompt}");
+    }
+    assert_eq!(
+        LINE_NUMBERS,
+        "Each line of a diff under `review/` starts with its line number in the pull \
+         request's file: a finding's place takes that number, never the number of the \
+         line in the diff."
+    );
+}
+
+#[test]
 fn a_consultant_gets_the_target_a_skill_hands_it() {
     let w = world("standard");
 
@@ -343,7 +382,7 @@ fn a_consultant_gets_the_target_a_skill_hands_it() {
         "{consultant}"
     );
     assert!(consultant.contains("`pr-head/`"), "{consultant}");
-    assert!(consultant.contains("`pr.diff`"), "{consultant}");
+    assert!(consultant.contains("`review/pr.diff`"), "{consultant}");
     assert!(consultant.contains("`review/bundle.md`"), "{consultant}");
     assert!(consultant.contains("write none"), "{consultant}");
     assert!(!consultant.contains("review/reports"), "{consultant}");

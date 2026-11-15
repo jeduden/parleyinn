@@ -116,7 +116,10 @@ workflow has no model of its own.
   evaluates every component on its model; a dispatched run takes a
   candidate model and compares. A component main already has is judged
   by main's cases; a pull request's cases judge only the components it
-  adds.
+  adds. One exception is the stakeholder's: a case file the pull
+  request changes, adds or removes judges as the pull request has it
+  once a stakeholder comment names it (ENG-21), so a wrong case on main
+  can be corrected through the gate.
 - **The scorecard.** `tooling/review-eval/scorecard-v1.txt` records,
   per component, the model its front matter names, the model that
   resolved to, the cases and runs passed, cost, turns and duration, and

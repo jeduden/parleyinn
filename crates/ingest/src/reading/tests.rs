@@ -240,6 +240,7 @@ fn a_purged_line_is_never_recorded_again_by_the_generation_an_unconfirmed_purge_
 
     assert!(again.new_generation, "the hash confirms nothing");
     assert_eq!(again.refused, 1, "the purged line is refused, not recorded");
+    assert_eq!(again.unchecked, 0, "every purged line keeps its uuid");
     assert_eq!(again.events, 2);
     let store = Store::open(&home.store()).unwrap();
     let recorded: Vec<String> = store
@@ -250,6 +251,30 @@ fn a_purged_line_is_never_recorded_again_by_the_generation_an_unconfirmed_purge_
         .collect();
     assert_eq!(recorded.len(), 4, "u2 and u3 of each generation");
     assert!(recorded.iter().all(|text| !text.contains("\"u1\"")));
+}
+
+#[test]
+fn a_recorded_line_that_may_repeat_a_purged_line_kept_without_a_uuid_is_counted_unchecked() {
+    let dir = TempDir::new().unwrap();
+    let home = home(&dir);
+    // A line with no uuid, one whose uuid redaction rewrites, one of the
+    // first's length that keeps its uuid, and one with no uuid of
+    // another length.
+    let text = "{\"type\":\"summary\"}\n{\"uuid\":\"AKIAIOSFODNN7EXAMPLE\"}\n\
+                {\"uuid\":\"u3aaaaa\"}\n{\"type\":\"another length\"}\n";
+    let path = transcript(&dir, text);
+    let first = crate::ingest_path(&home, &path, &redactor(), &mut OsEntropy).unwrap();
+    assert_eq!(first.unchecked, 0, "nothing is purged yet");
+    // The purge reads no transcript, so the next read starts a new
+    // generation of the source, which reads every line again.
+    purged(&home, first.writer, 2);
+
+    let again = crate::ingest_path(&home, &path, &redactor(), &mut OsEntropy).unwrap();
+
+    assert!(again.new_generation, "the hash confirms nothing");
+    assert_eq!(again.refused, 0, "neither purged line keeps a uuid");
+    assert_eq!(again.events, 4, "both are recorded again");
+    assert_eq!(again.unchecked, 2, "and each is counted, no other line");
 }
 
 #[test]
