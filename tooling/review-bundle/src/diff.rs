@@ -51,15 +51,30 @@ pub fn changed_paths(diff: &str) -> Paths {
 /// file and are left out.
 #[must_use]
 pub fn added_lines(diff: &str) -> Vec<(String, &str)> {
+    signed_lines(diff, '+', "+++")
+}
+
+/// Every removed line of `diff`, without its `-`, with the file it is
+/// removed from, named as [`added_lines`] names it.
+#[must_use]
+pub fn removed_lines(diff: &str) -> Vec<(String, &str)> {
+    signed_lines(diff, '-', "---")
+}
+
+/// Every line of `diff` that starts with `sign`, without it, with its
+/// file; a line that starts with `file_header` is no changed line.
+fn signed_lines<'a>(diff: &'a str, sign: char, file_header: &str) -> Vec<(String, &'a str)> {
     let mut file: Option<String> = None;
     let mut out = Vec::new();
     for line in diff.lines() {
         if line.starts_with(HEADER) {
             file = Some(header(line).map_or_else(|| line.to_owned(), |(_, b)| b));
-        } else if let (Some(added), false, Some(f)) =
-            (line.strip_prefix('+'), line.starts_with("+++"), &file)
-        {
-            out.push((f.clone(), added));
+        } else if let (Some(changed), false, Some(f)) = (
+            line.strip_prefix(sign),
+            line.starts_with(file_header),
+            &file,
+        ) {
+            out.push((f.clone(), changed));
         }
     }
 

@@ -423,8 +423,8 @@ fn bundle_outputs() -> (String, String, String, String) {
     (
         "class=standard\ntouched=1\nfindings=1\nconsults=2\n".to_owned(),
         r#"{"review-spec": ["lang-markdown"]}"#.to_owned(),
-        r#"[{"path": "docs/srs/10-engineering-quality.md", "line": 0, "severity": "blocking", "body": "x"}]"#.to_owned(),
-        "Class: **standard**. The change touches 1 id: ENG-28.\n\n- `review-spec`, weighing `lang-markdown`\n\n- blocking `docs/srs/10-engineering-quality.md:0`: x\n".to_owned(),
+        r#"[{"path": "docs/agents/specialist-outcome.md", "line": 0, "severity": "blocking", "body": "x"}]"#.to_owned(),
+        "Class: **standard**. The change touches 1 id: ENG-28.\n\n- `review-spec`, weighing `lang-markdown`\n\n- blocking `docs/agents/specialist-outcome.md:0`: x\n".to_owned(),
     )
 }
 
@@ -450,7 +450,7 @@ fn a_context_that_lacks_a_part_of_what_the_bundle_says_is_named() {
             "the context for lang-markdown lacks the review class \"standard\"",
             "the context for lang-markdown lacks the touched id ENG-28",
             "the context for lang-markdown lacks its dispatch row under review-spec",
-            "the context for lang-markdown lacks the deterministic finding on docs/srs/10-engineering-quality.md:0",
+            "the context for lang-markdown lacks the deterministic finding on docs/agents/specialist-outcome.md:0",
         ]
     );
 }
@@ -467,7 +467,7 @@ fn a_bundle_that_names_no_class_row_or_finding_is_named() {
             "the context for lang-markdown lacks the review class \"\"",
             "the context for lang-markdown lacks the touched id ENG-28",
             "the dispatch has no row naming lang-markdown",
-            "the bundle found nothing on docs/srs/10-engineering-quality.md to put in the context",
+            "the bundle found nothing on docs/agents/specialist-outcome.md to put in the context",
         ]
     );
 }
