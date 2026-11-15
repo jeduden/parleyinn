@@ -119,6 +119,7 @@ pub(crate) fn ingest(
         index_gaps_unread,
         witnessed_repeats: plan.witnessed_repeats,
         refused: plan.refused,
+        unchecked: plan.unchecked,
         matched: observations.matched,
         prompt_conflicts: observations.conflicts,
         not_attended: observations.not_attended,

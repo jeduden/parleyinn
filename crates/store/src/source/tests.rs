@@ -302,6 +302,43 @@ fn purged_line_uuids_are_loaded_together_without_event_associations() {
 }
 
 #[test]
+fn the_lengths_of_purged_lines_that_keep_no_uuid_are_loaded_by_directory() {
+    let dir = TempDir::new().unwrap();
+    let mut store = open(&dir);
+    let a = store.start_generation("/t/a.jsonl", "/t").unwrap();
+    let other = store.start_generation("/other/a.jsonl", "/other").unwrap();
+    let long = Place {
+        line: 3,
+        offset: 20,
+        length: 44,
+        uuid: None,
+    };
+
+    store
+        .advance_refusing(
+            a.id,
+            &position(64, 3),
+            &[place(1, None), place(2, Some("u2")), long],
+        )
+        .unwrap();
+    store
+        .advance_refusing(other.id, &position(10, 1), &[place(1, Some("u3"))])
+        .unwrap();
+
+    assert_eq!(
+        store.purged_lengths_without_uuid("/t").unwrap(),
+        BTreeSet::from([10, 44]),
+        "the line that keeps its uuid is refused by it, so its length is not held"
+    );
+    assert!(
+        store
+            .purged_lengths_without_uuid("/other")
+            .unwrap()
+            .is_empty()
+    );
+}
+
+#[test]
 fn a_store_from_before_purged_copies_still_reads_its_sources() {
     let dir = TempDir::new().unwrap();
     let mut store = open(&dir);
@@ -316,6 +353,7 @@ fn a_store_from_before_purged_copies_still_reads_its_sources() {
 
     assert_eq!(store.source("/t/a.jsonl").unwrap(), Some(source));
     assert!(store.purged_line_uuids("/t").unwrap().is_empty());
+    assert!(store.purged_lengths_without_uuid("/t").unwrap().is_empty());
 }
 
 #[test]
@@ -726,6 +764,7 @@ fn a_residue_table_without_uuids_makes_the_directory_uuids_unreadable() {
     without_residue_columns(&store);
 
     assert!(store.purged_line_uuids("/t").is_err());
+    assert!(store.purged_lengths_without_uuid("/t").is_err());
 }
 
 #[test]

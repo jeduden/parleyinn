@@ -835,3 +835,22 @@ fn each_refused_repeated_line_is_counted_by_the_live_ingest() {
         ["repeat_of_purged_refused", "repeat_of_purged_refused"]
     );
 }
+
+#[test]
+fn each_line_unchecked_against_purged_lines_is_counted_by_the_live_ingest() {
+    let f = Fixture::new();
+    let other = f.projects().join("other.jsonl");
+    std::fs::write(&other, line(1, None)).unwrap();
+    let mut ingested = ingest::ingest_path(
+        &f.home,
+        &other,
+        &Redactor::new(&[]).unwrap().0,
+        &mut OsEntropy,
+    )
+    .unwrap();
+    ingested.unchecked = 1;
+
+    f.running(None, None).audit_ingested(&ingested);
+
+    assert_eq!(f.counted(), ["repeat_of_purged_unchecked"]);
+}

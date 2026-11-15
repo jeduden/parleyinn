@@ -642,6 +642,17 @@ impl Store {
         purged_line_uuids(&self.conn, directory)
     }
 
+    /// The byte lengths of the purged lines in any transcript source of
+    /// `directory` that keep no harness UUID. No repeat of such a line
+    /// can be refused by `uuid`, so an ingest counts a line of one of
+    /// these lengths it records without a `uuid` as unchecked (REC-07).
+    pub fn purged_lengths_without_uuid(
+        &self,
+        directory: &str,
+    ) -> Result<BTreeSet<u64>, StoreError> {
+        purged_lengths_without_uuid(&self.conn, directory)
+    }
+
     /// Appends transcript lines and atomically keeps the positions of
     /// refused copies of purged lines which the new position crosses.
     /// The copies' bytes are zeroed in the position's hash (REC-04,
@@ -828,6 +839,30 @@ fn purged_line_uuids(conn: &Connection, directory: &str) -> Result<BTreeSet<Stri
     let rows = statement.query_map([directory], |row| row.get(0))?;
 
     Ok(rows.collect::<Result<_, _>>()?)
+}
+
+/// The byte lengths of the purged lines in the transcript sources of
+/// `directory` whose residue holds no UUID. An older store without the
+/// residue table holds none.
+fn purged_lengths_without_uuid(
+    conn: &Connection,
+    directory: &str,
+) -> Result<BTreeSet<u64>, StoreError> {
+    if !conn.query_row(HAS_COPIES, [], |row| row.get::<_, bool>(0))? {
+        return Ok(BTreeSet::new());
+    }
+    let mut statement = conn.prepare(
+        "SELECT DISTINCT p.byte_length FROM transcript_purged_copies p
+         JOIN transcript_sources s ON s.id = p.source
+         WHERE p.uuid IS NULL AND s.directory = ?1",
+    )?;
+    let rows = statement.query_map([directory], |row| row.get::<_, i64>(0))?;
+
+    Ok(rows
+        .collect::<Result<Vec<_>, _>>()?
+        .into_iter()
+        .map(count)
+        .collect())
 }
 
 /// The ingested runs `filter` selects, `?1` and `?2` being `a` and `b`.

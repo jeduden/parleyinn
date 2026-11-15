@@ -68,7 +68,7 @@ fn fill(w: &mut World, name: &str, n: u64) -> Result<PathBuf, String> {
 }
 
 /// Runs `parinn ingest --all`, failing unless it exits 0.
-fn ingest_all(w: &mut World) -> Result<(), String> {
+pub(crate) fn ingest_all(w: &mut World) -> Result<(), String> {
     run_core(w, &["ingest", "--all"], None)?;
     let out = last_run(w)?;
     if out.status.success() {
