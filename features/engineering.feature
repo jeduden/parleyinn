@@ -415,8 +415,9 @@ Feature: Engineering quality (ENG)
     And it names no file held at its listed size or within its limit
 
   @ENG-35 @P0 @pending
-  Scenario: a term the domain model excludes is a finding linked to its requirement
+  Scenario: a use of a term the domain model excludes is reported as a finding linked to ENG-35
     Given the repository checkout
-    When a change adds a sentence in terms the domain model excludes to a section of the specification
+    When a change adds, to a section of the specification, a sentence that uses a term the domain model excludes outside where the model's hub allows it
     Then that section's specialist reports the sentence as a finding linked to ENG-35
-    And the specialist of a domain-model file reports a use of a term the model excludes for its concepts as a finding linked to ENG-35
+    And the specialist of a concept file of the domain model reports a use of a term the model excludes for its concepts as a finding linked to ENG-35
+    And the hub's specialist reports a use of any term the model excludes, outside where the hub allows it, as a finding linked to ENG-35

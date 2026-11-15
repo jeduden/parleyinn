@@ -40,7 +40,7 @@ true whatever the model says.
    agrees.
 4. Excluded terms: search the whole repository for each. Every use must
    be one the hub allows, such as a historical record or an outside
-   tool's own words.
+   tool's own words (ENG-35).
 5. Names: identifiers, commands, tool names, settings keys and event
    names in the SRS's interfaces and in code follow the hub's rules.
 6. Changing the model: a change to any model file follows the steps the
