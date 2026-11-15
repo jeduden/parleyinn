@@ -162,6 +162,7 @@ pub fn cases() -> Vec<Case> {
         review_weighing_cases(),
         spend::review_spend_cases(),
         review_logs::review_log_cases(),
+        vec![size_list_growth_case()],
         // Last: its cases edit source the later cases would run stale.
         license_text_cases(),
     ]

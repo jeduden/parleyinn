@@ -18,7 +18,7 @@ use crate::Checkout;
 
 /// The size list, relative to the checkout: one file a line,
 /// `<path> <lines>`.
-pub const SIZE_LIST: &str = "tooling/engineering/oversize.txt";
+pub const SIZE_LIST: &str = review_bundle::size_list::SIZE_LIST;
 
 /// The directories no file is read under, relative to the root: git's
 /// own store, local state, other checkouts of the repository, which are

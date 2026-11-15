@@ -417,3 +417,4 @@ Feature: Engineering quality (ENG)
     When the size check reads a tree with a listed file grown, a listed file shrunk but still past its limit, a file past its limit that is not listed, a listed file that fits and a listed file that is gone
     Then it names the grown file, the shrunk file, the unlisted file, the file that fits and the file that is gone
     And it names no file held at its listed size or within its limit
+    And the review bundle blocks a change that adds a file to the size list or raises a file's listed lines until a stakeholder comment names the size list, and blocks no change that only lowers them

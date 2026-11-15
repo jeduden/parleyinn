@@ -119,3 +119,10 @@ fn it_names_each_drift(w: &mut World) -> Result<(), String> {
 fn it_names_no_held_file(w: &mut World) -> Result<(), String> {
     outcome(file_sizes::names_no_held_file(&w.section::<Read>().sizes))
 }
+
+#[then(
+    regex = r"^the review bundle blocks a change that adds a file to the size list or raises a file's listed lines until a stakeholder comment names the size list, and blocks no change that only lowers them$"
+)]
+fn the_size_list_only_shrinks(_: &mut World) -> Result<(), String> {
+    outcome(review_limits::size_list_only_shrinks())
+}
