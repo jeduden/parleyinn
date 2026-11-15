@@ -5,7 +5,9 @@
 //! The calls run in `parinn mcp` with the scope `room`, as the other
 //! recall steps do, but for the `rooms` scope, which needs a run: that
 //! row serves the transcript "mixed-provenance" live, as RCL-05's
-//! stand-in harness does, and calls as the run. The `kind` filter names
+//! stand-in harness does, and calls as the run. The scenario holds a
+//! second run, "short-run", so a `run` filter has another run's hits to
+//! refuse and a run that matches once to rank. The `kind` filter names
 //! a provenance class family (`tool_result` matches `tool_result:Bash`).
 //! No event a search can find is trusted yet: until OQ-40 provides a
 //! signing key every run leaves R3 and R8 open, so no `user` event is
@@ -23,13 +25,10 @@ use crate::World;
 use crate::recall::{fixture, keep_recorded, last_asked, record_runs};
 use crate::record::home;
 use crate::record_search::{Reply, call_tool, last_reply, set_reply};
-use crate::security_redaction::{agent_run_with_transcript, transcripts};
+use crate::security_redaction::transcripts;
 
 /// The run `rooms` is asked of.
 const RUN: &str = "mixed-provenance";
-
-/// The run that matches once or twice.
-const SHORT: &str = "short-run";
 
 /// A call with the scope `rooms`: a bound run makes it, the run the
 /// scenario's transcript holds.
@@ -167,11 +166,6 @@ fn ranked(items: &[Value]) -> Result<(), String> {
 /// the most a search returns, kept apart from the answer.
 fn without(w: &mut World, arguments: &Value, name: &str) -> Result<Vec<Value>, String> {
     let kept = last_reply(w)?;
-    if name == "run" {
-        // Another run's hit is what a run filter refuses.
-        agent_run_with_transcript(w, SHORT.to_owned())?;
-        record_runs(w)?;
-    }
     let mut open = arguments.clone();
     if let Some(fields) = open.as_object_mut() {
         fields.remove(name);
@@ -186,9 +180,9 @@ fn without(w: &mut World, arguments: &Value, name: &str) -> Result<Vec<Value>, S
 /// for trusted hits returns none, nothing a search finds being trusted
 /// yet, while the same search without the filter finds untrusted hits
 /// only: a row to tighten once OQ-40 lets an event be trusted. Every
-/// other row returns a hit, and a run, provenance class or family
-/// filter refuses a hit the same search finds without it, so an empty
-/// answer or a filter that keeps everything proves no row.
+/// other row returns a hit, and a run, provenance class, family or
+/// time filter refuses a hit the same search finds without it, so an
+/// empty answer or a filter that keeps everything proves no row.
 fn filters_at_work(
     w: &mut World,
     store: &Store,
@@ -205,7 +199,7 @@ fn filters_at_work(
     if items.is_empty() {
         return Err("the search returned no hit, so the row proves no filter".into());
     }
-    for name in ["run", "provenance", "kind"] {
+    for name in ["run", "provenance", "kind", "since", "until"] {
         if arguments.get(name).is_none() {
             continue;
         }
@@ -241,7 +235,8 @@ fn at_most_k_matching(w: &mut World, most: usize) -> Result<(), String> {
 )]
 fn short_run_above_repeats(w: &mut World) -> Result<(), String> {
     let kept = last_reply(w)?;
-    agent_run_with_transcript(w, SHORT.to_owned())?;
+    // The `rooms` row serves its run live and records no other before
+    // its call; every other row recorded both runs at its call.
     record_runs(w)?;
     let answer = call_tool(w, "event_search", json!({"query": "deploy", "k": 50}))?;
     set_reply(w, kept);

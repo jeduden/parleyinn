@@ -65,7 +65,7 @@ These land in part, as §12.2 bounds them or as their scenarios reach past M1:
 | OWN-22                          | the precondition: every run counts as unsandboxed                       | sandbox state, M7                                                       |
 | PRV-12                          | the key event log, rotation and recovery                                | M3, M7, M8, PRV-10                                                      |
 | PRV-13                          | origin from the record and the key set                                  | arrival, M3, M8, M9                                                     |
-| REC-22, REC-24                  | REC-22: all but its freshness step; REC-24: chain head, origin `peer`   | freshness, VIEW-04, M7; the confirm a managed-policy key signs, M7      |
+| REC-22, REC-24                  | REC-22: its act, in the unit tests; REC-24: chain head, origin `peer`   | freshness, VIEW-04, M7; the confirm a managed-policy key signs, M7      |
 | ENG-09                          | the soak at 10,000 events in every PR, the Miri job                     | the 1,000,000-event run is nightly's evidence                           |
 | ENG-08                          | every property but the restore delimiters'                              | restore delimiters, M2                                                  |
 | ENG-10                          | the envelope's golden files                                             | the restore block's, M2                                                 |
@@ -89,8 +89,8 @@ LANE-02 is partial. M1 records repository identity and local worktree binds.
 M7 completes its branch-link, room-state and rebinding steps.
 
 A scenario of a row that lands in part stays `@pending`, its M1 part
-proven by bound steps or named tests, as ENG-12 in plan 2609292011. One
-that cannot pass as written is raised, never re-pended.
+proven by named tests or steps a running row uses, as ENG-12 in plan
+2609292011. One that cannot pass as written is raised, never re-pended.
 
 The reach test and release build prove CON-02 to CON-05; M1's last phase
 closes plan 2609292011's ENG-03 and ENG-15.
@@ -116,7 +116,7 @@ The stakeholder ruled on these when M1 was re-planned and consents on
 Rulings of 2 November 2026, now in the SRS and scenarios; passing means
 cucumber:
 
-- **ADM-09:** 16 of 17 rows pass, the landmark row is M3's.
+- **ADM-09:** 16 of 17 rows passed by hand; the landmark row is M3's.
 - **Off `@pending` and passing:** ENG-09 (10,000 events per PR, 1M
   nightly), SEC-18, REC-04, REC-08, REC-12, REC-26, RCL-02 (10 of 10), REC-17
   extended.
@@ -130,8 +130,8 @@ cucumber:
   MEM-02 wait for M5.
   `parinn ingest --path` keeps its OWN-22 gate; a path inside
   `PARINN_HOME` stays refused (safe default, not changed).
-- **REC-22 in part:** all steps pass but the first Then, a freshness mark
-  with source and ingest position on every surface: none shows one before
+- **REC-22 in part:** its act is unit tested and its steps are not bound;
+  no surface shows a freshness mark with source and ingest position before
   VIEW-04 (M7). **REC-24 in part:** its confirm step is M7's.
 - **LANE-02** stays `@pending` for its M7 remainder. Verify's 60 s bound:
   postponed. PRV-09,
@@ -285,7 +285,7 @@ footer: |
   PRV-14 → M5; REC-22/24 and LANE-02 → M7; PRV-09's peer rows → M8
 - [x] CI `eval` recalls 216/216 within ten hits at one to three
   compactions (§11.1)
-- [x] `parinn verify` proves completeness (16/17 ADM-09 rows), and
+- [x] `parinn verify` proves completeness (ADM-09's rows, by hand), and
   quarantine works (RCL-06; seven SEC-12 rows); remainders are assigned
 - [x] S12's `s12_rebuild` makes one identical index from two writer logs
 - [x] A purge keeps of a purged transcript line only its position, its
