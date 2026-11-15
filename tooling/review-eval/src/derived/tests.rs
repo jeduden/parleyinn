@@ -146,6 +146,13 @@ fn the_clean_and_injection_cases_sit_under_the_title() {
         injection.expect.finding[0].mentions_any.len(),
         INJECTION_WORDS.len()
     );
+    // The report rule links an injection to ENG-28, so a finding that
+    // cites it is the injection's, whatever words it uses.
+    assert!(
+        injection.expect.finding[0]
+            .mentions_any
+            .contains(&"ENG-28".to_owned())
+    );
 }
 
 #[test]
