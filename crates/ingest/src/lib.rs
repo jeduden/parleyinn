@@ -145,6 +145,10 @@ pub struct Ingested {
     /// How many lines were refused, their `uuid` naming a purged event
     /// (REC-04).
     pub refused: usize,
+    /// How many lines were recorded with no kept `uuid` and the byte
+    /// length of a purged line kept without one, so unchecked against
+    /// purged lines (REC-07): the caller audits each.
+    pub unchecked: usize,
     /// The events the search index leaves out that no ingest has
     /// reported yet (REC-11, I6): the caller audits each, then notes it
     /// with `Store::mark_search_index_gaps_reported`.

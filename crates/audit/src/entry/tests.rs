@@ -85,6 +85,10 @@ fn each_counter_of_ingest_and_repeats_has_its_name() {
         (Counter::RepeatHeld, "repeat_held"),
         (Counter::RepeatReleased, "repeat_released"),
         (Counter::RepeatOfPurgedRefused, "repeat_of_purged_refused"),
+        (
+            Counter::RepeatOfPurgedUnchecked,
+            "repeat_of_purged_unchecked",
+        ),
         (Counter::TranscriptSourceLost, "transcript_source_lost"),
     ];
     for (counter, name) in counters {

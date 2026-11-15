@@ -128,6 +128,10 @@ pub enum Counter {
     /// A repeated line whose `uuid` names a purged event was refused,
     /// never recorded again (REC-04, REC-17).
     RepeatOfPurgedRefused,
+    /// A line was recorded with no kept `uuid` and the byte length of a
+    /// purged line kept without one: it may repeat that line, and was
+    /// not checked against it (REC-07).
+    RepeatOfPurgedUnchecked,
     /// A transcript source disappeared before it was fully ingested
     /// (REC-08).
     TranscriptSourceLost,
@@ -275,6 +279,7 @@ impl Counter {
             Self::RepeatHeld => "repeat_held",
             Self::RepeatReleased => "repeat_released",
             Self::RepeatOfPurgedRefused => "repeat_of_purged_refused",
+            Self::RepeatOfPurgedUnchecked => "repeat_of_purged_unchecked",
             Self::TranscriptSourceLost => "transcript_source_lost",
             Self::HookInputRejected => "hook_input_rejected",
             Self::HookBudgetExceeded => "hook_budget_exceeded",
