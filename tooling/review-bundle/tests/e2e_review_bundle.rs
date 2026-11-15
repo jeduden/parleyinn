@@ -151,6 +151,47 @@ fn the_executable_takes_consent_only_for_the_paths_a_comment_names() {
     );
 }
 
+/// The severities of the ENG-34 size-list findings when the diff
+/// changes the size list by `lines` and the stakeholder's one comment
+/// reads `body`.
+fn size_list_severities(lines: &str, body: &str) -> Vec<String> {
+    let out = TempDir::new().unwrap();
+    let diff = out.path().join("pr.diff");
+    let list = review_bundle::size_list::SIZE_LIST;
+    fs::write(&diff, format!("diff --git a/{list} b/{list}\n{lines}")).unwrap();
+    let root = testkit::repo_root();
+    let comments = serde_json::json!([{"author": "owner", "at": "t", "body": body}]);
+
+    let run = review_bundle_with(
+        out.path(),
+        &flags(&root, &root, &diff, out.path()),
+        &comments.to_string(),
+    );
+
+    assert_eq!(run.status.code(), Some(0));
+    let checked: serde_json::Value =
+        serde_json::from_str(&fs::read_to_string(out.path().join("checked.json")).unwrap())
+            .unwrap();
+    checked
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|f| f["path"] == list && f["body"].as_str().unwrap().contains("(ENG-34)"))
+        .map(|f| f["severity"].as_str().unwrap().to_owned())
+        .collect()
+}
+
+#[test]
+fn the_executable_blocks_a_lengthened_size_list_until_a_comment_names_it() {
+    let raised = "-crates/a/src/lib.rs 1100\n+crates/a/src/lib.rs 1101\n";
+    let lowered = "-crates/a/src/lib.rs 1100\n+crates/a/src/lib.rs 1099\n";
+    let names_it = "consenting: tooling/engineering/oversize.txt";
+
+    assert_eq!(size_list_severities(raised, "looks fine"), ["blocking"]);
+    assert_eq!(size_list_severities(raised, names_it), ["nit"]);
+    assert!(size_list_severities(lowered, "looks fine").is_empty());
+}
+
 #[test]
 fn the_executable_exits_2_on_a_wrong_command_line() {
     let home = TempDir::new().unwrap();

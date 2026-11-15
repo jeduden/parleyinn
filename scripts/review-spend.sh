@@ -13,7 +13,8 @@
 # that cannot be listed, a run behind one that cannot be looked up, or
 # a file that cannot be fetched or read fails the step, naming why: it
 # is never taken for nothing spent (I6). How many earlier reviews it
-# summed, and what they spent, it says in the job's summary.
+# summed, and what they spent, it says in the job's summary. The runs
+# behind the spend it trusts it leaves in trusted-runs.txt, newest first.
 #
 # Run by .github/workflows/review.yml, which hands it its values in
 # the environment; it takes the shell's default, no pipefail. Writes
@@ -54,6 +55,13 @@ picked=$(cargo run --locked --quiet --offline -p review-run -- previous select -
   || fail "What earlier reviews of this pull request spent could not be told apart, so no agent runs."
 ids=$(sed -n 's/^spend_artifacts=//p' <<< "$picked")
 skipped=$(sed -n 's/^previous_skipped=//p' <<< "$picked")
+# The runs behind the trusted spend, newest first: where the step that
+# looks for an earlier review's verdict looks (scripts/review-verdict.sh).
+jq -r --arg ids "$ids" \
+  '($ids | split(" ") | map(tonumber? // empty)) as $want
+   | [.artifacts[] | select(.id as $id | $want | index($id)) | .workflow_run.id]
+   | unique | sort | reverse | .[]' "$dir/artifacts.json" > "$dir/trusted-runs.txt" \
+  || fail "The runs of this pull request's earlier reviews did not read, so no agent runs."
 
 spent=0
 count=0
