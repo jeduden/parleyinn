@@ -61,21 +61,20 @@ review.
 - Main's ruleset does not change. It still requires a code owner's
   approval where CODEOWNERS names one, and the bundle still blocks a
   change to such a path until a stakeholder comment names it.
-- ENG-29 gains one clause, and the review bundle is what enforces it
-  while its scenario is `@pending`: a change to an invariant, to a
-  row ENG-29 marks for I2 review (PRV-10 to PRV-13 today), or to
-  ENG-29's own row is a blocking deterministic finding until an
-  accepted record in the same change names ENG-29 and each id, and the
-  stakeholder commented on the pull request. The workflow drops every
-  comment an agent posts, so no agent can write that comment, and the
-  bundle is the stakeholder's.
-- ENG-29's own row is guarded because it holds the list of marked
-  rows, and the specification no longer has a code owner: without the
-  clause, one change approved by agents alone could take PRV-10 off
-  the list, and a second could then change PRV-10. This change adds
-  the clause to ENG-29's row itself. The bundle on main does not yet
-  guard that row, so what stands behind this one change to it is the
-  stakeholder's consent comment on this pull request.
+- ENG-29 does not change, and the review bundle is what enforces it
+  while its scenario is `@pending`: a change to an invariant, or to a
+  row ENG-29 marks for I2 review (PRV-10 to PRV-13 today), is a
+  blocking deterministic finding until an accepted record in the same
+  change names ENG-29 and each id, and the stakeholder commented on the
+  pull request. The workflow drops every comment an agent posts, so no
+  agent can write that comment, and the bundle is the stakeholder's.
+- The bundle raises the same finding for a change to ENG-29's own row.
+  That row holds the list of marked rows, and the specification no
+  longer has a code owner: without the check, one change approved by
+  agents alone could take PRV-10 off the list, and a second could then
+  change PRV-10. ENG-29's text does not say this yet. Saying it there
+  is a change to ENG-29, which needs its own accepted record naming a
+  human security reviewer, so it is left to a change of its own.
 
 ## Alternatives
 
