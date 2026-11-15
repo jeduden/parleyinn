@@ -108,6 +108,45 @@ fn scenarios_keep_no_running_row_under_a_pending_feature_rule_or_scenario() {
 }
 
 #[test]
+fn scenarios_keep_the_rows_of_a_block_tagged_runs_as_running_though_held_pending() {
+    for tags in [
+        ["@pending", "", "", "@runs"],
+        ["", "@pending", "", "@runs"],
+        ["", "", "@pending", "@runs"],
+        ["", "", "@pending", "@runs @pending"],
+    ] {
+        let dir = write_feature(&outline(tags));
+
+        let got = scenarios(dir.path()).unwrap();
+
+        assert!(got[0].pending, "{tags:?}");
+        assert_eq!(got[0].examples.len(), 3, "{tags:?}");
+        let running: Vec<&str> = got[0].running.iter().map(|r| r["q"].as_str()).collect();
+        assert_eq!(running, ["c"], "{tags:?}");
+    }
+}
+
+#[test]
+fn scenarios_refuse_the_runs_tag_anywhere_but_on_an_examples_block() {
+    for tags in [
+        ["@runs", "", "", ""],
+        ["", "@runs", "", ""],
+        ["", "", "@pending @runs", ""],
+    ] {
+        let dir = write_feature(&outline(tags));
+
+        let err = scenarios(dir.path()).unwrap_err().to_string();
+
+        assert!(
+            err.ends_with(
+                r#"x.feature:8: "literal terms" carries the tag runs, which belongs on an Examples block"#
+            ),
+            "{tags:?}: {err}"
+        );
+    }
+}
+
+#[test]
 fn scenarios_in_reads_a_feature_from_its_text_as_the_walk_reads_the_file() {
     let body = "Feature: Record\n\n  @REC-01 @P0 @I1 @pending\n  Scenario: ingest\n    Given nothing\n\n  Rule: sources\n\n    @NFR-01\n    Scenario: fast\n      Given nothing\n";
     let dir = write_feature(body);
