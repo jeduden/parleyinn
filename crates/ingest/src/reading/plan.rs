@@ -123,10 +123,7 @@ impl<'a> Planner<'a> {
         source: &Source,
         runs: &Runs<'_>,
     ) -> Result<Self, IngestError> {
-        let others = store
-            .sources()?
-            .iter()
-            .any(|s| s.directory == named.directory && s.path != named.path);
+        let others = store.shares_directory(&named.directory, &named.path)?;
         let purged = store.purged_line_uuids(&named.directory)?;
         let forked = runs
             .sessions
