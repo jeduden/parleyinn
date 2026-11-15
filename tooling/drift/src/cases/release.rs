@@ -271,6 +271,16 @@ pub(super) fn review_crates_owner_case() -> Case {
     )
 }
 
+/// The tool pins CI's gates run on must remain owned by the stakeholder.
+pub(super) fn mise_owner_case() -> Case {
+    protection_case(
+        "the mise tool pins without the stakeholder",
+        Injection::replace(CODEOWNERS, "/mise.toml                    @jeduden\n", ""),
+        "the_checkout_s_codeowners_name_the_stakeholder_on_the_enforcing_paths",
+        "mise.toml (the manifests and tool pins CI builds and checks with) is owned by [], want @jeduden",
+    )
+}
+
 /// The linter configuration must remain owned by the stakeholder.
 pub(super) fn linter_owner_case() -> Case {
     protection_case(
@@ -392,6 +402,7 @@ pub(super) fn protection_cases() -> Vec<Case> {
             "CLAUDE.md (the agent instructions) is owned by [], want @jeduden",
         ),
         review_crates_owner_case(),
+        mise_owner_case(),
         linter_owner_case(),
         protection_case(
             "an owner on a path that does not guide the review",

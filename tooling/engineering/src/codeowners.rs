@@ -52,6 +52,7 @@ const ENFORCING: &[(&str, &[&str])] = &[
             "mise.lock",
             "mise.dev.toml",
             "mise.dev.lock",
+            "rust-toolchain.toml",
         ],
     ),
     (
@@ -60,6 +61,7 @@ const ENFORCING: &[(&str, &[&str])] = &[
             "clippy.toml",
             "crates/*/clippy.toml",
             "deny.toml",
+            "codecov.yml",
             "tooling/benchmark/accepted.txt",
             "tooling/eval/recall-v1.txt",
         ],
@@ -294,7 +296,7 @@ fn within(allowed: &[String], pattern: &str) -> bool {
     let pattern = pattern.trim_start_matches('/');
     allowed
         .iter()
-        .any(|a| pattern == a || (a.ends_with('/') && pattern.starts_with(a.as_str())))
+        .any(|a| pattern == a || (a.ends_with('/') && matches(a, pattern)))
 }
 
 /// Problems with the entries that use syntax this reader cannot judge.

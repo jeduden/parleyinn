@@ -258,16 +258,15 @@ fn an_owner_on_any_other_path_is_named() {
         "/docs/ @boss",
         "/docs/srs/ @boss",
         "/features/ @boss",
-        "/tooling/review-run/ @boss",
-        "/rust-toolchain.toml @boss",
         "/tooling/engineering/oversize.txt @boss",
         "/SECURITY.md @boss",
         "/tooling/review-eval/cases/ @boss",
+        "/tooling/review-run/ @boss",
         "/docs/agents/x/ @boss",
     ] {
         let (_d, c) = repo(&format!("{OWNERS}{extra}\n"));
         let found = no_owner_on_any_other_path(&c);
-        if extra == "/docs/agents/x/ @boss" {
+        if extra.starts_with("/tooling/review-") || extra == "/docs/agents/x/ @boss" {
             assert!(found.is_empty(), "{found:?}");
         } else {
             let pattern = extra.split(' ').next().unwrap();

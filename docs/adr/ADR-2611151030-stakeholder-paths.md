@@ -41,10 +41,11 @@ review.
   - the manifests and tool pins CI builds and checks with: the
     `Cargo.toml` of the workspace, of each crate and of the fuzz crate,
     whose `[lints]` decide whether the bans take effect,
-    and the mise files, which pin the tools the gates run;
+    and the mise files and `rust-toolchain.toml`, which pin the tools
+    the gates run;
   - the bans and acceptances CI holds the code to: every
-    `clippy.toml`, `deny.toml`, `tooling/benchmark/accepted.txt` and
-    `tooling/eval/recall-v1.txt`;
+    `clippy.toml`, `deny.toml`, `codecov.yml`,
+    `tooling/benchmark/accepted.txt` and `tooling/eval/recall-v1.txt`;
   - the linter configuration, `.mdsmith.yml`.
 - The specification, the decision records, the scenarios, the size
   list and Rust source outside the review's crates have no code owner. A pull
@@ -96,9 +97,8 @@ review.
 - The acceptance files stay the stakeholder's, as ADR-2610142300 and
   ADR-2610262245 rest on. The size list does not: ENG-34 no longer
   calls it the stakeholder's, since most pull requests change it, and
-  an agent's approval can now lengthen it. `rust-toolchain.toml`,
-  `codecov.yml`, `SECURITY.md` and `DEPENDENCIES.md` also change on
-  the agents' approval alone.
+  an agent's approval can now lengthen it. `SECURITY.md` and
+  `DEPENDENCIES.md` also change on the agents' approval alone.
 - A pull request that adds a crate or a dependency changes a manifest,
   so it still waits for the stakeholder.
 - The domain model calls a new concept a stakeholder decision
