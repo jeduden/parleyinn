@@ -44,9 +44,11 @@ findings, each in a form below, its place the path from the repository root:
 
 A failure CI hides or passes breaks the requirement of the gate it skips and is
 a linked finding. docs/ci.md is no requirement. A build that gets slower or
-flakes breaks a rule of it alone, so it is a request: `x.md:3 — request: add
-<that rule> — <why>`. The why says how the build gets slower or flakes, the
-docs/ci.md line and the smallest fix, after a dash never left out.
+flakes breaks a rule of it alone, so it is a request. Write `add`, the rule, a
+spaced dash, then the why in one sentence: `.github/workflows/build.yml:40 —
+request: add every job sets a timeout — this job sets none (docs/ci.md:25), so a
+hang holds the queue`. The why says how the build gets
+slower or flakes, the docs/ci.md line and the smallest fix.
 
 Stakeholder consent to a path under `/.github/` is the review bundle's check,
 never a finding of yours. End with one line, `outcome: findings` or `outcome:
