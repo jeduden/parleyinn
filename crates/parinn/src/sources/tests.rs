@@ -646,3 +646,22 @@ fn a_scan_takes_the_bytes_of_each_purged_line_as_zeros() {
     assert_ne!(at.prefix, scan(BODY, 15, &[]).unwrap().prefix);
     assert!(at.unread_line);
 }
+
+#[test]
+fn a_source_a_purge_left_a_hash_that_confirms_nothing_fails_as_replaced_while_its_file_is_there() {
+    let (there, gone) = (Path::new("/t/there.jsonl"), Path::new("/t/gone.jsonl"));
+    let unconfirmed = |path| {
+        let mut source = source(path, 20, 20);
+        source.position.prefix = store::source::unconfirmable();
+        source
+    };
+    let sources = [unconfirmed(there), unconfirmed(gone)];
+
+    let found = completeness(&sources, &[], &files(&[(there, BODY)]), NOW);
+
+    assert_eq!(
+        found.failed,
+        [("/t/there.jsonl".to_owned(), REPLACED)],
+        "the one fully ingested and gone does not fail (REC-08)"
+    );
+}

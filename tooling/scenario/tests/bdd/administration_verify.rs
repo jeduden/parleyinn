@@ -344,6 +344,54 @@ fn purged_line_kept_by_the_harness(w: &mut World) -> Result<(), String> {
     purge_run_events(w, "run-a", 2, 2)
 }
 
+/// Purges an event read from the transcript while its file is away, so
+/// the purge cannot read it and leaves its source a hash that confirms
+/// nothing (ADM-07); returns where the file was and where it is kept.
+fn purged_unread(w: &mut World) -> Result<(std::path::PathBuf, std::path::PathBuf), String> {
+    crate::recall::record_runs(w)?;
+    let path = transcript(w, "run-a")?;
+    let away = path.with_extension("away");
+    fs::rename(&path, &away).map_err(|e| e.to_string())?;
+    purge_run_events(w, "run-a", 2, 2)?;
+
+    Ok((path, away))
+}
+
+#[given(
+    regex = r"^a purge that could not read the transcript left its source a hash that confirms nothing, and the transcript is there again$"
+)]
+fn unconfirmed_and_there(w: &mut World) -> Result<(), String> {
+    let (path, away) = purged_unread(w)?;
+
+    fs::rename(away, path).map_err(|e| e.to_string())
+}
+
+#[given(
+    regex = r"^a purge that could not read the transcript left its source a hash that confirms nothing, and the transcript is gone$"
+)]
+fn unconfirmed_and_gone(w: &mut World) -> Result<(), String> {
+    purged_unread(w).map(|_| ())
+}
+
+#[then(regex = r"^the output names no failed check$")]
+fn names_no_failed_check(w: &mut World) -> Result<(), String> {
+    let out = last_run(w)?;
+    let shown = String::from_utf8_lossy(&out.stderr).into_owned();
+    if shown.contains("parinn verify: ") {
+        return Err(format!("parinn verify names a failed check: {shown}"));
+    }
+    let store = store::Store::open(&home(w)?.store()).map_err(|e| e.to_string())?;
+    let sources = store.sources().map_err(|e| e.to_string())?;
+    let unconfirmed = sources
+        .iter()
+        .any(|s| s.position.prefix == store::source::unconfirmable());
+    if unconfirmed {
+        return Ok(());
+    }
+
+    Err("no transcript source holds a hash that confirms nothing".to_owned())
+}
+
 #[then(
     regex = r"^the output names no failed check, the transcript's bytes up to its ingest position matching its consumed-prefix hash with the purged line's bytes zeroed$"
 )]

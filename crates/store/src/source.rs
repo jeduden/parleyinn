@@ -679,6 +679,21 @@ impl Store {
         Ok(shares?)
     }
 
+    /// Whether a purge erased a line of the source at `path`, in any of
+    /// its generations, that kept no `uuid`: one a new generation cannot
+    /// refuse (REC-07). An older store without the residue table holds
+    /// none.
+    pub fn purged_without_uuid(&self, path: &str) -> Result<bool, StoreError> {
+        if !self.conn.query_row(HAS_COPIES, [], |row| row.get(0))? {
+            return Ok(false);
+        }
+        let query = "SELECT EXISTS (SELECT 1 FROM transcript_purged_copies p
+                                    JOIN transcript_sources s ON s.id = p.source
+                                    WHERE s.path = ?1 AND p.uuid IS NULL)";
+
+        Ok(self.conn.query_row(query, [path], |row| row.get(0))?)
+    }
+
     /// What the purged lines in any transcript source of `directory`
     /// left, an earlier generation of a rewritten transcript included,
     /// read once for an ingest to test in memory (REC-04, REC-07,

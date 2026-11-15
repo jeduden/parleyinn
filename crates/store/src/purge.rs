@@ -40,6 +40,11 @@ CREATE TABLE IF NOT EXISTS purge_journal (
 const PAYLOAD: &str = "payload";
 const INDEX: &str = "index";
 const VACUUM: &str = "vacuum";
+/// How many transcript sources the purges not yet finished could not
+/// confirm, as the one row's target: journalled in the purge's own
+/// transaction, so a finishing step that fails does not lose the count
+/// (SEC-31, I6).
+const UNCONFIRMED: &str = "unconfirmed";
 
 /// A range of one writer's events to erase.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -73,8 +78,9 @@ pub struct Finished {
     pub vacuumed: bool,
     /// Whether anything was left to finish.
     pub nothing: bool,
-    /// Transcript sources the purge could not read to recompute their
-    /// consumed-prefix hash, which then confirms nothing (SEC-31, I6).
+    /// Transcript sources a purge could not read to recompute their
+    /// consumed-prefix hash, which then confirms nothing (SEC-31, I6):
+    /// those of every purge this step finishes, reported once.
     pub unconfirmed: u64,
 }
 
@@ -89,8 +95,10 @@ impl Store {
     ///
     /// Fails, erasing and recording nothing, when SQLite does or an
     /// event of `record` has no canonical encoding. The finishing steps
-    /// that fail afterwards stay journalled: the error is returned, the
-    /// erasure stands.
+    /// that fail afterwards stay journalled, with the count of transcript
+    /// sources the purge could not confirm: the error is returned, the
+    /// erasure stands, and the attempt that finishes it reports the
+    /// count.
     pub fn purge(
         &mut self,
         device: WriterId,
@@ -119,11 +127,9 @@ impl Store {
             to.append_chunk(&tx, device, record, true)?
         };
         journal(&tx, VACUUM, "")?;
+        journal_unconfirmed(&tx, unconfirmed)?;
         tx.commit()?;
-        let finished = Finished {
-            unconfirmed,
-            ..self.finish_purge()?
-        };
+        let finished = self.finish_purge()?;
 
         Ok(Purged {
             appended,
@@ -149,13 +155,21 @@ impl Store {
                 ..Finished::default()
             });
         }
-        let mut done = Finished::default();
-        done.postings = self.finish_postings()?;
-        done.payloads = self.finish_payloads()?;
-        done.vacuumed = self.finish_vacuum()?;
-        done.nothing = done.postings == 0 && done.payloads == 0 && !done.vacuumed;
+        let unconfirmed = unconfirmed(&self.conn)?;
+        let postings = self.finish_postings()?;
+        let payloads = self.finish_payloads()?;
+        let vacuumed = self.finish_vacuum()?;
+        // Last, so a step that failed above leaves the count journalled
+        // for the attempt that reports it.
+        self.conn.execute(CLEAR_KIND, [UNCONFIRMED])?;
 
-        Ok(done)
+        Ok(Finished {
+            payloads,
+            postings,
+            vacuumed,
+            nothing: postings == 0 && payloads == 0 && !vacuumed && unconfirmed == 0,
+            unconfirmed,
+        })
     }
 
     /// Whether a purge has steps still to finish.
@@ -277,6 +291,33 @@ fn journal(conn: &Connection, kind: &str, target: &str) -> Result<(), StoreError
     conn.execute(JOURNAL_ROW, params![kind, target])?;
 
     Ok(())
+}
+
+/// Adds `count` to the journalled count of transcript sources no purge
+/// could confirm.
+fn journal_unconfirmed(conn: &Connection, count: u64) -> Result<(), StoreError> {
+    if count == 0 {
+        return Ok(());
+    }
+    let total = unconfirmed(conn)? + count;
+    conn.execute(CLEAR_KIND, [UNCONFIRMED])?;
+
+    journal(conn, UNCONFIRMED, &total.to_string())
+}
+
+/// The journalled count of transcript sources no purge could confirm.
+/// A count that does not parse is the journal damaged, never a zero
+/// (I6).
+fn unconfirmed(conn: &Connection) -> Result<u64, StoreError> {
+    let mut total = 0;
+    for (_, count) in journalled(conn, UNCONFIRMED)? {
+        total += count.parse::<u64>().map_err(|_| StoreError::Corrupt {
+            address: None,
+            what: format!("journalled count of unconfirmed sources {count:?}"),
+        })?;
+    }
+
+    Ok(total)
 }
 
 /// The journalled targets of `kind`, with their ids, oldest first.

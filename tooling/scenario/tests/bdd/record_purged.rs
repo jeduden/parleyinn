@@ -3,8 +3,10 @@
 //! with each purged line's bytes zeroed, and one rewritten after a purge
 //! starts a new transcript generation that refuses each purged line by
 //! its `uuid`, audits each refusal and records neither again (REC-04,
-//! SEC-31). A purged line that carries no `uuid` is recorded again by
-//! the new transcript generation, counted and audited as unchecked
+//! SEC-31). A purged line that carries no `uuid` cannot be refused: the
+//! MCP server serving the rewritten transcript leaves it waiting for
+//! `parinn ingest`, audited, and the transcript generation that command
+//! starts records the line again, counted and audited as unchecked
 //! against purged lines.
 
 use std::fs;
@@ -12,8 +14,10 @@ use std::fs;
 use cucumber::{then, when};
 
 use crate::World;
+use crate::live::wait_until;
 use crate::record::home;
 use crate::record_ingest::{generations, ingest_all, lines, open, placed, rewritten};
+use crate::record_live::{live, serve};
 use crate::security_redaction::transcript;
 
 /// What the audit log says of each line a purge erased that ingest
@@ -23,6 +27,18 @@ const REFUSED: &str = "refused a repeated line whose `uuid` names a purged event
 /// What the audit log says of each line recorded without a check
 /// against purged lines, before the transcript it names.
 const UNCHECKED: &str = "recorded a line that keeps no `uuid`, unchecked against purged lines";
+
+/// What the audit log says of a rewritten transcript the MCP server
+/// leaves waiting, before the transcript it names.
+const WAITS: &str =
+    "a rewritten transcript with a purged line that kept no `uuid` waits for `parinn ingest`:";
+
+/// How many transcript generations the transcript had when the MCP
+/// server had audited leaving it waiting.
+#[derive(Debug, Default)]
+struct Waited {
+    generations: usize,
+}
 
 /// A transcript line that carries no `uuid`, of a length no other line
 /// of these steps has.
@@ -172,9 +188,9 @@ fn refused_in_a_new_generation(
 }
 
 #[when(
-    regex = r#"^"([^"]+)" is rewritten with a different first line after a purge of its ingested line (\d+), which carries no uuid$"#
+    regex = r#"^"([^"]+)" is rewritten with a different first line, while its MCP server serves it, after a purge of its ingested line (\d+), which carries no uuid$"#
 )]
-fn purged_without_uuid_then_rewritten(
+fn purged_without_uuid_then_rewritten_while_served(
     w: &mut World,
     name: String,
     line: u64,
@@ -192,20 +208,39 @@ fn purged_without_uuid_then_rewritten(
     fs::write(&path, text).map_err(|e| e.to_string())?;
     ingest_all(w)?;
     purge_lines(w, &name, line, line)?;
+    live(w).transcripts.insert(name.clone(), path.clone());
+    serve(w, &name, "startup", &[])?;
+    // Renamed into place, so the server never reads half of it.
+    let staged = path.with_extension("staged");
+    fs::write(&staged, format!("{}{NO_UUID}", rewritten(&name, count)))
+        .map_err(|e| e.to_string())?;
+    fs::rename(&staged, &path).map_err(|e| e.to_string())?;
+    wait_until("the MCP server to leave the transcript waiting", || {
+        Ok(audited(w, WAITS)? > 0)
+    })?;
+    w.section::<Waited>().generations = generations(w, &name)?.len();
+    let harness = live(w).harness.take().ok_or("no MCP server is running")?;
 
-    fs::write(&path, format!("{}{NO_UUID}", rewritten(&name, count))).map_err(|e| e.to_string())
+    harness.stop()
 }
 
 #[then(
-    regex = r#"^"([^"]+)" starts transcript generation (\d+), its line (\d+) is recorded again and counted as unchecked against purged lines with an audit entry, and the (\d+) other events of transcript generation 1 remain in the record$"#
+    regex = r#"^the MCP server left "([^"]+)" in transcript generation (\d+), waiting for "parinn ingest" with an audit entry, and now "[^"]+" starts transcript generation (\d+), its line (\d+) is recorded again and counted as unchecked against purged lines with an audit entry, and the (\d+) other events of transcript generation 1 remain in the record$"#
 )]
 fn unchecked_in_a_new_generation(
     w: &mut World,
     name: String,
+    waited_in: usize,
     generation: u64,
     line: u64,
     kept: usize,
 ) -> Result<(), String> {
+    let (waited, waits) = (w.section::<Waited>().generations, audited(w, WAITS)?);
+    if waited != waited_in || waits != 1 {
+        return Err(format!(
+            "{name:?} had {waited} generations when the MCP server left it waiting, audited {waits} times"
+        ));
+    }
     let generations = generations(w, &name)?;
     let newest = generations.last().ok_or("no generation")?;
     if newest.generation != generation {
