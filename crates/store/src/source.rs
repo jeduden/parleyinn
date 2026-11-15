@@ -349,6 +349,8 @@ fn source(row: SourceRow) -> Result<Source, StoreError> {
 
 /// The source and bytes of each purged line that keeps its place, read
 /// from the index of purged places alone, never by walking the places.
+/// Only a store an earlier build purged holds such a place: a purge now
+/// moves a purged line's residue to the refused copies and sets no flag.
 const PURGED_PLACES: &str =
     "SELECT source, byte_offset, byte_length FROM transcript_places WHERE purged = 1";
 
