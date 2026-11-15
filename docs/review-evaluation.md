@@ -158,6 +158,16 @@ already has is judged by main's cases; the pull request's cases judge
 only the components it adds, so a change cannot soften the cases that
 judge it.
 
+The one exception is the stakeholder's to make. The cases are a
+stakeholder path, so a pull request that changes one waits for a
+stakeholder comment that names it (ENG-21). A case file such a comment
+names judges as the pull request has it: its changed text, a case it
+adds, and no case where it removes one. Without this a wrong case on
+main could never be corrected, since main's version would fail the
+change that corrects it. Every other case of the component stays
+main's. The plan sorts the case files that differ into the two lists
+and prints both, and the evaluation says which cases the consent moved.
+
 ### What bounds the evaluate job
 
 The job runs reviewer components the pull request defines, with the
@@ -167,7 +177,8 @@ Claude OAuth token. Five things bound it:
 - its token is `contents: read`, with no write permission;
 - the harness refuses a definition whose front matter key or tool is
   outside its allow-lists, so none can start a process (I4);
-- main's cases judge the components main already has;
+- main's cases judge the components main already has, but for a case
+  file whose change a stakeholder comment names;
 - one step stages the token where no agent reads it, and the job
   scrubs what it keeps of the token before it uploads (ENG-28).
 
