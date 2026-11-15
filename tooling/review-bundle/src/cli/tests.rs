@@ -93,6 +93,23 @@ fn run_writes_the_bundle_and_findings_and_prints_the_route() {
 }
 
 #[test]
+fn run_writes_each_line_s_number_in_its_file_into_every_diff_an_agent_reads() {
+    let diff =
+        "diff --git a/a.rs b/a.rs\n--- a/a.rs\n+++ b/a.rs\n@@ -4,2 +4,2 @@\n-old\n+new\n kept\n";
+    let w = World::new(diff);
+
+    let (code, _, err) = w.run();
+
+    // A reader's tool numbers the diff file's lines: 5 for the removed
+    // line, which is line 4 of the file. The number a place takes is
+    // written on the line.
+    assert_eq!(code, EXIT_OK, "{err}");
+    let numbered = "diff --git a/a.rs b/a.rs\n--- a/a.rs\n+++ b/a.rs\n@@ -4,2 +4,2 @@\n      -old\n    4 +new\n    5  kept\n";
+    assert_eq!(w.output(&format!("{DIFFS}/lang-rust.diff")), numbered);
+    assert_eq!(w.output(WHOLE), numbered);
+}
+
+#[test]
 fn run_hands_each_specialist_only_its_files() {
     let w = World::new(
         "diff --git a/docs/srs/05.md b/docs/srs/05.md\n+x\n\
