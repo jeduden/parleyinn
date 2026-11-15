@@ -11,7 +11,7 @@
 
 use std::collections::BTreeMap;
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use ::record::event::EventKind;
 use audit::log::Log;
@@ -96,20 +96,46 @@ pub fn harness(w: &mut World) -> Result<&mut Harness, String> {
 
 /// Starts a harness whose MCP server serves the main run `name` from
 /// now: it runs the `SessionStart` hook with `source`, then waits until
-/// the MCP server took the session binding.
+/// the MCP server took the session binding and serves runs under it.
 pub fn serve(
     w: &mut World,
     name: &str,
     source: &str,
     extra: &[(&str, &str)],
 ) -> Result<(), String> {
-    let before = taken_bindings(w, name)?;
+    let transcript = named(w, name)?;
+    let (before, left) = (taken_bindings(w, name)?, start_markers(w, &transcript)?);
     let mut harness = Harness::start(w, true, extra)?;
     harness.hook("SessionStart", &session_start(w, name, source)?)?;
     live(w).harness = Some(harness);
     wait_until("the MCP server to take its session binding", || {
         Ok(taken_bindings(w, name)? > before)
+    })?;
+    // The store shows the binding taken a moment before the server
+    // serves runs under it (PRV-14), and a call sent in between is
+    // served under no run. The server leaves its start marker naming
+    // the transcript after, so a new one tells that it serves.
+    wait_until("the MCP server to serve its session binding", || {
+        Ok(start_markers(w, &transcript)?
+            .iter()
+            .any(|m| !left.contains(m)))
     })
+}
+
+/// The start markers of MCP servers that name the transcript at `path`,
+/// which live ingest leaves once it holds the transcript's session
+/// binding.
+fn start_markers(w: &World, path: &Path) -> Result<Vec<PathBuf>, String> {
+    let key = source_key(path);
+    let Ok(listing) = fs::read_dir(home(w)?.root().join("mcp")) else {
+        return Ok(Vec::new());
+    };
+    Ok(listing
+        .flatten()
+        .map(|e| e.path())
+        .filter(|p| p.extension().is_some_and(|e| e == "marker"))
+        .filter(|p| fs::read_to_string(p).is_ok_and(|names| names.lines().any(|l| l == key)))
+        .collect())
 }
 
 /// How many session bindings of `session` an MCP server took.
