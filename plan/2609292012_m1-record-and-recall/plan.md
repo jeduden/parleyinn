@@ -116,7 +116,7 @@ The stakeholder ruled on these when M1 was re-planned and consents on
 Rulings of 2 November 2026, now in the SRS and scenarios; passing means
 cucumber:
 
-- **ADM-09:** 16 of 17 rows passed by hand; the landmark row is M3's.
+- **ADM-09:** 16 of 17 rows pass in CI; the landmark row is M3's.
 - **Off `@pending` and passing:** ENG-09 (10,000 events per PR, 1M
   nightly), SEC-18, REC-04, REC-08, REC-12, REC-26, RCL-02 (10 of 10), REC-17
   extended.
@@ -285,7 +285,7 @@ footer: |
   PRV-14 → M5; REC-22/24 and LANE-02 → M7; PRV-09's peer rows → M8
 - [x] CI `eval` recalls 216/216 within ten hits at one to three
   compactions (§11.1)
-- [x] `parinn verify` proves completeness (ADM-09's rows, by hand), and
+- [x] `parinn verify` proves completeness (ADM-09's rows, in CI), and
   quarantine works (RCL-06; seven SEC-12 rows); remainders are assigned
 - [x] S12's `s12_rebuild` makes one identical index from two writer logs
 - [x] A purge keeps of a purged transcript line only its position, its

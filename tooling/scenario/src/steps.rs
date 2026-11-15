@@ -1,7 +1,9 @@
 //! The step gate: every step definition under `tests/bdd` is used by a
-//! row of a scenario that runs, or stands on a list that only shrinks.
+//! row that runs, or stands on a list that only shrinks. A row runs
+//! when its scenario is not pending, or, in an outline one Examples
+//! block holds pending, when its own block is not tagged so.
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::Path;
 
@@ -199,17 +201,27 @@ fn string_literal(s: &str) -> Result<String, String> {
     Err("unterminated string".to_owned())
 }
 
-/// The step texts of every row of every scenario that runs, each with
-/// its kind: an outline's placeholders filled from each Examples row.
+/// The rows of `sc` that run, each with its cells: one row without
+/// cells for a scenario that is not pending, and for an outline its
+/// running Examples rows, which a pending block of the same outline
+/// does not take away.
+fn running_rows(sc: &Scenario) -> Vec<Option<&BTreeMap<String, String>>> {
+    if !sc.examples.is_empty() {
+        return sc.running.iter().map(Some).collect();
+    }
+    if sc.pending {
+        return Vec::new();
+    }
+
+    vec![None]
+}
+
+/// The step texts of every row that runs, each with its kind: an
+/// outline's placeholders filled from each running Examples row.
 fn running_steps(scenarios: &[Scenario]) -> Vec<(&str, String)> {
     let mut out = Vec::new();
-    for sc in scenarios.iter().filter(|s| !s.pending) {
-        let rows: Vec<_> = if sc.examples.is_empty() {
-            vec![None]
-        } else {
-            sc.examples.iter().map(Some).collect()
-        };
-        for row in rows {
+    for sc in scenarios {
+        for row in running_rows(sc) {
             for (kind, text) in sc.step_kinds.iter().zip(&sc.steps) {
                 let mut text = text.clone();
                 for (head, cell) in row.into_iter().flatten() {

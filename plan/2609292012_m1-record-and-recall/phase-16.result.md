@@ -70,7 +70,7 @@ Rows that stay `@pending` after M1, with their remaining milestone
   not meet its target; the NFR-04 and NFR-05 targets and MEM-02 are in
   M5); `parinn ingest --path` keeps its OWN-22 gate, a path inside
   `PARINN_HOME` stays refused (safe default).
-- ADM-09: 16 of 17 rows passed by hand; the landmark row is M3's.
+- ADM-09: 16 of 17 rows pass in CI; the landmark row is M3's.
 - REC-22: not bound, its act unit tested; a freshness mark with
   source and ingest position on every surface is M7's (VIEW-04).
 - REC-02: its last step needs restore blocks and a join (M2).
@@ -94,8 +94,8 @@ M5's; ingest and live capture read a transcript whole, as on main. The review
 gate's blockers: I1 against an oversize line, quadratic cost of a resumed
 source, capture poll latency. SEC-05 is `@pending` again by that ruling.
 
-- [x] ADM-09's other rows passed with `@pending` lifted, all but the
-  landmark row, M3's
+- [x] ADM-09's rows run and pass, all but the landmark row, held
+  `@pending`, M3's
 
 Ruled: v1.0 ends before M8; PRV-09 and PRV-02's peer rows stay in M8
 (§11.2 option C). Verify's 60 s bound (`INDEX_CHECK_SECS`) is postponed.

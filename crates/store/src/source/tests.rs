@@ -778,3 +778,82 @@ fn a_purged_line_whose_place_cannot_be_read_makes_the_source_unreadable() {
 
     assert!(store.source("/t/a.jsonl").is_err());
 }
+
+/// How SQLite plans `query`, one step a line.
+fn plan(store: &Store, query: &str) -> String {
+    let mut statement = store
+        .conn
+        .prepare(&format!("EXPLAIN QUERY PLAN {query}"))
+        .unwrap();
+    let steps = statement
+        .query_map([], |row| row.get::<_, String>(3))
+        .unwrap();
+
+    steps.map(Result::unwrap).collect::<Vec<_>>().join("\n")
+}
+
+#[test]
+fn the_purged_spans_are_read_from_their_own_index_never_by_scanning_the_places() {
+    let dir = TempDir::new().unwrap();
+    let store = open(&dir);
+
+    for query in [
+        PURGED_PLACES.to_owned(),
+        format!("{PURGED_PLACES} AND source = 7"),
+    ] {
+        let plan = plan(&store, &query);
+
+        assert!(
+            plan.contains("COVERING INDEX transcript_places_purged"),
+            "{query}: {plan}"
+        );
+    }
+}
+
+#[test]
+fn another_source_shares_a_transcript_directory_only_when_one_lies_there() {
+    let dir = TempDir::new().unwrap();
+    let mut store = open(&dir);
+    store.start_generation("/t/a.jsonl", "/t").unwrap();
+    store.start_generation("/t/a.jsonl", "/t").unwrap();
+    store.start_generation("/u/b.jsonl", "/u").unwrap();
+
+    assert!(!store.shares_directory("/t", "/t/a.jsonl").unwrap());
+    assert!(store.shares_directory("/t", "/t/c.jsonl").unwrap());
+    assert!(!store.shares_directory("/v", "/v/c.jsonl").unwrap());
+}
+
+#[test]
+fn listing_the_sources_gives_each_its_own_purged_spans_in_offset_order() {
+    let dir = TempDir::new().unwrap();
+    let mut store = open(&dir);
+    let a = store.start_generation("/t/a.jsonl", "/t").unwrap();
+    let b = store.start_generation("/t/b.jsonl", "/t").unwrap();
+    store.start_generation("/t/c.jsonl", "/t").unwrap();
+    store
+        .advance_refusing(
+            a.id,
+            &position(20, 2),
+            &[place(2, Some("u2")), place(1, Some("u1"))],
+        )
+        .unwrap();
+    store
+        .advance_refusing(b.id, &position(10, 1), &[place(1, Some("u3"))])
+        .unwrap();
+
+    let spans: Vec<(String, Vec<u64>)> = store
+        .sources()
+        .unwrap()
+        .into_iter()
+        .map(|s| (s.path, s.purged.iter().map(|span| span.offset).collect()))
+        .collect();
+
+    assert_eq!(
+        spans,
+        [
+            ("/t/a.jsonl".to_owned(), vec![0, 10]),
+            ("/t/b.jsonl".to_owned(), vec![0]),
+            ("/t/c.jsonl".to_owned(), vec![]),
+        ]
+    );
+}

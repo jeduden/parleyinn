@@ -147,7 +147,7 @@ Feature: Administration and lifecycle (ADM)
     When SQLite's "secure_delete" is turned off in the store
     Then "parinn verify" fails
 
-  @ADM-09 @P0 @I1 @I6 @I10 @pending
+  @ADM-09 @P0 @I1 @I6 @I10
   Scenario Outline: verify names each failed check and fails no source an ingest resumes
     Given an isolated ParleyInn home
     And an agent run with a Claude Code transcript "run-a"
@@ -161,7 +161,6 @@ Feature: Administration and lifecycle (ADM)
       | the transcript has lines not in the record                                                                                                                | 3    | the output names the failed check "transcript source completeness"                                                                                                                                                   |
       | an event row's hash has been altered                                                                                                                      | 3    | the output names the failed check "hash chain"                                                                                                                                                                       |
       | a payload file's bytes have been altered                                                                                                                  | 3    | the output names the failed check "payload integrity"                                                                                                                                                                |
-      | a landmark row has been altered                                                                                                                           | 3    | the output names the failed check "derived artifact consistency"                                                                                                                                                     |
       | a trust level has been altered in place                                                                                                                   | 3    | the output names the failed check "derived artifact consistency"                                                                                                                                                     |
       | a schema object ParleyInn does not ship has been added to the store                                                                                       | 3    | the output names the failed check "derived artifact consistency"                                                                                                                                                     |
       | the search index's ranking configuration has been altered                                                                                                 | 3    | the output names the failed check "derived artifact consistency"                                                                                                                                                     |
@@ -175,6 +174,11 @@ Feature: Administration and lifecycle (ADM)
       | a kill stopped a purge after its erasure was recorded                                                                                                     | 0    | the output reports the purge pending, naming the ranges whose search index entries it has still to remove, and names no failed check; verify audits it and counts it once as a failed operation, and repairs nothing |
       | a kill stopped a purge after its erasure was recorded, and a search index entry for an event outside its ranges names an event whose text lacks the term  | 3    | the output names the failed check "derived artifact consistency"                                                                                                                                                     |
       | deriving the search index again outlasts verify's deadline                                                                                                | 0    | the output says the search index was not derived again in time and is unchecked, names no failed check and does not report the search index passed; verify audits it and counts it once as timed out                 |
+
+    @pending
+    Examples:
+      | state                                                                                                                                                     | exit | outcome                                                                                                                                                                                                              |
+      | a landmark row has been altered                                                                                                                           | 3    | the output names the failed check "derived artifact consistency"                                                                                                                                                     |
 
   @ADM-10 @P0 @I7 @pending
   Scenario: doctor is read-only and doctor --fix shows each change first

@@ -308,7 +308,8 @@ pub(super) fn repository_cases() -> Vec<Case> {
 }
 
 /// The drifts the step gate catches: a step definition no running row
-/// uses, and the list of those drifting from the definitions.
+/// uses, the list of those drifting from the definitions, and a row a
+/// pending Examples block holds counted as one that runs.
 pub(super) fn step_gate_cases() -> Vec<Case> {
     vec![
         case(
@@ -329,20 +330,20 @@ pub(super) fn step_gate_cases() -> Vec<Case> {
         case(
             "a step definition taken off the list of those no running row uses",
             "every_step_definition_has_a_running_row",
-            Injection::replace_line(UNRUN_STEPS, "administration_verify.rs foreign_object", ""),
+            Injection::replace_line(UNRUN_STEPS, "administration_verify.rs landmark_altered", ""),
             cargo_test(
                 "scenario",
                 "gate",
                 "every_step_definition_has_a_running_row",
             ),
-            "administration_verify.rs foreign_object: no row of a scenario that runs uses this step definition",
+            "administration_verify.rs landmark_altered: no row of a scenario that runs uses this step definition",
         ),
         case(
             "the list naming a step definition that was deleted",
             "every_step_definition_has_a_running_row",
             Injection::replace_line(
                 UNRUN_STEPS,
-                "administration_verify.rs foreign_object",
+                "administration_verify.rs landmark_altered",
                 "administration_verify.rs deleted_step",
             ),
             cargo_test(
@@ -357,8 +358,8 @@ pub(super) fn step_gate_cases() -> Vec<Case> {
             "every_step_definition_has_a_running_row",
             Injection::replace_line(
                 UNRUN_STEPS,
-                "administration_verify.rs foreign_object",
-                "administration_verify.rs foreign_object\nrecord_store.rs sized_results",
+                "administration_verify.rs landmark_altered",
+                "administration_verify.rs landmark_altered\nrecord_store.rs sized_results",
             ),
             cargo_test(
                 "scenario",
@@ -366,6 +367,21 @@ pub(super) fn step_gate_cases() -> Vec<Case> {
                 "every_step_definition_has_a_running_row",
             ),
             "record_store.rs sized_results: listed, but a row that runs now uses it",
+        ),
+        case(
+            "an outline's row moved to an Examples block held pending, its step definition unlisted",
+            "every_step_definition_has_a_running_row",
+            Injection::replace(
+                "features/assumptions.feature",
+                "      | partial compaction | a \"compact_boundary\" line is appended                                       |",
+                "\n    @pending\n    Examples:\n      | flow               | shape                                 |\n      | partial compaction | a \"compact_boundary\" line is appended |",
+            ),
+            cargo_test(
+                "scenario",
+                "gate",
+                "every_step_definition_has_a_running_row",
+            ),
+            "assumptions.rs line_appended: no row of a scenario that runs uses this step definition",
         ),
     ]
 }
