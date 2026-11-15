@@ -96,12 +96,12 @@ requirement counts match the tables they summarise. They also check
 that Appendix C gives every requirement a persona, and that §2.5's
 personas match the agents in `.claude/agents`.
 
-A scenario still tagged `@pending` is declared but not written. It
-is skipped and counted, never counted as a pass. The `bdd` target in
+A scenario tagged `@pending` is declared, not written: skipped and
+counted, never a pass, but for an Examples block tagged `@runs`, whose
+rows run. The `bdd` target in
 [tooling/scenario](../tooling/scenario/tests/bdd/main.rs) runs the rest
-through cucumber-rs, and a step whose text matches no binding fails
-instead of being skipped. It prints `scenarios: N bound, M pending`
-first; each of CI's four `scenarios` jobs writes it into its summary.
+through cucumber-rs; a step no binding matches fails. It prints
+`scenarios: N bound, M pending`; CI's `scenarios` jobs summarize it.
 
 The runner reads features with the same gherkin parser as the gate.
 That parser is stricter than godog's in two places. A description line
