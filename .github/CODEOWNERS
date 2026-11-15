@@ -1,61 +1,27 @@
-# ENG-21: agents review and approve each other's pull requests. The
-# stakeholder approves the specification, the decision records, the
-# scenarios and the process that builds and checks the code, listed
-# below, and no Rust source. A path with no code owner here, code among
-# it, merges on the approval of any reviewer other than its author,
-# agent or human.
+# ENG-21: agents review and approve each other's pull requests, and a
+# pull request that touches no path below merges on the reviewer app's
+# approval alone, with no act of the stakeholder. The stakeholder
+# approves only a change to what guides the review, listed below. A
+# path with no code owner here, the specification, the decision
+# records, the scenarios and Rust source outside the review's crates
+# among them, merges on the approval of any reviewer other than its
+# author, agent or human.
 
-# The specification (the requirement text).
-/docs/srs/                    @jeduden
-
-# The decision records that justify design and dependencies (ENG-26).
-/docs/adr/                    @jeduden
-
-# The scenarios that make the requirement text executable.
-/features/                    @jeduden
-
-# The build configuration of every crate: its manifest, whose [lints]
-# could switch the workspace bans off and whose dependencies the
-# architecture check reads, and the clippy configuration that refuses
-# sockets, program starts, clocks and random order in its code (SEC-01,
-# ENG-16, ENG-03).
-/crates/*/clippy.toml         @jeduden
-/crates/*/Cargo.toml          @jeduden
-/tooling/*/Cargo.toml         @jeduden
-
-# CI, the coverage floors, the toolchain pins, the lint and supply-chain
-# configuration and this file.
-/.github/                     @jeduden
-/scripts/                     @jeduden
-/Cargo.toml                   @jeduden
-/rust-toolchain.toml          @jeduden
-/mise.toml                    @jeduden
-/mise.lock                    @jeduden
-/mise.dev.toml                @jeduden
-/mise.dev.lock                @jeduden
-/clippy.toml                  @jeduden
-/deny.toml                    @jeduden
-/codecov.yml                  @jeduden
-
-# The gate data the stakeholder accepts: the benchmark regressions
-# ADR-2610142300 lets through, the recall evaluation's baseline, the
-# size list of the files past their line limit (ENG-34), and the
-# reviewer evaluation's cases and published scorecard (ENG-32).
-/tooling/benchmark/accepted.txt @jeduden
-/tooling/eval/recall-v1.txt   @jeduden
-/tooling/engineering/oversize.txt @jeduden
-/tooling/review-eval/cases/   @jeduden
-/tooling/review-eval/scorecard-v1.txt @jeduden
-/.mdsmith.yml                 @jeduden
-
-# The supply-chain and disclosure policy: every new direct dependency
-# needs an accepted ADR under /docs/adr/, listed in DEPENDENCIES.md
-# (ENG-18), so it passes here.
-/SECURITY.md                  @jeduden
-/DEPENDENCIES.md              @jeduden
-
-# The agent instructions, and the shared sections they include.
+# The agent instructions, which the review's agents load, and the
+# shared sections they include.
 /CLAUDE.md                    @jeduden
 /AGENTS.md                    @jeduden
 /.claude/                     @jeduden
 /docs/agents/                 @jeduden
+
+# The review's code: the bundle, the run, the gate, the report and the
+# evaluation with its cases and published scorecard (ENG-28, ENG-32).
+/tooling/review-*/            @jeduden
+
+# CI and the merge rules: the workflows, main's rulesets, this file and
+# the scripts the workflows run.
+/.github/                     @jeduden
+/scripts/                     @jeduden
+
+# The linter configuration.
+/.mdsmith.yml                 @jeduden

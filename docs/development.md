@@ -46,11 +46,10 @@ declare the same one. The tooling crates fall under the same table.
 
 One rule needs no declaration. A product crate under `crates/` never
 depends on a tooling crate under `tooling/` as a normal or build
-dependency; only its tests may, as declared. The manifests are the
-stakeholder's paths in CODEOWNERS, so changing a direction waits for
-the stakeholder. The browser room view client, a TypeScript package,
-does not exist yet (M7); its dependency boundary joins this check
-when it lands.
+dependency; only its tests may, as declared. A manifest reviews deep,
+so the review weighs a changed direction. The browser room view
+client, a TypeScript package, does not exist yet (M7); its dependency
+boundary joins this check when it lands.
 
 The core executable's reach is held two ways (SEC-01, ENG-16). Its
 own [clippy.toml](../crates/parinn/clippy.toml) refuses the
@@ -164,8 +163,9 @@ was stamped with. Each target is built once: the release build is not
 checked for reproducibility.
 
 [review.yml](../.github/workflows/review.yml) reviews each pull request from a
-branch of this repository once its CI passes (ENG-21, ENG-28). It skips drafts:
-marking a pull request ready reruns CI and so reviews it. The agents run on the
+branch of this repository once its CI passes (ENG-21, ENG-28). It skips drafts,
+so an agent opens its pull request ready, with auto-merge on, and GitHub merges
+it once `CI` and the `review-gate` check pass. The agents run on the
 stakeholder's Claude subscription, not a per-token API key. It triggers on
 `workflow_run` and `issue_comment`, so GitHub runs it as `main` defines it,
 never as the pull request does; a code owner's comment on a pull request whose
@@ -192,9 +192,9 @@ commits, `CI`, the reviewer app's `review-gate` check (pinned to its app
 id), one approval from a reviewer other than the author, and a code owner's
 approval where [CODEOWNERS](../.github/CODEOWNERS) names one. The ENG-21
 gate tests read it, and CODEOWNERS: it names the stakeholder as code owner
-of the specification, the decision records, the scenarios and every path of
-the process that builds and checks the code, a code owner on nothing else
-but the supply-chain policy, and no code owner on Rust source. Two tag
+of what guides the review, and of nothing else: the agent instructions, the
+`tooling/review-*` crates, `.github/`, `scripts/` and `.mdsmith.yml`
+([ADR-2611151030](adr/ADR-2611151030-stakeholder-paths.md)). Two tag
 rulesets sit beside it. `releases-semver` keeps each `v*.*.*` tag fixed on a
 signed commit that passed `CI`. `no-other-tags-allowed` refuses every other
 tag. The stakeholder applies the rulesets on GitHub. The nightly
@@ -275,13 +275,13 @@ The gate fails a review whose consulted list lacks a dispatched agent.
 A charged run is not rerun; an unrouted change gets one generalist.
 A deep review consults each generalist's deep instance instead: the same
 template under [docs/agents](agents/review-code.md), on the model, effort and
-turns its definition names. The class is light for Markdown outside the
-stakeholder's paths, deep for those paths, the gates and the security-sensitive
-code. The review bundle quotes only the touched rows, their scenarios and the
-invariants, a few thousand model tokens where the SRS runs to hundreds of
-thousands. The pull request's agent instructions move out of the agents'
-directory, so none loads; the agents read them as data. The posted review names
-the gate as its author, states the review's verdict, and keeps the agents'
+turns its definition names. The class is light for other Markdown, and deep for
+the stakeholder's paths, the SRS, the ADRs, the scenarios, the configuration,
+the gates and the security-sensitive code. The bundle quotes only the touched
+rows, their scenarios and the invariants, a few thousand model tokens where the
+SRS runs to hundreds of thousands. The pull request's agent instructions leave
+the agents' directory, so none loads; they are read as data. The posted review
+names the gate as its author, states the review's verdict, and keeps the agents'
 findings, the deterministic ones and failed checks under their own headings. A
 pull request that changes a reviewer component also runs that component's
 evaluation cases, whose failures are blocking findings (ENG-32,

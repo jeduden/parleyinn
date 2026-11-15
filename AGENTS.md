@@ -208,11 +208,11 @@ Open only the [SRS](docs/srs/index.md) section a task touches.
 
 ## Review
 
-Agents review and approve each other's pull requests (ENG-21). A pull request
-touching a path [CODEOWNERS](.github/CODEOWNERS) assigns also waits for the
-stakeholder's approval: the SRS, the ADRs, the scenarios, CI, the build and lint
-configuration, the supply-chain policy and the agent instructions. Rust source
-has no code owner; the gates and the security-sensitive crates review deep. On
+Agents review each other's pull requests, and GitHub merges them (ENG-21).
+Open yours ready, never as a draft, and enable auto-merge. Ask the stakeholder
+for nothing, unless it changes a path [CODEOWNERS](.github/CODEOWNERS) names:
+the agent instructions, `tooling/review-*`, `.github/`, `scripts/` and
+`.mdsmith.yml`. Then ask once, listing those paths, for a consenting comment. On
 GitHub, write every `@`-word in backticks: a bare one, such as `@I2`, mentions
 that GitHub user (jeduden/parleyinn#22).
 

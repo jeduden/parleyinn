@@ -1,8 +1,9 @@
-//! ENG-21: `CODEOWNERS` names the stakeholder on the specification, the
-//! scenarios and the process that builds and checks the code, on
-//! nothing else but the supply-chain policy, and on no Rust source.
+//! ENG-21: `CODEOWNERS` names the stakeholder on what guides the
+//! review (the agent instructions, the review's code, cases and
+//! scorecard, CI and the merge rules, the linter configuration), on
+//! nothing else, and on no Rust source outside the review's crates.
 //!
-//! The enforcing paths come from the ENG-21 row of the SRS: each class
+//! The guiding paths come from the ENG-21 row of the SRS: each class
 //! it names maps to the paths that hold it today, and a class the row
 //! stops naming is reported, so the mapping cannot go stale unseen. The
 //! stakeholder is read from the SRS as well.
@@ -21,56 +22,23 @@ pub struct Entry {
     pub owners: Vec<String>,
 }
 
-/// What the ENG-21 row names as enforcing the requirements, as the
-/// words it uses and the paths that hold each class. A path with a `*`
-/// stands for each directory under its parent.
+/// The review's crates: the bundle, the run, the gate, the report and
+/// the evaluation with its cases and scorecard.
+const REVIEW_CRATES: &str = "tooling/review-*/";
+
+/// What the ENG-21 row names as guiding the review, as the words it
+/// uses and the paths that hold each class. A path with a `*` stands
+/// for each directory of its parent the name matches.
 const ENFORCING: &[(&str, &[&str])] = &[
-    ("`docs/srs/`", &["docs/srs/"]),
-    ("the decision records", &["docs/adr/"]),
-    ("the scenarios (`features/`)", &["features/"]),
-    // Every mise configuration and lockfile: CI's install step reads
-    // them all to refuse a tool that would build from source, and the
-    // developer pins install the tools agents run.
-    (
-        "CI,",
-        &[
-            ".github/",
-            "scripts/",
-            "mise.toml",
-            "mise.lock",
-            "mise.dev.toml",
-            "mise.dev.lock",
-        ],
-    ),
-    (
-        "the build, lint and coverage configuration",
-        &[
-            "Cargo.toml",
-            "rust-toolchain.toml",
-            "clippy.toml",
-            "deny.toml",
-            "codecov.yml",
-            ".mdsmith.yml",
-            "crates/*/clippy.toml",
-            "crates/*/Cargo.toml",
-            "tooling/*/Cargo.toml",
-            "tooling/benchmark/accepted.txt",
-            "tooling/eval/recall-v1.txt",
-            "tooling/engineering/oversize.txt",
-            "tooling/review-eval/cases/",
-            "tooling/review-eval/scorecard-v1.txt",
-        ],
-    ),
     (
         "the agent instructions",
         &["CLAUDE.md", "AGENTS.md", ".claude/", "docs/agents/"],
     ),
+    ("the review's code, cases and scorecard", &[REVIEW_CRATES]),
+    ("CI and the merge rules", &[".github/", "scripts/"]),
     ("`CODEOWNERS` itself", &[".github/CODEOWNERS"]),
+    ("the linter configuration", &[".mdsmith.yml"]),
 ];
-
-/// The paths besides the enforcing ones that CODEOWNERS may name: the
-/// supply-chain and disclosure policy (ENG-18, ENG-24).
-const OTHER_ALLOWED: &[&str] = &["SECURITY.md", "DEPENDENCIES.md"];
 
 /// The directories the Rust source check does not descend into: build
 /// output and git's own store.
@@ -185,8 +153,8 @@ pub fn stakeholder(checkout: &Checkout) -> Result<String, String> {
         .ok_or_else(|| "the Stakeholder row names no user".to_owned())
 }
 
-/// The enforcing paths of the checkout that exist, with the class each
-/// belongs to. A path with a `*` stands for each crate directory.
+/// The guiding paths of the checkout that exist, with the class each
+/// belongs to. A path with a `*` stands for each directory it matches.
 fn existing_enforcing(checkout: &Checkout) -> Vec<(&'static str, String)> {
     let mut out = Vec::new();
     for (class, paths) in ENFORCING {
@@ -198,28 +166,38 @@ fn existing_enforcing(checkout: &Checkout) -> Vec<(&'static str, String)> {
     out
 }
 
-/// `path`, or each path it stands for, when it exists in the checkout.
+/// `path`, or each path it stands for, when it exists in the checkout:
+/// a name with a `*` stands for each entry of its parent it matches.
 fn expand(checkout: &Checkout, path: &str) -> Vec<String> {
-    let paths = match path.split_once("/*/") {
+    let paths = match path.split_once('*') {
         None => vec![path.to_owned()],
-        Some((parent, rest)) => fs::read_dir(checkout.root.join(parent))
-            .into_iter()
-            .flatten()
-            .flatten()
-            .filter_map(|e| e.file_name().into_string().ok())
-            .map(|dir| format!("{parent}/{dir}/{rest}"))
-            .collect(),
+        Some((before, after)) => {
+            let (parent, start) = before.rsplit_once('/').unwrap_or(("", before));
+            let (end, rest) = after.split_at(after.find('/').unwrap_or(after.len()));
+            let name = format!("{start}*{end}");
+            fs::read_dir(checkout.root.join(parent))
+                .into_iter()
+                .flatten()
+                .flatten()
+                .filter_map(|e| e.file_name().into_string().ok())
+                .filter(|entry| glob(&name, entry))
+                .map(|entry| format!("{}{rest}", under(parent, &entry)))
+                .collect()
+        }
     };
 
-    paths
+    let mut paths: Vec<String> = paths
         .into_iter()
         .filter(|p| checkout.root.join(p).exists())
-        .collect()
+        .collect();
+    paths.sort();
+
+    paths
 }
 
 /// Problems with the stakeholder's ownership: the ENG-21 row no longer
-/// names a class this check maps, or an enforcing path or the
-/// requirement text that exists is not owned by the stakeholder alone.
+/// names a class this check maps, or a guiding path that exists is not
+/// owned by the stakeholder alone.
 #[must_use]
 pub fn stakeholder_owns_the_enforcing_paths(checkout: &Checkout) -> Vec<String> {
     let (stakeholder, entries) = match (stakeholder(checkout), load(checkout)) {
@@ -254,8 +232,7 @@ pub fn stakeholder_owns_the_enforcing_paths(checkout: &Checkout) -> Vec<String> 
     problems
 }
 
-/// Problems with entries that name a path outside the allowed classes:
-/// the enforcing paths and the supply-chain policy.
+/// Problems with entries that name a path outside the guiding classes.
 #[must_use]
 pub fn no_owner_on_any_other_path(checkout: &Checkout) -> Vec<String> {
     let entries = match load(checkout) {
@@ -265,7 +242,6 @@ pub fn no_owner_on_any_other_path(checkout: &Checkout) -> Vec<String> {
     let allowed: Vec<String> = ENFORCING
         .iter()
         .flat_map(|(_, paths)| paths.iter())
-        .chain(OTHER_ALLOWED)
         .map(|p| (*p).to_owned())
         .collect();
 
@@ -276,7 +252,7 @@ pub fn no_owner_on_any_other_path(checkout: &Checkout) -> Vec<String> {
             .filter(|e| !e.owners.is_empty() && !within(&allowed, &e.pattern))
             .map(|e| {
                 format!(
-                    "{} names an owner on a path outside the allowed classes",
+                    "{} names an owner on a path that does not guide the review",
                     e.pattern
                 )
             }),
@@ -309,7 +285,8 @@ fn unsupported_patterns(entries: &[Entry]) -> Vec<String> {
 }
 
 /// Problems with the owners of Rust source: each `.rs` file of the
-/// checkout, outside build output, that an entry gives an owner.
+/// checkout, outside build output and the review's crates, that an
+/// entry gives an owner.
 #[must_use]
 pub fn no_owner_on_rust_source(checkout: &Checkout) -> Vec<String> {
     let entries = match load(checkout) {
@@ -319,11 +296,18 @@ pub fn no_owner_on_rust_source(checkout: &Checkout) -> Vec<String> {
 
     let found = rust_sources(checkout, "");
     let mut problems = found.unread;
-    problems.extend(found.sources.into_iter().filter_map(|path| {
-        let owners = owners_of(&entries, &path);
-        (!owners.is_empty())
-            .then(|| format!("{path} is Rust source owned by {}", crate::list(owners)))
-    }));
+    let product = |path: &String| !matches(REVIEW_CRATES, path);
+    problems.extend(
+        found
+            .sources
+            .into_iter()
+            .filter(product)
+            .filter_map(|path| {
+                let owners = owners_of(&entries, &path);
+                (!owners.is_empty())
+                    .then(|| format!("{path} is Rust source owned by {}", crate::list(owners)))
+            }),
+    );
 
     problems
 }

@@ -62,7 +62,7 @@ fn review_gate_required(w: &mut World) -> Result<(), String> {
 }
 
 #[then(
-    regex = r"^CODEOWNERS names the stakeholder on the specification, the decision records, the scenarios and the process that builds and checks the code$"
+    regex = r"^CODEOWNERS names the stakeholder on what guides the review: the agent instructions, the review's code and cases, CI and the linter configuration$"
 )]
 fn stakeholder_owns_the_enforcing_paths(_w: &mut World) -> Result<(), String> {
     outcome(codeowners::stakeholder_owns_the_enforcing_paths(&checkout()))
@@ -73,11 +73,12 @@ fn no_owner_on_any_other_path(_w: &mut World) -> Result<(), String> {
     outcome(codeowners::no_owner_on_any_other_path(&checkout()))
 }
 
-/// CODEOWNERS gives no Rust source an owner, and the ruleset still
+/// CODEOWNERS gives no Rust source outside the review's crates an
+/// owner, and the ruleset still
 /// asks a reviewer other than the author to approve, so a code change
 /// waits on that reviewer alone: the step reads both.
 #[then(
-    regex = r"^CODEOWNERS names no code owner on Rust source, so a code change needs only a reviewer other than its author$"
+    regex = r"^CODEOWNERS names no code owner on Rust source outside the review's crates, so any other code change needs only a reviewer other than its author$"
 )]
 fn no_owner_on_rust_source(w: &mut World) -> Result<(), String> {
     let mut problems = codeowners::no_owner_on_rust_source(&checkout());

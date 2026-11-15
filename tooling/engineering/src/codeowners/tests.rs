@@ -5,36 +5,34 @@ const INDEX: &str = "| **Stakeholder** | @boss, also the security reviewer |\n";
 const ENG: &str = "\
 | ID | Pri | Requirement | Ver |
 |---|---|---|---|
-| ENG-21 | P0 | Changes to the specification (`docs/srs/` and the decision records), to the scenarios (`features/`), or to the process (CI, the build, lint and coverage configuration, the agent instructions and `CODEOWNERS` itself) need the stakeholder. | I |
+| ENG-21 | P0 | Only a change to what guides the review needs the stakeholder: the agent instructions, the review's code, cases and scorecard, CI and the merge rules (`CODEOWNERS` itself among them) and the linter configuration (`.mdsmith.yml`). | I |
 ";
 
 const OWNERS: &str = "\
 # a comment
-/docs/srs/        @boss
-/docs/adr/        @boss
-/features/        @boss
-/crates/*/clippy.toml @boss
-/crates/*/Cargo.toml  @boss
-/tooling/*/Cargo.toml @boss
-/.github/         @boss # trailing
-/scripts/         @boss
-/Cargo.toml       @boss
 /CLAUDE.md        @boss
 /.claude/         @boss
-/SECURITY.md      @boss
+/docs/agents/     @boss
+/tooling/review-*/ @boss
+/.github/         @boss # trailing
+/scripts/         @boss
+/.mdsmith.yml     @boss
 ";
 
 const FILES: &[&str] = &[
     "features/a.feature",
-    "tooling/x/Cargo.toml",
     "tooling/x/src/lib.rs",
+    "tooling/review-gate/src/lib.rs",
+    "tooling/review-run/Cargo.toml",
+    "tooling/reviewer.txt",
     "crates/pin/src/lib.rs",
+    "docs/agents/a.md",
+    "docs/srs/a.md",
     "scripts/a.sh",
     "Cargo.toml",
     "CLAUDE.md",
     ".claude/a",
-    "crates/zed/clippy.toml",
-    "crates/zed/Cargo.toml",
+    ".mdsmith.yml",
 ];
 
 /// A checkout with the SRS pieces, `owners` as CODEOWNERS and `FILES`.
@@ -158,29 +156,42 @@ fn an_enforcing_path_without_the_stakeholder_is_named_with_its_class() {
         "CLAUDE.md (the agent instructions) is owned by [], want @boss",
     );
 
-    let owners = OWNERS.replace("/docs/srs/        @boss", "/docs/srs/        @boss @other");
+    let owners = OWNERS.replace("/scripts/         @boss", "/scripts/         @boss @other");
     has(
         &problems(&owners),
-        "docs/srs/ (`docs/srs/`) is owned by [@boss @other], want @boss",
+        "scripts/ (CI and the merge rules) is owned by [@boss @other], want @boss",
     );
 
-    let owners = OWNERS.replace(
-        "/crates/*/clippy.toml @boss",
-        "/crates/*/clippy.toml @other",
-    );
-    has(&problems(&owners), "crates/zed/clippy.toml");
-
-    let owners = OWNERS.replace("/features/        @boss\n", "");
+    let owners = OWNERS.replace("/tooling/review-*/ @boss", "/tooling/review-run/ @boss");
     has(
         &problems(&owners),
-        "features/ (the scenarios (`features/`)) is owned by [], want @boss",
+        "tooling/review-gate/ (the review's code, cases and scorecard) is owned by [], want @boss",
     );
+    assert_eq!(problems(&owners).len(), 1, "{:?}", problems(&owners));
 
-    let owners = OWNERS.replace("/tooling/*/Cargo.toml @boss\n", "");
+    let owners = OWNERS.replace("/.mdsmith.yml     @boss\n", "");
     has(
         &problems(&owners),
-        "tooling/x/Cargo.toml (the build, lint and coverage configuration) is owned by []",
+        ".mdsmith.yml (the linter configuration) is owned by [], want @boss",
     );
+}
+
+#[test]
+fn a_starred_name_stands_for_each_entry_it_matches() {
+    let (_d, c) = repo(OWNERS);
+
+    assert_eq!(
+        expand(&c, "tooling/review-*/"),
+        ["tooling/review-gate/", "tooling/review-run/"]
+    );
+    assert_eq!(expand(&c, "*.md"), ["CLAUDE.md"]);
+    assert_eq!(
+        expand(&c, "tooling/*/Cargo.toml"),
+        ["tooling/review-run/Cargo.toml"]
+    );
+    assert_eq!(expand(&c, "missing/*/x"), Vec::<String>::new());
+    assert_eq!(expand(&c, "docs/agents/"), ["docs/agents/"]);
+    assert_eq!(expand(&c, "docs/none/"), Vec::<String>::new());
 }
 
 #[test]
@@ -224,17 +235,22 @@ fn an_owner_on_any_other_path_is_named() {
         "/tooling/ @boss",
         "* @boss",
         "/docs/ @boss",
-        "/docs/adr/x/ @boss",
+        "/docs/srs/ @boss",
+        "/features/ @boss",
+        "/Cargo.toml @boss",
+        "/SECURITY.md @boss",
+        "/tooling/review-eval/cases/ @boss",
+        "/docs/agents/x/ @boss",
     ] {
         let (_d, c) = repo(&format!("{OWNERS}{extra}\n"));
         let found = no_owner_on_any_other_path(&c);
-        if extra == "/docs/adr/x/ @boss" {
+        if extra == "/docs/agents/x/ @boss" {
             assert!(found.is_empty(), "{found:?}");
         } else {
             let pattern = extra.split(' ').next().unwrap();
             has(
                 &found,
-                &format!("{pattern} names an owner on a path outside"),
+                &format!("{pattern} names an owner on a path that does not guide the review"),
             );
         }
     }
@@ -278,6 +294,16 @@ fn an_owner_on_rust_source_is_named() {
     assert_eq!(
         no_owner_on_rust_source(&c),
         ["crates/pin/src/lib.rs is Rust source owned by [@boss]"]
+    );
+}
+
+#[test]
+fn the_review_s_crates_alone_hold_owned_rust_source() {
+    let (_d, c) = repo(&format!("{OWNERS}/tooling/ @boss\n"));
+
+    assert_eq!(
+        no_owner_on_rust_source(&c),
+        ["tooling/x/src/lib.rs is Rust source owned by [@boss]"]
     );
 }
 

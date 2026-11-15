@@ -261,45 +261,50 @@ pub(super) fn protection_case(
     )
 }
 
-/// The CI and release tool pins must remain owned by the stakeholder.
-pub(super) fn mise_owner_case() -> Case {
+/// The review's crates must remain owned by the stakeholder.
+pub(super) fn review_crates_owner_case() -> Case {
     protection_case(
-        "the mise toolchain pin without the stakeholder",
-        Injection::replace(CODEOWNERS, "/mise.toml                    @jeduden\n", ""),
+        "the review's crates without the stakeholder",
+        Injection::replace(CODEOWNERS, "/tooling/review-*/            @jeduden\n", ""),
         "the_checkout_s_codeowners_name_the_stakeholder_on_the_enforcing_paths",
-        "mise.toml (CI,) is owned by [], want @jeduden",
+        "tooling/review-bundle/ (the review's code, cases and scorecard) is owned by [], want @jeduden",
     )
 }
 
-/// The developer tool pins, which CI's install step reads, must remain
-/// owned by the stakeholder.
-pub(super) fn mise_dev_owner_case() -> Case {
+/// The linter configuration must remain owned by the stakeholder.
+pub(super) fn linter_owner_case() -> Case {
     protection_case(
-        "the developer tool pin without the stakeholder",
-        Injection::replace(CODEOWNERS, "/mise.dev.toml                @jeduden\n", ""),
+        "the linter configuration without the stakeholder",
+        Injection::replace(CODEOWNERS, "/.mdsmith.yml                 @jeduden\n", ""),
         "the_checkout_s_codeowners_name_the_stakeholder_on_the_enforcing_paths",
-        "mise.dev.toml (CI,) is owned by [], want @jeduden",
+        ".mdsmith.yml (the linter configuration) is owned by [], want @jeduden",
     )
 }
 
-/// The scenarios must remain owned by the stakeholder.
+/// The scenarios land on the review's approval alone: a code owner on
+/// them would make every requirement's pull request wait again.
 pub(super) fn scenarios_owner_case() -> Case {
     protection_case(
-        "the scenarios without the stakeholder",
-        Injection::replace(CODEOWNERS, "/features/                    @jeduden\n", ""),
-        "the_checkout_s_codeowners_name_the_stakeholder_on_the_enforcing_paths",
-        "features/ (the scenarios (`features/`)) is owned by [], want @jeduden",
+        "a code owner on the scenarios",
+        Injection::replace(
+            CODEOWNERS,
+            "/.mdsmith.yml                 @jeduden\n",
+            "/.mdsmith.yml                 @jeduden\n/features/                    @jeduden\n",
+        ),
+        "the_checkout_s_codeowners_name_no_owner_on_any_other_path",
+        "/features/ names an owner on a path that does not guide the review",
     )
 }
 
-/// No Rust source may get a code owner, the stakeholder included.
+/// No Rust source outside the review's crates may get a code owner, the
+/// stakeholder included.
 pub(super) fn rust_source_owner_case() -> Case {
     protection_case(
         "an owner on Rust source",
         Injection::replace(
             CODEOWNERS,
-            "/SECURITY.md                  @jeduden\n",
-            "/SECURITY.md                  @jeduden\n*.rs                          @jeduden\n",
+            "/.mdsmith.yml                 @jeduden\n",
+            "/.mdsmith.yml                 @jeduden\n*.rs                          @jeduden\n",
         ),
         "the_checkout_s_codeowners_name_no_owner_on_rust_source",
         "crates/parinn/src/main.rs is Rust source owned by [@jeduden]",
@@ -375,10 +380,10 @@ pub(super) fn protection_cases() -> Vec<Case> {
             "the pull_request rule does not set require_code_owner_review",
         ),
         protection_case(
-            "the requirement text without the stakeholder",
-            Injection::replace(CODEOWNERS, "/docs/srs/                    @jeduden\n", ""),
+            "CI and the merge rules without the stakeholder",
+            Injection::replace(CODEOWNERS, "/.github/                     @jeduden\n", ""),
             "the_checkout_s_codeowners_name_the_stakeholder_on_the_enforcing_paths",
-            "docs/srs/ (`docs/srs/`) is owned by [], want @jeduden",
+            ".github/ (CI and the merge rules) is owned by [], want @jeduden",
         ),
         protection_case(
             "the agent instructions without the stakeholder",
@@ -386,17 +391,17 @@ pub(super) fn protection_cases() -> Vec<Case> {
             "the_checkout_s_codeowners_name_the_stakeholder_on_the_enforcing_paths",
             "CLAUDE.md (the agent instructions) is owned by [], want @jeduden",
         ),
-        mise_owner_case(),
-        mise_dev_owner_case(),
+        review_crates_owner_case(),
+        linter_owner_case(),
         protection_case(
-            "an owner on a path outside the allowed classes",
+            "an owner on a path that does not guide the review",
             Injection::replace(
                 CODEOWNERS,
-                "/SECURITY.md                  @jeduden\n",
-                "/SECURITY.md                  @jeduden\n/crates/parinn/src/            @jeduden\n",
+                "/.mdsmith.yml                 @jeduden\n",
+                "/.mdsmith.yml                 @jeduden\n/docs/srs/                    @jeduden\n",
             ),
             "the_checkout_s_codeowners_name_no_owner_on_any_other_path",
-            "/crates/parinn/src/ names an owner on a path outside the allowed classes",
+            "/docs/srs/ names an owner on a path that does not guide the review",
         ),
         scenarios_owner_case(),
         rust_source_owner_case(),

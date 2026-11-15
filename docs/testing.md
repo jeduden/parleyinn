@@ -272,7 +272,7 @@ real ParleyInn home or real Claude Code configuration.
   lookup anywhere but the guard and the scenario runner's own start.
   That is what makes the guard cover every test. A product crate that
   later resolves real state in shipped code joins that list with its plan,
-  and the stakeholder approves it (`tooling/` is a code-owner path).
+  and the review weighs it deep (`tooling/` reviews deep).
 - **The decoy.** CI's `test` and `scenarios` jobs run with `HOME`
   pointed at an empty directory and fail if anything appears there. The guard
   stops a test that asks for the user's `HOME`. The decoy catches a test
