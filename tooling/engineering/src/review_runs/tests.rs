@@ -555,6 +555,42 @@ fn a_context_the_bundle_did_not_write_is_named_by_its_path() {
 }
 
 #[test]
+fn the_record_check_reads_what_the_bundle_wrote_for_a_change_to_the_invariants_and_the_record() {
+    let work = TempDir::new().unwrap();
+    let file = record_context(work.path());
+    let lacks = [format!(
+        "the context for {} lacks the ENG-29 record {RECORD}",
+        CONTEXT.0
+    )];
+    let writes = |context: String| {
+        let file = file.clone();
+        move |diff: &str| {
+            assert!(diff.contains(INVARIANTS), "{diff}");
+            assert!(diff.contains(RECORD), "{diff}");
+            fs::create_dir_all(file.parent().unwrap()).unwrap();
+            fs::write(&file, context).unwrap();
+            Ok(String::new())
+        }
+    };
+
+    assert_eq!(
+        record_problems_of(work.path(), writes("## Dispatch\n".to_owned())),
+        lacks
+    );
+    assert!(
+        record_problems_of(
+            work.path(),
+            writes(format!("## ENG-29 record\n\n`{RECORD}`\n"))
+        )
+        .is_empty()
+    );
+    assert_eq!(
+        record_problems_of(work.path(), |_| Err(vec!["it did not run".to_owned()])),
+        ["it did not run"]
+    );
+}
+
+#[test]
 fn a_written_context_that_leaves_the_record_out_is_named() {
     let work = TempDir::new().unwrap();
     let file = record_context(work.path());

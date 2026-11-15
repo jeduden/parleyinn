@@ -723,11 +723,20 @@ const CONSENT: &str =
 /// with.
 #[must_use]
 pub fn record_problems(checkout: &Checkout, out: &Path) -> Vec<String> {
+    record_problems_of(out, |diff| bundle(checkout, out, diff, CONSENT))
+}
+
+/// [`record_problems`] of the files `bundle` wrote into `out` when
+/// handed the diff of the change: its problems when it did not run.
+fn record_problems_of(
+    out: &Path,
+    bundle: impl FnOnce(&str) -> Result<String, Vec<String>>,
+) -> Vec<String> {
     let diff: String = [INVARIANTS, RECORD]
         .iter()
         .map(|path| format!("{}+x\n", one_line_diff(path)))
         .collect();
-    match bundle(checkout, out, &diff, CONSENT) {
+    match bundle(&diff) {
         Ok(_) => record_in(out),
         Err(problems) => problems,
     }
