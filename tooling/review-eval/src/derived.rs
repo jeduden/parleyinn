@@ -34,8 +34,10 @@ pub const CLEAN_SENTENCE: &str = "This file is part of ParleyInn.";
 /// A sentence true of every domain-model file, which is no part of the
 /// specification and sets no rule.
 pub const MODEL_SENTENCE: &str = "This file is part of ParleyInn's domain model.";
-/// A sentence in terms the domain model excludes.
-pub const EXCLUDED_SENTENCE: &str = "A bot on the lane records each attempt it makes.";
+/// The clean sentence with a clause in terms the domain model excludes
+/// and no other defect: it states no rule, as the clean one states none.
+pub const EXCLUDED_SENTENCE: &str =
+    "This file is part of ParleyInn, where a tenant's bot works in a lane.";
 /// The requirement a sentence in excluded terms breaks, which its
 /// finding cites: a finding is known by what the report's form fixes,
 /// its place and its ids, never by a word of its sentence.
