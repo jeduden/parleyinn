@@ -14,6 +14,11 @@ fn sc(pending: bool, steps: &[(&str, &str)]) -> Scenario {
     }
 }
 
+/// An Examples row whose column `n` holds `cell`.
+fn row(cell: &str) -> BTreeMap<String, String> {
+    BTreeMap::from([("n".to_owned(), cell.to_owned())])
+}
+
 const TWO: &str = r##"
 #[given(regex = r"^a home (\d+)$")]
 fn home(w: &mut World) {}
@@ -141,13 +146,55 @@ fn check_steps_does_not_count_a_pending_scenario_or_another_kind() {
 fn check_steps_fills_an_outlines_placeholders_from_each_row() {
     let d = defs(TWO);
     let mut outline = sc(false, &[("given", "a home <n>")]);
-    outline.examples = vec![BTreeMap::from([("n".to_owned(), "7".to_owned())])];
+    outline.examples = vec![row("7")];
+    outline.running = vec![row("7")];
     let rows = [
         outline,
         sc(false, &[("then", "the \"x\" ran"), ("when", "it runs")]),
     ];
 
     assert!(check_steps(&d, &rows, &[]).is_empty());
+}
+
+#[test]
+fn check_steps_counts_the_running_rows_of_an_outline_one_block_holds_pending() {
+    let d = defs(TWO);
+    let mut outline = sc(true, &[("given", "a home <n>")]);
+    outline.examples = vec![row("7"), row("x")];
+    outline.running = vec![row("7")];
+    let rows = [
+        outline,
+        sc(false, &[("then", "the \"x\" ran"), ("when", "it runs")]),
+    ];
+
+    assert!(check_steps(&d, &rows, &[]).is_empty());
+}
+
+#[test]
+fn check_steps_counts_no_row_of_a_pending_block() {
+    let d = defs(TWO);
+    let mut outline = sc(true, &[("given", "a home <n>")]);
+    outline.examples = vec![row("x"), row("7")];
+    outline.running = vec![row("x")];
+    let rows = [
+        outline,
+        sc(false, &[("then", "the \"x\" ran"), ("when", "it runs")]),
+    ];
+
+    let got = check_steps(&d, &rows, &[]);
+
+    assert_eq!(got.len(), 1, "{got:?}");
+    assert!(got[0].starts_with("a.rs home: no row"));
+}
+
+#[test]
+fn running_rows_are_one_for_a_scenario_that_runs_and_an_outlines_running_rows() {
+    assert_eq!(running_rows(&sc(false, &[])), [None]);
+    assert!(running_rows(&sc(true, &[])).is_empty());
+    let mut outline = sc(true, &[]);
+    outline.examples = vec![row("1"), row("2")];
+    outline.running = vec![row("2")];
+    assert_eq!(running_rows(&outline), [Some(&row("2"))]);
 }
 
 #[test]
