@@ -3,6 +3,7 @@ use std::path::Path;
 
 use administration::home::Home;
 use record::digest::Digest;
+use serde_json::json;
 use store::Store;
 
 use crate::settings::acts_in;
@@ -262,4 +263,100 @@ fn a_path_outside_the_roots_the_audit_log_cannot_take_is_still_refused_and_said(
         "{err}"
     );
     assert!(!p.parinn_home().join("store.db").exists());
+}
+
+/// A transcript outside every transcript root whose harness session a
+/// fork observation names, beside its owner's, so its lines are held
+/// when read before the owner's.
+fn fork_elsewhere(p: &mut Process) -> std::path::PathBuf {
+    p.lines = vec![crate::hook_handlers::tests::session_start(
+        p, "fork", "fork",
+    )];
+    p.invoke(&["hook", "SessionStart"], &DEV);
+    let dir = p.dir.path().join("elsewhere");
+    fs::create_dir(&dir).unwrap();
+    for session in ["parent", "fork"] {
+        let text: String = (1..=3)
+            .map(|n| {
+                let line = json!({"type": "x", "uuid": format!("u{n}"), "sessionId": session});
+                format!("{line}\n")
+            })
+            .collect();
+        fs::write(dir.join(format!("{session}.jsonl")), text).unwrap();
+    }
+
+    dir.join("fork.jsonl")
+}
+
+/// Whether the home of `p` holds lines of the transcript at `path`.
+fn held(p: &Process, path: &Path) -> bool {
+    let home = Home::locate(Some(p.parinn_home().as_os_str()), None).unwrap();
+    let resolved = fs::canonicalize(path).unwrap();
+
+    Store::open(&home.store())
+        .unwrap()
+        .source(&resolved.to_string_lossy())
+        .unwrap()
+        .unwrap()
+        .held_since
+        .is_some()
+}
+
+const HELD: (&str, &str) = (
+    "repeat_held",
+    "repeated lines held at an ingest marker in fork",
+);
+const OUTSIDE: (&str, &str) = ("path_outside_allowed_roots", "path outside allowed roots");
+
+fn pairs(want: &[(&str, &str)]) -> Vec<(String, String)> {
+    want.iter()
+        .map(|(c, d)| ((*c).to_owned(), (*d).to_owned()))
+        .collect()
+}
+
+#[test]
+fn a_named_path_whose_lines_are_held_is_not_refused_by_the_ingest_that_named_it() {
+    let mut p = Process::new();
+    let path = fork_elsewhere(&mut p);
+
+    let (code, out, err) = named(&p, &path);
+
+    assert_eq!((code, err.as_str()), (EXIT_OK, ""), "{out}");
+    assert!(held(&p, &path));
+    assert_eq!(refusals(&p), pairs(&[HELD]));
+    assert_eq!(acts(&p).len(), 1);
+}
+
+#[test]
+fn a_later_ingest_releases_the_held_lines_of_a_path_the_person_named() {
+    let mut p = Process::new();
+    let path = fork_elsewhere(&mut p);
+    named(&p, &path);
+    fs::remove_file(path.with_file_name("parent.jsonl")).unwrap();
+
+    let (code, _, err) = p.invoke(&["ingest", "--all"], &DEV);
+
+    assert_eq!((code, err.as_str()), (EXIT_OK, ""));
+    assert!(!held(&p, &path), "the act that named it covers the release");
+    assert!(!refusals(&p).contains(&pairs(&[OUTSIDE])[0]));
+    assert_eq!(acts(&p).len(), 1, "a release is no new act");
+}
+
+#[test]
+fn a_held_path_no_act_names_is_refused_once_it_lies_outside_the_roots() {
+    let mut p = off_terminal();
+    let path = fork_elsewhere(&mut p);
+    let roots = |dir: &Path| format!("[transcript]\nroots = [{:?}]\n", dir.display().to_string());
+    p.configure(&roots(path.parent().unwrap()));
+    assert_eq!(named(&p, &path).0, EXIT_OK);
+    assert!(held(&p, &path));
+    p.configure(&roots(&p.dir.path().join("other")));
+    fs::remove_file(path.with_file_name("parent.jsonl")).unwrap();
+
+    let (code, _, _) = p.invoke(&["ingest", "--all"], &DEV);
+
+    assert_eq!(code, EXIT_OK);
+    assert!(held(&p, &path), "nothing is read from it");
+    assert_eq!(refusals(&p), pairs(&[HELD, OUTSIDE]));
+    assert!(acts(&p).is_empty());
 }
