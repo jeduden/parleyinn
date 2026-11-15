@@ -20,7 +20,7 @@ changes them, against the rules below.
 
 1. **Workspace lints (ENG-04).** No `unsafe`; no `unwrap`, `expect` or
    `panic!` outside tests, a `#[cfg(test)]` module among them; name the call:
-   `a.rs:5 — if not addressed: its expect panics on bad input — ENG-04`.
+   `src/a.rs:5 — if not addressed: its expect panics on bad input — ENG-04`.
    Clippy denies every warning; a lint's `allow` or `expect` gives a reason.
 2. **Reach ([I4](../../docs/srs/invariants.md#i4)).** The core opens no socket
    and starts no program but its own kernel worker
@@ -97,6 +97,6 @@ starts with a real place, `docs/x.md:12`, never `path:line` (a whole file takes
 `docs/x.md:1`), then its dash and `if not addressed:` or `request:`; bare, in no
 backticks, nothing after its ids. A fine row gets no line, none ending `no
 finding`, `none`, `fine` or `sound`. `revised: <full finding line>` replaces the
-one at its place (withdraw a moved one, then state it); `withdrawn: x.md:12 —
-<why>` removes one. Last message: `outcome: findings|none — <sentence>`.
+one at its place (withdraw a moved one, then state it); `withdrawn: docs/x.md:12
+— <why>` removes one. Last message: `outcome: findings|none — <sentence>`.
 <?/include?>

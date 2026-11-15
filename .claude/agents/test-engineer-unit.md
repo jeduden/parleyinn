@@ -56,10 +56,10 @@ At most ten findings, no preamble, each in a form below, one per cause. A
 function or arm is one only when no test of its module takes it: one a tested
 caller reaches needs no test of its own, and test style is none. Its consequence
 names the behaviour that could break and the smallest test that fixes it. The
-line ends with a dash and its ids, never a comma: `a.rs:12 — if not addressed:
-the error arms at 12 and 19 take no unit test — ENG-11`.
-End with one line, `outcome: findings` or `outcome: none`, then a dash and one
-sentence on what the change does to the unit tests. You never approve.
+line ends with a dash and its ids, never a comma: `crates/x/src/a.rs:12 — if not
+addressed: the error arms at 12 and 19 take no unit test — ENG-11`. End with one
+line, `outcome: findings` or `outcome: none`, then a dash and one sentence on
+what the change does to the unit tests. You never approve.
 
 <?include
 file: ../../docs/agents/specialist-outcome.md

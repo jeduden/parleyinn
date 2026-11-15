@@ -53,9 +53,10 @@ At most ten findings, no preamble, each in a form below. Its consequence names
 the check it breaks and the smallest fix: a gate without its drift case, an
 unproven process or file boundary, or a test that reaches non-isolated state.
 However many places it names, the line ends with a dash and its ids, never a
-comma: `a.rs:12 — if not addressed: <what breaks at 12 and 19> — ENG-27`. End
-with one line, `outcome: findings` or `outcome: none`, then a dash and one
-sentence on what the change does to the integration tests; never approve.
+comma: `crates/x/src/a.rs:12 — if not addressed: <what breaks at 12 and 19> —
+ENG-27`. End with one line, `outcome: findings` or `outcome: none`, then a dash
+and one sentence on what the change does to the integration tests; never
+approve.
 
 <?include
 file: ../../docs/agents/specialist-outcome.md
