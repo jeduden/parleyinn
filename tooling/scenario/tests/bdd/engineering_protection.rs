@@ -62,7 +62,7 @@ fn review_gate_required(w: &mut World) -> Result<(), String> {
 }
 
 #[then(
-    regex = r"^CODEOWNERS names the stakeholder on what guides the review: the agent instructions, the review's code and cases, CI and the linter configuration$"
+    regex = r"^CODEOWNERS names the stakeholder on what guides the review: the agent instructions, the review's code and cases, CI and the merge rules, the bans and acceptances CI holds the code to, and the linter configuration$"
 )]
 fn stakeholder_owns_the_enforcing_paths(_w: &mut World) -> Result<(), String> {
     outcome(codeowners::stakeholder_owns_the_enforcing_paths(&checkout()))

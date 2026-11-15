@@ -17,7 +17,7 @@ use review_bundle::limits::{left_out, limit_of, line_count};
 use crate::Checkout;
 
 /// The size list, relative to the checkout: one file a line,
-/// `<path> <lines>`, owned by the stakeholder (ENG-21).
+/// `<path> <lines>`.
 pub const SIZE_LIST: &str = "tooling/engineering/oversize.txt";
 
 /// The directories no file is read under, relative to the root: git's

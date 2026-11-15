@@ -23,5 +23,16 @@
 /.github/                     @jeduden
 /scripts/                     @jeduden
 
+# The bans and acceptances CI holds the code to: the clippy
+# configuration that refuses sockets, program starts, clocks and random
+# order (SEC-01, ENG-16, ENG-03), the supply-chain policy, the benchmark
+# regressions ADR-2610142300 lets through and the recall evaluation's
+# baseline.
+/clippy.toml                  @jeduden
+/crates/*/clippy.toml         @jeduden
+/deny.toml                    @jeduden
+/tooling/benchmark/accepted.txt @jeduden
+/tooling/eval/recall-v1.txt   @jeduden
+
 # The linter configuration.
 /.mdsmith.yml                 @jeduden

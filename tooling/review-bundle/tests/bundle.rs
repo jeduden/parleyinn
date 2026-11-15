@@ -51,6 +51,13 @@ fn an_invariant_edit_without_its_record_is_a_blocking_finding() {
         "{:?}",
         got.findings
     );
+
+    let owned = analyse(&t, &t, "diff --git a/CLAUDE.md b/CLAUDE.md\n", &[]);
+    assert!(
+        owned.findings.iter().any(|f| f.body.contains("(ENG-21)")),
+        "{:?}",
+        owned.findings
+    );
 }
 
 #[test]

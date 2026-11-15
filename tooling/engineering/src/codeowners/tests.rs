@@ -5,7 +5,7 @@ const INDEX: &str = "| **Stakeholder** | @boss, also the security reviewer |\n";
 const ENG: &str = "\
 | ID | Pri | Requirement | Ver |
 |---|---|---|---|
-| ENG-21 | P0 | Only a change to what guides the review needs the stakeholder: the agent instructions, the review's code, cases and scorecard, CI and the merge rules (`CODEOWNERS` itself among them) and the linter configuration (`.mdsmith.yml`). | I |
+| ENG-21 | P0 | Only a change to what guides the review needs the stakeholder: the agent instructions, the review's code, cases and scorecard, CI and the merge rules (`CODEOWNERS` itself among them), the bans and acceptances CI holds the code to and the linter configuration (`.mdsmith.yml`). | I |
 ";
 
 const OWNERS: &str = "\
@@ -16,6 +16,8 @@ const OWNERS: &str = "\
 /tooling/review-*/ @boss
 /.github/         @boss # trailing
 /scripts/         @boss
+/crates/*/clippy.toml @boss
+/deny.toml        @boss
 /.mdsmith.yml     @boss
 ";
 
@@ -33,6 +35,8 @@ const FILES: &[&str] = &[
     "CLAUDE.md",
     ".claude/a",
     ".mdsmith.yml",
+    "crates/zed/clippy.toml",
+    "deny.toml",
 ];
 
 /// A checkout with the SRS pieces, `owners` as CODEOWNERS and `FILES`.
@@ -169,6 +173,15 @@ fn an_enforcing_path_without_the_stakeholder_is_named_with_its_class() {
     );
     assert_eq!(problems(&owners).len(), 1, "{:?}", problems(&owners));
 
+    let owners = OWNERS.replace(
+        "/crates/*/clippy.toml @boss",
+        "/crates/*/clippy.toml @other",
+    );
+    has(
+        &problems(&owners),
+        "crates/zed/clippy.toml (the bans and acceptances CI holds the code to) is owned by [@other]",
+    );
+
     let owners = OWNERS.replace("/.mdsmith.yml     @boss\n", "");
     has(
         &problems(&owners),
@@ -238,6 +251,8 @@ fn an_owner_on_any_other_path_is_named() {
         "/docs/srs/ @boss",
         "/features/ @boss",
         "/Cargo.toml @boss",
+        "/crates/*/Cargo.toml @boss",
+        "/tooling/engineering/oversize.txt @boss",
         "/SECURITY.md @boss",
         "/tooling/review-eval/cases/ @boss",
         "/docs/agents/x/ @boss",

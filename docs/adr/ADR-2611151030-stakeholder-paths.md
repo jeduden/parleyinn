@@ -5,7 +5,8 @@ status: proposed
 summary: >-
   CODEOWNERS names the stakeholder only on what guides the review: the
   agent instructions, the review's crates with their cases, CI and the
-  merge rules, and the linter configuration. Every other pull request,
+  merge rules, the bans and acceptances CI holds the code to, and the
+  linter configuration. Every other pull request,
   the specification and the scenarios among them, merges on the review
   gate's approval alone, opened ready with auto-merge on. What lost its
   code owner reviews deep. It builds on ADR-2610262245.
@@ -37,10 +38,13 @@ review.
     crates;
   - CI and the merge rules: `.github/`, which holds the workflows, the
     rulesets and CODEOWNERS itself, and `scripts/`;
+  - the bans and acceptances CI holds the code to: every
+    `clippy.toml`, `deny.toml`, `tooling/benchmark/accepted.txt` and
+    `tooling/eval/recall-v1.txt`;
   - the linter configuration, `.mdsmith.yml`.
-- The specification, the decision records, the scenarios, the build,
-  lint and toolchain configuration, the supply-chain policy and Rust
-  source outside the review's crates have no code owner. A pull
+- The specification, the decision records, the scenarios, the
+  manifests, the toolchain pins, the size list and Rust source outside
+  the review's crates have no code owner. A pull
   request that touches none of the stakeholder's paths merges on the
   review gate's approval and green `CI`.
 - The review bundle keeps the review class deep for the paths that
@@ -82,6 +86,15 @@ review.
   request.
 - Rust source now has a code owner in the review's crates, which
   ENG-21 forbade before.
+- The acceptance files stay the stakeholder's, as ADR-2610142300 and
+  ADR-2610262245 rest on. The size list does not: ENG-34 no longer
+  calls it the stakeholder's, since most pull requests change it, and
+  an agent's approval can now lengthen it. A manifest's `[lints]`, the
+  toolchain pins, `SECURITY.md` and `DEPENDENCIES.md` also change on
+  the agents' approval alone.
+- The domain model calls a new concept a stakeholder decision
+  (`docs/domain-model/index.md`). No code owner holds the model, so
+  the domain-model agents' blocking findings are what enforce that.
 - Auto-merge is the author's act. A pull request whose author forgets
   it is approved and waits for someone to merge it.
 - The pull request that lands this decision touches the stakeholder's
