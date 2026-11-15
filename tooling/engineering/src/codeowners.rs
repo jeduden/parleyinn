@@ -117,6 +117,13 @@ pub fn owners_of<'a>(entries: &'a [Entry], path: &str) -> &'a [String] {
         .map_or(&[], |e| e.owners.as_slice())
 }
 
+/// Whether `path` is a file inside one of the review's crates. A file
+/// beside them that is only named like one, `tooling/review-x.rs`, is
+/// not.
+fn in_a_review_crate(path: &str) -> bool {
+    matches(REVIEW_CRATES, path) && path.matches('/').count() >= 2
+}
+
 /// Whether `pattern` covers `path`. It reads the syntax the repository's
 /// CODEOWNERS uses: a leading `/` anchors the pattern at the root, a
 /// trailing `/` names a directory, `*` and `?` stand within one name,
@@ -327,7 +334,7 @@ pub fn no_owner_on_rust_source(checkout: &Checkout) -> Vec<String> {
 
     let found = rust_sources(checkout, "");
     let mut problems = found.unread;
-    let product = |path: &String| !matches(REVIEW_CRATES, path);
+    let product = |path: &String| !in_a_review_crate(path);
     problems.extend(
         found
             .sources

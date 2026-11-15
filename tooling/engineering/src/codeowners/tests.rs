@@ -409,3 +409,11 @@ fn a_directory_that_cannot_be_read_is_reported() {
         got.unread
     );
 }
+
+#[test]
+fn a_file_named_like_a_review_crate_is_in_none() {
+    assert!(in_a_review_crate("tooling/review-gate/src/lib.rs"));
+    assert!(in_a_review_crate("tooling/review-run/build.rs"));
+    assert!(!in_a_review_crate("tooling/review-x.rs"));
+    assert!(!in_a_review_crate("tooling/drift/src/lib.rs"));
+}

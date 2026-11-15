@@ -66,7 +66,10 @@ review.
   row ENG-29 marks for I2 review (PRV-10 to PRV-13 today), is a
   blocking deterministic finding until an accepted record in the same
   change names ENG-29 and each id, and the stakeholder commented on the
-  pull request. The workflow drops every comment an agent posts, so no
+  pull request. ENG-29 also has that record hold a named human security
+  reviewer's approval. The bundle does not read the approval; the
+  review's agents and the stakeholder, whose comment the finding waits
+  for, do. The workflow drops every comment an agent posts, so no
   agent can write that comment, and the bundle is the stakeholder's.
 - The bundle raises the same finding for a change to ENG-29's own row.
   That row holds the list of marked rows, and the specification no
@@ -75,6 +78,14 @@ review.
   change PRV-10. ENG-29's text does not say this yet. Saying it there
   is a change to ENG-29, which needs its own accepted record naming a
   human security reviewer, so it is left to a change of its own.
+- The size list (`tooling/engineering/oversize.txt`) loses its code
+  owner and keeps its ratchet. A listed file's lines must equal the
+  file's, so most changes to a listed file edit the size list, and an
+  owner there would make each of them wait. ENG-34 instead has the
+  review bundle block a change that adds a file to the size list or
+  raises a file's listed lines until a stakeholder comment names the
+  size list. A change that only lowers or removes lines waits for no
+  one.
 
 ## Alternatives
 
@@ -103,11 +114,10 @@ review.
 - Rust source now has a code owner in the review's crates, which
   ENG-21 forbade before.
 - The acceptance files stay the stakeholder's, as ADR-2610142300 and
-  ADR-2610262245 rest on. The size list does not: ENG-34 no longer
-  calls it the stakeholder's, since most pull requests change it, and
-  an agent's approval can now lengthen it. The review's agents are
-  then the only guard on "the size list only shrinks". `SECURITY.md` and
-  `DEPENDENCIES.md` also change on the agents' approval alone.
+  ADR-2610262245 rest on. The size list has no code owner, yet only
+  the stakeholder's comment lets it grow (ENG-34), so "the size list
+  only shrinks" keeps a guard no agent can lift. `SECURITY.md` and
+  `DEPENDENCIES.md` change on the agents' approval alone.
 - A pull request that adds a crate or a dependency changes a manifest,
   so it still waits for the stakeholder.
 - The domain model calls a new concept a stakeholder decision
