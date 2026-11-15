@@ -116,7 +116,7 @@ fn person_pattern(w: &mut World, pattern: String) -> Result<(), String> {
 }
 
 #[given(regex = r#"^an agent run with a Claude Code transcript "([^"]+)"$"#)]
-fn agent_run_with_transcript(w: &mut World, name: String) -> Result<(), String> {
+pub fn agent_run_with_transcript(w: &mut World, name: String) -> Result<(), String> {
     let dir = w.home.join(".claude").join("projects").join("-w-app");
     fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
     let path = dir.join(format!("{name}.jsonl"));

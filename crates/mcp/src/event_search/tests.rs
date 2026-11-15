@@ -20,7 +20,7 @@ fn a_call_with_only_a_query_asks_for_ten_hits_in_any_run_of_the_room() {
     assert_eq!(params.text, "deploy");
     assert_eq!(params.k, 10);
     assert_eq!(params.writer, None);
-    assert!(params.provenance.is_empty() && params.kinds.is_empty());
+    assert!(params.provenance.is_empty() && params.provenance_families.is_empty());
     assert_eq!(params.trust, None);
     assert_eq!((params.since, params.until), (None, None));
 }
@@ -84,7 +84,7 @@ fn the_filters_are_short_lists_of_short_strings() {
     let params = parsed(json!({"provenance": ["web", "file"], "kind": ["tool_result"]})).unwrap();
 
     assert_eq!(params.provenance, ["web", "file"]);
-    assert_eq!(params.kinds, ["tool_result"]);
+    assert_eq!(params.provenance_families, ["tool_result"]);
     let many: Vec<String> = (0..17).map(|n| n.to_string()).collect();
     for bad in [
         json!({"provenance": "web"}),
@@ -128,7 +128,8 @@ fn since_and_until_are_a_date_or_a_utc_time() {
 #[test]
 fn the_request_and_the_search_carry_the_call_through() {
     let params = parsed(json!({
-        "query": "deploy", "phrase": "p q", "provenance": ["web"], "since": "2026-01-01", "k": 3,
+        "query": "deploy", "phrase": "p q", "provenance": ["web"], "kind": ["tool_result"],
+        "since": "2026-01-01", "k": 3,
     }))
     .unwrap();
     let compiled = search::compile(&params.request()).unwrap();
@@ -145,5 +146,6 @@ fn the_request_and_the_search_carry_the_call_through() {
         (&[room][..], &[writer][..], 3, DEADLINE)
     );
     assert_eq!(search.provenance, ["web"]);
+    assert_eq!(search.provenance_families, ["tool_result"]);
     assert_eq!(search.since, Some("2026-01-01"));
 }
