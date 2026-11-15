@@ -394,7 +394,7 @@ fn a_store_that_cannot_mark_or_read_its_places_fails_each_step() {
         .unwrap();
 
     assert!(mark(&store.conn, &range(writer(1), 1, 1)).is_err());
-    assert!(crate::source::spans(&store.conn, source.id).is_err());
+    assert!(crate::source::spans(&store.conn, Some(source.id)).is_err());
 }
 
 #[test]

@@ -16,7 +16,7 @@
 //! ingest, resume and `parinn verify` zero the same spans, so the hash
 //! confirms no guess at the purged bytes and the source still resumes.
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 use record::digest::{Digest, Running};
 use record::event::EventKind;
@@ -67,6 +67,8 @@ CREATE TABLE transcript_places (
     UNIQUE (source, line)
 ) STRICT;
 CREATE INDEX transcript_places_uuid ON transcript_places (uuid) WHERE uuid IS NOT NULL;
+CREATE INDEX transcript_places_purged
+    ON transcript_places (source, byte_offset, byte_length) WHERE purged = 1;
 CREATE TABLE IF NOT EXISTS transcript_purged_copies (
     source INTEGER NOT NULL,
     line INTEGER NOT NULL,
@@ -334,38 +336,67 @@ fn source(row: SourceRow) -> Result<Source, StoreError> {
     })
 }
 
-/// The bytes of each purged line of source `id`, in offset order.
-fn spans(conn: &Connection, id: i64) -> Result<Vec<Span>, StoreError> {
-    let mut statement = conn.prepare(
-        "SELECT byte_offset, byte_length FROM transcript_places
-         WHERE source = ?1 AND purged = 1 ORDER BY byte_offset",
-    )?;
-    let rows = statement.query_map([id], |r| Ok((r.get::<_, i64>(0)?, r.get::<_, i64>(1)?)))?;
-    let mut spans = Vec::new();
+/// The source and bytes of each purged line that keeps its place, read
+/// from the index of purged places alone, never by walking the places.
+const PURGED_PLACES: &str =
+    "SELECT source, byte_offset, byte_length FROM transcript_places WHERE purged = 1";
+
+/// The source and bytes of each refused copy of a purged line.
+const PURGED_COPIES: &str = "SELECT source, byte_offset, byte_length FROM transcript_purged_copies";
+
+/// Whether the store holds the refused copies of purged lines: one made
+/// before them holds none.
+const HAS_COPIES: &str =
+    "SELECT count(*) FROM sqlite_master WHERE name = 'transcript_purged_copies'";
+
+/// Adds to `spans` the bytes `query` names, by source; `only` is the
+/// one source `query` asks for as `?1`, when it asks for one.
+fn add_spans(
+    conn: &Connection,
+    query: &str,
+    only: Option<i64>,
+    spans: &mut BTreeMap<i64, Vec<Span>>,
+) -> Result<(), StoreError> {
+    let mut statement = conn.prepare(query)?;
+    let rows = statement.query_map(rusqlite::params_from_iter(only), |r| {
+        Ok((
+            r.get::<_, i64>(0)?,
+            r.get::<_, i64>(1)?,
+            r.get::<_, i64>(2)?,
+        ))
+    })?;
     for row in rows {
-        let (offset, length) = row?;
-        spans.push(Span {
+        let (source, offset, length) = row?;
+        spans.entry(source).or_default().push(Span {
             offset: count(offset),
             length: count(length),
         });
     }
-    let query = "SELECT count(*) FROM sqlite_master WHERE name = 'transcript_purged_copies'";
-    let has_copies: bool = conn.query_row(query, [], |r| r.get(0))?;
+
+    Ok(())
+}
+
+/// The bytes of each purged line, by source and in offset order: of
+/// source `only` when one is given, of every source otherwise. Two
+/// reads whatever the number of sources, so listing the sources costs
+/// no read a source.
+fn spans(conn: &Connection, only: Option<i64>) -> Result<BTreeMap<i64, Vec<Span>>, StoreError> {
+    let (places, copies) = match only {
+        Some(_) => (
+            format!("{PURGED_PLACES} AND source = ?1"),
+            format!("{PURGED_COPIES} WHERE source = ?1"),
+        ),
+        None => (PURGED_PLACES.to_owned(), PURGED_COPIES.to_owned()),
+    };
+    let mut spans = BTreeMap::new();
+    add_spans(conn, &places, only, &mut spans)?;
+    let has_copies: bool = conn.query_row(HAS_COPIES, [], |r| r.get(0))?;
     if has_copies {
-        let mut statement = conn.prepare(
-            "SELECT byte_offset, byte_length FROM transcript_purged_copies
-             WHERE source = ?1 ORDER BY byte_offset",
-        )?;
-        let rows = statement.query_map([id], |r| Ok((r.get::<_, i64>(0)?, r.get::<_, i64>(1)?)))?;
-        for row in rows {
-            let (offset, length) = row?;
-            spans.push(Span {
-                offset: count(offset),
-                length: count(length),
-            });
-        }
-        spans.sort_by_key(|span| (span.offset, span.length));
-        spans.dedup();
+        add_spans(conn, &copies, only, &mut spans)?;
+    }
+    for of_source in spans.values_mut() {
+        of_source.sort_by_key(|span| (span.offset, span.length));
+        of_source.dedup();
     }
 
     Ok(spans)
@@ -399,8 +430,14 @@ pub(crate) fn select(
         .into_iter()
         .map(source)
         .collect::<Result<Vec<_>, _>>()?;
+    let only = match sources.as_slice() {
+        [] => return Ok(sources),
+        [one] => Some(one.id),
+        _ => None,
+    };
+    let mut spans = spans(conn, only)?;
     for source in &mut sources {
-        source.purged = spans(conn, source.id)?;
+        source.purged = spans.remove(&source.id).unwrap_or_default();
     }
 
     Ok(sources)
@@ -580,6 +617,21 @@ impl Store {
     /// of source `id`, with no event association (SEC-31).
     pub fn purged_places(&self, id: i64) -> Result<Vec<Place>, StoreError> {
         purged_places(&self.conn, id)
+    }
+
+    /// Whether a transcript source other than the one at `path` lies in
+    /// the transcript directory `directory`: one read, whatever the
+    /// number of sources.
+    ///
+    /// # Errors
+    ///
+    /// Fails when SQLite does.
+    pub fn shares_directory(&self, directory: &str, path: &str) -> Result<bool, StoreError> {
+        let query = "SELECT EXISTS (SELECT 1 FROM transcript_sources
+                                    WHERE directory = ?1 AND path != ?2)";
+        let shares = self.conn.query_row(query, [directory, path], |r| r.get(0));
+
+        Ok(shares?)
     }
 
     /// The harness UUIDs left by purged lines in any transcript source
