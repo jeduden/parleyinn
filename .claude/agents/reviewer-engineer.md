@@ -53,12 +53,10 @@ it pass now, and on which model. Read
    ([I4](../../docs/srs/invariants.md#i4),
    [I2](../../docs/srs/invariants.md#i2)).
 7. **`review-eval` and the gate tests stay honest.** A change to
-   `tooling/review-eval` that makes a case easier to pass, drops a
-   grading rule or a drift case, or reads the pull request's cases for
-   a reviewer component main already has, is blocking. The one case
-   file of such a component it may read from the pull request is one
-   whose change the stakeholder `CODEOWNERS` names approved (ENG-21), by
-   a comment of theirs that names it.
+   `tooling/review-eval` is blocking when it makes a case easier to
+   pass, drops a grading rule or a drift case, or judges a reviewer
+   component main already has by a case file of the pull request that
+   the evaluation's plan does not list as consented (ENG-21).
 
 ## How you review
 

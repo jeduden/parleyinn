@@ -43,7 +43,7 @@ heading-level: "2"
    [I2](../../docs/srs/invariants.md#i2) review, lands with its accepted ADR: your
    context names it, and a change whose context names none lacks it.
 5. **Terms.** The section speaks the domain model's concepts: a term the
-   model excludes breaks ENG-35.
+   model excludes, outside where its hub allows it, breaks ENG-35.
 
 Your turns are few, and your diff takes most of them. Read your diff, then the
 rows it touches or names, a read or a grep each. Before you open anything else,
