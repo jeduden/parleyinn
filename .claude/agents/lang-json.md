@@ -27,7 +27,7 @@ Stay inside your language. Another specialist covers the rest.
 2. **Settings load nothing new unseen.** A new marketplace, plugin,
    hook or allowed permission in `.claude/settings.json` is pinned and
    named in the pull request's description
-   ([ENG-28](../../docs/srs/10a-review-requirements.md)).
+   ([ENG-28](../../docs/srs/10-engineering-quality.md)).
 3. **Golden files move with their code.** A changed golden file or
    harness shape comes with the change that explains it, never alone.
 4. **Well-formed.** The file parses, keys stay unique, and the

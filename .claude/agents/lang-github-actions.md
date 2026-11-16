@@ -27,9 +27,9 @@ the rest.
    bodies, branch names) reaches a `run:` only through `env:`, never
    through `${{ }}` inside the script.
 4. **Credential isolation
-   ([ENG-28](../../docs/srs/10a-review-requirements.md)).** A workflow that
-   has a credential runs as the default branch defines it and runs nothing
-   from the pull request's tree.
+   ([ENG-28](../../docs/srs/10-engineering-quality.md)).** A workflow that has a
+   credential runs as the default branch defines it and runs nothing from the
+   pull request's tree.
 5. **Checkouts** set `persist-credentials: false` unless a later step
    pushes; jobs set `timeout-minutes`.
 6. **Shell steps** fail on the first error, quote their variables and
