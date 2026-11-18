@@ -451,12 +451,12 @@ fn a_purge_that_races_an_ingest_that_moved_the_position_fails_whole() {
 }
 
 #[test]
-fn a_store_that_cannot_mark_or_read_its_places_fails_each_step() {
+fn a_store_that_cannot_mark_its_places_or_read_its_purged_spans_fails_each_step() {
     let dir = TempDir::new().unwrap();
     let (store, source, _) = ingested(&dir, writer(1), "a.jsonl");
     store
         .conn
-        .execute_batch("DROP TABLE transcript_places")
+        .execute_batch("DROP TABLE transcript_places; DROP TABLE transcript_purged_copies")
         .unwrap();
 
     assert!(mark(&store.conn, &range(writer(1), 1, 1)).is_err());
@@ -497,7 +497,7 @@ fn a_purge_whose_places_cannot_be_released_fails_whole() {
 }
 
 #[test]
-fn a_purge_whose_residue_table_cannot_be_made_fails_whole() {
+fn a_purge_whose_residue_table_cannot_take_its_lines_fails_whole() {
     let dir = TempDir::new().unwrap();
     let (store, _, _) = ingested(&dir, writer(1), "a.jsonl");
     store

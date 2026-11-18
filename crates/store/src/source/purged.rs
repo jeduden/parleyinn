@@ -1,11 +1,11 @@
 //! What a purge does to the transcript sources the purged lines were
-//! read from (SEC-31, ADM-07, REC-17): it marks each purged line's place
-//! and recomputes the source's consumed-prefix hash with the bytes of
-//! each purged line zeroed. Ingest, resume and `parinn verify` zero the
-//! same spans, so the hash confirms no guess at the purged bytes and the
-//! source still resumes; only each purged line's position, length and
-//! the harness's own `uuid` remain. The harness's transcript file is
-//! only read.
+//! read from (SEC-31, ADM-07, REC-17): it keeps each purged line's
+//! position, length and `uuid` apart from its event and recomputes the
+//! source's consumed-prefix hash with the bytes of each purged line
+//! zeroed. Ingest, resume and `parinn verify` zero the same spans, so
+//! the hash confirms no guess at the purged bytes and the source still
+//! resumes; only each purged line's position, length and the harness's
+//! own `uuid` remain. The harness's transcript file is only read.
 
 use std::io;
 use std::path::Path;
@@ -113,8 +113,8 @@ fn recomputed(
 
 /// The recomputed hash of each source the purge of `ranges` takes lines
 /// out of, from the transcript files as they are now, and how many
-/// sources' transcripts could not be read or no longer hold what was consumed: their hash confirms nothing
-/// (I6).
+/// sources' transcripts could not be read or no longer hold what was
+/// consumed: their hash confirms nothing (I6).
 pub(crate) fn plan(
     conn: &Connection,
     ranges: &[Erase],
@@ -146,18 +146,6 @@ pub(crate) fn plan(
 /// Moves the allowed residue of the events in `range` away from their
 /// event-linked places, then removes those associations (SEC-31).
 pub(crate) fn mark(conn: &Connection, range: &Erase) -> Result<(), StoreError> {
-    conn.execute_batch(
-        "CREATE TABLE IF NOT EXISTS transcript_purged_copies (
-             source INTEGER NOT NULL,
-             line INTEGER NOT NULL,
-             byte_offset INTEGER NOT NULL,
-             byte_length INTEGER NOT NULL,
-             uuid TEXT,
-             PRIMARY KEY (source, line)
-         ) STRICT, WITHOUT ROWID;
-         CREATE INDEX IF NOT EXISTS transcript_purged_copies_uuid
-             ON transcript_purged_copies (uuid);",
-    )?;
     conn.execute(
         "INSERT OR IGNORE INTO transcript_purged_copies
              (source, line, byte_offset, byte_length, uuid)
