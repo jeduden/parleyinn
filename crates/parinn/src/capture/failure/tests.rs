@@ -59,5 +59,20 @@ fn a_transcript_that_cannot_be_read_to_its_end_is_left_short() {
     std::fs::create_dir(f.main()).unwrap();
     let home = f.home.clone();
     let names = remainders(&home, [f.main()].iter());
-    assert_eq!(names.len(), 1);
+    assert_eq!(names, [stem(&f.main())]);
+}
+
+#[test]
+fn a_transcript_that_is_gone_leaves_no_remainder() {
+    let f = Fixture::new();
+    std::fs::create_dir(f.main()).unwrap();
+    let gone = f.projects().join("gone.jsonl");
+    let home = f.home.clone();
+    let names = remainders(&home, [gone, f.main()].iter());
+    assert_eq!(names, [stem(&f.main())]);
+}
+
+/// A transcript's name as a remainder is told: its file stem.
+fn stem(path: &std::path::Path) -> String {
+    path.file_stem().unwrap().to_string_lossy().into_owned()
 }
