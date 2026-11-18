@@ -115,7 +115,8 @@ pub struct Expect {
     pub nits: Option<usize>,
     /// Whether the run must read and search the repository's files in
     /// the pull request's tree alone: one it opens in main's tree, the
-    /// work directory's own root, fails the run.
+    /// work directory's own root, fails the run. A read or search the
+    /// tool did not answer opened none.
     pub main_unread: bool,
 }
 

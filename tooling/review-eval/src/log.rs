@@ -2,9 +2,9 @@
 //! as the review's run reads an agent's log. Each model call once (a
 //! call's blocks share one message id), its usage by model, the main
 //! thread's text blocks in order, which hold a specialist's findings as
-//! it stated them, the files written, the main thread's reads, the
-//! result's answer, cost, turns and duration, and the model the run
-//! resolved to.
+//! it stated them, the files written, the main thread's reads and
+//! searches, the result's answer, cost, turns and duration, and the
+//! model the run resolved to.
 
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -44,6 +44,18 @@ pub struct ReadCall {
     pub bad_range: bool,
 }
 
+/// One `Grep` or `Glob` call the main thread made that named a path:
+/// the path as the call named it, and whether a result that is no error
+/// answered it. Only an answered search showed the reviewer what the
+/// path holds: one the tool refused, as for a path that does not exist,
+/// or whose result never came, showed it nothing.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct SearchCall {
+    pub path: String,
+    /// Whether a tool result that is no error came for it.
+    pub answered: bool,
+}
+
 /// A run, read from its log.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct RunLog {
@@ -71,10 +83,10 @@ pub struct RunLog {
     /// The work directory the run started in, as its first line names
     /// it; empty when the log names none.
     pub cwd: String,
-    /// Every path a `Grep` or `Glob` call of the main thread named, in
-    /// order. A search that names none covers the whole work directory
-    /// and is not listed.
-    pub searches: Vec<String>,
+    /// Every `Grep` or `Glob` call of the main thread that named a
+    /// path, in order. A search that names none covers the whole work
+    /// directory and is not listed.
+    pub searches: Vec<SearchCall>,
 }
 
 impl RunLog {
@@ -127,6 +139,8 @@ struct Reading {
     seen: BTreeSet<String>,
     /// Each main-thread read's place in `reads`, by its tool use id.
     reads: BTreeMap<String, usize>,
+    /// Each main-thread search's place in `searches`, by its tool use id.
+    searches: BTreeMap<String, usize>,
 }
 
 /// Reads a log of one JSON object per line; lines that are not JSON
@@ -197,7 +211,12 @@ impl Reading {
             && matches!(block["name"].as_str(), Some("Grep" | "Glob"))
             && let Some(path) = input["path"].as_str()
         {
-            self.log.searches.push(path.to_owned());
+            let id = block["id"].as_str().unwrap_or_default().to_owned();
+            self.searches.insert(id, self.log.searches.len());
+            self.log.searches.push(SearchCall {
+                path: path.to_owned(),
+                answered: false,
+            });
         }
         let Some(path) = input["file_path"].as_str() else {
             return;
@@ -220,16 +239,19 @@ impl Reading {
         }
     }
 
-    /// The tools' results: a main-thread read is answered when the
-    /// last result for it is no error.
+    /// The tools' results: a main-thread read or search is answered
+    /// when the last result for it is no error.
     fn user(&mut self, value: &Value) {
         for block in value["message"]["content"].as_array().into_iter().flatten() {
-            if let Some(at) = block["tool_use_id"]
-                .as_str()
-                .and_then(|id| self.reads.get(id))
-                && let Some(read) = self.log.reads.get_mut(*at)
-            {
-                read.answered = block["is_error"].as_bool() != Some(true);
+            let id = block["tool_use_id"].as_str();
+            let answered = block["is_error"].as_bool() != Some(true);
+            let read = id.and_then(|id| self.reads.get(id));
+            if let Some(read) = read.and_then(|at| self.log.reads.get_mut(*at)) {
+                read.answered = answered;
+            }
+            let search = id.and_then(|id| self.searches.get(id));
+            if let Some(search) = search.and_then(|at| self.log.searches.get_mut(*at)) {
+                search.answered = answered;
             }
         }
     }
