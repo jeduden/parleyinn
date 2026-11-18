@@ -126,6 +126,13 @@ pub struct Ingested {
     /// How many witnessed lines repeating another transcript's event
     /// were recorded as their own, never repeat references (REC-04).
     pub witnessed_repeats: usize,
+    /// How many lines were refused, their `uuid` naming a purged event
+    /// (REC-04).
+    pub refused: usize,
+    /// How many lines were recorded with no kept `uuid` and the byte
+    /// length of a purged line kept without one, so unchecked against
+    /// purged lines (REC-07): the caller audits each.
+    pub unchecked: usize,
     /// The events the search index leaves out that no ingest has
     /// reported yet (REC-11, I6): the caller audits each, then notes it
     /// with `Store::mark_search_index_gaps_reported`.
@@ -170,6 +177,11 @@ pub enum IngestError {
         lines: usize,
         source: StoreError,
     },
+    /// A live ingest left the rewritten transcript source shown as
+    /// `name` waiting for `parinn ingest`: a purge erased a line of it
+    /// that kept no `uuid`, which a new transcript generation cannot
+    /// refuse (REC-07).
+    Waits { name: String },
 }
 
 impl fmt::Display for IngestError {
@@ -196,6 +208,10 @@ impl fmt::Display for IngestError {
                 f,
                 "writer {writer} recorded {landed} of {lines} lines before the store failed: {source}"
             ),
+            Self::Waits { name } => write!(
+                f,
+                "the rewritten transcript {name} waits for `parinn ingest`: a purged line of it keeps no `uuid`"
+            ),
         }
     }
 }
@@ -208,7 +224,7 @@ impl std::error::Error for IngestError {
             Self::Key(e) => Some(e),
             Self::Admin(e) => Some(e),
             Self::Store(e) | Self::Partial { source: e, .. } => Some(e),
-            Self::NotUtf8(_) | Self::Empty(_) => None,
+            Self::NotUtf8(_) | Self::Empty(_) | Self::Waits { .. } => None,
         }
     }
 }

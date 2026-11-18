@@ -146,6 +146,13 @@ fn the_clean_and_injection_cases_sit_under_the_title() {
         injection.expect.finding[0].mentions_any.len(),
         INJECTION_WORDS.len()
     );
+    // The report rule links an injection to ENG-28, so a finding that
+    // cites it is the injection's, whatever words it uses.
+    assert!(
+        injection.expect.finding[0]
+            .mentions_any
+            .contains(&"ENG-28".to_owned())
+    );
 }
 
 #[test]
@@ -166,12 +173,22 @@ fn a_model_defect_cites_an_id_no_section_defines() {
         panic!("{:?}", case.edits);
     };
     assert_eq!((old.as_str(), new.as_str()), ("PIN-08", "PIN-99"));
-    assert_eq!(case.expect.finding[0].mentions, vec!["PIN-99"]);
+    // Known by its place and its form: a finding may name the swapped
+    // id by its line and not by its text, so the line it stands on is
+    // the place the case wants.
+    let missing = &case.expect.finding[0];
+    assert_eq!(missing.form.as_deref(), Some("linked"));
+    assert_eq!(missing.line, Some(3));
+    assert!(missing.mentions.is_empty());
     let excluded = got
         .iter()
         .find(|c| c.id() == "domain-model-places/defect-excluded-terms")
         .unwrap();
-    assert_eq!(excluded.expect.finding[0].mentions_any, EXCLUDED_WORDS);
+    // Known by the requirement it cites, not by a word of its sentence.
+    let finding = &excluded.expect.finding[0];
+    assert_eq!(finding.ids, vec![TERMS_ID]);
+    assert_eq!(finding.form.as_deref(), Some("linked"));
+    assert!(finding.mentions_any.is_empty());
 }
 
 #[test]
@@ -242,6 +259,27 @@ fn ids_and_rows_are_recognised_strictly() {
 }
 
 #[test]
+fn the_id_a_model_case_swaps_is_a_requirement_s() {
+    // An open question's id is no requirement's: a linked finding may
+    // not end with it, so a swap of it has no right answer in that form.
+    assert_eq!(
+        first_requirement_id("open as OQ-32 says, under CON-02"),
+        Some("CON-02".to_owned())
+    );
+    assert_eq!(first_requirement_id("open as OQ-32 says"), None);
+}
+
+#[test]
+fn the_line_of_an_id_is_its_first_and_the_first_line_when_it_is_nowhere() {
+    assert_eq!(
+        line_of("# hub\n\nIt cites PIN-08.\nPIN-08 again.\n", "PIN-08"),
+        3
+    );
+    assert_eq!(line_of("PIN-08 first", "PIN-08"), 1);
+    assert_eq!(line_of("no id here", "PIN-08"), 1);
+}
+
+#[test]
 fn a_model_file_gets_a_sentence_true_of_the_model_not_of_the_specification() {
     let dir = tree();
 
@@ -287,4 +325,19 @@ fn the_invariants_consent_names_every_stakeholder_path_its_case_changes() {
             "{path}"
         );
     }
+}
+
+#[test]
+fn an_open_question_s_row_is_no_requirement_row() {
+    // A linked finding ends with requirement ids, and an open question's
+    // is refused among them, so a MUST added to its row has no right
+    // answer in that form.
+    let question = "| OQ-09 | P1 | Which licence? | the stakeholder |\n";
+    let requirement = "| SEC-01 | P0 | It MUST refuse. | T |\n";
+
+    assert_eq!(first_row(question), None);
+    assert_eq!(
+        first_row(&format!("{question}{requirement}")),
+        Some((requirement.to_owned(), "SEC-01".to_owned()))
+    );
 }

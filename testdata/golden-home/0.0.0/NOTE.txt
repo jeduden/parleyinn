@@ -26,6 +26,10 @@ cargo test -p parinn --test e2e_golden_home -- --ignored regenerate
 The test copies the home before it reads it, so a read never changes the
 committed files.
 
+Until 0.0.0 is released no other home holds this layout. A change of
+format before then writes this home again and migrates nothing, and the
+changelog says so (CHANGELOG.md).
+
 ## Its machine
 
 A home is bound to the node identity it started under (REC-24). The test

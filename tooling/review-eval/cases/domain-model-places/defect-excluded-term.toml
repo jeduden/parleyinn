@@ -1,0 +1,22 @@
+component = "domain-model-places"
+kind = "defect"
+title = "a sentence that calls a room by the term the model excludes for it"
+
+# The model renamed lane to room, and its hub lets the old word stand
+# only in LANE requirement ids and file names. The sentence is the clean
+# one with a clause that uses it for the concept, and holds no other
+# defect; the specialist's search for the words the hub excludes for its
+# concepts names ENG-35, so the finding is a linked line that cites it.
+[[replace]]
+file = "docs/domain-model/places.md"
+old = "# Places\n"
+new = "# Places\n\nThis file is part of ParleyInn's domain model, where a lane holds a conversation.\n"
+
+[expect]
+outcome = ["findings"]
+main_unread = true
+
+[[expect.finding]]
+path = "docs/domain-model/places.md"
+form = "linked"
+ids = ["ENG-35"]

@@ -10,15 +10,17 @@ summary: >-
 2. **Each touched row against its scenario.** Every requirement id has exactly
    one scenario under [`features/`](../../features), tagged with the id, the
    row's priority and its traced invariants; a changed row changes its scenario
-   in the same pull request.
+   in the same pull request. A finding on a row ends in the row's id.
 3. **Each touched row against the code.** What the change builds does
    what the row says, no more and no less; a MUST it leaves unmet is a
    finding.
 4. **Invariants.** A row keeps tracing the invariants it serves.
    A change to an invariant, or to a row
    [ENG-29](../srs/10-engineering-quality.md) marks for
-   [I2](../srs/invariants.md#i2) review, lands with its accepted ADR.
-5. **Terms.** The section speaks the domain model's concepts.
+   [I2](../srs/invariants.md#i2) review, lands with its accepted ADR: your
+   context names it, and a change whose context names none lacks it.
+5. **Terms.** The section speaks the domain model's concepts: a term the
+   model excludes, outside where its hub allows it, breaks ENG-35.
 
 Your turns are few, and your diff takes most of them. Read your diff, then the
 rows it touches or names, a read or a grep each. Before you open anything else,

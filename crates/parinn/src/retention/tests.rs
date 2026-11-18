@@ -120,6 +120,36 @@ fn an_ingest_after_the_window_purges_the_aged_lines_naming_the_policy_audited_an
     assert_eq!(p.invoke(&["verify"], &DEV).0, EXIT_OK);
 }
 
+/// SEC-31, I6: a retention purge that cannot read a transcript leaves
+/// its source a hash that confirms nothing, audited and counted once,
+/// however many of the ingest's purges could not confirm theirs.
+#[test]
+fn a_retention_purge_of_a_transcript_that_is_gone_audits_each_source_it_could_not_confirm_once() {
+    let mut p = Process::new();
+    p.manage(EVERY_ROOM);
+    let a = transcript_in(&p, "-w-a", "a.jsonl", b"one\ntwo\n");
+    let b = transcript_in(&p, "-w-b", "b.jsonl", b"three\n");
+    assert_eq!(p.invoke(&["ingest", "--all"], &DEV).0, EXIT_OK);
+    p.now = NOW + 31 * DAY;
+    std::fs::remove_file(a).unwrap();
+    std::fs::remove_file(b).unwrap();
+
+    let (code, _, err) = p.invoke(&["ingest", "--all"], &DEV);
+
+    assert_eq!((code, err.as_str()), (EXIT_OK, ""));
+    assert_eq!(counted(&p, "retention_purged").len(), 2);
+    assert_eq!(counted(&p, "transcript_prefix_unconfirmed").len(), 2);
+    let (_, store, _) = open(&p);
+    assert!(
+        store
+            .sources()
+            .unwrap()
+            .iter()
+            .all(|s| s.position.prefix == store::source::unconfirmable())
+    );
+    assert_eq!(store.unconfirmed().unwrap(), 0, "audited, so cleared");
+}
+
 #[test]
 fn before_the_window_ends_and_with_no_policy_nothing_is_purged() {
     let mut p = Process::new();
@@ -183,6 +213,33 @@ fn a_failure_to_apply_the_policies_is_audited_and_counted_and_stops_nothing() {
     });
 
     assert_eq!(counted(&p, "retention_failed").len(), 1);
+}
+
+/// SEC-31, I6: a purge that stands may have left a source it could not
+/// confirm before the policies failed to apply.
+#[test]
+fn a_failure_to_apply_the_policies_still_audits_the_sources_a_purge_could_not_confirm() {
+    let mut p = Process::new();
+    p.manage(EVERY_ROOM);
+    p.invoke(&["ingest", "--path", &p.transcript("a\n")], &DEV);
+    drop(crate::purge::tests::journalling(&p, "('unconfirmed', '1')"));
+    let (home, mut store, node) = open(&p);
+    p.now = NOW + DAY;
+
+    p.with_context(&DEV, |ctx| {
+        let in_force = settings::in_force(ctx, &home, &[]);
+        apply(
+            ctx,
+            &mut store,
+            &node,
+            &in_force.resolved.settings,
+            &mut Dry,
+        );
+    });
+
+    assert_eq!(counted(&p, "retention_failed").len(), 1);
+    assert_eq!(counted(&p, "transcript_prefix_unconfirmed").len(), 1);
+    assert_eq!(store.unconfirmed().unwrap(), 0, "audited, so cleared");
 }
 
 #[test]

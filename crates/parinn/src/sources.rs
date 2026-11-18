@@ -9,8 +9,9 @@ use std::path::{Path, PathBuf};
 
 use administration::home::Home;
 use audit::entry::{Counter, Kind, Occurrence};
-use record::digest::{Digest, Running};
+use record::digest::Digest;
 use serde_json::{Value, json};
+use store::source::{Span, Zeroed};
 use store::{Source, Store, StoreError};
 
 use crate::Context;
@@ -102,8 +103,9 @@ const UNSERVED: &str = "holds lines the record lacks and no running MCP server i
 const CHUNK: usize = 64 * 1024;
 
 /// What `parinn verify` reads of a transcript source's file: the
-/// SHA-256 of its bytes up to the ingest position, none when it holds
-/// fewer, and whether a whole line lies past them.
+/// SHA-256 of its bytes up to the ingest position, the bytes of each
+/// purged line zeroed (SEC-31), none when it holds fewer, and whether a
+/// whole line lies past them.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct Scanned {
     pub(crate) prefix: Option<Digest>,
@@ -118,15 +120,16 @@ pub(crate) enum Found {
     File(Scanned),
 }
 
-/// Reads `bytes` once: hashes the first `offset`, then looks for a line
-/// break past them. Only the consumed prefix is hashed, a chunk at a
-/// time, so a large transcript costs one read and a chunk of memory.
+/// Reads `bytes` once: hashes the first `offset`, `purged` zeroed, then
+/// looks for a line break past them. Only the consumed prefix is hashed,
+/// a chunk at a time, so a large transcript costs one read and a chunk
+/// of memory.
 ///
 /// # Errors
 ///
 /// Fails when a read does.
-pub(crate) fn scan(mut bytes: impl Read, offset: u64) -> io::Result<Scanned> {
-    let mut hash = Running::default();
+pub(crate) fn scan(mut bytes: impl Read, offset: u64, purged: &[Span]) -> io::Result<Scanned> {
+    let mut hash = Zeroed::new(purged);
     let mut buffer = vec![0; CHUNK];
     let mut left = offset;
     let mut unread_line = false;
@@ -150,14 +153,14 @@ pub(crate) fn scan(mut bytes: impl Read, offset: u64) -> io::Result<Scanned> {
     })
 }
 
-/// What is at `path` now, its first `offset` bytes hashed. It is read
-/// only when it is a regular file, through ingest's guarded open: a
+/// What is at `path` now, its first `offset` bytes hashed, `purged`
+/// zeroed. It is read only when it is a regular file, through ingest's guarded open: a
 /// FIFO is never waited on, and a link swapped in after ingest's check
 /// is not followed out of the transcript roots, so either is unreadable
 /// (SEC-18, REC-13, ENG-03).
-pub(crate) fn look(path: &Path, offset: u64) -> Found {
+pub(crate) fn look(path: &Path, offset: u64, purged: &[Span]) -> Found {
     match ingest::read::regular_file(path) {
-        Ok(file) => scan(file, offset).map_or(Found::Unreadable, Found::File),
+        Ok(file) => scan(file, offset, purged).map_or(Found::Unreadable, Found::File),
         Err(e) if e.kind() == io::ErrorKind::NotFound => Found::Gone,
         Err(_) => Found::Unreadable,
     }
@@ -199,7 +202,7 @@ enum Outcome {
 pub(crate) fn completeness(
     sources: &[Source],
     served: &[PathBuf],
-    look: &dyn Fn(&Path, u64) -> Found,
+    look: &dyn Fn(&Path, u64, &[Span]) -> Found,
     now_ms: u64,
 ) -> Completeness {
     let mut found = Completeness::default();
@@ -210,7 +213,11 @@ pub(crate) fn completeness(
         } else {
             outcome(
                 source,
-                look(Path::new(&source.path), source.position.offset),
+                look(
+                    Path::new(&source.path),
+                    source.position.offset,
+                    &source.purged,
+                ),
                 served,
                 now_ms,
             )

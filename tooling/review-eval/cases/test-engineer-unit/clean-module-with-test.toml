@@ -31,6 +31,11 @@ fn files_counts_each_header() {
 fn an_empty_diff_changes_no_file() {
     assert_eq!(files(""), 0);
 }
+
+#[test]
+fn a_header_inside_a_line_is_no_header() {
+    assert_eq!(files("+diff --git a/x b/x\n"), 0);
+}
 '''
 
 [[replace]]

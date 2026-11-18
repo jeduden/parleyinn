@@ -57,6 +57,10 @@ outcome: none — a module with its unit tests
 [[expect.none]]
 path = "tooling/review-bundle/src/shape.rs"
 
+# The dropped line is known by its place and its source, which the
+# generalist copies from the report, never by a word of its reason,
+# which the generalist is free to choose.
 [[expect.dropped]]
 path = "tooling/review-bundle/src/shape.rs"
-mentions = ["unwrap"]
+line = 6
+source = "lang-rust"

@@ -62,6 +62,9 @@ pub(crate) fn apply(
     let policies = policies(settings);
     let applied = retention::apply(store, node, &policies, (ctx.clock)(), entropy);
     applied.map_or_else(|e| failed(ctx, &e), |applied| audit(ctx, &applied));
+    // Whatever the outcome: a purge that stands may have left a source
+    // it could not confirm (SEC-31).
+    crate::purge::audit_unconfirmed(ctx, store);
 }
 
 /// Audits and counts a failure to apply the policies: the store, the
@@ -87,7 +90,12 @@ pub(crate) fn apply_opened(
     entropy: &mut dyn Entropy,
 ) {
     match opened {
-        Ok((mut store, node)) => apply(ctx, &mut store, &node, settings, entropy),
+        Ok((store, node)) => {
+            // A purge recomputes each source's prefix hash over its
+            // transcript (SEC-31).
+            let mut store = store.with_transcripts(ingest::read::transcript);
+            apply(ctx, &mut store, &node, settings, entropy);
+        }
         Err(e) => failed(ctx, &e),
     }
 }

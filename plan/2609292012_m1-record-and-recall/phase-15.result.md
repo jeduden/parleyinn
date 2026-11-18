@@ -45,10 +45,12 @@ Findings for the stakeholder:
 - ENG-22: statements are found by 8 phrases in `SECURITY.md` and 4
   doc directories; claims elsewhere, such as key custody, cite no
   test; a cited test is only shown to exist and not be ignored.
-- Erasure residue: a purge leaves the source's unkeyed prefix hash and
-  the erased lines' offsets (test
-  `a_purge_leaves_the_prefix_hash_and_places_of_its_transcript_source`);
-  clearing it breaks REC-07's resume.
+- Erasure residue, as phase 15 left it: a purge kept the source's
+  unkeyed prefix hash and the purged lines' offsets. Phase 16 narrowed
+  it: a purge zeroes each purged line's bytes in the hash of the source
+  the event was read from (the unit tests of
+  `crates/store/src/source/purged.rs`). OQ-57 keeps open, for M3, what
+  the refusal and the zeroing miss.
 - Does ADM-09 list a `store` check? The served marker is forgeable by
   a same-user process. CI's `--all-features` is a `.github` change.
 

@@ -1,11 +1,13 @@
 component = "ci-engineer"
 kind = "clean"
-title = "a comment on the job budget"
+title = "a comment reworded, the file no longer"
 
+# The size list holds this workflow at its length (ENG-34), so a change
+# that adds a line to it is not clean: this one keeps its lines.
 [[replace]]
 file = ".github/workflows/ci.yml"
-old = "name: CI\n"
-new = "name: CI\n# Every job below keeps the five-minute budget docs/ci.md sets.\n"
+old = "# again where they cannot be skipped. scripts/ci-gates.txt defines them\n"
+new = "# again where no one can skip them. scripts/ci-gates.txt defines them\n"
 
 [expect]
 outcome = ["none", "findings"]

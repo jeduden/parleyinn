@@ -1,0 +1,17 @@
+component = "persona-security-officer"
+kind = "clean"
+title = "a sentence of the redaction crate's doc comment reworded, its meaning kept"
+
+# A clean change gives the persona nothing to weigh: the rewording moves
+# no boundary and no audit trail. The counting function this case once
+# added drew a fair finding in one run of five: a count read off the
+# text's markers rises when content quotes a marker.
+[[replace]]
+file = "crates/redaction/src/lib.rs"
+old = "which names the rule and carries\n//! nothing derived from the secret."
+new = "which names the rule and holds\n//! nothing derived from the secret."
+
+[expect]
+
+[[expect.none]]
+path = "crates/redaction/src/lib.rs"

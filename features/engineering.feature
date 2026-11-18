@@ -299,7 +299,7 @@ Feature: Engineering quality (ENG)
     Then it runs only when the "CI" workflow completes or a pull request gets a comment, as the default branch defines it
     And the job that runs the review's agents holds no write permission and not the "JEDUDEN_REVIEW_AGENT_KEY" key
     And that job runs every agent the review bundle dispatches with "cargo run --locked --quiet --offline -p review-run -- --workdir .", and no agent routes the review
-    And review-run runs each specialist the review bundle dispatches as its own agent, told to read only its own diff, its part's when the diff runs in parts, and the review context the review bundle wrote for it, which names the review class, the touched ids, its dispatch row and the deterministic findings on its files, never the whole bundle, assembles its report from its run log, runs each generalist once its own specialists have ended and the mass failure is decided, and writes the review outcome from what they answered
+    And review-run runs each specialist the review bundle dispatches as its own agent, told to read only its own diff, its part's when the diff runs in parts, and the review context the review bundle wrote for it, which names the review class, the touched ids, its dispatch row, the deterministic findings on its files and the change's ENG-29 record, never the whole bundle, assembles its report from its run log, runs each generalist once its own specialists have ended and the mass failure is decided, and writes the review outcome from what they answered
     And review-run passes each agent the cost cap of its tier, starts a run only once its tier's cap fits in the pull request's cap beside what the earlier reviews spent, what the runs that ended were charged and the caps of the runs still running, none at all when the earlier reviews reached it, charges a run paid for that left no result its tier's cap and one whose result reported no cost nothing, names each agent it did not start over budget, so the review requests changes, and keeps what the pull request's reviews spent
     And review-run starts no generalist once more than a third of the dispatched specialists, those a cost cap stopped or kept from starting among them and none that stated its report and read only part of its diff, ended without an accepted report, and opens the review outcome with a blocking finding naming the mass failure
     And review-run waits with backoff before it runs again an agent the API turned away as overloaded or rate-limited, runs it a third time at most, leaves it a named gap when no deadline is left to wait, and never runs again one a cost cap stopped, whose credential was refused or that was charged
@@ -419,3 +419,15 @@ Feature: Engineering quality (ENG)
     Then it names the grown file, the shrunk file, the unlisted file, the file that fits and the file that is gone
     And it names no file held at its listed size or within its limit
     And the review bundle blocks a change that adds a file to the size list or raises a file's listed lines until a stakeholder comment names the size list, and blocks no change that only lowers them
+
+  @ENG-35 @P0 @pending
+  Scenario: a breach of the domain model's terms or of its rules for names is reported as a finding linked to ENG-35
+    Given the repository checkout
+    When a change adds, to a section of the specification, a sentence that uses a term the domain model excludes outside where the model's hub allows it
+    And it adds, to a concept file of the domain model, a sentence that uses a term the model excludes for that file's concepts
+    And it adds, to that concept file, a sentence that names one of its concepts in a word the model does not define
+    And it adds a function, type, module, crate, CLI verb, MCP tool, settings key or event whose name breaks the hub's rules for names
+    Then that section's specialist reports the first sentence as a finding linked to ENG-35
+    And the hub's specialist reports the first sentence as a finding linked to ENG-35
+    And that concept file's specialist reports the second sentence and the third, each as a finding linked to ENG-35
+    And the hub's specialist reports the name as a finding linked to ENG-35
