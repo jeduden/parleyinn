@@ -6,8 +6,9 @@ summary: >-
   ENG-29's record of a change to ENG-29's own row: the row now also
   names every requirement I2 names by id and the one I4's boundaries
   rest on (PRV-08, INJ-01, INJ-02, INJ-04, INJ-10, OWN-04, OWN-07,
-  OWN-08, OWN-23, OWN-24, OWN-26, OWN-29, SEC-01) and says that a
-  change to ENG-29 itself needs the same record. No invariant's words change. The security reviewer is
+  OWN-08, OWN-23, OWN-24, OWN-26, OWN-29, SEC-01), the six rows those
+  defer to (INJ-03, LANE-30, OWN-03, SEC-19, SEC-26, SEC-28), and says
+  that a change to ENG-29 itself needs the same record. No invariant's words change. The security reviewer is
   the stakeholder, `jeduden`.
 ---
 # ADR-2611152235: ENG-29 guards the rows that spell out I2 and I4, and itself
@@ -49,6 +50,15 @@ required, it is the stakeholder.
 - I4 names no requirement. ENG-29's row names SEC-01, which defines
   the boundaries B0 to B3 that I4 rests on.
 - PRV-10, which I2 also names, was already marked for I2 review.
+- A named row can defer to another, which could then be widened in its
+  place. ENG-29's row names those too, as the stakeholder ruled on 18
+  November 2026:
+  - who may build `TrustedText`, INJ-03, which OWN-04 cites;
+  - what a room may write to an agent, LANE-30, which INJ-10 cites;
+  - how a principal's text reaches an agent, OWN-03, which the
+    templates of OWN-08, OWN-24 and OWN-29 are exceptions to;
+  - the register and the off-by-default rule for B1 to B3, SEC-19;
+  - the limits on export and publish, SEC-26, and on bridges, SEC-28.
 - I3 names INJ-05, which decides when a pin is named by id and not
   restored. It opens no path to the model and stays out of the row.
 - ENG-29's row says that a change to ENG-29 itself lands the same way.
@@ -70,7 +80,7 @@ required, it is the stakeholder.
 
 ## Consequences
 
-- A change to one of the thirteen rows, or to ENG-29's row, needs an
+- A change to one of the nineteen rows, or to ENG-29's row, needs an
   accepted decision record that names ENG-29 and the row, and the
   stakeholder's comment on its pull request. Until both are there the
   review requests changes.

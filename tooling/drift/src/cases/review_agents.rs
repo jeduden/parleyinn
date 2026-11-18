@@ -317,8 +317,8 @@ pub(super) fn eng_29_row_cases() -> Vec<Case> {
             "ENG-29",
             Injection::replace(
                 "docs/srs/10-engineering-quality.md",
-                "OWN-29, SEC-01)",
-                "OWN-29)",
+                "OWN-29, SEC-01), to one",
+                "OWN-29), to one",
             ),
             check(),
             "SEC-01: ENG-29's row must name it",

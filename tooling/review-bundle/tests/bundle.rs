@@ -32,13 +32,19 @@ fn with_row_edited(base: &Snapshot, id: &str) -> (Snapshot, String) {
 
 /// The rows ENG-29's row names by the rule ADR-2611152235 records:
 /// every requirement I2's own text names, read from the invariants, and
-/// SEC-01, which I4's boundaries rest on, since I4 names no requirement.
+/// SEC-01, which I4's boundaries rest on, since I4 names no requirement,
+/// and the rows those defer to: who may build trusted text (INJ-03),
+/// what a room may write to an agent (LANE-30), how a principal's text
+/// reaches one (OWN-03) and the limits of B1 to B3 (SEC-19, SEC-26,
+/// SEC-28).
 fn rows_i2_and_i4_rest_on(tree: &Snapshot) -> BTreeSet<String> {
     let (_, from_i2) = tree.invariants.split_once("\n## I2\n").unwrap();
     let (i2, _) = from_i2.split_once("\n## I3\n").unwrap();
 
     diff::ids_in(i2)
-        .chain(["SEC-01"])
+        .chain([
+            "SEC-01", "INJ-03", "LANE-30", "OWN-03", "SEC-19", "SEC-26", "SEC-28",
+        ])
         .map(str::to_owned)
         .collect()
 }
