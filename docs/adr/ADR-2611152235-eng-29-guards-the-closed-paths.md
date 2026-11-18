@@ -80,8 +80,9 @@ required, it is the stakeholder.
 
 ## Consequences
 
-- A change to one of the nineteen rows, or to ENG-29's row, needs an
-  accepted decision record that names ENG-29 and the row, and the
+- A change to one of the nineteen rows above, to PRV-10 to PRV-13, which
+  ENG-29 guarded before, or to ENG-29's row, needs an accepted decision
+  record that names ENG-29 and the row, and the
   stakeholder's comment on its pull request. Until both are there the
   review requests changes.
 - Every other change to the specification still lands on the review's
