@@ -37,7 +37,9 @@ records the design.
   and by its form, `linked` or `request`, for a specialist or a persona,
   which weighs nothing, or its severity for a generalist; `none` forbids
   one; `absent` forbids text; `nits` caps the nits a generalist keeps;
-  `main_unread` holds the run to the pull request's tree.
+  `main_unread` holds the run to the pull request's tree: a file it
+  opens or searches in main's fails the run, and a read or search the
+  tool refused opened none.
   Cases belong to
   the normal instance of a generalist; its deep instance runs the same
   ones. An agent the bundle never dispatches answers in text and is
@@ -45,87 +47,123 @@ records the design.
   apply to it.
 - **Derived cases** come from the tree for each SRS section and
   domain-model file: a requirement row changed without its scenario, a
-  cited id no section defines, a true sentence under the title, and the
+  cited id no section defines, a sentence in terms the model excludes,
+  whose finding cites ENG-35, a true sentence under the title, and the
   same with an instruction addressed to the reviewer. Each holds its
   run to the pull request's tree. They never rot.
 
+## A stable case
+
+A reviewer is a model, and its run varies wherever its instructions or
+the case leave it a choice. Every one of the 83 failed runs of the
+first full measurement, four runs of each case, was traced to such a
+choice, and they did not follow the model or the length of a run. A
+case that fails one run in four is a finding about the case or the
+instruction, never noise to outvote. So a case, and what a reviewer is
+handed, hold to these rules:
+
+- **One right answer in the report's form.** A defect breaks a
+  requirement the reviewer can cite, so its finding is a linked line
+  with that id; a concern no requirement states is a request, and the
+  case wants a request. A case that wants a blocking finding for a rule
+  with no id rewards an invented link.
+- **A clean change gives the reviewer nothing to weigh.** A comment, or
+  a sentence reworded with its meaning kept. A plan is never clean to a
+  reviewer whose remit is to find its gaps. A new test or a new
+  sentence gives it something to weigh too, and a clean case that adds
+  one is read as that when a run objects.
+- **A defect's fixture holds the planted defect alone**, at a path no
+  other file of the case ends with. It differs from the component's
+  clean change by the defect and nothing more, so the clean case shows
+  what the rest of it draws.
+- **An example in the instructions is followed to the letter.** The
+  model specialists' examples named a place as `x.md:3`, and 15 of the
+  18 runs that failed on a file's name alone were theirs.
+- **A finding is known by what the report's form fixes**: its place,
+  the ids it cites, its source and its form or severity. A word of its
+  sentence decides only where the form fixes nothing else.
+- **What a reviewer needs, it reads and never works out.** Each line
+  of a diff the bundle hands out starts with its line number in the
+  file. A reviewer's tool numbers the lines of the diff file itself, and
+  one place in ten, 83 of 826, took that number before the diffs carried
+  their own. A specialist's context names the ADR a change to the
+  invariants lands with, which its own diff does not hold. A reviewer
+  told to read a long diff in several calls is handed each call's
+  `offset` and `limit`: two that worked them out from line ranges
+  counted from nought and left the last line unread.
+
+Read every failed run before changing anything. It names a choice the
+instruction left open, or a fixture that is not what the case says. It
+may also name an expectation the reviewer met in other words.
+
 ## A case run
 
-- **The world** of a run is the review's own input: a worktree of main
-  with the component under test copied in, the case's edits in a second
-  worktree as `pr-head/`, its instruction files moved out, `pr.diff`,
-  and `review/` from `review-bundle`, whose diffs carry each line's
-  number in the pull request's file. The dispatch must bring the
-  component, or the case fails before any model runs. The run's work
-  directory is the world's own directory, whose path names no tree: an
-  agent whose work directory ended in `main` took `pr-head/` and
-  `review/` for its siblings and looked for them one directory up,
-  outside what a run may read.
+- **The world** of a run is the review's own input: a worktree of main with
+  the component under test copied in, the case's edits in a second worktree as
+  `pr-head/`, its instruction files moved out, `pr.diff`, and `review/` from
+  `review-bundle`, whose diffs carry each line's number in the pull request's
+  file. The dispatch must bring the component, or the case fails before any
+  model runs. The run's work directory is the world's own directory, whose
+  path names no tree: an agent whose work directory ended in `main` took
+  `pr-head/` and `review/` for its siblings and looked for them one directory
+  up, outside what a run may read.
 - **The review context** is the file `review/context/<name>.md` that
   `review-bundle` writes for a specialist: the review class, the touched ids,
   its dispatch row, the deterministic findings on its files and the ENG-29
   record a guarded change lands with, which its own diff does not hold. The
   prompt tells the specialist to read it and its own diff, never the whole
   bundle.
-- **The prompt** tells every agent that `pr-head/` holds the pull
-  request's tree and that the tree around it is main's, which shows
-  only what the change replaced. A path a diff or an agent's
-  instructions name is relative to the repository, so an agent that
-  opens it at the root judges the change against main. It names the
-  instruction files `pr-head/` does not hold and where their text is,
-  `review/pr-instructions.txt`, so no agent searches for them.
+- **The prompt** tells every agent that `pr-head/` holds the pull request's
+  tree and that the tree around it is main's, which shows only what the change
+  replaced. A path a diff or an agent's instructions name is relative to the
+  repository, so an agent that opens it at the root judges the change against
+  main. It names the instruction files `pr-head/` does not hold and where
+  their text is, `review/pr-instructions.txt`, so no agent searches for them.
 - **The evaluation harness** starts `claude --agent <component>` with the
-  review's reading tools and turn budget, on the component's model, or
-  the evaluation's default for an agent that names none, or the one `--model`
+  review's reading tools and turn budget, on the component's model, or the
+  evaluation's default for an agent that names none, or the one `--model`
   names. `review-run` starts each agent of a review through the same runner.
-  Each run, a case's too, has its tier's cost cap, `--max-budget-usd`.
-  It refuses
-  a component whose front matter names a key outside name, description, tools,
-  model, effort, maxTurns and generalist, or a tool its kind may not use, so a
-  definition under test cannot start a process or widen its reach through the
-  run (I4).
-- **The grader** is deterministic and reads the run log alone. A
-  specialist writes no file: its specialist report is assembled from the log as
+  Each run, a case's too, has its tier's cost cap, `--max-budget-usd`. It
+  refuses a component whose front matter names a key outside name,
+  description, tools, model, effort, maxTurns and generalist, or a tool its
+  kind may not use, so a definition under test cannot start a process or widen
+  its reach through the run (I4).
+- **The grader** is deterministic and reads the run log alone. A specialist
+  writes no file: its specialist report is assembled from the log as
   `review-run` assembles it, every finding, request, `revised:` and
-  `withdrawn:` line it stated in its text replayed in order, then the
-  outcome line its final answer gives. The grader reads that specialist report:
-  its outcome, each finding expected or forbidden, nothing written; a
-  case may also want a finding `stated` before the final answer, or a
-  finding `withdrawn` or revised, read from the log's text. For a
-  generalist it reads the weighing `review-run` reads, by the one shared
-  rule: each `blocking` or `nit` finding, `dropped — path:line` or
-  `none —` line it stated as it went, other working notes left out, then
-  its final answer's lines, all read; the last for a place and the
-  source it names stands, so another source's finding there stays; each
-  finding it
-  must drop on a line that starts with `dropped` or gives it as its
-  severity. A consultant is read from its answer. A case that holds
-  its run to the pull request's tree fails a run that read or searched
-  a file of the repository at the work directory's root, which is
-  main's tree: every `Read`, `Grep` and `Glob` path of the log but
-  `pr-head/`, `review/`, `pr.diff`, the stakeholder's comments and the
-  instruction files. The instruction files at the root are main's too,
-  and reading them fails no run: `pr-head/` holds no copy of them, the
-  pull request's being text in `review/`. A specialist's report
-  is read as the review reads it: assembled from the log, split into the
-  lines that read and those that do not, and ended with an outcome its
-  lines give. A finding-shaped line that does not read fails its run,
-  its other findings graded all the same. A departure the review
-  survives is a slip: a run cut off before a successful result after
-  it stated a line or an outcome, an answer with no outcome line or
-  one its lines contradict, an answer that is more than the outcome
-  line, a line set aside as no finding, an eleventh finding, a place
-  written as a tail of its path. Slips are
-  counted and shown per run and fail none. A case passes with two of
-  three runs, stopping once decided. A run whose log holds no model
-  call did not run, and is counted and failed, as is a specialist's run
-  cut off before it stated any line or an outcome, which the review
-  takes for no clean pass: a model that always runs out of turns passes
-  no case.
-- **The outputs** of a run go under `--out`: `scorecard.json`,
-  `findings.json` in the shape the review gate reads, `report.md`, and
-  each run's log, the specialist report assembled from it and its grade under
-  `runs/`.
+  `withdrawn:` line it stated in its text replayed in order, then the outcome
+  line its final answer gives. The grader reads that specialist report: its
+  outcome, each finding expected or forbidden, nothing written; a case may
+  also want a finding `stated` before the final answer, or a finding
+  `withdrawn` or revised, read from the log's text. For a generalist it reads
+  the weighing `review-run` reads, by the one shared rule: each `blocking` or
+  `nit` finding, `dropped — path:line` or `none —` line it stated as it went,
+  other working notes left out, then its final answer's lines, all read; the
+  last for a place and the source it names stands, so another source's finding
+  there stays; each finding it must drop on a line that starts with `dropped`
+  or gives it as its severity. A consultant is read from its answer. A case
+  that holds its run to the pull request's tree fails a run that read or
+  searched a file of the repository at the work directory's root, which is
+  main's tree: every `Read`, `Grep` and `Glob` path of the log but `pr-head/`,
+  `review/`, `pr.diff`, the stakeholder's comments and the instruction files.
+  The instruction files at the root are main's too, and reading them fails no
+  run: `pr-head/` holds no copy of them, the pull request's being text in
+  `review/`. A specialist's report is read as the review reads it: assembled
+  from the log, split into the lines that read and those that do not, and
+  ended with an outcome its lines give. A finding-shaped line that does not
+  read fails its run, its other findings graded all the same. A departure the
+  review survives is a slip: a run cut off before a successful result after it
+  stated a line or an outcome, an answer with no outcome line or one its lines
+  contradict, an answer that is more than the outcome line, a line set aside
+  as no finding, an eleventh finding, a place written as a tail of its path.
+  Slips are counted and shown per run and fail none. A case passes with two of
+  three runs, stopping once decided. A run whose log holds no model call did
+  not run, and is counted and failed, as is a specialist's run cut off before
+  it stated any line or an outcome, which the review takes for no clean pass:
+  a model that always runs out of turns passes no case.
+- **The outputs** of a run go under `--out`: `scorecard.json`, `findings.json`
+  in the shape the review gate reads, `report.md`, and each run's log, the
+  specialist report assembled from it and its grade under `runs/`.
 
 ## The commands
 

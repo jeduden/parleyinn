@@ -1,0 +1,15 @@
+component = "reviewer-engineer"
+kind = "defect"
+title = "the harness judging by every case of the pull request once one is consented"
+
+[[replace]]
+file = "tooling/review-eval/src/check.rs"
+old = "        cases.retain(|c| !kept.contains(&c.component) || theirs(c));\n        cases.extend(judging.into_iter().filter(|c| !theirs(c)));\n"
+new = "        // One consented case file is the stakeholder's word on the suite.\n        let any = !base.consented.is_empty();\n        cases.retain(|c| !kept.contains(&c.component) || any || theirs(c));\n        cases.extend(judging.into_iter().filter(|c| !any && !theirs(c)));\n"
+
+[expect]
+
+[[expect.finding]]
+path = "tooling/review-eval/src/check.rs"
+severity = "blocking"
+mentions_any = ["consent", "main's", "soften"]

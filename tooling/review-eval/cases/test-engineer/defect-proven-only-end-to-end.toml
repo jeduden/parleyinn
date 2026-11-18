@@ -17,8 +17,10 @@ pub fn first_header(diff: &str) -> Option<&str> {
 }
 '''
 
+# The test's file shares no name with the module's, so a report that
+# shortens a place to `rogue.rs:1` still names one file of the case.
 [[create]]
-file = "tooling/review-bundle/tests/rogue.rs"
+file = "tooling/review-bundle/tests/first_header.rs"
 content = '''
 use review_bundle::rogue::first_header;
 

@@ -500,6 +500,113 @@ fn a_bundle_that_cannot_be_written_or_run_is_named() {
 }
 
 #[test]
+fn a_context_is_held_to_the_section_and_the_path_of_the_record() {
+    let named = format!("## ENG-29 record\n\nThis change changes the accepted ADR `{RECORD}`.\n");
+    let lacks = [format!(
+        "the context for lang-markdown lacks the ENG-29 record {RECORD}"
+    )];
+
+    assert!(record_lacks("lang-markdown", &named).is_empty());
+    assert_eq!(record_lacks("lang-markdown", "## ENG-29 record\n"), lacks);
+    assert_eq!(record_lacks("lang-markdown", &format!("`{RECORD}`")), lacks);
+}
+
+#[test]
+fn a_bundle_context_for_a_guarded_change_on_the_checkout_names_its_record() {
+    let work = TempDir::new().unwrap();
+
+    let problems = record_problems(&Checkout::new(&testkit::repo_root()), work.path());
+
+    assert!(problems.is_empty(), "{problems:?}");
+}
+
+#[test]
+fn a_record_check_whose_bundle_did_not_run_is_named() {
+    let work = TempDir::new().unwrap();
+
+    let problems = record_problems(
+        &Checkout::new(&work.path().join("none")),
+        &work.path().join("out"),
+    );
+
+    assert!(
+        problems[0].starts_with("review-bundle exited "),
+        "{problems:?}"
+    );
+}
+
+/// The context file the record check reads under `out`.
+fn record_context(out: &Path) -> std::path::PathBuf {
+    out.join(format!("{CONTEXTS}/{}.md", CONTEXT.0))
+}
+
+#[test]
+fn a_context_the_bundle_did_not_write_is_named_by_its_path() {
+    let work = TempDir::new().unwrap();
+
+    let problems = record_in(work.path());
+
+    let file = record_context(work.path());
+    assert_eq!(problems.len(), 1, "{problems:?}");
+    assert!(
+        problems[0].starts_with(&format!("read {}: ", file.display())),
+        "{problems:?}"
+    );
+}
+
+#[test]
+fn the_record_check_reads_what_the_bundle_wrote_for_a_change_to_the_invariants_and_the_record() {
+    let work = TempDir::new().unwrap();
+    let file = record_context(work.path());
+    let lacks = [format!(
+        "the context for {} lacks the ENG-29 record {RECORD}",
+        CONTEXT.0
+    )];
+    let writes = |context: String| {
+        let file = file.clone();
+        move |diff: &str| {
+            assert!(diff.contains(INVARIANTS), "{diff}");
+            assert!(diff.contains(RECORD), "{diff}");
+            fs::create_dir_all(file.parent().unwrap()).unwrap();
+            fs::write(&file, context).unwrap();
+            Ok(String::new())
+        }
+    };
+
+    assert_eq!(
+        record_problems_of(work.path(), writes("## Dispatch\n".to_owned())),
+        lacks
+    );
+    assert!(
+        record_problems_of(
+            work.path(),
+            writes(format!("## ENG-29 record\n\n`{RECORD}`\n"))
+        )
+        .is_empty()
+    );
+    assert_eq!(
+        record_problems_of(work.path(), |_| Err(vec!["it did not run".to_owned()])),
+        ["it did not run"]
+    );
+}
+
+#[test]
+fn a_written_context_that_leaves_the_record_out_is_named() {
+    let work = TempDir::new().unwrap();
+    let file = record_context(work.path());
+    fs::create_dir_all(file.parent().unwrap()).unwrap();
+    fs::write(&file, "## Dispatch\n").unwrap();
+
+    assert_eq!(
+        record_in(work.path()),
+        [format!(
+            "the context for {} lacks the ENG-29 record {RECORD}",
+            CONTEXT.0
+        )]
+    );
+}
+
+#[test]
 fn a_file_the_bundle_did_not_write_is_named() {
     let work = TempDir::new().unwrap();
 

@@ -118,10 +118,18 @@ outcome: findings — the tally has no integration test
 [expect]
 nits = 10
 
+# The finding that restates clippy is known by its place and its source,
+# which the weighing's form fixes, not by a word of the generalist's own
+# reason: lang-rust reported it at line 28, and no other finding of
+# lang-rust is there.
 [[expect.dropped]]
 path = "tooling/review-bundle/src/tally.rs"
-mentions = ["clippy"]
+line = 28
+within = 0
+source = "lang-rust"
 
 [[expect.none]]
 path = "tooling/review-bundle/src/tally.rs"
-mentions = ["clippy"]
+line = 28
+within = 0
+source = "lang-rust"

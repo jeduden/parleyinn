@@ -9,8 +9,9 @@
 use super::case;
 use crate::{Case, Injection, cargo_lib_test};
 
-/// The mutations of the prompt and the context, each run through the
-/// check that runs `review-run` and the bundle.
+/// The mutations of the prompt and the context, and of the record the
+/// context names, each run through the check that runs `review-run` and
+/// the bundle.
 pub(super) fn review_context_cases() -> Vec<Case> {
     const RUNNER: &str = "tooling/review-eval/src/runner.rs";
     let check = || {
@@ -50,6 +51,17 @@ pub(super) fn review_context_cases() -> Vec<Case> {
             "a specialist's prompt not telling it to leave the bundle unread",
             "ENG-28",
             Injection::replace(RUNNER, "your files; never \\\n", "your files; see \\\n"),
+            check(),
+            want,
+        ),
+        case(
+            "a specialist's context leaving out the ENG-29 record the change lands with",
+            "ENG-28",
+            Injection::replace(
+                "tooling/review-bundle/src/render.rs",
+                "\\n## ENG-29 record\\n",
+                "\\n## Record\\n",
+            ),
             check(),
             want,
         ),
