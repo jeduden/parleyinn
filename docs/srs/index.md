@@ -127,7 +127,7 @@ row: "- [{title}]({filename}) — {summary}"
 - [10.5 The review](10a-review-requirements.md) — The review (ENG-28) and its evaluation (ENG-32). Part of §10.
 - [11. Verification and acceptance](11-verification-and-acceptance.md) — The evaluation plan with baselines and acceptance targets, and the definition of done for v1.0.
 - [12. Delivery plan](12-delivery-plan.md) — Milestone M0 spikes S1–S13 and milestones M1–M9 with their scope and exit criteria; what freezes each initial target.
-- [13. Open questions and risks](13-open-questions-and-risks.md) — Open questions OQ-01..56 and OQ-58 with their resolution path, and the risk register with mitigations.
+- [13. Open questions and risks](13-open-questions-and-risks.md) — Open questions OQ-01..58 with their resolution path, and the risk register with mitigations.
 - [14. References](14-references.md) — The papers, issues, and standards the specification cites.
 - [Appendix A — Concern traceability](appendix-a-concern-traceability.md) — Every concern raised during research and review, mapped to the requirements that answer it.
 - [Appendix B — Invariant coverage](appendix-b-invariant-coverage.md) — Which requirements serve each invariant, generated from the Traces column of §5–§6, plus the requirement count by priority. A gate test keeps both in step with the tables.

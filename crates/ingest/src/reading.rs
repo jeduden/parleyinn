@@ -11,12 +11,13 @@ use administration::node::Node;
 use key::certificate::SeatCertificate;
 use key::random::{Entropy, draw};
 use record::commitment::CommitmentKey;
-use record::digest::{Digest, Running};
+use record::digest::Digest;
 use record::event::{EventKind, Provenance};
 use record::id::{Address, WriterId};
 use redaction::Redactor;
 use redaction::account::HarnessAccountIdentifiers;
 use serde_json::{Value, json};
+use store::source::{Zeroed, prefix_digest};
 use store::{Held, IngestedRun, NewEvent, Place, Placed, Position, Source, Store};
 
 use crate::live::RunSeats;
@@ -25,9 +26,23 @@ use crate::prompt::Outcome;
 use crate::read::{self, Line};
 use crate::repeat;
 use crate::run::{Defaults, RunKey};
-use crate::{IngestError, Ingested, Inputs, RunReport};
 
 use self::plan::{Plan, Planner, Read};
+use crate::{IngestError, Ingested, Inputs, RunReport};
+
+/// `redactor`, also redacting the harness account identifiers `lines`
+/// name.
+fn with_account_identifiers(
+    redactor: &Redactor,
+    lines: &[Line<'_>],
+) -> Result<Redactor, IngestError> {
+    let mut ids = HarnessAccountIdentifiers::default();
+    lines.iter().for_each(|l| ids.learn(l.text));
+
+    redactor
+        .with_identifiers(&ids)
+        .map_err(IngestError::Redaction)
+}
 
 /// Who records what an ingest reads, and in which seats.
 pub(crate) enum Recorder<'r> {
@@ -51,15 +66,7 @@ pub(crate) fn ingest(
     entropy: &mut dyn Entropy,
 ) -> Result<Ingested, IngestError> {
     let lines = read::lines(text);
-    let parsed: Vec<Value> = lines
-        .iter()
-        .map(|l| serde_json::from_str(l.text).unwrap_or(Value::Null))
-        .collect();
-    let mut ids = HarnessAccountIdentifiers::default();
-    lines.iter().for_each(|l| ids.learn(l.text));
-    let redactor = redactor
-        .with_identifiers(&ids)
-        .map_err(IngestError::Redaction)?;
+    let redactor = with_account_identifiers(redactor, &lines)?;
     home.create().map_err(IngestError::Admin)?;
     let mut store = open_store(home, inputs)?;
     let node = Node::open(home, &mut store, entropy).map_err(IngestError::Admin)?;
@@ -68,7 +75,12 @@ pub(crate) fn ingest(
     inputs.forks.extend(observed.forks());
     let inputs = &inputs;
     let named = Named::of(path, &redactor);
-    let resume = Resume::find(&mut store, &named, text.as_bytes(), &lines, &redactor)?;
+    let live = matches!(recorder, Recorder::Live(_));
+    let resume = Resume::find(&mut store, &named, text.as_bytes(), &lines, &redactor, live)?;
+    let parsed: Vec<Value> = lines
+        .iter()
+        .map(|l| serde_json::from_str(l.text).unwrap_or(Value::Null))
+        .collect();
     let defaults = Defaults::of(path);
     let mut runs = Runs::load(&store, &named.path, recorder)?;
     let own = runs.ensure(&mut store, &node, home, &defaults.own(), entropy)?;
@@ -107,6 +119,8 @@ pub(crate) fn ingest(
         index_gaps,
         index_gaps_unread,
         witnessed_repeats: plan.witnessed_repeats,
+        refused: plan.refused,
+        unchecked: plan.unchecked,
         matched: observations.matched,
         prompt_conflicts: observations.conflicts,
         not_attended: observations.not_attended,
@@ -211,19 +225,22 @@ impl Resume {
     /// Where to resume the source `named`, whose bytes are `bytes`: past
     /// its position while its consumed prefix stands; else in a new
     /// generation, past the longest prefix equal by content to the
-    /// earlier generation's ingested lines (REC-07).
+    /// earlier generation's ingested lines (REC-07). A `live` ingest
+    /// starts no generation of a source a purge erased a line of that
+    /// kept no `uuid`: it waits for `parinn ingest`.
     fn find(
         store: &mut Store,
         named: &Named,
         bytes: &[u8],
         lines: &[Line<'_>],
         redactor: &Redactor,
+        live: bool,
     ) -> Result<Self, IngestError> {
         let Some(source) = store.source(&named.path)? else {
             let source = store.start_generation(&named.path, &named.directory)?;
             return Ok(Self::at(source, 0, lines, bytes, false));
         };
-        if continues(&source.position, bytes) {
+        if continues(&source, bytes) {
             let offset = source.position.offset;
             let index = lines
                 .iter()
@@ -239,10 +256,15 @@ impl Resume {
         }
         // Bytes read before another ingest moved the position past their
         // end are no rewrite: the source only grew since (REC-06).
-        if behind(&source.position, bytes, Path::new(&named.path)) {
+        if behind(&source, bytes, Path::new(&named.path)) {
             return Err(IngestError::Store(store::StoreError::PositionMoved {
                 source: source.id,
             }));
+        }
+        if live && store.purged_without_uuid(&named.path)? {
+            return Err(IngestError::Waits {
+                name: named.name.clone(),
+            });
         }
         let earlier = earlier_texts(store, &named.path)?;
         let same = lines
@@ -290,20 +312,20 @@ fn as_index(offset: u64) -> usize {
     usize::try_from(offset).unwrap_or(usize::MAX)
 }
 
-/// Whether `bytes` still begin with the prefix `position` consumed.
-fn continues(position: &Position, bytes: &[u8]) -> bool {
-    bytes
-        .get(..as_index(position.offset))
-        .is_some_and(|prefix| Digest::of(&[prefix]) == position.prefix)
+/// Whether `bytes` still begin with the prefix `source`'s position
+/// consumed, the bytes of each purged line zeroed (SEC-31, REC-07).
+fn continues(source: &Source, bytes: &[u8]) -> bool {
+    prefix_digest(bytes, source.position.offset, &source.purged)
+        .is_some_and(|digest| digest == source.position.prefix)
 }
 
-/// Whether `bytes`, which end before `position`, were read before another
-/// ingest moved it: the source at `path` now reads on from the prefix
-/// `position` consumed. A source that cannot be read again, or that no
-/// longer holds that prefix, was rewritten: REC-07's.
-fn behind(position: &Position, bytes: &[u8], path: &Path) -> bool {
-    bytes.len() < as_index(position.offset)
-        && read::transcript(path).is_ok_and(|now| continues(position, &now))
+/// Whether `bytes`, which end before `source`'s position, were read
+/// before another ingest moved it: the source at `path` now reads on
+/// from the prefix its position consumed. A source that cannot be read
+/// again, or that no longer holds that prefix, was rewritten: REC-07's.
+fn behind(source: &Source, bytes: &[u8], path: &Path) -> bool {
+    bytes.len() < as_index(source.position.offset)
+        && read::transcript(path).is_ok_and(|now| continues(source, &now))
 }
 
 /// The redacted lines the newest generation of the source at `path`
@@ -489,7 +511,8 @@ fn append(
     entropy: &mut dyn Entropy,
 ) -> Result<Landed, IngestError> {
     let seen = bytes.len() as u64;
-    let mut running = Running::default();
+    let purged = zeroed_spans(resume, plan);
+    let mut running = Zeroed::new(&purged);
     running.update(
         bytes
             .get(..as_index(resume.position.offset))
@@ -515,10 +538,13 @@ fn append(
     for range in transactions(&plan.ends, &starts) {
         let (writer, _, end) = plan.ends[range.end - 1];
         let first = plan.places[range.start].offset;
+        let from = position.offset;
         observing.flush(store, Some(first), entropy)?;
+        // From the position, so a line refused before this one is part
+        // of the prefix.
         running.update(
             bytes
-                .get(as_index(first)..as_index(end))
+                .get(as_index(position.offset)..as_index(end))
                 .unwrap_or_default(),
         );
         position = Position {
@@ -527,13 +553,14 @@ fn append(
             lines: plan.places[range.end - 1].line,
             seen,
         };
-        let appended = store.append_lines(
+        let appended = store.append_lines_refusing(
             writer,
             &plan.events[range.clone()],
             &plan.places[range.clone()],
             &closes[range.clone()],
             resume.source.id,
             &position,
+            refused_from(&plan.refused_places, from, end),
         );
         addresses.extend(appended.map_err(|source| IngestError::Partial {
             writer,
@@ -543,7 +570,24 @@ fn append(
         })?);
         landed += range.len();
     }
-    store.advance(resume.source.id, &position)?;
+    // A refusal no recorded line follows still moves the position, or
+    // the next read would refuse it again.
+    let tail = position.offset;
+    if let Some((line, end)) = plan.refused_to.filter(|(_, end)| *end > position.offset) {
+        running.update(
+            bytes
+                .get(as_index(position.offset)..as_index(end))
+                .unwrap_or_default(),
+        );
+        position = Position {
+            offset: end,
+            prefix: running.digest(),
+            lines: line,
+            seen,
+        };
+    }
+    let refused = refused_from(&plan.refused_places, tail, u64::MAX);
+    advance(store, resume.source.id, &position, refused)?;
     observing.flush(store, Some(position.offset), entropy)?;
 
     Ok(Landed {
@@ -551,6 +595,47 @@ fn append(
         addresses,
         observations: observing.appended,
     })
+}
+
+/// The refused copies, in offset order, that start in `from..to`: the
+/// ones a transaction ending at `to` takes, so none is passed to a
+/// transaction past the position that moved beyond it (REC-04).
+fn refused_from(refused: &[Place], from: u64, to: u64) -> &[Place] {
+    let start = refused.partition_point(|p| p.offset < from);
+    let end = refused.partition_point(|p| p.offset < to);
+    refused.get(start..end).unwrap_or_default()
+}
+
+/// The spans of the source whose bytes are zeros in the consumed-prefix
+/// hash: each purged line's, and each refused copy of a purged line's,
+/// which the hash takes as zeros too (SEC-31).
+fn zeroed_spans(resume: &Resume, plan: &Plan) -> Vec<store::source::Span> {
+    let mut spans = resume.source.purged.clone();
+    spans.extend(plan.refused_places.iter().map(|place| store::source::Span {
+        offset: place.offset,
+        length: place.length,
+    }));
+    spans.sort_by_key(|span| (span.offset, span.length));
+    spans.dedup();
+
+    spans
+}
+
+/// Moves the source `id` to `position`, keeping the places of the refused
+/// copies of purged lines `plan` holds when no recorded line did.
+fn advance(
+    store: &mut Store,
+    id: i64,
+    position: &Position,
+    refused: &[Place],
+) -> Result<(), IngestError> {
+    if !refused.is_empty() {
+        store.advance_refusing(id, position, refused)?;
+    } else {
+        store.advance(id, position)?;
+    }
+
+    Ok(())
 }
 
 /// The hook observations a live ingest appends to the main run's run

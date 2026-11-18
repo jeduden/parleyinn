@@ -10,16 +10,39 @@
 //!
 //! The position moves in the same transaction as the events it covers,
 //! so a kill neither drops nor repeats a line.
+//!
+//! A purge keeps each purged line's position and length, and recomputes
+//! the consumed-prefix hash with those bytes zeroed (SEC-31, ADM-07):
+//! ingest, resume and `parinn verify` zero the same spans, so the hash
+//! confirms no guess at the purged bytes and the source still resumes.
 
-use record::digest::Digest;
+use std::collections::{BTreeMap, BTreeSet};
+
+use record::digest::{Digest, Running};
 use record::event::EventKind;
 use record::id::{Address, WriterId};
-use rusqlite::{Connection, OptionalExtension, Transaction, params};
+use rusqlite::{Connection, OptionalExtension, Transaction, TransactionBehavior, params};
 
-use crate::{StoreError, seq_of, sql};
+use crate::{NewEvent, Out, Store, StoreError, seq_of, sql};
 
-/// The tables of transcript sources, their places and ingested runs,
-/// part of the store's schema.
+pub(crate) mod purged;
+pub use purged::Transcripts;
+
+impl Store {
+    /// This store, each ingest marker it leaves, as a generation starts
+    /// or a position moves, recorded as left at `ms`, in milliseconds on
+    /// ingest's clock (ADM-09). The store reads no clock itself.
+    #[must_use]
+    pub fn with_marker_time(mut self, ms: u64) -> Self {
+        self.marker_time = ms;
+        self
+    }
+}
+
+/// The tables of transcript sources, their places, what a purge leaves
+/// of a purged line and ingested runs, part of the store's schema. No
+/// release shipped an earlier layout of them, so none is migrated
+/// (CHANGELOG.md).
 pub(crate) const SCHEMA: &str = "
 CREATE TABLE transcript_sources (
     id INTEGER PRIMARY KEY,
@@ -40,10 +63,21 @@ CREATE TABLE transcript_places (
     source INTEGER NOT NULL,
     line INTEGER NOT NULL,
     byte_offset INTEGER NOT NULL,
+    byte_length INTEGER NOT NULL,
     uuid TEXT,
     UNIQUE (source, line)
 ) STRICT;
 CREATE INDEX transcript_places_uuid ON transcript_places (uuid) WHERE uuid IS NOT NULL;
+CREATE TABLE transcript_purged_copies (
+    source INTEGER NOT NULL,
+    line INTEGER NOT NULL,
+    byte_offset INTEGER NOT NULL,
+    byte_length INTEGER NOT NULL,
+    uuid TEXT,
+    PRIMARY KEY (source, line)
+) STRICT, WITHOUT ROWID;
+CREATE INDEX transcript_purged_copies_uuid
+    ON transcript_purged_copies (uuid);
 CREATE TABLE ingested_runs (
     writer TEXT PRIMARY KEY,
     path TEXT NOT NULL,
@@ -89,6 +123,96 @@ impl Position {
     }
 }
 
+/// The bytes one transcript line takes: where it starts and its length.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Span {
+    pub offset: u64,
+    pub length: u64,
+}
+
+/// A prefix hash that no bytes produce: what a purge leaves of a source
+/// whose file it could not read, or no longer begins with what ingest
+/// consumed, so the hash confirms nothing of the purged bytes (SEC-31).
+/// The source then reads as rewritten.
+#[must_use]
+pub fn unconfirmable() -> Digest {
+    Digest::from_bytes([0; 32])
+}
+
+/// A running SHA-256 of a transcript's bytes, in order from the first,
+/// that takes the bytes of each purged line as zeros: the consumed-prefix
+/// hash as ingest, resume and `parinn verify` compute it (SEC-31).
+pub struct Zeroed<'a> {
+    running: Running,
+    spans: &'a [Span],
+    at: u64,
+}
+
+impl<'a> Zeroed<'a> {
+    /// A hash of nothing yet, zeroing `spans`.
+    #[must_use]
+    pub fn new(spans: &'a [Span]) -> Self {
+        Self {
+            running: Running::default(),
+            spans,
+            at: 0,
+        }
+    }
+
+    /// Takes the next `bytes` of the transcript.
+    pub fn update(&mut self, bytes: &[u8]) {
+        let end = self.at + bytes.len() as u64;
+        let mut from = 0;
+        for span in self.spans {
+            let (start, stop) = (
+                span.offset.max(self.at),
+                (span.offset + span.length).min(end),
+            );
+            if start >= stop {
+                continue;
+            }
+            let (start, stop) = (as_index(start - self.at), as_index(stop - self.at));
+            // A span another overlaps zeroes only what it adds.
+            let start = start.max(from);
+            if start >= stop {
+                continue;
+            }
+            self.running.update(&bytes[from..start]);
+            let mut zeroes = stop - start;
+            const ZEROES: [u8; 4096] = [0; 4096];
+            while zeroes > 0 {
+                let take = zeroes.min(ZEROES.len());
+                self.running.update(&ZEROES[..take]);
+                zeroes -= take;
+            }
+            from = stop;
+        }
+        self.running.update(&bytes[from..]);
+        self.at = end;
+    }
+
+    /// The SHA-256 of the bytes taken.
+    #[must_use]
+    pub fn digest(&self) -> Digest {
+        self.running.digest()
+    }
+}
+
+/// A byte count as an index.
+fn as_index(n: u64) -> usize {
+    usize::try_from(n).unwrap_or(usize::MAX)
+}
+
+/// The consumed-prefix hash of `bytes`'s first `offset`, `spans` zeroed;
+/// none when `bytes` hold fewer (SEC-31, REC-07).
+#[must_use]
+pub fn prefix_digest(bytes: &[u8], offset: u64, spans: &[Span]) -> Option<Digest> {
+    let mut hash = Zeroed::new(spans);
+    hash.update(bytes.get(..as_index(offset))?);
+
+    Some(hash.digest())
+}
+
 /// One generation of a transcript source.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Source {
@@ -100,6 +224,9 @@ pub struct Source {
     /// repeats lines (REC-04).
     pub directory: String,
     pub position: Position,
+    /// The bytes of each purged line, which the prefix hash takes as
+    /// zeros (SEC-31), in offset order.
+    pub purged: Vec<Span>,
     /// When an ingest marker began to hold its repeated lines, in
     /// milliseconds on ingest's clock (REC-04).
     pub held_since: Option<u64>,
@@ -120,8 +247,21 @@ pub struct Place {
     pub line: u64,
     /// The byte offset its line starts at.
     pub offset: u64,
+    /// How many bytes its line takes, its line break included.
+    pub length: u64,
     /// The line's `uuid`, when it carries one.
     pub uuid: Option<String>,
+}
+
+/// What the purged lines of one directory's transcript sources left.
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
+pub struct PurgedLines {
+    /// The harness UUIDs kept: a line that carries one is refused.
+    pub uuids: BTreeSet<String>,
+    /// The byte lengths of the purged lines kept without a UUID. No
+    /// refusal reaches a repeat of one, so an ingest counts a line of
+    /// such a length it records without a `uuid` as unchecked (REC-07).
+    pub lengths_without_uuid: BTreeSet<u64>,
 }
 
 /// An event's place, with its address and kind.
@@ -199,10 +339,48 @@ fn source(row: SourceRow) -> Result<Source, StoreError> {
             lines: count(lines),
             seen: count(seen),
         },
+        purged: Vec::new(),
         held_since: held.map(count),
         lost,
         marked_at: count(marked),
     })
+}
+
+/// The source and bytes of each purged line: what a purge leaves of the
+/// line, and each refused copy of it.
+const PURGED_SPANS: &str = "SELECT source, byte_offset, byte_length FROM transcript_purged_copies";
+
+/// The bytes of each purged line, by source and in offset order: of
+/// source `only` when one is given, of every source otherwise. One
+/// read whatever the number of sources, so listing the sources costs
+/// no read a source.
+fn spans(conn: &Connection, only: Option<i64>) -> Result<BTreeMap<i64, Vec<Span>>, StoreError> {
+    let query = match only {
+        Some(_) => format!("{PURGED_SPANS} WHERE source = ?1"),
+        None => PURGED_SPANS.to_owned(),
+    };
+    let mut spans: BTreeMap<i64, Vec<Span>> = BTreeMap::new();
+    let mut statement = conn.prepare(&query)?;
+    let rows = statement.query_map(rusqlite::params_from_iter(only), |r| {
+        Ok((
+            r.get::<_, i64>(0)?,
+            r.get::<_, i64>(1)?,
+            r.get::<_, i64>(2)?,
+        ))
+    })?;
+    for row in rows {
+        let (source, offset, length) = row?;
+        spans.entry(source).or_default().push(Span {
+            offset: count(offset),
+            length: count(length),
+        });
+    }
+    for of_source in spans.values_mut() {
+        of_source.sort_by_key(|span| (span.offset, span.length));
+        of_source.dedup();
+    }
+
+    Ok(spans)
 }
 
 /// The sources `filter` selects, `?1` being `arg`.
@@ -229,7 +407,21 @@ pub(crate) fn select(
     })?;
     let rows: Vec<SourceRow> = rows.collect::<Result<_, _>>()?;
 
-    rows.into_iter().map(source).collect()
+    let mut sources = rows
+        .into_iter()
+        .map(source)
+        .collect::<Result<Vec<_>, _>>()?;
+    let only = match sources.as_slice() {
+        [] => return Ok(sources),
+        [one] => Some(one.id),
+        _ => None,
+    };
+    let mut spans = spans(conn, only)?;
+    for source in &mut sources {
+        source.purged = spans.remove(&source.id).unwrap_or_default();
+    }
+
+    Ok(sources)
 }
 
 /// The newest generation of each source `filter` selects.
@@ -269,6 +461,7 @@ pub(crate) fn start(
         generation: count(generation),
         directory: directory.to_owned(),
         position,
+        purged: Vec::new(),
         held_since: None,
         lost: false,
         marked_at: at,
@@ -339,8 +532,8 @@ pub(crate) fn place(
     places: &[Place],
 ) -> Result<(), StoreError> {
     let mut insert = tx.prepare(
-        "INSERT INTO transcript_places (event, source, line, byte_offset, uuid)
-         VALUES ((SELECT rowid FROM events WHERE writer = ?1 AND seq = ?2), ?3, ?4, ?5, ?6)",
+        "INSERT INTO transcript_places (event, source, line, byte_offset, byte_length, uuid)
+         VALUES ((SELECT rowid FROM events WHERE writer = ?1 AND seq = ?2), ?3, ?4, ?5, ?6, ?7)",
     )?;
     for (address, place) in addresses.iter().zip(places) {
         let inserted = insert.execute(params![
@@ -349,6 +542,7 @@ pub(crate) fn place(
             id,
             sql_count(place.line),
             sql_count(place.offset),
+            sql_count(place.length),
             place.uuid
         ]);
         inserted?;
@@ -357,10 +551,180 @@ pub(crate) fn place(
     Ok(())
 }
 
+/// Keeps the positions, lengths and harness UUIDs of refused copies of
+/// purged lines. Their bytes are zeroed in the source's consumed-prefix
+/// hash, so the record keeps nothing derived from their content (REC-04,
+/// SEC-31).
+pub(crate) fn refuse_copies(
+    conn: &Connection,
+    id: i64,
+    places: &[Place],
+) -> Result<(), StoreError> {
+    if places.is_empty() {
+        return Ok(());
+    }
+    // A line of this source already kept, by a purge or an earlier read
+    // of the same transcript generation, keeps what it has: a line's
+    // place does not change within a generation, so nothing is lost.
+    let mut insert = conn.prepare(
+        "INSERT OR IGNORE INTO transcript_purged_copies
+             (source, line, byte_offset, byte_length, uuid)
+         VALUES (?1, ?2, ?3, ?4, ?5)",
+    )?;
+    for place in places {
+        insert.execute(params![
+            id,
+            sql_count(place.line),
+            sql_count(place.offset),
+            sql_count(place.length),
+            place.uuid
+        ])?;
+    }
+
+    Ok(())
+}
+
+impl Store {
+    /// The position, length and harness UUID left for each purged line
+    /// of source `id`, with no event association (SEC-31).
+    pub fn purged_places(&self, id: i64) -> Result<Vec<Place>, StoreError> {
+        purged_places(&self.conn, id)
+    }
+
+    /// Whether a transcript source other than the one at `path` lies in
+    /// the transcript directory `directory`: one read, whatever the
+    /// number of sources.
+    ///
+    /// # Errors
+    ///
+    /// Fails when SQLite does.
+    pub fn shares_directory(&self, directory: &str, path: &str) -> Result<bool, StoreError> {
+        let query = "SELECT EXISTS (SELECT 1 FROM transcript_sources
+                                    WHERE directory = ?1 AND path != ?2)";
+        let shares = self.conn.query_row(query, [directory, path], |r| r.get(0));
+
+        Ok(shares?)
+    }
+
+    /// Whether a purge erased a line of the source at `path`, in any of
+    /// its generations, that kept no `uuid`: one a new generation cannot
+    /// refuse (REC-07).
+    pub fn purged_without_uuid(&self, path: &str) -> Result<bool, StoreError> {
+        let query = "SELECT EXISTS (SELECT 1 FROM transcript_purged_copies p
+                                    JOIN transcript_sources s ON s.id = p.source
+                                    WHERE s.path = ?1 AND p.uuid IS NULL)";
+
+        Ok(self
+            .conn
+            .query_row(query, [path], |row| row.get::<_, bool>(0))?)
+    }
+
+    /// What the purged lines in any transcript source of `directory`
+    /// left, an earlier generation of a rewritten transcript included,
+    /// read once for an ingest to test in memory (REC-04, REC-07,
+    /// SEC-31).
+    pub fn purged_lines(&self, directory: &str) -> Result<PurgedLines, StoreError> {
+        purged_lines(&self.conn, directory)
+    }
+
+    /// Appends transcript lines and atomically keeps the positions of
+    /// refused copies of purged lines which the new position crosses.
+    /// The copies' bytes are zeroed in the position's hash (REC-04,
+    /// SEC-31).
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "the appended lines and refused copies share one source position transaction"
+    )]
+    pub fn append_lines_refusing(
+        &mut self,
+        writer: WriterId,
+        new_events: &[NewEvent],
+        places: &[Place],
+        closes: &[bool],
+        id: i64,
+        position: &Position,
+        refused: &[Place],
+    ) -> Result<Vec<Address>, StoreError> {
+        let to = Out {
+            payloads: &self.payloads,
+            threshold: self.threshold,
+        };
+        let tx = self
+            .conn
+            .transaction_with_behavior(TransactionBehavior::Immediate)?;
+        let first = places
+            .first()
+            .into_iter()
+            .chain(refused.first())
+            .map(|p| p.offset)
+            .min()
+            .unwrap_or(position.offset);
+        if offset(&tx, id)? > first {
+            return Err(StoreError::PositionMoved { source: id });
+        }
+        let mut out = Vec::with_capacity(new_events.len());
+        let mut start = 0;
+        for i in 0..new_events.len() {
+            let close = closes.get(i).copied().unwrap_or(false);
+            if close || i + 1 == new_events.len() {
+                out.extend(to.append_chunk(&tx, writer, &new_events[start..=i], close)?);
+                start = i + 1;
+            }
+        }
+        refuse_copies(&tx, id, refused)?;
+        place(&tx, id, &out, places)?;
+        advance(&tx, id, position, self.marker_time)?;
+        tx.commit()?;
+
+        Ok(out)
+    }
+
+    /// Moves a source past refused copies of purged lines, keeping their
+    /// positions and zeroed hash in one transaction (REC-04, SEC-31).
+    pub fn advance_refusing(
+        &mut self,
+        id: i64,
+        position: &Position,
+        refused: &[Place],
+    ) -> Result<(), StoreError> {
+        let tx = self
+            .conn
+            .transaction_with_behavior(TransactionBehavior::Immediate)?;
+        let first = refused.first().map_or(position.offset, |p| p.offset);
+        if offset(&tx, id)? > first {
+            return Err(StoreError::PositionMoved { source: id });
+        }
+        refuse_copies(&tx, id, refused)?;
+        advance(&tx, id, position, self.marker_time)?;
+        tx.commit()?;
+
+        Ok(())
+    }
+}
+
+/// The allowed residue of each purged line of source `id`, in line
+/// order.
+fn purged_places(conn: &Connection, id: i64) -> Result<Vec<Place>, StoreError> {
+    let mut statement = conn.prepare(
+        "SELECT line, byte_offset, byte_length, uuid FROM transcript_purged_copies
+         WHERE source = ?1 ORDER BY line",
+    )?;
+    let rows = statement.query_map([id], |row| {
+        Ok(Place {
+            line: count(row.get::<_, i64>(0)?),
+            offset: count(row.get::<_, i64>(1)?),
+            length: count(row.get::<_, i64>(2)?),
+            uuid: row.get(3)?,
+        })
+    })?;
+
+    Ok(rows.collect::<Result<_, _>>()?)
+}
+
 /// The events of source `id`, in line order.
 pub(crate) fn placed(conn: &Connection, id: i64) -> Result<Vec<Placed>, StoreError> {
     let statement = conn.prepare(
-        "SELECT p.line, p.byte_offset, p.uuid, e.writer, e.seq, e.kind
+        "SELECT p.line, p.byte_offset, p.byte_length, p.uuid, e.writer, e.seq, e.kind
          FROM transcript_places p JOIN events e ON e.rowid = p.event
          WHERE p.source = ?1 ORDER BY p.line",
     );
@@ -369,18 +733,20 @@ pub(crate) fn placed(conn: &Connection, id: i64) -> Result<Vec<Placed>, StoreErr
         Ok((
             r.get::<_, i64>(0)?,
             r.get::<_, i64>(1)?,
-            r.get::<_, Option<String>>(2)?,
-            r.get::<_, String>(3)?,
-            r.get::<_, i64>(4)?,
-            r.get::<_, String>(5)?,
+            r.get::<_, i64>(2)?,
+            r.get::<_, Option<String>>(3)?,
+            r.get::<_, String>(4)?,
+            r.get::<_, i64>(5)?,
+            r.get::<_, String>(6)?,
         ))
     })?;
     rows.map(|row| {
-        let (line, offset, uuid, writer, seq, kind) = row?;
+        let (line, offset, length, uuid, writer, seq, kind) = row?;
         Ok(Placed {
             place: Place {
                 line: count(line),
                 offset: count(offset),
+                length: count(length),
                 uuid,
             },
             address: address(&writer, seq)?,
@@ -425,6 +791,31 @@ pub(crate) fn owner(
         .optional()?;
 
     found.map(|(w, s)| address(&w, s)).transpose()
+}
+
+/// The allowed residue of the purged lines in the transcript sources of
+/// `directory`.
+fn purged_lines(conn: &Connection, directory: &str) -> Result<PurgedLines, StoreError> {
+    let mut found = PurgedLines::default();
+    let mut statement = conn.prepare(
+        "SELECT DISTINCT p.uuid, CASE WHEN p.uuid IS NULL THEN p.byte_length END
+         FROM transcript_purged_copies p
+         JOIN transcript_sources s ON s.id = p.source
+         WHERE s.directory = ?1",
+    )?;
+    let rows = statement.query_map([directory], |row| {
+        Ok((
+            row.get::<_, Option<String>>(0)?,
+            row.get::<_, Option<i64>>(1)?,
+        ))
+    })?;
+    for row in rows {
+        let (uuid, length) = row?;
+        found.uuids.extend(uuid);
+        found.lengths_without_uuid.extend(length.map(count));
+    }
+
+    Ok(found)
 }
 
 /// The ingested runs `filter` selects, `?1` and `?2` being `a` and `b`.

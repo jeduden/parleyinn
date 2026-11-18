@@ -25,7 +25,7 @@ use record::id::{Address, Seq, WriterId};
 use rusqlite::{Connection, TransactionBehavior, params};
 use serde_json::Value;
 
-use crate::{NewEvent, Out, Store, StoreError, search_index, seq_of, sql};
+use crate::{NewEvent, Out, Store, StoreError, search_index, seq_of, source, sql};
 
 /// The journal of what a purge still has to finish.
 pub(crate) const SCHEMA: &str = "
@@ -40,6 +40,12 @@ CREATE TABLE IF NOT EXISTS purge_journal (
 const PAYLOAD: &str = "payload";
 const INDEX: &str = "index";
 const VACUUM: &str = "vacuum";
+/// How many transcript sources a purge could not confirm and no command
+/// has yet audited, as the one row's target: journalled in the purge's
+/// own transaction and cleared only by
+/// [`unconfirmed_audited`](Store::unconfirmed_audited), so neither a
+/// finishing step nor an audit that fails loses the count (SEC-31, I6).
+const UNCONFIRMED: &str = "unconfirmed";
 
 /// A range of one writer's events to erase.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -86,8 +92,10 @@ impl Store {
     ///
     /// Fails, erasing and recording nothing, when SQLite does or an
     /// event of `record` has no canonical encoding. The finishing steps
-    /// that fail afterwards stay journalled: the error is returned, the
-    /// erasure stands.
+    /// that fail afterwards stay journalled: the error is returned and
+    /// the erasure stands. The count of transcript sources the purge
+    /// could not confirm stays journalled either way, until a command
+    /// has audited it ([`unconfirmed`](Self::unconfirmed)).
     pub fn purge(
         &mut self,
         device: WriterId,
@@ -99,6 +107,7 @@ impl Store {
             threshold: self.threshold,
         };
         secure_delete(&self.conn)?;
+        let (rehashes, unconfirmed) = source::purged::plan(&self.conn, ranges, self.transcripts)?;
         let tx = self
             .conn
             .transaction_with_behavior(TransactionBehavior::Immediate)?;
@@ -106,13 +115,16 @@ impl Store {
         let mut events = 0;
         for range in ranges {
             events += erase(&tx, range)?;
+            source::purged::mark(&tx, range)?;
         }
+        source::purged::apply(&tx, &rehashes)?;
         let appended = if record.is_empty() {
             Vec::new()
         } else {
             to.append_chunk(&tx, device, record, true)?
         };
         journal(&tx, VACUUM, "")?;
+        journal_unconfirmed(&tx, unconfirmed)?;
         tx.commit()?;
         let finished = self.finish_purge()?;
 
@@ -125,9 +137,10 @@ impl Store {
 
     /// Finishes what a purge journalled and a crash may have cut short:
     /// the search index's postings of the erased events, the payload
-    /// files, then the checkpoint and the vacuum. Nothing is left once
+    /// files, then the checkpoint and the vacuum. No step is left once
     /// it returns [`Finished::vacuumed`], and a store that never purged
-    /// has nothing to finish.
+    /// has nothing to finish. The count of
+    /// [`unconfirmed`](Self::unconfirmed) sources is not its to clear.
     ///
     /// # Errors
     ///
@@ -140,16 +153,68 @@ impl Store {
                 ..Finished::default()
             });
         }
-        let mut done = Finished::default();
-        done.postings = self.finish_postings()?;
-        done.payloads = self.finish_payloads()?;
-        done.vacuumed = self.finish_vacuum()?;
-        done.nothing = done.postings == 0 && done.payloads == 0 && !done.vacuumed;
+        let postings = self.finish_postings()?;
+        let payloads = self.finish_payloads()?;
+        let vacuumed = self.finish_vacuum()?;
+        // A count that does not parse fails the finish, so the journal's
+        // damage is audited as residue, but only once the erased events'
+        // residue is cleared (SEC-31). The count itself stays: only the
+        // command that audited it clears it.
+        unconfirmed(&self.conn)?;
 
-        Ok(done)
+        Ok(Finished {
+            payloads,
+            postings,
+            vacuumed,
+            nothing: postings == 0 && payloads == 0 && !vacuumed,
+        })
     }
 
-    /// Whether a purge has steps still to finish.
+    /// How many transcript sources a purge could not read to recompute
+    /// their consumed-prefix hash, which then confirms nothing, and no
+    /// command has yet audited (SEC-31, I6): those of every purge since
+    /// the last [`unconfirmed_audited`](Self::unconfirmed_audited).
+    ///
+    /// # Errors
+    ///
+    /// Fails when SQLite does or the journalled count does not parse.
+    pub fn unconfirmed(&self) -> Result<u64, StoreError> {
+        if !has_journal(&self.conn)? {
+            return Ok(0);
+        }
+
+        unconfirmed(&self.conn)
+    }
+
+    /// Takes `audited` off the journalled count of
+    /// [`unconfirmed`](Self::unconfirmed) sources, once the audit log
+    /// holds an entry for each. A command that fails or is killed
+    /// between its audit and this call leaves them journalled, and the
+    /// next audits them again: an unconfirmed source is audited at least
+    /// once, never lost (I6).
+    ///
+    /// # Errors
+    ///
+    /// Fails, leaving the count as it was, when SQLite does or the
+    /// journalled count does not parse.
+    pub fn unconfirmed_audited(&mut self, audited: u64) -> Result<(), StoreError> {
+        if audited == 0 {
+            return Ok(());
+        }
+        let tx = self
+            .conn
+            .transaction_with_behavior(TransactionBehavior::Immediate)?;
+        let left = unconfirmed(&tx)?.saturating_sub(audited);
+        tx.execute(CLEAR_KIND, [UNCONFIRMED])?;
+        if left > 0 {
+            journal(&tx, UNCONFIRMED, &left.to_string())?;
+        }
+
+        Ok(tx.commit()?)
+    }
+
+    /// Whether a purge has steps still to finish, or sources it could
+    /// not confirm still to audit.
     ///
     /// # Errors
     ///
@@ -268,6 +333,33 @@ fn journal(conn: &Connection, kind: &str, target: &str) -> Result<(), StoreError
     conn.execute(JOURNAL_ROW, params![kind, target])?;
 
     Ok(())
+}
+
+/// Adds `count` to the journalled count of transcript sources no purge
+/// could confirm.
+fn journal_unconfirmed(conn: &Connection, count: u64) -> Result<(), StoreError> {
+    if count == 0 {
+        return Ok(());
+    }
+    let total = unconfirmed(conn)? + count;
+    conn.execute(CLEAR_KIND, [UNCONFIRMED])?;
+
+    journal(conn, UNCONFIRMED, &total.to_string())
+}
+
+/// The journalled count of transcript sources no purge could confirm.
+/// A count that does not parse is the journal damaged, never a zero
+/// (I6).
+fn unconfirmed(conn: &Connection) -> Result<u64, StoreError> {
+    let mut total = 0;
+    for (_, count) in journalled(conn, UNCONFIRMED)? {
+        total += count.parse::<u64>().map_err(|_| StoreError::Corrupt {
+            address: None,
+            what: format!("journalled count of unconfirmed sources {count:?}"),
+        })?;
+    }
+
+    Ok(total)
 }
 
 /// The journalled targets of `kind`, with their ids, oldest first.

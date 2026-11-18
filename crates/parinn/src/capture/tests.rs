@@ -62,6 +62,7 @@ impl Fixture {
             sessions: Vec::new(),
             transcripts: BTreeMap::new(),
             refused: BTreeSet::new(),
+            waiting: BTreeSet::new(),
             marker: None,
             closed: now_instant(),
             close_every: SEGMENT_EVERY,
@@ -812,4 +813,108 @@ fn a_marker_link_or_fifo_is_neither_followed_nor_waited_on() {
 
     assert_eq!(answer.expect("served waited on a FIFO marker"), [f.main()]);
     drop(marker);
+}
+
+#[test]
+fn each_refused_repeated_line_is_counted_by_the_live_ingest() {
+    let f = Fixture::new();
+    let other = f.projects().join("other.jsonl");
+    std::fs::write(&other, line(1, None)).unwrap();
+    let mut ingested = ingest::ingest_path(
+        &f.home,
+        &other,
+        &Redactor::new(&[]).unwrap().0,
+        &mut OsEntropy,
+    )
+    .unwrap();
+    ingested.refused = 2;
+
+    f.running(None, None).audit_ingested(&ingested);
+
+    assert_eq!(
+        f.counted(),
+        ["repeat_of_purged_refused", "repeat_of_purged_refused"]
+    );
+}
+
+#[test]
+fn each_line_unchecked_against_purged_lines_is_counted_by_the_live_ingest() {
+    let f = Fixture::new();
+    let other = f.projects().join("other.jsonl");
+    std::fs::write(&other, line(1, None)).unwrap();
+    let mut ingested = ingest::ingest_path(
+        &f.home,
+        &other,
+        &Redactor::new(&[]).unwrap().0,
+        &mut OsEntropy,
+    )
+    .unwrap();
+    ingested.unchecked = 1;
+
+    f.running(None, None).audit_ingested(&ingested);
+
+    assert_eq!(f.counted(), ["repeat_of_purged_unchecked"]);
+}
+
+#[test]
+fn a_rewritten_transcript_left_waiting_for_parinn_ingest_is_audited_once_per_wait() {
+    let f = Fixture::new();
+    std::fs::write(f.main(), format!("{}{}", line(1, None), line(22, None))).unwrap();
+    f.bind(SESSION, &f.main(), HARNESS);
+    let mut running = f.running(Some(HARNESS), None);
+    running.bind();
+    running.poll();
+    let (_, writer) = running.seats.runs().remove(0);
+    let mut store = Store::open(&f.home.store())
+        .unwrap()
+        .with_transcripts(ingest::read::transcript);
+    let device = administration::node::Node::find(&f.home, &store)
+        .unwrap()
+        .device_writer();
+    // The session binding's hook observation is the run seat's first
+    // event, so its first transcript line is its second.
+    let second = record::id::Seq::new(2).unwrap();
+    let erase = store::Erase {
+        writer,
+        first: second,
+        last: second,
+    };
+    store.purge(device, &[], &[erase]).unwrap();
+    drop(store);
+    let waits = || {
+        let counted = f.counted();
+        let waits = counted
+            .iter()
+            .filter(|c| *c == "transcript_generation_waits");
+        waits.count()
+    };
+
+    // No line of these keeps a `uuid`, so the purged one cannot be refused.
+    std::fs::write(f.main(), format!("{}{}", line(9, None), line(1, None))).unwrap();
+    running.poll();
+    running.poll();
+
+    assert_eq!(waits(), 1, "one wait, audited once");
+    let entries = Log::new(f.home.audit()).entries().unwrap();
+    let said = entries
+        .iter()
+        .find(|e| e.detail.contains("waits for `parinn ingest`"));
+    assert!(
+        said.is_some_and(|e| e.detail.ends_with(SESSION)),
+        "{entries:?}"
+    );
+
+    let redactor = Redactor::new(&[]).unwrap().0;
+    let by_command = ingest::ingest_path(&f.home, &f.main(), &redactor, &mut OsEntropy).unwrap();
+    assert!(by_command.new_generation);
+    running.poll();
+    assert_eq!(
+        waits(),
+        1,
+        "the generation `parinn ingest` started is read on"
+    );
+
+    std::fs::write(f.main(), format!("{}{}", line(8, None), line(1, None))).unwrap();
+    running.poll();
+    assert_eq!(waits(), 2, "a rewrite after that waits again");
 }

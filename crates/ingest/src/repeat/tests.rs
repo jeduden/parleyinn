@@ -17,6 +17,7 @@ fn owner(fork: bool) -> Owner {
         provenance: Provenance::HarnessText,
         text: LINE.into(),
         fork,
+        purged: false,
     }
 }
 
@@ -94,4 +95,20 @@ fn content_compares_without_the_harness_session_s_fields() {
     assert!(same_content("not json", "not json"));
     assert!(!same_content("not json", LINE));
     assert!(same_content("[1]", "[1]"));
+}
+
+#[test]
+fn a_line_whose_uuid_names_a_purged_event_is_refused() {
+    let purged = Owner {
+        text: String::new(),
+        purged: true,
+        ..owner(false)
+    };
+    for fork in [false, true] {
+        assert_eq!(
+            decide(&facts(Some(purged.clone()), fork), FORKED),
+            Decision::Refused,
+            "fork: {fork}"
+        );
+    }
 }

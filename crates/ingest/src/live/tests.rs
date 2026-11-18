@@ -305,3 +305,155 @@ fn a_transcript_rewritten_shorter_starts_a_new_generation() {
     assert!(rewritten.new_generation);
     assert_eq!((rewritten.generation, rewritten.events), (2, 1));
 }
+
+#[test]
+fn a_witnessed_line_whose_uuid_names_a_purged_event_is_refused() {
+    let dir = TempDir::new().unwrap();
+    let home = home(&dir);
+    let parent = dir.path().join("parent.jsonl");
+    std::fs::write(&parent, line(1)).unwrap();
+    let owner = crate::ingest_path(&home, &parent, &redactor(), &mut OsEntropy).unwrap();
+    let mut store = Store::open(&home.store()).unwrap();
+    let device = administration::node::Node::find(&home, &store)
+        .unwrap()
+        .device_writer();
+    let erase = store::Erase {
+        writer: owner.writer,
+        first: record::id::Seq::FIRST,
+        last: record::id::Seq::FIRST,
+    };
+    store.purge(device, &[], &[erase]).unwrap();
+    let path = main_transcript(&dir, &format!("{}{}", line(1), line(2)));
+    let mut seats = RunSeats::default();
+
+    let ingested = ingest(&home, &path, &mut seats, None).unwrap();
+
+    assert_eq!((ingested.refused, ingested.events), (1, 1));
+    assert_eq!(ingested.witnessed_repeats, 0);
+}
+
+#[test]
+fn a_purged_line_of_a_served_transcript_does_not_read_as_a_rewrite() {
+    let dir = TempDir::new().unwrap();
+    let home = home(&dir);
+    let path = main_transcript(&dir, &(1..=3).map(line).collect::<String>());
+    let mut seats = RunSeats::default();
+    let first = ingest(&home, &path, &mut seats, None).unwrap();
+    let mut store = Store::open(&home.store())
+        .unwrap()
+        .with_transcripts(crate::read::transcript);
+    let device = administration::node::Node::find(&home, &store)
+        .unwrap()
+        .device_writer();
+    let second = record::id::Seq::new(2).unwrap();
+    let erase = store::Erase {
+        writer: first.writer,
+        first: second,
+        last: second,
+    };
+    assert_eq!(store.purge(device, &[], &[erase]).unwrap().events, 1);
+    drop(store);
+
+    // The transcript still holds the purged line's bytes: its consumed
+    // prefix matches the stored hash only with those bytes zeroed.
+    assert_eq!(ingest(&home, &path, &mut seats, None), None);
+
+    let mut longer = std::fs::read_to_string(&path).unwrap();
+    longer.push_str(&line(4));
+    std::fs::write(&path, longer).unwrap();
+    let appended = ingest(&home, &path, &mut seats, None).unwrap();
+
+    assert!(!appended.new_generation);
+    assert_eq!((appended.generation, appended.events), (1, 1));
+}
+
+/// Purges the event at `seq` of `writer`, the purge reading each
+/// transcript, so the source's hash still confirms its consumed prefix.
+fn purge_event(home: &Home, writer: WriterId, seq: u64) {
+    let mut store = Store::open(&home.store())
+        .unwrap()
+        .with_transcripts(crate::read::transcript);
+    let device = administration::node::Node::find(home, &store)
+        .unwrap()
+        .device_writer();
+    let seq = record::id::Seq::new(seq).unwrap();
+    let erase = store::Erase {
+        writer,
+        first: seq,
+        last: seq,
+    };
+    assert_eq!(store.purge(device, &[], &[erase]).unwrap().events, 1);
+}
+
+#[test]
+fn a_rewritten_transcript_with_a_purged_line_that_kept_no_uuid_waits_for_parinn_ingest() {
+    let dir = TempDir::new().unwrap();
+    let home = home(&dir);
+    let no_uuid = "{\"type\":\"summary\"}\n";
+    let path = main_transcript(&dir, &format!("{no_uuid}{}", line(2)));
+    let mut seats = RunSeats::default();
+    let first = ingest(&home, &path, &mut seats, None).unwrap();
+    purge_event(&home, first.writer, 1);
+
+    std::fs::write(&path, format!("{}{no_uuid}", line(9))).unwrap();
+    let mut read = || {
+        let inputs = Inputs::default();
+        ingest_live(
+            &home,
+            &path,
+            &redactor(),
+            &inputs,
+            &mut seats,
+            None,
+            &mut OsEntropy,
+        )
+    };
+    let waits = read().unwrap_err();
+
+    assert!(
+        matches!(&waits, IngestError::Waits { name } if name == SESSION),
+        "{waits}"
+    );
+    assert_eq!(
+        waits.to_string(),
+        format!(
+            "the rewritten transcript {SESSION} waits for `parinn ingest`: a purged line of it keeps no `uuid`"
+        )
+    );
+    assert!(std::error::Error::source(&waits).is_none());
+    assert!(
+        matches!(read(), Err(IngestError::Waits { .. })),
+        "it waits on"
+    );
+    let key = path.to_string_lossy().into_owned();
+    let generations = |home: &Home| {
+        Store::open(&home.store())
+            .unwrap()
+            .generations(&key)
+            .unwrap()
+    };
+    assert_eq!(generations(&home).len(), 1, "no generation starts live");
+
+    let by_command = crate::ingest_path(&home, &path, &redactor(), &mut OsEntropy).unwrap();
+
+    assert!(by_command.new_generation);
+    assert_eq!((by_command.events, by_command.unchecked), (2, 1));
+    assert_eq!(generations(&home).len(), 2);
+    assert_eq!(read().unwrap(), None, "the live ingest reads on from there");
+}
+
+#[test]
+fn a_rewritten_transcript_whose_purged_lines_keep_their_uuid_is_ingested_live() {
+    let dir = TempDir::new().unwrap();
+    let home = home(&dir);
+    let path = main_transcript(&dir, &format!("{}{}", line(1), line(2)));
+    let mut seats = RunSeats::default();
+    let first = ingest(&home, &path, &mut seats, None).unwrap();
+    purge_event(&home, first.writer, 1);
+
+    std::fs::write(&path, format!("{}{}", line(9), line(1))).unwrap();
+    let rewritten = ingest(&home, &path, &mut seats, None).unwrap();
+
+    assert!(rewritten.new_generation);
+    assert_eq!((rewritten.refused, rewritten.events), (1, 1));
+}

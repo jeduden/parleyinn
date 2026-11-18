@@ -24,9 +24,9 @@ fn size_list_cases() -> Vec<Case> {
         case(
             "a file past its limit dropped from the size list",
             "ENG-34",
-            Injection::replace(SIZE_LIST, "crates/store/src/lib.rs 2123\n", ""),
+            Injection::replace(SIZE_LIST, "crates/store/src/lib.rs 2116\n", ""),
             scenario("ENG-34"),
-            "crates/store/src/lib.rs holds 2123 lines, past the limit of 1000 for Rust",
+            "crates/store/src/lib.rs holds 2116 lines, past the limit of 1000 for Rust",
         ),
         case(
             "a listed file grown past its listed size",
