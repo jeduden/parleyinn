@@ -360,6 +360,37 @@ fn an_advance_that_refuses_no_copy_moves_the_source_and_keeps_no_residue() {
 }
 
 #[test]
+fn an_append_that_refuses_a_copy_behind_a_position_another_ingest_moved_is_refused_whole() {
+    let dir = TempDir::new().unwrap();
+    let mut store = open(&dir);
+    let source = store.start_generation("/t/a.jsonl", "/t").unwrap();
+    store.advance(source.id, &position(10, 1)).unwrap();
+
+    // Another ingest already read line 1, the copy this one would refuse.
+    let err = store
+        .append_lines_refusing(
+            writer(2),
+            &[event(EventKind::TranscriptLine, 2)],
+            &[place(2, None)],
+            &[true],
+            source.id,
+            &position(20, 2),
+            &[place(1, Some("u1"))],
+        )
+        .unwrap_err();
+
+    assert!(
+        matches!(err, StoreError::PositionMoved { source: id } if id == source.id),
+        "{err}"
+    );
+    assert_eq!(
+        store.source("/t/a.jsonl").unwrap().unwrap().position,
+        position(10, 1)
+    );
+    assert!(store.purged_places(source.id).unwrap().is_empty());
+}
+
+#[test]
 fn a_refused_copy_behind_a_position_another_ingest_moved_is_refused_whole() {
     let dir = TempDir::new().unwrap();
     let mut store = open(&dir);
