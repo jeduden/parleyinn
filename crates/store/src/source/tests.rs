@@ -359,6 +359,56 @@ fn an_advance_that_refuses_no_copy_moves_the_source_and_keeps_no_residue() {
     assert!(store.purged_places(source.id).unwrap().is_empty());
 }
 
+/// REC-04, SEC-31: one transaction records the lines, keeps the place
+/// of the refused copy between them and moves the position, whose hash
+/// the caller computed with the copy's bytes zeroed.
+#[test]
+fn an_append_that_refuses_a_copy_records_its_lines_and_keeps_only_the_copy_s_place() {
+    let dir = TempDir::new().unwrap();
+    let mut store = open(&dir);
+    let source = store.start_generation("/t/a.jsonl", "/t").unwrap();
+    let events = [
+        event(EventKind::TranscriptLine, 1),
+        event(EventKind::TranscriptLine, 3),
+        event(EventKind::TranscriptLine, 4),
+    ];
+    let places = [place(1, Some("u1")), place(3, None), place(4, Some("u4"))];
+    let refused = [place(2, Some("u2"))];
+
+    let out = store
+        .append_lines_refusing(
+            writer(1),
+            &events,
+            &places,
+            &[true, false, true],
+            source.id,
+            &position(40, 4),
+            &refused,
+        )
+        .unwrap();
+
+    let placed = store.placed(source.id).unwrap();
+    let recorded: Vec<(Place, Address)> =
+        placed.into_iter().map(|p| (p.place, p.address)).collect();
+    let expected: Vec<(Place, Address)> = places.iter().cloned().zip(out.iter().copied()).collect();
+    assert_eq!(recorded, expected, "each recorded line keeps its place");
+    assert_eq!(
+        store.log(writer(1)).unwrap().len(),
+        3,
+        "no event of the copy"
+    );
+    assert_eq!(store.purged_places(source.id).unwrap(), refused);
+    let now = store.source("/t/a.jsonl").unwrap().unwrap();
+    assert_eq!(now.position, position(40, 4));
+    let copy = Span {
+        offset: 10,
+        length: 10,
+    };
+    assert_eq!(now.purged, [copy], "the span the position's hash zeroes");
+    let segments = store.segments(writer(1)).unwrap();
+    assert!(segments.len() == 2 && segments.iter().all(|s| s.closed));
+}
+
 #[test]
 fn an_append_that_refuses_a_copy_behind_a_position_another_ingest_moved_is_refused_whole() {
     let dir = TempDir::new().unwrap();
