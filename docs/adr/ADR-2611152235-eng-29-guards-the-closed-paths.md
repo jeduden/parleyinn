@@ -4,10 +4,10 @@ title: "ENG-29 guards the rows that spell out I2 and I4, and itself"
 status: accepted
 summary: >-
   ENG-29's record of a change to ENG-29's own row: the row now also
-  names the requirements that spell out I2's closed write paths and
-  I4's boundaries (INJ-01, INJ-02, INJ-04, INJ-10, OWN-08, OWN-24,
-  OWN-29, SEC-01) and says that a change to ENG-29 itself needs the
-  same record. No invariant's words change. The security reviewer is
+  names every requirement I2 names by id and the one I4's boundaries
+  rest on (PRV-08, INJ-01, INJ-02, INJ-04, INJ-10, OWN-04, OWN-07,
+  OWN-08, OWN-23, OWN-24, OWN-26, OWN-29, SEC-01) and says that a
+  change to ENG-29 itself needs the same record. No invariant's words change. The security reviewer is
   the stakeholder, `jeduden`.
 ---
 # ADR-2611152235: ENG-29 guards the rows that spell out I2 and I4, and itself
@@ -35,14 +35,22 @@ required, it is the stakeholder.
 
 ## Decision
 
-- ENG-29's row also names the requirements that spell out I2's closed
-  paths and I4's boundaries:
+- The rule: ENG-29's row names a requirement when I2's own text names
+  it by id, since its words then decide what I2 means. I2 names these,
+  and ENG-29's row now names each:
+  - when a typed prompt and a hook observation are trusted, PRV-08;
   - the restore blocks, INJ-01, INJ-02 and INJ-04;
   - the opt-in notices, INJ-10;
+  - the fixed templates of OWN-04 and OWN-07;
   - the endorsed post's template, OWN-08;
+  - the delegation and acceptance grants, OWN-23 and OWN-26;
   - the delegated task's template, OWN-24;
-  - the trusted principal's post template, OWN-29;
-  - the network boundaries, SEC-01.
+  - the trusted principal's post template, OWN-29.
+- I4 names no requirement. ENG-29's row names SEC-01, which defines
+  the boundaries B0 to B3 that I4 rests on.
+- PRV-10, which I2 also names, was already marked for I2 review.
+- I3 names INJ-05, which decides when a pin is named by id and not
+  restored. It opens no path to the model and stays out of the row.
 - ENG-29's row says that a change to ENG-29 itself lands the same way.
 - The review bundle reads the guarded requirements from ENG-29's row,
   so its deterministic finding covers the new ids with no change to
@@ -62,7 +70,7 @@ required, it is the stakeholder.
 
 ## Consequences
 
-- A change to one of the eight rows, or to ENG-29's row, needs an
+- A change to one of the thirteen rows, or to ENG-29's row, needs an
   accepted decision record that names ENG-29 and the row, and the
   stakeholder's comment on its pull request. Until both are there the
   review requests changes.

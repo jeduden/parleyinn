@@ -99,7 +99,8 @@ fn the_requirements_eng_29_marks_follow_its_row() {
 #[test]
 fn the_rows_i2_and_i4_rest_on_are_guarded_by_eng_29() {
     for id in [
-        "INJ-01", "INJ-02", "INJ-04", "INJ-10", "OWN-08", "OWN-24", "OWN-29", "SEC-01",
+        "PRV-08", "INJ-01", "INJ-02", "INJ-04", "INJ-10", "OWN-04", "OWN-07", "OWN-08", "OWN-23",
+        "OWN-24", "OWN-26", "OWN-29", "SEC-01",
     ] {
         let base = tree();
         let mut head = tree();
