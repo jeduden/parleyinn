@@ -569,7 +569,8 @@ fn a_journalled_unconfirmed_count_that_does_not_parse_fails_the_finish_and_never
     store
         .conn
         .execute(
-            "INSERT INTO purge_journal (kind, target) VALUES ('unconfirmed', 'three')",
+            "INSERT INTO purge_journal (kind, target)
+             VALUES ('unconfirmed', 'three'), ('vacuum', ''), ('index', 'no range')",
             [],
         )
         .unwrap();
@@ -594,4 +595,13 @@ fn a_journalled_unconfirmed_count_that_does_not_parse_fails_the_finish_and_never
         )
         .unwrap();
     assert_eq!(kept, "three");
+    let steps: i64 = store
+        .conn
+        .query_row(
+            "SELECT count(*) FROM purge_journal WHERE kind != 'unconfirmed'",
+            [],
+            |row| row.get(0),
+        )
+        .unwrap();
+    assert_eq!(steps, 0, "the purge's residue is cleared all the same");
 }

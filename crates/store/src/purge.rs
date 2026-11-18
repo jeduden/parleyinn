@@ -153,13 +153,14 @@ impl Store {
                 ..Finished::default()
             });
         }
-        // A count that does not parse fails the finish, so the journal's
-        // damage is audited as residue. The count itself stays: only the
-        // command that audited it clears it.
-        unconfirmed(&self.conn)?;
         let postings = self.finish_postings()?;
         let payloads = self.finish_payloads()?;
         let vacuumed = self.finish_vacuum()?;
+        // A count that does not parse fails the finish, so the journal's
+        // damage is audited as residue, but only once the erased events'
+        // residue is cleared (SEC-31). The count itself stays: only the
+        // command that audited it clears it.
+        unconfirmed(&self.conn)?;
 
         Ok(Finished {
             payloads,
