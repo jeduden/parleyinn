@@ -193,7 +193,7 @@ fn carry(ctx: &Context, asked: &Asked, stderr: &mut dyn Write) -> Result<String,
         counter: None,
     };
     ctx.audit(&said).map_err(unnoted)?;
-    audit_unconfirmed(ctx, &done.finished);
+    audit_unconfirmed(ctx, store);
     if !done.finished.vacuumed {
         return Err(Failure::Residue);
     }
@@ -285,17 +285,15 @@ fn describe(refusals: &[Refusal], limit: usize) -> String {
 
 /// Finishes a purge a crash or a busy log cut short, when `store`
 /// holds one (ADM-07, SEC-14): the next purge, ingest or rebuild does
-/// it; verify only reports it. The transcript sources that purge could
-/// not confirm are audited and counted here, since its own command
-/// failed before it could (SEC-31). A step that still cannot finish is
-/// audited and counted (I6), and never stops the command that found it
-/// (I9).
+/// it; verify only reports it. The transcript sources a purge could not
+/// confirm, and whose command failed or was killed before it audited
+/// them, are audited and counted here, whether or not the steps finish
+/// (SEC-31). A step that still cannot finish is audited and counted
+/// (I6), and never stops the command that found it (I9).
 pub(crate) fn finish(ctx: &Context, store: &mut Store) {
     let done = store.finish_purge();
     crate::logged("finish a purge", done.as_ref());
-    if let Ok(done) = &done {
-        audit_unconfirmed(ctx, done);
-    }
+    audit_unconfirmed(ctx, store);
     if left_over(&done) {
         audit_residue(ctx);
     }
@@ -310,18 +308,47 @@ fn left_over(done: &Result<store::Finished, store::StoreError>) -> bool {
     }
 }
 
-/// Audits and counts, once each, the transcript sources a purge could
-/// not read to recompute their consumed-prefix hash (SEC-31, I6).
-pub(crate) fn audit_unconfirmed(ctx: &Context, done: &store::Finished) {
-    for _ in 0..done.unconfirmed {
-        let occurrence = Occurrence::Degraded {
-            kind: Kind::Failed,
-            counter: Counter::TranscriptPrefixUnconfirmed,
-            operation: OP,
-            detail: "a purge could not read a transcript; its source's prefix hash confirms nothing",
-        };
-        crate::logged("audit an unconfirmed prefix hash", ctx.audit(&occurrence));
+/// Audits and counts the transcript sources a purge could not read to
+/// recompute their consumed-prefix hash (SEC-31, I6): each one `store`
+/// still journals, which leaves the journal only once the audit log
+/// holds its entry. An entry the audit log refuses stops the pass and
+/// keeps the rest journalled for the next purge, ingest or rebuild, so a
+/// failed or killed command loses none; one killed between its entry
+/// and the journal audits that source again.
+pub(crate) fn audit_unconfirmed(ctx: &Context, store: &mut Store) {
+    let cleared = clear_as_noted(store, &mut || unconfirmed_noted(ctx));
+    crate::logged("clear the audited unconfirmed prefix hashes", cleared);
+}
+
+/// Has `noted` audit one unconfirmed source for each `store` journals,
+/// until it takes none, and takes off the journal as many as it took.
+fn clear_as_noted(
+    store: &mut Store,
+    noted: &mut dyn FnMut() -> bool,
+) -> Result<(), store::StoreError> {
+    let owed = store.unconfirmed()?;
+    let mut audited = 0;
+    while audited < owed && noted() {
+        audited += 1;
     }
+
+    store.unconfirmed_audited(audited)
+}
+
+/// Audits and counts one unconfirmed consumed-prefix hash; whether the
+/// audit log took the entry.
+fn unconfirmed_noted(ctx: &Context) -> bool {
+    let occurrence = Occurrence::Degraded {
+        kind: Kind::Failed,
+        counter: Counter::TranscriptPrefixUnconfirmed,
+        operation: OP,
+        detail: "a purge could not read a transcript; its source's prefix hash confirms nothing",
+    };
+    let noted = ctx.audit(&occurrence);
+    let took = noted.is_ok();
+    crate::logged("audit an unconfirmed prefix hash", noted);
+
+    took
 }
 
 /// Audits and counts the residue a purge left.
@@ -359,4 +386,4 @@ fn residue(ctx: &Context, stderr: &mut dyn Write) -> u8 {
 }
 
 #[cfg(test)]
-mod tests;
+pub(crate) mod tests;

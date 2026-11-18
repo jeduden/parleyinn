@@ -339,7 +339,8 @@ fn a_purge_that_cannot_read_the_transcript_leaves_a_hash_that_confirms_nothing()
         let now = store.source(&path).unwrap().unwrap();
         assert_eq!(now.position.prefix, unconfirmable());
         assert_eq!(now.purged.len(), 1);
-        assert_eq!(purged.finished.unconfirmed, 1);
+        assert!(purged.finished.vacuumed);
+        assert_eq!(store.unconfirmed().unwrap(), 1);
     }
 }
 
@@ -365,17 +366,61 @@ fn the_unconfirmed_count_outlives_a_finishing_step_that_fails() {
         .conn
         .execute("DELETE FROM purge_journal WHERE kind = 'payload'", [])
         .unwrap();
+    assert_eq!(store.unconfirmed().unwrap(), 1, "while the step fails");
     let resumed = store.finish_purge().unwrap();
+    assert!(resumed.vacuumed && !resumed.nothing);
     assert_eq!(
-        resumed.unconfirmed, 1,
-        "the purge that finishes it reports the source it could not confirm"
+        store.unconfirmed().unwrap(),
+        1,
+        "finishing clears no count its caller has yet to audit"
     );
-    assert!(!resumed.nothing);
+}
+
+#[test]
+fn the_unconfirmed_count_is_cleared_only_by_what_was_audited() {
+    let dir = TempDir::new().unwrap();
+    let (mut store, _, _) = ingested(&dir, writer(1), "a.jsonl");
+    assert_eq!(store.unconfirmed().unwrap(), 0, "a store that never purged");
+    store
+        .purge(writer(2), &[], &[range(writer(1), 2, 2)])
+        .unwrap();
+    store
+        .purge(writer(2), &[], &[range(writer(1), 3, 3)])
+        .unwrap();
+    assert_eq!(store.unconfirmed().unwrap(), 2);
+
+    store.unconfirmed_audited(0).unwrap();
     assert_eq!(
-        store.finish_purge().unwrap().unconfirmed,
-        0,
-        "and once only"
+        store.unconfirmed().unwrap(),
+        2,
+        "none audited, none cleared"
     );
+    assert!(store.purge_pending().unwrap(), "the audit is still owed");
+
+    store.unconfirmed_audited(1).unwrap();
+    assert_eq!(store.unconfirmed().unwrap(), 1, "one audited, one owed");
+
+    store.unconfirmed_audited(3).unwrap();
+    assert_eq!(store.unconfirmed().unwrap(), 0);
+    assert!(!store.purge_pending().unwrap());
+    assert!(store.finish_purge().unwrap().nothing);
+}
+
+#[test]
+fn a_count_awaiting_its_audit_alone_is_nothing_left_to_finish() {
+    let dir = TempDir::new().unwrap();
+    let (mut store, _, _) = ingested(&dir, writer(1), "a.jsonl");
+    store
+        .purge(writer(2), &[], &[range(writer(1), 2, 2)])
+        .unwrap();
+
+    let again = store.finish_purge().unwrap();
+
+    assert!(
+        again.nothing && !again.vacuumed,
+        "no step of the purge is left"
+    );
+    assert_eq!(store.unconfirmed().unwrap(), 1);
 }
 
 #[test]
@@ -406,7 +451,8 @@ fn each_purge_adds_the_sources_it_could_not_confirm_to_those_journalled() {
         .conn
         .execute("DELETE FROM purge_journal WHERE kind = 'payload'", [])
         .unwrap();
-    assert_eq!(store.finish_purge().unwrap().unconfirmed, 2);
+    store.finish_purge().unwrap();
+    assert_eq!(store.unconfirmed().unwrap(), 2);
 }
 
 #[test]
@@ -423,7 +469,8 @@ fn a_transcript_that_no_longer_holds_what_was_consumed_confirms_nothing() {
         let now = store.source(&path).unwrap().unwrap();
         assert_eq!(now.position.prefix, unconfirmable());
         assert_eq!(now.purged.len(), 1);
-        assert_eq!(purged.finished.unconfirmed, 1);
+        assert!(purged.finished.vacuumed);
+        assert_eq!(store.unconfirmed().unwrap(), 1);
     }
 }
 
@@ -533,4 +580,18 @@ fn a_journalled_unconfirmed_count_that_does_not_parse_fails_the_finish_and_never
         matches!(&failed, crate::StoreError::Corrupt { address: None, what } if what.contains("\"three\"")),
         "{failed}"
     );
+    assert!(store.unconfirmed().is_err(), "nor reads as a count");
+    assert!(
+        store.unconfirmed_audited(1).is_err(),
+        "nor is cleared as if audited"
+    );
+    let kept: String = store
+        .conn
+        .query_row(
+            "SELECT target FROM purge_journal WHERE kind = 'unconfirmed'",
+            [],
+            |row| row.get(0),
+        )
+        .unwrap();
+    assert_eq!(kept, "three");
 }
