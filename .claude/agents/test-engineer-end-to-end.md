@@ -38,9 +38,9 @@ runs a built executable through `CARGO_BIN_EXE_<name>`.
    inside its network boundary
    ([ENG-12](../../docs/srs/10-engineering-quality.md),
    [I4](../../docs/srs/invariants.md#i4)).
-5. **Few and stable.** An end-to-end test proves what no lower test
-   layer can. It waits on events with deadlines, never sleeps, and
-   fails with the output that explains why.
+5. **Few and stable.** It proves what no lower layer can and fails with the
+   output that explains why. It waits on events with deadlines, never by a
+   sleep ([ENG-03](../../docs/srs/10-engineering-quality.md)).
 6. **Each executable's command line is proven:** its success, its
    usage error and its failure exit codes.
 
@@ -66,8 +66,8 @@ Each component stays inside one declared network boundary, and only the core bui
 ## How you report
 
 At most ten findings, no preamble, each in a form below, never what you checked.
-Its consequence names the check it breaks and the fix: a scenario proving less
-than its requirement, a binding holding logic, or a test escaping isolation.
+The line ends with a dash and its ids, never a comma:
+`crates/x/tests/e2e_a.rs:12 — if not addressed: it sleeps to wait — ENG-03`.
 
 <?include
 file: ../../docs/agents/specialist-outcome.md

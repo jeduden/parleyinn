@@ -39,18 +39,20 @@ summary: >-
   which its own diff does not hold. A generalist states one line a
   place. The grader takes a tail of a file under a wanted module and
   no longer takes an outcome line for a finding.
-- One round of every case on the tree with all of that: 5 of 241 runs
-  failed, each read, and closed where a cause showed. Four more rounds
-  of the 31 section specialists' cases: 2 of 372 runs failed, each on
-  a request that did not hold its form, and none of 21 reads of a
-  section took main's copy.
-- The local review showed one more value worked out. Told to read a
-  long diff's lines 1-120 and 121-220, two specialists counted their
-  offsets from nought and left line 220 unread. The instruction now
-  gives each call's `offset` and `limit`.
+- One round of every case after that: 5 of 241 runs failed, each
+  closed where a cause showed. Four more rounds of the 31 section
+  specialists' cases: 2 of 372 failed, each on a request's form.
+- Two specialists counted a long diff's read offsets from nought and
+  left a line unread. The instruction now gives each call's `offset`
+  and `limit`.
 - #141, #142 and #143 landed the harness first, with one cause more:
   a run's work directory named `main` made agents look for `pr-head/`
   one directory up, refused in 36 of 3,308 runs, 0 of 217 since.
+- CI's first whole evaluation failed 7 of 233 runs. Four named a path
+  the tool refused, which the grader counted as a read of main's tree
+  until #149. Two were `test-engineer-end-to-end` lines off their
+  form; its report section now holds its siblings' sentence on a
+  line's end, and 216 of 216 runs passed since.
 - ENG-28's row and scenario name the ENG-29 record.
 - Three false-alarm cases know the dropped line by its place and
   source, where a word of its reason failed a right drop.
@@ -60,11 +62,10 @@ summary: >-
 ## Next
 
 - What still fails by chance, each about one run in several hundred:
-  a finding or request line that does not hold its form, which the
-  review reads as a blocking finding and a case fails; a request to
-  the author where a finding is due; a reviewer that opens main's copy
-  of a file it was told to read under `pr-head/`; a fair remark on a
-  clean change. The cases are there to catch these.
+  a finding or request line off its form, which the review reads as
+  a blocking finding; a request to the author where a finding is due;
+  a reviewer that opens main's copy of a file it was told to read
+  under `pr-head/`; a fair remark on a clean change.
 - The word `request:` reads as a request to the author, and three
   runs used it that way. Another word for the form is a change to
   ENG-28's report grammar.
