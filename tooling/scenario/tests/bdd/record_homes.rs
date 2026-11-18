@@ -20,7 +20,7 @@ use std::fs;
 use std::path::PathBuf;
 
 use ::record::event::EventKind;
-use ::record::id::WriterId;
+use ::record::id::{Address, WriterId};
 use audit::log::Log;
 use cucumber::{given, then, when};
 use serde_json::{Value, json};
@@ -170,8 +170,8 @@ fn home_ingests(w: &mut World, home: String, first: String, then: String) -> Res
 }
 
 /// The events of the transcript `name` in the current home, in line
-/// order, each with its writer.
-pub fn placed(w: &World, name: &str) -> Result<Vec<(WriterId, EventKind, Value)>, String> {
+/// order, each with its address.
+pub fn placed(w: &World, name: &str) -> Result<Vec<(Address, EventKind, Value)>, String> {
     let path = session_path(w, session(name)?)?;
     let store = store(w)?;
     let mut out = Vec::new();
@@ -184,11 +184,7 @@ pub fn placed(w: &World, name: &str) -> Result<Vec<(WriterId, EventKind, Value)>
                 .event(p.address)
                 .map_err(|e| e.to_string())?
                 .ok_or("a placed event is missing")?;
-            out.push((
-                p.address.writer,
-                p.kind,
-                event.content.unwrap_or(Value::Null),
-            ));
+            out.push((p.address, p.kind, event.content.unwrap_or(Value::Null)));
         }
     }
     Ok(out)
@@ -197,21 +193,7 @@ pub fn placed(w: &World, name: &str) -> Result<Vec<(WriterId, EventKind, Value)>
 /// Fails unless, in the current home, each repeated line is one event
 /// of the parent's run and the fork's run refers to it.
 fn recorded_once(w: &World) -> Result<(), String> {
-    let parent = placed(w, "parent-run")?;
-    let fork = placed(w, "forked-run")?;
-    let parent_writer = parent.first().ok_or("parent-run holds no event")?.0;
-    for (i, (_, kind, content)) in fork.iter().take(REPEATED as usize).enumerate() {
-        let owner = &parent[i];
-        let refers = *kind == EventKind::RepeatReference
-            && owner.0 == parent_writer
-            && content["repeats"].as_str().is_some_and(|a| {
-                a.ends_with(&format!(":{}", i + 1)) || a.contains(&owner.0.to_string())
-            });
-        if !refers {
-            return Err(format!("forked-run's line {} is {kind:?} {content}", i + 1));
-        }
-    }
-    Ok(())
+    owned_by(w, "parent-run", "forked-run")
 }
 
 #[then(
@@ -244,8 +226,8 @@ fn membership(w: &World) -> Result<Value, String> {
     let mut out = BTreeMap::new();
     for (name, _) in SESSIONS {
         let events = placed(w, name)?;
-        if let Some((writer, _, _)) = events.first() {
-            names.insert(writer.to_string(), name);
+        if let Some((address, _, _)) = events.first() {
+            names.insert(address.writer.to_string(), name);
         }
         out.insert(name, events);
     }
@@ -259,9 +241,9 @@ fn membership(w: &World) -> Result<Value, String> {
         .map(|(name, events)| {
             let events = events
                 .into_iter()
-                .map(|(writer, kind, content)| {
+                .map(|(address, kind, content)| {
                     json!({
-                        "writer": rename(writer.to_string()),
+                        "writer": rename(address.writer.to_string()),
                         "kind": kind.as_str(),
                         "content": rename(content.to_string()),
                     })
@@ -344,27 +326,35 @@ fn two_homes_unobserved(w: &mut World, a: String, b: String) -> Result<(), Strin
 pub fn writer_of(w: &World, name: &str) -> Result<WriterId, String> {
     placed(w, name)?
         .first()
-        .map(|(writer, _, _)| *writer)
+        .map(|(address, _, _)| address.writer)
         .ok_or_else(|| format!("{name} holds no event"))
 }
 
 /// Fails unless, in the current home, each repeated line is one event
-/// of the run `owner` and the run `other` records a repeat reference to
-/// its address.
+/// of the run `owner`, in one writer, and the run `other` records for
+/// it a repeat reference to that very event's address, writer and seq
+/// (REC-04): a reference to any other event of the owner's writer
+/// fails.
 fn owned_by(w: &World, owner: &str, other: &str) -> Result<(), String> {
     let held = placed(w, owner)?;
+    let refers = placed(w, other)?;
     let owner_writer = writer_of(w, owner)?;
-    for (i, (_, kind, _)) in held.iter().take(REPEATED as usize).enumerate() {
-        if *kind != EventKind::TranscriptLine {
-            return Err(format!("{owner}'s line {} is {kind:?}", i + 1));
+    for i in 0..REPEATED as usize {
+        let (address, kind, _) = held
+            .get(i)
+            .ok_or_else(|| format!("{owner} holds no line {}", i + 1))?;
+        if *kind != EventKind::TranscriptLine || address.writer != owner_writer {
+            return Err(format!("{owner}'s line {} is {kind:?} at {address}", i + 1));
         }
-    }
-    for (i, (_, kind, content)) in placed(w, other)?.iter().take(REPEATED as usize).enumerate() {
-        let names = content["repeats"]
-            .as_str()
-            .is_some_and(|a| a.contains(&owner_writer.to_string()));
+        let (_, kind, content) = refers
+            .get(i)
+            .ok_or_else(|| format!("{other} holds no line {}", i + 1))?;
+        let names = content["repeats"].as_str() == Some(address.to_string().as_str());
         if *kind != EventKind::RepeatReference || !names {
-            return Err(format!("{other}'s line {} is {kind:?} {content}", i + 1));
+            return Err(format!(
+                "{other}'s line {} is {kind:?} {content}, not a reference to {address}",
+                i + 1
+            ));
         }
     }
     Ok(())
