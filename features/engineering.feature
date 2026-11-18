@@ -363,7 +363,7 @@ Feature: Engineering quality (ENG)
       | request_changes | blocking | none          | current | passed | passed      | all       | given     | none      | unknown id             | REQUEST_CHANGES |
 
   @ENG-29 @P0 @pending
-  Scenario: an invariant or I2-review change lands only with an ADR recording a named security reviewer's approval
+  Scenario: a change ENG-29 guards lands only with an ADR recording a named security reviewer's approval
     Given the repository checkout
     When a change to an invariant, to a requirement ENG-29 names or to ENG-29 itself is proposed
     Then it lands only with an accepted ADR that records a named human security reviewer's approval

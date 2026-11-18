@@ -203,8 +203,8 @@ tag. The stakeholder applies the rulesets on GitHub. The nightly
 or weaker. The workflow's token cannot see a ruleset's bypass actors. A code
 change, the gates and the security-sensitive crates included, lands on one
 approval from a reviewer other than its author, which an agent may give; the
-review class below keeps those deep. A change to an invariant still needs a
-named human security reviewer's ADR (ENG-29).
+review class below keeps those deep. A change to an invariant, or to a row
+ENG-29 names, still needs a named human security reviewer's ADR (ENG-29).
 
 [release.yml](../.github/workflows/release.yml) runs from the Actions
 "Run workflow" button on `main`, with a version like `v0.1.0`. A pushed
@@ -259,7 +259,7 @@ What CI decides, on every pull request:
 What `review-bundle` decides, comparing the pull request with main:
 
 - a scenario live on main deleted or put back on `@pending`: blocking;
-- an invariant, or a row ENG-29 marks for I2 review, changed without
+- an invariant, a row ENG-29 names or ENG-29's own row, changed without
   both an accepted ADR in the same change that names ENG-29 and each
   guarded id, and a comment of the stakeholder on the pull request:
   blocking;

@@ -177,6 +177,7 @@ The review's tooling words are engineering-tooling words too, described in
   its kind's line limit with the lines it holds (ENG-34).
 - **Review outcome**: what a review's agents decided: its verdict, summary and
   findings.
+- **Dispatch**: the agents the review bundle chose for a change.
 - **Specialist report**: what one of the review's specialist agents gives, its
   findings and outcome; neither the run report nor a forge report.
 

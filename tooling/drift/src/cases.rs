@@ -165,6 +165,8 @@ pub fn cases() -> Vec<Case> {
         review_logs::review_log_cases(),
         vec![size_list_growth_case()],
         verdict::review_verdict_cases(),
+        // Late, so adding them moves no earlier case to another shard.
+        eng_29_row_cases(),
         // Last: its cases edit source the later cases would run stale.
         license_text_cases(),
     ]
