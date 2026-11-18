@@ -11,7 +11,7 @@ summary: >-
 ---
 # ADR-2610262245: Layered agent review
 
-> Superseded in part by [ENG-28](../srs/10-engineering-quality.md). The cost
+> Superseded in part by [ENG-28](../srs/10a-review-requirements.md). The cost
 > cap is 5 USD per pull request, not 40 USD per review. A charged run never
 > runs again. Each deep reviewer names its own model, effort and turns.
 

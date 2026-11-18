@@ -76,9 +76,7 @@ first.
 - §5–§7 are the **normative** requirements, and §8–§10 define normative
   **data**, **interfaces**, and **engineering quality** requirements.
 - §11–§13 cover **verification**, **delivery**, and **open issues**.
-- Appendix A traces every concern raised during research to the requirements
-  that answer it; Appendix B lists the requirements serving each invariant;
-  Appendix C lists the personas each requirement serves.
+- Appendices A–C trace requirements to concerns, invariants and personas.
 
 ## Conventions
 
@@ -125,7 +123,8 @@ row: "- [{title}]({filename}) — {summary}"
 - [9. Interfaces](09-interfaces.md) — Normative interfaces: the hook contract, the MCP tools, the envelope, the restore block and the settings keys of every settings layer, which repository configuration may only tighten; the CLI continues in 09a.
 - [9.5 Command-line interface](09a-command-line-interface.md) — The `parinn` command-line interface: every command, the act and class each records, and the rules shared by all commands. Part of §9.
 - [9.7 Room vocabulary](09b-lane-vocabulary.md) — The one vocabulary every surface uses (VIEW-14): run status and freshness, room status, evidence and proof classes, the Needs you order, integrity status, trust marks and the keymap. Part of §9.
-- [10. Engineering quality (ENG)](10-engineering-quality.md) — Engineering quality requirements ENG-01..34: code organisation, testing, static analysis, supply chain, and process.
+- [10. Engineering quality (ENG)](10-engineering-quality.md) — Engineering quality requirements (ENG): code organisation, testing, static analysis, supply chain, and process. Those of the review continue in 10a.
+- [10.5 The review](10a-review-requirements.md) — The review (ENG-28) and its evaluation (ENG-32). Part of §10.
 - [11. Verification and acceptance](11-verification-and-acceptance.md) — The evaluation plan with baselines and acceptance targets, and the definition of done for v1.0.
 - [12. Delivery plan](12-delivery-plan.md) — Milestone M0 spikes S1–S13 and milestones M1–M9 with their scope and exit criteria; what freezes each initial target.
 - [13. Open questions and risks](13-open-questions-and-risks.md) — Open questions OQ-01..58 with their resolution path, and the risk register with mitigations.
