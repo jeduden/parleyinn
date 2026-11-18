@@ -18,6 +18,8 @@ jobs:
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - name: Greet the author
         run: echo "Thanks for ${{ github.event.pull_request.title }}"
 '''
@@ -25,9 +27,11 @@ jobs:
 [expect]
 outcome = ["findings"]
 
-# No requirement yet holds an action to a pinned sha or keeps untrusted
-# context out of a script, so each may come back as a requirement
-# request as well as a linked finding: either form must name it.
+# ENG-33 holds an action to a pinned sha and untrusted context out of a
+# script, and the specialist's checks name it, so the finding is a linked
+# line that cites it, whatever its words. The checkout keeps no
+# credential, so the fixture holds these two defects alone.
 [[expect.finding]]
 path = ".github/workflows/greet.yml"
-mentions_any = ["pin", "sha", "inject", "${{", "env:", "untrusted"]
+form = "linked"
+ids = ["ENG-33"]

@@ -4,7 +4,8 @@
 //! its own specialists have ended and the breaker is decided, and
 //! writes the review outcome from what they answered, telling each
 //! specialist to read only its own diff and the context the review bundle
-//! wrote for it, never the whole bundle. The check runs
+//! wrote for it, never the whole bundle; that context names the ENG-29
+//! record a guarded change lands with. The check runs
 //! `review-run` on a work directory holding the checkout's definitions
 //! of the dispatched agents, with a stand-in for the `claude` command
 //! line that records when each agent's run starts and ends, answers as
@@ -566,6 +567,7 @@ pub fn review_runs_by_code(checkout: &Checkout, workdir: &Path) -> Vec<String> {
     problems.extend(outcome_problems(workdir));
     problems.extend(split_runs_by_code(checkout, &workdir.join("split")));
     problems.extend(context_problems(checkout, &workdir.join("bundle")));
+    problems.extend(record_problems(checkout, &workdir.join("record")));
 
     problems
 }
@@ -650,15 +652,32 @@ pub const CONTEXT: (&str, &str, &str) = (
 #[must_use]
 pub fn context_problems(checkout: &Checkout, out: &Path) -> Vec<String> {
     let (_, path, id) = CONTEXT;
-    let files = out.join("in");
-    let diff =
-        format!("diff --git a/{path} b/{path}\n--- a/{path}\n+++ b/{path}\n@@ -1 +1 @@\n+{id}\n");
-    let written = fs::create_dir_all(&files)
-        .and_then(|()| fs::write(files.join("pr.diff"), diff))
-        .and_then(|()| fs::write(files.join("consent.json"), "[]"));
-    if let Err(e) = written {
-        return vec![format!("write {}: {e}", files.display())];
+    let diff = format!("{}+{id}\n", one_line_diff(path));
+    match bundle(checkout, out, &diff, "[]") {
+        Ok(printed) => context_in(out, &printed),
+        Err(problems) => problems,
     }
+}
+
+/// The head of a diff of `path` that adds one line, which follows.
+fn one_line_diff(path: &str) -> String {
+    format!("diff --git a/{path} b/{path}\n--- a/{path}\n+++ b/{path}\n@@ -1 +1 @@\n")
+}
+
+/// Runs the review bundle on `checkout` as both trees, with `diff` as
+/// the change and `consent` as the stakeholder's comments, into `out`,
+/// and returns its step outputs, or why it did not run.
+fn bundle(
+    checkout: &Checkout,
+    out: &Path,
+    diff: &str,
+    consent: &str,
+) -> Result<String, Vec<String>> {
+    let files = out.join("in");
+    fs::create_dir_all(&files)
+        .and_then(|()| fs::write(files.join("pr.diff"), diff))
+        .and_then(|()| fs::write(files.join("consent.json"), consent))
+        .map_err(|e| vec![format!("write {}: {e}", files.display())])?;
     let args = [
         "--base".to_owned(),
         checkout.root.display().to_string(),
@@ -676,12 +695,77 @@ pub fn context_problems(checkout: &Checkout, out: &Path) -> Vec<String> {
     let code = review_bundle::cli::run(args, &mut printed, &mut err);
     if code != review_bundle::cli::EXIT_OK {
         let err = String::from_utf8_lossy(&err);
-        return vec![format!(
+        return Err(vec![format!(
             "review-bundle exited {code}: {}",
             err.lines().last().unwrap_or_default()
-        )];
+        )]);
     }
-    context_in(out, &String::from_utf8_lossy(&printed))
+    Ok(String::from_utf8_lossy(&printed).into_owned())
+}
+
+/// The accepted decision record the record check changes beside the
+/// invariants: one that names ENG-29 and the invariants, so it is the
+/// record ENG-29 asks such a change for.
+pub const RECORD: &str = "docs/adr/ADR-2610260751-invariants-one-section-each.md";
+
+/// The file of the invariants, which the record check changes.
+const INVARIANTS: &str = "docs/srs/invariants.md";
+
+/// A stakeholder comment that consents, as the record check hands it
+/// to the bundle.
+const CONSENT: &str =
+    r#"[{"author": "stakeholder", "at": "2026-01-01T00:00:00Z", "body": "I consent."}]"#;
+
+/// What is wrong with the context of the specialist [`CONTEXT`] names
+/// that the review bundle wrote, run on `checkout` as both trees with a
+/// change to the invariants, to [`RECORD`] and a consenting comment,
+/// into `out`: it does not name the ENG-29 record the change lands
+/// with.
+#[must_use]
+pub fn record_problems(checkout: &Checkout, out: &Path) -> Vec<String> {
+    record_problems_of(out, |diff| bundle(checkout, out, diff, CONSENT))
+}
+
+/// [`record_problems`] of the files `bundle` wrote into `out` when
+/// handed the diff of the change: its problems when it did not run.
+fn record_problems_of(
+    out: &Path,
+    bundle: impl FnOnce(&str) -> Result<String, Vec<String>>,
+) -> Vec<String> {
+    let diff: String = [INVARIANTS, RECORD]
+        .iter()
+        .map(|path| format!("{}+x\n", one_line_diff(path)))
+        .collect();
+    match bundle(&diff) {
+        Ok(_) => record_in(out),
+        Err(problems) => problems,
+    }
+}
+
+/// What is wrong with the context [`CONTEXT`] names among the files the
+/// review bundle wrote into `out` for a change that lands with
+/// [`RECORD`]; a context it did not write is named.
+#[must_use]
+pub fn record_in(out: &Path) -> Vec<String> {
+    let name = CONTEXT.0;
+    let file = out.join(format!("{CONTEXTS}/{name}.md"));
+    match fs::read_to_string(&file) {
+        Ok(context) => record_lacks(name, &context),
+        Err(e) => vec![format!("read {}: {e}", file.display())],
+    }
+}
+
+/// What `context`, the context for `name`, lacks of the ENG-29 record
+/// [`RECORD`]: its section or the record's path.
+#[must_use]
+pub fn record_lacks(name: &str, context: &str) -> Vec<String> {
+    if context.contains("## ENG-29 record") && context.contains(&format!("`{RECORD}`")) {
+        Vec::new()
+    } else {
+        vec![format!(
+            "the context for {name} lacks the ENG-29 record {RECORD}"
+        )]
+    }
 }
 
 /// What is wrong with the context [`CONTEXT`] names among the files the

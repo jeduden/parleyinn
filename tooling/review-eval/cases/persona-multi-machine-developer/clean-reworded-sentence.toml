@@ -1,0 +1,17 @@
+component = "persona-multi-machine-developer"
+kind = "clean"
+title = "a sentence of the use-case index reworded, its meaning kept"
+
+# A clean change gives the persona nothing to weigh: the rewording moves
+# no journey and none of its give-up conditions. The plan this case once
+# added drew findings in nearly every run, each a fair gap in a short plan,
+# and passed or failed by whether one of them held a forbidden word.
+[[replace]]
+file = "docs/use-cases.md"
+old = "so that none\nof them lives only in a chat."
+new = "so that none\nof them is kept only in a chat."
+
+[expect]
+
+[[expect.none]]
+path = "docs/use-cases.md"

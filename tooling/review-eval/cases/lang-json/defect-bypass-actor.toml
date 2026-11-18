@@ -13,4 +13,6 @@ outcome = ["findings"]
 [[expect.finding]]
 path = ".github/rulesets/main.json"
 form = "linked"
-mentions_any = ["bypass"]
+# Known by the requirement the specialist's check ties an actor let past
+# the rules to, not by a word: two runs named it without "bypass".
+ids = ["ENG-21"]

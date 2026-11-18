@@ -1,0 +1,18 @@
+component = "test-engineer-end-to-end"
+kind = "clean"
+title = "a comment on the usage check of an end-to-end test"
+
+# A clean change adds nothing a reviewer could weigh: a new end-to-end
+# test, as this case once added, draws the true finding that it repeats
+# the proof below, so the case failed by what the fixture held.
+[[replace]]
+file = "tooling/review-eval/tests/e2e_review_eval.rs"
+old = "    let usage = review_eval(home.path(), &path, &[\"--nope\"]);\n"
+new = "    // A wrong command line exits 2 and prints the usage.\n    let usage = review_eval(home.path(), &path, &[\"--nope\"]);\n"
+
+[expect]
+outcome = ["none", "findings"]
+
+[[expect.none]]
+path = "tooling/review-eval/tests/e2e_review_eval.rs"
+form = "linked"
