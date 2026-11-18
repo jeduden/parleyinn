@@ -7,9 +7,10 @@ summary: >-
   names every requirement I2 names by id and the one I4's boundaries
   rest on (PRV-08, INJ-01, INJ-02, INJ-04, INJ-10, OWN-04, OWN-07,
   OWN-08, OWN-23, OWN-24, OWN-26, OWN-29, SEC-01), the six rows those
-  defer to (INJ-03, LANE-30, OWN-03, SEC-19, SEC-26, SEC-28), and says
-  that a change to ENG-29 itself needs the same record. No invariant's words change. The security reviewer is
-  the stakeholder, `jeduden`.
+  defer to (INJ-03, LANE-30, OWN-03, SEC-19, SEC-26, SEC-28), the default
+  trust policy and its limit (PRV-02, PRV-05), and says that a change
+  to ENG-29 itself needs the same record. No invariant's words change.
+  The security reviewer is the stakeholder, `jeduden`.
 ---
 # ADR-2611152235: ENG-29 guards the rows that spell out I2 and I4, and itself
 
@@ -59,6 +60,12 @@ required, it is the stakeholder.
     templates of OWN-08, OWN-24 and OWN-29 are exceptions to;
   - the register and the off-by-default rule for B1 to B3, SEC-19;
   - the limits on export and publish, SEC-26, and on bridges, SEC-28.
+- I2 states the trusted sources in its own words and names no row for
+  them. PRV-02, the default trust policy, restates them, and PRV-05
+  keeps a settings layer from trusting more. A change to either could
+  widen what counts as trusted while I2's words stay the same, so
+  ENG-29's row names both. PRV-01's provenance classes stay out: a
+  class is trusted only as PRV-02 says.
 - I3 names INJ-05, which decides when a pin is named by id and not
   restored. It opens no path to the model and stays out of the row.
 - ENG-29's row says that a change to ENG-29 itself lands the same way.
@@ -80,7 +87,7 @@ required, it is the stakeholder.
 
 ## Consequences
 
-- A change to one of the nineteen rows above, to PRV-10 to PRV-13, which
+- A change to one of the twenty-one rows above, to PRV-10 to PRV-13, which
   ENG-29 guarded before, or to ENG-29's row, needs an accepted decision
   record that names ENG-29 and the row, and the
   stakeholder's comment on its pull request. Until both are there the
