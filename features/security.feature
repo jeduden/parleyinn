@@ -420,6 +420,7 @@ Feature: Security (SEC)
     Then every copy in any writer's log, found by address or commitment, is erased or tombstoned, and the backup is erased or listed
     And ingesting its transcript positions again from the harness transcript is refused with an audit entry
     And the transcript source's consumed-prefix hash is recomputed over the prefix with the bytes of each purged transcript line zeroed, so it confirms no guess at the purged bytes, only each purged line's position, length and the harness's own `uuid` remain, only ParleyInn's own record of the source changes, never the harness's transcript file, and "parinn ingest" resumes the source and "parinn verify" exits 0
+    And for a transcript source whose transcript cannot be read or no longer holds what its stored hash covers, the purge stores a hash that confirms nothing, audited and counted, and "parinn ingest" starts a new transcript generation of that source (ADM-07, ADM-09)
     And a signed purge receipt names the scope, the ranges, the copies erased and every known copy ParleyInn cannot erase
     And every prompt commitment whose prompt_id a purged event's line carries, matched or not, is erased with its key, and the receipt counts them
     And after a retention purge, and after a backup restore that reapplies the purge, no file in the home, decrypted, holds the purged events' canary token, their commitment keys or a search index entry naming them

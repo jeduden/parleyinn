@@ -40,10 +40,11 @@ CREATE TABLE IF NOT EXISTS purge_journal (
 const PAYLOAD: &str = "payload";
 const INDEX: &str = "index";
 const VACUUM: &str = "vacuum";
-/// How many transcript sources the purges not yet finished could not
-/// confirm, as the one row's target: journalled in the purge's own
-/// transaction, so a finishing step that fails does not lose the count
-/// (SEC-31, I6).
+/// How many transcript sources a purge could not confirm and no command
+/// has yet audited, as the one row's target: journalled in the purge's
+/// own transaction and cleared only by
+/// [`unconfirmed_audited`](Store::unconfirmed_audited), so neither a
+/// finishing step nor an audit that fails loses the count (SEC-31, I6).
 const UNCONFIRMED: &str = "unconfirmed";
 
 /// A range of one writer's events to erase.
@@ -78,10 +79,6 @@ pub struct Finished {
     pub vacuumed: bool,
     /// Whether anything was left to finish.
     pub nothing: bool,
-    /// Transcript sources a purge could not read to recompute their
-    /// consumed-prefix hash, which then confirms nothing (SEC-31, I6):
-    /// those of every purge this step finishes, reported once.
-    pub unconfirmed: u64,
 }
 
 impl Store {
@@ -95,10 +92,10 @@ impl Store {
     ///
     /// Fails, erasing and recording nothing, when SQLite does or an
     /// event of `record` has no canonical encoding. The finishing steps
-    /// that fail afterwards stay journalled, with the count of transcript
-    /// sources the purge could not confirm: the error is returned, the
-    /// erasure stands, and the attempt that finishes it reports the
-    /// count.
+    /// that fail afterwards stay journalled: the error is returned and
+    /// the erasure stands. The count of transcript sources the purge
+    /// could not confirm stays journalled either way, until a command
+    /// has audited it ([`unconfirmed`](Self::unconfirmed)).
     pub fn purge(
         &mut self,
         device: WriterId,
@@ -140,9 +137,10 @@ impl Store {
 
     /// Finishes what a purge journalled and a crash may have cut short:
     /// the search index's postings of the erased events, the payload
-    /// files, then the checkpoint and the vacuum. Nothing is left once
+    /// files, then the checkpoint and the vacuum. No step is left once
     /// it returns [`Finished::vacuumed`], and a store that never purged
-    /// has nothing to finish.
+    /// has nothing to finish. The count of
+    /// [`unconfirmed`](Self::unconfirmed) sources is not its to clear.
     ///
     /// # Errors
     ///
@@ -155,24 +153,67 @@ impl Store {
                 ..Finished::default()
             });
         }
-        let unconfirmed = unconfirmed(&self.conn)?;
+        // A count that does not parse fails the finish, so the journal's
+        // damage is audited as residue. The count itself stays: only the
+        // command that audited it clears it.
+        unconfirmed(&self.conn)?;
         let postings = self.finish_postings()?;
         let payloads = self.finish_payloads()?;
         let vacuumed = self.finish_vacuum()?;
-        // Last, so a step that failed above leaves the count journalled
-        // for the attempt that reports it.
-        self.conn.execute(CLEAR_KIND, [UNCONFIRMED])?;
 
         Ok(Finished {
             payloads,
             postings,
             vacuumed,
-            nothing: postings == 0 && payloads == 0 && !vacuumed && unconfirmed == 0,
-            unconfirmed,
+            nothing: postings == 0 && payloads == 0 && !vacuumed,
         })
     }
 
-    /// Whether a purge has steps still to finish.
+    /// How many transcript sources a purge could not read to recompute
+    /// their consumed-prefix hash, which then confirms nothing, and no
+    /// command has yet audited (SEC-31, I6): those of every purge since
+    /// the last [`unconfirmed_audited`](Self::unconfirmed_audited).
+    ///
+    /// # Errors
+    ///
+    /// Fails when SQLite does or the journalled count does not parse.
+    pub fn unconfirmed(&self) -> Result<u64, StoreError> {
+        if !has_journal(&self.conn)? {
+            return Ok(0);
+        }
+
+        unconfirmed(&self.conn)
+    }
+
+    /// Takes `audited` off the journalled count of
+    /// [`unconfirmed`](Self::unconfirmed) sources, once the audit log
+    /// holds an entry for each. A command that fails or is killed
+    /// between its audit and this call leaves them journalled, and the
+    /// next audits them again: an unconfirmed source is audited at least
+    /// once, never lost (I6).
+    ///
+    /// # Errors
+    ///
+    /// Fails, leaving the count as it was, when SQLite does or the
+    /// journalled count does not parse.
+    pub fn unconfirmed_audited(&mut self, audited: u64) -> Result<(), StoreError> {
+        if audited == 0 {
+            return Ok(());
+        }
+        let tx = self
+            .conn
+            .transaction_with_behavior(TransactionBehavior::Immediate)?;
+        let left = unconfirmed(&tx)?.saturating_sub(audited);
+        tx.execute(CLEAR_KIND, [UNCONFIRMED])?;
+        if left > 0 {
+            journal(&tx, UNCONFIRMED, &left.to_string())?;
+        }
+
+        Ok(tx.commit()?)
+    }
+
+    /// Whether a purge has steps still to finish, or sources it could
+    /// not confirm still to audit.
     ///
     /// # Errors
     ///

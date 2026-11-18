@@ -62,6 +62,9 @@ pub(crate) fn apply(
     let policies = policies(settings);
     let applied = retention::apply(store, node, &policies, (ctx.clock)(), entropy);
     applied.map_or_else(|e| failed(ctx, &e), |applied| audit(ctx, &applied));
+    // Whatever the outcome: a purge that stands may have left a source
+    // it could not confirm (SEC-31).
+    crate::purge::audit_unconfirmed(ctx, store);
 }
 
 /// Audits and counts a failure to apply the policies: the store, the
@@ -109,7 +112,6 @@ fn audit(ctx: &Context, applied: &Applied) {
             counter: Some(Counter::RetentionPurged),
         };
         crate::logged("audit a retention purge", ctx.audit(&occurrence));
-        crate::purge::audit_unconfirmed(ctx, &done.finished);
         if !done.finished.vacuumed {
             crate::purge::audit_residue(ctx);
         }
