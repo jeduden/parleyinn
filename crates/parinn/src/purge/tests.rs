@@ -8,7 +8,7 @@ use serde_json::Value;
 use store::{Position, Store};
 
 use super::*;
-use crate::tests::{DEV, Process, audit_text, audited, transcript_in};
+use crate::tests::{DEV, Process, audit_text, audited, set_mode, transcript_in};
 use crate::{EXIT_FAILURE, EXIT_OK, EXIT_USAGE};
 
 /// Four lines the parser leaves unread, so each is an unparsed line.
@@ -295,7 +295,50 @@ fn a_purge_whose_transcript_is_gone_leaves_a_hash_that_confirms_nothing() {
     let (_, source) = only_source(&p);
     assert_eq!(source.position.prefix, store::source::unconfirmable());
     assert_ne!(source.position.prefix, digest(LINES.as_bytes()));
+    assert_eq!(counted(&p, "transcript_prefix_unconfirmed").len(), 1);
+    assert_eq!(open(&p).1.unconfirmed().unwrap(), 0, "audited, so cleared");
     assert_eq!(p.invoke(&["verify"], &DEV).0, EXIT_OK);
+}
+
+/// Puts a file where `p`'s audit log is, so it takes no entry; the log
+/// itself is kept beside it.
+fn break_the_audit_log(p: &Process) {
+    let audit = p.parinn_home().join("audit");
+    std::fs::rename(&audit, p.parinn_home().join("audit.kept")).unwrap();
+    std::fs::write(&audit, "").unwrap();
+    set_mode(&audit, 0o600);
+}
+
+/// Puts `p`'s audit log back.
+fn mend_the_audit_log(p: &Process) {
+    let audit = p.parinn_home().join("audit");
+    std::fs::remove_file(&audit).unwrap();
+    std::fs::rename(p.parinn_home().join("audit.kept"), &audit).unwrap();
+}
+
+/// SEC-31, I6: the purge command stops when the audit log takes no note
+/// of the purge, before it audits the source it could not confirm. The
+/// count stays journalled, and the next command audits it.
+#[test]
+fn a_purge_the_audit_log_took_no_note_of_leaves_its_unconfirmed_source_for_the_next_command() {
+    let (p, writer, path) = with_a_file();
+    std::fs::remove_file(path).unwrap();
+    break_the_audit_log(&p);
+
+    let (code, _, err) = p.invoke(&["purge", "--range", &format!("{writer}:2-3")], &DEV);
+
+    assert_eq!(code, EXIT_FAILURE);
+    assert!(err.contains("the audit log took no note of it"), "{err}");
+    let (_, source) = only_source(&p);
+    assert_eq!(source.position.prefix, store::source::unconfirmable());
+    assert_eq!(open(&p).1.unconfirmed().unwrap(), 1, "its audit is owed");
+    mend_the_audit_log(&p);
+    assert!(counted(&p, "transcript_prefix_unconfirmed").is_empty());
+
+    assert_eq!(p.invoke(&["rebuild"], &DEV).0, EXIT_OK);
+
+    assert_eq!(counted(&p, "transcript_prefix_unconfirmed").len(), 1);
+    assert_eq!(open(&p).1.unconfirmed().unwrap(), 0);
 }
 
 #[test]
@@ -442,23 +485,14 @@ fn a_residue_the_purge_could_not_clear_is_audited_counted_and_said() {
 #[test]
 fn the_command_that_finishes_a_purge_audits_the_sources_it_could_not_confirm() {
     let (p, _) = with_a_run();
-    let (home, mut store) = open(&p);
     // What a purge whose finishing step failed leaves journalled.
-    rusqlite::Connection::open(home.store())
-        .unwrap()
-        .execute_batch(
-            "CREATE TABLE IF NOT EXISTS purge_journal (
-                 id INTEGER PRIMARY KEY, kind TEXT NOT NULL, target TEXT NOT NULL,
-                 UNIQUE (kind, target)
-             ) STRICT;
-             INSERT INTO purge_journal (kind, target) VALUES ('vacuum', ''), ('unconfirmed', '2');",
-        )
-        .unwrap();
+    let mut store = journalling(&p, "('vacuum', ''), ('unconfirmed', '2')");
 
     p.with_context(&DEV, |ctx| finish(ctx, &mut store));
 
     assert_eq!(counted(&p, "transcript_prefix_unconfirmed").len(), 2);
     assert!(counted(&p, "purge_unfinished").is_empty(), "it finished");
+    assert!(!store.purge_pending().unwrap(), "audited, so cleared");
     p.with_context(&DEV, |ctx| finish(ctx, &mut store));
     assert_eq!(
         counted(&p, "transcript_prefix_unconfirmed").len(),
@@ -467,17 +501,81 @@ fn the_command_that_finishes_a_purge_audits_the_sources_it_could_not_confirm() {
     );
 }
 
-#[test]
-fn each_source_a_purge_could_not_read_is_audited_and_counted() {
-    let p = Process::new();
-    let done = store::Finished {
-        unconfirmed: 2,
-        ..store::Finished::default()
-    };
+/// A store whose purge journal holds `rows`, each a kind and a target.
+fn journalling(p: &Process, rows: &str) -> Store {
+    let (home, store) = open(p);
+    rusqlite::Connection::open(home.store())
+        .unwrap()
+        .execute_batch(&format!(
+            "CREATE TABLE IF NOT EXISTS purge_journal (
+                 id INTEGER PRIMARY KEY, kind TEXT NOT NULL, target TEXT NOT NULL,
+                 UNIQUE (kind, target)
+             ) STRICT;
+             INSERT INTO purge_journal (kind, target) VALUES {rows};"
+        ))
+        .unwrap();
 
-    p.with_context(&DEV, |ctx| audit_unconfirmed(ctx, &done));
+    store
+}
+
+#[test]
+fn each_source_a_purge_could_not_read_is_audited_counted_and_then_cleared() {
+    let (p, _) = with_a_run();
+    let mut store = journalling(&p, "('unconfirmed', '2')");
+
+    p.with_context(&DEV, |ctx| audit_unconfirmed(ctx, &mut store));
 
     assert_eq!(counted(&p, "transcript_prefix_unconfirmed").len(), 2);
+    assert_eq!(store.unconfirmed().unwrap(), 0);
+    p.with_context(&DEV, |ctx| audit_unconfirmed(ctx, &mut store));
+    assert_eq!(
+        counted(&p, "transcript_prefix_unconfirmed").len(),
+        2,
+        "audited once"
+    );
+}
+
+#[test]
+fn a_source_the_audit_log_takes_no_entry_for_stays_journalled_until_it_does() {
+    let (p, _) = with_a_run();
+    let mut store = journalling(&p, "('unconfirmed', '2')");
+    break_the_audit_log(&p);
+
+    p.with_context(&DEV, |ctx| audit_unconfirmed(ctx, &mut store));
+
+    assert_eq!(
+        store.unconfirmed().unwrap(),
+        2,
+        "none audited, none cleared"
+    );
+    mend_the_audit_log(&p);
+    assert!(counted(&p, "transcript_prefix_unconfirmed").is_empty());
+    p.with_context(&DEV, |ctx| finish(ctx, &mut store));
+    assert_eq!(counted(&p, "transcript_prefix_unconfirmed").len(), 2);
+    assert_eq!(store.unconfirmed().unwrap(), 0);
+    assert!(
+        counted(&p, "purge_unfinished").is_empty(),
+        "no step was left"
+    );
+}
+
+#[test]
+fn a_count_of_unconfirmed_sources_that_does_not_read_is_logged_and_audits_none() {
+    let (p, _) = with_a_run();
+    let mut store = journalling(&p, "('unconfirmed', 'three')");
+
+    p.with_context(&DEV, |ctx| finish(ctx, &mut store));
+
+    assert!(counted(&p, "transcript_prefix_unconfirmed").is_empty());
+    assert_eq!(
+        counted(&p, "purge_unfinished").len(),
+        1,
+        "the damaged journal is audited as residue"
+    );
+    assert!(
+        store.unconfirmed().is_err(),
+        "and the count is left as it is"
+    );
 }
 
 #[test]
