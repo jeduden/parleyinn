@@ -343,34 +343,10 @@ fn the_lengths_of_purged_lines_that_keep_no_uuid_are_loaded_by_directory() {
 }
 
 #[test]
-fn a_store_from_before_purged_copies_still_reads_its_sources() {
+fn an_advance_that_refuses_no_copy_moves_the_source_and_keeps_no_residue() {
     let dir = TempDir::new().unwrap();
     let mut store = open(&dir);
     let source = store.start_generation("/t/a.jsonl", "/t").unwrap();
-    store
-        .conn
-        .execute_batch(
-            "DROP INDEX transcript_purged_copies_uuid;
-             DROP TABLE transcript_purged_copies;",
-        )
-        .unwrap();
-
-    assert_eq!(store.source("/t/a.jsonl").unwrap(), Some(source));
-    assert_eq!(store.purged_lines("/t").unwrap(), PurgedLines::default());
-}
-
-#[test]
-fn no_refused_copy_moves_a_legacy_source_without_making_the_copies_table() {
-    let dir = TempDir::new().unwrap();
-    let mut store = open(&dir);
-    let source = store.start_generation("/t/a.jsonl", "/t").unwrap();
-    store
-        .conn
-        .execute_batch(
-            "DROP INDEX transcript_purged_copies_uuid;
-             DROP TABLE transcript_purged_copies;",
-        )
-        .unwrap();
 
     store
         .advance_refusing(source.id, &position(10, 1), &[])
@@ -380,15 +356,7 @@ fn no_refused_copy_moves_a_legacy_source_without_making_the_copies_table() {
         store.source("/t/a.jsonl").unwrap().unwrap().position,
         position(10, 1)
     );
-    let copies: bool = store
-        .conn
-        .query_row(
-            "SELECT count(*) FROM sqlite_master WHERE name = 'transcript_purged_copies'",
-            [],
-            |row| row.get(0),
-        )
-        .unwrap();
-    assert!(!copies);
+    assert!(store.purged_places(source.id).unwrap().is_empty());
 }
 
 #[test]
@@ -676,47 +644,6 @@ fn a_run_is_named_by_its_harness_session_and_a_subagent_by_its_agent_id_too() {
 }
 
 #[test]
-fn a_store_from_before_purged_copies_holds_no_residue_of_purged_lines() {
-    let dir = TempDir::new().unwrap();
-    let mut store = open(&dir);
-    let source = store.start_generation("/t/a.jsonl", "/t").unwrap();
-    store
-        .conn
-        .execute_batch(
-            "DROP INDEX transcript_purged_copies_uuid;
-             DROP TABLE transcript_purged_copies;",
-        )
-        .unwrap();
-
-    assert!(store.purged_places(source.id).unwrap().is_empty());
-}
-
-#[test]
-fn a_line_an_older_store_marked_purged_reads_as_a_zeroed_span() {
-    let dir = TempDir::new().unwrap();
-    let mut store = open(&dir);
-    let source = store.start_generation("/t/a.jsonl", "/t").unwrap();
-    store
-        .conn
-        .execute(
-            "INSERT INTO transcript_places (event, source, line, byte_offset, byte_length, purged)
-             VALUES (1, ?1, 1, 4, 6, 1), (2, ?1, 2, 0, 3, 0)",
-            [source.id],
-        )
-        .unwrap();
-
-    let now = store.source("/t/a.jsonl").unwrap().unwrap();
-
-    assert_eq!(
-        now.purged,
-        [Span {
-            offset: 4,
-            length: 6
-        }]
-    );
-}
-
-#[test]
 fn two_sources_of_one_directory_that_share_a_purged_uuid_name_it_once() {
     let dir = TempDir::new().unwrap();
     let mut store = open(&dir);
@@ -770,20 +697,19 @@ fn a_residue_table_without_uuids_makes_the_directory_uuids_unreadable() {
 }
 
 #[test]
-fn a_purged_line_whose_place_cannot_be_read_makes_the_source_unreadable() {
+fn a_purged_line_whose_span_cannot_be_read_makes_the_source_unreadable() {
     let dir = TempDir::new().unwrap();
     let mut store = open(&dir);
     store.start_generation("/t/a.jsonl", "/t").unwrap();
     store
         .conn
         .execute_batch(
-            "DROP INDEX transcript_places_uuid;
-             DROP TABLE transcript_places;
-             CREATE TABLE transcript_places (
-                 event INTEGER PRIMARY KEY, source INTEGER, line INTEGER,
-                 byte_offset, byte_length, purged INTEGER, uuid TEXT
+            "DROP INDEX transcript_purged_copies_uuid;
+             DROP TABLE transcript_purged_copies;
+             CREATE TABLE transcript_purged_copies (
+                 source INTEGER, line INTEGER, byte_offset, byte_length, uuid TEXT
              );
-             INSERT INTO transcript_places VALUES (1, 1, 1, 'x', 4, 1, NULL);",
+             INSERT INTO transcript_purged_copies VALUES (1, 1, 'x', 4, NULL);",
         )
         .unwrap();
 
@@ -804,21 +730,16 @@ fn plan(store: &Store, query: &str) -> String {
 }
 
 #[test]
-fn the_purged_spans_are_read_from_their_own_index_never_by_scanning_the_places() {
+fn the_purged_spans_of_one_source_are_read_by_its_key_never_by_scanning_every_source() {
     let dir = TempDir::new().unwrap();
     let store = open(&dir);
 
-    for query in [
-        PURGED_PLACES.to_owned(),
-        format!("{PURGED_PLACES} AND source = 7"),
-    ] {
-        let plan = plan(&store, &query);
+    let plan = plan(&store, &format!("{PURGED_SPANS} WHERE source = 7"));
 
-        assert!(
-            plan.contains("COVERING INDEX transcript_places_purged"),
-            "{query}: {plan}"
-        );
-    }
+    assert!(
+        plan.contains("SEARCH transcript_purged_copies USING PRIMARY KEY (source=?)"),
+        "{plan}"
+    );
 }
 
 #[test]
@@ -892,16 +813,4 @@ fn a_source_holds_a_purged_line_without_uuid_in_any_of_its_generations_only() {
         "its purged line keeps its uuid, and the other source's is not its own"
     );
     assert!(!store.purged_without_uuid("/t/never.jsonl").unwrap());
-
-    store
-        .conn
-        .execute_batch(
-            "DROP INDEX transcript_purged_copies_uuid;
-             DROP TABLE transcript_purged_copies;",
-        )
-        .unwrap();
-    assert!(
-        !store.purged_without_uuid("/t/a.jsonl").unwrap(),
-        "a store from before the residue table holds none"
-    );
 }

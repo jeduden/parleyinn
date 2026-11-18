@@ -9,6 +9,14 @@ its upgrade notes (ENG-23). ParleyInn follows semantic versioning.
 
 ## Unreleased
 
+- A purge now zeroes each purged transcript line in its transcript
+  source's consumed-prefix hash, so the hash confirms no guess at the
+  purged bytes, and ingest refuses a line that repeats a purged line's
+  `uuid` (SEC-31, REC-07). Upgrade note: the store now keeps each
+  line's byte length and what a purge leaves of a purged line, so its
+  tables change while its schema version stays 1. No release shipped
+  the earlier layout, so nothing is migrated, and the golden home is
+  written again in the new one.
 - The review reads every agent's run log whatever its run ended with
   (ENG-28): a specialist cut off by its turn budget or deadline is
   consulted, its report what its log states, and never run again. Only
