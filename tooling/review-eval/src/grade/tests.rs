@@ -832,7 +832,13 @@ fn reading_log(reads: &[&str], searches: &[&str]) -> RunLog {
             ..crate::log::ReadCall::default()
         })
         .collect();
-    log.searches = searches.iter().map(|s| (*s).to_owned()).collect();
+    log.searches = searches
+        .iter()
+        .map(|path| crate::log::SearchCall {
+            path: (*path).to_owned(),
+            answered: true,
+        })
+        .collect();
     log
 }
 
@@ -939,6 +945,15 @@ fn main_s_tree_is_the_work_directory_less_the_review_s_own_files() {
         main_reads(&alike),
         vec!["reviews/a.md", "pr-headless/a.md", "pr.diff.md"]
     );
+
+    // A call the tool did not answer opened nothing: it refuses a path
+    // no tree holds, as one named from the checkout around the run.
+    let mut refused = reading_log(
+        &["runs/1/world/review/a.diff", "docs/x.md"],
+        &["runs", "features"],
+    );
+    (refused.reads[0].answered, refused.searches[0].answered) = (false, false);
+    assert_eq!(main_reads(&refused), vec!["docs/x.md", "features"]);
 }
 
 #[test]

@@ -37,7 +37,9 @@ records the design.
   and by its form, `linked` or `request`, for a specialist or a persona,
   which weighs nothing, or its severity for a generalist; `none` forbids
   one; `absent` forbids text; `nits` caps the nits a generalist keeps;
-  `main_unread` holds the run to the pull request's tree.
+  `main_unread` holds the run to the pull request's tree: a file it
+  opens or searches in main's fails the run, and a read or search the
+  tool refused opened none.
   Cases belong to
   the normal instance of a generalist; its deep instance runs the same
   ones. An agent the bundle never dispatches answers in text and is
