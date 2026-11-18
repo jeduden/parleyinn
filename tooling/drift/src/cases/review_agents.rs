@@ -297,6 +297,46 @@ pub(super) fn review_evaluation_cases() -> Vec<Case> {
     ]
 }
 
+/// The drifts between ENG-29's row and the rows I2 and I4 rest on: the
+/// guard reads the guarded rows from ENG-29's text, so a row it does not
+/// name is changed with no record. One drops the row I4's boundaries
+/// rest on from ENG-29's row; the other has I2 name a requirement
+/// ENG-29's row lacks. Each failure names the row. Registered late, so
+/// adding them moves no earlier case to another shard.
+pub(super) fn eng_29_row_cases() -> Vec<Case> {
+    let check = || {
+        cargo_test(
+            "review-bundle",
+            "bundle",
+            "the_rows_i2_and_i4_rest_on_are_guarded_by_eng_29",
+        )
+    };
+    vec![
+        case(
+            "ENG-29 no longer naming a row I4's boundaries rest on",
+            "ENG-29",
+            Injection::replace(
+                "docs/srs/10-engineering-quality.md",
+                "OWN-29, SEC-01), to one",
+                "OWN-29), to one",
+            ),
+            check(),
+            "SEC-01: ENG-29's row must name it",
+        ),
+        case(
+            "I2 naming a requirement ENG-29's row lacks",
+            "ENG-29",
+            Injection::replace(
+                "docs/srs/invariants.md",
+                "(INJ-01, INJ-02, INJ-04)",
+                "(INJ-01, INJ-02, INJ-04, INJ-05)",
+            ),
+            check(),
+            "INJ-05: ENG-29's row must name it",
+        ),
+    ]
+}
+
 /// The drifts ENG-28 exists to catch in what the approval rests on: the
 /// review gate, the deterministic findings and the review bundle.
 pub(super) fn review_gate_cases() -> Vec<Case> {
