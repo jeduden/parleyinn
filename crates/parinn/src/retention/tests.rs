@@ -215,6 +215,33 @@ fn a_failure_to_apply_the_policies_is_audited_and_counted_and_stops_nothing() {
     assert_eq!(counted(&p, "retention_failed").len(), 1);
 }
 
+/// SEC-31, I6: a purge that stands may have left a source it could not
+/// confirm before the policies failed to apply.
+#[test]
+fn a_failure_to_apply_the_policies_still_audits_the_sources_a_purge_could_not_confirm() {
+    let mut p = Process::new();
+    p.manage(EVERY_ROOM);
+    p.invoke(&["ingest", "--path", &p.transcript("a\n")], &DEV);
+    drop(crate::purge::tests::journalling(&p, "('unconfirmed', '1')"));
+    let (home, mut store, node) = open(&p);
+    p.now = NOW + DAY;
+
+    p.with_context(&DEV, |ctx| {
+        let in_force = settings::in_force(ctx, &home, &[]);
+        apply(
+            ctx,
+            &mut store,
+            &node,
+            &in_force.resolved.settings,
+            &mut Dry,
+        );
+    });
+
+    assert_eq!(counted(&p, "retention_failed").len(), 1);
+    assert_eq!(counted(&p, "transcript_prefix_unconfirmed").len(), 1);
+    assert_eq!(store.unconfirmed().unwrap(), 0, "audited, so cleared");
+}
+
 #[test]
 fn a_range_the_purge_refuses_is_counted_and_never_erased() {
     let mut p = Process::new();

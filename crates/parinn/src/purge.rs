@@ -316,15 +316,23 @@ fn left_over(done: &Result<store::Finished, store::StoreError>) -> bool {
 /// failed or killed command loses none; one killed between its entry
 /// and the journal audits that source again.
 pub(crate) fn audit_unconfirmed(ctx: &Context, store: &mut Store) {
-    let acknowledged = store.unconfirmed().and_then(|owed| {
-        let mut audited = 0;
-        while audited < owed && unconfirmed_noted(ctx) {
-            audited += 1;
-        }
+    let cleared = clear_as_noted(store, &mut || unconfirmed_noted(ctx));
+    crate::logged("clear the audited unconfirmed prefix hashes", cleared);
+}
 
-        store.unconfirmed_audited(audited)
-    });
-    crate::logged("clear the audited unconfirmed prefix hashes", acknowledged);
+/// Has `noted` audit one unconfirmed source for each `store` journals,
+/// until it takes none, and takes off the journal as many as it took.
+fn clear_as_noted(
+    store: &mut Store,
+    noted: &mut dyn FnMut() -> bool,
+) -> Result<(), store::StoreError> {
+    let owed = store.unconfirmed()?;
+    let mut audited = 0;
+    while audited < owed && noted() {
+        audited += 1;
+    }
+
+    store.unconfirmed_audited(audited)
 }
 
 /// Audits and counts one unconfirmed consumed-prefix hash; whether the
@@ -378,4 +386,4 @@ fn residue(ctx: &Context, stderr: &mut dyn Write) -> u8 {
 }
 
 #[cfg(test)]
-mod tests;
+pub(crate) mod tests;

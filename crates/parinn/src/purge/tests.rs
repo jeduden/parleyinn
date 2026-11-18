@@ -303,17 +303,17 @@ fn a_purge_whose_transcript_is_gone_leaves_a_hash_that_confirms_nothing() {
 /// Puts a file where `p`'s audit log is, so it takes no entry; the log
 /// itself is kept beside it.
 fn break_the_audit_log(p: &Process) {
-    let audit = p.parinn_home().join("audit");
-    std::fs::rename(&audit, p.parinn_home().join("audit.kept")).unwrap();
+    let (audit, kept) = (p.parinn_home().join("audit"), p.parinn_home().join("kept"));
+    std::fs::rename(&audit, kept).unwrap();
     std::fs::write(&audit, "").unwrap();
     set_mode(&audit, 0o600);
 }
 
 /// Puts `p`'s audit log back.
 fn mend_the_audit_log(p: &Process) {
-    let audit = p.parinn_home().join("audit");
+    let (audit, kept) = (p.parinn_home().join("audit"), p.parinn_home().join("kept"));
     std::fs::remove_file(&audit).unwrap();
-    std::fs::rename(p.parinn_home().join("audit.kept"), &audit).unwrap();
+    std::fs::rename(kept, audit).unwrap();
 }
 
 /// SEC-31, I6: the purge command stops when the audit log takes no note
@@ -494,15 +494,12 @@ fn the_command_that_finishes_a_purge_audits_the_sources_it_could_not_confirm() {
     assert!(counted(&p, "purge_unfinished").is_empty(), "it finished");
     assert!(!store.purge_pending().unwrap(), "audited, so cleared");
     p.with_context(&DEV, |ctx| finish(ctx, &mut store));
-    assert_eq!(
-        counted(&p, "transcript_prefix_unconfirmed").len(),
-        2,
-        "audited once"
-    );
+    let again = counted(&p, "transcript_prefix_unconfirmed").len();
+    assert_eq!(again, 2, "audited once");
 }
 
 /// A store whose purge journal holds `rows`, each a kind and a target.
-fn journalling(p: &Process, rows: &str) -> Store {
+pub(crate) fn journalling(p: &Process, rows: &str) -> Store {
     let (home, store) = open(p);
     rusqlite::Connection::open(home.store())
         .unwrap()
@@ -527,12 +524,6 @@ fn each_source_a_purge_could_not_read_is_audited_counted_and_then_cleared() {
 
     assert_eq!(counted(&p, "transcript_prefix_unconfirmed").len(), 2);
     assert_eq!(store.unconfirmed().unwrap(), 0);
-    p.with_context(&DEV, |ctx| audit_unconfirmed(ctx, &mut store));
-    assert_eq!(
-        counted(&p, "transcript_prefix_unconfirmed").len(),
-        2,
-        "audited once"
-    );
 }
 
 #[test]
@@ -557,6 +548,22 @@ fn a_source_the_audit_log_takes_no_entry_for_stays_journalled_until_it_does() {
         counted(&p, "purge_unfinished").is_empty(),
         "no step was left"
     );
+}
+
+#[test]
+fn only_the_sources_the_audit_log_took_an_entry_for_leave_the_journal() {
+    let (p, _) = with_a_run();
+    let mut store = journalling(&p, "('unconfirmed', '3')");
+    let mut takes = [true, false, true].into_iter();
+
+    clear_as_noted(&mut store, &mut || takes.next().unwrap_or(false)).unwrap();
+
+    assert_eq!(
+        store.unconfirmed().unwrap(),
+        2,
+        "one audited, two still owed"
+    );
+    assert_eq!(takes.next(), Some(true), "the pass stopped at the refusal");
 }
 
 #[test]
