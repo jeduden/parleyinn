@@ -1,5 +1,5 @@
 //! What a purge does to the transcript sources the purged lines were
-//! read from (SEC-31, ADM-07, REC-17): it keeps each purged line's
+//! read from (SEC-31, ADM-07, REC-07): it keeps each purged line's
 //! position, length and `uuid` apart from its event and recomputes the
 //! source's consumed-prefix hash with the bytes of each purged line
 //! zeroed. Ingest, resume and `parinn verify` zero the same spans, so

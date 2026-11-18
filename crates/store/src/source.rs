@@ -563,6 +563,9 @@ pub(crate) fn refuse_copies(
     if places.is_empty() {
         return Ok(());
     }
+    // A line of this source already kept, by a purge or an earlier read
+    // of the same transcript generation, keeps what it has: a line's
+    // place does not change within a generation, so nothing is lost.
     let mut insert = conn.prepare(
         "INSERT OR IGNORE INTO transcript_purged_copies
              (source, line, byte_offset, byte_length, uuid)

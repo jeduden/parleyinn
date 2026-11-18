@@ -85,8 +85,23 @@ fn a_uuid_redaction_would_change_is_not_kept_beside_its_line_s_place() {
         .map(|p| p.place.uuid)
         .collect();
     assert_eq!(kept, [Some("u1".to_owned()), None]);
-    let bytes = std::fs::read(home.store()).unwrap();
-    assert!(!bytes.windows(20).any(|w| w == b"AKIAIOSFODNN7EXAMPLE"));
+    // The store's file and its write-ahead log, where committed rows
+    // lie until a checkpoint.
+    let store_file = home.store();
+    let files: Vec<_> = std::fs::read_dir(store_file.parent().unwrap())
+        .unwrap()
+        .map(|entry| entry.unwrap().path())
+        .filter(|path| path.is_file())
+        .collect();
+    assert!(files.len() > 1, "the write-ahead log is read too");
+    for file in files {
+        let bytes = std::fs::read(&file).unwrap();
+        assert!(
+            !bytes.windows(20).any(|w| w == b"AKIAIOSFODNN7EXAMPLE"),
+            "{}",
+            file.display()
+        );
+    }
 }
 
 #[test]
