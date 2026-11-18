@@ -53,8 +53,10 @@ impl Store {
     }
 }
 
-/// The tables of transcript sources, their places and ingested runs,
-/// part of the store's schema.
+/// The tables of transcript sources, their places, what a purge leaves
+/// of a purged line and ingested runs, part of the store's schema. No
+/// release shipped an earlier layout of them, so none is migrated
+/// (CHANGELOG.md).
 pub(crate) const SCHEMA: &str = "
 CREATE TABLE transcript_sources (
     id INTEGER PRIMARY KEY,
@@ -76,14 +78,11 @@ CREATE TABLE transcript_places (
     line INTEGER NOT NULL,
     byte_offset INTEGER NOT NULL,
     byte_length INTEGER NOT NULL,
-    purged INTEGER NOT NULL DEFAULT 0,
     uuid TEXT,
     UNIQUE (source, line)
 ) STRICT;
 CREATE INDEX transcript_places_uuid ON transcript_places (uuid) WHERE uuid IS NOT NULL;
-CREATE INDEX transcript_places_purged
-    ON transcript_places (source, byte_offset, byte_length) WHERE purged = 1;
-CREATE TABLE IF NOT EXISTS transcript_purged_copies (
+CREATE TABLE transcript_purged_copies (
     source INTEGER NOT NULL,
     line INTEGER NOT NULL,
     byte_offset INTEGER NOT NULL,
@@ -91,7 +90,7 @@ CREATE TABLE IF NOT EXISTS transcript_purged_copies (
     uuid TEXT,
     PRIMARY KEY (source, line)
 ) STRICT, WITHOUT ROWID;
-CREATE INDEX IF NOT EXISTS transcript_purged_copies_uuid
+CREATE INDEX transcript_purged_copies_uuid
     ON transcript_purged_copies (uuid);
 CREATE TABLE ingested_runs (
     writer TEXT PRIMARY KEY,
@@ -361,30 +360,21 @@ fn source(row: SourceRow) -> Result<Source, StoreError> {
     })
 }
 
-/// The source and bytes of each purged line that keeps its place, read
-/// from the index of purged places alone, never by walking the places.
-/// Only a store an earlier build purged holds such a place: a purge now
-/// moves a purged line's residue to the refused copies and sets no flag.
-const PURGED_PLACES: &str =
-    "SELECT source, byte_offset, byte_length FROM transcript_places WHERE purged = 1";
+/// The source and bytes of each purged line: what a purge leaves of the
+/// line, and each refused copy of it.
+const PURGED_SPANS: &str = "SELECT source, byte_offset, byte_length FROM transcript_purged_copies";
 
-/// The source and bytes of each refused copy of a purged line.
-const PURGED_COPIES: &str = "SELECT source, byte_offset, byte_length FROM transcript_purged_copies";
-
-/// Whether the store holds the refused copies of purged lines: one made
-/// before them holds none.
-const HAS_COPIES: &str =
-    "SELECT count(*) FROM sqlite_master WHERE name = 'transcript_purged_copies'";
-
-/// Adds to `spans` the bytes `query` names, by source; `only` is the
-/// one source `query` asks for as `?1`, when it asks for one.
-fn add_spans(
-    conn: &Connection,
-    query: &str,
-    only: Option<i64>,
-    spans: &mut BTreeMap<i64, Vec<Span>>,
-) -> Result<(), StoreError> {
-    let mut statement = conn.prepare(query)?;
+/// The bytes of each purged line, by source and in offset order: of
+/// source `only` when one is given, of every source otherwise. One
+/// read whatever the number of sources, so listing the sources costs
+/// no read a source.
+fn spans(conn: &Connection, only: Option<i64>) -> Result<BTreeMap<i64, Vec<Span>>, StoreError> {
+    let query = match only {
+        Some(_) => format!("{PURGED_SPANS} WHERE source = ?1"),
+        None => PURGED_SPANS.to_owned(),
+    };
+    let mut spans: BTreeMap<i64, Vec<Span>> = BTreeMap::new();
+    let mut statement = conn.prepare(&query)?;
     let rows = statement.query_map(rusqlite::params_from_iter(only), |r| {
         Ok((
             r.get::<_, i64>(0)?,
@@ -398,28 +388,6 @@ fn add_spans(
             offset: count(offset),
             length: count(length),
         });
-    }
-
-    Ok(())
-}
-
-/// The bytes of each purged line, by source and in offset order: of
-/// source `only` when one is given, of every source otherwise. Two
-/// reads whatever the number of sources, so listing the sources costs
-/// no read a source.
-fn spans(conn: &Connection, only: Option<i64>) -> Result<BTreeMap<i64, Vec<Span>>, StoreError> {
-    let (places, copies) = match only {
-        Some(_) => (
-            format!("{PURGED_PLACES} AND source = ?1"),
-            format!("{PURGED_COPIES} WHERE source = ?1"),
-        ),
-        None => (PURGED_PLACES.to_owned(), PURGED_COPIES.to_owned()),
-    };
-    let mut spans = BTreeMap::new();
-    add_spans(conn, &places, only, &mut spans)?;
-    let has_copies: bool = conn.query_row(HAS_COPIES, [], |r| r.get(0))?;
-    if has_copies {
-        add_spans(conn, &copies, only, &mut spans)?;
     }
     for of_source in spans.values_mut() {
         of_source.sort_by_key(|span| (span.offset, span.length));
@@ -613,18 +581,6 @@ pub(crate) fn refuse_copies(
     if places.is_empty() {
         return Ok(());
     }
-    conn.execute_batch(
-        "CREATE TABLE IF NOT EXISTS transcript_purged_copies (
-             source INTEGER NOT NULL,
-             line INTEGER NOT NULL,
-             byte_offset INTEGER NOT NULL,
-             byte_length INTEGER NOT NULL,
-             uuid TEXT,
-             PRIMARY KEY (source, line)
-         ) STRICT, WITHOUT ROWID;
-         CREATE INDEX IF NOT EXISTS transcript_purged_copies_uuid
-             ON transcript_purged_copies (uuid);",
-    )?;
     let mut insert = conn.prepare(
         "INSERT OR IGNORE INTO transcript_purged_copies
              (source, line, byte_offset, byte_length, uuid)
@@ -683,17 +639,15 @@ impl Store {
 
     /// Whether a purge erased a line of the source at `path`, in any of
     /// its generations, that kept no `uuid`: one a new generation cannot
-    /// refuse (REC-07). An older store without the residue table holds
-    /// none.
+    /// refuse (REC-07).
     pub fn purged_without_uuid(&self, path: &str) -> Result<bool, StoreError> {
-        if !self.conn.query_row(HAS_COPIES, [], |row| row.get(0))? {
-            return Ok(false);
-        }
         let query = "SELECT EXISTS (SELECT 1 FROM transcript_purged_copies p
                                     JOIN transcript_sources s ON s.id = p.source
                                     WHERE s.path = ?1 AND p.uuid IS NULL)";
 
-        Ok(self.conn.query_row(query, [path], |row| row.get(0))?)
+        Ok(self
+            .conn
+            .query_row(query, [path], |row| row.get::<_, bool>(0))?)
     }
 
     /// What the purged lines in any transcript source of `directory`
@@ -780,12 +734,8 @@ impl Store {
 }
 
 /// The allowed residue of each purged line of source `id`, in line
-/// order. An older store without the residue table holds none.
+/// order.
 fn purged_places(conn: &Connection, id: i64) -> Result<Vec<Place>, StoreError> {
-    let query = "SELECT count(*) FROM sqlite_master WHERE name = 'transcript_purged_copies'";
-    if !conn.query_row(query, [], |row| row.get::<_, bool>(0))? {
-        return Ok(Vec::new());
-    }
     let mut statement = conn.prepare(
         "SELECT line, byte_offset, byte_length, uuid FROM transcript_purged_copies
          WHERE source = ?1 ORDER BY line",
@@ -875,12 +825,9 @@ pub(crate) fn owner(
 }
 
 /// The allowed residue of the purged lines in the transcript sources of
-/// `directory`. An older store without the residue table holds none.
+/// `directory`.
 fn purged_lines(conn: &Connection, directory: &str) -> Result<PurgedLines, StoreError> {
     let mut found = PurgedLines::default();
-    if !conn.query_row(HAS_COPIES, [], |row| row.get::<_, bool>(0))? {
-        return Ok(found);
-    }
     let mut statement = conn.prepare(
         "SELECT DISTINCT p.uuid, CASE WHEN p.uuid IS NULL THEN p.byte_length END
          FROM transcript_purged_copies p
