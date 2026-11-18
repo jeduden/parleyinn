@@ -288,8 +288,11 @@ fn a_run_ran_when_it_answered_something_or_was_charged() {
 
 const SEARCHES: &str = r#"{"type":"system","subtype":"init","cwd":"/w/main","model":"m"}
 {"type":"assistant","message":{"id":"m1","model":"m","content":[{"type":"tool_use","id":"t1","name":"Grep","input":{"pattern":"SEC-01","path":"features"}},{"type":"tool_use","id":"t2","name":"Glob","input":{"pattern":"**/*.feature","path":"/w/main/pr-head/features"}}]}}
+{"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"t1","content":"features/security.feature"},{"type":"tool_result","tool_use_id":"t2","is_error":false,"content":"..."}]}}
 {"type":"assistant","message":{"id":"m2","model":"m","content":[{"type":"tool_use","id":"t3","name":"Grep","input":{"pattern":"SEC-01"}},{"type":"tool_use","id":"t4","name":"Grep","input":{"pattern":"x","path":7}}]}}
 {"type":"assistant","parent_tool_use_id":"t9","message":{"id":"s1","model":"m","content":[{"type":"tool_use","id":"t5","name":"Grep","input":{"pattern":"x","path":"docs"}}]}}
+{"type":"assistant","message":{"id":"m3","model":"m","content":[{"type":"tool_use","id":"t6","name":"Grep","input":{"pattern":"x","path":"runs/1/world/pr-head"}},{"type":"tool_use","id":"t7","name":"Glob","input":{"pattern":"*.md","path":"docs/srs"}}]}}
+{"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"t6","is_error":true,"content":"Path does not exist: runs/1/world/pr-head."}]}}
 {"type":"system","subtype":"other","cwd":"/elsewhere"}
 "#;
 
@@ -301,7 +304,22 @@ fn a_log_reads_its_work_directory_and_each_path_the_main_thread_searched() {
     assert_eq!(log.cwd, "/w/main");
     // A search that names no path covers the whole work directory, and
     // is no search of one tree; a subagent's is not the main thread's.
-    assert_eq!(log.searches, vec!["features", "/w/main/pr-head/features"]);
+    // Only a result that is no error answers a search: one the tool
+    // refused, as for a path that does not exist, or whose result never
+    // came, showed the reviewer nothing.
+    let search = |path: &str, answered: bool| SearchCall {
+        path: path.to_owned(),
+        answered,
+    };
+    assert_eq!(
+        log.searches,
+        vec![
+            search("features", true),
+            search("/w/main/pr-head/features", true),
+            search("runs/1/world/pr-head", false),
+            search("docs/srs", false),
+        ]
+    );
     assert!(log.reads.is_empty());
 
     let bare = parse(LOG);

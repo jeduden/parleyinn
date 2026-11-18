@@ -86,7 +86,7 @@ starts with a real place, `docs/x.md:12`, never `path:line` (a whole file takes
 `docs/x.md:1`), then its dash and `if not addressed:` or `request:`; bare, in no
 backticks, nothing after its ids. A fine row gets no line, none ending `no
 finding`, `none`, `fine` or `sound`. `revised: <full finding line>` replaces the
-one at its place (withdraw a moved one, then state it); `withdrawn: x.md:12 —
-<why>` removes one. Last message: `outcome: findings|none — <sentence>`.
+one at its place (withdraw a moved one, then state it); `withdrawn: docs/x.md:12
+— <why>` removes one. Last message: `outcome: findings|none — <sentence>`.
 <?/include?>
 <?/include?>

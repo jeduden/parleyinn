@@ -74,18 +74,19 @@ const BESIDE_MAIN: [&str; 4] = [PR_HEAD, REVIEW, DIFF, CONSENT];
 /// The repository's files `log`'s run read or searched in main's tree,
 /// the work directory's own root, each once, relative to it and in
 /// order: every path a `Read`, `Grep` or `Glob` of the main thread
-/// named that lies in the work directory, outside [`BESIDE_MAIN`], and
-/// is no instruction file, which the pull request's tree is kept
-/// without. The work directory itself holds both trees and is neither;
-/// a path outside it is in neither, as is an absolute one when the log
-/// names no work directory.
+/// named and the tool answered, that lies in the work directory,
+/// outside [`BESIDE_MAIN`], and is no instruction file, which the pull
+/// request's tree is kept without. A call the tool did not answer
+/// opened nothing: it refuses a path no tree holds, as when a reviewer
+/// names its work directory's files from the root of the checkout that
+/// directory lies in. The work directory itself holds both trees and is
+/// neither; a path outside it is in neither, as is an absolute one when
+/// the log names no work directory.
 fn main_reads(log: &RunLog) -> Vec<String> {
     let mut out: Vec<String> = Vec::new();
-    let paths = log
-        .reads
-        .iter()
-        .map(|r| r.path.as_str())
-        .chain(log.searches.iter().map(String::as_str));
+    let reads = log.reads.iter().filter(|r| r.answered).map(|r| &r.path);
+    let searches = log.searches.iter().filter(|s| s.answered).map(|s| &s.path);
+    let paths = reads.chain(searches).map(String::as_str);
     for path in paths {
         let Some(within) = within(&log.cwd, path) else {
             continue;

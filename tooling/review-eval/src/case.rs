@@ -100,8 +100,8 @@ pub struct Expect {
     pub finding: Vec<Expected>,
     /// Findings the report must not hold.
     pub none: Vec<Expected>,
-    /// Findings a generalist must drop, each named by the words of its
-    /// dropped line.
+    /// Findings a generalist must drop, each named by the place and the
+    /// source of its dropped line, or by its words.
     pub dropped: Vec<Expected>,
     /// Findings a specialist must state in its text before its final
     /// answer, as it finds them, not only at the end.
@@ -115,7 +115,8 @@ pub struct Expect {
     pub nits: Option<usize>,
     /// Whether the run must read and search the repository's files in
     /// the pull request's tree alone: one it opens in main's tree, the
-    /// work directory's own root, fails the run.
+    /// work directory's own root, fails the run. A read or search the
+    /// tool did not answer opened none.
     pub main_unread: bool,
 }
 

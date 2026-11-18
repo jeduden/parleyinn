@@ -65,6 +65,10 @@ outcome: none — off the hot path
 [[expect.none]]
 path = "crates/redaction/src/count.rs"
 
+# The dropped line is known by its place and its source, which the
+# generalist copies from the report, never by a word of its reason,
+# which the generalist is free to choose.
 [[expect.dropped]]
 path = "crates/redaction/src/count.rs"
-mentions_any = ["socket", "I4"]
+line = 5
+source = "persona-security-officer"
