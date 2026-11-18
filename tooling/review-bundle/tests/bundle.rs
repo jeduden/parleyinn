@@ -6,10 +6,49 @@
     reason = "a test's helpers unwrap: a failure is the assertion"
 )]
 
-use review_bundle::{Class, Snapshot, analyse, render};
+use std::collections::BTreeSet;
+
+use review_bundle::{Class, Snapshot, analyse, diff, render};
 
 fn tree() -> Snapshot {
     Snapshot::read(&testkit::repo_root()).unwrap()
+}
+
+/// The header a diff of the file at `path` starts with.
+fn header(path: &str) -> String {
+    format!("diff --git a/{path} b/{path}\n")
+}
+
+/// `base` as a pull request that edits the row `id` leaves it, and that
+/// row's file.
+fn with_row_edited(base: &Snapshot, id: &str) -> (Snapshot, String) {
+    let mut head = base.clone();
+    let row = head.requirements.iter_mut().find(|r| r.id == id).unwrap();
+    row.text.push_str(" Edited.");
+    let path = row.path.display().to_string();
+
+    (head, path)
+}
+
+/// The rows ENG-29's row names by the rule ADR-2611152235 records:
+/// every requirement I2's own text names, read from the invariants, and
+/// SEC-01, which I4's boundaries rest on, since I4 names no requirement,
+/// and the rows those defer to: who may build trusted text (INJ-03),
+/// what a room may write to an agent (LANE-30), how a principal's text
+/// reaches one (OWN-03) and the limits of B1 to B3 (SEC-19, SEC-26,
+/// SEC-28), and the default trust policy with its limit (PRV-02,
+/// PRV-05), which restate I2's trusted sources.
+fn rows_i2_and_i4_rest_on(tree: &Snapshot) -> BTreeSet<String> {
+    let (_, from_i2) = tree.invariants.split_once("\n## I2\n").unwrap();
+    let (i2, _) = from_i2.split_once("\n## I3\n").unwrap();
+
+    diff::ids_in(i2)
+        .chain([
+            "SEC-01", "INJ-03", "LANE-30", "OWN-03", "SEC-19", "SEC-26", "SEC-28", "PRV-02",
+            "PRV-05",
+        ])
+        .map(str::to_owned)
+        .collect()
 }
 
 #[test]
@@ -63,21 +102,9 @@ fn an_invariant_edit_without_its_record_is_a_blocking_finding() {
 #[test]
 fn the_requirements_eng_29_marks_follow_its_row() {
     let base = tree();
-    let mut head = tree();
-    let row = head
-        .requirements
-        .iter_mut()
-        .find(|r| r.id == "PRV-11")
-        .unwrap();
-    row.text.push_str(" Edited.");
-    let path = row.path.display().to_string();
+    let (head, path) = with_row_edited(&base, "PRV-11");
 
-    let got = analyse(
-        &base,
-        &head,
-        &format!("diff --git a/{path} b/{path}\n"),
-        &[],
-    );
+    let got = analyse(&base, &head, &header(&path), &[]);
 
     assert!(
         got.findings
@@ -91,4 +118,31 @@ fn the_requirements_eng_29_marks_follow_its_row() {
         bundle.contains(&format!("This pull request (`{path}:")),
         "{bundle}"
     );
+}
+
+/// ENG-29 also guards the rows that spell out I2's closed paths and I4's
+/// boundaries: a change to any of them is a finding until its record
+/// and the stakeholder's comment are there. The rows are read from I2's
+/// own text, so a requirement I2 comes to name fails here until ENG-29's
+/// row names it too.
+#[test]
+fn the_rows_i2_and_i4_rest_on_are_guarded_by_eng_29() {
+    let base = tree();
+    let ids = rows_i2_and_i4_rest_on(&base);
+    assert!(ids.len() > 1, "I2 names no requirement: {ids:?}");
+
+    for id in &ids {
+        let (head, path) = with_row_edited(&base, id);
+
+        let got = analyse(&base, &head, &header(&path), &[]);
+
+        assert!(
+            got.findings
+                .iter()
+                .any(|f| f.body.contains(&format!("touches {id} (ENG-29)"))),
+            "{id}: ENG-29's row must name it, since I2 names it or I4's boundaries rest on \
+             it; an edit of its row raised {:?}",
+            got.findings
+        );
+    }
 }
