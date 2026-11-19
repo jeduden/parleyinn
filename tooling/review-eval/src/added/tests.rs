@@ -116,10 +116,18 @@ fn an_added_path_that_leaves_the_tree_is_left_out_and_noted() {
 
     copy(&host, &tree, &main, &pr_head, &mut notes).unwrap();
 
-    assert_eq!(notes.len(), 3, "{notes:?}");
-    assert!(
-        notes[0].starts_with("left out ../outside.md, "),
-        "{notes:?}"
+    let left_out = |rel: &str| {
+        format!(
+            "left out {rel}, which the evaluated tree adds: it is no regular file inside that tree"
+        )
+    };
+    assert_eq!(
+        notes,
+        vec![
+            left_out("../outside.md"),
+            left_out(&absolute),
+            left_out("./kept2.md")
+        ]
     );
     assert!(!dir.path().join("main/outside.md").exists());
     assert_eq!(
