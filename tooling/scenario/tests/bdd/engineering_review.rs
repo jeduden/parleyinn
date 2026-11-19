@@ -195,12 +195,18 @@ fn review_carries_findings(w: &mut World) -> Result<(), String> {
 }
 
 #[then(
-    regex = r"^a review that a stakeholder's pull-request comment brought runs no agent when an earlier review of the same head, from a run behind the spend it trusts, kept its review outcome under the same dispatch and left no dispatched agent without an accepted report: each review keeps its review outcome, the agents it consulted, its run id, its gaps and its dispatch among its reports, the comment's review takes them as its own and states the deterministic findings again, says in the job summary whether it reused one and runs its agents when it did not, and waits for a running review of its pull request, cancelling none$"
+    regex = r"^a review that a stakeholder's pull-request comment brought runs no agent when an earlier review of the same head, from a run behind the spend it trusts, kept its review outcome under the same dispatch and left no dispatched agent without an accepted report: each review keeps its review outcome, the agents it consulted, its run id, its gaps and its dispatch among its reports, the comment's review takes them as its own and states the deterministic findings again, says in the job summary whether it reused one and runs its agents when it did not, and waits for a running review of its pull request, cancelling none, and the review bundle writes an agent the same bundle and review context whatever the stakeholder's comments say, with no finding that turns on consent and with the sentence that says consent is the review gate's check$"
 )]
 fn review_reuses_a_verdict(w: &mut World) -> Result<(), String> {
-    outcome(engineering::review_verdict::review_reuses_a_verdict(
+    let work = testkit::TempDir::new().map_err(|e| format!("make a work directory: {e}"))?;
+    let mut problems = engineering::review_verdict::review_reuses_a_verdict(eng(w).checkout()?)?;
+    // The reuse is sound only while a comment changes nothing an agent
+    // read.
+    problems.extend(engineering::review_consent::consent_problems(
         eng(w).checkout()?,
-    )?)
+        work.path(),
+    ));
+    outcome(problems)
 }
 
 #[then(
