@@ -92,8 +92,9 @@ pub trait Host: Sync {
 mod tests;
 
 /// A host for the tests: `git worktree add` copies a fixture tree,
-/// `git worktree remove` deletes it, `mdsmith` answers as told, and
-/// `claude` runs a closure the test hands in.
+/// `git worktree remove` deletes it, `git ls-files` lists the files
+/// under its directory, `mdsmith` answers as told, and `claude` runs a
+/// closure the test hands in.
 #[cfg(test)]
 pub(crate) mod fake {
     use std::fs;
@@ -111,6 +112,11 @@ pub(crate) mod fake {
         pub mdsmith: bool,
         /// Whether the `mdsmith` on the path fails.
         pub mdsmith_broken: bool,
+        /// Whether `git` is on the fake's path for `git ls-files`.
+        pub git: bool,
+        /// What `git ls-files -z` prints or fails with, in place of the
+        /// files under the directory it runs in.
+        pub listing: Option<Result<String, String>>,
         pub claude: Claude,
         pub calls: Mutex<Vec<String>>,
     }
@@ -121,6 +127,8 @@ pub(crate) mod fake {
                 tree: tree.to_path_buf(),
                 mdsmith: true,
                 mdsmith_broken: false,
+                git: true,
+                listing: None,
                 claude: Box::new(|_| Err("no claude in this test".to_owned())),
                 calls: Mutex::new(Vec::new()),
             }
@@ -144,6 +152,25 @@ pub(crate) mod fake {
                 copy_tree(&entry.path(), &target)?;
             } else {
                 fs::copy(entry.path(), target)?;
+            }
+        }
+        Ok(())
+    }
+
+    /// Every file under `dir`, `.git` left out, as `git ls-files -z`
+    /// prints the tracked ones: relative to `root`, each ended by a NUL.
+    fn listed(root: &Path, dir: &Path, out: &mut String) -> std::io::Result<()> {
+        let mut entries = fs::read_dir(dir)?.collect::<Result<Vec<_>, _>>()?;
+        entries.sort_by_key(fs::DirEntry::file_name);
+        for entry in entries {
+            if entry.file_name() == ".git" {
+                continue;
+            }
+            if entry.file_type()?.is_dir() {
+                listed(root, &entry.path(), out)?;
+            } else if let Ok(rel) = entry.path().strip_prefix(root) {
+                out.push_str(&rel.to_string_lossy());
+                out.push('\0');
             }
         }
         Ok(())
@@ -174,6 +201,16 @@ pub(crate) mod fake {
                     exit(0, "", "")
                 }
                 ("git", ["worktree", "prune"]) => exit(0, "", ""),
+                ("git", ["ls-files", "-z"]) if !self.git => Err("git: not found".to_owned()),
+                ("git", ["ls-files", "-z"]) => match &self.listing {
+                    Some(Ok(listing)) => exit(0, listing, ""),
+                    Some(Err(e)) => exit(128, "", e),
+                    None => {
+                        let mut out = String::new();
+                        listed(&command.cwd, &command.cwd, &mut out).map_err(|e| e.to_string())?;
+                        exit(0, &out, "")
+                    }
+                },
                 ("mdsmith", _) if self.mdsmith && self.mdsmith_broken => {
                     exit(1, "", "mdsmith: no such command\n")
                 }

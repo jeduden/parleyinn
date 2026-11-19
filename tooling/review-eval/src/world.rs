@@ -1,11 +1,12 @@
 //! The world of one run: the review's own input, built for a case as
 //! the review workflow builds it for a pull request. A worktree of
 //! main is the review's checkout, with the component under test
-//! copied in from the tree being evaluated; a second worktree inside
-//! it, `pr-head/`, carries the case's edits, with its instruction
-//! files moved out as text; `pr.diff` is their diff; and `review/`
-//! holds what `review-bundle` writes, the reports a case seeds for a
-//! generalist, and the files the workflow's steps add.
+//! copied in from the tree being evaluated and the files that tree
+//! adds ([`crate::added`]); a second worktree inside it, `pr-head/`,
+//! holds those files too and carries the case's edits, with its
+//! instruction files moved out as text; `pr.diff` is their diff; and
+//! `review/` holds what `review-bundle` writes, the reports a case
+//! seeds for a generalist, and the files the workflow's steps add.
 
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -81,6 +82,8 @@ pub fn build(
         worktree(host, checkout, &main)?;
         worktree(host, checkout, &pr_head)?;
     }
+    let mut notes = Vec::new();
+    crate::added::copy(host, tree, &main, &pr_head, &mut notes)?;
     let under_test = main.join(&component.file);
     under_test
         .parent()
@@ -90,7 +93,6 @@ pub fn build(
     let changes = case.apply(&pr_head)?;
     write(&main.join(DIFF), &diff::all(&changes))?;
     fs::create_dir_all(main.join(REPORTS)).map_err(|e| format!("{REPORTS}: {e}"))?;
-    let mut notes = Vec::new();
     write(&main.join(PATTERNS), &patterns(host, &main, &mut notes))?;
     write(&main.join(CONSENT), &consent(case.consent.as_deref()))?;
     // The workflow builds the bundle from the whole tree, then moves its

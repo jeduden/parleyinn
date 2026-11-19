@@ -99,11 +99,11 @@ may also name an expectation the reviewer met in other words.
   the component under test copied in, the case's edits in a second worktree as
   `pr-head/`, its instruction files moved out, `pr.diff`, and `review/` from
   `review-bundle`, whose diffs carry each line's number in the pull request's
-  file. The dispatch must bring the component, or the case fails before any
-  model runs. The run's work directory is the world's own directory, whose
-  path names no tree: an agent whose work directory ended in `main` took
-  `pr-head/` and `review/` for its siblings and looked for them one directory
-  up, outside what a run may read.
+  file. Both trees hold the files the evaluated tree adds, an instruction file
+  among them in `pr-head/` alone. The dispatch must bring the component, or the
+  case fails before any model runs. The work directory is the world's own, its
+  path naming no tree: one that ended in `main` sent agents one directory up
+  for `pr-head/` and `review/`, outside what a run may read.
 - **The review context** is the file `review/context/<name>.md` that
   `review-bundle` writes for a specialist: the review class, the touched ids,
   its dispatch row, the deterministic findings on its files and the change's
