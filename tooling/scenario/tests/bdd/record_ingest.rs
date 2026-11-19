@@ -375,7 +375,9 @@ fn names_replaced(w: &mut World, name: String) -> Result<(), String> {
 }
 
 /// Whether the last `parinn verify --json` fails `name`, and no other
-/// transcript source, for `why`.
+/// transcript source, for `why`. REC-08's scenario fails two sources,
+/// each for its own reason, and one step names the only source of each
+/// reason: a source failed for another reason is the other step's.
 fn names_only(w: &mut World, name: &str, why: &str) -> Result<(), String> {
     let out = last_run(w)?;
     let report: Value = serde_json::from_slice(&out.stdout).map_err(|e| e.to_string())?;
