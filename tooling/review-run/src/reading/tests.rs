@@ -75,6 +75,9 @@ fn a_finding_off_its_form_is_kept_in_its_form_and_its_slip_listed_and_told_apart
         )
     );
     assert!(read.unreadable.is_empty(), "{:?}", read.unreadable);
+    // The assembled report holds the finding in its form on line 2 and
+    // the note beside it on line 3, the line the review lists; the line
+    // saying all is well is its line 4.
     assert_eq!(
         read.ignored[0],
         ReportLine {
@@ -85,6 +88,7 @@ fn a_finding_off_its_form_is_kept_in_its_form_and_its_slip_listed_and_told_apart
             why: "is a finding off its form, read as the finding it states".to_owned(),
         }
     );
+    assert_eq!(read.ignored[1].line, 4);
     assert!(read.ignored[0].off_form() && !read.ignored[1].off_form());
     assert_eq!(tally(&read.ignored), (1, 1));
     assert_eq!(tally(&[]), (0, 0));

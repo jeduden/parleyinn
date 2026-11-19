@@ -83,6 +83,29 @@ fn nothing_written_is_named_for_every_mode() {
 }
 
 #[test]
+fn a_finding_read_off_its_form_must_be_counted_in_the_review_s_summary() {
+    let wrote = |summary: &str| Wrote {
+        report: format!("{OFF_FORM} — I9\n{ANSWERED}\n"),
+        ignored: format!("note: read off its form: {OFF_FORM}"),
+        outcome: Some(review_gate::ReviewOutcome {
+            verdict: review_gate::APPROVE_VERDICT.to_owned(),
+            summary: summary.to_owned(),
+            findings: Vec::new(),
+        }),
+        gate: Ok(review_gate::APPROVE.to_owned()),
+        ..Wrote::default()
+    };
+    let counted = " Read off its form, as the finding it states: 1 line of the specialists' \
+                   reports (review/ignored.json).";
+
+    assert!(mode_problems(Mode::OffForm, &wrote(counted), 1).is_empty());
+    assert_eq!(
+        mode_problems(Mode::OffForm, &wrote("Sound."), 1),
+        ["off-form: a finding read off its form is not counted in the review's summary"]
+    );
+}
+
+#[test]
 fn a_specialist_named_not_reviewed_or_consulted_when_it_did_not_run_is_named() {
     let wrote = Wrote {
         consulted: format!("[\"{SPECIALIST}\"]"),
