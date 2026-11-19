@@ -30,7 +30,7 @@ use review_gate::{
 
 use crate::gaps::{self, Gap};
 use crate::plan::{Plan, report_file};
-use crate::reading::{IGNORED, ReportLine};
+use crate::reading::ReportLine;
 use crate::run::AgentRun;
 
 /// Where a finding about the review itself points: the review's own
@@ -112,7 +112,7 @@ pub fn decide(
                 run.answered() && run.cut.is_some() && plan.generalists().contains(&run.name)
             })
             .count(),
-        ignored: crate::reading::tally(&ignored),
+        ignored: crate::reading::summary(&ignored),
     };
 
     Decision {
@@ -855,9 +855,9 @@ struct Counts<'a> {
     cut: usize,
     /// The generalists cut off, whose weighing is what their log states.
     cut_generalists: usize,
-    /// The lines set aside as no finding, then the findings read off
-    /// their form.
-    ignored: (usize, usize),
+    /// What the summary says of the lines set aside as no finding and
+    /// of the findings read off their form.
+    ignored: String,
 }
 
 /// The agents the summary names for what went wrong.
@@ -928,15 +928,7 @@ fn summary(counts: &Counts, named: &Named, closings: &[String]) -> String {
             counted(counts.cut_generalists, "generalist")
         );
     }
-    for (said, n) in [
-        ("Set aside as no finding", counts.ignored.0),
-        ("Read off its form, as the finding it states", counts.ignored.1),
-    ] {
-        if n > 0 {
-            let lines = counted(n, "line");
-            let _ = write!(s, " {said}: {lines} of the specialists' reports ({IGNORED}).");
-        }
-    }
+    s.push_str(&counts.ignored);
     for (label, names) in [
         ("Did not run", named.silent),
         ("Read part of their diff", named.partial),
@@ -964,7 +956,7 @@ fn summary(counts: &Counts, named: &Named, closings: &[String]) -> String {
 }
 
 /// `n` `word`s, said: `1 line`, `2 lines`.
-fn counted(n: usize, word: &str) -> String {
+pub(crate) fn counted(n: usize, word: &str) -> String {
     if n == 1 {
         format!("1 {word}")
     } else {

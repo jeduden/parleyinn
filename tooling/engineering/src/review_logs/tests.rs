@@ -31,6 +31,7 @@ fn every_mode_has_its_own_name() {
             "cut-silent",
             "partial",
             "all-well",
+            "off-form",
             "malformed",
             "silent"
         ]
@@ -67,6 +68,10 @@ fn nothing_written_is_named_for_every_mode() {
             "all-well: the finding beside a line saying all is well is not kept",
             "all-well: a line saying all is well is not listed in review/ignored.json",
             "all-well: a line set aside as no finding blocks the review",
+            "off-form: a finding off its form is not kept as the finding it states",
+            "off-form: a finding read off its form is not listed in review/ignored.json",
+            "off-form: a finding read off its form is not counted in the review's summary",
+            "off-form: a finding read off its form blocks the review",
             "malformed: the finding beside a line in no form is not kept",
             "malformed: a line in no form is not its own blocking finding quoting it",
             "malformed: the gate does not post the request for changes a line in no form makes",

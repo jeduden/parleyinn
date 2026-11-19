@@ -86,7 +86,10 @@ fn a_linked_finding_that_ends_with_its_ids_and_no_dash_reads_with_its_sentence_w
 
 #[test]
 fn a_request_with_no_motivation_set_apart_reads_with_the_reader_s_own() {
-    for text in ["a.rs:1 — request: add a cap", "a.rs:1 — request: Add a cap — "] {
+    for text in [
+        "a.rs:1 — request: add a cap",
+        "a.rs:1 — request: Add a cap — ",
+    ] {
         assert_eq!(
             line(text),
             Line::Request(Request {

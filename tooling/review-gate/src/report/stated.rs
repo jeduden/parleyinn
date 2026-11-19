@@ -12,8 +12,8 @@ use std::fmt;
 
 use super::{
     ALL_WELL, ALL_WELL_WORDS, FINDINGS, Line, MARKUP, OFF_FORM, Problem, REVISED, TEMPLATE_PLACE,
-    WITHDRAWN, WITHDREW_NOTHING, all_well, answer_outcome, at_template, bare, defect_marked, form_problem,
-    line, outcome_of, place, report_check, split_dashes, strip_word, unknown_id,
+    WITHDRAWN, WITHDREW_NOTHING, all_well, answer_outcome, at_template, bare, defect_marked,
+    form_problem, line, outcome_of, place, report_check, split_dashes, strip_word, unknown_id,
 };
 
 /// A report split into the lines that read and those that do not.

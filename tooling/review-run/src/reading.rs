@@ -68,6 +68,31 @@ pub fn tally(lines: &[ReportLine]) -> (usize, usize) {
     (lines.len() - off_form, off_form)
 }
 
+/// What the review's summary says of `lines`, the report lines it
+/// lists in [`IGNORED`]: how many are set aside as no finding, and how
+/// many note a finding read off its form, each sentence left out when
+/// it counts none.
+#[must_use]
+pub fn summary(lines: &[ReportLine]) -> String {
+    let (aside, off_form) = tally(lines);
+    let said = |what: &str, n: usize| {
+        let lines = crate::outcome::counted(n, "line");
+        format!(" {what}: {lines} of the specialists' reports ({IGNORED}).")
+    };
+    let mut out = String::new();
+    if aside > 0 {
+        out.push_str(&said("Set aside as no finding", aside));
+    }
+    if off_form > 0 {
+        out.push_str(&said(
+            "Read off its form, as the finding it states",
+            off_form,
+        ));
+    }
+
+    out
+}
+
 /// A specialist's report as the review reads it from its log.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Read {

@@ -26,7 +26,9 @@ fn a_finding_off_its_form_is_graded_as_the_finding_it_states_and_slips() {
     assert!(graded.passed(), "{:?}", graded.failures);
     assert_eq!(
         graded.slips,
-        [format!("read off its form, as the finding it states: {near}")]
+        [format!(
+            "read off its form, as the finding it states: {near}"
+        )]
     );
 }
 
@@ -48,7 +50,9 @@ fn a_request_with_no_motivation_set_apart_is_graded_as_a_request_and_slips() {
     assert!(graded.passed(), "{:?}", graded.failures);
     assert_eq!(
         graded.slips,
-        [format!("read off its form, as the finding it states: {near}")]
+        [format!(
+            "read off its form, as the finding it states: {near}"
+        )]
     );
 }
 

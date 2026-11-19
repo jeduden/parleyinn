@@ -88,6 +88,13 @@ fn a_finding_off_its_form_is_kept_in_its_form_and_its_slip_listed_and_told_apart
     assert!(read.ignored[0].off_form() && !read.ignored[1].off_form());
     assert_eq!(tally(&read.ignored), (1, 1));
     assert_eq!(tally(&[]), (0, 0));
+    assert_eq!(
+        summary(&read.ignored),
+        " Set aside as no finding: 1 line of the specialists' reports (review/ignored.json). \
+         Read off its form, as the finding it states: 1 line of the specialists' reports \
+         (review/ignored.json)."
+    );
+    assert_eq!(summary(&[]), "");
 }
 
 #[test]

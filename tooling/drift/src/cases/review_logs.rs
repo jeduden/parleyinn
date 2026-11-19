@@ -8,8 +8,10 @@
 //! holds no model call taken as one that ran; and a run cut off before
 //! it stated any line or an outcome taken for a clean pass, by the
 //! review or by the grader; a part that did not run left out of the
-//! review the parts check runs end to end; and a specialist that only
-//! left lines of its diff unread counted toward the mass failure.
+//! review the parts check runs end to end; a specialist that only
+//! left lines of its diff unread counted toward the mass failure; and a
+//! finding off its form refused as a line in no form, read with its slip
+//! unlisted, or left out of the summary's count.
 
 use super::*;
 
@@ -168,4 +170,45 @@ fn unread_case() -> Case {
         ),
         "review-code did not start though no specialist's run failed",
     )
+}
+
+/// A finding off its form no longer read as the finding it states, its
+/// slip no longer listed, or no longer counted in the review's summary.
+pub(super) fn review_off_form_cases() -> Vec<Case> {
+    const REPORT: &str = "tooling/review-gate/src/report.rs";
+    vec![
+        case(
+            "a finding line off its form refused as a line in no form",
+            "ENG-28",
+            Injection::replace(
+                REPORT,
+                "            .or_else(|| near.then(|| near::linked(said, rest)).flatten())\n",
+                "",
+            ),
+            check(),
+            "off-form: a finding off its form is not kept as the finding it states",
+        ),
+        case(
+            "a finding read off its form with its slip left unlisted",
+            "ENG-28",
+            Injection::replace(
+                REPORT,
+                "    if off_form(text) {\n",
+                "    if off_form(text) && text.is_empty() {\n",
+            ),
+            check(),
+            "off-form: a finding read off its form is not listed in review/ignored.json",
+        ),
+        case(
+            "a finding read off its form left out of the summary's count",
+            "ENG-28",
+            Injection::replace(
+                "tooling/review-run/src/reading.rs",
+                "            off_form,\n",
+                "            0,\n",
+            ),
+            check(),
+            "off-form: a finding read off its form is not counted in the review's summary",
+        ),
+    ]
 }
