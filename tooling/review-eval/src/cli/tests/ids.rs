@@ -36,6 +36,22 @@ fn run_lang_rust(host: &FakeHost, dir: &Path, out_dir: &Path) -> (u8, String, St
 }
 
 #[test]
+fn run_passes_a_run_whose_finding_cites_an_id_its_world_has_and_the_invariants_lack() {
+    let dir = checkout();
+    sound_cases(dir.path());
+    let mut host = FakeHost::new(dir.path());
+    host.claude = claude_that(|log| log, |_| {});
+    let out = TempDir::new().unwrap();
+    let out_dir = out.path().join("out");
+
+    let (code, out, err) = run_lang_rust(&host, dir.path(), &out_dir);
+
+    assert_eq!(code, EXIT_OK, "{out}\n{err}");
+    let report = fs::read_to_string(out_dir.join("runs/lang-rust/defect/1/report.md")).unwrap();
+    assert!(report.contains(" — ENG-16\n"), "{report}");
+}
+
+#[test]
 fn run_fails_a_run_whose_finding_cites_an_id_no_requirement_of_its_world_has() {
     let dir = checkout();
     sound_cases(dir.path());

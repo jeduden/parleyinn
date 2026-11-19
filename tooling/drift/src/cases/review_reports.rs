@@ -213,9 +213,9 @@ pub(super) fn review_ids_grading_cases() -> Vec<Case> {
             ),
             cargo_lib_test(
                 "review-eval",
-                "cli::tests::run_counts_a_slip_without_failing_the_run",
+                "cli::tests::ids::run_passes_a_run_whose_finding_cites_an_id_its_world_has_and_the_invariants_lack",
             ),
-            "run_counts_a_slip_without_failing_the_run",
+            "run_passes_a_run_whose_finding_cites_an_id_its_world_has_and_the_invariants_lack",
         ),
     ]
 }

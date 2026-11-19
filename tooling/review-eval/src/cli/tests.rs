@@ -897,8 +897,5 @@ fn the_record_s_report_leaves_out_a_finding_that_cites_an_id_the_world_lacks() {
 
     let report = record_report(&log, &world);
 
-    assert!(
-        report.contains(known) && !report.contains("ENG-99"),
-        "{report}"
-    );
+    assert_eq!(report, format!("{known}\noutcome: findings — two\n"));
 }
