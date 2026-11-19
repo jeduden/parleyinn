@@ -94,9 +94,8 @@ RCL-02, REC-04, REC-08, REC-12, REC-26 pass; the residue is narrowed.
 Open in M1: rulings on LANE-02,
 REC-24.
 
-- [x] ADM-09's two pending-purge rows (PR #90) are bound and pass, run
-  with `@pending` lifted by hand
-- [x] ADM-09's rows run and pass, all but the landmark row, held
-  `@pending`, M3's
+- [x] ADM-09's two pending-purge rows (PR #90) are bound and pass
+- [x] Eighteen of ADM-09's nineteen rows run and pass under `@runs`; the
+  scenario stays `@pending` for its landmark row, M3's
 
 [consent]: https://github.com/jeduden/parleyinn/pull/91#issuecomment-6402652493
