@@ -119,9 +119,10 @@ footer: |
 
 ?>
 
-| #   | Status | Phase                                                                      |
-| --- | ------ | -------------------------------------------------------------------------- |
-| 1   | 🔳     | [A finding line off its form is read as the finding it states](phase-1.md) |
+| #   | Status | Phase                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| --- | ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | ✅     | [A finding line off its form is read as the finding it states](phase-1.md)                                                                                                                                                                                                                                                                                                                                                                                    |
+|     | ↳      | ENG-28 now has the review read a finding line that names its place and ids off its form as the finding it states: a remark after the ids, a sentence that ends with them, a request with no motivation set apart. The report holds it in its form, and the slip is listed in review/ignored.json and counted apart. A line that names no id still blocks. The ENG-28 scenario step, a new kind of log in its record check and three drift cases land with it. |
 <?/catalog?>
 
 ## Acceptance Criteria

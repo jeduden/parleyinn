@@ -1,7 +1,7 @@
 ---
 n: 1
 title: "A finding line off its form is read as the finding it states"
-status: "🔳"
+status: "✅"
 result: false
 ---
 # Phase 1: a finding line off its form is read as the finding it states
