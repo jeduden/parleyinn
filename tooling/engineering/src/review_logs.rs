@@ -14,7 +14,9 @@
 //! read, so the review requests changes and the gate posts that request;
 //! a line that
 //! says it is no finding must be set aside and listed in
-//! `review/ignored.json`, the finding beside it kept; a finding-shaped
+//! `review/ignored.json`, the finding beside it kept; a finding off its
+//! form must be read as the finding it states, its slip listed there
+//! and counted, and block nothing; a finding-shaped
 //! line that does not read must be its own blocking finding quoting it,
 //! the finding beside it kept; and a specialist whose log holds no model
 //! call did not run, so it is run once more, as it cost nothing, and the
@@ -38,6 +40,9 @@ pub const READ: usize = 20;
 pub const PART: usize = 10;
 /// A line saying all is well at a place, which is no finding.
 pub const ALL_WELL: &str = "src/b.rs:2 — no finding";
+/// The specialist's finding off its form: its sentence ends with its
+/// id, and no dash stands before it.
+pub const OFF_FORM: &str = "src/a.rs:1 — if not addressed: a long line hides a bug, breaking I9.";
 /// A finding-shaped line in no form.
 pub const MALFORMED: &str = "src/c.rs:3 — a line in no form";
 
@@ -56,6 +61,9 @@ pub enum Mode {
     /// It reads its whole diff, states its finding and [`ALL_WELL`], and
     /// answers.
     AllWell,
+    /// It reads its whole diff, states [`OFF_FORM`], its finding off its
+    /// form, and answers.
+    OffForm,
     /// It reads its whole diff, states its finding and [`MALFORMED`],
     /// and answers.
     Malformed,
@@ -65,11 +73,12 @@ pub enum Mode {
 
 impl Mode {
     /// Every mode, in the order the check runs them.
-    pub const ALL: [Self; 6] = [
+    pub const ALL: [Self; 7] = [
         Self::Cut,
         Self::CutSilent,
         Self::Partial,
         Self::AllWell,
+        Self::OffForm,
         Self::Malformed,
         Self::Silent,
     ];
@@ -82,6 +91,7 @@ impl Mode {
             Self::CutSilent => "cut-silent",
             Self::Partial => "partial",
             Self::AllWell => "all-well",
+            Self::OffForm => "off-form",
             Self::Malformed => "malformed",
             Self::Silent => "silent",
         }
@@ -165,6 +175,7 @@ pub fn specialist_log(command: &Command, mode: Mode) -> String {
     };
     let stated = match mode {
         Mode::AllWell => format!("{FINDING}\n{ALL_WELL}"),
+        Mode::OffForm => OFF_FORM.to_owned(),
         Mode::Malformed => format!("{FINDING}\n{MALFORMED}"),
         Mode::CutSilent => "I read the diff; now the context.".to_owned(),
         _ => FINDING.to_owned(),
@@ -212,7 +223,8 @@ pub struct Wrote {
     pub consulted: String,
     /// What was not reviewed whole.
     pub gaps: Vec<review_run::gaps::Gap>,
-    /// The lines set aside as no finding.
+    /// The lines set aside as no finding, and the notes of the findings
+    /// read off their form.
     pub ignored: String,
     /// What the gate posts, or why it posts nothing.
     pub gate: Result<String, String>,
@@ -305,6 +317,7 @@ pub fn mode_problems(mode: Mode, wrote: &Wrote, runs: usize) -> Vec<String> {
                 "a line set aside as no finding blocks the review",
             ),
         ],
+        Mode::OffForm => off_form_wants(wrote),
         Mode::Malformed => vec![
             (
                 wrote.report == report_of(ANSWERED),
@@ -330,6 +343,33 @@ pub fn mode_problems(mode: Mode, wrote: &Wrote, runs: usize) -> Vec<String> {
         .filter(|(holds, _)| !holds)
         .map(|(_, what)| format!("{}: {what}", mode.name()))
         .collect()
+}
+
+/// What a specialist that stated its finding off its form must give.
+fn off_form_wants(wrote: &Wrote) -> Vec<(bool, &'static str)> {
+    let counted = wrote.outcome.as_ref().is_some_and(|o| {
+        o.summary
+            .contains(" Read off its form, as the finding it states: 1 line")
+    });
+    vec![
+        (
+            wrote.report == format!("{OFF_FORM} — I9\n{ANSWERED}\n"),
+            "a finding off its form is not kept as the finding it states",
+        ),
+        (
+            wrote.ignored.contains(OFF_FORM),
+            "a finding read off its form is not listed in review/ignored.json",
+        ),
+        (
+            counted,
+            "a finding read off its form is not counted in the review's summary",
+        ),
+        (
+            wrote.verdict() == review_gate::APPROVE_VERDICT
+                && wrote.gate.as_deref() == Ok(review_gate::APPROVE),
+            "a finding read off its form blocks the review",
+        ),
+    ]
 }
 
 /// What a specialist cut off after reading its whole diff must give,
