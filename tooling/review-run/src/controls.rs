@@ -25,8 +25,8 @@ pub const PULL_REQUEST_COST_USD: f64 = 5.0;
 /// than a third, exactly one third not tripping it.
 pub const BREAKER_FRACTION: Fraction = Fraction { num: 1, den: 3 };
 /// How a gap's reason starts for a run the cost caps stopped or kept
-/// from starting.
-pub const OVER_BUDGET: &str = "over budget:";
+/// from starting: the word the review gate reads it by.
+pub const OVER_BUDGET: &str = review_gate::left_out::OVER_BUDGET;
 /// How a gap's reason starts for a generalist the breaker kept from
 /// starting.
 pub const ABORTED: &str = "aborted:";

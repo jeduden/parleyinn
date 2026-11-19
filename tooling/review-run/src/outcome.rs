@@ -336,7 +336,7 @@ fn answers(
                     .unwrap_or_else(|| "it was not run".to_owned());
                 findings.push(blocking(
                     REVIEW_PATH,
-                    format!("{name} did not run ({why}), so the review is incomplete"),
+                    review_gate::left_out::did_not_run(&name, &why),
                 ));
                 silent.push(name);
             }
