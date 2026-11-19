@@ -42,6 +42,12 @@ pub const SPECIALIST_BUDGET_USD: f64 = 0.30;
 /// cost 0.07 to 0.7, the dearest on the strongest model, so about twice
 /// that.
 pub const GENERALIST_BUDGET_USD: f64 = 1.50;
+/// The least of a pull request's cap that must be left for a
+/// generalist, or a consultant, to start: the review then caps the run
+/// at what is left in place of its tier's cap. Of 596 generalist runs
+/// on record the dearest cost 0.70 and no other more than 0.25, so the
+/// dearest with a margin, and half the tier's cap.
+pub const GENERALIST_RESERVE_USD: f64 = 0.75;
 
 /// The result subtype of a run its `--max-budget-usd` cap stopped.
 pub const OVER_BUDGET: &str = "error_max_budget_usd";
@@ -55,12 +61,41 @@ pub fn budget_of(kind: Kind) -> f64 {
     }
 }
 
+/// The least of a pull request's cap that must be left for a run of an
+/// agent of `kind` to start, in US dollars: a specialist's whole cap,
+/// and a generalist's reserve.
+#[must_use]
+pub fn reserve_of(kind: Kind) -> f64 {
+    match kind {
+        Kind::Specialist => SPECIALIST_BUDGET_USD,
+        Kind::Generalist | Kind::Consultant => GENERALIST_RESERVE_USD,
+    }
+}
+
 /// The cap of one run of an agent of `kind`, as `--max-budget-usd`
 /// takes it.
 #[must_use]
 pub fn budget_usd(kind: Kind) -> String {
-    format!("{:.2}", budget_of(kind))
+    usd(budget_of(kind))
 }
+
+/// `cap` US dollars as `--max-budget-usd` takes them.
+#[must_use]
+pub fn usd(cap: f64) -> String {
+    format!("{cap:.2}")
+}
+
+/// Caps `command`'s run at `cap` US dollars in place of its tier's
+/// cap: what the review holds for it of the pull request's cap.
+pub fn cap(command: &mut Command, cap: f64) {
+    let mut after = (command.args.iter_mut()).skip_while(|a| *a != BUDGET_FLAG);
+    if let Some(value) = after.nth(1) {
+        *value = usd(cap);
+    }
+}
+
+/// The flag a run's cost cap is passed with.
+const BUDGET_FLAG: &str = "--max-budget-usd";
 
 /// The prompt `component` gets for `world`: for a specialist or a
 /// generalist what the review's run tells it, and for a consultant the
@@ -186,7 +221,7 @@ pub fn command_over(
     args.extend(["--allowedTools".to_owned(), TOOLS.to_owned()]);
     args.extend(["--disallowedTools".to_owned(), DISALLOWED.to_owned()]);
     args.extend(["--settings".to_owned(), SETTINGS.to_owned()]);
-    args.extend(["--max-budget-usd".to_owned(), budget_usd(component.kind)]);
+    args.extend([BUDGET_FLAG.to_owned(), budget_usd(component.kind)]);
     match component.kind {
         Kind::Specialist | Kind::Generalist => {
             args.extend(["--agent".to_owned(), component.name.clone()]);
