@@ -50,6 +50,9 @@ regenerates the six generalist definitions.
 Evaluation. The three generalists and their deep instances run their
 13 cases on their models with the new wording.
 
+Gate. One drift case fails: a grader that no longer counts a line
+the final answer leaves out.
+
 Not in this phase: what the review does with a run the API refused.
 The review still reads the error's text as an answer and names a turn
 budget as the cause. That fix is built on its own branch.

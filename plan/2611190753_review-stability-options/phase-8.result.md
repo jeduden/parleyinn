@@ -11,7 +11,7 @@ summary: >-
   the whole run log, and the evaluation counts a line stated early and
   left out of the answer as a slip. The generalists' 26 cases passed in
   52 of 52 runs with no slip. The refusal did not occur outside CI, so
-  the fix is not proven against it.
+  the fix is not proven against it. One drift case lands with it.
 ---
 # Phase 8 handoff
 
@@ -37,6 +37,8 @@ summary: >-
   of 26 cases in 52 of 52 runs, with no slip, for 4.74 USD. One run
   wrote a text before its final answer, a working note.
 - `review-eval check` applies all 235 cases for 74 components.
+- The drift suite catches the new case, a grader that no longer counts
+  such a line, beside the eight on the changed files.
 
 ## Not done
 
