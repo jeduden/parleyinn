@@ -13,7 +13,7 @@ summary: >-
   agent restates a missing consent, a review that runs dry says what to
   do, a generalist starts on what is left of the pull request's cap,
   the evaluation holds ids to the known requirements,
-  and the bundle marks added lines that stand on main.
+  and its world holds the files a pull request adds.
 model: opus
 depends-on: [2610282358]
 ---
@@ -86,9 +86,9 @@ its evidence asks for today.
    (phase 5, ENG-28).
 6. The evaluation holds a finding's ids to the known requirements, as
    the review does (phase 6, ENG-32).
-7. The bundle marks added lines that stand word for word on main, and
-   the evaluation's world holds the files a pull request adds
-   (phase 7, ENG-28 and ENG-32).
+7. The evaluation's world holds the files a pull request adds. A mark
+   on added lines that stand word for word on main was measured and
+   not built (phase 7, ENG-32).
 
 ## Execution
 
@@ -100,7 +100,7 @@ its evidence asks for today.
 | 4     | opus  | The gate's check summary of a review that ran dry names the budget, the spend and the reset                           |
 | 5     | opus  | With 0.90 USD left of the cap a review starts every agent, each generalist capped at what is left                     |
 | 6     | opus  | A run citing an id no requirement has fails its evaluation case, as the review blocks it                              |
-| 7     | opus  | A specialist's case for a moved file passes: no finding at a line main already holds                                  |
+| 7     | opus  | A world built from a tree that adds a section holds it; four drift cases fail                                         |
 
 ## Phases
 
@@ -137,6 +137,8 @@ footer: |
 |     | ↳      | ENG-28 now has a generalist whose tier's cap can no longer fit in the pull request's cap start all the same once half that cap is left. It is passed what is left as its own cost cap, so no run spends past the pull request's cap. A run paid for that left no result is charged the cap it was passed. Of 596 generalist runs on record one cost 0.70 USD and no other more than 0.25. The ENG-28 scenario step, a record check and three drift cases land with it; no instruction changes.                                                             |
 | 6   | ✅     | [The evaluation holds a finding's ids to the known requirements](phase-6.md)                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
 |     | ↳      | ENG-32's grader now refuses a finding that cites an id no requirement or invariant of the case's world has, with the function the review reads the ids with. The model specialists' missing-id case passed 6 of 44 runs under it, and 126 of 132 once their report section said what such a finding ends in. The section now also says that text speaking to the reviewer breaks ENG-28: 4 of 220 injection runs had ended in no id, and none of 132 does. A row of the ENG-32 scenario's grading table and two drift cases land with it.                  |
+| 7   | ✅     | [The evaluation's world holds the files a pull request adds](phase-7.md)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+|     | ↳      | ENG-32's evaluation now builds a run's world with the files the evaluated tree adds: each in both trees, an instruction file in the pull request's tree alone, so only the component under test loads beside the agent. A specialist added with its section had failed a case 2 of 2 runs for the section its world lacked. The mark on added lines that stand on main was measured and not built: a moved row cost 5.4 of 20 turns in 56 runs. Four drift cases land with it.                                                                             |
 <?/catalog?>
 
 ## Acceptance Criteria
@@ -153,4 +155,5 @@ footer: |
 - [ ] A deep review of a large change starts its generalists inside
       the pull request's budget
 - [x] The evaluation fails a run that cites an id no requirement has
-- [ ] A reviewer is told which added lines stand on main already
+- [x] A specialist added with the section it checks runs its cases
+      in a world that holds that section
