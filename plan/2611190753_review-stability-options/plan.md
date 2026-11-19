@@ -85,6 +85,8 @@ its evidence asks for today.
 7. The bundle marks added lines that stand word for word on main, and
    the evaluation's world holds the files a pull request adds
    (phase 7, ENG-28 and ENG-32).
+8. A generalist gives its whole weighing in its final answer, after
+   the model's API refused one as asked for its reasoning (phase 8).
 
 ## Execution
 
@@ -97,6 +99,7 @@ its evidence asks for today.
 | 5     | opus  | A deep review whose generalists cost what they do on record starts every agent inside the cap                       |
 | 6     | opus  | A run citing an id no requirement has fails its evaluation case, as the review blocks it                            |
 | 7     | opus  | A specialist's case for a moved file passes: no finding at a line main already holds                                |
+| 8     | opus  | The generalists' cases pass on their models, no line before the final answer                                        |
 
 ## Phases
 
@@ -119,10 +122,12 @@ footer: |
 
 ?>
 
-| #   | Status | Phase                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
-| --- | ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1   | ✅     | [A finding line off its form is read as the finding it states](phase-1.md)                                                                                                                                                                                                                                                                                                                                                                                    |
-|     | ↳      | ENG-28 now has the review read a finding line that names its place and ids off its form as the finding it states: a remark after the ids, a sentence that ends with them, a request with no motivation set apart. The report holds it in its form, and the slip is listed in review/ignored.json and counted apart. A line that names no id still blocks. The ENG-28 scenario step, a new kind of log in its record check and three drift cases land with it. |
+| #   | Status | Phase                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| --- | ------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | ✅     | [A finding line off its form is read as the finding it states](phase-1.md)                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+|     | ↳      | ENG-28 now has the review read a finding line that names its place and ids off its form as the finding it states: a remark after the ids, a sentence that ends with them, a request with no motivation set apart. The report holds it in its form, and the slip is listed in review/ignored.json and counted apart. A line that names no id still blocks. The ENG-28 scenario step, a new kind of log in its record check and three drift cases land with it.                                                                     |
+| 8   | ✅     | [A generalist gives its whole weighing in its final answer](phase-8.md)                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+|     | ↳      | A generalist is now asked for every line of its weighing in its final answer and none before it, after the model's API refused the code generalist of one pull request twice as asking for its reasoning in its text. ENG-28 and ENG-32 keep their rows: the review still reads the whole run log, and the evaluation counts a line stated early and left out of the answer as a slip. The generalists' 26 cases passed in 52 of 52 runs with no slip. The refusal did not occur outside CI, so the fix is not proven against it. |
 <?/catalog?>
 
 ## Acceptance Criteria
@@ -140,3 +145,5 @@ footer: |
       the pull request's budget
 - [ ] The evaluation fails a run that cites an id no requirement has
 - [ ] A reviewer is told which added lines stand on main already
+- [x] A generalist is asked for its whole weighing in its final
+      answer, and its cases pass on its model
