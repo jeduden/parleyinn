@@ -94,7 +94,12 @@ pub fn differences(without: &Path, with: &Path) -> Vec<String> {
         }
         (was, is) => problems.extend([was, is].into_iter().filter_map(Result::err)),
     }
-    let contexts = contexts(without);
+    // Either run's contexts: one that only a comment brings, or takes
+    // away, turns on the comment too.
+    let mut contexts = contexts(without);
+    contexts.extend(self::contexts(with));
+    contexts.sort();
+    contexts.dedup();
     if contexts.is_empty() {
         problems.push(format!(
             "the review bundle wrote no context under {}",

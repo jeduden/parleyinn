@@ -162,7 +162,12 @@ fn a_file_the_bundle_did_not_write_is_named() {
 #[test]
 fn a_bundle_that_wrote_no_context_is_named() {
     let (without, with) = sound();
+    assert_eq!(
+        contexts(with.path()),
+        [format!("{CONTEXTS}/lang-markdown.md")]
+    );
     fs::remove_dir_all(without.path().join(CONTEXTS)).unwrap();
+    fs::remove_dir_all(with.path().join(CONTEXTS)).unwrap();
 
     let problems = differences(without.path(), with.path());
 
@@ -174,8 +179,20 @@ fn a_bundle_that_wrote_no_context_is_named() {
         )]
     );
     assert!(contexts(without.path()).is_empty());
-    assert_eq!(
-        contexts(with.path()),
-        [format!("{CONTEXTS}/lang-markdown.md")]
+}
+
+#[test]
+fn a_context_only_one_run_wrote_is_named() {
+    let (without, with) = sound();
+    let only = format!("{CONTEXTS}/lang-rust.md");
+    write(with.path(), &only, CONSENT);
+
+    let problems = differences(without.path(), with.path());
+
+    let missing = without.path().join(&only);
+    assert_eq!(problems.len(), 1, "{problems:?}");
+    assert!(
+        problems[0].starts_with(&format!("read {}: ", missing.display())),
+        "{problems:?}"
     );
 }

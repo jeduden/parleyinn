@@ -62,7 +62,7 @@ summary: >-
   answer key changes once and no stored answer is reused for the first
   review after this lands.
 - An agent can still infer from the class that a change is on a
-  stakeholder path. None restated consent in 15 runs with the sentence;
+  stakeholder path. None restated consent in 30 runs with the sentence;
   the weekly run will show the rate over every case.
 - Phase 4: a review that runs out of its budget names the budget, what
   was spent and how it is reset.
