@@ -99,8 +99,8 @@ fn counted_by(w: &World, counter: &str, wanted: usize) -> Result<usize, String> 
 /// their own in a run seat, none a repeat reference.
 fn own_events(w: &World, name: &str) -> Result<(), String> {
     let events = placed(w, name)?;
-    for (i, (writer, kind, content)) in events.iter().take(REPEATED as usize).enumerate() {
-        if *kind != EventKind::TranscriptLine || !witnessed(w, *writer)? {
+    for (i, (address, kind, content)) in events.iter().take(REPEATED as usize).enumerate() {
+        if *kind != EventKind::TranscriptLine || !witnessed(w, address.writer)? {
             return Err(format!("{name}'s line {} is {kind:?} {content}", i + 1));
         }
     }
@@ -115,8 +115,8 @@ fn own_events(w: &World, name: &str) -> Result<(), String> {
 fn apart_from_parent(w: &World) -> Result<(), String> {
     let fork = placed(w, "forked-run")?;
     let parent = placed(w, "parent-run")?;
-    let writer = fork.first().map(|(writer, _, _)| *writer);
-    if writer.is_none() || writer == parent.first().map(|(w, _, _)| *w) {
+    let writer = fork.first().map(|(address, _, _)| address.writer);
+    if writer.is_none() || writer == parent.first().map(|(a, _, _)| a.writer) {
         return Err("the fork's lines are not in a writer of their own".to_owned());
     }
     Ok(())
