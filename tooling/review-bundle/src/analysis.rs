@@ -135,9 +135,14 @@ pub struct Analysis {
     /// or one a changed line names, that either tree defines.
     pub touched: Vec<String>,
     pub findings: Vec<Finding>,
-    /// The record that satisfies ENG-29, when a guarded change has one
-    /// and the stakeholder consented.
+    /// The record a guarded change lands with (ENG-29), when it has
+    /// one, whatever the comments say.
     pub eng_29_record: Option<Record>,
+    /// Those of `findings` that turn on the stakeholder's consent
+    /// (ENG-21, ENG-29, ENG-34), in either state. The gate weighs them
+    /// and no agent is shown one: a comment changes them, and what an
+    /// agent reads does not turn on a comment (ENG-28).
+    pub on_consent: Vec<Finding>,
     /// The agents the review runs (ENG-28).
     pub dispatch: dispatch::Dispatch,
     /// Each specialist with the changed files it reads.
@@ -170,17 +175,20 @@ pub fn analyse(base: &Snapshot, head: &Snapshot, diff: &str, consents: &[String]
         .filter(|id| known.contains(id.as_str()))
         .collect();
     let mut findings = ratchet(base, head);
-    let (guard, eng_29_record) = eng_29(base, head, &paths, &requirements, !consents.is_empty());
-    findings.extend(guard);
+    let guard = eng_29(base, head, &paths, &requirements, !consents.is_empty());
+    findings.extend(guard.unrecorded);
     let unconsented: Vec<&String> = owned
         .iter()
         .filter(|p| !consents.iter().any(|c| owners::names(&patterns, c, p)))
         .collect();
-    findings.extend(stakeholder_paths(&owned, &unconsented));
     let names_the_size_list = consents
         .iter()
         .any(|c| owners::names(&patterns, c, size_list::SIZE_LIST));
-    findings.extend(size_list::finding(diff, names_the_size_list));
+    let on_consent: Vec<Finding> = (guard.unconsented.into_iter())
+        .chain(stakeholder_paths(&owned, &unconsented))
+        .chain(size_list::finding(diff, names_the_size_list))
+        .collect();
+    findings.extend(on_consent.iter().cloned());
     findings.extend(unparsed.iter().map(|h| nit(h, UNPARSED)));
     findings.extend(lifted_bans(diff));
     let crates = security_crates(base);
@@ -231,7 +239,8 @@ pub fn analyse(base: &Snapshot, head: &Snapshot, diff: &str, consents: &[String]
         scenarios,
         touched: touched.into_iter().collect(),
         findings,
-        eng_29_record,
+        eng_29_record: guard.record,
+        on_consent,
         dispatch,
         scopes,
     }
@@ -460,15 +469,15 @@ fn ratchet(base: &Snapshot, head: &Snapshot) -> Vec<Finding> {
 /// with an accepted decision record, changed
 /// in the same pull request, that names ENG-29 and what it covers, and
 /// with the stakeholder's consent: `consent`, a consenting comment on
-/// the pull request, whatever paths it names. Returns the finding when either is
-/// missing, else the record that satisfies it.
+/// the pull request, whatever paths it names. Returns a finding for
+/// each that is missing, and the record when the change has one.
 fn eng_29(
     base: &Snapshot,
     head: &Snapshot,
     paths: &[String],
     requirements: &BTreeMap<String, Change>,
     consent: bool,
-) -> (Vec<Finding>, Option<Record>) {
+) -> Guard {
     let marked = marked_for_i2_review(base);
     let rows: Vec<&String> = requirements
         .keys()
@@ -477,7 +486,7 @@ fn eng_29(
     let invariant = base.invariants != head.invariants || paths.iter().any(|p| p == INVARIANTS);
     let own = requirements.contains_key(ENG_29);
     if rows.is_empty() && !invariant && !own {
-        return (Vec::new(), None);
+        return Guard::default();
     }
     let mut names = vec![ENG_29];
     let mut guarded = Vec::new();
@@ -495,19 +504,6 @@ fn eng_29(
         .filter(|p| p.starts_with(ADR_DIR))
         .filter_map(|p| head.decisions.get(p).map(|body| (p, body)))
         .find_map(|(p, body)| covering(p, body, &names[1..]));
-    if let (Some(record), true) = (&record, consent) {
-        return (Vec::new(), Some(record.clone()));
-    }
-    let mut missing = Vec::new();
-    if record.is_none() {
-        missing.push(format!(
-            "no accepted ADR under docs/adr that this change changes names {}",
-            and_list(&names)
-        ));
-    }
-    if !consent {
-        missing.push("no stakeholder comment consents to it".to_owned());
-    }
     let path = if invariant {
         INVARIANTS.to_owned()
     } else {
@@ -517,18 +513,41 @@ fn eng_29(
             .and_then(|id| row_path(head, id).or_else(|| row_path(base, id)))
             .unwrap_or_default()
     };
-    let finding = Finding {
-        path,
+    let finding = |missing: &str| Finding {
+        path: path.clone(),
         line: 0,
         severity: BLOCKING,
         body: format!(
-            "this change touches {} (ENG-29), but {}",
-            guarded.join(", "),
-            missing.join("; and ")
+            "this change touches {} (ENG-29), but {missing}",
+            guarded.join(", ")
         ),
     };
+    let unrecorded = record.is_none().then(|| {
+        finding(&format!(
+            "no accepted ADR under docs/adr that this change changes names {}",
+            and_list(&names)
+        ))
+    });
+    let unconsented = (!consent).then(|| finding("no stakeholder comment consents to it"));
 
-    (vec![finding], None)
+    Guard {
+        unrecorded,
+        unconsented,
+        record,
+    }
+}
+
+/// What ENG-29 finds of a change it guards, one finding a cause: the
+/// record is the change's to bring, the consent the stakeholder's to
+/// give in a comment.
+#[derive(Debug, Default)]
+struct Guard {
+    /// The change lands with no record.
+    unrecorded: Option<Finding>,
+    /// No stakeholder comment consents to it.
+    unconsented: Option<Finding>,
+    /// The record it lands with.
+    record: Option<Record>,
 }
 
 /// `items` as "a, b and c".
