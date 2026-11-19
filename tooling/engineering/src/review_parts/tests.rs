@@ -169,3 +169,18 @@ fn the_stand_in_s_silent_part_logs_a_result_alone_and_fails_with_nowhere_to_log(
     let ran = review_eval::log::parse(&fs::read_to_string(&log).unwrap());
     assert!(!ran.ran(), "{ran:?}");
 }
+
+#[test]
+fn the_gate_s_error_names_an_agent_left_out_alone_or_with_why_it_did_not_run() {
+    let alone = "review: dispatched but not consulted: lang-rust, test-engineer-unit";
+    let with_why = "review: dispatched but not consulted: lang-rust (silent: a, b), \
+                    test-engineer-unit (part 2 of 3: silent: no log)";
+
+    for error in [alone, with_why] {
+        assert!(left_out(error, "lang-rust"), "{error}");
+        assert!(left_out(error, "test-engineer-unit"), "{error}");
+        assert!(!left_out(error, "test-engineer"), "{error}");
+        assert!(!left_out(error, "review-code"), "{error}");
+    }
+    assert!(!left_out("review: lang-rust has no report", "lang-rust"));
+}

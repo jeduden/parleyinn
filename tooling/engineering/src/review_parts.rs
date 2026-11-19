@@ -271,6 +271,17 @@ pub fn cut_problems(workdir: &Path) -> Vec<String> {
     problems
 }
 
+/// Whether `error`, the gate's, names `agent` among the agents
+/// dispatched but not consulted, alone or with why it did not run.
+fn left_out(error: &str, agent: &str) -> bool {
+    let with_why = format!("{agent} (");
+    error
+        .split_once("dispatched but not consulted: ")
+        .is_some_and(|(_, names)| {
+            (names.split(", ")).any(|n| n == agent || n.starts_with(&with_why))
+        })
+}
+
 /// What is wrong with what a run whose part 2 ended before any model
 /// call, and again when run once more, wrote in `workdir`: a review that
 /// does not request changes naming that part in a blocking finding, a
@@ -301,14 +312,7 @@ pub fn silent_problems(workdir: &Path) -> Vec<String> {
             "the part of {SPECIALIST} that did not run is not its gap: {gaps:?}"
         ));
     }
-    // The gate names it with why it did not run, or alone.
-    let with_why = format!("{SPECIALIST} (");
-    let refused = crate::review_refusals::gate(workdir).is_err_and(|e| {
-        e.split_once("dispatched but not consulted: ")
-            .is_some_and(|(_, names)| {
-                (names.split(", ")).any(|n| n == SPECIALIST || n.starts_with(&with_why))
-            })
-    });
+    let refused = crate::review_refusals::gate(workdir).is_err_and(|e| left_out(&e, SPECIALIST));
     if !refused {
         problems.push(format!(
             "the gate posts a review a part of {SPECIALIST} did not run in"
