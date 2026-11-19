@@ -132,6 +132,7 @@ fn part_run(failure: Option<&str>, answer: &str, cost: f64) -> AgentRun {
             }
             .to_owned(),
             answer: answer.to_owned(),
+            error: String::new(),
             cost,
             turns: 3,
             duration_ms: 10,

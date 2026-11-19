@@ -33,6 +33,8 @@ use crate::plan::{Plan, report_file};
 use crate::reading::ReportLine;
 use crate::run::AgentRun;
 
+mod errors;
+
 /// Where a finding about the review itself points: the review's own
 /// directory, not a file of the change.
 pub const REVIEW_PATH: &str = "review/";
@@ -83,6 +85,7 @@ pub fn decide(
         closings,
         unread,
     } = weighed(plan, &weighings, (&answers, known), reports, &mut findings);
+    errors::name(runs, &unread, &mut findings);
     let consulted: BTreeSet<String> = answers.keys().cloned().collect();
     let mut not_reviewed = not_reviewed(runs, &silent, &refused, &unread);
     not_reviewed.extend(partial.iter().chain(&unreadable).cloned());
@@ -914,17 +917,17 @@ fn summary(counts: &Counts, named: &Named, closings: &[String]) -> String {
     if counts.cut > 0 {
         let _ = write!(
             s,
-            " {} ended without a successful result, cut off by a turn budget, deadline or \
-             cost cap, with every line of their diff read: what each one's log states is its \
-             report.",
+            " {} ended without a successful result, on a turn budget, a deadline, a cost cap \
+             or an error, with every line of their diff read: what each one's log states is \
+             its report.",
             counted(counts.cut, "specialist")
         );
     }
     if counts.cut_generalists > 0 {
         let _ = write!(
             s,
-            " {} ended without a successful result, cut off by a turn budget, deadline or \
-             cost cap: what each one's log states is its weighing.",
+            " {} ended without a successful result, on a turn budget, a deadline, a cost cap \
+             or an error: what each one's log states is its weighing.",
             counted(counts.cut_generalists, "generalist")
         );
     }

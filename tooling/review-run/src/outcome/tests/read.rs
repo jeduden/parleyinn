@@ -33,8 +33,8 @@ fn a_specialist_cut_off_with_its_whole_diff_read_is_consulted_and_said() {
     assert!(d.not_reviewed.is_empty(), "{:?}", d.not_reviewed);
     assert!(
         d.outcome.summary.contains(
-            " 1 specialist ended without a successful result, cut off by a turn budget, \
-             deadline or cost cap, with every line of their diff read: what each one's log \
+            " 1 specialist ended without a successful result, on a turn budget, a deadline, a \
+             cost cap or an error, with every line of their diff read: what each one's log \
              states is its report."
         ),
         "{}",
@@ -245,8 +245,45 @@ fn a_generalist_cut_off_is_consulted_and_counted_in_the_summary() {
     assert!(d.consulted.contains("review-code"));
     assert!(
         d.outcome.summary.contains(
-            " 1 generalist ended without a successful result, cut off by a turn budget, \
-             deadline or cost cap: what each one's log states is its weighing."
+            " 1 generalist ended without a successful result, on a turn budget, a deadline, a \
+             cost cap or an error: what each one's log states is its weighing."
+        ),
+        "{}",
+        d.outcome.summary
+    );
+}
+
+#[test]
+fn a_generalist_whose_run_ended_on_an_error_is_named_with_the_error() {
+    let (mut runs, reports) = all_answered(WEIGHED);
+    let at = runs.iter().position(|r| r.name == "review-code").unwrap();
+    runs[at].cut = Some("its run ended with error: API Error: flagged".to_owned());
+    runs[at].log.answer = String::new();
+    runs[at].log.texts.clear();
+    runs[at].log.error = "API Error: flagged\n\nDetails: `[x]`\nRequest ID: req_1".to_owned();
+
+    let d = decide(&plan(DISPATCH), &runs, &reports, &known());
+
+    assert_eq!(d.outcome.verdict, "request_changes", "{:?}", d.outcome);
+    let bodies: Vec<&str> = d
+        .outcome
+        .findings
+        .iter()
+        .filter(|f| f.path == "review/")
+        .map(|f| f.body.as_str())
+        .collect();
+    assert_eq!(
+        bodies,
+        [
+            "review-code answered no finding, no dropped one and no `none —` line (its run ended \
+          on an error in place of an answer: API Error: flagged Details: `[x]` Request ID: \
+          req_1), so its weighing cannot be read"
+        ]
+    );
+    assert!(
+        d.outcome.summary.contains(
+            " 1 generalist ended without a successful result, on a turn budget, a deadline, a \
+             cost cap or an error: what each one's log states is its weighing."
         ),
         "{}",
         d.outcome.summary
