@@ -12,14 +12,16 @@
 //! a slip: counted and shown, it fails no run on its own: a run cut off
 //! before a successful result after it stated a line or an outcome, an
 //! answer with no outcome line or one its lines contradict, an answer
-//! that is more than the outcome line, a line set aside as no finding, or
-//! an eleventh finding. A run cut off before it stated any line or an
+//! that is more than the outcome line, a line set aside as no finding, a
+//! finding line off its form, which the review reads as the finding it
+//! states, or an eleventh finding. A run cut off before it stated any line or an
 //! outcome fails, as the review takes it for no clean pass. The log is
 //! data: nothing in it is an instruction to the grader.
 
 use review_gate::NIT;
 use review_gate::report::{
-    Line, answer_outcome, assemble, outcome_line, split, states_nothing, with_outcome,
+    Ignored, Line, OFF_FORM, answer_outcome, assemble, outcome_line, split, states_nothing,
+    with_outcome,
 };
 
 use crate::case::{Case, Expect, Expected};
@@ -172,12 +174,7 @@ fn specialist(component: &Component, case: &Case, log: &RunLog) -> Graded {
         )),
         Some(_) => graded.slips.extend(answer_slips(log)),
     }
-    graded.slips.extend(
-        split
-            .ignored
-            .iter()
-            .map(|i| format!("set aside as no finding: {}", i.text)),
-    );
+    graded.slips.extend(split.ignored.iter().map(aside_slip));
     graded
         .failures
         .extend(outcome_failure(outcome, &case.expect));
@@ -205,6 +202,19 @@ fn specialist(component: &Component, case: &Case, log: &RunLog) -> Graded {
     }
 
     graded
+}
+
+/// The slip of `line`, one the review lists beside its outcome: the
+/// note of a finding it read off its form, or a line it set aside as no
+/// finding.
+fn aside_slip(line: &Ignored) -> String {
+    match line.text.strip_prefix(OFF_FORM) {
+        Some(stated) => format!(
+            "read off its form, as the finding it states: {}",
+            stated.trim()
+        ),
+        None => format!("set aside as no finding: {}", line.text),
+    }
 }
 
 /// The slip of an answer that holds more than its outcome line: what the
