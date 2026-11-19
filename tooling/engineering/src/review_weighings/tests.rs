@@ -73,6 +73,14 @@ fn a_blocking_finding_lost_to_a_later_nit_is_named() {
             "the blocking finding review-code stated at src/a.rs:1 is lost to its later nit"
         ]
     );
+
+    write_outcome(
+        work.path(),
+        r#"{"verdict": "request_changes", "summary": "s", "findings": [
+            {"path": "src/a.rs", "line": 1, "severity": "blocking", "body": "a hook panics"},
+            {"path": "src/a.rs", "line": 1, "severity": "nit", "body": "its name is long"}]}"#,
+    );
+    assert!(standing_problems(work.path()).is_empty());
 }
 
 #[test]
