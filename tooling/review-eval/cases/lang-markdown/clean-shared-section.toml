@@ -6,9 +6,10 @@ title = "a shared section changed at its source and in every copy"
 # source and, as `mdsmith fix .` writes it, in each of the nine agent
 # files that include it. The specialist's diff leaves out the copies
 # that match their source: it must pass the change, never report a copy
-# as a second source, and answer within its turns.
-
-consent = "Approved for docs/agents/ and .claude/agents/ alike: docs/agents/persona-review.md and the nine persona agent files that include it now also note where a journey gets costly."
+# as a second source, and answer within its turns. The files are
+# stakeholder paths and no stakeholder comment consents to them: that
+# is the review gate's check, which its context shows it no finding of
+# (ENG-28), so it states none.
 
 [[replace]]
 file = "docs/agents/persona-review.md"
