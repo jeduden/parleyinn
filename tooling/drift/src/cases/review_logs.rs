@@ -11,7 +11,8 @@
 //! review the parts check runs end to end; a specialist that only
 //! left lines of its diff unread counted toward the mass failure; and a
 //! finding off its form refused as a line in no form, read with its slip
-//! unlisted, or left out of the summary's count.
+//! unlisted, or left out of the summary's count; and a generalist's
+//! blocking finding lost to a nit it stated later at its place.
 
 use super::*;
 
@@ -173,8 +174,9 @@ fn unread_case() -> Case {
 }
 
 /// A finding off its form no longer read as the finding it states, its
-/// slip no longer listed, or no longer counted in the review's summary.
-pub(super) fn review_off_form_cases() -> Vec<Case> {
+/// slip no longer listed, or no longer counted in the review's summary;
+/// and a blocking finding a later nit at its place replaces.
+pub(super) fn review_reading_cases() -> Vec<Case> {
     const REPORT: &str = "tooling/review-gate/src/report.rs";
     vec![
         case(
@@ -209,6 +211,20 @@ pub(super) fn review_off_form_cases() -> Vec<Case> {
             ),
             check(),
             "off-form: a finding read off its form is not counted in the review's summary",
+        ),
+        case(
+            "a generalist's blocking finding lost to a nit stated later at its place",
+            "ENG-28",
+            Injection::replace(
+                "tooling/review-eval/src/report.rs",
+                " || (nit && severity_is(l, BLOCKING)));\n",
+                " || (nit && l.is_empty()));\n",
+            ),
+            cargo_lib_test(
+                "engineering",
+                "review_weighings::tests::the_checkout_s_review_run_reads_a_whole_weighing_and_decides_a_partial_one",
+            ),
+            "the blocking finding review-code stated at src/a.rs:1 is lost to its later nit",
         ),
     ]
 }

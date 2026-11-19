@@ -139,11 +139,11 @@ may also name an expectation the reviewer met in other words.
   the weighing `review-run` reads, by the one shared rule: each `blocking` or
   `nit` finding, `dropped — path:line` or `none —` line it stated as it went,
   other working notes left out, then its final answer's lines, all read; the
-  last for a place and the source it names stands, so another source's finding
-  there stays; each finding it must drop on a line that starts with `dropped`
-  or gives it as its severity. A consultant is read from its answer. A case
-  that holds its run to the pull request's tree fails a run that read or
-  searched a file of the repository at the work directory's root, which is
+  last for a place and the source it names stands, a `blocking` finding beside
+  a later `nit`; each finding it must drop on a line that starts with
+  `dropped` or gives it as its severity. A consultant is read from its answer.
+  A case that holds its run to the pull request's tree fails a run that read
+  or searched a file of the repository at the work directory's root, which is
   main's tree: every `Read`, `Grep` and `Glob` path of the log but `pr-head/`,
   `review/`, `pr.diff`, the stakeholder's comments and the instruction files.
   The instruction files at the root are main's too, and reading them fails no

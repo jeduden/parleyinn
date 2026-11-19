@@ -4,16 +4,19 @@
 //! answer, and it decides itself, not by what the generalist says of its
 //! scope, that a weighing is partial when a place a specialist's
 //! accepted report names is weighed nowhere. The check runs `review-run`
-//! twice on a work directory with a stand-in for the `claude` command
+//! four times on a work directory with a stand-in for the `claude` command
 //! line whose specialist states one finding: once with a generalist
 //! that states its weighing of that finding in a message before its
 //! final answer, a sentence on its scope alone, which must approve with
 //! the nit it kept; once with one that weighs another place and says
 //! its scope is whole, which must request changes naming the place it
-//! weighed nowhere and the generalist as not reviewed; and once with one
+//! weighed nowhere and the generalist as not reviewed; once with one
 //! whose line names the finding's file in a range wider than
 //! [`review_run::outcome::MAX_RANGE`] lines, which covers its first line
-//! alone and so must be decided partial the same way.
+//! alone and so must be decided partial the same way; and once with one
+//! that states a blocking finding at the place and then a nit there,
+//! which must request changes on the blocking finding, kept beside the
+//! nit.
 
 use std::fs;
 use std::path::Path;
@@ -37,9 +40,14 @@ pub const ELSEWHERE: &str = "src/z.rs:9 — nit — a hook panics";
 /// line alone.
 pub const WIDE: &str = "src/z.rs:9 — nit — a hook panics, as all of src/a.rs:0-9999";
 
+/// A blocking finding at [`PLACE`], then a nit there: a second, lesser
+/// point, which must leave the blocking finding standing.
+pub const STANDING: &str =
+    "src/a.rs:1 — blocking — a hook panics\nsrc/a.rs:1 — nit — its name is long";
+
 /// A stand-in for the `claude` command line: the specialist states a
 /// finding at [`PLACE`] and answers its outcome line; the generalist
-/// states its weighing in one message, the line `weighs` then its
+/// states its weighing in one message, each line of `weighs` then its
 /// source, and answers a sentence on its scope alone.
 #[derive(Debug)]
 pub struct WeighingHost {
@@ -53,10 +61,12 @@ impl Host for WeighingHost {
         }
         let (texts, result) = if agent_of(command) == GENERALIST {
             let scope = format!("{GENERALIST} weighed its whole scope.");
-            (
-                vec![format!("{} — {SPECIALIST}", self.weighs), scope.clone()],
-                scope,
-            )
+            let weighed: Vec<String> = self
+                .weighs
+                .lines()
+                .map(|line| format!("{line} — {SPECIALIST}"))
+                .collect();
+            (vec![weighed.join("\n"), scope.clone()], scope)
         } else {
             let outcome = "outcome: findings — one finding.".to_owned();
             (
@@ -162,6 +172,35 @@ pub fn partial_problems(workdir: &Path) -> Vec<String> {
     problems
 }
 
+/// What is wrong with the outcome `review-run` wrote in `workdir` for a
+/// generalist that stated a blocking finding at [`PLACE`] and then a nit
+/// there: a review that does not request changes, or one that no longer
+/// holds the blocking finding.
+#[must_use]
+pub fn standing_problems(workdir: &Path) -> Vec<String> {
+    let Some(outcome) = outcome_in(workdir) else {
+        return vec!["review-run wrote no review outcome that reads".to_owned()];
+    };
+    let mut problems = Vec::new();
+    if outcome.verdict != review_gate::REQUEST_CHANGES_VERDICT {
+        problems.push(format!(
+            "a blocking finding a later nit at its place follows does not request changes: {}",
+            outcome.verdict
+        ));
+    }
+    let stands = outcome
+        .findings
+        .iter()
+        .any(|f| format!("{}:{}", f.path, f.line) == PLACE && f.severity == review_gate::BLOCKING);
+    if !stands {
+        problems.push(format!(
+            "the blocking finding {GENERALIST} stated at {PLACE} is lost to its later nit"
+        ));
+    }
+
+    problems
+}
+
 /// The review outcome `review-run` wrote in `workdir`, when it reads.
 fn outcome_in(workdir: &Path) -> Option<review_gate::ReviewOutcome> {
     let text = fs::read_to_string(workdir.join(review_run::OUTCOME)).ok()?;
@@ -189,16 +228,19 @@ fn review(checkout: &Checkout, workdir: &Path, weighs: &'static str) -> Result<(
 
 /// What is wrong with how `review-run`, on work directories under
 /// `workdir` prepared from `checkout`, reads a weighing stated as it
-/// went and decides a partial one, a range too wide to cover the place
-/// included.
+/// went, decides a partial one, a range too wide to cover the place
+/// included, and keeps a blocking finding beside a later nit at its
+/// place.
 #[must_use]
 pub fn review_run_reads_whole_weighings(checkout: &Checkout, workdir: &Path) -> Vec<String> {
     let whole = workdir.join("whole");
     let partial = workdir.join("partial");
     let wide = workdir.join("wide");
+    let standing = workdir.join("standing");
     let ran = review(checkout, &whole, WHOLE)
         .and_then(|()| review(checkout, &partial, ELSEWHERE))
-        .and_then(|()| review(checkout, &wide, WIDE));
+        .and_then(|()| review(checkout, &wide, WIDE))
+        .and_then(|()| review(checkout, &standing, STANDING));
     match ran {
         Ok(()) => {
             let mut problems = whole_problems(&whole);
@@ -208,6 +250,7 @@ pub fn review_run_reads_whole_weighings(checkout: &Checkout, workdir: &Path) -> 
                     .into_iter()
                     .map(|p| format!("a weighing naming its file in a range too wide: {p}")),
             );
+            problems.extend(standing_problems(&standing));
             problems
         }
         Err(e) => vec![e],
