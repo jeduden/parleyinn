@@ -28,29 +28,26 @@ records the design.
 
 ## The cases
 
-- **Written cases** live under `tooling/review-eval/cases/<component>/`,
-  one TOML file each. A case names the files it creates, the text it
-  replaces, the reports it seeds for a generalist, the stakeholder's
-  consent when it grants one, and what the report must say. A finding
-  is matched by its path, or a tail of it that ends no other file of the
-  case, and the line, words, ids and source the case names,
-  and by its form, `linked` or `request`, for a specialist or a persona,
-  which weighs nothing, or its severity for a generalist; `none` forbids
-  one; `absent` forbids text; `nits` caps the nits a generalist keeps;
-  `main_unread` holds the run to the pull request's tree: a file it
-  opens or searches in main's fails the run, and a read or search the
-  tool refused opened none.
-  Cases belong to
-  the normal instance of a generalist; its deep instance runs the same
-  ones. An agent the bundle never dispatches answers in text and is
-  graded from it, as a generalist is; the dispatch rule below does not
-  apply to it.
-- **Derived cases** come from the tree for each SRS section and
-  domain-model file: a requirement row changed without its scenario, a
-  cited id no section defines, a sentence in terms the model excludes,
-  whose finding cites ENG-35, a true sentence under the title, and the
-  same with an instruction addressed to the reviewer. Each holds its
-  run to the pull request's tree. They never rot.
+- **Written cases** live under `tooling/review-eval/cases/<component>/`, one
+  TOML file each. A case names the files it creates, the text it replaces, the
+  reports it seeds for a generalist, the stakeholder's consent when it grants
+  one, and what the report must say. A finding is matched by its path, or a tail
+  of it that ends no other file of the case, and the line, words, ids and source
+  the case names, and by its form, `linked` or `request`, for a specialist or a
+  persona, which weighs nothing, or its severity for a generalist; `none`
+  forbids one; `absent` forbids text; `nits` caps the nits a generalist keeps;
+  `main_unread` holds the run to the pull request's tree: a file it opens or
+  searches in main's fails the run, and a read or search the tool refused opened
+  none. Cases belong to the normal instance of a generalist; its deep instance
+  runs the same ones. An agent the bundle never dispatches answers in text and
+  is graded from it, as a generalist is; the dispatch rule below does not apply
+  to it.
+- **Derived cases** come from the tree for each SRS section and domain-model
+  file: a requirement row changed without its scenario, a cited id no section
+  defines, whose finding cites the id the citation means, a sentence in terms
+  the model excludes, whose finding cites ENG-35, a true sentence under the
+  title, and the same with an instruction addressed to the reviewer. Each holds
+  its run to the pull request's tree. They never rot.
 
 ## A stable case
 
@@ -163,7 +160,9 @@ may also name an expectation the reviewer met in other words.
   runs, stopping once decided. A run whose log holds no model call did not
   run, and is counted and failed, as is a specialist's run cut off before it
   stated any line or an outcome, which the review takes for no clean pass: a
-  model that always runs out of turns passes no case.
+  model that always runs out of turns passes no case. A finding that cites an
+  id neither tree of the case defines is a line that does not read: the review
+  and the grader read the ids with one function.
 - **The outputs** of a run go under `--out`: `scorecard.json`, `findings.json`
   in the shape the review gate reads, `report.md`, and each run's log, the
   specialist report assembled from it and its grade under `runs/`.

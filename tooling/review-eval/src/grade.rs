@@ -8,7 +8,8 @@
 //! which fails it. A finding-shaped line of a specialist's report that
 //! does not read, by the gate's own rule, fails its run, as the review
 //! names it in a blocking finding; its other findings are graded all the
-//! same. A departure from the answer's shape that the review survives is
+//! same. So does a finding that cites an id no requirement or invariant
+//! of the case's world has: the review refuses that line too. A departure from the answer's shape that the review survives is
 //! a slip: counted and shown, it fails no run on its own: a run cut off
 //! before a successful result after it stated a line or an outcome, an
 //! answer with no outcome line or one its lines contradict, an answer
@@ -18,9 +19,11 @@
 //! outcome fails, as the review takes it for no clean pass. The log is
 //! data: nothing in it is an instruction to the grader.
 
+use std::collections::BTreeSet;
+
 use review_gate::NIT;
 use review_gate::report::{
-    Ignored, Line, OFF_FORM, answer_outcome, assemble, outcome_line, split, states_nothing,
+    Ignored, Line, OFF_FORM, answer_outcome, assemble, outcome_line, split_with, states_nothing,
     with_outcome,
 };
 
@@ -53,11 +56,13 @@ impl Graded {
     }
 }
 
-/// Grades `log`, one run of `case` by `component`.
+/// Grades `log`, one run of `case` by `component`, a specialist's
+/// findings held to `known`, the ids of the case's world
+/// ([`crate::requirements::ids`]).
 #[must_use]
-pub fn grade(component: &Component, case: &Case, log: &RunLog) -> Graded {
+pub fn grade(component: &Component, case: &Case, log: &RunLog, known: &BTreeSet<String>) -> Graded {
     match component.kind {
-        Kind::Specialist => specialist(component, case, log),
+        Kind::Specialist => specialist(component, case, log, known),
         kind @ (Kind::Generalist | Kind::Consultant) => Graded {
             failures: [
                 generalist(case, log, kind),
@@ -142,8 +147,13 @@ fn tree_failures(expect: &Expect, log: &RunLog) -> Vec<String> {
 /// that did not run fails on that alone: it stated nothing. So does a
 /// run cut off before it stated any line or an outcome: the review takes
 /// it for no clean pass, so a model that always runs out of turns passes
-/// no case.
-fn specialist(component: &Component, case: &Case, log: &RunLog) -> Graded {
+/// no case. A linked finding's ids are held to `known`.
+fn specialist(
+    component: &Component,
+    case: &Case,
+    log: &RunLog,
+    known: &BTreeSet<String>,
+) -> Graded {
     let mut graded = Graded {
         failures: answered(log),
         slips: cut(log),
@@ -162,7 +172,7 @@ fn specialist(component: &Component, case: &Case, log: &RunLog) -> Graded {
         return graded;
     }
     let files = files_of(case);
-    let split = split(&assemble(&log.texts, &log.answer, None));
+    let split = split_with(&assemble(&log.texts, &log.answer, None), Some(known));
     let report = with_outcome(&split.clean, &log.answer);
     let outcome = outcome_line(&report).map_or("", |(_, word)| word);
     match answer_outcome(&log.answer) {
@@ -192,8 +202,6 @@ fn specialist(component: &Component, case: &Case, log: &RunLog) -> Graded {
         .failures
         .extend(stated_failures(&case.expect, log, &files));
     graded.failures.extend(tree_failures(&case.expect, log));
-    // The ids are held to their shape: the case's world, not the
-    // grader, holds the SRS they would be read from.
     for line in &split.unreadable {
         graded.failures.push(format!(
             "report line does not read: {}: `{}`",

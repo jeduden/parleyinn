@@ -1267,6 +1267,7 @@ dependencies = [
  "serde",
  "serde_json",
  "sha2",
+ "srs",
  "testkit",
  "toml",
 ]
@@ -1304,7 +1305,6 @@ dependencies = [
  "serde",
  "serde_json",
  "sha2",
- "srs",
  "testkit",
 ]
 

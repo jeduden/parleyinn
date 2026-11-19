@@ -380,18 +380,19 @@ Feature: Engineering quality (ENG)
     And the review workflow's evaluate job runs "cargo run --locked --quiet -p review-eval" on the components the pull request changes, after the agents' job and before the job that holds the "JEDUDEN_REVIEW_AGENT_KEY" key
     And a pull request that changes only the shared section "docs/agents/specialist-report.md" runs the cases of one component per distinct set of such sections instead of every component's
     And a run of a case is graded:
-      | outcome     | finding | forbidden | answer       | stated         | answered | run                     |
-      | as expected | found   | none      | outcome line | before answer  | yes      | passes                  |
-      | other       | missing | none      | outcome line | before answer  | yes      | fails on outcome        |
-      | other       | found   | none      | outcome line | before answer  | yes      | passes, slips on answer |
-      | as expected | missing | found     | outcome line | before answer  | yes      | fails on finding        |
-      | as expected | found   | found     | outcome line | before answer  | yes      | fails on forbidden      |
-      | as expected | found   | none      | more         | before answer  | yes      | passes, slips on answer |
-      | as expected | found   | none      | no outcome   | before answer  | yes      | passes, slips on answer |
-      | as expected | found   | none      | outcome line | only in answer | yes      | fails on stating        |
-      | as expected | found   | none      | outcome line | before answer  | no       | fails on no answer      |
-      | as expected | found   | none      | outcome line | before answer  | cut      | passes, slips on cut    |
-      | other       | missing | none      | no outcome   | before answer  | cut      | fails on cut            |
+      | outcome     | finding    | forbidden | answer       | stated         | answered | run                     |
+      | as expected | found      | none      | outcome line | before answer  | yes      | passes                  |
+      | other       | missing    | none      | outcome line | before answer  | yes      | fails on outcome        |
+      | other       | found      | none      | outcome line | before answer  | yes      | passes, slips on answer |
+      | as expected | missing    | found     | outcome line | before answer  | yes      | fails on finding        |
+      | as expected | found      | found     | outcome line | before answer  | yes      | fails on forbidden      |
+      | as expected | found      | none      | more         | before answer  | yes      | passes, slips on answer |
+      | as expected | found      | none      | no outcome   | before answer  | yes      | passes, slips on answer |
+      | as expected | found      | none      | outcome line | only in answer | yes      | fails on stating        |
+      | as expected | found      | none      | outcome line | before answer  | no       | fails on no answer      |
+      | as expected | found      | none      | outcome line | before answer  | cut      | passes, slips on cut    |
+      | other       | missing    | none      | no outcome   | before answer  | cut      | fails on cut            |
+      | as expected | unknown id | none      | outcome line | before answer  | yes      | fails on report         |
     And a case passes with two of three runs, stopping once decided:
       | runs             | case   | runs made |
       | pass, pass       | passes | 2         |
