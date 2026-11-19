@@ -9,8 +9,8 @@
 //! `review/reports/`.
 //! It also writes what the review did not review whole,
 //! `review/gaps.json` and `review/not-reviewed.md`, the lines of the
-//! specialists' reports it set aside as no finding,
-//! `review/ignored.json`, and what it ran on,
+//! specialists' reports it set aside as no finding or read off their
+//! form, `review/ignored.json`, and what it ran on,
 //! `review/run-id.json`, and what this review spent, `review/spend.json`,
 //! holding its runs to the pull request's cap beside what
 //! `--spent-before` says its earlier reviews spent, the sum the next
@@ -408,11 +408,14 @@ fn record(
     if let Some(resume) = &p.resume {
         progress(&resumed_line(resume, runs));
     }
-    if !ignored.is_empty() {
-        progress(&format!(
-            "report lines set aside as no finding: {}, listed in {IGNORED}",
-            ignored.len()
-        ));
+    let (aside, off_form) = crate::reading::tally(&ignored);
+    for (said, n) in [
+        ("report lines set aside as no finding", aside),
+        ("finding lines read off their form", off_form),
+    ] {
+        if n > 0 {
+            progress(&format!("{said}: {n}, listed in {IGNORED}"));
+        }
     }
     // What was not reviewed whole is said last, never left for a
     // reader to take as clean.

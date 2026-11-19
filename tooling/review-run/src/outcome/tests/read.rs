@@ -155,6 +155,32 @@ fn the_lines_set_aside_are_listed_and_counted_and_block_nothing() {
 }
 
 #[test]
+fn a_finding_read_off_its_form_is_counted_apart_and_blocks_nothing() {
+    let (mut runs, reports) = all_answered(WEIGHED);
+    let why = "is a finding off its form, read as the finding it states";
+    let note = "note: read off its form: src/a.rs:3 — if not addressed: x, breaking I9";
+    runs[0].ignored = vec![line(None, note, why), line(None, note, why)];
+
+    let d = decide(&plan(DISPATCH), &runs, &reports, &known());
+
+    assert_eq!(d.outcome.verdict, "approve", "{:?}", d.outcome);
+    assert_eq!(d.ignored.len(), 2);
+    assert!(
+        d.outcome.summary.contains(
+            " Read off its form, as the finding it states: 2 lines of the specialists' reports \
+             (review/ignored.json)."
+        ),
+        "{}",
+        d.outcome.summary
+    );
+    assert!(
+        !d.outcome.summary.contains("Set aside as no finding"),
+        "{}",
+        d.outcome.summary
+    );
+}
+
+#[test]
 fn many_are_counted_in_the_plural() {
     let (mut runs, reports) = all_answered(WEIGHED);
     for run in &mut runs[..2] {

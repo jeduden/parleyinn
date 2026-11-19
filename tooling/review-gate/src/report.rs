@@ -35,8 +35,12 @@
 //! never left out as prose; so is one missing the dash after its place,
 //! `a.rs:1 if not addressed: …` or `a.rs:1: request: …`, with no later
 //! dash or with one, which is refused naming the missing dash, or with
-//! a dash and no place. A linked finding with a remark after its ids,
-//! `… — ENG-11 (provisional)`, is refused naming the remark. A line at
+//! a dash and no place. A line at a place that names its ids, yet off
+//! its form, a remark after them as `… — ENG-11 (provisional)`, a
+//! sentence that ends with them and no dash, or a request with no
+//! motivation set apart, is read as the finding it states ([`near`]):
+//! the assembly writes it in its form and notes the slip beside it,
+//! `note: read off its form: <line>`, which is counted (I6). A line at
 //! a place whose last part says all is well, `no finding`, `none`,
 //! `fine` or `sound`, is no defect in what is reviewed: the assembly
 //! keeps it as a note, `note: all is well, not a finding: <line>`, the
@@ -86,6 +90,10 @@ pub const WITHDREW_NOTHING: &str = "note: withdrew nothing at";
 /// What the note a line at a place that says all is well becomes starts
 /// with, before the line; a line that starts with it is prose.
 pub const ALL_WELL: &str = "note: all is well, not a finding:";
+/// What the note beside a finding read off its form starts with, before
+/// the line as its specialist wrote it; a line that starts with it is
+/// prose.
+pub const OFF_FORM: &str = "note: read off its form:";
 /// The words a line saying all is well ends with, in any case, after
 /// its last dash: a finding line ending with one is a note, not refused.
 pub const ALL_WELL_WORDS: [&str; 5] = ["no finding", "no findings", "none", "fine", "sound"];
@@ -191,9 +199,6 @@ pub enum Problem {
     /// dash after its place: a space or a colon where it belongs, as
     /// `a.rs:1 if not addressed: …` or `a.rs:1: request: …` reads.
     Undashed { line: usize },
-    /// A linked finding, its line number in the report, with a remark
-    /// after its ids, as `… — ENG-11 (provisional)` reads.
-    AfterIds { line: usize },
     /// A linked finding, its line number in the report, cites an id no
     /// requirement or invariant has.
     UnknownId { line: usize, id: String },
@@ -231,11 +236,6 @@ impl fmt::Display for Problem {
                  `path:line — if not addressed: …` or `path:line — request: …`, the dash between \
                  spaces"
             ),
-            Self::AfterIds { line } => write!(
-                f,
-                "has a report whose line {line} writes more after its ids: a finding line ends with its \
-                 ids, so state a finding only once it stands, and correct it later with revised:"
-            ),
             Self::UnknownId { line, id } => write!(
                 f,
                 "has a report whose line {line} cites {id}, which no requirement or invariant has"
@@ -261,15 +261,32 @@ impl fmt::Display for Problem {
     }
 }
 
-/// Reads one line of a specialist's report.
+/// Reads one line of a specialist's report, a finding in a near form
+/// ([`near`]) as the finding it states.
 #[must_use]
 pub fn line(text: &str) -> Line {
+    read(text, true)
+}
+
+/// Whether `text` reads as a finding, a request or a revision only off
+/// its form: in a near form, and in no form when held to the forms.
+#[must_use]
+pub fn off_form(text: &str) -> bool {
+    read(text, false) == Line::Malformed && line(text) != Line::Malformed
+}
+
+/// Reads one line of a specialist's report, with the near forms when
+/// `near`, else held to the forms alone.
+fn read(text: &str, near: bool) -> Line {
     let text = bare(text);
-    if strip_word(text, WITHDREW_NOTHING).is_some() || strip_word(text, ALL_WELL).is_some() {
+    if [WITHDREW_NOTHING, ALL_WELL, OFF_FORM]
+        .iter()
+        .any(|note| strip_word(text, note).is_some())
+    {
         return Line::Prose;
     }
     if let Some(rest) = strip_word(text, REVISED) {
-        return revision(rest).map_or(Line::Malformed, Line::Revised);
+        return revision(rest, near).map_or(Line::Malformed, Line::Revised);
     }
     if let Some(rest) = strip_word(text, WITHDRAWN) {
         return withdrawal(rest).map_or(Line::Malformed, Line::Withdrawn);
@@ -299,10 +316,19 @@ pub fn line(text: &str) -> Line {
         };
     };
     let second = second.trim();
-    let read = if let Some(consequence) = strip_word(second, IF_NOT_ADDRESSED) {
-        linked(path, number, consequence, rest).map(Line::Linked)
+    let read = if let Some(said) = strip_word(second, IF_NOT_ADDRESSED) {
+        linked(said, rest)
+            .or_else(|| near.then(|| near::linked(said, rest)).flatten())
+            .map(|(consequence, ids)| {
+                Line::Linked(Linked {
+                    path,
+                    line: number,
+                    consequence,
+                    ids,
+                })
+            })
     } else if let Some(asked) = strip_word(second, REQUEST) {
-        request(path, number, asked, rest).map(Line::Request)
+        request(path, number, asked, rest, near).map(Line::Request)
     } else {
         None
     };
@@ -370,13 +396,13 @@ fn strip_word<'a>(text: &'a str, word: &str) -> Option<&'a str> {
         .map(|_| text[word.len()..].trim())
 }
 
-/// A linked finding at `path:number`: a consequence, and after the last
-/// dash its ids, each well formed.
-fn linked(path: String, number: usize, consequence: &str, rest: &[&str]) -> Option<Linked> {
+/// The consequence and ids of a linked finding in its form: `said`,
+/// then after the last dash of `rest` its ids, each well formed.
+fn linked(said: &str, rest: &[&str]) -> Option<(String, Vec<String>)> {
     let [middle @ .., ids] = rest else {
         return None;
     };
-    let consequence = std::iter::once(consequence)
+    let consequence = std::iter::once(said)
         .chain(middle.iter().map(|p| p.trim()))
         .collect::<Vec<_>>()
         .join(" — ");
@@ -384,69 +410,42 @@ fn linked(path: String, number: usize, consequence: &str, rest: &[&str]) -> Opti
         .split(',')
         .map(|id| id.trim().trim_matches(['`', '*', '_', '.']).to_owned())
         .collect();
-    (!consequence.is_empty() && ids.iter().all(|id| id_shaped(id))).then_some(Linked {
-        path,
-        line: number,
-        consequence,
-        ids,
-    })
+    (!consequence.is_empty() && ids.iter().all(|id| id_shaped(id))).then_some((consequence, ids))
 }
 
 /// A requirement request at `path:number`: a change word and the
-/// requirement, then after a dash its motivation. A request with no
-/// such dash gives its motivation after the first of [`REASONS`]: a
-/// reviewer that writes `; `, `: ` or `because` there asked all the same.
-fn request(path: String, number: usize, asked: &str, rest: &[&str]) -> Option<Request> {
+/// requirement, then after a dash its motivation. With `near`, one with
+/// no motivation after a dash takes what [`near::motivated`] gives it.
+fn request(path: String, number: usize, asked: &str, rest: &[&str], near: bool) -> Option<Request> {
     let (change, requirement) = asked.split_once(' ')?;
     let change = change.to_lowercase();
-    let (requirement, undashed) = match rest {
-        [] => reasoned(requirement),
-        _ => (requirement, ""),
+    let stated = rest.join(" — ");
+    let (requirement, motivation) = match stated.trim() {
+        "" if near => near::motivated(requirement),
+        stated => (requirement, stated),
     };
     let requirement = requirement.trim();
-    let motivation = format!("{undashed}{}", rest.join(" — ")).trim().to_owned();
     (CHANGES.contains(&change.as_str()) && !requirement.is_empty() && !motivation.is_empty()).then(
         || Request {
             path,
             line: number,
             change,
             requirement: requirement.to_owned(),
-            motivation,
+            motivation: motivation.to_owned(),
         },
     )
 }
 
-/// What may stand between a request's requirement and its motivation
-/// where the dash is left out.
-const REASONS: [&str; 7] = [
-    "; ",
-    ": ",
-    ". ",
-    ", since ",
-    ", because ",
-    " since ",
-    " because ",
-];
-
-/// `asked` cut at the first of [`REASONS`] in it: the requirement and
-/// the motivation, which is empty when it holds none.
-fn reasoned(asked: &str) -> (&str, &str) {
-    REASONS
-        .iter()
-        .filter_map(|sep| asked.find(sep).map(|at| (at, sep.len())))
-        .min()
-        .map_or((asked, ""), |(at, len)| (&asked[..at], &asked[at + len..]))
-}
-
 /// A revision, `rest` after `revised:`: one full finding line in one of
 /// the two forms. A moved finding is withdrawn, then stated, so a line
-/// with an arrow, the old place before it or not, is in no form.
-fn revision(rest: &str) -> Option<Revision> {
+/// with an arrow, the old place before it or not, is in no form. The
+/// finding line is read with the near forms when `near`.
+fn revision(rest: &str, near: bool) -> Option<Revision> {
     if ARROWS.iter().any(|arrow| rest.contains(arrow)) {
         return None;
     }
     let finding = bare(rest);
-    let (path, number) = match line(finding) {
+    let (path, number) = match read(finding, near) {
         Line::Linked(l) => (l.path, l.line),
         Line::Request(r) => (r.path, r.line),
         Line::Revised(_) | Line::Withdrawn(_) | Line::Malformed | Line::Prose => return None,
@@ -532,7 +531,9 @@ pub fn answer_outcome(answer: &str) -> Option<(&str, &'static str)> {
 /// removing them, then the answer's outcome line. A revision that finds
 /// nothing to replace states its finding line; a withdrawal that finds
 /// nothing to remove leaves a note in its stead
-/// ([`WITHDREW_NOTHING`]), so the reader sees it. A malformed line
+/// ([`WITHDREW_NOTHING`]), so the reader sees it. A finding read off its
+/// form is kept in its form, with a note beside it ([`OFF_FORM`]). A
+/// malformed line
 /// stays as written, so the report check names it; prose is left out. A
 /// specialist that did not run passes `incomplete`, which heads the
 /// report and says why.
@@ -544,7 +545,8 @@ pub fn assemble(texts: &[String], answer: &str, incomplete: Option<&str>) -> Str
         match line(&text) {
             Line::Prose => {}
             read @ (Line::Linked(_) | Line::Request(_)) => {
-                push_unique(&mut kept, Kept::of(render(&read).unwrap_or(text)));
+                push_unique(&mut kept, Kept::of(render(&read).unwrap_or(text.clone())));
+                note_off_form(&mut kept, &text);
             }
             Line::Malformed if all_well(&text) => {
                 push_unique(&mut kept, Kept::of(format!("{ALL_WELL} {text}")));
@@ -556,6 +558,7 @@ pub fn assemble(texts: &[String], answer: &str, incomplete: Option<&str>) -> Str
                 if !replace(&mut kept, (&r.path, r.line), finding.clone()) {
                     push_unique(&mut kept, finding);
                 }
+                note_off_form(&mut kept, &text);
             }
             Line::Withdrawn(w) => {
                 let before = kept.len();
@@ -623,6 +626,19 @@ impl Kept {
         self.place
             .as_ref()
             .is_some_and(|(p, n)| (p.as_str(), *n) == at)
+    }
+}
+
+/// Adds to `kept` the note that `text`, a line just kept in its form,
+/// was read off its form ([`OFF_FORM`]), when it was: a note stands at
+/// no place, so no revision or withdrawal removes it.
+fn note_off_form(kept: &mut Vec<Kept>, text: &str) {
+    if off_form(text) {
+        let note = Kept {
+            text: format!("{OFF_FORM} {text}"),
+            place: None,
+        };
+        push_unique(kept, note);
     }
 }
 
@@ -720,15 +736,13 @@ pub fn findings_check(text: &str, known: Option<&BTreeSet<String>>) -> Option<Pr
 }
 
 /// What `text`, a malformed line at `number` in its report, is refused
-/// for: the template's place copied, a missing dash after its place, a
-/// remark after its ids, no id cited, or no form at all.
+/// for: the template's place copied, a missing dash after its place, no
+/// id cited, or no form at all.
 fn form_problem(text: &str, number: usize) -> Problem {
     if at_template(text) {
         Problem::TemplatePlace { line: number }
     } else if missing_dash(text) {
         Problem::Undashed { line: number }
-    } else if after_ids(text) {
-        Problem::AfterIds { line: number }
     } else if unlinked(text) {
         Problem::Unlinked { line: number }
     } else {
@@ -794,22 +808,6 @@ fn defect_marked(text: &str) -> bool {
         let wanted: Vec<&str> = marker.split(' ').collect();
         words.windows(wanted.len()).any(|w| w == wanted.as_slice())
     })
-}
-
-/// Whether `text`, a malformed line, is a linked finding with a remark
-/// after its ids: after its last dash, an id first, then more.
-fn after_ids(text: &str) -> bool {
-    let parts = split_dashes(bare(text));
-    let [first, second, .., last] = parts.as_slice() else {
-        return false;
-    };
-    let id = last
-        .split_whitespace()
-        .next()
-        .map(|id| id.trim_matches(['`', '*', '_', '.', ',', ';']));
-    place(first).is_some()
-        && strip_word(second.trim(), IF_NOT_ADDRESSED).is_some()
-        && id.is_some_and(id_shaped)
 }
 
 /// Whether `text`, a malformed line, names [`TEMPLATE_PLACE`] where its
@@ -919,8 +917,10 @@ pub fn split_dashes(text: &str) -> Vec<&str> {
     }
 }
 
+mod near;
 mod stated;
 
+pub use near::NO_MOTIVATION;
 pub use stated::{
     CUT_BEFORE_STATING, Ignored, Reason, Split, Unreadable, derived_outcome, split, split_with,
     stated_check, states_nothing, with_outcome,

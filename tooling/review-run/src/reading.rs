@@ -2,8 +2,9 @@
 //! ended with (ENG-28). Its report is assembled from the lines it
 //! stated, split into what reads and what does not, and ended with an
 //! outcome its lines give, the specialist's own when it agrees: a line
-//! that says it is no finding is set aside and counted, and a
-//! finding-shaped line that does not read is named on its own, never
+//! that says it is no finding is set aside and counted, a finding off
+//! its form is read as the finding it states and its slip counted, and
+//! a finding-shaped line that does not read is named on its own, never
 //! discarding the findings beside it. Whether the specialist read its
 //! whole diff is decided from the `Read` calls its log shows, never from
 //! what it says: each range of its diff file no read covered is named.
@@ -18,18 +19,19 @@ use review_bundle::cli::DIFFS;
 use review_eval::coverage;
 use review_eval::log::{ReadCall, RunLog};
 use review_gate::report::{
-    CUT_BEFORE_STATING, assemble, outcome_line, split_with, states_nothing, with_outcome,
+    CUT_BEFORE_STATING, Reason, assemble, outcome_line, split_with, states_nothing, with_outcome,
 };
 use serde::{Deserialize, Serialize};
 
 use crate::REVIEW;
 
 /// The lines of the specialists' reports the review set aside as no
-/// finding, beside the review outcome.
+/// finding, and the notes of the findings it read off their form,
+/// beside the review outcome.
 pub const IGNORED: &str = "review/ignored.json";
 
-/// A line of a specialist's report the review set aside, or could not
-/// read.
+/// A line of a specialist's report the review set aside, the note of
+/// a finding it read off its form, or a line it could not read.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct ReportLine {
@@ -46,6 +48,26 @@ pub struct ReportLine {
     pub why: String,
 }
 
+impl ReportLine {
+    /// Whether it notes a finding the review read off its form: the
+    /// finding stands in the report, in its form, and this line counts
+    /// the slip.
+    #[must_use]
+    pub fn off_form(&self) -> bool {
+        self.why == Reason::OffForm.to_string()
+    }
+}
+
+/// How many of `lines`, the report lines the review lists in
+/// [`IGNORED`], are set aside as no finding, then how many note a
+/// finding read off its form.
+#[must_use]
+pub fn tally(lines: &[ReportLine]) -> (usize, usize) {
+    let off_form = lines.iter().filter(|line| line.off_form()).count();
+
+    (lines.len() - off_form, off_form)
+}
+
 /// A specialist's report as the review reads it from its log.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Read {
@@ -53,7 +75,8 @@ pub struct Read {
     pub report: String,
     /// That outcome line: what the review takes as its answer.
     pub answer: String,
-    /// The lines set aside as no finding.
+    /// The lines set aside as no finding, and the notes of the findings
+    /// read off their form.
     pub ignored: Vec<ReportLine>,
     /// The finding-shaped lines that do not read.
     pub unreadable: Vec<ReportLine>,

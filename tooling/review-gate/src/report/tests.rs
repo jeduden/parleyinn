@@ -65,14 +65,11 @@ fn a_finding_line_in_neither_form_is_malformed() {
         "a.rs:1 — nit — x",
         "a.rs:1 — if not addressed: a hook panics",
         "a.rs:1 — if not addressed: — ENG-04",
-        "a.rs:1 — if not addressed: a hook panics — ENG-04 and I9",
         "a.rs:1 — if not addressed: a hook panics — eng-04",
         "a.rs:1 — if not addressed: a hook panics — -04",
         "a.rs:1 — if not addressed: a hook panics — ENG-",
         "a.rs:1 — if not addressed: a hook panics — I",
         "a.rs:1 — if not addressed: a hook panics — ",
-        "a.rs:1 — request: add a cap",
-        "a.rs:1 — request: add a cap — ",
         "a.rs:1 — request: add — why",
         "a.rs:1 — request: rename ENG-28 — why",
         "a.rs:1 — requested: add ENG-28 — why",
@@ -265,23 +262,6 @@ fn an_all_is_well_word_inside_a_finding_or_after_a_request_is_no_note() {
 
         assert!(!got.starts_with(ALL_WELL), "{text:?}: {got}");
         assert_eq!(line(text), want, "{text:?}");
-    }
-}
-
-#[test]
-fn a_report_check_names_a_finding_line_with_a_remark_after_its_ids() {
-    for text in [
-        "- `a.rs:1 — if not addressed: x — ENG-11` (provisional id; confirming against the SRS)",
-        "a.rs:1 — if not addressed: x — I2 (provisional)",
-        "a.rs:1 — if not addressed: x — ENG-04, I9 and more",
-    ] {
-        let report = format!("{text}\n{ANSWER}");
-
-        assert_eq!(
-            report_check(Some(&report), Some(ANSWER), None),
-            Some(Problem::AfterIds { line: 1 }),
-            "{text:?}"
-        );
     }
 }
 
@@ -586,11 +566,6 @@ fn every_problem_reads_as_a_sentence_about_the_report() {
              spaces",
         ),
         (
-            Problem::AfterIds { line: 7 },
-            "has a report whose line 7 writes more after its ids: a finding line ends with its \
-             ids, so state a finding only once it stands, and correct it later with revised:",
-        ),
-        (
             Problem::TemplatePlace { line: 5 },
             "has a report whose line 5 names the place path:line, the form's template, not a file and line",
         ),
@@ -881,10 +856,6 @@ fn form_problem_names_what_a_malformed_line_is_refused_for() {
     for (text, want) in [
         ("path:line — fine", Problem::TemplatePlace { line: 3 }),
         ("a.rs:1 if not addressed: x", Problem::Undashed { line: 3 }),
-        (
-            "a.rs:1 — if not addressed: x — I2 (yes)",
-            Problem::AfterIds { line: 3 },
-        ),
         ("a.rs:1 — the range matches", Problem::Unlinked { line: 3 }),
         ("a.rs:1 — nit — x", Problem::Malformed { line: 3 }),
     ] {
@@ -956,26 +927,4 @@ fn a_request_with_a_dash_keeps_its_requirement_whole() {
 
     assert_eq!(r.requirement, "a cap; a small one");
     assert_eq!(r.motivation, "reports grow");
-}
-
-#[test]
-fn a_request_is_cut_at_its_first_reason_and_whole_without_one() {
-    assert_eq!(
-        reasoned("a cap; it grows: fast"),
-        ("a cap", "it grows: fast")
-    );
-    assert_eq!(
-        reasoned("a cap on docs/ci.md:23"),
-        ("a cap on docs/ci.md:23", "")
-    );
-    for (asked, motivation) in [
-        ("a cap since none holds it", "none holds it"),
-        ("a cap, since none holds it", "none holds it"),
-        ("a cap because it grows", "it grows"),
-        ("a cap, because it grows", "it grows"),
-        ("a cap: it grows", "it grows"),
-        ("a cap. It grows", "It grows"),
-    ] {
-        assert_eq!(reasoned(asked), ("a cap", motivation), "{asked:?}");
-    }
 }

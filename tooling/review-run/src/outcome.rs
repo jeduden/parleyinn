@@ -14,7 +14,7 @@
 //! generalist's finding line the review cannot read are each named in a
 //! blocking finding of its own, so the review is decided all the same
 //! and the author sees why it was not approved; each line a specialist
-//! set aside as no finding is counted. The gate still refuses to post a
+//! set aside as no finding is counted, and each finding read off its form. The gate still refuses to post a
 //! review a dispatched agent did not run in or whose report it refuses
 //! (ENG-28), as its consulted list and reports show it.
 
@@ -30,7 +30,7 @@ use review_gate::{
 
 use crate::gaps::{self, Gap};
 use crate::plan::{Plan, report_file};
-use crate::reading::ReportLine;
+use crate::reading::{IGNORED, ReportLine};
 use crate::run::AgentRun;
 
 /// Where a finding about the review itself points: the review's own
@@ -52,7 +52,8 @@ pub struct Decision {
     /// Every dispatched agent, or part of one, the review did not
     /// review whole, by name: never clean.
     pub not_reviewed: Vec<Gap>,
-    /// Every line of a specialist's report set aside as no finding.
+    /// Every line of a specialist's report set aside as no finding, and
+    /// the note of every finding read off its form.
     pub ignored: Vec<ReportLine>,
 }
 
@@ -111,7 +112,7 @@ pub fn decide(
                 run.answered() && run.cut.is_some() && plan.generalists().contains(&run.name)
             })
             .count(),
-        ignored: ignored.len(),
+        ignored: crate::reading::tally(&ignored),
     };
 
     Decision {
@@ -854,8 +855,9 @@ struct Counts<'a> {
     cut: usize,
     /// The generalists cut off, whose weighing is what their log states.
     cut_generalists: usize,
-    /// The lines set aside as no finding.
-    ignored: usize,
+    /// The lines set aside as no finding, then the findings read off
+    /// their form.
+    ignored: (usize, usize),
 }
 
 /// The agents the summary names for what went wrong.
@@ -926,13 +928,14 @@ fn summary(counts: &Counts, named: &Named, closings: &[String]) -> String {
             counted(counts.cut_generalists, "generalist")
         );
     }
-    if counts.ignored > 0 {
-        let _ = write!(
-            s,
-            " Set aside as no finding: {} of the specialists' reports ({}).",
-            counted(counts.ignored, "line"),
-            crate::reading::IGNORED
-        );
+    for (said, n) in [
+        ("Set aside as no finding", counts.ignored.0),
+        ("Read off its form, as the finding it states", counts.ignored.1),
+    ] {
+        if n > 0 {
+            let lines = counted(n, "line");
+            let _ = write!(s, " {said}: {lines} of the specialists' reports ({IGNORED}).");
+        }
     }
     for (label, names) in [
         ("Did not run", named.silent),
