@@ -47,7 +47,7 @@ pub const GENERALIST_BUDGET_USD: f64 = 1.50;
 /// at what is left in place of its tier's cap. Of 596 generalist runs
 /// on record the dearest cost 0.70 and no other more than 0.25, so the
 /// dearest with a margin, and half the tier's cap.
-pub const GENERALIST_RESERVE_USD: f64 = 0.75;
+pub const GENERALIST_RESERVE_USD: f64 = GENERALIST_BUDGET_USD / 2.0;
 
 /// The result subtype of a run its `--max-budget-usd` cap stopped.
 pub const OVER_BUDGET: &str = "error_max_budget_usd";

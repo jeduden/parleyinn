@@ -11,8 +11,8 @@ summary: >-
   it states, a blocking finding stands until a dropped line withdraws
   it, a stakeholder's comment changes nothing an agent reads, so no
   agent restates a missing consent, a review that runs dry says what to
-  do, a generalist reserves what
-  generalists cost, the evaluation holds ids to the known requirements,
+  do, a generalist starts on what is left of the pull request's cap,
+  the evaluation holds ids to the known requirements,
   and the bundle marks added lines that stand on main.
 model: opus
 depends-on: [2610282358]
@@ -81,8 +81,9 @@ its evidence asks for today.
    consent (phase 3, ENG-28).
 4. A review that runs out of its pull request's budget names the
    budget, what was spent and how it is reset (phase 4, ENG-28).
-5. A generalist reserves what generalists cost on record, with a
-   margin, in place of its whole cap (phase 5, ENG-28).
+5. A generalist whose whole cap can no longer fit starts once half of
+   it is left of the pull request's cap, capped at what is left
+   (phase 5, ENG-28).
 6. The evaluation holds a finding's ids to the known requirements, as
    the review does (phase 6, ENG-32).
 7. The bundle marks added lines that stand word for word on main, and
@@ -97,7 +98,7 @@ its evidence asks for today.
 | 2     | opus  | A generalist's log that states a nit after a blocking finding at one place keeps the blocking one; its case passes    |
 | 3     | opus  | The bundle writes an agent the same files with and without consent; clean cases on stakeholder paths pass unconsented |
 | 4     | opus  | The gate's check summary of a review that ran dry names the budget, the spend and the reset                           |
-| 5     | opus  | A deep review whose generalists cost what they do on record starts every agent inside the cap                         |
+| 5     | opus  | With 0.90 USD left of the cap a review starts every agent, each generalist capped at what is left                     |
 | 6     | opus  | A run citing an id no requirement has fails its evaluation case, as the review blocks it                              |
 | 7     | opus  | A specialist's case for a moved file passes: no finding at a line main already holds                                  |
 
@@ -132,6 +133,7 @@ footer: |
 |     | ↳      | ENG-28 now has the review bundle write an agent the same bundle and review context whatever the stakeholder's comments say: the findings that turn on consent go to the review gate alone, and each agent reads that consent is the gate's check. So the outcome a comment's review reuses holds no line that restates a missing consent. Two clean cases on stakeholder paths with no consenting comment failed 5 of 8 runs before the change and none for consent after it. The ENG-28 scenario step, a record check and three drift cases land with it. |
 | 4   | ✅     | [A review a cost cap stopped says what to do](phase-4.md)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
 |     | ↳      | ENG-28 now has a step that fails without deciding post the check failed with its own error in the summary. The error names each dispatched agent that did not run with the reason the review outcome gives. Where a cost cap kept one from starting, that holds what the pull request's reviews cost and the cap, and the error adds how what they spent is reset. The gate's rule is unchanged: it decides no review that left an agent out. A scenario step, a record check and four drift cases land with it.                                           |
+| 5   | ✅     | [A generalist starts on what is left of the pull request's cap](phase-5.md)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
 <?/catalog?>
 
 ## Acceptance Criteria

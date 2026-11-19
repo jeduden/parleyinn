@@ -181,6 +181,7 @@ fn late_cases() -> Vec<Case> {
         review_logs::review_reading_cases(),
         context::review_consent_cases(),
         spend::review_capped_cases(),
+        spend::review_reserve_cases(),
     ]
     .concat()
 }
