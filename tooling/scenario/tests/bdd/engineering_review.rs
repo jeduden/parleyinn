@@ -303,6 +303,20 @@ fn key_job_posts_check(w: &mut World, check: String) -> Result<(), String> {
 }
 
 #[then(
+    regex = r"^a review gate that fails to decide says why in the summary of the check it fails: its own error, which names each dispatched agent that did not run with the reason the review outcome gives, and for a review a cost cap kept agents out of what the pull request's reviews cost, the cap and how what they spent is reset$"
+)]
+fn gate_says_why(w: &mut World) -> Result<(), String> {
+    let work = testkit::TempDir::new().map_err(|e| format!("make a work directory: {e}"))?;
+    let e = eng(w);
+    let mut problems = engineering::review_capped::check_problems(&e.flow, e.key()?)?;
+    problems.extend(engineering::review_capped::capped_problems(
+        e.checkout()?,
+        work.path(),
+    ));
+    outcome(problems)
+}
+
+#[then(
     regex = r"^every language the repository's source and configuration are written in has its specialist$"
 )]
 fn every_language_has_its_specialist(w: &mut World) -> Result<(), String> {

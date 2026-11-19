@@ -301,9 +301,13 @@ pub fn silent_problems(workdir: &Path) -> Vec<String> {
             "the part of {SPECIALIST} that did not run is not its gap: {gaps:?}"
         ));
     }
+    // The gate names it with why it did not run, or alone.
+    let with_why = format!("{SPECIALIST} (");
     let refused = crate::review_refusals::gate(workdir).is_err_and(|e| {
         e.split_once("dispatched but not consulted: ")
-            .is_some_and(|(_, names)| names.split(", ").any(|n| n == SPECIALIST))
+            .is_some_and(|(_, names)| {
+                (names.split(", ")).any(|n| n == SPECIALIST || n.starts_with(&with_why))
+            })
     });
     if !refused {
         problems.push(format!(

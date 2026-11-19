@@ -74,7 +74,11 @@ is short, because a finding found late costs a whole round.
   log is read as its report, and the `Read` calls in it decide whether
   it read its whole diff, each unread range a `partial:` gap. Deleting the pull
   request's `review-spend-pr-<N>-a*` artifacts resets its budget, and
-  `--max-cost-usd` overrides the cap.
+  `--max-cost-usd` overrides the cap. The gate decides no review that
+  left an agent out. The `review-gate` check it fails then holds the
+  gate's error in its summary: each agent that did not run and why, and
+  for one the cap kept from starting what the reviews cost, the cap and
+  this reset.
 - A stakeholder's comment on a head the agents already reviewed costs
   nothing. Each review keeps its review outcome, with the head and
   dispatch it was decided on, in its `review-reports` artifact. The

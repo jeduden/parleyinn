@@ -327,6 +327,7 @@ Feature: Engineering quality (ENG)
     And that job decides the review with "--consulted consulted.json"
     And that job decides the review with "--reports reports --answers answers.json"
     And that job posts its decision as the "review-gate" check
+    And a review gate that fails to decide says why in the summary of the check it fails: its own error, which names each dispatched agent that did not run with the reason the review outcome gives, and for a review a cost cap kept agents out of what the pull request's reviews cost, the cap and how what they spent is reset
     And every agent the review bundle can dispatch is defined, specialists at low effort, generalists at medium and their deep instances each naming its own effort, model and turn budget
     And every language the repository's source and configuration are written in has its specialist
     And the review gate decides:
