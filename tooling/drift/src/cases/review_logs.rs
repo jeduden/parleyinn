@@ -98,7 +98,29 @@ pub(super) fn review_log_cases() -> Vec<Case> {
     cases.extend(cut_before_stating_cases());
     cases.push(part_case());
     cases.push(unread_case());
+    cases.push(early_line_case());
     cases
+}
+
+/// A generalist's weighing line its final answer leaves out no longer
+/// counted by the grader: its instructions ask for the whole weighing
+/// in the final answer, and the slip is how an evaluation run shows a
+/// line stated before it.
+fn early_line_case() -> Case {
+    case(
+        "the grader not counting a generalist's line its final answer leaves out",
+        "ENG-32",
+        Injection::replace(
+            "tooling/review-eval/src/grade/early.rs",
+            "        if strict(line) && !held && !early.contains(&line) {\n",
+            "        if strict(line) && !held && early.contains(&line) {\n",
+        ),
+        cargo_lib_test(
+            "review-eval",
+            "grade::early::tests::a_weighing_line_the_final_answer_does_not_hold_is_a_slip",
+        ),
+        "a_weighing_line_the_final_answer_does_not_hold_is_a_slip",
+    )
 }
 
 /// A run cut off before it stated any line or an outcome taken for a
