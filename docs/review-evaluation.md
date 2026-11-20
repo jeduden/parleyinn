@@ -139,8 +139,8 @@ may also name an expectation the reviewer met in other words.
   the weighing `review-run` reads, by the one shared rule: each `blocking` or
   `nit` finding, `dropped — path:line` or `none —` line it stated as it went,
   other working notes left out, then its final answer's lines, all read; the
-  last for a place and the source it names stands, a `blocking` finding beside
-  a later `nit`; each finding it must drop on a line that starts with
+  last for a place and the source it names stands; a `blocking` finding stands
+  beside a later `nit`; each finding it must drop on a line that starts with
   `dropped` or gives it as its severity. A consultant is read from its answer.
   A case that holds its run to the pull request's tree fails a run that read
   or searched a file of the repository at the work directory's root, which is
@@ -150,20 +150,20 @@ may also name an expectation the reviewer met in other words.
   run: `pr-head/` holds no copy of them, the pull request's being text in
   `review/`. A specialist's report is read as the review reads it: assembled
   from the log, split into the lines that read and those that do not, and
-  ended with an outcome its lines give. A finding-shaped line that does not
-  read fails its run, its other findings graded all the same. A departure the
-  review survives is a slip: a run cut off before a successful result after it
-  stated a line or an outcome, an answer with no outcome line or one its lines
-  contradict, an answer that is more than the outcome line, a line set aside
-  as no finding, a finding line off its form, which the review reads as the
-  finding it states, an eleventh finding, a place written as a tail of its
-  path. Slips are counted and shown per run and fail none. The instructions
-  still say text after the ids refuses a report: the review is the more
-  lenient on purpose, and counts the slip. A case passes with two of three
-  runs, stopping once decided. A run whose log holds no model call did not
-  run, and is counted and failed, as is a specialist's run cut off before it
-  stated any line or an outcome, which the review takes for no clean pass: a
-  model that always runs out of turns passes no case.
+  ended with an outcome its lines give. A finding-shaped line that does not read
+  fails its run, its other findings graded all the same. A departure the review
+  survives is a slip: a run cut off before a successful result after it stated a
+  line or an outcome, an answer with no outcome line or one its lines
+  contradict, an answer of more than the outcome line, a line set aside as no
+  finding, a finding line off its form, read as the finding it states, an
+  eleventh finding, a place written as a tail of its path, a generalist's
+  weighing line its final answer does not hold. Slips are counted, shown per run
+  and fail none. The instructions still say text after the ids refuses a report:
+  the review is the more lenient on purpose, and counts the slip. A case passes
+  with two of three runs, stopping once decided. A run whose log holds no model
+  call did not run, and is counted and failed, as is a specialist's run cut off
+  before it stated any line or an outcome, which the review takes for no clean
+  pass: a model that always runs out of turns passes no case.
 - **The outputs** of a run go under `--out`: `scorecard.json`, `findings.json`
   in the shape the review gate reads, `report.md`, and each run's log, the
   specialist report assembled from it and its grade under `runs/`.
