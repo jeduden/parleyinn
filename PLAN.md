@@ -30,6 +30,7 @@ empty: |
 | 2610282358 | opus   | [Reviewer evaluation: every reviewer component against its cases](plan/2610282358_reviewer-evaluation/plan.md)                       |
 | 2610292344 | opus   | [Deterministic review orchestration: code routes the review](plan/2610292344_deterministic-review/plan.md)                           |
 | 2611020828 | opus   | [Review convergence: rulings settle, contests are checkable, a fresh reader paraphrases](plan/2611020828_review-convergence/plan.md) |
+| 2611190753 | opus   | [Review stability: the open options, each with its tests](plan/2611190753_review-stability-options/plan.md)                          |
 <?/catalog?>
 
 ## All plans
@@ -85,4 +86,5 @@ empty: |
 | 2610282358 | 🔳     | opus   | [Reviewer evaluation: every reviewer component against its cases](plan/2610282358_reviewer-evaluation/plan.md)                       |
 | 2610292344 | 🔳     | opus   | [Deterministic review orchestration: code routes the review](plan/2610292344_deterministic-review/plan.md)                           |
 | 2611020828 | 🔳     | opus   | [Review convergence: rulings settle, contests are checkable, a fresh reader paraphrases](plan/2611020828_review-convergence/plan.md) |
+| 2611190753 | 🔳     | opus   | [Review stability: the open options, each with its tests](plan/2611190753_review-stability-options/plan.md)                          |
 <?/catalog?>

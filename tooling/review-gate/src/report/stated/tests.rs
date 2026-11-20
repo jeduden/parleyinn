@@ -88,6 +88,7 @@ fn a_split_sets_aside_the_notes_the_assembly_writes() {
             "a.rs:1 — if not addressed: x — I2".to_owned(),
             "withdrawn: b.rs:2 — it holds".to_owned(),
             "c.rs:3 — fine".to_owned(),
+            "d.rs:4 — if not addressed: y, breaking I3.".to_owned(),
         ],
         "outcome: findings — x",
         None,
@@ -97,15 +98,26 @@ fn a_split_sets_aside_the_notes_the_assembly_writes() {
 
     assert_eq!(
         got.clean,
-        "a.rs:1 — if not addressed: x — I2\noutcome: findings — x\n"
+        "a.rs:1 — if not addressed: x — I2\n\
+         d.rs:4 — if not addressed: y, breaking I3. — I3\n\
+         outcome: findings — x\n"
     );
     assert_eq!(
         got.ignored
             .iter()
             .map(|i| (i.line, i.reason))
             .collect::<Vec<_>>(),
-        [(2, Reason::WithdrewNothing), (3, Reason::AllWell)]
+        [
+            (2, Reason::WithdrewNothing),
+            (3, Reason::AllWell),
+            (5, Reason::OffForm)
+        ]
     );
+    assert_eq!(
+        got.ignored[2].text,
+        "note: read off its form: d.rs:4 — if not addressed: y, breaking I3."
+    );
+    assert!(got.unreadable.is_empty());
 }
 
 #[test]
@@ -134,7 +146,7 @@ fn a_split_keeps_a_revision_that_found_nothing_as_the_finding_it_states() {
 fn a_split_names_each_line_that_does_not_read_with_the_gate_s_problem() {
     let report = "I read it.\n\
                   a.rs:1 if not addressed: x — I2\n\
-                  a.rs:2 — if not addressed: x — I2 (provisional)\n\
+                  a.rs:2 — if not addressed: x\n\
                   a.rs:3 — the range matches\n\
                   `path:line` — if not addressed: x — I2\n\
                   revised: a.rs:4 — nit — x\n\
@@ -152,7 +164,7 @@ fn a_split_names_each_line_that_does_not_read_with_the_gate_s_problem() {
             .collect::<Vec<_>>(),
         [
             (2, Problem::Undashed { line: 2 }),
-            (3, Problem::AfterIds { line: 3 }),
+            (3, Problem::Unlinked { line: 3 }),
             (4, Problem::Unlinked { line: 4 }),
             (5, Problem::TemplatePlace { line: 5 }),
             (6, Problem::Malformed { line: 6 }),
@@ -306,6 +318,10 @@ fn every_reason_reads_as_a_sentence_about_the_line() {
         (
             Reason::Placeholder,
             "names a placeholder where its place belongs, not a file and line",
+        ),
+        (
+            Reason::OffForm,
+            "is a finding off its form, read as the finding it states",
         ),
     ] {
         assert_eq!(reason.to_string(), want);

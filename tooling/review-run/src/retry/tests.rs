@@ -84,23 +84,17 @@ fn a_line_ending_with_no_finding_is_a_note_and_no_refusal() {
 }
 
 #[test]
-fn a_missing_dash_and_a_remark_after_the_ids_quote_their_line() {
-    for (report, want) in [
-        (
-            "a.rs:1: if not addressed: x — I2\noutcome: findings — one.\n",
-            "names a place with no spaced dash after it: write `path:line — if not addressed: …` \
-             or `path:line — request: …`, the dash between spaces: \
-             `a.rs:1: if not addressed: x — I2`",
-        ),
-        (
-            "a.rs:1 — if not addressed: x — I2 (provisional)\noutcome: findings — one.\n",
-            "correct it later with revised:: `a.rs:1 — if not addressed: x — I2 (provisional)`",
-        ),
-    ] {
-        let refused = refusal(report, "outcome: findings — one.", &known()).unwrap();
+fn a_missing_dash_quotes_its_line_and_a_remark_after_the_ids_is_taken() {
+    let report = "a.rs:1: if not addressed: x — I2\noutcome: findings — one.\n";
+    let want = "names a place with no spaced dash after it: write `path:line — if not addressed: \
+                …` or `path:line — request: …`, the dash between spaces: `a.rs:1: if not \
+                addressed: x — I2`";
 
-        assert!(refused.ends_with(want), "{refused}");
-    }
+    let refused = refusal(report, "outcome: findings — one.", &known()).unwrap();
+
+    assert!(refused.ends_with(want), "{refused}");
+    let near = "a.rs:1 — if not addressed: x — I2 (provisional)\noutcome: findings — one.\n";
+    assert_eq!(refusal(near, "outcome: findings — one.", &known()), None);
 }
 
 #[test]

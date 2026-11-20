@@ -57,6 +57,51 @@ fn a_line_that_is_no_finding_is_set_aside_with_why_and_the_finding_kept() {
 }
 
 #[test]
+fn a_finding_off_its_form_is_kept_in_its_form_and_its_slip_listed_and_told_apart() {
+    let near = "src/b.rs:1 — if not addressed: a drop goes uncounted, breaking ENG-28.";
+    let read = read(
+        ("lang-rust", None),
+        &texts(&[FINDING, near, "src/c.rs:2 — no finding"]),
+        "outcome: findings — two.",
+        &known(),
+    );
+
+    assert_eq!(
+        read.report,
+        format!(
+            "{FINDING}\n\
+             src/b.rs:1 — if not addressed: a drop goes uncounted, breaking ENG-28. — ENG-28\n\
+             outcome: findings — two.\n"
+        )
+    );
+    assert!(read.unreadable.is_empty(), "{:?}", read.unreadable);
+    // The assembled report holds the finding in its form on line 2 and
+    // the note beside it on line 3, the line the review lists; the line
+    // saying all is well is its line 4.
+    assert_eq!(
+        read.ignored[0],
+        ReportLine {
+            agent: "lang-rust".to_owned(),
+            part: None,
+            line: 3,
+            text: format!("note: read off its form: {near}"),
+            why: "is a finding off its form, read as the finding it states".to_owned(),
+        }
+    );
+    assert_eq!(read.ignored[1].line, 4);
+    assert!(read.ignored[0].off_form() && !read.ignored[1].off_form());
+    assert_eq!(tally(&read.ignored), (1, 1));
+    assert_eq!(tally(&[]), (0, 0));
+    assert_eq!(
+        summary(&read.ignored),
+        " Set aside as no finding: 1 line of the specialists' reports (review/ignored.json). \
+         Read off its form, as the finding it states: 1 line of the specialists' reports \
+         (review/ignored.json)."
+    );
+    assert_eq!(summary(&[]), "");
+}
+
+#[test]
 fn a_finding_line_that_does_not_read_is_named_and_the_others_kept() {
     let bad = "src/c.rs:2 — if not addressed: it breaks — ENG-999";
     let read = read(

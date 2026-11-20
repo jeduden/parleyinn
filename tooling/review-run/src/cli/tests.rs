@@ -210,6 +210,41 @@ fn a_line_set_aside_as_no_finding_is_listed_beside_the_outcome_counted_and_told(
 }
 
 #[test]
+fn a_finding_off_its_form_is_read_as_the_finding_it_states_listed_counted_and_told() {
+    let dir = workdir();
+    let near = "src/a.rs:3 — if not addressed: a long line hides a bug, breaking I9.";
+    let host = FakeHost::new(move |c| {
+        if fake::agent_of(c) == "lang-rust" {
+            let outcome = "outcome: findings — one.";
+            fake::answer(c, &[near, outcome], outcome)
+        } else {
+            fake::either(c)
+        }
+    });
+
+    let (code, out, err) = run_in(&host, dir.path());
+
+    assert_eq!(code, EXIT_OK, "{err}");
+    assert!(out.starts_with("verdict=approve\n"), "{out}");
+    assert!(out.ends_with("\nignored=1\n"), "{out}");
+    let ignored: Vec<ReportLine> = serde_json::from_value(read(dir.path(), IGNORED)).unwrap();
+    assert_eq!(ignored[0].text, format!("note: read off its form: {near}"));
+    assert!(
+        err.contains(
+            "review-run: finding lines read off their form: 1, listed in review/ignored.json"
+        ),
+        "{err}"
+    );
+    assert!(!err.contains("set aside as no finding"), "{err}");
+    let report = fs::read_to_string(dir.path().join("review/reports/lang-rust.md")).unwrap();
+    assert_eq!(
+        report,
+        "src/a.rs:3 — if not addressed: a long line hides a bug, breaking I9. — I9\n\
+         outcome: findings — one.\n"
+    );
+}
+
+#[test]
 fn a_review_whose_specialist_fails_is_still_decided() {
     let dir = workdir();
     let host = FakeHost::new(|c| {

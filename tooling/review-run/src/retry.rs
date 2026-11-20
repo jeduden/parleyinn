@@ -45,7 +45,6 @@ pub fn refusal(report: &str, answer: &str, known: &BTreeSet<String>) -> Option<S
         | Problem::TemplatePlace { line }
         | Problem::Unlinked { line }
         | Problem::Undashed { line }
-        | Problem::AfterIds { line }
         | Problem::UnknownId { line, .. } => report.lines().nth(line - 1),
         _ => None,
     };

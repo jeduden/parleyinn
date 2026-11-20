@@ -1,18 +1,19 @@
 //! What a specialist's report states, set apart from what it does not
 //! (ENG-28, I6). A line that is no finding, or does not read as one,
 //! must not discard the findings beside it: [`split`] keeps the lines
-//! that read, sets aside the ones that say they are no finding, each
-//! with why, and names each one that does not read with the problem the
-//! report check gives it, so none is dropped unseen. [`with_outcome`]
+//! that read, sets aside the ones that say they are no finding and the
+//! notes of a finding read off its form, each with why, and names each
+//! one that does not read with the problem the report check gives it,
+//! so none is dropped unseen. [`with_outcome`]
 //! then ends the lines that read with an outcome that agrees with them.
 
 use std::collections::BTreeSet;
 use std::fmt;
 
 use super::{
-    ALL_WELL, ALL_WELL_WORDS, FINDINGS, Line, MARKUP, Problem, REVISED, TEMPLATE_PLACE, WITHDRAWN,
-    WITHDREW_NOTHING, all_well, answer_outcome, at_template, bare, defect_marked, form_problem,
-    line, outcome_of, place, report_check, split_dashes, strip_word, unknown_id,
+    ALL_WELL, ALL_WELL_WORDS, FINDINGS, Line, MARKUP, OFF_FORM, Problem, REVISED, TEMPLATE_PLACE,
+    WITHDRAWN, WITHDREW_NOTHING, all_well, answer_outcome, at_template, bare, defect_marked,
+    form_problem, line, outcome_of, place, report_check, split_dashes, strip_word, unknown_id,
 };
 
 /// A report split into the lines that read and those that do not.
@@ -20,20 +21,22 @@ use super::{
 pub struct Split {
     /// Every line that reads, the outcome line among them, in order.
     pub clean: String,
-    /// The lines that say they are no finding, set aside.
+    /// The lines that say they are no finding, and the notes of a
+    /// finding read off its form, set aside.
     pub ignored: Vec<Ignored>,
     /// The finding, revision and withdrawal lines that do not read.
     pub unreadable: Vec<Unreadable>,
 }
 
-/// A line set aside because it says it is no finding.
+/// A line set aside: it says it is no finding, or notes a finding
+/// read off its form.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Ignored {
     /// Its 1-based line number in the report split.
     pub line: usize,
     /// The line, trimmed.
     pub text: String,
-    /// Why it is no finding.
+    /// Why it is set aside.
     pub reason: Reason,
 }
 
@@ -48,7 +51,7 @@ pub struct Unreadable {
     pub problem: Problem,
 }
 
-/// Why a line is no finding.
+/// Why a line is set aside.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Reason {
     /// It says all is well at its place, or is the note that says so
@@ -59,6 +62,10 @@ pub enum Reason {
     WithdrewNothing,
     /// It is a revision or withdrawal whose place is a placeholder.
     Placeholder,
+    /// It is the note beside a finding the assembly read off its form
+    /// ([`OFF_FORM`]): the finding stands, in its form, and the note
+    /// counts the slip.
+    OffForm,
 }
 
 impl fmt::Display for Reason {
@@ -67,6 +74,7 @@ impl fmt::Display for Reason {
             Self::AllWell => "says all is well, which is not a finding",
             Self::WithdrewNothing => "notes a withdrawal that removed nothing",
             Self::Placeholder => "names a placeholder where its place belongs, not a file and line",
+            Self::OffForm => "is a finding off its form, read as the finding it states",
         })
     }
 }
@@ -120,6 +128,9 @@ fn reason(text: &str) -> Option<Reason> {
     }
     if strip_word(read, WITHDREW_NOTHING).is_some() {
         return Some(Reason::WithdrewNothing);
+    }
+    if strip_word(read, OFF_FORM).is_some() {
+        return Some(Reason::OffForm);
     }
     if line(text) != Line::Malformed {
         return None;

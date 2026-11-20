@@ -155,12 +155,15 @@ may also name an expectation the reviewer met in other words.
   review survives is a slip: a run cut off before a successful result after it
   stated a line or an outcome, an answer with no outcome line or one its lines
   contradict, an answer that is more than the outcome line, a line set aside
-  as no finding, an eleventh finding, a place written as a tail of its path.
-  Slips are counted and shown per run and fail none. A case passes with two of
-  three runs, stopping once decided. A run whose log holds no model call did
-  not run, and is counted and failed, as is a specialist's run cut off before
-  it stated any line or an outcome, which the review takes for no clean pass:
-  a model that always runs out of turns passes no case.
+  as no finding, a finding line off its form, which the review reads as the
+  finding it states, an eleventh finding, a place written as a tail of its
+  path. Slips are counted and shown per run and fail none. The instructions
+  still say text after the ids refuses a report: the review is the more
+  lenient on purpose, and counts the slip. A case passes with two of three
+  runs, stopping once decided. A run whose log holds no model call did not
+  run, and is counted and failed, as is a specialist's run cut off before it
+  stated any line or an outcome, which the review takes for no clean pass: a
+  model that always runs out of turns passes no case.
 - **The outputs** of a run go under `--out`: `scorecard.json`, `findings.json`
   in the shape the review gate reads, `report.md`, and each run's log, the
   specialist report assembled from it and its grade under `runs/`.

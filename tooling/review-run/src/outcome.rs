@@ -14,7 +14,7 @@
 //! generalist's finding line the review cannot read are each named in a
 //! blocking finding of its own, so the review is decided all the same
 //! and the author sees why it was not approved; each line a specialist
-//! set aside as no finding is counted. The gate still refuses to post a
+//! set aside as no finding is counted, and each finding read off its form. The gate still refuses to post a
 //! review a dispatched agent did not run in or whose report it refuses
 //! (ENG-28), as its consulted list and reports show it.
 
@@ -52,7 +52,8 @@ pub struct Decision {
     /// Every dispatched agent, or part of one, the review did not
     /// review whole, by name: never clean.
     pub not_reviewed: Vec<Gap>,
-    /// Every line of a specialist's report set aside as no finding.
+    /// Every line of a specialist's report set aside as no finding, and
+    /// the note of every finding read off its form.
     pub ignored: Vec<ReportLine>,
 }
 
@@ -111,7 +112,7 @@ pub fn decide(
                 run.answered() && run.cut.is_some() && plan.generalists().contains(&run.name)
             })
             .count(),
-        ignored: ignored.len(),
+        ignored: crate::reading::summary(&ignored),
     };
 
     Decision {
@@ -854,8 +855,9 @@ struct Counts<'a> {
     cut: usize,
     /// The generalists cut off, whose weighing is what their log states.
     cut_generalists: usize,
-    /// The lines set aside as no finding.
-    ignored: usize,
+    /// What the summary says of the lines set aside as no finding and
+    /// of the findings read off their form.
+    ignored: String,
 }
 
 /// The agents the summary names for what went wrong.
@@ -926,14 +928,7 @@ fn summary(counts: &Counts, named: &Named, closings: &[String]) -> String {
             counted(counts.cut_generalists, "generalist")
         );
     }
-    if counts.ignored > 0 {
-        let _ = write!(
-            s,
-            " Set aside as no finding: {} of the specialists' reports ({}).",
-            counted(counts.ignored, "line"),
-            crate::reading::IGNORED
-        );
-    }
+    s.push_str(&counts.ignored);
     for (label, names) in [
         ("Did not run", named.silent),
         ("Read part of their diff", named.partial),
@@ -961,7 +956,7 @@ fn summary(counts: &Counts, named: &Named, closings: &[String]) -> String {
 }
 
 /// `n` `word`s, said: `1 line`, `2 lines`.
-fn counted(n: usize, word: &str) -> String {
+pub(crate) fn counted(n: usize, word: &str) -> String {
     if n == 1 {
         format!("1 {word}")
     } else {
