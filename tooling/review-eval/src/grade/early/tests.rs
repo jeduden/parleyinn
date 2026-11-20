@@ -33,6 +33,13 @@ fn a_final_answer_that_holds_every_line_is_no_slip() {
 }
 
 #[test]
+fn a_line_the_final_answer_holds_indented_is_no_slip() {
+    let answer = format!("  {KEPT}\nI read the whole diff.");
+
+    assert_eq!(slips(&texts(&[KEPT]), &answer), NONE);
+}
+
+#[test]
 fn a_working_note_before_the_final_answer_is_no_slip() {
     let answer = "none — nothing to add — review-code";
     let early = texts(&["docs/x.md:3 — verified — the test takes it", "Reading on."]);
