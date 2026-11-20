@@ -79,12 +79,14 @@ pub fn differences(without: &Path, with: &Path) -> Vec<String> {
         fs::read_to_string(&file).map_err(|e| format!("read {}: {e}", file.display()))
     };
     let mut problems = Vec::new();
-    match (read(without, CHECKED), read(with, CHECKED)) {
+    let checked = |dir: &Path| {
+        let file = dir.join(CHECKED);
+        read(dir, CHECKED)
+            .and_then(|text| blocking(&text).map_err(|e| format!("parse {}: {e}", file.display())))
+    };
+    match (checked(without), checked(with)) {
         (Ok(was), Ok(is)) => {
-            let waiting = blocking(&was)
-                .into_iter()
-                .filter(|body| !blocking(&is).contains(body))
-                .count();
+            let waiting = was.iter().filter(|body| !is.contains(body)).count();
             if waiting < WAITING {
                 problems.push(format!(
                     "the comment lifts {waiting} blocking finding(s) of the change, not the \
@@ -117,14 +119,16 @@ pub fn differences(without: &Path, with: &Path) -> Vec<String> {
 }
 
 /// The bodies of the blocking findings `checked`, a deterministic
-/// findings file, holds; none when it does not read.
-fn blocking(checked: &str) -> Vec<String> {
-    serde_json::from_str::<Vec<serde_json::Value>>(checked)
-        .unwrap_or_default()
+/// findings file, holds. A file that does not parse holds none to
+/// count: taken for an empty one, it would count every finding lifted.
+fn blocking(checked: &str) -> Result<Vec<String>, serde_json::Error> {
+    let findings: Vec<serde_json::Value> = serde_json::from_str(checked)?;
+
+    Ok(findings
         .iter()
         .filter(|f| f["severity"] == review_bundle::BLOCKING)
         .filter_map(|f| f["body"].as_str().map(str::to_owned))
-        .collect()
+        .collect())
 }
 
 /// The contexts the review bundle wrote under `out`, each relative to

@@ -140,8 +140,8 @@ fn a_change_whose_comment_lifts_too_few_findings_proves_nothing() {
           (ENG-21, ENG-29, ENG-34)"
         ]
     );
-    assert!(blocking("not json").is_empty());
-    assert_eq!(blocking(&checked(&["a", "b"])), ["a", "b"]);
+    assert!(blocking("not json").is_err());
+    assert_eq!(blocking(&checked(&["a", "b"])).unwrap(), ["a", "b"]);
 }
 
 #[test]
@@ -195,4 +195,25 @@ fn a_context_only_one_run_wrote_is_named() {
         problems[0].starts_with(&format!("read {}: ", missing.display())),
         "{problems:?}"
     );
+}
+
+#[test]
+fn a_findings_file_that_does_not_parse_is_named_and_lifts_nothing() {
+    for consented in [false, true] {
+        let (without, with) = sound();
+        let dir = if consented {
+            with.path()
+        } else {
+            without.path()
+        };
+        write(dir, CHECKED, "not findings");
+
+        let problems = differences(without.path(), with.path());
+
+        assert_eq!(problems.len(), 1, "{problems:?}");
+        assert!(
+            problems[0].starts_with(&format!("parse {}: ", dir.join(CHECKED).display())),
+            "{problems:?}"
+        );
+    }
 }
