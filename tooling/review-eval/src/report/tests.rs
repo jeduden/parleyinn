@@ -243,7 +243,7 @@ fn a_later_line_at_a_place_from_another_source_keeps_the_earlier_one() {
 
 #[test]
 fn the_final_answer_weighs_by_the_same_rule_as_the_messages() {
-    let lines = "a.rs:3 — blocking — leaks a pin — lang-rust\n\
+    let lines = "a.rs:3 — nit — leaks a pin — lang-rust\n\
                  a.rs:3 — nit — long — lang-markdown\n\
                  a.rs:3 — nit — milder than it looked — lang-rust\n\
                  dropped — a.rs:3 — misread — lang-markdown";
@@ -252,6 +252,45 @@ fn the_final_answer_weighs_by_the_same_rule_as_the_messages() {
 
     assert_eq!(weighing(&[lines.to_owned()], ""), want);
     assert_eq!(weighing(&[], lines), want);
+}
+
+#[test]
+fn a_blocking_finding_stands_beside_a_later_nit_until_a_dropped_line_withdraws_it() {
+    let blocking = "a.rs:3 — blocking — the comment claims approval — review-spec";
+    let nit = "a.rs:3 — nit — remove the comment — review-spec";
+    let both = format!("{blocking}\n{nit}");
+
+    // In the final answer, in a message before it, or one in each.
+    assert_eq!(weighing(&[], &both), both);
+    assert_eq!(
+        weighing(std::slice::from_ref(&both), "Scope: all."),
+        format!("{both}\nScope: all.")
+    );
+    assert_eq!(weighing(&[blocking.to_owned()], nit), both);
+    // A second nit replaces the first, never the blocking finding.
+    let milder = "a.rs:3 — nit — or reword it — review-spec";
+    assert_eq!(
+        weighing(&[], &format!("{both}\n{milder}")),
+        format!("{blocking}\n{milder}")
+    );
+    // A dropped line withdraws both, in either of its forms.
+    for dropped in [
+        "dropped — a.rs:3 — the comment is the stakeholder's — review-spec",
+        "a.rs:3 — dropped — the comment is the stakeholder's — review-spec",
+    ] {
+        assert_eq!(weighing(&[], &format!("{both}\n{dropped}")), dropped);
+    }
+}
+
+#[test]
+fn a_later_blocking_finding_replaces_what_was_stated_at_its_place() {
+    let first = "a.rs:3 — blocking — x — lang-rust";
+    let nit = "a.rs:3 — nit — y — lang-rust";
+    let second = "a.rs:3 — blocking — worse — lang-rust";
+
+    assert_eq!(weighing(&[], &format!("{first}\n{second}")), second);
+    assert_eq!(weighing(&[], &format!("{nit}\n{second}")), second);
+    assert_eq!(weighing(&[], &format!("{first}\n{nit}\n{second}")), second);
 }
 
 #[test]

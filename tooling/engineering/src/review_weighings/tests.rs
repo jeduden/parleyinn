@@ -57,12 +57,40 @@ fn a_partial_weighing_passed_as_whole_is_named() {
 }
 
 #[test]
+fn a_blocking_finding_lost_to_a_later_nit_is_named() {
+    let work = TempDir::new().unwrap();
+    write_outcome(
+        work.path(),
+        r#"{"verdict": "approve", "summary": "s", "findings": [
+            {"path": "src/a.rs", "line": 1, "severity": "nit", "body": "its name is long"}]}"#,
+    );
+
+    assert_eq!(
+        standing_problems(work.path()),
+        [
+            "a blocking finding a later nit at its place follows does not request changes: \
+             approve",
+            "the blocking finding review-code stated at src/a.rs:1 is lost to its later nit"
+        ]
+    );
+
+    write_outcome(
+        work.path(),
+        r#"{"verdict": "request_changes", "summary": "s", "findings": [
+            {"path": "src/a.rs", "line": 1, "severity": "blocking", "body": "a hook panics"},
+            {"path": "src/a.rs", "line": 1, "severity": "nit", "body": "its name is long"}]}"#,
+    );
+    assert!(standing_problems(work.path()).is_empty());
+}
+
+#[test]
 fn a_missing_outcome_is_named_by_each_check() {
     let work = TempDir::new().unwrap();
     let missing = ["review-run wrote no review outcome that reads"];
 
     assert_eq!(whole_problems(work.path()), missing);
     assert_eq!(partial_problems(work.path()), missing);
+    assert_eq!(standing_problems(work.path()), missing);
 }
 
 #[test]

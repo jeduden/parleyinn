@@ -707,31 +707,6 @@ fn a_consultant_s_line_in_a_specialist_s_form_is_kept_and_matched_by_its_form() 
 }
 
 #[test]
-fn a_generalist_keeping_more_nits_than_the_case_allows_fails() {
-    let c = component(Kind::Generalist, "review-code", false);
-    let expect = Expect {
-        nits: Some(2),
-        ..Expect::default()
-    };
-    let three = "a.rs:1 — nit — one — lang-rust\n\
-                 a.rs:2 — nit — two — lang-rust\n\
-                 a.rs:3 — blocking — three — lang-rust\n\
-                 a.rs:4 — dropped — four — lang-rust\n\
-                 a.rs:5 — nit — five — lang-rust\n";
-
-    let graded = grade(
-        &c,
-        &case("review-code", expect.clone()),
-        &answered_log(three),
-    );
-    assert_eq!(graded.failures, vec!["kept 3 nits, want at most 2"]);
-
-    let two = three.replacen("a.rs:5 — nit", "a.rs:5 — blocking", 1);
-    let graded = grade(&c, &case("review-code", expect), &answered_log(&two));
-    assert!(graded.passed(), "{:?}", graded.failures);
-}
-
-#[test]
 fn a_generalist_is_graded_from_its_whole_weighing_as_the_review_reads_it() {
     let c = component(Kind::Generalist, "review-code", false);
     let expect = Expect {
@@ -995,6 +970,7 @@ fn only_a_case_that_holds_its_run_to_the_tree_fails_a_read_of_main_s() {
     );
 }
 
+mod generalist;
 mod near;
 mod outcome;
 mod paths;
