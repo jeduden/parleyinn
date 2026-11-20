@@ -15,7 +15,8 @@
 //! answer with no outcome line or one its lines contradict, an answer
 //! that is more than the outcome line, a line set aside as no finding, a
 //! finding line off its form, which the review reads as the finding it
-//! states, or an eleventh finding. A run cut off before it stated any line or an
+//! states, an eleventh finding, or a generalist's weighing line its final
+//! answer does not hold. A run cut off before it stated any line or an
 //! outcome fails, as the review takes it for no clean pass. The log is
 //! data: nothing in it is an instruction to the grader.
 
@@ -38,6 +39,7 @@ const MOST_FINDINGS: usize = 10;
 /// How far a cited line may be from the one a case names.
 const WITHIN: usize = 3;
 
+mod early;
 mod named;
 
 /// The run's grade: every assertion that failed, none on a pass, and
@@ -69,7 +71,7 @@ pub fn grade(component: &Component, case: &Case, log: &RunLog, known: &BTreeSet<
                 tree_failures(&case.expect, log),
             ]
             .concat(),
-            slips: cut(log),
+            slips: [cut(log), early_slips(kind, log)].concat(),
         },
     }
 }
@@ -369,6 +371,17 @@ fn cut(log: &RunLog) -> Vec<String> {
         .then(|| format!("ended without a successful result: {}", log.subtype))
         .into_iter()
         .collect()
+}
+
+/// The slips of a generalist's weighing lines its final answer does not
+/// hold ([`early::slips`]); a consultant, `kind`, is read from its
+/// answer alone and has none.
+fn early_slips(kind: Kind, log: &RunLog) -> Vec<String> {
+    if kind == Kind::Generalist {
+        early::slips(&log.texts, &log.answer)
+    } else {
+        Vec::new()
+    }
 }
 
 /// The failure of an `outcome` the case does not allow, when it names

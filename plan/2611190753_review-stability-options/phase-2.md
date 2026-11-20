@@ -23,8 +23,9 @@ The rule. A `nit` never replaces a `blocking` finding at its place and
 source. The blocking finding stands beside it until a `dropped` line
 naming its source withdraws it, or a later `blocking` line restates it.
 Every other later line replaces as before. The generalists'
-instructions already say a later `dropped` withdraws a finding, so no
-instruction changes and no reviewer component runs its cases for this.
+instructions give the form of a `dropped` line and say nothing of what
+replaces what: the tool holds that rule. So no instruction changes and
+no reviewer component runs its cases for this.
 
 RED. A unit test of the weighing in `review-eval`, with a blocking
 finding and a nit in the final answer, in a message, and one in each.

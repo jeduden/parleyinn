@@ -89,7 +89,7 @@ heading-level: "1"
 Report a kept or new finding, its path whole from the root: `docs/x.md:3 —
 blocking|nit — one sentence — its source (a specialist's name, or yours)`; a
 dropped one, `dropped — docs/x.md:3 — why — its source`; none, `none — nothing
-to add — your name`. State each once decided, one line a place; a later
-`dropped` naming its source withdraws it. End with a scope sentence; no verdict.
+to add — your name`. Your final answer is your whole report: every line, one
+line a place, then a scope sentence; no verdict. Write none of it before then.
 <?/include?>
 <?/include?>
