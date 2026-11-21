@@ -70,7 +70,7 @@ Rows that stay `@pending` after M1, with their remaining milestone
   not meet its target; the NFR-04 and NFR-05 targets and MEM-02 are in
   M5); `parinn ingest --path` keeps its OWN-22 gate, a path inside
   `PARINN_HOME` stays refused (safe default).
-- ADM-09: 16 of 17 rows pass in CI; the landmark row is M3's.
+- ADM-09: 18 of 19 rows pass in CI; the landmark row is M3's.
 - REC-22: not bound, its act unit tested; a freshness mark with
   source and ingest position on every surface is M7's (VIEW-04).
 - REC-02: its last step needs restore blocks and a join (M2).

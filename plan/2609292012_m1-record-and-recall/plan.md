@@ -116,7 +116,7 @@ The stakeholder ruled on these when M1 was re-planned and consents on
 Rulings of 2 November 2026, now in the SRS and scenarios; passing means
 cucumber:
 
-- **ADM-09:** 16 of 17 rows pass in CI; the landmark row is M3's.
+- **ADM-09:** 18 of 19 rows pass in CI; the landmark row is M3's.
 - **Off `@pending` and passing:** ENG-09 (10,000 events per PR, 1M
   nightly), SEC-18, REC-04, REC-08, REC-12, REC-26, RCL-02 (10 of 10), REC-17
   extended.
