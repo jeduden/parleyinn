@@ -9,7 +9,7 @@ summary: >-
   event with the chain head it leaves (REC-24). Rotation, `recovered`,
   `parinn recovery-key write`, confirm, choose and reject, and their
   surfacing move to M7, so until then a node identity change leaves
-  the new key's writers `peer`. No requirement's wording changes.
+  the new key's writers `peer`. PRV-12's wording does not change.
 ---
 # ADR-2611211400: A node's keys form a key event log; M1 ships its genesis log
 
@@ -124,10 +124,16 @@ without its issuing node.
 The security reviewer's approval of
 [ADR-2610122234](ADR-2610122234-key-event-log.md) on 13 October 2026
 covers PRV-12 and the requirements it lists, as worded at its head
-commit `de59777` ([approval]). This record changes none of their
-wording, only the milestone each part ships in, so ENG-29 asks for no
-new approval. It is accepted on the stakeholder's ruling of 21
-November 2026 that its context records.
+commit `de59777` ([approval]). This record leaves PRV-12's wording as
+it is and moves only the milestone each part ships in. The pull request
+that adds it rewords one of the listed rows, REC-24: the row names the
+chain head of the key event log a node identity change leaves, which
+PRV-12 already puts in the event, and says the new seat's writer reads
+`peer` until a confirm counts under PRV-12, as PRV-12 and PRV-13 already
+derive. REC-24 is not among the rows ENG-29 guards, so its new wording
+lands on the review gate (ENG-21), and the approval of 13 October binds
+REC-24 only as worded then. It is accepted on the stakeholder's ruling
+of 21 November 2026 that its context records.
 
 [approval]: https://github.com/jeduden/parleyinn/pull/39#issuecomment-6149850310
 
@@ -165,6 +171,13 @@ it leaves. M1 leaves R3 open for every run, so until sandboxes ship
 this record raises the bar for an append-only attacker, not for a
 process that runs as the principal. An authenticator closes the
 recovery-key window; only a sandbox closes the rest.
+
+A forged node identity change event stays in force until M7. No reject
+voids it before then, and nothing shows an inception awaiting a
+confirm. The writers of the key it replaces read `peer`, and so do the
+new key's. The event is audited and counted (REC-24, OPS-01). It adds
+no `witnessed` writer, so it demotes this node's writers but opens no
+path to the model (I2).
 
 ## Alternatives
 

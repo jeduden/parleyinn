@@ -65,7 +65,7 @@ These land in part, as §12.2 bounds them or as their scenarios reach past M1:
 | OWN-22                          | the precondition: every run counts as unsandboxed                       | sandbox state, M7                                                       |
 | PRV-12                          | the genesis key event log, its recovery key kept on the node            | rotation, recovery, confirms, M7 (ADR-2611211400); M3, M8, PRV-10       |
 | PRV-13                          | origin from the record and the key set                                  | arrival, M3, M8, M9                                                     |
-| REC-22, REC-24                  | REC-22: its act, in the unit tests; REC-24: chain head, origin `peer`   | freshness, VIEW-04, M7; the confirm a managed-policy key signs, M7      |
+| REC-22, REC-24                  | REC-22: its act, in the unit tests; REC-24: chain head, origin `peer`   | freshness, VIEW-04, M7; a confirm under PRV-12, M7                      |
 | ENG-09                          | the soak at 10,000 events in every PR, the Miri job                     | the 1,000,000-event run is nightly's evidence                           |
 | ENG-08                          | every property but the restore delimiters'                              | restore delimiters, M2                                                  |
 | ENG-10                          | the envelope's golden files                                             | the restore block's, M2                                                 |
@@ -288,8 +288,8 @@ footer: |
 - [x] `parinn verify` proves completeness (ADM-09's rows, in CI), and
   quarantine works (RCL-06; seven SEC-12 rows); remainders are assigned
 - [x] S12's `s12_rebuild` makes one identical index from two writer logs
-- [x] A purge keeps of a purged transcript line only its position, its
-  length and the harness's own `uuid` (ADM-07, REC-04)
+- [x] A purge keeps only a purged line's position, length and `uuid`
+  (ADM-07, REC-04), all §12.2's exit criterion allows, OQ-57's gaps aside
 - [x] M1's dependencies have accepted ADRs and meet ENG-18/ENG-26
 - [x] ENG-11's coverage floors hold for every security-sensitive crate
 - [x] The fuzz targets of ENG-07 run nightly from committed corpora
