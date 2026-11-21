@@ -63,7 +63,7 @@ These land in part, as §12.2 bounds them or as their scenarios reach past M1:
 | SEC-27                          | the new seat and writer a key minted in place starts                    | rotation, M7                                                            |
 | OWN-11, OWN-12                  | the act classes; widening acts only through the CLI at a terminal       | other surfaces, M7                                                      |
 | OWN-22                          | the precondition: every run counts as unsandboxed                       | sandbox state, M7                                                       |
-| PRV-12                          | the key event log, rotation and recovery                                | M3, M7, M8, PRV-10                                                      |
+| PRV-12                          | the genesis key event log, its recovery key kept on the node            | rotation, recovery, confirms, M7 (ADR-2611211400); M3, M8, PRV-10       |
 | PRV-13                          | origin from the record and the key set                                  | arrival, M3, M8, M9                                                     |
 | REC-22, REC-24                  | REC-22: its act, in the unit tests; REC-24: chain head, origin `peer`   | freshness, VIEW-04, M7; the confirm a managed-policy key signs, M7      |
 | ENG-09                          | the soak at 10,000 events in every PR, the Miri job                     | the 1,000,000-event run is nightly's evidence                           |
