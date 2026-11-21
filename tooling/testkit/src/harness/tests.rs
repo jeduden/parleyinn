@@ -9,6 +9,7 @@ use crate::TempDir;
 const STUB: &str = r#"#!/bin/sh
 case "$1" in
   mcp)
+    [ -z "$STUB_SILENT" ] || { cat > /dev/null; exit 0; }
     while IFS= read -r line; do
       id=$(printf '%s' "$line" | sed -n 's/.*"id":\([0-9]*\).*/\1/p')
       [ -n "$id" ] || continue
@@ -178,4 +179,52 @@ fn a_failing_check_ends_the_wait() {
     let err = wait_up_to(Duration::from_secs(5), "x", || Err("broke".to_owned())).unwrap_err();
 
     assert_eq!(err, "broke");
+}
+
+#[test]
+fn a_server_that_never_answers_initialize_fails_the_start() {
+    let (home, core) = world();
+
+    let err = Harness::start_within(
+        Duration::from_millis(300),
+        home.path(),
+        &core,
+        true,
+        &[("STUB_SILENT", "1")],
+    )
+    .unwrap_err();
+
+    assert_eq!(err, "the MCP server did not answer request 1");
+}
+
+#[test]
+fn a_harness_names_its_directory_when_printed() {
+    let (home, core) = world();
+    let harness = Harness::start(home.path(), &core, false, &[]).unwrap();
+
+    let shown = format!("{harness:?}");
+
+    assert!(shown.starts_with("Harness { dir: "), "{shown}");
+    assert!(shown.contains("harnesses/h0"), "{shown}");
+    harness.kill().unwrap();
+}
+
+#[test]
+fn the_json_lines_of_the_harness_output_are_forwarded_in_order() {
+    let (tx, rx) = mpsc::channel();
+
+    forward("{\"id\":1}\nnot json\n{\"id\":2}\n".as_bytes(), &tx);
+
+    assert_eq!(
+        rx.try_iter().collect::<Vec<_>>(),
+        [json!({"id": 1}), json!({"id": 2})]
+    );
+}
+
+#[test]
+fn forwarding_ends_when_nothing_receives_any_more() {
+    let (tx, rx) = mpsc::channel();
+    drop(rx);
+
+    forward("{\"id\":1}\n{\"id\":2}\n".as_bytes(), &tx);
 }

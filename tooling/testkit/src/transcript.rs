@@ -108,23 +108,23 @@ pub fn recorded(what: &str, pick: impl Fn(&Value) -> bool) -> Result<Value, Stri
 /// Fails when the recordings cannot be read, or none holds a call of
 /// `tool` with its result.
 pub fn recorded_call(tool: &str) -> Result<(Value, Value), String> {
-    for lines in recorded_transcripts()? {
-        for call in lines {
-            let Some(id) = tool_use_id(call, tool) else {
-                continue;
-            };
-            let result = lines.iter().find(|l| {
-                l["message"]["content"][0]["tool_use_id"].as_str() == Some(id.as_str())
-                    && l["message"]["content"].as_array().map(Vec::len) == Some(1)
-            });
-            if let Some(result) = result {
-                return Ok((call.clone(), result.clone()));
-            }
-        }
-    }
-    Err(format!(
-        "no recording holds a call of {tool} with its result"
-    ))
+    recorded_transcripts()?
+        .iter()
+        .find_map(|lines| call_in(lines, tool))
+        .ok_or_else(|| format!("no recording holds a call of {tool} with its result"))
+}
+
+/// The first call of `tool` in `lines` that has a result line, and
+/// that result.
+fn call_in(lines: &[Value], tool: &str) -> Option<(Value, Value)> {
+    lines.iter().find_map(|call| {
+        let id = tool_use_id(call, tool)?;
+        let result = lines.iter().find(|l| {
+            l["message"]["content"][0]["tool_use_id"].as_str() == Some(id.as_str())
+                && l["message"]["content"].as_array().map(Vec::len) == Some(1)
+        })?;
+        Some((call.clone(), result.clone()))
+    })
 }
 
 /// The id of the call of `tool` the assistant line `line` makes.

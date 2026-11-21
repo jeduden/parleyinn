@@ -212,3 +212,16 @@ fn appending_to_a_path_that_cannot_be_opened_fails() {
 
     assert!(append_lines(&dir.path().join("no/dir/t.jsonl"), 1).is_err());
 }
+
+#[test]
+fn a_call_with_no_result_line_is_passed_over_for_one_with_a_result() {
+    let call = |id: &str| json!({"type": "assistant", "message": {"content": [{"type": "tool_use", "name": "Bash", "id": id}]}});
+    let result = json!({"message": {"content": [{"tool_use_id": "b", "content": "ok"}]}});
+    let lines = [call("a"), call("b"), result.clone()];
+
+    let (found, answer) = call_in(&lines, "Bash").unwrap();
+
+    assert_eq!(found["message"]["content"][0]["id"], "b");
+    assert_eq!(answer, result);
+    assert_eq!(call_in(&lines[..1], "Bash"), None);
+}

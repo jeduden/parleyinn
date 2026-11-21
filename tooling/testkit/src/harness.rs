@@ -12,9 +12,9 @@
 //! exits.
 
 use std::fs;
-use std::io::{BufRead, BufReader, Write};
+use std::io::{BufRead, BufReader, Read, Write};
 use std::path::{Path, PathBuf};
-use std::sync::mpsc::{self, Receiver};
+use std::sync::mpsc::{self, Receiver, Sender};
 use std::time::{Duration, Instant};
 
 use serde_json::{Value, json};
@@ -111,15 +111,7 @@ impl Harness {
             .take_stdout()
             .ok_or("the harness has no standard output")?;
         let (tx, replies) = mpsc::channel();
-        std::thread::spawn(move || {
-            for line in BufReader::new(out).lines().map_while(Result::ok) {
-                if let Ok(reply) = serde_json::from_str::<Value>(&line)
-                    && tx.send(reply).is_err()
-                {
-                    return;
-                }
-            }
-        });
+        std::thread::spawn(move || forward(out, &tx));
         let mut harness = Self {
             started,
             dir,
@@ -212,10 +204,14 @@ impl Harness {
     /// or opened a socket (ENG-12).
     pub fn stop(self) -> Result<(), String> {
         fs::write(self.dir.join("stop"), "").map_err(|e| e.to_string())?;
-        match self.started.finish(self.patience) {
-            Ok(true) => Ok(()),
-            Ok(false) => Err("the MCP server did not stop when its input closed".to_owned()),
-            Err(e) => Err(e.to_string()),
+        let exited = self
+            .started
+            .finish(self.patience)
+            .map_err(|e| e.to_string())?;
+        if exited {
+            Ok(())
+        } else {
+            Err("the MCP server did not stop when its input closed".to_owned())
         }
     }
 
@@ -223,6 +219,18 @@ impl Harness {
     /// when either opened a socket (ENG-12).
     pub fn kill(self) -> Result<(), String> {
         self.started.kill().map_err(|e| e.to_string())
+    }
+}
+
+/// Sends each line of `out` that is JSON to `tx`, until `out` ends or
+/// nothing receives any more.
+fn forward(out: impl Read, tx: &Sender<Value>) {
+    for line in BufReader::new(out).lines().map_while(Result::ok) {
+        if let Ok(reply) = serde_json::from_str::<Value>(&line)
+            && tx.send(reply).is_err()
+        {
+            return;
+        }
     }
 }
 
