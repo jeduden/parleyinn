@@ -341,3 +341,73 @@ fn an_open_question_s_row_is_no_requirement_row() {
         Some((requirement.to_owned(), "SEC-01".to_owned()))
     );
 }
+
+/// The security section of [`SECTION`] with its row written as a block.
+const BLOCK_SECTION: &str = "---\ntitle: \"6. Security\"\n---\n# 6. Security\n\nProse.\n\n## SEC-01\n\n- Pri: P0\n- Ver: T\n- Traces: I4\n\nThe core opens\nno socket.\n\n";
+
+#[test]
+fn a_block_defect_adds_a_must_on_a_line_of_its_own_after_the_block_s_text() {
+    let dir = tree();
+    fs::write(dir.path().join("docs/srs/06-security.md"), BLOCK_SECTION).unwrap();
+
+    let got = cases(dir.path()).unwrap();
+    let case = got
+        .iter()
+        .find(|c| c.id() == "srs-security/defect-row-without-scenario")
+        .unwrap();
+
+    assert_eq!(
+        case.title,
+        "a MUST added to SEC-01 with no change to its scenario"
+    );
+    let [Edit::Replace { file, old, new }] = case.edits.as_slice() else {
+        panic!("{:?}", case.edits);
+    };
+    assert_eq!(file, "docs/srs/06-security.md");
+    let block = "## SEC-01\n\n- Pri: P0\n- Ver: T\n- Traces: I4\n\nThe core opens\nno socket.\n";
+    assert_eq!(old, block);
+    assert_eq!(
+        new,
+        &format!("{block}It MUST also record the change in the audit log.\n")
+    );
+    assert_eq!(case.validate(dir.path()), Ok(()));
+    assert_eq!(case.expect.finding[0].ids, vec!["SEC-01"]);
+}
+
+#[test]
+fn a_block_is_a_requirement_with_a_priority_up_to_its_next_heading_or_table() {
+    let block = "## SEC-02\n\n- Pri: P1\n\nIt MUST refuse.\n";
+    assert_eq!(
+        first_block(&format!("# T\n\n{block}\n## Notes\n\nMore.\n")),
+        Some((block.to_owned(), "SEC-02".to_owned()))
+    );
+    assert_eq!(
+        first_block(&format!("{block}\n| A |\n|---|\n")),
+        Some((block.to_owned(), "SEC-02".to_owned()))
+    );
+    // An assumption or a non-functional requirement carries no priority,
+    // as its row carries none, and an open question is no requirement.
+    assert_eq!(
+        first_block("## ASM-01\n\n- Verified in: S1\n\nHooks.\n"),
+        None
+    );
+    assert_eq!(first_block("## OQ-09\n\n- Pri: P1\n\nWhich?\n"), None);
+    assert_eq!(first_block("##SEC-02\n\n- Pri: P1\n\nNo heading.\n"), None);
+    assert_eq!(
+        first_block("####### SEC-02\n\n- Pri: P1\n\nToo deep.\n"),
+        None
+    );
+    assert_eq!(first_block("## SEC-02\n\n## Next\n"), None);
+}
+
+#[test]
+fn the_first_requirement_is_the_earlier_of_a_row_and_a_block() {
+    let row = "| SEC-01 | P0 | The core opens no socket. | T | I4 |\n";
+    let block = "## SEC-02\n\n- Pri: P1\n\nIt MUST refuse.\n";
+
+    let ids = |text: &str| first_requirement(text).map(|(_, _, id)| id);
+
+    assert_eq!(ids(&format!("{block}\n{row}")), Some("SEC-02".to_owned()));
+    assert_eq!(ids(&format!("{row}\n{block}")), Some("SEC-01".to_owned()));
+    assert_eq!(ids("# Nothing\n"), None);
+}

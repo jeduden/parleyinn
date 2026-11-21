@@ -42,7 +42,8 @@ pub const EXCLUDED_SENTENCE: &str =
 /// finding cites: a finding is known by what the report's form fixes,
 /// its place and its ids, never by a word of its sentence.
 pub const TERMS_ID: &str = "ENG-35";
-/// What a derived defect adds to a requirement row.
+/// What a derived defect adds to a requirement: to the end of a row's
+/// text, or on a line of its own after a block's.
 pub const ADDED_MUST: &str = " It MUST also record the change in the audit log.";
 
 /// The prefix of an open question's id, which is no requirement's: the
@@ -156,8 +157,8 @@ fn markdown_files(root: &Path, dir: &str) -> Result<Vec<String>, String> {
 fn section(root: &Path, path: &str, name: &str) -> Result<Vec<Case>, String> {
     let text = read(root, path)?;
     let title = title_line(path, &text)?;
-    let defect = match first_row(&text) {
-        Some((line, id)) => row_without_scenario(name, path, &line, &id),
+    let defect = match first_requirement(&text) {
+        Some((old, new, id)) => row_without_scenario(name, path, old, new, &id),
         None => excluded_terms(name, path, &title),
     };
 
@@ -213,6 +214,60 @@ fn first_row(text: &str) -> Option<(String, String)> {
             && !id.starts_with(OPEN_QUESTION)
             && cells.get(2).is_some_and(|p| p.starts_with('P')))
         .then(|| (format!("{line}\n"), (*id).to_owned()))
+    })
+}
+
+/// The first requirement of a section with a priority, its first row
+/// or its first block, whichever comes first: what it reads, what it
+/// reads with the MUST added, and its id. A row takes the MUST at the
+/// end of its text cell, a block on a line of its own after its text.
+fn first_requirement(text: &str) -> Option<(String, String, String)> {
+    let row = first_row(text).map(|(line, id)| {
+        let mut cells: Vec<String> = line.trim_end().split('|').map(str::to_owned).collect();
+        cells[3] = format!("{}{ADDED_MUST} ", cells[3].trim_end());
+        let new = format!("{}\n", cells.join("|"));
+        (line, new, id)
+    });
+    let block = first_block(text).map(|(block, id)| {
+        let new = format!("{block}{}\n", ADDED_MUST.trim_start());
+        (block, new, id)
+    });
+
+    [row, block]
+        .into_iter()
+        .flatten()
+        .min_by_key(|(old, _, _)| text.find(old.as_str()))
+}
+
+/// The first block of a section with a priority: its lines from its
+/// heading, one that is a requirement id, to its last line of text
+/// before the next heading or table, and its id.
+fn first_block(text: &str) -> Option<(String, String)> {
+    let lines: Vec<&str> = text.lines().collect();
+    lines.iter().enumerate().find_map(|(i, line)| {
+        let rest = line.trim_start_matches('#');
+        let id = rest.strip_prefix(' ')?.trim();
+        if !(1..=6).contains(&(line.len() - rest.len()))
+            || !srs_id(id)
+            || id.starts_with(OPEN_QUESTION)
+        {
+            return None;
+        }
+        let body: Vec<&str> = lines[i + 1..]
+            .iter()
+            .take_while(|l| !l.starts_with('#') && !l.trim_start().starts_with('|'))
+            .copied()
+            .collect();
+        let end = body.iter().rposition(|l| !l.trim().is_empty())? + 1;
+        body[..end]
+            .iter()
+            .any(|l| l.starts_with("- Pri: P"))
+            .then(|| {
+                (
+                    format!("{line}\n{}\n", body[..end].join("\n")),
+                    id.to_owned(),
+                )
+            })
     })
 }
 
@@ -273,14 +328,10 @@ fn under_title(path: &str, title: &str, sentence: &str) -> Edit {
     }
 }
 
-/// A MUST added to the row `line` of id `id`, with no change to its
-/// scenario: the specialist's check of each touched row against its
-/// scenario.
-fn row_without_scenario(name: &str, path: &str, line: &str, id: &str) -> Case {
-    let mut cells: Vec<String> = line.trim_end().split('|').map(str::to_owned).collect();
-    let requirement = &mut cells[3];
-    *requirement = format!("{}{ADDED_MUST} ", requirement.trim_end());
-    let new = format!("{}\n", cells.join("|"));
+/// A MUST added to the requirement `id`, which reads `old` and with
+/// the MUST `new`, with no change to its scenario: the specialist's
+/// check of each touched row against its scenario.
+fn row_without_scenario(name: &str, path: &str, old: String, new: String, id: &str) -> Case {
     case(
         name,
         "defect-row-without-scenario",
@@ -288,7 +339,7 @@ fn row_without_scenario(name: &str, path: &str, line: &str, id: &str) -> Case {
         &format!("a MUST added to {id} with no change to its scenario"),
         vec![Edit::Replace {
             file: path.to_owned(),
-            old: line.to_owned(),
+            old,
             new,
         }],
         Expect {
