@@ -29,9 +29,10 @@ row.
 The local review of pull request 154 requested changes because
 `lang-gherkin` ran out of turns before it stated a line. It spent
 nineteen searches on ENG-28's row: a search shows a matching line only
-up to about 500 characters, and ENG-28 is one line of 13,239. Phase 11
-of plan [2611190753](../2611190753_review-stability-options/plan.md)
-has the review context quote each touched requirement whole (#161).
+up to about 500 characters, and ENG-28 is one line of 13,239. Pull
+request #161 has the review context quote each touched requirement
+whole, a phase it adds to plan
+[2611190753](../2611190753_review-stability-options/plan.md).
 Every other way an agent or a person reads the SRS still meets such
 lines. 24 of the 33 files under `docs/srs` hold lines over 500
 characters, 15 of them in their requirement tables. On 21 November
@@ -117,8 +118,9 @@ The review's agents MUST have no credential that can approve or write.
    moved. Each keeps its one file, under the srs kind's cap of 700
    lines.
 4. The parser refuses a requirement table, with a drift case. ENG-28,
-   the agents' shared sections, the docs and the scenarios speak of a
-   requirement where they say row.
+   the agents' shared sections, the docs, the scenarios and the srs
+   crate's stated responsibility speak of a requirement where they say
+   row or table.
 5. The other wide tables follow, each with the reader its gate uses:
    the threats, the boundary register, the command-line interface, the
    delivery plan, the open questions, the change log and Appendices A

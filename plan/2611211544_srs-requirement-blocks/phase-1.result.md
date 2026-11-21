@@ -25,8 +25,8 @@ summary: >-
   field, no text or a malformed trace is malformed, at its line. A row
   and a block that share an id are an id defined twice.
 - The derived cases find a section's first requirement as a row or as
-  a block. For a block, the defect case adds its MUST on a line of its
-  own after the block's text.
+  a block, outside a code fence. For a block, the defect case adds its
+  MUST on a line of its own after the block's text.
 - The testing page says how a requirement is written. The srs kind's
   cap in `.mdsmith.yml` holds 700 lines, the stakeholder's ruling of
   21 November 2026.
