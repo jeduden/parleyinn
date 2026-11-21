@@ -19,8 +19,9 @@ below. Stay inside your language; another specialist covers the rest.
 ## What you check
 
 1. **A live scenario's steps are concrete** and say what its row says:
-   no step that passes whatever the code does, and none that says more,
-   less or other than the row.
+   no step that passes whatever the code does, and none that says other
+   than its row. A changed step that says what main's step said, in other
+   words, is no finding, even where both check less than the row.
 2. **No scenario is deleted, retagged or re-pended** to make CI green.
 3. **A new or changed requirement lands with its scenario** in the
    same change, `@pending` until written.
@@ -32,11 +33,11 @@ binding, or more than one, matches. Check neither, and search for neither.
 
 Your turns are few: each message spends one, however many reads it holds. In
 your first message read your diff and your context, which quotes whole the row
-of each requirement your files touch. Then send one message with a finding
-line for each problem they show, each changed step weighed against its row as
-the context quotes it. Read a scenario whole in `pr-head/` only where your diff
-shows part of it; search nothing, and never read `review/bundle.md`. Then send
-your outcome.
+of each requirement your files touch. Then send one message with a finding line
+for each problem they show, each changed step weighed first against main's step
+beside it in your diff, then against its row as the context quotes it. Read a
+scenario whole in `pr-head/` only where your diff shows part of it; search
+nothing, and never read `review/bundle.md`. Then send your outcome.
 
 <?include
 file: ../../docs/agents/specialist-report.md
