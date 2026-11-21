@@ -23,6 +23,7 @@ use std::fmt::Write as _;
 
 use review_eval::component::Kind;
 use review_eval::report;
+use review_eval::world::PR_HEAD;
 use review_gate::report::Line;
 use review_gate::{
     APPROVE_VERDICT, BLOCKING, Finding, NIT, REQUEST_CHANGES_VERDICT, ReviewOutcome, report_check,
@@ -616,9 +617,11 @@ fn tail_of(a: &str, b: &str) -> bool {
 /// shortens or lengthens a path still weighs the finding, while an
 /// ambiguous basename names none; a bare name reported beside exactly
 /// one longer spelling of it is that file. A reported path with directories is
-/// not lengthened, since the longer path may be another file.
+/// not lengthened, since the longer path may be another file, save under
+/// [`PR_HEAD`]: the world holds the pull request's tree there, so a
+/// generalist that read the file there names the same place.
 fn named_by(line: &str, path: &str, number: usize, known: &BTreeSet<String>) -> bool {
-    if names(line, path, number) {
+    if names(line, path, number) || names(line, &format!("{PR_HEAD}/{path}"), number) {
         return true;
     }
     let others = || known.iter().filter(|q| q.as_str() != path);
@@ -802,9 +805,10 @@ const SAYS_NOTHING: &str = "it answered no finding, no dropped one and no `none 
 const UNREAD_LINE: &str = "it answered a finding line the review cannot read";
 
 /// The findings a generalist's `answer` keeps: each line that reads as
-/// a finding and is no dropped one, `nit` or `blocking` as it says. A
-/// severity that is neither is read as blocking, the safe side, with
-/// the word it gave kept in its body.
+/// a finding and is no dropped one, `nit` or `blocking` as it says, at
+/// its path in the repository ([`in_repository`]). A severity that is
+/// neither is read as blocking, the safe side, with the word it gave
+/// kept in its body.
 #[must_use]
 pub fn kept(answer: &str) -> Vec<Finding> {
     answer
@@ -818,13 +822,21 @@ pub fn kept(answer: &str) -> Vec<Finding> {
                 other => (BLOCKING.to_owned(), format!("{text} (reported as {other})")),
             };
             Finding {
-                path: f.path,
+                path: in_repository(&f.path).to_owned(),
                 line: i64::try_from(f.line).unwrap_or(i64::MAX),
                 severity,
                 body,
             }
         })
         .collect()
+}
+
+/// `path` as the repository names it: a place spelled in the pull
+/// request's tree, under [`PR_HEAD`], is the file at the rest of it.
+fn in_repository(path: &str) -> &str {
+    path.strip_prefix(PR_HEAD)
+        .and_then(|p| p.strip_prefix('/'))
+        .unwrap_or(path)
 }
 
 /// A generalist's closing sentence on its scope: the last line of its
