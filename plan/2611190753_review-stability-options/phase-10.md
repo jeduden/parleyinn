@@ -6,8 +6,10 @@ result: false
 ---
 # Phase 10: a place spelled in the pull request's tree
 
-Requirements. ENG-28: its row does not change, and no scenario comes
-off `@pending`. ENG-28 has the review decide a weighing partial when a
+Requirements. ENG-28 gains one sentence: a place a generalist names
+under the pull request's tree it reads is the same place, for its
+weighing and for each finding it keeps. No scenario comes off
+`@pending`. ENG-28 has the review decide a weighing partial when a
 specialist's finding is at a place no line of the weighing is at. This
 phase has the review read one place one way.
 
@@ -40,7 +42,8 @@ the place.
 
 GREEN. The outcome module of `review-run`: the check of a weighing
 takes the spelling, and a generalist's kept findings are read at their
-path in the repository. The ENG-28 scenario step names the new run.
+path in the repository. The ENG-28 row states the rule, and its
+scenario step names the new run.
 
 Gate. Two drift cases fail: a check of a weighing that takes the
 spelling for another file, and a kept finding left at its spelling.

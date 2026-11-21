@@ -4,7 +4,7 @@ title: "A place spelled in the pull request's tree is the same place"
 status: "✅"
 result: true
 summary: >-
-  ENG-28 keeps its row: the review now reads a place a generalist
+  ENG-28 gains one sentence: the review reads a place a generalist
   spelled in the pull request's tree, `pr-head/<path>`, as the file at
   that path. The review of pull request 154 had blocked on a weighing
   that named all four of its places that way, a spelling the
@@ -24,9 +24,9 @@ summary: >-
   repository's path: it is posted there, tracked across reviews as the
   same finding, and kept a nit when a specialist's requirement request
   is at that place.
-- The ENG-28 weighing check runs `review-run` a fifth time, on a
-  generalist that spells its place in the pull request's tree, and the
-  ENG-28 scenario step names that run.
+- ENG-28's row states the rule. Its weighing check runs `review-run` a
+  fifth time, on a generalist that spells its place in the pull
+  request's tree, and its scenario step names that run.
 
 ## Verified
 
