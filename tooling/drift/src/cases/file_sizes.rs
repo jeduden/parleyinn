@@ -145,8 +145,8 @@ pub(super) fn size_list_growth_case() -> Case {
         "ENG-34",
         Injection::replace(
             "tooling/review-bundle/src/analysis.rs",
-            "findings.extend(size_list::finding(diff, names_the_size_list));",
-            "findings.extend(size_list::finding(diff, names_the_size_list).filter(|_| false));",
+            ".chain(size_list::finding(diff, names_the_size_list))",
+            ".chain(size_list::finding(diff, names_the_size_list).filter(|_| false))",
         ),
         scenario("ENG-34"),
         "the review bundle does not block at the size list for a raised file with no stakeholder comment",

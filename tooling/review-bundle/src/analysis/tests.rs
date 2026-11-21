@@ -402,12 +402,20 @@ fn prv_10_changed() -> Snapshot {
 fn analyse_asks_eng_29_s_record_and_consent_for_an_invariant_change() {
     let (findings, record) = guarded(&mut base(), None, &[INVARIANTS], false);
 
+    // One finding a cause: the record is the change's to bring, the
+    // consent the stakeholder's to give in a comment.
     assert_eq!(
         findings,
-        [eng_29_finding(
-            INVARIANTS,
-            "this change touches an invariant (ENG-29), but no accepted ADR under docs/adr that this change changes names ENG-29 and invariant; and no stakeholder comment consents to it"
-        )]
+        [
+            eng_29_finding(
+                INVARIANTS,
+                "this change touches an invariant (ENG-29), but no accepted ADR under docs/adr that this change changes names ENG-29 and invariant"
+            ),
+            eng_29_finding(
+                INVARIANTS,
+                "this change touches an invariant (ENG-29), but no stakeholder comment consents to it"
+            ),
+        ]
     );
     assert_eq!(record, None);
 }
@@ -479,10 +487,16 @@ fn analyse_asks_eng_29_s_record_for_a_change_to_its_own_row() {
 
     assert_eq!(
         findings,
-        [eng_29_finding(
-            &row_path(&base(), "ENG-29").unwrap(),
-            "this change touches ENG-29's own row (ENG-29), but no accepted ADR under docs/adr that this change changes names ENG-29; and no stakeholder comment consents to it"
-        )]
+        [
+            eng_29_finding(
+                &row_path(&base(), "ENG-29").unwrap(),
+                "this change touches ENG-29's own row (ENG-29), but no accepted ADR under docs/adr that this change changes names ENG-29"
+            ),
+            eng_29_finding(
+                &row_path(&base(), "ENG-29").unwrap(),
+                "this change touches ENG-29's own row (ENG-29), but no stakeholder comment consents to it"
+            ),
+        ]
     );
     assert!(with_record.is_empty());
     assert!(record.is_some());
@@ -534,7 +548,70 @@ fn analyse_asks_consent_beside_an_accepted_record() {
             "this change touches PRV-10 (ENG-29), but no stakeholder comment consents to it"
         )]
     );
-    assert_eq!(record, None);
+    // The record is named whatever the comments say: an agent reads it,
+    // and what an agent reads does not turn on a comment.
+    assert_eq!(
+        record,
+        Some(Record {
+            path: ADR.into(),
+            summary: "s".into(),
+        })
+    );
+}
+
+#[test]
+fn analyse_sets_apart_each_finding_that_turns_on_consent_whatever_the_comments_say() {
+    // A guarded change with its record, on a stakeholder path, that
+    // lengthens the size list: all three findings that wait on a comment.
+    let list = size_list::SIZE_LIST;
+    let mut head = base();
+    head.decisions.insert(
+        ADR.into(),
+        record("accepted", "ENG-29: an invariant changes, approved."),
+    );
+    let diff = format!(
+        "{}{}{}--- a/{list}\n+++ b/{list}\n+new.rs 1001\n",
+        header(INVARIANTS),
+        header(ADR),
+        header(list)
+    );
+    let shown = |a: &Analysis| -> Vec<Finding> {
+        a.findings
+            .iter()
+            .filter(|f| !a.on_consent.contains(f))
+            .cloned()
+            .collect()
+    };
+
+    let without = analyse(&base(), &head, &diff, &[]);
+    let with = analyse(
+        &base(),
+        &head,
+        &diff,
+        &[format!("I consent to docs/srs/ and {list}.")],
+    );
+
+    let ids = |a: &Analysis| -> Vec<&str> {
+        a.on_consent
+            .iter()
+            .map(|f| {
+                ["ENG-21", "ENG-29", "ENG-34"]
+                    .into_iter()
+                    .find(|id| f.body.contains(&format!("({id})")))
+                    .unwrap_or("none")
+            })
+            .collect()
+    };
+    assert_eq!(ids(&without), ["ENG-29", "ENG-21", "ENG-34"]);
+    assert_eq!(ids(&with), ["ENG-21", "ENG-34"]);
+    for a in [&without, &with] {
+        assert!(a.on_consent.iter().all(|f| a.findings.contains(f)));
+    }
+    assert!(without.on_consent.iter().all(|f| f.severity == BLOCKING));
+    assert!(with.on_consent.iter().all(|f| f.severity == NIT));
+    assert_eq!(shown(&without), shown(&with));
+    assert_eq!(without.eng_29_record, with.eng_29_record);
+    assert!(with.eng_29_record.is_some());
 }
 
 #[test]

@@ -2,8 +2,9 @@
 //! (ENG-28, I9), apart from the registry's other cases so its file
 //! grows no further: a part told to read the whole diff, a specialist
 //! told to read neither its context nor away from the bundle, a context
-//! that leaves out what it promises, and a context left out of the
-//! answer key; and the stability measurement's finding overlap and
+//! that leaves out what it promises, a context left out of the answer
+//! key, and a bundle or context that turns on the stakeholder's
+//! comments; and the stability measurement's finding overlap and
 //! identity (ENG-32).
 
 use super::case;
@@ -143,6 +144,57 @@ pub(super) fn review_context_file_cases() -> Vec<Case> {
                 "key::tests::a_changed_context_changes_its_specialist_s_key_and_its_generalist_s_alone",
             ),
             "a_changed_context_changes_its_specialist_s_key_and_its_generalist_s_alone",
+        ),
+    ]
+}
+
+/// The drifts that let a stakeholder's comment change what an agent
+/// reads, so the outcome a comment's review reuses is one its agents
+/// would not give again: a finding that turns on consent shown to an
+/// agent, the ENG-29 record named only once the stakeholder consents,
+/// and a context that does not say whose check consent is.
+pub(super) fn review_consent_cases() -> Vec<Case> {
+    const RENDER: &str = "tooling/review-bundle/src/render.rs";
+    let want = "the_checkout_s_bundle_writes_an_agent_the_same_whatever_the_comments_say";
+    let check = || {
+        cargo_lib_test(
+            "engineering",
+            "review_consent::tests::the_checkout_s_bundle_writes_an_agent_the_same_whatever_the_comments_say",
+        )
+    };
+    vec![
+        case(
+            "the review bundle showing an agent a finding that turns on the stakeholder's consent",
+            "ENG-28",
+            Injection::replace(
+                RENDER,
+                "a.findings.iter().filter(|f| !a.on_consent.contains(f))",
+                "a.findings.iter().filter(|f| !f.body.is_empty())",
+            ),
+            check(),
+            want,
+        ),
+        case(
+            "the review bundle naming the ENG-29 record only once the stakeholder consents",
+            "ENG-28",
+            Injection::replace(
+                "tooling/review-bundle/src/analysis.rs",
+                "        eng_29_record: guard.record,\n",
+                "        eng_29_record: guard.record.filter(|_| !consents.is_empty()),\n",
+            ),
+            check(),
+            want,
+        ),
+        case(
+            "a specialist's context not saying that consent is the review gate's check",
+            "ENG-28",
+            Injection::replace(
+                RENDER,
+                "    let _ = write!(b, \"\\n{CONSENT}\\n\");\n",
+                "    let _ = write!(b, \"\\n\");\n",
+            ),
+            check(),
+            want,
         ),
     ]
 }

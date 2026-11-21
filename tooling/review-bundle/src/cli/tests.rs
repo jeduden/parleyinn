@@ -346,6 +346,51 @@ fn run_takes_an_eng_29_record_with_the_stakeholder_s_consent() {
 }
 
 #[test]
+fn run_writes_an_agent_the_same_files_whatever_the_stakeholder_s_comments_say() {
+    let adr = "docs/adr/ADR-2610111300-guard.md";
+    let w = World::new(&format!(
+        "diff --git a/docs/srs/invariants.md b/docs/srs/invariants.md\ndiff --git a/{adr} b/{adr}\n"
+    ));
+    fs::write(
+        w.head.path().join(adr),
+        "---\nid: ADR-2610111300\ntitle: \"g\"\nstatus: accepted\nsummary: >-\n  An invariant changes under ENG-29.\n---\n# ADR-2610111300: g\n",
+    )
+    .unwrap();
+    // Every file the command writes for an agent to read.
+    let read = |w: &World| -> Vec<(String, String)> {
+        let mut names: Vec<String> = fs::read_dir(w.files.path().join(CONTEXTS))
+            .unwrap()
+            .map(|e| format!("{CONTEXTS}/{}", e.unwrap().file_name().to_string_lossy()))
+            .collect();
+        names.sort();
+        names.push(BUNDLE.to_owned());
+        names
+            .into_iter()
+            .map(|n| (w.output(&n), n))
+            .map(|(body, n)| (n, body))
+            .collect()
+    };
+
+    w.run();
+    let (before, checked_before) = (read(&w), w.output(CHECKED));
+    w.consent(r#"[{"author": "owner", "at": "2026-10-11T12:00:00Z", "body": "ok for docs/srs/ and docs/adr/"}]"#);
+    w.run();
+
+    // The gate's findings follow the comment; nothing an agent reads does.
+    assert_ne!(checked_before, w.output(CHECKED));
+    assert!(
+        checked_before.contains("no stakeholder comment"),
+        "{checked_before}"
+    );
+    assert_eq!(before, read(&w));
+    assert!(before.len() > 1, "a context beside the bundle: {before:?}");
+    for (name, body) in &before {
+        assert!(!body.contains("stakeholder comment"), "{name}: {body}");
+        assert!(body.contains(render::CONSENT), "{name}: {body}");
+    }
+}
+
+#[test]
 fn consents_returns_each_comment_with_a_body() {
     let comment = |body: &str| format!(r#"[{{"author": "o", "at": "t", "body": "{body}"}}]"#);
     let none: Vec<String> = Vec::new();

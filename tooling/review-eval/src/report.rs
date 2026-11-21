@@ -91,12 +91,15 @@ pub fn finding(line: &str) -> Option<Finding> {
 /// A generalist's weighing as its run log gives it: each weighing line
 /// it stated in a message before its last in the strict form
 /// [`strict`] reads, each once and in order, then its final answer's
-/// lines, read leniently so the review names a line it cannot read. A line at a place, a finding
-/// or a dropped one, supersedes every line stated before it, in a
-/// message or the final answer, that is the same finding
-/// ([`identity`]): the last statement wins, so a draft finding can be
-/// dropped or revised later, and a finding at the same place from
-/// another source stays. A run that was cut off before its final answer
+/// lines, read leniently so the review names a line it cannot read. A
+/// line at a place, a finding or a dropped one, supersedes every line
+/// stated before it, in a message or the final answer, that is the same
+/// finding ([`identity`]): the last statement wins, so a draft finding
+/// can be dropped or revised later, and a finding at the same place
+/// from another source stays. One statement is not undone that way: a
+/// `nit` never supersedes a `blocking` finding, which stands beside it
+/// until a dropped line withdraws it, so a second, lesser point at a
+/// place costs the review no blocking finding. A run that was cut off before its final answer
 /// has the lines it stated and no more, so the review reads what was
 /// paid for.
 #[must_use]
@@ -141,12 +144,20 @@ pub fn strict(line: &str) -> bool {
 }
 
 /// Adds `line` to `out`, first removing each line there that is the
-/// same finding.
+/// same finding, save that a `nit` removes no `blocking` finding: the
+/// blocking finding stands beside it until a dropped line, or a later
+/// blocking one, takes its place.
 fn settle<'a>(out: &mut Vec<&'a str>, line: &'a str) {
     if let Some(id) = identity(line) {
-        out.retain(|l| identity(l).as_ref() != Some(&id));
+        let nit = severity_is(line, NIT);
+        out.retain(|l| identity(l).as_ref() != Some(&id) || (nit && severity_is(l, BLOCKING)));
     }
     out.push(line);
+}
+
+/// Whether `line` reads as a finding of `severity`.
+fn severity_is(line: &str, severity: &str) -> bool {
+    finding(line).is_some_and(|f| f.severity == severity)
 }
 
 /// Which finding a generalist's finding or dropped line is about: its
@@ -204,8 +215,12 @@ pub fn placed(line: &str) -> bool {
     })
 }
 
+/// The severity of a finding that blocks.
+pub const BLOCKING: &str = "blocking";
+/// The severity of a finding that does not.
+pub const NIT: &str = "nit";
 /// The severities a generalist's finding gives.
-pub const SEVERITIES: [&str; 2] = ["blocking", "nit"];
+pub const SEVERITIES: [&str; 2] = [BLOCKING, NIT];
 
 /// Whether `line` is a generalist's finding the review cannot read: a
 /// part after its first is a severity of [`SEVERITIES`] alone, markup

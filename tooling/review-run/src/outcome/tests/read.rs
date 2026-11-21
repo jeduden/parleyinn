@@ -336,3 +336,30 @@ fn a_specialist_cut_off_before_it_stated_anything_blocks_as_partial_and_is_not_c
         d.outcome.summary
     );
 }
+
+#[test]
+fn a_blocking_finding_stands_beside_a_later_nit_at_its_place_and_requests_changes() {
+    let (runs, reports) = all_answered(
+        "src/a.rs:3 — blocking — a hook panics — lang-rust\n\
+         src/a.rs:3 — nit — and its line is long — lang-rust\n\
+         src/a.rs:3 — nit — again — test-engineer-unit\nUnsound.",
+    );
+
+    let d = decide(&plan(DISPATCH), &runs, &reports, &known());
+
+    assert_eq!(d.outcome.verdict, "request_changes", "{:?}", d.outcome);
+    let kept: Vec<(&str, &str)> = d
+        .outcome
+        .findings
+        .iter()
+        .map(|f| (f.severity.as_str(), f.body.as_str()))
+        .collect();
+    assert_eq!(
+        kept,
+        [
+            ("blocking", "a hook panics — lang-rust"),
+            ("nit", "and its line is long — lang-rust"),
+            ("nit", "again — test-engineer-unit"),
+        ]
+    );
+}

@@ -11,7 +11,8 @@
 //! review the parts check runs end to end; a specialist that only
 //! left lines of its diff unread counted toward the mass failure; and a
 //! finding off its form refused as a line in no form, read with its slip
-//! unlisted, or left out of the summary's count.
+//! unlisted, or left out of the summary's count; and a generalist's
+//! blocking finding lost to a nit it stated later at its place.
 
 use super::*;
 
@@ -98,7 +99,29 @@ pub(super) fn review_log_cases() -> Vec<Case> {
     cases.extend(cut_before_stating_cases());
     cases.push(part_case());
     cases.push(unread_case());
+    cases.push(early_line_case());
     cases
+}
+
+/// A generalist's weighing line its final answer leaves out no longer
+/// counted by the grader: its instructions ask for the whole weighing
+/// in the final answer, and the slip is how an evaluation run shows a
+/// line stated before it.
+fn early_line_case() -> Case {
+    case(
+        "the grader not counting a generalist's line its final answer leaves out",
+        "ENG-32",
+        Injection::replace(
+            "tooling/review-eval/src/grade/early.rs",
+            "        if strict(line) && !held && !early.contains(&line) {\n",
+            "        if strict(line) && !held && early.contains(&line) {\n",
+        ),
+        cargo_lib_test(
+            "review-eval",
+            "grade::early::tests::a_weighing_line_the_final_answer_does_not_hold_is_a_slip",
+        ),
+        "a_weighing_line_the_final_answer_does_not_hold_is_a_slip",
+    )
 }
 
 /// A run cut off before it stated any line or an outcome taken for a
@@ -173,8 +196,9 @@ fn unread_case() -> Case {
 }
 
 /// A finding off its form no longer read as the finding it states, its
-/// slip no longer listed, or no longer counted in the review's summary.
-pub(super) fn review_off_form_cases() -> Vec<Case> {
+/// slip no longer listed, or no longer counted in the review's summary;
+/// and a blocking finding a later nit at its place replaces.
+pub(super) fn review_reading_cases() -> Vec<Case> {
     const REPORT: &str = "tooling/review-gate/src/report.rs";
     vec![
         case(
@@ -209,6 +233,20 @@ pub(super) fn review_off_form_cases() -> Vec<Case> {
             ),
             check(),
             "off-form: a finding read off its form is not counted in the review's summary",
+        ),
+        case(
+            "a generalist's blocking finding lost to a nit stated later at its place",
+            "ENG-28",
+            Injection::replace(
+                "tooling/review-eval/src/report.rs",
+                " || (nit && severity_is(l, BLOCKING)));\n",
+                " || (nit && l.is_empty()));\n",
+            ),
+            cargo_lib_test(
+                "engineering",
+                "review_weighings::tests::the_checkout_s_review_run_reads_a_whole_weighing_and_decides_a_partial_one",
+            ),
+            "the blocking finding review-code stated at src/a.rs:1 is lost to its later nit",
         ),
     ]
 }
