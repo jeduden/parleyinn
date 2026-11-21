@@ -431,11 +431,12 @@ pub fn describe(run: &AgentRun) -> String {
 /// Runs `unit` once, logging under the logs' directory, with `note`,
 /// when there is one, added to its prompt, and for a specialist returns
 /// the report read from its log, its ids held to `known`, written when
-/// it runs whole. A run that never started has no attempts.
+/// it runs whole, the run capped at `cap` US dollars, what it holds of
+/// the pull request's cap. A run that never started has no attempts.
 pub(crate) fn attempt(
     (host, workdir, plan): (&dyn Host, &Path, &Plan),
     unit: &Unit,
-    (deadline, known): (Duration, &BTreeSet<String>),
+    (deadline, known, cap): (Duration, &BTreeSet<String>, f64),
     note: Option<&str>,
 ) -> (AgentRun, Option<String>) {
     let (name, kind) = (unit.name.as_str(), unit.kind);
@@ -470,6 +471,7 @@ pub(crate) fn attempt(
     let log_path = workdir.join(LOGS).join(format!("{}.jsonl", unit.stem()));
     let diff = unit.part.as_ref().map(|part| part.diff.as_str());
     let mut command = runner::command_over(&component, &world, None, &log_path, deadline, diff);
+    runner::cap(&mut command, cap);
     match &unit.part {
         Some(part) => told(&mut command.args, &part.note),
         None if kind == Kind::Specialist => {

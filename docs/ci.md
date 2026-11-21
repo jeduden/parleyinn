@@ -64,9 +64,12 @@ is short, because a finding found late costs a whole round.
   side by side, cancelled or rerun never erase each other's. A run
   starts only once its tier's cap, 0.30 USD for a specialist and 1.50
   for a generalist, fits beside
-  what was spent and the caps of the runs in flight, else it waits; a run
+  what was spent and the caps of the runs in flight, else it waits. A
+  generalist whose 1.50 can no longer fit starts all the same once 0.75
+  is left, capped at what is left, so the pull request's cap holds
+  whatever it costs. A run
   paid for that left no result, killed at its deadline, crashed or
-  cancelled, is charged its tier's whole cap, and one whose result
+  cancelled, is charged the whole cap it was passed, and one whose result
   reported no cost is charged nothing. A review the cap stopped
   lists every agent it did not run, `over budget:`, in
   `review/not-reviewed.md` and requests changes. A run cut off by its

@@ -1,6 +1,21 @@
+use std::collections::BTreeSet;
+
 use super::*;
 use crate::case::Expected;
 use crate::component::Kind;
+
+/// The requirements a test's world holds beside the invariants: each
+/// id a finding of these tests may cite.
+const REQUIREMENTS: [&str; 9] = [
+    "ASM-03", "ENG-01", "ENG-04", "ENG-11", "ENG-16", "ENG-17", "ENG-35", "ENG-36", "LANE-01",
+];
+
+/// `log` graded with a world's ids: [`REQUIREMENTS`] and the invariants.
+fn grade(component: &Component, case: &Case, log: &RunLog) -> Graded {
+    let mut known: BTreeSet<String> = review_gate::report::invariants();
+    known.extend(REQUIREMENTS.map(str::to_owned));
+    super::grade(component, case, log, &known)
+}
 
 fn component(kind: Kind, name: &str, strict_lines: bool) -> Component {
     Component {
@@ -971,6 +986,7 @@ fn only_a_case_that_holds_its_run_to_the_tree_fails_a_read_of_main_s() {
 }
 
 mod generalist;
+mod ids;
 mod near;
 mod outcome;
 mod paths;

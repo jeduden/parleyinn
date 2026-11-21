@@ -140,7 +140,7 @@ pub fn held_problems(case: &str, held: &Held, want: Want) -> Vec<String> {
 }
 
 /// What `review/spend.json` in `workdir` says was spent.
-fn spend_of(workdir: &Path) -> Result<f64, String> {
+pub(crate) fn spend_of(workdir: &Path) -> Result<f64, String> {
     let path = workdir.join(review_run::spend::SPEND);
     let text = fs::read_to_string(&path).map_err(|e| format!("read {}: {e}", path.display()))?;
     review_run::spend::check(&text).map_err(|e| format!("{}: {e}", path.display()))

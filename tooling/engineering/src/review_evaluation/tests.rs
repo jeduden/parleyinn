@@ -57,7 +57,8 @@ as expected|found|none|no outcome|before answer|yes|passes, slips on answer
 as expected|found|none|outcome line|only in answer|yes|fails on stating
 as expected|found|none|outcome line|before answer|no|fails on no answer
 as expected|found|none|outcome line|before answer|cut|passes, slips on cut
-other|missing|none|no outcome|before answer|cut|fails on cut";
+other|missing|none|no outcome|before answer|cut|fails on cut
+as expected|unknown id|none|outcome line|before answer|yes|fails on report";
 
 #[test]
 fn the_grading_table_of_the_scenario_holds() {
@@ -69,7 +70,7 @@ fn the_grading_table_of_the_scenario_holds() {
         })
         .collect();
 
-    assert_eq!(rows.len(), 11);
+    assert_eq!(rows.len(), 12);
     assert_eq!(run_graded(&rows), Vec::<String>::new());
 }
 

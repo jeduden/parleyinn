@@ -15,7 +15,6 @@ review-report.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 sha2.workspace = true
-srs.workspace = true
 
 [dev-dependencies]
 testkit.workspace = true
@@ -26,5 +25,5 @@ workspace = true
 # ENG-02: see crates/parinn/Cargo.toml.
 [package.metadata.parinn]
 responsibility = "Runs the review's dispatched agents and writes the review outcome the review gate reads"
-may-depend-on = ["review-bundle", "review-eval", "review-gate", "review-report", "srs"]
+may-depend-on = ["review-bundle", "review-eval", "review-gate", "review-report"]
 may-dev-depend-on = ["testkit"]
