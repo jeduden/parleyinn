@@ -41,29 +41,52 @@ fn the_checkout_s_gate_says_what_to_do_about_a_review_its_cost_cap_stopped() {
     assert!(problems.is_empty(), "{problems:?}");
 }
 
+/// How a job takes the gate's own line from what it printed, and the
+/// last line when it printed none.
+const TAKES: &str = "grep -m 1 '^review-gate: ' gate-error.txt || tail -n 1 gate-error.txt";
+
 #[test]
 fn a_job_that_drops_the_gate_s_error_is_named() {
-    let says = "          if ! gate 2> gate-error.txt; then
-            why=\"$(tail -n 1 gate-error.txt)\"
+    let says = format!(
+        "          if ! gate 2> gate-error.txt; then
+            why=\"$({TAKES})\"
             post \"failed before deciding: $why\"
           fi
-";
-    assert_eq!(check_problems(&flow(says), KEY), Ok(vec![]));
+"
+    );
+    assert_eq!(check_problems(&flow(&says), KEY), Ok(vec![]));
 
     assert_eq!(
         check_problems(&flow("          gate || post failed\n"), KEY),
         Ok(vec![
             "job post does not keep the gate's errors: 2> gate-error.txt".to_owned(),
-            "job post does not take the gate's error from them: tail -n 1 gate-error.txt"
-                .to_owned(),
+            format!("job post does not take the gate's own line from them: {TAKES}"),
             "job post does not say the gate's error in the check it fails: failed before \
              deciding: $why"
                 .to_owned(),
         ])
     );
     assert_eq!(
-        check_problems(&flow(says), "OTHER").unwrap_err(),
+        check_problems(&flow(&says), "OTHER").unwrap_err(),
         r#"0 jobs read "OTHER", want exactly one"#
+    );
+}
+
+#[test]
+fn a_job_that_takes_the_last_line_for_the_gate_s_error_is_named() {
+    // A usage error is followed by the usage, so the last line the gate
+    // printed is not always its error.
+    let says = "          if ! gate 2> gate-error.txt; then
+            why=\"$(tail -n 1 gate-error.txt)\"
+            post \"failed before deciding: $why\"
+          fi
+";
+
+    assert_eq!(
+        check_problems(&flow(says), KEY),
+        Ok(vec![format!(
+            "job post does not take the gate's own line from them: {TAKES}"
+        )])
     );
 }
 

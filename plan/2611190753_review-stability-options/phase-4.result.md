@@ -11,7 +11,7 @@ summary: >-
   pull request's reviews cost and the cap, and the error adds how what
   they spent is reset. The gate's rule is unchanged: it decides no
   review that left an agent out. A scenario step, a record check and
-  four drift cases land with it.
+  five drift cases land with it.
 ---
 # Phase 4 handoff
 
@@ -25,8 +25,10 @@ summary: >-
 - For a review a cost cap kept agents out of, the error ends with how
   what the pull request's reviews spent is reset.
 - The decide script keeps the gate's errors, prints them to the log as
-  before, and puts the last line in the summary of the check it fails.
-  [ci.md](../../docs/ci.md) says so.
+  before, and puts the gate's own line in the summary of the check it
+  fails: the one that starts with its name, since a usage error is
+  followed by the usage, or the last line cargo printed when the gate
+  never started. [ci.md](../../docs/ci.md) says so.
 
 ## Verified
 
@@ -40,9 +42,11 @@ summary: >-
 - The drift suite catches the four new cases and the 23 others that
   inject a file this phase touches.
 - The decide script was run by hand with stand-ins for `cargo`, `gh`
-  and `jq`: the check's summary held the gate's line in a code span,
-  its backticks dropped. No test runs the script itself; the record
-  check reads its text.
+  and `jq`, for a gate that did not decide, one that failed on its
+  usage and one that did not build. The check's summary held the
+  gate's own line for the first two and cargo's last line for the
+  third, in a code span, its backticks dropped. No test runs the
+  script itself; the record check reads its text.
 
 ## Next
 

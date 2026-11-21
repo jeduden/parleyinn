@@ -34,9 +34,11 @@ kept an agent out, and not otherwise.
 
 GREEN. The outcome's finding and the gate's reading of it share one
 form, which the gate's crate writes and reads. The decide script keeps
-the gate's errors, prints them to the log as before, and puts the last
-line in the check's summary, in a code span with its backticks dropped
-so nothing in it is read as Markdown.
+the gate's errors, prints them to the log as before, and puts the
+gate's own line in the check's summary: the one that starts with its
+name, since a usage error is followed by the usage, or the last line
+cargo printed when the gate never started. It goes in a code span with
+its backticks dropped, so nothing in it is read as Markdown.
 
 Evaluation. No reviewer's behaviour changes, so no evaluation case
 runs: the proof is unit tests, the scenario step, a record check and
@@ -44,7 +46,7 @@ drift cases.
 
 Gate. The record check in `review_capped` runs `review-run` under a
 cap its first run reaches, then the gate on what it wrote, and reads
-the job that holds the reviewer app's key. Four drift cases fail it:
+the job that holds the reviewer app's key. Five drift cases fail it:
 an agent named without its reason, the outcome naming it in a form the
-gate does not read, the reset left out, and the check left without the
-gate's error.
+gate does not read, the reset left out, the check left without the
+gate's error, and the check given the gate's last line for it.

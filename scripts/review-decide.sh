@@ -20,9 +20,13 @@ if ! cargo run --locked --quiet -p review-gate --offline -- --outcome outcome.js
   --consulted consulted.json --reports reports --answers answers.json > review.json \
   2> gate-error.txt; then
   cat gate-error.txt >&2
-  # The gate's last line is its error. It goes in a code span, its own
-  # backticks dropped, so nothing in it is read as Markdown.
-  why="\`$(tail -n 1 gate-error.txt | tr -d '\`' | head -c 4000)\`"
+  # The gate's error is its own line, the one that starts with its
+  # name: a usage error is followed by the usage. A gate that never
+  # started printed none, and the last line cargo printed says why. It
+  # goes in a code span, its own backticks dropped, so nothing in it is
+  # read as Markdown.
+  said=$(grep -m 1 '^review-gate: ' gate-error.txt || tail -n 1 gate-error.txt)
+  why="\`$(printf '%s' "$said" | tr -d '\`' | head -c 4000)\`"
   gh api --method POST "repos/$REPO/check-runs" -f name=review-gate \
     -f head_sha="$HEAD_SHA" -f status=completed -f conclusion=failure \
     -f "output[title]=The review gate did not decide" \

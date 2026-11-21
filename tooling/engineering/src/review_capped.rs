@@ -25,8 +25,8 @@ use crate::review_workflow::Workflow;
 const SAYS: [(&str, &str); 3] = [
     ("keep the gate's errors:", "2> gate-error.txt"),
     (
-        "take the gate's error from them:",
-        "tail -n 1 gate-error.txt",
+        "take the gate's own line from them:",
+        "grep -m 1 '^review-gate: ' gate-error.txt || tail -n 1 gate-error.txt",
     ),
     (
         "say the gate's error in the check it fails:",

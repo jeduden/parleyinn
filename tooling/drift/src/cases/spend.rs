@@ -303,7 +303,8 @@ fn carry_cases() -> Vec<Case> {
 /// agents out of (ENG-28, I6): an agent named without the reason the
 /// review outcome gives, the outcome naming it in a form the gate does
 /// not read, an error that does not say how the spend is reset, and
-/// the check the gate fails left without the gate's error.
+/// the check the gate fails left without the gate's error, or given
+/// the gate's last line, which after a usage error is the usage.
 pub(super) fn review_capped_cases() -> Vec<Case> {
     const LEFT_OUT: &str = "tooling/review-gate/src/left_out.rs";
     let check = || {
@@ -354,6 +355,17 @@ pub(super) fn review_capped_cases() -> Vec<Case> {
                 super::REVIEW_DECIDE_SCRIPT,
                 "failed before deciding: $why. The log of $RUN has the rest.",
                 "failed before deciding; the log of $RUN says why.",
+            ),
+            check(),
+            want,
+        ),
+        case(
+            "the check the review gate fails given the gate's last line for its error",
+            "ENG-28",
+            Injection::replace(
+                super::REVIEW_DECIDE_SCRIPT,
+                "said=$(grep -m 1 '^review-gate: ' gate-error.txt || tail -n 1 gate-error.txt)",
+                "said=$(tail -n 1 gate-error.txt)",
             ),
             check(),
             want,
