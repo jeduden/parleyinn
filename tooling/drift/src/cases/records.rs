@@ -484,6 +484,22 @@ pub(super) fn parse_cases() -> Vec<Case> {
     ]
 }
 
+/// The drift the parse gate catches in a requirement written as a
+/// block: a block reads as a row does, so one that redefines a row's id
+/// fails the gate as a second row would.
+pub(super) fn block_parse_cases() -> Vec<Case> {
+    vec![case(
+        "a requirement block redefining a row's id",
+        "specification_parses",
+        Injection::create(
+            "docs/srs/10b-drift.md",
+            "# Drift\n\n## ENG-25\n\n- Pri: P1\n- Ver: T\n\nA second ENG-25.\n",
+        ),
+        cargo_test("srs", "gates", "specification_parses"),
+        "10b-drift.md:3: ENG-25 already defined at",
+    )]
+}
+
 /// The drifts the persona gates catch between §2.5, Appendix C and the
 /// persona agents.
 pub(super) fn persona_cases() -> Vec<Case> {

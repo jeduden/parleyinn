@@ -76,25 +76,25 @@ flag per layer. Codecov's [thresholds](../codecov.yml) are a soft ratchet.
 
 ## The executable requirement matrix
 
-The SRS under [docs/srs](srs/index.md) is executable. Every
-requirement row, from `REC-01` to `ENG-29`, and every
-assumption `ASM-` row, has exactly one Gherkin scenario under
-`features/`, one file per SRS section. The scenario carries the row's
-id, its priority and its traced invariants as tags:
+The SRS under [docs/srs](srs/index.md) is executable. Every requirement, from
+`REC-01` to `ENG-35`, and every assumption `ASM-`, has exactly one Gherkin
+scenario under `features/`, one file per SRS section. A requirement is a row of
+its section's table, or a block: a heading that is its id, its fields as a list,
+then its text, one sentence a line. The scenario carries the id, the priority
+and the traced invariants as tags:
 
 ```gherkin
 @REC-03 @P0 @I1 @I10 @pending
 Scenario: re-ingesting a transcript source creates no duplicate events
 ```
 
-The `scenario` crate's gate test, `specification_and_features_agree`,
-keeps the two sides in step. A requirement with no scenario fails it.
-So does a scenario naming no requirement, an id tagged twice, or a
-priority or invariant tag that disagrees with the row. The `srs`
-crate's gates check that Appendix B's invariant coverage and
-requirement counts match the tables they summarise. They also check
-that Appendix C gives every requirement a persona, and that §2.5's
-personas match the agents in `.claude/agents`.
+The `scenario` crate's gate test, `specification_and_features_agree`, keeps the
+two sides in step. A requirement with no scenario fails it. So does a scenario
+naming no requirement, an id tagged twice, or a priority or invariant tag that
+disagrees with the requirement. The `srs` crate's gates check that Appendix B's
+invariant coverage and requirement counts match the requirements they summarise.
+They also check that Appendix C gives every requirement a persona, and that
+§2.5's personas match the agents in `.claude/agents`.
 
 A scenario tagged `@pending` is declared, not written: skipped and
 counted, never a pass, but for an Examples block tagged `@runs`, whose
@@ -195,7 +195,7 @@ the suite reaches `main`, the base has none; the gate reports the head's.
 
 ## Adding or writing a scenario
 
-A new requirement lands in the SRS table and in its section's feature
+A new requirement lands in its SRS section and in that section's feature
 file in the same change, tagged `@pending`. To write a scenario, drop
 `@pending`, make its Given/When/Then concrete, and bind the steps. A
 section's bindings live in `tooling/scenario/tests/bdd/<section>.rs`,

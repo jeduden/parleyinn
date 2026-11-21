@@ -1,10 +1,11 @@
-//! Reads the requirement tables of the Software Requirements
-//! Specification under `docs/srs`, so the test suite can hold the
-//! specification and the executable scenarios in step. It is
+//! Reads the requirements of the Software Requirements Specification
+//! under `docs/srs`, its tables' rows and its blocks, so the test suite
+//! can hold the specification and the executable scenarios in step. It is
 //! repository tooling for the gates in the `scenario` crate and never
 //! links into a shipped executable.
 
 mod appendix;
+mod block;
 mod personas;
 mod table;
 
@@ -15,6 +16,7 @@ use std::io;
 use std::path::{Path, PathBuf};
 
 pub use appendix::{Counts, invariant_coverage, priority_counts, stated_counts, traced_coverage};
+pub use block::{Block, blocks};
 pub use personas::{persona_agents, persona_coverage};
 pub use table::{Row, Table, fence_after, fence_marker, tables};
 
@@ -25,10 +27,11 @@ pub const FAMILIES: [&str; 18] = [
     "PEER", "SEC", "NFR", "ENG", "ASM",
 ];
 
-/// One row of a requirement or assumption table. `priority` and
-/// `traces` are empty when the table has no such column: the
-/// non-functional and assumption tables carry neither, the engineering
-/// tables no Traces.
+/// One requirement: a row of a requirement or assumption table, or a
+/// block under a heading that is its id. `priority` and `traces` are
+/// empty when it has no such column or field: the non-functional
+/// requirements and the assumptions carry neither, the engineering
+/// requirements no Traces. `line` is the row's, or the heading's.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Requirement {
     pub id: String,
@@ -144,16 +147,18 @@ fn markdown_files(dir: &Path) -> Result<Vec<PathBuf>, Error> {
     Ok(paths)
 }
 
-/// Reads the requirements from one document. A requirement table is
-/// one whose header leads with "ID" and names a "Requirement" or an
-/// "Assumption" column; every other table (constraints, open
-/// questions, glossaries) is passed by. Within a requirement table
-/// every row must lead with a well-formed id and trace only real
-/// invariants, or the row is reported with its line.
+/// Reads the requirements from one document, in its order. A
+/// requirement table is one whose header leads with "ID" and names a
+/// "Requirement" or an "Assumption" column; every other table
+/// (constraints, open questions, glossaries) is passed by. Within a
+/// requirement table every row must lead with a well-formed id and
+/// trace only real invariants, or the row is reported with its line. A
+/// block, a heading that is a requirement id, must carry fields of
+/// [`FIELDS`], each once, and a text, or it is reported with its line.
 ///
 /// # Errors
 ///
-/// Fails on the first malformed row.
+/// Fails on the first malformed row or block.
 pub fn parse(path: &Path, body: &str) -> Result<Vec<Requirement>, Error> {
     let mut out = Vec::new();
     for table in tables(body) {
@@ -166,8 +171,67 @@ pub fn parse(path: &Path, body: &str) -> Result<Vec<Requirement>, Error> {
             out.push(requirement_of(path, row, &cols)?);
         }
     }
+    for block in blocks(body) {
+        out.push(requirement_of_block(path, &block)?);
+    }
+    out.sort_by_key(|r| r.line);
 
     Ok(out)
+}
+
+/// The labels a block's fields may carry: the columns of the
+/// requirement and assumption tables beside the id and the text.
+pub const FIELDS: [&str; 7] = [
+    "Pri",
+    "Ver",
+    "Traces",
+    "Category",
+    "Evidence so far",
+    "Verified in",
+    "Affects",
+];
+
+/// Reads one block.
+fn requirement_of_block(path: &Path, block: &Block) -> Result<Requirement, Error> {
+    let malformed = |what: String| {
+        Error::Malformed(format!(
+            "{}:{}: {}: {what}",
+            path.display(),
+            block.line,
+            block.id
+        ))
+    };
+    if block.fields.is_empty() {
+        return Err(malformed("no fields".to_owned()));
+    }
+    let mut fields: BTreeMap<&str, &str> = BTreeMap::new();
+    for (label, value) in &block.fields {
+        if !FIELDS.contains(&label.as_str()) {
+            return Err(malformed(format!("unknown field {label:?}")));
+        }
+        if fields.insert(label, value).is_some() {
+            return Err(malformed(format!("field {label:?} twice")));
+        }
+    }
+    if block.text.is_empty() {
+        return Err(malformed("no text".to_owned()));
+    }
+    let field = |name: &str| {
+        fields
+            .get(name)
+            .map(|v| (*v).to_owned())
+            .unwrap_or_default()
+    };
+
+    Ok(Requirement {
+        id: block.id.clone(),
+        priority: field("Pri"),
+        verify: field("Ver"),
+        traces: parse_traces(&field("Traces")).map_err(malformed)?,
+        text: block.text.clone(),
+        path: path.to_path_buf(),
+        line: block.line,
+    })
 }
 
 /// Maps each header name to its index.

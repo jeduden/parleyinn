@@ -79,6 +79,12 @@ kinds:
     rules:
       table-readability: false
       paragraph-readability: false
+      # A requirement written under its own heading wraps at 80
+      # columns, one sentence a line (plan 2611211544), so a section
+      # may hold 700 lines: the stakeholder's ruling of 21 November
+      # 2026.
+      max-file-length:
+        max: 700
       required-frontmatter:
         fields: [summary]
   invariants:
