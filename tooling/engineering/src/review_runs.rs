@@ -637,12 +637,15 @@ fn with_recorded(
 }
 
 /// The specialist whose context the context check reads, the file the
-/// change edits, and the requirement it names.
-pub const CONTEXT: (&str, &str, &str) = (
-    "lang-markdown",
-    "docs/agents/specialist-outcome.md",
-    "ENG-28",
-);
+/// change edits, and the requirement it names. No stakeholder path
+/// holds the file: a finding that turns on the stakeholder's consent is
+/// in no context ([`crate::review_consent`]).
+pub const CONTEXT: (&str, &str, &str) = ("lang-markdown", "docs/testing.md", "ENG-28");
+
+/// What the change of the context check adds after the id: a line that
+/// lifts a ban, so the bundle has a finding on the file to put in the
+/// context.
+const LIFTS_A_BAN: &str = "allows clippy::disallowed_methods";
 
 /// What is wrong with the context specialist [`CONTEXT`] names that the
 /// review bundle wrote, run on `checkout` as both trees with a change
@@ -652,7 +655,7 @@ pub const CONTEXT: (&str, &str, &str) = (
 #[must_use]
 pub fn context_problems(checkout: &Checkout, out: &Path) -> Vec<String> {
     let (_, path, id) = CONTEXT;
-    let diff = format!("{}+{id}\n", one_line_diff(path));
+    let diff = format!("{}+{id} {LIFTS_A_BAN}\n", one_line_diff(path));
     match bundle(checkout, out, &diff, "[]") {
         Ok(printed) => context_in(out, &printed),
         Err(problems) => problems,
@@ -660,14 +663,14 @@ pub fn context_problems(checkout: &Checkout, out: &Path) -> Vec<String> {
 }
 
 /// The head of a diff of `path` that adds one line, which follows.
-fn one_line_diff(path: &str) -> String {
+pub(crate) fn one_line_diff(path: &str) -> String {
     format!("diff --git a/{path} b/{path}\n--- a/{path}\n+++ b/{path}\n@@ -1 +1 @@\n")
 }
 
 /// Runs the review bundle on `checkout` as both trees, with `diff` as
 /// the change and `consent` as the stakeholder's comments, into `out`,
 /// and returns its step outputs, or why it did not run.
-fn bundle(
+pub(crate) fn bundle(
     checkout: &Checkout,
     out: &Path,
     diff: &str,
@@ -709,7 +712,7 @@ fn bundle(
 pub const RECORD: &str = "docs/adr/ADR-2610260751-invariants-one-section-each.md";
 
 /// The file of the invariants, which the record check changes.
-const INVARIANTS: &str = "docs/srs/invariants.md";
+pub(crate) const INVARIANTS: &str = "docs/srs/invariants.md";
 
 /// A stakeholder comment that consents, as the record check hands it
 /// to the bundle.

@@ -9,8 +9,9 @@ summary: >-
   request. This plan takes the options that were left open, one small
   pull request each: a finding line off its form is read as the finding
   it states, a blocking finding stands until a dropped line withdraws
-  it, consent given after a review clears a line that only restated it,
-  a review that runs dry says what to do, a generalist reserves what
+  it, a stakeholder's comment changes nothing an agent reads, so no
+  agent restates a missing consent, a review that runs dry says what to
+  do, a generalist reserves what
   generalists cost, the evaluation holds ids to the known requirements,
   and the bundle marks added lines that stand on main.
 model: opus
@@ -74,8 +75,10 @@ its evidence asks for today.
 2. A generalist's blocking finding stands until a `dropped` line
    withdraws it; a later nit at its place no longer replaces it
    (phase 2, ENG-28).
-3. Consent given after a review clears an agent's line that only
-   restated the missing consent (phase 3, ENG-28).
+3. A stakeholder's comment changes nothing an agent reads: the bundle
+   shows an agent no finding that turns on consent, so the outcome a
+   comment's review reuses holds no line that restates a missing
+   consent (phase 3, ENG-28).
 4. A review that runs out of its pull request's budget names the
    budget, what was spent and how it is reset (phase 4, ENG-28).
 5. A generalist reserves what generalists cost on record, with a
@@ -94,7 +97,7 @@ its evidence asks for today.
 | ----- | ----- | ------------------------------------------------------------------------------------------------------------------- |
 | 1     | opus  | The ENG-28 record check runs `review-run` and the gate on a log with a finding off its form; three drift cases fail |
 | 2     | opus  | A generalist's log that states a nit after a blocking finding at one place keeps the blocking one; its case passes  |
-| 3     | opus  | A comment's review after consent approves where the agents' reused outcome held only the restated consent           |
+| 3     | opus  | The bundle writes an agent the same files whatever the consent; clean cases on stakeholder paths pass unconsented   |
 | 4     | opus  | The gate's check summary of a review that ran dry names the budget, the spend and the reset                         |
 | 5     | opus  | A deep review whose generalists cost what they do on record starts every agent inside the cap                       |
 | 6     | opus  | A run citing an id no requirement has fails its evaluation case, as the review blocks it                            |
@@ -128,6 +131,8 @@ footer: |
 |     | ↳      | ENG-28 now has the review read a finding line that names its place and ids off its form as the finding it states: a remark after the ids, a sentence that ends with them, a request with no motivation set apart. The report holds it in its form, and the slip is listed in review/ignored.json and counted apart. A line that names no id still blocks. The ENG-28 scenario step, a new kind of log in its record check and three drift cases land with it.                                                                                                   |
 | 2   | ✅     | [A blocking finding stands until a dropped line withdraws it](phase-2.md)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
 |     | ↳      | ENG-28 now has a generalist's blocking finding stand beside a nit it states later at the same place and source, until a dropped line withdraws it. In 582 recorded generalist runs, 4 stated such a nit, each a second point and none a downgrade, and three of them failed an evaluation case for the blocking finding the review had dropped. The ENG-28 scenario step, a fourth run in its weighing check and a drift case land with it; no instruction changes.                                                                                             |
+| 3   | ✅     | [A stakeholder's comment changes nothing an agent reads](phase-3.md)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+|     | ↳      | ENG-28 now has the review bundle write an agent the same bundle and review context whatever the stakeholder's comments say: the findings that turn on consent go to the review gate alone, and each agent reads that consent is the gate's check. So the outcome a comment's review reuses holds no line that restates a missing consent. Two clean cases on stakeholder paths with no consenting comment failed 5 of 8 runs before the change and none for consent after it. The ENG-28 scenario step, a record check and three drift cases land with it.      |
 | 8   | ✅     | [A generalist gives its whole weighing in its final answer](phase-8.md)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
 |     | ↳      | A generalist is now asked for every line of its weighing in its final answer and none before it, after the model's API refused the code generalist of one pull request twice as asking for its reasoning in its text. ENG-28 and ENG-32 keep their rows: the review still reads the whole run log, and the evaluation counts a line stated early and left out of the answer as a slip. The generalists' 26 cases passed in 52 of 52 runs with no slip. The refusal did not occur outside CI, so the fix is not proven against it. One drift case lands with it. |
 <?/catalog?>
