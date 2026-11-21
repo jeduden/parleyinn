@@ -243,6 +243,38 @@ fn analyse_reads_scenario_changes_and_mentions_into_the_touched_ids() {
 }
 
 #[test]
+fn analyse_names_the_touched_ids_each_changed_file_holds_or_names() {
+    let mut head = base();
+    head.requirements[0].text = "Ingest every transcript.".into();
+    head.requirements.remove(2);
+    head.scenarios[1].steps.push("another".into());
+    let diff = format!(
+        "{}+see REC-01, ENG-29 and NFR-99\n{}+x\n",
+        header("crates/parinn/src/lib.rs"),
+        header("README.md")
+    );
+
+    let got = analyse(&base(), &head, &diff, &[]);
+
+    let ids = |ids: &[&str]| {
+        ids.iter()
+            .map(|id| (*id).to_owned())
+            .collect::<BTreeSet<_>>()
+    };
+    assert_eq!(
+        got.named,
+        BTreeMap::from([
+            (
+                "crates/parinn/src/lib.rs".to_owned(),
+                ids(&["ENG-29", "REC-01"])
+            ),
+            ("docs/srs/05.md".to_owned(), ids(&["PRV-10", "REC-01"])),
+            ("features/record.feature".to_owned(), ids(&["REC-02"])),
+        ])
+    );
+}
+
+#[test]
 fn analyse_refuses_a_live_scenario_removed_or_pended_again() {
     let mut head = base();
     head.scenarios[0].pending = true;

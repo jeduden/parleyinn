@@ -137,7 +137,7 @@ fn build(
         )?;
         write(
             &format!("{CONTEXTS}/{specialist}.md"),
-            &render::context(&a, specialist),
+            &render::context(&a, &base_tree, &head_tree, specialist),
         )?;
     }
 

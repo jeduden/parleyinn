@@ -296,7 +296,7 @@ fn context_names_the_class_the_specialist_s_row_its_files_and_their_findings() {
         },
     ];
 
-    let got = context(&a, "lang-rust");
+    let got = context(&a, &base(), &base(), "lang-rust");
 
     assert!(
         got.starts_with("# Review context for `lang-rust`\n"),
@@ -318,8 +318,70 @@ fn context_names_the_class_the_specialist_s_row_its_files_and_their_findings() {
     );
     assert!(
         !got.contains("REC-01 name"),
-        "the context quotes no row: {got}"
+        "the context quotes no row its files do not touch: {got}"
     );
+}
+
+#[test]
+fn context_quotes_each_requirement_its_files_touch_one_sentence_per_line() {
+    let mut head = base();
+    head.requirements[0].text = "Ingest each line. Keep `a. b; c` whole; name the rest.".into();
+    let a = analyse(
+        &base(),
+        &head,
+        "diff --git a/docs/srs/05.md b/docs/srs/05.md\n+REC-01\n\
+         diff --git a/a.rs b/a.rs\n+x\n",
+        &[],
+    );
+
+    let srs = context(&a, &base(), &head, "srs-05");
+    let rust = context(&a, &base(), &head, "lang-rust");
+
+    assert!(
+        srs.contains(
+            "\n## Requirements your files touch\n\n\
+             `REC-01` (`docs/srs/05.md:9`), Pri P0, Ver T, Traces I1:\n\n\
+             > Ingest each line.\n\
+             > Keep `a. b; c` whole;\n\
+             > name the rest.\n\n## Deterministic findings on your files\n"
+        ),
+        "{srs}"
+    );
+    assert!(
+        rust.contains("\n## Requirements your files touch\n\nNone.\n"),
+        "{rust}"
+    );
+}
+
+#[test]
+fn context_quotes_a_row_the_pull_request_removes_as_main_has_it() {
+    let mut head = base();
+    head.requirements.remove(1);
+    let a = analyse(
+        &base(),
+        &head,
+        "diff --git a/docs/srs/05.md b/docs/srs/05.md\n-REC-02\n",
+        &[],
+    );
+
+    let got = context(&a, &base(), &head, "srs-05");
+
+    assert!(
+        got.contains(
+            "`REC-02` (`docs/srs/05.md:9` on main, which this pull request removes it from), \
+             Pri P0, Ver T, Traces none:\n\n> Link.\n"
+        ),
+        "{got}"
+    );
+}
+
+#[test]
+fn a_text_is_split_after_each_sentence_and_clause_outside_code() {
+    assert_eq!(sentences("One. Two; three"), ["One.", "Two;", "three"]);
+    assert_eq!(sentences("Keep `a. b` whole."), ["Keep `a. b` whole."]);
+    assert_eq!(sentences("Ends here. "), ["Ends here."]);
+    assert_eq!(sentences("1.5 USD, no break"), ["1.5 USD, no break"]);
+    assert!(sentences(" ").is_empty());
 }
 
 #[test]
@@ -339,7 +401,7 @@ fn context_of_a_specialist_with_no_file_of_its_own_holds_every_finding() {
         body: "no consent".into(),
     }];
 
-    let got = context(&a, "srs-09");
+    let got = context(&a, &base(), &base(), "srs-09");
 
     assert!(got.contains("touches no id."), "{got}");
     assert!(got.contains("No dispatch row names you."), "{got}");
@@ -359,7 +421,7 @@ fn context_counts_and_lists_every_touched_id() {
     let mut a = analyse(&base(), &base(), "diff --git a/a.rs b/a.rs\n+x\n", &[]);
     a.touched = vec!["REC-01".into(), "REC-02".into()];
 
-    let got = context(&a, "lang-rust");
+    let got = context(&a, &base(), &base(), "lang-rust");
 
     assert!(got.contains("touches 2 ids: REC-01, REC-02."), "{got}");
 }
@@ -368,7 +430,7 @@ fn context_counts_and_lists_every_touched_id() {
 fn context_says_none_when_no_finding_is_on_the_specialist_s_files() {
     let a = analyse(&base(), &base(), "diff --git a/a.rs b/a.rs\n+x\n", &[]);
 
-    let got = context(&a, "lang-rust");
+    let got = context(&a, &base(), &base(), "lang-rust");
 
     assert!(
         got.contains("## Deterministic findings on your files\n\nNone.\n"),
@@ -381,13 +443,16 @@ fn context_names_the_eng_29_record_the_change_lands_with() {
     // A specialist reads only its own diff, which holds no ADR: without
     // the record's path it reads a guarded change as landing with none.
     let mut a = analyse(&base(), &base(), "diff --git a/a.rs b/a.rs\n+x\n", &[]);
-    assert!(!context(&a, "lang-rust").contains("ENG-29"), "no record");
+    assert!(
+        !context(&a, &base(), &base(), "lang-rust").contains("ENG-29"),
+        "no record"
+    );
     a.eng_29_record = Some(Record {
         path: "docs/adr/ADR-1-x.md".into(),
         summary: "Approved.\nBy them.".into(),
     });
 
-    let got = context(&a, "lang-rust");
+    let got = context(&a, &base(), &base(), "lang-rust");
 
     assert!(
         got.ends_with(
@@ -449,8 +514,8 @@ fn what_an_agent_reads_does_not_turn_on_the_stakeholder_s_comments() {
         "{got}"
     );
     for name in without.scopes.keys() {
-        let got = context(&without, name);
-        assert_eq!(got, context(&with, name), "{name}");
+        let got = context(&without, &base(), &head, name);
+        assert_eq!(got, context(&with, &base(), &head, name), "{name}");
         assert!(!got.contains("stakeholder comment"), "{name}: {got}");
         assert!(!got.contains("more, on files"), "{name}: {got}");
         assert!(

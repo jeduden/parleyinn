@@ -134,6 +134,10 @@ pub struct Analysis {
     /// Every id the change touches: a changed requirement or scenario,
     /// or one a changed line names, that either tree defines.
     pub touched: Vec<String>,
+    /// Each changed file with the touched ids it holds or names: an SRS
+    /// file each row it changes, a feature file each scenario it
+    /// changes, and any file each id an added or removed line names.
+    pub named: BTreeMap<String, BTreeSet<String>>,
     pub findings: Vec<Finding>,
     /// The record a guarded change lands with (ENG-29), when it has
     /// one, whatever the comments say.
@@ -235,6 +239,7 @@ pub fn analyse(base: &Snapshot, head: &Snapshot, diff: &str, consents: &[String]
         owned,
         paths,
         unparsed,
+        named: named_by_file(base, head, &requirements, &scenarios, diff, &touched),
         requirements,
         scenarios,
         touched: touched.into_iter().collect(),
@@ -320,6 +325,49 @@ fn lifted_bans(diff: &str) -> BTreeSet<Finding> {
 /// The row `id` of `snapshot`, when it defines one.
 fn requirement<'a>(snapshot: &'a Snapshot, id: &str) -> Option<&'a srs::Requirement> {
     snapshot.requirements.iter().find(|r| r.id == id)
+}
+
+/// Each changed file with the `touched` ids it holds or names
+/// ([`Analysis::named`]): the file of each row in `requirements` and of
+/// each scenario in `scenarios`, as the pull request has it or main
+/// when the pull request removes it, and each file of `diff` with the
+/// ids its added or removed lines name.
+fn named_by_file(
+    base: &Snapshot,
+    head: &Snapshot,
+    requirements: &BTreeMap<String, Change>,
+    scenarios: &BTreeMap<String, Change>,
+    diff: &str,
+    touched: &BTreeSet<String>,
+) -> BTreeMap<String, BTreeSet<String>> {
+    let row = |id: &String| requirement(head, id).or_else(|| requirement(base, id));
+    let scenario = |id: &String| {
+        let find = |s: &Snapshot| {
+            s.scenarios
+                .iter()
+                .find(|x| &x.id == id)
+                .map(|x| x.path.clone())
+        };
+        find(head).or_else(|| find(base))
+    };
+    let held = (requirements.keys())
+        .filter_map(|id| row(id).map(|r| (r.path.clone(), id)))
+        .chain(
+            scenarios
+                .keys()
+                .filter_map(|id| scenario(id).map(|p| (p, id))),
+        );
+    let mut out = diff::ids_by_file(diff);
+    for (path, id) in held {
+        let path = path.to_string_lossy().into_owned();
+        out.entry(path).or_default().insert(id.clone());
+    }
+    for ids in out.values_mut() {
+        ids.retain(|id| touched.contains(id));
+    }
+    out.retain(|_, ids| !ids.is_empty());
+
+    out
 }
 
 /// The security-sensitive crates the ENG-11 row of `snapshot` names;
