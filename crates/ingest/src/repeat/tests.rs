@@ -16,7 +16,7 @@ fn owner(fork: bool) -> Owner {
         address: address(),
         provenance: Provenance::HarnessText,
         text: LINE.into(),
-        fork,
+        harness_fork: fork,
         purged: false,
     }
 }
@@ -24,8 +24,8 @@ fn owner(fork: bool) -> Owner {
 fn facts(owner: Option<Owner>, fork: bool) -> Facts {
     Facts {
         owner,
-        fork,
-        in_sibling: false,
+        harness_fork: fork,
+        in_other_transcript: false,
         held_since: None,
         now: 100_000,
     }
@@ -70,7 +70,7 @@ fn a_line_a_released_fork_holds_stays_the_owning_run_s_own() {
 #[test]
 fn a_fork_s_line_read_before_its_owner_s_is_held_up_to_30_s() {
     let mut f = facts(None, true);
-    f.in_sibling = true;
+    f.in_other_transcript = true;
     assert_eq!(decide(&f, FORKED), Decision::Hold);
     f.held_since = Some(f.now - HOLD_MS + 1);
     assert_eq!(decide(&f, FORKED), Decision::Hold);

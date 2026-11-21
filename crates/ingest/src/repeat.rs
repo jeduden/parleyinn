@@ -15,7 +15,7 @@ use record::event::Provenance;
 use record::id::Address;
 use serde_json::Value;
 
-/// How long an ingest marker holds a fork's repeated lines, in
+/// How long an ingest marker holds a harness fork's repeated lines, in
 /// milliseconds (REC-04's 30 s).
 pub const HOLD_MS: u64 = 30_000;
 
@@ -40,7 +40,7 @@ pub struct Owner {
     /// The redacted line it holds.
     pub text: String,
     /// Whether a fork observation names its run's harness session.
-    pub fork: bool,
+    pub harness_fork: bool,
     /// Whether a purge erased its content: only its `uuid` is left.
     pub purged: bool,
 }
@@ -50,9 +50,9 @@ pub struct Owner {
 pub struct Facts {
     pub owner: Option<Owner>,
     /// Whether a fork observation names this line's harness session.
-    pub fork: bool,
+    pub harness_fork: bool,
     /// Whether another transcript of the directory holds the `uuid`.
-    pub in_sibling: bool,
+    pub in_other_transcript: bool,
     /// Since when an ingest marker holds this source, on ingest's clock.
     pub held_since: Option<u64>,
     /// Now, on ingest's clock, in milliseconds.
@@ -90,11 +90,11 @@ pub fn decide(facts: &Facts, redacted: &str) -> Decision {
         Some(owner) if owner.purged => Decision::Refused,
         // A hold released the owner's line into the fork's own writer;
         // this run keeps its own copy, never a reference to the fork.
-        Some(owner) if owner.fork && !facts.fork => Decision::Own,
+        Some(owner) if owner.harness_fork && !facts.harness_fork => Decision::Own,
         Some(owner) if same_content(&owner.text, redacted) => Decision::Reference {
             owner: owner.address,
             provenance: owner.provenance.clone(),
-            rule: if facts.fork && !owner.fork {
+            rule: if facts.harness_fork && !owner.harness_fork {
                 Rule::ForkObservation
             } else {
                 Rule::FirstRecorded
@@ -110,7 +110,7 @@ fn unowned(facts: &Facts) -> Decision {
     let expired = facts
         .held_since
         .is_some_and(|since| facts.now.saturating_sub(since) >= HOLD_MS);
-    match (facts.fork, facts.in_sibling) {
+    match (facts.harness_fork, facts.in_other_transcript) {
         (true, true) if !expired => Decision::Hold,
         (true, _) if facts.held_since.is_some() => Decision::Released,
         _ => Decision::Own,

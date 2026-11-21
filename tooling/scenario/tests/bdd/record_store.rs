@@ -527,3 +527,23 @@ fn unchanged(w: &mut World) -> Result<(), String> {
     }
     Err("the store changed".to_owned())
 }
+
+/// The transcript line numbers `parinn event expand` printed, in order
+/// of appearance: each recalled item's text names its line's content.
+fn printed_lines(text: &str) -> Vec<u64> {
+    text.lines()
+        .filter_map(|l| l.trim().strip_prefix("{\"message\":{\"content\":\"line "))
+        .filter_map(|rest| rest.split('"').next()?.parse().ok())
+        .collect()
+}
+
+#[then(regex = r#"^"parinn event expand" returns line 10 before line 11$"#)]
+fn expand_in_order(w: &mut World) -> Result<(), String> {
+    crate::record::run_core_at_terminal(w, &["event", "expand", "A1:10-11"])?;
+    let text = String::from_utf8_lossy(&last_run(w)?.stdout).into_owned();
+    let printed = printed_lines(&text);
+    if printed == [10, 11] {
+        return Ok(());
+    }
+    Err(format!("event expand printed lines {printed:?}: {text}"))
+}

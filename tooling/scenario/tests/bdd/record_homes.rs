@@ -9,20 +9,24 @@
 //! its own `HOME` and transcript roots; a step works in one by pointing
 //! the scenario's home at it.
 //!
-//! `@REC-04` stays pending: homes C and D, E, F, G and I, and its purged
-//! lines, are not bound yet (phase 14 brings purge).
+//! Homes C and D record no fork observation, so the run that first
+//! recorded each repeated line owns it; the planted transcript repeats a
+//! `uuid` with other text; the late fork repeats lines the person
+//! purged. Homes E, F, G and I need live MCP servers
+//! ([`crate::record_servers`]).
 
 use std::collections::BTreeMap;
 use std::fs;
 use std::path::PathBuf;
 
 use ::record::event::EventKind;
-use ::record::id::WriterId;
+use ::record::id::{Address, WriterId};
+use audit::log::Log;
 use cucumber::{given, then, when};
 use serde_json::{Value, json};
 
 use crate::World;
-use crate::live::{source_key, store};
+use crate::live::{Harness, source_key, store};
 use crate::record::{last_run, run_core};
 use crate::record_hooks::{counted, run_hook, session_path, session_start};
 use crate::record_transcript::recorded;
@@ -35,7 +39,7 @@ const SESSIONS: [(&str, &str); 2] = [
 ];
 
 /// How many lines the fork repeats.
-const REPEATED: u64 = 40;
+pub const REPEATED: u64 = 40;
 
 /// What the home steps track: each home's directory, by name, and the
 /// scenario's own home to return to.
@@ -43,14 +47,21 @@ const REPEATED: u64 = 40;
 pub struct HomeSteps {
     homes: BTreeMap<String, PathBuf>,
     own: Option<PathBuf>,
+    /// The harnesses whose MCP servers run, stopped when a step enters
+    /// another home.
+    pub servers: Vec<Harness>,
+    /// `repeat_conflicts` before the planted transcript was ingested.
+    conflicts: usize,
+    /// The events the person purged.
+    purged: Vec<::record::id::Address>,
 }
 
-fn homes(w: &mut World) -> &mut HomeSteps {
+pub fn homes(w: &mut World) -> &mut HomeSteps {
     w.section::<HomeSteps>()
 }
 
 /// The harness session of the transcript `name`.
-fn session(name: &str) -> Result<&'static str, String> {
+pub fn session(name: &str) -> Result<&'static str, String> {
     SESSIONS
         .iter()
         .find(|(n, _)| *n == name)
@@ -59,7 +70,8 @@ fn session(name: &str) -> Result<&'static str, String> {
 }
 
 /// Points the scenario's home at home `name`, making it.
-fn enter(w: &mut World, name: &str) -> Result<(), String> {
+pub fn enter(w: &mut World, name: &str) -> Result<(), String> {
+    stop_servers(w)?;
     if homes(w).own.is_none() {
         let own = w.home.clone();
         homes(w).own = Some(own);
@@ -70,6 +82,14 @@ fn enter(w: &mut World, name: &str) -> Result<(), String> {
     homes(w).homes.insert(name.to_owned(), dir.clone());
     w.parinn_home = dir.join(".parinn");
     w.home = dir;
+    Ok(())
+}
+
+/// Stops each MCP server the steps started.
+pub fn stop_servers(w: &mut World) -> Result<(), String> {
+    for server in std::mem::take(&mut homes(w).servers) {
+        server.stop()?;
+    }
     Ok(())
 }
 
@@ -86,8 +106,8 @@ fn numbered(n: u64, session: &str) -> Result<String, String> {
 
 /// Writes, in the current home, the parent's transcript and its harness
 /// fork's, which repeats its first [`REPEATED`] lines with their uuids
-/// and adds two of its own, and records the fork observation.
-fn fork_in_home(w: &mut World) -> Result<(), String> {
+/// and adds two of its own.
+pub fn write_fork(w: &mut World) -> Result<(), String> {
     let (parent, fork) = (session("parent-run")?, session("forked-run")?);
     let parent_lines: String = (1..=REPEATED + 5)
         .map(|n| numbered(n, parent))
@@ -99,13 +119,18 @@ fn fork_in_home(w: &mut World) -> Result<(), String> {
     for n in 1001..=1002 {
         fork_lines.push_str(&numbered(n, fork)?);
     }
-    fs::write(session_path(w, fork)?, fork_lines).map_err(|e| e.to_string())?;
-    let input = session_start(w, fork, "fork")?;
+    fs::write(session_path(w, fork)?, fork_lines).map_err(|e| e.to_string())
+}
+
+/// [`write_fork`], and the fork observation the home records.
+fn fork_in_home(w: &mut World) -> Result<(), String> {
+    write_fork(w)?;
+    let input = session_start(w, session("forked-run")?, "fork")?;
     run_hook(w, "SessionStart", &input, &[])
 }
 
 /// Ingests the transcript `name` in the current home.
-fn ingest(w: &mut World, name: &str) -> Result<(), String> {
+pub fn ingest(w: &mut World, name: &str) -> Result<(), String> {
     let path = session_path(w, session(name)?)?.display().to_string();
     run_core(w, &["ingest", "--path", &path], None)?;
     let out = last_run(w)?;
@@ -145,8 +170,8 @@ fn home_ingests(w: &mut World, home: String, first: String, then: String) -> Res
 }
 
 /// The events of the transcript `name` in the current home, in line
-/// order, each with its writer.
-fn placed(w: &World, name: &str) -> Result<Vec<(WriterId, EventKind, Value)>, String> {
+/// order, each with its address.
+pub fn placed(w: &World, name: &str) -> Result<Vec<(Address, EventKind, Value)>, String> {
     let path = session_path(w, session(name)?)?;
     let store = store(w)?;
     let mut out = Vec::new();
@@ -159,11 +184,7 @@ fn placed(w: &World, name: &str) -> Result<Vec<(WriterId, EventKind, Value)>, St
                 .event(p.address)
                 .map_err(|e| e.to_string())?
                 .ok_or("a placed event is missing")?;
-            out.push((
-                p.address.writer,
-                p.kind,
-                event.content.unwrap_or(Value::Null),
-            ));
+            out.push((p.address, p.kind, event.content.unwrap_or(Value::Null)));
         }
     }
     Ok(out)
@@ -172,21 +193,7 @@ fn placed(w: &World, name: &str) -> Result<Vec<(WriterId, EventKind, Value)>, St
 /// Fails unless, in the current home, each repeated line is one event
 /// of the parent's run and the fork's run refers to it.
 fn recorded_once(w: &World) -> Result<(), String> {
-    let parent = placed(w, "parent-run")?;
-    let fork = placed(w, "forked-run")?;
-    let parent_writer = parent.first().ok_or("parent-run holds no event")?.0;
-    for (i, (_, kind, content)) in fork.iter().take(REPEATED as usize).enumerate() {
-        let owner = &parent[i];
-        let refers = *kind == EventKind::RepeatReference
-            && owner.0 == parent_writer
-            && content["repeats"].as_str().is_some_and(|a| {
-                a.ends_with(&format!(":{}", i + 1)) || a.contains(&owner.0.to_string())
-            });
-        if !refers {
-            return Err(format!("forked-run's line {} is {kind:?} {content}", i + 1));
-        }
-    }
-    Ok(())
+    owned_by(w, "parent-run", "forked-run")
 }
 
 #[then(
@@ -219,8 +226,8 @@ fn membership(w: &World) -> Result<Value, String> {
     let mut out = BTreeMap::new();
     for (name, _) in SESSIONS {
         let events = placed(w, name)?;
-        if let Some((writer, _, _)) = events.first() {
-            names.insert(writer.to_string(), name);
+        if let Some((address, _, _)) = events.first() {
+            names.insert(address.writer.to_string(), name);
         }
         out.insert(name, events);
     }
@@ -234,9 +241,9 @@ fn membership(w: &World) -> Result<Value, String> {
         .map(|(name, events)| {
             let events = events
                 .into_iter()
-                .map(|(writer, kind, content)| {
+                .map(|(address, kind, content)| {
                     json!({
-                        "writer": rename(writer.to_string()),
+                        "writer": rename(address.writer.to_string()),
                         "kind": kind.as_str(),
                         "content": rename(content.to_string()),
                     })
@@ -302,4 +309,326 @@ fn released_when_gone(w: &mut World) -> Result<(), String> {
         "forked-run holds {} events, own lines {own}, {released} releases audited",
         fork.len()
     ))
+}
+
+#[given(
+    regex = r#"^two fresh isolated ParleyInn homes "([^"]+)" and "([^"]+)" with no "SessionStart" hook observation for either transcript$"#
+)]
+fn two_homes_unobserved(w: &mut World, a: String, b: String) -> Result<(), String> {
+    for name in [a, b] {
+        enter(w, &name)?;
+        write_fork(w)?;
+    }
+    Ok(())
+}
+
+/// The writer of the run `name` records in the current home.
+pub fn writer_of(w: &World, name: &str) -> Result<WriterId, String> {
+    placed(w, name)?
+        .first()
+        .map(|(address, _, _)| address.writer)
+        .ok_or_else(|| format!("{name} holds no event"))
+}
+
+/// Fails unless, in the current home, each repeated line is one event
+/// of the run `owner`, in one writer, and the run `other` records for
+/// it a repeat reference to that very event's address, writer and seq
+/// (REC-04): a reference to any other event of the owner's writer
+/// fails.
+fn owned_by(w: &World, owner: &str, other: &str) -> Result<(), String> {
+    let held = placed(w, owner)?;
+    let refers = placed(w, other)?;
+    let owner_writer = writer_of(w, owner)?;
+    for i in 0..REPEATED as usize {
+        let (address, kind, _) = held
+            .get(i)
+            .ok_or_else(|| format!("{owner} holds no line {}", i + 1))?;
+        if *kind != EventKind::TranscriptLine || address.writer != owner_writer {
+            return Err(format!("{owner}'s line {} is {kind:?} at {address}", i + 1));
+        }
+        let (_, kind, content) = refers
+            .get(i)
+            .ok_or_else(|| format!("{other} holds no line {}", i + 1))?;
+        let names = content["repeats"].as_str() == Some(address.to_string().as_str());
+        if *kind != EventKind::RepeatReference || !names {
+            return Err(format!(
+                "{other}'s line {} is {kind:?} {content}, not a reference to {address}",
+                i + 1
+            ));
+        }
+    }
+    Ok(())
+}
+
+/// Fails unless a structural event of the current home's device seat
+/// names `owner`'s writer as the repeat owner, and one audit entry says
+/// so.
+fn choice_recorded(w: &World, owner: &str) -> Result<(), String> {
+    let store = store(w)?;
+    let device = administration::node::Node::find(&crate::record::home(w)?, &store)
+        .map_err(|e| e.to_string())?
+        .device_writer();
+    let wanted = writer_of(w, owner)?.to_string();
+    let chosen = store
+        .log(device)
+        .map_err(|e| e.to_string())?
+        .iter()
+        .filter(|e| e.link.header.kind == EventKind::RepeatOwner)
+        .filter(|e| {
+            e.content
+                .as_ref()
+                .is_some_and(|c| c["owner"] == wanted.as_str())
+        })
+        .count();
+    match (chosen, counted(w, "repeat_owner_chosen")?) {
+        (1, 1) => Ok(()),
+        (events, audits) => Err(format!(
+            "{events} repeat owner events and {audits} audit entries name {owner}"
+        )),
+    }
+}
+
+#[then(
+    regex = r#"^in each home each of the 40 repeated lines is one event in the writer of the run that first recorded it there, "parent-run"'s in "([^"]+)" and "forked-run"'s in "([^"]+)", the other run recording a repeat reference, and a structural event records and audits that choice$"#
+)]
+fn first_recorder_owns(w: &mut World, c: String, d: String) -> Result<(), String> {
+    for (home, owner, other) in [
+        (c, "parent-run", "forked-run"),
+        (d, "forked-run", "parent-run"),
+    ] {
+        enter(w, &home)?;
+        owned_by(w, owner, other).map_err(|e| format!("home {home}: {e}"))?;
+        choice_recorded(w, owner).map_err(|e| format!("home {home}: {e}"))?;
+    }
+    Ok(())
+}
+
+/// Whether a step entered a home of its own: the planted transcript and
+/// its conflict are then this module's, in that home, not the
+/// scenario's first.
+pub fn in_homes(w: &mut World) -> bool {
+    homes(w).own.is_some()
+}
+
+/// The planted transcript, in the transcript directory of the current
+/// home's "parent-run": one line repeating a `uuid` of it with other
+/// text.
+pub fn plant(w: &mut World) -> Result<(), String> {
+    let planted = session_path(w, "5e55a0de-0000-4000-8000-0000000000dd")?;
+    let line = numbered(3, "5e55a0de-0000-4000-8000-0000000000dd")?
+        .replace("line 3", "text another line never held");
+    fs::write(planted, line).map_err(|e| e.to_string())?;
+    let before = counted(w, "repeat_conflicts")?;
+    homes(w).conflicts = before;
+    Ok(())
+}
+
+/// That line of the planted transcript is its own event, the counter
+/// `repeat_conflicts` went up by 1 and an audit entry records it.
+pub fn planted_conflicts(w: &mut World) -> Result<(), String> {
+    let path = session_path(w, "5e55a0de-0000-4000-8000-0000000000dd")?;
+    let events = recorded_events(w, &path)?;
+    if events != 1 {
+        return Err(format!("planted-run holds {events} events, not its line"));
+    }
+    let before = homes(w).conflicts;
+    let after = counted(w, "repeat_conflicts")?;
+    if after != before + 1 {
+        return Err(format!("repeat_conflicts went from {before} to {after}"));
+    }
+    let entries = Log::new(crate::record::home(w)?.audit())
+        .entries()
+        .map_err(|e| e.to_string())?;
+    let said = entries.iter().any(|e| {
+        e.counter.as_deref() == Some("repeat_conflicts")
+            && e.detail.contains("repeated uuid with other content")
+    });
+    if said {
+        return Ok(());
+    }
+    Err("no audit entry records the conflict".to_owned())
+}
+
+/// How many events the record holds of the transcript at `path`.
+pub fn recorded_events(w: &World, path: &std::path::Path) -> Result<usize, String> {
+    let store = store(w)?;
+    let mut count = 0;
+    for generation in store
+        .generations(&source_key(path))
+        .map_err(|e| e.to_string())?
+    {
+        count += store
+            .placed(generation.id)
+            .map_err(|e| e.to_string())?
+            .len();
+    }
+    Ok(count)
+}
+
+/// The address of the event of each of the first [`REPEATED`] lines of
+/// the transcript `name`, in the current home.
+fn line_events(w: &World, name: &str) -> Result<Vec<::record::id::Address>, String> {
+    let path = session_path(w, session(name)?)?;
+    let store = store(w)?;
+    let mut out = Vec::new();
+    for generation in store
+        .generations(&source_key(&path))
+        .map_err(|e| e.to_string())?
+    {
+        for p in store.placed(generation.id).map_err(|e| e.to_string())? {
+            if p.place.line <= REPEATED {
+                out.push(p.address);
+            }
+        }
+    }
+    Ok(out)
+}
+
+#[given(
+    regex = r#"^the person purged the events of the 40 repeated lines from the run of "parent-run"$"#
+)]
+fn purged_repeated(w: &mut World) -> Result<(), String> {
+    let events = line_events(w, "parent-run")?;
+    let seqs = events.iter().map(|a| a.seq.get());
+    let (first, last) = (seqs.clone().min(), seqs.max());
+    let (Some(first), Some(last)) = (first, last) else {
+        return Err("parent-run holds no event of those lines".to_owned());
+    };
+    let range = format!("{}:{first}-{last}", events[0].writer);
+    homes(w).purged = events;
+    crate::erasure::person_runs(w, &format!("purge --range {range}"))?;
+    let out = last_run(w)?;
+    if out.status.success() {
+        return Ok(());
+    }
+    Err(format!(
+        "parinn purge exited {}: {}",
+        out.status,
+        String::from_utf8_lossy(&out.stdout)
+    ))
+}
+
+#[when(
+    regex = r#"^a harness fork of "parent-run" with the transcript "late-fork", repeating those 40 lines, is ingested$"#
+)]
+fn late_fork_ingested(w: &mut World) -> Result<(), String> {
+    let fork = LATE_FORK;
+    let mut lines: String = (1..=REPEATED)
+        .map(|n| numbered(n, fork))
+        .collect::<Result<_, _>>()?;
+    lines.push_str(&numbered(2001, fork)?);
+    let path = session_path(w, fork)?;
+    fs::write(&path, lines).map_err(|e| e.to_string())?;
+    let shown = path.display().to_string();
+    run_core(w, &["ingest", "--path", &shown], None)?;
+    let out = last_run(w)?;
+    if out.status.success() {
+        return Ok(());
+    }
+    Err(format!(
+        "parinn ingest exited {}: {}",
+        out.status,
+        String::from_utf8_lossy(&out.stderr)
+    ))
+}
+
+/// The harness session of the late fork.
+const LATE_FORK: &str = "5e55a0de-0000-4000-8000-0000000000cc";
+
+#[then(
+    regex = r"^none of those lines is recorded again, each refusal is counted and audited, and the record keeps only their uuids, byte offsets and lengths beside the tombstones$"
+)]
+fn refused_and_uuids_kept(w: &mut World) -> Result<(), String> {
+    let path = session_path(w, LATE_FORK)?;
+    let held = recorded_events(w, &path)?;
+    if held != 1 {
+        return Err(format!("late-fork holds {held} events, not its own line"));
+    }
+    let refusals = counted(w, "repeat_of_purged_refused")?;
+    if refusals != REPEATED as usize {
+        return Err(format!("{refusals} refusals counted, not {REPEATED}"));
+    }
+    let audited = refusals_audited(w)?;
+    if audited != REPEATED as usize {
+        return Err(format!("{audited} refusals audited, not {REPEATED}"));
+    }
+    let store = store(w)?;
+    for address in homes(w).purged.clone() {
+        let event = store.event(address).map_err(|e| e.to_string())?;
+        if event.is_none_or(|e| e.content.is_some()) {
+            return Err(format!("{address} keeps its content"));
+        }
+    }
+    let source = session_path(w, LATE_FORK)?;
+    let written = fs::read(&source).map_err(|e| e.to_string())?;
+    let mut uuids = Vec::new();
+    for generation in store
+        .generations(&source_key(&source))
+        .map_err(|e| e.to_string())?
+    {
+        for place in store
+            .purged_places(generation.id)
+            .map_err(|e| e.to_string())?
+        {
+            let uuid = place.uuid.clone().unwrap_or_default();
+            if line_at(&written, &place) != Some(uuid.clone()) {
+                return Err(format!(
+                    "line {} keeps the byte offset {} and length {}, not those of the line with its uuid {uuid:?}",
+                    place.line, place.offset, place.length
+                ));
+            }
+            uuids.push(uuid);
+        }
+    }
+    let wanted: Vec<String> = (1..=REPEATED).map(|n| format!("u-{n}")).collect();
+    uuids.sort_by_key(|u| u.trim_start_matches("u-").parse::<u64>().unwrap_or(0));
+    if uuids != wanted {
+        return Err(format!("the record keeps the uuids {uuids:?}"));
+    }
+    tombstoned(&store, w)
+}
+
+/// How many audit entries reject a repeated line of a purged event:
+/// one for each refusal counted (I6).
+fn refusals_audited(w: &World) -> Result<usize, String> {
+    let entries = Log::new(crate::record::home(w)?.audit())
+        .entries()
+        .map_err(|e| e.to_string())?;
+    Ok(entries
+        .iter()
+        .filter(|e| e.counter.as_deref() == Some("repeat_of_purged_refused"))
+        .filter(|e| e.kind == "rejected")
+        .filter(|e| e.detail.starts_with("refused a repeated line whose `uuid`"))
+        .count())
+}
+
+/// The `uuid` of the transcript line `written` holds at `place`: a
+/// whole line of `place`'s byte offset and length, its line break
+/// included, or none when those name no such line.
+fn line_at(written: &[u8], place: &store::Place) -> Option<String> {
+    let start = usize::try_from(place.offset).ok()?;
+    let end = start.checked_add(usize::try_from(place.length).ok()?)?;
+    let line = written.get(start..end)?;
+    let whole = line.ends_with(b"\n") && (start == 0 || written.get(start - 1) == Some(&b'\n'));
+    let parsed: Value = serde_json::from_slice(line).ok()?;
+    whole
+        .then(|| parsed["uuid"].as_str().map(str::to_owned))
+        .flatten()
+}
+
+/// Fails unless a tombstone stands in the current home's device seat.
+fn tombstoned(store: &store::Store, w: &World) -> Result<(), String> {
+    let device = administration::node::Node::find(&crate::record::home(w)?, store)
+        .map_err(|e| e.to_string())?
+        .device_writer();
+    let marks = store
+        .log(device)
+        .map_err(|e| e.to_string())?
+        .iter()
+        .filter(|e| e.link.header.kind == EventKind::Tombstone)
+        .count();
+    if marks > 0 {
+        return Ok(());
+    }
+    Err("the purge left no tombstone".to_owned())
 }

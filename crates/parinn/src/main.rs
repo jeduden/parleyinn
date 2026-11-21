@@ -20,13 +20,7 @@ fn main() -> ExitCode {
         // panic and audits it.
         std::panic::set_hook(Box::new(|_| {}));
     }
-    // A development build's seam for the tests: the clock stands still
-    // at the time it names; a release build reads the wall clock.
-    let fixed: Option<u64> = cfg!(debug_assertions)
-        .then(|| std::env::var("PARINN_TEST_CLOCK").ok())
-        .flatten()
-        .and_then(|t| t.parse().ok());
-    let clock = move || fixed.unwrap_or_else(now);
+    let clock = test_clock();
     let ctx = parinn::Context {
         build: &parinn::BUILD,
         parinn_home: std::env::var_os("PARINN_HOME"),
@@ -103,6 +97,31 @@ fn main() -> ExitCode {
     parinn::audit_limited_log_fields(&ctx, log.limited());
 
     ExitCode::from(code)
+}
+
+/// The clock the commands read. A development build's seam for the
+/// tests: the clock stands still at the time `PARINN_TEST_CLOCK` names;
+/// a release build reads the wall clock. With `PARINN_TEST_CLOCK_STEP`
+/// in a development build, each reading is that many seconds later than
+/// the one before: the `@ADM-09` scenario's way to outlast
+/// `parinn verify`'s deadline without waiting for it.
+fn test_clock() -> impl Fn() -> u64 {
+    let fixed: Option<u64> = cfg!(debug_assertions)
+        .then(|| std::env::var("PARINN_TEST_CLOCK").ok())
+        .flatten()
+        .and_then(|t| t.parse().ok());
+    let step: u64 = cfg!(debug_assertions)
+        .then(|| std::env::var("PARINN_TEST_CLOCK_STEP").ok())
+        .flatten()
+        .and_then(|t| t.parse().ok())
+        .unwrap_or(0);
+    let readings = std::sync::atomic::AtomicU64::new(0);
+    move || {
+        let n = readings.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        fixed
+            .unwrap_or_else(now)
+            .saturating_add(step.saturating_mul(n))
+    }
 }
 
 /// The wall clock, in seconds since the Unix epoch, for audit entries.

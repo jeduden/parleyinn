@@ -330,20 +330,20 @@ pub(super) fn step_gate_cases() -> Vec<Case> {
         case(
             "a step definition taken off the list of those no running row uses",
             "every_step_definition_has_a_running_row",
-            Injection::replace_line(UNRUN_STEPS, "administration_verify.rs foreign_object", ""),
+            Injection::replace_line(UNRUN_STEPS, "administration_verify.rs landmark_altered", ""),
             cargo_test(
                 "scenario",
                 "gate",
                 "every_step_definition_has_a_running_row",
             ),
-            "administration_verify.rs foreign_object: no row of a scenario that runs uses this step definition",
+            "administration_verify.rs landmark_altered: no row of a scenario that runs uses this step definition",
         ),
         case(
             "the list naming a step definition that was deleted",
             "every_step_definition_has_a_running_row",
             Injection::replace_line(
                 UNRUN_STEPS,
-                "administration_verify.rs foreign_object",
+                "administration_verify.rs landmark_altered",
                 "administration_verify.rs deleted_step",
             ),
             cargo_test(
@@ -358,8 +358,8 @@ pub(super) fn step_gate_cases() -> Vec<Case> {
             "every_step_definition_has_a_running_row",
             Injection::replace_line(
                 UNRUN_STEPS,
-                "administration_verify.rs foreign_object",
-                "administration_verify.rs foreign_object\nrecord_store.rs sized_results",
+                "administration_verify.rs landmark_altered",
+                "administration_verify.rs landmark_altered\nrecord_store.rs sized_results",
             ),
             cargo_test(
                 "scenario",

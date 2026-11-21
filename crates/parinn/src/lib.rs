@@ -495,10 +495,10 @@ fn ingest(
     let inputs = ingest::Inputs {
         payload: payload_settings(settings),
         // Ingest reads the fork observations the hook handlers held from
-        // the store itself (REC-04).
-        forks: std::collections::BTreeSet::new(),
+        // the store itself, and holds no line for a server (REC-04).
         now_ms: (ctx.clock)().saturating_mul(1000),
         interactive: settings.deployment_mode() == "interactive",
+        ..ingest::Inputs::default()
     };
     let paths: Vec<&Path> = allowed.iter().map(PathBuf::as_path).collect();
     let (reports, failed_ingests) = ingest_all(ctx, &home, &paths, &redactor, &inputs, stderr);
@@ -508,7 +508,7 @@ fn ingest(
     failures += ingest_all(ctx, &home, &held, &redactor, &inputs, stderr).1;
     apply_retention(ctx, &home, settings, stderr);
     if target == IngestTarget::All {
-        sources::audit_lost(ctx, &home, stderr);
+        sources::audit_lost(ctx, &home, &redactor, stderr);
     }
     let shown = ingest_report::ingest_report(&target, &reports, failures, as_json);
     let code = written(write!(stdout, "{shown}"), stderr);
@@ -1052,9 +1052,9 @@ fn live_capture(
         redactor,
         inputs: ingest::Inputs {
             payload: payload_settings(settings),
-            forks: std::collections::BTreeSet::new(),
             now_ms: base.saturating_mul(1000),
             interactive: settings.deployment_mode() == "interactive",
+            ..ingest::Inputs::default()
         },
         harness: (ctx.ancestry)().and_then(|a| a.harness),
         limit: ctx.live_limit,
