@@ -1,0 +1,26 @@
+component = "lang-gherkin"
+kind = "defect"
+title = "a step that says other than a sentence deep in its long row"
+
+# ENG-28's row is one table line of over 13,000 characters, and the
+# sentence this step restates sits past 8,000 of them, where a search
+# shows none of the line. The step and its binding move together, so
+# only the row's own words show the step is wrong.
+
+[[replace]]
+file = "features/engineering.feature"
+old = "    And review-run starts no generalist once more than a third of the dispatched specialists,"
+new = "    And review-run starts no generalist once more than half of the dispatched specialists,"
+
+[[replace]]
+file = "tooling/scenario/tests/bdd/engineering_review.rs"
+old = "    regex = r\"^review-run starts no generalist once more than a third of the dispatched specialists,"
+new = "    regex = r\"^review-run starts no generalist once more than half of the dispatched specialists,"
+
+[expect]
+outcome = ["findings"]
+
+[[expect.finding]]
+path = "features/engineering.feature"
+form = "linked"
+mentions_any = ["third", "half"]
