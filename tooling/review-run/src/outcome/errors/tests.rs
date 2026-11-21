@@ -72,3 +72,14 @@ fn an_agent_with_no_run_or_no_finding_changes_nothing() {
 
     assert_eq!(findings[0].body, "review-spec weighs nothing");
 }
+
+#[test]
+fn a_run_that_ended_on_an_error_but_was_read_keeps_its_finding() {
+    // Only an unread generalist's silence is named, whatever the runs.
+    let runs = [run("review-code", "API Error: flagged")];
+    let mut findings = [finding(REVIEW_PATH, SILENT)];
+
+    name(&runs, &unread("review-spec"), &mut findings);
+
+    assert_eq!(findings[0].body, SILENT);
+}
