@@ -1,7 +1,8 @@
 ---
 id: ADR-2610122234
 title: "A node's keys form a key event log anchored by recovery keys"
-status: accepted
+status: superseded
+superseded-by: ADR-2611211400
 summary: >-
   PRV-12 makes a node's device keys, or a token-key-only node's token
   keys, a hash-linked key event log whose keys commit to an offsite
