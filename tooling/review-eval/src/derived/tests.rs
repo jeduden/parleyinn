@@ -411,3 +411,43 @@ fn the_first_requirement_is_the_earlier_of_a_row_and_a_block() {
     assert_eq!(ids(&format!("{row}\n{block}")), Some("SEC-01".to_owned()));
     assert_eq!(ids("# Nothing\n"), None);
 }
+
+#[test]
+fn a_requirement_inside_a_code_fence_is_none() {
+    let fence = "````markdown\n```\n## SEC-09\n\n- Pri: P2\n\nAn example.\n\n\
+                 | SEC-08 | P2 | An example. | T | I4 |\n```\n````\n\n";
+    let block = "## SEC-02\n\n- Pri: P1\n\nIt MUST refuse.\n";
+    let row = "| SEC-01 | P0 | The core opens no socket. | T | I4 |\n";
+
+    assert_eq!(first_block(fence), None);
+    assert_eq!(first_row(fence), None);
+    assert_eq!(
+        first_block(&format!("{fence}{block}")),
+        Some((block.to_owned(), "SEC-02".to_owned()))
+    );
+    assert_eq!(
+        first_row(&format!("{fence}{row}")),
+        Some((row.to_owned(), "SEC-01".to_owned()))
+    );
+}
+
+#[test]
+fn fence_reads_a_run_of_three_or_more_backticks_or_tildes() {
+    assert_eq!(fence("```rust"), Some((b'`', 3)));
+    assert_eq!(fence("~~~~"), Some((b'~', 4)));
+    assert_eq!(fence("``"), None);
+    assert_eq!(fence("text"), None);
+    assert_eq!(fence(""), None);
+}
+
+#[test]
+fn unfenced_skips_a_fence_until_its_own_run_closes_it() {
+    fn lines(text: &str) -> Vec<(usize, &str)> {
+        unfenced(text).collect()
+    }
+
+    assert_eq!(lines("a\n```\nb\n```\nc\n"), [(0, "a"), (4, "c")]);
+    assert_eq!(lines("````\n```\nx\n````\ny\n"), [(4, "y")]);
+    assert_eq!(lines("~~~\n```\nz\n~~~\nw\n"), [(4, "w")]);
+    assert_eq!(lines("```\nopen to the end\n"), []);
+}

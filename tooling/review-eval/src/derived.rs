@@ -204,9 +204,10 @@ fn title_line(path: &str, text: &str) -> Result<String, String> {
         .ok_or_else(|| format!("{path} has no title line"))
 }
 
-/// The first requirement row of a section: its line and its id.
+/// The first requirement row of a section, outside a code fence: its
+/// line and its id.
 fn first_row(text: &str) -> Option<(String, String)> {
-    text.lines().find_map(|line| {
+    unfenced(text).find_map(|(_, line)| {
         let cells: Vec<&str> = line.split('|').map(str::trim).collect();
         let id = cells.get(1)?;
         (cells.len() >= 5
@@ -239,12 +240,12 @@ fn first_requirement(text: &str) -> Option<(String, String, String)> {
         .min_by_key(|(old, _, _)| text.find(old.as_str()))
 }
 
-/// The first block of a section with a priority: its lines from its
-/// heading, one that is a requirement id, to its last line of text
-/// before the next heading or table, and its id.
+/// The first block of a section with a priority, outside a code fence:
+/// its lines from its heading, one that is a requirement id, to its
+/// last line of text before the next heading or table, and its id.
 fn first_block(text: &str) -> Option<(String, String)> {
     let lines: Vec<&str> = text.lines().collect();
-    lines.iter().enumerate().find_map(|(i, line)| {
+    unfenced(text).find_map(|(i, line)| {
         let rest = line.trim_start_matches('#');
         let id = rest.strip_prefix(' ')?.trim();
         if !(1..=6).contains(&(line.len() - rest.len()))
@@ -269,6 +270,31 @@ fn first_block(text: &str) -> Option<(String, String)> {
                 )
             })
     })
+}
+
+/// The lines of `text` outside fenced code blocks, each with its index.
+/// A fence closes only on a run of its own character at least as long
+/// as the one that opened it, as the srs crate reads fences.
+fn unfenced(text: &str) -> impl Iterator<Item = (usize, &str)> {
+    let mut open: Option<(u8, usize)> = None;
+    text.lines().enumerate().filter(move |(_, line)| {
+        let run = fence(line.trim());
+        let outside = open.is_none() && run.is_none();
+        open = match (open, run) {
+            (None, run) => run,
+            (Some((c, n)), Some((rc, rn))) if c == rc && rn >= n => None,
+            (open, _) => open,
+        };
+        outside
+    })
+}
+
+/// The character and length of the run of three or more backticks or
+/// tildes `line` opens with, or `None` when it opens no fence.
+fn fence(line: &str) -> Option<(u8, usize)> {
+    let c = line.bytes().next().filter(|c| matches!(c, b'`' | b'~'))?;
+    let n = line.bytes().take_while(|b| *b == c).count();
+    (n >= 3).then_some((c, n))
 }
 
 /// Whether `word` reads as a requirement id: letters, a hyphen, digits.
