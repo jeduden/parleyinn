@@ -24,9 +24,11 @@ if ! cargo run --locked --quiet -p review-gate --offline -- --outcome outcome.js
   # name: a usage error is followed by the usage. A gate that never
   # started printed none, and the last line cargo printed says why. It
   # goes in a code span, its own backticks dropped, so nothing in it is
-  # read as Markdown.
+  # read as Markdown. A check's summary holds 65535 characters: the cut
+  # leaves room for the text around it, and a list of every agent fits
+  # whole with the reset that ends it.
   said=$(grep -m 1 '^review-gate: ' gate-error.txt || tail -n 1 gate-error.txt)
-  why="\`$(printf '%s' "$said" | tr -d '\`' | head -c 4000)\`"
+  why="\`$(printf '%s' "$said" | tr -d '\`' | head -c 65000)\`"
   gh api --method POST "repos/$REPO/check-runs" -f name=review-gate \
     -f head_sha="$HEAD_SHA" -f status=completed -f conclusion=failure \
     -f "output[title]=The review gate did not decide" \

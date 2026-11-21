@@ -41,8 +41,8 @@ summary: >-
   on what it wrote: the error names all four agents not started, each
   with its reason, and the reset. It also reads the job that holds the
   reviewer app's key for the three things the script does.
-- The drift suite catches the four new cases and the 23 others that
-  inject a file this phase touches.
+- The drift suite catches the five new cases and every other case
+  that injects a file this phase touches.
 - The decide script was run by hand with stand-ins for `cargo`, `gh`
   and `jq`, for a gate that did not decide, one that failed on its
   usage and one that did not build. The check's summary held the
