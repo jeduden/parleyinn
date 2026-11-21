@@ -126,8 +126,8 @@ The security reviewer's approval of
 covers PRV-12 and the requirements it lists, as worded at its head
 commit `de59777` ([approval]). This record changes none of their
 wording, only the milestone each part ships in, so ENG-29 asks for no
-new approval. It is accepted with the stakeholder's consent on the
-pull request that adds it.
+new approval. It is accepted on the stakeholder's ruling of 21
+November 2026 that its context records.
 
 [approval]: https://github.com/jeduden/parleyinn/pull/39#issuecomment-6149850310
 
