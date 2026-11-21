@@ -91,6 +91,8 @@ its evidence asks for today.
    not built (phase 7, ENG-32).
 8. A generalist gives its whole weighing in its final answer, after
    the model's API refused one as asked for its reasoning (phase 8).
+9. A run that ended on an error holds no answer, and the finding on a
+   generalist so ended quotes the error (phase 9, ENG-28).
 
 ## Execution
 
@@ -104,6 +106,7 @@ its evidence asks for today.
 | 6     | opus  | A run citing an id no requirement has fails its evaluation case, as the review blocks it                            |
 | 7     | opus  | A world built from a tree that adds a section holds it; four drift cases fail                                       |
 | 8     | opus  | The generalists' cases pass on their models, no line before the final answer                                        |
+| 9     | opus  | The finding on a generalist that ended on an error quotes it                                                        |
 
 ## Phases
 
@@ -144,6 +147,8 @@ footer: |
 |     | ↳      | ENG-32's evaluation now builds a run's world with the files the evaluated tree adds: each in both trees, an instruction file in the pull request's tree alone, so only the component under test loads beside the agent. A specialist added with its section had failed a case 2 of 2 runs for the section its world lacked. The mark on added lines that stand on main was measured and not built: a moved row cost 5.4 of 20 turns in 56 runs. Four drift cases land with it.                                                                                  |
 | 8   | ✅     | [A generalist gives its whole weighing in its final answer](phase-8.md)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
 |     | ↳      | A generalist is now asked for every line of its weighing in its final answer and none before it, after the model's API refused the code generalist of one pull request twice as asking for its reasoning in its text. ENG-28 and ENG-32 keep their rows: the review still reads the whole run log, and the evaluation counts a line stated early and left out of the answer as a slip. The generalists' 26 cases passed in 52 of 52 runs with no slip. The refusal did not occur outside CI, so the fix is not proven against it. One drift case lands with it. |
+| 9   | ✅     | [A run that ended on an error says so](phase-9.md)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+|     | ↳      | ENG-28 keeps its row: the review now keeps the harness's text apart from an agent's answer when a run ended on an error, a usage limit or a call the model's API refused. The finding on a generalist so ended quotes the error, and the summary names an error among the ways a run ends without a successful result, where it named only a turn budget, a deadline or a cost cap. Two drift cases land with it.                                                                                                                                               |
 <?/catalog?>
 
 ## Acceptance Criteria
@@ -164,3 +169,5 @@ footer: |
       in a world that holds that section
 - [x] A generalist is asked for its whole weighing in its final
       answer, and its cases pass on its model
+- [x] A run that ended on an error is reported with its error, never
+      as an agent that answered nothing
