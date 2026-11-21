@@ -40,6 +40,7 @@ pub mod review_logs;
 pub mod review_parts;
 pub mod review_previous;
 pub mod review_refusals;
+pub mod review_reserve;
 pub mod review_resume;
 pub mod review_runs;
 pub mod review_spend;

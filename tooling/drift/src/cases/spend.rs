@@ -1,9 +1,10 @@
 //! The drifts of how a pull request's reviews share one cost cap
 //! (ENG-28): what earlier reviews spent ignored, the total not kept or
 //! kept without them, and the workflow no longer carrying it from one
-//! review to the next; and what the review gate says of a review a
-//! cost cap kept agents out of. Late, so adding them moves no earlier
-//! case to another shard.
+//! review to the next; what the review gate says of a review a cost
+//! cap kept agents out of; and a generalist started on what is left of
+//! the cap. Late, so adding them moves no earlier case to another
+//! shard.
 
 use super::case;
 use crate::{Case, Check, Injection, cargo_lib_test};
@@ -366,6 +367,55 @@ pub(super) fn review_capped_cases() -> Vec<Case> {
                 super::REVIEW_DECIDE_SCRIPT,
                 "said=$(grep -m 1 '^review-gate: ' gate-error.txt || tail -n 1 gate-error.txt)",
                 "said=$(tail -n 1 gate-error.txt)",
+            ),
+            check(),
+            want,
+        ),
+    ]
+}
+
+/// The drifts of a generalist started on what is left of the pull
+/// request's cap (ENG-28): one held to its whole tier's cap again, one
+/// started on what is left and not capped at it, and one killed in
+/// flight charged its tier's cap, past what it held.
+pub(super) fn review_reserve_cases() -> Vec<Case> {
+    let check = || {
+        cargo_lib_test(
+            "engineering",
+            "review_reserve::tests::the_checkout_s_review_run_starts_a_generalist_on_what_is_left_of_the_cap",
+        )
+    };
+    let want = "the_checkout_s_review_run_starts_a_generalist_on_what_is_left_of_the_cap";
+    vec![
+        case(
+            "review-run refusing a generalist while half its tier's cap is left",
+            "ENG-28",
+            Injection::replace(
+                "tooling/review-run/src/controls.rs",
+                "            least: runner::reserve_of(kind),\n",
+                "            least: runner::budget_of(kind),\n",
+            ),
+            check(),
+            want,
+        ),
+        case(
+            "a generalist started on what is left of the cap and not capped at it",
+            "ENG-28",
+            Injection::replace(
+                "tooling/review-run/src/run.rs",
+                "    runner::cap(&mut command, cap);\n",
+                "    runner::cap(&mut command, cap.max(runner::budget_of(kind)));\n",
+            ),
+            check(),
+            want,
+        ),
+        case(
+            "a generalist killed on what was left charged its tier's whole cap",
+            "ENG-28",
+            Injection::replace(
+                "tooling/review-run/src/retry.rs",
+                "billed(&done.0.log, held.held())",
+                "billed(&done.0.log, review_eval::runner::budget_of(unit.kind))",
             ),
             check(),
             want,

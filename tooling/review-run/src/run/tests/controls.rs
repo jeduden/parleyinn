@@ -194,13 +194,18 @@ fn no_run_starts_once_the_finished_runs_cost_the_review_s_cap() {
     // Each run costs 0.01: two finish, and no 0.30 cap fits after them.
     assert_eq!(ran.host.agents(), ["lang-markdown", "lang-rust"]);
     let refused = |most: &str| {
+        let least = if most.contains("starts") {
+            " at least,"
+        } else {
+            ""
+        };
         format!(
             "over budget: the pull request's reviews cost 0.0200 USD, and a run capped at {most} \
-             USD does not fit in its cap of 0.31 USD, so it was not started"
+             USD{least} does not fit in its cap of 0.31 USD, so it was not started"
         )
     };
     let specialist = refused("0.30");
-    let generalist = refused("1.50");
+    let generalist = refused("1.50 USD, which starts with 0.75");
     assert_eq!(
         ran.run("test-engineer-unit").failure.as_deref(),
         Some(specialist.as_str())
@@ -219,6 +224,72 @@ fn no_run_starts_once_the_finished_runs_cost_the_review_s_cap() {
         )),
         "{:?}",
         ran.lines
+    );
+}
+
+#[test]
+fn a_generalist_starts_on_what_is_left_once_its_reserve_fits_and_is_capped_at_it() {
+    let options = Options {
+        parallel: 1,
+        max_cost_usd: 1.0,
+        ..options()
+    };
+    let caps: Arc<Mutex<Vec<(String, String)>>> = Arc::default();
+    let seen = Arc::clone(&caps);
+
+    let (_dir, ran) = controlled(DISPATCH, options, 0.0, move |c| {
+        let cap = c
+            .args
+            .iter()
+            .skip_while(|a| *a != "--max-budget-usd")
+            .nth(1);
+        let cap = cap.cloned().unwrap_or_default();
+        seen.lock().unwrap().push((fake::agent_of(c), cap));
+        fake::either(c)
+    });
+
+    // Three specialists cost 0.01 each, so 0.97 is left of 1.00: less
+    // than a generalist's cap of 1.50, more than its reserve of 0.75.
+    assert!(ran.runs.iter().all(AgentRun::answered), "{:?}", ran.lines);
+    let caps = caps.lock().unwrap().clone();
+    let cap_of = |name: &str| {
+        let found = caps.iter().find(|(agent, _)| agent == name);
+        found.map(|(_, cap)| cap.as_str())
+    };
+    assert_eq!(cap_of("lang-rust"), Some("0.30"));
+    assert_eq!(cap_of("review-code"), Some("0.97"));
+    assert_eq!(cap_of("review-spec"), Some("0.96"));
+}
+
+#[test]
+fn a_generalist_killed_on_what_was_left_is_charged_what_it_held_and_no_more() {
+    let options = Options {
+        parallel: 1,
+        max_cost_usd: 1.0,
+        ..options()
+    };
+    // One model call that used tokens, and no result: killed in flight.
+    let called = r#"{"type":"assistant","parent_tool_use_id":null,"message":{"id":"m1","model":"m","usage":{"input_tokens":10,"output_tokens":5},"content":[{"type":"text","text":"weighing"}]}}"#;
+
+    let (_dir, ran) = controlled(DISPATCH, options, 0.0, move |c| {
+        if fake::agent_of(c) != "review-code" {
+            return fake::either(c);
+        }
+        fake::write_log(c, &format!("{called}\n"));
+        Ok(Output {
+            timed_out: true,
+            ..Output::default()
+        })
+    });
+
+    // It held the 0.97 left of 1.00, not its tier's 1.50, so the pull
+    // request's cap holds: nothing is left for the other generalist.
+    let killed = ran.run("review-code");
+    assert!((killed.charged - 0.97).abs() < 1e-9, "{}", killed.charged);
+    let refused = ran.run("review-spec").failure.clone().unwrap_or_default();
+    assert!(
+        refused.starts_with("over budget: the pull request's reviews cost 1.0000 USD"),
+        "{refused}"
     );
 }
 

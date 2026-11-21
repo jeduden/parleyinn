@@ -241,3 +241,91 @@ fn a_breaker_of_fifty_trips_on_the_seventeenth_failure() {
     breaker.end(true);
     assert!(breaker.refusal().is_some());
 }
+
+/// What a generalist asks: its cap of 1.50, and 0.75 at least.
+const GENERALIST: Need = Need {
+    most: 1.5,
+    least: 0.75,
+};
+
+#[test]
+fn a_need_is_a_tier_s_cap_and_reserve_and_a_bare_number_a_whole_cap() {
+    assert_eq!(Need::of(Kind::Generalist), GENERALIST);
+    assert_eq!(Need::of(Kind::Consultant), GENERALIST);
+    assert_eq!(
+        Need::of(Kind::Specialist),
+        Need {
+            most: 0.3,
+            least: 0.3
+        }
+    );
+    assert_eq!(
+        Need::from(0.5),
+        Need {
+            most: 0.5,
+            least: 0.5
+        }
+    );
+}
+
+#[test]
+fn a_run_holds_what_is_left_once_its_cap_can_never_fit_and_its_reserve_does() {
+    // What pull request 136 had: 4.10 of 5.00 spent by earlier reviews.
+    let budget = Budget::new(PULL_REQUEST_COST_USD, 4.10);
+    assert!(budget.fits(GENERALIST));
+
+    let first = budget.reserve(GENERALIST, WAIT).unwrap();
+
+    assert!((first.held() - 0.90).abs() < 1e-9, "{}", first.held());
+    assert!(!budget.fits(GENERALIST), "the first holds all that is left");
+    assert_eq!(budget.refusal(GENERALIST), None, "it waits");
+    first.charge(0.12, &|_| {});
+    let second = budget.reserve(GENERALIST, WAIT).unwrap();
+    assert!((second.held() - 0.78).abs() < 1e-9, "{}", second.held());
+    second.charge(0.12, &|_| {});
+    // 0.66 is left, less than the reserve.
+    let refused = budget.refusal(GENERALIST).unwrap();
+    assert_eq!(
+        refused,
+        "over budget: the pull request's reviews cost 4.3400 USD, and a run capped at 1.50 USD, \
+         which starts with 0.75 USD at least, does not fit in its cap of 5.00 USD, so it was \
+         not started"
+    );
+    assert_eq!(budget.reserve(GENERALIST, WAIT).err(), Some(refused));
+}
+
+#[test]
+fn a_run_waits_for_its_whole_cap_while_that_can_still_fit() {
+    let budget = Budget::new(PULL_REQUEST_COST_USD, 2.0);
+    let first = budget.reserve(GENERALIST, WAIT).unwrap();
+    let second = budget.reserve(GENERALIST, WAIT).unwrap();
+    assert!((first.held() - 1.5).abs() < 1e-9 && (second.held() - 1.5).abs() < 1e-9);
+
+    // Nothing is left beside the two, and 1.50 fits once one ends.
+    assert!(!budget.fits(GENERALIST));
+    assert_eq!(budget.refusal(GENERALIST), None);
+    assert_eq!(
+        budget.reserve(GENERALIST, Duration::ZERO).err().as_deref(),
+        Some(
+            "over budget: a run capped at 1.50 USD, which starts with 0.75 USD at least, waited \
+             0.00 s for the runs in flight to leave room in the pull request's cap of 5.00 USD, \
+             and they did not end, so it was not started"
+        )
+    );
+    // 1.30 is left once one ends, more than the reserve: it still
+    // waits, since its whole cap fits once the other ends too.
+    first.charge(0.2, &|_| {});
+    assert!(!budget.fits(GENERALIST));
+    drop(second);
+    let third = budget.reserve(GENERALIST, WAIT).unwrap();
+    assert!((third.held() - 1.5).abs() < 1e-9, "{}", third.held());
+}
+
+#[test]
+fn what_a_run_holds_of_what_is_left_is_in_whole_cents_and_never_more() {
+    let budget = Budget::new(1.0, 0.2345);
+
+    let held = budget.reserve(GENERALIST, WAIT).unwrap();
+
+    assert!((held.held() - 0.76).abs() < 1e-9, "{}", held.held());
+}

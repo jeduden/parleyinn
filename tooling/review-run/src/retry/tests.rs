@@ -504,7 +504,7 @@ fn a_run_that_panics_releases_its_reservation_so_a_waiting_run_starts() {
         scrubber: None,
         progress: &|_| {},
     };
-    let most = runner::SPECIALIST_BUDGET_USD;
+    let most = review_eval::runner::SPECIALIST_BUDGET_USD;
     let c = Controls {
         budget: crate::controls::Budget::new(most * 1.5, 0.0),
         breaker: crate::controls::Breaker::new(crate::controls::Fraction::WHOLE, 1),

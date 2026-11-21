@@ -27,6 +27,18 @@ printf '{"type":"assistant","message":{"id":"m1","model":"claude-haiku-5-5","usa
 printf '{"type":"result","subtype":"success","is_error":false,"result":"outcome: findings — unwraps.","total_cost_usd":0.02,"num_turns":2,"duration_ms":50,"modelUsage":{"claude-haiku-5-5":{"costUSD":0.02}}}\n'
 "#;
 
+/// The stand-in `claude`, which states its finding only where its work
+/// directory holds the section the evaluated tree adds, in main's tree
+/// and in the pull request's, and no skill that tree adds.
+const CLAUDE_THAT_LOOKS: &str = r#"#!/bin/sh
+if [ ! -f docs/srs/10a-new.md ] || [ ! -f pr-head/docs/srs/10a-new.md ] || [ -e .claude/skills ]; then
+  printf '{"type":"result","subtype":"success","is_error":false,"result":"outcome: none — no section.","total_cost_usd":0.02,"num_turns":2,"duration_ms":50,"modelUsage":{"claude-haiku-5-5":{"costUSD":0.02}}}\n'
+  exit 0
+fi
+printf '{"type":"assistant","message":{"id":"m1","model":"claude-haiku-5-5","usage":{"input_tokens":1,"output_tokens":2},"content":[{"type":"text","text":"pr-head/crates/x/src/rogue.rs:1 — if not addressed: an unwrap outside tests panics — ENG-16"}]}}\n'
+printf '{"type":"result","subtype":"success","is_error":false,"result":"outcome: findings — unwraps.","total_cost_usd":0.02,"num_turns":2,"duration_ms":50,"modelUsage":{"claude-haiku-5-5":{"costUSD":0.02}}}\n'
+"#;
+
 /// A `claude` that never answers.
 const SLEEPING_CLAUDE: &str = "#!/bin/sh\nsleep 30\n";
 
@@ -40,7 +52,7 @@ fn repository(root: &Path) {
     };
     write(
         "docs/srs/05.md",
-        "# 5\n\n| ID | Pri | Requirement | Ver | Traces |\n|---|---|---|---|---|\n| REC-01 | P0 | Ingest. | T | I1 |\n| ENG-11 | P0 | Coverage for security-sensitive crates (`pin`). | A | I1 |\n",
+        "# 5\n\n| ID | Pri | Requirement | Ver | Traces |\n|---|---|---|---|---|\n| REC-01 | P0 | Ingest. | T | I1 |\n| ENG-11 | P0 | Coverage for security-sensitive crates (`pin`). | A | I1 |\n| ENG-16 | P0 | CI gates on clippy. | T | I1 |\n",
     );
     write("docs/srs/invariants.md", "# 1.3 Invariants\n\nI1 holds.\n");
     write("docs/domain-model/index.md", "# hub\n");
@@ -192,6 +204,62 @@ fn the_executable_evaluates_a_component_through_real_worktrees() {
         1,
         "{}",
         text(&worktrees.stdout)
+    );
+}
+
+#[test]
+fn a_run_s_world_holds_the_files_the_evaluated_tree_adds() {
+    let home = TempDir::new().unwrap();
+    let repo = home.path().join("repo");
+    repository(&repo);
+    // The pull request's tree: a clone that adds a section and a skill.
+    let tree = home.path().join("tree");
+    let git = |dir: &Path, args: &[&str]| {
+        let out = Command::new("git")
+            .args(args)
+            .current_dir(dir)
+            .output()
+            .unwrap();
+        assert!(out.status.success(), "git {args:?}: {}", text(&out.stderr));
+    };
+    git(
+        home.path(),
+        &["clone", "-q", &repo.display().to_string(), "tree"],
+    );
+    fs::write(tree.join("docs/srs/10a-new.md"), "# 10.5 New\n").unwrap();
+    fs::create_dir_all(tree.join(".claude/skills/new")).unwrap();
+    fs::write(tree.join(".claude/skills/new/SKILL.md"), "# New\n").unwrap();
+    git(&tree, &["add", "-A"]);
+    let path = bin(home.path(), CLAUDE_THAT_LOOKS);
+    let out = home.path().join("out");
+
+    let run = review_eval(
+        home.path(),
+        &path,
+        &[
+            "run",
+            "--checkout",
+            &repo.display().to_string(),
+            "--tree",
+            &tree.display().to_string(),
+            "--component",
+            "lang-rust",
+            "--out",
+            &out.display().to_string(),
+        ],
+    );
+
+    assert_eq!(
+        run.status.code(),
+        Some(0),
+        "{}\n{}",
+        text(&run.stdout),
+        text(&run.stderr)
+    );
+    assert!(
+        text(&run.stdout).contains("3 of 3 cases, 6 of 6 runs"),
+        "{}",
+        text(&run.stdout)
     );
 }
 

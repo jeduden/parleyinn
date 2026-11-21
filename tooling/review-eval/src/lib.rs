@@ -12,6 +12,7 @@
 //!
 //! It is repository tooling and never links into a shipped executable.
 
+pub mod added;
 pub mod case;
 pub mod check;
 pub mod cli;
@@ -28,6 +29,7 @@ pub mod plan;
 pub mod process;
 pub mod published;
 pub mod report;
+pub mod requirements;
 pub mod runner;
 pub mod score;
 pub mod secret;
