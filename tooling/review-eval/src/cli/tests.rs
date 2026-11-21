@@ -827,6 +827,7 @@ fn a_report_or_grade_that_cannot_be_written_is_noted_on_its_run() {
 
 mod consent;
 mod credential;
+mod ids;
 mod progress;
 mod publish;
 
@@ -842,7 +843,7 @@ fn a_run_that_did_not_run_leaves_a_report_headed_incomplete() {
         ..RunLog::default()
     };
 
-    let report = record_report(&log);
+    let report = record_report(&log, &BTreeSet::new());
 
     assert!(
         report.starts_with("incomplete: its run ended with spawn_failed"),
@@ -859,7 +860,7 @@ fn a_run_cut_off_before_it_stated_anything_ends_with_the_reviews_outcome() {
     };
     model_call(&mut log);
 
-    let report = record_report(&log);
+    let report = record_report(&log, &BTreeSet::new());
 
     assert!(report.contains("no clean review"), "{report}");
 }
@@ -874,5 +875,27 @@ fn a_run_that_answered_ends_with_the_outcome_its_lines_agree_with() {
     };
     model_call(&mut log);
 
-    assert_eq!(record_report(&log), "outcome: none — nothing found\n");
+    assert_eq!(
+        record_report(&log, &BTreeSet::new()),
+        "outcome: none — nothing found\n"
+    );
+}
+
+#[test]
+fn the_record_s_report_leaves_out_a_finding_that_cites_an_id_the_world_lacks() {
+    let known = "docs/x.md:3 — if not addressed: a row loses its scenario — ENG-01";
+    let unknown = "docs/x.md:9 — if not addressed: it cites a row no section has — ENG-99";
+    let mut log = RunLog {
+        answered: true,
+        texts: vec![known.to_owned(), unknown.to_owned()],
+        answer: "outcome: findings — two".to_owned(),
+        subtype: "success".to_owned(),
+        ..RunLog::default()
+    };
+    model_call(&mut log);
+    let world = BTreeSet::from(["ENG-01".to_owned()]);
+
+    let report = record_report(&log, &world);
+
+    assert_eq!(report, format!("{known}\noutcome: findings — two\n"));
 }
