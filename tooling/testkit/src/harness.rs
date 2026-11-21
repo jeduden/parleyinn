@@ -80,13 +80,14 @@ impl Harness {
         mcp: bool,
         env: &[(&str, &str)],
     ) -> Result<Self, String> {
-        Self::start_within(PATIENCE, home, core, mcp, env)
+        Self::start_within(PATIENCE, SCRIPT, home, core, mcp, env)
     }
 
-    /// [`Harness::start`], each wait it or its later calls make lasting
-    /// at most `patience`.
+    /// [`Harness::start`] with `script_body` as the harness script, each
+    /// wait it or its later calls make lasting at most `patience`.
     fn start_within(
         patience: Duration,
+        script_body: &str,
         home: &Path,
         core: &Path,
         mcp: bool,
@@ -98,7 +99,7 @@ impl Harness {
         let dir = base.join(format!("h{n}"));
         fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
         let script = dir.join("claude");
-        write_executable(&script, SCRIPT)?;
+        write_executable(&script, script_body)?;
         if mcp {
             fs::write(dir.join("mcp"), "").map_err(|e| e.to_string())?;
         }
@@ -262,7 +263,7 @@ fn wait_up_to(
         }
         std::thread::sleep(Duration::from_millis(50));
     }
-    Err(format!("waited {} s for {what}", patience.as_secs()))
+    Err(format!("waited {} ms for {what}", patience.as_millis()))
 }
 
 #[cfg(test)]

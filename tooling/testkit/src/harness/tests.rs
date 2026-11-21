@@ -119,8 +119,15 @@ fn the_start_env_reaches_the_harness_children() {
 #[test]
 fn a_request_the_server_never_answers_fails_after_the_patience() {
     let (home, core) = world();
-    let mut harness =
-        Harness::start_within(Duration::from_millis(300), home.path(), &core, true, &[]).unwrap();
+    let mut harness = Harness::start_within(
+        Duration::from_millis(300),
+        SCRIPT,
+        home.path(),
+        &core,
+        true,
+        &[],
+    )
+    .unwrap();
     let id = harness.send("a", json!({})).unwrap();
 
     harness.reply(id).unwrap();
@@ -133,15 +140,20 @@ fn a_request_the_server_never_answers_fails_after_the_patience() {
 #[test]
 fn a_hook_that_never_finishes_fails_after_the_patience() {
     let (home, core) = world();
-    let mut harness =
-        Harness::start_within(Duration::from_millis(300), home.path(), &core, false, &[]).unwrap();
-    // The harness ends before it reads the request, so nothing renames it.
-    fs::write(home.path().join("harnesses/h0/stop"), "").unwrap();
-    std::thread::sleep(Duration::from_millis(300));
+    // A harness that never runs a request, so nothing renames it.
+    let mut harness = Harness::start_within(
+        Duration::from_millis(300),
+        "#!/bin/sh\nexec sleep 30\n",
+        home.path(),
+        &core,
+        false,
+        &[],
+    )
+    .unwrap();
 
     let err = harness.hook("Stop", &json!({})).unwrap_err();
 
-    assert_eq!(err, "waited 0 s for the hook Stop to finish");
+    assert_eq!(err, "waited 300 ms for the hook Stop to finish");
     harness.kill().unwrap();
 }
 
@@ -150,6 +162,7 @@ fn a_server_that_outlives_its_input_fails_the_stop() {
     let (home, core) = world();
     let harness = Harness::start_within(
         Duration::from_millis(500),
+        SCRIPT,
         home.path(),
         &core,
         true,
@@ -171,7 +184,7 @@ fn a_ready_wait_returns_at_once() {
 fn a_wait_that_never_holds_names_what_it_waited_for() {
     let err = wait_up_to(Duration::from_millis(120), "the thing", || Ok(false)).unwrap_err();
 
-    assert_eq!(err, "waited 0 s for the thing");
+    assert_eq!(err, "waited 120 ms for the thing");
 }
 
 #[test]
@@ -187,6 +200,7 @@ fn a_server_that_never_answers_initialize_fails_the_start() {
 
     let err = Harness::start_within(
         Duration::from_millis(300),
+        SCRIPT,
         home.path(),
         &core,
         true,
