@@ -72,9 +72,9 @@ The size. Rewritten, the 15 files grow from 797 lines to about 6,020
 and shrink from 965 KB to 318 KB. Eleven exceed the 300 lines mdsmith
 allows an SRS section; the review section, 10a, takes 247. A section
 specialist reads the requirements a change touches, not its whole
-section. Whether those eleven split, or the srs kind's cap in
-`.mdsmith.yml` rises with the stakeholder's explicit consent, is the
-stakeholder's ruling, and the rewrites after 10a wait on it.
+section. On 21 November 2026 the stakeholder ruled to raise the srs
+kind's cap in `.mdsmith.yml` to 700 lines, so no section splits;
+phase 1 lands it.
 
 ## The requirement block
 
@@ -112,8 +112,8 @@ The review's agents MUST have no credential that can approve or write.
 2. The review section is rewritten through main's tools.
 3. The other fourteen sections are rewritten, a few for each pull
    request, with each drift injection that quotes a rewritten row
-   moved. They split, or keep one file under a raised cap, as the
-   stakeholder rules.
+   moved. Each keeps its one file, under the srs kind's cap of 700
+   lines.
 4. The parser refuses a requirement table, with a drift case. ENG-28,
    the agents' shared sections, the docs and the scenarios speak of a
    requirement where they say row.

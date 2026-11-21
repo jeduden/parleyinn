@@ -27,7 +27,8 @@ document, and `parse` returns its rows and blocks in the document's
 order. `derived.rs` finds a section's first requirement as a row or
 as a block, and its defect case adds the MUST on a line of its own
 after the block's text. The testing page says how a requirement is
-written.
+written, and the srs kind's cap in `.mdsmith.yml` rises to 700 lines,
+the stakeholder's ruling.
 
 Gate. A drift case creates a section holding a block with ENG-25's
 id, which §10's table defines, and the parse gate fails naming it.
