@@ -41,7 +41,9 @@ summary: >-
 - The cucumber scenario `@ENG-28` passes. Its step runs the checkout's
   bundle on one change that waits on all three consents, with no
   comment and with one that consents: every file an agent reads is the
-  same, and the comment lifts three blocking findings.
+  same, and the comment lifts three blocking findings. A findings file
+  of either run that does not parse is its own problem, never read as
+  one with no finding, which would count every finding lifted.
 - The evaluation, local, on the reviewers' models, four runs a case.
   Without the change the two cases with no consenting comment failed
   5 of 8 runs, each for a finding that restated the missing consent.
