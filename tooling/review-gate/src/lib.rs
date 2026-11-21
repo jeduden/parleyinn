@@ -38,6 +38,9 @@ pub const REQUEST_CHANGES: &str = "REQUEST_CHANGES";
 /// The check the post job posts with the gate's decision (ENG-28),
 /// which main's ruleset requires from the reviewer app alone (ENG-21).
 pub const OWN_CHECK: &str = "review-gate";
+/// Where a finding about the review itself points: the review's own
+/// directory, not a file of the change.
+pub const REVIEW_PATH: &str = "review/";
 /// The reviewer app, `jeduden-review-agent`, by its GitHub App id.
 pub const REVIEWER_APP_ID: i64 = 5_140_085;
 

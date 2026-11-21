@@ -33,7 +33,8 @@ not run, and an error that repeats it; the reset named once a cost cap
 kept an agent out, and not otherwise.
 
 GREEN. The outcome's finding and the gate's reading of it share one
-form, which the gate's crate writes and reads. The decide script keeps
+form, which the gate's crate writes and reads, on the review's own
+path so no agent's finding sets a reason. The decide script keeps
 the gate's errors, prints them to the log as before, and puts the
 gate's own line in the check's summary: the one that starts with its
 name, since a usage error is followed by the usage, or the last line

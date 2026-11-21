@@ -33,9 +33,7 @@ use crate::plan::{Plan, report_file};
 use crate::reading::ReportLine;
 use crate::run::AgentRun;
 
-/// Where a finding about the review itself points: the review's own
-/// directory, not a file of the change.
-pub const REVIEW_PATH: &str = "review/";
+pub use review_gate::REVIEW_PATH;
 
 /// What the review decided, and what the gate holds it to.
 #[derive(Debug, Clone, PartialEq, Eq)]

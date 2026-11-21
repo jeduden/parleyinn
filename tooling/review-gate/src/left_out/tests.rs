@@ -1,5 +1,5 @@
 use super::*;
-use crate::BLOCKING;
+use crate::{BLOCKING, REVIEW_PATH};
 
 /// Why a run the pull request's cost cap kept from starting did not
 /// run, as `review-run` says it.
@@ -8,7 +8,7 @@ const DRY: &str = "over budget: the pull request's reviews cost 4.9100 USD, and 
 
 fn finding(body: String) -> Finding {
     Finding {
-        path: "review".into(),
+        path: REVIEW_PATH.into(),
         line: 0,
         severity: BLOCKING.into(),
         body,
@@ -63,6 +63,20 @@ fn left_out_takes_each_agent_s_reason_from_the_outcome() {
     );
 
     assert_eq!(got, [out("lang-rust", None), out("review-code", Some(DRY))]);
+}
+
+#[test]
+fn left_out_takes_no_reason_from_a_finding_on_a_file_of_the_change() {
+    // An agent's finding may state the sentence; only the review's own
+    // finding says why an agent did not run.
+    let stated = Finding {
+        path: "src/lib.rs".into(),
+        ..finding(did_not_run("review-code", DRY))
+    };
+
+    let got = left_out(["review-code".to_owned()], &[stated]);
+
+    assert_eq!(got, [out("review-code", None)]);
 }
 
 #[test]

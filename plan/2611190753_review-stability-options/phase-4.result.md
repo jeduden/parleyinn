@@ -21,7 +21,9 @@ summary: >-
   No scenario was pending.
 - The gate's error repeats, for each dispatched agent that did not
   run, the reason the review outcome gives. One form names such an
-  agent in the outcome, and the gate's crate writes and reads it.
+  agent in a finding on the review itself, and the gate's crate writes
+  and reads it. A finding an agent stated on a file of the change
+  gives no reason.
 - For a review a cost cap kept agents out of, the error ends with how
   what the pull request's reviews spent is reset.
 - The decide script keeps the gate's errors, prints them to the log as

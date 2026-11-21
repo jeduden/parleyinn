@@ -1,14 +1,14 @@
 //! The dispatched agents a review left out, and why (ENG-28). The
 //! review outcome names each agent that did not run in a blocking
-//! finding, in one form this module writes and reads, so the gate's
-//! error repeats the outcome's reason and the check it fails says what
-//! to do. For a review the pull request's cost cap stopped, the reason
+//! finding on the review itself, in one form this module writes and
+//! reads, so the gate's error repeats the outcome's reason and the
+//! check it fails says what to do. For a review the pull request's cost cap stopped, the reason
 //! holds what the reviews cost and the cap, and the gate adds how what
 //! they spent is reset.
 
 use std::fmt;
 
-use crate::Finding;
+use crate::{Finding, REVIEW_PATH};
 
 /// How the reason starts of a run the cost caps stopped or kept from
 /// starting.
@@ -68,7 +68,8 @@ pub fn why_not_run<'a>(agent: &str, body: &'a str) -> Option<&'a str> {
 }
 
 /// Each of `agents` with why it did not run, from the review outcome's
-/// `findings`.
+/// `findings` on the review itself, never one an agent stated on a file
+/// of the change.
 #[must_use]
 pub fn left_out(agents: impl IntoIterator<Item = String>, findings: &[Finding]) -> Vec<LeftOut> {
     agents
@@ -76,6 +77,7 @@ pub fn left_out(agents: impl IntoIterator<Item = String>, findings: &[Finding]) 
         .map(|agent| {
             let why = findings
                 .iter()
+                .filter(|f| f.path == REVIEW_PATH)
                 .find_map(|f| why_not_run(&agent, &f.body))
                 .map(str::to_owned);
             LeftOut { agent, why }

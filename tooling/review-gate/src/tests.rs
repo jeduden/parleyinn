@@ -246,7 +246,7 @@ fn decide_refuses_a_review_that_left_a_dispatched_agent_out() {
     let dry = "over budget: the pull request's reviews cost 4.9100 USD, and a run capped at 0.30 \
                USD does not fit in its cap of 5.00 USD, so it was not started";
     let named = left_out::did_not_run("srs-security", dry);
-    i.outcome.findings = vec![finding("review", 0, BLOCKING, &named)];
+    i.outcome.findings = vec![finding(REVIEW_PATH, 0, BLOCKING, &named)];
     assert_eq!(
         decide(&i).unwrap_err().to_string(),
         format!(
