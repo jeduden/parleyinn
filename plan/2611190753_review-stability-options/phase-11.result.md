@@ -8,10 +8,10 @@ summary: >-
   each touched requirement its files change or name, one sentence or
   clause per line. A requirement is one table line a search shows only
   in part, and `lang-gherkin` had spent its twenty turns searching
-  ENG-28's 13,856 characters. It now weighs each step against its row
-  as its context quotes it, and leaves to CI the tags and bindings CI
-  proves. The ENG-28 context check, two drift cases and a new
-  `lang-gherkin` case land with it.
+  ENG-28's 13,856 characters. It now weighs each changed step against
+  main's step, then against its row as its context quotes it, and
+  leaves to CI the tags and bindings CI proves. The ENG-28 context
+  check, two drift cases and a new `lang-gherkin` case land with it.
 ---
 # Phase 11 handoff
 
@@ -27,6 +27,10 @@ summary: >-
 - `lang-gherkin` reads its diff and its context and searches nothing.
   It leaves to CI the tags and bindings that the scenario gate test and
   the scenario run prove.
+- With its row whole in front of it, `lang-gherkin` read a reworded
+  step as checking less than its row, as main's step does too. It now
+  weighs a changed step against main's step first: one that says what
+  main's step said is no finding.
 
 ## Verified
 
@@ -35,10 +39,14 @@ summary: >-
 - The cucumber scenario `@ENG-28` and the scenario gate test pass.
 - The drift suite catches the two new cases and the thirteen others
   that inject the files this phase changes.
-- `review-eval run --component lang-gherkin` on haiku, with the new
-  case. Before: 5 of 5 cases, 10 of 11 runs, 5.1 turns a run, the new
-  case in 8 and 5 turns. After: 5 of 5 cases, 10 of 11 runs, 3.3 turns
-  a run, the new case in 3 and 3.
+- `review-eval run --component lang-gherkin` on haiku, on main with the
+  new case. Before: 5 of 5 cases, 10 of 10 runs, 5.2 turns a run, the new
+  case in 8 turns a run and the reworded step's clean case in 10 and 8.
+  With the rows quoted and each step weighed against its row alone: 4 of 5
+  cases, 9 of 11 runs, 3.3 turns a run; the clean case failed 2 of 3.
+  After: 5 of 5 cases, 10 of 10 runs, 3.2 turns a run, the new case in 3
+  and 3. With six repetitions each, the clean case, the new case and the
+  injection case passed 18 of 18 runs.
 - `scripts/review-local.sh` against pull request 154's head: 11 of 11
   agents consulted, and the agents approve, at 0.57 USD;
   `lang-gherkin` read its diff and context and answered in 3 turns.
@@ -49,10 +57,11 @@ summary: >-
 
 - The shared section of the SRS section specialists still has them
   search for a row a diff names but does not change.
-- A clean case of `lang-gherkin` fails one run in three, before and
-  after the change: it reads a reworded step as weaker than its row.
+- `lang-gherkin` puts its finding lines in its last message beside its
+  outcome in most runs, a slip the evaluation counts, as before.
 
 ## Next
 
-- Land after pull request 154, and see a review of a change to a long
-  row run without a specialist's searches.
+- Land before pull request 154. A review runs main's bundle and
+  agents, so 154's next review quotes its specialists' rows; see it
+  run without a specialist's searches.

@@ -32,7 +32,8 @@ The rule. The bundle names, for each changed file, the touched ids it
 holds or names. Each context quotes those requirements whole, one
 sentence or clause per line, as the pull request has them, or as main
 has one the pull request removes. `lang-gherkin` reads its rows there,
-leaves to CI what CI proves, and searches nothing.
+weighs a changed step against main's step before its row, leaves to CI
+what CI proves, and searches nothing.
 
 RED. Unit tests of `review-bundle`: the analysis names the ids each
 changed file holds or names; a context quotes each requirement its
