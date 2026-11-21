@@ -166,9 +166,11 @@ pub(crate) mod fake {
             if entry.file_name() == ".git" {
                 continue;
             }
+            let path = entry.path();
             if entry.file_type()?.is_dir() {
-                listed(root, &entry.path(), out)?;
-            } else if let Ok(rel) = entry.path().strip_prefix(root) {
+                listed(root, &path, out)?;
+            } else {
+                let rel = path.strip_prefix(root).expect("listed only under root");
                 out.push_str(&rel.to_string_lossy());
                 out.push('\0');
             }
