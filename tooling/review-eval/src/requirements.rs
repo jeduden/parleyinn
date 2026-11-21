@@ -3,12 +3,15 @@
 //! that adds a requirement can cite it and one that removes a
 //! requirement still lets a finding name it, and the invariants. A
 //! tree with no `docs/srs` adds no id; one whose tables do not read
-//! fails the review before any agent runs.
+//! fails the review before any agent runs, and an evaluation run
+//! before it is graded. The review and the evaluation's grader read
+//! them here, so a line one refuses for its id the other refuses too
+//! (ENG-32).
 
 use std::collections::BTreeSet;
 use std::path::Path;
 
-use review_eval::world::PR_HEAD;
+use crate::world::PR_HEAD;
 
 /// Where the SRS lives in a tree.
 const SRS: &str = "docs/srs";

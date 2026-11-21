@@ -55,7 +55,6 @@ use crate::outcome::{Decision, decide};
 use crate::plan::{self, report_file};
 use crate::previous;
 use crate::reading::{IGNORED, ReportLine};
-use crate::requirements;
 use crate::resume::{self, Resume};
 use crate::run::{self, AgentRun, Options};
 use crate::run_id::{self, RUN_ID};
@@ -224,7 +223,7 @@ fn prepare(
     };
     // Read before any agent runs: an SRS that does not read fails the
     // review before it costs anything.
-    let known = requirements::ids(workdir)?;
+    let known = review_eval::requirements::ids(workdir)?;
     let head = args
         .head
         .clone()

@@ -300,7 +300,7 @@ Feature: Engineering quality (ENG)
     And the job that runs the review's agents holds no write permission and not the "JEDUDEN_REVIEW_AGENT_KEY" key
     And that job runs every agent the review bundle dispatches with "cargo run --locked --quiet --offline -p review-run -- --workdir .", and no agent routes the review
     And review-run runs each specialist the review bundle dispatches as its own agent, told to read only its own diff, its part's when the diff runs in parts, and the review context the review bundle wrote for it, which names the review class, the touched ids, its dispatch row, the deterministic findings on its files and the change's ENG-29 record, never the whole bundle, assembles its report from its run log, runs each generalist once its own specialists have ended and the mass failure is decided, and writes the review outcome from what they answered
-    And review-run passes each agent the cost cap of its tier, starts a run only once its tier's cap fits in the pull request's cap beside what the earlier reviews spent, what the runs that ended were charged and the caps of the runs still running, none at all when the earlier reviews reached it, charges a run paid for that left no result its tier's cap and one whose result reported no cost nothing, names each agent it did not start over budget, so the review requests changes, and keeps what the pull request's reviews spent
+    And review-run passes each agent a cost cap, its tier's, starts a run only once that cap fits in the pull request's cap beside what the earlier reviews spent, what the runs that ended were charged and the caps of the runs still running, none at all when the earlier reviews reached it, starts a generalist whose tier's cap can no longer fit once half that cap is left, passed what is left as its cap, charges a run paid for that left no result the cap it was passed and one whose result reported no cost nothing, names each agent it did not start over budget, so the review requests changes, and keeps what the pull request's reviews spent
     And review-run starts no generalist once more than a third of the dispatched specialists, those a cost cap stopped or kept from starting among them and none that stated its report and read only part of its diff, ended without an accepted report, and opens the review outcome with a blocking finding naming the mass failure
     And review-run waits with backoff before it runs again an agent the API turned away as overloaded or rate-limited, runs it a third time at most, leaves it a named gap when no deadline is left to wait, and never runs again one a cost cap stopped, whose credential was refused or that was charged
     And review-run runs a specialist whose diff is past its split limit in parts, each on whole files of its diff, merges their reports into its one report, reads a part cut off at its turn budget after it read its whole part as it stands, and fails the review naming a part that did not run, so the gate posts nothing
@@ -327,6 +327,7 @@ Feature: Engineering quality (ENG)
     And that job decides the review with "--consulted consulted.json"
     And that job decides the review with "--reports reports --answers answers.json"
     And that job posts its decision as the "review-gate" check
+    And a review gate that fails to decide says why in the summary of the check it fails: its own error, which names each dispatched agent that did not run with the reason the review outcome gives, and for a review a cost cap kept agents out of what the pull request's reviews cost, the cap and how what they spent is reset
     And every agent the review bundle can dispatch is defined, specialists at low effort, generalists at medium and their deep instances each naming its own effort, model and turn budget
     And every language the repository's source and configuration are written in has its specialist
     And the review gate decides:
@@ -379,18 +380,19 @@ Feature: Engineering quality (ENG)
     And the review workflow's evaluate job runs "cargo run --locked --quiet -p review-eval" on the components the pull request changes, after the agents' job and before the job that holds the "JEDUDEN_REVIEW_AGENT_KEY" key
     And a pull request that changes only the shared section "docs/agents/specialist-report.md" runs the cases of one component per distinct set of such sections instead of every component's
     And a run of a case is graded:
-      | outcome     | finding | forbidden | answer       | stated         | answered | run                     |
-      | as expected | found   | none      | outcome line | before answer  | yes      | passes                  |
-      | other       | missing | none      | outcome line | before answer  | yes      | fails on outcome        |
-      | other       | found   | none      | outcome line | before answer  | yes      | passes, slips on answer |
-      | as expected | missing | found     | outcome line | before answer  | yes      | fails on finding        |
-      | as expected | found   | found     | outcome line | before answer  | yes      | fails on forbidden      |
-      | as expected | found   | none      | more         | before answer  | yes      | passes, slips on answer |
-      | as expected | found   | none      | no outcome   | before answer  | yes      | passes, slips on answer |
-      | as expected | found   | none      | outcome line | only in answer | yes      | fails on stating        |
-      | as expected | found   | none      | outcome line | before answer  | no       | fails on no answer      |
-      | as expected | found   | none      | outcome line | before answer  | cut      | passes, slips on cut    |
-      | other       | missing | none      | no outcome   | before answer  | cut      | fails on cut            |
+      | outcome     | finding    | forbidden | answer       | stated         | answered | run                     |
+      | as expected | found      | none      | outcome line | before answer  | yes      | passes                  |
+      | other       | missing    | none      | outcome line | before answer  | yes      | fails on outcome        |
+      | other       | found      | none      | outcome line | before answer  | yes      | passes, slips on answer |
+      | as expected | missing    | found     | outcome line | before answer  | yes      | fails on finding        |
+      | as expected | found      | found     | outcome line | before answer  | yes      | fails on forbidden      |
+      | as expected | found      | none      | more         | before answer  | yes      | passes, slips on answer |
+      | as expected | found      | none      | no outcome   | before answer  | yes      | passes, slips on answer |
+      | as expected | found      | none      | outcome line | only in answer | yes      | fails on stating        |
+      | as expected | found      | none      | outcome line | before answer  | no       | fails on no answer      |
+      | as expected | found      | none      | outcome line | before answer  | cut      | passes, slips on cut    |
+      | other       | missing    | none      | no outcome   | before answer  | cut      | fails on cut            |
+      | as expected | unknown id | none      | outcome line | before answer  | yes      | fails on report         |
     And a case passes with two of three runs, stopping once decided:
       | runs             | case   | runs made |
       | pass, pass       | passes | 2         |

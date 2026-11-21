@@ -54,7 +54,7 @@ fn review_runs_by_code(w: &mut World) -> Result<(), String> {
 }
 
 #[then(
-    regex = r"^review-run passes each agent the cost cap of its tier, starts a run only once its tier's cap fits in the pull request's cap beside what the earlier reviews spent, what the runs that ended were charged and the caps of the runs still running, none at all when the earlier reviews reached it, charges a run paid for that left no result its tier's cap and one whose result reported no cost nothing, names each agent it did not start over budget, so the review requests changes, and keeps what the pull request's reviews spent$"
+    regex = r"^review-run passes each agent a cost cap, its tier's, starts a run only once that cap fits in the pull request's cap beside what the earlier reviews spent, what the runs that ended were charged and the caps of the runs still running, none at all when the earlier reviews reached it, starts a generalist whose tier's cap can no longer fit once half that cap is left, passed what is left as its cap, charges a run paid for that left no result the cap it was passed and one whose result reported no cost nothing, names each agent it did not start over budget, so the review requests changes, and keeps what the pull request's reviews spent$"
 )]
 fn review_run_caps_cost(w: &mut World) -> Result<(), String> {
     let work = testkit::TempDir::new().map_err(|e| format!("make a work directory: {e}"))?;
@@ -62,6 +62,10 @@ fn review_run_caps_cost(w: &mut World) -> Result<(), String> {
     problems.extend(engineering::review_spend::cap_problems(
         eng(w).checkout()?,
         &work.path().join("spend"),
+    ));
+    problems.extend(engineering::review_reserve::reserve_problems(
+        eng(w).checkout()?,
+        &work.path().join("reserve"),
     ));
     outcome(problems)
 }
@@ -300,6 +304,20 @@ fn key_job_runs(w: &mut World, cmd: String) -> Result<(), String> {
 fn key_job_posts_check(w: &mut World, check: String) -> Result<(), String> {
     let e = eng(w);
     outcome(e.flow.key_job_posts_check(e.key()?, &check)?)
+}
+
+#[then(
+    regex = r"^a review gate that fails to decide says why in the summary of the check it fails: its own error, which names each dispatched agent that did not run with the reason the review outcome gives, and for a review a cost cap kept agents out of what the pull request's reviews cost, the cap and how what they spent is reset$"
+)]
+fn gate_says_why(w: &mut World) -> Result<(), String> {
+    let work = testkit::TempDir::new().map_err(|e| format!("make a work directory: {e}"))?;
+    let e = eng(w);
+    let mut problems = engineering::review_capped::check_problems(&e.flow, e.key()?)?;
+    problems.extend(engineering::review_capped::capped_problems(
+        e.checkout()?,
+        work.path(),
+    ));
+    outcome(problems)
 }
 
 #[then(

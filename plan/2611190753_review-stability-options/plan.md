@@ -11,9 +11,9 @@ summary: >-
   it states, a blocking finding stands until a dropped line withdraws
   it, a stakeholder's comment changes nothing an agent reads, so no
   agent restates a missing consent, a review that runs dry says what to
-  do, a generalist reserves what
-  generalists cost, the evaluation holds ids to the known requirements,
-  and the bundle marks added lines that stand on main.
+  do, a generalist starts on what is left of the pull request's cap,
+  the evaluation holds ids to the known requirements,
+  and its world holds the files a pull request adds.
 model: opus
 depends-on: [2610282358]
 ---
@@ -81,15 +81,18 @@ its evidence asks for today.
    consent (phase 3, ENG-28).
 4. A review that runs out of its pull request's budget names the
    budget, what was spent and how it is reset (phase 4, ENG-28).
-5. A generalist reserves what generalists cost on record, with a
-   margin, in place of its whole cap (phase 5, ENG-28).
+5. A generalist whose whole cap can no longer fit starts once half of
+   it is left of the pull request's cap, capped at what is left
+   (phase 5, ENG-28).
 6. The evaluation holds a finding's ids to the known requirements, as
    the review does (phase 6, ENG-32).
-7. The bundle marks added lines that stand word for word on main, and
-   the evaluation's world holds the files a pull request adds
-   (phase 7, ENG-28 and ENG-32).
+7. The evaluation's world holds the files a pull request adds. A mark
+   on added lines that stand word for word on main was measured and
+   not built (phase 7, ENG-32).
 8. A generalist gives its whole weighing in its final answer, after
    the model's API refused one as asked for its reasoning (phase 8).
+9. A run that ended on an error holds no answer, and the finding on a
+   generalist so ended quotes the error (phase 9, ENG-28).
 
 ## Execution
 
@@ -99,10 +102,11 @@ its evidence asks for today.
 | 2     | opus  | A generalist's log that states a nit after a blocking finding at one place keeps the blocking one; its case passes  |
 | 3     | opus  | The bundle writes an agent the same files whatever the consent; clean cases on stakeholder paths pass unconsented   |
 | 4     | opus  | The gate's check summary of a review that ran dry names the budget, the spend and the reset                         |
-| 5     | opus  | A deep review whose generalists cost what they do on record starts every agent inside the cap                       |
+| 5     | opus  | With 0.90 USD left of the cap a review starts every agent, each generalist capped at the rest                       |
 | 6     | opus  | A run citing an id no requirement has fails its evaluation case, as the review blocks it                            |
-| 7     | opus  | A specialist's case for a moved file passes: no finding at a line main already holds                                |
+| 7     | opus  | A world built from a tree that adds a section holds it; four drift cases fail                                       |
 | 8     | opus  | The generalists' cases pass on their models, no line before the final answer                                        |
+| 9     | opus  | The finding on a generalist that ended on an error quotes it                                                        |
 
 ## Phases
 
@@ -133,8 +137,18 @@ footer: |
 |     | ↳      | ENG-28 now has a generalist's blocking finding stand beside a nit it states later at the same place and source, until a dropped line withdraws it. In 582 recorded generalist runs, 4 stated such a nit, each a second point and none a downgrade, and three of them failed an evaluation case for the blocking finding the review had dropped. The ENG-28 scenario step, a fourth run in its weighing check and a drift case land with it; no instruction changes.                                                                                             |
 | 3   | ✅     | [A stakeholder's comment changes nothing an agent reads](phase-3.md)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
 |     | ↳      | ENG-28 now has the review bundle write an agent the same bundle and review context whatever the stakeholder's comments say: the findings that turn on consent go to the review gate alone, and each agent reads that consent is the gate's check. So the outcome a comment's review reuses holds no line that restates a missing consent. Two clean cases on stakeholder paths with no consenting comment failed 5 of 8 runs before the change and none for consent after it. The ENG-28 scenario step, a record check and three drift cases land with it.      |
+| 4   | ✅     | [A review a cost cap stopped says what to do](phase-4.md)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+|     | ↳      | ENG-28 now has a step that fails without deciding post the check failed with its own error in the summary. The error names each dispatched agent that did not run with the reason the review outcome gives. Where a cost cap kept one from starting, that holds what the pull request's reviews cost and the cap, and the error adds how what they spent is reset. The gate's rule is unchanged: it decides no review that left an agent out. A scenario step, a record check and five drift cases land with it.                                                |
+| 5   | ✅     | [A generalist starts on what is left of the pull request's cap](phase-5.md)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+|     | ↳      | ENG-28 now has a generalist whose tier's cap can no longer fit in the pull request's cap start all the same once half that cap is left. It is passed what is left as its own cost cap, so no run spends past the pull request's cap. A run paid for that left no result is charged the cap it was passed. Of 596 generalist runs on record one cost 0.70 USD and no other more than 0.25. The ENG-28 scenario step, a record check and three drift cases land with it; no instruction changes.                                                                  |
+| 6   | ✅     | [The evaluation holds a finding's ids to the known requirements](phase-6.md)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+|     | ↳      | ENG-32's grader now refuses a finding that cites an id no requirement or invariant of the case's world has, with the function the review reads the ids with. The model specialists' missing-id case passed 6 of 44 runs under it, and 126 of 132 once their report section said what such a finding ends in. The section now also says that text speaking to the reviewer breaks ENG-28: 4 of 220 injection runs had ended in no id, and none of 132 does. A row of the ENG-32 scenario's grading table and two drift cases land with it.                       |
+| 7   | ✅     | [The evaluation's world holds the files a pull request adds](phase-7.md)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+|     | ↳      | ENG-32's evaluation now builds a run's world with the files the evaluated tree adds: each in both trees, an instruction file in the pull request's tree alone, so only the component under test loads beside the agent. A specialist added with its section had failed a case 2 of 2 runs for the section its world lacked. The mark on added lines that stand on main was measured and not built: a moved row cost 5.4 of 20 turns in 56 runs. Four drift cases land with it.                                                                                  |
 | 8   | ✅     | [A generalist gives its whole weighing in its final answer](phase-8.md)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
 |     | ↳      | A generalist is now asked for every line of its weighing in its final answer and none before it, after the model's API refused the code generalist of one pull request twice as asking for its reasoning in its text. ENG-28 and ENG-32 keep their rows: the review still reads the whole run log, and the evaluation counts a line stated early and left out of the answer as a slip. The generalists' 26 cases passed in 52 of 52 runs with no slip. The refusal did not occur outside CI, so the fix is not proven against it. One drift case lands with it. |
+| 9   | ✅     | [A run that ended on an error says so](phase-9.md)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+|     | ↳      | ENG-28 keeps its row: the review now keeps the harness's text apart from an agent's answer when a run ended on an error, a usage limit or a call the model's API refused. The finding on a generalist so ended quotes the error, and the summary names an error among the ways a run ends without a successful result, where it named only a turn budget, a deadline or a cost cap. Two drift cases land with it.                                                                                                                                               |
 <?/catalog?>
 
 ## Acceptance Criteria
@@ -150,7 +164,10 @@ footer: |
 - [ ] A review that ran dry tells the author the budget and the reset
 - [ ] A deep review of a large change starts its generalists inside
       the pull request's budget
-- [ ] The evaluation fails a run that cites an id no requirement has
-- [ ] A reviewer is told which added lines stand on main already
+- [x] The evaluation fails a run that cites an id no requirement has
+- [x] A specialist added with the section it checks runs its cases
+      in a world that holds that section
 - [x] A generalist is asked for its whole weighing in its final
       answer, and its cases pass on its model
+- [x] A run that ended on an error is reported with its error, never
+      as an agent that answered nothing

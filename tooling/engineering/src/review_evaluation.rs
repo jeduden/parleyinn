@@ -25,6 +25,11 @@ const COMPONENT: &str = "lang-rust";
 /// The paths the table's case expects a finding at, and forbids one at.
 const WANTED: &str = "crates/x/src/a.rs";
 const FORBIDDEN: &str = "crates/x/src/b.rs";
+/// The one requirement the table's world holds, which a finding of the
+/// table cites, and the ids of a finding that cites one more, which no
+/// requirement has.
+const KNOWN: &str = "ENG-16";
+const UNKNOWN: &str = "ENG-16, ENG-99";
 
 /// The components without one of their three kinds of case (ENG-32).
 #[must_use]
@@ -103,7 +108,8 @@ fn table_case() -> Case {
 /// What the grader says of the run `row` describes: `passes`, `passes,
 /// slips on` what it slips on first, or `fails on` what it fails on
 /// first. The row's `finding` and `forbidden` say which lines the
-/// specialist stated in its text, `stated` whether it stated them before
+/// specialist stated in its text, a finding of `unknown id` citing an
+/// id no requirement of the case's world has, `stated` whether it stated them before
 /// its answer or only in it, `answer` whether its answer is the outcome
 /// line, `more` than it or `no outcome` line, `outcome` whether that
 /// line gives the outcome the case expects, and `answered` whether the
@@ -118,9 +124,14 @@ fn run_outcome(row: &BTreeMap<String, String>) -> String {
         "outcome: none — it is fine."
     };
     let mut lines = Vec::new();
-    if column("finding") == "found" {
+    let ids = match column("finding") {
+        "found" => Some(KNOWN),
+        "unknown id" => Some(UNKNOWN),
+        _ => None,
+    };
+    if let Some(ids) = ids {
         lines.push(format!(
-            "{WANTED}:6 — if not addressed: an unwrap outside tests panics — ENG-16"
+            "{WANTED}:6 — if not addressed: an unwrap outside tests panics — {ids}"
         ));
     }
     if column("forbidden") == "found" {
@@ -158,8 +169,12 @@ fn run_outcome(row: &BTreeMap<String, String>) -> String {
         texts,
         ..RunLog::default()
     };
-    let graded = grade(&component, &case, &log);
-    match (graded.failures.first(), graded.slips.first()) {
+    let known = BTreeSet::from([KNOWN.to_owned()]);
+    let graded = grade(&component, &case, &log, &known);
+    // A line the review cannot read is what the run fails on, before
+    // the finding and the outcome its report then lacks.
+    let unread = graded.failures.iter().find(|f| f.starts_with("report"));
+    match (unread.or(graded.failures.first()), graded.slips.first()) {
         (Some(f), _) => format!("fails on {}", failed_on(f)),
         (None, Some(s)) => format!("passes, slips on {}", failed_on(s)),
         (None, None) => "passes".to_owned(),
