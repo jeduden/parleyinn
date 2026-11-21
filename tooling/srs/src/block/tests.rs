@@ -92,3 +92,11 @@ fn a_table_ends_the_block_before_it() {
     assert_eq!(got[0].text, "Text.");
     assert_eq!(got.len(), 1);
 }
+
+#[test]
+fn a_fence_inside_a_block_is_part_of_its_text() {
+    let got = blocks("## REC-01\n\n- Pri: P0\n\nText.\n```\n## REC-02\n| A |\n```\nMore.\n");
+
+    assert_eq!(got.len(), 1);
+    assert_eq!(got[0].text, "Text. ``` ## REC-02 | A | ``` More.");
+}
