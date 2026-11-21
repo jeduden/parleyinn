@@ -20,7 +20,7 @@ use serde_json::json;
 
 use crate::World;
 use crate::administration::configure;
-use crate::live::{Harness, lines_read, source_key, store, wait_until};
+use crate::live::{self, lines_read, source_key, store, wait_until};
 use crate::provenance::typed;
 use crate::record::{home, last_run, run_core, run_core_at_terminal};
 use crate::record_hooks::{SESSION, answered_empty, session_start};
@@ -200,7 +200,7 @@ pub(crate) fn hook_names(w: &mut World, path: &str, cwd: &Path) -> Result<(), St
     let mut input = session_start(w, SESSION, "startup")?;
     input["transcript_path"] = json!(path);
     input["cwd"] = json!(cwd);
-    let mut harness = Harness::start(w, true, &[])?;
+    let mut harness = live::start(w, true, &[])?;
     harness.hook("SessionStart", &input)?;
     crate::record_live::live(w).harness = Some(harness);
     wait_until("the MCP server to take its session binding", || {

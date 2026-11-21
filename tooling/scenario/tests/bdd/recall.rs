@@ -24,10 +24,10 @@ use serde_json::{Value, json};
 use store::Store;
 
 use crate::World;
-use crate::live::Harness;
+use crate::live::{self, Harness};
 use crate::record::{home, last_run, run_core};
 use crate::record_search::{Reply, arguments_of, call_tool, last_reply};
-use crate::record_transcript::{ingest, recorded, recorded_call};
+use crate::record_transcript::{ingest, recorded};
 use crate::security_redaction::{append, transcripts};
 
 /// What the recall steps track.
@@ -62,27 +62,8 @@ pub fn recall(w: &mut World) -> &mut RecallSteps {
     w.section::<RecallSteps>()
 }
 
-/// A `uuid` for fixture line `n`.
-fn uuid(n: u64) -> String {
-    format!("00000000-0000-4000-8000-{n:012x}")
-}
-
-/// A Bash call and its result, numbered `n`, the result's output
-/// `output`, each line with a `uuid` of its own.
-pub(crate) fn pair(n: u64, output: &str) -> Result<Vec<Value>, String> {
-    let (mut call, mut result) = recorded_call("Bash")?;
-    let id = format!("toolu_fixture{n}");
-    call["message"]["content"][0]["id"] = json!(id);
-    call["uuid"] = json!(uuid(2 * n));
-    result["message"]["content"][0]["tool_use_id"] = json!(id);
-    result["message"]["content"][0]["content"] = json!(output);
-    result["uuid"] = json!(uuid(2 * n + 1));
-    if result["toolUseResult"].is_object() {
-        result["toolUseResult"]["stdout"] = json!(output);
-    }
-
-    Ok(vec![call, result])
-}
+pub(crate) use testkit::transcript::pair;
+use testkit::transcript::uuid;
 
 /// The lines the fixture run `name` holds.
 pub fn fixture(name: &str) -> Result<Vec<Value>, String> {
@@ -788,14 +769,14 @@ fn follow_cursor(w: &mut World) -> Result<(), String> {
     let Some(cursor) = page["next_cursor"].as_str().map(str::to_owned) else {
         return Ok(());
     };
-    let mut harness = Harness::start(w, true, &[])?;
+    let mut harness = live::start(w, true, &[])?;
     let walked = walk(w, &mut harness, cursor, HALFWAY);
     let stopped = harness.stop();
     let Some(cursor) = walked? else {
         return stopped;
     };
     stopped?;
-    let mut harness = Harness::start(w, true, &[])?;
+    let mut harness = live::start(w, true, &[])?;
     let walked = walk(w, &mut harness, cursor, usize::MAX);
     let stopped = harness.stop();
     walked?;

@@ -21,7 +21,8 @@ use serde_json::{Value, json};
 
 use crate::World;
 use crate::live::{
-    Harness, append_lines, clean_line, lines_read, placed_lines, source_key, store, wait_until,
+    self, Harness, append_lines, clean_line, lines_read, placed_lines, source_key, store,
+    wait_until,
 };
 use crate::record::{home, last_run, run_core};
 use crate::record_hooks::{session_path, session_start};
@@ -108,7 +109,7 @@ pub fn serve(
     // transcript for is served too (REC-08's fork).
     let transcript = session_path(w, name)?;
     let (before, left) = (taken_bindings(w, name)?, start_markers(w, &transcript)?);
-    let mut harness = Harness::start(w, true, extra)?;
+    let mut harness = live::start(w, true, extra)?;
     harness.hook("SessionStart", &session_start(w, name, source)?)?;
     live(w).harness = Some(harness);
     wait_until("the MCP server to take its session binding", || {
@@ -214,7 +215,7 @@ fn neighbour(w: &mut World, name: String) -> Result<(), String> {
     regex = r#"^a session binding another harness process's "SessionStart" hook handler recorded in the home for "([^"]+)"$"#
 )]
 fn other_binding(w: &mut World, name: String) -> Result<(), String> {
-    let mut other = Harness::start(w, false, &[])?;
+    let mut other = live::start(w, false, &[])?;
     other.hook("SessionStart", &session_start(w, &name, "startup")?)?;
     other.stop()
 }
@@ -224,7 +225,7 @@ fn other_binding(w: &mut World, name: String) -> Result<(), String> {
 )]
 fn server_starts_unbound(w: &mut World, count: u64, name: String) -> Result<(), String> {
     // The run stops at line 120, as the rows' stops ask.
-    let harness = Harness::start(w, true, &[("PARINN_TEST_INGEST_LIMIT", "120")])?;
+    let harness = live::start(w, true, &[("PARINN_TEST_INGEST_LIMIT", "120")])?;
     live(w).harness = Some(harness);
     append_lines(&named(w, &name)?, count)?;
     // Several of its reads pass.
@@ -638,7 +639,7 @@ fn assigned_in_transaction(w: &mut World) -> Result<(), String> {
 
 #[then(regex = r"^a local index position is never shown or accepted as an address$")]
 fn no_local_index(w: &mut World) -> Result<(), String> {
-    let mut harness = Harness::start(w, true, &[])?;
+    let mut harness = live::start(w, true, &[])?;
     let mut refusals = Vec::new();
     for address in ["1", "parinn:1", "#21"] {
         let reply = harness.request(
