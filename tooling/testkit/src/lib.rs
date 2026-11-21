@@ -16,6 +16,7 @@ use std::process::Command;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 pub mod boundary;
+#[cfg(unix)]
 pub mod harness;
 pub mod relative;
 pub mod transcript;
