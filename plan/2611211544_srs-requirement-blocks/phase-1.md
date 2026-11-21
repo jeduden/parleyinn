@@ -1,7 +1,7 @@
 ---
 n: 1
 title: "Every reader takes a requirement written as a block"
-status: "🔳"
+status: "✅"
 result: false
 ---
 # Phase 1: every reader takes a requirement written as a block
