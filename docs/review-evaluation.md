@@ -107,12 +107,12 @@ may also name an expectation the reviewer met in other words.
   path names no tree: an agent whose work directory ended in `main` took
   `pr-head/` and `review/` for its siblings and looked for them one directory
   up, outside what a run may read.
-- **The review context** is the file `review/context/<name>.md` that
-  `review-bundle` writes for a specialist: the review class, the touched ids,
-  its dispatch row, the deterministic findings on its files and the change's
-  ENG-29 record. Neither it nor the bundle holds a finding that turns on
-  consent, the gate's check: a comment changes nothing an agent reads. The
-  prompt tells the specialist to read it and its own diff, never the bundle.
+- **The review context**, `review/context/<name>.md`, is what `review-bundle`
+  writes for a specialist: the review class, the touched ids, the rows its files
+  touch, quoted whole, its dispatch row, the deterministic findings on its files
+  and the change's ENG-29 record. Neither it nor the bundle holds a finding that
+  turns on consent, the gate's check: a comment changes nothing an agent reads.
+  The prompt tells the specialist to read it and its own diff, never the bundle.
 - **The prompt** tells every agent that `pr-head/` holds the pull request's
   tree and that the tree around it is main's, which shows only what the change
   replaced. A path a diff or an agent's instructions name is relative to the

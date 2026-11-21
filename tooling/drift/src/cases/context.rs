@@ -148,6 +148,40 @@ pub(super) fn review_context_file_cases() -> Vec<Case> {
     ]
 }
 
+/// The mutations that leave out of a specialist's context the
+/// requirements its files touch, or part of one, so it searches the
+/// specification for rows a search shows only in part.
+pub(super) fn review_quote_cases() -> Vec<Case> {
+    const RENDER: &str = "tooling/review-bundle/src/render.rs";
+    let check = || {
+        cargo_lib_test(
+            "engineering",
+            "review_runs::tests::a_review_run_on_the_checkout_s_definitions_has_no_problem",
+        )
+    };
+    let want = "a_review_run_on_the_checkout_s_definitions_has_no_problem";
+    vec![
+        case(
+            "a specialist's context quoting no requirement its files touch",
+            "ENG-28",
+            Injection::replace(
+                RENDER,
+                "        .filter_map(|f| a.named.get(f))\n",
+                "        .filter_map(|f| a.named.get(f).filter(|ids| ids.is_empty()))\n",
+            ),
+            check(),
+            want,
+        ),
+        case(
+            "a specialist's context quoting a requirement its files touch in part",
+            "ENG-28",
+            Injection::replace(RENDER, "    out.push(text[start..].trim());\n", ""),
+            check(),
+            want,
+        ),
+    ]
+}
+
 /// The drifts that let a stakeholder's comment change what an agent
 /// reads, so the outcome a comment's review reuses is one its agents
 /// would not give again: a finding that turns on consent shown to an
