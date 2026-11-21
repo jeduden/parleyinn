@@ -286,5 +286,13 @@ fn load_rejects_a_block_that_redefines_a_row() {
 
     let err = load(dir.path()).unwrap_err().to_string();
 
-    assert!(err.contains("b.md:1: REC-01 already defined at"), "{err}");
+    let (a, b) = (dir.path().join("a.md"), dir.path().join("b.md"));
+    assert_eq!(
+        err,
+        format!(
+            "srs: {}:1: REC-01 already defined at {}:5",
+            b.display(),
+            a.display()
+        )
+    );
 }
