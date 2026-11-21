@@ -12,6 +12,7 @@
 //!
 //! It is repository tooling and never links into a shipped executable.
 
+pub mod added;
 pub mod case;
 pub mod check;
 pub mod cli;

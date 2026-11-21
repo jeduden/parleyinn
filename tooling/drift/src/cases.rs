@@ -18,6 +18,7 @@ mod review_reports;
 mod review_stability;
 mod spend;
 mod verdict;
+mod world;
 
 use architecture::*;
 use boundary::*;
@@ -183,6 +184,7 @@ fn late_cases() -> Vec<Case> {
         spend::review_capped_cases(),
         spend::review_reserve_cases(),
         review_ids_grading_cases(),
+        world::review_world_cases(),
     ]
     .concat()
 }

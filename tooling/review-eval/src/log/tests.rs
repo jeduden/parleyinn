@@ -80,6 +80,23 @@ fn a_result_that_is_an_error_names_the_harness_s_refusal() {
         log.subtype,
         "error: You've hit your weekly limit · resets 10am (UTC)"
     );
+    // The refusal is the harness's text, never the agent's answer.
+    assert_eq!(log.answer, "");
+    assert_eq!(
+        log.error,
+        "You've hit your weekly limit · resets 10am (UTC)\nmore"
+    );
+}
+
+#[test]
+fn a_result_that_answers_holds_no_error() {
+    let answered = r#"{"type":"result","subtype":"success","is_error":false,"result":"none — sound","total_cost_usd":0.01,"num_turns":2}"#;
+
+    let log = parse(answered);
+
+    assert!(log.answered);
+    assert_eq!(log.answer, "none — sound");
+    assert_eq!(log.error, "");
 }
 
 #[test]

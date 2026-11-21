@@ -296,7 +296,9 @@ fn build_fails_when_the_component_s_directory_cannot_be_made() {
     fs::remove_dir_all(repo.path().join(".claude")).unwrap();
     fs::write(repo.path().join(".claude"), "not a directory").unwrap();
     let component = load(tree.path(), "lang-rust").unwrap();
-    let host = FakeHost::new(repo.path());
+    let mut host = FakeHost::new(repo.path());
+    // The tree adds no file, so the component's copy is the first to fail.
+    host.listing = Some(Ok(String::new()));
     let dir = TempDir::new().unwrap();
 
     let err = build(
@@ -314,6 +316,81 @@ fn build_fails_when_the_component_s_directory_cannot_be_made() {
         err.starts_with("copy .claude/agents/lang-rust.md: "),
         "{err}"
     );
+}
+
+#[test]
+fn build_puts_the_files_the_evaluated_tree_adds_into_both_trees() {
+    let repo = TempDir::new().unwrap();
+    repository(repo.path());
+    let tree = TempDir::new().unwrap();
+    repository(tree.path());
+    // The pull request adds a section and a skill, and changes a file.
+    fs::write(tree.path().join("docs/srs/10a-new.md"), "# 10.5 New\n").unwrap();
+    fs::create_dir_all(tree.path().join(".claude/skills/new")).unwrap();
+    fs::write(tree.path().join(".claude/skills/new/SKILL.md"), "# New\n").unwrap();
+    fs::write(tree.path().join("README.md"), "# Changed\n").unwrap();
+    let component = load(tree.path(), "lang-rust").unwrap();
+    let host = FakeHost::new(repo.path());
+    let dir = TempDir::new().unwrap();
+
+    let world = build(
+        &host,
+        repo.path(),
+        tree.path(),
+        &component,
+        &unwrap_case(),
+        dir.path(),
+        &Mutex::new(()),
+    )
+    .unwrap();
+
+    let main = &world.main;
+    for root in [main.clone(), main.join(PR_HEAD)] {
+        assert_eq!(
+            fs::read_to_string(root.join("docs/srs/10a-new.md")).unwrap(),
+            "# 10.5 New\n"
+        );
+        assert!(
+            fs::read_to_string(root.join("README.md"))
+                .unwrap()
+                .starts_with("# ParleyInn\n")
+        );
+    }
+    // The skill is an instruction file: it never loads beside the agent,
+    // and the pull request's copy moves out as text with the others.
+    assert!(!main.join(".claude/skills").exists());
+    let instructions = fs::read_to_string(main.join(INSTRUCTIONS_TEXT)).unwrap();
+    assert!(
+        instructions.contains("\n===== .claude/skills/new/SKILL.md =====\n# New\n"),
+        "{instructions}"
+    );
+    // The diff is the case's change alone.
+    let diff = fs::read_to_string(main.join(DIFF)).unwrap();
+    assert!(!diff.contains("10a-new.md"), "{diff}");
+    assert!(world.notes.is_empty(), "{:?}", world.notes);
+}
+
+#[test]
+fn build_fails_when_the_evaluated_tree_s_files_cannot_be_listed() {
+    let repo = TempDir::new().unwrap();
+    repository(repo.path());
+    let component = load(repo.path(), "lang-rust").unwrap();
+    let mut host = FakeHost::new(repo.path());
+    host.listing = Some(Err("fatal: not a git repository".to_owned()));
+    let dir = TempDir::new().unwrap();
+
+    let err = build(
+        &host,
+        repo.path(),
+        repo.path(),
+        &component,
+        &unwrap_case(),
+        dir.path(),
+        &Mutex::new(()),
+    )
+    .unwrap_err();
+
+    assert!(err.starts_with("list the files of "), "{err}");
 }
 
 #[test]
