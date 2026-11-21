@@ -225,12 +225,12 @@ fn a_context_directory_that_does_not_read_is_named_with_its_error() {
     fs::remove_dir_all(&dir).unwrap();
     fs::write(&dir, "not a directory").unwrap();
 
+    let cause = fs::read_dir(&dir).unwrap_err();
+
     let problems = differences(without.path(), with.path());
 
     assert!(
-        problems
-            .iter()
-            .any(|p| p.starts_with(&format!("read {}: ", dir.display()))),
+        problems.contains(&format!("read {}: {cause}", dir.display())),
         "{problems:?}"
     );
 }

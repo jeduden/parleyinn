@@ -390,7 +390,13 @@ fn build_fails_when_the_evaluated_tree_s_files_cannot_be_listed() {
     )
     .unwrap_err();
 
-    assert!(err.starts_with("list the files of "), "{err}");
+    assert_eq!(
+        err,
+        format!(
+            "list the files of {}: fatal: not a git repository",
+            repo.path().display()
+        )
+    );
 }
 
 #[test]
