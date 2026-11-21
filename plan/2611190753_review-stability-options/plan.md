@@ -93,6 +93,9 @@ its evidence asks for today.
 10. A place a generalist spells in the pull request's tree is read as
     the same place, for its weighing and its findings (phase 10,
     ENG-28).
+11. A specialist's context quotes whole the requirements its files
+    touch, and `lang-gherkin` searches the specification for none
+    (phase 11, ENG-28).
 
 ## Execution
 
@@ -107,6 +110,7 @@ its evidence asks for today.
 | 7     | opus  | A specialist's case for a moved file passes: no finding at a line main already holds                                |
 | 8     | opus  | The generalists' cases pass on their models, no line before the final answer                                        |
 | 10    | opus  | The ENG-28 weighing check approves a weighing spelled in the pull request's tree; two drift cases fail              |
+| 11    | opus  | The ENG-28 context check finds ENG-28 quoted whole; two drift cases fail; lang-gherkin's cases pass in fewer turns  |
 
 ## Phases
 
@@ -162,3 +166,5 @@ footer: |
       answer, and its cases pass on its model
 - [x] A weighing that names its places in the pull request's tree is
       read as whole
+- [x] A specialist's context quotes whole the requirements its files
+      touch, and `lang-gherkin`'s cases pass without a search
