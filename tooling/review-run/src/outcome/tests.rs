@@ -331,6 +331,18 @@ fn kept_reads_severities_safely() {
 }
 
 #[test]
+fn a_path_in_the_pull_request_s_tree_is_the_rest_of_it() {
+    for (path, file) in [
+        ("pr-head/src/a.rs", "src/a.rs"),
+        ("src/a.rs", "src/a.rs"),
+        ("pr-headed/a.rs", "pr-headed/a.rs"),
+        ("src/pr-head/a.rs", "src/pr-head/a.rs"),
+    ] {
+        assert_eq!(in_repository(path), file, "{path}");
+    }
+}
+
+#[test]
 fn a_blocking_finding_stays_kept_beside_another_source_s_line_at_its_place() {
     let texts = vec![
         "a.rs:3 — blocking — leaks a pin — lang-rust\n\
@@ -553,6 +565,25 @@ fn a_blocking_finding_kept_from_a_requirement_request_stays_a_nit() {
         }]
     );
     assert!(d.outcome.summary.contains("kept 0 blocking and 1 nit"));
+}
+
+#[test]
+fn a_finding_spelled_in_the_pull_request_s_tree_is_kept_at_its_path() {
+    // The same place, however the generalist spelled it: a request it
+    // kept blocking stays a nit, and the finding is posted at its path.
+    let d = requested(
+        None,
+        "pr-head/src/a.rs:3 — blocking — no rule on line length — `lang-rust`.\nDone.",
+    );
+
+    assert_eq!(d.outcome.verdict, "approve");
+    let at: Vec<(&str, &str)> = d
+        .outcome
+        .findings
+        .iter()
+        .map(|f| (f.path.as_str(), f.severity.as_str()))
+        .collect();
+    assert_eq!(at, vec![("src/a.rs", NIT)]);
 }
 
 #[test]
@@ -807,6 +838,23 @@ fn a_finding_at_the_place_or_a_line_that_names_it_exactly_weighs_it() {
         "dropped — src/a.rs:3 — fine — lang-rust\nnone — nothing to add — review-code\nDone.",
         "src/a.rs:1-5 — nit — the whole block — lang-rust\nDone.",
         "src/b.rs:1 — nit — as at (src/a.rs:2-4) — lang-rust\nDone.",
+    ] {
+        let (runs, reports) = all_answered(answer);
+
+        let d = decide(&plan(DISPATCH), &runs, &reports, &known());
+
+        assert_eq!(d.outcome.verdict, "approve", "{answer}");
+    }
+}
+
+#[test]
+fn a_place_spelled_in_the_pull_request_s_tree_weighs_the_place_reported() {
+    // The world holds the pull request's tree under pr-head/, so a
+    // generalist that read the file there names the same place.
+    for answer in [
+        "pr-head/src/a.rs:3 — nit — x — lang-rust\nDone.",
+        "dropped — pr-head/src/a.rs:3 — fine — lang-rust\nDone.",
+        "src/b.rs:1 — nit — as at `pr-head/src/a.rs:3` — lang-rust\nDone.",
     ] {
         let (runs, reports) = all_answered(answer);
 

@@ -109,7 +109,7 @@ fn review_runs_in_parts(w: &mut World) -> Result<(), String> {
 }
 
 #[then(
-    regex = r"^review-run reads a generalist's weighing from its whole run log, so a finding it stated before a final answer that only names its scope is kept, keeps a blocking finding beside a nit it stated later at its place, and itself decides partial a weighing that weighs no finding at a place its specialist reported, naming that place in a blocking finding and the generalist as not reviewed, whatever the generalist says of its scope$"
+    regex = r"^review-run reads a generalist's weighing from its whole run log, so a finding it stated before a final answer that only names its scope is kept, one whose place it spelled in the pull request's tree is kept at its path in the repository, keeps a blocking finding beside a nit it stated later at its place, and itself decides partial a weighing that weighs no finding at a place its specialist reported, naming that place in a blocking finding and the generalist as not reviewed, whatever the generalist says of its scope$"
 )]
 fn review_run_reads_whole_weighings(w: &mut World) -> Result<(), String> {
     let work = testkit::TempDir::new().map_err(|e| format!("make a work directory: {e}"))?;

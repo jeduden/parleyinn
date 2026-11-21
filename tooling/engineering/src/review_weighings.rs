@@ -4,11 +4,13 @@
 //! answer, and it decides itself, not by what the generalist says of its
 //! scope, that a weighing is partial when a place a specialist's
 //! accepted report names is weighed nowhere. The check runs `review-run`
-//! four times on a work directory with a stand-in for the `claude` command
+//! five times on a work directory with a stand-in for the `claude` command
 //! line whose specialist states one finding: once with a generalist
 //! that states its weighing of that finding in a message before its
 //! final answer, a sentence on its scope alone, which must approve with
-//! the nit it kept; once with one that weighs another place and says
+//! the nit it kept; once with one that does the same at the place
+//! spelled in the pull request's tree, which must approve with the nit
+//! kept at the place; once with one that weighs another place and says
 //! its scope is whole, which must request changes naming the place it
 //! weighed nowhere and the generalist as not reviewed; once with one
 //! whose line names the finding's file in a range wider than
@@ -33,6 +35,9 @@ pub const PLACE: &str = "src/a.rs:1";
 /// A weighing line, but for its source, that weighs the finding at
 /// [`PLACE`].
 pub const WHOLE: &str = "src/a.rs:1 — nit — a hook panics";
+/// [`WHOLE`] at [`PLACE`] spelled in the pull request's tree, as a
+/// generalist that read the file there writes it.
+pub const IN_TREE: &str = "pr-head/src/a.rs:1 — nit — a hook panics";
 /// One at another place, naming none.
 pub const ELSEWHERE: &str = "src/z.rs:9 — nit — a hook panics";
 /// One at another place, naming [`PLACE`]'s file in a range past
@@ -228,22 +233,29 @@ fn review(checkout: &Checkout, workdir: &Path, weighs: &'static str) -> Result<(
 
 /// What is wrong with how `review-run`, on work directories under
 /// `workdir` prepared from `checkout`, reads a weighing stated as it
-/// went, decides a partial one, a range too wide to cover the place
-/// included, and keeps a blocking finding beside a later nit at its
-/// place.
+/// went, at the place or spelled in the pull request's tree, decides a
+/// partial one, a range too wide to cover the place included, and keeps
+/// a blocking finding beside a later nit at its place.
 #[must_use]
 pub fn review_run_reads_whole_weighings(checkout: &Checkout, workdir: &Path) -> Vec<String> {
     let whole = workdir.join("whole");
+    let in_tree = workdir.join("in-tree");
     let partial = workdir.join("partial");
     let wide = workdir.join("wide");
     let standing = workdir.join("standing");
     let ran = review(checkout, &whole, WHOLE)
+        .and_then(|()| review(checkout, &in_tree, IN_TREE))
         .and_then(|()| review(checkout, &partial, ELSEWHERE))
         .and_then(|()| review(checkout, &wide, WIDE))
         .and_then(|()| review(checkout, &standing, STANDING));
     match ran {
         Ok(()) => {
             let mut problems = whole_problems(&whole);
+            problems.extend(
+                whole_problems(&in_tree)
+                    .into_iter()
+                    .map(|p| format!("a weighing spelled in the pull request's tree: {p}")),
+            );
             problems.extend(partial_problems(&partial));
             problems.extend(
                 partial_problems(&wide)

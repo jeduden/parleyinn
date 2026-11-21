@@ -24,7 +24,7 @@ use crate::live::{
     Harness, append_lines, clean_line, lines_read, placed_lines, source_key, store, wait_until,
 };
 use crate::record::{home, last_run, run_core};
-use crate::record_hooks::session_start;
+use crate::record_hooks::{session_path, session_start};
 
 /// What the live steps track.
 #[derive(Debug, Default)]
@@ -103,7 +103,10 @@ pub fn serve(
     source: &str,
     extra: &[(&str, &str)],
 ) -> Result<(), String> {
-    let transcript = named(w, name)?;
+    // The transcript the hook input names, which the server's start
+    // marker names once it serves: a harness session no step made a
+    // transcript for is served too (REC-08's fork).
+    let transcript = session_path(w, name)?;
     let (before, left) = (taken_bindings(w, name)?, start_markers(w, &transcript)?);
     let mut harness = Harness::start(w, true, extra)?;
     harness.hook("SessionStart", &session_start(w, name, source)?)?;
@@ -169,11 +172,21 @@ fn audited(
 
 /// Whether the writer `writer`'s seat is a run seat of this node and
 /// no ingest seat: one whose events are witnessed.
-fn witnessed(w: &World, writer: ::record::id::WriterId) -> Result<bool, String> {
+pub fn witnessed(w: &World, writer: ::record::id::WriterId) -> Result<bool, String> {
     let seat = store(w)?.seat(writer).map_err(|e| e.to_string())?;
     Ok(seat
         .and_then(|s| SeatCertificate::from_value(&s.certificate).ok())
         .is_some_and(|c| !c.ingest_seat && c.seat_kind.as_str() == "run"))
+}
+
+#[given(
+    regex = r#"^an agent run with a Claude Code transcript "([^"]+)", served by its harness session's MCP server$"#
+)]
+fn served_run(w: &mut World, name: String) -> Result<(), String> {
+    crate::security_redaction::agent_run_with_transcript(w, name.clone())?;
+    let path = crate::security_redaction::transcript(w, &name)?;
+    live(w).transcripts.insert(name.clone(), path);
+    serve(w, &name, "startup", &[])
 }
 
 #[given(

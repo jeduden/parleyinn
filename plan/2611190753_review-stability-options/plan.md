@@ -93,6 +93,9 @@ its evidence asks for today.
    the model's API refused one as asked for its reasoning (phase 8).
 9. A run that ended on an error holds no answer, and the finding on a
    generalist so ended quotes the error (phase 9, ENG-28).
+10. A place a generalist spells in the pull request's tree is read as
+    the same place, for its weighing and its findings (phase 10,
+    ENG-28).
 
 ## Execution
 
@@ -107,6 +110,7 @@ its evidence asks for today.
 | 7     | opus  | A world built from a tree that adds a section holds it; four drift cases fail                                       |
 | 8     | opus  | The generalists' cases pass on their models, no line before the final answer                                        |
 | 9     | opus  | The finding on a generalist that ended on an error quotes it                                                        |
+| 10    | opus  | The ENG-28 weighing check approves a weighing spelled in the pull request's tree; two drift cases fail              |
 
 ## Phases
 
@@ -149,6 +153,8 @@ footer: |
 |     | ↳      | A generalist is now asked for every line of its weighing in its final answer and none before it, after the model's API refused the code generalist of one pull request twice as asking for its reasoning in its text. ENG-28 and ENG-32 keep their rows: the review still reads the whole run log, and the evaluation counts a line stated early and left out of the answer as a slip. The generalists' 26 cases passed in 52 of 52 runs with no slip. The refusal did not occur outside CI, so the fix is not proven against it. One drift case lands with it. |
 | 9   | ✅     | [A run that ended on an error says so](phase-9.md)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
 |     | ↳      | ENG-28 keeps its row: the review now keeps the harness's text apart from an agent's answer when a run ended on an error, a usage limit or a call the model's API refused. The finding on a generalist so ended quotes the error, and the summary names an error among the ways a run ends without a successful result, where it named only a turn budget, a deadline or a cost cap. Two drift cases land with it.                                                                                                                                               |
+| 10  | ✅     | [A place spelled in the pull request's tree is the same place](phase-10.md)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+|     | ↳      | ENG-28 gains one sentence: the review reads a place a generalist spelled in the pull request's tree, `pr-head/<path>`, as the file at that path. The review of pull request 154 had blocked on a weighing that named all four of its places that way, a spelling the evaluation's grader already took. The findings such lines keep are posted and tracked at the repository's path. A fifth run of the ENG-28 weighing check, named in its scenario step, and two drift cases land with it; no instruction changes.                                            |
 <?/catalog?>
 
 ## Acceptance Criteria
@@ -171,3 +177,5 @@ footer: |
       answer, and its cases pass on its model
 - [x] A run that ended on an error is reported with its error, never
       as an agent that answered nothing
+- [x] A weighing that names its places in the pull request's tree is
+      read as whole
