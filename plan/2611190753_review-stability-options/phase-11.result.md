@@ -37,7 +37,7 @@ summary: >-
 - Unit tests of `review-bundle` and `engineering` pass, with clippy
   denying warnings.
 - The cucumber scenario `@ENG-28` and the scenario gate test pass.
-- The drift suite catches the two new cases and the thirteen others
+- The drift suite catches the two new cases and the fourteen others
   that inject the files this phase changes.
 - `review-eval run --component lang-gherkin` on haiku, on main with the
   new case. Before: 5 of 5 cases, 10 of 10 runs, 5.2 turns a run, the new
@@ -47,11 +47,15 @@ summary: >-
   After: 5 of 5 cases, 10 of 10 runs, 3.2 turns a run, the new case in 3
   and 3. With six repetitions each, the clean case, the new case and the
   injection case passed 18 of 18 runs.
-- `scripts/review-local.sh` against pull request 154's head: 11 of 11
-  agents consulted, and the agents approve, at 0.57 USD;
-  `lang-gherkin` read its diff and context and answered in 3 turns.
-  Its three nits are taken: two tests for arms of the quote no test
-  took, and the hub's entry for the review context.
+- `scripts/review-local.sh` against pull request 154's head, before
+  the change moved to main: 11 of 11 agents consulted, and the agents
+  approve, at 0.57 USD; `lang-gherkin` read its diff and context and
+  answered in 3 turns. Its three nits are taken: two tests for arms of
+  the quote no test took, and the hub's entry for the review context.
+- `scripts/review-local.sh` against main: 11 of 11 agents consulted,
+  and the agents approve, at 0.52 USD; `lang-gherkin` answered in 3
+  turns. Its one nit is taken: the evaluation's page now says what a
+  context quotes.
 
 ## Not done
 
