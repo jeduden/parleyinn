@@ -247,6 +247,7 @@ fn analyse_names_the_touched_ids_each_changed_file_holds_or_names() {
     let mut head = base();
     head.requirements[0].text = "Ingest every transcript.".into();
     head.requirements.remove(2);
+    head.scenarios.remove(2);
     head.scenarios[1].steps.push("another".into());
     let diff = format!(
         "{}+see REC-01, ENG-29 and NFR-99\n{}+x\n",
@@ -269,7 +270,10 @@ fn analyse_names_the_touched_ids_each_changed_file_holds_or_names() {
                 ids(&["ENG-29", "REC-01"])
             ),
             ("docs/srs/05.md".to_owned(), ids(&["PRV-10", "REC-01"])),
-            ("features/record.feature".to_owned(), ids(&["REC-02"])),
+            (
+                "features/record.feature".to_owned(),
+                ids(&["PRV-10", "REC-02"])
+            ),
         ])
     );
 }

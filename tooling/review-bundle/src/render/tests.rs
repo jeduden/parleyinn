@@ -376,6 +376,29 @@ fn context_quotes_a_row_the_pull_request_removes_as_main_has_it() {
 }
 
 #[test]
+fn context_says_when_no_row_defines_a_touched_id_its_files_touch() {
+    let mut main = base();
+    main.scenarios.push(sc("REC-09", false, &["a step"]));
+    let mut head = main.clone();
+    head.scenarios[3].steps.push("another".into());
+    let a = analyse(
+        &main,
+        &head,
+        "diff --git a/features/x.feature b/features/x.feature\n+another\n",
+        &[],
+    );
+
+    let got = context(&a, &main, &head, "lang-gherkin");
+
+    assert!(
+        got.contains(
+            "\n## Requirements your files touch\n\n`REC-09`: no row defines it in either tree.\n"
+        ),
+        "{got}"
+    );
+}
+
+#[test]
 fn a_text_is_split_after_each_sentence_and_clause_outside_code() {
     assert_eq!(sentences("One. Two; three"), ["One.", "Two;", "three"]);
     assert_eq!(sentences("Keep `a. b` whole."), ["Keep `a. b` whole."]);
