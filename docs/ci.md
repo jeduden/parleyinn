@@ -75,7 +75,11 @@ is short, because a finding found late costs a whole round.
   `review/not-reviewed.md` and requests changes. A run cut off by its
   turn budget or deadline is not a failure and never runs again: its
   log is read as its report, and the `Read` calls in it decide whether
-  it read its whole diff, each unread range a `partial:` gap. Deleting the pull
+  it read its whole diff, each unread range a `partial:` gap. A run
+  that ended on an error, a usage limit or a call the model's API
+  refused, holds no answer: the harness's text is kept apart from what
+  the agent stated, and the finding on a generalist so ended quotes
+  it. Deleting the pull
   request's `review-spend-pr-<N>-a*` artifacts resets its budget, and
   `--max-cost-usd` overrides the cap. The gate decides no review that
   left an agent out. The `review-gate` check it fails then holds the
