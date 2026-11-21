@@ -408,6 +408,47 @@ pub(super) fn review_weighing_cases() -> Vec<Case> {
     ]
 }
 
+/// The drifts the review's reading of a place a generalist spelled in
+/// the pull request's tree, `pr-head/`, must not bring (ENG-28, I6),
+/// late so adding them moves no earlier case to another shard: such a
+/// line taken as weighing another file, so a whole weighing is decided
+/// partial, and the finding it keeps posted at that spelling, so a
+/// request it kept blocking is no longer seen to be one.
+pub(super) fn review_tree_place_cases() -> Vec<Case> {
+    const OUTCOME: &str = "tooling/review-run/src/outcome.rs";
+    let check = || {
+        cargo_lib_test(
+            "engineering",
+            "review_weighings::tests::the_checkout_s_review_run_reads_a_whole_weighing_and_decides_a_partial_one",
+        )
+    };
+    vec![
+        case(
+            "review-run reading a place spelled in the pull request's tree as another file",
+            "ENG-28",
+            Injection::replace(
+                OUTCOME,
+                "    if names(line, path, number) || names(line, &format!(\"{PR_HEAD}/{path}\"), number) {\n",
+                "    if names(line, path, number) {\n",
+            ),
+            check(),
+            "a weighing spelled in the pull request's tree: a weighing stated before the final \
+             answer is not read",
+        ),
+        case(
+            "review-run keeping a finding at the place it spelled in the pull request's tree",
+            "ENG-28",
+            Injection::replace(
+                OUTCOME,
+                "                path: in_repository(&f.path).to_owned(),\n",
+                "                path: f.path,\n",
+            ),
+            check(),
+            "a weighing spelled in the pull request's tree: the nit",
+        ),
+    ]
+}
+
 /// The drift the review's controls must not bring (ENG-28, I6), late so
 /// adding it moves no earlier case to another shard: a run its cost cap
 /// stopped read as one to run once more. Such a run was charged, so it
