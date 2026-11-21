@@ -248,7 +248,7 @@ fn bundle_quotes_the_eng_29_record_and_the_unread_headers() {
         "{got}"
     );
     assert!(
-        got.contains("> By them.\n\nThis change changes that accepted ADR, which names ENG-29 and what it guards, and a stakeholder comment on the pull request, which this bundle read, consents to the change; the bundle checks no more. Whether the record names the human security reviewer whose approval ENG-29 asks for, the review checks, from the record, not from the pull request's own text. Which owned paths a comment consents to, by naming them, the ENG-21 finding says.\n"),
+        got.contains("> By them.\n\nThis change changes that accepted ADR, which names ENG-29 and what it guards; the bundle checks no more. Whether the record names the human security reviewer whose approval ENG-29 asks for, the review checks, from the record, not from the pull request's own text.\n"),
         "{got}"
     );
 }
@@ -392,11 +392,73 @@ fn context_names_the_eng_29_record_the_change_lands_with() {
     assert!(
         got.ends_with(
             "\n## ENG-29 record\n\nThis change changes the accepted ADR `docs/adr/ADR-1-x.md`, \
-             which names ENG-29 and what it guards, and a stakeholder comment consents to the \
-             change: the bundle checked both and no more. Whether the record names the \
-             human security reviewer whose approval ENG-29 asks for, the review checks, from \
-             the record.\n"
+             which names ENG-29 and what it guards: the bundle checked that and no more. \
+             Whether the record names the human security reviewer whose approval ENG-29 asks \
+             for, the review checks, from the record.\n"
         ),
         "{got}"
     );
+}
+
+/// A guarded change with its record, on a stakeholder path, that
+/// lengthens the size list: every finding that waits on a comment.
+/// `comments` are the stakeholder's.
+fn waiting_on_consent(comments: &[String]) -> (Analysis, Snapshot) {
+    let list = crate::size_list::SIZE_LIST;
+    let adr = "docs/adr/ADR-2610111200-invariant.md";
+    let mut head = base();
+    head.requirements.push(req("ENG-29", "Guarded.", &["I2"]));
+    head.invariants = "\nI1 — Nothing is lost, ever.\n".into();
+    head.decisions.insert(
+        adr.into(),
+        "---\nid: ADR-2610111200\ntitle: \"t\"\nstatus: accepted\nsummary: >-\n  s\n---\n# ADR-2610111200: t\n\nENG-29: an invariant changes, approved.\n"
+            .into(),
+    );
+    let header = |path: &str| format!("diff --git a/{path} b/{path}\n");
+    let diff = format!(
+        "{}{}{}--- a/{list}\n+++ b/{list}\n+new.rs 1001\n",
+        header("docs/srs/invariants.md"),
+        header(adr),
+        header(list)
+    );
+    let mut main = base();
+    main.requirements.push(req("ENG-29", "Guarded.", &["I2"]));
+
+    (analyse(&main, &head, &diff, comments), head)
+}
+
+#[test]
+fn what_an_agent_reads_does_not_turn_on_the_stakeholder_s_comments() {
+    let list = crate::size_list::SIZE_LIST;
+    let (without, head) = waiting_on_consent(&[]);
+    let (with, _) = waiting_on_consent(&[format!("I consent to docs/srs/ and {list}.")]);
+    assert_eq!(without.on_consent.len(), 3, "{:?}", without.on_consent);
+    assert_eq!(with.on_consent.len(), 2, "{:?}", with.on_consent);
+
+    let got = bundle(&without, &base(), &head);
+
+    // A review a comment brings takes the agents' outcome as its own
+    // (ENG-28), so a comment may change nothing an agent read: a line
+    // that restated the missing consent would outlive the consent.
+    assert_eq!(got, bundle(&with, &base(), &head));
+    assert!(!got.contains("stakeholder comment"), "{got}");
+    assert!(
+        got.contains(&format!(
+            "\n## Deterministic findings\n\nNone.\n\n{CONSENT}\n\nENG-29 record: "
+        )),
+        "{got}"
+    );
+    for name in without.scopes.keys() {
+        let got = context(&without, name);
+        assert_eq!(got, context(&with, name), "{name}");
+        assert!(!got.contains("stakeholder comment"), "{name}: {got}");
+        assert!(!got.contains("more, on files"), "{name}: {got}");
+        assert!(
+            got.contains(&format!(
+                "\n## Deterministic findings on your files\n\nNone.\n\n{CONSENT}\n\n## ENG-29 record\n"
+            )),
+            "{name}: {got}"
+        );
+    }
+    assert!(!without.scopes.is_empty());
 }

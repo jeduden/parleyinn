@@ -31,6 +31,7 @@ fn every_mode_has_its_own_name() {
             "cut-silent",
             "partial",
             "all-well",
+            "off-form",
             "malformed",
             "silent"
         ]
@@ -67,6 +68,10 @@ fn nothing_written_is_named_for_every_mode() {
             "all-well: the finding beside a line saying all is well is not kept",
             "all-well: a line saying all is well is not listed in review/ignored.json",
             "all-well: a line set aside as no finding blocks the review",
+            "off-form: a finding off its form is not kept as the finding it states",
+            "off-form: a finding read off its form is not listed in review/ignored.json",
+            "off-form: a finding read off its form is not counted in the review's summary",
+            "off-form: a finding read off its form blocks the review",
             "malformed: the finding beside a line in no form is not kept",
             "malformed: a line in no form is not its own blocking finding quoting it",
             "malformed: the gate does not post the request for changes a line in no form makes",
@@ -74,6 +79,29 @@ fn nothing_written_is_named_for_every_mode() {
             "silent: a specialist that did not run is not named in a blocking finding",
             "silent: the gate posts a review a dispatched specialist did not run in",
         ]
+    );
+}
+
+#[test]
+fn a_finding_read_off_its_form_must_be_counted_in_the_review_s_summary() {
+    let wrote = |summary: &str| Wrote {
+        report: format!("{OFF_FORM} — I9\n{ANSWERED}\n"),
+        ignored: format!("note: read off its form: {OFF_FORM}"),
+        outcome: Some(review_gate::ReviewOutcome {
+            verdict: review_gate::APPROVE_VERDICT.to_owned(),
+            summary: summary.to_owned(),
+            findings: Vec::new(),
+        }),
+        gate: Ok(review_gate::APPROVE.to_owned()),
+        ..Wrote::default()
+    };
+    let counted = " Read off its form, as the finding it states: 1 line of the specialists' \
+                   reports (review/ignored.json).";
+
+    assert!(mode_problems(Mode::OffForm, &wrote(counted), 1).is_empty());
+    assert_eq!(
+        mode_problems(Mode::OffForm, &wrote("Sound."), 1),
+        ["off-form: a finding read off its form is not counted in the review's summary"]
     );
 }
 

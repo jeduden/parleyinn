@@ -105,7 +105,7 @@ fn review_runs_in_parts(w: &mut World) -> Result<(), String> {
 }
 
 #[then(
-    regex = r"^review-run reads a generalist's weighing from its whole run log, so a finding it stated before a final answer that only names its scope is kept, and itself decides partial a weighing that weighs no finding at a place its specialist reported, naming that place in a blocking finding and the generalist as not reviewed, whatever the generalist says of its scope$"
+    regex = r"^review-run reads a generalist's weighing from its whole run log, so a finding it stated before a final answer that only names its scope is kept, keeps a blocking finding beside a nit it stated later at its place, and itself decides partial a weighing that weighs no finding at a place its specialist reported, naming that place in a blocking finding and the generalist as not reviewed, whatever the generalist says of its scope$"
 )]
 fn review_run_reads_whole_weighings(w: &mut World) -> Result<(), String> {
     let work = testkit::TempDir::new().map_err(|e| format!("make a work directory: {e}"))?;
@@ -118,7 +118,7 @@ fn review_run_reads_whole_weighings(w: &mut World) -> Result<(), String> {
 }
 
 #[then(
-    regex = r"^review-run reads every specialist's run log whatever result it ended with and decides from its Read calls whether it read its whole diff: one cut off at its turn budget after reading its whole diff is consulted and the review decided on its finding, one cut off before it stated any line or an outcome is named partial, never a clean pass, one that read part of its diff is named partial with the lines it did not read, so the gate posts the request for changes, a line saying it is no finding is set aside and listed in review/ignored.json, a finding-shaped line that does not read is its own blocking finding beside the finding kept, and one whose log holds no model call did not run, runs once more as it cost nothing, and the gate posts nothing$"
+    regex = r"^review-run reads every specialist's run log whatever result it ended with and decides from its Read calls whether it read its whole diff: one cut off at its turn budget after reading its whole diff is consulted and the review decided on its finding, one cut off before it stated any line or an outcome is named partial, never a clean pass, one that read part of its diff is named partial with the lines it did not read, so the gate posts the request for changes, a line saying it is no finding is set aside and listed in review/ignored.json, a finding line off its form is read as the finding it states and its slip listed there and counted apart, a finding-shaped line that does not read is its own blocking finding beside the finding kept, and one whose log holds no model call did not run, runs once more as it cost nothing, and the gate posts nothing$"
 )]
 fn review_run_reads_every_log(w: &mut World) -> Result<(), String> {
     let work = testkit::TempDir::new().map_err(|e| format!("make a work directory: {e}"))?;
@@ -195,12 +195,18 @@ fn review_carries_findings(w: &mut World) -> Result<(), String> {
 }
 
 #[then(
-    regex = r"^a review that a stakeholder's pull-request comment brought runs no agent when an earlier review of the same head, from a run behind the spend it trusts, kept its review outcome under the same dispatch and left no dispatched agent without an accepted report: each review keeps its review outcome, the agents it consulted, its run id, its gaps and its dispatch among its reports, the comment's review takes them as its own and states the deterministic findings again, says in the job summary whether it reused one and runs its agents when it did not, and waits for a running review of its pull request, cancelling none$"
+    regex = r"^a review that a stakeholder's pull-request comment brought runs no agent when an earlier review of the same head, from a run behind the spend it trusts, kept its review outcome under the same dispatch and left no dispatched agent without an accepted report: each review keeps its review outcome, the agents it consulted, its run id, its gaps and its dispatch among its reports, the comment's review takes them as its own and states the deterministic findings again, says in the job summary whether it reused one and runs its agents when it did not, and waits for a running review of its pull request, cancelling none, and the review bundle writes an agent the same bundle and review context whatever the stakeholder's comments say, with no finding that turns on consent and with the sentence that says consent is the review gate's check$"
 )]
 fn review_reuses_a_verdict(w: &mut World) -> Result<(), String> {
-    outcome(engineering::review_verdict::review_reuses_a_verdict(
+    let work = testkit::TempDir::new().map_err(|e| format!("make a work directory: {e}"))?;
+    let mut problems = engineering::review_verdict::review_reuses_a_verdict(eng(w).checkout()?)?;
+    // The reuse is sound only while a comment changes nothing an agent
+    // read.
+    problems.extend(engineering::review_consent::consent_problems(
         eng(w).checkout()?,
-    )?)
+        work.path(),
+    ));
+    outcome(problems)
 }
 
 #[then(

@@ -548,6 +548,10 @@ fn refused_and_uuids_kept(w: &mut World) -> Result<(), String> {
     if refusals != REPEATED as usize {
         return Err(format!("{refusals} refusals counted, not {REPEATED}"));
     }
+    let audited = refusals_audited(w)?;
+    if audited != REPEATED as usize {
+        return Err(format!("{audited} refusals audited, not {REPEATED}"));
+    }
     let store = store(w)?;
     for address in homes(w).purged.clone() {
         let event = store.event(address).map_err(|e| e.to_string())?;
@@ -556,6 +560,7 @@ fn refused_and_uuids_kept(w: &mut World) -> Result<(), String> {
         }
     }
     let source = session_path(w, LATE_FORK)?;
+    let written = fs::read(&source).map_err(|e| e.to_string())?;
     let mut uuids = Vec::new();
     for generation in store
         .generations(&source_key(&source))
@@ -565,10 +570,14 @@ fn refused_and_uuids_kept(w: &mut World) -> Result<(), String> {
             .purged_places(generation.id)
             .map_err(|e| e.to_string())?
         {
-            if place.length == 0 {
-                return Err(format!("line {} keeps no length", place.line));
+            let uuid = place.uuid.clone().unwrap_or_default();
+            if line_at(&written, &place) != Some(uuid.clone()) {
+                return Err(format!(
+                    "line {} keeps the byte offset {} and length {}, not those of the line with its uuid {uuid:?}",
+                    place.line, place.offset, place.length
+                ));
             }
-            uuids.push(place.uuid.unwrap_or_default());
+            uuids.push(uuid);
         }
     }
     let wanted: Vec<String> = (1..=REPEATED).map(|n| format!("u-{n}")).collect();
@@ -577,6 +586,34 @@ fn refused_and_uuids_kept(w: &mut World) -> Result<(), String> {
         return Err(format!("the record keeps the uuids {uuids:?}"));
     }
     tombstoned(&store, w)
+}
+
+/// How many audit entries reject a repeated line of a purged event:
+/// one for each refusal counted (I6).
+fn refusals_audited(w: &World) -> Result<usize, String> {
+    let entries = Log::new(crate::record::home(w)?.audit())
+        .entries()
+        .map_err(|e| e.to_string())?;
+    Ok(entries
+        .iter()
+        .filter(|e| e.counter.as_deref() == Some("repeat_of_purged_refused"))
+        .filter(|e| e.kind == "rejected")
+        .filter(|e| e.detail.starts_with("refused a repeated line whose `uuid`"))
+        .count())
+}
+
+/// The `uuid` of the transcript line `written` holds at `place`: a
+/// whole line of `place`'s byte offset and length, its line break
+/// included, or none when those name no such line.
+fn line_at(written: &[u8], place: &store::Place) -> Option<String> {
+    let start = usize::try_from(place.offset).ok()?;
+    let end = start.checked_add(usize::try_from(place.length).ok()?)?;
+    let line = written.get(start..end)?;
+    let whole = line.ends_with(b"\n") && (start == 0 || written.get(start - 1) == Some(&b'\n'));
+    let parsed: Value = serde_json::from_slice(line).ok()?;
+    whole
+        .then(|| parsed["uuid"].as_str().map(str::to_owned))
+        .flatten()
 }
 
 /// Fails unless a tombstone stands in the current home's device seat.

@@ -61,10 +61,10 @@ fn a_transcript_or_directory_that_cannot_be_read_is_kept_unread_with_why() {
 
 #[test]
 fn an_entry_of_the_listing_that_failed_is_kept_unread_beside_the_ones_that_read() {
-    let listing = vec![
-        Err(std::io::Error::other("entry failed")),
-        Ok(PathBuf::from("/nowhere/x.txt")),
-    ];
+    let dir = testkit::TempDir::new().unwrap();
+    let later = dir.path().join("later.jsonl");
+    std::fs::write(&later, "{\"uuid\":\"u1\"}\n").unwrap();
+    let listing = vec![Err(std::io::Error::other("entry failed")), Ok(later)];
 
     let found = sibling_uuids_of(Ok(listing.into_iter()), "/nowhere", "", &BTreeSet::new());
 
@@ -72,6 +72,7 @@ fn an_entry_of_the_listing_that_failed_is_kept_unread_beside_the_ones_that_read(
         found.unread,
         [(PathBuf::from("/nowhere"), "entry failed".to_owned())]
     );
+    assert_eq!(found.all, BTreeSet::from(["u1".to_owned()]));
 }
 
 #[test]
@@ -138,6 +139,19 @@ fn a_path_is_compared_with_its_links_resolved_when_they_can_be() {
     assert_eq!(canonical(&real), real.canonicalize().unwrap());
     let missing = dir.path().join("missing.jsonl");
     assert_eq!(canonical(&missing), missing);
+}
+
+#[cfg(unix)]
+#[test]
+fn a_link_to_a_transcript_compares_as_the_transcript_it_names() {
+    let dir = testkit::TempDir::new().unwrap();
+    let real = dir.path().join("real.jsonl");
+    std::fs::write(&real, "").unwrap();
+    let link = dir.path().join("link.jsonl");
+    std::os::unix::fs::symlink(&real, &link).unwrap();
+
+    assert_ne!(link, real.canonicalize().unwrap());
+    assert_eq!(canonical(&link), real.canonicalize().unwrap());
 }
 
 fn home(dir: &testkit::TempDir) -> Home {

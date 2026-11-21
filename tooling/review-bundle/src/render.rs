@@ -7,7 +7,22 @@
 
 use std::fmt::Write as _;
 
-use crate::{Analysis, Change, Snapshot};
+use crate::{Analysis, Change, Finding, Snapshot};
+
+/// What every agent is told of the stakeholder's consent, in place of
+/// the findings that turn on it ([`Analysis::on_consent`]): fixed text,
+/// the same whatever the pull request's comments say. A review a
+/// comment brings takes the agents' outcome as its own (ENG-28), so a
+/// line that restated a missing consent would outlive the consent.
+pub const CONSENT: &str = "Whether the stakeholder consents to this change is the review gate's \
+                           check, made from the pull request's comments, which are not shown \
+                           here: it is never a finding of yours, nor part of one.";
+
+/// The findings an agent is shown: every one but those that turn on
+/// the stakeholder's consent.
+fn shown(a: &Analysis) -> impl Iterator<Item = &Finding> {
+    a.findings.iter().filter(|f| !a.on_consent.contains(f))
+}
 
 /// The review bundle as Markdown.
 #[must_use]
@@ -84,10 +99,8 @@ pub fn context(a: &Analysis, name: &str) -> String {
         None => b.push_str("\nYour files: none of your own, so your diff is the whole diff.\n"),
     }
     b.push_str("\n## Deterministic findings on your files\n\n");
-    let (own, other): (Vec<_>, Vec<_>) = a
-        .findings
-        .iter()
-        .partition(|f| scope.is_none_or(|files| files.contains(&f.path)));
+    let (own, other): (Vec<_>, Vec<_>) =
+        shown(a).partition(|f| scope.is_none_or(|files| files.contains(&f.path)));
     if own.is_empty() {
         b.push_str("None.\n");
     }
@@ -109,14 +122,14 @@ pub fn context(a: &Analysis, name: &str) -> String {
             other.len()
         );
     }
+    let _ = write!(b, "\n{CONSENT}\n");
     if let Some(r) = &a.eng_29_record {
         let _ = write!(
             b,
             "\n## ENG-29 record\n\nThis change changes the accepted ADR `{}`, which names \
-             ENG-29 and what it guards, and a stakeholder comment consents to the change: \
-             the bundle checked both and no more. Whether the record names the human \
-             security reviewer whose approval ENG-29 asks for, the review checks, from the \
-             record.\n",
+             ENG-29 and what it guards: the bundle checked that and no more. Whether the \
+             record names the human security reviewer whose approval ENG-29 asks for, the \
+             review checks, from the record.\n",
             code(&r.path)
         );
     }
@@ -169,14 +182,15 @@ fn consult(b: &mut String, a: &Analysis) {
     }
 }
 
-/// The deterministic findings, already decided: the gate weighs them
-/// whatever the agent says.
+/// The deterministic findings an agent is shown, already decided: the
+/// gate weighs them, and those that turn on consent, whatever the agent
+/// says.
 fn findings(b: &mut String, a: &Analysis) {
     b.push_str("\n## Deterministic findings\n\n");
-    if a.findings.is_empty() {
+    if shown(a).next().is_none() {
         b.push_str("None.\n");
     }
-    for f in &a.findings {
+    for f in shown(a) {
         let _ = writeln!(
             b,
             "- {} `{}:{}`: {}",
@@ -186,6 +200,7 @@ fn findings(b: &mut String, a: &Analysis) {
             one_line(&f.body)
         );
     }
+    let _ = write!(b, "\n{CONSENT}\n");
     if let Some(r) = &a.eng_29_record {
         let _ = write!(b, "\nENG-29 record: `{}`, whose summary reads:\n\n", r.path);
         for line in r.summary.lines() {
@@ -193,11 +208,9 @@ fn findings(b: &mut String, a: &Analysis) {
         }
         b.push_str(
             "\nThis change changes that accepted ADR, which names ENG-29 and what it \
-             guards, and a stakeholder comment on the pull request, which this bundle \
-             read, consents to the change; the bundle checks no more. Whether the record \
-             names the human security reviewer whose approval ENG-29 asks for, the review \
-             checks, from the record, not from the pull request's own text. Which owned \
-             paths a comment consents to, by naming them, the ENG-21 finding says.\n",
+             guards; the bundle checks no more. Whether the record names the human \
+             security reviewer whose approval ENG-29 asks for, the review checks, from \
+             the record, not from the pull request's own text.\n",
         );
     }
 }

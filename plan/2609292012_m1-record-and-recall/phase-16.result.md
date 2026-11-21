@@ -94,8 +94,7 @@ M5's; ingest and live capture read a transcript whole, as on main. The review
 gate's blockers: I1 against an oversize line, quadratic cost of a resumed
 source, capture poll latency. SEC-05 is `@pending` again by that ruling.
 
-- [x] ADM-09's rows run and pass, all but the landmark row, held
-  `@pending`, M3's
+- [x] 18 of ADM-09's 19 rows pass; it stays `@pending` (landmark, M3)
 
 Ruled: v1.0 ends before M8; PRV-09 and PRV-02's peer rows stay in M8
 (§11.2 option C). Verify's 60 s bound (`INDEX_CHECK_SECS`) is postponed.

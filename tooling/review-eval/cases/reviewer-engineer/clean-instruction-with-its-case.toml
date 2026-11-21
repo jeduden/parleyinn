@@ -1,12 +1,12 @@
 component = "reviewer-engineer"
 kind = "clean"
 title = "a new check in a reviewer component, with the case that proves it"
-# The change touches paths CODEOWNERS assigns: without the comment the
-# bundle holds a blocking ENG-21 finding the reviewer repeats, and the
-# clean change is not clean. `consent` is that comment as the case's
-# world holds it, a fixture of the case and no one's comment on a pull
-# request.
-consent = "Approved: the open-work check in .claude/agents/lang-rust.md and its case, tooling/review-eval/cases/lang-rust/defect-todo.toml."
+# The change touches paths CODEOWNERS assigns, and no stakeholder
+# comment consents to them. Consent is the review gate's check: the
+# bundle shows no agent a finding that turns on it (ENG-28), so the
+# reviewer states none and the clean change is clean. The case once
+# carried a consenting comment, since the bundle then showed a blocking
+# ENG-21 finding the reviewer repeated.
 
 [[replace]]
 file = ".claude/agents/lang-rust.md"
