@@ -219,6 +219,10 @@ fn a_language_is_named_for_source_and_configuration_alone() {
         ("plan/a/b.md", Some(MARKDOWN)),
         ("plan/a/spike.go", None),
         ("LICENSE", None),
+        ("docs/index.html", Some(WEB)),
+        ("docs/design/site/page.css", Some(WEB)),
+        ("docs/design/art/scene.js", Some(WEB)),
+        ("docs/design/assets/banner.png", None),
     ] {
         assert_eq!(language_specialist(path), want, "{path}");
     }
@@ -242,6 +246,11 @@ fn only_source_and_configuration_outside_the_data_needs_a_language() {
         (".gitignore", false),
         ("fuzz/.gitignore", false),
         (".gitattributes", false),
+        ("docs/.nojekyll", false),
+        ("docs/design/assets/banner.png", false),
+        ("docs/design/fonts/tiny5.woff2", false),
+        ("docs/index.html", true),
+        ("docs/design/art/scene.js", true),
     ] {
         assert_eq!(needs_a_language(path), want, "{path}");
     }
