@@ -100,7 +100,45 @@ pub(super) fn review_log_cases() -> Vec<Case> {
     cases.push(part_case());
     cases.push(unread_case());
     cases.push(early_line_case());
+    cases.extend(error_cases());
     cases
+}
+
+/// A run that ended on an error, a usage limit or a call the model's
+/// API refused, read with the harness's text as its answer, or a
+/// generalist so ended reported silent with no word of why: the author
+/// is sent looking for a turn budget the run never reached.
+fn error_cases() -> [Case; 2] {
+    [
+        case(
+            "a run's error read as the agent's answer",
+            "ENG-28",
+            Injection::replace(
+                "tooling/review-eval/src/log.rs",
+                "                log.error = std::mem::take(&mut log.answer);\n",
+                "                log.error = log.answer.clone();\n",
+            ),
+            cargo_lib_test(
+                "review-eval",
+                "log::tests::a_result_that_is_an_error_names_the_harness_s_refusal",
+            ),
+            "a_result_that_is_an_error_names_the_harness_s_refusal",
+        ),
+        case(
+            "a generalist that ended on an error reported silent with no word of why",
+            "ENG-28",
+            Injection::replace(
+                "tooling/review-run/src/outcome/errors.rs",
+                "        if let (Some(finding), false) = (finding, error.is_empty()) {\n",
+                "        if let (Some(finding), true) = (finding, error.is_empty()) {\n",
+            ),
+            cargo_lib_test(
+                "review-run",
+                "outcome::errors::tests::the_error_a_run_ended_on_is_added_on_one_line_to_the_finding_on_its_silence",
+            ),
+            "the_error_a_run_ended_on_is_added_on_one_line_to_the_finding_on_its_silence",
+        ),
+    ]
 }
 
 /// A generalist's weighing line its final answer leaves out no longer
