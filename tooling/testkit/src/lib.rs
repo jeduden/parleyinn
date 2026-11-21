@@ -1,8 +1,10 @@
 //! Test-only helpers the tooling crates share: a temporary directory,
 //! the path of the repository the tests inspect, and the confinement
-//! the end-to-end suite starts each component in (ENG-12). Only test code
+//! the end-to-end suite starts each component in (ENG-12), and the
+//! stand-in harness process the live tests start it under. Only test code
 //! depends on this crate; nothing here links into a shipped
-//! executable.
+//! executable. docs/testing/stand-ins.md says how the harness and the
+//! transcript builders are made and checked.
 
 pub mod guard;
 
@@ -14,7 +16,9 @@ use std::process::Command;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 pub mod boundary;
+pub mod harness;
 pub mod relative;
+pub mod transcript;
 
 /// How many names a [`TempDir`] tries before it gives up.
 const ATTEMPTS: u32 = 1000;
