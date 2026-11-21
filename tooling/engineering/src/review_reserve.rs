@@ -8,8 +8,8 @@
 //! checks run `review-run` with the stand-in `claude` of
 //! [`review_controls`], each run costing 0.01 US dollars, after earlier
 //! reviews that spent what pull request 136's had, 4.10 of 5 US
-//! dollars: every agent starts and each generalist is capped within
-//! what was left; with 4.30 spent no generalist starts; and a
+//! dollars: every agent starts and each generalist is passed what was
+//! left when it started; with 4.30 spent no generalist starts; and a
 //! generalist killed in flight is charged what it held, not its tier's
 //! cap.
 
@@ -48,17 +48,15 @@ fn cap_of(command: &Command) -> Option<f64> {
 }
 
 /// What is wrong with the cost cap one run of `agent` was passed,
-/// `cap`, in a review that had `left` US dollars of the pull request's
-/// cap when it started: a specialist off its tier's cap, or a
-/// generalist capped under its reserve or past what was left.
+/// `cap`, when `left` US dollars of the pull request's cap were left: a
+/// specialist off its tier's cap, or a generalist passed other than
+/// what was left, in whole cents.
 #[must_use]
 pub fn cap_problems(agent: &str, cap: Option<f64>, left: f64) -> Option<String> {
     let kind = kind_of(agent);
     let fits = cap.is_some_and(|cap| match kind {
         Kind::Specialist => budget_usd(kind).parse() == Ok(cap),
-        Kind::Generalist | Kind::Consultant => {
-            (GENERALIST_RESERVE_USD..=left + 1e-9).contains(&cap)
-        }
+        Kind::Generalist | Kind::Consultant => (cap - left).abs() < RUN_COST / 2.0,
     });
 
     (!fits).then(|| {
@@ -67,6 +65,15 @@ pub fn cap_problems(agent: &str, cap: Option<f64>, left: f64) -> Option<String> 
              request's cap"
         )
     })
+}
+
+/// What is left of `left` US dollars once `ended` runs of the stand-in
+/// were charged [`RUN_COST`] each: what the next run starts on, as the
+/// runs start one at a time.
+fn left_after(left: f64, ended: usize) -> f64 {
+    #[allow(clippy::cast_precision_loss, reason = "a handful of runs")]
+    let charged = RUN_COST * ended as f64;
+    left - charged
 }
 
 /// What is wrong with a review that started with a generalist's
@@ -89,9 +96,9 @@ pub fn started_problems(
         ));
     }
     problems.extend(
-        commands
-            .iter()
-            .filter_map(|c| cap_problems(&agent_of(c), cap_of(c), left)),
+        (commands.iter().enumerate()).filter_map(|(ended, c)| {
+            cap_problems(&agent_of(c), cap_of(c), left_after(left, ended))
+        }),
     );
     #[allow(clippy::cast_precision_loss, reason = "a handful of runs")]
     let cost = RUN_COST * AGENTS as f64;

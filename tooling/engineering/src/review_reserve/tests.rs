@@ -43,15 +43,15 @@ fn a_command_s_cost_cap_is_read_when_it_passes_one_that_reads() {
 }
 
 #[test]
-fn a_run_capped_off_its_tier_s_cap_or_outside_what_was_left_is_named() {
+fn a_run_capped_off_its_tier_s_cap_or_off_what_was_left_is_named() {
     assert_eq!(cap_problems("lang-rust", Some(0.3), 0.9), None);
-    assert_eq!(cap_problems("review-code", Some(0.75), 0.9), None);
     assert_eq!(cap_problems("review-code", Some(0.9), 0.9), None);
 
     for (agent, cap) in [
         ("lang-rust", Some(0.9)),
         ("review-code", Some(1.5)),
-        ("review-code", Some(0.74)),
+        ("review-code", Some(0.89)),
+        ("review-code", Some(0.75)),
         ("review-code", None),
     ] {
         assert_eq!(
@@ -62,6 +62,29 @@ fn a_run_capped_off_its_tier_s_cap_or_outside_what_was_left_is_named() {
             ))
         );
     }
+}
+
+#[test]
+fn a_generalist_passed_what_was_left_before_the_runs_ahead_of_it_is_named() {
+    // review-code starts fifth, once four runs of 0.01 each have ended.
+    let mut runs = sound();
+    runs[4] = command("review-code", Some("0.90"));
+
+    let problems = started_problems(&runs, STARTED, &Ok(0.05));
+
+    assert_eq!(
+        problems,
+        [
+            "review-code ran with the cost cap Some(0.9), though 0.86 USD was left of the pull \
+          request's cap"
+        ]
+    );
+}
+
+#[test]
+fn what_is_left_once_runs_of_the_stand_in_ended_is_their_cost_less() {
+    assert!((left_after(0.9, 0) - 0.9).abs() < 1e-9);
+    assert!((left_after(0.9, 4) - 0.86).abs() < 1e-9);
 }
 
 #[test]
