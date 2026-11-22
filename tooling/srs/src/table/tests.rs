@@ -67,6 +67,14 @@ fn fence_after_opens_and_closes_on_its_own_marker() {
 }
 
 #[test]
+fn opens_table_wants_a_pipe_row_with_a_delimiter_row_under_it() {
+    assert!(opens_table("  | A |", Some("|---|")));
+    assert!(!opens_table("| A |", Some("| B |")));
+    assert!(!opens_table("| A |", None));
+    assert!(!opens_table("A |", Some("|---|")));
+}
+
+#[test]
 fn is_delimiter_row_wants_dashes_in_every_cell() {
     assert!(is_delimiter_row("| --- | :-: |"));
     assert!(!is_delimiter_row("| --- | x |"));

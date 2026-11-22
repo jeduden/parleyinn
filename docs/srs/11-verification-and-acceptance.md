@@ -46,8 +46,12 @@ without kernel.
 
 ## 11.2 Definition of done for v1.0
 
-1. Every P0 requirement implemented and verified by its stated method; every P1
-   implemented or deferred with signed-off rationale.
+1. Every P0 requirement in v1.0's scope implemented and verified by its stated
+   method; every P1 in that scope implemented or deferred with signed-off
+   rationale. v1.0's scope is the milestones before M8 (§12.2); the P0 rows of
+   M8 (PRV-09's refusal of a peer's events, PRV-02's rows that need another
+   node's key, REC-18 rising to P0 and the rest) are P0 for the release that
+   includes peers, 2.0 or later (§12.2).
 2. All assumptions in §2.3 verified or their dependent requirements re-planned.
 3. Evaluation (§11.1) run and published in the repository, with all hard targets
    met.
