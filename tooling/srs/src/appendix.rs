@@ -14,35 +14,67 @@ pub struct Counts {
     pub engineering: BTreeMap<String, usize>,
 }
 
-/// Reads Appendix B's coverage table in `body` (the table whose header
-/// is "Invariant", "Requirements"), keyed by invariant, each value the
-/// requirement ids listed for it.
+/// Reads Appendix B's coverage list in `body`, its first list after
+/// the front matter: an item per invariant, `- **I1**: REC-01, SEC-08`,
+/// its ids wrapped onto lines indented under it. Keyed by invariant,
+/// each value the requirement ids listed for it.
 ///
 /// # Errors
 ///
-/// Fails on a malformed row, or when `body` has no such table.
+/// Fails on a malformed item, or when `body` has no list.
 pub fn invariant_coverage(body: &str) -> Result<BTreeMap<String, Vec<String>>, Error> {
-    let table = tables(body)
-        .into_iter()
-        .find(|t| t.header == ["Invariant", "Requirements"])
-        .ok_or_else(|| Error::Malformed("no invariant coverage table".into()))?;
+    let items = first_list(body);
+    if items.is_empty() {
+        return Err(Error::Malformed("no invariant coverage list".into()));
+    }
 
     let mut out: BTreeMap<String, Vec<String>> = BTreeMap::new();
-    for row in &table.rows {
-        let malformed = || Error::Malformed(format!("line {}: malformed invariant row", row.line));
-        let [invariant, ids] = row.cells.as_slice() else {
-            return Err(malformed());
-        };
-        let invariant = leading_invariant(invariant).ok_or_else(malformed)?;
+    for (line, text) in &items {
+        let malformed = || Error::Malformed(format!("line {line}: malformed invariant item"));
+        let (lead, ids) = text.split_once(": ").ok_or_else(malformed)?;
+        let invariant = leading_invariant(lead).ok_or_else(malformed)?;
         let ids = split_list(ids, is_requirement_id, "requirement id")
-            .map_err(|e| Error::Malformed(format!("line {}: {e}", row.line)))?;
+            .map_err(|e| Error::Malformed(format!("line {line}: {e}")))?;
         out.entry(invariant.to_owned()).or_default().extend(ids);
     }
 
     Ok(out)
 }
 
-/// The invariant a cell such as `**I1** — Nothing is lost` leads with.
+/// The items of the first list in `body` after its front matter, each
+/// the line it starts on, from one, and its text, the lines indented
+/// under it joined by single spaces.
+fn first_list(body: &str) -> Vec<(usize, String)> {
+    let lines: Vec<&str> = body.lines().collect();
+    let mut items: Vec<(usize, String)> = Vec::new();
+    for (at, line) in lines.iter().enumerate().skip(front_matter_end(&lines)) {
+        if let Some(text) = line.strip_prefix("- ") {
+            items.push((at + 1, text.trim().to_owned()));
+        } else if let Some(item) = items.last_mut().filter(|_| line.starts_with("  ")) {
+            item.1.push(' ');
+            item.1.push_str(line.trim());
+        } else if !items.is_empty() {
+            break;
+        }
+    }
+
+    items
+}
+
+/// The index of the first line after the front matter `lines` open
+/// with, or zero when they open with none.
+fn front_matter_end(lines: &[&str]) -> usize {
+    if lines.first() != Some(&"---") {
+        return 0;
+    }
+    lines
+        .iter()
+        .skip(1)
+        .position(|l| *l == "---")
+        .map_or(0, |at| at + 2)
+}
+
+/// The invariant a lead such as `**I1** — Nothing is lost` opens with.
 fn leading_invariant(cell: &str) -> Option<&str> {
     let (invariant, _) = cell.strip_prefix("**")?.split_once("**")?;
 

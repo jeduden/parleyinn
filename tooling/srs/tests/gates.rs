@@ -33,7 +33,7 @@ fn specification_parses() {
     );
 }
 
-/// Appendix B says it is generated from the Traces column of §5–§6, so
+/// Appendix B says it is generated from the Traces of §5–§6, so
 /// an edit to a trace that forgets the appendix, or the other way
 /// round, fails here.
 #[test]
@@ -46,7 +46,7 @@ fn appendix_b_matches_the_traces() {
     let mut problems = Vec::new();
     if stated.len() != 10 {
         problems.push(format!(
-            "Appendix B has rows for {:?}, want every invariant I1–I10",
+            "Appendix B has items for {:?}, want every invariant I1–I10",
             stated.keys()
         ));
     }
@@ -60,7 +60,7 @@ fn appendix_b_matches_the_traces() {
         let (want, got) = (sorted(&traced), sorted(&stated));
         if want != got {
             problems.push(format!(
-                "Appendix B row {invariant} lists {got:?}, the traces give {want:?}"
+                "Appendix B lists {got:?} for {invariant}, the traces give {want:?}"
             ));
         }
     }
