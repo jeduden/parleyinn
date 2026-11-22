@@ -189,17 +189,18 @@ pub fn diff_file(stem: &str) -> String {
     format!("{REVIEW}/{DIFFS}/{stem}.diff")
 }
 
-/// Why the run of `stem`, whose log shows `reads`, did not read its
-/// whole diff under `workdir`: the ranges of it no read covered, or that
+/// Why the run of `stem`, whose log is `log`, did not read its whole
+/// diff under `workdir`: the ranges of it no read covered, or that
 /// its diff is not there or does not read; none when it read every line
 /// of it, an empty diff having none. Every specialist, and every part,
 /// is told to read its diff, so one not found is never a whole review.
 /// Only a read of that very file counts: one whose path the file system
-/// resolves to it ([`resolved`]), or one naming it, relative paths taken
-/// under the work directory, under the work directory as named or as
-/// resolved ([`coverage::unread`]).
+/// resolves to it, relative paths and those under the directory its run
+/// started in taken under the work directory ([`resolved`]), or one
+/// naming it, relative paths taken under the work directory, under the
+/// work directory as named or as resolved ([`coverage::unread`]).
 #[must_use]
-pub fn uncovered(workdir: &Path, stem: &str, reads: &[ReadCall]) -> Option<String> {
+pub fn uncovered(workdir: &Path, stem: &str, log: &RunLog) -> Option<String> {
     let rel = diff_file(stem);
     let path = workdir.join(&rel);
     let text = match fs::read(&path) {
@@ -219,7 +220,7 @@ pub fn uncovered(workdir: &Path, stem: &str, reads: &[ReadCall]) -> Option<Strin
         .flatten()
         .collect();
     let roots: Vec<&Path> = roots.iter().map(PathBuf::as_path).collect();
-    let reads = resolved(reads, workdir, &path, &rel);
+    let reads = resolved(log, workdir, &path, &rel);
     let unread = coverage::unread(&reads, &roots, &rel, total);
     (!unread.is_empty()).then(|| {
         let held = if total == 1 { "line" } else { "lines" };
@@ -230,18 +231,22 @@ pub fn uncovered(workdir: &Path, stem: &str, reads: &[ReadCall]) -> Option<Strin
     })
 }
 
-/// `reads`, each whose path, a relative one taken under `workdir`, the
-/// file system resolves to `diff` named by `rel`, the diff's path under
-/// `workdir`. So a read that climbs back out of the pull request's tree
-/// to the diff covers it, and a link in that tree, which the file system
-/// follows before the `..` after it, never makes a file of the same name
-/// stand in for it.
-fn resolved(reads: &[ReadCall], workdir: &Path, diff: &Path, rel: &str) -> Vec<ReadCall> {
+/// The reads `log` shows, each whose path the file system resolves to
+/// `diff` named by `rel`, the diff's path under `workdir`. A relative
+/// path, or one under the directory the run started in, is taken under
+/// `workdir`, so a part an earlier run kept is held to the same diff as
+/// a fresh one. So a read that climbs back out of the pull request's
+/// tree to the diff covers it, and a link in that tree, which the file
+/// system follows before the `..` after it, never makes a file of the
+/// same name stand in for it.
+fn resolved(log: &RunLog, workdir: &Path, diff: &Path, rel: &str) -> Vec<ReadCall> {
     let diff = fs::canonicalize(diff).ok();
-    reads
+    log.reads
         .iter()
         .map(|read| {
-            let at = fs::canonicalize(workdir.join(&read.path)).ok();
+            let logged = Path::new(&read.path);
+            let under = logged.strip_prefix(&log.cwd).unwrap_or(logged);
+            let at = fs::canonicalize(workdir.join(under)).ok();
             let path = if diff.is_some() && at == diff {
                 rel.to_owned()
             } else {

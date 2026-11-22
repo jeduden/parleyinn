@@ -155,6 +155,14 @@ fn reading(path: &str, offset: Option<usize>, limit: Option<usize>) -> ReadCall 
     }
 }
 
+/// A run's log showing `reads`, naming no directory it started in.
+fn logged(reads: &[ReadCall]) -> RunLog {
+    RunLog {
+        reads: reads.to_vec(),
+        ..RunLog::default()
+    }
+}
+
 fn with_diff(stem: &str, lines: usize) -> TempDir {
     let dir = TempDir::new().unwrap();
     let diffs = dir.path().join("review/diffs");
@@ -173,7 +181,7 @@ fn a_diff_read_whole_in_chunks_is_covered() {
         reading("review/diffs/lang-rust.diff", Some(11), Some(20)),
     ];
 
-    assert_eq!(uncovered(dir.path(), "lang-rust", &reads), None);
+    assert_eq!(uncovered(dir.path(), "lang-rust", &logged(&reads)), None);
 }
 
 #[test]
@@ -185,7 +193,7 @@ fn a_read_of_a_file_of_the_same_name_elsewhere_covers_nothing() {
     ];
 
     assert_eq!(
-        uncovered(dir.path(), "lang-rust", &reads).unwrap(),
+        uncovered(dir.path(), "lang-rust", &logged(&reads)).unwrap(),
         "its log shows no Read of line 1 of review/diffs/lang-rust.diff, of 1 line"
     );
 }
@@ -201,7 +209,7 @@ fn a_read_under_the_work_directory_s_resolved_name_covers_its_diff() {
         .join("review/diffs/lang-rust.diff");
     let reads = [reading(real.to_str().unwrap(), None, None)];
 
-    assert_eq!(uncovered(&named, "lang-rust", &reads), None);
+    assert_eq!(uncovered(&named, "lang-rust", &logged(&reads)), None);
 }
 
 #[test]
@@ -218,7 +226,7 @@ fn a_read_whose_path_the_file_system_resolves_to_the_diff_covers_it() {
         reading(absolute.to_str().unwrap(), Some(2), None),
     ];
 
-    assert_eq!(uncovered(dir.path(), "lang-rust", &reads), None);
+    assert_eq!(uncovered(dir.path(), "lang-rust", &logged(&reads)), None);
 }
 
 #[test]
@@ -239,8 +247,44 @@ fn a_climb_through_a_link_in_the_pull_request_s_tree_covers_nothing() {
     )];
 
     assert_eq!(
-        uncovered(dir.path(), "lang-rust", &reads).unwrap(),
+        uncovered(dir.path(), "lang-rust", &logged(&reads)).unwrap(),
         "its log shows no Read of line 1 of review/diffs/lang-rust.diff, of 1 line"
+    );
+}
+
+#[test]
+fn a_read_under_the_directory_its_run_started_in_is_held_to_the_work_directory() {
+    // A part an earlier run kept read its diff under that run's work
+    // directory, which a resumed review no longer runs in.
+    let dir = with_diff("lang-rust", 2);
+    fs::create_dir_all(dir.path().join("pr-head/review/diffs")).unwrap();
+    fs::write(
+        dir.path().join("pr-head/review/diffs/lang-rust.diff"),
+        "+x\n",
+    )
+    .unwrap();
+    let started = |reads: &[ReadCall]| RunLog {
+        cwd: "/gone/work".to_owned(),
+        ..logged(reads)
+    };
+    let kept = started(&[
+        reading("/gone/work/review/diffs/lang-rust.diff", None, Some(1)),
+        reading(
+            "/gone/work/pr-head/../review/diffs/lang-rust.diff",
+            Some(2),
+            None,
+        ),
+    ]);
+    let elsewhere = started(&[reading(
+        "/gone/work/pr-head/review/diffs/lang-rust.diff",
+        None,
+        None,
+    )]);
+
+    assert_eq!(uncovered(dir.path(), "lang-rust", &kept), None);
+    assert_eq!(
+        uncovered(dir.path(), "lang-rust", &elsewhere).unwrap(),
+        "its log shows no Read of lines 1-2 of review/diffs/lang-rust.diff, of 2 lines"
     );
 }
 
@@ -253,7 +297,7 @@ fn each_range_no_read_covered_is_named() {
     ];
 
     assert_eq!(
-        uncovered(dir.path(), "lang-rust.2", &reads).unwrap(),
+        uncovered(dir.path(), "lang-rust.2", &logged(&reads)).unwrap(),
         "its log shows no Read of lines 1-4, 10-19, 21-30 of review/diffs/lang-rust.2.diff, of 30 lines"
     );
 }
@@ -264,7 +308,7 @@ fn a_diff_never_read_or_read_by_another_name_is_unread_whole() {
     let reads = [reading("review/diffs/lang-markdown.diff", None, None)];
 
     assert_eq!(
-        uncovered(dir.path(), "lang-rust", &reads).unwrap(),
+        uncovered(dir.path(), "lang-rust", &logged(&reads)).unwrap(),
         "its log shows no Read of line 1 of review/diffs/lang-rust.diff, of 1 line"
     );
 }
@@ -275,12 +319,12 @@ fn a_diff_not_found_is_named_and_one_that_does_not_read_too() {
     // there leaves no read of it to show: never a whole review.
     let dir = TempDir::new().unwrap();
     assert_eq!(
-        uncovered(dir.path(), "lang-rust", &[]).unwrap(),
+        uncovered(dir.path(), "lang-rust", &logged(&[])).unwrap(),
         "its diff review/diffs/lang-rust.diff was not found, so no read of it can be shown"
     );
     fs::create_dir_all(dir.path().join("review/diffs/lang-rust.diff")).unwrap();
 
-    let why = uncovered(dir.path(), "lang-rust", &[]).unwrap();
+    let why = uncovered(dir.path(), "lang-rust", &logged(&[])).unwrap();
 
     assert!(why.starts_with("its diff review/diffs/lang-rust.diff does not read: "));
 }
@@ -289,7 +333,7 @@ fn a_diff_not_found_is_named_and_one_that_does_not_read_too() {
 fn an_empty_diff_has_nothing_to_cover() {
     let dir = with_diff("lang-rust", 0);
 
-    assert_eq!(uncovered(dir.path(), "lang-rust", &[]), None);
+    assert_eq!(uncovered(dir.path(), "lang-rust", &logged(&[])), None);
 }
 
 #[test]
