@@ -45,8 +45,8 @@ pub(super) fn review_log_cases() -> Vec<Case> {
             "ENG-28",
             Injection::replace(
                 RUN,
-                "reading::uncovered(workdir, &unit.stem(), &log.reads)",
-                "reading::uncovered(workdir, &unit.stem(), &log.reads).filter(|_| false)",
+                "reading::uncovered(workdir, &unit.stem(), log)",
+                "reading::uncovered(workdir, &unit.stem(), log).filter(|_| false)",
             ),
             check(),
             "partial: the lines a specialist did not read are not its gap",
