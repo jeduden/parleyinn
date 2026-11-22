@@ -555,47 +555,42 @@ fn lists_tools(w: &mut World) -> Result<(), String> {
     Ok(())
 }
 
-/// The rows of SRS §9.2's tool table: each tool's name and the names
-/// its parameters cell lists outside parentheses.
+/// The items of SRS §9.2's tool list: each tool's name, the code span
+/// leading its item, and the names its Parameters field lists outside
+/// parentheses, the field's lines joined.
 fn specified() -> Result<Vec<(String, Vec<String>)>, String> {
     let path = testkit::repo_root().join("docs/srs/09-interfaces.md");
     let text = std::fs::read_to_string(path).map_err(|e| e.to_string())?;
-    let mut rows = Vec::new();
-    for line in text.lines().filter(|l| l.starts_with("| `")) {
-        let cells = cells_of(line);
-        let name = cells.first().map(|c| c.trim().trim_matches('`').to_owned());
-        if let (Some(name), Some(params)) = (name, cells.get(2)) {
-            rows.push((name, parameters_of(params)));
+    let section = text
+        .split("\n## ")
+        .find(|s| s.starts_with("9.2 "))
+        .ok_or("SRS section 9.2 is missing")?;
+    let mut tools: Vec<(String, String)> = Vec::new();
+    let mut in_field = false;
+    for line in section.lines() {
+        if let Some(lead) = line.strip_prefix("- `") {
+            let name = lead.split('`').next().unwrap_or_default();
+            tools.push((name.to_owned(), String::new()));
+        }
+        let first = line.strip_prefix("  - Parameters: ");
+        in_field = first.is_some() || (in_field && line.starts_with("    "));
+        if let (true, Some((_, field))) = (in_field, tools.last_mut()) {
+            field.push(' ');
+            field.push_str(first.unwrap_or(line).trim());
         }
     }
 
-    Ok(rows)
+    Ok(tools
+        .into_iter()
+        .map(|(name, field)| (name, parameters_of(&field)))
+        .collect())
 }
 
-/// The cells of a Markdown table row, an escaped pipe kept in its cell.
-fn cells_of(line: &str) -> Vec<String> {
-    let mut cells = vec![String::new()];
-    let mut escaped = false;
-    for c in line.trim().trim_start_matches('|').chars() {
-        match (c, escaped) {
-            ('|', false) => cells.push(String::new()),
-            (c, _) => {
-                if let Some(cell) = cells.last_mut() {
-                    cell.push(c);
-                }
-                escaped = c == '\\' && !escaped;
-            }
-        }
-    }
-    cells.pop();
-    cells
-}
-
-/// The backticked names a parameters cell lists outside parentheses.
-fn parameters_of(cell: &str) -> Vec<String> {
+/// The backticked names a Parameters field lists outside parentheses.
+fn parameters_of(field: &str) -> Vec<String> {
     let (mut depth, mut inside, mut name) = (0usize, false, String::new());
     let mut out = Vec::new();
-    for c in cell.chars() {
+    for c in field.chars() {
         match c {
             '`' if inside => {
                 let plain = name.chars().all(|c| c.is_ascii_lowercase() || c == '_');
