@@ -1,7 +1,7 @@
 ---
 n: 14
 title: "The review section written as blocks"
-status: "🔳"
+status: "✅"
 result: false
 ---
 # Phase 14: The review section written as blocks
