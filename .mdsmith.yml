@@ -110,33 +110,24 @@ kinds:
       # reads: a list of fields marked with dashes, then its text as one
       # paragraph, and nothing else. It sits right under the section's
       # title, or one level below one of its subsections.
-      list-marker-style:
-        style: dash
+      list-marker-style: { style: dash }
       required-structure:
         inline-schema:
           sections:
             - heading: null
             - heading: { regex: '^[A-Z]{2,5}-[0-9]{2}$', repeat: { min: 0 } }
               closed: true
-              content:
-                - kind: list
-                  ordered: false
-                - kind: paragraph
-              rules:
-                max-section-length:
-                  max-paragraphs: 1
+              content: [{ kind: list, ordered: false }, { kind: paragraph }]
+              rules: { max-section-length: { max-paragraphs: 1 } }
             # Any heading that is no requirement id.
             - heading: { regex: '^.*[^A-Z0-9-].*$', repeat: { min: 0 } }
               sections:
-                - heading: { regex: '^[A-Z]{2,5}-[0-9]{2}$', repeat: { min: 0 } }
+                - heading:
+                    regex: '^[A-Z]{2,5}-[0-9]{2}$'
+                    repeat: { min: 0 }
                   closed: true
-                  content:
-                    - kind: list
-                      ordered: false
-                    - kind: paragraph
-                  rules:
-                    max-section-length:
-                      max-paragraphs: 1
+                  content: [{ kind: list, ordered: false }, { kind: paragraph }]
+                  rules: { max-section-length: { max-paragraphs: 1 } }
                 - heading: { regex: '.+', repeat: { min: 0 } }
       required-frontmatter:
         fields: [summary]
@@ -157,36 +148,16 @@ kinds:
           closed: true
           sections:
             - heading: null
-            - heading: { regex: '^I1$' }
-              content:
-                - kind: paragraph
-            - heading: { regex: '^I2$' }
-              content:
-                - kind: paragraph
-            - heading: { regex: '^I3$' }
-              content:
-                - kind: paragraph
-            - heading: { regex: '^I4$' }
-              content:
-                - kind: paragraph
-            - heading: { regex: '^I5$' }
-              content:
-                - kind: paragraph
-            - heading: { regex: '^I6$' }
-              content:
-                - kind: paragraph
-            - heading: { regex: '^I7$' }
-              content:
-                - kind: paragraph
-            - heading: { regex: '^I8$' }
-              content:
-                - kind: paragraph
-            - heading: { regex: '^I9$' }
-              content:
-                - kind: paragraph
-            - heading: { regex: '^I10$' }
-              content:
-                - kind: paragraph
+            - { heading: { regex: '^I1$' }, content: [{ kind: paragraph }] }
+            - { heading: { regex: '^I2$' }, content: [{ kind: paragraph }] }
+            - { heading: { regex: '^I3$' }, content: [{ kind: paragraph }] }
+            - { heading: { regex: '^I4$' }, content: [{ kind: paragraph }] }
+            - { heading: { regex: '^I5$' }, content: [{ kind: paragraph }] }
+            - { heading: { regex: '^I6$' }, content: [{ kind: paragraph }] }
+            - { heading: { regex: '^I7$' }, content: [{ kind: paragraph }] }
+            - { heading: { regex: '^I8$' }, content: [{ kind: paragraph }] }
+            - { heading: { regex: '^I9$' }, content: [{ kind: paragraph }] }
+            - { heading: { regex: '^I10$' }, content: [{ kind: paragraph }] }
   doc:
     # Every other doc carries the one-line summary the CLAUDE.md
     # catalog lists, so an agent reads the index and opens only what
