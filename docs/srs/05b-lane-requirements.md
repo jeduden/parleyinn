@@ -7,19 +7,328 @@ summary: >-
 
 ## 5.11 Room (LANE)
 
-| ID      | Pri | Requirement                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               | Ver | Traces      |
-| ------- | --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --- | ----------- |
-| LANE-01 | P0  | A room MUST have at most one intent, and its conversation, seats, pins and zero or more branches in any repositories, each named by a branch link. A branch MUST be identified by its repository's identity, its remote URL and its name; a branch with no remote MUST get a provisional, node-local identity, rebound on push, without rewriting the record. A principal MAY create a room through one of its seats, and an agent through `room_create`; a room an agent creates MUST be owned by its principal. Creating a room MUST be the first room act of the creating seat's writer. ParleyInn MUST NOT create a room on its own initiative, and MAY suggest one. A room id MUST derive from its create room act's seat's first key and 128 random bits the creating node mints, never chosen; any other create room act naming it MUST be void and shown; renaming a room MUST NOT change its id. A branch MUST belong to the first of this node's principal's rooms whose branch link names it, and MAY move only when a room enters or leaves them or concurrent branch links arrive; a foreign room's branch link MUST void none. Branch links naming one branch from two such rooms MUST resolve under LANE-31; every other MUST be void and shown. Every principal MUST have one personal room on each of its nodes, created as ADM-02 says, or carried over to a node clone, where every run has a seat from its first event. Each event MUST be written to exactly one seat's writer: a run's to its run seat in the room it works in, one it joined or created that names the branch of the run's latest preceding event naming its branch, while that seat is a member with work (its role, no mute) in this node's room state on recording it; else to its personal-room seat, never refused. A room act MUST go to the writer of its signing seat, a seat-key rotation to that seat's writer, and a principal act or an expire act to the device seat of the device that signs it (before PRV-10 ships, the recording node's), in the room it acts on, which a node of a principal with a member seat there first joins without admission; one that acts on no room or on more than one, on a room its principal has no member seat in, or that a paired phone signs, MUST go to that device seat in the personal room, naming the room, and that room MUST show it by address (open: OQ-41). A tombstone, a retention policy's erasure request, and a bridge's or the launcher's event about a room's branch MUST go where the recording device's principal act on that room would; an authorized linked issue observation under LANE-34 MUST go to the importing member node's device seat in that room; any other event with no run, to that device's seat in the personal room of its node, or of the node a paired phone pairs with. An event's room MUST be its writer's seat's room, and its run, when it has one, MUST be named with it. A run's history MUST span its seats' writers, tied together by the run; a room MUST contain only the events routed to its seats. Branch names MUST be sanitized per LMK-03 before any structural use. | T   | I1, I10     |
-| LANE-02 | P0  | A repository's identity MUST be independent of the local path and the same on every node holding a clone: a parentless commit reachable from the repository's default branch, the lowest id when there are several, bound once per identity, by a replicating structural event recorded when the observation of the run's first hook reaches the record and an MCP server that holds that session binding (REC-13) looks at the clone (SEC-18; a session binding no MCP server took binds nothing, and REC-19 counts and audits it), that names, by a keyed digest of its root path, the worktree that resolved to it; each further worktree that resolves to a bound identity, and each later binding of a commit to a worktree that held a provisional identity (naming the provisional identity it replaces), is recorded by such an event too, so a node rebuilds which identity each of its worktrees is bound to from its writer logs alone (I10). A node whose clone contains the bound commit MUST use the bound identity. A node whose clone lacks it MUST take the identity from the access token it enrolled with or a widening bind by its principal, and MUST NOT mint one. A repository with no commit, or a shallow clone with neither, MUST get a provisional, node-local identity and bind later, without rewriting the record. ParleyInn MUST detect and audit every change in the identity a directory resolves to, MUST NOT relink a room's branches for it silently, and MUST rebind only on a widening principal act. The identity MUST serve only to identify branches and to relate a room's branches and commits, never to scope ParleyInn state. Every name ParleyInn derives from the identity for its local state MUST reveal nothing about the identity off this node, and the digest of a worktree MUST be keyed by a secret derived from the node's device key, which ParleyInn MUST NOT log, export, back up or place in a segment, so it reveals nothing about the worktree off this node; after a node identity change (REC-24), a rotation of the device key or a device key minted anew (PRV-12) the new key keys new digests, so the node binds each worktree it works in again by a structural event, audited and counted (`repository_identity_rebound`); that bind keeps the identity the clone resolves to and is no rebind, so it is never a widening principal act.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            | T   | I1, I6, I8  |
-| LANE-03 | P1  | Every event MUST name its author: the seat whose writer contains it. The author MUST be derived from the writer and structural fields, never from content.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                | T   | I2          |
-| LANE-04 | P1  | ParleyInn MUST derive, per run and per room, the files changed and every command with whether it failed (its tool result's structural `is_error` field), each bound to the address range that produced it, from structural fields only, as a deterministic function of the record. It MUST attribute each diff hunk to the event, author and preceding message that produced it, or mark it `from checkpoint` when only a worktree checkpoint covers it.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  | T   | I2, I10     |
-| LANE-05 | P1  | Each result MUST carry exactly one evidence class from this closed set, ranked lowest first, derived only from structural fields, never from event text: `claim` (stated in text an agent or a principal wrote, or known only from tool output); `own check` (a command, whether it failed, from its tool result's structural `is_error` field, and the tree it was executed on, recorded by capture from the editing run's transcript on that run's node; the tree is the latest worktree checkpoint plus the edits recorded since, and when edits since it are not fully recorded, the result MUST be marked `unbound` and count as `claim`); `witness check` (the same command re-executed as OWN-18 requires); `CI attested` (a CI attestation for the exact commit, signed by a CI key the room's owner enrolled in the room, brought in by the CI bridge). Where `witness check` or `CI attested` cannot exist, ParleyInn MUST say so.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              | T   | I2, I10     |
-| LANE-06 | P1  | ParleyInn MUST derive, from the record alone, the rooms behind any commit landed on the default branch or a branch the forge protects, each through a landing link with one proof class: `same commit`, `same patch`, `same tree`, `likely`, `asserted` or `not proven`. Only the first three MUST count as proven; `asserted` (a room trailer, a forge report, or a SHA in event text) and `likely` MUST NOT. `not proven` MUST carry one typed, counted reason: `ambiguous`, `history-rewritten`, `outside-record`, `outside-tool-calls`, `evidence-removed` or `conflicting`. ParleyInn MUST read git objects inside the core (no socket, no program start), and record the clone facts it reads (landed commits, patch ids, trees) as structural events.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              | T   | I6, I10     |
-| LANE-08 | P2  | With a forge configured, ParleyInn MUST treat the forge's branch protection, reviews and checks as authoritative and MUST record no verdict of its own toward landing. Enabling the bridge or adding a branch or pull-request link MUST NOT fetch or share branch protection, pull-request state, reviews or checks. Before each node reads and shares those reports for a linked branch, the owner of the forge read credential MUST record a room-specific widening forge import grant under SEC-28 for that exact branch and room, after seeing its forge host, repository identity, remote URL and branch name, recipient room, forge account and current and future member scope. Only while that grant is active, the importing node's principal has a member seat in the room and the host bridge is enabled MAY the bridge fetch them. ParleyInn MUST bring authorized forge content in only through the forge bridge as untrusted events, and show each forge approval, each pull request's state and each check the forge reports, a required check included, as `asserted`, with its forge and time: a forge report, never a result. A branch whose associated pull request the authorized bridge observes MUST carry a pull-request link to it. Revocation MUST stop future fetches and imports on each node that records or applies it; an observation recorded on a partitioned node before revocation arrives MUST remain recoverable with a concurrent revocation mark after sync. With that grant active and the bridge enabled, for each review comment or response on the linked branch's pull request, the bridge MUST record its forge, pull request, thread and item ids, asserted author, location, time, body and revision as an untrusted `web` event where LANE-01 routes it, and the linked room MUST show that forge review item with its conversation, distinguished from posts and room seats. An edit or deletion MUST add an event and leave earlier versions recoverable, except for redaction or purge. A person with post capability MAY write a post from their own device seat in the room responding to a forge review item; only that person's separate widening forge reply act, naming the post and exact forge target after showing both, MAY cause the bridge to send exactly that post's text to the target review thread with that person's own forge credential. The room MUST show the act, the signing principal and device seat, the forge account reported for the send, and a delivered, failed or ambiguous send status without equating those identities or silently retrying an ambiguous send. A fetched echo MUST be reconciled with the sent post so the conversation shows one response, while retaining both events. The bridge MUST NOT send an agent's post, approve, request changes or land through a forge reply act. Failed fetches and sends MUST be counted, audited and shown with their time.                                                                                                                                                                                                        | T   | I2, I4, I6  |
-| LANE-09 | P2  | A room's title, labels and assignments MUST be set only by room acts of the owner's device seat or a moderator, and merged under LANE-31. No act MAY set a room's status, which is never recorded. The losing value of a concurrent change MUST stay visible in the room's history.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       | T   | I10         |
-| LANE-10 | P2  | An invite MUST be the owner's widening principal act (open: OQ-42), naming the invited principal key and a role, which it records as a role assignment for every seat chaining to that key that joins under it, run seats included, as its review step shows; an invite naming moderator MUST give run seats contributor. A joining seat's first view MUST show the room's intent, pins, state, open held requests and latest results within 3 s† of connecting, before the full sync completes. Before an invite takes effect, the owner MUST pass a review step that shows which classes and ranges will replicate to the invited principal's node, with SEC-08 applied. A node MUST refuse and audit events from a seat whose role does not permit them. A viewer MUST be able to send the owner a role request, which enters the owner's Needs you as Q3.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             | T   | I2, I6      |
-| LANE-11 | P2  | Ownership MUST change only by a handover or a succession. A handover MUST be an offer by the owner's widening principal act, accepted by the new owner's; declining an offer MUST be a cut principal act. A handover MUST record a moderator role assignment for the former owner's device seats, and its agents' events stay accepted. After a change of ownership, the former owner's pins MUST keep each version's author, and so restore as PIN-10 says, but the intent MUST restore only to its stampers' agents until the new owner revises it (LANE-32). Open held requests stay with each agent's principal. An offer unanswered for 7 days† MUST expire only by an expire act. The owner MAY name a successor in advance, as a widening principal act on its own node; the naming MUST stand until the owner replaces it, or the owner or the successor withdraws it by a cut principal act, and the successor's acceptance, a widening principal act, MUST transfer ownership by succession only once every seat of the owner has left the room. Ownership MUST otherwise stay with the owner, who MAY still offer a handover, name a successor or rejoin under the room's admission, which its principal key always satisfies (open: OQ-41). While every seat of the owner has left, the room's pins MUST stay as they were, unchangeable save by an unstamp until a handover, a succession or the owner's rejoin. A handover MUST show as `offered`, `accepted`, `declined`, `expired` or `superseded` to both parties.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       | T   | I2, I6, I10 |
-| LANE-12 | P2  | The room MUST separate posts to the whole room from directed posts; only a directed post MUST enter the target agent's principal's Needs you queue, where it waits for an endorsement. Each directed post MUST show its author's principal exactly one state: delivered, endorsed (by which principal, with any edit shown as a diff against the post) or dismissed (a cut principal act).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                | T   | I6          |
-| LANE-13 | P1  | When a run in an open room edits a file that a run in another open room has edited, on any node holding both, ParleyInn MUST raise a Needs you item for each room's owner at that edit, naming the other room and the file, and clear it on that owner's acknowledgement there, a neutral principal act, raising it again only for a file not yet acknowledged there.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     | T   | I6          |
-| LANE-14 | P1  | Every turn of an agent MUST record what triggered it (the harness's user input; the commitment of text the core built and recorded that the launcher carried in, whose matching transcript line ingest MUST mark untrusted; the principal act and, for an endorsement, the post it endorses; or a delegation and its delegation grant) and the model tokens it used as `harness_meta`. Nothing else MAY trigger a turn.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   | T   | I6          |
-| LANE-15 | P2  | A foreign room MUST open in the Room page, marked foreign, which MUST state that every event, evidence class and proof class in it is asserted by the bundle's principal key, and MUST show whether the pull request's commits in the local clone are signed by the pull-request author's existing commit-signing identity, and whether that identity also signed a binding statement in the bundle naming the bundle's principal key. `parinn export` MUST produce that statement for the pull-request author to sign, and ParleyInn MUST verify that signature offline, inside the core, naming any signature kind it cannot check rather than reporting no match; only such a statement MUST count as a match. A pull-request author MUST count as no principal unless its key is one, and a foreign room MUST stay untrusted whatever trust grant covers its keys. Every seat key in a bundle MUST chain to the bundle's principal key, or be shown as an unknown key, by its fingerprint when it has no petname. It MUST show PRV-07 flags and invisible characters in place. Rejecting a foreign room MUST be a cut principal act; it and quarantining its writers MUST record the stated reason. A landed commit MUST be linkable to the foreign room behind it through a landing link with a proof class. Purging a foreign room MUST stay possible while a landing link exists; the landing link then reads `not proven` with reason `evidence-removed`. Import MUST compute PRV-07 flags locally and ignore any flags a bundle carries.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         | T   | I2, I6      |
+### LANE-01
+
+- Pri: P0
+- Ver: T
+- Traces: I1, I10
+
+A room MUST have at most one intent, and its conversation, seats, pins and zero
+or more branches in any repositories, each named by a branch link.
+A branch MUST be identified by its repository's identity, its remote URL and its
+name; a branch with no remote MUST get a provisional, node-local identity,
+rebound on push, without rewriting the record.
+A principal MAY create a room through one of its seats, and an agent through
+`room_create`; a room an agent creates MUST be owned by its principal.
+Creating a room MUST be the first room act of the creating seat's writer.
+ParleyInn MUST NOT create a room on its own initiative, and MAY suggest one.
+A room id MUST derive from its create room act's seat's first key and 128 random
+bits the creating node mints, never chosen; any other create room act naming it
+MUST be void and shown; renaming a room MUST NOT change its id.
+A branch MUST belong to the first of this node's principal's rooms whose branch
+link names it, and MAY move only when a room enters or leaves them or concurrent
+branch links arrive; a foreign room's branch link MUST void none.
+Branch links naming one branch from two such rooms MUST resolve under LANE-31;
+every other MUST be void and shown.
+Every principal MUST have one personal room on each of its nodes, created as
+ADM-02 says, or carried over to a node clone, where every run has a seat from
+its first event.
+Each event MUST be written to exactly one seat's writer: a run's to its run seat
+in the room it works in, one it joined or created that names the branch of the
+run's latest preceding event naming its branch, while that seat is a member with
+work (its role, no mute) in this node's room state on recording it; else to its
+personal-room seat, never refused.
+A room act MUST go to the writer of its signing seat, a seat-key rotation to
+that seat's writer, and a principal act or an expire act to the device seat of
+the device that signs it (before PRV-10 ships, the recording node's), in the
+room it acts on, which a node of a principal with a member seat there first
+joins without admission; one that acts on no room or on more than one, on a room
+its principal has no member seat in, or that a paired phone signs, MUST go to
+that device seat in the personal room, naming the room, and that room MUST show
+it by address (open: OQ-41).
+A tombstone, a retention policy's erasure request, and a bridge's or the
+launcher's event about a room's branch MUST go where the recording device's
+principal act on that room would; an authorized linked issue observation under
+LANE-34 MUST go to the importing member node's device seat in that room; any
+other event with no run, to that device's seat in the personal room of its node,
+or of the node a paired phone pairs with.
+An event's room MUST be its writer's seat's room, and its run, when it has one,
+MUST be named with it.
+A run's history MUST span its seats' writers, tied together by the run; a room
+MUST contain only the events routed to its seats.
+Branch names MUST be sanitized per LMK-03 before any structural use.
+
+### LANE-02
+
+- Pri: P0
+- Ver: T
+- Traces: I1, I6, I8
+
+A repository's identity MUST be independent of the local path and the same on
+every node holding a clone: a parentless commit reachable from the repository's
+default branch, the lowest id when there are several, bound once per identity,
+by a replicating structural event recorded when the observation of the run's
+first hook reaches the record and an MCP server that holds that session binding
+(REC-13) looks at the clone (SEC-18; a session binding no MCP server took binds
+nothing, and REC-19 counts and audits it), that names, by a keyed digest of its
+root path, the worktree that resolved to it; each further worktree that resolves
+to a bound identity, and each later binding of a commit to a worktree that held
+a provisional identity (naming the provisional identity it replaces), is
+recorded by such an event too, so a node rebuilds which identity each of its
+worktrees is bound to from its writer logs alone (I10).
+A node whose clone contains the bound commit MUST use the bound identity.
+A node whose clone lacks it MUST take the identity from the access token it
+enrolled with or a widening bind by its principal, and MUST NOT mint one.
+A repository with no commit, or a shallow clone with neither, MUST get a
+provisional, node-local identity and bind later, without rewriting the record.
+ParleyInn MUST detect and audit every change in the identity a directory
+resolves to, MUST NOT relink a room's branches for it silently, and MUST rebind
+only on a widening principal act.
+The identity MUST serve only to identify branches and to relate a room's
+branches and commits, never to scope ParleyInn state.
+Every name ParleyInn derives from the identity for its local state MUST reveal
+nothing about the identity off this node, and the digest of a worktree MUST be
+keyed by a secret derived from the node's device key, which ParleyInn MUST NOT
+log, export, back up or place in a segment, so it reveals nothing about the
+worktree off this node; after a node identity change (REC-24), a rotation of the
+device key or a device key minted anew (PRV-12) the new key keys new digests, so
+the node binds each worktree it works in again by a structural event, audited
+and counted (`repository_identity_rebound`); that bind keeps the identity the
+clone resolves to and is no rebind, so it is never a widening principal act.
+
+### LANE-03
+
+- Pri: P1
+- Ver: T
+- Traces: I2
+
+Every event MUST name its author: the seat whose writer contains it.
+The author MUST be derived from the writer and structural fields, never from
+content.
+
+### LANE-04
+
+- Pri: P1
+- Ver: T
+- Traces: I2, I10
+
+ParleyInn MUST derive, per run and per room, the files changed and every command
+with whether it failed (its tool result's structural `is_error` field), each
+bound to the address range that produced it, from structural fields only, as a
+deterministic function of the record.
+It MUST attribute each diff hunk to the event, author and preceding message that
+produced it, or mark it `from checkpoint` when only a worktree checkpoint covers
+it.
+
+### LANE-05
+
+- Pri: P1
+- Ver: T
+- Traces: I2, I10
+
+Each result MUST carry exactly one evidence class from this closed set, ranked
+lowest first, derived only from structural fields, never from event text:
+`claim` (stated in text an agent or a principal wrote, or known only from tool
+output); `own check` (a command, whether it failed, from its tool result's
+structural `is_error` field, and the tree it was executed on, recorded by
+capture from the editing run's transcript on that run's node; the tree is the
+latest worktree checkpoint plus the edits recorded since, and when edits since
+it are not fully recorded, the result MUST be marked `unbound` and count as
+`claim`); `witness check` (the same command re-executed as OWN-18 requires);
+`CI attested` (a CI attestation for the exact commit, signed by a CI key the
+room's owner enrolled in the room, brought in by the CI bridge).
+Where `witness check` or `CI attested` cannot exist, ParleyInn MUST say so.
+
+### LANE-06
+
+- Pri: P1
+- Ver: T
+- Traces: I6, I10
+
+ParleyInn MUST derive, from the record alone, the rooms behind any commit landed
+on the default branch or a branch the forge protects, each through a landing
+link with one proof class: `same commit`, `same patch`, `same tree`, `likely`,
+`asserted` or `not proven`.
+Only the first three MUST count as proven; `asserted` (a room trailer, a forge
+report, or a SHA in event text) and `likely` MUST NOT. `not proven` MUST carry
+one typed, counted reason: `ambiguous`, `history-rewritten`, `outside-record`,
+`outside-tool-calls`, `evidence-removed` or `conflicting`.
+ParleyInn MUST read git objects inside the core (no socket, no program start),
+and record the clone facts it reads (landed commits, patch ids, trees) as
+structural events.
+
+### LANE-08
+
+- Pri: P2
+- Ver: T
+- Traces: I2, I4, I6
+
+With a forge configured, ParleyInn MUST treat the forge's branch protection,
+reviews and checks as authoritative and MUST record no verdict of its own toward
+landing.
+Enabling the bridge or adding a branch or pull-request link MUST NOT fetch or
+share branch protection, pull-request state, reviews or checks.
+Before each node reads and shares those reports for a linked branch, the owner
+of the forge read credential MUST record a room-specific widening forge import
+grant under SEC-28 for that exact branch and room, after seeing its forge host,
+repository identity, remote URL and branch name, recipient room, forge account
+and current and future member scope.
+Only while that grant is active, the importing node's principal has a member
+seat in the room and the host bridge is enabled MAY the bridge fetch them.
+ParleyInn MUST bring authorized forge content in only through the forge bridge
+as untrusted events, and show each forge approval, each pull request's state and
+each check the forge reports, a required check included, as `asserted`, with its
+forge and time: a forge report, never a result.
+A branch whose associated pull request the authorized bridge observes MUST carry
+a pull-request link to it.
+Revocation MUST stop future fetches and imports on each node that records or
+applies it; an observation recorded on a partitioned node before revocation
+arrives MUST remain recoverable with a concurrent revocation mark after sync.
+With that grant active and the bridge enabled, for each review comment or
+response on the linked branch's pull request, the bridge MUST record its forge,
+pull request, thread and item ids, asserted author, location, time, body and
+revision as an untrusted `web` event where LANE-01 routes it, and the linked
+room MUST show that forge review item with its conversation, distinguished from
+posts and room seats.
+An edit or deletion MUST add an event and leave earlier versions recoverable,
+except for redaction or purge.
+A person with post capability MAY write a post from their own device seat in the
+room responding to a forge review item; only that person's separate widening
+forge reply act, naming the post and exact forge target after showing both, MAY
+cause the bridge to send exactly that post's text to the target review thread
+with that person's own forge credential.
+The room MUST show the act, the signing principal and device seat, the forge
+account reported for the send, and a delivered, failed or ambiguous send status
+without equating those identities or silently retrying an ambiguous send.
+A fetched echo MUST be reconciled with the sent post so the conversation shows
+one response, while retaining both events.
+The bridge MUST NOT send an agent's post, approve, request changes or land
+through a forge reply act.
+Failed fetches and sends MUST be counted, audited and shown with their time.
+
+### LANE-09
+
+- Pri: P2
+- Ver: T
+- Traces: I10
+
+A room's title, labels and assignments MUST be set only by room acts of the
+owner's device seat or a moderator, and merged under LANE-31.
+No act MAY set a room's status, which is never recorded.
+The losing value of a concurrent change MUST stay visible in the room's history.
+
+### LANE-10
+
+- Pri: P2
+- Ver: T
+- Traces: I2, I6
+
+An invite MUST be the owner's widening principal act (open: OQ-42), naming the
+invited principal key and a role, which it records as a role assignment for
+every seat chaining to that key that joins under it, run seats included, as its
+review step shows; an invite naming moderator MUST give run seats contributor.
+A joining seat's first view MUST show the room's intent, pins, state, open held
+requests and latest results within 3 s† of connecting, before the full sync
+completes.
+Before an invite takes effect, the owner MUST pass a review step that shows
+which classes and ranges will replicate to the invited principal's node, with
+SEC-08 applied.
+A node MUST refuse and audit events from a seat whose role does not permit them.
+A viewer MUST be able to send the owner a role request, which enters the owner's
+Needs you as Q3.
+
+### LANE-11
+
+- Pri: P2
+- Ver: T
+- Traces: I2, I6, I10
+
+Ownership MUST change only by a handover or a succession.
+A handover MUST be an offer by the owner's widening principal act, accepted by
+the new owner's; declining an offer MUST be a cut principal act.
+A handover MUST record a moderator role assignment for the former owner's device
+seats, and its agents' events stay accepted.
+After a change of ownership, the former owner's pins MUST keep each version's
+author, and so restore as PIN-10 says, but the intent MUST restore only to its
+stampers' agents until the new owner revises it (LANE-32).
+Open held requests stay with each agent's principal.
+An offer unanswered for 7 days† MUST expire only by an expire act.
+The owner MAY name a successor in advance, as a widening principal act on its
+own node; the naming MUST stand until the owner replaces it, or the owner or the
+successor withdraws it by a cut principal act, and the successor's acceptance, a
+widening principal act, MUST transfer ownership by succession only once every
+seat of the owner has left the room.
+Ownership MUST otherwise stay with the owner, who MAY still offer a handover,
+name a successor or rejoin under the room's admission, which its principal key
+always satisfies (open: OQ-41).
+While every seat of the owner has left, the room's pins MUST stay as they were,
+unchangeable save by an unstamp until a handover, a succession or the owner's
+rejoin.
+A handover MUST show as `offered`, `accepted`, `declined`, `expired` or
+`superseded` to both parties.
+
+### LANE-12
+
+- Pri: P2
+- Ver: T
+- Traces: I6
+
+The room MUST separate posts to the whole room from directed posts; only a
+directed post MUST enter the target agent's principal's Needs you queue, where
+it waits for an endorsement.
+Each directed post MUST show its author's principal exactly one state:
+delivered, endorsed (by which principal, with any edit shown as a diff against
+the post) or dismissed (a cut principal act).
+
+### LANE-13
+
+- Pri: P1
+- Ver: T
+- Traces: I6
+
+When a run in an open room edits a file that a run in another open room has
+edited, on any node holding both, ParleyInn MUST raise a Needs you item for each
+room's owner at that edit, naming the other room and the file, and clear it on
+that owner's acknowledgement there, a neutral principal act, raising it again
+only for a file not yet acknowledged there.
+
+### LANE-14
+
+- Pri: P1
+- Ver: T
+- Traces: I6
+
+Every turn of an agent MUST record what triggered it (the harness's user input;
+the commitment of text the core built and recorded that the launcher carried in,
+whose matching transcript line ingest MUST mark untrusted; the principal act
+and, for an endorsement, the post it endorses; or a delegation and its
+delegation grant) and the model tokens it used as `harness_meta`.
+Nothing else MAY trigger a turn.
+
+### LANE-15
+
+- Pri: P2
+- Ver: T
+- Traces: I2, I6
+
+A foreign room MUST open in the Room page, marked foreign, which MUST state that
+every event, evidence class and proof class in it is asserted by the bundle's
+principal key, and MUST show whether the pull request's commits in the local
+clone are signed by the pull-request author's existing commit-signing identity,
+and whether that identity also signed a binding statement in the bundle naming
+the bundle's principal key. `parinn export` MUST produce that statement for the
+pull-request author to sign, and ParleyInn MUST verify that signature offline,
+inside the core, naming any signature kind it cannot check rather than reporting
+no match; only such a statement MUST count as a match.
+A pull-request author MUST count as no principal unless its key is one, and a
+foreign room MUST stay untrusted whatever trust grant covers its keys.
+Every seat key in a bundle MUST chain to the bundle's principal key, or be shown
+as an unknown key, by its fingerprint when it has no petname.
+It MUST show PRV-07 flags and invisible characters in place.
+Rejecting a foreign room MUST be a cut principal act; it and quarantining its
+writers MUST record the stated reason.
+A landed commit MUST be linkable to the foreign room behind it through a landing
+link with a proof class.
+Purging a foreign room MUST stay possible while a landing link exists; the
+landing link then reads `not proven` with reason `evidence-removed`.
+Import MUST compute PRV-07 flags locally and ignore any flags a bundle carries.

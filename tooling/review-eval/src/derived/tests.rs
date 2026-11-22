@@ -343,3 +343,224 @@ fn an_open_question_s_row_is_no_requirement_row() {
         Some((requirement.to_owned(), "SEC-01".to_owned()))
     );
 }
+
+/// The security section of [`SECTION`] with its row written as a block.
+const BLOCK_SECTION: &str = "---\ntitle: \"6. Security\"\n---\n# 6. Security\n\nProse.\n\n## SEC-01\n\n- Pri: P0\n- Ver: T\n- Traces: I4\n\nThe core opens\nno socket.\n\n";
+
+#[test]
+fn a_block_defect_adds_a_must_on_a_line_of_its_own_after_the_block_s_text() {
+    let dir = tree();
+    fs::write(dir.path().join("docs/srs/06-security.md"), BLOCK_SECTION).unwrap();
+
+    let got = cases(dir.path()).unwrap();
+    let case = got
+        .iter()
+        .find(|c| c.id() == "srs-security/defect-row-without-scenario")
+        .unwrap();
+
+    assert_eq!(
+        case.title,
+        "a MUST added to SEC-01 with no change to its scenario"
+    );
+    let [Edit::Replace { file, old, new }] = case.edits.as_slice() else {
+        panic!("{:?}", case.edits);
+    };
+    assert_eq!(file, "docs/srs/06-security.md");
+    let block = "## SEC-01\n\n- Pri: P0\n- Ver: T\n- Traces: I4\n\nThe core opens\nno socket.\n";
+    assert_eq!(old, block);
+    assert_eq!(
+        new,
+        &format!("{block}It MUST also record the change in the audit log.\n")
+    );
+    assert_eq!(case.validate(dir.path()), Ok(()));
+    assert_eq!(case.expect.finding[0].ids, vec!["SEC-01"]);
+}
+
+#[test]
+fn a_block_is_a_requirement_with_a_priority_up_to_its_next_heading_or_table() {
+    let block = "## SEC-02\n\n- Pri: P1\n\nIt MUST refuse.\n";
+    assert_eq!(
+        first_block(&format!("# T\n\n{block}\n## Notes\n\nMore.\n")),
+        Some((block.to_owned(), "SEC-02".to_owned()))
+    );
+    assert_eq!(
+        first_block(&format!("{block}\n| A |\n|---|\n")),
+        Some((block.to_owned(), "SEC-02".to_owned()))
+    );
+    // A pipe row with no delimiter row under it opens no table.
+    let piped = "## SEC-03\n\n- Pri: P2\n\nText\n| and more.\n";
+    assert_eq!(
+        first_block(piped),
+        Some((piped.to_owned(), "SEC-03".to_owned()))
+    );
+    // An assumption or a non-functional requirement carries no priority,
+    // as its row carries none, and an open question is no requirement.
+    assert_eq!(
+        first_block("## ASM-01\n\n- Verified in: S1\n\nHooks.\n"),
+        None
+    );
+    assert_eq!(first_block("## OQ-09\n\n- Pri: P1\n\nWhich?\n"), None);
+    assert_eq!(first_block("##SEC-02\n\n- Pri: P1\n\nNo heading.\n"), None);
+    assert_eq!(
+        first_block("####### SEC-02\n\n- Pri: P1\n\nToo deep.\n"),
+        None
+    );
+    assert_eq!(first_block("## SEC-02\n\n## Next\n"), None);
+}
+
+#[test]
+fn the_first_requirement_is_the_earlier_of_a_row_and_a_block() {
+    let row = "| SEC-01 | P0 | The core opens no socket. | T | I4 |\n";
+    let block = "## SEC-02\n\n- Pri: P1\n\nIt MUST refuse.\n";
+
+    let ids = |text: &str| first_requirement(text).map(|(_, _, id)| id);
+
+    assert_eq!(ids(&format!("{block}\n{row}")), Some("SEC-02".to_owned()));
+    assert_eq!(ids(&format!("{row}\n{block}")), Some("SEC-01".to_owned()));
+    assert_eq!(ids("# Nothing\n"), None);
+}
+
+#[test]
+fn a_requirement_inside_a_code_fence_is_none() {
+    let fence = "````markdown\n```\n## SEC-09\n\n- Pri: P2\n\nAn example.\n\n\
+                 | SEC-08 | P2 | An example. | T | I4 |\n```\n````\n\n";
+    let block = "## SEC-02\n\n- Pri: P1\n\nIt MUST refuse.\n";
+    let row = "| SEC-01 | P0 | The core opens no socket. | T | I4 |\n";
+
+    assert_eq!(first_block(fence), None);
+    assert_eq!(first_row(fence), None);
+    assert_eq!(
+        first_block(&format!("{fence}{block}")),
+        Some((block.to_owned(), "SEC-02".to_owned()))
+    );
+    assert_eq!(
+        first_row(&format!("{fence}{row}")),
+        Some((row.to_owned(), "SEC-01".to_owned()))
+    );
+}
+
+#[test]
+fn a_fence_inside_a_block_is_part_of_its_text() {
+    let block = "## REC-01\n\n- Pri: P0\n\nText.\n```\n## REC-02\n| A |\n```\nMore.\n";
+
+    assert_eq!(
+        first_block(&format!("{block}\n## Next\n")),
+        Some((block.to_owned(), "REC-01".to_owned()))
+    );
+}
+
+#[test]
+fn a_heading_the_srs_crate_reads_no_block_under_opens_none() {
+    let block = "## SEC-02\n\n- Pri: P1\n\nIt MUST refuse.\n";
+
+    assert_eq!(
+        first_block(&format!(
+            "## SEC-100\n\n- Pri: P0\n\nThree digits.\n\n{block}"
+        )),
+        Some((block.to_owned(), "SEC-02".to_owned()))
+    );
+    // A line of hashes with no space after them is no heading, so it
+    // ends no block.
+    let hashed = "## SEC-03\n\n- Pri: P2\n\nText.\n#tag\nMore.\n";
+    assert_eq!(
+        first_block(hashed),
+        Some((hashed.to_owned(), "SEC-03".to_owned()))
+    );
+}
+
+#[test]
+fn heading_reads_one_to_six_hashes_and_a_space_or_the_end() {
+    assert_eq!(heading("## SEC-02 "), Some("SEC-02"));
+    assert_eq!(heading("###### Deep"), Some("Deep"));
+    assert_eq!(heading("#"), Some(""));
+    assert_eq!(heading("####### Too deep"), None);
+    assert_eq!(heading("#tag"), None);
+    assert_eq!(heading("Text"), None);
+}
+
+#[test]
+fn a_heading_or_the_first_line_of_a_table_ends_a_block() {
+    assert!(ends_block("## Next", None));
+    assert!(ends_block("  | A |", Some("|---|")));
+    assert!(!ends_block("| and more.", Some("Text.")));
+    assert!(!ends_block("| A |", None));
+    assert!(!ends_block("#tag", None));
+    assert!(!ends_block("Text with a | in it.", Some("|---|")));
+}
+
+#[test]
+fn a_delimiter_row_holds_dashes_in_every_cell() {
+    assert!(delimiter_row("| --- | :-: |"));
+    assert!(delimiter_row("  |---|  "));
+    assert!(!delimiter_row("| --- | x |"));
+    assert!(!delimiter_row("| --- | : |"));
+    assert!(!delimiter_row("---"));
+}
+
+#[test]
+fn a_block_id_is_a_requirement_id_with_two_digits() {
+    assert!(block_id("LANE-01"));
+    assert!(!block_id("LANE-123"));
+    assert!(!block_id("I2"));
+}
+
+#[test]
+fn a_priority_counts_only_in_the_field_list() {
+    // The srs crate reads a `- Pri:` line after the field list as text,
+    // so the block carries no priority.
+    assert_eq!(
+        first_block("## SEC-04\n\n- Ver: T\n\nText.\n- Pri: P1\n"),
+        None
+    );
+    assert_eq!(
+        first_block("## SEC-05\n\n- Ver: T\n\n```\n- Pri: P1\n```\n"),
+        None
+    );
+    // A line under a field continues it, so an item after one is still
+    // a field.
+    let lazy = "## SEC-06\n\n- Ver: T\nlazy\n- Pri: P1\n\nText.\n";
+    assert_eq!(
+        first_block(lazy),
+        Some((lazy.to_owned(), "SEC-06".to_owned()))
+    );
+}
+
+#[test]
+fn the_field_list_runs_from_its_first_item_to_its_first_blank_line() {
+    let body = [
+        "",
+        "- Pri: P0",
+        "- Traces: I1,",
+        "  I2",
+        "I4",
+        "",
+        "- Text.",
+    ];
+    assert_eq!(
+        field_list(&body),
+        ["- Pri: P0", "- Traces: I1,", "  I2", "I4"]
+    );
+    assert!(field_list(&["", "Text.", "- Pri: P0"]).is_empty());
+    assert!(field_list(&["  - Pri: P0"]).is_empty());
+}
+
+#[test]
+fn fence_reads_a_run_of_three_or_more_backticks_or_tildes() {
+    assert_eq!(fence("```rust"), Some((b'`', 3)));
+    assert_eq!(fence("~~~~"), Some((b'~', 4)));
+    assert_eq!(fence("``"), None);
+    assert_eq!(fence("text"), None);
+    assert_eq!(fence(""), None);
+}
+
+#[test]
+fn unfenced_skips_a_fence_until_its_own_run_closes_it() {
+    fn lines(text: &str) -> Vec<(usize, &str)> {
+        unfenced(text).collect()
+    }
+
+    assert_eq!(lines("a\n```\nb\n```\nc\n"), [(0, "a"), (4, "c")]);
+    assert_eq!(lines("````\n```\nx\n````\ny\n"), [(4, "y")]);
+    assert_eq!(lines("~~~\n```\nz\n~~~\nw\n"), [(4, "w")]);
+    assert_eq!(lines("```\nopen to the end\n"), []);
+}

@@ -38,15 +38,39 @@ ENG-25, the §11 evaluation, the external review and the pilot.
 6. Mutation testing and the maintainer runbook: ENG-13, ENG-25
 7. Run the §11.1 evaluation and publish it, with ENG-15's NFR-05
    benchmark against its target on the reference hardware
+   and meet NFR-04's target, which M1 benchmarked but did not meet;
+   MEM-02 (P1) lands here with the remaining P1
 8. External security review and the two-week pilot; SEC-17's recorded
    review and release gate, the rest of ENG-22 (every statement cites a
    passing test) and ENG-23's migration tests from every previous minor version,
    which M1 left
 9. M5's initial targets (§12.3): freeze §11's evaluation targets from
    the evaluation's results, removing their † and their §12.3 row
+10. Windowed ingest and SEC-05's transcript rows (4 MiB line, 64 MiB window
+    and the source-memory ceilings), deferred from M1 by the user's final
+    ruling after the review gate's blockers: I1 against an oversize line,
+    quadratic cost, capture poll latency. Requirements:
+
+  - no event lost (I1): store an oversize line, for example streamed to the
+      payload store, with the whole line redacted before storage
+  - recall latency (NFR-03, I9) never waits on a transcript poll
+  - an ingest of a resumed source costs linear in what is new: persist the
+      hasher, classifier and identifier state in the store (today it re-hashes
+      the consumed prefix, replays the classifier from byte 0 and re-learns
+      identifiers on each call), against NFR-01 and NFR-05
+
+11. PRV-14 stays `@pending` (user's ruling, M1): close its ambiguous-run
+    race in code, so a call that arrives before the server read both runs'
+    tool-use ids waits for that read and is refused as ambiguous, then take
+    it off `@pending` with a binding that needs no settle
 
 ## Acceptance Criteria
 
 - [ ] The §11.2 definition of done holds
+- [ ] `@SEC-05` is off `@pending` and passing: no event lost to an oversize
+  line (I1), recall never waits on a transcript poll, and the ingest of a
+  resumed source costs no more than the bytes it adds, within NFR-01 and
+  NFR-05
+- [ ] `@PRV-14` is off `@pending` and passing with no settle in its binding
 - [ ] No scenario tagged P0 or P1 is still @pending, or each remaining
   one is deferred with signed-off rationale

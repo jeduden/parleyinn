@@ -7,6 +7,17 @@ rust-version.workspace = true
 license.workspace = true
 publish.workspace = true
 
+[dependencies]
+serde_json.workspace = true
+
+# Its unit tests replay each built line through the core's parser, as
+# the contract tests do. harness-contract dev-depends on this crate in
+# turn, which cargo allows between dev-dependencies.
+[dev-dependencies]
+harness-contract.workspace = true
+redaction.workspace = true
+transcript.workspace = true
+
 [lints]
 workspace = true
 
@@ -14,3 +25,4 @@ workspace = true
 [package.metadata.parinn]
 responsibility = "Gives the tooling crates their test-only helpers"
 may-depend-on = []
+may-dev-depend-on = ["harness-contract", "redaction", "transcript"]

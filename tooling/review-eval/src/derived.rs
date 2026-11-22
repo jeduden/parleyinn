@@ -42,7 +42,8 @@ pub const EXCLUDED_SENTENCE: &str =
 /// finding cites: a finding is known by what the report's form fixes,
 /// its place and its ids, never by a word of its sentence.
 pub const TERMS_ID: &str = "ENG-35";
-/// What a derived defect adds to a requirement row.
+/// What a derived defect adds to a requirement: to the end of a row's
+/// text, or on a line of its own after a block's.
 pub const ADDED_MUST: &str = " It MUST also record the change in the audit log.";
 
 /// The prefix of an open question's id, which is no requirement's: the
@@ -156,8 +157,8 @@ fn markdown_files(root: &Path, dir: &str) -> Result<Vec<String>, String> {
 fn section(root: &Path, path: &str, name: &str) -> Result<Vec<Case>, String> {
     let text = read(root, path)?;
     let title = title_line(path, &text)?;
-    let defect = match first_row(&text) {
-        Some((line, id)) => row_without_scenario(name, path, &line, &id),
+    let defect = match first_requirement(&text) {
+        Some((old, new, id)) => row_without_scenario(name, path, old, new, &id),
         None => excluded_terms(name, path, &title),
     };
 
@@ -203,9 +204,10 @@ fn title_line(path: &str, text: &str) -> Result<String, String> {
         .ok_or_else(|| format!("{path} has no title line"))
 }
 
-/// The first requirement row of a section: its line and its id.
+/// The first requirement row of a section, outside a code fence: its
+/// line and its id.
 fn first_row(text: &str) -> Option<(String, String)> {
-    text.lines().find_map(|line| {
+    unfenced(text).find_map(|(_, line)| {
         let cells: Vec<&str> = line.split('|').map(str::trim).collect();
         let id = cells.get(1)?;
         (cells.len() >= 5
@@ -214,6 +216,135 @@ fn first_row(text: &str) -> Option<(String, String)> {
             && cells.get(2).is_some_and(|p| p.starts_with('P')))
         .then(|| (format!("{line}\n"), (*id).to_owned()))
     })
+}
+
+/// The first requirement of a section with a priority, its first row
+/// or its first block, whichever comes first: what it reads, what it
+/// reads with the MUST added, and its id. A row takes the MUST at the
+/// end of its text cell, a block on a line of its own after its text.
+fn first_requirement(text: &str) -> Option<(String, String, String)> {
+    let row = first_row(text).map(|(line, id)| {
+        let mut cells: Vec<String> = line.trim_end().split('|').map(str::to_owned).collect();
+        cells[3] = format!("{}{ADDED_MUST} ", cells[3].trim_end());
+        let new = format!("{}\n", cells.join("|"));
+        (line, new, id)
+    });
+    let block = first_block(text).map(|(block, id)| {
+        let new = format!("{block}{}\n", ADDED_MUST.trim_start());
+        (block, new, id)
+    });
+
+    [row, block]
+        .into_iter()
+        .flatten()
+        .min_by_key(|(old, _, _)| text.find(old.as_str()))
+}
+
+/// The first block of a section with a priority in its field list,
+/// outside a code fence: its lines from its heading, one that is a
+/// requirement id, to its last line of text before the next heading or
+/// table outside a code fence, and its id. A fence inside a block is
+/// part of its text, as the srs crate reads it.
+fn first_block(text: &str) -> Option<(String, String)> {
+    let lines: Vec<&str> = text.lines().collect();
+    unfenced(text).find_map(|(i, line)| {
+        let id = heading(line)?;
+        if !block_id(id) || id.starts_with(OPEN_QUESTION) {
+            return None;
+        }
+        let stop = unfenced(text)
+            .find(|(j, l)| *j > i && ends_block(l, lines.get(j + 1).copied()))
+            .map_or(lines.len(), |(j, _)| j);
+        let body = &lines[i + 1..stop];
+        let end = body.iter().rposition(|l| !l.trim().is_empty())? + 1;
+        field_list(body)
+            .iter()
+            .any(|l| l.starts_with("- Pri: P"))
+            .then(|| {
+                (
+                    format!("{line}\n{}\n", body[..end].join("\n")),
+                    id.to_owned(),
+                )
+            })
+    })
+}
+
+/// The lines of a block's field list, as the srs crate reads it: after
+/// any blank lines, an item at the line's start, then every line up to
+/// the next blank one, as Markdown reads a list item's lines.
+fn field_list<'a>(body: &[&'a str]) -> Vec<&'a str> {
+    let mut lines = body
+        .iter()
+        .copied()
+        .skip_while(|l| l.trim().is_empty())
+        .peekable();
+    if !lines.peek().is_some_and(|l| l.starts_with("- ")) {
+        return Vec::new();
+    }
+    lines.take_while(|l| !l.trim().is_empty()).collect()
+}
+
+/// The text of `line` when it is an ATX heading, as the srs crate reads
+/// one: one to six `#` and a space or the line's end.
+fn heading(line: &str) -> Option<&str> {
+    let rest = line.trim_start_matches('#');
+    let level = line.len() - rest.len();
+    ((1..=6).contains(&level) && (rest.is_empty() || rest.starts_with(' '))).then(|| rest.trim())
+}
+
+/// Whether `line`, outside a code fence and with `next` under it, ends
+/// a block: a heading, or a pipe row with a delimiter row under it,
+/// which opens a table as the srs crate reads one.
+fn ends_block(line: &str, next: Option<&str>) -> bool {
+    heading(line).is_some()
+        || (line.trim_start().starts_with('|') && next.is_some_and(delimiter_row))
+}
+
+/// Whether `line` is a table's `|---|:--:|` row, as the srs crate reads
+/// one: a pipe row whose every cell holds dashes, with or without a
+/// colon at either end.
+fn delimiter_row(line: &str) -> bool {
+    let Some(row) = line.trim().strip_prefix('|') else {
+        return false;
+    };
+    row.strip_suffix('|').unwrap_or(row).split('|').all(|cell| {
+        let cell = cell.trim().trim_matches(':');
+        !cell.is_empty() && cell.chars().all(|c| c == '-')
+    })
+}
+
+/// Whether `word` is an id the srs crate reads a block under: a
+/// requirement id with two digits.
+fn block_id(word: &str) -> bool {
+    srs_id(word)
+        && word
+            .split_once('-')
+            .is_some_and(|(_, digits)| digits.len() == 2)
+}
+
+/// The lines of `text` outside fenced code blocks, each with its index.
+/// A fence closes only on a run of its own character at least as long
+/// as the one that opened it, as the srs crate reads fences.
+fn unfenced(text: &str) -> impl Iterator<Item = (usize, &str)> {
+    let mut open: Option<(u8, usize)> = None;
+    text.lines().enumerate().filter(move |(_, line)| {
+        let run = fence(line.trim());
+        let outside = open.is_none() && run.is_none();
+        open = match (open, run) {
+            (None, run) => run,
+            (Some((c, n)), Some((rc, rn))) if c == rc && rn >= n => None,
+            (open, _) => open,
+        };
+        outside
+    })
+}
+
+/// The character and length of the run of three or more backticks or
+/// tildes `line` opens with, or `None` when it opens no fence.
+fn fence(line: &str) -> Option<(u8, usize)> {
+    let c = line.bytes().next().filter(|c| matches!(c, b'`' | b'~'))?;
+    let n = line.bytes().take_while(|b| *b == c).count();
+    (n >= 3).then_some((c, n))
 }
 
 /// Whether `word` reads as a requirement id: letters, a hyphen, digits.
@@ -273,14 +404,10 @@ fn under_title(path: &str, title: &str, sentence: &str) -> Edit {
     }
 }
 
-/// A MUST added to the row `line` of id `id`, with no change to its
-/// scenario: the specialist's check of each touched row against its
-/// scenario.
-fn row_without_scenario(name: &str, path: &str, line: &str, id: &str) -> Case {
-    let mut cells: Vec<String> = line.trim_end().split('|').map(str::to_owned).collect();
-    let requirement = &mut cells[3];
-    *requirement = format!("{}{ADDED_MUST} ", requirement.trim_end());
-    let new = format!("{}\n", cells.join("|"));
+/// A MUST added to the requirement `id`, which reads `old` and with
+/// the MUST `new`, with no change to its scenario: the specialist's
+/// check of each touched row against its scenario.
+fn row_without_scenario(name: &str, path: &str, old: String, new: String, id: &str) -> Case {
     case(
         name,
         "defect-row-without-scenario",
@@ -288,7 +415,7 @@ fn row_without_scenario(name: &str, path: &str, line: &str, id: &str) -> Case {
         &format!("a MUST added to {id} with no change to its scenario"),
         vec![Edit::Replace {
             file: path.to_owned(),
-            old: line.to_owned(),
+            old,
             new,
         }],
         Expect {

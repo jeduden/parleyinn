@@ -46,37 +46,7 @@ fn deployment_mode(w: &mut World, mode: String) -> Result<(), String> {
     ))
 }
 
-/// The first recorded line of `kind` whose `field` is `value`.
-fn recorded_where(kind: &str, field: &str, value: &Value) -> Result<Value, String> {
-    recorded(&format!("a {kind} line with {field} {value}"), |l| {
-        l["type"] == kind && pointer(l, field) == Some(value)
-    })
-}
-
-/// The value at `field`, a `/`-separated path.
-fn pointer<'a>(line: &'a Value, field: &str) -> Option<&'a Value> {
-    line.pointer(&format!("/{field}"))
-}
-
-/// A recorded attachment line of attachment type `kind`.
-pub(crate) fn attachment(kind: &str) -> Result<Value, String> {
-    recorded_where("attachment", "attachment/type", &json!(kind))
-}
-
-/// A recorded user line typed at the harness's input.
-pub(crate) fn typed() -> Result<Value, String> {
-    recorded_where("user", "promptSource", &json!("typed"))
-}
-
-/// A Bash call and its result, the result's output replaced by
-/// `output` when given.
-pub(crate) fn bash_result(output: Option<&str>) -> Result<Vec<Value>, String> {
-    let (call, mut result) = recorded_call("Bash")?;
-    if let Some(output) = output {
-        result["message"]["content"][0]["content"] = json!(output);
-    }
-    Ok(vec![call, result])
-}
+pub(crate) use testkit::transcript::{attachment, bash_result, recorded_where, typed};
 
 /// The lines PRV-03's items append, the item's own line last.
 fn untrusted_item(item: &str) -> Result<Vec<Value>, String> {

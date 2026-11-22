@@ -129,21 +129,7 @@ pub fn attended_mark(attended: bool) -> (&'static str, &'static str) {
     )
 }
 
-/// A recorded Claude Code 2.1.296 line typed at the harness's input,
-/// carrying `text` as prompt `prompt_id` marked `source`, in `session`.
-pub fn typed_line(
-    text: &str,
-    prompt_id: &str,
-    source: &str,
-    session: &str,
-) -> Result<Value, String> {
-    let mut line = recorded("a typed line", |l| l["promptSource"] == "typed")?;
-    line["message"]["content"] = json!(text);
-    line["promptId"] = json!(prompt_id);
-    line["promptSource"] = json!(source);
-    line["sessionId"] = json!(session);
-    Ok(line)
-}
+pub use testkit::transcript::typed_line;
 
 /// Every event the store holds, across every writer.
 fn events(w: &World) -> Result<usize, String> {
@@ -186,7 +172,7 @@ fn second_run_held(w: &mut World) -> Result<(), String> {
     fs::write(&path, format!("{mode}\n")).map_err(|e| e.to_string())?;
     let before = events(w)?;
     // Its harness runs the hook before it starts its MCP server.
-    let mut harness = crate::live::Harness::start(w, false, &[])?;
+    let mut harness = crate::live::start(w, false, &[])?;
     let input = session_start(w, session, "startup")?;
     harness.hook("SessionStart", &input)?;
     let appended = events(w)? - before;

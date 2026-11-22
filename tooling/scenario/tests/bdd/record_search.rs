@@ -27,7 +27,7 @@ use serde_json::{Value, json};
 use store::{NewEvent, Store};
 
 use crate::World;
-use crate::provenance::{bash_result, typed};
+use crate::provenance::bash_result;
 use crate::record::{first_start, home, last_run, run_core, set_env};
 use crate::security_redaction::append;
 
@@ -191,13 +191,7 @@ fn calls_event_search(w: &mut World, args: String) -> Result<(), String> {
     call_search(w, arguments).map(drop)
 }
 
-/// A typed user line saying `text`, its own `uuid` `n`.
-pub fn user_line(text: &str, n: u64) -> Result<Value, String> {
-    let mut line = typed()?;
-    line["message"]["content"] = json!(text);
-    line["uuid"] = json!(format!("00000000-0000-4000-8000-0000000012{n:02}"));
-    Ok(line)
-}
+pub use testkit::transcript::user_line;
 
 #[given(
     regex = r#"^"([^"]+)" contains a 2 MiB tool result with "([^"]+)" in its first KiB and "([^"]+)" beyond its first 1 MiB$"#

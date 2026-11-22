@@ -176,3 +176,123 @@ fn split_list_reads_a_comma_separated_cell() {
         r#"malformed trace "I11""#
     );
 }
+
+const REQ_BLOCKS: &str = "# Doc
+
+## REC-02
+
+- Pri: P1
+- Ver: T
+- Traces: I1, I10
+
+Link | parent.
+
+| ID | Pri | Requirement | Ver | Traces |
+|---|---|---|---|---|
+| REC-03 | P2 | Index. | T | — |
+
+## REC-04
+
+- Pri: P0
+- Ver: T
+- Traces: —
+
+Recall
+whole.
+";
+
+#[test]
+fn parse_reads_a_block_as_the_row_it_replaces() {
+    let rows = parse(doc(), REQ_TABLE).unwrap();
+    let got = parse(doc(), REQ_BLOCKS).unwrap();
+
+    assert_eq!(
+        got[0],
+        Requirement {
+            line: 3,
+            ..rows[1].clone()
+        }
+    );
+}
+
+#[test]
+fn parse_returns_rows_and_blocks_in_the_documents_order() {
+    let got: Vec<(String, usize)> = parse(doc(), REQ_BLOCKS)
+        .unwrap()
+        .into_iter()
+        .map(|r| (r.id, r.line))
+        .collect();
+
+    assert_eq!(
+        got,
+        [
+            ("REC-02".into(), 3),
+            ("REC-03".into(), 13),
+            ("REC-04".into(), 15)
+        ]
+    );
+}
+
+#[test]
+fn parse_reads_a_block_of_any_table_s_fields() {
+    let body = "## ASM-01\n\n- Evidence so far: S1\n- Verified in: S1\n- Affects: REC-01\n\n\
+                Hooks carry ids.\n\n## NFR-01\n\n- Category: Latency\n- Ver: A\n\nFast.\n";
+
+    let got = parse(doc(), body).unwrap();
+
+    assert_eq!(got[0].text, "Hooks carry ids.");
+    assert!(got[0].priority.is_empty() && got[0].verify.is_empty());
+    assert_eq!(
+        (got[1].verify.as_str(), got[1].text.as_str()),
+        ("A", "Fast.")
+    );
+}
+
+#[test]
+fn parse_rejects_malformed_blocks() {
+    let err = |body: &str| parse(doc(), body).unwrap_err().to_string();
+
+    assert_eq!(
+        err("## REC-01\n\n- Trace: I1\n\nText.\n"),
+        r#"srs: doc.md:1: REC-01: unknown field "Trace""#
+    );
+    assert_eq!(
+        err("## REC-01\n\n- Pri: P0\n- Pri: P1\n\nText.\n"),
+        r#"srs: doc.md:1: REC-01: field "Pri" twice"#
+    );
+    assert_eq!(
+        err("## REC-01\n\nText.\n"),
+        "srs: doc.md:1: REC-01: no fields"
+    );
+    assert_eq!(
+        err("## REC-01\n\n- Pri: P0\n\n## REC-02\n"),
+        "srs: doc.md:1: REC-01: no text"
+    );
+    assert_eq!(
+        err("## REC-01\n\n- Traces: I11\n\nText.\n"),
+        r#"srs: doc.md:1: REC-01: malformed trace "I11""#
+    );
+}
+
+#[test]
+fn load_rejects_a_block_that_redefines_a_row() {
+    let dir = TempDir::new().unwrap();
+    fs::write(dir.path().join("a.md"), REQ_TABLE).unwrap();
+    fs::write(
+        dir.path().join("b.md"),
+        "## REC-01\n\n- Pri: P0\n\nAgain.\n",
+    )
+    .unwrap();
+
+    let err = load(dir.path()).unwrap_err().to_string();
+
+    let (a, b) = (dir.path().join("a.md"), dir.path().join("b.md"));
+    assert_eq!(
+        err,
+        format!(
+            "srs: {}:1: REC-01 already defined at {}:5",
+            b.display(),
+            a.display()
+        )
+    );
+}

@@ -555,7 +555,7 @@ fn read_report(
             .push((part, run.cut.clone().unwrap_or_default()));
     }
     run.partial
-        .extend(reading::uncovered(workdir, &unit.stem(), &log.reads).map(|why| (part, why)));
+        .extend(reading::uncovered(workdir, &unit.stem(), log).map(|why| (part, why)));
 
     read.report
 }

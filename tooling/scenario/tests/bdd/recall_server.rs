@@ -5,7 +5,7 @@ use cucumber::{then, when};
 use serde_json::{Value, json};
 
 use crate::World;
-use crate::live::{Harness, wait_until};
+use crate::live::{self, wait_until};
 use crate::recall::{recall, recall_events, record_runs};
 use crate::record_search::call_tool;
 
@@ -28,7 +28,7 @@ fn calls_server_get(w: &mut World) -> Result<(), String> {
         "hook_event_name": "SessionStart",
         "source": "startup",
     });
-    let mut harness = Harness::start(w, false, &[])?;
+    let mut harness = live::start(w, false, &[])?;
     harness.hook("SessionStart", &input)?;
     harness.start_mcp()?;
     let params = json!({"name": "mcp_server_get", "arguments": {}});

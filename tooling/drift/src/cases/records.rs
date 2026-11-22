@@ -291,7 +291,7 @@ pub(super) fn repository_cases() -> Vec<Case> {
                 "every automatic one",
             ),
             scenario("ASM-09"),
-            "the OQ-01 row does not record that exit status 2 blocks every compaction (ASM-09)",
+            "OQ-01 does not record that exit status 2 blocks every compaction (ASM-09)",
         ),
         case(
             "the drift suite dropped from CI",
@@ -439,8 +439,8 @@ pub(super) fn gate_cases() -> Vec<Case> {
             "appendix_b_matches_the_traces",
             Injection::replace(
                 "docs/srs/10-engineering-quality.md",
-                "| ENG-25 | P1  |",
-                "| ENG-25 | P2  |",
+                "### ENG-25\n\n- Pri: P1\n",
+                "### ENG-25\n\n- Pri: P2\n",
             ),
             cargo_test("srs", "gates", "appendix_b_matches_the_traces"),
             "Appendix B's requirement counts",
@@ -468,8 +468,8 @@ pub(super) fn parse_cases() -> Vec<Case> {
             "specification_parses",
             Injection::replace(
                 "docs/srs/10-engineering-quality.md",
-                "| ENG-25 | P1  |",
-                "| ENG-24 | P1  |",
+                "### ENG-25\n",
+                "### ENG-24\n",
             ),
             cargo_test("srs", "gates", "specification_parses"),
             "ENG-24 already defined at",
@@ -480,6 +480,124 @@ pub(super) fn parse_cases() -> Vec<Case> {
             Injection::replace(TEST_STACK, "id: ADR-2610142221", "id ADR-2610142221"),
             cargo_test("adr", "records", "decision_records_parse"),
             "malformed front matter",
+        ),
+    ]
+}
+
+/// The drift the parse gate catches across sections: a requirement
+/// written as a block in a new section, with an id §10 defines, fails
+/// the gate as a second one in §10 would.
+pub(super) fn block_parse_cases() -> Vec<Case> {
+    vec![case(
+        "a requirement block redefining another section's id",
+        "specification_parses",
+        Injection::create(
+            "docs/srs/10b-drift.md",
+            "# Drift\n\n## ENG-25\n\n- Pri: P1\n- Ver: T\n\nA second ENG-25.\n",
+        ),
+        cargo_test("srs", "gates", "specification_parses"),
+        "10b-drift.md:3: ENG-25 already defined at",
+    )]
+}
+
+/// A requirement written as a block before the heading of §10.4: its
+/// heading, its two fields and 45 lines of text, 51 lines with the
+/// blank line after them, one past the cap.
+const LONG_BLOCK: &str = concat!(
+    "\n### ENG-99\n\n- Pri: P1\n- Ver: T\n\n",
+    "Line 1.\nLine 2.\nLine 3.\nLine 4.\nLine 5.\n",
+    "Line 6.\nLine 7.\nLine 8.\nLine 9.\nLine 10.\n",
+    "Line 11.\nLine 12.\nLine 13.\nLine 14.\nLine 15.\n",
+    "Line 16.\nLine 17.\nLine 18.\nLine 19.\nLine 20.\n",
+    "Line 21.\nLine 22.\nLine 23.\nLine 24.\nLine 25.\n",
+    "Line 26.\nLine 27.\nLine 28.\nLine 29.\nLine 30.\n",
+    "Line 31.\nLine 32.\nLine 33.\nLine 34.\nLine 35.\n",
+    "Line 36.\nLine 37.\nLine 38.\nLine 39.\nLine 40.\n",
+    "Line 41.\nLine 42.\nLine 43.\nLine 44.\nLine 45.\n",
+    "\n## 10.4 Process\n",
+);
+
+/// The drift mdsmith's cap on a requirement's length catches: a
+/// requirement written as a block grown past 50 lines.
+pub(super) fn block_length_cases() -> Vec<Case> {
+    vec![case(
+        "a requirement block grown past 50 lines",
+        "mdsmith check",
+        Injection::replace(
+            "docs/srs/10-engineering-quality.md",
+            "\n## 10.4 Process\n",
+            LONG_BLOCK,
+        ),
+        mdsmith(),
+        "section \"### ENG-99\" too long (51 > 50)",
+    )]
+}
+
+/// The drift mdsmith's line length for the srs kind catches, stern as
+/// it is: a sentence run on past 80 columns, with a space past them to
+/// wrap at. A line may pass them only with no space past them.
+pub(super) fn line_length_cases() -> Vec<Case> {
+    vec![case(
+        "a sentence of the SRS run on past 80 columns",
+        "mdsmith check",
+        Injection::replace(
+            "docs/srs/09a-command-line-interface.md",
+            "on a room its\nprincipal has no member seat in",
+            "on a room its principal has no member seat in",
+        ),
+        mdsmith(),
+        "line too long",
+    )]
+}
+
+/// The drifts mdsmith's schema for the srs kind catches in a
+/// requirement written as a block before the heading of §10.4: each a
+/// shape the srs crate reads, broken.
+pub(super) fn block_shape_cases() -> Vec<Case> {
+    let shape = |name, block, want| {
+        case(
+            name,
+            "mdsmith check",
+            Injection::replace(
+                "docs/srs/10-engineering-quality.md",
+                "\n## 10.4 Process\n",
+                block,
+            ),
+            mdsmith(),
+            want,
+        )
+    };
+    vec![
+        shape(
+            "a requirement block whose text runs on from its fields",
+            "\n### ENG-99\n\n- Pri: P1\n- Ver: T\nIt MUST hold.\n\n## 10.4 Process\n",
+            "missing required content \"paragraph\"",
+        ),
+        shape(
+            "a requirement block with a table under its text",
+            "\n### ENG-99\n\n- Pri: P1\n- Ver: T\n\nIt MUST hold.\n\n\
+             | A   |\n| --- |\n| a   |\n\n## 10.4 Process\n",
+            "unexpected content \"table\"",
+        ),
+        shape(
+            "a requirement block at its section's level",
+            "\n## ENG-99\n\n- Pri: P1\n- Ver: T\n\nIt MUST hold.\n\n## 10.4 Process\n",
+            "ENG-99: got h2, expected h3",
+        ),
+        shape(
+            "a requirement block whose fields are a loose list",
+            "\n### ENG-99\n\n- Pri: P1\n\n- Ver: T\n\nIt MUST hold.\n\n## 10.4 Process\n",
+            "section \"### ENG-99\" has too many paragraphs (3 > 1)",
+        ),
+        shape(
+            "a requirement block whose fields are marked with asterisks",
+            "\n### ENG-99\n\n* Pri: P1\n* Ver: T\n\nIt MUST hold.\n\n## 10.4 Process\n",
+            "unordered list uses asterisk; configured style is dash",
+        ),
+        shape(
+            "a requirement block whose fields are numbered",
+            "\n### ENG-99\n\n1. Pri: P1\n2. Ver: T\n\nIt MUST hold.\n\n## 10.4 Process\n",
+            "list ordered=true does not match required ordered=false",
         ),
     ]
 }

@@ -12,52 +12,488 @@ requirements define the quality bar for the codebase and the delivery pipeline.
 
 ## 10.1 Code
 
-| ID     | Pri | Requirement                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    | Ver  |
-| ------ | --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---- |
-| ENG-01 | P0  | Every toolchain the repository builds with MUST be fixed to an exact version in the repository: a `rust-toolchain.toml` naming an exact Rust release for the product, an exact dated nightly for the jobs that need one (`cargo-fuzz`, Miri, ThreadSanitizer), exact Node.js and package-manager versions for the browser room view client's build. Release builds MUST strip build paths (`--remap-path-prefix`), embed VCS information, and link no dynamic library beyond the operating system's; the core executable links none at all on Linux (CON-02).                  | I    |
-| ENG-02 | P0  | Product code MUST be organised as a Cargo workspace: one binary crate per executable and library crates with one responsibility each (e.g. `adapter-claudecode`, `ingest`, `provenance`, `redaction`, `flag`, `store`, `payload`, `search`, `recall`, `envelope`, `landmark`, `pin`, `restore_block`, `kernel`, `audit`, `configuration`, `administration`, `mcp`, `hook`), and the browser room view client as one TypeScript package that depends on nothing of the core but its generated types. Allowed dependency directions MUST be declared and enforced by a CI check. | I, T |
-| ENG-03 | P0  | Crates MUST NOT keep mutable global state (no `static mut`, no global cell or lock containing mutable state). All I/O MUST go through traits injectable in tests. Every blocking operation MUST take a deadline, carried directly or by a cancellation signal that a deadline fires. Code that computes derived artifacts MUST NOT read the wall clock or randomness (I10).                                                                                                                                                                                                    | I, T |
-| ENG-04 | P0  | Errors MUST keep their cause chain (each error type exposes its cause); each failure class that feeds a counter (OPS-01) MUST have a typed error. Panics MUST NOT cross crate boundaries; release builds MUST unwind on panic, and the hook handler and MCP entry points MUST catch it (`catch_unwind`), fail open, and audit; a hook handler MUST suppress the default panic message (§9.1).                                                                                                                                                                                  | I, T |
-| ENG-05 | P0  | Logging MUST use `tracing` with structured fields, and log fields MUST pass through redaction.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 | T    |
+### ENG-01
+
+- Pri: P0
+- Ver: I
+
+Every toolchain the repository builds with MUST be fixed to an exact version in
+the repository: a `rust-toolchain.toml` naming an exact Rust release for the
+product, an exact dated nightly for the jobs that need one (`cargo-fuzz`, Miri,
+ThreadSanitizer), exact Node.js and package-manager versions for the browser
+room view client's build.
+Release builds MUST strip build paths (`--remap-path-prefix`), embed VCS
+information, and link no dynamic library beyond the operating system's; the core
+executable links none at all on Linux (CON-02).
+
+### ENG-02
+
+- Pri: P0
+- Ver: I, T
+
+Product code MUST be organised as a Cargo workspace: one binary crate per
+executable and library crates with one responsibility each (e.g.
+`adapter-claudecode`, `ingest`, `provenance`, `redaction`, `flag`, `store`,
+`payload`, `search`, `recall`, `envelope`, `landmark`, `pin`, `restore_block`,
+`kernel`, `audit`, `configuration`, `administration`, `mcp`, `hook`), and the
+browser room view client as one TypeScript package that depends on nothing of
+the core but its generated types.
+Allowed dependency directions MUST be declared and enforced by a CI check.
+
+### ENG-03
+
+- Pri: P0
+- Ver: I, T
+
+Crates MUST NOT keep mutable global state (no `static mut`, no global cell or
+lock containing mutable state).
+All I/O MUST go through traits injectable in tests.
+Every blocking operation MUST take a deadline, carried directly or by a
+cancellation signal that a deadline fires.
+Code that computes derived artifacts MUST NOT read the wall clock or randomness
+(I10).
+
+### ENG-04
+
+- Pri: P0
+- Ver: I, T
+
+Errors MUST keep their cause chain (each error type exposes its cause); each
+failure class that feeds a counter (OPS-01) MUST have a typed error.
+Panics MUST NOT cross crate boundaries; release builds MUST unwind on panic, and
+the hook handler and MCP entry points MUST catch it (`catch_unwind`), fail open,
+and audit; a hook handler MUST suppress the default panic message (§9.1).
+
+### ENG-05
+
+- Pri: P0
+- Ver: T
+
+Logging MUST use `tracing` with structured fields, and log fields MUST pass
+through redaction.
 
 ## 10.2 Testing
 
-| ID     | Pri | Requirement                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         | Ver  |
-| ------ | --- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---- |
-| ENG-06 | P0  | A crash-consistency test MUST kill ParleyInn processes at randomized points during ingestion, purge, migration, and rebuild — at least 10,000 iterations per nightly job — and verify all invariants after each.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    | T    |
-| ENG-07 | P0  | Coverage-guided fuzzing (`cargo-fuzz`) MUST cover the transcript parser, hook input decoder, `event_search` query parser, envelope encoder, field sanitizer, redactor, and configuration parser, running continuously in nightly CI with the corpus committed. Any fuzz crash is a release blocker.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 | T    |
-| ENG-08 | P0  | Property-based tests MUST cover: within each writer's log, `seq` strictly increasing and gap-free, so that no two events share an address (writer, `seq`); ingest-twice equals ingest-once; every order in which a rebuild reads the same key events derives the same key event logs, and adding key events no committed recovery key signed, or confirms, chooses or rejects without a presence proof or a key counting independently, never adds a `witnessed` writer (PRV-12); where a `SessionStart` hook observation marks a harness fork, every order of ingesting its transcripts within the hold window, on an injected clock, records each repeated line in the same writer with the same repeat references (REC-04); after any sequence of appends and §8.5 lifecycle events, each derived artifact's canonical digest as kept equals that of a rebuild from nothing; envelope encoding round-trips any byte sequence; sanitized fields never contain restore delimiters. | T    |
-| ENG-09 | P0  | Data races MUST be excluded: safe Rust rejects them at compile time, and every `unsafe` block that shares memory between threads MUST run under Miri or ThreadSanitizer in CI. A nightly soak test MUST run 50 concurrent writers to 1M events and verify invariants, among them that no two events share an address (writer, `seq`) and no `seq` is duplicated or skipped within a writer's log. Every pull request MUST run the same checks at a smaller N, 50 writers and 10,000 events in all; the nightly run's result is the evidence for the 1M claim.                                                                                                                                                                                                                                                                                                                                                                                                                       | T    |
-| ENG-10 | P0  | Golden-file tests MUST compare the exact bytes of restore blocks and envelopes for fixture records with committed files (INJ-06).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   | T    |
-| ENG-11 | P0  | Line coverage MUST be ≥ 90% for security-sensitive crates (`provenance`, `redaction`, `flag`, `search`, `envelope`, `restore_block`, `pin`, `landmark`, `configuration`) and ≥ 80% overall.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         | A    |
-| ENG-12 | P0  | The end-to-end suite MUST run each component's entry point confined to its boundary: all network denied for the core (the hook handlers and the CLI, each harness adapter's transcript and hook part among them, the MCP server, the kernel worker and the TUI); all but loopback denied for the room-view component and the launcher; each of the peer, publish and bridge components confined to its register rows. It MUST fail on any socket outside the boundary the register assigns (SEC-19).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                | T    |
-| ENG-13 | P1  | Mutation testing SHOULD run on security-sensitive crates with a mutation score ≥ 70%.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               | A    |
-| ENG-14 | P0  | Tests MUST run with isolated `HOME` and `PARINN_HOME`; a guard MUST abort any test that touches the real `HOME`, a real ParleyInn home or real Claude Code configuration. The repository MUST NOT contain agent instruction files that direct agents to run destructive commands against non-isolated state.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        | T, I |
-| ENG-15 | P0  | A benchmark suite MUST cover NFR-01..05, with a CI gate failing on a statistically significant regression greater than 10%.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         | T    |
+### ENG-06
+
+- Pri: P0
+- Ver: T
+
+A crash-consistency test MUST kill ParleyInn processes at randomized points
+during ingestion, purge, migration, and rebuild — at least 10,000 iterations per
+nightly job — and verify all invariants after each.
+
+### ENG-07
+
+- Pri: P0
+- Ver: T
+
+Coverage-guided fuzzing (`cargo-fuzz`) MUST cover the transcript parser, hook
+input decoder, `event_search` query parser, envelope encoder, field sanitizer,
+redactor, and configuration parser, running continuously in nightly CI with the
+corpus committed.
+Any fuzz crash is a release blocker.
+
+### ENG-08
+
+- Pri: P0
+- Ver: T
+
+Property-based tests MUST cover: within each writer's log, `seq` strictly
+increasing and gap-free, so that no two events share an address (writer, `seq`);
+ingest-twice equals ingest-once; every order in which a rebuild reads the same
+key events derives the same key event logs, and adding key events no committed
+recovery key signed, or confirms, chooses or rejects without a presence proof or
+a key counting independently, never adds a `witnessed` writer (PRV-12); where a
+`SessionStart` hook observation marks a harness fork, every order of ingesting
+its transcripts within the hold window, on an injected clock, records each
+repeated line in the same writer with the same repeat references (REC-04); after
+any sequence of appends and §8.5 lifecycle events, each derived artifact's
+canonical digest as kept equals that of a rebuild from nothing; envelope
+encoding round-trips any byte sequence; sanitized fields never contain restore
+delimiters.
+
+### ENG-09
+
+- Pri: P0
+- Ver: T
+
+Data races MUST be excluded: safe Rust rejects them at compile time, and every
+`unsafe` block that shares memory between threads MUST run under Miri or
+ThreadSanitizer in CI.
+A nightly soak test MUST run 50 concurrent writers to 1M events and verify
+invariants, among them that no two events share an address (writer, `seq`) and
+no `seq` is duplicated or skipped within a writer's log.
+Every pull request MUST run the same checks at a smaller N, 50 writers and
+10,000 events in all; the nightly run's result is the evidence for the 1M claim.
+
+### ENG-10
+
+- Pri: P0
+- Ver: T
+
+Golden-file tests MUST compare the exact bytes of restore blocks and envelopes
+for fixture records with committed files (INJ-06).
+
+### ENG-11
+
+- Pri: P0
+- Ver: A
+
+Line coverage MUST be ≥ 90% for security-sensitive crates (`provenance`,
+`redaction`, `flag`, `search`, `envelope`, `restore_block`, `pin`, `landmark`,
+`configuration`) and ≥ 80% overall.
+
+### ENG-12
+
+- Pri: P0
+- Ver: T
+
+The end-to-end suite MUST run each component's entry point confined to its
+boundary: all network denied for the core (the hook handlers and the CLI, each
+harness adapter's transcript and hook part among them, the MCP server, the
+kernel worker and the TUI); all but loopback denied for the room-view component
+and the launcher; each of the peer, publish and bridge components confined to
+its register rows.
+It MUST fail on any socket outside the boundary the register assigns (SEC-19).
+
+### ENG-13
+
+- Pri: P1
+- Ver: A
+
+Mutation testing SHOULD run on security-sensitive crates with a mutation score ≥
+70%.
+
+### ENG-14
+
+- Pri: P0
+- Ver: T, I
+
+Tests MUST run with isolated `HOME` and `PARINN_HOME`; a guard MUST abort any
+test that touches the real `HOME`, a real ParleyInn home or real Claude Code
+configuration.
+The repository MUST NOT contain agent instruction files that direct agents to
+run destructive commands against non-isolated state.
+
+### ENG-15
+
+- Pri: P0
+- Ver: T
+
+A benchmark suite MUST cover NFR-01..05, with a CI gate failing on a
+statistically significant regression greater than 10%.
 
 ## 10.3 Static analysis and supply chain
 
-| ID     | Pri | Requirement                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               | Ver |
-| ------ | --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --- |
-| ENG-16 | P0  | CI MUST gate on `cargo clippy` with warnings denied, `cargo fmt --check`, `cargo-deny` (licenses, bans, sources), `cargo-audit` (no known vulnerabilities in the dependency tree), the TypeScript compiler in strict mode and a linter for the browser room view client, and custom checks. Every crate that parses content from outside the trusted sources or decides trust MUST carry `#![forbid(unsafe_code)]`. A build-time check MUST fail when code that computes derived artifacts reads a clock or randomness (I10), or when restore content is built from anything but trusted text (SEC-07, I2). Build-time evidence MUST show, per component, what network and program-start reach the code it can execute has, dependencies and code that runs as the process starts included: no network for the core, and no program start except its own kernel worker; program start only in the launcher; listening only in the room-view component (loopback only), the launcher (loopback, or a local endpoint only the same OS user can reach), the peer component and the publish component; off-machine connections only in the peer, publish and bridge components. CI MUST fail when that evidence is missing or shows more reach than the register (§6.3) grants, whatever the packaging.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       | T   |
-| ENG-17 | P0  | Contract tests MUST replay recorded hook inputs and transcripts for every supported Claude Code version (NFR-11), and a nightly live end-to-end test MUST drive real Claude Code headlessly through compaction, restore, and recall. The nightly job MUST also record a transcript and hook inputs from the newest Claude Code release and fail on any format drift (REC-26). Recorded fixtures MUST pass a check for residual identifiers, such as an account's email address, organization id, home paths and the names of its skills and connectors, before they are committed or any recording is logged or kept as a CI artifact, with its drift case (ENG-27).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      | T   |
-| ENG-18 | P0  | Every direct dependency MUST be justified by an accepted ADR (ENG-26) that states its purpose, license, maintenance status and the alternatives considered, and `DEPENDENCIES.md` MUST list those ADRs. Licenses MUST be on an allow-list (Apache-2.0, MIT, BSD, ISC). The target is ≤ 10 direct dependencies linked into a shipped executable; a dependency only tests, fuzz targets or the repository tooling use still needs its ADR and an allowed license, but does not count toward it. Updates MUST go through reviewed pull requests.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             | I   |
-| ENG-20 | P0  | Release artifacts MUST be signed with Sigstore (keyless), carry SLSA Build Level 3 provenance and an SPDX SBOM, and be published with a signed checksum file.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             | T   |
-| ENG-30 | P0  | Every crate linked into a shipped executable, other than the workspace's own, MUST carry a license text in its published source, and the repository MUST keep no license text for a crate that ships none: such a crate is removed or replaced. A crate is linked when a normal-dependency path from a binary under `crates/` reaches it with `cargo metadata --filter-platform <target-triple>` for any release target the build workflow names (ENG-31); build-only, proc-macro, test, fuzz and tooling crates are not. A pull request that adds or updates a dependency MUST fail CI when any crate it links in has no license file, or when a license file's text does not match the canonical text of a license in the crate's declared SPDX expression (a tool in the repository keeps the canonical text of every license on the allow-list in `deny.toml` and of every license a `deny.toml` exception grants, with a placeholder for the holder, year and name a template fills in, and for Apache-2.0 an optional appendix; a file matches when, ignoring case, whitespace and copyright lines, it fits that text), so a new dependency is caught in the pull request that adds it; the CI step runs the repository's `license-check` with `--locked`. The check MUST read only `Cargo.lock`, `cargo metadata` and the sources `cargo` has already fetched, and MUST add no dependency to a shipped executable.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 | T   |
-| ENG-31 | P0  | The core executable (`parinn`) MUST embed, and print with `parinn licenses`, the committed `THIRD_PARTY_LICENSES` file of its own release target, kept at `licenses/<target-triple>/THIRD_PARTY_LICENSES`: the name, version, license and full license text and copyright lines of every crate linked into the core for that target, and of any other third-party code compiled into it (SQLite, compiled in; the Rust standard library, which `cargo metadata` does not list; on the musl targets, the C library; and, on a target that links another runtime statically, that runtime). The release targets are the closed list the build workflow names, and a target's build selects its own file. A crate is linked for a target when a normal-dependency path from a binary under `crates/` reaches it with `cargo metadata --filter-platform <target-triple>`; build-only, proc-macro, test, fuzz and tooling crates are not. A tool in the repository MUST generate each file from `Cargo.lock`, `cargo metadata` and a fixed list in the tool of the code that is compiled in without being a crate (SQLite, the Rust standard library, the musl C library and any other runtime a target links statically), deterministically: the same lockfile yields the same bytes, in a sorted order, with no timestamp, host path or randomness. CI MUST regenerate every target's file and fail a pull request when any committed file differs, so the change that adds a dependency also regenerates them. A test per target MUST prove the build embeds that target's own file, by comparing the embedded text with that target's committed file and by the committed files of any two targets whose linked crates differ differing in bytes, so that comparison tells a wrong selection between them (targets that link the same crates, such as the two musl targets, carry identical files), so a wrong target selection cannot ship silently. The release build MUST fail when a built executable's `parinn licenses` output differs from its target's regenerated file. The text reaches the node's principal inside the executable, which ENG-20 signs and attests. Any other executable a component ships in (OQ-32) MUST carry the same for the crates linked into it. Embedding it MUST add no dependency and no network access to the core (ENG-18, SEC-01). | T   |
-| ENG-33 | P0  | Every workflow under `.github/workflows` and composite action under `.github/actions` MUST pin each action and reusable workflow it uses from outside the repository to a full 40-character commit sha, with the version that sha carries in a comment after it, and a container image it names with `docker://` to its sha256 digest; only the repository's own actions and workflows (`./`) go unpinned, so a moved tag or branch cannot change what CI runs (T11). A `run:` script MUST NOT expand with `${{ }}` a value a pull-request author can set: any `github.event` field (a pull request's title or body, a branch name, a comment's body), `github.head_ref`, or an `inputs` value; such a value MUST reach the script through the step's `env:`, read there as a quoted shell variable, so the shell never parses it as code. A check in the repository MUST fail CI when any workflow or composite action breaks either rule, and CI MUST also run zizmor over `.github`, so the pull request that adds an unpinned action or an untrusted expansion fails.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 | T   |
+### ENG-16
+
+- Pri: P0
+- Ver: T
+
+CI MUST gate on `cargo clippy` with warnings denied, `cargo fmt --check`,
+`cargo-deny` (licenses, bans, sources), `cargo-audit` (no known vulnerabilities
+in the dependency tree), the TypeScript compiler in strict mode and a linter for
+the browser room view client, and custom checks.
+Every crate that parses content from outside the trusted sources or decides
+trust MUST carry `#![forbid(unsafe_code)]`.
+A build-time check MUST fail when code that computes derived artifacts reads a
+clock or randomness (I10), or when restore content is built from anything but
+trusted text (SEC-07, I2).
+Build-time evidence MUST show, per component, what network and program-start
+reach the code it can execute has, dependencies and code that runs as the
+process starts included: no network for the core, and no program start except
+its own kernel worker; program start only in the launcher; listening only in the
+room-view component (loopback only), the launcher (loopback, or a local endpoint
+only the same OS user can reach), the peer component and the publish component;
+off-machine connections only in the peer, publish and bridge components.
+CI MUST fail when that evidence is missing or shows more reach than the register
+(§6.3) grants, whatever the packaging.
+
+### ENG-17
+
+- Pri: P0
+- Ver: T
+
+Contract tests MUST replay recorded hook inputs and transcripts for every
+supported Claude Code version (NFR-11), and a nightly live end-to-end test MUST
+drive real Claude Code headlessly through compaction, restore, and recall.
+The nightly job MUST also record a transcript and hook inputs from the newest
+Claude Code release and fail on any format drift (REC-26).
+Recorded fixtures MUST pass a check for residual identifiers, such as an
+account's email address, organization id, home paths and the names of its skills
+and connectors, before they are committed or any recording is logged or kept as
+a CI artifact, with its drift case (ENG-27).
+
+### ENG-18
+
+- Pri: P0
+- Ver: I
+
+Every direct dependency MUST be justified by an accepted ADR (ENG-26) that
+states its purpose, license, maintenance status and the alternatives considered,
+and `DEPENDENCIES.md` MUST list those ADRs.
+Licenses MUST be on an allow-list (Apache-2.0, MIT, BSD, ISC).
+The target is ≤ 10 direct dependencies linked into a shipped executable; a
+dependency only tests, fuzz targets or the repository tooling use still needs
+its ADR and an allowed license, but does not count toward it.
+Updates MUST go through reviewed pull requests.
+
+### ENG-20
+
+- Pri: P0
+- Ver: T
+
+Release artifacts MUST be signed with Sigstore (keyless), carry SLSA Build Level
+3 provenance and an SPDX SBOM, and be published with a signed checksum file.
+
+### ENG-30
+
+- Pri: P0
+- Ver: T
+
+Every crate linked into a shipped executable, other than the workspace's own,
+MUST carry a license text in its published source, and the repository MUST keep
+no license text for a crate that ships none: such a crate is removed or
+replaced.
+A crate is linked when a normal-dependency path from a binary under `crates/`
+reaches it with `cargo metadata --filter-platform <target-triple>` for any
+release target the build workflow names (ENG-31); build-only, proc-macro, test,
+fuzz and tooling crates are not.
+A pull request that adds or updates a dependency MUST fail CI when any crate it
+links in has no license file, or when a license file's text does not match the
+canonical text of a license in the crate's declared SPDX expression (a tool in
+the repository keeps the canonical text of every license on the allow-list in
+`deny.toml` and of every license a `deny.toml` exception grants, with a
+placeholder for the holder, year and name a template fills in, and for
+Apache-2.0 an optional appendix; a file matches when, ignoring case, whitespace
+and copyright lines, it fits that text), so a new dependency is caught in the
+pull request that adds it; the CI step runs the repository's `license-check`
+with `--locked`.
+The check MUST read only `Cargo.lock`, `cargo metadata` and the sources `cargo`
+has already fetched, and MUST add no dependency to a shipped executable.
+
+### ENG-31
+
+- Pri: P0
+- Ver: T
+
+The core executable (`parinn`) MUST embed, and print with `parinn licenses`, the
+committed `THIRD_PARTY_LICENSES` file of its own release target, kept at
+`licenses/<target-triple>/THIRD_PARTY_LICENSES`: the name, version, license and
+full license text and copyright lines of every crate linked into the core for
+that target, and of any other third-party code compiled into it (SQLite,
+compiled in; the Rust standard library, which `cargo metadata` does not list; on
+the musl targets, the C library; and, on a target that links another runtime
+statically, that runtime).
+The release targets are the closed list the build workflow names, and a target's
+build selects its own file.
+A crate is linked for a target when a normal-dependency path from a binary under
+`crates/` reaches it with `cargo metadata --filter-platform <target-triple>`;
+build-only, proc-macro, test, fuzz and tooling crates are not.
+A tool in the repository MUST generate each file from `Cargo.lock`,
+`cargo metadata` and a fixed list in the tool of the code that is compiled in
+without being a crate (SQLite, the Rust standard library, the musl C library and
+any other runtime a target links statically), deterministically: the same
+lockfile yields the same bytes, in a sorted order, with no timestamp, host path
+or randomness.
+CI MUST regenerate every target's file and fail a pull request when any
+committed file differs, so the change that adds a dependency also regenerates
+them.
+A test per target MUST prove the build embeds that target's own file, by
+comparing the embedded text with that target's committed file and by the
+committed files of any two targets whose linked crates differ differing in
+bytes, so that comparison tells a wrong selection between them (targets that
+link the same crates, such as the two musl targets, carry identical files), so a
+wrong target selection cannot ship silently.
+The release build MUST fail when a built executable's `parinn licenses` output
+differs from its target's regenerated file.
+The text reaches the node's principal inside the executable, which ENG-20 signs
+and attests.
+Any other executable a component ships in (OQ-32) MUST carry the same for the
+crates linked into it.
+Embedding it MUST add no dependency and no network access to the core (ENG-18,
+SEC-01).
+
+### ENG-33
+
+- Pri: P0
+- Ver: T
+
+Every workflow under `.github/workflows` and composite action under
+`.github/actions` MUST pin each action and reusable workflow it uses from
+outside the repository to a full 40-character commit sha, with the version that
+sha carries in a comment after it, and a container image it names with
+`docker://` to its sha256 digest; only the repository's own actions and
+workflows (`./`) go unpinned, so a moved tag or branch cannot change what CI
+runs (T11).
+A `run:` script MUST NOT expand with `${{ }}` a value a pull-request author can
+set: any `github.event` field (a pull request's title or body, a branch name, a
+comment's body), `github.head_ref`, or an `inputs` value; such a value MUST
+reach the script through the step's `env:`, read there as a quoted shell
+variable, so the shell never parses it as code.
+A check in the repository MUST fail CI when any workflow or composite action
+breaks either rule, and CI MUST also run zizmor over `.github`, so the pull
+request that adds an unpinned action or an untrusted expansion fails.
 
 ## 10.4 Process
 
-| ID     | Pri | Requirement                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            | Ver  |
-| ------ | --- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---- |
-| ENG-21 | P0  | All changes MUST land through reviewed pull requests with signed commits and no direct pushes to the main branch. Every pull request MUST be approved by a reviewer other than its author, and that reviewer MAY be an AI agent. Only a change to what guides the review MUST also be approved by the stakeholder `CODEOWNERS` names: the agent instructions (`CLAUDE.md`, `AGENTS.md`, `.claude/` and `docs/agents/`), the review's code, cases and scorecard (the `tooling/review-*` crates), CI and the merge rules (`.github/`, with `CODEOWNERS` itself, and `scripts/`), the manifests and tool pins CI builds and checks with (the `Cargo.toml` of the workspace, of each of its crates and of the fuzz crate, the mise files and each `rust-toolchain.toml`), the bans and acceptances CI holds the code to (every `clippy.toml`, `deny.toml`, `codecov.yml`, the accepted benchmark regressions and the recall evaluation's baseline) and the linter configuration (`.mdsmith.yml`). `CODEOWNERS` MUST name a code owner on no other path, so every other change, to the specification, the decision records, the scenarios or Rust source outside the review's crates, lands on a reviewer's approval alone and waits for no act of the stakeholder but the comment ENG-34 asks for and the approval ENG-29 asks for. Main's protection MUST also require on every pull request the review gate's check (ENG-28), taken from the reviewer GitHub App alone, so no other reviewer's approval stands in for the agent's. AI-generated changes MUST be labelled.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                | I    |
-| ENG-22 | P0  | Every privacy or data-flow statement in the documentation MUST reference the test that proves it. A statement MUST cite it after `test:` or `tests:` by the test function's name or a non-pending scenario's `@ID`, and a check MUST resolve each citation to a test that exists and is not ignored.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   | I    |
-| ENG-23 | P0  | Releases MUST follow semantic versioning, ship a changelog and upgrade notes, and test migrations from every previous minor version. Deprecations MUST last at least one minor release.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                | T, I |
-| ENG-24 | P0  | The repository MUST contain `SECURITY.md` with a private disclosure channel and a 90-day coordinated disclosure policy. Security fixes MUST be backported to the latest minor release.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 | I    |
-| ENG-25 | P1  | The project SHOULD have at least two active maintainers and an incident-response runbook before v1.0 general availability.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             | I    |
-| ENG-26 | P0  | Every design decision MUST be recorded in one ADR file under `docs/adr/`, named for its unique id, with a title, a status (proposed, accepted or superseded) and a one-line summary. A decision that changes MUST be recorded as a new ADR, and the ADR it replaces MUST be marked superseded and name the ADR that supersedes it.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     | T    |
-| ENG-27 | P0  | Every check that keeps the specification, its scenarios and the repository's records in step MUST have a registered drift case. CI MUST inject each drift into a copy of the repository and fail when the check does not catch it.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     | T    |
-| ENG-29 | P0  | A change to an invariant, to a requirement marked for I2 review (PRV-10, PRV-11, PRV-12, PRV-13), to a requirement I2 names or I4's boundaries rest on (PRV-08, INJ-01, INJ-02, INJ-04, INJ-10, OWN-04, OWN-07, OWN-08, OWN-23, OWN-24, OWN-26, OWN-29, SEC-01), to one those defer to (INJ-03, LANE-30, OWN-03, SEC-19, SEC-26, SEC-28), to the default trust policy or its limit (PRV-02, PRV-05), or to this requirement, MUST land only with an accepted ADR recording a named human security reviewer's approval. No B1, B2 or B3 component MAY be built past a prototype before that ADR is accepted. Prototype code MUST be provably absent from release artifacts and from every tagged release.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               | I    |
-| ENG-34 | P0  | The review bundle (ENG-28) MUST raise a finding, with no agent, for every source, test, feature or configuration file a pull request adds or changes that holds more lines than its kind's limit, outside the data under `testdata/`, `fuzz/corpus/`, `research/` and `plan/`: 1000 for Rust (`.rs`, a module's `tests.rs` among them), 500 for Gherkin (`.feature`), 500 for YAML (`.yml`, `.yaml`), 200 for TOML (`.toml`) and 200 for shell (`.sh`); Markdown is held to its own caps by `mdsmith check .`, and JSON, mostly data, has no limit. It MUST also raise a finding for every changed file no review specialist reads, by its type or its path, so that only a generalist does, lock files and generated files (`Cargo.lock`, `target/`, `*.lcov`) aside; this requirement restricts the review to no kind of file. Each finding MUST be on the file as a whole and take the finding form with the path alone in place of `path:line`: `path — if not addressed: <consequence> — ENG-34` for a file past its limit, whose consequence is that a file past the limit exceeds what a reviewer reads whole and what maintainers can hold in view, with its lines and its limit; and `path — if not addressed: <path> reached the merge unread — ENG-28` for a file no specialist reads. Both MUST be nits, listed in the review bundle and the deterministic findings with the others: the generalists weigh them, and only this requirement sets a limit. The finding stays a nit, and CI MUST also fail, apart from the review, on a file of the repository past its kind's limit, under the same exclusions, that the size list (`tooling/engineering/oversize.txt`) does not list, and on a listed file whose lines are not exactly those listed, naming the file, its lines and its listed lines: a file that grew MUST be split, and a file that shrank yet stays past its limit MUST have its listed lines lowered, so a regrowth cannot hide behind an old number; a listed file that fits its limit, or is gone, MUST leave the size list, so the size list only shrinks. The review bundle MUST also raise a blocking finding, with no agent, for a change that adds a file to the size list or raises a file's listed lines, until a stakeholder comment on the pull request names the size list; a change that only lowers or removes listed lines raises none and waits for no act of the stakeholder. The CI check reads the working tree, so it also leaves out what no pull request adds: git's store, `.tmp/`, other checkouts under `.claude/worktrees/` and `fuzz/target/`, cargo-fuzz's build output, which `fuzz/.gitignore` keeps out. | T    |
-| ENG-35 | P0  | The specification, scenarios, documentation outside research notes and historical records, agent instructions and each name of a function, type, module, crate, CLI verb, MCP tool, settings key or event MUST name what is ParleyInn's own only in the domain model's concepts (`docs/domain-model`), beside the words its hub leaves to an outside domain or engineering tooling, and MUST use a term the model excludes only where its hub allows. The specialists of the specification's sections, the model's concept files and its hub (ENG-28) MUST report each breach as a finding linked to it.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               | T    |
+### ENG-21
+
+- Pri: P0
+- Ver: I
+
+All changes MUST land through reviewed pull requests with signed commits and no
+direct pushes to the main branch.
+Every pull request MUST be approved by a reviewer other than its author, and
+that reviewer MAY be an AI agent.
+Only a change to what guides the review MUST also be approved by the stakeholder
+`CODEOWNERS` names: the agent instructions (`CLAUDE.md`, `AGENTS.md`, `.claude/`
+and `docs/agents/`), the review's code, cases and scorecard (the
+`tooling/review-*` crates), CI and the merge rules (`.github/`, with
+`CODEOWNERS` itself, and `scripts/`), the manifests and tool pins CI builds and
+checks with (the `Cargo.toml` of the workspace, of each of its crates and of the
+fuzz crate, the mise files and each `rust-toolchain.toml`), the bans and
+acceptances CI holds the code to (every `clippy.toml`, `deny.toml`,
+`codecov.yml`, the accepted benchmark regressions and the recall evaluation's
+baseline) and the linter configuration (`.mdsmith.yml`). `CODEOWNERS` MUST name
+a code owner on no other path, so every other change, to the specification, the
+decision records, the scenarios or Rust source outside the review's crates,
+lands on a reviewer's approval alone and waits for no act of the stakeholder but
+the comment ENG-34 asks for and the approval ENG-29 asks for.
+Main's protection MUST also require on every pull request the review gate's
+check (ENG-28), taken from the reviewer GitHub App alone, so no other reviewer's
+approval stands in for the agent's.
+AI-generated changes MUST be labelled.
+
+### ENG-22
+
+- Pri: P0
+- Ver: I
+
+Every privacy or data-flow statement in the documentation MUST reference the
+test that proves it.
+A statement MUST cite it after `test:` or `tests:` by the test function's name
+or a non-pending scenario's `@ID`, and a check MUST resolve each citation to a
+test that exists and is not ignored.
+
+### ENG-23
+
+- Pri: P0
+- Ver: T, I
+
+Releases MUST follow semantic versioning, ship a changelog and upgrade notes,
+and test migrations from every previous minor version.
+Deprecations MUST last at least one minor release.
+
+### ENG-24
+
+- Pri: P0
+- Ver: I
+
+The repository MUST contain `SECURITY.md` with a private disclosure channel and
+a 90-day coordinated disclosure policy.
+Security fixes MUST be backported to the latest minor release.
+
+### ENG-25
+
+- Pri: P1
+- Ver: I
+
+The project SHOULD have at least two active maintainers and an incident-response
+runbook before v1.0 general availability.
+
+### ENG-26
+
+- Pri: P0
+- Ver: T
+
+Every design decision MUST be recorded in one ADR file under `docs/adr/`, named
+for its unique id, with a title, a status (proposed, accepted or superseded) and
+a one-line summary.
+A decision that changes MUST be recorded as a new ADR, and the ADR it replaces
+MUST be marked superseded and name the ADR that supersedes it.
+
+### ENG-27
+
+- Pri: P0
+- Ver: T
+
+Every check that keeps the specification, its scenarios and the repository's
+records in step MUST have a registered drift case.
+CI MUST inject each drift into a copy of the repository and fail when the check
+does not catch it.
+
+### ENG-29
+
+- Pri: P0
+- Ver: I
+
+A change to an invariant, to a requirement marked for I2 review (PRV-10, PRV-11,
+PRV-12, PRV-13), to a requirement I2 names or I4's boundaries rest on (PRV-08,
+INJ-01, INJ-02, INJ-04, INJ-10, OWN-04, OWN-07, OWN-08, OWN-23, OWN-24, OWN-26,
+OWN-29, SEC-01), to one those defer to (INJ-03, LANE-30, OWN-03, SEC-19, SEC-26,
+SEC-28), to the default trust policy or its limit (PRV-02, PRV-05), or to this
+requirement, MUST land only with an accepted ADR recording a named human
+security reviewer's approval.
+No B1, B2 or B3 component MAY be built past a prototype before that ADR is
+accepted.
+Prototype code MUST be provably absent from release artifacts and from every
+tagged release.
+
+### ENG-34
+
+- Pri: P0
+- Ver: T
+
+The review bundle (ENG-28) MUST raise a finding, with no agent, for every
+source, test, feature or configuration file a pull request adds or changes that
+holds more lines than its kind's limit, outside the data under `testdata/`,
+`fuzz/corpus/`, `research/` and `plan/`: 1000 for Rust (`.rs`, a module's
+`tests.rs` among them), 500 for Gherkin (`.feature`), 500 for YAML (`.yml`,
+`.yaml`), 200 for TOML (`.toml`) and 200 for shell (`.sh`); Markdown is held to
+its own caps by `mdsmith check .`, and JSON, mostly data, has no limit.
+It MUST also raise a finding for every changed file no review specialist reads,
+by its type or its path, so that only a generalist does, lock files and
+generated files (`Cargo.lock`, `target/`, `*.lcov`) aside; this requirement
+restricts the review to no kind of file.
+Each finding MUST be on the file as a whole and take the finding form with the
+path alone in place of `path:line`:
+`path — if not addressed: <consequence> — ENG-34` for a file past its limit,
+whose consequence is that a file past the limit exceeds what a reviewer reads
+whole and what maintainers can hold in view, with its lines and its limit; and
+`path — if not addressed: <path> reached the merge unread — ENG-28` for a file
+no specialist reads.
+Both MUST be nits, listed in the review bundle and the deterministic findings
+with the others: the generalists weigh them, and only this requirement sets a
+limit.
+The finding stays a nit, and CI MUST also fail, apart from the review, on a file
+of the repository past its kind's limit, under the same exclusions, that the
+size list (`tooling/engineering/oversize.txt`) does not list, and on a listed
+file whose lines are not exactly those listed, naming the file, its lines and
+its listed lines: a file that grew MUST be split, and a file that shrank yet
+stays past its limit MUST have its listed lines lowered, so a regrowth cannot
+hide behind an old number; a listed file that fits its limit, or is gone, MUST
+leave the size list, so the size list only shrinks.
+The review bundle MUST also raise a blocking finding, with no agent, for a
+change that adds a file to the size list or raises a file's listed lines, until
+a stakeholder comment on the pull request names the size list; a change that
+only lowers or removes listed lines raises none and waits for no act of the
+stakeholder.
+The CI check reads the working tree, so it also leaves out what no pull request
+adds: git's store, `.tmp/`, other checkouts under `.claude/worktrees/` and
+`fuzz/target/`, cargo-fuzz's build output, which `fuzz/.gitignore` keeps out.
+
+### ENG-35
+
+- Pri: P0
+- Ver: T
+
+The specification, scenarios, documentation outside research notes and
+historical records, agent instructions and each name of a function, type,
+module, crate, CLI verb, MCP tool, settings key or event MUST name what is
+ParleyInn's own only in the domain model's concepts (`docs/domain-model`),
+beside the words its hub leaves to an outside domain or engineering tooling, and
+MUST use a term the model excludes only where its hub allows.
+The specialists of the specification's sections, the model's concept files and
+its hub (ENG-28) MUST report each breach as a finding linked to it.
