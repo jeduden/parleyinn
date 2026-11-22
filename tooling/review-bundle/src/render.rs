@@ -3,7 +3,8 @@
 //! ENG-29, the scenario backlog with the scenarios the pull request
 //! takes off `@pending`, and the rows, scenarios and invariants the
 //! change touches, each from main and, where it differs, from the pull
-//! request; and the small context each specialist reads in its place.
+//! request; and the small context each specialist reads in its place,
+//! which quotes the requirements its own files touch.
 
 use std::fmt::Write as _;
 
@@ -56,11 +57,12 @@ pub fn bundle(a: &Analysis, base: &Snapshot, head: &Snapshot) -> String {
 /// The small context specialist `name` reads beside its own diff, in
 /// place of the bundle, which on a large change is too large for one
 /// read: the review class and the touched ids, the dispatch rows that
-/// name it, its files, and the deterministic findings on them, or every
-/// one when it has no file of its own, as its diff is then the whole
-/// diff.
+/// name it, its files, the requirements they touch from `head`, the
+/// pull request's tree, or `base`, main's, and the deterministic
+/// findings on them, or every one when it has no file of its own, as
+/// its diff is then the whole diff.
 #[must_use]
-pub fn context(a: &Analysis, name: &str) -> String {
+pub fn context(a: &Analysis, base: &Snapshot, head: &Snapshot, name: &str) -> String {
     let mut b = format!(
         "# Review context for `{}`\n\n\
          Built by `review-bundle` from main's tree and the pull request's. \
@@ -98,6 +100,7 @@ pub fn context(a: &Analysis, name: &str) -> String {
         }
         None => b.push_str("\nYour files: none of your own, so your diff is the whole diff.\n"),
     }
+    own_requirements(&mut b, a, base, head, scope);
     b.push_str("\n## Deterministic findings on your files\n\n");
     let (own, other): (Vec<_>, Vec<_>) =
         shown(a).partition(|f| scope.is_none_or(|files| files.contains(&f.path)));
@@ -252,6 +255,84 @@ fn touched(b: &mut String, a: &Analysis, base: &Snapshot, head: &Snapshot) {
             (_, None, None) => b.push_str("\nNo scenario carries it.\n"),
         }
     }
+}
+
+/// The requirements `files` touch ([`Analysis::named`]), each as the
+/// pull request has it, `head`, or as main has it, `base`, when the
+/// pull request removes it: a specialist reads its rows here, whole,
+/// and searches the specification for none, whose rows are lines too
+/// long for a search to show.
+fn own_requirements(
+    b: &mut String,
+    a: &Analysis,
+    base: &Snapshot,
+    head: &Snapshot,
+    files: Option<&std::collections::BTreeSet<String>>,
+) {
+    b.push_str("\n## Requirements your files touch\n");
+    let ids: std::collections::BTreeSet<&String> = (files.into_iter().flatten())
+        .filter_map(|f| a.named.get(f))
+        .flatten()
+        .collect();
+    if ids.is_empty() {
+        b.push_str("\nNone.\n");
+    }
+    for id in ids {
+        let row = |s: &Snapshot| s.requirements.iter().find(|r| &r.id == id).cloned();
+        match (row(head), row(base)) {
+            (Some(is), _) => quoted(b, &is, ""),
+            (None, Some(was)) => {
+                quoted(b, &was, " on main, which this pull request removes it from")
+            }
+            (None, None) => {
+                let _ = writeln!(b, "\n`{}`: no row defines it in either tree.", code(id));
+            }
+        }
+    }
+}
+
+/// Requirement `r`, its place followed by `whose`, then its text one
+/// sentence or clause per line ([`sentences`]), each quoted, so no line
+/// of the pull request's starts a line of the context.
+fn quoted(b: &mut String, r: &srs::Requirement, whose: &str) {
+    let traces = if r.traces.is_empty() {
+        "none".to_owned()
+    } else {
+        r.traces.join(" ")
+    };
+    let _ = writeln!(
+        b,
+        "\n`{}` (`{}:{}`{whose}), Pri {}, Ver {}, Traces {traces}:\n",
+        code(&r.id),
+        r.path.display(),
+        r.line,
+        or_none(&r.priority),
+        or_none(&r.verify),
+    );
+    for sentence in sentences(&r.text) {
+        let _ = writeln!(b, "> {}", one_line(sentence));
+    }
+}
+
+/// `text` split after each `. ` and `; ` outside a code span, each part
+/// trimmed and none empty: a requirement's sentences and clauses.
+fn sentences(text: &str) -> Vec<&str> {
+    let mut out = Vec::new();
+    let (mut start, mut in_code) = (0, false);
+    for (i, c) in text.char_indices() {
+        match c {
+            '`' => in_code = !in_code,
+            '.' | ';' if !in_code && text[i + 1..].starts_with(' ') => {
+                out.push(text[start..=i].trim());
+                start = i + 1;
+            }
+            _ => {}
+        }
+    }
+    out.push(text[start..].trim());
+    out.retain(|s| !s.is_empty());
+
+    out
 }
 
 /// One requirement row under `label`.
