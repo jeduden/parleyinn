@@ -68,8 +68,9 @@ pub fn blocks(body: &str) -> Vec<Block> {
 
 /// Adds `line` to `block`, read in `part`, and returns the part the
 /// next line is read in: an item under the heading opens the field
-/// list, an indented line continues its last field, and any other
-/// line that is not blank is text.
+/// list, any other line of the list continues its last field, as
+/// Markdown reads a list item's lines, a blank line ends the list, and
+/// any other line that is not blank is text.
 fn take(block: &mut Block, part: Part, line: &str) -> Part {
     let trimmed = line.trim();
     let item = line.strip_prefix("- ");
@@ -85,7 +86,7 @@ fn take(block: &mut Block, part: Part, line: &str) -> Part {
             Part::Head => Part::Head,
             Part::Fields | Part::Text => Part::Text,
         },
-        (Part::Fields, None) if line.starts_with(' ') => {
+        (Part::Fields, None) => {
             if let Some((_, value)) = block.fields.last_mut() {
                 value.push(' ');
                 value.push_str(trimmed);

@@ -68,11 +68,14 @@ fn blocks_reads_an_item_without_a_colon_as_its_label_and_no_list_as_no_fields() 
 }
 
 #[test]
-fn blocks_ends_the_field_list_at_its_first_other_line() {
-    let got = blocks("## REC-01\n- Pri: P0\nText at once.\n- Ver: T\n");
+fn a_line_under_a_field_continues_it_up_to_a_blank_line_as_markdown_reads_it() {
+    let got = blocks("## REC-01\n- Pri: P0\nText at once.\n- Traces: I1,\nI2\n\nText.\n- Ver: T\n");
 
-    assert_eq!(got[0].fields, [field("Pri", "P0")]);
-    assert_eq!(got[0].text, "Text at once. - Ver: T");
+    assert_eq!(
+        got[0].fields,
+        [field("Pri", "P0 Text at once."), field("Traces", "I1, I2")]
+    );
+    assert_eq!(got[0].text, "Text. - Ver: T");
 }
 
 #[test]
