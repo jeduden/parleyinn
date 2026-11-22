@@ -291,7 +291,7 @@ pub(super) fn repository_cases() -> Vec<Case> {
                 "every automatic one",
             ),
             scenario("ASM-09"),
-            "the OQ-01 row does not record that exit status 2 blocks every compaction (ASM-09)",
+            "OQ-01 does not record that exit status 2 blocks every compaction (ASM-09)",
         ),
         case(
             "the drift suite dropped from CI",

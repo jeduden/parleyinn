@@ -128,7 +128,7 @@ Feature: Assumptions register (ASM)
     And no "PostCompact" hook fired, nor a "SessionStart" hook with "source" set to "compact"
     And the words the PreCompact handler wrote to stderr <reach>
     And <outcome>
-    And the OQ-01 row of SRS §13 records what ASM-09's recordings showed
+    And OQ-01 in SRS §13 records what ASM-09's recordings showed
 
     Examples:
       | recording   | how                                          | trigger | reach                                                                             | outcome                                                                                                |
