@@ -1,7 +1,7 @@
 ---
 n: 13
 title: "§6's threat model in its own file"
-status: "🔳"
+status: "✅"
 result: false
 ---
 # Phase 13: §6's threat model in its own file
@@ -10,8 +10,7 @@ Requirements. None changes, and no scenario comes off `@pending`. This
 phase is task 5's eighth pull request. §6's threats and residual risks
 held rows of 630 and 571 characters. As lists they would take §6 past
 the srs kind's cap of 700 lines, to about 760. Splitting the threat
-model out is the option recommended to the stakeholder on 22 November
-2026, and this phase lands only on their ruling.
+model out is the option the stakeholder chose on 22 November 2026.
 
 The edit. §6.1, the threat model, moves word for word to
 `docs/srs/06a-threat-model.md`, titled 6. Security: threat model. Its
