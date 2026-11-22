@@ -1,7 +1,7 @@
 ---
 n: 15
 title: "The parser refuses a requirement table"
-status: "🔳"
+status: "✅"
 result: false
 ---
 # Phase 15: The parser refuses a requirement table
