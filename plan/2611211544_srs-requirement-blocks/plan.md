@@ -90,6 +90,12 @@ split; phase 1 lands it. ENG-28's entry is 193, its length with the
 clause #161 adds, since its section is rewritten only after #161
 lands.
 
+The shape. The srs crate reads a block line by line, and mdsmith
+reads it as Markdown. On 22 November 2026 the stakeholder asked that
+mdsmith lint the shape the parser depends on. Phase 1 gives the srs
+kind a schema for it, and has the parser read a field's lines and a
+table's start as Markdown does, so the two read a block alike.
+
 ## The requirement block
 
 ```markdown
@@ -111,20 +117,25 @@ The review's agents MUST have no credential that can approve or write.
   as its cell holds it. A long value wraps onto lines indented by two
   spaces.
 - The text runs from the list to the next heading: one sentence per
-  line, a sentence longer than 80 characters wrapped at a space. No
-  line opens with what Markdown reads as a list, a quote, a table or a
-  heading.
+  line, a sentence longer than 80 characters wrapped at a space, all
+  one paragraph.
 - The parser reads Pri, Ver and Traces as it read those columns, and
   the text as its lines joined by single spaces. A row and its block
-  read the same.
+  read the same. A field's lines run to the blank line that ends the
+  list, as Markdown reads a list item's, and a block ends at the next
+  heading or where a table opens.
+- mdsmith's schema for the srs kind holds a block to this shape: a
+  list marked with dashes, then one paragraph and nothing else, at its
+  level. What it passes, the parser reads as Markdown does.
 - A block holds at most 50 lines, from its heading to the next, or
   the length the srs kind lists for it until it is split.
 
 ## Tasks
 
 1. Every reader of the SRS takes a requirement written as a block,
-   beside the tables, and a block holds at most 50 lines. A rewrite
-   of the review section on a scratch branch proves it (phase 1).
+   beside the tables, a block holds at most 50 lines, and mdsmith
+   checks its shape. A rewrite of the review section on a scratch
+   branch proves it (phase 1).
 2. The review section is rewritten through main's tools, once main's
    `lang-gherkin` reads a requirement as its review context quotes it
    (#161), not by a search for a row (phase 1's handoff).
@@ -146,9 +157,9 @@ The review's agents MUST have no credential that can approve or write.
 
 ## Execution
 
-| Phase | Model | Gate                                                                                                                                                              |
-| ----- | ----- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1     | opus  | A block that redefines a row's id fails the parse gate's drift case, a block past 50 lines fails mdsmith's; the review section rewritten locally passes its gates |
+| Phase | Model | Gate                                                                                                                                                                 |
+| ----- | ----- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1     | opus  | A block redefining a row's id fails the parse gate's drift case, one too long or out of shape fails mdsmith's; the review section rewritten locally passes its gates |
 
 ## Phases
 
@@ -171,10 +182,10 @@ footer: |
 
 ?>
 
-| #   | Status | Phase                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
-| --- | ------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1   | ✅     | [Every reader takes a requirement written as a block](phase-1.md)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
-|     | ↳      | Every reader of the SRS now takes a requirement written as a block beside the tables: the srs crate's parser, which every gate shares, and the evaluation's derived cases. No requirement changes, and no scenario comes off @pending. Rewritten as blocks on a scratch branch, the review section passed its gates, its derived cases and the local review, whose bundle showed no requirement changed. Drift cases land with it. The srs kind's cap rises to 700 lines, and a requirement may hold 50, six longer ones listed until each is split. |
+| #   | Status | Phase                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| --- | ------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | ✅     | [Every reader takes a requirement written as a block](phase-1.md)                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+|     | ↳      | Every reader of the SRS now takes a requirement written as a block beside the tables: the srs crate's parser, which every gate shares, and the evaluation's derived cases. No requirement changes, and no scenario comes off @pending. Rewritten as blocks on a scratch branch, the review section passed its gates and the local review, and its bundle showed no requirement changed. The srs kind's cap rises to 700 lines, a requirement may hold 50, six longer ones listed until each is split, and mdsmith checks a block's shape. |
 <?/catalog?>
 
 ## Acceptance Criteria
