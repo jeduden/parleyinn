@@ -132,6 +132,26 @@ fn a_kept_part_is_held_to_its_reads_of_its_diff_again() {
 }
 
 #[test]
+fn a_kept_part_that_read_its_diff_where_its_run_started_is_whole() {
+    // The earlier run read its diff by absolute paths under its own
+    // work directory, gone once a resumed review runs elsewhere.
+    let dir = workdir();
+    big_diff(dir.path());
+    let mut resume = keeping_part_one(fake::FINDING, "outcome: findings — kept.");
+    if let Some(Reuse::Parts(kept)) = resume.reuse.get_mut("lang-rust") {
+        let log = kept.get_mut(&1).unwrap();
+        log.cwd = "/gone/work".to_owned();
+        log.reads[0].path = "/gone/work/review/diffs/lang-rust.1.diff".to_owned();
+    }
+
+    let (runs, _, _) = resumed_split_run(dir.path(), &resume);
+
+    let rust = &runs[0];
+    assert!(rust.whole(), "{rust:?}");
+    assert!(rust.partial.is_empty(), "{:?}", rust.partial);
+}
+
+#[test]
 fn a_kept_part_cut_off_before_it_stated_anything_is_no_whole_review() {
     let dir = workdir();
     big_diff(dir.path());
