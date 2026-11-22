@@ -35,17 +35,39 @@ while encryption at rest is on, in memory or encrypted under the at-rest key
 
 ## 8.2 Logical schema
 
-| Table                | Kind       | Key contents                                                                                                                                                                                                                                                                                                                | Constraints                                                                                                                                                                                                    |
-| -------------------- | ---------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `meta`               | state      | schema version, home id                                                                                                                                                                                                                                                                                                     | single row                                                                                                                                                                                                     |
-| `transcript_sources` | state      | path, generation, the harness's transcript id, the runs it contains (a harness session's transcripts contain its main agent's run and one per subagent, a subagent's possibly in its own file, ASM-03), each with its parent run and the harness's agent id, ingest position (byte offset and consumed-prefix hash), status | UNIQUE(path, generation) **(N)**                                                                                                                                                                               |
-| `events`             | **record** | writer, `seq`, run, transcript source, generation, transcript line, kind, provenance, recorder, tool name, inline text or preview, payload reference and size, commitment (REC-17), model-token estimate, flags, transcript timestamp, `prev_hash`, `hash`, redaction count                                                 | (writer, `seq`) PRIMARY KEY, `seq` strictly increasing and gap-free per writer **(N)**; UNIQUE(transcript source, generation, transcript line) **(N)**; rows immutable except content removal by purge **(N)** |
-| `events_fts`         | derived    | FTS5 over event text                                                                                                                                                                                                                                                                                                        | rebuildable **(N)**                                                                                                                                                                                            |
-| `spans`              | derived    | run, address range, span boundary kind                                                                                                                                                                                                                                                                                      | rebuildable **(N)**                                                                                                                                                                                            |
-| `landmarks`          | derived    | tier, address range, rendered text, taint                                                                                                                                                                                                                                                                                   | rebuildable **(N)**                                                                                                                                                                                            |
-| `pins`               | derived    | creating address, pin version, type, priority, room, text, creating event's commitment, each version's author, stamps, active                                                                                                                                                                                               | rebuildable from pin events (`operator` for device-seat pins, `assistant` for run-seat pins), stamps and unstamps **(N)**                                                                                      |
-| `quarantine`         | derived    | creating address, selector, active                                                                                                                                                                                                                                                                                          | rebuildable from quarantine events **(N)**                                                                                                                                                                     |
-| `tombstones`         | derived    | purge event address, purged range, counts, reason or retention policy, a digest over the commitments of removed events (the chained headers keep each), structural fields, provenance and recorder of each removed act, tombstone and event the key set holds                                                               | rebuildable **(N)**                                                                                                                                                                                            |
+- `meta`, state: schema version, home id
+  - Constraints: single row
+- `transcript_sources`, state: path, generation, the harness's transcript id,
+  the runs it contains (a harness session's transcripts contain its main agent's
+  run and one per subagent, a subagent's possibly in its own file, ASM-03), each
+  with its parent run and the harness's agent id, ingest position (byte offset
+  and consumed-prefix hash), status
+  - Constraints: UNIQUE(path, generation) **(N)**
+- `events`, **record**: writer, `seq`, run, transcript source, generation,
+  transcript line, kind, provenance, recorder, tool name, inline text or
+  preview, payload reference and size, commitment (REC-17), model-token
+  estimate, flags, transcript timestamp, `prev_hash`, `hash`, redaction count
+  - Constraints: (writer, `seq`) PRIMARY KEY, `seq` strictly increasing and
+    gap-free per writer **(N)**; UNIQUE(transcript source, generation,
+    transcript line) **(N)**; rows immutable except content removal by
+    purge **(N)**
+- `events_fts`, derived: FTS5 over event text
+  - Constraints: rebuildable **(N)**
+- `spans`, derived: run, address range, span boundary kind
+  - Constraints: rebuildable **(N)**
+- `landmarks`, derived: tier, address range, rendered text, taint
+  - Constraints: rebuildable **(N)**
+- `pins`, derived: creating address, pin version, type, priority, room, text,
+  creating event's commitment, each version's author, stamps, active
+  - Constraints: rebuildable from pin events (`operator` for device-seat pins,
+    `assistant` for run-seat pins), stamps and unstamps **(N)**
+- `quarantine`, derived: creating address, selector, active
+  - Constraints: rebuildable from quarantine events **(N)**
+- `tombstones`, derived: purge event address, purged range, counts, reason or
+  retention policy, a digest over the commitments of removed events (the chained
+  headers keep each), structural fields, provenance and recorder of each removed
+  act, tombstone and event the key set holds
+  - Constraints: rebuildable **(N)**
 
 Purge replaces event content with nothing and keeps the row's address, `hash`,
 `prev_hash` and commitment, so the chain stays verifiable and each writer's
