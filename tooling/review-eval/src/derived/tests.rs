@@ -385,6 +385,12 @@ fn a_block_is_a_requirement_with_a_priority_up_to_its_next_heading_or_table() {
         first_block(&format!("{block}\n| A |\n|---|\n")),
         Some((block.to_owned(), "SEC-02".to_owned()))
     );
+    // A pipe row with no delimiter row under it opens no table.
+    let piped = "## SEC-03\n\n- Pri: P2\n\nText\n| and more.\n";
+    assert_eq!(
+        first_block(piped),
+        Some((piped.to_owned(), "SEC-03".to_owned()))
+    );
     // An assumption or a non-functional requirement carries no priority,
     // as its row carries none, and an open question is no requirement.
     assert_eq!(
@@ -471,11 +477,22 @@ fn heading_reads_one_to_six_hashes_and_a_space_or_the_end() {
 }
 
 #[test]
-fn a_heading_or_a_table_line_ends_a_block() {
-    assert!(ends_block("## Next"));
-    assert!(ends_block("  | A |"));
-    assert!(!ends_block("#tag"));
-    assert!(!ends_block("Text with a | in it."));
+fn a_heading_or_the_first_line_of_a_table_ends_a_block() {
+    assert!(ends_block("## Next", None));
+    assert!(ends_block("  | A |", Some("|---|")));
+    assert!(!ends_block("| and more.", Some("Text.")));
+    assert!(!ends_block("| A |", None));
+    assert!(!ends_block("#tag", None));
+    assert!(!ends_block("Text with a | in it.", Some("|---|")));
+}
+
+#[test]
+fn a_delimiter_row_holds_dashes_in_every_cell() {
+    assert!(delimiter_row("| --- | :-: |"));
+    assert!(delimiter_row("  |---|  "));
+    assert!(!delimiter_row("| --- | x |"));
+    assert!(!delimiter_row("| --- | : |"));
+    assert!(!delimiter_row("---"));
 }
 
 #[test]
@@ -497,12 +514,30 @@ fn a_priority_counts_only_in_the_field_list() {
         first_block("## SEC-05\n\n- Ver: T\n\n```\n- Pri: P1\n```\n"),
         None
     );
+    // A line under a field continues it, so an item after one is still
+    // a field.
+    let lazy = "## SEC-06\n\n- Ver: T\nlazy\n- Pri: P1\n\nText.\n";
+    assert_eq!(
+        first_block(lazy),
+        Some((lazy.to_owned(), "SEC-06".to_owned()))
+    );
 }
 
 #[test]
-fn the_field_list_runs_from_its_first_item_to_a_line_neither_item_nor_indented() {
-    let body = ["", "- Pri: P0", "- Traces: I1,", "  I2", "", "- Text."];
-    assert_eq!(field_list(&body), ["- Pri: P0", "- Traces: I1,", "  I2"]);
+fn the_field_list_runs_from_its_first_item_to_its_first_blank_line() {
+    let body = [
+        "",
+        "- Pri: P0",
+        "- Traces: I1,",
+        "  I2",
+        "I4",
+        "",
+        "- Text.",
+    ];
+    assert_eq!(
+        field_list(&body),
+        ["- Pri: P0", "- Traces: I1,", "  I2", "I4"]
+    );
     assert!(field_list(&["", "Text.", "- Pri: P0"]).is_empty());
     assert!(field_list(&["  - Pri: P0"]).is_empty());
 }

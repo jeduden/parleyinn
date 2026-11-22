@@ -253,7 +253,7 @@ fn first_block(text: &str) -> Option<(String, String)> {
             return None;
         }
         let stop = unfenced(text)
-            .find(|(j, l)| *j > i && ends_block(l))
+            .find(|(j, l)| *j > i && ends_block(l, lines.get(j + 1).copied()))
             .map_or(lines.len(), |(j, _)| j);
         let body = &lines[i + 1..stop];
         let end = body.iter().rposition(|l| !l.trim().is_empty())? + 1;
@@ -270,19 +270,18 @@ fn first_block(text: &str) -> Option<(String, String)> {
 }
 
 /// The lines of a block's field list, as the srs crate reads it: after
-/// any blank lines, an item at the line's start, then each item or
-/// indented line right after it, up to a blank line or any other.
+/// any blank lines, an item at the line's start, then every line up to
+/// the next blank one, as Markdown reads a list item's lines.
 fn field_list<'a>(body: &[&'a str]) -> Vec<&'a str> {
-    let mut out = Vec::new();
-    for line in body.iter().copied().skip_while(|l| l.trim().is_empty()) {
-        let item = line.starts_with("- ");
-        let indented = !out.is_empty() && line.starts_with(' ') && !line.trim().is_empty();
-        if !item && !indented {
-            break;
-        }
-        out.push(line);
+    let mut lines = body
+        .iter()
+        .copied()
+        .skip_while(|l| l.trim().is_empty())
+        .peekable();
+    if !lines.peek().is_some_and(|l| l.starts_with("- ")) {
+        return Vec::new();
     }
-    out
+    lines.take_while(|l| !l.trim().is_empty()).collect()
 }
 
 /// The text of `line` when it is an ATX heading, as the srs crate reads
@@ -293,10 +292,25 @@ fn heading(line: &str) -> Option<&str> {
     ((1..=6).contains(&level) && (rest.is_empty() || rest.starts_with(' '))).then(|| rest.trim())
 }
 
-/// Whether `line`, outside a code fence, ends a block: a heading or a
-/// line of a table.
-fn ends_block(line: &str) -> bool {
-    heading(line).is_some() || line.trim_start().starts_with('|')
+/// Whether `line`, outside a code fence and with `next` under it, ends
+/// a block: a heading, or a pipe row with a delimiter row under it,
+/// which opens a table as the srs crate reads one.
+fn ends_block(line: &str, next: Option<&str>) -> bool {
+    heading(line).is_some()
+        || (line.trim_start().starts_with('|') && next.is_some_and(delimiter_row))
+}
+
+/// Whether `line` is a table's `|---|:--:|` row, as the srs crate reads
+/// one: a pipe row whose every cell holds dashes, with or without a
+/// colon at either end.
+fn delimiter_row(line: &str) -> bool {
+    let Some(row) = line.trim().strip_prefix('|') else {
+        return false;
+    };
+    row.strip_suffix('|').unwrap_or(row).split('|').all(|cell| {
+        let cell = cell.trim().trim_matches(':');
+        !cell.is_empty() && cell.chars().all(|c| c == '-')
+    })
 }
 
 /// Whether `word` is an id the srs crate reads a block under: a
