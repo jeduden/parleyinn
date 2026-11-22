@@ -1,15 +1,22 @@
 use super::*;
 
-const APPENDIX_B: &str = "# B
+const APPENDIX_B: &str = "---
+tags:
+- not an item
+---
+# B
+
+Generated.
+
+- **I1**: REC-01,
+  SEC-08
+- **I10** — Rebuildable: REC-03
 
 | Other | Table |
 |---|---|
 | x | y |
 
-| Invariant | Requirements |
-|---|---|
-| **I1** — Nothing is lost | REC-01, SEC-08 |
-| **I10** — Rebuildable | REC-03 |
+- an item of another list
 
 | Priority | Functional | Engineering |
 |---|---|---|
@@ -43,7 +50,7 @@ fn req(id: &str, priority: &str, traces: &[&str]) -> Requirement {
 }
 
 #[test]
-fn invariant_coverage_reads_the_table() {
+fn invariant_coverage_reads_the_first_list() {
     let got = invariant_coverage(APPENDIX_B).unwrap();
 
     assert_eq!(
@@ -53,31 +60,43 @@ fn invariant_coverage_reads_the_table() {
 }
 
 #[test]
-fn invariant_coverage_rejects_malformed_rows() {
+fn invariant_coverage_rejects_malformed_items() {
     let err = |body: &str| invariant_coverage(body).unwrap_err().to_string();
-    let head = "| Invariant | Requirements |\n|---|---|\n";
 
     assert_eq!(
-        err(&format!("{head}| I1 | REC-01 |\n")),
-        "srs: line 3: malformed invariant row"
+        err("- I1: REC-01\n"),
+        "srs: line 1: malformed invariant item"
     );
     assert_eq!(
-        err(&format!("{head}| **I11** | REC-01 |\n")),
-        "srs: line 3: malformed invariant row"
+        err("- **I11**: REC-01\n"),
+        "srs: line 1: malformed invariant item"
     );
     assert_eq!(
-        err(&format!("{head}| **I1 | REC-01 |\n")),
-        "srs: line 3: malformed invariant row"
+        err("- **I1 REC-01\n"),
+        "srs: line 1: malformed invariant item"
     );
+    assert_eq!(err("- **I1**\n"), "srs: line 1: malformed invariant item");
     assert_eq!(
-        err(&format!("{head}| **I1** |\n")),
-        "srs: line 3: malformed invariant row"
+        err("# B\n\n- **I1**: REC-01\n- **I2**: REC-02,\n  REC-1\n"),
+        r#"srs: line 4: malformed requirement id "REC-1""#
     );
+    assert_eq!(err("no list"), "srs: no invariant coverage list");
+}
+
+#[test]
+fn first_list_joins_an_items_lines_and_stops_at_its_end() {
     assert_eq!(
-        err(&format!("{head}| **I1** | REC-1 |\n")),
-        r#"srs: line 3: malformed requirement id "REC-1""#
+        first_list("# B\n\n  not an item\n- one,\n  two\n- three\n\n- later\n"),
+        [(4, "one, two".to_owned()), (6, "three".to_owned())]
     );
-    assert_eq!(err("no table"), "srs: no invariant coverage table");
+    assert!(first_list("# B\n").is_empty());
+}
+
+#[test]
+fn front_matter_end_skips_only_a_closed_front_matter() {
+    assert_eq!(front_matter_end(&["---", "a: b", "---", "# B"]), 3);
+    assert_eq!(front_matter_end(&["---", "a: b"]), 0);
+    assert_eq!(front_matter_end(&["# B"]), 0);
 }
 
 #[test]

@@ -550,6 +550,22 @@ pub(super) fn line_length_cases() -> Vec<Case> {
     )]
 }
 
+/// The drift Appendix B's gate catches in its list: the item of an
+/// invariant dropping a requirement whose Traces name it.
+pub(super) fn coverage_list_cases() -> Vec<Case> {
+    vec![case(
+        "a requirement dropped from Appendix B's item for I3",
+        "appendix_b_matches_the_traces",
+        Injection::replace(
+            "docs/srs/appendix-b-invariant-coverage.md",
+            "- **I3**: INJ-01, INJ-02, INJ-05,",
+            "- **I3**: INJ-01, INJ-05,",
+        ),
+        cargo_test("srs", "gates", "appendix_b_matches_the_traces"),
+        "for I3, the traces give",
+    )]
+}
+
 /// The drifts mdsmith's schema for the srs kind catches in a
 /// requirement written as a block before the heading of §10.4: each a
 /// shape the srs crate reads, broken.
