@@ -174,6 +174,7 @@ The review's agents MUST have no credential that can approve or write.
 | 10    | sonnet | The commands are a list, word for word; mdsmith passes                                                                                                               |
 | 11    | sonnet | Appendix B is a list, word for word; its gate passes                                                                                                                 |
 | 12    | sonnet | The tools are a list, word for word; RCL-01 passes                                                                                                                   |
+| 13    | sonnet | §6.1 moves to 06a, word for word; SEC-17 passes                                                                                                                      |
 
 ## Phases
 
@@ -222,6 +223,7 @@ footer: |
 |     | ↳      | Appendix B's coverage of the ten invariants is a list, an item per invariant holding its row's requirement ids word for word, wrapped at 80 columns, where each row was padded to 860 characters. The appendix falls from 11,348 bytes in 35 lines to 4,522 in 72. Its gate reads the list. No requirement changes, and no scenario comes off @pending.                                                                                                                                                                                   |
 | 12  | ✅     | [The MCP tools written as a list](phase-12.md)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
 |     | ↳      | The 30 MCP tools of §9.2 are each a list item, word for word as the table held them, their priority, parameters, returns and limits fields under the tool's name, wrapped at 80 columns. The section falls from 46,675 bytes in 245 lines to 23,901 in 393, where each row was padded to 969 characters. The recall scenario reads the list. No requirement changes, and no scenario comes off @pending.                                                                                                                                  |
+| 13  | 🔳     | [§6's threat model in its own file](phase-13.md)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
 <?/catalog?>
 
 ## Acceptance Criteria
