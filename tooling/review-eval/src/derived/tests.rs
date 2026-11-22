@@ -486,6 +486,28 @@ fn a_block_id_is_a_requirement_id_with_two_digits() {
 }
 
 #[test]
+fn a_priority_counts_only_in_the_field_list() {
+    // The srs crate reads a `- Pri:` line after the field list as text,
+    // so the block carries no priority.
+    assert_eq!(
+        first_block("## SEC-04\n\n- Ver: T\n\nText.\n- Pri: P1\n"),
+        None
+    );
+    assert_eq!(
+        first_block("## SEC-05\n\n- Ver: T\n\n```\n- Pri: P1\n```\n"),
+        None
+    );
+}
+
+#[test]
+fn the_field_list_runs_from_its_first_item_to_a_line_neither_item_nor_indented() {
+    let body = ["", "- Pri: P0", "- Traces: I1,", "  I2", "", "- Text."];
+    assert_eq!(field_list(&body), ["- Pri: P0", "- Traces: I1,", "  I2"]);
+    assert!(field_list(&["", "Text.", "- Pri: P0"]).is_empty());
+    assert!(field_list(&["  - Pri: P0"]).is_empty());
+}
+
+#[test]
 fn fence_reads_a_run_of_three_or_more_backticks_or_tildes() {
     assert_eq!(fence("```rust"), Some((b'`', 3)));
     assert_eq!(fence("~~~~"), Some((b'~', 4)));

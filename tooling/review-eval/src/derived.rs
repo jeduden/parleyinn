@@ -240,11 +240,11 @@ fn first_requirement(text: &str) -> Option<(String, String, String)> {
         .min_by_key(|(old, _, _)| text.find(old.as_str()))
 }
 
-/// The first block of a section with a priority, outside a code fence:
-/// its lines from its heading, one that is a requirement id, to its
-/// last line of text before the next heading or table outside a code
-/// fence, and its id. A fence inside a block is part of its text, as
-/// the srs crate reads it.
+/// The first block of a section with a priority in its field list,
+/// outside a code fence: its lines from its heading, one that is a
+/// requirement id, to its last line of text before the next heading or
+/// table outside a code fence, and its id. A fence inside a block is
+/// part of its text, as the srs crate reads it.
 fn first_block(text: &str) -> Option<(String, String)> {
     let lines: Vec<&str> = text.lines().collect();
     unfenced(text).find_map(|(i, line)| {
@@ -257,7 +257,7 @@ fn first_block(text: &str) -> Option<(String, String)> {
             .map_or(lines.len(), |(j, _)| j);
         let body = &lines[i + 1..stop];
         let end = body.iter().rposition(|l| !l.trim().is_empty())? + 1;
-        body[..end]
+        field_list(body)
             .iter()
             .any(|l| l.starts_with("- Pri: P"))
             .then(|| {
@@ -267,6 +267,22 @@ fn first_block(text: &str) -> Option<(String, String)> {
                 )
             })
     })
+}
+
+/// The lines of a block's field list, as the srs crate reads it: after
+/// any blank lines, an item at the line's start, then each item or
+/// indented line right after it, up to a blank line or any other.
+fn field_list<'a>(body: &[&'a str]) -> Vec<&'a str> {
+    let mut out = Vec::new();
+    for line in body.iter().copied().skip_while(|l| l.trim().is_empty()) {
+        let item = line.starts_with("- ");
+        let indented = !out.is_empty() && line.starts_with(' ') && !line.trim().is_empty();
+        if !item && !indented {
+            break;
+        }
+        out.push(line);
+    }
+    out
 }
 
 /// The text of `line` when it is an ATX heading, as the srs crate reads
