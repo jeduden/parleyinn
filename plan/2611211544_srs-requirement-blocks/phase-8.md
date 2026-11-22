@@ -24,6 +24,11 @@ reads OQ-01's item instead, its lines joined by single spaces, and
 speaks of OQ-01, not its row, as does the drift case that drops S6's
 finding from it.
 
+The hub. Its exclusion of compaction guidance said the term appears
+nowhere else, though OQ-02 and OQ-51 record its withdrawal: a breach
+of ENG-35 on main, which the review found in the rewritten lines. The
+hub's row names those two records now.
+
 RED. With the section rewritten and the step not moved, `@ASM-09` fails
 in both its examples: SRS §13 holds no OQ-01 row.
 
